@@ -28,6 +28,7 @@ public class TextCombiner : MonoBehaviour
     public TMP_Text textComponent;
     private Dictionary<string, string> resolvedValues = new Dictionary<string, string>();
     private TMP_FontAsset currentFont;
+    private List<LocalizedString.ChangeHandler> _activeHandlers = new();
 
     void Awake()
     {
@@ -57,11 +58,13 @@ public class TextCombiner : MonoBehaviour
                 {
                     Debug.LogWarning($"TextCombiner [{gameObject.name}]: 条目 {i} 是空的（既无 localizedString 也无文本内容），请检查是否误添加了空 Entry", this);
                 }
+                _activeHandlers.Add(null);
                 continue;
             }
             if (entry.localizedString.IsEmpty)
             {
                 Debug.LogWarning($"TextCombiner [{gameObject.name}]: 条目 {i} 的 localizedString 未配置（Table 或 Key 为空），请检查 Inspector", this);
+                _activeHandlers.Add(null);
                 continue;
             }
             string key = entry.localizedString.TableEntryReference.Key;
@@ -69,7 +72,9 @@ public class TextCombiner : MonoBehaviour
             string tableName = entry.localizedString.TableReference.TableCollectionName;
             Debug.Log($"TextCombiner [{gameObject.name}] 条目 {i}: Table={tableName}, Key={key}, KeyId={keyId}");
 
-            entry.localizedString.StringChanged += (value) => OnEntryUpdated(index, value);
+            LocalizedString.ChangeHandler OnEntryChanged = (value) => OnEntryUpdated(index, value);
+            entry.localizedString.StringChanged += OnEntryChanged;
+            _activeHandlers.Add(OnEntryChanged);
         }
     }
 
@@ -118,11 +123,14 @@ public class TextCombiner : MonoBehaviour
         // 如果是有效的本地化条目，注册回调并刷新
         if (entry.localizedString != null && !entry.localizedString.IsEmpty)
         {
-            entry.localizedString.StringChanged += (value) => OnEntryUpdated(index, value);
+            LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
+            entry.localizedString.StringChanged += handler;
+            _activeHandlers.Add(handler);
             entry.localizedString.RefreshString();
         }
         else
         {
+            _activeHandlers.Add(null);
             // 静态条目直接刷新显示
             UpdateDisplay();
         }
@@ -138,6 +146,7 @@ public class TextCombiner : MonoBehaviour
         var entry = new TextEntry(null, staticText);
         int index = entries.Count;
         entries.Add(entry);
+        _activeHandlers.Add(null);
         // 静态文本不需要注册回调，直接刷新显示
         UpdateDisplay();
     }
@@ -157,9 +166,9 @@ public class TextCombiner : MonoBehaviour
         var entry = entries[index];
 
         // 清理回调
-        if (entry.localizedString != null && !entry.localizedString.IsEmpty)
+        if (entry.localizedString != null && !entry.localizedString.IsEmpty && index < _activeHandlers.Count)
         {
-            entry.localizedString.StringChanged -= null;
+            entry.localizedString.StringChanged -= _activeHandlers[index];
         }
 
         // 清理缓存值
@@ -168,6 +177,8 @@ public class TextCombiner : MonoBehaviour
 
         // 移除条目
         entries.RemoveAt(index);
+        if (index < _activeHandlers.Count)
+            _activeHandlers.RemoveAt(index);
 
         // 重新注册索引 >= index 的条目的回调（因为索引变了）
         RebuildCallbacks();
@@ -181,11 +192,13 @@ public class TextCombiner : MonoBehaviour
     public void ClearAllEntries()
     {
         // 清理所有回调
-        foreach (var entry in entries)
+        for (int i = 0; i < entries.Count; i++)
         {
-            if (entry.localizedString != null)
-                entry.localizedString.StringChanged -= null;
+            var entry = entries[i];
+            if (entry.localizedString != null && i < _activeHandlers.Count && _activeHandlers[i] != null)
+                entry.localizedString.StringChanged -= _activeHandlers[i];
         }
+        _activeHandlers.Clear();
 
         entries.Clear();
         resolvedValues.Clear();
@@ -214,7 +227,9 @@ public class TextCombiner : MonoBehaviour
         // 如果是有效的本地化条目，注册回调并刷新
         if (entry.localizedString != null && !entry.localizedString.IsEmpty)
         {
-            entry.localizedString.StringChanged += (value) => OnEntryUpdated(index, value);
+            LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
+            entry.localizedString.StringChanged += handler;
+            _activeHandlers.Add(handler);
             entry.localizedString.RefreshString();
         }
         else if (!string.IsNullOrEmpty(entry.leadingSeparator))
@@ -257,11 +272,13 @@ public class TextCombiner : MonoBehaviour
     private void RebuildCallbacks()
     {
         // 先清除所有回调
-        foreach (var entry in entries)
+        for (int i = 0; i < entries.Count; i++)
         {
-            if (entry.localizedString != null)
-                entry.localizedString.StringChanged -= null;
+            var entry = entries[i];
+            if (entry.localizedString != null && i < _activeHandlers.Count && _activeHandlers[i] != null)
+                entry.localizedString.StringChanged -= _activeHandlers[i];
         }
+        _activeHandlers.Clear();
 
         resolvedValues.Clear();
 
@@ -272,9 +289,15 @@ public class TextCombiner : MonoBehaviour
             var entry = entries[index];
             if (entry.localizedString != null && !entry.localizedString.IsEmpty)
             {
-                entry.localizedString.StringChanged += (value) => OnEntryUpdated(index, value);
+                LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
+                entry.localizedString.StringChanged += handler;
+                _activeHandlers.Add(handler);
                 // 主动刷新一次获取当前值
                 entry.localizedString.RefreshString();
+            }
+            else
+            {
+                _activeHandlers.Add(null);
             }
         }
     }
@@ -402,10 +425,11 @@ public class TextCombiner : MonoBehaviour
     {
         if (entries != null)
         {
-            foreach (var entry in entries)
+            for (int i = 0; i < entries.Count; i++)
             {
-                if (entry.localizedString != null)
-                    entry.localizedString.StringChanged -= null;
+                var entry = entries[i];
+                if (entry.localizedString != null && i < _activeHandlers.Count && _activeHandlers[i] != null)
+                    entry.localizedString.StringChanged -= _activeHandlers[i];
             }
         }
     }

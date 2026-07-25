@@ -390,6 +390,22 @@ MonoBehaviour:
     m_Localized: Quest
     m_Metadata:
       m_Items: []
+  - m_Id: 24220769647669248
+    m_Localized: Weapon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24220769677029376
+    m_Localized: Artifact
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24220769689612288
+    m_Localized: Food
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24220769689612289
+    m_Localized: Drink
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

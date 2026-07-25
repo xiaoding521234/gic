@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.Localization;
 using UnityEngine.UI;
 
 /// <summary>
@@ -18,6 +17,9 @@ public class UnitDetailPanel : MonoBehaviour, ICardDetailPanel
     public GameObject skillViewPrefab;
     public SkillDetailView skillDetailView;
     public ToggleGroup toggleGroup;
+
+    [Header("标签芯片")]
+    [SerializeField] private GameObject tagChipPrefab;
 
     // 公用字段引用（由 CardDetailView 注入）
     private Image _top;
@@ -78,17 +80,8 @@ public class UnitDetailPanel : MonoBehaviour, ICardDetailPanel
         move.AddEntry(new TextEntry(null, "："));
         move.AddEntry(new TextEntry(null, raw.GetEffectiveMoveSpeed().ToString()));
 
-        // 标签
-        _tags.ClearAllEntries();
-        if (raw.tags is { Length: > 0 })
-        {
-            for (int i = 0; i < raw.tags.Length; i++)
-            {
-                _tags.AddEntry(raw.tags[i].GetEntry());
-                if (i < raw.tags.Length - 1) _tags.AddStaticEntry("·");
-            }
-        }
-        else _tags.AddEntry(new LocalizedString(TableName.UIText.ToString(), "None"));
+        // 标签 — 每个标签生成独立的方形背景芯片
+        RefreshTagChips(card, raw);
 
         // 技能面板
         RefreshSkillsPanel(raw);
@@ -113,6 +106,25 @@ public class UnitDetailPanel : MonoBehaviour, ICardDetailPanel
     public void RebuildLayout()
     {
         // 由 CardDetailView 统一处理
+    }
+
+    private void RefreshTagChips(Card card, UnitConfig.UnitData unitData)
+    {
+        var container = card?.cardDetailView?.tagContainer;
+        if (container == null || tagChipPrefab == null) return;
+
+        // 清除旧芯片
+        foreach (Transform child in container)
+            Destroy(child.gameObject);
+
+        if (unitData.tags is not { Length: > 0 }) return;
+
+        foreach (var tag in unitData.tags)
+        {
+            var chipObj = Instantiate(tagChipPrefab, container);
+            var chip = chipObj.GetComponent<TagChip>();
+            chip?.SetEntry(tag.GetEntry());
+        }
     }
 
     private void RefreshStars(int starLevel)

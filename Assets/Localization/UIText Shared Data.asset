@@ -387,6 +387,22 @@ MonoBehaviour:
     m_Key: Quest
     m_Metadata:
       m_Items: []
+  - m_Id: 24220769647669248
+    m_Key: Weapon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24220769677029376
+    m_Key: Artifact
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24220769689612288
+    m_Key: Food
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24220769689612289
+    m_Key: Drink
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

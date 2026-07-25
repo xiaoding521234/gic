@@ -59,6 +59,9 @@
 - **存档层**: `SaveCardData`（class，持有 `CardId` + `count` + `skin` + `inDecks`）→ `PlayerSaveData.ownedCards`（运行时缓存，合并 `ownedUnits` + `ownedNormalItems` 两个序列化列表）
 - **卡牌显示**: `Card`（MonoBehaviour 容器，`cardType` 为只读派生属性 `=> saveCardData.id.cardType`）→ `ICardViewStrategy`（策略接口，仅处理 Card 本身显示）→ `CardViewStrategyFactory`（按 `CardType` 返回单例策略）
 - **详情面板**: `CardDetailView`（容器，管理公用字段 + 皮肤切换，`cardType` 为只读派生属性 `=> card.cardType`）→ `ICardDetailPanel`（接口）→ `UnitDetailPanel` / `ItemDetailPanel`（子面板，处理类型专属字段）
+  - 角色标签：`TagChip`（方形背景芯片，`TagChip.prefab`），通过 `WrapLayoutGroup`（自动换行布局）排列在 `TagContainer` 中；`UnitDetailPanel.RefreshTagChips()` 按数量动态生成
+  - 物品标签：仅 `ItemDetailPanel.mainTag` 显示 `subType`，描述区域不显示标签
+- **TextCombiner**: 本地化文本组合器（`_Scripts/Tool/Component/`），通过 `LocalizedString.ChangeHandler` 委托注册回调。`_activeHandlers` 列表存储委托引用，`ClearAllEntries()`/`RemoveEntry()`/`OnDestroy()` 通过引用正确 `-=` 取消注册（旧代码用 `-= null` 导致回调泄漏）
 - **分类系统**: `BackpackTab`（7 个背包分页）由 `ICardConfig.GetBackpackTab()` 返回，驱动 `BackpackScreen.BuildDisplayList()` 筛选。角色通过 `UnitType`→`BackpackTab` 映射，物品通过 `ItemSubType`→`BackpackTab` 映射（`ItemSubTypeExtensions.ToBackpackTab()`）。`ItemSubType` 是物品唯一分类枚举（已删除 `ItemTag`），同时也是物品排序键（`SortOrder => (int)subType`）
 - **物品使用**: `IUsable` 接口，`ItemConfig.ItemData` 可选择实现，`ItemDetailPanel` 按需显示使用按钮
 - **对象池**: `CardPool`（`_Scripts/Framework/Pool/`），`BackpackScreen` 使用池获取/归还卡牌，消除全量 destroy/respawn

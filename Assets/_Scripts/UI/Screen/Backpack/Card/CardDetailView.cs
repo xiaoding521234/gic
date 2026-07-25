@@ -14,6 +14,7 @@ public class CardDetailView : MonoBehaviour
     public Image bottomImage;
     public GameObject stars;
     public TextCombiner tags;
+    public Transform tagContainer;
     public TextCombiner description;
     public RectTransform descriptionContent;
     public Button skinButton;
@@ -54,6 +55,10 @@ public class CardDetailView : MonoBehaviour
     {
         if (unitDetailPanel != null) unitDetailPanel.SetActive(type == CardType.Unit);
         if (itemDetailPanel != null) itemDetailPanel.SetActive(type == CardType.Item);
+
+        // 标签显示模式：角色用 tagContainer（方形背景芯片），物品不显示描述区标签
+        if (tags != null) tags.gameObject.SetActive(false);
+        if (tagContainer != null) tagContainer.gameObject.SetActive(type == CardType.Unit);
 
         _activePanel = type switch
         {

@@ -934,6 +934,17 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 296786456}
   m_CullTransparentMesh: 1
+--- !u!114 &341357717 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5096698353069438598, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+  m_PrefabInstance: {fileID: 1113043057591819389}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c40c2d19ed2f0fd4d9bcca35a7fab760, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &388594878
 GameObject:
   m_ObjectHideFlags: 0
@@ -1026,6 +1037,7 @@ MonoBehaviour:
   skillViewPrefab: {fileID: 6462589359584906603, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
   skillDetailView: {fileID: 224878514}
   toggleGroup: {fileID: 1113043057591819392}
+  tagChipPrefab: {fileID: 7091972748805195243, guid: dede696daa770034e91e52d338e97970, type: 3}
 --- !u!1 &637543226
 GameObject:
   m_ObjectHideFlags: 0
@@ -5018,6 +5030,78 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_AllowSwitchOff: 0
+--- !u!1 &1996406837
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 7
+  m_Component:
+  - component: {fileID: 1996406838}
+  - component: {fileID: 1996406839}
+  - component: {fileID: 1996406840}
+  m_Layer: 0
+  m_HasEditorInfo: 1
+  m_Name: TagContainer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &1996406838
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996406837}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1113043057591819393}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 634.21, y: 0}
+  m_Pivot: {x: 0, y: 1}
+--- !u!114 &1996406839
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996406837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_HorizontalFit: 0
+  m_VerticalFit: 2
+--- !u!114 &1996406840
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1996406837}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1399fc44a7aeb3640bc6eda321d1fd3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 4
+    m_Bottom: 4
+  m_ChildAlignment: 0
+  m_Spacing: 6
+  m_LineSpacing: 6
 --- !u!1 &2020413083
 GameObject:
   m_ObjectHideFlags: 0
@@ -5405,6 +5489,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3919539434091472091, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4723939510409306885, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -5437,6 +5525,10 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5573734228871644686, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+      propertyPath: tagContainer
+      value: 
+      objectReference: {fileID: 1996406838}
     - target: {fileID: 5573734228871644686, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
       propertyPath: itemDetailPanel
       value: 
@@ -5551,7 +5643,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 8599321248332531514, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+      insertIndex: 1
+      addedObject: {fileID: 1996406838}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 1609996479016794613, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
       insertIndex: -1
@@ -5587,6 +5682,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2fafe2cfe61f6974895a912c3755e8f1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!224 &1113043057591819393 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 8599321248332531514, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+  m_PrefabInstance: {fileID: 1113043057591819389}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1113043057591819394 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5148455098137002714, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
@@ -5674,17 +5774,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c40c2d19ed2f0fd4d9bcca35a7fab760, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &1113043057591819403 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5096698353069438598, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
-  m_PrefabInstance: {fileID: 1113043057591819389}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c40c2d19ed2f0fd4d9bcca35a7fab760, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1113043057591819404 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1609996479016794613, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
@@ -5714,7 +5803,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   itemImage: {fileID: 1113043057591819405}
-  mainTag: {fileID: 1113043057591819403}
+  mainTag: {fileID: 341357717}
   composition: {fileID: 1113043057591819402}
   maxPrepareCount: {fileID: 1113043057591819401}
   useButton: {fileID: 0}

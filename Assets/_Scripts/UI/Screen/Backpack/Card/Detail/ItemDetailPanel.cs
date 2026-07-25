@@ -26,7 +26,6 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
     private Image _bottomImage;
     private GameObject _stars;
     private TextCombiner _cardName;
-    private TextCombiner _tags;
     private TextCombiner _description;
 
     /// <summary>
@@ -39,7 +38,6 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
         _bottomImage = bottomImage;
         _stars = stars;
         _cardName = cardName;
-        _tags = tags;
         _description = description;
     }
 
@@ -83,10 +81,6 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
         maxPrepareCount.AddEntry(new LocalizedString(TableName.UIText.ToString(), "MaxPrepareCount"));
         maxPrepareCount.AddStaticEntry("：");
         maxPrepareCount.AddStaticEntry(raw.maxPrepareCount.ToString());
-
-        // 标签
-        _tags.ClearAllEntries();
-        _tags.AddEntry(raw.subType.GetEntry());
 
         // 描述
         _description.ClearAllEntries();
