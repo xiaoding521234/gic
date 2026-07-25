@@ -63,10 +63,7 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
 
         // 主标签
         mainTag.ClearAllEntries();
-        if (raw.tags is { Length: > 0 })
-            mainTag.AddEntry(raw.tags[0].GetEntry());
-        else
-            mainTag.AddEntry(new LocalizedString(TableName.UIText.ToString(), "None"));
+        mainTag.AddEntry(raw.subType.GetEntry());
 
         // 元素构成
         composition.ClearAllEntries();
@@ -89,15 +86,7 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
 
         // 标签
         _tags.ClearAllEntries();
-        if (raw.tags is { Length: > 0 })
-        {
-            for (int i = 0; i < raw.tags.Length; i++)
-            {
-                _tags.AddEntry(raw.tags[i].GetEntry());
-                if (i < raw.tags.Length - 1) _tags.AddStaticEntry("·");
-            }
-        }
-        else _tags.AddEntry(new LocalizedString(TableName.UIText.ToString(), "None"));
+        _tags.AddEntry(raw.subType.GetEntry());
 
         // 描述
         _description.ClearAllEntries();

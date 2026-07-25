@@ -56,10 +56,10 @@
 ### 卡牌/背包架构 (`_Scripts/Battle/Card/` + `_Scripts/UI/Screen/Backpack/`)
 
 - **数据层**: `CardId`（struct，统一标识角色/物品）→ `ICardConfig`（接口，统一配置查询）→ `CardConfigAdapter`（适配器，委托到 `UnitConfig`/`ItemConfig`）→ `CardConfigResolver`（静态注册表，按 `CardId` 返回适配器）
-- **存档层**: `SaveCardData`（class，持有 `CardId` + `count` + `skin` + `inDecks`）→ `PlayerSaveData.ownedCards`（统一列表，合并角色/普通物品/珍贵物品）
-- **卡牌显示**: `Card`（MonoBehaviour 容器，保留公用字段 + 类型显示字段）→ `ICardViewStrategy`（策略接口，仅处理 Card 本身显示）→ `CardViewStrategyFactory`（按 `CardType` 返回单例策略）
-- **详情面板**: `CardDetailView`（容器，管理公用字段 + 皮肤切换）→ `ICardDetailPanel`（接口）→ `UnitDetailPanel` / `ItemDetailPanel`（子面板，挂在 NameCard / ItemImage 上，处理类型专属字段）
-- **分类系统**: 统一使用 `Category` 枚举（Character/CommonItem/PreciousItem），`ICardConfig.GetCategory()` 返回分类，`BackpackScreen.BuildDisplayList()` 数据驱动筛选
+- **存档层**: `SaveCardData`（class，持有 `CardId` + `count` + `skin` + `inDecks`）→ `PlayerSaveData.ownedCards`（运行时缓存，合并 `ownedUnits` + `ownedNormalItems` 两个序列化列表）
+- **卡牌显示**: `Card`（MonoBehaviour 容器，`cardType` 为只读派生属性 `=> saveCardData.id.cardType`）→ `ICardViewStrategy`（策略接口，仅处理 Card 本身显示）→ `CardViewStrategyFactory`（按 `CardType` 返回单例策略）
+- **详情面板**: `CardDetailView`（容器，管理公用字段 + 皮肤切换，`cardType` 为只读派生属性 `=> card.cardType`）→ `ICardDetailPanel`（接口）→ `UnitDetailPanel` / `ItemDetailPanel`（子面板，处理类型专属字段）
+- **分类系统**: `BackpackTab`（7 个背包分页）由 `ICardConfig.GetBackpackTab()` 返回，驱动 `BackpackScreen.BuildDisplayList()` 筛选。角色通过 `UnitType`→`BackpackTab` 映射，物品通过 `ItemSubType`→`BackpackTab` 映射（`ItemSubTypeExtensions.ToBackpackTab()`）。`ItemSubType` 是物品唯一分类枚举（已删除 `ItemTag`），同时也是物品排序键（`SortOrder => (int)subType`）
 - **物品使用**: `IUsable` 接口，`ItemConfig.ItemData` 可选择实现，`ItemDetailPanel` 按需显示使用按钮
 - **对象池**: `CardPool`（`_Scripts/Framework/Pool/`），`BackpackScreen` 使用池获取/归还卡牌，消除全量 destroy/respawn
 

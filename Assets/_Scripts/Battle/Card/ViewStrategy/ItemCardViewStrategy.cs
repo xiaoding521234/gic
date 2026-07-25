@@ -7,8 +7,6 @@ public class ItemCardViewStrategy : ICardViewStrategy
 {
     public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
     {
-        card.cardType = CardType.Item;
-
         var cfg = data.Config;
         if (cfg != null)
         {

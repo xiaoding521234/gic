@@ -44,8 +44,8 @@ public readonly struct ItemConfigAdapter : ICardConfig
     public int StarLevel => _d?.starLevel ?? 0;
 
     public int SortOrder =>
-        _d?.tags != null && _d.tags.Length > 0
-            ? (int)_d.tags[0]
+        _d != null
+            ? (int)_d.subType
             : int.MaxValue;
 
     public BackpackTab GetBackpackTab() => _d?.subType.ToBackpackTab() ?? BackpackTab.Material;
@@ -57,7 +57,7 @@ public readonly struct ItemConfigAdapter : ICardConfig
     public Sprite GetSprite(int index)        => _d?.GetIcon(index);
     public int    GetTotalSkins()              => _d?.icon?.Count ?? 0;
 
-    public int      GetTagCount()           => _d?.tags?.Length ?? 0;
-    public TextEntry GetTagEntry(int index) => _d?.tags?[index].GetEntry();
+    public int      GetTagCount()           => 1;
+    public TextEntry GetTagEntry(int index) => _d?.subType.GetEntry();
     public Color    GetStarColor()          => StarColor.GetStarColor(_d?.starLevel ?? 0);
 }

@@ -6,8 +6,7 @@ using UnityEngine.UI;
 
 public class Card : MonoBehaviour
 {
-    [Header("公用")]
-    public CardType cardType = CardType.Item;
+    public CardType cardType => saveCardData?.id.cardType ?? CardType.Item;
     public ViewType viewType = ViewType.Display;
     public bool isEditMode = false;
 
@@ -70,7 +69,6 @@ public class Card : MonoBehaviour
     public void Init(SaveCardData data, CardDetailView detailView)
     {
         saveCardData = data;
-        cardType = data.id.cardType;
         _strategy = CardViewStrategyFactory.Get(cardType);
         _strategy?.InitCardDisplay(this, data, detailView);
     }

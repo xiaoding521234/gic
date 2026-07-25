@@ -241,13 +241,9 @@ public class SaveManager : IWargameManager
         itemConfig.BuildCache();
         var allItems = itemConfig.GetAllItems();
 
-        // 构建已拥有物品的ID集合（普通+珍贵）
+        // 构建已拥有物品的ID集合
         var ownedItemIds = new HashSet<int>();
         foreach (var card in CurrentSave.ownedNormalItems)
-        {
-            ownedItemIds.Add(card.id.value);
-        }
-        foreach (var card in CurrentSave.ownedValuableItems)
         {
             ownedItemIds.Add(card.id.value);
         }
@@ -280,7 +276,6 @@ public class SaveManager : IWargameManager
     {
         SortUnits();
         SortItems(CurrentSave.ownedNormalItems);
-        SortItems(CurrentSave.ownedValuableItems);
     }
 
     /// <summary>

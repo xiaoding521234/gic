@@ -27,9 +27,6 @@ public class ItemConfig : ScriptableObject
         [Header("元素构成")]
         public Element[] elements;
 
-        [Header("物品标签")]
-        public ItemTag[] tags;
-
         [Header("物品子类型")]
         public ItemSubType subType = ItemSubType.Material;
 
@@ -54,42 +51,6 @@ public class ItemConfig : ScriptableObject
         [SerializeField] public ItemParam[] customParams;
 
         // 删除 description 字段，改用本地化
-
-        /// <summary>
-        /// 获取物品标签的显示名称列表（本地化）
-        /// </summary>
-        public List<TextEntry> GetTagsEntries()
-        {
-            var entries = new List<TextEntry>();
-            if (tags == null || tags.Length == 0)
-            {
-                entries.Add(new TextEntry(null, "无"));
-                return entries;
-            }
-
-            for (int i = 0; i < tags.Length; i++)
-            {
-                entries.Add(tags[i].GetEntry());
-                if (i < tags.Length - 1)
-                {
-                    entries.Add(new TextEntry(null, " "));
-                }
-            }
-            return entries;
-        }
-
-        /// <summary>
-        /// 判断是否有指定标签
-        /// </summary>
-        public bool HasTag(ItemTag tag)
-        {
-            if (tags == null) return false;
-            foreach (var t in tags)
-            {
-                if (t == tag) return true;
-            }
-            return false;
-        }
 
         /// <summary>
         /// 获取整数参数
@@ -212,32 +173,6 @@ public class ItemConfig : ScriptableObject
     {
         if (dataCache == null) BuildCache();
         return new List<ItemData>(dataCache.Values);
-    }
-
-    public List<ItemData> GetItemsByTag(ItemTag tag)
-    {
-        if (dataCache == null) BuildCache();
-
-        var result = new List<ItemData>();
-        foreach (var data in dataCache.Values)
-        {
-            if (data.HasTag(tag))
-                result.Add(data);
-        }
-        return result;
-    }
-
-    public List<ItemData> GetItemsBySubType(ItemSubType subType)
-    {
-        if (dataCache == null) BuildCache();
-
-        var result = new List<ItemData>();
-        foreach (var data in dataCache.Values)
-        {
-            if (data.subType == subType)
-                result.Add(data);
-        }
-        return result;
     }
 
     public List<ItemData> GetItemsByStarLevel(int starLevel)

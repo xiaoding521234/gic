@@ -7,8 +7,7 @@ using UnityEngine.UI;
 /// </summary>
 public class CardDetailView : MonoBehaviour
 {
-    [Header("公用")]
-    public CardType cardType = CardType.Unit;
+    public CardType cardType => card?.cardType ?? CardType.Unit;
     public Card card;
     public Image top;
     public TextCombiner cardName;
@@ -41,7 +40,6 @@ public class CardDetailView : MonoBehaviour
     public void Init(Card c)
     {
         card = c;
-        cardType = c.cardType;
         _strategy = CardViewStrategyFactory.Get(cardType);
 
         // 切换子面板

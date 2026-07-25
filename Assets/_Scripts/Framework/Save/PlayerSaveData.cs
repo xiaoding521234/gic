@@ -14,12 +14,11 @@ public class PlayerSaveData
 
     // 卡片相关
     public List<SaveCardData> ownedUnits = new List<SaveCardData>();        // 已拥有的角色
-    public List<SaveCardData> ownedNormalItems = new List<SaveCardData>();  // 已拥有的普通物品
-    public List<SaveCardData> ownedValuableItems = new List<SaveCardData>(); // 已拥有的珍贵物品
+    public List<SaveCardData> ownedNormalItems = new List<SaveCardData>();  // 已拥有的物品
     public int currentDeck = 0;
 
     /// <summary>
-    /// 统一拥有卡牌列表（运行时合并 ownedUnits + ownedNormalItems + ownedValuableItems）
+    /// 统一拥有卡牌列表（运行时合并 ownedUnits + ownedNormalItems）
     /// </summary>
     [NonSerialized] private List<SaveCardData> _ownedCards;
     public List<SaveCardData> ownedCards
@@ -31,7 +30,6 @@ public class PlayerSaveData
                 _ownedCards = new List<SaveCardData>();
                 _ownedCards.AddRange(ownedUnits);
                 _ownedCards.AddRange(ownedNormalItems);
-                _ownedCards.AddRange(ownedValuableItems);
             }
             return _ownedCards;
         }
@@ -139,7 +137,7 @@ public class PlayerSaveData
         ownedUnits[10].AddToDeck(3);  // Kirara
         ownedUnits[11].AddToDeck(3);  // Gorou
         ownedUnits[12].AddToDeck(3);  // Mizuki
-        // ==================== 珍贵物品 ====================
+        // ==================== 货币/珍贵物品 ====================
 
         List<ItemName> valuableItemList = new List<ItemName>
         {
@@ -149,6 +147,8 @@ public class PlayerSaveData
             ItemName.Magatama,
             ItemName.Primogem
         };
+
+        int valuableStartIndex = ownedNormalItems.Count;
 
         valuableItemList.ForEach(itemID =>
         {
@@ -164,12 +164,13 @@ public class PlayerSaveData
                 _ => 1
             };
             cardData.SaveItem(itemID, count);
-            ownedValuableItems.Add(cardData);
+            ownedNormalItems.Add(cardData);
         });
 
         // 纠缠之缘和体力加入卡组1
-        ownedValuableItems[1].AddToDeck(0);  // IntertwinedFate
-        ownedValuableItems[2].AddToDeck(0);  // Stamina
+        ownedNormalItems[valuableStartIndex + 1].AddToDeck(0);  // IntertwinedFate
+        ownedNormalItems[valuableStartIndex + 2].AddToDeck(0);  // Stamina
+
         // ==================== 普通物品 ====================
 
         List<ItemName> itemList = new List<ItemName>

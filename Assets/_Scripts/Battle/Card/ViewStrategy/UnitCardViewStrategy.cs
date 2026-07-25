@@ -7,8 +7,6 @@ public class UnitCardViewStrategy : ICardViewStrategy
 {
     public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
     {
-        card.cardType = CardType.Unit;
-
         var raw = CardConfigResolver.UnitConfig?.GetUnitData(data.id.AsUnitName());
         if (raw != null)
         {

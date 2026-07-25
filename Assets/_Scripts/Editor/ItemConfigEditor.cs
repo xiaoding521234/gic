@@ -28,14 +28,14 @@ public class ItemConfigEditor : Editor
             var element = listProperty.GetArrayElementAtIndex(index);
             var itemIDProperty = element.FindPropertyRelative("itemID");
             var starLevelProperty = element.FindPropertyRelative("starLevel");
-            var tagsProperty = element.FindPropertyRelative("tags");
+            var subTypeProperty = element.FindPropertyRelative("subType");
 
             var itemIDValue = (ItemName)itemIDProperty.intValue;
             var starLevel = starLevelProperty.intValue;
 
             string displayName = itemIDValue.GetInspectorName();
             string starIcons = new string('★', starLevel);
-            string firstTag = GetFirstTagDisplayName(tagsProperty);
+            string firstTag = GetSubTypeDisplayName(subTypeProperty);
 
             string title = $"[{firstTag}] {displayName} {starIcons}";
 
@@ -253,16 +253,15 @@ public class ItemConfigEditor : Editor
         }
     }
 
-    private string GetFirstTagDisplayName(SerializedProperty tagsProperty)
+    private string GetSubTypeDisplayName(SerializedProperty subTypeProperty)
     {
-        if (tagsProperty == null || tagsProperty.arraySize == 0)
+        if (subTypeProperty == null)
             return "无";
 
-        var firstTag = tagsProperty.GetArrayElementAtIndex(0);
-        int enumIndex = firstTag.enumValueIndex;
-        var enumValues = Enum.GetValues(typeof(ItemTag));
-        var tagValue = (ItemTag)enumValues.GetValue(enumIndex);
-        return tagValue.GetInspectorName();
+        int enumIndex = subTypeProperty.enumValueIndex;
+        var enumValues = Enum.GetValues(typeof(ItemSubType));
+        var subTypeValue = (ItemSubType)enumValues.GetValue(enumIndex);
+        return subTypeValue.GetInspectorName();
     }
 }
 

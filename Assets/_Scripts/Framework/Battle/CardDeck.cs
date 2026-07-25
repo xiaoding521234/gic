@@ -69,7 +69,6 @@ public class CardDeck
         var all = new List<SaveCardData>();
         all.AddRange(save.ownedUnits);
         all.AddRange(save.ownedNormalItems);
-        all.AddRange(save.ownedValuableItems);
 
         foreach (var card in all)
         {
