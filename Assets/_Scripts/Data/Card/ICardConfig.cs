@@ -9,7 +9,7 @@ public interface ICardConfig
 {
     int                  StarLevel         { get; }
     int                  SortOrder         { get; }   // 主排序键
-    Category             GetCategory();              // 背包分类
+    BackpackTab          GetBackpackTab();           // 背包分页
     TextEntry            GetNameEntry();
     TextEntry            GetDescriptionEntry();
     IReadOnlyList<Sprite> GetSprites();

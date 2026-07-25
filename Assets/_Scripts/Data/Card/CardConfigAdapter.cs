@@ -18,7 +18,11 @@ public readonly struct UnitConfigAdapter : ICardConfig
             ? (int)_d.factions[0]
             : int.MaxValue;
 
-    public Category GetCategory() => Category.Character;
+    public BackpackTab GetBackpackTab() => _d?.unitType switch
+    {
+        UnitType.Creation => BackpackTab.Creation,
+        _ => BackpackTab.Character,
+    };
 
     public TextEntry GetNameEntry()        => _d?.GetNameEntry();
     public TextEntry GetDescriptionEntry() => _d?.GetDescriptionEntry();
@@ -44,7 +48,7 @@ public readonly struct ItemConfigAdapter : ICardConfig
             ? (int)_d.tags[0]
             : int.MaxValue;
 
-    public Category GetCategory() => _d?.category ?? Category.CommonItem;
+    public BackpackTab GetBackpackTab() => _d?.subType.ToBackpackTab() ?? BackpackTab.Material;
 
     public TextEntry GetNameEntry()        => _d?.itemID.GetEntry();
     public TextEntry GetDescriptionEntry() => _d?.GetDescriptionEntry();

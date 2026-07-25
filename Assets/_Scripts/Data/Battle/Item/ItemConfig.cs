@@ -30,8 +30,8 @@ public class ItemConfig : ScriptableObject
         [Header("物品标签")]
         public ItemTag[] tags;
 
-        [Header("物品类别")]
-        public Category category = Category.CommonItem;
+        [Header("物品子类型")]
+        public ItemSubType subType = ItemSubType.Material;
 
         [Header("堆叠")]
         public int maxStack = 9999;
@@ -133,11 +133,11 @@ public class ItemConfig : ScriptableObject
         }
 
         /// <summary>
-        /// 获取物品类别的 Entry（用于 TextCombiner）
+        /// 获取物品子类型的 Entry（用于 TextCombiner）
         /// </summary>
         public TextEntry GetCategoryEntry()
         {
-            return category.GetEntry();
+            return subType.GetEntry();
         }
 
         #endregion
@@ -227,14 +227,14 @@ public class ItemConfig : ScriptableObject
         return result;
     }
 
-    public List<ItemData> GetItemsByCategory(Category category)
+    public List<ItemData> GetItemsBySubType(ItemSubType subType)
     {
         if (dataCache == null) BuildCache();
 
         var result = new List<ItemData>();
         foreach (var data in dataCache.Values)
         {
-            if (data.category == category)
+            if (data.subType == subType)
                 result.Add(data);
         }
         return result;

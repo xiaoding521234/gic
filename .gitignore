@@ -7,10 +7,13 @@
 /[Ll]ogs/
 /[Uu]serSettings/
 
-# Codely
+# Codely / Claude
 .codely-cli/
 .codely/
+.codely.packages/
+.claude/
 .com-unity-codely.json
+.codelyignore
 
 # IDE
 .vscode/
@@ -28,8 +31,7 @@ Thumbs.db
 screenshots/
 mem-log/
 
-# Misc
+# Build artifacts
 *.apk
 *.aab
 *.unitypackage
-.codelyignore

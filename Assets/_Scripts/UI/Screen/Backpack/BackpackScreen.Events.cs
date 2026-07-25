@@ -10,7 +10,7 @@ public partial class BackpackScreen
         public bool CanHandle(OnBackpackCategoryChangedEvent evt)
             => _screen != null && _screen.gameObject.activeInHierarchy;
         public void Handle(OnBackpackCategoryChangedEvent evt)
-            => _screen.SetCategory(evt.Category, isInit: false);
+            => _screen.SetCategory(evt.Tab, isInit: false);
     }
 
     private class DeckChangedHandler : IEventHandler<OnDeckChangedEvent>

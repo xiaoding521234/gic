@@ -44,7 +44,7 @@ public partial class BackpackScreen : MonoBehaviour
     [SerializeField] private float panelSlideOffset = 100f;
     [SerializeField] private float buttonSlideOffset = 80f;
 
-    private Category currentCategory = Category.Character;
+    private BackpackTab currentTab = BackpackTab.Character;
     private int currentDeckId;
     private HashSet<SaveCardData> currentDeckCards = new();
     private List<Card> spawnedCards = new();
@@ -95,7 +95,7 @@ public partial class BackpackScreen : MonoBehaviour
 
         _cardPool = new CardPool(cardPrefab, cardContent.transform);
 
-        SetCategory(Category.Character, isInit: true);
+        SetCategory(BackpackTab.Character, isInit: true);
         RefreshCurrentDeckCache();
 
         SetPanelsOffScreen();

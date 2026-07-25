@@ -5,32 +5,41 @@ using UnityEngine.Localization;
 
 public partial class BackpackScreen
 {
-    private static readonly Category[] CategoryOrder = { Category.Character, Category.CommonItem, Category.PreciousItem };
+    private static readonly BackpackTab[] TabOrder =
+    {
+        BackpackTab.Character,
+        BackpackTab.Creation,
+        BackpackTab.Equipment,
+        BackpackTab.Consumable,
+        BackpackTab.Material,
+        BackpackTab.Currency,
+        BackpackTab.Quest,
+    };
 
     private void OnPreviousCategory()
     {
-        int idx = Array.IndexOf(CategoryOrder, currentCategory);
-        SetCategory(CategoryOrder[(idx - 1 + CategoryOrder.Length) % CategoryOrder.Length], isInit: false);
+        int idx = Array.IndexOf(TabOrder, currentTab);
+        SetCategory(TabOrder[(idx - 1 + TabOrder.Length) % TabOrder.Length], isInit: false);
     }
 
     private void OnNextCategory()
     {
-        int idx = Array.IndexOf(CategoryOrder, currentCategory);
-        SetCategory(CategoryOrder[(idx + 1) % CategoryOrder.Length], isInit: false);
+        int idx = Array.IndexOf(TabOrder, currentTab);
+        SetCategory(TabOrder[(idx + 1) % TabOrder.Length], isInit: false);
     }
 
-    private void SetCategory(Category newCategory, bool isInit)
+    private void SetCategory(BackpackTab newTab, bool isInit)
     {
-        if (currentCategory == newCategory && !isInit) return;
-        currentCategory = newCategory;
+        if (currentTab == newTab && !isInit) return;
+        currentTab = newTab;
 
         if (categoryText != null)
         {
             categoryText.ClearAllEntries();
-            categoryText.AddEntry(new LocalizedString(TableName.UIText.ToString(), newCategory.ToString()));
+            categoryText.AddEntry(new LocalizedString(TableName.UIText.ToString(), newTab.ToString()));
         }
 
-        EventBusHub.Instance.Publish(new OnBackpackCategorySyncEvent { Category = newCategory });
+        EventBusHub.Instance.Publish(new OnBackpackCategorySyncEvent { Tab = newTab });
 
         if (!isInit) RefreshCardList();
     }

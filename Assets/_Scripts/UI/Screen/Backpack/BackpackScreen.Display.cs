@@ -33,7 +33,7 @@ public partial class BackpackScreen
         foreach (var card in saveManager.CurrentSave.ownedCards)
         {
             if (!added.Add(card)) continue;
-            if (card.Config?.GetCategory() != currentCategory) continue;
+            if (card.Config?.GetBackpackTab() != currentTab) continue;
             if (IsHidden(card)) continue;
             result.Add(card);
         }

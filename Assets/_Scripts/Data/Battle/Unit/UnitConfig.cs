@@ -123,9 +123,9 @@ public class UnitConfig : ScriptableObject
         public bool IsCreation => unitType == UnitType.Creation;
 
         /// <summary>
-        /// 是否为交互单位
+        /// 是否为造物（原 Interactive 已合并到 Creation）
         /// </summary>
-        public bool IsInteractive => unitType == UnitType.Interactive;
+        public bool IsInteractive => unitType == UnitType.Creation;
 
         public Sprite GetCard(int skin)
         {

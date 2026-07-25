@@ -10,10 +10,7 @@ public enum UnitType
     Character = 1,      // 可操控的角色
 
     [InspectorName("造物")]
-    Creation = 2,       // 元素造物
-
-    [InspectorName("交互")]
-    Interactive = 3,    // 宝箱，资源点，机关等
+    Creation = 2,       // 元素造物、建筑、场景交互物
 }
 
 /// <summary>

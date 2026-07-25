@@ -261,16 +261,10 @@ public class SaveManager : IWargameManager
                 var newCard = new SaveCardData();
                 newCard.SaveItem(itemData.itemID, 0);
 
-                if (itemData.category == Category.PreciousItem)
-                {
-                    CurrentSave.ownedValuableItems.Add(newCard);
-                }
-                else
-                {
-                    CurrentSave.ownedNormalItems.Add(newCard);
-                }
+                CurrentSave.ownedNormalItems.Add(newCard);
+                CurrentSave.RebuildOwnedCards();
 
-                Debug.Log($"补充缺失物品: {itemData.itemID.GetInspectorName()} (count=0, category={itemData.category})");
+                Debug.Log($"补充缺失物品: {itemData.itemID.GetInspectorName()} (count=0, subType={itemData.subType})");
             }
         }
     }

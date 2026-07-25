@@ -31,19 +31,19 @@ namespace LocalEvents
     }
 
     /// <summary>
-    /// 背包类别切换事件（ItemCategoryView → BackpackScreen）
+    /// 背包分页切换事件（ItemCategoryView → BackpackScreen）
     /// </summary>
     public class OnBackpackCategoryChangedEvent : BaseEvent
     {
-        public Category Category;
+        public BackpackTab Tab;
     }
 
     /// <summary>
-    /// 请求同步类别Toggle（BackpackScreen → ItemCategoryView）
+    /// 请求同步分页Toggle（BackpackScreen → ItemCategoryView）
     /// </summary>
     public class OnBackpackCategorySyncEvent : BaseEvent
     {
-        public Category Category;
+        public BackpackTab Tab;
     }
 
     /// <summary>
