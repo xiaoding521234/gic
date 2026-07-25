@@ -1,0 +1,150 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bccbdb560996fe4ebb55c5da093fcea, type: 3}
+  m_Name: PositionConfig
+  m_EditorClassIdentifier: 
+  mapDataList:
+  - position: 1001
+    region: 1
+    taskNames: []
+    audioPrefix: lempo_isle
+    dayAudios:
+      clips:
+      - clip: {fileID: 8300000, guid: 02fa13602f58a8c4f87645ca89ce5cd6, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: ce6dd4ebe8b391c42a56605c8b7e5478, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 6b30eb217fef3f445ad17aa232306fce, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: f8aebddeaa2f99942836647da9a85bc7, type: 3}
+        weight: 1
+    nightAudios:
+      clips:
+      - clip: {fileID: 8300000, guid: ba0a099b077f6b14cb0f149ba993e2bb, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: e58ce596b9648de478fbc62c6323e5e9, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 0234d75e79dbb4844b4cd1a1bd52572f, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: cfe1d1535b1a31b4b996d5e2301e417d, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 6bc15c36351399143a507bb14c7a7545, type: 3}
+        weight: 1
+    isUnlocked: 1
+  - position: 1002
+    region: 1
+    taskNames: []
+    audioPrefix: lempo_isle
+    dayAudios:
+      clips:
+      - clip: {fileID: 8300000, guid: 02fa13602f58a8c4f87645ca89ce5cd6, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: ce6dd4ebe8b391c42a56605c8b7e5478, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 6b30eb217fef3f445ad17aa232306fce, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: f8aebddeaa2f99942836647da9a85bc7, type: 3}
+        weight: 1
+    nightAudios:
+      clips:
+      - clip: {fileID: 8300000, guid: ba0a099b077f6b14cb0f149ba993e2bb, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: e58ce596b9648de478fbc62c6323e5e9, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 0234d75e79dbb4844b4cd1a1bd52572f, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: cfe1d1535b1a31b4b996d5e2301e417d, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 6bc15c36351399143a507bb14c7a7545, type: 3}
+        weight: 1
+    isUnlocked: 1
+  - position: 1003
+    region: 1
+    taskNames: []
+    audioPrefix: nasha_town
+    dayAudios:
+      clips:
+      - clip: {fileID: 8300000, guid: e24b089a3b7420748a07900903b2da77, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 13b50d8d0d8f5a04da0416e8eae19786, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 9f2811507fc86e5408042342dc43cb35, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 0a97308a0170cd24cbf47a30a173dd4d, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: b9ee06c26dab1404d8ab371a5dc1a3d4, type: 3}
+        weight: 1
+    nightAudios:
+      clips:
+      - clip: {fileID: 8300000, guid: f500418a6a45b2241a35b42796a7702b, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: d463315a3b6e025419586fd383fac5c6, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: a274cbd7bd91063488da79512967fd2c, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 545e4b093b779a94eba344ae08ddb226, type: 3}
+        weight: 1
+    isUnlocked: 1
+  - position: 2001
+    region: 2
+    taskNames: []
+    audioPrefix: 
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 1
+  - position: 2002
+    region: 2
+    taskNames: []
+    audioPrefix: 
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 0
+  - position: 2003
+    region: 2
+    taskNames: []
+    audioPrefix: 
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 0
+  - position: 2004
+    region: 2
+    taskNames: []
+    audioPrefix: 
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 0
+  - position: 2005
+    region: 2
+    taskNames: []
+    audioPrefix: 
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 0
+  - position: 2006
+    region: 2
+    taskNames: []
+    audioPrefix: 
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 0

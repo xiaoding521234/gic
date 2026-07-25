@@ -1,0 +1,183 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: SkillName_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: 3f90a1f5beae5c742a501a6981b0bd89, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 3097808678912
+    m_Localized: None
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1
+    m_Localized: Walk
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2
+    m_Localized: Fly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001001
+    m_Localized: Time
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001002
+    m_Localized: Space
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001005
+    m_Localized: Paimon's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001001
+    m_Localized: Fiery Rain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001002
+    m_Localized: Precise Shot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001003
+    m_Localized: Everywhere Outrider
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001004
+    m_Localized: Gliding Champion
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001005
+    m_Localized: Amber's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002001
+    m_Localized: Frostgnaw
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002002
+    m_Localized: Glacial Waltz
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002003
+    m_Localized: Hidden Strength
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002004
+    m_Localized: Cold-Blooded Strike
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002005
+    m_Localized: Kaeya's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003001
+    m_Localized: Shining Miracle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003002
+    m_Localized: Let the Show Begin
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003003
+    m_Localized: That's What I Like
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003005
+    m_Localized: Barbara's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004001
+    m_Localized: Violet Arc
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004002
+    m_Localized: Lightning Rose
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004003
+    m_Localized: Rose Mark
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004004
+    m_Localized: Pulsing Witch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004005
+    m_Localized: Lisa's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006001
+    m_Localized: Searing Onslaught
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006002
+    m_Localized: Dawn
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006003
+    m_Localized: Tradition of Dawn
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006004
+    m_Localized: Judgment
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006005
+    m_Localized: Diluc's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008001
+    m_Localized: Wind's Ode
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008002
+    m_Localized: Wind's Grand Ode
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008003
+    m_Localized: Skyward Sonnet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008004
+    m_Localized: Embrace of Winds
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008005
+    m_Localized: Venti's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002001
+    m_Localized: Gust Surge
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002002
+    m_Localized: Teyvat Fried Egg
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002003
+    m_Localized: Starward Wind
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002004
+    m_Localized: Sweet Madame
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002005
+    m_Localized: Aether's Constellation
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

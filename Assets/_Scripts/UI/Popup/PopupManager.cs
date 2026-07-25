@@ -1,0 +1,33 @@
+using UnityEngine;
+
+public class PopupManager : MonoBehaviour
+{
+    public GameObject popupPrefab;
+
+
+    private void Awake()
+    {
+        
+    }
+
+
+    public void ShowPopup(string message)
+    {
+        if (popupPrefab == null)
+        {
+            Debug.LogError("PopupManager: popupPrefab 未设置");
+            return;
+        }
+
+        var instance = Instantiate(popupPrefab, transform);
+        var dialog = instance.GetComponent<PopupDialog>();
+        if (dialog != null)
+        {
+            dialog.Init(message);
+        }
+        else
+        {
+            Debug.LogError("PopupManager: popupPrefab 上未找到 PopupDialog 组件");
+        }
+    }
+}

@@ -1,0 +1,267 @@
+using UnityEngine;
+using System;
+using System.Collections.Generic;
+using UnityEngine.Localization;
+
+/// <summary>
+/// 物品配置 - 支持多个物品数据
+/// </summary>
+[CreateAssetMenu(fileName = "ItemConfig", menuName = "Game/ItemConfig")]
+public class ItemConfig : ScriptableObject
+{
+    [Serializable]
+    public class ItemData
+    {
+        [SerializeField] private bool _isInitialized = false;
+
+        [Header("物品标识")]
+        public ItemName itemID;
+
+        [Header("基础信息")]
+        public List<Sprite> icon;
+
+        [Header("稀有度")]
+        [Range(1, 5)]
+        public int starLevel = 1;
+
+        [Header("元素构成")]
+        public Element[] elements;
+
+        [Header("物品标签")]
+        public ItemTag[] tags;
+
+        [Header("物品类别")]
+        public Category category = Category.CommonItem;
+
+        [Header("堆叠")]
+        public int maxStack = 9999;
+
+        [Header("卡组")]
+        public int maxPrepareCount = 10;
+
+        [Header("每份数量")]
+        [Range(1, 5)]
+        public int countPerServing = 1;
+
+        [Header("战斗")]
+        [Tooltip("战斗结束后是否回收")]
+        public bool recycleAfterBattle = true;
+
+        [Tooltip("回收时丢失数量")]
+        public int recycleLossCount = 0;
+
+        [Header("自定义参数")]
+        [SerializeField] public ItemParam[] customParams;
+
+        // 删除 description 字段，改用本地化
+
+        /// <summary>
+        /// 获取物品标签的显示名称列表（本地化）
+        /// </summary>
+        public List<TextEntry> GetTagsEntries()
+        {
+            var entries = new List<TextEntry>();
+            if (tags == null || tags.Length == 0)
+            {
+                entries.Add(new TextEntry(null, "无"));
+                return entries;
+            }
+
+            for (int i = 0; i < tags.Length; i++)
+            {
+                entries.Add(tags[i].GetEntry());
+                if (i < tags.Length - 1)
+                {
+                    entries.Add(new TextEntry(null, " "));
+                }
+            }
+            return entries;
+        }
+
+        /// <summary>
+        /// 判断是否有指定标签
+        /// </summary>
+        public bool HasTag(ItemTag tag)
+        {
+            if (tags == null) return false;
+            foreach (var t in tags)
+            {
+                if (t == tag) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 获取整数参数
+        /// </summary>
+        public int GetInt(string key, int defaultValue = 0)
+        {
+            if (customParams != null)
+            {
+                foreach (var p in customParams)
+                {
+                    if (p.key == key) return p.value;
+                }
+            }
+            return defaultValue;
+        }
+
+        public Sprite GetIcon(int index)
+        {
+            if (icon == null || icon.Count == 0) return null;
+            if (index < 0 || index >= icon.Count) return icon[0];
+            return icon[index];
+        }
+
+        #region 本地化 Entry 获取方法
+
+        /// <summary>
+        /// 获取物品名称的 Entry（用于 TextCombiner）
+        /// </summary>
+        public TextEntry GetNameEntry()
+        {
+            return itemID.GetEntry();
+        }
+
+        /// <summary>
+        /// 获取物品描述的 Entry（用于 TextCombiner）
+        /// </summary>
+        public TextEntry GetDescriptionEntry()
+        {
+            var localizedString = new LocalizedString(TableName.ItemDescription.ToString(), itemID.ToString());
+            return new TextEntry(localizedString, "");
+        }
+
+        /// <summary>
+        /// 获取物品类别的 Entry（用于 TextCombiner）
+        /// </summary>
+        public TextEntry GetCategoryEntry()
+        {
+            return category.GetEntry();
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// 物品自定义参数
+    /// </summary>
+    [Serializable]
+    public class ItemParam
+    {
+        public string key;
+        public string displayName;
+        public int value;
+
+        public ItemParam() { }
+
+        public ItemParam(string key, string displayName, int value)
+        {
+            this.key = key;
+            this.displayName = displayName;
+            this.value = value;
+        }
+
+        /// <summary>
+        /// 获取参数名称的本地化 Entry
+        /// </summary>
+        public TextEntry GetNameEntry()
+        {
+            if (string.IsNullOrEmpty(key)) return null;
+            var localizedString = new LocalizedString(TableName.SkillParamName.ToString(), key);
+            return new TextEntry(localizedString, "");
+        }
+    }
+
+    public List<ItemData> itemDataList = new();
+    private Dictionary<ItemName, ItemData> dataCache;
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (itemDataList == null) return;
+    }
+#endif
+
+    public void BuildCache()
+    {
+        dataCache = new Dictionary<ItemName, ItemData>();
+        foreach (var data in itemDataList)
+        {
+            if (data != null && !dataCache.ContainsKey(data.itemID))
+            {
+                dataCache.Add(data.itemID, data);
+            }
+        }
+    }
+
+    public ItemData GetItemData(ItemName itemID)
+    {
+        if (dataCache == null) BuildCache();
+        dataCache.TryGetValue(itemID, out var data);
+        return data;
+    }
+
+    public bool TryGetItemData(ItemName itemID, out ItemData data)
+    {
+        if (dataCache == null) BuildCache();
+        return dataCache.TryGetValue(itemID, out data);
+    }
+
+    public List<ItemData> GetAllItems()
+    {
+        if (dataCache == null) BuildCache();
+        return new List<ItemData>(dataCache.Values);
+    }
+
+    public List<ItemData> GetItemsByTag(ItemTag tag)
+    {
+        if (dataCache == null) BuildCache();
+
+        var result = new List<ItemData>();
+        foreach (var data in dataCache.Values)
+        {
+            if (data.HasTag(tag))
+                result.Add(data);
+        }
+        return result;
+    }
+
+    public List<ItemData> GetItemsByCategory(Category category)
+    {
+        if (dataCache == null) BuildCache();
+
+        var result = new List<ItemData>();
+        foreach (var data in dataCache.Values)
+        {
+            if (data.category == category)
+                result.Add(data);
+        }
+        return result;
+    }
+
+    public List<ItemData> GetItemsByStarLevel(int starLevel)
+    {
+        if (dataCache == null) BuildCache();
+
+        var result = new List<ItemData>();
+        foreach (var data in dataCache.Values)
+        {
+            if (data.starLevel == starLevel)
+                result.Add(data);
+        }
+        return result;
+    }
+
+    public bool HasItem(ItemName itemID)
+    {
+        if (dataCache == null) BuildCache();
+        return dataCache.ContainsKey(itemID);
+    }
+
+    public int GetItemCount()
+    {
+        if (dataCache == null) BuildCache();
+        return dataCache.Count;
+    }
+}

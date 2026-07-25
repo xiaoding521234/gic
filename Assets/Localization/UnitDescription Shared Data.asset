@@ -1,0 +1,176 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: UnitDescription Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: UnitDescription
+  m_TableCollectionNameGuidString: 4131e0ed9822fa744aa8411b21aaeef8
+  m_Entries:
+  - m_Id: 1001
+    m_Key: Paimon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Key: Zibai
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Key: Linnea
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Key: Illuga
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Key: Columbina
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Key: Amber
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Key: Kaeya
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003
+    m_Key: Barbara
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004
+    m_Key: Lisa
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3005
+    m_Key: Diona
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006
+    m_Key: Diluc
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3007
+    m_Key: Varka
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008
+    m_Key: Venti
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3009
+    m_Key: Barbatos
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3010
+    m_Key: Bennett
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Key: Xingqiu
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Key: Beidou
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Key: Xiangling
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Key: Ningguang
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Key: Hutao
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4006
+    m_Key: Ganyu
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4007
+    m_Key: Zhongli
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5001
+    m_Key: Mizuki
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5002
+    m_Key: Gorou
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5003
+    m_Key: Kirara
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5004
+    m_Key: Ei
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Key: Alhaitham
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Key: Collei
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Key: Nilou
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Key: Nahida
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7001
+    m_Key: Sigewinne
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7002
+    m_Key: Wriothesley
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7003
+    m_Key: Chiori
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7004
+    m_Key: Furina
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8001
+    m_Key: Mavuika
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11001
+    m_Key: ProtocolCore
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002
+    m_Key: Traveler
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 6472961795758489602
+  references:
+    version: 2
+    RefIds:
+    - rid: 6472961795758489602
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1779429565613

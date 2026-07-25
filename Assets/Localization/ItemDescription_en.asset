@@ -1,0 +1,144 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: ItemDescription_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: eced69ca459a85843bc2821799f89062, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 33076883456
+    m_Localized: None
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001
+    m_Localized: The universal currency of Teyvat, accepted everywhere across the
+      continent.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1002
+    m_Localized: A seed of fate that connects dreams together. Its radiant glow weaves
+      destinies together.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1003
+    m_Localized: Energy consumed by travelers while exploring the world. It naturally
+      recovers over time.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Localized: A magatama unique to Inazuma, infused with the power of Electro.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1005
+    m_Localized: A primordial crystalline gem beyond this world. In the dark cosmos,
+      it shines with the light of unclaimed dreams and hopes.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Localized: An ordinary iron longsword, commonly used by adventurers across
+      the land.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Localized: An ordinary iron shield, capable of blocking common attacks.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Localized: An ordinary set of leather armor, light and practical.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Localized: Mondstadt's signature vintage, brewed from dandelion seeds with
+      a refreshing aroma.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Localized: A special concoction by Cat's Tail Tavern's popular bartender Diona.
+      Not that she'd ever admit it.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Localized: A common and delicious fruit. They say an apple a day keeps the
+      doctor away.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Localized: A fresh chunk of beast meat. When properly cooked, it makes a hearty
+      and energizing meal.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Localized: A shelled bird egg, rich in protein and a fundamental ingredient
+      in countless dishes.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Localized: Golden ears of grain that give hope and strength to the earth. A
+      key ingredient for staple foods.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Localized: A fibrous root vegetable, easy to plant and harvest. It adds the
+      perfect finishing touch to many dishes.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5001
+    m_Localized: A crystal imbued with blazing fire energy. Warm to the touch, it's
+      a common material among alchemists.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5002
+    m_Localized: A crystal imbued with pure Hydro energy. Cool to the touch, it can
+      cleanse impurities.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5003
+    m_Localized: A crystal imbued with wild Electro energy. Small arcs spark from
+      it, emitting a dangerous glow.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5004
+    m_Localized: A crystal imbued with gentle Anemo energy. Held to the ear, it seems
+      to whisper with the breeze.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5005
+    m_Localized: A crystal imbued with frigid Cryo energy. Ice-cold to the touch,
+      it never melts.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5006
+    m_Localized: A crystal imbued with steadfast Geo energy. Incredibly hard, it
+      symbolizes eternity and immutability.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5007
+    m_Localized: A crystal imbued with thriving Dendro energy. Pulses with life,
+      as if it's growing in your hand.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Localized: An ancient key that emits a faint glow. It seems capable of unlocking
+      a long-forgotten door somewhere.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Localized: A yellowed ancient scroll, chronicling lost civilizations and forbidden
+      knowledge.
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

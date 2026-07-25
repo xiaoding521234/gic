@@ -1,0 +1,188 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: SkillName Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: SkillName
+  m_TableCollectionNameGuidString: 3f90a1f5beae5c742a501a6981b0bd89
+  m_Entries:
+  - m_Id: 3097808678912
+    m_Key: None
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1
+    m_Key: Common_Walk
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2
+    m_Key: Common_Fly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001001
+    m_Key: Paimon_Skill1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001002
+    m_Key: Paimon_Skill2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1001005
+    m_Key: Paimon_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001001
+    m_Key: Amber_ArrowRain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001002
+    m_Key: Amber_Sharpshooter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001003
+    m_Key: Amber_Scouting
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001004
+    m_Key: Amber_FlyingChampion
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001005
+    m_Key: Amber_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002001
+    m_Key: Kaeya_Frostgnaw
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002002
+    m_Key: Kaeya_GlacialWaltz
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002003
+    m_Key: Kaeya_HiddenStrength
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002004
+    m_Key: Kaeya_ColdBloodedBlade
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002005
+    m_Key: Kaeya_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003001
+    m_Key: Barbara_ShiningMiracle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003002
+    m_Key: Barbara_HeartfeltDevotion
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003003
+    m_Key: Barbara_VitalityBurst
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003005
+    m_Key: Barbara_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004001
+    m_Key: Lisa_VioletArc
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004002
+    m_Key: Lisa_LightningRose
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004003
+    m_Key: Lisa_RoseMark
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004004
+    m_Key: Lisa_PulsingWitch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004005
+    m_Key: Lisa_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006001
+    m_Key: Diluc_SearingOnslaught
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006002
+    m_Key: Diluc_Dawn
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006003
+    m_Key: Diluc_Tradition
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006004
+    m_Key: Diluc_Judgment
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006005
+    m_Key: Diluc_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008001
+    m_Key: Venti_WindOde
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008002
+    m_Key: Venti_WindsGrandOde
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008003
+    m_Key: Venti_SkywardSonnet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008004
+    m_Key: Venti_WindEmbrace
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008005
+    m_Key: Venti_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002001
+    m_Key: Traveler_WindBlade
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002002
+    m_Key: Traveler_FriedEgg
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002003
+    m_Key: Traveler_StarwindVortex
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002004
+    m_Key: Traveler_SweetMadame
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002005
+    m_Key: Traveler_Constellation
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 6472961775147941926
+  references:
+    version: 2
+    RefIds:
+    - rid: 6472961775147941926
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1779371337586

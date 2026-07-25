@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: SkillType_ja
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: ja
+  m_SharedData: {fileID: 11400000, guid: 910a1d2b2a681ba4d80fc35e4f7dc69c, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 1
+    m_Localized: "\u79FB\u52D5"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2
+    m_Localized: "\u6226\u6280"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3
+    m_Localized: "\u7206\u767A"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4
+    m_Localized: "\u5929\u8CE6"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5
+    m_Localized: "\u30A4\u30F3\u30BF\u30E9\u30AF\u30C8"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6
+    m_Localized: "\u5EF6\u594F"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7
+    m_Localized: "\u5909\u594F"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8
+    m_Localized: "\u5951\u7D04"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9
+    m_Localized: "\u9023\u643A"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10
+    m_Localized: "\u77E5\u6075"
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

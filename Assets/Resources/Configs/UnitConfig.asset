@@ -1,0 +1,1068 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ea59ae9c0fe98e4284bb8b8c1e89820, type: 3}
+  m_Name: UnitConfig
+  m_EditorClassIdentifier: 
+  unitDataList:
+  - unitName: 1001
+    unitType: 1
+    factions: e9030000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 995ea11a87b311d489b7e407157c2ab7, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 4
+    deployCost: -1
+    weaponType: 4
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 2
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 8
+    visionRange: -1
+    inventorySize: -1
+    tags: a60f0000
+    skills: []
+  - unitName: 2001
+    unitType: 1
+    factions: d1070000
+    avatar: {fileID: 21300000, guid: df6842f9dd8615b4ab231feb770c16fa, type: 3}
+    cards:
+    - {fileID: 21300000, guid: ec0921993ea60b84e94ae4ad2eb8567a, type: 3}
+    - {fileID: 21300000, guid: 77ae75539af390344a1169e1639e645c, type: 3}
+    nameCard: {fileID: 21300000, guid: 93346be2723cfe844a9f3cd0182cdfdd, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 7
+    visionRange: -64
+    inventorySize: -64
+    tags: bf0b0000bb0b0000ea030000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 2002
+    unitType: 1
+    factions: d1070000
+    avatar: {fileID: 21300000, guid: e248288e6aae4b34baaf1628cda265d9, type: 3}
+    cards:
+    - {fileID: 21300000, guid: e90113174efafab48860363d682a8b38, type: 3}
+    nameCard: {fileID: 21300000, guid: 619ff4e09a0e13c4b886b92aa5c1b95f, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 5
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 7
+    visionRange: -64
+    inventorySize: -64
+    tags: a10f0000a20f0000d2070000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 2003
+    unitType: 1
+    factions: d1070000
+    avatar: {fileID: 21300000, guid: 430d71c80a1d3ba428502678e6afaf94, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 8d0c6211b53ac214f9a24dea04bf5a99, type: 3}
+    nameCard: {fileID: 21300000, guid: 12688bd232e44aa4c934108bac26ceaf, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 2
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 7
+    visionRange: -64
+    inventorySize: -64
+    tags: ed030000a70f0000ea030000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 2004
+    unitType: 1
+    factions: d1070000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 4
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 2
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 2
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 3001
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: 6bbff8fa0d7aa404c9e5a79c37eda8ce, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 77ae75539af390344a1169e1639e645c, type: 3}
+    nameCard: {fileID: 21300000, guid: 61c683655e18f9e4995cfdc5ec9e8d42, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 5
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: 5
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 2
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 1
+    visionRange: -64
+    inventorySize: -64
+    tags: a10f0000ba0b0000e9030000ed030000
+    skills:
+    - skillID: 3001004
+      icon: {fileID: 21300000, guid: 8fd7698eeaa5ef048af18b5cb4531296, type: 3}
+      skillType: 1
+      customParams:
+      - key: MoveDistance
+        value: 100
+        baseType: 9
+      - key: Count
+        value: 2
+        baseType: 0
+    - skillID: 3001001
+      icon: {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
+      skillType: 3
+      customParams:
+      - key: Damage
+        value: 40
+        baseType: 1
+      - key: Count
+        value: 4
+        baseType: 0
+      - key: EnergyCost
+        value: 3
+        baseType: 0
+    - skillID: 3001002
+      icon: {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
+      skillType: 6
+      customParams:
+      - key: ATKBonus
+        value: 10
+        baseType: 0
+      - key: EnergyCost
+        value: 2
+        baseType: 0
+    - skillID: 3001003
+      icon: {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
+      skillType: 7
+      customParams:
+      - key: EffectRadius
+        value: 3
+        baseType: 0
+    - skillID: 3001005
+      icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
+      skillType: 4
+      customParams:
+      - key: C1MoveSpeed
+        value: 1
+        baseType: 0
+      - key: C1Vision
+        value: 1
+        baseType: 0
+      - key: C2MoveSpeed
+        value: 2
+        baseType: 0
+  - unitName: 3002
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: 1cd1426e7d039a64e838b6531d0f040d, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 07a454e67a67d8a48aa2ca98cc2dbd0d, type: 3}
+    nameCard: {fileID: 21300000, guid: 6c409b229a14b5e46b479d2d5d19528f, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 5
+    visionRange: -64
+    inventorySize: -64
+    tags: be0b0000d2070000b90b000089130000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 3002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 3003
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: e1161073f76fbf04686ddbd006617a96, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 83919bccf87fcc9449de328b28ce6b4a, type: 3}
+    nameCard: {fileID: 21300000, guid: 2ce814b262046f442bbd3617f98ccc87, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 4
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 2
+    visionRange: -64
+    inventorySize: -64
+    tags: a50f0000a20f0000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 3008
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 5
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 2
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 3
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 4001
+    unitType: 1
+    factions: a10f0000
+    avatar: {fileID: 21300000, guid: c21fa61ea6d74b24693c5264b1737f31, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 5e3c038ef269fb94eb9b95cbe8fe3476, type: 3}
+    nameCard: {fileID: 21300000, guid: 3051a0793bbd690438aa785d709fcc3d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 2
+    visionRange: -64
+    inventorySize: -64
+    tags: c00b0000a70f0000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 4002
+    unitType: 1
+    factions: a10f0000
+    avatar: {fileID: 21300000, guid: 99a639c711773e4498d87fba7c6438f3, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 947b0f3600c155f4b8f3c8d891c73f7e, type: 3}
+    nameCard: {fileID: 21300000, guid: 720e71ce5f98591458599dde23f3a019, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 0
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 3
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 4
+    visionRange: -64
+    inventorySize: -64
+    tags: a50f0000a20f0000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 4005
+    unitType: 1
+    factions: a10f0000
+    avatar: {fileID: 21300000, guid: d5c6d975238881e4bbf7e860b5b88432, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 59bb0d008ccdb964baca1e8706b8ab67, type: 3}
+    nameCard: {fileID: 21300000, guid: 09451ce4ccda3d247afae06d01963071, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 2
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 1
+    visionRange: -64
+    inventorySize: -64
+    tags: a50f0000a20f0000
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams: []
+    - skillID: 1002001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 0
+        value: 0
+        baseType: 0
+    - skillID: 1002002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams: []
+    - skillID: 1002003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams: []
+    - skillID: 1002004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 1002005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams: []
+  - unitName: 4007
+    unitType: 1
+    factions: a10f0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 2
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 7
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 5001
+    unitType: 1
+    factions: 89130000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 5002
+    unitType: 1
+    factions: 89130000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 1e26834a813b504408971a8d83af014b, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 5003
+    unitType: 1
+    factions: 89130000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 74bad361f4b306c41a8501d56aa40873, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 5004
+    unitType: 1
+    factions: 89130000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 2
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 4
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 6001
+    unitType: 1
+    factions: 71170000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 45fcf702057746341bd1292cb6836e02, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 6002
+    unitType: 1
+    factions: 71170000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 63da76fd8df9c974eb4040b6d38c3391, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 6003
+    unitType: 1
+    factions: 71170000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 479d545aca45a834eb2fd16bfdd635a5, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 6004
+    unitType: 1
+    factions: 71170000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 4
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 7001
+    unitType: 1
+    factions: 591b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b7caeddbccc20fa4299ed59fa5bc33ae, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 7002
+    unitType: 1
+    factions: 591b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: fe941b2ba1cbf0b46811c39e972b6006, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 7003
+    unitType: 1
+    factions: 591b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: 007a7e6be6f279a4ba73687516798556, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -1
+    inventorySize: -1
+    tags: 0000000000000000
+    skills: []
+  - unitName: 7004
+    unitType: 1
+    factions: 591b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 3
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 2
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 8001
+    unitType: 1
+    factions: 411f0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 5
+    deployCost: -1
+    weaponType: 0
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 2
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 1
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []
+  - unitName: 11002
+    unitType: 1
+    factions: f92a0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 1
+    starLevel: 4
+    deployCost: -1
+    weaponType: 1
+    baseHP: -1
+    baseAttack: -1
+    baseDefense: -1
+    baseAttackSpeed: -1
+    baseMoveSpeed: -1
+    baseLuck: -1
+    baseTenacity: -1
+    baseMastery: -1
+    baseSanity: -1
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 0
+    visionRange: -1
+    inventorySize: -1
+    tags: 
+    skills: []

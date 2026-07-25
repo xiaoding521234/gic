@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e88d21de19f779144be45a595ae96df0, type: 3}
+  m_Name: ElementFactionIconConfig
+  m_EditorClassIdentifier: 
+  pyroStroke: {fileID: 21300000, guid: 86e49bf4938f29c4f9aff05e27a26b91, type: 3}
+  hydroStroke: {fileID: 21300000, guid: 7c4bde67528d7cc498b3a23c01ad6c44, type: 3}
+  anemoStroke: {fileID: 21300000, guid: 36a2b7494185e444db0cd8b91926197c, type: 3}
+  electroStroke: {fileID: 21300000, guid: aeebf75d9f118e04b9d1d38cf6d15941, type: 3}
+  cryoStroke: {fileID: 21300000, guid: a49cbd7d02c6a3349832397a1549ccfb, type: 3}
+  dendroStroke: {fileID: 21300000, guid: 28cca5edf8823ec46bf148ebd5ddbe33, type: 3}
+  geoStroke: {fileID: 21300000, guid: cda770fb9b4a3d042ac0f1787fae3e77, type: 3}
+  physicalStroke: {fileID: 21300000, guid: cda770fb9b4a3d042ac0f1787fae3e77, type: 3}
+  lightStroke: {fileID: 21300000, guid: cda770fb9b4a3d042ac0f1787fae3e77, type: 3}
+  pyroDeep: {fileID: 21300000, guid: ba7825c556f1de445b872ebc17511214, type: 3}
+  hydroDeep: {fileID: 21300000, guid: 322f6e3fa3f675144b3834b6c90f2a7d, type: 3}
+  anemoDeep: {fileID: 21300000, guid: 544d28e1f01d3dc4c8c4767bb9830946, type: 3}
+  electroDeep: {fileID: 21300000, guid: 3629fe466eb896e46b2e9650983b7175, type: 3}
+  cryoDeep: {fileID: 21300000, guid: 4d91ce8196b7ad2489bd8ce095a39987, type: 3}
+  dendroDeep: {fileID: 21300000, guid: a1dd7d2fd4776734d965de5d5a6cc3d6, type: 3}
+  geoDeep: {fileID: 21300000, guid: 1bcf2616703c8bd41ac45b31a18ccf21, type: 3}
+  physicalDeep: {fileID: 21300000, guid: 1bcf2616703c8bd41ac45b31a18ccf21, type: 3}
+  lightDeep: {fileID: 21300000, guid: 1bcf2616703c8bd41ac45b31a18ccf21, type: 3}
+  celestia: {fileID: 21300000, guid: ca41d6dbd83ce124ab8d6cf1dad01f18, type: 3}
+  nodkrai: {fileID: 21300000, guid: 65f63f0b7d7efed4bad8f2ab7e6908c2, type: 3}
+  mondstadt: {fileID: 21300000, guid: eaef217502ec92741964b8726d73dbd3, type: 3}
+  liyue: {fileID: 21300000, guid: cbacc8bfb68b6e0478f1ddd7fae1f65d, type: 3}
+  inazuma: {fileID: 21300000, guid: 5f44224fdfd13bd4e9392555332f03f4, type: 3}
+  sumeru: {fileID: 21300000, guid: 6d76afaaa365f6d41ad5838d972c8220, type: 3}
+  fontaine: {fileID: 21300000, guid: 654374b9ce2ed254599625768b64075d, type: 3}
+  natlan: {fileID: 21300000, guid: ca41d6dbd83ce124ab8d6cf1dad01f18, type: 3}
+  snezhnaya: {fileID: 21300000, guid: ca41d6dbd83ce124ab8d6cf1dad01f18, type: 3}
+  khaenriah: {fileID: 21300000, guid: ca41d6dbd83ce124ab8d6cf1dad01f18, type: 3}
+  special: {fileID: 21300000, guid: ca41d6dbd83ce124ab8d6cf1dad01f18, type: 3}

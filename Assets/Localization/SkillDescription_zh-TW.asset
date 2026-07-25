@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: SkillDescription_zh-TW
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: zh-TW
+  m_SharedData: {fileID: 11400000, guid: 4d4245aae4666224e8534fc54d04c112, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 1
+    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\u6B65\u884C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2
+    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\u98DB\u884C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001004
+    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\u98DB\u884C\n\xB7\u63A1\u96C6\u7D93\u904E\u7684\u8CC7\u6E90\u9EDE2\u6B21"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001001
+    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\u5C04\u51FA\u5927\u91CF\u7BAD\u77E2\n\xB7\u9020\u62104\u6B21\u5C11\u91CF\u706B\u50B7"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001002
+    m_Localized: "\xB7\u88AB\u5354\u8005\u63D0\u5347\u5C11\u91CF\u653B\u64CA"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001003
+    m_Localized: "\xB7\u7834\u9664\u5927\u7BC4\u570D\u8FF7\u9727\u4E26\u89E3\u9664\u6575\u4EBA\u96B1\u8EAB"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001005
+    m_Localized: "\xB7\u30101\u547D\u3011\u79FB\u901F\u63D0\u5347\uFF0C\u8996\u91CE\u63D0\u5347\n\xB7\u30102\u547D\u3011\u79FB\u901F\u5927\u91CF\u63D0\u5347\uFF0C\u7206\u767C\u53EF\u4EE5\u7834\u9664\u8FF7\u9727\n\xB7\u30103\u547D\u3011\u7372\u5F97<color=#FFD700><u><link=\"BaronBunny\">\u5154\u5154\u4F2F\u7235</link></u></color>"
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

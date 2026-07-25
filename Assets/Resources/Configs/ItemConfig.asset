@@ -1,0 +1,193 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef8e2fab08142c1409c5c26822302040, type: 3}
+  m_Name: ItemConfig
+  m_EditorClassIdentifier: 
+  itemDataList:
+  - _isInitialized: 1
+    itemID: 1001
+    icon:
+    - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
+    starLevel: 3
+    elements:
+    - elementType: 7
+      stacks: 1
+    tags: 00000000
+    category: 2
+    maxStack: 9999
+    maxPrepareCount: 40
+    countPerServing: 5
+    recycleAfterBattle: 1
+    recycleLossCount: 60
+    customParams: []
+  - _isInitialized: 1
+    itemID: 1002
+    icon:
+    - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
+    starLevel: 4
+    elements:
+    - elementType: 5
+      stacks: 1
+    tags: 00000000
+    category: 2
+    maxStack: 9999
+    maxPrepareCount: 20
+    countPerServing: 5
+    recycleAfterBattle: 1
+    recycleLossCount: 60
+    customParams: []
+  - _isInitialized: 1
+    itemID: 1003
+    icon:
+    - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
+    starLevel: 4
+    elements:
+    - elementType: 6
+      stacks: 1
+    tags: 00000000
+    category: 2
+    maxStack: 9999
+    maxPrepareCount: 2
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 1004
+    icon:
+    - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
+    starLevel: 4
+    elements:
+    - elementType: 4
+      stacks: 1
+    tags: 00000000
+    category: 2
+    maxStack: 9999
+    maxPrepareCount: 2
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 1005
+    icon:
+    - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
+    starLevel: 5
+    elements:
+    - elementType: 8
+      stacks: 1
+    tags: 00000000
+    category: 2
+    maxStack: 9999
+    maxPrepareCount: 100
+    countPerServing: 5
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 3001
+    icon:
+    - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
+    starLevel: 2
+    elements:
+    - elementType: 3
+      stacks: 1
+    - elementType: 2
+      stacks: 1
+    tags: 020000000700000005000000
+    category: 1
+    maxStack: 9999
+    maxPrepareCount: 5
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 4001
+    icon:
+    - {fileID: 21300000, guid: 9af9caa073664874787b3310147653e9, type: 3}
+    starLevel: 1
+    elements:
+    - elementType: 6
+      stacks: 1
+    tags: 030000000400000005000000
+    category: 1
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 4002
+    icon:
+    - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
+    starLevel: 1
+    elements:
+    - elementType: 1
+      stacks: 1
+    tags: 0300000004000000
+    category: 1
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 4003
+    icon:
+    - {fileID: 21300000, guid: 4f97dfa0394017848b683bb6d38591f9, type: 3}
+    starLevel: 1
+    elements:
+    - elementType: 3
+      stacks: 1
+    tags: 0300000004000000
+    category: 1
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 4004
+    icon:
+    - {fileID: 21300000, guid: 4eaca57f760d8864ab50b40d6d5d65bb, type: 3}
+    starLevel: 1
+    elements:
+    - elementType: 6
+      stacks: 1
+    tags: 0300000004000000
+    category: 1
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 4005
+    icon:
+    - {fileID: 21300000, guid: 32d5c04fc5004494888bc64d1adceffe, type: 3}
+    starLevel: 1
+    elements:
+    - elementType: 6
+      stacks: 1
+    tags: 0300000004000000
+    category: 1
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []

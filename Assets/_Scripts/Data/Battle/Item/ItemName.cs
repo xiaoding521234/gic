@@ -1,0 +1,128 @@
+using UnityEngine;
+using UnityEngine.Localization;
+
+/// <summary>
+/// 物品ID枚举
+/// </summary>
+public enum ItemName
+{
+    [InspectorName("无")]
+    None = 0,
+
+    #region 货币
+
+    [InspectorName("摩拉")]
+    Mora = 1001,
+
+    [InspectorName("纠缠之缘")]
+    IntertwinedFate = 1002,
+
+    [InspectorName("体力")]
+    Stamina = 1003,
+
+    [InspectorName("勾玉")]
+    Magatama = 1004,
+    [InspectorName("原石")]
+    Primogem = 1005,
+
+    #endregion
+
+    #region 装备
+
+    [InspectorName("铁剑")]
+    IronSword = 2001,
+    [InspectorName("铁盾")]
+    IronShield = 2002,
+    [InspectorName("皮甲")]
+    LeatherArmor = 2003,
+
+    #endregion
+
+    #region 饮品
+
+    [InspectorName("蒲公英酒")]
+    DandelionWine = 3001,
+    [InspectorName("迪奥娜特调")]
+    DionaSpecial = 3002,
+
+    #endregion
+
+    #region 食物
+
+    [InspectorName("苹果")]
+    Apple = 4001,
+    [InspectorName("生肉")]
+    RawMeat = 4002,
+    [InspectorName("蛋")]
+    Egg = 4003,
+    [InspectorName("小麦")]
+    Wheat = 4004,
+    [InspectorName("萝卜")]
+    Radish = 4005,
+
+    #endregion
+
+    #region 材料
+
+    [InspectorName("火晶体")]
+    FireCrystal = 5001,
+    [InspectorName("水晶体")]
+    WaterCrystal = 5002,
+    [InspectorName("雷晶体")]
+    ThunderCrystal = 5003,
+    [InspectorName("风晶体")]
+    WindCrystal = 5004,
+    [InspectorName("冰晶体")]
+    IceCrystal = 5005,
+    [InspectorName("岩晶体")]
+    RockCrystal = 5006,
+    [InspectorName("草晶体")]
+    GrassCrystal = 5007,
+
+    #endregion
+
+    #region 任务物品
+
+    [InspectorName("神秘钥匙")]
+    MysteryKey = 6001,
+    [InspectorName("古老卷轴")]
+    AncientScroll = 6002,
+
+    #endregion
+}
+
+
+
+/// <summary>
+/// ItemName 扩展方法
+/// </summary>
+public static class ItemNameExtensions
+{
+    /// <summary>
+    /// 获取物品在本地化表中的 Entry Key
+    /// </summary>
+    private static string GetEntryKey(this ItemName itemName)
+    {
+        return itemName.ToString();
+    }
+
+    /// <summary>
+    /// 创建用于本地化系统的 LocalizedString 对象
+    /// </summary>
+    private static LocalizedString GetLocalizedString(this ItemName itemName)
+    {
+        return new LocalizedString(TableName.ItemName.ToString(), itemName.GetEntryKey());
+    }
+
+    /// <summary>
+    /// 创建 Entry 对象（用于 TextCombiner）
+    /// </summary>
+    /// <param name="leadingSeparator">前置连接符</param>
+    public static TextEntry GetEntry(this ItemName itemName, string leadingSeparator = "")
+    {
+        LocalizedString localizedString = itemName.GetLocalizedString();
+        return new TextEntry(localizedString, leadingSeparator);
+    }
+
+}
+

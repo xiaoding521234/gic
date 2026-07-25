@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: PositionName Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: PositionName
+  m_TableCollectionNameGuidString: a9edc2c818676414098fc0652976169e
+  m_Entries:
+  - m_Id: 1001
+    m_Key: StarsandShoal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1002
+    m_Key: NashaTownGate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1003
+    m_Key: NashaTown
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Key: StormterrorLair
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Key: DawnWinery
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Key: MondstadtBridge
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Key: MondstadtSquare
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2005
+    m_Key: Windrise
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2006
+    m_Key: StarfellLake
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2007
+    m_Key: DragonspineFoot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Key: YaoguangShoal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Key: GuyunStoneForest
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003
+    m_Key: LiyueHarbor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004
+    m_Key: LiyueCity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3005
+    m_Key: GoldenHouse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006
+    m_Key: JueyunKarst
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3007
+    m_Key: WangshuInn
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 6472961775147941890
+  references:
+    version: 2
+    RefIds:
+    - rid: 6472961775147941890
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1779349844996

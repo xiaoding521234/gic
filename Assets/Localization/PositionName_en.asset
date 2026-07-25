@@ -1,0 +1,91 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: PositionName_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: a9edc2c818676414098fc0652976169e, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 1001
+    m_Localized: Starsand Shoal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1002
+    m_Localized: Nasha Town Gate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1003
+    m_Localized: Nasha Town
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Localized: Stormterror's Lair
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Localized: Dawn Winery
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Localized: Mondstadt Bridge
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Localized: Mondstadt Square
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2005
+    m_Localized: Windrise
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2006
+    m_Localized: Starfell Lake
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2007
+    m_Localized: Dragonspine Foothills
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Localized: Yaoguang Shoal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Localized: Guyun Stone Forest
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003
+    m_Localized: Liyue Harbor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004
+    m_Localized: Liyue City
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3005
+    m_Localized: Golden House
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006
+    m_Localized: Jueyun Karst
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3007
+    m_Localized: Wangshu Inn
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

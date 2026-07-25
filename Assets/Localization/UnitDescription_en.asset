@@ -1,0 +1,207 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: UnitDescription_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: 4131e0ed9822fa744aa8411b21aaeef8, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 1001
+    m_Localized: ???
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Localized: A legendary Adeptus from Liyue, the most mysterious figure in Liyue's
+      folklore.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Localized: A non-human being born into the world, her path to growth is far
+      more bitter than ordinary.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Localized: The youngest squad leader of the Lamp Bearers, an enthusiastic and
+      reliable Lamp Bearer.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Localized: An Outrider of the Knights of Favonius and Mondstadt's Gliding Champion.
+      Her endless energy makes her a trustworthy companion.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Localized: The Cavalry Captain of the Knights of Favonius, known as the Frostwind
+      Knight. Easygoing on the surface, he harbors secrets unknown to others.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003
+    m_Localized: A deaconess of the Church of Favonius and the shining idol of Mondstadt.
+      Her singing has the power to heal hearts.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004
+    m_Localized: The librarian of the Knights of Favonius, known as the Rose Witch.
+      Beneath her lazy exterior lies formidable magical prowess.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3005
+    m_Localized: A popular bartender at Cat's Tail Tavern, sworn to destroy Mondstadt's
+      wine industry. Yet her drinks always turn out unexpectedly delicious.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006
+    m_Localized: The owner of Dawn Winery and Mondstadt's darknight hero. Wielding
+      Wolf's Gravestone, he protects the city from the shadows.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3007
+    m_Localized: The Grand Master of the Knights of Favonius, the Knight of Boreas.
+      Currently leading an expedition, he is a living legend of Mondstadt.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008
+    m_Localized: A bard in Mondstadt, in truth the mortal form of Barbatos, the God
+      of Freedom. He tells the stories of this land through song and poetry.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3009
+    m_Localized: One of The Seven in Mondstadt, the God of Freedom Barbatos. He walks
+      among mortals as Venti, listening to people's wishes.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3010
+    m_Localized: A young adventurer of the Adventurers' Guild, known as the Trial
+      of Fate. Despite his terrible luck, he never gives up on his dream of adventure.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Localized: A disciple of the Guhua Clan, skilled in swordsmanship and calligraphy.
+      Gentle in appearance, but a formidable fighter at heart.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Localized: The captain of The Crux fleet, the Uncrowned Lord of the Ocean.
+      Bold and straightforward, she commands great respect in Liyue Harbor.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Localized: The young chef at Wanmin Restaurant, passionate about ingredients.
+      Her cooking always brings delightful surprises.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Localized: The owner of the Jade Chamber, a business genius of Liyue. She controls
+      Liyue's economic lifeline with wisdom and skill.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Localized: The 77th Director of Wangsheng Funeral Parlor. Young yet highly
+      capable, she has unique insights on life and death.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4006
+    m_Localized: A secretary at Yuehai Pavilion, with qilin blood in her veins. Diligent
+      to a fault, she is deeply trusted by Ningguang.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5001
+    m_Localized: Yumemizuki Mizuki, a mysterious character skilled in dream manipulation.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5002
+    m_Localized: A general of the Watatsumi Army, a loyal warrior. He boosts morale
+      on the battlefield and leads his troops courageously.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5003
+    m_Localized: A delivery girl from Inazuma with the ability to transform. She
+      always delivers packages on time.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Localized: A scribe of the Akademiya, a calm and rational scholar. He pursues
+      truth and knowledge, not power.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Localized: A trainee ranger in Sumeru, once a victim of Fatui experiments.
+      With Tighnari's help, she slowly overcomes her past.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Localized: A dancer at the Zubayr Theater, famous for her graceful moves. Her
+      performances bring peace to the audience's souls.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7001
+    m_Localized: The head nurse of Meropide, known as Sigewinne. Kind and gentle,
+      she silently cares for every patient.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7002
+    m_Localized: The administrator of Meropide, known as Wriothesley. Mysterious
+      and enigmatic, he seems to wield unknown power.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7003
+    m_Localized: A tailor in Fontaine, known as Chiori. Famous for her exquisite
+      tailoring skills, beloved by customers.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11001
+    m_Localized: ???
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002
+    m_Localized: A traveler from another world, journeying across the seven nations
+      of Teyvat in search of their lost sibling.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4007
+    m_Localized: A mysterious consultant of Wangsheng Funeral Parlor, knowledgeable
+      in rites and artifacts. In truth, the mortal vessel of the Geo Archon, he walks
+      Liyue in the name of contracts.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5004
+    m_Localized: The Raiden Shogun of Inazuma, the Almighty Narukami Ogosho who grants
+      her people Eternity. She pursues an unchanging plane of perfect stillness.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Localized: The Lesser Lord Kusanali of Sumeru, profound wisdom lies beneath
+      her childlike appearance. She weaves the future of Sumeru through dreams and
+      imagination.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7004
+    m_Localized: The queen of all waters, kindreds, peoples and laws of Fontaine.
+      Under the Opera Epiclese's spotlight, she remains the center of attention.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8001
+    m_Localized: The Pyro Archon of Natlan, the Blazing Rebirth. Burning herself
+      to illuminate all of Natlan, she is its brightest Sun.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Localized: A mysterious Harbinger from Snezhnaya, ranked Third of the Fatui.
+      She speaks little, yet transforms into the feared 'Damselette' on the battlefield.
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

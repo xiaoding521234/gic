@@ -1,0 +1,376 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: UIText Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: UIText
+  m_TableCollectionNameGuidString: 831edd0eb5b469a45be7b5efd1f02648
+  m_Entries:
+  - m_Id: 1001
+    m_Key: Settings
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1002
+    m_Key: StartGame
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1003
+    m_Key: Back
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Key: Leave
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1005
+    m_Key: Create
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1006
+    m_Key: Ready
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1007
+    m_Key: None
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1008
+    m_Key: MaxPrepareCount
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Key: DescenderNotFound
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Key: Searching
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Key: Remind
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Key: Kick
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2005
+    m_Key: Random
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Key: Multiplayer
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Key: Character
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003
+    m_Key: CommonItem
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004
+    m_Key: PreciousItem
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3005
+    m_Key: EditDeckHint
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Key: Null
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Key: Nodkrai
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Key: Mondstadt
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Key: Liyue
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Key: Inazuma
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4006
+    m_Key: Sumeru
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4007
+    m_Key: Fontaine
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4008
+    m_Key: Natlan
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4009
+    m_Key: Snezhnaya
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4010
+    m_Key: Khaenriah
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5001
+    m_Key: Red
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5002
+    m_Key: Blue
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5003
+    m_Key: Green
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5004
+    m_Key: Yellow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5005
+    m_Key: Purple
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5006
+    m_Key: Cyan
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5007
+    m_Key: Orange
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5008
+    m_Key: Pink
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5009
+    m_Key: White
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5010
+    m_Key: Gray
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Key: MainWorld
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Key: RestingPlace
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7001
+    m_Key: Physical
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7002
+    m_Key: Pyro
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7003
+    m_Key: Hydro
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7004
+    m_Key: Anemo
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7005
+    m_Key: Electro
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7006
+    m_Key: Cryo
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7007
+    m_Key: Dendro
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7008
+    m_Key: Geo
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7009
+    m_Key: Light
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7010
+    m_Key: PhysicalFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7011
+    m_Key: PyroFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7012
+    m_Key: HydroFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7013
+    m_Key: AnemoFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7014
+    m_Key: ElectroFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7015
+    m_Key: CryoFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7016
+    m_Key: DendroFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7017
+    m_Key: GeoFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7018
+    m_Key: LightFull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8001
+    m_Key: Walk
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8002
+    m_Key: Fly
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8003
+    m_Key: Amphibious
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8004
+    m_Key: Knockback
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8005
+    m_Key: Pull
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8006
+    m_Key: Jump
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8007
+    m_Key: Teleport
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9001
+    m_Key: Display
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9002
+    m_Key: Sound
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9003
+    m_Key: Control
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9004
+    m_Key: Account
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9005
+    m_Key: Other
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9006
+    m_Key: Language
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9007
+    m_Key: Resolution
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9008
+    m_Key: FrameRate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9009
+    m_Key: MasterVolume
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9010
+    m_Key: MusicVolume
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9011
+    m_Key: SFXVolume
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9012
+    m_Key: VoiceVolume
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9013
+    m_Key: Name
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9014
+    m_Key: Command
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9015
+    m_Key: Fullscreen
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9016
+    m_Key: Windowed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9017
+    m_Key: Confirm
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9018
+    m_Key: Cancel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9019
+    m_Key: Reset
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9020
+    m_Key: Default
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10001
+    m_Key: Wish1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002
+    m_Key: Wish10
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 6472961731485761560
+  references:
+    version: 2
+    RefIds:
+    - rid: 6472961731485761560
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1779183345455

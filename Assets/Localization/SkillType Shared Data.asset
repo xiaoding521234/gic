@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: SkillType Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: SkillType
+  m_TableCollectionNameGuidString: 910a1d2b2a681ba4d80fc35e4f7dc69c
+  m_Entries:
+  - m_Id: 1
+    m_Key: Move
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2
+    m_Key: Normal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3
+    m_Key: Burst
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4
+    m_Key: Talent
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5
+    m_Key: Interact
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6
+    m_Key: Enso
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7
+    m_Key: Henka
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8
+    m_Key: Contract
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9
+    m_Key: Renkei
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10
+    m_Key: Wisdom
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 6472961775147941931
+  references:
+    version: 2
+    RefIds:
+    - rid: 6472961775147941931
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1779373118731

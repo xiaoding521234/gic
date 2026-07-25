@@ -1,0 +1,171 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: UnitTitle_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: d59113bde2e1d05429c3bc0aa933bf49, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 1001
+    m_Localized: Emergency Food
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Localized: Shadow of the Fleeting Dream
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Localized: Erudite Journey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Localized: Wick of Nightmare
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Localized: Outrider
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Localized: Frostwind Knight
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003
+    m_Localized: Shining Idol
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004
+    m_Localized: Rose Witch
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3005
+    m_Localized: Cat Tail Special
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006
+    m_Localized: Dark Side of Dawn
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3007
+    m_Localized: Knight of Boreas
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3008
+    m_Localized: Windborne Bard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3009
+    m_Localized: God of Mondstadt
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3010
+    m_Localized: Trial of Fate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Localized: Flying Cloud of Guhua
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Localized: Uncrowned Lord of the Ocean
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Localized: Chef de Cuisine
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Localized: Hidden Moon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Localized: Plum Blossom in Snow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4006
+    m_Localized: Gentle Breeze of Return
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5001
+    m_Localized: Mizuki
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5002
+    m_Localized: Canine Warrior
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5003
+    m_Localized: Cat Upon the Eaves
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Localized: Admonishing Instruction
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Localized: Sprout of Rebirth
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Localized: Dance of Lotuslight
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7001
+    m_Localized: Sigewinne
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7002
+    m_Localized: Wriothesley
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7003
+    m_Localized: Chiori
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11001
+    m_Localized: Combat Core
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002
+    m_Localized: Traveler
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4007
+    m_Localized: Vago Mundo
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5004
+    m_Localized: Plane of Euthymia
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Localized: Physic of Purity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7004
+    m_Localized: Endless Solo of Solitude
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8001
+    m_Localized: Blazing Rebirth
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Localized: Fallen Angel's Feather
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []
