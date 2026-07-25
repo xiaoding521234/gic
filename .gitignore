@@ -1,0 +1,35 @@
+# Unity generated
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]serSettings/
+
+# Codely
+.codely-cli/
+.codely/
+.com-unity-codely.json
+
+# IDE
+.vscode/
+.vsconfig
+*.csproj
+*.csproj.lscache
+*.slnx
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated
+screenshots/
+mem-log/
+
+# Misc
+*.apk
+*.aab
+*.unitypackage
+.codelyignore

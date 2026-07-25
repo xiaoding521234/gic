@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/Boot.unity
+    guid: ebeb4d51b9bf5fd4a8e52b970478e905
+  - enabled: 1
+    path: Assets/Scenes/SplashScreen.unity
+    guid: 2cda990e2423bbf4892e6590ba056729
+  - enabled: 1
+    path: Assets/Scenes/MainHall.unity
+    guid: b5b8f743fd9c65c4e936f2ff97b17b1a
+  - enabled: 1
+    path: Assets/Scenes/MapScreen.unity
+    guid: a310ff8ee8bc3e04ba9e9265e79a8557
+  - enabled: 1
+    path: Assets/Scenes/CoopScreen.unity
+    guid: 47adc9219d7d9e6478694c11105c86d8
+  - enabled: 1
+    path: Assets/Scenes/BackpackScreen.unity
+    guid: a0042b18d695be64e907d401b728e30d
+  - enabled: 1
+    path: Assets/Scenes/SettingsScreen.unity
+    guid: 74de4816bfecc554182702226da459d9
+  - enabled: 1
+    path: Assets/Scenes/WishScreen.unity
+    guid: 46325499d59395d4a8fb93d9e8dbc820
+  m_BuildProfiles: []
+  m_configObjects:
+    com.unity.addressableassets: {fileID: 11400000, guid: 22e5059b49680434dae0e20a9738d830, type: 2}
+    com.unity.localization.settings: {fileID: 11400000, guid: 33ab3f0b89850564381014c127b871ad, type: 2}
+  m_SlimFeaturesWeixinMiniGame:
+    ACLDecompression: 0
+    AllocateOverhead: 1
+    DecompressASTC: 0
+    DecompressDXT: 0
+    DecompressETC: 1
+    FreeTypeSfntPng: 1
+    LightProbe: 2
+    RootMotion: 0
+    UseStringInternPool: 2
