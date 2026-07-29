@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -27,23 +27,27 @@ MonoBehaviour:
     m_Key: Common_Fly
     m_Metadata:
       m_Items: []
-  - m_Id: 3001004
+  - m_Id: 3001001
     m_Key: Amber_FlyingChampion
     m_Metadata:
       m_Items: []
-  - m_Id: 3001001
-    m_Key: Amber_ArrowRain
-    m_Metadata:
-      m_Items: []
   - m_Id: 3001002
-    m_Key: Amber_Sharpshooter
+    m_Key: Amber_DoubleShot
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Key: Amber_Scouting
+    m_Key: Amber_ArrowRain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001004
+    m_Key: Amber_Sharpshooter
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
+    m_Key: Amber_Scouting
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001006
     m_Key: Amber_Constellation
     m_Metadata:
       m_Items: []

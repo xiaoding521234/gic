@@ -30,20 +30,23 @@ public enum SkillName
 
 
     #region 安柏 (3001)
+    [InspectorName("飞行冠军")]
+    Amber_FlyingChampion = 3001001,
+
+    [InspectorName("一箭双丘丘")]
+    Amber_DoubleShot = 3001002,
+
     [InspectorName("箭雨")]
-    Amber_ArrowRain = 3001001,
+    Amber_ArrowRain = 3001003,
 
     [InspectorName("百发百中")]
-    Amber_Sharpshooter = 3001002,
+    Amber_Sharpshooter = 3001004,
 
     [InspectorName("全面侦查")]
-    Amber_Scouting = 3001003,
-
-    [InspectorName("飞行冠军")]
-    Amber_FlyingChampion = 3001004,
+    Amber_Scouting = 3001005,
 
     [InspectorName("安柏命座")]
-    Amber_Constellation = 3001005,
+    Amber_Constellation = 3001006,
     #endregion
 
     #region 凯亚 (3002)

@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -27,26 +27,37 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7Fly in one of the four cardinal directions\n\xB7Collect resources
-      along the path 2 times"
+    m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus}"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
-    m_Localized: "\xB7Shoot a volley of arrows in one of the four cardinal directions\n\xB7Deal
-      minor Pyro DMG 4 times"
+    m_Localized: "\xB7Fly in one of the four cardinal directions\n\xB7Collect resources
+      along the path {CollectCount} times"
     m_Metadata:
       m_Items: []
   - m_Id: 3001002
-    m_Localized: "\xB7Increase coordinated ally's ATK slightly"
+    m_Localized: "\xB7Shoot {DamageCount} arrows in one of the four cardinal directions\n\xB7Deal
+      {Damage} Pyro DMG per arrow"
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Localized: "\xB7Dispel a wide area of fog and reveal stealthed enemies"
+    m_Localized: "\xB7Shoot a volley of arrows in one of the four cardinal directions\n\xB7Deal
+      {Damage} Pyro DMG {DamageCount} times"
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: "\xB7[C1] Increased Move SPD and Vision\n\xB7[C2] Greatly increased
-      Move SPD. Burst can dispel fog\n\xB7[C3] Gain <color=#FFD700><u><link=\"BaronBunny\">Baron
+    m_Localized: "\xB7Dispel fog in a {EffectRadius}-tile radius and reveal stealthed
+      enemies"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24651732772147200
+    m_Localized: "\xB7Shoot {DamageCount} arrows in one of the four cardinal directions\n\xB7Deal
+      {Damage} Pyro DMG per arrow"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001006
+    m_Localized: "\xB7[C1] Move SPD +{C1MoveSpeed}, Vision +{C1Vision}\n\xB7[C2]
+      Move SPD +{C2MoveSpeed}. Burst can dispel fog\n\xB7[C3] Gain <color=#FFD700><u><link=\"Unit:Amber\">Baron
       Bunny</link></u></color>"
     m_Metadata:
       m_Items: []

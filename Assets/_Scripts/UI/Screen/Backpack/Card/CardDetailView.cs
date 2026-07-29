@@ -7,8 +7,9 @@ using UnityEngine.UI;
 /// </summary>
 public class CardDetailView : MonoBehaviour
 {
-    public CardType cardType => card?.cardType ?? CardType.Unit;
+    public CardType cardType => _saveData?.cardType ?? card?.cardType ?? CardType.Unit;
     public Card card;
+    public SaveCardData saveCardData => _saveData ?? card?.saveCardData;
     public Image top;
     public TextCombiner cardName;
     public Image bottomImage;
@@ -26,6 +27,12 @@ public class CardDetailView : MonoBehaviour
 
     private ICardDetailPanel _activePanel;
     private ICardViewStrategy _strategy;
+    private SaveCardData _saveData;
+
+    /// <summary>
+    /// 只读模式：隐藏所有可交互按钮（皮肤切换、使用按钮等），用于关联面板
+    /// </summary>
+    public bool IsReadOnly { get; private set; }
 
     private void Awake()
     {
@@ -41,6 +48,7 @@ public class CardDetailView : MonoBehaviour
     public void Init(Card c)
     {
         card = c;
+        _saveData = null;
         _strategy = CardViewStrategyFactory.Get(cardType);
 
         // 切换子面板
@@ -49,6 +57,35 @@ public class CardDetailView : MonoBehaviour
 
         RefreshSkinDisplay();
         RebuildLayout();
+    }
+
+    /// <summary>
+    /// 不依赖 Card 组件的初始化（用于关联面板等无 Card 实例的场景）
+    /// </summary>
+    public void Init(SaveCardData data)
+    {
+        IsReadOnly = true;
+
+        card = null;
+        _saveData = data;
+        _strategy = CardViewStrategyFactory.Get(cardType);
+
+        EnsureInjected();
+        SwitchPanel(cardType);
+        _activePanel?.Init(data, true);
+
+        // 只读模式：隐藏皮肤按钮
+        if (skinButton != null) skinButton.gameObject.SetActive(false);
+
+        RebuildLayout();
+    }
+
+    private void EnsureInjected()
+    {
+        if (unitDetailPanel != null)
+            unitDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description);
+        if (itemDetailPanel != null)
+            itemDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description);
     }
 
     private void SwitchPanel(CardType type)
@@ -70,7 +107,13 @@ public class CardDetailView : MonoBehaviour
 
     private void OnSkinButtonClicked()
     {
-        if (card == null || _strategy == null) return;
+        if (saveCardData == null || _strategy == null) return;
+
+        if (card == null)
+        {
+            GameScene.Instance.ShowLocalizedPopup("Skin_OnlyOne");
+            return;
+        }
 
         int totalSkins = _strategy.GetTotalSkins(card);
         if (totalSkins <= 1)
@@ -86,7 +129,13 @@ public class CardDetailView : MonoBehaviour
 
     private void RefreshSkinDisplay()
     {
-        if (card?.saveCardData == null || _strategy == null)
+        if (saveCardData == null || _strategy == null)
+        {
+            skin.gameObject.SetActive(false);
+            return;
+        }
+
+        if (card == null)
         {
             skin.gameObject.SetActive(false);
             return;

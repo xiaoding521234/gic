@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -39,7 +39,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 8
     visionRange: -1
-    inventorySize: -1
     tags: a60f0000
     skills: []
   - unitName: 2001
@@ -69,7 +68,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 7
     visionRange: -64
-    inventorySize: -64
     tags: bf0b0000bb0b0000ea030000
     skills:
     - skillID: 1
@@ -125,7 +123,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 7
     visionRange: -64
-    inventorySize: -64
     tags: a10f0000a20f0000d2070000
     skills:
     - skillID: 1
@@ -181,7 +178,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 7
     visionRange: -64
-    inventorySize: -64
     tags: ed030000a70f0000ea030000
     skills:
     - skillID: 1
@@ -237,7 +233,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 3001
@@ -266,60 +261,69 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 1
     visionRange: -64
-    inventorySize: -64
     tags: a10f0000ba0b0000e9030000ed030000
     skills:
-    - skillID: 3001004
+    - skillID: 3001001
       icon: {fileID: 21300000, guid: 8fd7698eeaa5ef048af18b5cb4531296, type: 3}
       skillType: 1
       customParams:
-      - key: MoveDistance
+      - key: 5
         value: 100
         baseType: 9
-      - key: Count
+      - key: 16
         value: 2
         baseType: 0
-    - skillID: 3001001
-      icon: {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
-      skillType: 3
+    - skillID: 3001002
+      icon: {fileID: 21300000, guid: f96030a9a9bcc494a802b1a9c0ae67cd, type: 3}
+      skillType: 2
       customParams:
-      - key: Damage
+      - key: 1
         value: 40
         baseType: 1
-      - key: Count
-        value: 4
-        baseType: 0
-      - key: EnergyCost
-        value: 3
-        baseType: 0
-    - skillID: 3001002
-      icon: {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
-      skillType: 6
-      customParams:
-      - key: ATKBonus
-        value: 10
-        baseType: 0
-      - key: EnergyCost
+      - key: 17
         value: 2
         baseType: 0
     - skillID: 3001003
+      icon: {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
+      skillType: 3
+      customParams:
+      - key: 1
+        value: 40
+        baseType: 1
+      - key: 17
+        value: 4
+        baseType: 0
+      - key: 9
+        value: 3
+        baseType: 0
+    - skillID: 3001004
+      icon: {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
+      skillType: 6
+      customParams:
+      - key: 8
+        value: 10
+        baseType: 0
+      - key: 9
+        value: 2
+        baseType: 0
+    - skillID: 3001005
       icon: {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
       skillType: 7
       customParams:
-      - key: EffectRadius
+      - key: 6
         value: 3
         baseType: 0
-    - skillID: 3001005
+    - skillID: 3001006
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
       customParams:
-      - key: C1MoveSpeed
+      - key: 13
         value: 1
         baseType: 0
-      - key: C1Vision
+      - key: 14
         value: 1
         baseType: 0
-      - key: C2MoveSpeed
+      - key: 15
         value: 2
         baseType: 0
   - unitName: 3002
@@ -348,7 +352,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 5
     visionRange: -64
-    inventorySize: -64
     tags: be0b0000d2070000b90b000089130000
     skills:
     - skillID: 1
@@ -404,7 +407,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -64
-    inventorySize: -64
     tags: a50f0000a20f0000
     skills:
     - skillID: 1
@@ -460,7 +462,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 3
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 4001
@@ -489,7 +490,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -64
-    inventorySize: -64
     tags: c00b0000a70f0000
     skills:
     - skillID: 1
@@ -545,7 +545,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 4
     visionRange: -64
-    inventorySize: -64
     tags: a50f0000a20f0000
     skills:
     - skillID: 1
@@ -601,7 +600,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 1
     visionRange: -64
-    inventorySize: -64
     tags: a50f0000a20f0000
     skills:
     - skillID: 1
@@ -657,7 +655,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 7
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 5001
@@ -686,7 +683,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 5002
@@ -715,7 +711,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 5003
@@ -744,7 +739,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 5004
@@ -773,7 +767,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 4
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 6001
@@ -802,7 +795,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 6002
@@ -831,7 +823,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 6003
@@ -860,7 +851,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 6004
@@ -889,7 +879,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 7001
@@ -918,7 +907,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 7002
@@ -947,7 +935,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 7003
@@ -976,7 +963,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 6
     visionRange: -1
-    inventorySize: -1
     tags: 0000000000000000
     skills: []
   - unitName: 7004
@@ -1005,7 +991,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 8001
@@ -1034,7 +1019,6 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 1
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []
   - unitName: 11002
@@ -1063,6 +1047,5 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 0
     visionRange: -1
-    inventorySize: -1
     tags: 
     skills: []

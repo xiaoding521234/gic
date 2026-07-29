@@ -37,7 +37,6 @@ public class UnitStats : MonoBehaviour, IUnitComponent
     
     { StatType.DamageReduction, new RangedInt(-300, 300, 0) },
     { StatType.DamageBonus, new RangedInt(-300, 300, 0) },
-    { StatType.DamageAmplify, new RangedInt(-300, 300, 0) },
 };
 
     // ==================== 当前属性实例 ====================
@@ -61,7 +60,6 @@ public class UnitStats : MonoBehaviour, IUnitComponent
 
     public float DamageReduction => GetFinalStat(StatType.DamageReduction);
     public float DamageBonus => GetFinalStat(StatType.DamageBonus);
-    public float DamageAmplify => GetFinalStat(StatType.DamageAmplify);
 
     // ==================== 初始化 ====================
     public void Init(Unit owner)

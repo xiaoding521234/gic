@@ -13,6 +13,10 @@ public class TextCombiner : MonoBehaviour
     [Header("条目列表")]
     public List<TextEntry> entries = new List<TextEntry>();
 
+    [Header("文本后处理")]
+    [Tooltip("设置后，最终文本会经过此函数处理（用于动态描述等）")]
+    public System.Func<string, string> textProcessor;
+
     [Header("字体设置")]
     [Tooltip("本地化字体资产表")]
     private LocalizedAssetTable fontTable = new LocalizedAssetTable(TableName.UIAssets.ToString());
@@ -418,7 +422,11 @@ public class TextCombiner : MonoBehaviour
         if (!string.IsNullOrEmpty(globalSuffix))
             sb.Append(globalSuffix);
 
-        textComponent.text = sb.ToString();
+        string finalText = sb.ToString();
+        if (textProcessor != null)
+            finalText = textProcessor(finalText);
+
+        textComponent.text = finalText;
     }
 
     void OnDestroy()

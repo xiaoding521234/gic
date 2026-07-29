@@ -54,7 +54,7 @@ public abstract class BaseSkill
         
     }
 
-    public SkillParam GetParam(string key)
+    public SkillParam GetParam(SkillParamKey key)
     {
         foreach (var p in SkillParams)
         {

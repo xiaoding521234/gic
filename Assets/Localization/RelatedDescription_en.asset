@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21,6 +21,11 @@ MonoBehaviour:
   - m_Id: 1
     m_Localized: 3 Durability. When the holder takes 50 or more DMG, Baron Bunny
       blocks it and loses 1 Durability.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11512500209799168
+    m_Localized: An Outrider of the Knights of Favonius and Mondstadt's Gliding Champion.
+      Her endless energy makes her a trustworthy companion.
     m_Metadata:
       m_Items: []
   references:

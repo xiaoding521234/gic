@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -43,23 +43,23 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
-    m_Localized: "\u77E2\u306E\u96E8"
+    m_Localized: "\u98DB\u884C\u30C1\u30E3\u30F3\u30D4\u30AA\u30F3"
     m_Metadata:
       m_Items: []
   - m_Id: 3001002
-    m_Localized: "\u767E\u767A\u767E\u4E2D"
+    m_Localized: "\u30C0\u30D6\u30EB\u30B7\u30E7\u30C3\u30C8"
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Localized: "\u5168\u9762\u5075\u5BDF"
+    m_Localized: "\u77E2\u306E\u96E8"
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\u98DB\u884C\u51A0\u8ECD"
+    m_Localized: "\u767E\u767A\u767E\u4E2D"
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: "\u30A2\u30F3\u30D0\u30FC\u306E\u547D\u5EA7"
+    m_Localized: "\u5168\u9762\u5075\u5BDF"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001
@@ -176,6 +176,14 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 11002005
     m_Localized: "\u7A7A\u306E\u547D\u5EA7"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24890562406207488
+    m_Localized: "\u30C0\u30D6\u30EB\u30B7\u30E7\u30C3\u30C8"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001006
+    m_Localized: "\u30A2\u30F3\u30D0\u30FC\u661F\u5EA7"
     m_Metadata:
       m_Items: []
   references:

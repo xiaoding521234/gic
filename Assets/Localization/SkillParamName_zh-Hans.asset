@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -72,6 +72,18 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 13
     m_Localized: "2\u547D\u79FB\u901F\u63D0\u5347"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24279222071283712
+    m_Localized: "\u4F53\u529B\u6D88\u8017"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24290055270649856
+    m_Localized: "\u91C7\u96C6\u6B21\u6570"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24290055392284672
+    m_Localized: "\u4F24\u5BB3\u6B21\u6570"
     m_Metadata:
       m_Items: []
   references:

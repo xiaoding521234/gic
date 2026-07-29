@@ -25,7 +25,7 @@ public class SkillConfig : ScriptableObject
         [Header("自定义参数")]
         [SerializeField] public SkillParam[] customParams;
 
-        public int GetInt(string key, int defaultValue = 0)
+        public int GetInt(SkillParamKey key, int defaultValue = 0)
         {
             if (customParams != null)
             {
@@ -37,7 +37,7 @@ public class SkillConfig : ScriptableObject
             return defaultValue;
         }
 
-        public bool GetBool(string key, bool defaultValue = false)
+        public bool GetBool(SkillParamKey key, bool defaultValue = false)
         {
             if (customParams != null)
             {
@@ -88,23 +88,29 @@ public class SkillConfig : ScriptableObject
 [Serializable]
 public class SkillParam
 {
-    public string key;
+    public SkillParamKey key;
     public int value;
     public SkillBaseType baseType;
 
     public SkillParam()
     { }
 
-    public SkillParam(string key, int value, SkillBaseType baseType)
+    public SkillParam(SkillParamKey key, int value, SkillBaseType baseType)
     {
         this.key = key;
         this.value = value;
         this.baseType = baseType;
     }
 
-    private string GetDisplayValue()
+    /// <summary>
+    /// 获取展示值文本（不含颜色）：
+    /// 固定值 → "3"
+    /// 非固定值 → "100%攻击力"
+    /// </summary>
+    public string GetDisplayValueText()
     {
-        // 固定值不需要加 %
+        if (key == SkillParamKey.None) return null;
+
         if (baseType == SkillBaseType.Fixed)
         {
             return value.ToString();
@@ -113,23 +119,40 @@ public class SkillParam
     }
 
     /// <summary>
-    /// 获取技能参数展示值（右侧）：
-    /// 固定值 → 直接显示数值 如 "3"
-    /// 非固定值 → "100%攻击力" 格式
+    /// 获取带颜色的展示值（用于动态描述注入）
+    /// </summary>
+    public string GetColoredDisplayValue()
+    {
+        string display = GetDisplayValueText();
+        if (string.IsNullOrEmpty(display)) return display;
+
+        // 固定值：数值本身着色
+        // 非固定值：数值着色 + 基础类型名着色
+        if (baseType == SkillBaseType.Fixed)
+        {
+            return $"<color=#FFD700>{display}</color>";
+        }
+        // 非固定值: "100%攻击力" → 数值和类型名一起着色
+        return $"<color=#FFD700>{display}</color>";
+    }
+
+    /// <summary>
+    /// 获取技能参数展示值（右侧）的 Entry：
+    /// 固定值 → "3"
+    /// 非固定值 → "100%攻击力"（类型名通过本地化）
     /// </summary>
     public TextEntry GetValueEntry()
     {
-        if (string.IsNullOrEmpty(key))
+        if (key == SkillParamKey.None)
         {
             return null;
         }
-        string displayValue = GetDisplayValue();
+        string displayValue = GetDisplayValueText();
         if (baseType == SkillBaseType.Fixed)
         {
-            // 固定值：直接返回纯文本，不需要加基于类型的后缀
             return new TextEntry(null, displayValue);
         }
-        TextEntry baseEntry = GetBaseTypeEntry();
+        TextEntry baseEntry = baseType.GetEntry();
         baseEntry.leadingSeparator = displayValue;
         return baseEntry;
     }
@@ -139,20 +162,11 @@ public class SkillParam
     /// </summary>
     public TextEntry GetNameEntry()
     {
-        if (string.IsNullOrEmpty(key))
+        if (key == SkillParamKey.None)
         {
             return null;
         }
-        var localizedString = new LocalizedString(TableName.SkillParamName.ToString(), key);
-        return new TextEntry(localizedString, "");
-    }
-
-    /// <summary>
-    /// 获取技能参数基础类型的本地化 Entry（用于 TextCombiner）
-    /// </summary>
-    private TextEntry GetBaseTypeEntry()
-    {
-        return baseType.GetEntry();
+        return key.GetEntry();
     }
 }
 /// <summary>

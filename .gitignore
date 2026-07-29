@@ -30,6 +30,7 @@ Thumbs.db
 # Generated
 screenshots/
 mem-log/
+Export/
 
 # Build artifacts
 *.apk

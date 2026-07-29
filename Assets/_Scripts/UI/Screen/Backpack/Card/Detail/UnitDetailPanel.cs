@@ -47,7 +47,18 @@ public class UnitDetailPanel : MonoBehaviour, ICardDetailPanel
     {
         var raw = CardConfigResolver.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
         if (raw == null) return;
+        InitInternal(raw, card.saveCardData, card?.cardDetailView?.tagContainer);
+    }
 
+    public void Init(SaveCardData data, bool isReadOnly = false)
+    {
+        var raw = CardConfigResolver.UnitConfig?.GetUnitData(data.id.AsUnitName());
+        if (raw == null) return;
+        InitInternal(raw, data, null);
+    }
+
+    private void InitInternal(UnitConfig.UnitData raw, SaveCardData data, Transform tagContainerFromCard)
+    {
         _top.color = StarColor.GetStarColor(raw.starLevel);
         _bottomImage.color = StarColor.GetStarColor(raw.starLevel);
         nameCard.sprite = raw.nameCard;
@@ -80,8 +91,8 @@ public class UnitDetailPanel : MonoBehaviour, ICardDetailPanel
         move.AddEntry(new TextEntry(null, "："));
         move.AddEntry(new TextEntry(null, raw.GetEffectiveMoveSpeed().ToString()));
 
-        // 标签 — 每个标签生成独立的方形背景芯片
-        RefreshTagChips(card, raw);
+        // 标签
+        RefreshTagChips(raw, tagContainerFromCard);
 
         // 技能面板
         RefreshSkillsPanel(raw);
@@ -108,9 +119,8 @@ public class UnitDetailPanel : MonoBehaviour, ICardDetailPanel
         // 由 CardDetailView 统一处理
     }
 
-    private void RefreshTagChips(Card card, UnitConfig.UnitData unitData)
+    private void RefreshTagChips(UnitConfig.UnitData unitData, Transform container)
     {
-        var container = card?.cardDetailView?.tagContainer;
         if (container == null || tagChipPrefab == null) return;
 
         // 清除旧芯片

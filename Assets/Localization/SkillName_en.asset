@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -43,23 +43,23 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
-    m_Localized: Fiery Rain
+    m_Localized: Flying Champion
     m_Metadata:
       m_Items: []
   - m_Id: 3001002
-    m_Localized: Precise Shot
+    m_Localized: Double Shot
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Localized: Everywhere Outrider
+    m_Localized: Arrow Rain
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: Gliding Champion
+    m_Localized: Sharpshooter
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: Amber's Constellation
+    m_Localized: Scouting
     m_Metadata:
       m_Items: []
   - m_Id: 3002001
@@ -176,6 +176,14 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 11002005
     m_Localized: Aether's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24890562406207488
+    m_Localized: Double Shot
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001006
+    m_Localized: Amber Constellation
     m_Metadata:
       m_Items: []
   references:

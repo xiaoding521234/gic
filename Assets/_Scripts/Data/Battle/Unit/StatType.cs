@@ -42,10 +42,7 @@ public enum StatType
     DamageReduction,
 
     [InspectorName("增伤")]
-    DamageBonus,
-
-    [InspectorName("加深")]
-    DamageAmplify
+    DamageBonus
 }
 
 // StatType 扩展方法

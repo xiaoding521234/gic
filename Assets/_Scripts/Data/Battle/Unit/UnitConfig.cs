@@ -55,9 +55,6 @@ public class UnitConfig : ScriptableObject
         [Header("视野")]
         public int visionRange = Unspecified;
 
-        [Header("背包")]
-        public int inventorySize = Unspecified;
-
         [Header("标签")]
         public UnitTag[] tags;
 
@@ -69,7 +66,7 @@ public class UnitConfig : ScriptableObject
         public int GetDeployCost()
         {
             if (IsSpecified(deployCost)) return deployCost;
-            return starLevel switch { 1 => 10, 2 => 20, 3 => 30, 4 => 50, 5 => 80, _ => 30 };
+            return starLevel switch { 1 => 10, 2 => 20, 3 => 50, 4 => 100, 5 => 300, _ => 50 };
         }
 
         public int GetHPByStarLevel()
@@ -109,7 +106,6 @@ public class UnitConfig : ScriptableObject
         public int GetEffectiveSanity() => IsSpecified(baseSanity) ? baseSanity : 50;
         public int GetEffectiveHP() => IsSpecified(baseHP) ? baseHP : GetHPByStarLevel();
         public int GetEffectiveVisionRange() => IsSpecified(visionRange) ? visionRange : 1;
-        public int GetEffectiveInventorySize() => IsSpecified(inventorySize) ? inventorySize : 2;
         public int GetEffectiveDeployCost() => IsSpecified(deployCost) ? deployCost : GetDeployCost();
 
         /// <summary>

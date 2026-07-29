@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -72,6 +72,18 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 13
     m_Localized: C2 Move SPD Bonus
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24279222071283712
+    m_Localized: Stamina Cost
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24290055270649856
+    m_Localized: Collect Count
+    m_Metadata:
+      m_Items: []
+  - m_Id: 24290055392284672
+    m_Localized: Hit Count
     m_Metadata:
       m_Items: []
   references:

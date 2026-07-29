@@ -267,8 +267,7 @@ public class UnitDataEditorWindow : EditorWindow
             {
                 list.serializedProperty.arraySize++;
                 var newEl = list.serializedProperty.GetArrayElementAtIndex(list.serializedProperty.arraySize - 1);
-                newEl.FindPropertyRelative("key").stringValue = "";
-                newEl.FindPropertyRelative("displayName").stringValue = "";
+                newEl.FindPropertyRelative("key").intValue = 0;
                 newEl.FindPropertyRelative("value").intValue = 0;
                 newEl.FindPropertyRelative("baseType").intValue = 0;
                 configSerializedObject.ApplyModifiedProperties();
@@ -291,7 +290,6 @@ public class UnitDataEditorWindow : EditorWindow
 
         var paramElement = currentCustomParamsProperty.GetArrayElementAtIndex(index);
         var keyProperty = paramElement.FindPropertyRelative("key");
-        var displayNameProperty = paramElement.FindPropertyRelative("displayName");
         var valueProperty = paramElement.FindPropertyRelative("value");
         var baseTypeProperty = paramElement.FindPropertyRelative("baseType");
 
@@ -299,30 +297,26 @@ public class UnitDataEditorWindow : EditorWindow
         float pad = 2f;
 
         Rect row1 = new Rect(contentRect.x, contentRect.y, contentRect.width, lineH);
-        float labelW1 = 25f, labelW2 = 35f;
-        float fieldW = (row1.width - labelW1 - labelW2 - pad * 2) / 2;
+        float labelW1 = 30f, labelW2 = 30f;
+        float fieldW = (row1.width - labelW1 - labelW2 - pad) / 2;
 
-        EditorGUI.LabelField(new Rect(row1.x, row1.y, labelW1, lineH), "Key");
-        keyProperty.stringValue = EditorGUI.TextField(
-            new Rect(row1.x + labelW1, row1.y, fieldW, lineH), keyProperty.stringValue);
+        EditorGUI.LabelField(new Rect(row1.x, row1.y, labelW1, lineH), "参数");
+        keyProperty.intValue = EditorGUI.Popup(
+            new Rect(row1.x + labelW1, row1.y, fieldW, lineH),
+            keyProperty.intValue, keyProperty.enumDisplayNames);
 
-        EditorGUI.LabelField(new Rect(row1.x + labelW1 + fieldW + pad, row1.y, labelW2, lineH), "显示名");
-        displayNameProperty.stringValue = EditorGUI.TextField(
+        EditorGUI.LabelField(new Rect(row1.x + labelW1 + fieldW + pad, row1.y, labelW2, lineH), "类型");
+        baseTypeProperty.intValue = EditorGUI.Popup(
             new Rect(row1.x + labelW1 + fieldW + pad + labelW2, row1.y, fieldW, lineH),
-            displayNameProperty.stringValue);
+            baseTypeProperty.intValue, baseTypeProperty.enumDisplayNames);
 
         Rect row2 = new Rect(contentRect.x, contentRect.y + lineH + pad, contentRect.width, lineH);
-        float vw1 = 25f, vw2 = 30f, vw3 = 100f;
-        float vFieldW = row2.width - vw1 - vw2 - vw3 - pad * 2;
+        float vw1 = 30f;
+        float vFieldW = row2.width - vw1 - pad;
 
         EditorGUI.LabelField(new Rect(row2.x, row2.y, vw1, lineH), "值");
         valueProperty.intValue = EditorGUI.IntField(
             new Rect(row2.x + vw1, row2.y, vFieldW, lineH), valueProperty.intValue);
-
-        EditorGUI.LabelField(new Rect(row2.x + vw1 + vFieldW + pad, row2.y, vw2, lineH), "类型");
-        baseTypeProperty.intValue = EditorGUI.Popup(
-            new Rect(row2.x + vw1 + vFieldW + pad + vw2, row2.y, vw3, lineH),
-            baseTypeProperty.intValue, baseTypeProperty.enumDisplayNames);
     }
 
     #endregion

@@ -43,7 +43,17 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
 
     public void Init(Card card)
     {
-        var raw = CardConfigResolver.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
+        InitInternal(card.saveCardData, false);
+    }
+
+    public void Init(SaveCardData data, bool isReadOnly = false)
+    {
+        InitInternal(data, isReadOnly);
+    }
+
+    private void InitInternal(SaveCardData data, bool isReadOnly)
+    {
+        var raw = CardConfigResolver.ItemConfig?.GetItemData(data.id.AsItemName());
         if (raw == null) return;
 
         _top.color = StarColor.GetStarColor(raw.starLevel);
@@ -57,7 +67,7 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
         _cardName.AddEntry(raw.itemID.GetEntry());
 
         // 图标
-        itemImage.sprite = raw.GetIcon(card.saveCardData.skin);
+        itemImage.sprite = raw.GetIcon(data.skin);
 
         // 主标签
         mainTag.ClearAllEntries();
@@ -86,9 +96,13 @@ public class ItemDetailPanel : MonoBehaviour, ICardDetailPanel
         _description.ClearAllEntries();
         _description.AddEntry(raw.GetDescriptionEntry());
 
-        // 使用按钮
-        if (raw is IUsable usable)
-            SetUsable(usable, card.saveCardData);
+        // 使用按钮（只读模式下隐藏）
+        if (isReadOnly)
+        {
+            if (useButton != null) useButton.gameObject.SetActive(false);
+        }
+        else if (raw is IUsable usable)
+            SetUsable(usable, data);
         else
             SetUsable(null, null);
     }
