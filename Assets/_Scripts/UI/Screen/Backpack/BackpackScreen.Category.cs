@@ -39,7 +39,7 @@ public partial class BackpackScreen
             categoryText.AddEntry(new LocalizedString(TableName.UIText.ToString(), newTab.ToString()));
         }
 
-        EventBusHub.Instance.Publish(new OnBackpackCategorySyncEvent { Tab = newTab });
+        EventBusHub.Instance.SendImmediate(new OnBackpackCategorySyncEvent { Tab = newTab });
 
         if (!isInit) RefreshCardList();
     }

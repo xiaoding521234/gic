@@ -96,7 +96,7 @@ public class Card : MonoBehaviour
             if (isEditMode)
             {
                 bool inDeck = saveCardData?.HasInDeck(GetCurrentDeckId()) ?? false;
-                EventBusHub.Instance.Publish(new OnCardClickedInEditModeEvent
+                EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
                 {
                     CardData = saveCardData,
                     IsInDeck = inDeck

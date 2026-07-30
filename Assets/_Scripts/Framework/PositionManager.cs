@@ -57,7 +57,7 @@ public class PositionManager : IWargameManager
         // 切换位置时播放新位置的音乐
         PlayCurrentPositionMusic();
 
-        EventBusHub.Instance.Send(new OnPositionChangedEvent
+        EventBusHub.Instance.SendImmediate(new OnPositionChangedEvent
         {
             PositionName = CurrentPosition
         });

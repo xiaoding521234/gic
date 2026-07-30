@@ -201,7 +201,7 @@ public class GameScene : MonoBehaviour
     {
         if (EventBusHub.Instance != null)
         {
-            EventBusHub.Instance.Send(new OnSceneActivatedEvent
+            EventBusHub.Instance.SendImmediate(new OnSceneActivatedEvent
             {
                 SceneName = newScene.name
             });

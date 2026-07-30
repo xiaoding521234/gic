@@ -33,7 +33,7 @@ public class DeckChooseView : MonoBehaviour
 
         if (isOn)
         {
-            EventBusHub.Instance.Publish(new OnDeckChangedEvent
+            EventBusHub.Instance.SendImmediate(new OnDeckChangedEvent
             {
                 DeckId = deckID
             });

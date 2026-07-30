@@ -34,7 +34,7 @@ public class ItemCategoryView : MonoBehaviour
 
         if (isOn)
         {
-            EventBusHub.Instance.Publish(new OnBackpackCategoryChangedEvent
+            EventBusHub.Instance.SendImmediate(new OnBackpackCategoryChangedEvent
             {
                 Tab = tab
             });

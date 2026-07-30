@@ -7,7 +7,6 @@ public class EventBusHub : MonoBehaviour
     public static EventBusHub Instance { get; private set; }
 
     [Header("设置")]
-    [SerializeField] private int _targetFrameRate = 60;
     [SerializeField] private bool _dontDestroyOnLoad = true;
 
     [Header("组件引用")]
@@ -32,14 +31,13 @@ public class EventBusHub : MonoBehaviour
 
         // 初始化本地事件总线
         LocalEventBus = new LocalEventBus();
-        LocalEventBus.SetTargetFrameRate(_targetFrameRate);
 
         Debug.Log("[EventBusHub] 初始化完成");
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
-        LocalEventBus?.Update();
+        LocalEventBus?.Tick();
     }
 
     #region 核心路由逻辑
@@ -65,6 +63,9 @@ public class EventBusHub : MonoBehaviour
             eventData.SourcePlayerID = PlayerID.Unknown;
     }
 
+    [Header("调试")]
+    [SerializeField] private bool _enableDebugLog = false;
+
     public void Publish(BaseEvent eventData)
     {
         if (eventData == null || !eventData.Active)
@@ -79,13 +80,15 @@ public class EventBusHub : MonoBehaviour
         switch (eventData.Type)
         {
             case EventType.Local:
-                Debug.Log($"[EventBusHub] SendEvent: 本地事件 Type={eventData.GetType().Name}, SourcePlayerID={eventData.SourcePlayerID}");
+                if (_enableDebugLog)
+                    Debug.Log($"[EventBusHub] SendEvent: 本地事件 Type={eventData.GetType().Name}, SourcePlayerID={eventData.SourcePlayerID}");
                 LocalEventBus?.Send(eventData);
                 break;
 
             case EventType.All:
             case EventType.OnlyHost:
-                Debug.Log($"[EventBusHub] SendEvent: 网络事件 Type={eventData.GetType().Name}, EventType={eventData.Type}, SourcePlayerID={eventData.SourcePlayerID}");
+                if (_enableDebugLog)
+                    Debug.Log($"[EventBusHub] SendEvent: 网络事件 Type={eventData.GetType().Name}, EventType={eventData.Type}, SourcePlayerID={eventData.SourcePlayerID}");
                 if (_networkEventBus != null)
                 {
                     if (eventData.Type == EventType.All)
@@ -171,16 +174,21 @@ public class EventBusHub : MonoBehaviour
 
     #region 公共静态 API
 
-    public void SetTargetFrameRate(int frameRate)
-    {
-        _targetFrameRate = frameRate;
-        LocalEventBus?.SetTargetFrameRate(frameRate);
-    }
-
     /// <summary>
     /// 发布事件 — 自动判断本地/网络路由
     /// </summary>
     public void Send(BaseEvent eventData) => Instance?.Publish(eventData);
+
+    /// <summary>
+    /// 发布本地事件 — 立即执行，不进入队列
+    /// </summary>
+    public void SendImmediate(BaseEvent eventData)
+    {
+        if (eventData == null) return;
+        eventData.Immediate = true;
+        eventData.Type = EventType.Local;
+        Instance?.Publish(eventData);
+    }
 
     public void SendToPlayer(string targetPlayerID, BaseEvent eventData)
     {

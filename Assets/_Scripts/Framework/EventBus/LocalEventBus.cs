@@ -21,67 +21,20 @@ public class LocalEventBus
 
     private HashSet<BaseEvent> _processingEvents = new();
 
-    private int _targetFrameRate = 60;
-    private float _fixedTimeStep;
-    private float _accumulatedTime;
-    private float _lastProcessTime;
-
     public int QueuedEventCount => _eventQueue.Count;
     public bool HasQueuedEvents => _eventQueue.Count > 0;
     public EventBusLockState CurrentLockState => _currentLockState;
     public bool IsLocked => _currentLockState != EventBusLockState.None;
 
-    public LocalEventBus()
-    {
-        InitializeFixedFrameRate();
-    }
-
-    #region 帧率控制
-
-    public void InitializeFixedFrameRate()
-    {
-        _fixedTimeStep = 1f / _targetFrameRate;
-        _accumulatedTime = 0f;
-        _lastProcessTime = Time.realtimeSinceStartup;
-    }
-
-    public void SetTargetFrameRate(int frameRate)
-    {
-        if (frameRate <= 0) return;
-        _targetFrameRate = frameRate;
-        InitializeFixedFrameRate();
-    }
-
-    public void Update()
-    {
-        ProcessEventsWithFixedRate();
-    }
-
-    private void ProcessEventsWithFixedRate()
-    {
-        float currentTime = Time.realtimeSinceStartup;
-        float deltaTime = currentTime - _lastProcessTime;
-        deltaTime = Mathf.Min(deltaTime, 0.1f);
-
-        _accumulatedTime += deltaTime;
-        _lastProcessTime = currentTime;
-
-        while (_accumulatedTime >= _fixedTimeStep)
-        {
-            ProcessOneHandlerPerFrame();
-            _accumulatedTime -= _fixedTimeStep;
-
-            if (_eventQueue.Count == 0)
-            {
-                _accumulatedTime = 0;
-                break;
-            }
-        }
-    }
-
-    #endregion
-
     #region 事件处理
+
+    /// <summary>
+    /// 每个 FixedUpdate 调用一次，处理一个 handler
+    /// </summary>
+    public void Tick()
+    {
+        ProcessOneHandlerPerFrame();
+    }
 
     private void ProcessOneHandlerPerFrame()
     {
@@ -194,8 +147,15 @@ public class LocalEventBus
                 if (!eventData.Active)
                 {
                     queued.State = EventProcessState.Cancelled;
+                    return;
                 }
 
+                // 没有更多handler了，立即标记完成（不浪费一个tick）
+                if (queued.CurrentHandlerIndex >= list.Count)
+                {
+                    queued.State = EventProcessState.Completed;
+                }
+                // 还有更多handler，等下一个tick处理
                 return;
             }
 

@@ -85,7 +85,7 @@ public partial class BackpackScreen : MonoBehaviour
         _cardClickedHandler = new CardClickedInEditHandler(this);
         EventBusHub.Instance.Subscribe(_cardClickedHandler);
 
-        EventBusHub.Instance.Publish(new OnBackpackDeckSyncEvent { DeckId = currentDeckId });
+        EventBusHub.Instance.SendImmediate(new OnBackpackDeckSyncEvent { DeckId = currentDeckId });
 
         CachePanelPositions();
         CacheButtonPositions();
