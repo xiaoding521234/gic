@@ -21,8 +21,6 @@ MonoBehaviour:
     elements:
     - elementType: 7
       stacks: 1
-    tags: 00000000
-    category: 2
     subType: 0
     maxStack: 9999
     maxPrepareCount: 40
@@ -38,8 +36,6 @@ MonoBehaviour:
     elements:
     - elementType: 5
       stacks: 1
-    tags: 00000000
-    category: 2
     subType: 0
     maxStack: 9999
     maxPrepareCount: 20
@@ -55,25 +51,6 @@ MonoBehaviour:
     elements:
     - elementType: 6
       stacks: 1
-    tags: 00000000
-    category: 2
-    subType: 0
-    maxStack: 9999
-    maxPrepareCount: 2
-    countPerServing: 1
-    recycleAfterBattle: 1
-    recycleLossCount: 0
-    customParams: []
-  - _isInitialized: 1
-    itemID: 1004
-    icon:
-    - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
-    starLevel: 4
-    elements:
-    - elementType: 4
-      stacks: 1
-    tags: 00000000
-    category: 2
     subType: 0
     maxStack: 9999
     maxPrepareCount: 2
@@ -89,8 +66,6 @@ MonoBehaviour:
     elements:
     - elementType: 8
       stacks: 1
-    tags: 00000000
-    category: 2
     subType: 0
     maxStack: 9999
     maxPrepareCount: 100
@@ -101,18 +76,14 @@ MonoBehaviour:
   - _isInitialized: 1
     itemID: 3001
     icon:
-    - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
-    starLevel: 2
+    - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
+    starLevel: 4
     elements:
-    - elementType: 3
+    - elementType: 4
       stacks: 1
-    - elementType: 2
-      stacks: 1
-    tags: 020000000700000005000000
-    category: 1
-    subType: 4
+    subType: 2
     maxStack: 9999
-    maxPrepareCount: 5
+    maxPrepareCount: 2
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
@@ -125,8 +96,6 @@ MonoBehaviour:
     elements:
     - elementType: 6
       stacks: 1
-    tags: 030000000400000005000000
-    category: 1
     subType: 3
     maxStack: 9999
     maxPrepareCount: 10
@@ -142,8 +111,6 @@ MonoBehaviour:
     elements:
     - elementType: 1
       stacks: 1
-    tags: 0300000004000000
-    category: 1
     subType: 3
     maxStack: 9999
     maxPrepareCount: 10
@@ -159,8 +126,6 @@ MonoBehaviour:
     elements:
     - elementType: 3
       stacks: 1
-    tags: 0300000004000000
-    category: 1
     subType: 3
     maxStack: 9999
     maxPrepareCount: 10
@@ -176,8 +141,6 @@ MonoBehaviour:
     elements:
     - elementType: 6
       stacks: 1
-    tags: 0300000004000000
-    category: 1
     subType: 3
     maxStack: 9999
     maxPrepareCount: 10
@@ -193,11 +156,26 @@ MonoBehaviour:
     elements:
     - elementType: 6
       stacks: 1
-    tags: 0300000004000000
-    category: 1
     subType: 3
     maxStack: 9999
     maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
+    itemID: 5001
+    icon:
+    - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
+    starLevel: 2
+    elements:
+    - elementType: 3
+      stacks: 1
+    - elementType: 2
+      stacks: 1
+    subType: 4
+    maxStack: 9999
+    maxPrepareCount: 5
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0

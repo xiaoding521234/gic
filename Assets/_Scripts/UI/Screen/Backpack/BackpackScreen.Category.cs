@@ -1,6 +1,9 @@
 // ==================== BackpackScreen.Category.cs ====================
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using LocalEvents;
+using UnityEngine;
 using UnityEngine.Localization;
 
 public partial class BackpackScreen
@@ -9,6 +12,7 @@ public partial class BackpackScreen
     {
         BackpackTab.Character,
         BackpackTab.Creation,
+        BackpackTab.Building,
         BackpackTab.Equipment,
         BackpackTab.Consumable,
         BackpackTab.Material,
@@ -28,6 +32,19 @@ public partial class BackpackScreen
         SetCategory(TabOrder[(idx + 1) % TabOrder.Length], isInit: false);
     }
 
+    private void CacheTabViews()
+    {
+        _tabViews.Clear();
+        // 直接在 Canvas 下找 TabContainer
+        var tc = GameObject.Find("Canvas/TopPanel/TabContainer");
+        if (tc == null) return;
+        for (int i = 0; i < tc.transform.childCount; i++)
+        {
+            var view = tc.transform.GetChild(i).GetComponent<ItemCategoryView>();
+            if (view != null) _tabViews.Add(view);
+        }
+    }
+
     private void SetCategory(BackpackTab newTab, bool isInit)
     {
         if (currentTab == newTab && !isInit) return;
@@ -41,7 +58,68 @@ public partial class BackpackScreen
 
         EventBusHub.Instance.SendImmediate(new OnBackpackCategorySyncEvent { Tab = newTab });
 
+        if (!isInit)
+            SlideSelectLineTo(newTab);
+
         if (!isInit) RefreshCardList();
+    }
+
+    private void SnapSelectLineTo(BackpackTab tab)
+    {
+        if (sharedSelectLine == null) return;
+
+        ItemCategoryView target = null;
+        foreach (var view in _tabViews)
+        {
+            if (view != null && view.tab == tab) { target = view; break; }
+        }
+        if (target == null) return;
+
+        var targetRT = target.GetComponent<RectTransform>();
+        sharedSelectLine.position = new Vector2(targetRT.position.x, sharedSelectLine.position.y);
+    }
+
+    private void SlideSelectLineTo(BackpackTab tab)
+    {
+        if (sharedSelectLine == null) return;
+
+        ItemCategoryView target = null;
+        foreach (var view in _tabViews)
+        {
+            if (view != null && view.tab == tab)
+            {
+                target = view;
+                break;
+            }
+        }
+
+        if (target == null) return;
+
+        // 用世界坐标 position（和 SettingsScreen 一样的做法）
+        var targetRT = target.GetComponent<RectTransform>();
+        if (_lineCoroutine != null) StopCoroutine(_lineCoroutine);
+        _lineCoroutine = StartCoroutine(SlideLineCoroutine(targetRT));
+    }
+
+    private IEnumerator SlideLineCoroutine(RectTransform targetRT)
+    {
+        float startX = sharedSelectLine.position.x;
+        float targetX = targetRT.position.x;
+        float y = sharedSelectLine.position.y; // 固定 Y
+
+        float elapsed = 0f;
+        while (elapsed < lineSlideDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / lineSlideDuration;
+            t = 1f - Mathf.Pow(1f - t, 3f); // ease out cubic
+
+            float x = Mathf.Lerp(startX, targetX, t);
+            sharedSelectLine.position = new Vector2(x, y);
+            yield return null;
+        }
+
+        sharedSelectLine.position = new Vector2(targetX, y);
     }
 
     private void OnClose()

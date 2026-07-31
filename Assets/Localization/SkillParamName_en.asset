@@ -63,7 +63,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 11
-    m_Localized: C1 Move SPD Bonus
+    m_Localized: Stamina Cost
     m_Metadata:
       m_Items: []
   - m_Id: 12

@@ -1,7 +1,9 @@
 // ==================== BackpackScreen.Deck.cs ====================
 using System.Collections;
+using System.Collections.Generic;
 using LocalEvents;
 using UnityEngine;
+using UnityEngine.UI;
 
 public partial class BackpackScreen
 {
@@ -21,6 +23,9 @@ public partial class BackpackScreen
         saveManager.CurrentSave.currentDeck = newDeckId;
         saveManager.SaveGame();
         RefreshCardList();
+
+        if (isEditMode)
+            RefreshDeckPanel();
     }
 
     private void OnToggleEditMode()
@@ -52,6 +57,8 @@ public partial class BackpackScreen
         {
             if (card != null) card.EnterEditMode();
         }
+
+        RefreshDeckPanel();
     }
 
     private void ExitEditMode()
@@ -71,6 +78,8 @@ public partial class BackpackScreen
         {
             if (card != null) card.ExitEditDeck();
         }
+
+        ClearDeckPanel();
     }
 
     private IEnumerator SlideEditPanel(bool slideIn)
@@ -141,6 +150,46 @@ public partial class BackpackScreen
         }
 
         UpdateDeckCountText();
+        RefreshDeckPanel();
+    }
+
+    private void RefreshDeckPanel()
+    {
+        if (_deckCardPool == null || deckContent == null) return;
+
+        ClearDeckPanel();
+
+        if (currentDeckId < 0 || currentDeckId >= cardManager.decks.Length) return;
+
+        // 用 deck.Cards（已排序）而非 currentDeckCards（HashSet 无序）
+        foreach (var cardData in cardManager.decks[currentDeckId].Cards)
+        {
+            Card card = _deckCardPool.Get(cardData, cardDetailView);
+            if (card == null) continue;
+
+            card.isDeckPanelMode = true;
+            card.SetViewType(ViewType.Display);
+            card.transform.localScale = Vector3.one * deckCardScale;
+
+            if (card.toggle != null) card.toggle.group = null;
+            deckSpawnedCards.Add(card);
+        }
+    }
+
+    private void ClearDeckPanel()
+    {
+        foreach (var c in deckSpawnedCards)
+        {
+            if (c != null)
+            {
+                c.transform.localScale = Vector3.one;
+                c.isDeckPanelMode = false;
+                c.ExitEditDeck(); // 重置 overlay 和 isEditMode
+                c.transform.localScale = Vector3.one; // 重置缩放
+                _deckCardPool.Release(c);
+            }
+        }
+        deckSpawnedCards.Clear();
     }
 
     private Card FindCardByData(SaveCardData cardData)
@@ -166,4 +215,4 @@ public partial class BackpackScreen
             return cardManager.decks[currentDeckId].Count;
         return 0;
     }
-}  
+}

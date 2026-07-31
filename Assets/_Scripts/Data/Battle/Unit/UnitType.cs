@@ -7,10 +7,13 @@ using UnityEngine.Localization;
 public enum UnitType
 {
     [InspectorName("角色")]
-    Character = 1,      // 可操控的角色
+    Character = 1,      // 可操控的角色，可编入卡组，有命座
 
     [InspectorName("造物")]
-    Creation = 2,       // 元素造物、建筑、场景交互物
+    Creation = 2,       // 元素造物，不可编入卡组，由技能召唤产出
+
+    [InspectorName("建筑")]
+    Building = 3,       // 建筑，可编入卡组，无命座，重复打出=加一个，战技=科技面板
 }
 
 /// <summary>

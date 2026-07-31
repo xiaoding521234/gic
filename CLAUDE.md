@@ -30,14 +30,17 @@
 - **`IWargameManager`**: Manager 接口，定义 `Start()` 和 `Update(float deltaTime)`
 - **`GameScene`**: 场景管理器（MonoBehaviour 单例，DontDestroyOnLoad），负责场景加载/卸载/历史栈
 - **`EventBusHub`**: 事件总线中枢（MonoBehaviour 单例），自动路由本地/网络事件
-  - `LocalEventBus`: 本地事件队列，按帧率处理
+  - `LocalEventBus`: 本地事件队列，FixedUpdate 驱动（默认50fps），每 tick 处理一个 handler
+  - `Send()`: 入队事件，按优先级处理
+  - `SendImmediate()`: 立即执行事件，不入队（用于 UI 同步等场景）
   - `NetworkEventBus`: 基于 Mirror 的网络事件同步
 - **Manager 列表**: ConfigManager, SaveManager, InputManager, UIManager, CardManager, PositionManager, PlayerManager, SkillManager, UnitManager
 
 ### 事件系统 (`_Scripts/Data/Event/`)
 
 - **`BaseEvent`**: 所有事件基类，包含 `SourcePlayerID`、`EventType`（Local/All/OnlyHost）、`Immediate` 等字段
-- 事件通过 `EventBusHub.Instance.Send(event)` 发布
+- 事件通过 `EventBusHub.Instance.Send(event)` 发布（入队）或 `SendImmediate(event)` 发布（立即执行）
+- 事件按 handler 优先级处理（高→低），每 FixedUpdate tick 处理一个 handler
 - 本地事件定义在 `LocalEvents.cs`，网络事件定义在 `PlayerNetworkEvents.cs`
 
 ### 场景系统 (`_Scripts/Data/SceneType.cs`)

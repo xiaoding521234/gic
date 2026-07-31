@@ -61,6 +61,8 @@ public partial class BackpackScreen
     private IEnumerator SpawnCardsWithDelay(List<SaveCardData> cardDataList)
     {
         bool isFirst = true;
+        float interval = 0.012f;
+        float elapsed = 0f;
         foreach (var data in cardDataList)
         {
             SpawnCard(data);
@@ -69,7 +71,13 @@ public partial class BackpackScreen
                 spawnedCards[0].toggle.isOn = true;
                 isFirst = false;
             }
-            yield return new WaitForSeconds(0.012f);
+            // 帧率无关的间隔等待
+            elapsed = 0f;
+            while (elapsed < interval)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
         }
 
         if (isEditMode)
@@ -94,7 +102,13 @@ public partial class BackpackScreen
     private void ReleaseSpawnedCards()
     {
         foreach (var c in spawnedCards)
-            if (c != null) _cardPool.Release(c);
+        {
+            if (c != null)
+            {
+                c.ExitEditDeck(); // 重置 overlay 和 isEditMode
+                _cardPool.Release(c);
+            }
+        }
         spawnedCards.Clear();
     }
 }

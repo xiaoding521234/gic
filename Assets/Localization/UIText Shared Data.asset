@@ -403,6 +403,14 @@ MonoBehaviour:
     m_Key: Drink
     m_Metadata:
       m_Items: []
+  - m_Id: 26188703944364032
+    m_Key: Building
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26188703973724160
+    m_Key: Accessory
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

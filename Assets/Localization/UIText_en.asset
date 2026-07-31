@@ -406,6 +406,14 @@ MonoBehaviour:
     m_Localized: Drink
     m_Metadata:
       m_Items: []
+  - m_Id: 26188703944364032
+    m_Localized: Building
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26188703973724160
+    m_Localized: Accessory
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

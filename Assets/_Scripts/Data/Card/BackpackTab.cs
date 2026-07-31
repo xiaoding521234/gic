@@ -8,11 +8,12 @@ public enum BackpackTab
 {
     [InspectorName("角色")]     Character = 0,
     [InspectorName("造物")]     Creation = 1,
-    [InspectorName("装备")]     Equipment = 2,
-    [InspectorName("消耗品")]   Consumable = 3,
-    [InspectorName("材料")]     Material = 4,
-    [InspectorName("货币")]     Currency = 5,
-    [InspectorName("任务")]     Quest = 6,
+    [InspectorName("建筑")]     Building = 2,
+    [InspectorName("装备")]     Equipment = 3,
+    [InspectorName("消耗品")]   Consumable = 4,
+    [InspectorName("材料")]     Material = 5,
+    [InspectorName("货币")]     Currency = 6,
+    [InspectorName("任务")]     Quest = 7,
 }
 
 /// <summary>

@@ -144,7 +144,6 @@ public class PlayerSaveData
             ItemName.Mora,
             ItemName.IntertwinedFate,
             ItemName.Stamina,
-            ItemName.Magatama,
             ItemName.Primogem
         };
 
@@ -159,7 +158,6 @@ public class PlayerSaveData
                 ItemName.Mora => 100,
                 ItemName.IntertwinedFate => 60,
                 ItemName.Stamina => 10,
-                ItemName.Magatama => 10,
                 ItemName.Primogem => 1600,
                 _ => 1
             };

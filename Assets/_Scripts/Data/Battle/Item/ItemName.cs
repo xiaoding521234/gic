@@ -20,14 +20,12 @@ public enum ItemName
     [InspectorName("体力")]
     Stamina = 1003,
 
-    [InspectorName("勾玉")]
-    Magatama = 1004,
     [InspectorName("原石")]
     Primogem = 1005,
 
     #endregion
 
-    #region 装备
+    #region 武器
 
     [InspectorName("铁剑")]
     IronSword = 2001,
@@ -38,12 +36,10 @@ public enum ItemName
 
     #endregion
 
-    #region 饮品
+    #region 配件
 
-    [InspectorName("蒲公英酒")]
-    DandelionWine = 3001,
-    [InspectorName("迪奥娜特调")]
-    DionaSpecial = 3002,
+    [InspectorName("勾玉")]
+    Magatama = 3001,
 
     #endregion
 
@@ -62,31 +58,40 @@ public enum ItemName
 
     #endregion
 
+    #region 饮品
+
+    [InspectorName("蒲公英酒")]
+    DandelionWine = 5001,
+    [InspectorName("迪奥娜特调")]
+    DionaSpecial = 5002,
+
+    #endregion
+
     #region 材料
 
     [InspectorName("火晶体")]
-    FireCrystal = 5001,
+    FireCrystal = 6001,
     [InspectorName("水晶体")]
-    WaterCrystal = 5002,
+    WaterCrystal = 6002,
     [InspectorName("雷晶体")]
-    ThunderCrystal = 5003,
+    ThunderCrystal = 6003,
     [InspectorName("风晶体")]
-    WindCrystal = 5004,
+    WindCrystal = 6004,
     [InspectorName("冰晶体")]
-    IceCrystal = 5005,
+    IceCrystal = 6005,
     [InspectorName("岩晶体")]
-    RockCrystal = 5006,
+    RockCrystal = 6006,
     [InspectorName("草晶体")]
-    GrassCrystal = 5007,
+    GrassCrystal = 6007,
 
     #endregion
 
     #region 任务物品
 
     [InspectorName("神秘钥匙")]
-    MysteryKey = 6001,
+    MysteryKey = 7001,
     [InspectorName("古老卷轴")]
-    AncientScroll = 6002,
+    AncientScroll = 7002,
 
     #endregion
 }

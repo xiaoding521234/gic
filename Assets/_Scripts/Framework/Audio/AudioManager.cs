@@ -66,10 +66,35 @@ public partial class AudioManager : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
             InitializeAudioManager();
+            
+            // AudioManager 持有全局唯一的 AudioListener（DontDestroyOnLoad 永不消失）
+            if (GetComponent<AudioListener>() == null)
+                gameObject.AddComponent<AudioListener>();
         }
         else
         {
             Destroy(gameObject);
+        }
+    }
+
+    void OnEnable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        // 禁用场景里摄像机上的 AudioListener，避免和 AudioManager 上的重复
+        var listeners = FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
+        foreach (var l in listeners)
+        {
+            if (l.transform != transform)
+                l.enabled = false;
         }
     }
 

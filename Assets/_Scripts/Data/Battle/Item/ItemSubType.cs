@@ -8,7 +8,7 @@ public enum ItemSubType
 {
     [InspectorName("货币")]   Currency = 0,
     [InspectorName("武器")]   Weapon = 1,
-    [InspectorName("圣遗物")] Artifact = 2,
+    [InspectorName("配件")]   Accessory = 2,
     [InspectorName("食物")]   Food = 3,
     [InspectorName("饮品")]   Drink = 4,
     [InspectorName("材料")]   Material = 5,
@@ -27,7 +27,7 @@ public static class ItemSubTypeExtensions
     {
         ItemSubType.Currency  => BackpackTab.Currency,
         ItemSubType.Weapon    => BackpackTab.Equipment,
-        ItemSubType.Artifact  => BackpackTab.Equipment,
+        ItemSubType.Accessory => BackpackTab.Equipment,
         ItemSubType.Food      => BackpackTab.Consumable,
         ItemSubType.Drink     => BackpackTab.Consumable,
         ItemSubType.Material  => BackpackTab.Material,

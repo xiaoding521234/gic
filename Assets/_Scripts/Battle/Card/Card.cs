@@ -9,6 +9,7 @@ public class Card : MonoBehaviour
     public CardType cardType => saveCardData?.id.cardType ?? CardType.Item;
     public ViewType viewType = ViewType.Display;
     public bool isEditMode = false;
+    public bool isDeckPanelMode = false;
 
     public Toggle toggle;
     public Image cardBack;
@@ -31,6 +32,8 @@ public class Card : MonoBehaviour
     [SerializeField] private CanvasGroup canvasGroup;
     private float fadeInDuration = 0.2f;
     [SerializeField] private AnimationCurve fadeCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+    [SerializeField] private float slideOffset = 30f;
+    [SerializeField] private RectTransform content; // 卡片内容容器，位移作用于此
 
     private ICardViewStrategy _strategy;
 
@@ -41,7 +44,14 @@ public class Card : MonoBehaviour
 
     private void OnEnable()
     {
+        ResetContentPosition();
         PlayFadeIn();
+    }
+
+    private void ResetContentPosition()
+    {
+        if (content != null)
+            content.anchoredPosition = Vector2.zero;
     }
 
     public void PlayFadeIn()
@@ -55,15 +65,22 @@ public class Card : MonoBehaviour
         float elapsed = 0f;
         canvasGroup.alpha = 0f;
 
+        RectTransform rt = content != null ? content : GetComponent<RectTransform>();
+        Vector2 targetPos = rt.anchoredPosition;
+        Vector2 startPos = targetPos - new Vector2(0f, slideOffset);
+        rt.anchoredPosition = startPos;
+
         while (elapsed < fadeInDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / fadeInDuration;
-            canvasGroup.alpha = fadeCurve.Evaluate(t);
+            float t = fadeCurve.Evaluate(elapsed / fadeInDuration);
+            canvasGroup.alpha = t;
+            rt.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
             yield return null;
         }
 
         canvasGroup.alpha = 1f;
+        rt.anchoredPosition = targetPos;
     }
 
     public void Init(SaveCardData data, CardDetailView detailView)
@@ -93,7 +110,17 @@ public class Card : MonoBehaviour
 
         if (isOn)
         {
-            if (isEditMode)
+            if (isDeckPanelMode)
+            {
+                // 面板内卡片点击 → 移出卡组
+                EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
+                {
+                    CardData = saveCardData,
+                    IsInDeck = true
+                });
+                select.gameObject.SetActive(false);
+            }
+            else if (isEditMode)
             {
                 bool inDeck = saveCardData?.HasInDeck(GetCurrentDeckId()) ?? false;
                 EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
@@ -103,9 +130,11 @@ public class Card : MonoBehaviour
                 });
                 select.gameObject.SetActive(false);
             }
-
-            cardDetailView.gameObject.Reactivate();
-            cardDetailView.Init(this);
+            else
+            {
+                cardDetailView.gameObject.Reactivate();
+                cardDetailView.Init(this);
+            }
         }
     }
 

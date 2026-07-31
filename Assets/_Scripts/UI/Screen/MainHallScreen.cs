@@ -8,7 +8,7 @@ using UnityEngine.SceneManagement;
 public class MainHallScreen : MonoBehaviour
 {
     [Header("背景")]
-    [SerializeField] private Image backgroundImage;
+    [SerializeField] private SpriteRenderer backgroundRenderer;
 
     [Header("左侧按钮")]
     [SerializeField] private Button missionButton;
@@ -216,7 +216,7 @@ public class MainHallScreen : MonoBehaviour
 
     private void UpdateBackground(PositionName position)
     {
-        if (backgroundImage == null) return;
+        if (backgroundRenderer == null) return;
 
         var positionData = wargame.PositionManager.GetPositionData(position);
         if (positionData == null) return;
@@ -232,7 +232,7 @@ public class MainHallScreen : MonoBehaviour
 
         if (backgroundSprite != null)
         {
-            backgroundImage.sprite = backgroundSprite;
+            backgroundRenderer.sprite = backgroundSprite;
         }
         else
         {

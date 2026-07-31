@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "cn.tuanjie.codely.bridge": "1.0.73",
     "com.besty.unity-skills": "file:D:/Ai/Unity-Skills-2.0.0/SkillsForUnity",
     "com.unity.collab-proxy": "2.7.1",
     "com.unity.feature.2d": "2.0.1",
@@ -8,6 +9,7 @@
     "com.unity.ide.vscode": "1.2.5",
     "com.unity.localization": "1.5.3",
     "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.render-pipelines.universal": "14.2.0-t1",
     "com.unity.test-framework": "1.1.33",
     "com.unity.textmeshpro": "3.0.9",
     "com.unity.timeline": "1.7.7",
@@ -43,8 +45,7 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0",
-    "cn.tuanjie.codely.bridge": "1.0.73"
+    "com.unity.modules.xr": "1.0.0"
   },
   "testables": [
     "com.besty.unity-skills"

@@ -55,7 +55,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001
-    m_Localized: Dandelion Wine
+    m_Localized: Magatama
     m_Metadata:
       m_Items: []
   - m_Id: 3002
@@ -83,11 +83,11 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 5001
-    m_Localized: Fire Crystal
+    m_Localized: Dandelion Wine
     m_Metadata:
       m_Items: []
   - m_Id: 5002
-    m_Localized: Water Crystal
+    m_Localized: Diona's Special
     m_Metadata:
       m_Items: []
   - m_Id: 5003

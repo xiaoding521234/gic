@@ -38,13 +38,19 @@ public class CardDeck
         _dirty = false;
     }
 
-    /// <summary>排序</summary>
+    /// <summary>排序：角色卡在前，物品卡在后；同类型内按 SortOrder + 星级</summary>
     public void Sort()
     {
         _cards.Sort((a, b) =>
         {
+            // 先按卡牌类型：角色卡在前，物品卡在后（Unit=1 < Item=0 反转）
+            int typeCmp = b.id.cardType.CompareTo(a.id.cardType);
+            if (typeCmp != 0) return typeCmp;
+
+            // 同类型内按 SortOrder
             int cmp = a.SortOrder.CompareTo(b.SortOrder);
             if (cmp != 0) return cmp;
+
             return b.StarLevel.CompareTo(a.StarLevel); // 星级从高到低
         });
     }

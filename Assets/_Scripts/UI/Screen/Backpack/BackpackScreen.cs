@@ -25,6 +25,8 @@ public partial class BackpackScreen : MonoBehaviour
     public GameObject editDetailsPanel;//进入编辑模式时，从下往上滑入 退出时反之
     public Button returnButton;//点击以退出编辑模式
     public TextMeshProUGUI countText;//显示数量 例如 2/8
+    [SerializeField] private Transform deckContent; // 编辑面板内卡组内容容器
+    [SerializeField] private float deckCardScale = 0.5f;
 
     [Header("详情面板")]
     public SkillDetailView skillDetailView;
@@ -44,11 +46,19 @@ public partial class BackpackScreen : MonoBehaviour
     [SerializeField] private float panelSlideOffset = 100f;
     [SerializeField] private float buttonSlideOffset = 80f;
 
+    [Header("标签指示线")]
+    [SerializeField] private RectTransform sharedSelectLine;
+    [SerializeField] private float lineSlideDuration = 0.2f;
+    private List<ItemCategoryView> _tabViews = new();
+    private Coroutine _lineCoroutine;
+
     private BackpackTab currentTab = BackpackTab.Character;
     private int currentDeckId;
     private HashSet<SaveCardData> currentDeckCards = new();
     private List<Card> spawnedCards = new();
+    private List<Card> deckSpawnedCards = new();
     private CardPool _cardPool;
+    private CardPool _deckCardPool;
 
     private CardManager cardManager;
     private SaveManager saveManager;
@@ -89,11 +99,15 @@ public partial class BackpackScreen : MonoBehaviour
 
         CachePanelPositions();
         CacheButtonPositions();
+        CacheTabViews();
 
         foreach (Transform child in cardContent.transform)
             Destroy(child.gameObject);
 
         _cardPool = new CardPool(cardPrefab, cardContent.transform);
+
+        if (deckContent != null)
+            _deckCardPool = new CardPool(cardPrefab, deckContent);
 
         SetCategory(BackpackTab.Character, isInit: true);
         RefreshCurrentDeckCache();
@@ -121,6 +135,7 @@ public partial class BackpackScreen : MonoBehaviour
         }
 
         _cardPool?.Clear();
+        _deckCardPool?.Clear();
     }
 
     private void CacheEditPanelPosition()
