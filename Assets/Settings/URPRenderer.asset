@@ -14,10 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   settings:
-    downsample: 0.5
-    blurRadius: 5
-    iterations: 4
+    downsample: 1
+    blurRadius: 6
+    iterations: 3
     renderPassEvent: 500
+  blurShader: {fileID: 4800000, guid: 55836a228a2446f4390d896b13c6c60f, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

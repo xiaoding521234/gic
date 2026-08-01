@@ -1,23 +1,34 @@
-using UnityEngine;
-
-public static class GameObjectExtensions
+﻿using UnityEngine;
+using GIC.UI;
+using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.Battle;
+namespace GIC.Tool
 {
-    /// <summary>
-    /// 重新激活GameObject
-    /// </summary>
-    public static void Reactivate(this GameObject obj)
-    {
-        if (obj == null) return;
-        obj.SetActive(false);
-        obj.SetActive(true);
-    }
 
-    /// <summary>
-    /// 重新激活组件所在的GameObject
-    /// </summary>
-    public static void Reactivate(this Component component)
+
+    public static class GameObjectExtensions
     {
-        if (component == null) return;
-        component.gameObject.Reactivate();
+        /// <summary>
+        /// 重新激活GameObject
+        /// </summary>
+        public static void Reactivate(this GameObject obj)
+        {
+            if (obj == null) return;
+            obj.SetActive(false);
+            obj.SetActive(true);
+        }
+
+        /// <summary>
+        /// 重新激活组件所在的GameObject
+        /// </summary>
+        public static void Reactivate(this Component component)
+        {
+            if (component == null) return;
+            component.gameObject.Reactivate();
+        }
     }
 }
+
+

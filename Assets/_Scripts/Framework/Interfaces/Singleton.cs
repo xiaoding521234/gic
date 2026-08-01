@@ -1,21 +1,32 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-
-public class Singleton<T>
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.Framework
 {
-    private static readonly T instance = Activator.CreateInstance<T>();
 
-    public static T Instance
+
+    public class Singleton<T>
     {
-        get {
-            return instance;
+        private static readonly T instance = Activator.CreateInstance<T>();
+
+        public static T Instance
+        {
+            get {
+                return instance;
+            }
         }
-    }
-    public virtual void Init()
-    {
+        public virtual void Init()
+        {
+
+        }
 
     }
 
 }
+

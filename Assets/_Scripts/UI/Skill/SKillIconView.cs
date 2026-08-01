@@ -1,107 +1,118 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
-
-public class SkillIconView : MonoBehaviour
+using GIC.Framework;
+using GIC.Battle;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.Tool;
+namespace GIC.UI
 {
-    public Image skillIcon;
-    public Image skillCircle;
-    public Image skillSelect;
-    public Toggle toggle;
 
-    private ViewType viewType;
-    private SkillConfig.SkillData skillData;
-    private UnitConfig.UnitData unitData;
-    private BaseSkill skill;
 
-    public SkillDetailView skillDetailView;
-
-    public void Awake()
+    public class SkillIconView : MonoBehaviour
     {
-    
-        toggle.onValueChanged.AddListener(OnToggleValueChanged);
-        
-        skillSelect.gameObject.SetActive(false);
-        
-    }
+        public Image skillIcon;
+        public Image skillCircle;
+        public Image skillSelect;
+        public Toggle toggle;
 
-    public void InitWithData(SkillConfig.SkillData skillData, UnitConfig.UnitData unitData, ViewType viewType, SkillDetailView skillDetailView)
-    {
-        this.viewType = viewType;
-        this.skillData = skillData;
-        this.unitData = unitData;
-        this.skillDetailView = skillDetailView;
+        private ViewType viewType;
+        private SkillConfig.SkillData skillData;
+        private UnitConfig.UnitData unitData;
+        private BaseSkill skill;
 
-        if (skillIcon != null)
-            skillIcon.sprite = skillData.icon;
+        public SkillDetailView skillDetailView;
+
+        public void Awake()
+        {
+        
+            toggle.onValueChanged.AddListener(OnToggleValueChanged);
             
-        if (skillData.skillType.IsActive())
-        {
-            if (skillCircle != null)
-                skillCircle.color = SkillCircleColor.colorAvailable;
-        }
-        else
-        {
-            if (skillCircle != null)
-                skillCircle.color = SkillCircleColor.colorPassive;
-        }
-        
-        if (skillSelect != null)
-        {
             skillSelect.gameObject.SetActive(false);
+            
         }
-    }
 
-    public void InitWithSkill(BaseSkill skill, ViewType viewType, SkillDetailView skillDetailView)
-    {
-        this.viewType = viewType;
-        this.skill = skill;
-    }
-
-    private void OnToggleValueChanged(bool isOn)
-    {
-        if(viewType == ViewType.OnlyDisplay)
+        public void InitWithData(SkillConfig.SkillData skillData, UnitConfig.UnitData unitData, ViewType viewType, SkillDetailView skillDetailView)
         {
-            return;
+            this.viewType = viewType;
+            this.skillData = skillData;
+            this.unitData = unitData;
+            this.skillDetailView = skillDetailView;
+
+            if (skillIcon != null)
+                skillIcon.sprite = skillData.icon;
+                
+            if (skillData.skillType.IsActive())
+            {
+                if (skillCircle != null)
+                    skillCircle.color = SkillCircleColor.colorAvailable;
+            }
+            else
+            {
+                if (skillCircle != null)
+                    skillCircle.color = SkillCircleColor.colorPassive;
+            }
+            
+            if (skillSelect != null)
+            {
+                skillSelect.gameObject.SetActive(false);
+            }
         }
-        Debug.Log("变化");
-        
-        skillSelect.gameObject.SetActive(isOn);
-        
-        
-        if (isOn && viewType == ViewType.Display)
+
+        public void InitWithSkill(BaseSkill skill, ViewType viewType, SkillDetailView skillDetailView)
         {
-            skillDetailView.OpenPanel();
-            skillDetailView.InitWithData(skillData, unitData,this);
+            this.viewType = viewType;
+            this.skill = skill;
         }
-    }
 
-    public void OnReselect()
-    {
-        if(viewType == ViewType.OnlyDisplay)
+        private void OnToggleValueChanged(bool isOn)
         {
-            return;
+            if(viewType == ViewType.OnlyDisplay)
+            {
+                return;
+            }
+            Debug.Log("变化");
+            
+            skillSelect.gameObject.SetActive(isOn);
+            
+            
+            if (isOn && viewType == ViewType.Display)
+            {
+                skillDetailView.OpenPanel();
+                skillDetailView.InitWithData(skillData, unitData,this);
+            }
         }
 
-        Debug.Log("再次选中");
+        public void OnReselect()
+        {
+            if(viewType == ViewType.OnlyDisplay)
+            {
+                return;
+            }
+
+            Debug.Log("再次选中");
+            
+            
+        }
+
         
+        public void SetSelected(bool isSelected)
+        {
+            toggle.isOn = isSelected;
+        }
         
+        public bool IsSelected()
+        {
+            return toggle.isOn;
+        }
     }
 
-    
-    public void SetSelected(bool isSelected)
+    public static class SkillCircleColor
     {
-        toggle.isOn = isSelected;
-    }
-    
-    public bool IsSelected()
-    {
-        return toggle.isOn;
+        public static Color colorAvailable = "FF9800".FromHex();
+        public static Color colorUnavailable = "ECE5D8".FromHex();
+        public static Color colorPassive = "9C27B0".FromHex();
     }
 }
 
-public static class SkillCircleColor
-{
-    public static Color colorAvailable = "FF9800".FromHex();
-    public static Color colorUnavailable = "ECE5D8".FromHex();
-    public static Color colorPassive = "9C27B0".FromHex();
-}
+

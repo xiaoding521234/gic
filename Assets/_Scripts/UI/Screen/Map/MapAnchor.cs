@@ -1,62 +1,73 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
-using static PositionConfig;
-
-
-public class MapAnchor : MonoBehaviour
+using static GIC.Data.PositionConfig;
+using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.UI
 {
-    [Header("锚点配置")]
-    [SerializeField] private PositionName positionName;
-    
-    [Header("未解锁效果")]
-    [SerializeField] private Color unlockedColor = Color.white;
 
-    [SerializeField] private Color lockedColor = new Color(0.5f, 0.5f, 0.5f, 1);
-    
-    private Image iconImage;
-    private Button button;
-    private PositionData cachedData;
-    
-    public PositionName PositionName => positionName;
-    
-    private void Awake()
+
+
+    public class MapAnchor : MonoBehaviour
     {
-        iconImage = GetComponent<Image>();
-        button = GetComponent<Button>();
+        [Header("锚点配置")]
+        [SerializeField] private PositionName positionName;
         
-        if (button != null)
-            button.onClick.AddListener(OnClick);
-    }
-    
-    public void SetData(PositionData data)
-    {
-        cachedData = data;
+        [Header("未解锁效果")]
+        [SerializeField] private Color unlockedColor = Color.white;
+
+        [SerializeField] private Color lockedColor = new Color(0.5f, 0.5f, 0.5f, 1);
         
-        if (button != null)
-            button.interactable = data.isUnlocked;
+        private Image iconImage;
+        private Button button;
+        private PositionData cachedData;
         
-        // 图标变灰，但不隐藏
-        if (iconImage != null)
+        public PositionName PositionName => positionName;
+        
+        private void Awake()
         {
-            iconImage.color = data.isUnlocked ? unlockedColor : lockedColor;
-        }
+            iconImage = GetComponent<Image>();
+            button = GetComponent<Button>();
             
-    }
-    
-    private void OnClick()
-    {
-        if(cachedData == null)
-        {
-            Debug.Log($"未配置: {positionName}");
+            if (button != null)
+                button.onClick.AddListener(OnClick);
         }
-        if (cachedData != null && cachedData.isUnlocked)
+        
+        public void SetData(PositionData data)
         {
-            Debug.Log($"移动到: {positionName}");
-            Wargame.Instance.PositionManager.MoveToPosition(positionName);
+            cachedData = data;
+            
+            if (button != null)
+                button.interactable = data.isUnlocked;
+            
+            // 图标变灰，但不隐藏
+            if (iconImage != null)
+            {
+                iconImage.color = data.isUnlocked ? unlockedColor : lockedColor;
+            }
+                
         }
-        else
+        
+        private void OnClick()
         {
-            Debug.Log($"未解锁: {positionName}");
+            if(cachedData == null)
+            {
+                Debug.Log($"未配置: {positionName}");
+            }
+            if (cachedData != null && cachedData.isUnlocked)
+            {
+                Debug.Log($"移动到: {positionName}");
+                Wargame.Instance.PositionManager.MoveToPosition(positionName);
+            }
+            else
+            {
+                Debug.Log($"未解锁: {positionName}");
+            }
         }
     }
 }
+
+

@@ -1,82 +1,93 @@
-using UnityEngine;
-
-/// <summary>
-/// 3D 背景视差效果，跟随鼠标移动 SpriteRenderer。
-/// 替代 Canvas 版的 BackgroundParallax。
-/// </summary>
-public class BackgroundParallax3D : MonoBehaviour
+﻿using UnityEngine;
+using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.UI
 {
-    [Header("视差效果")]
-    [Range(0f, 1f)] public float parallaxIntensity = 1f;
-    [Range(0.01f, 0.2f)] public float smoothTime = 0.15f;
 
-    [Header("边界控制")]
-    public bool clampToBounds = true;
 
-    private SpriteRenderer _sr;
-    private Vector3 _startPos;
-    private Vector3 _currentOffset;
-    private Vector3 _targetOffset;
-    private Vector3 _smoothVelocity;
-    private float _maxOffsetX;
-    private float _maxOffsetY;
-
-    private void Awake()
+    /// <summary>
+    /// 3D 背景视差效果，跟随鼠标移动 SpriteRenderer。
+    /// 替代 Canvas 版的 BackgroundParallax。
+    /// </summary>
+    public class BackgroundParallax3D : MonoBehaviour
     {
-        _sr = GetComponent<SpriteRenderer>();
-        _startPos = transform.position;
-        CalculateBounds();
-    }
+        [Header("视差效果")]
+        [Range(0f, 1f)] public float parallaxIntensity = 1f;
+        [Range(0.01f, 0.2f)] public float smoothTime = 0.15f;
 
-    private void CalculateBounds()
-    {
-        // 相机可见区域
-        var cam = Camera.main;
-        if (cam == null || !cam.orthographic) return;
+        [Header("边界控制")]
+        public bool clampToBounds = true;
 
-        float camHeight = cam.orthographicSize * 2f;
-        float camWidth = camHeight * cam.aspect;
+        private SpriteRenderer _sr;
+        private Camera _camera;
+        private Vector3 _startPos;
+        private Vector3 _currentOffset;
+        private Vector3 _targetOffset;
+        private Vector3 _smoothVelocity;
+        private float _maxOffsetX;
+        private float _maxOffsetY;
 
-        // 背景实际尺寸
-        float bgWidth = _sr.bounds.size.x;
-        float bgHeight = _sr.bounds.size.y;
-
-        _maxOffsetX = Mathf.Max(0, (bgWidth - camWidth) / 2f);
-        _maxOffsetY = Mathf.Max(0, (bgHeight - camHeight) / 2f);
-    }
-
-    private void Update()
-    {
-        if (_maxOffsetX <= 0 && _maxOffsetY <= 0) return;
-
-        Vector2 input = Vector2.zero;
-        if (Input.touchCount > 0)
+        private void Awake()
         {
-            var touch = Input.GetTouch(0);
-            input = new Vector2(
-                (touch.position.x / Screen.width - 0.5f) * -2f,
-                (touch.position.y / Screen.height - 0.5f) * -2f
-            );
-        }
-        else
-        {
-            input = new Vector2(
-                (Input.mousePosition.x / Screen.width - 0.5f) * -2f,
-                (Input.mousePosition.y / Screen.height - 0.5f) * -2f
-            );
+            _sr = GetComponent<SpriteRenderer>();
+            _camera = Camera.main;
+            _startPos = transform.position;
+            CalculateBounds();
         }
 
-        float targetX = _maxOffsetX * input.x * parallaxIntensity;
-        float targetY = _maxOffsetY * input.y * parallaxIntensity;
-
-        if (clampToBounds)
+        private void CalculateBounds()
         {
-            targetX = Mathf.Clamp(targetX, -_maxOffsetX, _maxOffsetX);
-            targetY = Mathf.Clamp(targetY, -_maxOffsetY, _maxOffsetY);
+            if (_camera == null || !_camera.orthographic) return;
+
+            float camHeight = _camera.orthographicSize * 2f;
+            float camWidth = camHeight * _camera.aspect;
+
+            // 背景实际尺寸
+            float bgWidth = _sr.bounds.size.x;
+            float bgHeight = _sr.bounds.size.y;
+
+            _maxOffsetX = Mathf.Max(0, (bgWidth - camWidth) / 2f);
+            _maxOffsetY = Mathf.Max(0, (bgHeight - camHeight) / 2f);
         }
 
-        _targetOffset = new Vector3(targetX, targetY, 0);
-        _currentOffset = Vector3.SmoothDamp(_currentOffset, _targetOffset, ref _smoothVelocity, smoothTime);
-        transform.position = _startPos + _currentOffset;
+        private void Update()
+        {
+            if (_maxOffsetX <= 0 && _maxOffsetY <= 0) return;
+
+            Vector2 input = Vector2.zero;
+            if (Input.touchCount > 0)
+            {
+                var touch = Input.GetTouch(0);
+                input = new Vector2(
+                    (touch.position.x / Screen.width - 0.5f) * -2f,
+                    (touch.position.y / Screen.height - 0.5f) * -2f
+                );
+            }
+            else
+            {
+                input = new Vector2(
+                    (Input.mousePosition.x / Screen.width - 0.5f) * -2f,
+                    (Input.mousePosition.y / Screen.height - 0.5f) * -2f
+                );
+            }
+
+            float targetX = _maxOffsetX * input.x * parallaxIntensity;
+            float targetY = _maxOffsetY * input.y * parallaxIntensity;
+
+            if (clampToBounds)
+            {
+                targetX = Mathf.Clamp(targetX, -_maxOffsetX, _maxOffsetX);
+                targetY = Mathf.Clamp(targetY, -_maxOffsetY, _maxOffsetY);
+            }
+
+            _targetOffset = new Vector3(targetX, targetY, 0);
+            _currentOffset = Vector3.SmoothDamp(_currentOffset, _targetOffset, ref _smoothVelocity, smoothTime);
+            transform.position = _startPos + _currentOffset;
+        }
     }
+
 }
+

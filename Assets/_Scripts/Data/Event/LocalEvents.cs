@@ -1,4 +1,9 @@
-namespace LocalEvents
+﻿using GIC.Framework;
+using GIC.Data;
+using GIC.UI;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.Data.Event
 {
     public class OnPositionChangedEvent : BaseEvent
     {
@@ -72,3 +77,4 @@ namespace LocalEvents
     }
 
 }
+

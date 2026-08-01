@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using GIC.Data;
 using GIC.Data.Event;
 using GIC.UI;
@@ -10,7 +8,7 @@ namespace GIC.Framework
 {
 
 
-    public class InputManager : IWargameManager
+    public class SkillManager : IWargameManager
     {
 
         public void Start()
@@ -22,7 +20,14 @@ namespace GIC.Framework
         {
             
         }
-    }
 
+
+
+
+
+
+
+
+    }
 }
 

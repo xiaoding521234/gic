@@ -2253,8 +2253,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -8.942261, y: 0}
-  m_SizeDelta: {x: -491.3489, y: -20}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: -500, y: -20}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1019196818
 MonoBehaviour:
@@ -2275,7 +2275,7 @@ MonoBehaviour:
   m_Elasticity: 0.1
   m_Inertia: 1
   m_DecelerationRate: 0.135
-  m_ScrollSensitivity: 1
+  m_ScrollSensitivity: -30
   m_Viewport: {fileID: 1781715032}
   m_HorizontalScrollbar: {fileID: 0}
   m_VerticalScrollbar: {fileID: 0}
@@ -3825,6 +3825,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   panelSlideOffset: 100
   buttonSlideOffset: 80
+  tabContainer: {fileID: 256099739}
   sharedSelectLine: {fileID: 1125764635}
   lineSlideDuration: 0.2
 --- !u!4 &1582878654
@@ -4444,7 +4445,7 @@ MonoBehaviour:
     m_Top: 0
     m_Bottom: 0
   m_ChildAlignment: 3
-  m_Spacing: 0
+  m_Spacing: -10
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 0

@@ -1,5 +1,15 @@
-public interface IWargameManager
+﻿using GIC.Data;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.Framework
 {
-    void Start();
-    void Update(float deltaTime);
+
+    public interface IWargameManager
+    {
+        void Start();
+        void Update(float deltaTime);
+    }
 }
+

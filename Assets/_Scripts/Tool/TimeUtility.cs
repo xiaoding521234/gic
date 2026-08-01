@@ -1,70 +1,81 @@
-using System;
+﻿using System;
 using UnityEngine;
-
-public static class TimeUtility
+using GIC.UI;
+using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.Battle;
+namespace GIC.Tool
 {
-    /// <summary>
-    /// 默认白天开始时间（8点）
-    /// </summary>
-    public static int DayStartHour = 8;
-    
-    /// <summary>
-    /// 默认白天结束时间（20点）
-    /// </summary>
-    public static int DayEndHour = 20;
-    
-    /// <summary>
-    /// 获取时间段后缀
-    /// </summary>
-    public static string GetTimeSuffix()
+
+
+    public static class TimeUtility
     {
-        string result = GetTimeSuffix(DayStartHour, DayEndHour);
-        Debug.Log($"[TimeUtility] GetTimeSuffix() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
-        return result;
+        /// <summary>
+        /// 默认白天开始时间（8点）
+        /// </summary>
+        public static int DayStartHour = 8;
+        
+        /// <summary>
+        /// 默认白天结束时间（20点）
+        /// </summary>
+        public static int DayEndHour = 20;
+        
+        /// <summary>
+        /// 获取时间段后缀
+        /// </summary>
+        public static string GetTimeSuffix()
+        {
+            string result = GetTimeSuffix(DayStartHour, DayEndHour);
+            Debug.Log($"[TimeUtility] GetTimeSuffix() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
+            return result;
+        }
+        
+        /// <summary>
+        /// 获取时间段后缀（自定义时间范围）
+        /// </summary>
+        /// <param name="dayStartHour">白天开始小时（如 8）</param>
+        /// <param name="dayEndHour">白天结束小时（如 20）</param>
+        public static string GetTimeSuffix(int dayStartHour, int dayEndHour)
+        {
+            int hour = DateTime.Now.Hour;
+            bool isDaytime = hour >= dayStartHour && hour < dayEndHour;
+            
+            string result = isDaytime ? "daytime" : "night";
+            
+            Debug.Log($"[TimeUtility] GetTimeSuffix({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
+            
+            return result;
+        }
+        
+        /// <summary>
+        /// 获取时间段枚举
+        /// </summary>
+        public static TimePeriod GetCurrentTimePeriod()
+        {
+            TimePeriod result = GetCurrentTimePeriod(DayStartHour, DayEndHour);
+            Debug.Log($"[TimeUtility] GetCurrentTimePeriod() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
+            return result;
+        }
+        
+        public static TimePeriod GetCurrentTimePeriod(int dayStartHour, int dayEndHour)
+        {
+            int hour = DateTime.Now.Hour;
+            bool isDaytime = hour >= dayStartHour && hour < dayEndHour;
+            
+            TimePeriod result = isDaytime ? TimePeriod.Daytime : TimePeriod.Night;
+            
+            Debug.Log($"[TimeUtility] GetCurrentTimePeriod({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
+            
+            return result;
+        }
     }
-    
-    /// <summary>
-    /// 获取时间段后缀（自定义时间范围）
-    /// </summary>
-    /// <param name="dayStartHour">白天开始小时（如 8）</param>
-    /// <param name="dayEndHour">白天结束小时（如 20）</param>
-    public static string GetTimeSuffix(int dayStartHour, int dayEndHour)
+
+    public enum TimePeriod
     {
-        int hour = DateTime.Now.Hour;
-        bool isDaytime = hour >= dayStartHour && hour < dayEndHour;
-        
-        string result = isDaytime ? "daytime" : "night";
-        
-        Debug.Log($"[TimeUtility] GetTimeSuffix({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
-        
-        return result;
-    }
-    
-    /// <summary>
-    /// 获取时间段枚举
-    /// </summary>
-    public static TimePeriod GetCurrentTimePeriod()
-    {
-        TimePeriod result = GetCurrentTimePeriod(DayStartHour, DayEndHour);
-        Debug.Log($"[TimeUtility] GetCurrentTimePeriod() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
-        return result;
-    }
-    
-    public static TimePeriod GetCurrentTimePeriod(int dayStartHour, int dayEndHour)
-    {
-        int hour = DateTime.Now.Hour;
-        bool isDaytime = hour >= dayStartHour && hour < dayEndHour;
-        
-        TimePeriod result = isDaytime ? TimePeriod.Daytime : TimePeriod.Night;
-        
-        Debug.Log($"[TimeUtility] GetCurrentTimePeriod({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
-        
-        return result;
+        Daytime,
+        Night
     }
 }
 
-public enum TimePeriod
-{
-    Daytime,
-    Night
-}
+

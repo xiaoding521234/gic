@@ -1,24 +1,35 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
-
-public class UIManager : IWargameManager
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.Framework
 {
 
 
-    
-
-    public void Start()
+    public class UIManager : IWargameManager
     {
+
+
+        
+
+        public void Start()
+        {
+            
+        }
+
+
+        public void Update(float deltaTime)
+        {
+            
+
+        }
         
     }
 
-
-    public void Update(float deltaTime)
-    {
-        
-
-    }
-    
 }
+

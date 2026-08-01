@@ -1,18 +1,29 @@
-using UnityEngine;
-
-public class UnitManager : IWargameManager
+﻿using UnityEngine;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.Framework
 {
-    public UnitConfig unitConfig;
 
 
-
-    public void Start()
+    public class UnitManager : IWargameManager
     {
-        unitConfig = Wargame.Instance.ConfigManager.GetUnitConfig();
-    }
+        public UnitConfig unitConfig;
 
-    public void Update(float deltaTime)
-    {
 
+
+        public void Start()
+        {
+            unitConfig = Wargame.Instance.ConfigManager.GetUnitConfig();
+        }
+
+        public void Update(float deltaTime)
+        {
+
+        }
     }
 }
+
+

@@ -1,16 +1,27 @@
-// 基础事件
+﻿// 基础事件
 using System;
-
-public class BaseEvent
+using GIC.Framework;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Battle;
+using GIC.Tool;
+namespace GIC.Data
 {
-    public string SourcePlayerID = PlayerID.Unknown;
-    public bool Active = true;
-    public EventType Type = EventType.Local;
-    public bool IgnoreAnimationLock = false;
-    public bool Immediate = false;
-
-    [NonSerialized]
-    public EventSource Source = EventSource.Local;
 
 
+    public class BaseEvent
+    {
+        public string SourcePlayerID = PlayerID.Unknown;
+        public bool Active = true;
+        public EventType Type = EventType.Local;
+        public bool IgnoreAnimationLock = false;
+        public bool Immediate = false;
+
+        [NonSerialized]
+        public EventSource Source = EventSource.Local;
+
+
+    }
 }
+
+

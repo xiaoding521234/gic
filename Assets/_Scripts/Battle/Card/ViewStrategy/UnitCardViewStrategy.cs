@@ -1,44 +1,57 @@
-using UnityEngine;
-
-/// <summary>
-/// 角色卡牌的视图策略 — 处理 Card 本身的显示逻辑
-/// </summary>
-public class UnitCardViewStrategy : ICardViewStrategy
+﻿using UnityEngine;
+using GIC.Framework;
+using GIC.UI;
+using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.Tool;
+namespace GIC.Battle
 {
-    public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
+
+
+    /// <summary>
+    /// 角色卡牌的视图策略 — 处理 Card 本身的显示逻辑
+    /// </summary>
+    public class UnitCardViewStrategy : ICardViewStrategy
     {
-        var raw = CardConfigResolver.UnitConfig?.GetUnitData(data.id.AsUnitName());
-        if (raw != null)
+        public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
         {
-            card.cardBack.color = StarColor.GetStarColor(raw.starLevel);
-            card.unitImage.gameObject.SetActive(true);
-            card.unitImage.sprite = raw.GetCard(data.skin);
-            card.obtainText.SetSingleEntry(raw.GetObtainDescriptionEntry());
+            var raw = CardConfigResolver.UnitConfig?.GetUnitData(data.id.AsUnitName());
+            if (raw != null)
+            {
+                card.cardBack.color = StarColor.GetStarColor(raw.starLevel);
+                card.unitImage.gameObject.SetActive(true);
+                card.unitImage.sprite = raw.GetCard(data.skin);
+                card.obtainText.SetSingleEntry(raw.GetObtainDescriptionEntry());
+            }
+
+            card.itemImage.gameObject.SetActive(false);
+            card.countImage.gameObject.SetActive(false);
+
+            card.cardDetailView = detailView;
+            card.saveCardData   = data;
+            card.countText.text = data.count.ToString();
         }
 
-        card.itemImage.gameObject.SetActive(false);
-        card.countImage.gameObject.SetActive(false);
+        public void EnterEditMode(Card card)
+        {
+            if (card.saveCardData.count < 1)
+                card.overlay.gameObject.SetActive(true);
+        }
 
-        card.cardDetailView = detailView;
-        card.saveCardData   = data;
-        card.countText.text = data.count.ToString();
+        public int GetTotalSkins(Card card) =>
+            card.saveCardData.Config?.GetTotalSkins() ?? 0;
+
+        public void ApplySkin(Card card, int skinIndex)
+        {
+            card.saveCardData.skin = skinIndex;
+            card.unitImage.sprite  = card.saveCardData.Config?.GetSprite(skinIndex);
+        }
+
+        public bool ShouldOverlayInEditMode(Card card) =>
+            card.saveCardData.count < 1;
     }
 
-    public void EnterEditMode(Card card)
-    {
-        if (card.saveCardData.count < 1)
-            card.overlay.gameObject.SetActive(true);
-    }
-
-    public int GetTotalSkins(Card card) =>
-        card.saveCardData.Config?.GetTotalSkins() ?? 0;
-
-    public void ApplySkin(Card card, int skinIndex)
-    {
-        card.saveCardData.skin = skinIndex;
-        card.unitImage.sprite  = card.saveCardData.Config?.GetSprite(skinIndex);
-    }
-
-    public bool ShouldOverlayInEditMode(Card card) =>
-        card.saveCardData.count < 1;
 }
+
+

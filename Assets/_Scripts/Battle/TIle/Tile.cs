@@ -1,36 +1,46 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-
-/// <summary>
-/// 地块基类 - 组件容器
-/// </summary>
-public class Tile : MonoBehaviour
+using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Tool;
+namespace GIC.Battle
 {
-    private Dictionary<System.Type, ITileComponent> _components = new();
 
-    private void Awake()
+
+    /// <summary>
+    /// 地块基类 - 组件容器
+    /// </summary>
+    public class Tile : MonoBehaviour
     {
-        foreach (var comp in GetComponents<ITileComponent>())
+        private Dictionary<System.Type, ITileComponent> _components = new();
+
+        private void Awake()
         {
-            _components[comp.GetType()] = comp;
-            comp.Initialize(this);
+            foreach (var comp in GetComponents<ITileComponent>())
+            {
+                _components[comp.GetType()] = comp;
+                comp.Initialize(this);
+            }
+        }
+
+        /// <summary>
+        /// 获取指定类型的地块组件
+        /// </summary>
+        public T GetTileComponent<T>() where T : class, ITileComponent
+        {
+            _components.TryGetValue(typeof(T), out var comp);
+            return comp as T;
+        }
+
+        /// <summary>
+        /// 是否拥有指定类型的地块组件
+        /// </summary>
+        public bool HasTileComponent<T>() where T : ITileComponent
+        {
+            return _components.ContainsKey(typeof(T));
         }
     }
-
-    /// <summary>
-    /// 获取指定类型的地块组件
-    /// </summary>
-    public T GetTileComponent<T>() where T : class, ITileComponent
-    {
-        _components.TryGetValue(typeof(T), out var comp);
-        return comp as T;
-    }
-
-    /// <summary>
-    /// 是否拥有指定类型的地块组件
-    /// </summary>
-    public bool HasTileComponent<T>() where T : ITileComponent
-    {
-        return _components.ContainsKey(typeof(T));
-    }
 }
+

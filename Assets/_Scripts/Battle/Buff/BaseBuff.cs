@@ -1,13 +1,23 @@
-public class BaseBuff
+﻿using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
+using GIC.UI;
+using GIC.Tool;
+namespace GIC.Battle
 {
-    
-    public Unit owner;
-    public Unit source;
-    public int value;
+
+    public class BaseBuff
+    {
+        
+        public Unit owner;
+        public Unit source;
+        public int value;
 
 
 
 
 
 
+    }
 }
+
