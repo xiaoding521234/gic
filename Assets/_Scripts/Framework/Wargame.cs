@@ -31,7 +31,6 @@ namespace GIC.Framework
         {
 
             ConfigManager = new ConfigManager();
-            ConfigManager.SetInstance(ConfigManager);
             SaveManager = new SaveManager();
             InputManager = new InputManager();
             UIManager = new UIManager();
@@ -68,8 +67,11 @@ namespace GIC.Framework
 
         public void Update(float deltaTime)
         {
-            managers.ForEach(manager => manager.Update(deltaTime));
-            
+            if (managers == null) return;
+            foreach (var manager in managers)
+            {
+                manager?.Update(deltaTime);
+            }
         }
     }
 

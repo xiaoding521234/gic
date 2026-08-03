@@ -128,6 +128,13 @@ namespace GIC.Framework
             SetAudioSource2D(sfxSource);
             SetAudioSource2D(voiceSource);
 
+            if (audioMixer != null && voiceSource != null)
+            {
+                var groups = audioMixer.FindMatchingGroups("Voice");
+                if (groups.Length > 0)
+                    voiceSource.outputAudioMixerGroup = groups[0];
+            }
+
             for (int i = 0; i < SFX_POOL_SIZE; i++)
             {
                 CreatePooledSFXSource();

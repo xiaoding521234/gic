@@ -75,6 +75,9 @@ namespace GIC.Data
         #endregion
 
         #region 芭芭拉 (3003)
+        [InspectorName("水之浅唱")]
+        Barbara_WaterSerenade = 3003004,
+
         [InspectorName("闪耀奇迹")]
         Barbara_ShiningMiracle = 3003001,
 

@@ -23,6 +23,16 @@ namespace GIC.Framework
         public int CurrentPlayers = 1;
         public int MaxPlayers = 6;
         public string GameMode = "对战";
+
+        /// <summary>客户端收到的房间显示信息（按 serverId 索引）</summary>
+        public static readonly System.Collections.Generic.Dictionary<long, RoomDisplayInfo> DiscoveredRooms = new();
+
+        public struct RoomDisplayInfo
+        {
+            public string HostName;
+            public int CurrentPlayers;
+            public int MaxPlayers;
+        }
         
         private PlayerManager _playerManager;
 
@@ -66,6 +76,8 @@ namespace GIC.Framework
         }
 
         // ========== 修改点：替换默认的广播发现为单播扫描 ==========
+        private Coroutine _scanCoroutine;
+
         public void StartDiscovering()
         {
             Debug.Log("[MyNetworkDiscovery] 开始扫描局域网（单播模式）...");
@@ -74,12 +86,16 @@ namespace GIC.Framework
             StartDiscovery();
 
             // 启动单播扫描协程
-            StartCoroutine(UnicastScanCoroutine());
+            _scanCoroutine = StartCoroutine(UnicastScanCoroutine());
         }
 
         public void StopDiscovering()
         {
-            StopAllCoroutines();
+            if (_scanCoroutine != null)
+            {
+                StopCoroutine(_scanCoroutine);
+                _scanCoroutine = null;
+            }
             StopDiscovery();
             Debug.Log("[MyNetworkDiscovery] 停止扫描");
         }
@@ -246,13 +262,23 @@ namespace GIC.Framework
                     CurrentPlayers = _playerManager.GetPlayerCount();
                 }
 
+                // 从存档获取 Host 名称
+                HostPlayerName = Wargame.Instance?.SaveManager?.CurrentSave?.playerName ?? "旅行者";
+
+                var baseUri = transport.ServerUri();
+                // 将房间信息编码到 URI 查询参数中
+                var builder = new UriBuilder(baseUri)
+                {
+                    Query = $"host={Uri.EscapeDataString(HostPlayerName)}&cur={CurrentPlayers}&max={MaxPlayers}"
+                };
+
                 var response = new ServerResponse
                 {
                     serverId = ServerId,
-                    uri = transport.ServerUri()
+                    uri = builder.Uri
                 };
 
-                Debug.Log($"[MyNetworkDiscovery] 响应发现请求: {endpoint.Address}:{endpoint.Port} - 玩家: {CurrentPlayers}/{MaxPlayers}");
+                Debug.Log($"[MyNetworkDiscovery] 响应发现请求: {endpoint.Address}:{endpoint.Port} - 房主: {HostPlayerName} - 玩家: {CurrentPlayers}/{MaxPlayers}");
                 return response;
             }
             catch (NotImplementedException)
@@ -268,15 +294,29 @@ namespace GIC.Framework
 
             response.EndPoint = endpoint;
 
+            // 从 URI 查询参数解析房间信息
+            var query = System.Web.HttpUtility.ParseQueryString(response.uri.Query);
+            string hostName = query["host"] ?? "未知房主";
+            int cur = int.TryParse(query["cur"], out var c) ? c : 1;
+            int max = int.TryParse(query["max"], out var m) ? m : 6;
+
+            DiscoveredRooms[response.serverId] = new RoomDisplayInfo
+            {
+                HostName = Uri.UnescapeDataString(hostName),
+                CurrentPlayers = cur,
+                MaxPlayers = max
+            };
+
             UriBuilder realUri = new UriBuilder(response.uri)
             {
-                Host = response.EndPoint.Address.ToString()
+                Host = response.EndPoint.Address.ToString(),
+                Query = "" // 清除查询参数，避免影响连接
             };
             response.uri = realUri.Uri;
 
             OnServerFound.Invoke(response);
             
-            Debug.Log($"[MyNetworkDiscovery] 发现房间: {response.EndPoint.Address}:{response.uri.Port} (ServerId: {response.serverId})");
+            Debug.Log($"[MyNetworkDiscovery] 发现房间: {response.EndPoint.Address}:{response.uri.Port} 房主: {hostName} ({cur}/{max})");
         }
 
         void OnDestroy()
@@ -287,6 +327,7 @@ namespace GIC.Framework
             }
             
             StopDiscovery();
+            DiscoveredRooms.Clear();
         }
     }
 }

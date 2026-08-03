@@ -75,6 +75,58 @@ namespace GIC.Data
 
         [InspectorName("2命移速提升")]
         C2MoveSpeed = 15,
+
+        [InspectorName("2命迷雾元能阈值")]
+        C2FogEnergyThreshold = 18,
+
+        [InspectorName("2命迷雾元能获取")]
+        C2FogEnergyGain = 19,
+
+        [InspectorName("视野暴露持续回合")]
+        VisionDuration = 20,
+
+        [InspectorName("召唤数量")]
+        ShardCount = 21,
+
+        [InspectorName("飞行距离")]
+        ProjectileDistance = 22,
+
+        [InspectorName("治疗半径")]
+        HealRadius = 23,
+
+        // 凯亚命座
+        [InspectorName("1命治疗效率")]
+        C1HealEfficiency = 24,
+
+        [InspectorName("1命吸血")]
+        C1LifeSteal = 25,
+
+        [InspectorName("2命叠层上限")]
+        C2StackLimit = 26,
+
+        [InspectorName("2命防御减少")]
+        C2DefenseReduce = 27,
+
+        [InspectorName("3命叠层上限")]
+        C3StackLimit = 28,
+
+        [InspectorName("3命生效半径")]
+        C3Radius = 29,
+
+        // 凯亚延奏
+        [InspectorName("移速提升")]
+        MoveSpeedBonus = 30,
+
+        // 凯亚战技
+        [InspectorName("伤害距离")]
+        DamageDistance = 31,
+
+        // 芭芭拉命座
+        [InspectorName("1命获取元能")]
+        C1EnergyGain = 32,
+
+        [InspectorName("2命生效半径")]
+        C2Radius = 33,
     }
 
     /// <summary>

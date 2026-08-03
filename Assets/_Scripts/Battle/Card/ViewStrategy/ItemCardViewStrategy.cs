@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using GIC.Framework;
 using GIC.UI;
-using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
 using GIC.Tool;

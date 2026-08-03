@@ -45,6 +45,9 @@ namespace GIC.Battle
         
         { StatType.DamageReduction, new RangedInt(-300, 300, 0) },
         { StatType.DamageBonus, new RangedInt(-300, 300, 0) },
+        { StatType.LifeSteal, new RangedInt(0, 100, 0) },
+        { StatType.HealEfficiency, new RangedInt(0, 300, 100) },
+        { StatType.Energy, new RangedInt(0, 100, 0) },
     };
 
         // ==================== 当前属性实例 ====================
@@ -68,6 +71,9 @@ namespace GIC.Battle
 
         public float DamageReduction => GetFinalStat(StatType.DamageReduction);
         public float DamageBonus => GetFinalStat(StatType.DamageBonus);
+        public int LifeSteal => GetFinalStat(StatType.LifeSteal);
+        public int HealEfficiency => GetFinalStat(StatType.HealEfficiency);
+        public int Energy => GetFinalStat(StatType.Energy);
 
         // ==================== 初始化 ====================
         public void Init(Unit owner)
@@ -93,8 +99,13 @@ namespace GIC.Battle
                 SetBaseValue(StatType.Tenacity, rawData.GetEffectiveTenacity());
                 SetBaseValue(StatType.Mastery, rawData.GetEffectiveMastery());
                 SetBaseValue(StatType.Sanity, rawData.GetEffectiveSanity());
-                SetBaseValue(StatType.HP, rawData.GetEffectiveHP());
+                // HP: value=max=baseHP（满血登场）
+                SetCapacityValue(StatType.HP, rawData.GetEffectiveHP());
                 SetBaseValue(StatType.VisionRange, rawData.GetEffectiveVisionRange());
+                SetBaseValue(StatType.LifeSteal, rawData.GetEffectiveLifeSteal());
+                SetBaseValue(StatType.HealEfficiency, rawData.GetEffectiveHealEfficiency());
+                // Energy: max=baseEnergy, value=0（空蓝登场）
+                _stats[StatType.Energy] = new RangedInt(0, rawData.GetEffectiveEnergy(), 0);
             }
             else
             {
@@ -173,6 +184,14 @@ namespace GIC.Battle
             {
                 Debug.LogWarning($"[UnitStats] 未找到属性: {statType}");
             }
+        }
+
+        /// <summary>
+        /// 设置容量型属性（value=max=传入值），用于 HP 等登场即满的属性
+        /// </summary>
+        public void SetCapacityValue(StatType statType, int value)
+        {
+            _stats[statType] = new RangedInt(0, value, value);
         }
 
         public int GetBaseValue(StatType statType)

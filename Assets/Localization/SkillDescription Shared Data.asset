@@ -51,6 +51,46 @@ MonoBehaviour:
     m_Key: Amber_Constellation
     m_Metadata:
       m_Items: []
+  - m_Id: 26206775032754176
+    m_Key: Kaeya_Frostgnaw
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775263440896
+    m_Key: Kaeya_GlacialWaltz
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775263440897
+    m_Key: Kaeya_HiddenStrength
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635200
+    m_Key: Kaeya_ColdBloodedBlade
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635201
+    m_Key: Kaeya_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635202
+    m_Key: Barbara_ShiningMiracle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635203
+    m_Key: Barbara_HeartfeltDevotion
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635204
+    m_Key: Barbara_VitalityBurst
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635205
+    m_Key: Barbara_Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26250548261498880
+    m_Key: Barbara_WaterSerenade
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

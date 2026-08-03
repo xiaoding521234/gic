@@ -64,6 +64,9 @@ namespace GIC.UI
             _player = updatedInfo;
             _isInitializing = true;
 
+            // 重新初始化名称 dropdown（名称可能已更新）
+            InitNameDropdown();
+
             spawnDropdown.SetValueWithoutNotify(GetCurrentSpawnIndex());
             colorDropdown.SetValueWithoutNotify((int)_player.Color - 1);
             teamDropdown.SetValueWithoutNotify((int)_player.Team);
@@ -191,6 +194,7 @@ namespace GIC.UI
                 EventBusHub.Instance.Send(new KickPlayerRequestEvent { TargetPlayerID = _player.PlayerID });
             }
 
+            // 重置为玩家名称（选项 0）
             nameDropdown.SetValueWithoutNotify(0);
         }
 
@@ -255,6 +259,15 @@ namespace GIC.UI
         {
             var localizedString = new LocalizedString(TableName.UIText.ToString(), key);
             return localizedString.GetLocalizedString();
+        }
+
+        void OnDestroy()
+        {
+            if (nameDropdown != null) nameDropdown.RemoveAllListeners();
+            if (spawnDropdown != null) spawnDropdown.RemoveAllListeners();
+            if (colorDropdown != null) colorDropdown.RemoveAllListeners();
+            if (teamDropdown != null) teamDropdown.RemoveAllListeners();
+            if (readyButton != null) readyButton.onClick.RemoveAllListeners();
         }
     }
 }

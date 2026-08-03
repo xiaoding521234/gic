@@ -332,6 +332,12 @@
       },
       "url": "https://packages.tuanjie.cn"
     },
+    "com.veriorpies.parrelsync": {
+      "version": "file:ParrelSync",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.unity.modules.ai": {
       "version": "1.0.0",
       "depth": 0,

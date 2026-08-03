@@ -24,8 +24,11 @@ namespace GIC.Data
         [InspectorName("防御提升")]
         DefenseUp = 1002,
 
+        [InspectorName("移速提升")]
+        MoveSpeedUp = 1003,
+
         [InspectorName("幸运暴击")]
-        LuckyCrit = 1003,
+        LuckyCrit = 1004,
 
         [InspectorName("视野")]
         Vision = 1005,
@@ -40,6 +43,9 @@ namespace GIC.Data
 
         [InspectorName("防御削弱")]
         DefenseDown = 2002,
+
+        [InspectorName("移速削弱")]
+        MoveSpeedDown = 2003,
         #endregion
 
         #region 战斗特点
@@ -58,8 +64,8 @@ namespace GIC.Data
         [InspectorName("笨重")]
         Heavy = 3005,
 
-        [InspectorName("推进")]
-        Push = 3006,
+        [InspectorName("前线推进")]
+        FrontlinePush = 3006,
 
         [InspectorName("突进")]
         Dash = 3007,

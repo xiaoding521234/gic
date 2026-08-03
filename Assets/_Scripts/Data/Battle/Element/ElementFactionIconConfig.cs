@@ -50,13 +50,6 @@ namespace GIC.Data
         public Sprite khaenriah;
         public Sprite special;
 
-        // ---- 静态入口（由 ConfigManager 注入） ----
-        private static ElementFactionIconConfig _instance;
-        public static ElementFactionIconConfig Instance => _instance;
-
-        /// <summary>由 ConfigManager Start 调用</summary>
-        public static void SetInstance(ElementFactionIconConfig config) => _instance = config;
-
         // ---- 查询方法 ----
 
         public Sprite GetElementIconStroke(ElementType type)

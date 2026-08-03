@@ -21,6 +21,7 @@ namespace GIC.UI
         public Color tint = new(0, 0, 0, 0.5f);
 
         private Material _mat;
+        private Material _originalMat;
         private Image _img;
 
         private static readonly int ScreenBlurTexID = Shader.PropertyToID("_ScreenBlurTex");
@@ -29,9 +30,13 @@ namespace GIC.UI
         private void OnEnable()
         {
             _img = GetComponent<Image>();
-            _mat = _img.materialForRendering != null
-                ? new Material(_img.materialForRendering)
-                : null;
+            // 保存原始材质引用（仅在首次保存）
+            if (_originalMat == null)
+                _originalMat = _img.material;
+
+            // 始终从原始资产材质创建新实例，避免引用已销毁的材质
+            var sourceMat = _originalMat != null ? _originalMat : _img.materialForRendering;
+            _mat = sourceMat != null ? new Material(sourceMat) : null;
 
             if (_mat != null)
             {
@@ -44,7 +49,6 @@ namespace GIC.UI
         {
             if (_mat == null) return;
 
-            // 每帧从全局获取模糊纹理，设到材质实例上
             var blurTex = Shader.GetGlobalTexture(ScreenBlurTexID);
             if (blurTex != null)
                 _mat.SetTexture(ScreenBlurTexID, blurTex);
@@ -58,6 +62,9 @@ namespace GIC.UI
                     Destroy(_mat);
                 _mat = null;
             }
+            // 恢复 Image 的原始材质，防止下次 OnEnable 引用已销毁的材质
+            if (_img != null && _originalMat != null)
+                _img.material = _originalMat;
         }
 
         private void OnDestroy()

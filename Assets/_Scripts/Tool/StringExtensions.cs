@@ -25,7 +25,7 @@ namespace GIC.Tool
                 
                 if (char.IsUpper(c))
                 {
-                    if (i > 0)
+                    if (i > 0 && input[i - 1] != '_')
                         result.Append('_');
                     result.Append(char.ToLower(c));
                 }

@@ -31,7 +31,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 1003
-    m_Localized: Lucky Crit
+    m_Localized: Move SPD Up
     m_Metadata:
       m_Items: []
   - m_Id: 1005
@@ -71,7 +71,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3006
-    m_Localized: Push
+    m_Localized: Frontline Push
     m_Metadata:
       m_Items: []
   - m_Id: 3007
@@ -112,6 +112,14 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 5001
     m_Localized: Fast Enso
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Localized: Move SPD Down
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Localized: Lucky Crit
     m_Metadata:
       m_Items: []
   references:

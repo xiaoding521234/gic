@@ -50,7 +50,16 @@ namespace GIC.Data
         DamageReduction,
 
         [InspectorName("增伤")]
-        DamageBonus
+        DamageBonus,
+
+        [InspectorName("吸血")]
+        LifeSteal,
+
+        [InspectorName("治疗效率")]
+        HealEfficiency,
+
+        [InspectorName("元能")]
+        Energy
     }
 
     // StatType 扩展方法

@@ -27,8 +27,6 @@ namespace GIC.Framework
             itemConfig = LoadConfig<ItemConfig>("Configs/ItemConfig");
             elementFactionIconConfig = LoadConfig<ElementFactionIconConfig>("Configs/ElementFactionIconConfig");
 
-            ElementFactionIconConfig.SetInstance(elementFactionIconConfig);
-
             // 注入全局配置查询入口
             CardConfigResolver.Initialize(unitConfig, itemConfig);
         }
@@ -82,11 +80,6 @@ namespace GIC.Framework
         {
             return elementFactionIconConfig;
         }
-
-        private static ConfigManager _instance;
-        public static ConfigManager Instance => _instance;
-
-        public static void SetInstance(ConfigManager instance) => _instance = instance;
     }
 
 }

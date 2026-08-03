@@ -2,12 +2,18 @@
 
 ## Codely Structured Memories
 
+- [2026-08-03 21:53:27] 技能参数非 Fixed 值是百分比，不是固定值。如"伤害 40 BasedOnAttack"= 40%×攻击力，不是 40 点固定伤害。**Why:** 用户纠正了 AI 评审时把百分比当固定值计算导致数值分析全部错误的问题。**How to apply:** 读取角色文档的技能参数表时，非 Fixed 基准的值一律按百分比理解（代码 SkillParam.GetDisplayValueText 中 value+"%"）。
+
+
 ### User
 - [2026-07-27 14:07:54] User is experienced with Java backend application development (Spring Boot, etc.). When explaining Agent/AI concepts, use Java backend analogies (Controller/Service/Mapper, Spring patterns, etc.) instead of Python/AI-native analogies.
 
 ### Feedback
 - [2026-07-25 09:27:44] User prefers Chinese field names for Inspector-exposed serialized fields (e.g. 光柱颜色, 上升时间). When creating UI/effect components, use Chinese [SerializeField] names and [Header] labels instead of English. **Why:** User explicitly asked to change LightPillarEffect fields from English to Chinese for readability. **How to apply:** New MonoBehaviour components with Inspector-facing fields should use Chinese names by default.
 - [2026-08-01 00:22:21] GIC 项目不使用 asmdef（2026-08-01 决定）。尝试过拆分 GIC.Framework/GIC.UI/GIC.Battle/GIC.Editor，但 Framework↔UI↔Battle 间存在大量循环依赖（Framework 引用 UI 的 PopupManager/CardDetailView，Battle 引用 Framework 的 SaveCardData，PlayerManager 引用 Battle 的 Unit/TeamType），硬拆需引入大量接口。**Why:** 单人开发、176 文件、个人 Demo，asmdef 收益不足以抵消重构成本。**How to apply:** 保持单一程序集 + 命名空间（GIC.Framework/GIC.UI/GIC.Battle/GIC.Editor）做逻辑隔离即可，不主动推进 asmdef 拆分。
+- [2026-08-02 01:28:18] 用户偏好直接在 Unity 编辑器中修改 Prefab/场景的 UI 属性（如字体大小），而非在代码中运行时修改。**Why:** 用户明确指出"为什么不直接在编辑器里修改"，代码中修改 UI 属性不直观且难以维护。**How to apply:** 字体大小、颜色、布局等 UI 属性应直接在 Prefab 或场景中修改，不要在 MonoBehaviour 代码中通过 `tmp.fontSize = X` 设置。
+- [2026-08-02 23:43:50] 角色属性设计规范（2026-08-02）：属性命名参考 HP，不加 Max 前缀。如 baseEnergy（不是 baseMaxEnergy），StatType.Energy（不是 MaxEnergy）。baseEnergy 是基础值=上限，角色登场时当前元能为 0 是运行时逻辑，不在 UnitStats.Init 中处理——Init 只负责把 baseEnergy 设为基础值，和 HP 完全一致。**Why:** 用户指出 Energy 应参考 HP 的设计，HP 的 baseHP 既是基础值也是上限，当前血量在战斗中往下扣；Energy 同理，baseEnergy 既是基础值也是上限，当前元能在战斗中从 0 往上加。**How to apply:** 新增属性时不要加 Max 前缀，Init 中直接 SetBaseValue，运行时的当前值/上下限管理留给战斗系统。
+- [2026-08-03 13:26:42] 通用设计规则应写在总设计文档中（如 docs/08-命座系统.md），不应写在个别角色文档里。**Why:** 用户纠正了 AI 试图在芭芭拉.md 中添加 0命概念说明的做法——角色文档只记录该角色的具体数据，通用规则属于总文档。**How to apply:** 涉及多角色的通用规则/概念，写入对应的总设计文档（如命座系统→08、行动系统→05），不要在角色文档中重复。
 
 ### Project
 
@@ -20,17 +26,13 @@
 - [2026-07-28 09:16:21] GIC project: solo developer (1人), personal Demo/portfolio goal, NOT commercial launch. Target audience: both Genshin players and strategy/tactical gamers. **Why:** Solo dev with limited resources — scope must be drastically cut from GDD ambition. **How to apply:** Recommend 2-player 1v1 over 6-player, 2-3 factions over 7, hotseat/local before Mirror networking, vertical slice over breadth.
 
 
-- [2026-07-29 14:26:28] Unit data file at docs/unit-data.md (created 2026-07-29): Markdown-based character config spec. AI reads this file to sync UnitConfig.asset / SkillName enum / SkillParamKey enum / localization tables. Contains field reference tables (weapon defaults, skill types, param base types), Amber as complete template (6 skills incl. DoubleShot), and HTML-comment template block for new characters. **Why:** eliminates manual multi-file editing when adding/modifying characters — edit one MD, AI applies changes everywhere. **How to apply:** user edits unit-data.md, asks AI to apply; AI updates enum + UnitConfig.asset + localization tables per gic-localization skill.
+- [2026-08-02 14:07:01] Unit data docs at docs/units/ (moved from docs/unit-data.md on 2026-08-02): Each character has its own MD file (安柏.md, 凯亚.md, etc.). Field reference & template at docs/units/_模板与字段说明.md. AI reads these files to sync UnitConfig.asset / SkillName enum / SkillParamKey enum / localization tables. **Why:** eliminates manual multi-file editing when adding/modifying characters — edit one MD, AI applies changes everywhere. **How to apply:** user edits docs/units/{name}.md, asks AI to apply; AI updates enum + UnitConfig.asset + localization tables per gic-localization skill.
+
+
 - [2026-07-29 22:56:01] GIC battle system architecture decision (2026-07-29): Will use StS-style "Action Queue (coroutine, serial) + DamagePipeline (sync, Phase hooks)" pattern. EventBusHub/LocalEventBus retained for UI/network layer only — battle logic does NOT go through EventBus. Key mappings: AbstractGameAction→BattleAction(IEnumerator Execute()), addToBot→ActionQueue.Enqueue(), DamageInfo.applyPowers→DamagePipeline.Process(), AbstractPower hooks→IDamageHook+DamagePhase enum (PreDamage/Calculate/PostDamage/OnDeath), isDone→yield return. No R/D two-phase needed (sync pipeline makes it unnecessary vs Java mod's frame-driven queue). **Why:** User confirmed turn-based = strict serial, no concurrency. StS validates this exact pattern. **How to apply:** When implementing battle system, create ActionQueue + DamagePipeline as separate layer from existing EventBus.
-
-
-
-
-
-
-
-
-
+- [2026-08-01 21:49:24] GIC 项目使用 ParrelSync 进行编辑器内联机测试（2026-08-01 安装）。位于 Packages/ParrelSync（从 umc 项目复制）。使用方法：菜单 ParrelSync/Preferences/Clone Manager → Clone current project → 两个 Editor 窗口都 Play，一个 Host 一个 Client。Clone 通过 Windows Junction 链接 Assets/Packages/Library，改代码实时同步。
+- [2026-08-02 13:04:07] GIC 角色语音架构 (2026-08-02): 语音数据内嵌在 UnitConfig.UnitData.voices (UnitVoiceData)，不独立 ScriptableObject。UnitVoiceData 包含 6 组通用 AudioClipRandom (onGoWar/onChooseHighHP/onChooseLowHP/onHitLight/onHitHeavy/onDie) + SkillVoiceEntry[] (按 SkillName 索引)。AudioClipRandom 已有权重+不连续重复。复用 AudioManager.PlayVoice 通道。语音文件在 Assets/Resources/Audios/Voices/{UnitName}/，命名: go_war_0.wav, choose_high_hp_0.wav, hit_light_0.wav, die_0.wav, {skillname_snake}_0.wav。Editor 工具 Tools/UnitConfig/自动加载语音 按文件名前缀匹配自动填充。8 角色 223 文件已从老 mod 搬入 (Amber/Kaeya/Barbara/Lisa/Jean/Klee/Citlali/Haborym)。
+- [2026-08-03 13:41:52] GIC 术语区分（2026-08-03）：【消散】= 玩家战败时单位从游戏中真正删除，不可恢复；【放逐】= 转移到另一个维度，单位仍然存在，可被特定技能召回（如丽莎爆发蔷薇的雷光可召回被放逐的标记单位并承受真伤惩罚）。**Why:** 用户澄清两个术语容易混淆，之前文档中混用。**How to apply:** 玩家战败清场用"消散"，维度转移用"放逐"，不要混用。注意凯亚/芭芭拉文档中的"棱消散/环消散"是Buff机制用语，与单位消散无关。
 
 ### Reference
 - [2026-07-28 16:17:53] Localization CSV tool at Tools/Localization/CSV 导出导入 (created 2026-07-28). Exports/imports all 21 TableName localization tables to/from CSV ({TableName}.csv). CSV format: Key,Id,zh-Hans,zh-TW,en,ja,ru. RFC 4180 compliant (supports commas/quotes/newlines in values). Smart matching: Id first, then Key, then create new. **Why:** Unity Localization YAML is unicode-escaped and hard to batch-edit. **How to apply:** use this tool instead of Unity Localization Window for bulk edits; CSV folder defaults to Export/Localization.

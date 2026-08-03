@@ -17,9 +17,6 @@ namespace GIC.Framework
     /// </summary>
     public class PlayerManager : IWargameManager
     {
-        // 单例由 Wargame 持有
-        public static PlayerManager Instance { get; private set; }
-
         // 自身 PlayerID（由服务器通过 SetSelfPlayerEvent 设置）
         private string _selfPlayerID = PlayerID.Offline;
 
@@ -77,6 +74,7 @@ namespace GIC.Framework
         private UpdatePlayerInfoHandler _updatePlayerInfoHandler;
         private KickedFromRoomHandler _kickedFromRoomHandler;
         private SetSelfPlayerHandler _setSelfPlayerHandler;
+        private SetPlayerNameHandler _setPlayerNameHandler;
 
         // ==================== 事件 ====================
 
@@ -99,8 +97,6 @@ namespace GIC.Framework
 
         public void Start()
         {
-            Instance = this;
-
             // 创建 Handler 实例并保存引用
             CreateHandlers();
 
@@ -127,6 +123,7 @@ namespace GIC.Framework
             _updatePlayerInfoHandler = new UpdatePlayerInfoHandler(this);
             _kickedFromRoomHandler = new KickedFromRoomHandler(this);
             _setSelfPlayerHandler = new SetSelfPlayerHandler(this);
+            _setPlayerNameHandler = new SetPlayerNameHandler(this);
         }
 
         private void SubscribeEvents()
@@ -144,6 +141,7 @@ namespace GIC.Framework
             EventBusHub.Instance.Subscribe<UpdatePlayerInfoEvent>(_updatePlayerInfoHandler);
             EventBusHub.Instance.Subscribe<KickedFromRoomEvent>(_kickedFromRoomHandler);
             EventBusHub.Instance.Subscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler);
+            EventBusHub.Instance.Subscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler);
         }
 
         // ==================== 玩家管理 ====================
@@ -161,7 +159,9 @@ namespace GIC.Framework
         {
             string playerID = conn.connectionId.ToString();
             bool isHost = playerID == PlayerID.Host;
-            string playerName = isHost ? "旅行者" : ("玩家" + conn.connectionId);
+            string playerName = isHost
+                ? (Wargame.Instance?.SaveManager?.CurrentSave?.playerName ?? "旅行者")
+                : ("玩家" + conn.connectionId);
 
             RegisterPlayer(playerID, playerName, TeamType.A,
                           GetNextAvailableColorPublic(), isHost, conn.address, conn);
@@ -295,6 +295,18 @@ namespace GIC.Framework
         public int GetPlayerCount() => _allPlayers.Count;
 
         // ==================== 属性修改 ====================
+
+        public void SetPlayerName(string playerID, string newName)
+        {
+            if (string.IsNullOrEmpty(newName)) return;
+            if (_allPlayers.TryGetValue(playerID, out var info))
+            {
+                info.PlayerName = newName;
+                _allPlayers[playerID] = info;
+                Debug.Log($"[PlayerManager] 玩家 {playerID} 设置名称: {newName}");
+                OnPlayerInfoUpdated?.Invoke(playerID, info);
+            }
+        }
 
         public void SetPlayerTeam(string playerID, TeamType team)
         {
@@ -448,8 +460,7 @@ namespace GIC.Framework
             EventBusHub.Instance.Unsubscribe<UpdatePlayerInfoEvent>(_updatePlayerInfoHandler);
             EventBusHub.Instance.Unsubscribe<KickedFromRoomEvent>(_kickedFromRoomHandler);
             EventBusHub.Instance.Unsubscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler);
-
-            Instance = null;
+            EventBusHub.Instance.Unsubscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler);
         }
 
 
@@ -588,6 +599,22 @@ namespace GIC.Framework
             public SetSelfPlayerHandler(PlayerManager m) => _mgr = m;
             public bool CanHandle(SetSelfPlayerEvent e) => e.Source == EventSource.Network;
             public void Handle(SetSelfPlayerEvent e) => _mgr.SetSelfPlayerID(e.TargetPlayerID);
+        }
+
+        private class SetPlayerNameHandler : IEventHandler<SetPlayerNameRequestEvent>
+        {
+            private readonly PlayerManager _mgr;
+            public SetPlayerNameHandler(PlayerManager m) => _mgr = m;
+            public bool CanHandle(SetPlayerNameRequestEvent e) => NetworkServer.active;
+            public void Handle(SetPlayerNameRequestEvent e)
+            {
+                string pid = e.SourcePlayerID;
+                if (string.IsNullOrEmpty(pid) || pid == PlayerID.Unknown) pid = _mgr.SelfPlayerID;
+                _mgr.SetPlayerName(pid, e.PlayerName);
+                var info = _mgr.GetPlayerInfo(pid);
+                if (info != null)
+                    EventBusHub.Instance.Send(new UpdatePlayerInfoEvent { UpdatedInfo = info });
+            }
         }
     }
 }

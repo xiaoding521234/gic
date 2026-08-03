@@ -63,7 +63,7 @@ namespace GIC.Framework
 
             // 备用：从 PlayerManager 获取
             if (string.IsNullOrEmpty(senderId) || senderId == PlayerID.Offline)
-                senderId = PlayerManager.Instance?.SelfPlayerID;
+                senderId = Wargame.Instance?.PlayerManager?.SelfPlayerID;
 
             if (!string.IsNullOrEmpty(senderId) && senderId != PlayerID.Offline)
                 eventData.SourcePlayerID = senderId;

@@ -27,10 +27,6 @@ MonoBehaviour:
     m_Key: DefenseUp
     m_Metadata:
       m_Items: []
-  - m_Id: 1003
-    m_Key: LuckyCrit
-    m_Metadata:
-      m_Items: []
   - m_Id: 1005
     m_Key: Vision
     m_Metadata:
@@ -65,10 +61,6 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3005
     m_Key: Heavy
-    m_Metadata:
-      m_Items: []
-  - m_Id: 3006
-    m_Key: Push
     m_Metadata:
       m_Items: []
   - m_Id: 3007
@@ -109,6 +101,22 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 5001
     m_Key: FastEnso
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3006
+    m_Key: FrontlinePush
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Key: MoveSpeedDown
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1003
+    m_Key: MoveSpeedUp
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Key: LuckyCrit
     m_Metadata:
       m_Items: []
   m_Metadata:

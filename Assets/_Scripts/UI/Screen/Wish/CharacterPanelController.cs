@@ -68,8 +68,9 @@ namespace GIC.UI
             if (contentFilled) return;
             contentFilled = true;
 
-            var config = ConfigManager.Instance != null
-                ? ConfigManager.Instance.GetUnitConfig()
+            var configManager = Wargame.Instance?.ConfigManager;
+            var config = configManager != null
+                ? configManager.GetUnitConfig()
                 : Resources.Load<UnitConfig>("Configs/UnitConfig");
             if (config == null) return;
 
@@ -85,7 +86,7 @@ namespace GIC.UI
                 titleText.text = data.GetTitleEntry().GetLocalizedString();
 
             // 元素图标
-            var iconConfig = ElementFactionIconConfig.Instance;
+            var iconConfig = Wargame.Instance?.ConfigManager?.GetElementFactionIconConfig();
             if (elementIcon != null && iconConfig != null)
                 elementIcon.sprite = iconConfig.GetElementIconDeep(data.selfElement);
 

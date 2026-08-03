@@ -150,6 +150,19 @@ namespace GIC.Data
             Immediate = true;        // 立即执行
         }
     }
+
+    /// <summary>
+    /// 客户端设置自己名称的请求（客户端 -> 服务器）
+    /// </summary>
+    public class SetPlayerNameRequestEvent : BaseEvent
+    {
+        public string PlayerName;
+        
+        public SetPlayerNameRequestEvent()
+        {
+            Type = GIC.Framework.EventType.OnlyHost;
+        }
+    }
 }
 
 

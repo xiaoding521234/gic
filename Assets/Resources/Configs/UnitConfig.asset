@@ -33,6 +33,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 2
     blockAllies: 1
     blockEnemies: 1
@@ -41,6 +44,20 @@ MonoBehaviour:
     visionRange: -1
     tags: a60f0000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 2001
     unitType: 1
     factions: d1070000
@@ -62,6 +79,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -97,6 +117,20 @@ MonoBehaviour:
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 2002
     unitType: 1
     factions: d1070000
@@ -117,6 +151,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -152,6 +189,20 @@ MonoBehaviour:
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 2003
     unitType: 1
     factions: d1070000
@@ -172,6 +223,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -207,6 +261,20 @@ MonoBehaviour:
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 2004
     unitType: 1
     factions: d1070000
@@ -227,6 +295,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 2
     blockAllies: 1
     blockEnemies: 1
@@ -235,6 +306,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 3001
     unitType: 1
     factions: b90b0000
@@ -255,6 +340,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 3
     normalMoveType: 2
     blockAllies: 1
     blockEnemies: 1
@@ -313,6 +401,9 @@ MonoBehaviour:
       - key: 6
         value: 3
         baseType: 0
+      - key: 20
+        value: 6
+        baseType: 0
     - skillID: 3001006
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -326,6 +417,86 @@ MonoBehaviour:
       - key: 15
         value: 2
         baseType: 0
+      - key: 18
+        value: 5
+        baseType: 0
+      - key: 19
+        value: 1
+        baseType: 0
+    voices:
+      onGoWar:
+        clips:
+        - clip: {fileID: 8300000, guid: 6bfbd2fe14f335b4fa3cb4cca143ce95, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: b10b476b9dde0fb4ca2b08649397f683, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: cbc6b8a506e74ff4589e8bbf4db64914, type: 3}
+          weight: 1
+      onChooseHighHP:
+        clips:
+        - clip: {fileID: 8300000, guid: 93b44b926c34aec49b1181a52ce07143, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 52224a8f6d4b4a542bccb137eb274c81, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: f9994234006b6a94da1d5595881b7689, type: 3}
+          weight: 1
+      onChooseLowHP:
+        clips:
+        - clip: {fileID: 8300000, guid: f6d5329a5af73e1499f55f3f349d5c71, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 08dba4fb17102524d93d1a363f81bae3, type: 3}
+          weight: 1
+      onHitLight:
+        clips:
+        - clip: {fileID: 8300000, guid: 3dfdee4d75aa2124787da3eb7fe41db5, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: ea3349bca3fc38942aa035c9a45d29fd, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: da1d82d861e8f4d45966fe7af7ce79e0, type: 3}
+          weight: 1
+      onHitHeavy:
+        clips:
+        - clip: {fileID: 8300000, guid: 7b68cc52c53b93e4a8bca3458354aa6f, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: aca57147c16e6904d80b44a09fb146cf, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: e4c0c8a53f3765f4da8f3414f0d46e67, type: 3}
+          weight: 1
+      onDie:
+        clips:
+        - clip: {fileID: 8300000, guid: d8fb2675248ff0346bd17f136b75e03a, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: d3fbcd53fcddc644db7dd7a028a157a5, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 84d87cc5904881d4daff5392868b9f64, type: 3}
+          weight: 1
+      skillVoices:
+      - skillName: 3001003
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 6205b3ade80d693429f5c1e4f513ec38, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 8be023c5c39f2984aad5a6a6853000f0, type: 3}
+            weight: 1
+      - skillName: 3001002
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: c923d3a82322c7d46a5e8ff3b89ea0a7, type: 3}
+            weight: 1
+      - skillName: 3001001
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: de7b3e0a787bcd748aae3da57d20b5c7, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: d8fef33badb278743aa83eab96a4ce37, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 7bd5efd58ae7b2b439d4bc85d83df95e, type: 3}
+            weight: 1
+      - skillName: 3001005
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 8d951c27979d7194784ffcb32c427f27, type: 3}
+            weight: 1
   - unitName: 3002
     unitType: 1
     factions: b90b0000
@@ -339,48 +510,178 @@ MonoBehaviour:
     weaponType: 1
     baseHP: -64
     baseAttack: -64
-    baseDefense: -64
+    baseDefense: 0
     baseAttackSpeed: -64
-    baseMoveSpeed: -64
-    baseLuck: -64
-    baseTenacity: -64
-    baseMastery: -64
-    baseSanity: -64
+    baseMoveSpeed: 3
+    baseLuck: 0
+    baseTenacity: 0
+    baseMastery: 0
+    baseSanity: 50
+    baseLifeSteal: 0
+    baseHealEfficiency: 100
+    baseEnergy: 4
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 5
     visionRange: -64
-    tags: be0b0000d2070000b90b000089130000
+    tags: eb030000be0b000089130000
     skills:
     - skillID: 1
       icon: {fileID: 0}
       skillType: 1
-      customParams: []
+      customParams:
+      - key: 5
+        value: 100
+        baseType: 9
     - skillID: 3002001
       icon: {fileID: 0}
       skillType: 2
       customParams:
-      - key: 0
-        value: 0
+      - key: 1
+        value: 100
+        baseType: 1
+      - key: 31
+        value: 2
         baseType: 0
-    - skillID: 1002002
+    - skillID: 3002002
       icon: {fileID: 0}
       skillType: 3
-      customParams: []
-    - skillID: 1002003
+      customParams:
+      - key: 21
+        value: 2
+        baseType: 0
+      - key: 9
+        value: 4
+        baseType: 0
+    - skillID: 3002003
       icon: {fileID: 0}
       skillType: 6
-      customParams: []
-    - skillID: 1002004
+      customParams:
+      - key: 30
+        value: 1
+        baseType: 0
+      - key: 9
+        value: 1
+        baseType: 0
+    - skillID: 3002004
       icon: {fileID: 0}
       skillType: 7
-      customParams: []
-    - skillID: 1002005
+      customParams:
+      - key: 3
+        value: 50
+        baseType: 1
+    - skillID: 3002005
       icon: {fileID: 0}
       skillType: 4
-      customParams: []
+      customParams:
+      - key: 24
+        value: 50
+        baseType: 0
+      - key: 25
+        value: 50
+        baseType: 0
+      - key: 26
+        value: 1
+        baseType: 0
+      - key: 27
+        value: 5
+        baseType: 0
+      - key: 28
+        value: 1
+        baseType: 0
+      - key: 29
+        value: 1
+        baseType: 0
+    voices:
+      onGoWar:
+        clips:
+        - clip: {fileID: 8300000, guid: c9aa7bae9c34a204e9d767a3a7d2ef20, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: d7233a9728741e34c868a93cb55279a4, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: a5cd051cc91d86f4da4e7af7c904d836, type: 3}
+          weight: 1
+      onChooseHighHP:
+        clips:
+        - clip: {fileID: 8300000, guid: 050b4fa7b44a11f42a45f165697e83e3, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 39bb875da17ce884aaefe963dea2106f, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 176579351ebd85f43b113c702cd61c70, type: 3}
+          weight: 1
+      onChooseLowHP:
+        clips:
+        - clip: {fileID: 8300000, guid: 93c18e50ef1a5ec4e9fba0d754df6527, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 51d0cfa4acf4bed419b5e695db8d01ef, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 5abc56cc9cb111148ae2ef40247a63f8, type: 3}
+          weight: 1
+      onHitLight:
+        clips:
+        - clip: {fileID: 8300000, guid: 9883546137965c14f9e0a49ca899b455, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 4f0573a1065196c44976d5a876a21fe6, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: d46ec814de2d612438a84e49dfdbcf61, type: 3}
+          weight: 1
+      onHitHeavy:
+        clips:
+        - clip: {fileID: 8300000, guid: 4c7a9e0e40e2cf344ad6eaf2ae23947a, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 2a546f5a63bc38545b16f010b7010b55, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: f45f2a3c1a673794c875432f900844b8, type: 3}
+          weight: 1
+      onDie:
+        clips:
+        - clip: {fileID: 8300000, guid: 375c5759fe86e9d468c29a5959723d86, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 667951e66ec06a448a5cb32d6b0d8978, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 3de6fd7bf794b40469c0a0344a8c6424, type: 3}
+          weight: 1
+      skillVoices:
+      - skillName: 1
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 943c0a7bf60134348804c9cf8d4b888f, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: b56cb1822cacf5a4dbbe4fd31f8ed56f, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 232dd88016d4fc8479ccf7f8db18dda8, type: 3}
+            weight: 1
+      - skillName: 3002004
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 5d6b5473b6f99464799645b3c34d5a4f, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 7d23e2b4f893336459c7b38255dec074, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 52101996b3d33f141b70683201e8089b, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 2ecb9759709dcfc4988338b976d8a08a, type: 3}
+            weight: 1
+      - skillName: 3002001
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: f135e12776eb1444d923514e3ccb1184, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: e932abb7c15d58243b58de62d25c6336, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: bfc5dbb81438b314bb88098f360d157d, type: 3}
+            weight: 1
+      - skillName: 3002002
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: c38d2637021becb4caee9620d3f19eb7, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 1776244102a75e94bb327e7b6b7d1ef2, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: b15b2584c15aca844ab659791c531f37, type: 3}
+            weight: 1
   - unitName: 3003
     unitType: 1
     factions: b90b0000
@@ -394,48 +695,165 @@ MonoBehaviour:
     weaponType: 4
     baseHP: -64
     baseAttack: -64
-    baseDefense: -64
+    baseDefense: 0
     baseAttackSpeed: -64
-    baseMoveSpeed: -64
-    baseLuck: -64
-    baseTenacity: -64
-    baseMastery: -64
-    baseSanity: -64
+    baseMoveSpeed: 3
+    baseLuck: 0
+    baseTenacity: 0
+    baseMastery: 0
+    baseSanity: 50
+    baseLifeSteal: 0
+    baseHealEfficiency: 100
+    baseEnergy: 10
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -64
-    tags: a50f0000a20f0000
+    tags: a20f0000a50f0000
     skills:
     - skillID: 1
       icon: {fileID: 0}
       skillType: 1
-      customParams: []
-    - skillID: 1002001
+      customParams:
+      - key: 5
+        value: 100
+        baseType: 9
+    - skillID: 3003004
       icon: {fileID: 0}
       skillType: 2
       customParams:
-      - key: 0
-        value: 0
+      - key: 22
+        value: 5
         baseType: 0
-    - skillID: 1002002
+      - key: 1
+        value: 10
+        baseType: 2
+      - key: 23
+        value: 1
+        baseType: 0
+      - key: 3
+        value: 15
+        baseType: 2
+    - skillID: 3003001
       icon: {fileID: 0}
       skillType: 3
-      customParams: []
-    - skillID: 1002003
+      customParams:
+      - key: 3
+        value: 40
+        baseType: 2
+      - key: 9
+        value: 10
+        baseType: 0
+    - skillID: 3003002
       icon: {fileID: 0}
       skillType: 6
-      customParams: []
-    - skillID: 1002004
+      customParams:
+      - key: 3
+        value: 15
+        baseType: 2
+      - key: 9
+        value: 2
+        baseType: 0
+    - skillID: 3003003
       icon: {fileID: 0}
       skillType: 7
-      customParams: []
-    - skillID: 1002005
+      customParams:
+      - key: 3
+        value: 8
+        baseType: 2
+    - skillID: 3003005
       icon: {fileID: 0}
       skillType: 4
-      customParams: []
+      customParams:
+      - key: 32
+        value: 1
+        baseType: 0
+      - key: 33
+        value: 1
+        baseType: 0
+      - key: 28
+        value: 1
+        baseType: 0
+    voices:
+      onGoWar:
+        clips:
+        - clip: {fileID: 8300000, guid: b1e327478845a364fbcbe3b72f1b1e1b, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 1154724e09c04f2438917296b1a6ee18, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 4ab04ca54fa729441b3a29fc36e54e89, type: 3}
+          weight: 1
+      onChooseHighHP:
+        clips:
+        - clip: {fileID: 8300000, guid: 6fb4eaa24e807ad45b57d147779d00ad, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 50ff96b213c3ad24b9567566d9eb531d, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 0a6af2ef391156647872ea7a727fe41e, type: 3}
+          weight: 1
+      onChooseLowHP:
+        clips:
+        - clip: {fileID: 8300000, guid: 10a36d83032ee734c880ce1d8a6be366, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 56694954669e94841a43564665a9eb16, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 3af3e94739536e4408170b4d4186059a, type: 3}
+          weight: 1
+      onHitLight:
+        clips:
+        - clip: {fileID: 8300000, guid: 86675fe25435ab7408b8d4f1238e78d2, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 5a21eafa448e90649a0ed87515e6362c, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 838c541660d6ad543ad756aabeba7765, type: 3}
+          weight: 1
+      onHitHeavy:
+        clips:
+        - clip: {fileID: 8300000, guid: 3e53451798efc90478b05373a6dfc842, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 44ee16f1e4b17144797820ae4e342f29, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 27e63f755c1e9d641928ee6c52d9d80d, type: 3}
+          weight: 1
+      onDie:
+        clips:
+        - clip: {fileID: 8300000, guid: 627fd7ce20fb6f04f9794affdbf27100, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 52572675c1e5a564d8fea47a4e2ed032, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: b40ff65d54a72014da6822f9e11e11c4, type: 3}
+          weight: 1
+      skillVoices:
+      - skillName: 3003002
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: a4d449141f5f5854c940103b65e4efd7, type: 3}
+            weight: 1
+      - skillName: 3003001
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 1410acd08ac09cd43a8f2c9b794ad2dc, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: be14d0b6e3dce1446b1448ce48780b42, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 33ff64f43783eba49866e5162f4e2770, type: 3}
+            weight: 1
+      - skillName: 3003003
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 4af23b62f704f134cbc1363e6750d0f6, type: 3}
+            weight: 1
+      - skillName: 1
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 7f72ff96d0b27b64c85eb392ee802271, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 3e3ea5e133b14c44b97bba47f689680c, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: ff537bd67aa911141bf3c718f6abe76f, type: 3}
+            weight: 1
   - unitName: 3008
     unitType: 1
     factions: b90b0000
@@ -456,6 +874,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 2
     blockAllies: 1
     blockEnemies: 1
@@ -464,6 +885,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 4001
     unitType: 1
     factions: a10f0000
@@ -484,6 +919,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -519,6 +957,20 @@ MonoBehaviour:
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 4002
     unitType: 1
     factions: a10f0000
@@ -539,6 +991,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 3
     blockAllies: 1
     blockEnemies: 1
@@ -574,6 +1029,20 @@ MonoBehaviour:
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 4005
     unitType: 1
     factions: a10f0000
@@ -594,6 +1063,9 @@ MonoBehaviour:
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -629,6 +1101,20 @@ MonoBehaviour:
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 4007
     unitType: 1
     factions: a10f0000
@@ -649,6 +1135,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -657,6 +1146,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 5001
     unitType: 1
     factions: 89130000
@@ -677,6 +1180,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -685,6 +1191,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 5002
     unitType: 1
     factions: 89130000
@@ -705,6 +1225,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -713,6 +1236,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 5003
     unitType: 1
     factions: 89130000
@@ -733,6 +1270,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -741,6 +1281,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 5004
     unitType: 1
     factions: 89130000
@@ -761,6 +1315,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -769,6 +1326,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 6001
     unitType: 1
     factions: 71170000
@@ -789,6 +1360,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -797,6 +1371,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 6002
     unitType: 1
     factions: 71170000
@@ -817,6 +1405,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -825,6 +1416,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 6003
     unitType: 1
     factions: 71170000
@@ -845,6 +1450,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -853,6 +1461,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 6004
     unitType: 1
     factions: 71170000
@@ -873,6 +1495,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -881,6 +1506,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 7001
     unitType: 1
     factions: 591b0000
@@ -901,6 +1540,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -909,6 +1551,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 7002
     unitType: 1
     factions: 591b0000
@@ -929,6 +1585,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -937,6 +1596,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 7003
     unitType: 1
     factions: 591b0000
@@ -957,6 +1630,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -965,6 +1641,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 0000000000000000
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 7004
     unitType: 1
     factions: 591b0000
@@ -985,6 +1675,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 3
     blockAllies: 1
     blockEnemies: 1
@@ -993,6 +1686,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 8001
     unitType: 1
     factions: 411f0000
@@ -1013,6 +1720,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 2
     blockAllies: 1
     blockEnemies: 1
@@ -1021,6 +1731,20 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 11002
     unitType: 1
     factions: f92a0000
@@ -1041,6 +1765,9 @@ MonoBehaviour:
     baseTenacity: -1
     baseMastery: -1
     baseSanity: -1
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -1049,3 +1776,17 @@ MonoBehaviour:
     visionRange: -1
     tags: 
     skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []

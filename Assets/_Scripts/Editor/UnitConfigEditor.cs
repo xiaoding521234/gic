@@ -5,6 +5,10 @@
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
@@ -18,6 +22,8 @@ namespace GIC.Editor
     [CustomEditor(typeof(UnitConfig))]
     public class UnitConfigEditor : UnityEditor.Editor
     {
+        private const string VOICE_ROOT_PATH = "Assets/Resources/Audios/Voices/";
+
         private ReorderableListWithMenu listWithMenu;
 
         private void OnEnable()
@@ -78,6 +84,20 @@ namespace GIC.Editor
                 listWithMenu.ShowContextMenu();
             }
 
+            // ========== 批量填充工具 ==========
+            EditorGUILayout.Space(20);
+            EditorGUILayout.LabelField("批量填充工具", EditorStyles.boldLabel);
+
+            if (GUILayout.Button("自动加载所有角色语音", GUILayout.Height(30)))
+            {
+                AutoFillAllVoices((UnitConfig)target);
+            }
+
+            if (GUILayout.Button("仅加载缺失的语音", GUILayout.Height(30)))
+            {
+                AutoFillMissingVoices((UnitConfig)target);
+            }
+
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -100,6 +120,202 @@ namespace GIC.Editor
             int enumValue = factionsProperty.GetArrayElementAtIndex(0).intValue;
             return ((FactionType)enumValue).GetInspectorName();
         }
+
+        #region 语音自动填充
+
+        private void AutoFillAllVoices(UnitConfig config)
+        {
+            int success = 0, fail = 0;
+            var warnings = new List<string>();
+
+            foreach (var unitData in config.unitDataList)
+            {
+                if (unitData == null) continue;
+                if (LoadVoicesForUnit(unitData, warnings)) success++; else fail++;
+            }
+
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"语音加载完成: 成功 {success}, 失败 {fail}");
+            if (warnings.Count > 0)
+                Debug.LogWarning($"语音加载警告 ({warnings.Count}):\n" + string.Join("\n", warnings));
+        }
+
+        private void AutoFillMissingVoices(UnitConfig config)
+        {
+            int loaded = 0, skipped = 0;
+            var warnings = new List<string>();
+
+            foreach (var unitData in config.unitDataList)
+            {
+                if (unitData == null) continue;
+                if (unitData.voices != null && IsVoiceDataComplete(unitData.voices))
+                {
+                    skipped++;
+                    continue;
+                }
+                if (LoadVoicesForUnit(unitData, warnings)) loaded++; else skipped++;
+            }
+
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"语音加载完成: 加载 {loaded}, 跳过 {skipped}");
+            if (warnings.Count > 0)
+                Debug.LogWarning($"语音加载警告 ({warnings.Count}):\n" + string.Join("\n", warnings));
+        }
+
+        private bool LoadVoicesForUnit(UnitConfig.UnitData unitData, List<string> warnings)
+        {
+            string folderPath = Path.Combine(VOICE_ROOT_PATH, unitData.unitName.ToString());
+
+            if (!Directory.Exists(folderPath))
+            {
+                warnings.Add($"[{unitData.unitName}] 目录不存在: {folderPath}");
+                return false;
+            }
+
+            string[] guids = AssetDatabase.FindAssets("t:AudioClip", new[] { folderPath });
+            if (guids.Length == 0)
+            {
+                warnings.Add($"[{unitData.unitName}] 无音频文件");
+                return false;
+            }
+
+            unitData.voices ??= new UnitConfig.UnitVoiceData();
+
+            // 构建 SkillName snake_case → SkillName 映射
+            var skillNameMap = new Dictionary<string, SkillName>();
+            foreach (SkillName skill in Enum.GetValues(typeof(SkillName)))
+            {
+                if (skill == SkillName.None) continue;
+                skillNameMap[skill.ToString().ToSnakeCase()] = skill;
+            }
+
+            var genericMap = new (string prefix, Action<UnitConfig.UnitVoiceData, AudioClip[]> setter)[]
+            {
+                ("go_war",         (v, c) => v.onGoWar        = CreateAudioClipRandom(c)),
+                ("choose_high_hp", (v, c) => v.onChooseHighHP = CreateAudioClipRandom(c)),
+                ("choose_low_hp",  (v, c) => v.onChooseLowHP  = CreateAudioClipRandom(c)),
+                ("hit_light",      (v, c) => v.onHitLight     = CreateAudioClipRandom(c)),
+                ("hit_heavy",      (v, c) => v.onHitHeavy     = CreateAudioClipRandom(c)),
+                ("die",            (v, c) => v.onDie          = CreateAudioClipRandom(c)),
+            };
+
+            var genericClips = new Dictionary<string, List<AudioClip>>();
+            var skillClips = new Dictionary<SkillName, List<AudioClip>>();
+            var unmatched = new List<string>();
+
+            foreach (string guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                string fileName = Path.GetFileNameWithoutExtension(assetPath);
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(assetPath);
+                if (clip == null) continue;
+
+                bool matched = false;
+                foreach (var (prefix, _) in genericMap)
+                {
+                    if (fileName.StartsWith(prefix + "_") || fileName == prefix)
+                    {
+                        if (!genericClips.ContainsKey(prefix))
+                            genericClips[prefix] = new List<AudioClip>();
+                        genericClips[prefix].Add(clip);
+                        matched = true;
+                        break;
+                    }
+                }
+                if (matched) continue;
+
+                // 技能语音：最长前缀匹配
+                string skillPrefix = null;
+                SkillName matchedSkill = SkillName.None;
+
+                foreach (var kvp in skillNameMap)
+                {
+                    if (fileName.StartsWith(kvp.Key + "_"))
+                    {
+                        if (skillPrefix == null || kvp.Key.Length > skillPrefix.Length)
+                        {
+                            skillPrefix = kvp.Key;
+                            matchedSkill = kvp.Value;
+                        }
+                    }
+                }
+
+                if (skillPrefix != null)
+                {
+                    if (!skillClips.ContainsKey(matchedSkill))
+                        skillClips[matchedSkill] = new List<AudioClip>();
+                    skillClips[matchedSkill].Add(clip);
+                    continue;
+                }
+
+                if (fileName.StartsWith("move_skill_") || fileName == "move_skill")
+                {
+                    warnings.Add($"[{unitData.unitName}] 未映射的 move_skill: {fileName}");
+                    continue;
+                }
+
+                unmatched.Add(fileName);
+            }
+
+            // 填充通用语音
+            foreach (var (prefix, setter) in genericMap)
+            {
+                if (genericClips.TryGetValue(prefix, out var clips) && clips.Count > 0)
+                    setter(unitData.voices, clips.ToArray());
+            }
+
+            // 填充技能语音
+            if (skillClips.Count > 0)
+            {
+                var entries = new List<UnitConfig.SkillVoiceEntry>();
+                foreach (var kvp in skillClips)
+                {
+                    if (kvp.Value.Count > 0)
+                        entries.Add(new UnitConfig.SkillVoiceEntry
+                        {
+                            skillName = kvp.Key,
+                            voices = CreateAudioClipRandom(kvp.Value.ToArray())
+                        });
+                }
+                unitData.voices.skillVoices = entries.ToArray();
+            }
+
+            if (unmatched.Count > 0)
+                warnings.Add($"[{unitData.unitName}] 未匹配文件: {string.Join(", ", unmatched)}");
+
+            return true;
+        }
+
+        private AudioClipRandom CreateAudioClipRandom(AudioClip[] clips)
+        {
+            var random = new AudioClipRandom();
+            foreach (var clip in clips)
+                random.AddClip(clip);
+            return random;
+        }
+
+        private int CountFilledVoiceGroups(UnitConfig.UnitVoiceData voices)
+        {
+            int count = 0;
+            if (voices.onGoWar != null && voices.onGoWar.Count > 0) count++;
+            if (voices.onChooseHighHP != null && voices.onChooseHighHP.Count > 0) count++;
+            if (voices.onChooseLowHP != null && voices.onChooseLowHP.Count > 0) count++;
+            if (voices.onHitLight != null && voices.onHitLight.Count > 0) count++;
+            if (voices.onHitHeavy != null && voices.onHitHeavy.Count > 0) count++;
+            if (voices.onDie != null && voices.onDie.Count > 0) count++;
+            return count;
+        }
+
+        private bool IsVoiceDataComplete(UnitConfig.UnitVoiceData voices)
+        {
+            return CountFilledVoiceGroups(voices) == 6;
+        }
+
+        #endregion
     }
 
     // ============================================

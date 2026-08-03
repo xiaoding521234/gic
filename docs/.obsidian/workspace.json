@@ -6,49 +6,23 @@
       {
         "id": "1c93109925ae2d8b",
         "type": "tabs",
-        "dimension": 73.1687898089172,
         "children": [
           {
-            "id": "470b3f6ac6bd67ef",
+            "id": "c43dec818f286095",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "unit-data.md",
+                "file": "units/丽莎.md",
                 "mode": "source",
-                "source": false,
-                "backlinks": false
+                "source": false
               },
               "icon": "lucide-file",
-              "title": "unit-data"
-            },
-            "group": "dbb7567cb26ea7e6"
+              "title": "丽莎"
+            }
           }
         ],
         "stacked": true
-      },
-      {
-        "id": "cf0d034de23e6517",
-        "type": "tabs",
-        "dimension": 26.831210191082803,
-        "children": [
-          {
-            "id": "2705b07d12ca799b",
-            "type": "leaf",
-            "state": {
-              "type": "outline",
-              "state": {
-                "file": "unit-data.md",
-                "followCursor": false,
-                "showSearch": false,
-                "searchQuery": ""
-              },
-              "icon": "lucide-list",
-              "title": "unit-data 的大纲"
-            },
-            "group": "dbb7567cb26ea7e6"
-          }
-        ]
       }
     ],
     "direction": "vertical"
@@ -68,7 +42,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "文件列表"
@@ -210,10 +186,31 @@
       "bases:新建数据库": false
     }
   },
-  "active": "470b3f6ac6bd67ef",
+  "active": "c43dec818f286095",
   "lastOpenFiles": [
-    "unit-data.md.tmp.35448.1785305943133",
-    "unit-data.md.tmp.35448.1785305935849",
-    "unit-data.md.tmp.35448.1785305925387"
+    "units/草稿.md.tmp.35640.1785762594776",
+    "units/安柏.md",
+    "units/草稿.md.tmp.35640.1785762318649",
+    "units/丽莎.md",
+    "units/安柏.md.tmp.18844.1785760651646",
+    "05-行动系统.md.tmp.51792.1785735706303",
+    "02-胜负条件.md.tmp.51792.1785735706257",
+    "units/草稿.md",
+    "units/芭芭拉.md",
+    "units/凯亚.md",
+    "units/凯亚.md.tmp.57032.1785686095635",
+    "units/安柏.md.tmp.57032.1785683487991",
+    "units/芭芭拉.md.tmp.57032.1785682625813",
+    "units/凯亚.md.tmp.57032.1785682602483",
+    "units/_模板与字段说明.md",
+    "units/凯亚.md.tmp.54176.1785656164101",
+    "units/kaeya.md",
+    "units/amber.md",
+    "02-胜负条件.md",
+    "01-局前准备.md",
+    "units/_template.md",
+    "00-概念提案.md",
+    "未命名",
+    "unit-data.md"
   ]
 }

@@ -42,12 +42,12 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001003
     m_Localized: "\xB7Shoot a volley of arrows in one of the four cardinal directions\n\xB7Deal
-      {Damage} Pyro DMG {DamageCount} times"
+      {Damage} Pyro DMG {DamageCount} times to all enemies on the line"
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: "\xB7Dispel fog in a {EffectRadius}-tile radius and reveal stealthed
-      enemies"
+    m_Localized: "\xB7Dispel fog in a {EffectRadius}-tile radius\n\xB7Reveal enemies
+      in range for {VisionDuration} turns"
     m_Metadata:
       m_Items: []
   - m_Id: 24651732772147200
@@ -57,8 +57,64 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001006
     m_Localized: "\xB7[C1] Move SPD +{C1MoveSpeed}, Vision +{C1Vision}\n\xB7[C2]
-      Move SPD +{C2MoveSpeed}. Burst can dispel fog\n\xB7[C3] Gain <color=#FFD700><u><link=\"Unit:Amber\">Baron
+      Move SPD +{C2MoveSpeed}. Burst can dispel fog, gain {C2FogEnergyGain} energy
+      per {C2FogEnergyThreshold} tiles dispelled\n\xB7[C3] Gain <color=#FFD700><u><link=\"Unit:Amber\">Baron
       Bunny</link></u></color>"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775032754176
+    m_Localized: "\xB7Thrust frost in one of the four cardinal directions\n\xB7Deal
+      {Damage} Cryo DMG to {DamageDistance} tiles ahead"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775263440896
+    m_Localized: "\xB7Summon {ShardCount} <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
+      Shards</link></u></color> orbiting self"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775263440897
+    m_Localized: "\xB7Increase coordinated ally's Move SPD by {MoveSpeedBonus} for
+      3 turns\n\xB7Stacks up to 5 times, duration stacks too"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635200
+    m_Localized: "\xB7Heal self for {Heal} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635201
+    m_Localized: "\xB7[C1] Healing efficiency +{C1HealEfficiency}, Life steal +{C1LifeSteal}\n\xB7[C2]
+      <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>
+      stack limit +{C2StackLimit}, hits reduce enemy DEF by {C2DefenseReduce}\n\xB7[C3]
+      <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>
+      stack limit +{C3StackLimit}, radius +{C3Radius}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635202
+    m_Localized: "\xB7Select an ally: if downed, revive and heal {Heal} HP; if alive,
+      grant <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635203
+    m_Localized: "\xB7Heal coordinated ally for {Heal} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635204
+    m_Localized: "\xB7Heal all allies for {Heal} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26206775267635205
+    m_Localized: "\xB7[C0] Summon <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      Ring</link></u></color>\n\xB7[C1] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      Ring</link></u></color> grants holder {C1EnergyGain} energy each turn end\n\xB7[C2]
+      <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>
+      radius +{C2Radius}, no longer applies elements to allies\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      Ring</link></u></color> stack limit +{C3StackLimit}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26250548261498880
+    m_Localized: "\xB7Launch a water orb in one of the four cardinal directions,
+      flying {ProjectileDistance} tiles\n\xB7Deal {Damage} Hydro DMG on hit\n\xB7Heal
+      all allies within {HealRadius} tiles for {Heal} HP"
     m_Metadata:
       m_Items: []
   references:

@@ -17,9 +17,10 @@ namespace GIC.Framework
         {
             get
             {
-                if (PlayerManager.Instance != null)
+                var pm = Wargame.Instance?.PlayerManager;
+                if (pm != null)
                 {
-                    string id = PlayerManager.Instance.SelfPlayerID;
+                    string id = pm.SelfPlayerID;
                     if (id != PlayerID.Offline && !string.IsNullOrEmpty(id)) return id;
                 }
                 return PlayerID.Offline;
@@ -34,14 +35,12 @@ namespace GIC.Framework
         public override void OnStartServer()
         {
             NetworkServer.ReplaceHandler<NetworkEventMessage>(OnServerReceive);
-            // Host 模式下 OnStartServer 先于 OnStartClient 执行，
-            // 但 OnServerConnect 已开始向 host client 发消息，需提前注册 client handler
-            NetworkClient.ReplaceHandler<NetworkEventMessage>(OnClientReceive);
         }
 
         public override void OnStartClient()
         {
-            NetworkClient.ReplaceHandler<NetworkEventMessage>(OnClientReceive);
+            // client handler 统一在 MyNetworkManager.OnClientConnect 中注册
+            // 此处不再重复注册，避免三重注册竞争
         }
 
         /// <summary>

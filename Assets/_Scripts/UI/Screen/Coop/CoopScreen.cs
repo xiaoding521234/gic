@@ -40,16 +40,18 @@ namespace GIC.UI
 
         private CoopNetworkController _network;
         private PlayerManager _playerManager;
+        private MyNetworkManager _netMgr;
+        private MyNetworkDiscovery _discovery;
 
         private enum RoomState { DisconnectedClient, Host, ConnectedClient }
         private RoomState _currentState = RoomState.DisconnectedClient;
 
         void Awake()
         {
-            var netMgr = FindObjectOfType<MyNetworkManager>();
-            var discovery = FindObjectOfType<MyNetworkDiscovery>();
+            _netMgr = FindObjectOfType<MyNetworkManager>();
+            _discovery = FindObjectOfType<MyNetworkDiscovery>();
             _playerManager = Wargame.Instance.PlayerManager;
-            _network = new CoopNetworkController(netMgr, discovery, _playerManager);
+            _network = new CoopNetworkController(_netMgr, _discovery, _playerManager);
 
             ClearPlayerList();
             ClearServerList();
@@ -73,7 +75,7 @@ namespace GIC.UI
 
         void Update()
         {
-            if (_network.IsTimedOut)
+            if (_network != null && _network.IsTimedOut)
                 StopDiscoveryAndUpdateUI();
         }
 
@@ -96,8 +98,7 @@ namespace GIC.UI
 
         private void BindDiscoveryEvents()
         {
-            var discovery = FindObjectOfType<MyNetworkDiscovery>();
-            if (discovery) discovery.OnServerFound.AddListener(OnServerFound);
+            if (_discovery) _discovery.OnServerFound.AddListener(OnServerFound);
         }
 
         private void BindPlayerEvents()
@@ -110,10 +111,9 @@ namespace GIC.UI
 
         private void BindNetworkEvents()
         {
-            var netMgr = FindObjectOfType<MyNetworkManager>();
-            if (netMgr == null) return;
-            netMgr.OnClientConnectedEvent += OnClientConnected;
-            netMgr.OnClientDisconnectedEvent += OnClientDisconnected;
+            if (_netMgr == null) return;
+            _netMgr.OnClientConnectedEvent += OnClientConnected;
+            _netMgr.OnClientDisconnectedEvent += OnClientDisconnected;
         }
 
         private void UnbindPlayerEvents()
@@ -126,19 +126,17 @@ namespace GIC.UI
 
         private void UnbindNetworkEvents()
         {
-            var netMgr = FindObjectOfType<MyNetworkManager>();
-            if (netMgr == null) return;
-            netMgr.OnClientConnectedEvent -= OnClientConnected;
-            netMgr.OnClientDisconnectedEvent -= OnClientDisconnected;
+            if (_netMgr == null) return;
+            _netMgr.OnClientConnectedEvent -= OnClientConnected;
+            _netMgr.OnClientDisconnectedEvent -= OnClientDisconnected;
         }
 
         private void UnbindDiscoveryEvents()
         {
-            var discovery = FindObjectOfType<MyNetworkDiscovery>();
-            if (discovery == null) return;
-            discovery.OnServerFound.RemoveListener(OnServerFound);
-            discovery.StopBroadcast();
-            discovery.StopDiscovering();
+            if (_discovery == null) return;
+            _discovery.OnServerFound.RemoveListener(OnServerFound);
+            _discovery.StopBroadcast();
+            _discovery.StopDiscovering();
         }
 
         #endregion
@@ -148,7 +146,7 @@ namespace GIC.UI
         private void StopCurrentConnection()
         {
             if (NetworkServer.active || NetworkClient.isConnected)
-                FindObjectOfType<MyNetworkManager>().StopHost();
+                _netMgr?.StopHost();
         }
 
         private void SetRoomState(RoomState newState)
@@ -193,8 +191,12 @@ namespace GIC.UI
             if (_currentState == RoomState.Host) return;
 
             _network.StartHost();
+            _hostStartRetries = 0;
             Invoke(nameof(WaitForHostStart), 0.5f);
         }
+
+        private int _hostStartRetries;
+        private const int MAX_HOST_START_RETRIES = 10;
 
         void WaitForHostStart()
         {
@@ -203,7 +205,15 @@ namespace GIC.UI
                 SetRoomState(RoomState.Host);
                 _network.StartBroadcast();
             }
-            else Invoke(nameof(WaitForHostStart), 0.5f);
+            else if (_hostStartRetries < MAX_HOST_START_RETRIES)
+            {
+                _hostStartRetries++;
+                Invoke(nameof(WaitForHostStart), 0.5f);
+            }
+            else
+            {
+                Debug.LogError("[CoopScreen] 主机启动超时，请检查端口是否被占用");
+            }
         }
 
         void OnStartClick()
@@ -326,6 +336,7 @@ namespace GIC.UI
                 _network.StartDiscovery();
 
             UpdateEmptyRoomHint();
+            CancelInvoke(nameof(AutoRefreshServers));
             InvokeRepeating(nameof(AutoRefreshServers), 5f, 5f);
         }
 
@@ -351,7 +362,19 @@ namespace GIC.UI
 
             string ip = response.EndPoint.Address.ToString();
             int port = response.uri.Port;
-            if (text) text.text = $"房间 ({ip}:{port})";
+
+            // 从 MyNetworkDiscovery.DiscoveredRooms 获取房间显示信息
+            string displayText;
+            if (MyNetworkDiscovery.DiscoveredRooms.TryGetValue(response.serverId, out var info))
+            {
+                displayText = $"{info.HostName} 的房间  ({info.CurrentPlayers}/{info.MaxPlayers})";
+            }
+            else
+            {
+                displayText = $"房间 ({ip}:{port})";
+            }
+
+            if (text) text.text = displayText;
             if (button) button.onClick.AddListener(() => JoinServer(ip, port));
         }
 
@@ -367,6 +390,7 @@ namespace GIC.UI
         {
             _network.ClearServers();
             ClearServerList();
+            MyNetworkDiscovery.DiscoveredRooms.Clear();
             _network.StartDiscovery();
             UpdateEmptyRoomHint();
         }

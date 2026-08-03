@@ -49,6 +49,11 @@ namespace GIC.Data
             public int baseMastery = Unspecified;
             public int baseSanity = Unspecified;
 
+            [Header("战斗属性")]
+            public int baseLifeSteal = Unspecified;
+            public int baseHealEfficiency = Unspecified;
+            public int baseEnergy = Unspecified;
+
             [Header("常态移动")]
             public ForceType normalMoveType = ForceType.Walk;
 
@@ -68,6 +73,9 @@ namespace GIC.Data
 
             [Header("技能")]
             public SkillConfig.SkillData[] skills;
+
+            [Header("语音")]
+            public UnitVoiceData voices;
 
             private bool IsSpecified(int value) => value != Unspecified;
 
@@ -114,7 +122,18 @@ namespace GIC.Data
             public int GetEffectiveSanity() => IsSpecified(baseSanity) ? baseSanity : 50;
             public int GetEffectiveHP() => IsSpecified(baseHP) ? baseHP : GetHPByStarLevel();
             public int GetEffectiveVisionRange() => IsSpecified(visionRange) ? visionRange : 1;
+            public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
+            public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
+            public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 10;
             public int GetEffectiveDeployCost() => IsSpecified(deployCost) ? deployCost : GetDeployCost();
+
+            /// <summary>
+            /// 获取指定技能的语音组
+            /// </summary>
+            public AudioClipRandom GetSkillVoices(SkillName skill)
+            {
+                return voices?.GetSkillVoices(skill);
+            }
 
             /// <summary>
             /// 是否为角色单位
@@ -185,6 +204,49 @@ namespace GIC.Data
             }
 
             #endregion
+        }
+
+        [System.Serializable]
+        public class SkillVoiceEntry
+        {
+            public SkillName skillName;
+            public AudioClipRandom voices;
+        }
+
+        [System.Serializable]
+        public class UnitVoiceData
+        {
+            [Header("出战")]
+            public AudioClipRandom onGoWar;
+
+            [Header("选择(高血量)")]
+            public AudioClipRandom onChooseHighHP;
+
+            [Header("选择(低血量)")]
+            public AudioClipRandom onChooseLowHP;
+
+            [Header("受轻击")]
+            public AudioClipRandom onHitLight;
+
+            [Header("受重击")]
+            public AudioClipRandom onHitHeavy;
+
+            [Header("倒下")]
+            public AudioClipRandom onDie;
+
+            [Header("技能语音")]
+            public SkillVoiceEntry[] skillVoices;
+
+            public AudioClipRandom GetSkillVoices(SkillName skill)
+            {
+                if (skillVoices == null) return null;
+                foreach (var entry in skillVoices)
+                {
+                    if (entry.skillName == skill)
+                        return entry.voices;
+                }
+                return null;
+            }
         }
 
         public List<UnitData> unitDataList = new();

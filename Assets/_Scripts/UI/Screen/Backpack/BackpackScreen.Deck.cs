@@ -149,7 +149,8 @@ namespace GIC.UI
                     cardManager.RebuildDeck(currentDeckId);
                     RefreshCurrentDeckCache();
                     UpdateCardDeckVisual(cardData, true);
-                }
+
+                    PlayAddToDeckVoice(cardData);                }
                 else
                 {
                     GameScene.Instance.ShowLocalizedPopup("Deck_Full");
@@ -158,6 +159,19 @@ namespace GIC.UI
 
             UpdateDeckCountText();
             RefreshDeckPanel();
+        }
+
+        private void PlayAddToDeckVoice(SaveCardData cardData)
+        {
+            if (cardData.id.cardType != Data.CardType.Unit) return;
+
+            UnitName unitName = cardData.id.AsUnitName();
+            var unitData = unitConfig.GetUnitData(unitName);
+            if (unitData?.voices?.onGoWar == null || unitData.voices.onGoWar.Count == 0) return;
+
+            var clip = unitData.voices.onGoWar.GetRandomClip();
+            if (clip != null)
+                AudioManager.Instance?.PlayVoiceExclusive(clip);
         }
 
         private void RefreshDeckPanel()

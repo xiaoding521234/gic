@@ -168,7 +168,7 @@ namespace GIC.UI
             // 更新氛围特效的元素颜色
             if (ambience != null)
             {
-                var config = ConfigManager.Instance?.GetUnitConfig();
+                var config = Wargame.Instance?.ConfigManager?.GetUnitConfig();
                 var unitData = config?.GetUnitData(newEntry.panel.UnitName);
                 if (unitData != null)
                     ambience.SetElementColor(ElementColor.GetColor(unitData.selfElement));

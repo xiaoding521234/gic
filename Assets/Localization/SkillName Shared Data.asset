@@ -179,6 +179,10 @@ MonoBehaviour:
     m_Key: Amber_Constellation
     m_Metadata:
       m_Items: []
+  - m_Id: 26489378201743360
+    m_Key: Barbara_WaterSerenade
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -247,6 +247,9 @@ namespace GIC.Framework
         {
             base.OnClientConnect();
 
+            // 提前注册 NetworkEventMessage handler，防止服务器在 OnStartClient 之前发消息
+            NetworkClient.ReplaceHandler<NetworkEventMessage>(OnClientReceiveNetworkEvent);
+
             Debug.Log($"[MyNetworkManager] ========================================");
             Debug.Log($"[MyNetworkManager] 已成功连接到服务器");
             Debug.Log($"[MyNetworkManager]   我的角色: {(NetworkServer.active ? "房主" : "客户端")}");
@@ -265,6 +268,13 @@ namespace GIC.Framework
             _isKicked = false;
             _isIntentionalDisconnect = false;
 
+            // 客户端连接后发送自己的名称给服务器
+            if (!NetworkServer.active)
+            {
+                string myName = Wargame.Instance?.SaveManager?.CurrentSave?.playerName ?? "旅行者";
+                EventBusHub.Instance.Send(new SetPlayerNameRequestEvent { PlayerName = myName });
+            }
+
             OnClientConnectedEvent?.Invoke();
         }
 
@@ -277,7 +287,8 @@ namespace GIC.Framework
             Debug.Log($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID ?? "未设置"}");
             Debug.Log($"[MyNetworkManager] ========================================");
 
-            PlayerManager.Instance.ClearPlayers();   
+            _playerManager?.ClearPlayers();
+            _playerManager?.Cleanup();
             OnClientDisconnectedEvent?.Invoke();
 
             _hostStarted = false;
@@ -290,6 +301,13 @@ namespace GIC.Framework
         }
 
         public int OnlinePlayers => NetworkServer.connections.Count;
+
+        private void OnClientReceiveNetworkEvent(NetworkEventMessage msg)
+        {
+            var eventData = NetworkEventRegistry.Unpack(msg);
+            if (eventData != null)
+                EventBusHub.Instance?.ReceiveNetworkEvent(eventData);
+        }
     }
 }
 

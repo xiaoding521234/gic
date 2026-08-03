@@ -186,6 +186,10 @@ MonoBehaviour:
     m_Localized: Amber Constellation
     m_Metadata:
       m_Items: []
+  - m_Id: 26489378201743360
+    m_Localized: Water Serenade
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

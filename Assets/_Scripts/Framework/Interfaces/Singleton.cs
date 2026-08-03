@@ -11,16 +11,15 @@ namespace GIC.Framework
 {
 
 
-    public class Singleton<T>
+    public class Singleton<T> where T : class
     {
-        private static readonly T instance = Activator.CreateInstance<T>();
+        private static T _instance;
 
         public static T Instance
         {
-            get {
-                return instance;
-            }
+            get { return _instance ??= Activator.CreateInstance<T>(); }
         }
+
         public virtual void Init()
         {
 

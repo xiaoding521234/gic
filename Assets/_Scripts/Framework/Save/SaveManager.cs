@@ -19,7 +19,25 @@ namespace GIC.Framework
     public class SaveManager : IWargameManager
     {
         private const string SAVE_FILE_NAME = "gic_save.json";
-        private static string SavePath => Path.Combine(Application.persistentDataPath, SAVE_FILE_NAME);
+
+        /// <summary>
+        /// 存档路径 — Clone 实例使用独立子目录，避免与主实例共用存档
+        /// </summary>
+        private static string SavePath
+        {
+            get
+            {
+                string dir = Application.persistentDataPath;
+                string cloneMarker = Path.Combine(Application.dataPath, "../.clone");
+                if (File.Exists(cloneMarker))
+                {
+                    dir = Path.Combine(dir, "clone");
+                    if (!Directory.Exists(dir))
+                        Directory.CreateDirectory(dir);
+                }
+                return Path.Combine(dir, SAVE_FILE_NAME);
+            }
+        }
 
         private const int CURRENT_SAVE_VERSION = 1;
 

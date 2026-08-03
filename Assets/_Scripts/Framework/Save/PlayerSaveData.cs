@@ -57,7 +57,7 @@ namespace GIC.Framework
         public float masterVolume = 1.0f;      // 总音量
 
         [Range(0f, 1f)]
-        public float bgmVolume = 0.6f;         // 音乐音量
+        public float bgmVolume = 0.4f;         // 音乐音量
 
         [Range(0f, 1f)]
         public float sfxVolume = 0.8f;         // 音效音量
@@ -84,7 +84,7 @@ namespace GIC.Framework
             InitCards();
 
             masterVolume = 1.0f;
-            bgmVolume = 0.6f;
+            bgmVolume = 0.4f;
             sfxVolume = 0.8f;
             voiceVolume = 0.8f;
 

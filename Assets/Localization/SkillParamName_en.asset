@@ -86,6 +86,70 @@ MonoBehaviour:
     m_Localized: Hit Count
     m_Metadata:
       m_Items: []
+  - m_Id: 26187074403643392
+    m_Localized: C2 Fog Energy Threshold
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26187074487529472
+    m_Localized: C2 Fog Energy Gain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26191813191217152
+    m_Localized: Vision Reveal Duration
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26201398455119872
+    m_Localized: Shard Count
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26211417317781504
+    m_Localized: Projectile Distance
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26211417317781505
+    m_Localized: Heal Radius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310798049280
+    m_Localized: C1 Heal Efficiency
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186624
+    m_Localized: C1 Life Steal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186625
+    m_Localized: C2 Stack Limit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186626
+    m_Localized: C2 Defense Reduce
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186627
+    m_Localized: C3 Stack Limit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186628
+    m_Localized: C3 Radius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186629
+    m_Localized: Move SPD Bonus
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186630
+    m_Localized: Damage Distance
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186631
+    m_Localized: C1 Energy Gain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26341310844186632
+    m_Localized: C2 Radius
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
