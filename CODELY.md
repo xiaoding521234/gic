@@ -14,6 +14,8 @@
 - [2026-08-02 01:28:18] 用户偏好直接在 Unity 编辑器中修改 Prefab/场景的 UI 属性（如字体大小），而非在代码中运行时修改。**Why:** 用户明确指出"为什么不直接在编辑器里修改"，代码中修改 UI 属性不直观且难以维护。**How to apply:** 字体大小、颜色、布局等 UI 属性应直接在 Prefab 或场景中修改，不要在 MonoBehaviour 代码中通过 `tmp.fontSize = X` 设置。
 - [2026-08-02 23:43:50] 角色属性设计规范（2026-08-02）：属性命名参考 HP，不加 Max 前缀。如 baseEnergy（不是 baseMaxEnergy），StatType.Energy（不是 MaxEnergy）。baseEnergy 是基础值=上限，角色登场时当前元能为 0 是运行时逻辑，不在 UnitStats.Init 中处理——Init 只负责把 baseEnergy 设为基础值，和 HP 完全一致。**Why:** 用户指出 Energy 应参考 HP 的设计，HP 的 baseHP 既是基础值也是上限，当前血量在战斗中往下扣；Energy 同理，baseEnergy 既是基础值也是上限，当前元能在战斗中从 0 往上加。**How to apply:** 新增属性时不要加 Max 前缀，Init 中直接 SetBaseValue，运行时的当前值/上下限管理留给战斗系统。
 - [2026-08-03 13:26:42] 通用设计规则应写在总设计文档中（如 docs/08-命座系统.md），不应写在个别角色文档里。**Why:** 用户纠正了 AI 试图在芭芭拉.md 中添加 0命概念说明的做法——角色文档只记录该角色的具体数据，通用规则属于总文档。**How to apply:** 涉及多角色的通用规则/概念，写入对应的总设计文档（如命座系统→08、行动系统→05），不要在角色文档中重复。
+- [2026-08-04 13:38:46] 用户偏好自己测试游戏效果，不需要 AI 进入 Play Mode 截图验证。**Why:** 用户明确说"你不需要截图，测试交给我"。**How to apply:** 完成代码改动后编译验证即可，不要主动进入 Play Mode 截图测试游戏画面效果。
+- [2026-08-04 15:09:49] Unity UI 自定义 Shader 特效应使用自定义 Graphic 子类而非 Image 组件。**Why:** Image 组件要求 shader 必须有 `_MainTex` 属性（否则报 warning），且需要 Sprite 才能生成 mesh；在 Mask/Stencil 环境下还有额外的参数注入问题。改用 `class XxxGraphic : Graphic` + `OnPopulateMesh` 直接生成 quad，基类自动处理 stencil 注入，彻底绕过这些问题。**How to apply:** 需要在 UI 上叠加自定义 shader 效果时，创建 Graphic 子类而非用 Image + material。
 
 ### Project
 

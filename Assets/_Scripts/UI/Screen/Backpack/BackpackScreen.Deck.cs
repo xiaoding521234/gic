@@ -139,6 +139,9 @@ namespace GIC.UI
                 cardManager.RebuildDeck(currentDeckId);
                 RefreshCurrentDeckCache();
                 UpdateCardDeckVisual(cardData, false);
+
+                if (card != null)
+                    card.PlayLightBandReverse();
             }
             else
             {
@@ -149,8 +152,11 @@ namespace GIC.UI
                     cardManager.RebuildDeck(currentDeckId);
                     RefreshCurrentDeckCache();
                     UpdateCardDeckVisual(cardData, true);
+                    PlayAddToDeckVoice(cardData);
 
-                    PlayAddToDeckVoice(cardData);                }
+                    if (card != null)
+                        card.PlayLightBand();
+                }
                 else
                 {
                     GameScene.Instance.ShowLocalizedPopup("Deck_Full");

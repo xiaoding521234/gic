@@ -155,6 +155,28 @@ namespace GIC.Battle
             countText.text = count.ToString();
             saveCardData.count = count;
         }
+
+        /// <summary>
+        /// 播放光带特效（正向：左下→右上）
+        /// </summary>
+        public void PlayLightBand()
+        {
+            var effect = GetComponent<CardLightBandEffect>();
+            if (effect == null)
+                effect = gameObject.AddComponent<CardLightBandEffect>();
+            effect.Play();
+        }
+
+        /// <summary>
+        /// 播放光带特效（反向：右上→左下）
+        /// </summary>
+        public void PlayLightBandReverse()
+        {
+            var effect = GetComponent<CardLightBandEffect>();
+            if (effect == null)
+                effect = gameObject.AddComponent<CardLightBandEffect>();
+            effect.PlayReverse();
+        }
     }
 
 }
