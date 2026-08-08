@@ -144,8 +144,8 @@ namespace GIC.Data
         #endregion
 
         #region 坎瑞亚 (10001-10999)
-        [InspectorName("丘丘暴徒")]
-        HilichurlBrute = 10001,
+        [InspectorName("火斧丘丘暴徒")]
+        PyroAxeHilichurlBrute = 10001,
 
         [InspectorName("丘丘人")]
         Hilichurl = 10002,

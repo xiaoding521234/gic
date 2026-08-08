@@ -2,7 +2,7 @@
 
 ## Codely Structured Memories
 
-- [2026-08-03 21:53:27] 技能参数非 Fixed 值是百分比，不是固定值。如"伤害 40 BasedOnAttack"= 40%×攻击力，不是 40 点固定伤害。**Why:** 用户纠正了 AI 评审时把百分比当固定值计算导致数值分析全部错误的问题。**How to apply:** 读取角色文档的技能参数表时，非 Fixed 基准的值一律按百分比理解（代码 SkillParam.GetDisplayValueText 中 value+"%"）。
+
 
 
 ### User
@@ -17,8 +17,9 @@
 - [2026-08-04 13:38:46] 用户偏好自己测试游戏效果，不需要 AI 进入 Play Mode 截图验证。**Why:** 用户明确说"你不需要截图，测试交给我"。**How to apply:** 完成代码改动后编译验证即可，不要主动进入 Play Mode 截图测试游戏画面效果。
 - [2026-08-04 15:09:49] Unity UI 自定义 Shader 特效应使用自定义 Graphic 子类而非 Image 组件。**Why:** Image 组件要求 shader 必须有 `_MainTex` 属性（否则报 warning），且需要 Sprite 才能生成 mesh；在 Mask/Stencil 环境下还有额外的参数注入问题。改用 `class XxxGraphic : Graphic` + `OnPopulateMesh` 直接生成 quad，基类自动处理 stencil 注入，彻底绕过这些问题。**How to apply:** 需要在 UI 上叠加自定义 shader 效果时，创建 Graphic 子类而非用 Image + material。
 - [2026-08-08 00:24:08] 祈愿系统 UI 层级已在场景中静态预设（WishDrawRoot 下的 CardTrack/CountdownBar/ResultContainer/FinalDisplay），未抽卡时 drawRoot 隐藏"。**Why:** 用户要求祈愿 UI 不要代码动态生成，要提前在场景里建好便于编辑器调整布局。**How to apply:** 后续调整祈愿 UI 布局直接在 WishScreen 场景的 Canvas/WishDrawRoot 下改，不要在 WishDrawController 代码里用 new GameObject 创建；所有引用是 SerializeField（cardTrack/cardSpawnPoint/cardEndPoint/fateLineContainer/countdownBar/countdownBarFill/resultContainer/finalDisplayContainer/finalDisplayCanvasGroup）。
-- [2026-08-08 14:01:39] LightPillarEffect 的协程管理修复（2026-08-08）：StopAllCoroutines 会停掉同 MonoBehaviour 上所有协程包括外部的，导致 WishDrawController.GlowBurstCoroutine 被中断。**Why:** LightPillarEffect.Play/Stop 原来用 StopAllCoroutines，会中断 WishDrawController 上运行的 GlowBurstCoroutine，导致 Destroy(pillarObj) 永不执行、粒子残留。**How to apply:** LightPillarEffect 用 _activeCoroutines 列表 + Track() 只停自己的协程；粒子协程(AnimateSpark)不追踪，由 ClearSpawned 销毁；AnimateBeam 无限循环加 if(img==null) yield break 防止 MissingReferenceException。
+
 - [2026-08-08 21:48:15] Toggle 组件的 transition=Fade 会控制 CanvasGroup.alpha，即使手动设 alpha=1 也会被 Toggle 覆覆为 0（当 toggle.isOn=false 时）。`toggle.interactable=false` 不能阻止此行为，必须 `toggle.enabled=false` 才能完全禁用 Toggle 对 CanvasGroup.alpha 的控制。**Why:** 祈愿卡道卡用 `toggle.interactable=false` 后卡片背景仍半透明，用户排查发现是 Toggle Fade transition 导致 CanvasGroup.alpha 被设为 0。**How to apply:** 任何不需要 Toggle 交互的 Card（如 OnlyDisplay 状态）用 `toggle.enabled=false` 而非 `toggle.interactable=false`。
+- [2026-08-09 00:19:47] 技能参数非 Fixed 值是百分比，不是固定值。如"伤害 40 BasedOnAttack"= 40%×攻击力，不是 40 点固定伤害。**Why:** 用户纠正了 AI 评审时把百分比当固定值计算导致数值分析全部错误的问题。**How to apply:** 读取角色文档的技能参数表时，非 Fixed 基准的值一律按百分比理解（代码 SkillParam.GetDisplayValueText 中 value+"%"）。
 
 ### Project
 
@@ -40,28 +41,31 @@
 - [2026-08-02 13:04:07] GIC 角色语音架构 (2026-08-02): 语音数据内嵌在 UnitConfig.UnitData.voices (UnitVoiceData)，不独立 ScriptableObject。UnitVoiceData 包含 6 组通用 AudioClipRandom (onGoWar/onChooseHighHP/onChooseLowHP/onHitLight/onHitHeavy/onDie) + SkillVoiceEntry[] (按 SkillName 索引)。AudioClipRandom 已有权重+不连续重复。复用 AudioManager.PlayVoice 通道。语音文件在 Assets/Resources/Audios/Voices/{UnitName}/，命名: go_war_0.wav, choose_high_hp_0.wav, hit_light_0.wav, die_0.wav, {skillname_snake}_0.wav。Editor 工具 Tools/UnitConfig/自动加载语音 按文件名前缀匹配自动填充。8 角色 223 文件已从老 mod 搬入 (Amber/Kaeya/Barbara/Lisa/Jean/Klee/Citlali/Haborym)。
 - [2026-08-05 23:39:43] GIC 术语区分：【消散】（带方括号）= 玩家战败时该玩家所有单位从游戏中真正删除，不可恢复；【放逐】= 转移到另一个维度，单位仍然存在，可被特定技能召回（如丽莎爆发蔷薇的雷光可召回被放逐的标记单位并承受真伤惩罚）。Buff/造物过期用"消失"，不用"消散"。丽莎文档中"标记所属单位【消散】"是正确用法（指玩家战败）。凯亚/芭芭拉文档中的"棱消散/环消散"旧措辞应改为"消失"以避免与游戏机制混淆。
 
-- [2026-08-05 16:02:52] GIC 元素反应系统已设计完成（docs/06-元素与反应系统.md）。七元素（火/水/冰/雷/草/岩/风）都会附着，永久存在直到反应消耗。大部分附着1层，多层特别说明。反应1比1消耗，多层强化反应级别。11种反应：蒸发(增伤50%×级别)、融化(易伤50%×级别)、燃烧(每回合10火伤×3回合×级别，草附着优先反应并延长)、超载(增伤10%×级别+韧性-5×级别)、冻结(冰冻2×级别回合)、导电(半径3×级别内10×级别雷伤)、绽放(生成草原核造物，待定)、超导(防御-5×级别)、休眠(元能-1×级别)、激化(每次伤害+10，持续3×级别回合，草附着优先反应并延长)、扩散(风+其它5元素，半径1×级别内20%本次元素伤害)、结晶(岩+其它5元素，最近我方+20×级别护盾+附着元素，手牌+1×级别结晶物品)。元素护盾=元素附着+护盾=同元素伤害减50%。
-- [2026-08-05 16:02:58] GIC 局内初始资源调整（2026-08-04）：初始体力从2改为6个原粹树脂，摩拉不变(200+5/回合)。PlayerSaveData.cs 的 Stamina=10 是局外存档初始物品数量，与局内体力无关，不要改。
-- [2026-08-05 16:03:04] GIC 战争迷雾改为半透明（2026-08-04）：可看见地形但看不见单位/建筑/宝箱。玩家出生点固定为3×3石路地形，因此可通过迷雾中的地形特征推断对手方位。docs/03-地图与资源.md §3.4 新增石路地形+出生点规则，§3.6 迷雾从不可见改为半透明。
-- [2026-08-05 16:03:13] 琴(Jean)正式文档已创建：docs/units/琴.md。4星/剑/风/Walk/HP250/ATK40/攻速40/移速3/元能5。标签: Push, Control, Dash, Shield, TenacityUp。技能：引领之风(移动铺蒲公英之风)、风压剑(>2格牵引/≤2格击退+50%ATK风伤)、西风吹拂之时(爆发-蒲公英领域)、听凭风引(延奏-十字5格风场)、顺风而行(变奏-风场冲刺，经过风场+2移速+刷新距离，碰撞50%ATK+1000%移速伤害)。命座C0全队50护盾/C1风压剑可命中友方+射程+3/C2风场持续+3+牵引额外20%ATK风伤/C3移动风场方向反转。变奏移速实时计算，不需要不同方向风场，任意风场即可触发加速。
-- [2026-08-05 16:03:18] UnitTag 枚举新增3个标签（2026-08-04）：Shield(1007 护盾)、TenacityUp(1008 韧性提升)在增益效果区，Push(3009 推力)在战斗特点区。FrontlinePush是前线推进定位≠Push击退/牵引。
-- [2026-08-05 23:40:08] GIC 回合流程四阶段（docs/04-回合流程.md）：①准备阶段（玩家同时选1行动）→ ②行动阶段（玩家行动按攻速排序执行）→ ③AI行动阶段（1-2星角色/造物按攻速排序执行）→ ④结束阶段（回合结束时效果按代码注册顺序触发）。攻速取主动行动的角色，变奏是延奏触发的被动效果，触发时机取决于延奏者攻速而非变奏者自身攻速。
-
-- [2026-08-05 23:39:39] GIC 角色设计进展（截至2026-08-05）：已转正6个角色（安柏/凯亚/丽莎/芭芭拉/琴/诺艾尔），草稿1个（行秋）。诺艾尔(Noelle/3006): 3星/Claymore/Geo/Walk/ATK60/攻速20/移速2/元能3。标签: Shield,Heavy,BurstDamage,DifficultyNormal。大扫除200%ATK AOE+蓄力2回合+变奏加速。C3武器染色=跟随当前护盾元素切换攻击元素。0命缺少常驻被动。行秋(Xingqiu/3008)草稿: 3星/Sword/Hydro/两栖/ATK40/攻速40/元能3。首个璃月角色，使用契约而非延奏/变奏。协同攻击（雨帘剑）=全角色第一个被动协同机制。标签: CoordinatedAttack,BurstDamage,DifficultyEasy。
 
 
 
 
-- [2026-08-05 23:11:40] UnitTag 新增上手难度标签（2026-08-04）：DifficultyBeginner(6001 入门)、DifficultyEasy(6002 简单)、DifficultyNormal(6003 普通)、DifficultyHard(6004 困难)、DifficultyExpert(6005 专家)。角色对应：凯亚=入门、安柏/芭芭拉=简单、诺艾尔=普通、丽莎=困难、琴=专家。6个角色文档已全部更新标签。
-- [2026-08-05 23:40:04] GIC 文档目录结构（2026-08-05）：docs/ 下编号 00-11，其中 06-元素与反应系统.md(新增)、07-势力机制/(原06)、08-势力衍生玩法(原07)、09-命座系统(原08)、10-经济闭环(原09)、11-待解决问题(原10)。08子章节已从7.x更正为8.x。全面审查修复了11个问题（交叉引用、过期内容、术语不一致、已解决TODO未标记）。
-
-- [2026-08-05 23:39:05] GIC 蒙德延奏/变奏跨势力规则（2026-08-04 确认）：延奏可选择全图任意我方角色，不限于蒙德角色。目标为蒙德角色或施法者自身→触发变奏+1元能；目标为非蒙德角色→不触发变奏，但获得2元能。行秋(璃月)可被蒙德角色延奏但不会触发变奏，行秋不能延奏蒙德角色（延奏是蒙德专属技能类型）。详见 docs/07-势力机制/蒙德.md。
-- [2026-08-08 22:45:09] GIC 祈愿系统架构（2026-08-08 实现，持续迭代）：WishPoolConfig(ScriptableObject) 定义卡池角色/物品/概率 → WishManager 负责货币消耗+写入存档(AddResultToInventory 只改内存，抽卡流程结束后统一 SaveGame 一次) → WishDrawController 控制全流程UI动画。UI 层级在 WishScreen 场景 Canvas/WishDrawRoot 下静态预设，所有引用为 SerializeField。祈愿机制=反应速度游戏：卡道上的卡随机生成（DrawRandomTrackCard），玩家射击命中哪张卡就获得哪张卡（不预抽），通过 Card.saveCardData 读取实际结果并写入存档。卡道永远滚动不暂停(cardMoveDuration=0.75f, cardSpawnInterval=0.09f)，卡道卡射中后 SetParent(resultContainer,true) 保持世界位置→中心停留(星级越高越久：1★=0.3s~5★=1.0s)→飞到左侧竖向排列，抽完后同一批卡飞到中间横向排列展示。射击冷却=0.3f+starLevel×0.15f。命运之线 0.2s 从右到左，Shader.Find 缓存为 static。射击后播放三个特效：①光带(Card.PlayLightBand()) ②光柱(LightPillarEffect.Play(starColor)，纹理 static 共享) ③屏幕边缘泛光(ScreenEdgeGlow，自定义 Shader UI/ScreenEdgeGlow，alpha+edgeWidth 随星级)。卡道卡用 card.SetViewType(ViewType.OnlyDisplay)→toggle.enabled=false(不是interactable=false，否则 Toggle Fade 会覆盖 CanvasGroup.alpha=0 导致半透明)+skipFadeIn=true。卡片缩放用 localScale 不用 sizeDelta（避免 TMP 字体不跟随）。HoldThenFly 协程需在 ShowFinalDisplay 前停止避免位置冲突。性能优化：StartWish 时预构建星级→候选缓存 Dictionary。Background 用 AspectRatioFitter(EnvelopeParent) 适应不同屏幕比例。**Why:** 设计文档要求卡道连续出卡+命运之线射击+倒计时+结果展示。**How to apply:** 新增卡池创建 WishPoolConfig asset 并配到 WishScreen.wishPools 列表；调整布局在场景 Canvas/WishDrawRoot 下改。
 
 
 
 
-- [2026-08-08 12:25:11] GIC 新增 UnitName 枚举（2026-08-07）：Jean=3011（琴，蒙德4星剑风）、HilichurlBrute=10001（丘丘暴徒，坎瑞亚2星双手剑物理）、Hilichurl=10002（丘丘人，坎瑞亚1星弓物理）。已添加到 UnitConfig.asset 基础数据（无技能/语音/图片）。Bennett(3010) 和 Diona(3005) 之前已在枚举中，本次补充到 UnitConfig.asset。Diluc(3006) 和 Varka(3007) 枚举已存在但 UnitConfig 中暂无数据。初始原石(Primogem)从1600改为16000（PlayerSaveData.InitDefault）。
+
+
+
+
+
+
+
+
+- [2026-08-09 00:19:42] GIC 祈愿系统架构：WishPoolConfig(ScriptableObject) 定义卡池角色/物品/概率 → WishManager 负责货币消耗+写入存档(抽卡结束后统一 SaveGame) → WishDrawController 控制 UI 动画。祈愿机制=反应速度游戏：卡道滚动出卡，玩家射击命中哪张卡获得哪张卡（不预抽），通过 Card.saveCardData 读取结果写入存档。UI 层级在 WishScreen 场景 Canvas/WishDrawRoot 下静态预设，所有引用为 SerializeField。**Why:** 设计文档要求卡道连续出卡+命运之线射击+倒计时+结果展示。**How to apply:** 新增卡池创建 WishPoolConfig asset 并配到 WishScreen.wishPools 列表；调整布局在场景 Canvas/WishDrawRoot 下改。
+
+
+
+
+
+
+
+
 
 
 ### Reference

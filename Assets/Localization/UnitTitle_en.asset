@@ -166,6 +166,30 @@ MonoBehaviour:
     m_Localized: Fallen Angel's Feather
     m_Metadata:
       m_Items: []
+  - m_Id: 28425744569413632
+    m_Localized: Blazing Brute
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28428311978389504
+    m_Localized: Dandelion Knight
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28428312003555328
+    m_Localized: Wildling of the Wilds
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3011
+    m_Localized: Dandelion Knight
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10001
+    m_Localized: Blazing Brute
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002
+    m_Localized: Wildling of the Wilds
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

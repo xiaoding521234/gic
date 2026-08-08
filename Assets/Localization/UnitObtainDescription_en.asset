@@ -166,6 +166,30 @@ MonoBehaviour:
     m_Localized: Obtained from Wishes
     m_Metadata:
       m_Items: []
+  - m_Id: 28412927757856768
+    m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28415495179415552
+    m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28415495200387072
+    m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3011
+    m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10001
+    m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002
+    m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

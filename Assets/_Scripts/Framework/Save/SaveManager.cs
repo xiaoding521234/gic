@@ -321,7 +321,7 @@ namespace GIC.Framework
             {
                 return CardSortUtility.CompareByPrimaryThenStar(
                     a.SortOrder, b.SortOrder,
-                    b.StarLevel, a.StarLevel
+                    a.StarLevel, b.StarLevel
                 );
             });
         }
@@ -341,7 +341,7 @@ namespace GIC.Framework
             {
                 return CardSortUtility.CompareByPrimaryThenStar(
                     a.SortOrder, b.SortOrder,
-                    b.StarLevel, a.StarLevel
+                    a.StarLevel, b.StarLevel
                 );
             });
         }

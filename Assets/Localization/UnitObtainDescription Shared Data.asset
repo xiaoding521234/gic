@@ -163,6 +163,18 @@ MonoBehaviour:
     m_Key: Traveler
     m_Metadata:
       m_Items: []
+  - m_Id: 3011
+    m_Key: Jean
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002
+    m_Key: Hilichurl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10001
+    m_Key: PyroAxeHilichurlBrute
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

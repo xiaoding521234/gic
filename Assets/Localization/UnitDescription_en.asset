@@ -202,6 +202,32 @@ MonoBehaviour:
       She speaks little, yet transforms into the feared 'Damselette' on the battlefield.
     m_Metadata:
       m_Items: []
+  - m_Id: 10001
+    m_Localized: A Hilichurl Brute wielding a flaming great axe.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28423079558983680
+    m_Localized: Acting Grand Master of the Knights of Favonius, the Dandelion Knight.
+      Known for being strict with herself and decisive in action.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28423079579955200
+    m_Localized: Primitive inhabitants found throughout Teyvat's wilderness, living
+      in tribal communities. Despite limited intelligence, they possess a unique
+      culture.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3011
+    m_Localized: Acting Grand Master of the Knights of Favonius, the Dandelion Knight.
+      Known for being strict with herself and decisive in action.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002
+    m_Localized: Primitive inhabitants found throughout Teyvat's wilderness, living
+      in tribal communities. Despite limited intelligence, they possess a unique
+      culture.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

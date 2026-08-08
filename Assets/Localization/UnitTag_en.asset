@@ -122,6 +122,70 @@ MonoBehaviour:
     m_Localized: Lucky Crit
     m_Metadata:
       m_Items: []
+  - m_Id: 28658985733795840
+    m_Localized: Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738880
+    m_Localized: Tenacity Up
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738881
+    m_Localized: Push
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738882
+    m_Localized: Beginner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738883
+    m_Localized: Easy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738884
+    m_Localized: Normal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738885
+    m_Localized: Hard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28658985775738886
+    m_Localized: Expert
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1007
+    m_Localized: Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1008
+    m_Localized: Tenacity Up
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3009
+    m_Localized: Push
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Localized: Beginner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Localized: Easy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Localized: Normal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Localized: Hard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6005
+    m_Localized: Expert
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

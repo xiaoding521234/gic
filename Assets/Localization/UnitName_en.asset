@@ -166,6 +166,30 @@ MonoBehaviour:
     m_Localized: Columbina
     m_Metadata:
       m_Items: []
+  - m_Id: 28664823747784704
+    m_Localized: Pyro Axe Hilichurl Brute
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28667391181926400
+    m_Localized: Jean
+    m_Metadata:
+      m_Items: []
+  - m_Id: 28667391219675136
+    m_Localized: Hilichurl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3011
+    m_Localized: Jean
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10001
+    m_Localized: Pyro Axe Hilichurl Brute
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002
+    m_Localized: Hilichurl
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

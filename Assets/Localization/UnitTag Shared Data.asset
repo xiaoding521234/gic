@@ -119,6 +119,38 @@ MonoBehaviour:
     m_Key: LuckyCrit
     m_Metadata:
       m_Items: []
+  - m_Id: 1007
+    m_Key: Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1008
+    m_Key: TenacityUp
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3009
+    m_Key: Push
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6001
+    m_Key: DifficultyBeginner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Key: DifficultyEasy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Key: DifficultyNormal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Key: DifficultyHard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6005
+    m_Key: DifficultyExpert
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
