@@ -133,6 +133,8 @@ namespace GIC.UI
             card.saveCardData.skin = (card.saveCardData.skin + 1) % totalSkins;
             _strategy.ApplySkin(card, card.saveCardData.skin);
             RefreshSkinDisplay();
+
+            card.PlayLightBand();
         }
 
         private void RefreshSkinDisplay()

@@ -104,7 +104,15 @@ namespace GIC.Battle
             _strategy?.InitCardDisplay(this, data, detailView);
         }
 
-        public void SetViewType(ViewType type) => viewType = type;
+        public void SetViewType(ViewType type)
+        {
+            viewType = type;
+            if (type == ViewType.OnlyDisplay)
+            {
+                skipFadeIn = true;
+                if (toggle != null) toggle.enabled = false;
+            }
+        }
 
         public void EnterEditMode()
         {

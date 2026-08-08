@@ -98,6 +98,18 @@ namespace GIC.Editor
                 AutoFillMissingVoices((UnitConfig)target);
             }
 
+            EditorGUILayout.Space(10);
+
+            if (GUILayout.Button("自动加载所有图片", GUILayout.Height(30)))
+            {
+                AutoFillAllImages((UnitConfig)target);
+            }
+
+            if (GUILayout.Button("仅加载缺失的图片", GUILayout.Height(30)))
+            {
+                AutoFillMissingImages((UnitConfig)target);
+            }
+
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -313,6 +325,184 @@ namespace GIC.Editor
         private bool IsVoiceDataComplete(UnitConfig.UnitVoiceData voices)
         {
             return CountFilledVoiceGroups(voices) == 6;
+        }
+
+        #endregion
+
+        #region 图片自动填充
+
+        private const string AVATAR_PATH = "Resources/UI/Avatars/";
+        private const string CARD_PATH = "Resources/UI/Cards/";
+        private const string NAMECARD_PATH = "Resources/UI/NameCards/";
+
+        private void AutoFillAllImages(UnitConfig config)
+        {
+            int success = 0, fail = 0;
+            var missing = new List<string>();
+
+            foreach (var unitData in config.unitDataList)
+            {
+                if (unitData == null) continue;
+                if (LoadImagesForUnit(unitData, missing))
+                    success++;
+                else
+                    fail++;
+            }
+
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"图片加载完成: 成功 {success}, 失败 {fail}");
+            if (missing.Count > 0)
+                Debug.LogWarning($"缺失的图片文件 ({missing.Count}个):\n" + string.Join("\n", missing));
+            EditorUtility.DisplayDialog("完成", $"图片加载完成\n成功: {success}\n失败: {fail}\n缺失文件数: {missing.Count}", "确定");
+        }
+
+        private void AutoFillMissingImages(UnitConfig config)
+        {
+            int loaded = 0, skipped = 0;
+            var missing = new List<string>();
+
+            foreach (var unitData in config.unitDataList)
+            {
+                if (unitData == null) continue;
+
+                bool needsUpdate = false;
+
+                if (unitData.avatar == null)
+                {
+                    var sprite = LoadSprite(AVATAR_PATH, unitData.unitName.ToString().ToSnakeCase(), missing);
+                    if (sprite != null && !IsNullSprite(sprite, AVATAR_PATH))
+                    {
+                        unitData.avatar = sprite;
+                        loaded++;
+                    }
+                    needsUpdate = true;
+                }
+
+                if (unitData.nameCard == null)
+                {
+                    var sprite = LoadSprite(NAMECARD_PATH, unitData.unitName.ToString().ToSnakeCase(), missing);
+                    if (sprite != null && !IsNullSprite(sprite, NAMECARD_PATH))
+                    {
+                        unitData.nameCard = sprite;
+                        loaded++;
+                    }
+                    needsUpdate = true;
+                }
+
+                if (unitData.cards == null || unitData.cards.Count == 0)
+                {
+                    LoadCardsForUnit(unitData, missing);
+                    loaded++;
+                    needsUpdate = true;
+                }
+
+                if (!needsUpdate) skipped++;
+            }
+
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"图片加载完成: 加载 {loaded}, 跳过 {skipped}");
+            if (missing.Count > 0)
+                Debug.LogWarning($"缺失的图片文件 ({missing.Count}个):\n" + string.Join("\n", missing));
+            EditorUtility.DisplayDialog("完成", $"图片加载完成\n加载: {loaded}\n跳过: {skipped}\n缺失文件数: {missing.Count}", "确定");
+        }
+
+        private bool LoadImagesForUnit(UnitConfig.UnitData unitData, List<string> missing)
+        {
+            string baseName = unitData.unitName.ToString().ToSnakeCase();
+            bool allSuccess = true;
+
+            var avatar = LoadSprite(AVATAR_PATH, baseName, missing);
+            if (avatar != null && !IsNullSprite(avatar, AVATAR_PATH))
+                unitData.avatar = avatar;
+            else
+                allSuccess = false;
+
+            var nameCard = LoadSprite(NAMECARD_PATH, baseName, missing);
+            if (nameCard != null && !IsNullSprite(nameCard, NAMECARD_PATH))
+                unitData.nameCard = nameCard;
+            else
+                allSuccess = false;
+
+            LoadCardsForUnit(unitData, missing);
+
+            return allSuccess;
+        }
+
+        private void LoadCardsForUnit(UnitConfig.UnitData unitData, List<string> missing)
+        {
+            string baseName = unitData.unitName.ToString().ToSnakeCase();
+
+            if (unitData.cards == null)
+                unitData.cards = new List<Sprite>();
+            else
+                unitData.cards.Clear();
+
+            int skinIndex = 0;
+            while (true)
+            {
+                string fileName = skinIndex == 0 ? baseName : $"{baseName}_{skinIndex}";
+                var sprite = LoadSprite(CARD_PATH, fileName, missing);
+
+                if (sprite != null && !IsNullSprite(sprite, CARD_PATH))
+                {
+                    unitData.cards.Add(sprite);
+                    skinIndex++;
+                }
+                else
+                    break;
+            }
+
+            if (unitData.cards.Count == 0)
+            {
+                Sprite nullSprite = LoadSprite(CARD_PATH, "null", missing);
+                if (nullSprite != null)
+                {
+                    unitData.cards.Add(nullSprite);
+                    Debug.LogWarning($"角色 {unitData.unitName} 没有真实卡片，已添加 null 占位");
+                }
+            }
+        }
+
+        private Sprite LoadSprite(string folderPath, string fileName, List<string> missing)
+        {
+            string cleanPath = folderPath.Replace("Resources/", "");
+            string fullPath = $"{cleanPath}{fileName}";
+            var sprite = Resources.Load<Sprite>(fullPath);
+
+            if (sprite != null)
+            {
+                if (IsNullSprite(sprite, folderPath))
+                {
+                    missing?.Add($"{folderPath}{fileName}");
+                    return sprite;
+                }
+                return sprite;
+            }
+
+            Sprite nullSprite = Resources.Load<Sprite>($"{cleanPath}null");
+            if (nullSprite != null)
+            {
+                missing?.Add($"{folderPath}{fileName}");
+                return nullSprite;
+            }
+
+            return null;
+        }
+
+        private bool IsNullSprite(Sprite sprite, string folderPath)
+        {
+            if (sprite == null) return false;
+            string cleanPath = folderPath.Replace("Resources/", "");
+            string nullSpritePath = $"{cleanPath}null";
+            string assetPath = AssetDatabase.GetAssetPath(sprite);
+            return assetPath != null && (
+                assetPath.Contains($"{nullSpritePath}.png") ||
+                assetPath.Contains($"{nullSpritePath}.jpg") ||
+                assetPath.Contains($"{nullSpritePath}.jpeg") ||
+                assetPath.Contains($"{nullSpritePath}.psd")
+            );
         }
 
         #endregion

@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Battle;
+using GIC.UI;
 using GIC.Tool;
 
 namespace GIC.UI
@@ -44,7 +45,8 @@ namespace GIC.UI
 
         [Header("倒计时")]
         [SerializeField] private float clickTimeLimit = 1.5f;
-        [SerializeField] private float shotCooldown = 0.6f;
+        [SerializeField] private float baseShotCooldown = 0.3f;
+        [SerializeField] private float cooldownPerStar = 0.15f;
 
         [Header("结果展示")]
         [SerializeField] private float resultCardSize = 80f;
@@ -74,6 +76,7 @@ namespace GIC.UI
 
         private List<RectTransform> _resultCards = new();
         private List<GameObject> _cardPool = new();
+        private readonly List<Coroutine> _holdThenFlyCoroutines = new();
 
         // 星级→候选列表预缓存（每次抽卡流程开始时构建，避免逐卡遍历全表）
         private Dictionary<int, List<UnitName>> _unitsByStar;
@@ -352,13 +355,15 @@ namespace GIC.UI
             StartCoroutine(FateLineCoroutine());
 
             _isInCooldown = true;
-            _cooldownTimer = shotCooldown;
 
             // 立即弹出中心卡（射中什么就是什么，不替换内容）
-            RevealAndPopResultCard(_shotsCompleted - 1);
+            int starLevel = RevealAndPopResultCard(_shotsCompleted - 1);
+
+            // 星级越高冷却越长，让高星结果停留更久
+            _cooldownTimer = baseShotCooldown + starLevel * cooldownPerStar;
         }
 
-        private void RevealAndPopResultCard(int index)
+        private int RevealAndPopResultCard(int index)
         {
             // 找到最接近卡道中心的卡牌
             WishTrackCard centerCard = FindCardNearestCenter();
@@ -367,7 +372,7 @@ namespace GIC.UI
                 // 卡道上没卡，立即生成一张再用
                 SpawnTrackCard();
                 centerCard = FindCardNearestCenter();
-                if (centerCard == null) return;
+                if (centerCard == null) return 1;
             }
 
             // 从卡道移除但保持世界位置
@@ -406,7 +411,7 @@ namespace GIC.UI
             // 转移到 resultContainer，保持世界位置不变（视觉上卡片不动）
             var rect = centerCard.GetComponent<RectTransform>();
             centerCard.transform.SetParent(resultContainer, true);
-            rect.sizeDelta = new Vector2(resultCardSize, resultCardSize * 1.5f);
+            rect.localScale = Vector3.one * (resultCardSize / 160f);
 
             _resultCards.Add(rect);
 
@@ -415,14 +420,17 @@ namespace GIC.UI
             float targetY = startY + index * (resultCardSize + resultCardSpacing);
             Vector2 targetPos = new Vector2(0f, targetY);
 
-            // 先在中心停留 0.3 秒，再飞到左侧目标位置
-            StartCoroutine(HoldThenFly(rect, targetPos));
+            // 先在中心停留（星级越高停留越久），再飞到左侧目标位置
+            float holdTime = 0.3f + (starLevel - 1) * 0.175f; // 1★=0.3s, 5★=1.0s
+            _holdThenFlyCoroutines.Add(StartCoroutine(HoldThenFly(rect, targetPos, holdTime)));
+
+            return starLevel;
         }
 
-        private IEnumerator HoldThenFly(RectTransform rect, Vector2 targetPos)
+        private IEnumerator HoldThenFly(RectTransform rect, Vector2 targetPos, float holdTime)
         {
             // 停留让玩家看清抽到了什么
-            yield return new WaitForSeconds(0.3f);
+            yield return new WaitForSeconds(holdTime);
 
             // 飞到左侧目标位置
             Vector2 startPos = rect.anchoredPosition;
@@ -437,6 +445,18 @@ namespace GIC.UI
                 yield return null;
             }
             rect.anchoredPosition = targetPos;
+        }
+
+        /// <summary>
+        /// 停止所有仍在运行的 HoldThenFly 协程，避免与 ShowFinalDisplay 的 FlyToPosition 冲突
+        /// </summary>
+        private void StopHoldThenFlyCoroutines()
+        {
+            foreach (var c in _holdThenFlyCoroutines)
+            {
+                if (c != null) StopCoroutine(c);
+            }
+            _holdThenFlyCoroutines.Clear();
         }
 
         /// <summary>
@@ -580,6 +600,9 @@ namespace GIC.UI
         {
             _isActive = false;
 
+            // 停止所有仍在飞行的 HoldThenFly 协程，避免与 FlyToPosition 冲突导致卡片位置跳变
+            StopHoldThenFlyCoroutines();
+
             cardTrack.gameObject.SetActive(false);
             countdownBar.gameObject.SetActive(false);
 
@@ -594,7 +617,7 @@ namespace GIC.UI
                 if (rect == null) continue;
                 rect.transform.SetParent(finalDisplayContainer, true);
                 float x = startX + i * (finalCardSize + resultCardSpacing);
-                rect.sizeDelta = new Vector2(finalCardSize, finalCardSize * 1.5f);
+                rect.localScale = Vector3.one * (finalCardSize / 160f);
                 // 飞到中间横向排列位置
                 StartCoroutine(FlyToPosition(rect, new Vector2(x, 0f)));
             }
@@ -647,17 +670,13 @@ namespace GIC.UI
             obj.layer = cardTrack.gameObject.layer;
             obj.name = "WishCard";
             var rect = obj.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(cardWidth, cardHeight);
+            // 用 scale 统一缩放，不改 sizeDelta（避免 ContentSizeFitter/TMP 字体不跟随的问题）
+            rect.localScale = Vector3.one * (cardWidth / rect.sizeDelta.x);
 
             // 禁用交互，卡道卡不需要点击，跳过 FadeIn 避免半透明
             var card = obj.GetComponent<Card>();
             if (card != null)
-            {
-                card.skipFadeIn = true;
-                if (card.toggle != null) card.toggle.interactable = false;
-                var cg = obj.GetComponent<CanvasGroup>();
-                if (cg != null) cg.alpha = 1f;
-            }
+                card.SetViewType(ViewType.OnlyDisplay);
 
             return obj;
         }
@@ -701,11 +720,6 @@ namespace GIC.UI
             };
 
             card.Init(saveData, null);
-
-            if (card.toggle != null) card.toggle.interactable = false;
-
-            var cg = cardObj.GetComponent<CanvasGroup>();
-            if (cg != null) cg.alpha = 1f;
         }
 
         private void ClearResultCards()
@@ -720,6 +734,7 @@ namespace GIC.UI
         private void OnDisable()
         {
             _isActive = false;
+            StopHoldThenFlyCoroutines();
             ClearTrackCards();
             ClearCardPool();
             ClearResultCards();

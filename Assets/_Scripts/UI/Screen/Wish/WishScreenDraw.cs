@@ -25,6 +25,7 @@ namespace GIC.UI
 
         [Header("货币显示")]
         [SerializeField] private TextMeshProUGUI fateCountText;
+        [SerializeField] private RectTransform primogemDisplay;
 
         private WishManager _wishManager;
 
