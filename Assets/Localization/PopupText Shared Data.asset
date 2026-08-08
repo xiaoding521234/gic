@@ -23,6 +23,10 @@ MonoBehaviour:
     m_Key: Deck_Full
     m_Metadata:
       m_Items: []
+  - m_Id: 3
+    m_Key: Wish_NoPrimogem
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

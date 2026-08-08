@@ -64,6 +64,9 @@ namespace GIC.Data
 
         [InspectorName("班尼特")]
         Bennett = 3010,
+
+        [InspectorName("琴")]
+        Jean = 3011,
         #endregion
 
         #region 璃月 (4001-4999)
@@ -141,7 +144,11 @@ namespace GIC.Data
         #endregion
 
         #region 坎瑞亚 (10001-10999)
-        // 坎瑞亚角色待添加
+        [InspectorName("丘丘暴徒")]
+        HilichurlBrute = 10001,
+
+        [InspectorName("丘丘人")]
+        Hilichurl = 10002,
         #endregion
 
         #region 特殊 (11001-11999)

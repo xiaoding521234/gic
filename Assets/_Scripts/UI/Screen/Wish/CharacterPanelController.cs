@@ -127,6 +127,15 @@ namespace GIC.UI
             SetAlpha(0f);
             gameObject.SetActive(true);
 
+            // 若本身或祖先仍处于未激活（可能在场景切换瞬间），无法启动协程，
+            // 直接跳到目标状态兜底，避免 "Coroutine couldn't be started" 报错
+            if (!gameObject.activeInHierarchy)
+            {
+                SnapToTarget();
+                SetAlpha(1f);
+                return;
+            }
+
             StopAllCoroutines();
             StartCoroutine(FadeInCoroutine());
         }

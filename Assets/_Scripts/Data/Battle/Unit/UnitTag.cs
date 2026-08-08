@@ -35,6 +35,12 @@ namespace GIC.Data
 
         [InspectorName("隐身")]
         Invisible = 1006,
+
+        [InspectorName("护盾")]
+        Shield = 1007,
+
+        [InspectorName("韧性提升")]
+        TenacityUp = 1008,
         #endregion
 
         #region 减益效果
@@ -72,6 +78,9 @@ namespace GIC.Data
 
         [InspectorName("协同攻击")]
         CoordinatedAttack = 3008,
+
+        [InspectorName("推力")]
+        Push = 3009,
         #endregion
 
         #region 功能特性
@@ -100,6 +109,23 @@ namespace GIC.Data
         #region 势力特点
         [InspectorName("快速延奏")]
         FastEnso = 5001,
+        #endregion
+
+        #region 上手难度
+        [InspectorName("入门")]
+        DifficultyBeginner = 6001,
+
+        [InspectorName("简单")]
+        DifficultyEasy = 6002,
+
+        [InspectorName("普通")]
+        DifficultyNormal = 6003,
+
+        [InspectorName("困难")]
+        DifficultyHard = 6004,
+
+        [InspectorName("专家")]
+        DifficultyExpert = 6005,
         #endregion
     }
 

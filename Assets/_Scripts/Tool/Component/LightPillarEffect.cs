@@ -44,7 +44,7 @@ namespace GIC.Tool
         [SerializeField] private float 上升时间 = 0.25f;
         [SerializeField] private float 淡出时间 = 0.5f;
         [SerializeField] private float 闪光时间 = 0.3f;
-        [SerializeField] private float 粒子延迟 = 0.2f;
+        [SerializeField] private float 粒子延迟 = 0f;
         [SerializeField] private float 核心过冲 = 1.08f;
 
         [Header("持续状态")]
@@ -52,11 +52,11 @@ namespace GIC.Tool
         [SerializeField, Range(0f, 0.5f)] private float 脉冲幅度 = 0.3f;
 
         [Header("粒子")]
-        [SerializeField] private int 粒子数量 = 12;
-        [SerializeField] private float 粒子速度 = 500f;
-        [SerializeField] private float 粒子大小 = 30f;
-        [SerializeField] private float 粒子扩散 = 1f;
-        [SerializeField] private float 粒子时长 = 1f;
+        [SerializeField] private int 粒子数量 = 30;
+        [SerializeField] private float 粒子速度 = 1200f;
+        [SerializeField] private float 粒子大小 = 25f;
+        [SerializeField] private float 粒子扩散 = 1.5f;
+        [SerializeField] private float 粒子时长 = 0.8f;
 
         [Header("地面闪光")]
         [SerializeField] private float 地面闪光宽度 = 300f;
@@ -65,16 +65,21 @@ namespace GIC.Tool
         [Header("材质")]
         [SerializeField] private Material 加法材质;
 
+        private Coroutine _playSequenceCoroutine;
+        private readonly List<Coroutine> _activeCoroutines = new();
+
         #endregion
 
         #region 运行时
 
         private RectTransform _rectTransform;
         private Material _additiveMat;
-        private Texture2D _beamTexture;
-        private Texture2D _radialTexture;
-        private Sprite _beamSprite;
-        private Sprite _radialSprite;
+
+        // 纹理和 Sprite 是无状态纯像素数据，所有实例共享，避免每次射击重建
+        private static Texture2D _sharedBeamTexture;
+        private static Sprite _sharedBeamSprite;
+        private static Texture2D _sharedRadialTexture;
+        private static Sprite _sharedRadialSprite;
 
         private readonly List<GameObject> _spawnedObjects = new();
         private readonly List<Image> _sustainedBeams = new();
@@ -100,10 +105,6 @@ namespace GIC.Tool
         private void OnDestroy()
         {
             if (_additiveMat != null) Destroy(_additiveMat);
-            if (_beamTexture != null) Destroy(_beamTexture);
-            if (_radialTexture != null) Destroy(_radialTexture);
-            if (_beamSprite != null) Destroy(_beamSprite);
-            if (_radialSprite != null) Destroy(_radialSprite);
         }
 
         #endregion
@@ -126,10 +127,15 @@ namespace GIC.Tool
         public void Play(Color color)
         {
             if (!isActiveAndEnabled) return;
-            StopAllCoroutines();
-            ClearSpawned();
+            // 停掉自己的所有协程
+            foreach (var c in _activeCoroutines)
+            {
+                if (c != null) StopCoroutine(c);
+            }
+            _activeCoroutines.Clear();
             _sustainedBeams.Clear();
-            StartCoroutine(PlaySequence(color));
+            ClearSpawned();
+            _playSequenceCoroutine = Track(PlaySequence(color));
         }
 
         /// <summary>
@@ -138,11 +144,25 @@ namespace GIC.Tool
         [ContextMenu("Stop")]
         public void Stop()
         {
-            StopAllCoroutines();
+            // 停掉自己的所有协程
+            foreach (var c in _activeCoroutines)
+            {
+                if (c != null) StopCoroutine(c);
+            }
+            _activeCoroutines.Clear();
+            _playSequenceCoroutine = null;
+
             if (_sustainedBeams.Count > 0)
-                StartCoroutine(FadeOutAndClear());
+                _activeCoroutines.Add(StartCoroutine(FadeOutAndClear()));
             else
                 ClearSpawned();
+        }
+
+        private Coroutine Track(IEnumerator routine)
+        {
+            var c = StartCoroutine(routine);
+            _activeCoroutines.Add(c);
+            return c;
         }
 
         #endregion
@@ -154,7 +174,7 @@ namespace GIC.Tool
             // --- 创建视觉元素 ---
 
             // 地面闪光
-            RectTransform groundFlash = CreateImage("GroundFlash", _radialSprite,
+            RectTransform groundFlash = CreateImage("GroundFlash", _sharedRadialSprite,
                 new Vector2(地面闪光宽度, 地面闪光高度));
             groundFlash.pivot = new Vector2(0.5f, 0.5f);
             groundFlash.anchoredPosition = Vector2.zero;
@@ -167,7 +187,7 @@ namespace GIC.Tool
             for (int i = 0; i < 光晕层数; i++)
             {
                 float layerWidth = 光柱宽度 * (1f + (光晕宽度倍数 - 1f) * (i + 1) / 光晕层数);
-                RectTransform glow = CreateImage($"Glow_{i}", _beamSprite, new Vector2(layerWidth, 光柱高度));
+                RectTransform glow = CreateImage($"Glow_{i}", _sharedBeamSprite, new Vector2(layerWidth, 光柱高度));
                 glow.pivot = new Vector2(0.5f, 0.5f);
                 glow.anchoredPosition = Vector2.zero;
                 glow.localScale = new Vector3(1f, 0f, 1f);
@@ -175,7 +195,7 @@ namespace GIC.Tool
             }
 
             // 核心光束（pivot 中心，从中心向上下双向生长）
-            RectTransform coreBeam = CreateImage("CoreBeam", _beamSprite, new Vector2(光柱宽度, 光柱高度));
+            RectTransform coreBeam = CreateImage("CoreBeam", _sharedBeamSprite, new Vector2(光柱宽度, 光柱高度));
             coreBeam.pivot = new Vector2(0.5f, 0.5f);
             coreBeam.anchoredPosition = Vector2.zero;
             coreBeam.localScale = new Vector3(1f, 0f, 1f);
@@ -184,9 +204,9 @@ namespace GIC.Tool
 
             // --- 启动各动画 ---
 
-            StartCoroutine(AnimateGroundFlash(groundFlashImg, color, 爆发强度));
+            Track(AnimateGroundFlash(groundFlashImg, color, 爆发强度));
             _sustainedBeams.Add(coreBeamImg);
-            StartCoroutine(AnimateBeam(coreBeamImg, Color.white, 爆发强度, 1f, 0f, true));
+            Track(AnimateBeam(coreBeamImg, Color.white, 爆发强度, 1f, 0f, true));
 
             for (int i = 0; i < glowImgs.Count; i++)
             {
@@ -194,7 +214,7 @@ namespace GIC.Tool
                 float sustainAlpha = 0.4f / (i + 1);
                 float delay = (i + 1) * 0.03f;
                 _sustainedBeams.Add(glowImgs[i]);
-                StartCoroutine(AnimateBeam(glowImgs[i], color, burstAlpha, sustainAlpha, delay, false));
+                Track(AnimateBeam(glowImgs[i], color, burstAlpha, sustainAlpha, delay, false));
             }
 
             // 等待光柱接近顶部后释放粒子
@@ -252,10 +272,11 @@ namespace GIC.Tool
 
             rect.localScale = Vector3.one;
 
-            // 持续脉冲（无限循环，由 StopAllCoroutines 中断）
+            // 持续脉冲（无限循环，由 Stop 中断）
             float pulseT = 0f;
             while (true)
             {
+                if (img == null) yield break;
                 pulseT += Time.unscaledDeltaTime;
                 float pulse = 1f + Mathf.Sin(pulseT * 脉冲速度) * 脉冲幅度;
                 img.color = new Color(color.r, color.g, color.b, sustainAlpha * pulse);
@@ -339,7 +360,7 @@ namespace GIC.Tool
                 go.transform.SetParent(_rectTransform, false);
 
                 var img = go.AddComponent<Image>();
-                img.sprite = _radialSprite;
+                img.sprite = _sharedRadialSprite;
                 img.raycastTarget = false;
                 img.material = _additiveMat;
 
@@ -357,6 +378,7 @@ namespace GIC.Tool
                 float delay = Random.Range(0f, 0.1f);
 
                 img.color = new Color(color.r, color.g, color.b, 0f);
+                // 粒子协程不追踪，由 ClearSpawned 直接销毁对象
                 StartCoroutine(AnimateSpark(rect, img, dir, speed, lifetime, delay, color, 爆发强度));
                 _spawnedObjects.Add(go);
             }
@@ -370,29 +392,35 @@ namespace GIC.Tool
 
             float t = 0f;
             Vector2 pos = Vector2.zero;
+            float initialSpeed = speed;
+            float alpha = Mathf.Min(maxAlpha, 1f);
 
             while (t < lifetime && rect != null)
             {
                 t += Time.unscaledDeltaTime;
                 float p = t / lifetime;
 
-                pos += dir * speed * Time.unscaledDeltaTime;
-                // 减速模拟重力
-                speed = Mathf.Max(0f, speed - 350f * Time.unscaledDeltaTime);
+                // 速度持续衰减但不停止（飞到终点不停留）
+                float curSpeed = initialSpeed * (1f - p * 0.7f);
+                pos += dir * curSpeed * Time.unscaledDeltaTime;
                 rect.anchoredPosition = pos;
 
-                // 先放大再缩小
-                float scaleP = p < 0.15f
-                    ? Mathf.Lerp(0f, 1f, p / 0.15f)
-                    : Mathf.Lerp(1f, 0f, (p - 0.15f) / 0.85f);
+                // 前期快速放大，后期缩小到 0
+                float scaleP = p < 0.1f
+                    ? Mathf.Lerp(0f, 1f, p / 0.1f)
+                    : Mathf.Lerp(1f, 0f, (p - 0.1f) / 0.9f);
                 rect.localScale = Vector3.one * scaleP;
 
-                img.color = new Color(color.r, color.g, color.b, Mathf.Lerp(maxAlpha, 0f, p * p));
+                // 后半段快速淡出（30% 后加速消失）
+                float fade = p < 0.3f
+                    ? alpha
+                    : alpha * (1f - (p - 0.3f) / 0.7f) * (1f - (p - 0.3f) / 0.7f);
+                img.color = new Color(color.r, color.g, color.b, fade);
                 yield return null;
             }
 
             if (rect != null)
-                rect.gameObject.SetActive(false);
+                Destroy(rect.gameObject);
         }
 
         #endregion
@@ -449,11 +477,13 @@ namespace GIC.Tool
 
         private void CreateTextures()
         {
+            if (_sharedBeamTexture != null) return;
+
             // 光柱纹理：水平高斯衰减 + 竖向中心亮两端暗（上下对称）
             int w = 32, h = 128;
-            _beamTexture = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            _beamTexture.filterMode = FilterMode.Bilinear;
-            _beamTexture.wrapMode = TextureWrapMode.Clamp;
+            _sharedBeamTexture = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            _sharedBeamTexture.filterMode = FilterMode.Bilinear;
+            _sharedBeamTexture.wrapMode = TextureWrapMode.Clamp;
             for (int y = 0; y < h; y++)
             {
                 float vy = (float)y / (h - 1);
@@ -464,19 +494,19 @@ namespace GIC.Tool
                     float vx = (x - w * 0.5f) / (w * 0.5f);
                     float hAlpha = Mathf.Exp(-vx * vx * 3f);
                     float alpha = hAlpha * vAlpha;
-                    _beamTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                    _sharedBeamTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
                 }
             }
-            _beamTexture.Apply();
-            _beamSprite = Sprite.Create(_beamTexture,
+            _sharedBeamTexture.Apply();
+            _sharedBeamSprite = Sprite.Create(_sharedBeamTexture,
                 new Rect(0, 0, w, h),
                 new Vector2(w * 0.5f, h * 0.5f), 100f);
 
             // 径向纹理：圆形渐变（用于地面闪光、粒子）
             int s = 64;
-            _radialTexture = new Texture2D(s, s, TextureFormat.RGBA32, false);
-            _radialTexture.filterMode = FilterMode.Bilinear;
-            _radialTexture.wrapMode = TextureWrapMode.Clamp;
+            _sharedRadialTexture = new Texture2D(s, s, TextureFormat.RGBA32, false);
+            _sharedRadialTexture.filterMode = FilterMode.Bilinear;
+            _sharedRadialTexture.wrapMode = TextureWrapMode.Clamp;
             float center = (s - 1) * 0.5f;
             for (int y = 0; y < s; y++)
             {
@@ -487,11 +517,11 @@ namespace GIC.Tool
                     float dist = Mathf.Sqrt(dx * dx + dy * dy);
                     float alpha = Mathf.Clamp01(1f - dist);
                     alpha = Mathf.Pow(alpha, 1.5f);
-                    _radialTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                    _sharedRadialTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
                 }
             }
-            _radialTexture.Apply();
-            _radialSprite = Sprite.Create(_radialTexture,
+            _sharedRadialTexture.Apply();
+            _sharedRadialSprite = Sprite.Create(_sharedRadialTexture,
                 new Rect(0, 0, s, s),
                 new Vector2(s * 0.5f, s * 0.5f), 100f);
         }

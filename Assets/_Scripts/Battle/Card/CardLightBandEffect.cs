@@ -37,7 +37,15 @@ namespace GIC.Battle
         /// </summary>
         public void Play()
         {
-            PlayBand(true);
+            PlayBand(true, 光带颜色);
+        }
+
+        /// <summary>
+        /// 播放光带扫过特效（正向），指定颜色
+        /// </summary>
+        public void Play(Color color)
+        {
+            PlayBand(true, color);
         }
 
         /// <summary>
@@ -45,10 +53,10 @@ namespace GIC.Battle
         /// </summary>
         public void PlayReverse()
         {
-            PlayBand(false);
+            PlayBand(false, 光带颜色);
         }
 
-        private void PlayBand(bool forward)
+        private void PlayBand(bool forward, Color color)
         {
             if (BandShader == null)
             {
@@ -59,12 +67,12 @@ namespace GIC.Battle
             if (_coroutine != null)
                 StopCoroutine(_coroutine);
 
-            _coroutine = StartCoroutine(BandCoroutine(forward));
+            _coroutine = StartCoroutine(BandCoroutine(forward, color));
         }
 
-        private IEnumerator BandCoroutine(bool forward)
+        private IEnumerator BandCoroutine(bool forward, Color color)
         {
-            CreateBandGraphic();
+            CreateBandGraphic(color);
 
             float elapsed = 0f;
             const float startProgress = -0.3f;
@@ -86,7 +94,7 @@ namespace GIC.Battle
             _coroutine = null;
         }
 
-        private void CreateBandGraphic()
+        private void CreateBandGraphic(Color color)
         {
             if (_bandGraphic != null) return;
 
@@ -106,7 +114,7 @@ namespace GIC.Battle
             _bandGraphic.raycastTarget = false;
 
             _bandMaterial = new Material(BandShader);
-            _bandMaterial.SetColor("_GlowColor", 光带颜色);
+            _bandMaterial.SetColor("_GlowColor", color);
             _bandMaterial.SetFloat("_BandWidth", 光带宽度);
             _bandMaterial.SetFloat("_Progress", -0.3f);
             _bandGraphic.material = _bandMaterial;

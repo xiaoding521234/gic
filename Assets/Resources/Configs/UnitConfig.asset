@@ -1790,3 +1790,228 @@ MonoBehaviour:
       onDie:
         clips: []
       skillVoices: []
+  - unitName: 3011
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 4
+    deployCost: 100
+    weaponType: 1
+    baseHP: 250
+    baseAttack: 40
+    baseDefense: 0
+    baseAttackSpeed: 40
+    baseMoveSpeed: 3
+    baseLuck: 0
+    baseTenacity: 0
+    baseMastery: 0
+    baseSanity: 50
+    baseLifeSteal: 0
+    baseHealEfficiency: 100
+    baseEnergy: 5
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 3
+    visionRange: 1
+    tags: 75170000c10b0000a30f0000bf0b0000ef030000f0030000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+  - unitName: 3010
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 5
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 1
+    visionRange: -64
+    tags: a20f0000e903000071170000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+  - unitName: 3005
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 5
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 5
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 5
+    visionRange: -64
+    tags: ef030000a20f000072170000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+  - unitName: 10001
+    unitType: 1
+    factions: 11270000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 2
+    deployCost: -64
+    weaponType: 0
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 10
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 0
+    visionRange: -64
+    tags: bd0b0000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+  - unitName: 10002
+    unitType: 1
+    factions: 11270000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 1
+    deployCost: -64
+    weaponType: 5
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 10
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 0
+    visionRange: -64
+    tags: 71170000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []

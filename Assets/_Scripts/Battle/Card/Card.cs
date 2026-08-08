@@ -17,6 +17,7 @@ namespace GIC.Battle
         public ViewType viewType = ViewType.Display;
         public bool isEditMode = false;
         public bool isDeckPanelMode = false;
+        public bool skipFadeIn = false;
 
         public Toggle toggle;
         public Image cardBack;
@@ -52,7 +53,13 @@ namespace GIC.Battle
         private void OnEnable()
         {
             ResetContentPosition();
-            PlayFadeIn();
+            if (!skipFadeIn)
+                PlayFadeIn();
+            else
+            {
+                var cg = GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = 1f;
+            }
         }
 
         private void ResetContentPosition()

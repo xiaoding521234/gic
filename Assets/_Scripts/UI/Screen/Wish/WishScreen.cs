@@ -11,7 +11,7 @@ namespace GIC.UI
 {
 
 
-    public class WishScreen : MonoBehaviour
+    public partial class WishScreen : MonoBehaviour
     {
         [Serializable]
         public class CharacterEntry
@@ -82,6 +82,8 @@ namespace GIC.UI
             {
                 AudioManager.Instance.PushMusicState(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
             }
+
+            InitWishDraw();
 
             // 确保所有 Layout Group 计算完成，并等渲染管线跑完一帧
             Canvas.ForceUpdateCanvases();
