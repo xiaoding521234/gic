@@ -1,65 +1,32 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
 using GIC.Battle;
 using GIC.Tool;
+
 namespace GIC.UI
 {
-
-
     /// <summary>
-    /// 祈愿界面氛围特效：白雾层 + 元素粒子，从右往左飘动
+    /// 祈愿界面氛围特效：烟雾层 + 元素粒子，由 ParticleSystem 驱动
+    /// 粒子层级在 Ambience 子 Canvas (sortingOrder=75) 下渲染，
+    /// 位于 BackgroundLayer(50) 之上、主 UI Canvas(100) 之下
     /// </summary>
     public class WishAmbienceController : MonoBehaviour
     {
-        [Header("白雾")]
-        [SerializeField] private Image fogImage;
-        [SerializeField] private float fogScrollSpeed = 15f;
-        [SerializeField] private float fogScrollRange = 1920f;
-        [SerializeField] private float fogMaxAlpha = 0.15f;
+        [Header("粒子系统")]
+        [SerializeField] private ParticleSystem smokeParticles;
+        [SerializeField] private ParticleSystem elementParticles;
 
-        [Header("元素粒子")]
-        [SerializeField] private RectTransform particleContainer;
-        [SerializeField] private Sprite particleSprite;
-        [SerializeField] private int particleCount = 12;
-        [SerializeField] private float particleSpawnInterval = 0.8f;
-        [SerializeField] private float particleMinSpeed = 20f;
-        [SerializeField] private float particleMaxSpeed = 60f;
-        [SerializeField] private float particleMinSize = 6f;
-        [SerializeField] private float particleMaxSize = 18f;
-        [SerializeField] private float particleMinDriftY = -15f;
-        [SerializeField] private float particleMaxDriftY = 15f;
-        [SerializeField] private float particleFadeInDuration = 0.5f;
-        [SerializeField] private float particleFadeOutStart = 0.7f;
-
-        [Header("边界")]
-        [SerializeField] private float spawnX = 1200f;
-        [SerializeField] private float destroyX = -1200f;
-
-        [Header("区域裁剪")]
-        [SerializeField] private float topBound = 0f;
-        [SerializeField] private float bottomBound = -600f;
-
-        private readonly List<ParticleData> _activeParticles = new();
-        private Coroutine _fogCoroutine;
-        private Coroutine _spawnCoroutine;
         private Color _currentColor = Color.white;
-        private Material _particleMat;
+        private ParticleSystem.Particle[] _particleBuffer = new ParticleSystem.Particle[128];
+        private Coroutine _speedBoostCoroutine;
 
-        [System.Serializable]
-        private struct ParticleData
-        {
-            public RectTransform rect;
-            public Image image;
-            public Vector2 velocity;
-            public float lifetime;
-            public float age;
-            public float startAlpha;
-        }
+        // 缓存原始速度（只在首次加速时记录，避免连续切换累积）
+        private float _origVelXMin, _origVelXMax, _origVelYMin, _origVelYMax;
+        private float _origEmissionRate;
+        private bool _hasOrigVel;
 
         private void OnEnable()
         {
@@ -73,208 +40,117 @@ namespace GIC.UI
 
         public void StartAmbience()
         {
-            if (fogImage != null && _fogCoroutine == null)
-            {
-                Color c = Color.white;
-                c.a = fogMaxAlpha;
-                fogImage.color = c;
-                _fogCoroutine = StartCoroutine(ScrollFog());
-            }
+            StartWithPrewarm(smokeParticles);
+            StartWithPrewarm(elementParticles);
+        }
 
-            if (particleContainer != null && particleSprite != null && _spawnCoroutine == null)
-            {
-                // 创建 Additive 混合材质（发光效果）
-                if (_particleMat == null)
-                {
-                    var shader = Shader.Find("UI/Default");
-                    _particleMat = new Material(shader);
-                    _particleMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    _particleMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                    _particleMat.SetInt("_Blend", 1);
-                    _particleMat.DisableKeyword("_ALPHATEST_ON");
-                    _particleMat.EnableKeyword("_ALPHABLEND_ON");
-                    _particleMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                    _particleMat.renderQueue = 3000;
-                }
-
-                // 初始预填充：在屏幕内随机位置生成粒子，不等生成间隔
-                for (int i = 0; i < particleCount; i++)
-                {
-                    SpawnOneParticle(initial: true);
-                }
-                _spawnCoroutine = StartCoroutine(SpawnParticles());
-            }
+        /// <summary>
+        /// 手动预热：Simulate 模拟一个完整周期，使粒子预填充整个屏幕，
+        /// 而不是全部从生成点（右侧）开始飞入。prewarm 标志只对 playOnAwake 生效，手动 Play 不会触发。
+        /// </summary>
+        private void StartWithPrewarm(ParticleSystem ps)
+        {
+            if (ps == null) return;
+            ps.Clear(true);
+            ps.Simulate(ps.main.duration, true, true);
+            ps.Play(true);
         }
 
         public void StopAmbience()
         {
-            if (_fogCoroutine != null) { StopCoroutine(_fogCoroutine); _fogCoroutine = null; }
-            if (_spawnCoroutine != null) { StopCoroutine(_spawnCoroutine); _spawnCoroutine = null; }
-
-            foreach (var p in _activeParticles)
-            {
-                if (p.rect != null) Destroy(p.rect.gameObject);
-            }
-            _activeParticles.Clear();
+            if (smokeParticles != null) smokeParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            if (elementParticles != null) elementParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         }
 
         /// <summary>
-        /// 设置粒子颜色（传入角色元素的对应颜色）
+        /// 切换卡池时立即触发粒子加速。
+        /// </summary>
+        public void OnPoolSwitching()
+        {
+            BoostElementSpeed(8f, 0.6f);
+        }
+
+        /// <summary>
+        /// 设置粒子颜色（传入角色元素的对应颜色）。
+        /// 同时更新 startColor（影响新粒子）和已存活粒子的颜色。
         /// </summary>
         public void SetElementColor(Color color)
         {
             _currentColor = color;
-            // 即时更新已有粒子
-            foreach (var p in _activeParticles)
+
+            if (elementParticles != null)
             {
-                if (p.image != null)
-                {
-                    float alpha = p.image.color.a;
-                    p.image.color = new Color(color.r, color.g, color.b, alpha);
-                }
+                var main = elementParticles.main;
+                main.startColor = color;
+
+                int count = elementParticles.GetParticles(_particleBuffer);
+                for (int i = 0; i < count; i++)
+                    _particleBuffer[i].startColor = color;
+                elementParticles.SetParticles(_particleBuffer, count);
             }
         }
 
-        // ==================== 白雾滚动 ====================
-
-        private IEnumerator ScrollFog()
+        /// <summary>
+        /// 临时加快元素粒子速度，加速后平滑减速回原速。
+        /// 连续切换时基于缓存的原速计算，不累积加速。
+        /// </summary>
+        private void BoostElementSpeed(float multiplier, float duration)
         {
-            // 用 Material 的 UV 偏移实现无缝滚动，不会有瞬移跳变
-            Material fogMat = null;
-            if (fogImage != null)
+            if (elementParticles == null) return;
+
+            var vel = elementParticles.velocityOverLifetime;
+            var emission = elementParticles.emission;
+
+            // 首次记录原始速度和发射率
+            if (!_hasOrigVel)
             {
-                fogMat = fogImage.materialForRendering;
-                if (fogMat == null || fogMat == fogImage.defaultMaterial)
-                {
-                    // 没有自定义 Material，创建一个实例来修改 UV offset
-                    fogMat = new Material(fogImage.defaultMaterial);
-                    fogImage.material = fogMat;
-                }
-                else
-                {
-                    fogMat = Instantiate(fogMat);
-                    fogImage.material = fogMat;
-                }
+                _origVelXMin = vel.x.constantMin;
+                _origVelXMax = vel.x.constantMax;
+                _origVelYMin = vel.y.constantMin;
+                _origVelYMax = vel.y.constantMax;
+                _origEmissionRate = emission.rateOverTime.constant;
+                _hasOrigVel = true;
             }
 
-            float offset = 0f;
-            float uvSpeed = fogScrollSpeed / fogScrollRange;
-
-            while (true)
-            {
-                offset += Time.deltaTime * uvSpeed;
-                if (offset > 1f) offset -= 1f;
-                if (fogMat != null)
-                    fogMat.mainTextureOffset = new Vector2(offset, 0f);
-                yield return null;
-            }
+            if (_speedBoostCoroutine != null)
+                StopCoroutine(_speedBoostCoroutine);
+            _speedBoostCoroutine = StartCoroutine(SpeedBoostRoutine(multiplier, duration));
         }
 
-        // ==================== 粒子生成与更新 ====================
-
-        private IEnumerator SpawnParticles()
+        private IEnumerator SpeedBoostRoutine(float multiplier, float duration)
         {
-            while (true)
+            var vel = elementParticles.velocityOverLifetime;
+            var emission = elementParticles.emission;
+
+            // 瞬间加速 + 同步提高发射率（维持屏幕密度）
+            vel.x = new ParticleSystem.MinMaxCurve(_origVelXMin * multiplier, _origVelXMax * multiplier);
+            vel.y = new ParticleSystem.MinMaxCurve(_origVelYMin * multiplier, _origVelYMax * multiplier);
+            emission.rateOverTime = _origEmissionRate * multiplier;
+
+            // 加速持续 duration 秒
+            yield return new WaitForSeconds(duration);
+
+            // 0.5 秒平滑减速回原速 + 同步降低发射率
+            float decelTime = 0.5f;
+            float elapsed = 0f;
+            while (elapsed < decelTime)
             {
-                SpawnOneParticle();
-                yield return new WaitForSeconds(particleSpawnInterval);
-            }
-        }
-
-        private void SpawnOneParticle(bool initial = false)
-        {
-            if (particleContainer == null || particleSprite == null) return;
-
-            var go = new GameObject("AmbientParticle");
-            go.transform.SetParent(particleContainer, false);
-
-            var rect = go.AddComponent<RectTransform>();
-            float startY = Random.Range(bottomBound, topBound);
-            float x = initial ? Random.Range(destroyX + 50f, spawnX - 50f) : spawnX;
-            rect.anchoredPosition = new Vector2(x, startY);
-            rect.sizeDelta = Vector2.one * Random.Range(particleMinSize, particleMaxSize);
-
-            var img = go.AddComponent<Image>();
-            img.sprite = particleSprite;
-            img.raycastTarget = false;
-            if (_particleMat != null)
-                img.material = _particleMat;
-            Color c = _currentColor;
-            c.a = initial ? Random.Range(0.3f, 0.8f) : 0f;
-            img.color = c;
-
-        #if UNITY_EDITOR
-            img.name = $"Particle_{_activeParticles.Count}";
-        #endif
-
-            float speed = Random.Range(particleMinSpeed, particleMaxSpeed);
-            float driftY = Random.Range(particleMinDriftY, particleMaxDriftY);
-            float lifetime = Mathf.Abs(x - destroyX) / speed;
-
-            var data = new ParticleData
-            {
-                rect = rect,
-                image = img,
-                velocity = new Vector2(-speed, driftY),
-                lifetime = lifetime,
-                age = 0f,
-                startAlpha = Random.Range(0.3f, 0.8f)
-            };
-
-            _activeParticles.Add(data);
-            StartCoroutine(UpdateParticle(data));
-        }
-
-        private IEnumerator UpdateParticle(ParticleData data)
-        {
-            while (data.age < data.lifetime && data.rect != null)
-            {
-                data.age += Time.deltaTime;
-                float p = data.age / data.lifetime;
-
-                // 移动
-                data.rect.anchoredPosition += data.velocity * Time.deltaTime;
-
-                // 淡入
-                float alpha;
-                if (p < particleFadeInDuration)
-                {
-                    alpha = Mathf.Lerp(0f, data.startAlpha, p / particleFadeInDuration);
-                }
-                else if (p > particleFadeOutStart)
-                {
-                    alpha = Mathf.Lerp(data.startAlpha, 0f, (p - particleFadeOutStart) / (1f - particleFadeOutStart));
-                }
-                else
-                {
-                    alpha = data.startAlpha;
-                }
-
-                // 缩放呼吸
-                float breathe = 1f + Mathf.Sin(data.age * 2f) * 0.1f;
-                data.rect.localScale = Vector3.one * breathe;
-
-                data.image.color = new Color(_currentColor.r, _currentColor.g, _currentColor.b, alpha);
-
-                // 超出边界销毁
-                if (data.rect.anchoredPosition.x < destroyX)
-                    break;
-
+                elapsed += Time.deltaTime;
+                float t = elapsed / decelTime;
+                vel.x = new ParticleSystem.MinMaxCurve(
+                    Mathf.Lerp(_origVelXMin * multiplier, _origVelXMin, t),
+                    Mathf.Lerp(_origVelXMax * multiplier, _origVelXMax, t));
+                vel.y = new ParticleSystem.MinMaxCurve(
+                    Mathf.Lerp(_origVelYMin * multiplier, _origVelYMin, t),
+                    Mathf.Lerp(_origVelYMax * multiplier, _origVelYMax, t));
+                emission.rateOverTime = Mathf.Lerp(_origEmissionRate * multiplier, _origEmissionRate, t);
                 yield return null;
             }
 
-            _activeParticles.Remove(data);
-            if (data.rect != null) Destroy(data.rect.gameObject);
-        }
-
-        private void OnDestroy()
-        {
-            StopAmbience();
-            if (_particleMat != null)
-                Destroy(_particleMat);
+            // 确保精确恢复
+            vel.x = new ParticleSystem.MinMaxCurve(_origVelXMin, _origVelXMax);
+            vel.y = new ParticleSystem.MinMaxCurve(_origVelYMin, _origVelYMax);
+            emission.rateOverTime = _origEmissionRate;
         }
     }
-
 }
-
-

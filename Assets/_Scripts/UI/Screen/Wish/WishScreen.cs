@@ -20,6 +20,8 @@ namespace GIC.UI
             public CharacterPanelController panel;
             [Tooltip("选中时显示的图片（可选，不填则用 button 的 TargetGraphic）")]
             public Image buttonImage;
+            [Tooltip("该角色对应的祈愿卡池（为空表示卡池未开放）")]
+            public WishPoolConfig pool;
         }
 
         public AudioClip wishClip;
@@ -64,6 +66,13 @@ namespace GIC.UI
 
             CachePanelPositions();
             SetPanelsToStartOffset();  // Awake 就移到偏移位，避免首帧闪烁
+
+            // 尽早预加载所有角色立绘（4K 纹理提前加载，首次选中即可丝滑淡入）
+            foreach (var entry in characters)
+            {
+                if (entry.panel != null)
+                    entry.panel.PreloadSprite();
+            }
 
             for (int i = 0; i < characters.Length; i++)
             {
@@ -143,8 +152,16 @@ namespace GIC.UI
         {
             isSwitching = true;
 
+            // 立即触发粒子加速，不等淡出
+            if (ambience != null)
+                ambience.OnPoolSwitching();
+
             var oldEntry = currentIndex >= 0 ? characters[currentIndex] : null;
             var newEntry = characters[newIndex];
+
+            // 预加载新角色立绘（利用旧面板淡出的时间并行加载 4K 纹理）
+            if (newEntry.panel != null)
+                newEntry.panel.PreloadSprite();
 
             // 淡出当前面板
             if (oldEntry?.panel != null)
@@ -166,6 +183,9 @@ namespace GIC.UI
             {
                 newEntry.panel.FadeIn();
             }
+
+            // 切换对应的祈愿卡池
+            SwitchPool(newEntry.pool);
 
             // 更新氛围特效的元素颜色
             if (ambience != null)
