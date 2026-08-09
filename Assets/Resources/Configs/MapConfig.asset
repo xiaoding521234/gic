@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a5d6e617ab14d54d992c97e27801355, type: 3}
+  m_Name: MapConfig
+  m_EditorClassIdentifier: 
+  regions:
+  - region: 1
+    mapImageAnchoredPosition: {x: 4666, y: -3963.6}
+    mapImageSize: {x: 21504, y: 13824.5625}
+    contentAnchoredPosition: {x: -2.68, y: 1415.07}
+    contentSizeDelta: {x: 3661.34, y: 5897.38}
+    anchors:
+    - positionName: 1001
+      normalizedX: 0.2929
+      normalizedY: 0.3208
+    - positionName: 1002
+      normalizedX: 0.2958
+      normalizedY: 0.357
+    - positionName: 1003
+      normalizedX: 0.2991
+      normalizedY: 0.3693
+  - region: 2
+    mapImageAnchoredPosition: {x: -6136, y: -2783}
+    mapImageSize: {x: 21504, y: 13824.5625}
+    contentAnchoredPosition: {x: 0, y: 229.14}
+    contentSizeDelta: {x: 3975.66, y: 4173.33}
+    anchors:
+    - positionName: 2001
+      normalizedX: 0.7316
+      normalizedY: 0.2888
+    - positionName: 2002
+      normalizedX: 0.7517
+      normalizedY: 0.3522
+    - positionName: 2003
+      normalizedX: 0.79
+      normalizedY: 0.3267
+    - positionName: 2004
+      normalizedX: 0.7768
+      normalizedY: 0.3195
+  - region: 3
+    mapImageAnchoredPosition: {x: -4076, y: -871}
+    mapImageSize: {x: 21504, y: 13824.5625}
+    contentAnchoredPosition: {x: -819, y: 1103}
+    contentSizeDelta: {x: 4542.14, y: 4328.66}
+    anchors: []
+  - region: 4
+    mapImageAnchoredPosition: {x: -961, y: 645}
+    mapImageSize: {x: 5586.7573, y: 6085.9995}
+    contentAnchoredPosition: {x: -517.56, y: -2041.73}
+    contentSizeDelta: {x: 6141.13, y: 6416.03}
+    anchors: []
+  - region: 5
+    mapImageAnchoredPosition: {x: -649, y: 798}
+    mapImageSize: {x: 21504, y: 13824.5625}
+    contentAnchoredPosition: {x: -1366.15, y: -539}
+    contentSizeDelta: {x: 5294.29, y: 5500.75}
+    anchors: []
+  - region: 6
+    mapImageAnchoredPosition: {x: -1294, y: -3217}
+    mapImageSize: {x: 21504, y: 13824.5625}
+    contentAnchoredPosition: {x: 453.32, y: -482}
+    contentSizeDelta: {x: 3466.64, y: 4631.44}
+    anchors: []
+  - region: 7
+    mapImageAnchoredPosition: {x: 5946.4, y: 977}
+    mapImageSize: {x: 21504, y: 13824.5625}
+    contentAnchoredPosition: {x: -1955.91, y: 843.68}
+    contentSizeDelta: {x: 9380.95, y: 6624.99}
+    anchors: []

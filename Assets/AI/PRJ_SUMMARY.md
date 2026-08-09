@@ -234,7 +234,7 @@ SaveManager (IWargameManager)
   ├── 路径: Application.persistentDataPath/gic_save.json
   ├── IS_DELETION_TEST_MODE = true  ← ⚠️ 发布前改为 false
   ├── PlayerSaveData: 玩家名, 拥有角色/物品, 当前牌组, 音量, 显示设置, 当前位置
-  └── SyncMissingUnits/SyncMissingItems: 自动补充配置中有但存档中没有的卡牌(count=0)
+  └── SyncMissingUnits/SyncMissingItems: 按配置文件顺序重建列表，已有数据保留，缺失的补 count=0
 ```
 
 ## 关键设计模式
@@ -257,4 +257,4 @@ SaveManager (IWargameManager)
 - **LocalEventBus**：固定帧率处理事件（每帧处理一个 handler），有锁机制（Animation/Highest）
 - **Localization**：全面使用 Unity Localization 包，TextCombiner 组件统一管理多段本地化文本
 - **PlayerID**：使用 connectionId（"0"=Host, "99"=Unknown, "Offline"=未连接）
-- **SortOrder**：卡牌排序按 SortOrder 升序 + StarLevel 降序
+- **SortOrder**：卡牌排序按 SortOrder（势力/物品子类型）升序 → StarLevel 降序 → ConfigIndex（配置文件顺序）升序

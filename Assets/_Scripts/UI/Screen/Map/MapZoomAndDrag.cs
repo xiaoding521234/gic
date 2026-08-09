@@ -262,6 +262,15 @@ namespace GIC.UI
             return currentScale;
         }
 
+        /// <summary>
+        /// 更新原始位置（切换区域后调用，使 ResetMap/入场动画使用新的 Content 位置）
+        /// </summary>
+        public void UpdateOriginalPosition()
+        {
+            if (content != null)
+                contentOriginalPosition = content.anchoredPosition;
+        }
+
         #endregion
     }
 }

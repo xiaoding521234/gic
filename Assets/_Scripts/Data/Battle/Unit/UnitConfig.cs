@@ -350,6 +350,19 @@ namespace GIC.Data
             return dataCache.ContainsKey(unitName);
         }
 
+        /// <summary>
+        /// 获取角色在 unitDataList 中的索引（配置文件顺序），不存在返回 -1
+        /// </summary>
+        public int GetUnitIndex(UnitName unitName)
+        {
+            for (int i = 0; i < unitDataList.Count; i++)
+            {
+                if (unitDataList[i] != null && unitDataList[i].unitName == unitName)
+                    return i;
+            }
+            return -1;
+        }
+
         public int GetUnitCount()
         {
             if (dataCache == null) BuildCache();

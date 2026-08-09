@@ -158,6 +158,11 @@ namespace GIC.Framework
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
+
+#if !UNITY_EDITOR
+                // Release 构建：抑制 Debug.Log（保留 LogWarning / LogError 用于诊断）
+                Debug.unityLogger.filterLogType = LogType.Warning;
+#endif
             }
             else if (Instance != this)
             {

@@ -64,7 +64,8 @@ namespace GIC.Framework
         {
             _settings = settings;
             var shader = blurShader != null ? blurShader : Shader.Find("Hidden/ScreenBlur");
-            _blurMaterial = CoreUtils.CreateEngineMaterial(shader);
+            if (shader != null)
+                _blurMaterial = CoreUtils.CreateEngineMaterial(shader);
             _mpb = new MaterialPropertyBlock();
         }
 

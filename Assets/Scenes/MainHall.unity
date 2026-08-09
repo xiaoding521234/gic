@@ -259,8 +259,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   parallaxIntensity: 1
-  smoothSpeed: 0.04
+  smoothTime: 0.15
   clampToBounds: 1
+  parallaxMargin: 0.15
 --- !u!1 &328748158
 GameObject:
   m_ObjectHideFlags: 0

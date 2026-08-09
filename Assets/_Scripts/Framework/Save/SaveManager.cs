@@ -219,7 +219,7 @@ namespace GIC.Framework
         }
 
         /// <summary>
-        /// 补充缺失的角色
+        /// 补充缺失的角色 — 按配置文件顺序重建列表，已有数据保留，缺失的补 count=0
         /// </summary>
         private void SyncMissingUnits()
         {
@@ -231,31 +231,38 @@ namespace GIC.Framework
             }
 
             unitConfig.BuildCache();
-            var allUnits = unitConfig.GetAllUnits();
 
-            // 构建已拥有角色的ID集合
-            var ownedUnitIds = new HashSet<int>();
+            // 构建已有角色数据的索引
+            var existingData = new Dictionary<int, SaveCardData>();
             foreach (var card in CurrentSave.ownedUnits)
             {
-                ownedUnitIds.Add(card.id.value);
+                existingData[card.id.value] = card;
             }
 
-            // 补充缺失的角色
-            foreach (var unitData in allUnits)
+            // 按 unitDataList 顺序重建列表
+            var newList = new List<SaveCardData>();
+            foreach (var unitData in unitConfig.unitDataList)
             {
+                if (unitData == null) continue;
                 int uid = (int)unitData.unitName;
-                if (!ownedUnitIds.Contains(uid))
+                if (existingData.TryGetValue(uid, out var existing))
+                {
+                    newList.Add(existing);
+                }
+                else
                 {
                     var newCard = new SaveCardData();
                     newCard.SaveUnit(unitData.unitName, 0);
-                    CurrentSave.ownedUnits.Add(newCard);
+                    newList.Add(newCard);
                     Debug.Log($"补充缺失角色: {unitData.unitName.GetInspectorName()} (count=0)");
                 }
             }
+
+            CurrentSave.ownedUnits = newList;
         }
 
         /// <summary>
-        /// 补充缺失的物品
+        /// 补充缺失的物品 — 按配置文件顺序重建列表，已有数据保留，缺失的补 count=0
         /// </summary>
         private void SyncMissingItems()
         {
@@ -267,30 +274,34 @@ namespace GIC.Framework
             }
 
             itemConfig.BuildCache();
-            var allItems = itemConfig.GetAllItems();
 
-            // 构建已拥有物品的ID集合
-            var ownedItemIds = new HashSet<int>();
+            // 构建已有物品数据的索引
+            var existingData = new Dictionary<int, SaveCardData>();
             foreach (var card in CurrentSave.ownedNormalItems)
             {
-                ownedItemIds.Add(card.id.value);
+                existingData[card.id.value] = card;
             }
 
-            // 补充缺失的物品，按类别放入对应列表
-            foreach (var itemData in allItems)
+            // 按 itemDataList 顺序重建列表
+            var newList = new List<SaveCardData>();
+            foreach (var itemData in itemConfig.itemDataList)
             {
+                if (itemData == null) continue;
                 int iid = (int)itemData.itemID;
-                if (!ownedItemIds.Contains(iid))
+                if (existingData.TryGetValue(iid, out var existing))
+                {
+                    newList.Add(existing);
+                }
+                else
                 {
                     var newCard = new SaveCardData();
                     newCard.SaveItem(itemData.itemID, 0);
-
-                    CurrentSave.ownedNormalItems.Add(newCard);
-                    CurrentSave.RebuildOwnedCards();
-
+                    newList.Add(newCard);
                     Debug.Log($"补充缺失物品: {itemData.itemID.GetInspectorName()} (count=0, subType={itemData.subType})");
                 }
             }
+
+            CurrentSave.ownedNormalItems = newList;
         }
 
         #endregion
@@ -321,7 +332,8 @@ namespace GIC.Framework
             {
                 return CardSortUtility.CompareByPrimaryThenStar(
                     a.SortOrder, b.SortOrder,
-                    a.StarLevel, b.StarLevel
+                    a.StarLevel, b.StarLevel,
+                    a.ConfigIndex, b.ConfigIndex
                 );
             });
         }
@@ -341,7 +353,8 @@ namespace GIC.Framework
             {
                 return CardSortUtility.CompareByPrimaryThenStar(
                     a.SortOrder, b.SortOrder,
-                    a.StarLevel, b.StarLevel
+                    a.StarLevel, b.StarLevel,
+                    a.ConfigIndex, b.ConfigIndex
                 );
             });
         }

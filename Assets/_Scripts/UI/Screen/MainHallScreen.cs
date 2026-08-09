@@ -4,6 +4,8 @@ using GIC.Data.Event;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using GIC.Framework;
 using GIC.Battle;
 using GIC.Data;
@@ -86,6 +88,9 @@ namespace GIC.UI
                 if (_goBackHandler != null)
                     EventBusHub.Instance.Unsubscribe(_goBackHandler);
             }
+
+            if (_bgHandle.IsValid())
+                Addressables.Release(_bgHandle);
         }
 
         #region 事件处理器
@@ -221,6 +226,8 @@ namespace GIC.UI
             }
         }
 
+        private AsyncOperationHandle<Sprite> _bgHandle;
+
         private void UpdateBackground(PositionName position)
         {
             if (backgroundRenderer == null) return;
@@ -233,17 +240,30 @@ namespace GIC.UI
             string regionName = region.ToString();
             string positionName = position.ToString().ToSnakeCase();
             string timeSuffix = TimeUtility.GetTimeSuffix();
-            string path = $"UI/PositionBack/{regionName}/{positionName}_{timeSuffix}";
+            string address = $"PositionBack/{regionName}/{positionName}_{timeSuffix}";
 
-            Sprite backgroundSprite = Resources.Load<Sprite>(path);
+            StartCoroutine(UpdateBackgroundAsync(address));
+        }
 
-            if (backgroundSprite != null)
+        private IEnumerator UpdateBackgroundAsync(string address)
+        {
+            // 释放上一张背景
+            if (_bgHandle.IsValid())
             {
-                backgroundRenderer.sprite = backgroundSprite;
+                Addressables.Release(_bgHandle);
+                _bgHandle = default;
+            }
+
+            _bgHandle = Addressables.LoadAssetAsync<Sprite>(address);
+            yield return _bgHandle;
+
+            if (_bgHandle.Status == AsyncOperationStatus.Succeeded)
+            {
+                backgroundRenderer.sprite = _bgHandle.Result;
             }
             else
             {
-                Debug.LogWarning($"未找到背景图片: {path}");
+                Debug.LogWarning($"未找到背景图片: {address}");
             }
         }
 

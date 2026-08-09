@@ -1930,7 +1930,7 @@ MonoBehaviour:
     factions: 11270000
     avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
     cards:
-    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    - {fileID: 21300000, guid: 09bb399298eb16d4bb1e165f0f011a83, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 2
@@ -1975,7 +1975,7 @@ MonoBehaviour:
     factions: 11270000
     avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
     cards:
-    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    - {fileID: 21300000, guid: 4d271a8961861a1408948bf8a1436719, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 1

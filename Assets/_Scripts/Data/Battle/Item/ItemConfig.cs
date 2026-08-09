@@ -202,6 +202,19 @@ namespace GIC.Data
             return dataCache.ContainsKey(itemID);
         }
 
+        /// <summary>
+        /// 获取物品在 itemDataList 中的索引（配置文件顺序），不存在返回 -1
+        /// </summary>
+        public int GetItemIndex(ItemName itemID)
+        {
+            for (int i = 0; i < itemDataList.Count; i++)
+            {
+                if (itemDataList[i] != null && itemDataList[i].itemID == itemID)
+                    return i;
+            }
+            return -1;
+        }
+
         public int GetItemCount()
         {
             if (dataCache == null) BuildCache();

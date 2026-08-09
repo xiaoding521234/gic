@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b5262a1bd634d44f92fcc9080add910, type: 3}
+  m_Name: WishPool_Mondstadt
+  m_EditorClassIdentifier: 
+  poolName: "\u98CE\u795E\u5361\u6C60"
+  description: "\u8499\u5FB7\u4E4B\u98CE"
+  units: c00b0000b90b0000ba0b0000bb0b0000bd0b0000c20b0000c30b00001227000011270000
+  items: a10f0000a40f000089130000eb030000e9030000ed030000a20f0000a30f0000a50f0000
+  star5Rate: 2
+  star4Rate: 8
+  star3Rate: 15
+  star2Rate: 30
+  star1Rate: 45
+  unitRate: 50

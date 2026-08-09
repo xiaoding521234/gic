@@ -60,6 +60,9 @@ namespace GIC.UI
         [SerializeField] private AudioClip cardHitSFX;
         [SerializeField] private float sfxVolume = 0.8f;
 
+        /// <summary>抽卡流程是否进行中（防重入）</summary>
+        public bool IsWishInProgress => _isActive;
+
         // 运行时状态
         private WishManager _wishManager;
         private WishPoolConfig _pool;
@@ -72,6 +75,7 @@ namespace GIC.UI
         private float _currentTimer;
         private bool _isInCooldown;
         private float _cooldownTimer;
+        private float _totalCooldownTime;
         private bool _isActive;
 
         private List<RectTransform> _resultCards = new();
@@ -308,7 +312,8 @@ namespace GIC.UI
                 if (_isInCooldown)
                 {
                     _cooldownTimer -= Time.deltaTime;
-                    UpdateCountdownBar(0f);
+                    // 冷却期间进度条从 0 增长到 1（不缩反增），冷却结束时刚好填满
+                    UpdateCountdownBar(1f - _cooldownTimer / _totalCooldownTime);
 
                     if (_cooldownTimer <= 0f)
                     {
@@ -361,6 +366,7 @@ namespace GIC.UI
 
             // 星级越高冷却越长，让高星结果停留更久
             _cooldownTimer = baseShotCooldown + starLevel * cooldownPerStar;
+            _totalCooldownTime = _cooldownTimer;
         }
 
         private int RevealAndPopResultCard(int index)
@@ -431,20 +437,8 @@ namespace GIC.UI
         {
             // 停留让玩家看清抽到了什么
             yield return new WaitForSeconds(holdTime);
-
             // 飞到左侧目标位置
-            Vector2 startPos = rect.anchoredPosition;
-            float duration = 0.4f;
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                float eased = 1f - Mathf.Pow(1f - t, 3f);
-                rect.anchoredPosition = Vector2.Lerp(startPos, targetPos, eased);
-                yield return null;
-            }
-            rect.anchoredPosition = targetPos;
+            yield return FlyToPosition(rect, targetPos);
         }
 
         /// <summary>

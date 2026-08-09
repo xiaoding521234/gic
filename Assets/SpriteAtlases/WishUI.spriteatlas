@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: WishUI
+  serializedVersion: 2
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 3
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      webStreaming: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 16
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 102900000, guid: 7ad8101169eb5d64492958ffafd0c4b8, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 81fccf30de90e5b41a640557fdfc90e4: 21300000
+    - 1f510480d86383c4bbedbd12163bd312: 21300000
+    - f9e607912221f144bbb482efef6d9597: 21300000
+    - bfed2622dc7bff24da51b97254570492: 21300000
+    - c4db0d63c8417ed4b9c2cd58410c686e: 21300000
+    - 8f3b8214abbd90144a3c8ec6ff635490: 21300000
+    - 433bb2a5d43293146a0ecf142c5c15e2: 21300000
+    - 6bc08d063d0de274793a25e13b8ebe4c: 21300000
+    - be845027c46f046409805966229485f0: 21300000
+    - 3f875c69a72bee74085844652ae82f6d: 21300000
+    - 288ddab9981b7424ba5d5a464ef56371: 21300000
+    - fac0238c6cd8b7f47b26b4b9c6d7d676: 21300000
+    - 0981323f83a2fc042904f4499192ab80: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 81fccf30de90e5b41a640557fdfc90e4, type: 3}
+  - {fileID: 21300000, guid: 1f510480d86383c4bbedbd12163bd312, type: 3}
+  - {fileID: 21300000, guid: f9e607912221f144bbb482efef6d9597, type: 3}
+  - {fileID: 21300000, guid: bfed2622dc7bff24da51b97254570492, type: 3}
+  - {fileID: 21300000, guid: c4db0d63c8417ed4b9c2cd58410c686e, type: 3}
+  - {fileID: 21300000, guid: 8f3b8214abbd90144a3c8ec6ff635490, type: 3}
+  - {fileID: 21300000, guid: 433bb2a5d43293146a0ecf142c5c15e2, type: 3}
+  - {fileID: 21300000, guid: 6bc08d063d0de274793a25e13b8ebe4c, type: 3}
+  - {fileID: 21300000, guid: be845027c46f046409805966229485f0, type: 3}
+  - {fileID: 21300000, guid: 3f875c69a72bee74085844652ae82f6d, type: 3}
+  - {fileID: 21300000, guid: 288ddab9981b7424ba5d5a464ef56371, type: 3}
+  - {fileID: 21300000, guid: fac0238c6cd8b7f47b26b4b9c6d7d676, type: 3}
+  - {fileID: 21300000, guid: 0981323f83a2fc042904f4499192ab80, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - nahida_button
+  - mavuika_button
+  - primogem_bg
+  - venti_button
+  - fog_soft
+  - columbina_button
+  - zhongli_button
+  - ei_button
+  - button
+  - furina_button
+  - wish_button
+  - left
+  - primogem_capsule_bg
+  m_RenderDataMap: {}
+  m_Tag: WishUI
+  m_IsVariant: 0
+  m_IsPlaceholder: 0

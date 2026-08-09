@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: NameCards
+  serializedVersion: 2
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 3
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      webStreaming: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 16
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 102900000, guid: c49c469a05df487429ff4ed71df8a791, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 190fcec0f0e7d5a419adf5db686ad0b2: 21300000
+    - 619ff4e09a0e13c4b886b92aa5c1b95f: 21300000
+    - 6c409b229a14b5e46b479d2d5d19528f: 21300000
+    - 2ce814b262046f442bbd3617f98ccc87: 21300000
+    - 12688bd232e44aa4c934108bac26ceaf: 21300000
+    - 93346be2723cfe844a9f3cd0182cdfdd: 21300000
+    - 9ea399f26d1b67049969cd28ab0066b4: 21300000
+    - 09451ce4ccda3d247afae06d01963071: 21300000
+    - 61c683655e18f9e4995cfdc5ec9e8d42: 21300000
+    - 3051a0793bbd690438aa785d709fcc3d: 21300000
+    - 3996419b0441a314c8f9b6e53a4fb21d: 21300000
+    - 720e71ce5f98591458599dde23f3a019: 21300000
+    - cf28fffe635e56045a189703dd1904f8: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 190fcec0f0e7d5a419adf5db686ad0b2, type: 3}
+  - {fileID: 21300000, guid: 619ff4e09a0e13c4b886b92aa5c1b95f, type: 3}
+  - {fileID: 21300000, guid: 6c409b229a14b5e46b479d2d5d19528f, type: 3}
+  - {fileID: 21300000, guid: 2ce814b262046f442bbd3617f98ccc87, type: 3}
+  - {fileID: 21300000, guid: 12688bd232e44aa4c934108bac26ceaf, type: 3}
+  - {fileID: 21300000, guid: 93346be2723cfe844a9f3cd0182cdfdd, type: 3}
+  - {fileID: 21300000, guid: 9ea399f26d1b67049969cd28ab0066b4, type: 3}
+  - {fileID: 21300000, guid: 09451ce4ccda3d247afae06d01963071, type: 3}
+  - {fileID: 21300000, guid: 61c683655e18f9e4995cfdc5ec9e8d42, type: 3}
+  - {fileID: 21300000, guid: 3051a0793bbd690438aa785d709fcc3d, type: 3}
+  - {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+  - {fileID: 21300000, guid: 720e71ce5f98591458599dde23f3a019, type: 3}
+  - {fileID: 21300000, guid: cf28fffe635e56045a189703dd1904f8, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - shadow
+  - linnea
+  - kaeya
+  - barbara
+  - illuga
+  - zibai
+  - image (13)
+  - hutao
+  - amber
+  - xingqiu
+  - null
+  - beidou
+  - bottom
+  m_RenderDataMap: {}
+  m_Tag: NameCards
+  m_IsVariant: 0
+  m_IsPlaceholder: 0

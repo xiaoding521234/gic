@@ -26,6 +26,11 @@ namespace GIC.UI
         private PositionData cachedData;
         
         public PositionName PositionName => positionName;
+
+        public void SetPositionName(PositionName name)
+        {
+            positionName = name;
+        }
         
         private void Awake()
         {

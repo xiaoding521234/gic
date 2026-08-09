@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Avatars
+  serializedVersion: 2
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 3
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      webStreaming: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 16
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 102900000, guid: 628e5c418cc1ff74abccb3b1874c4828, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - e1161073f76fbf04686ddbd006617a96: 21300000
+    - d5c6d975238881e4bbf7e860b5b88432: 21300000
+    - 138b10868f0e6a74ab63dbd44cbab517: 21300000
+    - 99a639c711773e4498d87fba7c6438f3: 21300000
+    - 430d71c80a1d3ba428502678e6afaf94: 21300000
+    - df6842f9dd8615b4ab231feb770c16fa: 21300000
+    - b23cd64a6c48fca4c8801a062e52f54b: 21300000
+    - 988b7d5a1aa48d540816f80c030dffbc: 21300000
+    - 6bbff8fa0d7aa404c9e5a79c37eda8ce: 21300000
+    - cb3c0b7c53b96db4fb9725ea901b999c: 21300000
+    - c21fa61ea6d74b24693c5264b1737f31: 21300000
+    - 1cd1426e7d039a64e838b6531d0f040d: 21300000
+    - e248288e6aae4b34baaf1628cda265d9: 21300000
+    - 5ffbccef8d0829d448e3084ee51ba2c1: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: e1161073f76fbf04686ddbd006617a96, type: 3}
+  - {fileID: 21300000, guid: d5c6d975238881e4bbf7e860b5b88432, type: 3}
+  - {fileID: 21300000, guid: 138b10868f0e6a74ab63dbd44cbab517, type: 3}
+  - {fileID: 21300000, guid: 99a639c711773e4498d87fba7c6438f3, type: 3}
+  - {fileID: 21300000, guid: 430d71c80a1d3ba428502678e6afaf94, type: 3}
+  - {fileID: 21300000, guid: df6842f9dd8615b4ab231feb770c16fa, type: 3}
+  - {fileID: 21300000, guid: b23cd64a6c48fca4c8801a062e52f54b, type: 3}
+  - {fileID: 21300000, guid: 988b7d5a1aa48d540816f80c030dffbc, type: 3}
+  - {fileID: 21300000, guid: 6bbff8fa0d7aa404c9e5a79c37eda8ce, type: 3}
+  - {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+  - {fileID: 21300000, guid: c21fa61ea6d74b24693c5264b1737f31, type: 3}
+  - {fileID: 21300000, guid: 1cd1426e7d039a64e838b6531d0f040d, type: 3}
+  - {fileID: 21300000, guid: e248288e6aae4b34baaf1628cda265d9, type: 3}
+  - {fileID: 21300000, guid: 5ffbccef8d0829d448e3084ee51ba2c1, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - barbara
+  - hutao
+  - fill_bar
+  - beidou
+  - illuga
+  - zibai
+  - rounded_chess_frame
+  - bottom_bar
+  - amber
+  - null
+  - xingqiu
+  - kaeya
+  - linnea
+  - chess_bottom
+  m_RenderDataMap: {}
+  m_Tag: Avatars
+  m_IsVariant: 0
+  m_IsPlaceholder: 0

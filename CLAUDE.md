@@ -76,7 +76,7 @@
   - 始终只有 1 个 RelatedPanel，CardMode 时从 `cardDetailViewTemplate`（场景中背包的 CardDetailView）实例化副本，关闭时 Destroy
   - CardMode 内点击技能图标 → 关闭 RelatedPanel + SkillDetailView 更新为新技能（副本的 `UnitDetailPanel.skillDetailView` 指向 Layer 2 的 SkillDetailView）
 - **TextCombiner**: 本地化文本组合器（`_Scripts/Tool/Component/`），通过 `LocalizedString.ChangeHandler` 委托注册回调。`_activeHandlers` 列表存储委托引用，`ClearAllEntries()`/`RemoveEntry()`/`OnDestroy()` 通过引用正确 `-=` 取消注册。新增 `textProcessor`（`Func<string, string>`）回调，最终文本经过处理后显示（用于动态描述注入）
-- **分类系统**: `BackpackTab`（7 个背包分页）由 `ICardConfig.GetBackpackTab()` 返回，驱动 `BackpackScreen.BuildDisplayList()` 筛选。角色通过 `UnitType`→`BackpackTab` 映射，物品通过 `ItemSubType`→`BackpackTab` 映射（`ItemSubTypeExtensions.ToBackpackTab()`）。`ItemSubType` 是物品唯一分类枚举（已删除 `ItemTag`），同时也是物品排序键（`SortOrder => (int)subType`）
+- **分类系统**: `BackpackTab`（7 个背包分页）由 `ICardConfig.GetBackpackTab()` 返回，驱动 `BackpackScreen.BuildDisplayList()` 筛选。角色通过 `UnitType`→`BackpackTab` 映射，物品通过 `ItemSubType`→`BackpackTab` 映射（`ItemSubTypeExtensions.ToBackpackTab()`）。`ItemSubType` 是物品唯一分类枚举（已删除 `ItemTag`），同时也是物品排序键（`SortOrder => (int)subType`）。排序三级键：SortOrder 升序 → StarLevel 降序 → ConfigIndex（配置文件列表顺序）升序。`ICardConfig.ConfigIndex` 由 `UnitConfig.GetUnitIndex()` / `ItemConfig.GetItemIndex()` 提供。`SaveManager.SyncMissingUnits/SyncMissingItems` 按配置文件 `unitDataList`/`itemDataList` 顺序重建存档列表（已有保留，缺失补 count=0），重建后统一排序写回
 - **物品使用**: `IUsable` 接口，`ItemConfig.ItemData` 可选择实现，`ItemDetailPanel` 按需显示使用按钮
 - **对象池**: `CardPool`（`_Scripts/Framework/Pool/`），`BackpackScreen` 使用池获取/归还卡牌，消除全量 destroy/respawn
 

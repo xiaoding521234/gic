@@ -73,8 +73,9 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3008
-    m_Localized: A bard in Mondstadt, in truth the mortal form of Barbatos, the God
-      of Freedom. He tells the stories of this land through song and poetry.
+    m_Localized: A free-spirited bard who resides in the City of Winds. His true
+      identity is Barbatos, the Anemo Archon of Mondstadt, who for a thousand years
+      has celebrated freedom through song and poetry.
     m_Metadata:
       m_Items: []
   - m_Id: 3009
@@ -172,34 +173,39 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 4007
     m_Localized: A mysterious consultant of Wangsheng Funeral Parlor, knowledgeable
-      in rites and artifacts. In truth, the mortal vessel of the Geo Archon, he walks
-      Liyue in the name of contracts.
+      in all matters. In truth, he is the mortal vessel of Morax, the Geo Archon,
+      who safeguards Liyue in the name of contracts.
     m_Metadata:
       m_Items: []
   - m_Id: 5004
-    m_Localized: The Raiden Shogun of Inazuma, the Almighty Narukami Ogosho who grants
-      her people Eternity. She pursues an unchanging plane of perfect stillness.
+    m_Localized: The Raiden Shogun of Inazuma, whose true name is Ei. She promised
+      her people unchanging 'Eternity,' once ruling through a puppet while her true
+      self secluded in the Plane of Euthymia, pursuing eternal stillness.
     m_Metadata:
       m_Items: []
   - m_Id: 6004
-    m_Localized: The Lesser Lord Kusanali of Sumeru, profound wisdom lies beneath
-      her childlike appearance. She weaves the future of Sumeru through dreams and
-      imagination.
+    m_Localized: The Dendro Archon of Sumeru, the Lesser Lord Kusanali. Bearing profound
+      wisdom beneath a childlike guise, she weaves Sumeru's future through dreams
+      and imagination, guarding the leaves of the Tree of Knowledge.
     m_Metadata:
       m_Items: []
   - m_Id: 7004
-    m_Localized: The queen of all waters, kindreds, peoples and laws of Fontaine.
-      Under the Opera Epiclese's spotlight, she remains the center of attention.
+    m_Localized: The superstar of Fontaine, once known as the 'Queen of all waters,
+      kindreds, peoples, and laws.' She was the human half of the Hydro Archon Focalors,
+      enduring five centuries of solitary performance. Now, as a mortal, she finally
+      begins her own life.
     m_Metadata:
       m_Items: []
   - m_Id: 8001
-    m_Localized: The Pyro Archon of Natlan, the Blazing Rebirth. Burning herself
-      to illuminate all of Natlan, she is its brightest Sun.
+    m_Localized: The Pyro Archon of Natlan, the God of War. Her blazing will illuminates
+      all of Natlan as its brightest Sun. To protect her people's future, she is
+      willing to burn herself, composing a poem of rebirth.
     m_Metadata:
       m_Items: []
   - m_Id: 2004
-    m_Localized: A mysterious Harbinger from Snezhnaya, ranked Third of the Fatui.
-      She speaks little, yet transforms into the feared 'Damselette' on the battlefield.
+    m_Localized: Third of the Fatui Harbingers, codenamed 'Damselette.' She wields
+      the power of the moon and once sang a mournful lament by a coffin. Fragile
+      in appearance, she possesses strength far beyond ordinary.
     m_Metadata:
       m_Items: []
   - m_Id: 10001

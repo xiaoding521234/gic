@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;
@@ -23,22 +24,24 @@ namespace GIC.UI
         [SerializeField] private Button natlanButton;
         [SerializeField] private Button snezhnayaButton;
         [SerializeField] private Button khaenriahButton;
-        [SerializeField] private TextCombiner titleText;  // 改为 TextCombiner
+        [SerializeField] private TextCombiner titleText;
 
-        [Header("地图容器")]
-        [SerializeField] private Transform mapContainer;
+        [Header("地图结构引用（场景中静态）")]
+        [SerializeField] private RectTransform mapContent;      // ScrollRect.content
+        [SerializeField] private RectTransform mapImage;        // MapImage (大地图纹理)
+        [SerializeField] private Transform anchorsContainer;   // 锚点父节点
+        [SerializeField] private SimpleMapZoom mapZoom;        // 缩放/入场动画控制器
 
-        [Header("性能优化")]
-        [SerializeField] private bool unloadUnusedOnSwitch = true;
+        [Header("配置")]
+        [SerializeField] private MapConfig mapConfig;
+        [SerializeField] private GameObject anchorPrefab;      // Anchor.prefab
 
-        [SerializeField] private GameObject currentMap;
         private RegionName currentRegion;
-        
+        private readonly List<GameObject> _spawnedAnchors = new();
 
 
         private void Start()
         {
-            // 绑定按钮事件（保持不变）
             if (closeButton != null)
                 closeButton.onClick.AddListener(OnCloseClick);
             if (nodkraiButton != null)
@@ -66,8 +69,7 @@ namespace GIC.UI
 
         public void ShowRegion(RegionName region)
         {
-            if (currentRegion == region && currentMap != null) return;
-
+            if (currentRegion == region) return;
             currentRegion = region;
 
             if (titleText != null)
@@ -76,61 +78,66 @@ namespace GIC.UI
                 titleText.AddEntry(region.GetEntry());
             }
 
-            // 销毁实例
-            if (currentMap != null)
+            var data = mapConfig.GetRegion(region);
+            if (data == null)
             {
-                Destroy(currentMap);
-                currentMap = null;
-            }
-
-            // 关键：强制清理未被引用的资源
-            if (unloadUnusedOnSwitch)
-            {
-                StartCoroutine(UnloadUnusedAssetsCoroutine());
-            }
-
-            // 加载新地图
-            LoadMapPrefab(region);
-        }
-
-        private void LoadMapPrefab(RegionName region)
-        {
-            string path = region.GetResourcePath();
-            GameObject prefab = Resources.Load<GameObject>(path);
-
-            if (prefab == null)
-            {
-                Debug.LogError($"未找到地图预制体: {path}");
+                Debug.LogWarning($"[MapScreen] 未找到区域配置: {region}");
                 return;
             }
 
-            currentMap = Instantiate(prefab, mapContainer);
-            
-            Canvas mapCanvas = currentMap.GetComponent<Canvas>();
-            if (mapCanvas != null)
+            ClearAnchors();
+
+            // 应用地图位置、尺寸和滚动范围
+            mapImage.anchoredPosition = data.mapImageAnchoredPosition;
+            mapImage.sizeDelta = data.mapImageSize;
+            mapContent.anchoredPosition = data.contentAnchoredPosition;
+            mapContent.sizeDelta = data.contentSizeDelta;
+
+            SpawnAnchors(data);
+
+            // 更新缩放控制器的原始位置（使用新的 Content 位置），然后重置并播放入场动画
+            if (mapZoom != null)
             {
-                mapCanvas.overrideSorting = true;
-                mapCanvas.sortingOrder = 50;
-            }
-            
-            InitializeMapAnchors(currentMap, region);
-            
-            // 加载完成后也清理一次，释放可能残留的旧资源
-            if (unloadUnusedOnSwitch)
-            {
-                StartCoroutine(UnloadUnusedAssetsCoroutine());
+                mapZoom.UpdateOriginalPosition();
+                mapZoom.ResetMap();
+                mapZoom.ReplayEntryAnimation();
             }
         }
 
-        private void InitializeMapAnchors(GameObject mapInstance, RegionName region)
+        private void SpawnAnchors(MapConfig.RegionData data)
         {
-            var anchors = mapInstance.GetComponentsInChildren<MapAnchor>(true);
-            foreach (var anchor in anchors)
+            Vector2 mapSize = mapImage.sizeDelta;
+            Vector2 mapPos = mapImage.anchoredPosition;
+            var posManager = Wargame.Instance.PositionManager;
+
+            foreach (var anchor in data.anchors)
             {
-                var data = Wargame.Instance.PositionManager.GetPositionData(anchor.PositionName);
-                if (data != null && data.region == region)
-                    anchor.SetData(data);
+                var go = Instantiate(anchorPrefab, anchorsContainer);
+                var rt = go.GetComponent<RectTransform>();
+
+                // 归一化坐标 → 像素位置（相对于 MapImage 中心，pivot=0.5,0.5）
+                float px = mapPos.x + (anchor.normalizedX - 0.5f) * mapSize.x;
+                float py = mapPos.y + (0.5f - anchor.normalizedY) * mapSize.y;
+                rt.anchoredPosition = new Vector2(px, py);
+
+                // 初始化 MapAnchor 数据
+                var mapAnchor = go.GetComponent<MapAnchor>();
+                mapAnchor.SetPositionName(anchor.positionName);
+                var posData = posManager.GetPositionData(anchor.positionName);
+                if (posData != null && posData.region == data.region)
+                    mapAnchor.SetData(posData);
+
+                _spawnedAnchors.Add(go);
             }
+        }
+
+        private void ClearAnchors()
+        {
+            foreach (var go in _spawnedAnchors)
+            {
+                if (go != null) Destroy(go);
+            }
+            _spawnedAnchors.Clear();
         }
 
         private void OnCloseClick()
@@ -139,20 +146,9 @@ namespace GIC.UI
             GameScene.Instance.GoBack();
         }
 
-        private IEnumerator UnloadUnusedAssetsCoroutine()
+        private void OnDestroy()
         {
-            yield return null; // 等待一帧，确保 Destroy 操作完成
-            
-            // 调用两次以确保彻底清理
-            AsyncOperation op = Resources.UnloadUnusedAssets();
-            yield return op;
-            
-            // 可选：第二次调用
-            yield return Resources.UnloadUnusedAssets();
-            
-            Debug.Log("未使用资源已清理");
+            ClearAnchors();
         }
     }
 }
-
-

@@ -1,0 +1,121 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Icons
+  serializedVersion: 2
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 3
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      webStreaming: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 16
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 102900000, guid: a3d8a03fdd871b3419f4e7828011a370, type: 3}
+    - {fileID: 102900000, guid: 92c0b15713d392d4994349220ee7ea42, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 9af9caa073664874787b3310147653e9: 21300000
+    - 4f97dfa0394017848b683bb6d38591f9: 21300000
+    - aa067161f45acfc41bfba70b4a80b49b: 21300000
+    - 2e04ac81d073d5e4b822ec722cace92c: 21300000
+    - 62f43eb11ab365d4f8b5dc555ee7175d: 21300000
+    - de472ae2896b9ce4d81f66fa24f26c96: 21300000
+    - b1e72193a5f02a2438f9dd084f92be9b: 21300000
+    - 39f9ec44617920641bbb03a2d5631fa1: 21300000
+    - d72ecd35e6924114b95f51402007f837: 21300000
+    - bcd88e26649e3fc4cbe3cbceac56cbb0: 21300000
+    - c54119b6fe915994d9346433dfed462b: 21300000
+    - bdd686e661bbce84eaf3ac90bafc5c68: 21300000
+    - 904790a7b6578e443899548661a1c8e5: 21300000
+    - 79595858371497641a128d88edd01616: 21300000
+    - 04b7668990803b74e9e59675da77d209: 21300000
+    - f96030a9a9bcc494a802b1a9c0ae67cd: 21300000
+    - f1c2792a0d66dd6408864beedbfd0ec1: 21300000
+    - f0a43b3a6d95abb48bb0d0a80aa91f24: 21300000
+    - 5a3ca0cdd572a684885527900394f22b: 21300000
+    - 8fd7698eeaa5ef048af18b5cb4531296: 21300000
+    - c17fe7ded9f44a04bbee607a9c07ac18: 21300000
+    - 64afcc1f1a0efb14699b321d7585fdf8: 21300000
+    - 32d5c04fc5004494888bc64d1adceffe: 21300000
+    - 4eaca57f760d8864ab50b40d6d5d65bb: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 9af9caa073664874787b3310147653e9, type: 3}
+  - {fileID: 21300000, guid: 4f97dfa0394017848b683bb6d38591f9, type: 3}
+  - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
+  - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
+  - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
+  - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
+  - {fileID: 21300000, guid: b1e72193a5f02a2438f9dd084f92be9b, type: 3}
+  - {fileID: 21300000, guid: 39f9ec44617920641bbb03a2d5631fa1, type: 3}
+  - {fileID: 21300000, guid: d72ecd35e6924114b95f51402007f837, type: 3}
+  - {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
+  - {fileID: 21300000, guid: c54119b6fe915994d9346433dfed462b, type: 3}
+  - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
+  - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
+  - {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
+  - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
+  - {fileID: 21300000, guid: f96030a9a9bcc494a802b1a9c0ae67cd, type: 3}
+  - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
+  - {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
+  - {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
+  - {fileID: 21300000, guid: 8fd7698eeaa5ef048af18b5cb4531296, type: 3}
+  - {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
+  - {fileID: 21300000, guid: 64afcc1f1a0efb14699b321d7585fdf8, type: 3}
+  - {fileID: 21300000, guid: 32d5c04fc5004494888bc64d1adceffe, type: 3}
+  - {fileID: 21300000, guid: 4eaca57f760d8864ab50b40d6d5d65bb, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - apple
+  - egg
+  - masterless_starglitter
+  - intertwined_fate
+  - primogem
+  - stamina
+  - detail
+  - bottom
+  - select
+  - sharpshooter
+  - circle
+  - raw_meat
+  - dandelion_wine
+  - constellation
+  - mora
+  - bow
+  - magatama
+  - reveal
+  - walk
+  - fly
+  - arrow_rain
+  - null
+  - radish
+  - wheat
+  m_RenderDataMap: {}
+  m_Tag: Icons
+  m_IsVariant: 0
+  m_IsPlaceholder: 0

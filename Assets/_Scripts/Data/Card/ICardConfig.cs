@@ -17,6 +17,7 @@ namespace GIC.Data
     {
         int                  StarLevel         { get; }
         int                  SortOrder         { get; }   // 主排序键
+        int                  ConfigIndex       { get; }   // 配置文件中的顺序（同主键同星级的次级排序）
         BackpackTab          GetBackpackTab();           // 背包分页
         TextEntry            GetNameEntry();
         TextEntry            GetDescriptionEntry();

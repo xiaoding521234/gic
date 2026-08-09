@@ -26,6 +26,16 @@ namespace GIC.Data
                 ? (int)_d.factions[0]
                 : int.MaxValue;
 
+        public int ConfigIndex
+        {
+            get
+            {
+                if (_d == null || CardConfigResolver.UnitConfig == null) return int.MaxValue;
+                int idx = CardConfigResolver.UnitConfig.GetUnitIndex(_d.unitName);
+                return idx >= 0 ? idx : int.MaxValue;
+            }
+        }
+
         public BackpackTab GetBackpackTab() => _d?.unitType switch
         {
             UnitType.Creation => BackpackTab.Creation,
@@ -55,6 +65,16 @@ namespace GIC.Data
             _d != null
                 ? (int)_d.subType
                 : int.MaxValue;
+
+        public int ConfigIndex
+        {
+            get
+            {
+                if (_d == null || CardConfigResolver.ItemConfig == null) return int.MaxValue;
+                int idx = CardConfigResolver.ItemConfig.GetItemIndex(_d.itemID);
+                return idx >= 0 ? idx : int.MaxValue;
+            }
+        }
 
         public BackpackTab GetBackpackTab() => _d?.subType.ToBackpackTab() ?? BackpackTab.Material;
 

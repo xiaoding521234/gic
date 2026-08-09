@@ -231,6 +231,7 @@ namespace GIC.Framework
 
         public int StarLevel => Config?.StarLevel ?? 0;
         public int SortOrder => Config?.SortOrder ?? int.MaxValue;
+        public int ConfigIndex => Config?.ConfigIndex ?? int.MaxValue;
 
         // ── 卡组管理 ──
 

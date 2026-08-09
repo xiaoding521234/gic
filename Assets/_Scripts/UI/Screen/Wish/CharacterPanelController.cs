@@ -2,6 +2,8 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
@@ -54,6 +56,8 @@ namespace GIC.UI
         private bool targetPositionsReady;
         private bool contentFilled;
 
+        private AsyncOperationHandle<Sprite> _wishArtHandle;
+
         private void Awake()
         {
             SetAlpha(0f);
@@ -103,11 +107,6 @@ namespace GIC.UI
                 descriptionText.text = data.GetDescriptionEntry().GetLocalizedString();
         }
 
-        private Sprite LoadCharacterSprite()
-        {
-            return Resources.Load<Sprite>($"UI/Wish/{unitName.ToString().ToLower()}");
-        }
-
         public void SetFadeInState()
         {
             EnsureTargetPositions();
@@ -118,10 +117,6 @@ namespace GIC.UI
         public void FadeIn()
         {
             EnsureTargetPositions();
-
-            // 按需加载立绘（延迟到真正显示时才加载，避免 7 张 4K 同时进内存）
-            if (characterImage != null && characterImage.sprite == null)
-                characterImage.sprite = LoadCharacterSprite();
 
             SetToStartPositions();
             SetAlpha(0f);
@@ -136,8 +131,23 @@ namespace GIC.UI
                 return;
             }
 
+            // 按需加载立绘（在 FadeInCoroutine 内部等待，避免被 StopAllCoroutines 中断）
+            bool needsLoad = characterImage != null && characterImage.sprite == null;
+
             StopAllCoroutines();
-            StartCoroutine(FadeInCoroutine());
+            StartCoroutine(FadeInCoroutine(needsLoad));
+        }
+
+        /// <summary>
+        /// 预加载立绘（在旧面板淡出期间调用，提前开始加载 4K 纹理）
+        /// </summary>
+        public void PreloadSprite()
+        {
+            if (characterImage == null || characterImage.sprite != null) return;
+            if (_wishArtHandle.IsValid()) return;
+
+            string address = $"WishArt/{unitName.ToString().ToLower()}";
+            _wishArtHandle = Addressables.LoadAssetAsync<Sprite>(address);
         }
 
         public void FadeOut()
@@ -167,10 +177,18 @@ namespace GIC.UI
                 titleArea.anchoredPosition = titleTargetPos + Vector2.right * slideDistance;
         }
 
-        private IEnumerator FadeInCoroutine()
+        private IEnumerator FadeInCoroutine(bool loadSprite)
         {
+            // 若需要加载且尚未通过 PreloadSprite 预加载，则启动异步加载
+            if (loadSprite && !_wishArtHandle.IsValid())
+            {
+                string address = $"WishArt/{unitName.ToString().ToLower()}";
+                _wishArtHandle = Addressables.LoadAssetAsync<Sprite>(address);
+            }
+
             float startTime = Time.realtimeSinceStartup;
 
+            // Phase 1: 位置动画与立绘加载并行，alpha 仅在立绘就绪后跟随
             while (true)
             {
                 float elapsed = Time.realtimeSinceStartup - startTime;
@@ -188,11 +206,49 @@ namespace GIC.UI
                 if (titleArea != null)
                     titleArea.anchoredPosition = titleTargetPos + Vector2.right * Mathf.LerpUnclamped(slideDistance, 0f, t);
 
-                SetAlpha(t);
+                // 立绘加载完成则赋值
+                if (loadSprite && characterImage != null && characterImage.sprite == null
+                    && _wishArtHandle.IsValid() && _wishArtHandle.IsDone)
+                {
+                    if (_wishArtHandle.Status == AsyncOperationStatus.Succeeded)
+                        characterImage.sprite = _wishArtHandle.Result;
+                    else
+                        Debug.LogWarning($"无法加载立绘: WishArt/{unitName.ToString().ToLower()}");
+                    loadSprite = false;
+                }
+
+                // alpha 仅在立绘就绪后才开始淡入，避免空图淡入后立绘瞬间弹出
+                if (!loadSprite || (characterImage != null && characterImage.sprite != null))
+                    SetAlpha(t);
+
                 yield return null;
             }
 
             SnapToTarget();
+
+            // Phase 2: 立绘尚未加载完成，等待加载后单独淡入
+            if (loadSprite && characterImage != null && characterImage.sprite == null
+                && _wishArtHandle.IsValid())
+            {
+                while (!_wishArtHandle.IsDone)
+                    yield return null;
+
+                if (_wishArtHandle.Status == AsyncOperationStatus.Succeeded)
+                    characterImage.sprite = _wishArtHandle.Result;
+                else
+                    Debug.LogWarning($"无法加载立绘: WishArt/{unitName.ToString().ToLower()}");
+
+                startTime = Time.realtimeSinceStartup;
+                while (true)
+                {
+                    float elapsed = Time.realtimeSinceStartup - startTime;
+                    elapsed = Mathf.Min(elapsed, fadeDuration);
+                    if (elapsed >= fadeDuration) break;
+                    SetAlpha(fadeCurve.Evaluate(elapsed / fadeDuration));
+                    yield return null;
+                }
+            }
+
             SetAlpha(1f);
         }
 
@@ -236,6 +292,12 @@ namespace GIC.UI
         private void SetAlpha(float alpha)
         {
             if (canvasGroup != null) canvasGroup.alpha = alpha;
+        }
+
+        private void OnDestroy()
+        {
+            if (_wishArtHandle.IsValid())
+                Addressables.Release(_wishArtHandle);
         }
     }
 

@@ -16,8 +16,6 @@ namespace GIC.UI
     {
         [Header("祈愿抽卡")]
         [SerializeField] private WishDrawController drawController;
-        [SerializeField] private List<WishPoolConfig> wishPools;
-        [SerializeField] private int currentPoolIndex = 0;
 
         [Header("祈愿按钮")]
         [SerializeField] private Button wish1Button;
@@ -28,6 +26,7 @@ namespace GIC.UI
         [SerializeField] private RectTransform primogemDisplay;
 
         private WishManager _wishManager;
+        private WishPoolConfig _currentPool;
 
         /// <summary>
         /// 祈愿部分的初始化（由 WishScreen.Start 调用）
@@ -53,7 +52,15 @@ namespace GIC.UI
         private void StartDraw(int count)
         {
             if (_wishManager == null) return;
-            if (wishPools == null || wishPools.Count == 0 || currentPoolIndex >= wishPools.Count) return;
+
+            // 防重入：抽卡进行中不允许再次触发
+            if (drawController != null && drawController.IsWishInProgress) return;
+
+            if (_currentPool == null || _currentPool.units.Count == 0 && _currentPool.items.Count == 0)
+            {
+                GameScene.Instance.ShowLocalizedPopup("Wish_PoolNotAvailable");
+                return;
+            }
 
             if (!_wishManager.CanAfford(count))
             {
@@ -61,10 +68,12 @@ namespace GIC.UI
                 return;
             }
 
-            var pool = wishPools[currentPoolIndex];
+            // 取消按钮选中，防止按空格/回车再次触发 onClick
+            UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(null);
+
             if (drawController != null)
             {
-                drawController.StartWish(_wishManager, pool, count);
+                drawController.StartWish(_wishManager, _currentPool, count);
             }
 
             UpdateFateCount();
@@ -89,12 +98,11 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 切换卡池
+        /// 切换卡池（由角色选择时调用，直接传入该角色绑定的卡池配置）
         /// </summary>
-        public void SwitchPool(int index)
+        public void SwitchPool(WishPoolConfig pool)
         {
-            if (index < 0 || index >= wishPools.Count) return;
-            currentPoolIndex = index;
+            _currentPool = pool;
         }
     }
 }
