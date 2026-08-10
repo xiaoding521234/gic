@@ -28,6 +28,12 @@ namespace GIC.UI
         private float _origEmissionRate;
         private bool _hasOrigVel;
 
+        [Header("粒子循环（飞出左边重生在右边）")]
+        [SerializeField] private float wrapLeftX = -1100f;
+        [SerializeField] private float wrapRightX = 1100f;
+
+        private ParticleSystem.Particle[] _wrapBuffer = new ParticleSystem.Particle[256];
+
         private void OnEnable()
         {
             StartAmbience();
@@ -60,6 +66,38 @@ namespace GIC.UI
         {
             if (smokeParticles != null) smokeParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             if (elementParticles != null) elementParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
+
+        /// <summary>
+        /// 每帧将飞出左边的粒子瞬移到右边，保持屏幕粒子密度恒定。
+        /// 解决反复切换卡池（加速）导致粒子飞散后密度下降的问题。
+        /// </summary>
+        private void LateUpdate()
+        {
+            WrapParticles(elementParticles);
+            WrapParticles(smokeParticles);
+        }
+
+        private void WrapParticles(ParticleSystem ps)
+        {
+            if (ps == null) return;
+
+            int count = ps.GetParticles(_wrapBuffer);
+            if (count == 0) return;
+
+            bool changed = false;
+            for (int i = 0; i < count; i++)
+            {
+                if (_wrapBuffer[i].position.x < wrapLeftX)
+                {
+                    var pos = _wrapBuffer[i].position;
+                    pos.x = wrapRightX;
+                    _wrapBuffer[i].position = pos;
+                    changed = true;
+                }
+            }
+            if (changed)
+                ps.SetParticles(_wrapBuffer, count);
         }
 
         /// <summary>

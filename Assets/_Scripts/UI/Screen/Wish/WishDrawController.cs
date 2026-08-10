@@ -51,6 +51,7 @@ namespace GIC.UI
         [Header("结果展示")]
         [SerializeField] private float resultCardSize = 80f;
         [SerializeField] private float resultCardSpacing = 10f;
+        [SerializeField] private float holdCardSize = 140f;
 
         [Header("最终展示")]
         [SerializeField] private float finalCardSize = 160f;
@@ -417,7 +418,7 @@ namespace GIC.UI
             // 转移到 resultContainer，保持世界位置不变（视觉上卡片不动）
             var rect = centerCard.GetComponent<RectTransform>();
             centerCard.transform.SetParent(resultContainer, true);
-            rect.localScale = Vector3.one * (resultCardSize / 160f);
+            rect.localScale = Vector3.one * (holdCardSize / 160f);
 
             _resultCards.Add(rect);
 
@@ -435,10 +436,10 @@ namespace GIC.UI
 
         private IEnumerator HoldThenFly(RectTransform rect, Vector2 targetPos, float holdTime)
         {
-            // 停留让玩家看清抽到了什么
+            // 停留让玩家看清抽到了什么（卡片已放大到 holdCardSize）
             yield return new WaitForSeconds(holdTime);
-            // 飞到左侧目标位置
-            yield return FlyToPosition(rect, targetPos);
+            // 飞到左侧目标位置，同时缩小到 resultCardSize
+            yield return FlyToPosition(rect, targetPos, resultCardSize / 160f);
         }
 
         /// <summary>
@@ -491,9 +492,11 @@ namespace GIC.UI
             Destroy(pillarObj);
         }
 
-        private IEnumerator FlyToPosition(RectTransform rect, Vector2 targetPos)
+        private IEnumerator FlyToPosition(RectTransform rect, Vector2 targetPos, float targetScale = -1f)
         {
             Vector2 startPos = rect.anchoredPosition;
+            Vector3 startScale = rect.localScale;
+            Vector3 endScale = targetScale > 0 ? Vector3.one * targetScale : startScale;
             float duration = 0.4f;
             float elapsed = 0f;
             while (elapsed < duration)
@@ -502,9 +505,11 @@ namespace GIC.UI
                 float t = Mathf.Clamp01(elapsed / duration);
                 float eased = 1f - Mathf.Pow(1f - t, 3f);
                 rect.anchoredPosition = Vector2.Lerp(startPos, targetPos, eased);
+                rect.localScale = Vector3.Lerp(startScale, endScale, eased);
                 yield return null;
             }
             rect.anchoredPosition = targetPos;
+            rect.localScale = endScale;
         }
 
         /// <summary>

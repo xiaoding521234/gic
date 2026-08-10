@@ -72,6 +72,9 @@ namespace GIC.UI
             EventBusHub.Instance.Subscribe(_goBackHandler);
 
             UpdateBackground(wargame.PositionManager.CurrentPosition);
+
+            // 预加载首个祈愿角色立绘（4K），保证进入祈愿场景第一眼不是黑屏
+            WishArtPreloader.PreloadPersistent();
             
             // 播放入场动画
             PlayEnterAnimation();
@@ -227,6 +230,7 @@ namespace GIC.UI
         }
 
         private AsyncOperationHandle<Sprite> _bgHandle;
+        private string _lastBgAddress;
 
         private void UpdateBackground(PositionName position)
         {
@@ -242,6 +246,11 @@ namespace GIC.UI
             string timeSuffix = TimeUtility.GetTimeSuffix();
             string address = $"PositionBack/{regionName}/{positionName}_{timeSuffix}";
 
+            // 地址相同且精灵已加载 → 跳过重载，避免 Release 后到 Load 完成前的纹理空窗期
+            if (address == _lastBgAddress && backgroundRenderer.sprite != null)
+                return;
+
+            _lastBgAddress = address;
             StartCoroutine(UpdateBackgroundAsync(address));
         }
 

@@ -57,6 +57,7 @@ namespace GIC.UI
         private bool contentFilled;
 
         private AsyncOperationHandle<Sprite> _wishArtHandle;
+        private bool _spriteFromCache;
 
         private void Awake()
         {
@@ -140,11 +141,20 @@ namespace GIC.UI
 
         /// <summary>
         /// 预加载立绘（在旧面板淡出期间调用，提前开始加载 4K 纹理）
+        /// 优先查 WishArtPreloader 常驻缓存（如哥伦比娅），命中则直接赋值无需等待
         /// </summary>
         public void PreloadSprite()
         {
             if (characterImage == null || characterImage.sprite != null) return;
             if (_wishArtHandle.IsValid()) return;
+
+            // 优先查常驻缓存
+            if (WishArtPreloader.TryGetHandle(unitName, out var cachedHandle))
+            {
+                _wishArtHandle = cachedHandle;
+                _spriteFromCache = true;
+                return;
+            }
 
             string address = $"WishArt/{unitName.ToString().ToLower()}";
             _wishArtHandle = Addressables.LoadAssetAsync<Sprite>(address);
@@ -296,6 +306,9 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
+            // 常驻缓存的 handle 由 WishArtPreloader 管理，不在此释放
+            if (_spriteFromCache) return;
+
             if (_wishArtHandle.IsValid())
                 Addressables.Release(_wishArtHandle);
         }

@@ -13,7 +13,7 @@ namespace GIC.Tool
     public class ScreenEdgeGlow : MonoBehaviour
     {
         [Header("泛光参数")]
-        [SerializeField] private float maxAlpha = 0.6f;
+        [SerializeField] private float maxAlpha = 1.0f;
         [SerializeField] private float duration = 0.8f;
         [SerializeField] private float baseEdgeWidth = 0.08f;
         [SerializeField] private float edgeWidthPerStar = 0.04f;

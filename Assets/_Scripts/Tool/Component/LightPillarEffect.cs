@@ -57,6 +57,7 @@ namespace GIC.Tool
         [SerializeField] private float 粒子大小 = 25f;
         [SerializeField] private float 粒子扩散 = 1.5f;
         [SerializeField] private float 粒子时长 = 0.8f;
+        [SerializeField] private float 粒子不透明度 = 1f;
 
         [Header("地面闪光")]
         [SerializeField] private float 地面闪光宽度 = 300f;
@@ -210,8 +211,8 @@ namespace GIC.Tool
 
             for (int i = 0; i < glowImgs.Count; i++)
             {
-                float burstAlpha = 0.4f / (i + 1) * 爆发强度;
-                float sustainAlpha = 0.4f / (i + 1);
+                float burstAlpha = 0.6f / (i * 0.5f + 1f) * 爆发强度;
+                float sustainAlpha = 0.5f / (i * 0.5f + 1f);
                 float delay = (i + 1) * 0.03f;
                 _sustainedBeams.Add(glowImgs[i]);
                 Track(AnimateBeam(glowImgs[i], color, burstAlpha, sustainAlpha, delay, false));
@@ -379,7 +380,7 @@ namespace GIC.Tool
 
                 img.color = new Color(color.r, color.g, color.b, 0f);
                 // 粒子协程不追踪，由 ClearSpawned 直接销毁对象
-                StartCoroutine(AnimateSpark(rect, img, dir, speed, lifetime, delay, color, 爆发强度));
+                StartCoroutine(AnimateSpark(rect, img, dir, speed, lifetime, delay, color, 粒子不透明度 * 爆发强度));
                 _spawnedObjects.Add(go);
             }
         }
@@ -405,16 +406,16 @@ namespace GIC.Tool
                 pos += dir * curSpeed * Time.unscaledDeltaTime;
                 rect.anchoredPosition = pos;
 
-                // 前期快速放大，后期缩小到 0
+                // 前期快速放大，后期缓慢缩小
                 float scaleP = p < 0.1f
                     ? Mathf.Lerp(0f, 1f, p / 0.1f)
-                    : Mathf.Lerp(1f, 0f, (p - 0.1f) / 0.9f);
+                    : Mathf.Lerp(1f, 0.2f, (p - 0.1f) / 0.9f);
                 rect.localScale = Vector3.one * scaleP;
 
-                // 后半段快速淡出（30% 后加速消失）
-                float fade = p < 0.3f
+                // 前 60% 保持高透明度，后 40% 平滑淡出
+                float fade = p < 0.6f
                     ? alpha
-                    : alpha * (1f - (p - 0.3f) / 0.7f) * (1f - (p - 0.3f) / 0.7f);
+                    : alpha * (1f - Mathf.Pow((p - 0.6f) / 0.4f, 2f));
                 img.color = new Color(color.r, color.g, color.b, fade);
                 yield return null;
             }

@@ -75,5 +75,3 @@ namespace GIC.UI
     }
 
 }
-
-

@@ -35,6 +35,8 @@
 - [2026-08-09 22:30:54] ParticleSystem 最终渲染 alpha = `main.startColor.a × colorOverLifetime.gradient.a`。两者相乘而非取其一。设 startColor.a=0.15 且 gradient 中段 a=0.15 时实际 alpha 仅 0.0225。**Why:** 2026-08-09 雾气粒子太淡，排查发现 startColor 和 gradient alpha 相乘导致实际值远低于预期。**How to apply:** 透明度只在一处控制——要么 startColor 控制固定透明度 + gradient 中段=1.0 做淡入淡出，要么 gradient 控制全程 + startColor.a=1.0。不要两处都设小值。
 
 - [2026-08-09 22:30:58] Tuanjie 引擎 ParticleSystem API 差异：①`startColor.mode` 用 `ParticleSystemGradientMode.Color`（不是 `ParticleSystemCurveMode.Color`）②`NoiseModule` 没有 `dampen` 属性（编译报 CS1061）③`noise.strength` 需通过 `.constant` 访问。**How to apply:** 在 Tuanjie 引擎写 ParticleSystem 脚本时注意这些 API 名称差异。
+- [2026-08-09 23:04:14] GIC 文档术语区分（2026-08-09 确定）：**战场**=局内网格战棋地图（20×20~50×50，地形/迷雾/宝箱，文档 03）；**大地图**=局外导航地图（MapScreen 区域切换/锚点传送，文档 13）。**Why:** 之前文档中两种地图都叫"地图"导致混淆。**How to apply:** 写文档或讨论时严格区分，局内用"战场"，局外导航用"大地图"，不要混用"地图"。
+- [2026-08-10 00:25:19] Unity UI 关闭闪烁问题（Build-only）：从背包/设置/联机关闭返回大厅时全屏闪烁，编辑器不闪。根因是 MainHallScreen.UpdateBackgroundAsync 每次返回都 Addressables.Release 旧背景精灵再异步重载同一张，Release 到 Load 完成间的空窗期 SpriteRenderer 渲染空白→闪烁。修复：加 _lastBgAddress 缓存，地址相同且精灵已加载时跳过重载。毛玻璃 UIBlurCapture 是干扰项非根因。**Why:** 2026-08-10 排查，多次误判为毛玻璃材质切换/异步卸载残留帧，实际是 Addressables Release+Load 空窗期。**How to apply:** Build-only 闪烁优先检查异步资源加载的 Release→Load 空窗期，编辑器因缓存命中不暴露此问题。
 
 
 ### Project
@@ -78,7 +80,8 @@
 
 
 - [2026-08-09 11:35:34] GIC 构建配置（ProjectSettings.asset 可直接编辑）：测试用 Mono+ARMv7（快，约3分钟），发布用 IL2CPP+ARM64+Stripping Low（慢首次5-15分钟）。字段：scriptingBackend.Android(0=Mono,1=IL2CPP)、AndroidTargetArchitectures(1=ARMv7,2=ARM64)、managedStrippingLevel.Android(3=Low)。Android APK ~270MB vs Windows ~2GB 是正常的（APK ZIP压缩 + ASTC纹理 vs Windows 未压缩 + DXT纹理）。**Why:** 频繁切测试/发布配置。**How to apply:** 直接编辑 ProjectSettings.asset 改这三个字段，无需 execute_csharp_script（Tuanjie 引擎限制 EditorSettings/GraphicsSettings 类型不可用）。编辑器崩溃看 Editor.log：%USERPROFILE%\AppData\Local\Tuanjie\Editor\Editor.log；Windows 事件查看器查 Tuanjie.exe 异常码。
-- [2026-08-09 15:33:15] GIC 快速导出 APK 工具：Tools/导出 APK/ 快速导出(Mono/ARMv7 测试) 或 正式导出(IL2CPP/ARM64 发布)。编辑器保持在 Windows 平台，不切换平台直接 BuildPipeline.BuildPlayer target=Android。脚本在 Assets/_Scripts/Editor/Tool/QuickAPKBuilder.cs。测试构建约 226 秒、269MB。**Why:** 避免切换平台导致 Library 重新导入 1687 张纹理。**How to apply:** 日常测试用"快速导出"，发布用"正式导出"。ADB 路径：D:\Tool\2022.3.62t11\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe。
+- [2026-08-10 00:49:23] GIC 快速导出 APK 工具：Tools/导出 APK/ 快速导出(Mono/ARMv7 测试) 或 正式导出(IL2CPP/ARM64 发布)。脚本在 Assets/_Scripts/Editor/Tool/QuickAPKBuilder.cs。**重要：构建前必须确保编辑器在 Android 平台**（脚本会自动切换）。**Why:** 不切换平台时 Addressables 会按 Windows 平台打包 bundle（DXT 纹理/Windows 路径），导致 Android 上黑屏+无声音+体积大 200MB（2026-08-10 排查）。脚本构建后不切回原平台，避免第二次纹理重导入。**How to apply:** 日常测试用"快速导出"，发布用"正式导出"。ADB 路径：D:\Tool\2022.3.62t11\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe。
+
 
 - [2026-08-09 20:01:16] GIC 资源优化约定：BGM 用 Streaming loadType；Release 包用 `#if !UNITY_EDITOR Debug.unityLogger.filterLogType = LogType.Warning #endif` 抑制 Debug.Log；6 个 Sprite Atlas（UICommon/Icons/Avatars/NameCards/MapUI/WishUI，路径 Assets/SpriteAtlases/）。Tuanjie 引擎 SpriteAtlas API：扩展方法在 UnityEditor.U2D.SpriteAtlasExtensions，`atlas.Add(objs)` / `atlas.SetIncludeInBuild(true)` 是方法不是属性；textureType=8 是 Sprite。**How to apply:** 新增小 UI 贴图加入对应 Sprite Atlas；大贴图（4096²角色立绘/地图/背景）不入 Atlas。
 
