@@ -61,6 +61,17 @@ namespace GIC.UI
         [SerializeField] private AudioClip cardHitSFX;
         [SerializeField] private float sfxVolume = 0.8f;
 
+        [Header("星辉雨")]
+        [SerializeField] private RectTransform starglitterRainContainer;
+        [SerializeField] private Sprite starglitterSprite;
+
+        [Header("星辉进度条")]
+        [SerializeField] private RectTransform starglitterProgressBar;
+        [SerializeField] private RectTransform starglitterProgressFill;
+
+        [Header("相遇之线")]
+        [SerializeField] private Color encounterLineColor = new Color(1f, 0.85f, 0.3f, 1f);
+
         /// <summary>抽卡流程是否进行中（防重入）</summary>
         public bool IsWishInProgress => _isActive;
 
@@ -92,6 +103,21 @@ namespace GIC.UI
 
         // 屏幕边缘泛光
         private ScreenEdgeGlow _edgeGlow;
+
+        // 星辉雨对象池 + 单协程批量管理
+        private readonly List<GameObject> _starglitterPool = new();
+        private struct StarglitterDropData
+        {
+            public RectTransform rt;
+            public Image img;
+            public Vector2 startPos;
+            public float fallHeight;
+            public float startRot;
+            public float endRot;
+            public float duration;
+            public float elapsed;
+        }
+        private readonly List<StarglitterDropData> _activeDrops = new();
 
         private void Awake()
         {
@@ -172,6 +198,8 @@ namespace GIC.UI
             _currentTimer = clickTimeLimit;
             _isInCooldown = false;
             _cooldownTimer = 0f;
+
+            UpdateStarglitterProgressBar();
         }
 
         private IEnumerator SpawnCardsCoroutine()
@@ -349,25 +377,34 @@ namespace GIC.UI
             }
         }
 
+        private bool _isEncounterShot;
+
         private void Shoot()
         {
             if (_isInCooldown || _shotsCompleted >= _totalShots) return;
 
             _shotsCompleted++;
 
+            // 检查是否有相遇之线可用
+            _isEncounterShot = _wishManager.IsEncounterReady();
+            if (_isEncounterShot) _wishManager.ConsumeEncounter();
+
             if (shootSFX != null)
                 AudioManager.Instance?.PlaySFX(shootSFX, sfxVolume);
 
-            StartCoroutine(FateLineCoroutine());
+            StartCoroutine(FateLineCoroutine(_isEncounterShot));
 
             _isInCooldown = true;
 
-            // 立即弹出中心卡（射中什么就是什么，不替换内容）
+            // 立即弹出中心卡
             int starLevel = RevealAndPopResultCard(_shotsCompleted - 1);
 
-            // 星级越高冷却越长，让高星结果停留更久
+            // 星级越高冷却越长，让高星结果停留更久；相遇之线额外加长
             _cooldownTimer = baseShotCooldown + starLevel * cooldownPerStar;
+            if (_isEncounterShot) _cooldownTimer += 2f;
             _totalCooldownTime = _cooldownTimer;
+
+            UpdateStarglitterProgressBar();
         }
 
         private int RevealAndPopResultCard(int index)
@@ -376,7 +413,6 @@ namespace GIC.UI
             WishTrackCard centerCard = FindCardNearestCenter();
             if (centerCard == null)
             {
-                // 卡道上没卡，立即生成一张再用
                 SpawnTrackCard();
                 centerCard = FindCardNearestCenter();
                 if (centerCard == null) return 1;
@@ -386,51 +422,61 @@ namespace GIC.UI
             _activeCards.Remove(centerCard);
             centerCard.SetPaused(true);
 
-            // 射中什么卡就是什么卡——读取该卡的 SaveCardData 作为实际结果
             var card = centerCard.GetComponent<Card>();
+            var rect = centerCard.GetComponent<RectTransform>();
+
+            // 转移到 resultContainer，保持世界位置不变
+            centerCard.transform.SetParent(resultContainer, true);
+            rect.localScale = Vector3.one * (holdCardSize / 160f);
+            _resultCards.Add(rect);
+
+            // 相遇之线走特殊协程
+            if (_isEncounterShot && card != null && card.saveCardData != null)
+            {
+                StartCoroutine(EncounterRevealCoroutine(card, rect, index));
+                return 5; // 冷却按最高星级算
+            }
+
+            // ── 普通射击逻辑 ──
             int starLevel = 1;
             if (card != null && card.saveCardData != null)
             {
                 starLevel = card.saveCardData.StarLevel;
+                bool isUnit = card.saveCardData.cardType == CardType.Unit;
+
                 var result = new WishResult(
                     card.saveCardData.id,
                     starLevel,
                     card.saveCardData.cardType,
-                    card.saveCardData.cardType == CardType.Unit
+                    isUnit
                         ? _wishManager.GetUnitConfig().GetUnitData(card.saveCardData.id.AsUnitName())?.GetCard(0)
                         : _wishManager.GetItemConfig().GetItemData(card.saveCardData.id.AsItemName())?.GetIcon(0),
                     false
                 );
-                _results.Add(result);
-                _wishManager.AddResultToInventory(result);
 
-                // 播放光带特效（默认金色）
+                _wishManager.AddResultToInventory(result, out int starglitter);
+                result.starglitterAmount = starglitter;
+                _results.Add(result);
+
+                if (starglitter > 0)
+                    StartCoroutine(StarglitterRainCoroutine(starglitter));
+
                 card.PlayLightBand();
             }
 
-            // 播放光柱爆发特效（星级颜色，强度随星级）
             StartCoroutine(GlowBurstCoroutine(starLevel));
-
-            // 播放屏幕边缘泛光（星级颜色 + 星级强度 + 星级延伸距离）
             Color starColor = StarColor.GetStarColor(starLevel);
             _edgeGlow?.Play(starColor, starLevel);
-
-            // 转移到 resultContainer，保持世界位置不变（视觉上卡片不动）
-            var rect = centerCard.GetComponent<RectTransform>();
-            centerCard.transform.SetParent(resultContainer, true);
-            rect.localScale = Vector3.one * (holdCardSize / 160f);
-
-            _resultCards.Add(rect);
 
             // 计算左侧竖向排列目标位置
             float startY = -(_totalShots - 1) * (resultCardSize + resultCardSpacing) * 0.5f;
             float targetY = startY + index * (resultCardSize + resultCardSpacing);
             Vector2 targetPos = new Vector2(0f, targetY);
 
-            // 先在中心停留（星级越高停留越久），再飞到左侧目标位置
-            float holdTime = 0.3f + (starLevel - 1) * 0.175f; // 1★=0.3s, 5★=1.0s
+            float holdTime = 0.3f + (starLevel - 1) * 0.175f;
             _holdThenFlyCoroutines.Add(StartCoroutine(HoldThenFly(rect, targetPos, holdTime)));
 
+            UpdateStarglitterProgressBar();
             return starLevel;
         }
 
@@ -443,6 +489,179 @@ namespace GIC.UI
         }
 
         /// <summary>
+        /// 相遇之线——星级提升协程
+        /// </summary>
+        private IEnumerator EncounterRevealCoroutine(Card card, RectTransform rect, int index)
+        {
+            int starLevel = card.saveCardData.StarLevel;
+            bool isUnit = card.saveCardData.cardType == CardType.Unit;
+
+            // 1. 写入存档，检查重复
+            var result = new WishResult(
+                card.saveCardData.id, starLevel, card.saveCardData.cardType,
+                isUnit
+                    ? _wishManager.GetUnitConfig().GetUnitData(card.saveCardData.id.AsUnitName())?.GetCard(0)
+                    : _wishManager.GetItemConfig().GetItemData(card.saveCardData.id.AsItemName())?.GetIcon(0),
+                false
+            );
+            _wishManager.AddResultToInventory(result, out int starglitter);
+            result.starglitterAmount = starglitter;
+            _results.Add(result);
+
+            if (starglitter > 0)
+                StartCoroutine(StarglitterRainCoroutine(starglitter));
+
+            card.PlayLightBand();
+            StartCoroutine(GlowBurstCoroutine(starLevel));
+            _edgeGlow?.Play(StarColor.GetStarColor(starLevel), starLevel);
+            UpdateStarglitterProgressBar();
+
+            // 2. 随机提升次数
+            int upgradeCount = _wishManager.RollUpgradeCount(_pool);
+
+            // 3. 开始抖动+越来越亮
+            Coroutine shakeGlow = StartCoroutine(CardShakeGlowCoroutine(rect, (upgradeCount + 1) * 0.5f));
+
+            // 4. 逐级提升
+            for (int i = 0; i < upgradeCount; i++)
+            {
+                // 等待短暂时间（保留惊喜感）
+                yield return new WaitForSeconds(0.5f);
+
+                starLevel++;
+                if (starLevel > 5) starLevel = 5;
+
+                // 从新星级随机选卡
+                var upgraded = _wishManager.RollCardByStar(_pool, starLevel, isUnit);
+                if (upgraded.cardId.value == 0) break; // 该星级无候选，中止
+
+                // 更新卡片显示
+                var newSaveData = new SaveCardData();
+                if (isUnit)
+                    newSaveData.SaveUnit(upgraded.cardId.AsUnitName(), 1);
+                else
+                    newSaveData.SaveItem(upgraded.cardId.AsItemName(), 1);
+                card.Init(newSaveData, null);
+                card.PlayLightBand();
+
+                // 写入存档 + 重复判定
+                if (isUnit)
+                {
+                    _wishManager.AddResultToInventory(upgraded, out int sg);
+                    if (sg > 0)
+                    {
+                        StartCoroutine(StarglitterRainCoroutine(sg));
+                        UpdateStarglitterProgressBar();
+                    }
+                }
+                else
+                {
+                    _wishManager.AddResultToInventory(upgraded, out _);
+                }
+
+                // 播放特效
+                StartCoroutine(GlowBurstCoroutine(starLevel));
+                _edgeGlow?.Play(StarColor.GetStarColor(starLevel), starLevel);
+            }
+
+            // 5. 停止抖动
+            if (shakeGlow != null) StopCoroutine(shakeGlow);
+            // 恢复位置和颜色
+            rect.anchoredPosition = Vector2.zero;
+            rect.localEulerAngles = Vector3.zero;
+            var cardBack = card.cardBack;
+            if (cardBack != null)
+                cardBack.color = StarColor.GetStarColor(starLevel);
+
+            // 6. 飞到左侧
+            float startY = -(_totalShots - 1) * (resultCardSize + resultCardSpacing) * 0.5f;
+            float targetY = startY + index * (resultCardSize + resultCardSpacing);
+            Vector2 targetPos = new Vector2(0f, targetY);
+            yield return FlyToPosition(rect, targetPos, resultCardSize / 160f);
+
+            // 相遇之线结束，恢复正常进度条
+            _isEncounterShot = false;
+            UpdateStarglitterProgressBar();
+        }
+
+        /// <summary>
+        /// 卡片抖动+越来越亮动画
+        /// </summary>
+        private IEnumerator CardShakeGlowCoroutine(RectTransform rect, float duration)
+        {
+            Vector2 basePos = rect.anchoredPosition;
+            float elapsed = 0f;
+            var card = rect.GetComponent<Card>();
+            Color baseColor = card != null && card.cardBack != null ? card.cardBack.color : Color.white;
+            Color targetColor = new Color(1f, 0.95f, 0.6f);
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                // 抖动：幅度先增后减
+                float shakeIntensity = Mathf.Sin(t * Mathf.PI) * 8f;
+                rect.anchoredPosition = basePos + new Vector2(
+                    Random.Range(-shakeIntensity, shakeIntensity),
+                    Random.Range(-shakeIntensity, shakeIntensity));
+
+                // 越来越亮
+                if (card != null && card.cardBack != null)
+                    card.cardBack.color = Color.Lerp(baseColor, targetColor, t);
+
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// 更新星辉进度条
+        /// </summary>
+        private void UpdateStarglitterProgressBar()
+        {
+            if (starglitterProgressFill == null) return;
+
+            // 相遇之线射击中 或 有可用相遇之线：填满 + 持续抖动+流彩
+            if (_isEncounterShot || _wishManager.GetEncounterCharges() > 0)
+            {
+                starglitterProgressFill.localScale = new Vector3(1f, 1f, 1f);
+                if (_progressBarGlowCoroutine == null)
+                    _progressBarGlowCoroutine = StartCoroutine(ProgressBarGlowCoroutine());
+                return;
+            }
+
+            // 正常进度
+            float progress = _wishManager.GetStarglitterProgress();
+            starglitterProgressFill.localScale = new Vector3(progress, 1f, 1f);
+
+            if (_progressBarGlowCoroutine != null)
+            {
+                StopCoroutine(_progressBarGlowCoroutine);
+                _progressBarGlowCoroutine = null;
+                starglitterProgressFill.anchoredPosition = Vector2.zero;
+                starglitterProgressFill.GetComponent<Image>().color = new Color(0.9f, 0.8f, 0.2f, 0.8f);
+            }
+        }
+
+        private Coroutine _progressBarGlowCoroutine;
+
+        private IEnumerator ProgressBarGlowCoroutine()
+        {
+            Vector2 basePos = starglitterProgressFill.anchoredPosition;
+            float elapsed = 0f;
+            while (true)
+            {
+                elapsed += Time.deltaTime;
+                // 抖动
+                float shake = 6f;
+                starglitterProgressFill.anchoredPosition = basePos + new Vector2(
+                    Random.Range(-shake, shake), Random.Range(-shake, shake));
+                // 流彩（颜色循环）
+                float hue = (elapsed * 2f) % 1f;
+                starglitterProgressFill.GetComponent<Image>().color = Color.HSVToRGB(hue, 0.85f, 1f);
+                yield return null;
+            }
+        }
         /// 停止所有仍在运行的 HoldThenFly 协程，避免与 ShowFinalDisplay 的 FlyToPosition 冲突
         /// </summary>
         private void StopHoldThenFlyCoroutines()
@@ -539,14 +758,15 @@ namespace GIC.UI
             return nearest;
         }
 
-        private IEnumerator FateLineCoroutine()
+        private IEnumerator FateLineCoroutine(bool isEncounter = false)
         {
-            var lineObj = new GameObject("FateLine", typeof(RectTransform), typeof(Image));
+            Color lineColor = isEncounter ? encounterLineColor : fateLineColor;
+            var lineObj = new GameObject(isEncounter ? "EncounterLine" : "FateLine", typeof(RectTransform), typeof(Image));
             lineObj.transform.SetParent(fateLineContainer, false);
             lineObj.layer = fateLineContainer.gameObject.layer;
 
             var lineImg = lineObj.GetComponent<Image>();
-            lineImg.color = fateLineColor;
+            lineImg.color = lineColor;
             lineImg.raycastTarget = false;
 
             if (_fateLineShader == null)
@@ -593,6 +813,118 @@ namespace GIC.UI
             if (countdownBarFill == null) return;
             ratio = Mathf.Clamp01(ratio);
             countdownBarFill.localScale = new Vector3(ratio, 1f, 1f);
+        }
+
+        /// <summary>
+        /// 星辉雨动画——单协程批量管理所有下落，分批错落生成
+        /// </summary>
+        private IEnumerator StarglitterRainCoroutine(int totalAmount)
+        {
+            if (starglitterRainContainer == null || starglitterSprite == null) yield break;
+
+            float parentWidth = ((RectTransform)starglitterRainContainer).rect.width;
+            float parentHeight = ((RectTransform)starglitterRainContainer).rect.height;
+            float startY = parentHeight * 0.5f + 50f;
+            float fallHeight = startY + parentHeight * 0.5f + 100f;
+
+            int batchSize = Mathf.Clamp(totalAmount / 4, 2, 5);
+            int spawned = 0;
+            float nextSpawnTime = 0f;
+
+            while (spawned < totalAmount || _activeDrops.Count > 0)
+            {
+                // 分批生成
+                if (spawned < totalAmount && Time.time >= nextSpawnTime)
+                {
+                    int batch = Mathf.Min(batchSize, totalAmount - spawned);
+                    for (int i = 0; i < batch; i++)
+                    {
+                        var go = GetPooledStarglitter();
+                        var rt = go.GetComponent<RectTransform>();
+                        var img = go.GetComponent<Image>();
+
+                        float size = Random.Range(40f, 60f);
+                        rt.sizeDelta = new Vector2(size, size);
+
+                        float startX = Random.Range(-parentWidth * 0.4f, parentWidth * 0.4f);
+                        rt.anchoredPosition = new Vector2(startX, startY);
+                        img.color = Color.white;
+                        go.SetActive(true);
+
+                        _activeDrops.Add(new StarglitterDropData
+                        {
+                            rt = rt,
+                            img = img,
+                            startPos = new Vector2(startX, startY),
+                            fallHeight = fallHeight,
+                            startRot = Random.Range(0f, 360f),
+                            endRot = 0f, // 下面随机
+                            duration = Random.Range(0.6f, 1.0f),
+                            elapsed = -Random.Range(0f, 0.15f), // 负值=延迟
+                        });
+                        // endRot 需要基于 startRot，单独处理
+                        int idx = _activeDrops.Count - 1;
+                        var d = _activeDrops[idx];
+                        d.endRot = d.startRot + Random.Range(180f, 540f);
+                        _activeDrops[idx] = d;
+
+                        spawned++;
+                    }
+                    nextSpawnTime = Time.time + Random.Range(0.15f, 0.35f);
+                }
+
+                // 批量更新所有活跃星辉
+                for (int i = _activeDrops.Count - 1; i >= 0; i--)
+                {
+                    var drop = _activeDrops[i];
+                    drop.elapsed += Time.deltaTime;
+
+                    if (drop.elapsed < 0f)
+                    {
+                        _activeDrops[i] = drop;
+                        continue;
+                    }
+
+                    float t = drop.elapsed / drop.duration;
+                    if (t >= 1f)
+                    {
+                        drop.rt.gameObject.SetActive(false);
+                        _activeDrops.RemoveAt(i);
+                        continue;
+                    }
+
+                    drop.rt.anchoredPosition = new Vector2(drop.startPos.x, drop.startPos.y - drop.fallHeight * t);
+                    drop.rt.localEulerAngles = new Vector3(0, 0, Mathf.Lerp(drop.startRot, drop.endRot, t));
+                    _activeDrops[i] = drop;
+                }
+
+                yield return null;
+            }
+        }
+
+        private GameObject GetPooledStarglitter()
+        {
+            for (int i = 0; i < _starglitterPool.Count; i++)
+            {
+                if (!_starglitterPool[i].activeInHierarchy)
+                    return _starglitterPool[i];
+            }
+
+            var obj = new GameObject("StarglitterDrop", typeof(RectTransform), typeof(Image));
+            obj.transform.SetParent(starglitterRainContainer, false);
+            obj.layer = starglitterRainContainer.gameObject.layer;
+
+            var img = obj.GetComponent<Image>();
+            img.sprite = starglitterSprite;
+            img.preserveAspect = true;
+            img.raycastTarget = false;
+
+            var rt = obj.GetComponent<RectTransform>();
+            rt.pivot = new Vector2(0.5f, 0.5f);
+
+            obj.SetActive(false);
+            _starglitterPool.Add(obj);
+            return obj;
         }
 
         private IEnumerator ShowFinalDisplay()
@@ -737,6 +1069,17 @@ namespace GIC.UI
             ClearTrackCards();
             ClearCardPool();
             ClearResultCards();
+            ClearStarglitterPool();
+        }
+
+        private void ClearStarglitterPool()
+        {
+            foreach (var go in _starglitterPool)
+            {
+                if (go != null) Destroy(go);
+            }
+            _starglitterPool.Clear();
+            _activeDrops.Clear();
         }
     }
 

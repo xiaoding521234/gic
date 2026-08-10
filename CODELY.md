@@ -37,6 +37,7 @@
 
 - [2026-08-09 23:04:14] GIC 文档术语区分（2026-08-09 确定）：**战场**=局内网格战棋地图（20×20~50×50，地形/迷雾/宝箱，文档 03）；**大地图**=局外导航地图（MapScreen 区域切换/锚点传送，文档 13）。**Why:** 之前文档中两种地图都叫"地图"导致混淆。**How to apply:** 写文档或讨论时严格区分，局内用"战场"，局外导航用"大地图"，不要混用"地图"。
 - [2026-08-10 14:39:36] 目录名保持英文，不使用中文目录名。**Why:** 项目目录（Assets/docs/Packages 等）全为英文，混入中文目录不一致且可能遇编码问题。**How to apply:** 新建目录时用英文命名，不因中文术语而将目录改为中文。
+- [2026-08-10 14:53:26] 角色文档属性规范（2026-08-10）：采用默认值的字段只写 auto，不写具体数值（不写 `auto (→50)`，只写 `auto`）。UnitConfig.asset 中对应填 -64（Unspecified 哨兵）。只有非默认值才写显式数字。**Why:** 用户要求简化文档，-64 运行时会自动派生正确值，无需在文档重复标注。**How to apply:** 编辑 docs/units/{name}.md 时，等于默认值的属性写 auto；UnitConfig.asset 中对应字段填 -64。默认值参考 UnitConfig.GetEffective*() 方法（defense=0, moveSpeed=3, sanity=50, luck=0, tenacity=0, mastery=0, lifesteal=0, healEfficiency=100, energy=10, visionRange=1）。
 
 ### Project
 
@@ -75,7 +76,9 @@
 
 
 
-- [2026-08-09 20:02:45] GIC 祈愿系统架构：WishPoolConfig(ScriptableObject) 定义卡池角色/物品/概率 → WishManager 负责货币消耗+写入存档 → WishDrawController 控制 UI 动画。祈愿机制=反应速度游戏：卡道滚动出卡，玩家射击命中哪张卡获得哪张卡（不预抽），通过 Card.saveCardData 读取结果写入存档。卡池绑定：CharacterEntry.pool 直接引用卡池 asset，pool 为 null 则提示"卡池未开放"。卡池 asset 命名 WishPool_{势力英文名}.asset。**How to apply:** 新增卡池创建 WishPoolConfig asset 并拖到对应角色的 CharacterEntry.pool；UI 布局在场景 Canvas/WishDrawRoot 下改。
+- [2026-08-10 23:10:15] GIC 祈愿系统架构：WishPoolConfig(ScriptableObject) 定义卡池角色/物品/权重（star5Weight~star1Weight + unitWeight/itemWeight，概率=权重/总权重，无需凑满100） → WishManager 负责货币消耗+写入存档 → WishDrawController 控制 UI 动画。祈愿机制=反应速度游戏：卡道滚动出卡，玩家射击命中哪张卡获得哪张卡（不预抽），通过 Card.saveCardData 读取结果写入存档。卡池绑定：CharacterEntry.pool 直接引用卡池 asset，pool 为 null 则提示"卡池未开放"。卡池 asset 命名 WishPool_{势力英文名}.asset。当前权重：1/4/10/30/55（5★→1★），角色物品各50。星辉(Starglitter, ItemName=1006)为4★货币物品，祈愿可获得，初始数量0。重复角色卡转星辉（5★=50/4★=25/3★=15/2★=8/1★=3），count>0判重复，count=0为新获得。相遇之线：每累计20星辉触发1次，下次射击变金色相遇之线，射中卡逐级星级提升（RollStarLevel映射：5★→升4级...1★→升0级），每级重新选卡+重复判定+特效。星辉不消耗，溢出自动累计（如50星辉=2次+余10）。星辉雨用对象池+单协程批量管理（List<StarglitterDropData> struct）。**How to apply:** 新增卡池创建 WishPoolConfig asset 并拖到对应角色的 CharacterEntry.pool；UI 布局在场景 Canvas/WishDrawRoot 下改；货币显示在 WishScreen 根对象的 WishScreen（partial class WishScreenDraw）上，TopPanel/CurrencyContainer 下 PrimogemDisplay/StarglitterDisplay；WishDrawController 挂在 Canvas 上。
+
+
 
 
 - [2026-08-09 11:35:34] GIC 构建配置（ProjectSettings.asset 可直接编辑）：测试用 Mono+ARMv7（快，约3分钟），发布用 IL2CPP+ARM64+Stripping Low（慢首次5-15分钟）。字段：scriptingBackend.Android(0=Mono,1=IL2CPP)、AndroidTargetArchitectures(1=ARMv7,2=ARM64)、managedStrippingLevel.Android(3=Low)。Android APK ~270MB vs Windows ~2GB 是正常的（APK ZIP压缩 + ASTC纹理 vs Windows 未压缩 + DXT纹理）。**Why:** 频繁切测试/发布配置。**How to apply:** 直接编辑 ProjectSettings.asset 改这三个字段，无需 execute_csharp_script（Tuanjie 引擎限制 EditorSettings/GraphicsSettings 类型不可用）。编辑器崩溃看 Editor.log：%USERPROFILE%\AppData\Local\Tuanjie\Editor\Editor.log；Windows 事件查看器查 Tuanjie.exe 异常码。

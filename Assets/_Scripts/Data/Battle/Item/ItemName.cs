@@ -31,6 +31,9 @@ namespace GIC.Data
         [InspectorName("原石")]
         Primogem = 1005,
 
+        [InspectorName("星辉")]
+        Starglitter = 1006,
+
         #endregion
 
         #region 武器

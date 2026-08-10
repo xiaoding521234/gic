@@ -115,6 +115,10 @@ MonoBehaviour:
     m_Key: AncientScroll
     m_Metadata:
       m_Items: []
+  - m_Id: 1006
+    m_Key: Starglitter
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

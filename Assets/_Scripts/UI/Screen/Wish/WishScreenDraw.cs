@@ -24,6 +24,7 @@ namespace GIC.UI
         [Header("货币显示")]
         [SerializeField] private TextMeshProUGUI fateCountText;
         [SerializeField] private RectTransform primogemDisplay;
+        [SerializeField] private TextMeshProUGUI starglitterCountText;
 
         private WishManager _wishManager;
         private WishPoolConfig _currentPool;
@@ -95,6 +96,21 @@ namespace GIC.UI
                 }
             }
             fateCountText.text = primogem.ToString();
+
+            // 星辉数量
+            if (starglitterCountText != null)
+            {
+                int starglitter = 0;
+                foreach (var card in save.ownedNormalItems)
+                {
+                    if (card.id.AsItemName() == ItemName.Starglitter)
+                    {
+                        starglitter = card.count;
+                        break;
+                    }
+                }
+                starglitterCountText.text = starglitter.ToString();
+            }
         }
 
         /// <summary>

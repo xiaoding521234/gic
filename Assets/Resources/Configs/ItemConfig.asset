@@ -23,7 +23,7 @@ MonoBehaviour:
       stacks: 1
     subType: 0
     maxStack: 9999
-    maxPrepareCount: 40
+    maxPrepareCount: 100
     countPerServing: 5
     recycleAfterBattle: 1
     recycleLossCount: 60
@@ -38,7 +38,7 @@ MonoBehaviour:
       stacks: 1
     subType: 0
     maxStack: 9999
-    maxPrepareCount: 20
+    maxPrepareCount: 10
     countPerServing: 5
     recycleAfterBattle: 1
     recycleLossCount: 60
@@ -53,7 +53,7 @@ MonoBehaviour:
       stacks: 1
     subType: 0
     maxStack: 9999
-    maxPrepareCount: 2
+    maxPrepareCount: 6
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
@@ -74,6 +74,21 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
   - _isInitialized: 1
+    itemID: 1006
+    icon:
+    - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
+    starLevel: 4
+    elements:
+    - elementType: 8
+      stacks: 1
+    subType: 0
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - _isInitialized: 1
     itemID: 3001
     icon:
     - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
@@ -83,7 +98,7 @@ MonoBehaviour:
       stacks: 1
     subType: 2
     maxStack: 9999
-    maxPrepareCount: 2
+    maxPrepareCount: 3
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0

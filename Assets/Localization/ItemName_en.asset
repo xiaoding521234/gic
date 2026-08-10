@@ -118,6 +118,10 @@ MonoBehaviour:
     m_Localized: Ancient Scroll
     m_Metadata:
       m_Items: []
+  - m_Id: 1006
+    m_Localized: Starglitter
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

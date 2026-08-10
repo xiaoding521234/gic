@@ -18,14 +18,17 @@ namespace GIC.UI
         public CardType cardType;
         public Sprite sprite;
         public bool isNew;
+        /// <summary>重复角色卡转换为星辉的数量（0=非重复或物品）</summary>
+        public int starglitterAmount;
 
-        public WishResult(CardId id, int star, CardType type, Sprite spr, bool isNew)
+        public WishResult(CardId id, int star, CardType type, Sprite spr, bool isNew, int starglitter = 0)
         {
             cardId = id;
             starLevel = star;
             cardType = type;
             sprite = spr;
             this.isNew = isNew;
+            starglitterAmount = starglitter;
         }
     }
 
@@ -37,6 +40,11 @@ namespace GIC.UI
         private readonly SaveManager _saveManager;
         private readonly UnitConfig _unitConfig;
         private readonly ItemConfig _itemConfig;
+
+        /// <summary>每获取 N 个星辉触发 1 次相遇之线</summary>
+        public const int EncounterThreshold = 20;
+
+        private int _encounterUsed;
 
         public WishManager(SaveManager saveManager, UnitConfig unitConfig, ItemConfig itemConfig)
         {
@@ -51,9 +59,97 @@ namespace GIC.UI
         /// <summary>
         /// 将一张祈愿结果写入存档（仅修改内存数据，不立即存盘）
         /// </summary>
-        public void AddResultToInventory(WishResult result)
+        /// <param name="starglitter">重复角色卡转换的星辉数量（0=非重复或物品）</param>
+        public void AddResultToInventory(WishResult result, out int starglitter)
         {
-            AddCardToInventory(result.cardId, result.cardType == CardType.Unit);
+            AddCardToInventory(result.cardId, result.cardType == CardType.Unit, result.starLevel, out starglitter);
+        }
+
+        /// <summary>
+        /// 重复角色卡→星辉转换表
+        /// </summary>
+        public static int GetStarglitterByStar(int starLevel)
+        {
+            return starLevel switch
+            {
+                5 => 50,
+                4 => 25,
+                3 => 15,
+                2 => 8,
+                1 => 3,
+                _ => 0
+            };
+        }
+
+        // ── 相遇之线 ──
+
+        /// <summary>
+        /// 当前星辉总数（从存档读取，不减少）
+        /// </summary>
+        public int GetStarglitterTotal()
+        {
+            var save = _saveManager.CurrentSave;
+            foreach (var card in save.ownedNormalItems)
+            {
+                if (card.id.AsItemName() == ItemName.Starglitter)
+                    return card.count;
+            }
+            return 0;
+        }
+
+        /// <summary>待用的相遇之线次数 = 总量/20 - 已用量</summary>
+        public int GetEncounterCharges() => GetStarglitterTotal() / EncounterThreshold - _encounterUsed;
+
+        /// <summary>当前进度条比例 (0~1) = (总量%20) / 20</summary>
+        public float GetStarglitterProgress() => (GetStarglitterTotal() % EncounterThreshold) / (float)EncounterThreshold;
+
+        /// <summary>是否有可用的相遇之线</summary>
+        public bool IsEncounterReady() => GetEncounterCharges() > 0;
+
+        /// <summary>消耗 1 次相遇之线（不扣星辉总数，只增加 used 计数）</summary>
+        public bool ConsumeEncounter()
+        {
+            if (GetEncounterCharges() <= 0) return false;
+            _encounterUsed++;
+            return true;
+        }
+
+        /// <summary>
+        /// 随机星级提升次数：RollStarLevel 的结果映射为提升级数
+        /// 5★权重→提升4级, 4★→3级, 3★→2级, 2★→1级, 1★→0级
+        /// </summary>
+        public int RollUpgradeCount(WishPoolConfig pool)
+        {
+            int star = pool.RollStarLevel();
+            return star switch { 5 => 4, 4 => 3, 3 => 2, 2 => 1, _ => 0 };
+        }
+
+        /// <summary>
+        /// 从指定星级+类型随机选一张卡，返回新 WishResult
+        /// </summary>
+        public WishResult RollCardByStar(WishPoolConfig pool, int starLevel, bool isUnit)
+        {
+            CardId cardId;
+            Sprite sprite = null;
+
+            if (isUnit)
+            {
+                var candidates = pool.GetUnitsByStar(_unitConfig, starLevel);
+                if (candidates.Count == 0) return default;
+                var name = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+                cardId = new CardId(name);
+                sprite = _unitConfig.GetUnitData(name)?.GetCard(0);
+                return new WishResult(cardId, starLevel, CardType.Unit, sprite, false);
+            }
+            else
+            {
+                var candidates = pool.GetItemsByStar(_itemConfig, starLevel);
+                if (candidates.Count == 0) return default;
+                var name = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+                cardId = new CardId(name);
+                sprite = _itemConfig.GetItemData(name)?.GetIcon(0);
+                return new WishResult(cardId, starLevel, CardType.Item, sprite, false);
+            }
         }
 
         /// <summary>
@@ -110,8 +206,12 @@ namespace GIC.UI
             return 0;
         }
 
-        private void AddCardToInventory(CardId cardId, bool isUnit)
+        /// <summary>
+        /// 添加卡牌到存档。重复角色卡不增加数量，转为星辉。
+        /// </summary>
+        private void AddCardToInventory(CardId cardId, bool isUnit, int starLevel, out int starglitter)
         {
+            starglitter = 0;
             var save = _saveManager.CurrentSave;
             var list = isUnit ? save.ownedUnits : save.ownedNormalItems;
 
@@ -128,7 +228,24 @@ namespace GIC.UI
             {
                 if (card.id == cardId)
                 {
-                    card.count += addCount;
+                    if (isUnit)
+                    {
+                        if (card.count > 0)
+                        {
+                            // 已拥有（count>0）：重复角色卡转为星辉
+                            starglitter = GetStarglitterByStar(starLevel);
+                            AddStarglitter(save, starglitter);
+                        }
+                        else
+                        {
+                            // count=0：重新获得
+                            card.count = 1;
+                        }
+                    }
+                    else
+                    {
+                        card.count += addCount;
+                    }
                     save.RebuildOwnedCards();
                     return;
                 }
@@ -142,6 +259,25 @@ namespace GIC.UI
                 newCard.SaveItem(cardId.AsItemName(), addCount);
             list.Add(newCard);
             save.RebuildOwnedCards();
+        }
+
+        /// <summary>
+        /// 向存档中添加星辉
+        /// </summary>
+        private void AddStarglitter(PlayerSaveData save, int amount)
+        {
+            foreach (var card in save.ownedNormalItems)
+            {
+                if (card.id.AsItemName() == ItemName.Starglitter)
+                {
+                    card.count += amount;
+                    return;
+                }
+            }
+            // 星辉不在存档中（初始为0未创建），新建
+            var newCard = new SaveCardData();
+            newCard.SaveItem(ItemName.Starglitter, amount);
+            save.ownedNormalItems.Add(newCard);
         }
     }
 }

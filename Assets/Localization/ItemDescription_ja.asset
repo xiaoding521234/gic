@@ -119,6 +119,10 @@ MonoBehaviour:
     m_Localized: ' chronicling lost civilizations and forbidden knowledge.'
     m_Metadata:
       m_Items: []
+  - m_Id: 1006
+    m_Localized: "\u91CD\u8907\u3057\u3066\u7372\u5F97\u3057\u305F\u30AD\u30E3\u30E9\u30AB\u30FC\u30C9\u306F\u661F\u8F1D\u306B\u5909\u63DB\u3055\u308C\u3001\u30B7\u30E7\u30C3\u30D7\u3067\u30EC\u30A2\u30A2\u30A4\u30C6\u30E0\u3068\u4EA4\u63DB\u3067\u304D\u308B\u3002"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

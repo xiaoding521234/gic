@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Data
 {
@@ -20,15 +21,16 @@ namespace GIC.Data
         [Header("物品卡")]
         public List<ItemName> items = new();
 
-        [Header("出卡概率（百分比）")]
-        [Range(0, 100)] public float star5Rate = 2f;
-        [Range(0, 100)] public float star4Rate = 8f;
-        [Range(0, 100)] public float star3Rate = 15f;
-        [Range(0, 100)] public float star2Rate = 30f;
-        [Range(0, 100)] public float star1Rate = 45f;
+        [Header("出卡权重（概率 = 权重 / 总权重）")]
+        [FormerlySerializedAs("star5Rate")] public float star5Weight = 1f;
+        [FormerlySerializedAs("star4Rate")] public float star4Weight = 4f;
+        [FormerlySerializedAs("star3Rate")] public float star3Weight = 10f;
+        [FormerlySerializedAs("star2Rate")] public float star2Weight = 30f;
+        [FormerlySerializedAs("star1Rate")] public float star1Weight = 55f;
 
-        [Header("角色/物品比例")]
-        [Range(0, 100)] public float unitRate = 50f;
+        [Header("角色/物品权重")]
+        [FormerlySerializedAs("unitRate")] public float unitWeight = 50f;
+        public float itemWeight = 50f;
 
         /// <summary>
         /// 获取指定星级的所有角色
@@ -61,34 +63,39 @@ namespace GIC.Data
         }
 
         /// <summary>
-        /// 按概率抽取一个星级 (1-5)
+        /// 按权重抽取一个星级 (1-5)
         /// </summary>
         public int RollStarLevel()
         {
-            float roll = UnityEngine.Random.Range(0f, 100f);
+            float totalWeight = star5Weight + star4Weight + star3Weight + star2Weight + star1Weight;
+            if (totalWeight <= 0f) return 1;
+
+            float roll = UnityEngine.Random.Range(0f, totalWeight);
             float cumulative = 0f;
 
-            cumulative += star5Rate;
+            cumulative += star5Weight;
             if (roll < cumulative) return 5;
 
-            cumulative += star4Rate;
+            cumulative += star4Weight;
             if (roll < cumulative) return 4;
 
-            cumulative += star3Rate;
+            cumulative += star3Weight;
             if (roll < cumulative) return 3;
 
-            cumulative += star2Rate;
+            cumulative += star2Weight;
             if (roll < cumulative) return 2;
 
             return 1;
         }
 
         /// <summary>
-        /// 按概率决定是角色还是物品
+        /// 按权重决定是角色还是物品
         /// </summary>
         public bool RollIsUnit()
         {
-            return UnityEngine.Random.Range(0f, 100f) < unitRate;
+            float totalWeight = unitWeight + itemWeight;
+            if (totalWeight <= 0f) return true;
+            return UnityEngine.Random.Range(0f, totalWeight) < unitWeight;
         }
     }
 }

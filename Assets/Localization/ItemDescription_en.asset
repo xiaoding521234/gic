@@ -128,6 +128,11 @@ MonoBehaviour:
     m_Localized: A yellowed ancient scroll
     m_Metadata:
       m_Items: []
+  - m_Id: 1006
+    m_Localized: Surplus character cards convert into Starglitter, used to redeem
+      rare items in the shop.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
