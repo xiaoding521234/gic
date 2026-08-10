@@ -234,6 +234,12 @@ MonoBehaviour:
       culture.
     m_Metadata:
       m_Items: []
+  - m_Id: 3012
+    m_Localized: A maid of the Knights of Favonius who dreams of becoming a formal
+      knight. Hardworking and kind-hearted, she always does her best to care for
+      those around her.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

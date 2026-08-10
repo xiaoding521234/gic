@@ -67,6 +67,9 @@ namespace GIC.Data
 
         [InspectorName("琴")]
         Jean = 3011,
+
+        [InspectorName("诺艾尔")]
+        Noelle = 3012,
         #endregion
 
         #region 璃月 (4001-4999)

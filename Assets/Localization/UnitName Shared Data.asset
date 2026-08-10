@@ -175,6 +175,10 @@ MonoBehaviour:
     m_Key: PyroAxeHilichurlBrute
     m_Metadata:
       m_Items: []
+  - m_Id: 3012
+    m_Key: Noelle
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

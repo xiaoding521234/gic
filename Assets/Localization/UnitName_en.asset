@@ -190,6 +190,10 @@ MonoBehaviour:
     m_Localized: Hilichurl
     m_Metadata:
       m_Items: []
+  - m_Id: 3012
+    m_Localized: Noelle
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

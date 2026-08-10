@@ -348,7 +348,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 1
     visionRange: -64
-    tags: a10f0000ba0b0000e9030000ed030000
+    tags: 72170000a10f0000ba0b0000e9030000ed030000
     skills:
     - skillID: 3001001
       icon: {fileID: 21300000, guid: 8fd7698eeaa5ef048af18b5cb4531296, type: 3}
@@ -509,15 +509,15 @@ MonoBehaviour:
     weaponType: 1
     baseHP: -64
     baseAttack: -64
-    baseDefense: 0
+    baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 3
-    baseLuck: 0
-    baseTenacity: 0
-    baseMastery: 0
-    baseSanity: 50
-    baseLifeSteal: 0
-    baseHealEfficiency: 100
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
     baseEnergy: 4
     normalMoveType: 1
     blockAllies: 1
@@ -525,7 +525,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 5
     visionRange: -64
-    tags: eb030000be0b000089130000
+    tags: 71170000eb030000be0b000089130000
     skills:
     - skillID: 1
       icon: {fileID: 0}
@@ -694,23 +694,23 @@ MonoBehaviour:
     weaponType: 4
     baseHP: -64
     baseAttack: -64
-    baseDefense: 0
+    baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 3
-    baseLuck: 0
-    baseTenacity: 0
-    baseMastery: 0
-    baseSanity: 50
-    baseLifeSteal: 0
-    baseHealEfficiency: 100
-    baseEnergy: 10
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: -64
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -64
-    tags: a20f0000a50f0000
+    tags: 72170000a20f0000a50f0000
     skills:
     - skillID: 1
       icon: {fileID: 0}
@@ -853,6 +853,51 @@ MonoBehaviour:
             weight: 1
           - clip: {fileID: 8300000, guid: ff537bd67aa911141bf3c718f6abe76f, type: 3}
             weight: 1
+  - unitName: 3004
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 4
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 5
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 7
+    visionRange: -64
+    tags: 74170000a30f0000ba0b0000bf0b0000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
   - unitName: 3005
     unitType: 1
     factions: b90b0000
@@ -998,27 +1043,72 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 4
-    deployCost: 100
+    deployCost: -64
     weaponType: 1
-    baseHP: 250
-    baseAttack: 40
-    baseDefense: 0
-    baseAttackSpeed: 40
-    baseMoveSpeed: 3
-    baseLuck: 0
-    baseTenacity: 0
-    baseMastery: 0
-    baseSanity: 50
-    baseLifeSteal: 0
-    baseHealEfficiency: 100
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
     baseEnergy: 5
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 3
-    visionRange: 1
+    visionRange: -64
     tags: 75170000c10b0000a30f0000bf0b0000ef030000f0030000
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+  - unitName: 3012
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
+    cards:
+    - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
+    nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: -64
+    weaponType: 0
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: 2
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 3
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    selfElement: 6
+    visionRange: -64
+    tags: 73170000ef030000bd0b0000ba0b0000
     skills: []
     voices:
       onGoWar:

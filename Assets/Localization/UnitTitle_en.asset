@@ -190,6 +190,10 @@ MonoBehaviour:
     m_Localized: Wildling of the Wilds
     m_Metadata:
       m_Items: []
+  - m_Id: 3012
+    m_Localized: Chivalric Maid
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
