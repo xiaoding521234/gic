@@ -44,8 +44,6 @@ namespace GIC.UI
         /// <summary>每获取 N 个星辉触发 1 次相遇之线</summary>
         public const int EncounterThreshold = 20;
 
-        private int _encounterUsed;
-
         public WishManager(SaveManager saveManager, UnitConfig unitConfig, ItemConfig itemConfig)
         {
             _saveManager = saveManager;
@@ -83,35 +81,31 @@ namespace GIC.UI
 
         // ── 相遇之线 ──
 
-        /// <summary>
-        /// 当前星辉总数（从存档读取，不减少）
-        /// </summary>
-        public int GetStarglitterTotal()
-        {
-            var save = _saveManager.CurrentSave;
-            foreach (var card in save.ownedNormalItems)
-            {
-                if (card.id.AsItemName() == ItemName.Starglitter)
-                    return card.count;
-            }
-            return 0;
-        }
+        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
+        public int GetStarglitterEarned() => _saveManager.CurrentSave.starglitterEarned;
 
-        /// <summary>待用的相遇之线次数 = 总量/20 - 已用量</summary>
-        public int GetEncounterCharges() => GetStarglitterTotal() / EncounterThreshold - _encounterUsed;
+        /// <summary>待用的相遇之线次数 = 累计获取量/20 - 已用量</summary>
+        public int GetEncounterCharges() => GetStarglitterEarned() / EncounterThreshold - _saveManager.CurrentSave.encounterUsed;
 
-        /// <summary>当前进度条比例 (0~1) = (总量%20) / 20</summary>
-        public float GetStarglitterProgress() => (GetStarglitterTotal() % EncounterThreshold) / (float)EncounterThreshold;
+        /// <summary>当前进度条比例 (0~1) = (累计获取量%20) / 20</summary>
+        public float GetStarglitterProgress() => (GetStarglitterEarned() % EncounterThreshold) / (float)EncounterThreshold;
 
         /// <summary>是否有可用的相遇之线</summary>
         public bool IsEncounterReady() => GetEncounterCharges() > 0;
 
-        /// <summary>消耗 1 次相遇之线（不扣星辉总数，只增加 used 计数）</summary>
+        /// <summary>消耗 1 次相遇之线（不扣星辉，只增加 encounterUsed）</summary>
         public bool ConsumeEncounter()
         {
             if (GetEncounterCharges() <= 0) return false;
-            _encounterUsed++;
+            _saveManager.CurrentSave.encounterUsed++;
             return true;
+        }
+
+        /// <summary>返还 1 次相遇之线（5★卡无法提升时退回）</summary>
+        public void RefundEncounter()
+        {
+            if (_saveManager.CurrentSave.encounterUsed > 0)
+                _saveManager.CurrentSave.encounterUsed--;
         }
 
         /// <summary>
@@ -262,10 +256,12 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 向存档中添加星辉
+        /// 向存档中添加星辉（同时累加 starglitterEarned 用于相遇之线计数）
         /// </summary>
         private void AddStarglitter(PlayerSaveData save, int amount)
         {
+            save.starglitterEarned += amount;
+
             foreach (var card in save.ownedNormalItems)
             {
                 if (card.id.AsItemName() == ItemName.Starglitter)
@@ -278,6 +274,26 @@ namespace GIC.UI
             var newCard = new SaveCardData();
             newCard.SaveItem(ItemName.Starglitter, amount);
             save.ownedNormalItems.Add(newCard);
+        }
+
+        /// <summary>
+        /// 仅判重复并发放星辉，不写入存档（用于相遇之线中间星级卡）
+        /// </summary>
+        public void AwardStarglitterIfDuplicate(WishResult result, out int starglitter)
+        {
+            starglitter = 0;
+            if (result.cardType != CardType.Unit) return;
+
+            var save = _saveManager.CurrentSave;
+            foreach (var card in save.ownedUnits)
+            {
+                if (card.id == result.cardId && card.count > 0)
+                {
+                    starglitter = GetStarglitterByStar(result.starLevel);
+                    AddStarglitter(save, starglitter);
+                    return;
+                }
+            }
         }
     }
 }

@@ -96,6 +96,16 @@ namespace GIC.Editor
             return true;
         }
 
+        [MenuItem(MENU_BASE + "GlowTest", priority = 100)]
+        private static void OpenGlowTest() => OpenScene("Assets/Scenes/GlowTest.scene");
+
+        [MenuItem(MENU_BASE + "GlowTest", true)]
+        private static bool OpenGlowTestValidate()
+        {
+            Menu.SetChecked(MENU_BASE + "GlowTest", EditorSceneManager.GetActiveScene().path == "Assets/Scenes/GlowTest.scene");
+            return true;
+        }
+
         private static void OpenScene(string path)
         {
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
