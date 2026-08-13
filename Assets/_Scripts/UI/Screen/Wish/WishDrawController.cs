@@ -231,7 +231,7 @@ namespace GIC.UI
 
             if (_shotsCompleted >= _totalShots)
             {
-                while (_isEncounterAnimating)
+                while (_isEncounterAnimating || _isVideoPlaying)
                     yield return null;
 
                 _wishManager.SaveGame();
