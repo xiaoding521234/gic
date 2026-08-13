@@ -133,6 +133,12 @@ namespace GIC.UI
         {
             if (drawRoot != null) drawRoot.SetActive(false);
             CreateEdgeGlow();
+            CreateStar5VideoOverlay();
+        }
+
+        private void OnDestroy()
+        {
+            OnDestroyStar5Video();
         }
 
         #region 公共入口
@@ -183,6 +189,8 @@ namespace GIC.UI
             _cooldownTimer = 0f;
 
             UpdateStarglitterProgressBar();
+
+            PreloadStar5Video();
         }
 
         #endregion
@@ -197,7 +205,7 @@ namespace GIC.UI
             {
                 if (_isInCooldown)
                 {
-                    if (!_isEncounterAnimating)
+                    if (!_isEncounterAnimating && !_isVideoPlaying)
                     {
                         _cooldownTimer -= Time.deltaTime;
                         UpdateCountdownBar(1f - _cooldownTimer / _totalCooldownTime);
@@ -294,9 +302,16 @@ namespace GIC.UI
                 card.PlayLightBand();
             }
 
-            PlayCardHitEffects(starLevel);
-            StartHoldThenFly(rect, index, starLevel);
-            UpdateStarglitterProgressBar();
+            if (starLevel >= 5)
+            {
+                StartCoroutine(Star5NormalRevealCoroutine(starLevel, rect, index));
+            }
+            else
+            {
+                PlayCardHitEffects(starLevel);
+                StartHoldThenFly(rect, index, starLevel);
+                UpdateStarglitterProgressBar();
+            }
             return starLevel;
         }
 
@@ -363,6 +378,17 @@ namespace GIC.UI
                 StartCoroutine(StarglitterRainCoroutine(starglitter));
         }
 
+        /// <summary>
+        /// 五星普通射击揭示：先播放过渡视频，再展示特效+飞行
+        /// </summary>
+        private IEnumerator Star5NormalRevealCoroutine(int starLevel, RectTransform rect, int index)
+        {
+            yield return PlayStar5TransitionCoroutine();
+            PlayCardHitEffects(starLevel);
+            StartHoldThenFly(rect, index, starLevel);
+            UpdateStarglitterProgressBar();
+        }
+
         #endregion
 
         #region 清理
@@ -375,6 +401,7 @@ namespace GIC.UI
             ClearCardPool();
             ClearResultCards();
             ClearStarglitterPool();
+            CleanupStar5Video();
         }
 
         protected void StopHoldThenFlyCoroutines()

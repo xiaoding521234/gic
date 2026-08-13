@@ -16,10 +16,15 @@ MonoBehaviour:
   description: "\u8499\u5FB7\u4E4B\u98CE"
   units: c00b0000b90b0000ba0b0000bb0b0000bd0b0000c20b0000c30b00001227000011270000
   items: a10f0000a40f000089130000eb030000e9030000ed030000a20f0000a30f0000a50f0000ee030000
-  star5Weight: 1
+  star5Weight: 20
   star4Weight: 4
   star3Weight: 10
   star2Weight: 30
   star1Weight: 55
   unitWeight: 50
   itemWeight: 50
+  upgrade0Weight: 40
+  upgrade1Weight: 30
+  upgrade2Weight: 20
+  upgrade3Weight: 7
+  upgrade4Weight: 3

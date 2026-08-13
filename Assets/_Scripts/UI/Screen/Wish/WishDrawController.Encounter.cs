@@ -41,6 +41,7 @@ namespace GIC.UI
             {
                 _wishManager.RefundEncounter();
                 AddResultAndStarglitter(BuildResultFromCard(card));
+                yield return PlayStar5TransitionCoroutine();
                 PlayCardHitEffects(starLevel, card);
                 UpdateStarglitterProgressBar();
 
@@ -110,6 +111,10 @@ namespace GIC.UI
             // 8. 最终卡入账（星辉已在展示阶段发放完毕，这里不重复发放）
             _wishManager.AddFinalResultToInventory(currentResult);
             _results.Add(currentResult);
+
+            // 8.5 五星过渡视频
+            if (starLevel >= 5)
+                yield return PlayStar5TransitionCoroutine();
 
             // 9. 播放最终星级特效
             PlayCardHitEffects(starLevel, card);
