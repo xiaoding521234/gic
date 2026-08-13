@@ -43,6 +43,10 @@ namespace GIC.UI
         
         private void Start()
         {
+            // 预加载首个祈愿角色立绘（4K），与 splash 动画并行加载
+            // 比原来在 MainHall.Start() 中预加载提前了 ~2s（splash 动画时长）
+            Wargame.Instance?.AssetCache?.Preload<Sprite>("WishArt/columbina");
+
             // 如果跳过动画，直接加载大厅
             if (skipAnimation)
             {

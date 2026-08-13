@@ -4,8 +4,6 @@ using GIC.Data.Event;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using GIC.Framework;
 using GIC.Battle;
 using GIC.Data;
@@ -73,9 +71,6 @@ namespace GIC.UI
 
             UpdateBackground(wargame.PositionManager.CurrentPosition);
 
-            // 预加载首个祈愿角色立绘（4K），保证进入祈愿场景第一眼不是黑屏
-            WishArtPreloader.PreloadPersistent();
-            
             // 播放入场动画
             PlayEnterAnimation();
         }
@@ -92,8 +87,8 @@ namespace GIC.UI
                     EventBusHub.Instance.Unsubscribe(_goBackHandler);
             }
 
-            if (_bgHandle.IsValid())
-                Addressables.Release(_bgHandle);
+            if (_lastBgAddress != null)
+                Wargame.Instance?.AssetCache?.Release(_lastBgAddress);
         }
 
         #region 事件处理器
@@ -229,7 +224,6 @@ namespace GIC.UI
             }
         }
 
-        private AsyncOperationHandle<Sprite> _bgHandle;
         private string _lastBgAddress;
 
         private void UpdateBackground(PositionName position)
@@ -250,30 +244,16 @@ namespace GIC.UI
             if (address == _lastBgAddress && backgroundRenderer.sprite != null)
                 return;
 
-            _lastBgAddress = address;
-            StartCoroutine(UpdateBackgroundAsync(address));
-        }
-
-        private IEnumerator UpdateBackgroundAsync(string address)
-        {
             // 释放上一张背景
-            if (_bgHandle.IsValid())
-            {
-                Addressables.Release(_bgHandle);
-                _bgHandle = default;
-            }
+            if (_lastBgAddress != null)
+                wargame.AssetCache?.Release(_lastBgAddress);
 
-            _bgHandle = Addressables.LoadAssetAsync<Sprite>(address);
-            yield return _bgHandle;
-
-            if (_bgHandle.Status == AsyncOperationStatus.Succeeded)
+            _lastBgAddress = address;
+            wargame.AssetCache?.LoadAsync<Sprite>(address, sprite =>
             {
-                backgroundRenderer.sprite = _bgHandle.Result;
-            }
-            else
-            {
-                Debug.LogWarning($"未找到背景图片: {address}");
-            }
+                if (this != null && backgroundRenderer != null && sprite != null)
+                    backgroundRenderer.sprite = sprite;
+            }, LoadPriority.Normal);
         }
 
         private void InitializeButtons()

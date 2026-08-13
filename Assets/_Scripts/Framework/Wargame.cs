@@ -24,6 +24,7 @@ namespace GIC.Framework
         public PlayerManager PlayerManager => Context?.Get<PlayerManager>();
         public SkillManager SkillManager => Context?.Get<SkillManager>();
         public UnitManager UnitManager => Context?.Get<UnitManager>();
+        public AssetCache AssetCache => Context?.Get<AssetCache>();
 
         List<IWargameManager> managers;
 
@@ -38,6 +39,7 @@ namespace GIC.Framework
             Context.ProcessConfigurations();
 
             // ── 阶段2：按依赖顺序注册 [Component] 类（构造器注入，依赖必须已就绪）──
+            Context.Register<AssetCache>();         // 无依赖，缓存控制中枢
             Context.Register<SaveManager>();       // deps: UnitConfig, ItemConfig
             Context.Register<CardManager>();       // deps: SaveManager, ItemConfig, UnitConfig
             Context.Register<PositionManager>();   // deps: SaveManager, PositionConfig
@@ -54,7 +56,7 @@ namespace GIC.Framework
             Context.Validate();
 
             // 构建 managers 列表（用于 Update 循环）
-            managers = new List<IWargameManager> { ConfigManager, SaveManager, InputManager, UIManager, CardManager, PositionManager, PlayerManager, SkillManager, UnitManager };
+            managers = new List<IWargameManager> { ConfigManager, AssetCache, SaveManager, InputManager, UIManager, CardManager, PositionManager, PlayerManager, SkillManager, UnitManager };
 
             Debug.Log("Wargame初始化完成");
             Debug.Log(Application.consoleLogPath);

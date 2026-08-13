@@ -2,8 +2,6 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.AddressableAssets;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
@@ -56,8 +54,8 @@ namespace GIC.UI
         private bool targetPositionsReady;
         private bool contentFilled;
 
-        private AsyncOperationHandle<Sprite> _wishArtHandle;
-        private bool _spriteFromCache;
+        private string _currentAddress;
+        private bool _spriteLoadDone;
 
         private void Awake()
         {
@@ -141,23 +139,22 @@ namespace GIC.UI
 
         /// <summary>
         /// 预加载立绘（在旧面板淡出期间调用，提前开始加载 4K 纹理）
-        /// 优先查 WishArtPreloader 常驻缓存（如哥伦比娅），命中则直接赋值无需等待
+        /// 通过 AssetCache 统一管理：命中缓存（如哥伦比娅）则立即回调，否则异步加载
         /// </summary>
         public void PreloadSprite()
         {
             if (characterImage == null || characterImage.sprite != null) return;
-            if (_wishArtHandle.IsValid()) return;
+            if (_currentAddress != null) return;
 
-            // 优先查常驻缓存
-            if (WishArtPreloader.TryGetHandle(unitName, out var cachedHandle))
+            _currentAddress = $"WishArt/{unitName.ToString().ToLower()}";
+            _spriteLoadDone = false;
+
+            Wargame.Instance?.AssetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
             {
-                _wishArtHandle = cachedHandle;
-                _spriteFromCache = true;
-                return;
-            }
-
-            string address = $"WishArt/{unitName.ToString().ToLower()}";
-            _wishArtHandle = Addressables.LoadAssetAsync<Sprite>(address);
+                if (this != null && characterImage != null && sprite != null)
+                    characterImage.sprite = sprite;
+                _spriteLoadDone = true;
+            }, LoadPriority.High);
         }
 
         public void FadeOut()
@@ -189,11 +186,18 @@ namespace GIC.UI
 
         private IEnumerator FadeInCoroutine(bool loadSprite)
         {
-            // 若需要加载且尚未通过 PreloadSprite 预加载，则启动异步加载
-            if (loadSprite && !_wishArtHandle.IsValid())
+            // 若需要加载且尚未通过 PreloadSprite 预加载，则通过 AssetCache 启动异步加载
+            if (loadSprite && _currentAddress == null)
             {
-                string address = $"WishArt/{unitName.ToString().ToLower()}";
-                _wishArtHandle = Addressables.LoadAssetAsync<Sprite>(address);
+                _currentAddress = $"WishArt/{unitName.ToString().ToLower()}";
+                _spriteLoadDone = false;
+
+                Wargame.Instance?.AssetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
+                {
+                    if (this != null && characterImage != null && sprite != null)
+                        characterImage.sprite = sprite;
+                    _spriteLoadDone = true;
+                }, LoadPriority.High);
             }
 
             float startTime = Time.realtimeSinceStartup;
@@ -216,17 +220,6 @@ namespace GIC.UI
                 if (titleArea != null)
                     titleArea.anchoredPosition = titleTargetPos + Vector2.right * Mathf.LerpUnclamped(slideDistance, 0f, t);
 
-                // 立绘加载完成则赋值
-                if (loadSprite && characterImage != null && characterImage.sprite == null
-                    && _wishArtHandle.IsValid() && _wishArtHandle.IsDone)
-                {
-                    if (_wishArtHandle.Status == AsyncOperationStatus.Succeeded)
-                        characterImage.sprite = _wishArtHandle.Result;
-                    else
-                        Debug.LogWarning($"无法加载立绘: WishArt/{unitName.ToString().ToLower()}");
-                    loadSprite = false;
-                }
-
                 // alpha 仅在立绘就绪后才开始淡入，避免空图淡入后立绘瞬间弹出
                 if (!loadSprite || (characterImage != null && characterImage.sprite != null))
                     SetAlpha(t);
@@ -236,26 +229,24 @@ namespace GIC.UI
 
             SnapToTarget();
 
-            // Phase 2: 立绘尚未加载完成，等待加载后单独淡入
-            if (loadSprite && characterImage != null && characterImage.sprite == null
-                && _wishArtHandle.IsValid())
+            // Phase 2: 立绘尚未加载完成，等待 AssetCache 回调后单独淡入
+            if (loadSprite && characterImage != null && characterImage.sprite == null)
             {
-                while (!_wishArtHandle.IsDone)
+                // 等待回调（成功设 sprite，失败设 _spriteLoadDone=true 且 sprite 仍为 null）
+                while (!_spriteLoadDone)
                     yield return null;
 
-                if (_wishArtHandle.Status == AsyncOperationStatus.Succeeded)
-                    characterImage.sprite = _wishArtHandle.Result;
-                else
-                    Debug.LogWarning($"无法加载立绘: WishArt/{unitName.ToString().ToLower()}");
-
-                startTime = Time.realtimeSinceStartup;
-                while (true)
+                if (characterImage.sprite != null)
                 {
-                    float elapsed = Time.realtimeSinceStartup - startTime;
-                    elapsed = Mathf.Min(elapsed, fadeDuration);
-                    if (elapsed >= fadeDuration) break;
-                    SetAlpha(fadeCurve.Evaluate(elapsed / fadeDuration));
-                    yield return null;
+                    startTime = Time.realtimeSinceStartup;
+                    while (true)
+                    {
+                        float elapsed = Time.realtimeSinceStartup - startTime;
+                        elapsed = Mathf.Min(elapsed, fadeDuration);
+                        if (elapsed >= fadeDuration) break;
+                        SetAlpha(fadeCurve.Evaluate(elapsed / fadeDuration));
+                        yield return null;
+                    }
                 }
             }
 
@@ -306,11 +297,9 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            // 常驻缓存的 handle 由 WishArtPreloader 管理，不在此释放
-            if (_spriteFromCache) return;
-
-            if (_wishArtHandle.IsValid())
-                Addressables.Release(_wishArtHandle);
+            // 通过 AssetCache 释放引用（引用计数 -1）
+            if (_currentAddress != null)
+                Wargame.Instance?.AssetCache?.Release(_currentAddress);
         }
     }
 
