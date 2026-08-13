@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
@@ -324,3 +325,4 @@ namespace GIC.Framework
             => star switch { 5 => pool.star5Weight, 4 => pool.star4Weight, 3 => pool.star3Weight, 2 => pool.star2Weight, _ => pool.star1Weight };
     }
 }
+#endif

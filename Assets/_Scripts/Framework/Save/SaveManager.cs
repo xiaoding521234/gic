@@ -228,7 +228,6 @@ namespace GIC.Framework
         /// </summary>
         private void SyncMissingUnits()
         {
-            Debug.Log("开始补充缺失角色");
             if (unitConfig == null)
             {
                 Debug.LogWarning("UnitConfig 为空，跳过角色同步");
@@ -246,6 +245,7 @@ namespace GIC.Framework
 
             // 按 unitDataList 顺序重建列表
             var newList = new List<SaveCardData>();
+            int added = 0;
             foreach (var unitData in unitConfig.unitDataList)
             {
                 if (unitData == null) continue;
@@ -259,9 +259,12 @@ namespace GIC.Framework
                     var newCard = new SaveCardData();
                     newCard.SaveUnit(unitData.unitName, 0);
                     newList.Add(newCard);
-                    Debug.Log($"补充缺失角色: {unitData.unitName.GetInspectorName()} (count=0)");
+                    added++;
                 }
             }
+
+            if (added > 0)
+                Debug.Log($"补充缺失角色 {added} 个");
 
             CurrentSave.ownedUnits = newList;
         }
@@ -271,7 +274,6 @@ namespace GIC.Framework
         /// </summary>
         private void SyncMissingItems()
         {
-            Debug.Log("开始补充缺失物品");
             if (itemConfig == null)
             {
                 Debug.LogWarning("ItemConfig 为空，跳过物品同步");
@@ -289,6 +291,7 @@ namespace GIC.Framework
 
             // 按 itemDataList 顺序重建列表
             var newList = new List<SaveCardData>();
+            int added = 0;
             foreach (var itemData in itemConfig.itemDataList)
             {
                 if (itemData == null) continue;
@@ -302,9 +305,12 @@ namespace GIC.Framework
                     var newCard = new SaveCardData();
                     newCard.SaveItem(itemData.itemID, 0);
                     newList.Add(newCard);
-                    Debug.Log($"补充缺失物品: {itemData.itemID.GetInspectorName()} (count=0, subType={itemData.subType})");
+                    added++;
                 }
             }
+
+            if (added > 0)
+                Debug.Log($"补充缺失物品 {added} 个");
 
             CurrentSave.ownedNormalItems = newList;
         }

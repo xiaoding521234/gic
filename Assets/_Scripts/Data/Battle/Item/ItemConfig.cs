@@ -20,8 +20,6 @@ namespace GIC.Data
         [Serializable]
         public class ItemData
         {
-            [SerializeField] private bool _isInitialized = false;
-
             [Header("物品标识")]
             public ItemName itemID;
 

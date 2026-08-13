@@ -26,12 +26,18 @@ namespace GIC.UI
         private Image iconImage;
         private Button button;
         private PositionData cachedData;
-        
+        private MapScreen _mapScreen;
+
         public PositionName PositionName => positionName;
 
         public void SetPositionName(PositionName name)
         {
             positionName = name;
+        }
+
+        public void SetMapScreen(MapScreen screen)
+        {
+            _mapScreen = screen;
         }
         
         private void Awake()
@@ -68,7 +74,11 @@ namespace GIC.UI
             {
                 Debug.Log($"移动到: {positionName}");
                 Wargame.Instance.Context.Inject(this);
+
+                // 切换位置（触发 OnPositionChangedEvent，大厅开始预加载新背景），
+                // 然后通过 MapScreen 淡出后 GoBack
                 _positionManager.MoveToPosition(positionName);
+                _mapScreen?.CloseWithFade();
             }
             else
             {

@@ -21,7 +21,6 @@ namespace GIC.Tool
 
         private TMP_Dropdown dropdown;
         private List<string> currentOptions = new List<string>();
-        private bool isRefreshing = false;
 
         private void Awake()
         {
@@ -48,8 +47,6 @@ namespace GIC.Tool
         {
             if (dropdown == null || optionEntries == null || optionEntries.Count == 0) return;
 
-            isRefreshing = true;
-
             // 保存当前选中值
             int currentValue = dropdown.value;
 
@@ -75,7 +72,6 @@ namespace GIC.Tool
                 dropdown.value = 0;
 
             dropdown.RefreshShownValue();
-            isRefreshing = false;
         }
 
         private string GetTextFromEntry(TextEntry entry)

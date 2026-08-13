@@ -186,6 +186,32 @@ MonoBehaviour:
   mapZoom: {fileID: 4395357792365615732}
   mapConfig: {fileID: 11400000, guid: ece0a0d1b4ff9c7408f25d5eb4f5e719, type: 2}
   anchorPrefab: {fileID: 5531753999916910276, guid: f77dcf2b46f16b144897a1c536f06e34, type: 3}
+  canvasGroup: {fileID: 1555992354}
+  fadeOutDuration: 0.3
+  fadeOutCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &148976098
 GameObject:
   m_ObjectHideFlags: 0
@@ -951,6 +977,7 @@ GameObject:
   - component: {fileID: 1555992353}
   - component: {fileID: 1555992352}
   - component: {fileID: 1555992351}
+  - component: {fileID: 1555992354}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Canvas
@@ -1045,6 +1072,18 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 100
   m_TargetDisplay: 0
+--- !u!225 &1555992354
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555992349}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &1556797593
 GameObject:
   m_ObjectHideFlags: 0

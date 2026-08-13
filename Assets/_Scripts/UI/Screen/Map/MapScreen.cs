@@ -36,6 +36,11 @@ namespace GIC.UI
         [SerializeField] private MapConfig mapConfig;
         [SerializeField] private GameObject anchorPrefab;      // Anchor.prefab
 
+        [Header("淡出动画")]
+        [SerializeField] private CanvasGroup canvasGroup;
+        [SerializeField] private float fadeOutDuration = 0.3f;
+        [SerializeField] private AnimationCurve fadeOutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
         private RegionName currentRegion;
         private readonly List<GameObject> _spawnedAnchors = new();
 
@@ -126,6 +131,7 @@ namespace GIC.UI
                 // 初始化 MapAnchor 数据
                 var mapAnchor = go.GetComponent<MapAnchor>();
                 mapAnchor.SetPositionName(anchor.positionName);
+                mapAnchor.SetMapScreen(this);
                 var posData = posManager.GetPositionData(anchor.positionName);
                 if (posData != null && posData.region == data.region)
                     mapAnchor.SetData(posData);
@@ -146,6 +152,37 @@ namespace GIC.UI
         private void OnCloseClick()
         {
             AudioManager.Instance.PopMusicVolume();
+            CloseWithFade();
+        }
+
+        /// <summary>
+        /// 淡出后返回大厅（关闭按钮和锚点传送共用）
+        /// </summary>
+        public void CloseWithFade()
+        {
+            StartCoroutine(CloseWithFadeCoroutine());
+        }
+
+        private IEnumerator CloseWithFadeCoroutine()
+        {
+            // 淡出动画，给大厅背景加载留出时间
+            if (canvasGroup != null)
+            {
+                float startTime = Time.realtimeSinceStartup;
+                float startAlpha = canvasGroup.alpha;
+
+                while (true)
+                {
+                    float elapsed = Time.realtimeSinceStartup - startTime;
+                    if (elapsed >= fadeOutDuration) break;
+
+                    float t = fadeOutCurve.Evaluate(elapsed / fadeOutDuration);
+                    canvasGroup.alpha = Mathf.LerpUnclamped(startAlpha, 0f, t);
+                    yield return null;
+                }
+                canvasGroup.alpha = 0f;
+            }
+
             GameScene.Instance.GoBack();
         }
 

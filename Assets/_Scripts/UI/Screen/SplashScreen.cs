@@ -47,6 +47,9 @@ namespace GIC.UI
             // 比原来在 MainHall.Start() 中预加载提前了 ~2s（splash 动画时长）
             Wargame.Instance?.AssetCache?.Preload<Sprite>("WishArt/columbina");
 
+            // 预加载大厅默认位置背景，与 splash 动画并行加载
+            PreloadMainHallBackground();
+
             // 如果跳过动画，直接加载大厅
             if (skipAnimation)
             {
@@ -95,6 +98,23 @@ namespace GIC.UI
             SceneType.MainHall.Load();
         }
         
+        private void PreloadMainHallBackground()
+        {
+            var wargame = Wargame.Instance;
+            if (wargame?.PositionManager == null || wargame.AssetCache == null) return;
+
+            var position = wargame.PositionManager.CurrentPosition;
+            var positionData = wargame.PositionManager.GetPositionData(position);
+            if (positionData == null) return;
+
+            string regionName = positionData.region.ToString();
+            string positionName = position.ToString().ToSnakeCase();
+            string timeSuffix = TimeUtility.GetTimeSuffix();
+            string bgAddress = $"PositionBack/{regionName}/{positionName}_{timeSuffix}";
+
+            wargame.AssetCache.Preload<Sprite>(bgAddress);
+        }
+
         private IEnumerator FadeLogo(float startAlpha, float targetAlpha, float duration)
         {
             float elapsedTime = 0f;

@@ -75,7 +75,7 @@ namespace GIC.Framework
 
         // ========== 相遇之线 ==========
         /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
-        public int starglitterEarned = 19980; // 999 * 20, 测试用
+        public int starglitterEarned = 0;
         /// <summary>已使用的相遇之线次数</summary>
         public int encounterUsed = 0;
 

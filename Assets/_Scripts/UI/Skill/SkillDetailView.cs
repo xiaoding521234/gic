@@ -39,7 +39,6 @@ namespace GIC.UI
         [SerializeField] private AnimationCurve slideCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
         [SerializeField] private float slideOffset = 80f;
 
-        private ViewType viewType;
         private SkillConfig.SkillData skillData;
         private UnitConfig.UnitData unitData;
         private BaseSkill skill;
@@ -303,7 +302,6 @@ namespace GIC.UI
 
         public void InitWithData(SkillConfig.SkillData skillData, UnitConfig.UnitData unitData, SkillIconView sourceSkillIconView)
         {
-            viewType = ViewType.Display;
             this.skillData = skillData;
             this.unitData = unitData;
 
@@ -334,7 +332,6 @@ namespace GIC.UI
 
         public void InitWithSkill(BaseSkill skill, SkillIconView sourceSkillIconView)
         {
-            viewType = ViewType.Actual;
             this.skill = skill;
             RefreshLayout();
         }

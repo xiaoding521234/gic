@@ -39,7 +39,6 @@ namespace GIC.UI
         [SerializeField] private float cardHeight = 150f;
 
         [Header("命运之线")]
-        [SerializeField] private float fateLineSpeed = 8000f;
         [SerializeField] private float fateLineThickness = 3f;
         [SerializeField] private Color fateLineColor = Color.white;
 

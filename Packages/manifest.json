@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.besty.unity-skills": "file:D:/Ai/Unity-Skills-2.0.0/SkillsForUnity",
     "com.unity.collab-proxy": "2.7.1",
     "com.unity.feature.2d": "2.0.1",
     "com.unity.ide.rider": "3.0.39",
@@ -45,7 +44,7 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0",
-    "cn.tuanjie.codely.bridge": "1.0.74"
+    "cn.tuanjie.codely.bridge": "1.0.75"
   },
   "testables": [
     "com.besty.unity-skills"

@@ -37,7 +37,6 @@ namespace GIC.Framework
         [SerializeField] private List<WeightedClip> clips = new List<WeightedClip>();
 
         private AudioClip lastClip;
-        private bool isInitialized = false;
 
         /// <summary>
         /// 添加一个音频片段
@@ -45,7 +44,6 @@ namespace GIC.Framework
         public void AddClip(AudioClip clip, float weight = 1f)
         {
             clips.Add(new WeightedClip(clip, weight));
-            isInitialized = false;
         }
 
         /// <summary>
@@ -57,7 +55,6 @@ namespace GIC.Framework
             {
                 this.clips.Add(new WeightedClip(clip, weight));
             }
-            isInitialized = false;
         }
 
         /// <summary>
@@ -69,7 +66,6 @@ namespace GIC.Framework
             if (index >= 0)
             {
                 clips.RemoveAt(index);
-                isInitialized = false;
                 return true;
             }
             return false;
@@ -82,7 +78,6 @@ namespace GIC.Framework
         {
             clips.Clear();
             lastClip = null;
-            isInitialized = false;
         }
 
         /// <summary>

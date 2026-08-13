@@ -170,8 +170,7 @@ namespace GIC.Framework
             CurrentPosition = targetPosition;
 
             Debug.Log($"移动到: {targetPosition}");
-
-            SceneType.MainHall.Load();
+            // 场景切换由调用方（MapScreen）负责，这里只更新位置数据
             return true;
         }
 

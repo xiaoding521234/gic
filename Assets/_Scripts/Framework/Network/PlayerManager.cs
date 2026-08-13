@@ -98,9 +98,6 @@ namespace GIC.Framework
         // 自身 PlayerID 变化事件
         public event Action<string> OnSelfPlayerIDChanged;
 
-        // 缓存的上一帧 PlayerID，用于检测变化
-        private string _cachedSelfPlayerID = PlayerID.Offline;
-
         // ==================== IWargameManager 实现 ====================
 
         public void Start()

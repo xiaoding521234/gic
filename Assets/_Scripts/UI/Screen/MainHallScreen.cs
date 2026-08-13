@@ -89,6 +89,9 @@ namespace GIC.UI
 
             if (_lastBgAddress != null)
                 Wargame.Instance?.AssetCache?.Release(_lastBgAddress);
+            // 若有正在加载但未完成的新背景，也释放
+            if (_pendingBgAddress != null && _pendingBgAddress != _lastBgAddress)
+                Wargame.Instance?.AssetCache?.Release(_pendingBgAddress);
         }
 
         #region 事件处理器
@@ -225,6 +228,7 @@ namespace GIC.UI
         }
 
         private string _lastBgAddress;
+        private string _pendingBgAddress;
 
         private void UpdateBackground(PositionName position)
         {
@@ -240,20 +244,38 @@ namespace GIC.UI
             string timeSuffix = TimeUtility.GetTimeSuffix();
             string address = $"PositionBack/{regionName}/{positionName}_{timeSuffix}";
 
-            // 地址相同且精灵已加载 → 跳过重载，避免 Release 后到 Load 完成前的纹理空窗期
+            // 地址相同且精灵已加载 → 跳过重载
             if (address == _lastBgAddress && backgroundRenderer.sprite != null)
                 return;
 
-            // 释放上一张背景
-            if (_lastBgAddress != null)
-                wargame.AssetCache?.Release(_lastBgAddress);
+            // 相同地址已在加载中 → 不重复请求
+            if (address == _pendingBgAddress)
+                return;
 
-            _lastBgAddress = address;
+            _pendingBgAddress = address;
+            string oldAddress = _lastBgAddress;
+
             wargame.AssetCache?.LoadAsync<Sprite>(address, sprite =>
             {
-                if (this != null && backgroundRenderer != null && sprite != null)
+                if (this == null || backgroundRenderer == null) return;
+
+                // 加载期间地址可能已变（快速切换），丢弃过期结果
+                if (_pendingBgAddress != address) return;
+
+                if (sprite != null)
+                {
                     backgroundRenderer.sprite = sprite;
-            }, LoadPriority.Normal);
+                    _lastBgAddress = address;
+
+                    // 新背景已上屏，释放旧背景
+                    if (oldAddress != null && oldAddress != address)
+                        wargame.AssetCache?.Release(oldAddress);
+                }
+                else
+                {
+                    Debug.LogWarning($"未找到背景图片: {address}");
+                }
+            }, LoadPriority.High);
         }
 
         private void InitializeButtons()

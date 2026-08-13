@@ -29,7 +29,6 @@ namespace GIC.Framework
         // 自定义事件
         public event System.Action OnClientConnectedEvent;
         public event System.Action OnClientDisconnectedEvent;
-        public event System.Action<string> OnSelfPlayerIDReceived;
 
         public bool IsHost => _hostStarted && NetworkServer.active;
         public int CurrentPort { get; private set; }

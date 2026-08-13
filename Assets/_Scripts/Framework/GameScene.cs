@@ -54,7 +54,6 @@ namespace GIC.Framework
         private SceneType currentRootScene;
 
         // 资源清理协程
-        private Coroutine cleanupCoroutine;
         private Coroutine currentLoadCoroutine;
 
         // 场景切换锁，防止并发操作
@@ -532,7 +531,6 @@ namespace GIC.Framework
         {
             yield return new WaitForSeconds(cleanupDelay);
             yield return CleanupUnusedResources();
-            cleanupCoroutine = null;
         }
 
         #endregion
