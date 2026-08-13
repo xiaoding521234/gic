@@ -8,28 +8,35 @@ namespace GIC.Framework
 {
 
 
+    [Component]
     public class CardManager : IWargameManager
     {
         private const int DeckCount = 7;
 
-        public ItemConfig itemConfig;
-        public UnitConfig unitConfig;
-        private SaveManager saveManager;
+        private readonly SaveManager saveManager;
+        public readonly ItemConfig itemConfig;
+        public readonly UnitConfig unitConfig;
+
+        public CardManager(SaveManager saveManager, ItemConfig itemConfig, UnitConfig unitConfig)
+        {
+            this.saveManager = saveManager;
+            this.itemConfig = itemConfig;
+            this.unitConfig = unitConfig;
+        }
 
         public CardDeck[] decks;
 
-        public void Start()
+        [PostConstruct]
+        public void Init()
         {
-            itemConfig  = Wargame.Instance.ConfigManager.GetItemConfig();
-            unitConfig  = Wargame.Instance.ConfigManager.GetUnitConfig();
-            saveManager = Wargame.Instance.SaveManager;
-
             decks = new CardDeck[DeckCount];
             for (int i = 0; i < DeckCount; i++)
                 decks[i] = new CardDeck(i);
 
             BuildAllDecks();
         }
+
+        public void Start() { }
 
         public void Update(float deltaTime) { }
 

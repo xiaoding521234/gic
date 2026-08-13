@@ -16,6 +16,8 @@ namespace GIC.UI
 
     public class SettingsScreen : MonoBehaviour
     {
+        [Autowired] private SaveManager _saveManager;
+
         [Header("顶部")]
         public GameObject topPanel;
         public TextCombiner titleText;
@@ -95,6 +97,8 @@ namespace GIC.UI
 
         void Start()
         {
+            Wargame.Instance.Context.Inject(this);
+
             // 收集所有设置面板
             settingPanels.Add(displaySettings);
             settingPanels.Add(soundSettings);
@@ -378,7 +382,7 @@ namespace GIC.UI
                 }
             }
 
-            int savedIndex = Wargame.Instance.SaveManager.CurrentSave.languageIndex;
+            int savedIndex = _saveManager.CurrentSave.languageIndex;
             if (savedIndex >= 0 && savedIndex < languageOptions.Count)
             {
                 currentIndex = savedIndex;
@@ -389,8 +393,8 @@ namespace GIC.UI
                 if (index >= 0 && index < locales.Count)
                 {
                     LocalizationSettings.SelectedLocale = locales[index];
-                    Wargame.Instance.SaveManager.CurrentSave.languageIndex = index;
-                    Wargame.Instance.SaveManager.SaveGame();
+                    _saveManager.CurrentSave.languageIndex = index;
+                    _saveManager.SaveGame();
                 }
             });
             languageSetting.Initialize();
@@ -409,12 +413,12 @@ namespace GIC.UI
                 resolutionOptions.Add(new TextEntry(null, resText));
             }
 
-            int currentIndex = Wargame.Instance.SaveManager.CurrentSave.resolutionIndex;
+            int currentIndex = _saveManager.CurrentSave.resolutionIndex;
 
             resolutionSetting.Setup("Resolution", resolutionOptions, currentIndex, (index) =>
             {
-                Wargame.Instance.SaveManager.CurrentSave.resolutionIndex = index;
-                Wargame.Instance.SaveManager.SaveGame();
+                _saveManager.CurrentSave.resolutionIndex = index;
+                _saveManager.SaveGame();
 
                 if (index == 0)
                 {
@@ -452,7 +456,7 @@ namespace GIC.UI
                 }
             }
 
-            int savedIndex = Wargame.Instance.SaveManager.CurrentSave.frameRate;
+            int savedIndex = _saveManager.CurrentSave.frameRate;
             for (int i = 0; i < frameRates.Length; i++)
             {
                 if (frameRates[i] == savedIndex)
@@ -467,8 +471,8 @@ namespace GIC.UI
                 if (index >= 0 && index < frameRates.Length)
                 {
                     Application.targetFrameRate = frameRates[index];
-                    Wargame.Instance.SaveManager.CurrentSave.frameRate = frameRates[index];
-                    Wargame.Instance.SaveManager.SaveGame();
+                    _saveManager.CurrentSave.frameRate = frameRates[index];
+                    _saveManager.SaveGame();
                 }
             });
             frameRateSetting.Initialize();
@@ -513,7 +517,7 @@ namespace GIC.UI
 
         private void InitAccountSettings()
         {
-            var saveManager = Wargame.Instance.SaveManager;
+            var saveManager = _saveManager;
             string playerName = saveManager.CurrentSave.playerName;
 
             playerNameSetting.Setup("Name", playerName,

@@ -12,12 +12,18 @@ namespace GIC.Data
     // ─────────────────────────────────────────────
     // 两个轻量适配器 — 不改 UnitData / ItemData 的序列化结构，
     // 只提供 ICardConfig 接口的委托实现。
+    // 由 CardConfigResolver.Resolve() 构造时注入配置引用。
     // ─────────────────────────────────────────────
 
     public readonly struct UnitConfigAdapter : ICardConfig
     {
         private readonly UnitConfig.UnitData _d;
-        public UnitConfigAdapter(UnitConfig.UnitData data) => _d = data;
+        private readonly UnitConfig _unitConfig;
+        public UnitConfigAdapter(UnitConfig.UnitData data, UnitConfig unitConfig)
+        {
+            _d = data;
+            _unitConfig = unitConfig;
+        }
 
         public int StarLevel => _d?.starLevel ?? 0;
 
@@ -30,8 +36,8 @@ namespace GIC.Data
         {
             get
             {
-                if (_d == null || CardConfigResolver.UnitConfig == null) return int.MaxValue;
-                int idx = CardConfigResolver.UnitConfig.GetUnitIndex(_d.unitName);
+                if (_d == null || _unitConfig == null) return int.MaxValue;
+                int idx = _unitConfig.GetUnitIndex(_d.unitName);
                 return idx >= 0 ? idx : int.MaxValue;
             }
         }
@@ -51,13 +57,18 @@ namespace GIC.Data
 
         public int      GetTagCount()                        => _d?.tags?.Length ?? 0;
         public TextEntry GetTagEntry(int index)              => _d?.tags?[index].GetEntry();
-        public Color    GetStarColor()                       => StarColor.GetStarColor(_d?.starLevel ?? 0);
+        public Color    GetStarColor()                       => StarVisualConfig.GetStarColor(_d?.starLevel ?? 0);
     }
 
     public readonly struct ItemConfigAdapter : ICardConfig
     {
         private readonly ItemConfig.ItemData _d;
-        public ItemConfigAdapter(ItemConfig.ItemData data) => _d = data;
+        private readonly ItemConfig _itemConfig;
+        public ItemConfigAdapter(ItemConfig.ItemData data, ItemConfig itemConfig)
+        {
+            _d = data;
+            _itemConfig = itemConfig;
+        }
 
         public int StarLevel => _d?.starLevel ?? 0;
 
@@ -70,8 +81,8 @@ namespace GIC.Data
         {
             get
             {
-                if (_d == null || CardConfigResolver.ItemConfig == null) return int.MaxValue;
-                int idx = CardConfigResolver.ItemConfig.GetItemIndex(_d.itemID);
+                if (_d == null || _itemConfig == null) return int.MaxValue;
+                int idx = _itemConfig.GetItemIndex(_d.itemID);
                 return idx >= 0 ? idx : int.MaxValue;
             }
         }
@@ -87,10 +98,7 @@ namespace GIC.Data
 
         public int      GetTagCount()           => 1;
         public TextEntry GetTagEntry(int index) => _d?.subType.GetEntry();
-        public Color    GetStarColor()          => StarColor.GetStarColor(_d?.starLevel ?? 0);
+        public Color    GetStarColor()          => StarVisualConfig.GetStarColor(_d?.starLevel ?? 0);
     }
 
 }
-
-
-

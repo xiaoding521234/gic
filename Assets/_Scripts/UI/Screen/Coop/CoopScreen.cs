@@ -39,7 +39,7 @@ namespace GIC.UI
         public TMP_Dropdown boardDropdown;
 
         private CoopNetworkController _network;
-        private PlayerManager _playerManager;
+        [Autowired] private PlayerManager _playerManager;
         private MyNetworkManager _netMgr;
         private MyNetworkDiscovery _discovery;
 
@@ -50,7 +50,7 @@ namespace GIC.UI
         {
             _netMgr = FindObjectOfType<MyNetworkManager>();
             _discovery = FindObjectOfType<MyNetworkDiscovery>();
-            _playerManager = Wargame.Instance.PlayerManager;
+            Wargame.Instance.Context.Inject(this);
             _network = new CoopNetworkController(_netMgr, _discovery, _playerManager);
 
             ClearPlayerList();

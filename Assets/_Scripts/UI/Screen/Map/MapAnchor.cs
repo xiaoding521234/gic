@@ -13,6 +13,8 @@ namespace GIC.UI
 
     public class MapAnchor : MonoBehaviour
     {
+        [Autowired] private PositionManager _positionManager;
+
         [Header("锚点配置")]
         [SerializeField] private PositionName positionName;
         
@@ -65,7 +67,8 @@ namespace GIC.UI
             if (cachedData != null && cachedData.isUnlocked)
             {
                 Debug.Log($"移动到: {positionName}");
-                Wargame.Instance.PositionManager.MoveToPosition(positionName);
+                Wargame.Instance.Context.Inject(this);
+                _positionManager.MoveToPosition(positionName);
             }
             else
             {

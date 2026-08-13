@@ -11,30 +11,30 @@ namespace GIC.Framework
 {
 
 
+    [Configuration]
     public class ConfigManager : IWargameManager
     {
+        // ── [Bean] 方法：加载配置并注册到容器 ──
 
-        [Header("配置")]
-        private PositionConfig positionConfig;
-        private UnitConfig unitConfig;
-        private ItemConfig itemConfig;
-        private ElementFactionIconConfig elementFactionIconConfig;
+        [Bean] public UnitConfig GetUnitConfig() => LoadConfig<UnitConfig>("Configs/UnitConfig");
+        [Bean] public ItemConfig GetItemConfig() => LoadConfig<ItemConfig>("Configs/ItemConfig");
+        [Bean] public PositionConfig GetPositionConfig() => LoadConfig<PositionConfig>("Configs/PositionConfig");
+        [Bean] public ElementFactionIconConfig GetElementFactionIconConfig() => LoadConfig<ElementFactionIconConfig>("Configs/ElementFactionIconConfig");
+        [Bean] public StarVisualConfig GetStarVisualConfig() => LoadConfig<StarVisualConfig>("Configs/StarVisualConfig");
 
-        public void Start()
+        [Autowired] private UnitConfig _unitConfig;
+        [Autowired] private ItemConfig _itemConfig;
+        [Bean] public CardConfigResolver GetCardConfigResolver() => new CardConfigResolver(_unitConfig, _itemConfig);
+
+        [PostConstruct]
+        public void Init()
         {
-            positionConfig = LoadConfig<PositionConfig>("Configs/PositionConfig");
-            unitConfig = LoadConfig<UnitConfig>("Configs/UnitConfig");
-            itemConfig = LoadConfig<ItemConfig>("Configs/ItemConfig");
-            elementFactionIconConfig = LoadConfig<ElementFactionIconConfig>("Configs/ElementFactionIconConfig");
-
-            // 注入全局配置查询入口
-            CardConfigResolver.Initialize(unitConfig, itemConfig);
+            // StarVisualConfig 静态访问兼容
+            StarVisualConfig.Initialize(GetStarVisualConfig());
         }
 
-        public void Update(float deltaTime)
-        {
-
-        }
+        public void Start() { }
+        public void Update(float deltaTime) { }
 
         /// <summary>
         /// 泛型加载配置并自动 BuildCache
@@ -60,28 +60,14 @@ namespace GIC.Framework
             return config;
         }
 
-        // 获取配置的公共方法
-        public PositionConfig GetPositionConfig()
-        {
-            return positionConfig;
-        }
-
-        public UnitConfig GetUnitConfig()
-        {
-            return unitConfig;
-        }
-
-        public ItemConfig GetItemConfig()
-        {
-            return itemConfig;
-        }
-
-        public ElementFactionIconConfig GetElementFactionIconConfig()
-        {
-            return elementFactionIconConfig;
-        }
+        // 保留 Getter 方法供 Service Locator 风格调用（UI 层等）
+        // 优先推荐通过 [Autowired] 或 ApplicationContext.Get<T>() 获取
+        public PositionConfig PositionConfig => Wargame.Instance.Context.Get<PositionConfig>();
+        public UnitConfig UnitConfig => Wargame.Instance.Context.Get<UnitConfig>();
+        public ItemConfig ItemConfig => Wargame.Instance.Context.Get<ItemConfig>();
+        public ElementFactionIconConfig ElementFactionIconConfig => Wargame.Instance.Context.Get<ElementFactionIconConfig>();
+        public StarVisualConfig StarVisualConfig => Wargame.Instance.Context.Get<StarVisualConfig>();
+        public CardConfigResolver CardResolver => Wargame.Instance.Context.Get<CardConfigResolver>();
     }
 
 }
-
-

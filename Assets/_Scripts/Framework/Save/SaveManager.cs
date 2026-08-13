@@ -16,6 +16,7 @@ namespace GIC.Framework
     /// <summary>
     /// JSON 存档管理器
     /// </summary>
+    [Component]
     public class SaveManager : IWargameManager
     {
         private const string SAVE_FILE_NAME = "gic_save.json";
@@ -54,11 +55,18 @@ namespace GIC.Framework
         // 删档测试模式下，旧存档的备份标识（可选，用于调试）
         private const string BACKUP_SUFFIX = ".backup";
 
-        // 配置引用（通过 Wargame.Instance 获取，或通过其他方式注入）
-        private UnitConfig unitConfig;
-        private ItemConfig itemConfig;
+        // 配置引用
+        private readonly UnitConfig unitConfig;
+        private readonly ItemConfig itemConfig;
 
-        public void Start()
+        public SaveManager(UnitConfig unitConfig, ItemConfig itemConfig)
+        {
+            this.unitConfig = unitConfig;
+            this.itemConfig = itemConfig;
+        }
+
+        [PostConstruct]
+        public void Init()
         {
             Debug.Log($"存档路径: {SavePath}");
 
@@ -68,13 +76,10 @@ namespace GIC.Framework
                 HandleDeletionTestMode();
             }
 
-            // 从 ConfigManager 获取配置（避免重复 Resources.Load）
-            var configManager = Wargame.Instance.ConfigManager;
-            unitConfig = configManager.GetUnitConfig();
-            itemConfig = configManager.GetItemConfig();
-
             LoadSaveData();
         }
+
+        public void Start() { }
 
         /// <summary>
         /// 处理删档测试模式 - 每次启动都强制使用新存档

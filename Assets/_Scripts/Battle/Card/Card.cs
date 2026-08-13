@@ -29,6 +29,9 @@ namespace GIC.Battle
         public TextMeshProUGUI countText;
         public SaveCardData saveCardData;
 
+        [Header("发光叠加")]
+        public Image glowImage;
+
         [Header("角色显示")]
         public Image unitImage;
 

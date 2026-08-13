@@ -27,7 +27,7 @@ namespace GIC.UI
         public TextCombiner readyButtonText;
 
         private PlayerInfo _player;
-        private PlayerManager _playerManager;
+        [Autowired] private PlayerManager _playerManager;
         private bool _isHost;
         private bool _isSelf;
 
@@ -41,7 +41,7 @@ namespace GIC.UI
         public void Setup(PlayerInfo player)
         {
             _player = player;
-            _playerManager = Wargame.Instance.PlayerManager;
+            Wargame.Instance.Context.Inject(this);
             
             _isSelf = _playerManager.IsSelfPlayer(player.PlayerID);
             _isHost = Mirror.NetworkServer.active;

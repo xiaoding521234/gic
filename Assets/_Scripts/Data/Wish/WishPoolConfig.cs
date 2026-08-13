@@ -32,6 +32,13 @@ namespace GIC.Data
         [FormerlySerializedAs("unitRate")] public float unitWeight = 50f;
         public float itemWeight = 50f;
 
+        [Header("相遇之线升级权重（概率 = 权重 / 总权重）")]
+        public float upgrade0Weight = 40f;
+        public float upgrade1Weight = 30f;
+        public float upgrade2Weight = 20f;
+        public float upgrade3Weight = 7f;
+        public float upgrade4Weight = 3f;
+
         /// <summary>
         /// 获取指定星级的所有角色
         /// </summary>
@@ -96,6 +103,32 @@ namespace GIC.Data
             float totalWeight = unitWeight + itemWeight;
             if (totalWeight <= 0f) return true;
             return UnityEngine.Random.Range(0f, totalWeight) < unitWeight;
+        }
+
+        /// <summary>
+        /// 按权重抽取相遇之线升级次数 (0-4)
+        /// </summary>
+        public int RollUpgradeCount()
+        {
+            float totalWeight = upgrade0Weight + upgrade1Weight + upgrade2Weight + upgrade3Weight + upgrade4Weight;
+            if (totalWeight <= 0f) return 0;
+
+            float roll = UnityEngine.Random.Range(0f, totalWeight);
+            float cumulative = 0f;
+
+            cumulative += upgrade0Weight;
+            if (roll < cumulative) return 0;
+
+            cumulative += upgrade1Weight;
+            if (roll < cumulative) return 1;
+
+            cumulative += upgrade2Weight;
+            if (roll < cumulative) return 2;
+
+            cumulative += upgrade3Weight;
+            if (roll < cumulative) return 3;
+
+            return 4;
         }
     }
 }

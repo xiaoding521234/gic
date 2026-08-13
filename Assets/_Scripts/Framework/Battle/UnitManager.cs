@@ -8,16 +8,17 @@ namespace GIC.Framework
 {
 
 
+    [Component]
     public class UnitManager : IWargameManager
     {
-        public UnitConfig unitConfig;
+        public readonly UnitConfig unitConfig;
 
-
-
-        public void Start()
+        public UnitManager(UnitConfig unitConfig)
         {
-            unitConfig = Wargame.Instance.ConfigManager.GetUnitConfig();
+            this.unitConfig = unitConfig;
         }
+
+        public void Start() { }
 
         public void Update(float deltaTime)
         {
@@ -25,5 +26,4 @@ namespace GIC.Framework
         }
     }
 }
-
 

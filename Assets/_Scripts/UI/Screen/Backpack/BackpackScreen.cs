@@ -68,10 +68,10 @@ namespace GIC.UI
         private CardPool _cardPool;
         private CardPool _deckCardPool;
 
-        private CardManager cardManager;
-        private SaveManager saveManager;
-        private UnitConfig unitConfig;
-        private ItemConfig itemConfig;
+        [Autowired] private CardManager cardManager;
+        [Autowired] private SaveManager saveManager;
+        [Autowired] private UnitConfig unitConfig;
+        [Autowired] private ItemConfig itemConfig;
         private BackpackCategoryChangedHandler _categoryChangedHandler;
         private DeckChangedHandler _deckChangedHandler;
         private CardClickedInEditHandler _cardClickedHandler;
@@ -82,10 +82,7 @@ namespace GIC.UI
         {
             AudioManager.Instance.PushMusicVolume();
 
-            cardManager = Wargame.Instance.CardManager;
-            saveManager = Wargame.Instance.SaveManager;
-            unitConfig = cardManager.unitConfig;
-            itemConfig = cardManager.itemConfig;
+            Wargame.Instance.Context.Inject(this);
 
             currentDeckId = saveManager.CurrentSave.currentDeck;
 

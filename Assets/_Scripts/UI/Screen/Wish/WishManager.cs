@@ -56,11 +56,22 @@ namespace GIC.UI
 
         /// <summary>
         /// 将一张祈愿结果写入存档（仅修改内存数据，不立即存盘）
+        /// 普通射击路径：入账时判断重复，重复角色卡转星辉
         /// </summary>
         /// <param name="starglitter">重复角色卡转换的星辉数量（0=非重复或物品）</param>
         public void AddResultToInventory(WishResult result, out int starglitter)
         {
-            AddCardToInventory(result.cardId, result.cardType == CardType.Unit, result.starLevel, out starglitter);
+            AddCardToInventory(result.cardId, result.cardType == CardType.Unit, result.starLevel, out starglitter, awardStarglitter: true);
+        }
+
+        /// <summary>
+        /// 将最终卡写入存档，但不再判重发星辉。
+        /// 相遇之线流程中，每张展示卡（含最终卡）的星辉已在展示阶段通过 AwardDuplicateStarglitter 发放，
+        /// 这里只负责把最终卡加入背包（新建 count / 堆叠物品），避免重复发放。
+        /// </summary>
+        public void AddFinalResultToInventory(WishResult result)
+        {
+            AddCardToInventory(result.cardId, result.cardType == CardType.Unit, result.starLevel, out _, awardStarglitter: false);
         }
 
         /// <summary>
@@ -109,13 +120,11 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 随机星级提升次数：RollStarLevel 的结果映射为提升级数
-        /// 5★权重→提升4级, 4★→3级, 3★→2级, 2★→1级, 1★→0级
+        /// 相遇之线升级次数：使用 WishPoolConfig 的独立升级权重表
         /// </summary>
         public int RollUpgradeCount(WishPoolConfig pool)
         {
-            int star = pool.RollStarLevel();
-            return star switch { 5 => 4, 4 => 3, 3 => 2, 2 => 1, _ => 0 };
+            return pool.RollUpgradeCount();
         }
 
         /// <summary>
@@ -201,9 +210,10 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 添加卡牌到存档。重复角色卡不增加数量，转为星辉。
+        /// 添加卡牌到存档。重复角色卡不增加数量，转为星辉（当 awardStarglitter=true 时）。
         /// </summary>
-        private void AddCardToInventory(CardId cardId, bool isUnit, int starLevel, out int starglitter)
+        /// <param name="awardStarglitter">是否在发现重复角色卡时发放星辉。普通射击=true；相遇之线最终卡=false（已在展示时发放）。</param>
+        private void AddCardToInventory(CardId cardId, bool isUnit, int starLevel, out int starglitter, bool awardStarglitter)
         {
             starglitter = 0;
             var save = _saveManager.CurrentSave;
@@ -226,9 +236,13 @@ namespace GIC.UI
                     {
                         if (card.count > 0)
                         {
-                            // 已拥有（count>0）：重复角色卡转为星辉
-                            starglitter = GetStarglitterByStar(starLevel);
-                            AddStarglitter(save, starglitter);
+                            // 已拥有（count>0）：重复角色卡
+                            if (awardStarglitter)
+                            {
+                                starglitter = GetStarglitterByStar(starLevel);
+                                AddStarglitter(save, starglitter);
+                            }
+                            // awardStarglitter=false 时星辉已在展示阶段发放，这里不重复
                         }
                         else
                         {
@@ -277,23 +291,25 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 仅判重复并发放星辉，不写入存档（用于相遇之线中间星级卡）
+        /// 判重复并发放星辉（不写入存档卡片列表）。
+        /// 相遇之线每张展示卡（原始卡+中间卡+最终卡）都调用一次。
         /// </summary>
-        public void AwardStarglitterIfDuplicate(WishResult result, out int starglitter)
+        /// <returns>发放的星辉数量（0=非重复或物品）</returns>
+        public int AwardDuplicateStarglitter(WishResult result)
         {
-            starglitter = 0;
-            if (result.cardType != CardType.Unit) return;
+            if (result.cardType != CardType.Unit) return 0;
 
             var save = _saveManager.CurrentSave;
             foreach (var card in save.ownedUnits)
             {
                 if (card.id == result.cardId && card.count > 0)
                 {
-                    starglitter = GetStarglitterByStar(result.starLevel);
+                    int starglitter = GetStarglitterByStar(result.starLevel);
                     AddStarglitter(save, starglitter);
-                    return;
+                    return starglitter;
                 }
             }
+            return 0;
         }
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using GIC.Data;
 
 namespace GIC.Tool
 {
@@ -12,12 +13,6 @@ namespace GIC.Tool
     [RequireComponent(typeof(Image))]
     public class ScreenEdgeGlow : MonoBehaviour
     {
-        [Header("泛光参数")]
-        [SerializeField] private float maxAlpha = 1.0f;
-        [SerializeField] private float duration = 0.8f;
-        [SerializeField] private float baseEdgeWidth = 0.08f;
-        [SerializeField] private float edgeWidthPerStar = 0.04f;
-
         private static Shader _glowShader;
 
         private Material _mat;
@@ -69,10 +64,11 @@ namespace GIC.Tool
 
         private IEnumerator GlowCoroutine(Color color, int starLevel)
         {
-            float peakAlpha = Mathf.Min(maxAlpha * (0.3f + starLevel * 0.18f), 1f);
-            float edgeWidth = baseEdgeWidth + (starLevel - 1) * edgeWidthPerStar;
+            float peakAlpha = Mathf.Min(StarVisualConfig.EdgeGlowMaxAlpha * StarVisualConfig.GetEdgeGlowAlpha(starLevel), 1f);
+            float edgeWidth = StarVisualConfig.GetEdgeGlowWidth(starLevel);
             _mat.SetFloat("_EdgeWidth", edgeWidth);
 
+            float duration = StarVisualConfig.EdgeGlowDuration;
             float elapsed = 0f;
             while (elapsed < duration)
             {

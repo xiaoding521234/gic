@@ -14,13 +14,18 @@ namespace GIC.Framework
 {
 
 
+    [Component]
     public class PositionManager : IWargameManager
     {
-        [Header("配置")]
-        private PositionConfig positionConfig;
-
-        private SaveManager saveManager;
+        private readonly SaveManager saveManager;
+        private readonly PositionConfig positionConfig;
         private AudioManager audioManager;
+
+        public PositionManager(SaveManager saveManager, PositionConfig positionConfig)
+        {
+            this.saveManager = saveManager;
+            this.positionConfig = positionConfig;
+        }
 
         // 音乐间隔时间（秒）
         private const float MUSIC_INTERVAL = 10f;
@@ -42,17 +47,18 @@ namespace GIC.Framework
         // 当前位置的详细信息
         public PositionData CurrentPositionData => positionConfig?.GetPositionData(CurrentPosition);
 
-        public void Start()
+        [PostConstruct]
+        public void Init()
         {
-            saveManager = Wargame.Instance.SaveManager;
             audioManager = AudioManager.Instance;
-            positionConfig = Wargame.Instance.ConfigManager.GetPositionConfig();
 
             // 初始播放当前位置的音乐
             PlayCurrentPositionMusic();
 
             Debug.Log($"PositionManager 启动完成，当前位置: {CurrentPosition}");
         }
+
+        public void Start() { }
 
         public void Update(float deltaTime)
         {

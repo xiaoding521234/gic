@@ -39,9 +39,12 @@ namespace GIC.UI
         private RegionName currentRegion;
         private readonly List<GameObject> _spawnedAnchors = new();
 
+        [Autowired] private PositionManager _positionManager;
+
 
         private void Start()
         {
+            Wargame.Instance.Context.Inject(this);
             if (closeButton != null)
                 closeButton.onClick.AddListener(OnCloseClick);
             if (nodkraiButton != null)
@@ -64,7 +67,7 @@ namespace GIC.UI
                 khaenriahButton.onClick.AddListener(() => ShowRegion(RegionName.Khaenriah));
 
             AudioManager.Instance.PushMusicVolume();
-            ShowRegion(Wargame.Instance.PositionManager.GetCurrentRegion());
+            ShowRegion(_positionManager.GetCurrentRegion());
         }
 
         public void ShowRegion(RegionName region)
@@ -108,7 +111,7 @@ namespace GIC.UI
         {
             Vector2 mapSize = mapImage.sizeDelta;
             Vector2 mapPos = mapImage.anchoredPosition;
-            var posManager = Wargame.Instance.PositionManager;
+            var posManager = _positionManager;
 
             foreach (var anchor in data.anchors)
             {

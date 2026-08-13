@@ -15,10 +15,10 @@ namespace GIC.Battle
     {
         public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
         {
-            var raw = CardConfigResolver.UnitConfig?.GetUnitData(data.id.AsUnitName());
+            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.UnitConfig?.GetUnitData(data.id.AsUnitName());
             if (raw != null)
             {
-                card.cardBack.color = StarColor.GetStarColor(raw.starLevel);
+                card.cardBack.color = StarVisualConfig.GetStarColor(raw.starLevel);
                 card.unitImage.gameObject.SetActive(true);
                 card.unitImage.sprite = raw.GetCard(data.skin);
                 card.obtainText.SetSingleEntry(raw.GetObtainDescriptionEntry());

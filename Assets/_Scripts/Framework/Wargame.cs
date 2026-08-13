@@ -12,58 +12,60 @@ namespace GIC.Framework
 
     public class Wargame : Singleton<Wargame>, IWargameManager
     {
-        public ConfigManager ConfigManager;
-        public SaveManager SaveManager;
-        public InputManager InputManager;
-        public UIManager UIManager;
-        public CardManager CardManager;
-        public PositionManager PositionManager;
-        public PlayerManager PlayerManager;
+        public ApplicationContext Context { get; private set; }
 
-        public SkillManager SkillManager;
-        public UnitManager UnitManager;
+        // 兼容旧调用：通过 Context 获取
+        public ConfigManager ConfigManager => Context?.Get<ConfigManager>();
+        public SaveManager SaveManager => Context?.Get<SaveManager>();
+        public InputManager InputManager => Context?.Get<InputManager>();
+        public UIManager UIManager => Context?.Get<UIManager>();
+        public CardManager CardManager => Context?.Get<CardManager>();
+        public PositionManager PositionManager => Context?.Get<PositionManager>();
+        public PlayerManager PlayerManager => Context?.Get<PlayerManager>();
+        public SkillManager SkillManager => Context?.Get<SkillManager>();
+        public UnitManager UnitManager => Context?.Get<UnitManager>();
 
         List<IWargameManager> managers;
-        
-        
 
         public override void Init()
         {
+            Context = new ApplicationContext();
 
-            ConfigManager = new ConfigManager();
-            SaveManager = new SaveManager();
-            InputManager = new InputManager();
-            UIManager = new UIManager();
-            CardManager = new CardManager();
-            PositionManager = new PositionManager();
-            PlayerManager = new PlayerManager();
-            SkillManager = new SkillManager();
-            UnitManager = new UnitManager();
+            // ── 阶段1：注册 [Configuration] 类（无构造函数依赖）──
+            Context.Register<ConfigManager>();
 
-            managers = new List<IWargameManager>();
+            // 处理 [Configuration]：调用 [Bean] 方法产出 configs（等价 Spring refresh 的 invokeBeanFactoryPostProcessors）
+            Context.ProcessConfigurations();
 
-            managers.Add(ConfigManager);
-            managers.Add(SaveManager);
-            managers.Add(InputManager);
-            managers.Add(UIManager);
-            managers.Add(CardManager);  
-            managers.Add(PositionManager);
-            managers.Add(PlayerManager);
-            managers.Add(SkillManager);
-            managers.Add(UnitManager);
+            // ── 阶段2：按依赖顺序注册 [Component] 类（构造器注入，依赖必须已就绪）──
+            Context.Register<SaveManager>();       // deps: UnitConfig, ItemConfig
+            Context.Register<CardManager>();       // deps: SaveManager, ItemConfig, UnitConfig
+            Context.Register<PositionManager>();   // deps: SaveManager, PositionConfig
+            Context.Register<PlayerManager>();     // deps: SaveManager
+            Context.Register<UnitManager>();       // deps: UnitConfig
+            Context.Register<InputManager>();
+            Context.Register<UIManager>();
+            Context.Register<SkillManager>();
+
+            // 注入剩余 [Autowired] 字段（ConfigManager 自身 [Bean] 产物、MonoBehaviour 层）
+            Context.InjectAll();
+
+            // 校验所有依赖是否注入成功，缺失则抛异常快速失败
+            Context.Validate();
+
+            // 构建 managers 列表（用于 Update 循环）
+            managers = new List<IWargameManager> { ConfigManager, SaveManager, InputManager, UIManager, CardManager, PositionManager, PlayerManager, SkillManager, UnitManager };
 
             Debug.Log("Wargame初始化完成");
             Debug.Log(Application.consoleLogPath);
 
         }
-        
+
         public void Start()
         {
-            managers.ForEach(manager => manager.Start());
-            
+            // 调用所有 [PostConstruct] 方法（等价 Spring finishBeanFactoryInitialization → @PostConstruct）
+            Context.PostConstruct();
         }
-        
-
 
         public void Update(float deltaTime)
         {
@@ -76,4 +78,3 @@ namespace GIC.Framework
     }
 
 }
-

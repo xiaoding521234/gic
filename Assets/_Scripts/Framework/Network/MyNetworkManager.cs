@@ -34,7 +34,7 @@ namespace GIC.Framework
         public bool IsHost => _hostStarted && NetworkServer.active;
         public int CurrentPort { get; private set; }
 
-        private PlayerManager _playerManager;
+        [Autowired] private PlayerManager _playerManager;
 
         public override void Awake()
         {
@@ -51,7 +51,7 @@ namespace GIC.Framework
             if (discovery == null)
                 discovery = GetComponent<MyNetworkDiscovery>();
 
-            _playerManager = Wargame.Instance.PlayerManager;
+            Wargame.Instance.Context.Inject(this);
             _playerManager?.SetNetworkManager(this);
 
             Debug.Log("[MyNetworkManager] 初始化完成");

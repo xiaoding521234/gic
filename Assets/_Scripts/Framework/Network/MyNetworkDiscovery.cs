@@ -34,11 +34,11 @@ namespace GIC.Framework
             public int MaxPlayers;
         }
         
-        private PlayerManager _playerManager;
+        [Autowired] private PlayerManager _playerManager;
 
         void Awake()
         {
-            _playerManager = Wargame.Instance.PlayerManager;
+            Wargame.Instance.Context.Inject(this);
         }
 
         public override void Start()

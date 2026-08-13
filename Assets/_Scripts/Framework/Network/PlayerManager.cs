@@ -15,10 +15,18 @@ namespace GIC.Framework
     /// <summary>
     /// 玩家管理器（普通类，由 Wargame 统一管理生命周期）
     /// </summary>
+    [Component]
     public class PlayerManager : IWargameManager
     {
         // 自身 PlayerID（由服务器通过 SetSelfPlayerEvent 设置）
         private string _selfPlayerID = PlayerID.Offline;
+
+        private readonly SaveManager saveManager;
+
+        public PlayerManager(SaveManager saveManager)
+        {
+            this.saveManager = saveManager;
+        }
 
         /// <summary>
         /// 获取自身 PlayerID（connectionId）
@@ -160,7 +168,7 @@ namespace GIC.Framework
             string playerID = conn.connectionId.ToString();
             bool isHost = playerID == PlayerID.Host;
             string playerName = isHost
-                ? (Wargame.Instance?.SaveManager?.CurrentSave?.playerName ?? "旅行者")
+                ? (saveManager?.CurrentSave?.playerName ?? "旅行者")
                 : ("玩家" + conn.connectionId);
 
             RegisterPlayer(playerID, playerName, TeamType.A,

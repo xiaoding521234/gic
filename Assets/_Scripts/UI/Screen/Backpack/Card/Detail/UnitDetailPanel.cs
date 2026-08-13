@@ -53,22 +53,22 @@ namespace GIC.UI
 
         public void Init(Card card)
         {
-            var raw = CardConfigResolver.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
+            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
             if (raw == null) return;
             InitInternal(raw, card.saveCardData, card?.cardDetailView?.tagContainer);
         }
 
         public void Init(SaveCardData data, bool isReadOnly = false)
         {
-            var raw = CardConfigResolver.UnitConfig?.GetUnitData(data.id.AsUnitName());
+            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.UnitConfig?.GetUnitData(data.id.AsUnitName());
             if (raw == null) return;
             InitInternal(raw, data, null);
         }
 
         private void InitInternal(UnitConfig.UnitData raw, SaveCardData data, Transform tagContainerFromCard)
         {
-            _top.color = StarColor.GetStarColor(raw.starLevel);
-            _bottomImage.color = StarColor.GetStarColor(raw.starLevel);
+            _top.color = StarVisualConfig.GetStarColor(raw.starLevel);
+            _bottomImage.color = StarVisualConfig.GetStarColor(raw.starLevel);
             nameCard.sprite = raw.nameCard;
 
             // 星级

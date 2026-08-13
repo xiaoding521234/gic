@@ -33,7 +33,7 @@ namespace GIC.Battle
 
         public void EnterEditMode(Card card)
         {
-            var raw = CardConfigResolver.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
+            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
             if (raw != null && raw.maxPrepareCount == 0)
                 card.overlay.gameObject.SetActive(true);
         }
@@ -49,7 +49,7 @@ namespace GIC.Battle
 
         public bool ShouldOverlayInEditMode(Card card)
         {
-            var raw = CardConfigResolver.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
+            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
             return raw != null && raw.maxPrepareCount == 0;
         }
     }

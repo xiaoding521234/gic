@@ -9315,7 +9315,7 @@ MonoBehaviour:
   cooldownPerStar: 0.15
   resultCardSize: 80
   resultCardSpacing: 10
-  holdCardSize: 140
+  holdCardSize: 280
   finalCardSize: 160
   shootSFX: {fileID: 0}
   cardHitSFX: {fileID: 0}

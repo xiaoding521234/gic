@@ -63,12 +63,15 @@ Shader "UI/CardGlowOverlay"
                 float4 vertex   : SV_POSITION;
                 fixed4 color    : COLOR;
                 float4 worldPosition : TEXCOORD0;
+                float2 uv       : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
             fixed4 _GlowColor;
             float _Intensity;
             float4 _ClipRect;
+            sampler2D _MainTex;
+            float4 _MainTex_ST;
 
             v2f vert(appdata_t v)
             {
@@ -78,6 +81,7 @@ Shader "UI/CardGlowOverlay"
                 OUT.worldPosition = v.vertex;
                 OUT.vertex = UnityObjectToClipPos(v.vertex);
                 OUT.color = v.color;
+                OUT.uv = v.texcoord;
                 return OUT;
             }
 
@@ -88,6 +92,10 @@ Shader "UI/CardGlowOverlay"
                 #ifdef UNITY_UI_CLIP_RECT
                 a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);
                 #endif
+
+                // 采样卡面 Sprite alpha，让发光遵循圆角形状
+                fixed4 tex = tex2D(_MainTex, IN.uv);
+                a *= tex.a;
 
                 // Blend One One: dst.rgb = src.rgb + dst.rgb (pure additive)
                 float3 rgb = _GlowColor.rgb * _Intensity * a;
