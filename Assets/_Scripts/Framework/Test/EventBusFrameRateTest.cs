@@ -58,7 +58,7 @@ namespace GIC.Framework
             _processedCount = 0;
             _isTesting = true;
             var handler = new TestEventHandler(this);
-            EventBusHub.Instance.Subscribe(handler);
+            EventBusHub.Instance.Subscribe(handler, this);
 
             // 持续入队事件，持续 testDuration 秒
             float startTime = Time.realtimeSinceStartup;
@@ -79,7 +79,7 @@ namespace GIC.Framework
                 yield return null;
             }
 
-            EventBusHub.Instance.Unsubscribe(handler);
+            EventBusHub.Instance.UnsubscribeOwner(this);
             _isTesting = false;
 
             float actualElapsed = Time.realtimeSinceStartup - startTime;

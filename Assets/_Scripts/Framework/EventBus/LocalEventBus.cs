@@ -274,10 +274,27 @@ namespace GIC.Framework
 
             var type = typeof(T);
             var wrappedHandler = new EventHandlerWrapper<T>(eventHandler);
-            SubscribeInternal(type, wrappedHandler, eventHandler.Priority);
+            SubscribeInternal(type, wrappedHandler, eventHandler.Priority, owner: null);
         }
 
-        private void SubscribeInternal(Type eventType, BaseEventHandler eventHandler, int priority)
+        /// <summary>
+        /// 带 owner 登记：UnsubscribeAllForOwner(owner) 可一次性退订该 owner 的全部订阅，
+        /// 避免 MonoBehaviour 在 OnDestroy 手工逐个 Unsubscribe（漏一个就泄漏）。
+        /// </summary>
+        public void Subscribe<T>(IEventHandler<T> eventHandler, object owner) where T : BaseEvent
+        {
+            if (eventHandler == null)
+            {
+                GICLog.Error("[LocalEventBus] 尝试注册空的 IEventHandler");
+                return;
+            }
+
+            var type = typeof(T);
+            var wrappedHandler = new EventHandlerWrapper<T>(eventHandler);
+            SubscribeInternal(type, wrappedHandler, eventHandler.Priority, owner);
+        }
+
+        private void SubscribeInternal(Type eventType, BaseEventHandler eventHandler, int priority, object owner)
         {
             if (priority < 0) priority = 0;
 
@@ -285,7 +302,8 @@ namespace GIC.Framework
             {
                 EventHandler = eventHandler,
                 Priority = priority,
-                Order = _subscriptionCounter++
+                Order = _subscriptionCounter++,
+                Owner = owner
             };
 
             if (!_handlers.TryGetValue(eventType, out var list))
@@ -327,6 +345,63 @@ namespace GIC.Framework
 
                 if (list.Count == 0)
                     _handlers.Remove(type);
+            }
+        }
+
+        /// <summary>
+        /// 退订 owner 登记的全部订阅（OnDestroy/Cleanup 一行兜底）。
+        /// 返回移除数量，0 = 无登记（可能漏传 owner，便于排查）。
+        /// </summary>
+        public int UnsubscribeAllForOwner(object owner)
+        {
+            if (owner == null) return 0;
+
+            int removed = 0;
+            List<Type> emptyTypes = null;
+
+            foreach (var kv in _handlers)
+            {
+                var list = kv.Value;
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    if (ReferenceEquals(list[i].Owner, owner))
+                    {
+                        list.RemoveAt(i);
+                        removed++;
+                    }
+                }
+
+                if (list.Count == 0)
+                {
+                    emptyTypes ??= new List<Type>();
+                    emptyTypes.Add(kv.Key);
+                }
+            }
+
+            if (emptyTypes != null)
+                foreach (var t in emptyTypes)
+                    _handlers.Remove(t);
+
+            if (removed > 0)
+                PruneInvalidatedQueuedEvents();
+
+            return removed;
+        }
+
+        /// <summary>订阅清空后，把队列中已无处理者的事件标记完成，避免 Tick 空转</summary>
+        private void PruneInvalidatedQueuedEvents()
+        {
+            var node = _eventQueue.First;
+            while (node != null)
+            {
+                var queued = node.Value;
+                var type = queued.EventData.GetType();
+                bool noHandlers = !_handlers.TryGetValue(type, out var list) || list.Count == 0;
+
+                if (queued.State == EventProcessState.Waiting && noHandlers)
+                    queued.State = EventProcessState.Completed;
+
+                node = node.Next;
             }
         }
 
@@ -432,6 +507,7 @@ namespace GIC.Framework
             public BaseEventHandler EventHandler;
             public int Priority;
             public long Order;
+            public object Owner; // 订阅登记人（可选），UnsubscribeAllForOwner 用
         }
 
         private class QueuedEvent

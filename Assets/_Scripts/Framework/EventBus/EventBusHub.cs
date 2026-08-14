@@ -226,9 +226,21 @@ namespace GIC.Framework
             Instance?.LocalEventBus?.Subscribe(handler);
         }
 
+        /// <summary>带 owner 登记订阅：owner 销毁时用 UnsubscribeOwner(owner) 一行退订全部</summary>
+        public void Subscribe<T>(IEventHandler<T> handler, object owner) where T : BaseEvent
+        {
+            Instance?.LocalEventBus?.Subscribe(handler, owner);
+        }
+
         public void Unsubscribe<T>(IEventHandler<T> handler) where T : BaseEvent
         {
             Instance?.LocalEventBus?.Unsubscribe(handler);
+        }
+
+        /// <summary>退订 owner 登记的全部订阅（OnDestroy 兜底）。返回移除数量。</summary>
+        public int UnsubscribeOwner(object owner)
+        {
+            return Instance?.LocalEventBus?.UnsubscribeAllForOwner(owner) ?? 0;
         }
 
         public void SetLockState(EventBusLockState state) => Instance?.LocalEventBus?.SetLockState(state);

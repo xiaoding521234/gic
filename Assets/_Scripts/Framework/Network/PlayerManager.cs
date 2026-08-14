@@ -138,19 +138,19 @@ namespace GIC.Framework
         private void SubscribeEvents()
         {
             // 订阅服务器端收到的客户端请求
-            EventBusHub.Instance.Subscribe<SetTeamRequestEvent>(_setTeamHandler);
-            EventBusHub.Instance.Subscribe<SetColorRequestEvent>(_setColorHandler);
-            EventBusHub.Instance.Subscribe<SetSpawnRequestEvent>(_setSpawnHandler);
-            EventBusHub.Instance.Subscribe<ToggleReadyRequestEvent>(_toggleReadyHandler);
-            EventBusHub.Instance.Subscribe<KickPlayerRequestEvent>(_kickPlayerHandler);
+            EventBusHub.Instance.Subscribe<SetTeamRequestEvent>(_setTeamHandler, this);
+            EventBusHub.Instance.Subscribe<SetColorRequestEvent>(_setColorHandler, this);
+            EventBusHub.Instance.Subscribe<SetSpawnRequestEvent>(_setSpawnHandler, this);
+            EventBusHub.Instance.Subscribe<ToggleReadyRequestEvent>(_toggleReadyHandler, this);
+            EventBusHub.Instance.Subscribe<KickPlayerRequestEvent>(_kickPlayerHandler, this);
 
             // 订阅网络事件（所有客户端收到）
-            EventBusHub.Instance.Subscribe<AddPlayerEvent>(_addPlayerHandler);
-            EventBusHub.Instance.Subscribe<RemovePlayerEvent>(_removePlayerHandler);
-            EventBusHub.Instance.Subscribe<UpdatePlayerInfoEvent>(_updatePlayerInfoHandler);
-            EventBusHub.Instance.Subscribe<KickedFromRoomEvent>(_kickedFromRoomHandler);
-            EventBusHub.Instance.Subscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler);
-            EventBusHub.Instance.Subscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler);
+            EventBusHub.Instance.Subscribe<AddPlayerEvent>(_addPlayerHandler, this);
+            EventBusHub.Instance.Subscribe<RemovePlayerEvent>(_removePlayerHandler, this);
+            EventBusHub.Instance.Subscribe<UpdatePlayerInfoEvent>(_updatePlayerInfoHandler, this);
+            EventBusHub.Instance.Subscribe<KickedFromRoomEvent>(_kickedFromRoomHandler, this);
+            EventBusHub.Instance.Subscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler, this);
+            EventBusHub.Instance.Subscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler, this);
         }
 
         // ==================== 玩家管理 ====================
@@ -458,18 +458,8 @@ namespace GIC.Framework
 
         public void Cleanup()
         {
-            // 使用保存的引用精准取消订阅
-            EventBusHub.Instance.Unsubscribe<SetTeamRequestEvent>(_setTeamHandler);
-            EventBusHub.Instance.Unsubscribe<SetColorRequestEvent>(_setColorHandler);
-            EventBusHub.Instance.Unsubscribe<SetSpawnRequestEvent>(_setSpawnHandler);
-            EventBusHub.Instance.Unsubscribe<ToggleReadyRequestEvent>(_toggleReadyHandler);
-            EventBusHub.Instance.Unsubscribe<KickPlayerRequestEvent>(_kickPlayerHandler);
-            EventBusHub.Instance.Unsubscribe<AddPlayerEvent>(_addPlayerHandler);
-            EventBusHub.Instance.Unsubscribe<RemovePlayerEvent>(_removePlayerHandler);
-            EventBusHub.Instance.Unsubscribe<UpdatePlayerInfoEvent>(_updatePlayerInfoHandler);
-            EventBusHub.Instance.Unsubscribe<KickedFromRoomEvent>(_kickedFromRoomHandler);
-            EventBusHub.Instance.Unsubscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler);
-            EventBusHub.Instance.Unsubscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler);
+            // owner 登记制：一行退订 SubscribeEvents 中登记的全部订阅
+            EventBusHub.Instance?.UnsubscribeOwner(this);
         }
 
 

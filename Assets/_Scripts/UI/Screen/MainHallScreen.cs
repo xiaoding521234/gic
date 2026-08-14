@@ -68,9 +68,9 @@ namespace GIC.UI
             _goBackHandler = new GoBackHandler(this);
             
             // 订阅事件
-            EventBusHub.Instance.Subscribe(_positionHandler);
-            EventBusHub.Instance.Subscribe(_sceneActivatedHandler);
-            EventBusHub.Instance.Subscribe(_goBackHandler);
+            EventBusHub.Instance.Subscribe(_positionHandler, this);
+            EventBusHub.Instance.Subscribe(_sceneActivatedHandler, this);
+            EventBusHub.Instance.Subscribe(_goBackHandler, this);
 
             UpdateBackground(_positionManager.CurrentPosition);
 
@@ -80,15 +80,8 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            if (EventBusHub.Instance != null)
-            {
-                if (_positionHandler != null)
-                    EventBusHub.Instance.Unsubscribe(_positionHandler);
-                if (_sceneActivatedHandler != null)
-                    EventBusHub.Instance.Unsubscribe(_sceneActivatedHandler);
-                if (_goBackHandler != null)
-                    EventBusHub.Instance.Unsubscribe(_goBackHandler);
-            }
+            // owner 登记制：一行退订全部事件
+            EventBusHub.Instance?.UnsubscribeOwner(this);
 
             if (_lastBgAddress != null)
                 _assetCache?.Release(_lastBgAddress);

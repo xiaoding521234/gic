@@ -30,7 +30,7 @@ namespace GIC.UI
             toggle.onValueChanged.AddListener(OnToggleValueChanged);
 
             _syncHandler = new CategorySyncHandler(this);
-            EventBusHub.Instance.Subscribe(_syncHandler);
+            EventBusHub.Instance.Subscribe(_syncHandler, this);
 
             if (selectIcon != null)
             {
@@ -44,8 +44,7 @@ namespace GIC.UI
         {
             toggle.onValueChanged.RemoveListener(OnToggleValueChanged);
 
-            if (EventBusHub.Instance != null && _syncHandler != null)
-                EventBusHub.Instance.Unsubscribe(_syncHandler);
+            EventBusHub.Instance?.UnsubscribeOwner(this);
         }
 
         private void OnToggleValueChanged(bool isOn)

@@ -99,13 +99,13 @@ namespace GIC.UI
             closeButton.onClick.AddListener(OnClose);
 
             _categoryChangedHandler = new BackpackCategoryChangedHandler(this);
-            EventBusHub.Instance.Subscribe(_categoryChangedHandler);
+            EventBusHub.Instance.Subscribe(_categoryChangedHandler, this);
 
             _deckChangedHandler = new DeckChangedHandler(this);
-            EventBusHub.Instance.Subscribe(_deckChangedHandler);
+            EventBusHub.Instance.Subscribe(_deckChangedHandler, this);
 
             _cardClickedHandler = new CardClickedInEditHandler(this);
-            EventBusHub.Instance.Subscribe(_cardClickedHandler);
+            EventBusHub.Instance.Subscribe(_cardClickedHandler, this);
 
             EventBusHub.Instance.SendImmediate(new OnBackpackDeckSyncEvent { DeckId = currentDeckId });
 
@@ -143,12 +143,8 @@ namespace GIC.UI
             editDeck.onClick.RemoveListener(OnToggleEditMode);
             closeButton.onClick.RemoveListener(OnClose);
 
-            if (EventBusHub.Instance != null)
-            {
-                if (_categoryChangedHandler != null) EventBusHub.Instance.Unsubscribe(_categoryChangedHandler);
-                if (_deckChangedHandler != null) EventBusHub.Instance.Unsubscribe(_deckChangedHandler);
-                if (_cardClickedHandler != null) EventBusHub.Instance.Unsubscribe(_cardClickedHandler);
-            }
+            // owner 登记制：一行退订全部事件
+            EventBusHub.Instance?.UnsubscribeOwner(this);
 
             _cardPool?.Clear();
             _deckCardPool?.Clear();

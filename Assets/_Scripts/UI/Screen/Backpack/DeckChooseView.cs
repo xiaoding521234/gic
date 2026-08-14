@@ -22,15 +22,14 @@ namespace GIC.UI
             toggle.onValueChanged.AddListener(OnToggleValueChanged);
 
             _syncHandler = new DeckSyncHandler(this);
-            EventBusHub.Instance.Subscribe(_syncHandler);
+            EventBusHub.Instance.Subscribe(_syncHandler, this);
         }
 
         public void OnDestroy()
         {
             toggle.onValueChanged.RemoveListener(OnToggleValueChanged);
 
-            if (EventBusHub.Instance != null && _syncHandler != null)
-                EventBusHub.Instance.Unsubscribe(_syncHandler);
+            EventBusHub.Instance?.UnsubscribeOwner(this);
         }
 
         private void OnToggleValueChanged(bool isOn)
