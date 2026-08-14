@@ -478,6 +478,106 @@ MonoBehaviour:
     m_Localized: Create Room
     m_Metadata:
       m_Items: []
+  - m_Id: 31541456859115520
+    m_Localized: Skip Animation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31541456917835776
+    m_Localized: Close
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31541456917835777
+    m_Localized: Press any key...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31546887237087232
+    m_Localized: Primary
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31546887287418880
+    m_Localized: Secondary
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31543633904218112
+    m_Localized: This key is already bound to another action
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387510456320
+    m_Localized: Left Mouse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342400
+    m_Localized: Right Mouse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342401
+    m_Localized: Middle Mouse
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342402
+    m_Localized: Space
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342403
+    m_Localized: ESC
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342404
+    m_Localized: Enter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342405
+    m_Localized: Tab
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342406
+    m_Localized: Backspace
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342407
+    m_Localized: Delete
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342408
+    m_Localized: "\u2190"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342409
+    m_Localized: "\u2192"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342410
+    m_Localized: "\u2191"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342411
+    m_Localized: "\u2193"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342412
+    m_Localized: L-Shift
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342413
+    m_Localized: R-Shift
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342414
+    m_Localized: L-Ctrl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342415
+    m_Localized: R-Ctrl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342416
+    m_Localized: L-Alt
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342417
+    m_Localized: R-Alt
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

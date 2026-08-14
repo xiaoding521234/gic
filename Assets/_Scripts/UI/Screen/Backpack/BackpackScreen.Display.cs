@@ -63,7 +63,8 @@ namespace GIC.UI
         {
             RefreshCurrentDeckCache();
             ReleaseSpawnedCards();
-            StartCoroutine(SpawnCardsWithDelay(BuildDisplayList()));
+            if (_spawnCoroutine != null) StopCoroutine(_spawnCoroutine);
+            _spawnCoroutine = StartCoroutine(SpawnCardsWithDelay(BuildDisplayList()));
         }
 
         private IEnumerator SpawnCardsWithDelay(List<SaveCardData> cardDataList)

@@ -129,6 +129,10 @@ namespace GIC.UI
 
         private void OnClose()
         {
+            if (isClosing) return;
+            isClosing = true;
+            InputLocks.Push(this, InputLockReason.Closing);
+
             if (isEditMode)
             {
                 ExitEditMode();

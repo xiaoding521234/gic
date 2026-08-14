@@ -475,6 +475,106 @@ MonoBehaviour:
     m_Key: CreateRoom
     m_Metadata:
       m_Items: []
+  - m_Id: 31541456859115520
+    m_Key: SkipAnimation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31541456917835776
+    m_Key: CloseUI
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31541456917835777
+    m_Key: PressKey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31543633904218112
+    m_Key: KeyConflict
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31546887237087232
+    m_Key: PrimaryKey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31546887287418880
+    m_Key: SecondaryKey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387510456320
+    m_Key: KeyName_Mouse0
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342400
+    m_Key: KeyName_Mouse1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342401
+    m_Key: KeyName_Mouse2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342402
+    m_Key: KeyName_Space
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342403
+    m_Key: KeyName_Escape
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342404
+    m_Key: KeyName_Return
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342405
+    m_Key: KeyName_Tab
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342406
+    m_Key: KeyName_Backspace
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342407
+    m_Key: KeyName_Delete
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342408
+    m_Key: KeyName_LeftArrow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342409
+    m_Key: KeyName_RightArrow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342410
+    m_Key: KeyName_UpArrow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342411
+    m_Key: KeyName_DownArrow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342412
+    m_Key: KeyName_LeftShift
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342413
+    m_Key: KeyName_RightShift
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342414
+    m_Key: KeyName_LeftControl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342415
+    m_Key: KeyName_RightControl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342416
+    m_Key: KeyName_LeftAlt
+    m_Metadata:
+      m_Items: []
+  - m_Id: 31598387594342417
+    m_Key: KeyName_RightAlt
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -13,7 +13,7 @@ namespace GIC.UI
 {
 
 
-    public class PopupDialog : MonoBehaviour
+    public class PopupDialog : MonoBehaviour, IClosable
     {
         [FormerlySerializedAs("messageText")]
         [SerializeField] private TextMeshProUGUI messageTextObj;
@@ -37,6 +37,9 @@ namespace GIC.UI
         [SerializeField] private float 抖动强度 = 20f;
 
         public enum PopupMode { Modal, Toast }
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => Close();
 
         private PopupMode _mode = PopupMode.Modal;
         private Vector2 _toastTargetPos;
@@ -219,8 +222,12 @@ namespace GIC.UI
 
         private void Show()
         {
-            if (_mode == PopupMode.Modal && backPanel != null)
-                backPanel.onClick.AddListener(Close);
+            if (_mode == PopupMode.Modal)
+            {
+                Wargame.Instance?.InputManager?.RegisterClosable(this);
+                if (backPanel != null)
+                    backPanel.onClick.AddListener(Close);
+            }
             gameObject.SetActive(true);
 
             if (_mode == PopupMode.Toast)
@@ -231,6 +238,7 @@ namespace GIC.UI
 
         private IEnumerator ShowCoroutine()
         {
+            InputLocks.Push(this, InputLockReason.PopupEntering);
             canvasGroup.alpha = 0f;
 
             float elapsed = 0f;
@@ -241,6 +249,7 @@ namespace GIC.UI
                 yield return null;
             }
             canvasGroup.alpha = 1f;
+            InputLocks.Pop(this, InputLockReason.PopupEntering);
 
             yield return new WaitForSeconds(displayDuration);
 
@@ -305,9 +314,13 @@ namespace GIC.UI
 
         private void Close()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+
             if (currentCoroutine != null)
             {
                 StopCoroutine(currentCoroutine);
+                // Show 协程在淡入完成前被中断 — 释放入场锁（幂等）
+                InputLocks.Pop(this, InputLockReason.PopupEntering);
             }
             if (_mode == PopupMode.Toast)
             {
@@ -320,6 +333,10 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：淡入期间被外部销毁时释放本类持有的锁
+            InputLocks.PopAll(this);
+
             if (backPanel != null)
                 backPanel.onClick.RemoveListener(Close);
             // 外部销毁（如场景切换）时通知 PopupManager 清理引用

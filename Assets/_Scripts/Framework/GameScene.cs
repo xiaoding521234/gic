@@ -56,8 +56,7 @@ namespace GIC.Framework
         // 资源清理协程
         private Coroutine currentLoadCoroutine;
 
-        // 场景切换锁，防止并发操作
-        private bool isTransitioning = false;
+        // 场景切换锁已由 InputManager.InputLock 替代
 
         #endregion
 
@@ -69,7 +68,8 @@ namespace GIC.Framework
             private set => currentScene = value;
         }
 
-        public bool IsTransitioning => isTransitioning;
+        public bool IsTransitioning
+            => Wargame.Instance?.InputManager?.HasInputLock(InputLockReason.SceneTransition) ?? false;
 
         #endregion
 
@@ -105,6 +105,8 @@ namespace GIC.Framework
         {
             CleanupEventHandlers();
             StopAllCoroutines();
+            // 兜底：释放本类持有的全部输入锁（正常流程早已配对 pop）
+            InputLocks.PopAll(this);
         }
 
         #endregion
@@ -234,7 +236,8 @@ namespace GIC.Framework
         /// </summary>
         public void LoadSceneWithConfig(SceneType scene)
         {
-            if (isTransitioning)
+            // 只在真正的场景切换期间拦截（入场动画等其它输入锁不阻塞导航）
+            if (Wargame.Instance?.InputManager?.HasInputLock(InputLockReason.SceneTransition) == true)
             {
                 Debug.LogWarning("场景正在切换中，请稍后再试");
                 return;
@@ -294,6 +297,9 @@ namespace GIC.Framework
                 yield break;
             }
 
+            // 场景切换锁 — 防止切换期间输入干扰
+            InputLocks.Push(this, InputLockReason.SceneTransition);
+
             // 等待预加载完成
             while (asyncLoad.progress < 0.9f)
             {
@@ -314,6 +320,11 @@ namespace GIC.Framework
 
             // 设置为活动场景
             yield return SetActiveSceneAfterLoad(scene);
+
+            // 额外等待一帧，确保新场景的 Start() 已执行（RegisterClosable + InputLock pop 已生效）
+            yield return null;
+
+            InputLocks.Pop(this, InputLockReason.SceneTransition);
 
             if (enableDebugLog)
             {
@@ -363,7 +374,7 @@ namespace GIC.Framework
 
         private IEnumerator LoadSceneWithConfigCoroutine(SceneType scene)
         {
-            isTransitioning = true;
+            InputLocks.Push(this, InputLockReason.SceneTransition);
 
             // 记录历史
             RecordSceneHistory(scene);
@@ -377,7 +388,10 @@ namespace GIC.Framework
                 yield return SetActiveSceneAfterLoad(scene);
             }
 
-            isTransitioning = false;
+            // 额外等待一帧，确保新场景的 Start() 已执行
+            yield return null;
+
+            InputLocks.Pop(this, InputLockReason.SceneTransition);
         }
 
         private IEnumerator LoadSceneAsync(SceneType scene)
@@ -425,7 +439,7 @@ namespace GIC.Framework
 
         private IEnumerator GoBackCoroutine()
         {
-            isTransitioning = true;
+            InputLocks.Push(this, InputLockReason.SceneTransition);
 
             SceneType previousScene = sceneHistory.Pop();
             SceneType sceneToUnload = CurrentScene;
@@ -454,12 +468,12 @@ namespace GIC.Framework
             // 5. 发送事件
             SendGoBackEvent(fromSceneName, toSceneName);
 
-            isTransitioning = false;
+            InputLocks.Pop(this, InputLockReason.SceneTransition);
         }
 
         private IEnumerator LoadNewRootSceneCoroutine(SceneType scene)
         {
-            isTransitioning = true;
+            InputLocks.Push(this, InputLockReason.SceneTransition);
 
             ClearHistory();
             currentRootScene = scene;
@@ -467,7 +481,7 @@ namespace GIC.Framework
 
             yield return LoadSceneAsync(scene);
 
-            isTransitioning = false;
+            InputLocks.Pop(this, InputLockReason.SceneTransition);
         }
 
         private IEnumerator UnloadSceneWithEventsCoroutine(SceneType scene)
@@ -607,13 +621,6 @@ namespace GIC.Framework
         {
             if (sceneHistory.Count == 0)
             {
-                ShowToast("没有上一个场景可返回");
-                return false;
-            }
-
-            if (isTransitioning)
-            {
-                ShowToast("场景正在切换中，请稍后再试");
                 return false;
             }
 

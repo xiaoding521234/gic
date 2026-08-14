@@ -73,14 +73,15 @@ namespace GIC.UI
         [Header("相遇之线")]
         [SerializeField] private Color encounterLineColor = new Color(1f, 0.85f, 0.3f, 1f);
 
-        /// <summary>抽卡流程是否进行中（防重入）</summary>
-        public bool IsWishInProgress => _flow != null && _flow.CurrentState != WishFlowController.State.Idle;
+        /// <summary>抽卡流程是否进行中（供 StartDraw 防重入检查）</summary>
+        public bool IsWishInProgress => _isWishActive;
 
         #region 运行时状态
 
         protected WishManager _wishManager;
         protected WishPoolConfig _pool;
         protected WishFlowController _flow;
+        private bool _isWishActive;
 
         protected List<WishTrackCard> _activeCards = new();
 
@@ -153,13 +154,18 @@ namespace GIC.UI
             _pool = pool;
             _flow = new WishFlowController(manager, pool);
             _flow.StartFlow(count);
+            _isWishActive = true;
 
             if (!manager.ConsumePrimogem(count))
             {
                 GameScene.Instance?.ShowToast("原石不足");
                 _flow.Reset();
+                _isWishActive = false;
                 return;
             }
+
+            // 抽卡全程锁定输入 — CloseUI 等动作派发暂停（放在扣费成功之后，失败路径无锁可泄）
+            InputLocks.Push(this, InputLockReason.WishInProgress);
 
             // 从 flow 获取星级缓存
             _unitsByStar = new Dictionary<int, List<UnitName>>();
@@ -230,7 +236,7 @@ namespace GIC.UI
                     _currentTimer -= Time.deltaTime;
                     UpdateCountdownBar(_currentTimer / clickTimeLimit);
 
-                    if (_currentTimer <= 0f || Input.GetMouseButtonDown(0))
+                    if (_currentTimer <= 0f || IsConfirmPressed())
                         Shoot();
                 }
 
@@ -247,6 +253,25 @@ namespace GIC.UI
                 OnWishComplete?.Invoke();
                 StartCoroutine(ShowFinalDisplay());
             }
+        }
+
+        /// <summary>
+        /// 确认输入是否按下 — 鼠标左键 + Confirm 动作绑定的按键（支持重绑定）
+        /// </summary>
+        private bool IsConfirmPressed()
+        {
+            if (Input.GetMouseButtonDown(0)) return true;
+
+            var im = Wargame.Instance?.InputManager;
+            if (im == null) return false;
+
+            for (int slot = 0; slot < 2; slot++)
+            {
+                var key = im.GetKey(KeyAction.Confirm, slot);
+                if (key != KeyCode.None && Input.GetKeyDown(key))
+                    return true;
+            }
+            return false;
         }
 
         private void Shoot()
@@ -434,6 +459,8 @@ namespace GIC.UI
 
         private void OnDisable()
         {
+            _isWishActive = false;
+            InputLocks.Pop(this, InputLockReason.WishInProgress);
             _flow?.Reset();
             StopHoldThenFlyCoroutines();
             ClearTrackCards();

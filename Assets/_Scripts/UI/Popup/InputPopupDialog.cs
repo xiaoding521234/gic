@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Localization;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
+using GIC.Framework;
 using GIC.Tool;
 
 namespace GIC.UI
@@ -13,7 +14,7 @@ namespace GIC.UI
     /// 原神风格输入弹窗：标题 + TMP输入框 + 确认/取消按钮，带淡入淡出动画。
     /// 通过 Show(titleKey, currentValue, onConfirm) 调用，确认后回调返回输入文本。
     /// </summary>
-    public class InputPopupDialog : MonoBehaviour
+    public class InputPopupDialog : MonoBehaviour, IClosable
     {
         [Header("UI组件")]
         [FormerlySerializedAs("titleText")]
@@ -33,6 +34,9 @@ namespace GIC.UI
         private TextCombiner _cancelText;
         private Action<string> onConfirmCallback;
         private Coroutine currentCoroutine;
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => OnCancel();
 
         /// <summary>
         /// 显示输入弹窗。
@@ -59,6 +63,9 @@ namespace GIC.UI
 
             canvasGroup.interactable = true;
             canvasGroup.blocksRaycasts = true;
+
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            InputLocks.Push(this, InputLockReason.InputPopupEntering);
 
             gameObject.SetActive(true);
 
@@ -122,6 +129,8 @@ namespace GIC.UI
             }
             canvasGroup.alpha = 1f;
 
+            InputLocks.Pop(this, InputLockReason.InputPopupEntering);
+
             inputField.Select();
             inputField.ActivateInputField();
         }
@@ -143,8 +152,14 @@ namespace GIC.UI
 
         private void Hide()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+
             if (currentCoroutine != null)
+            {
                 StopCoroutine(currentCoroutine);
+                // Show 协程在淡入完成前被中断 — 释放入场锁（幂等，已完成时为空操作）
+                InputLocks.Pop(this, InputLockReason.InputPopupEntering);
+            }
             currentCoroutine = StartCoroutine(HideCoroutine());
         }
 
@@ -166,6 +181,9 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：淡入期间被外部销毁时释放本类持有的锁
+            InputLocks.PopAll(this);
             confirmButton?.onClick.RemoveAllListeners();
             cancelButton?.onClick.RemoveAllListeners();
             backPanel?.onClick.RemoveAllListeners();

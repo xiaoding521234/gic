@@ -64,6 +64,7 @@ namespace GIC.UI
 
         private IEnumerator PlaySlideInAnimation()
         {
+            InputLocks.Push(this, InputLockReason.Entering);
             float elapsed = 0f;
             while (elapsed < panelSlideDuration)
             {
@@ -73,6 +74,7 @@ namespace GIC.UI
                 yield return null;
             }
             SnapToTarget();
+            InputLocks.Pop(this, InputLockReason.Entering);
         }
 
         private IEnumerator CloseWithAnimation()
@@ -94,6 +96,7 @@ namespace GIC.UI
 
             if (centerCanvasGroup != null) centerCanvasGroup.alpha = 0f;
             if (cardDetailCanvasGroup != null) cardDetailCanvasGroup.alpha = 0f;
+            InputLocks.Pop(this, InputLockReason.Closing);
             GameScene.Instance.GoBack();
         }
 

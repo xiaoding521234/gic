@@ -73,6 +73,9 @@ namespace GIC.Framework
         // 锚点位置信息
         public int currentPosition = (int)PositionName.NashaTown;
 
+        // ========== 按键绑定 ==========
+        public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();
+
         // ========== 相遇之线 ==========
         /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
         public int starglitterEarned = 0;
@@ -100,7 +103,7 @@ namespace GIC.Framework
 
             currentPosition = (int)PositionName.NashaTown;
 
-
+            keyBindings.Clear();
         }
 
         public void InitCards()

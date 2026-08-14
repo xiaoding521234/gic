@@ -14,7 +14,7 @@ namespace GIC.UI
 {
 
 
-    public partial class BackpackScreen : MonoBehaviour
+    public partial class BackpackScreen : MonoBehaviour, IClosable
     {
         [Header("卡片展示")]
         public GameObject cardContent;
@@ -67,6 +67,7 @@ namespace GIC.UI
         private List<Card> deckSpawnedCards = new();
         private CardPool _cardPool;
         private CardPool _deckCardPool;
+        private Coroutine _spawnCoroutine;
 
         [Autowired] private CardManager cardManager;
         [Autowired] private SaveManager saveManager;
@@ -77,12 +78,17 @@ namespace GIC.UI
         private CardClickedInEditHandler _cardClickedHandler;
 
         private bool isEditMode = false;
+        private bool isClosing = false;
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => OnClose();
 
         private void Start()
         {
             AudioManager.Instance.PushMusicVolume();
 
             Wargame.Instance.Context.Inject(this);
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
 
             currentDeckId = saveManager.CurrentSave.currentDeck;
 
@@ -120,13 +126,17 @@ namespace GIC.UI
             SetPanelsOffScreen();
             SetButtonsOffScreen();
             StartCoroutine(PlaySlideInAnimation());
-            StartCoroutine(SpawnCardsWithDelay(BuildDisplayList()));
+            _spawnCoroutine = StartCoroutine(SpawnCardsWithDelay(BuildDisplayList()));
 
             CacheEditPanelPosition();
         }
 
         private void OnDestroy()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：动画协程被销毁中断时释放本类持有的锁
+            InputLocks.PopAll(this);
+
             nextButtonLeft.onClick.RemoveListener(OnPreviousCategory);
             nextButtonRight.onClick.RemoveListener(OnNextCategory);
             editDeck.onClick.RemoveListener(OnToggleEditMode);

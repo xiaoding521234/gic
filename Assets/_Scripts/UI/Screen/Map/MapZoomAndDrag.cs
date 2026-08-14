@@ -54,6 +54,12 @@ namespace GIC.UI
             ResetAnimationCurve();
         }
 
+        private void OnDestroy()
+        {
+            // 兜底：入场动画协程被销毁中断时释放本类持有的锁
+            InputLocks.PopAll(this);
+        }
+
         private void ResetAnimationCurve()
         {
             // 快进慢出曲线：开始陡峭，结束平缓
@@ -141,9 +147,10 @@ namespace GIC.UI
         private void PlayEntryAnimation()
         {
             if (entryAnimationCoroutine != null)
-            {
                 StopCoroutine(entryAnimationCoroutine);
-            }
+
+            // Push 对同 (owner,reason) 去重 — 上一次动画未完成（协程被中断）也不会堆积重复锁
+            InputLocks.Push(this, InputLockReason.MapEntering);
             entryAnimationCoroutine = StartCoroutine(EntryAnimationCoroutine());
         }
 
@@ -217,6 +224,7 @@ namespace GIC.UI
             scrollRect.velocity = Vector2.zero;
 
             entryAnimationCoroutine = null;
+            InputLocks.Pop(this, InputLockReason.MapEntering);
         }
 
 
@@ -236,6 +244,8 @@ namespace GIC.UI
             {
                 StopCoroutine(entryAnimationCoroutine);
                 entryAnimationCoroutine = null;
+                // 动画被中断 — 释放入场锁（幂等，已释放时为空操作）
+                InputLocks.Pop(this, InputLockReason.MapEntering);
             }
 
             currentScale = 1f;
@@ -253,6 +263,11 @@ namespace GIC.UI
         {
             PlayEntryAnimation();
         }
+
+        /// <summary>
+        /// 入场动画是否正在播放
+        /// </summary>
+        public bool IsAnimating => entryAnimationCoroutine != null;
 
         /// <summary>
         /// 获取当前缩放值

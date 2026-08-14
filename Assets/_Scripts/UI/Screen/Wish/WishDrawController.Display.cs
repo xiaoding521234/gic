@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using GIC.Framework;
 
 namespace GIC.UI
 {
@@ -49,7 +50,6 @@ namespace GIC.UI
         private IEnumerator ShowFinalDisplay()
         {
             int totalShots = _flow.TotalShots;
-            _flow?.Reset();
 
             StopHoldThenFlyCoroutines();
 
@@ -80,7 +80,7 @@ namespace GIC.UI
             }
             finalDisplayCanvasGroup.alpha = 1f;
 
-            yield return new WaitUntil(() => Input.GetMouseButtonDown(0));
+            yield return new WaitUntil(() => Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2));
 
             fadeElapsed = 0f;
             while (fadeElapsed < fadeDuration)
@@ -96,6 +96,11 @@ namespace GIC.UI
 
             ClearTrackCards();
             ClearCardPool();
+
+            // 最终展示结束后才解除输入锁，之前保持锁定防止 CloseUI 关闭整个祈愿场景
+            _flow?.Reset();
+            _isWishActive = false;
+            InputLocks.Pop(this, InputLockReason.WishInProgress);
         }
 
         #endregion

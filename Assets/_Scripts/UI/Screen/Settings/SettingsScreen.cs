@@ -14,7 +14,7 @@ namespace GIC.UI
 {
 
 
-    public class SettingsScreen : MonoBehaviour
+    public class SettingsScreen : MonoBehaviour, IClosable
     {
         [Autowired] private SaveManager _saveManager;
 
@@ -56,6 +56,10 @@ namespace GIC.UI
 
         [Header("操作设置")]
         public GameObject controlSettings;
+        public KeyBindingSettingItem closeUIPrimaryKeyItem;
+        public KeyBindingSettingItem closeUISecondaryKeyItem;
+        public KeyBindingSettingItem confirmPrimaryKeyItem;
+        public KeyBindingSettingItem confirmSecondaryKeyItem;
 
         [Header("账户设置")]
         public GameObject accountSettings;
@@ -143,7 +147,11 @@ namespace GIC.UI
             // 初始化各项设置
             InitDisplaySettings();
             InitSoundSettings();
+            InitControlSettings();
             InitAccountSettings();
+
+            // 注册为可关闭 UI
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
 
             // 缓存动画位置
             CacheAnimationPositions();
@@ -205,6 +213,7 @@ namespace GIC.UI
 
         private IEnumerator PlayEnterAnimationCoroutine()
         {
+            InputLocks.Push(this, InputLockReason.Entering);
             float elapsed = 0f;
 
             while (elapsed < panelSlideDuration)
@@ -254,11 +263,12 @@ namespace GIC.UI
                 leftPanelRect.anchoredPosition = leftPanelTargetPos;
             if (centerPanelRect != null)
                 centerPanelRect.anchoredPosition = centerPanelTargetPos;
-            if (centerGroup != null)
-                centerGroup.alpha = 1f;
-        }
+                if (centerGroup != null) centerGroup.alpha = 1f;
 
-        private IEnumerator PlayExitAnimationCoroutine()
+                InputLocks.Pop(this, InputLockReason.Entering);
+            }
+
+            private IEnumerator PlayExitAnimationCoroutine()
         {
             float elapsed = 0f;
             float slideOutDuration = panelSlideDuration * 0.7f;
@@ -307,6 +317,7 @@ namespace GIC.UI
 
             if (centerGroup != null) centerGroup.alpha = 0f;
 
+            InputLocks.Pop(this, InputLockReason.Closing);
             GameScene.Instance.GoBack();
         }
 
@@ -513,6 +524,25 @@ namespace GIC.UI
 
         #endregion
 
+        #region 操作设置
+
+        private void InitControlSettings()
+        {
+            closeUIPrimaryKeyItem?.Setup(KeyAction.CloseUI, 0, "CloseUI");
+            closeUIPrimaryKeyItem?.Initialize();
+
+            closeUISecondaryKeyItem?.Setup(KeyAction.CloseUI, 1, "CloseUI");
+            closeUISecondaryKeyItem?.Initialize();
+
+            confirmPrimaryKeyItem?.Setup(KeyAction.Confirm, 0, "Confirm");
+            confirmPrimaryKeyItem?.Initialize();
+
+            confirmSecondaryKeyItem?.Setup(KeyAction.Confirm, 1, "Confirm");
+            confirmSecondaryKeyItem?.Initialize();
+        }
+
+        #endregion
+
         #region 账户设置
 
         private void InitAccountSettings()
@@ -639,7 +669,22 @@ namespace GIC.UI
 
         public void Close()
         {
+            if (isClosing) return;
+            isClosing = true;
+            InputLocks.Push(this, InputLockReason.Closing);
             StartCoroutine(PlayExitAnimationCoroutine());
+        }
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => Close();
+
+        private bool isClosing = false;
+
+        private void OnDestroy()
+        {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：动画协程被销毁中断时释放本类持有的锁
+            InputLocks.PopAll(this);
         }
     }
 }

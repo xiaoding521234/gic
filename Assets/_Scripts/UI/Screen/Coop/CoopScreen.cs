@@ -17,7 +17,7 @@ namespace GIC.UI
 {
 
 
-    public class CoopScreen : MonoBehaviour
+    public class CoopScreen : MonoBehaviour, IClosable
     {
         [Header("房间详情")]
         public GameObject roomPanel;
@@ -56,6 +56,10 @@ namespace GIC.UI
 
         private enum RoomState { DisconnectedClient, Host, ConnectedClient }
         private RoomState _currentState = RoomState.DisconnectedClient;
+        private bool _isClosing = false;
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => OnLeaveRoomClick();
 
         private void EnsureTextCombiners()
         {
@@ -113,6 +117,8 @@ namespace GIC.UI
             StopCurrentConnection();
             AudioManager.Instance.PushMusicVolume();
 
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
+
             BindButtonEvents();
             BindDiscoveryEvents();
             BindPlayerEvents();
@@ -131,6 +137,9 @@ namespace GIC.UI
 
         void OnDestroy()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：释放本类持有的全部输入锁
+            InputLocks.PopAll(this);
             UnbindPlayerEvents();
             UnbindNetworkEvents();
             UnbindDiscoveryEvents();
@@ -285,10 +294,14 @@ namespace GIC.UI
 
         void OnLeaveRoomClick()
         {
+            if (_isClosing) return;
+
             switch (_currentState)
             {
                 case RoomState.DisconnectedClient:
+                    _isClosing = true;
                     AudioManager.Instance.PopMusicVolume();
+                    // 无退场动画 — 转场期间输入由 GoBackCoroutine 的 SceneTransition 锁封锁
                     GameScene.Instance.GoBack();
                     break;
                 case RoomState.Host:

@@ -55,6 +55,10 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：释放 WishScreen 及其祈愿流程持有的全部锁
+            InputLocks.PopAll(this);
+
             if (drawController != null)
                 drawController.OnWishComplete -= UpdateFateCount;
         }

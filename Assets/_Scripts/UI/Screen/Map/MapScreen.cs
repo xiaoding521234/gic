@@ -11,7 +11,7 @@ namespace GIC.UI
 {
 
 
-    public class MapScreen : MonoBehaviour
+    public class MapScreen : MonoBehaviour, IClosable
     {
         [Header("固定UI")]
         [SerializeField] private Button closeButton;
@@ -43,6 +43,10 @@ namespace GIC.UI
 
         private RegionName currentRegion;
         private readonly List<GameObject> _spawnedAnchors = new();
+        private bool isClosing = false;
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => OnCloseClick();
 
         [Autowired] private PositionManager _positionManager;
 
@@ -50,6 +54,7 @@ namespace GIC.UI
         private void Start()
         {
             Wargame.Instance.Context.Inject(this);
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
             if (closeButton != null)
                 closeButton.onClick.AddListener(OnCloseClick);
             if (nodkraiButton != null)
@@ -151,6 +156,9 @@ namespace GIC.UI
 
         private void OnCloseClick()
         {
+            if (isClosing) return;
+            isClosing = true;
+            InputLocks.Push(this, InputLockReason.Closing);
             AudioManager.Instance.PopMusicVolume();
             CloseWithFade();
         }
@@ -183,11 +191,15 @@ namespace GIC.UI
                 canvasGroup.alpha = 0f;
             }
 
+            InputLocks.Pop(this, InputLockReason.Closing);
             GameScene.Instance.GoBack();
         }
 
         private void OnDestroy()
         {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：淡出协程被销毁中断时释放本类持有的锁
+            InputLocks.PopAll(this);
             ClearAnchors();
         }
     }

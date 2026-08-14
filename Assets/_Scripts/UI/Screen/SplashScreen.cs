@@ -1,5 +1,4 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;
@@ -9,48 +8,48 @@ using GIC.Battle;
 using GIC.Tool;
 namespace GIC.UI
 {
-
-
-    public class SplashScreen : MonoBehaviour
+    /// <summary>
+    /// 启动动画屏 — 淡入/保持/淡出 Logo 后进入大厅。
+    /// 跳过方式：任意键或鼠标按钮。
+    /// 启动后 0.3 秒内通过 InputLock 保护，防止误触。
+    /// </summary>
+    public class SplashScreen : MonoBehaviour, IClosable
     {
         [Header("UI组件")]
         [SerializeField] private Image logoImage;
         
         [Header("动画参数")]
-        [SerializeField] private float fadeInDuration = 0.85f;      // 淡入时间
-        [SerializeField] private float holdDuration = 0.5f;        // 保持时间
-        [SerializeField] private float fadeOutDuration = 0.7f;     // 淡出时间
+        [SerializeField] private float fadeInDuration = 0.85f;
+        [SerializeField] private float holdDuration = 0.5f;
+        [SerializeField] private float fadeOutDuration = 0.7f;
         
         [Header("调试设置")]
-        [SerializeField] private bool skipAnimation = false;        // 跳过动画（测试用）
-        [SerializeField] private KeyCode skipKey = KeyCode.Space;   // 跳过动画的按键
-        
+        [SerializeField] private bool skipAnimation = false;
+
         private CanvasGroup logoCanvasGroup;
         private bool isSkipped = false;
+
+        void IClosable.Close() => SkipAnimation();
         
         private void Awake()
         {
-            // 获取或添加CanvasGroup组件
             logoCanvasGroup = logoImage.GetComponent<CanvasGroup>();
             if (logoCanvasGroup == null)
-            {
                 logoCanvasGroup = logoImage.gameObject.AddComponent<CanvasGroup>();
-            }
-            
-            // 初始状态为完全透明
             logoCanvasGroup.alpha = 0f;
         }
         
         private void Start()
         {
-            // 预加载首个祈愿角色立绘（4K），与 splash 动画并行加载
-            // 比原来在 MainHall.Start() 中预加载提前了 ~2s（splash 动画时长）
-            Wargame.Instance?.AssetCache?.Preload<Sprite>("WishArt/columbina");
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
 
-            // 预加载大厅默认位置背景，与 splash 动画并行加载
+            // 启动后 0.3 秒内锁定输入，防止误触
+            InputLocks.Push(this, InputLockReason.SplashProtection);
+            StartCoroutine(ReleaseProtectionAfter(0.3f));
+
+            Wargame.Instance?.AssetCache?.Preload<Sprite>("WishArt/columbina");
             PreloadMainHallBackground();
 
-            // 如果跳过动画，直接加载大厅
             if (skipAnimation)
             {
                 Debug.Log("跳过启动动画，直接进入大厅");
@@ -58,43 +57,53 @@ namespace GIC.UI
                 return;
             }
             
-            // 开始Logo动画
             StartCoroutine(PlayLogoAnimation());
         }
-        
+
+        private IEnumerator ReleaseProtectionAfter(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            InputLocks.Pop(this, InputLockReason.SplashProtection);
+        }
+
         private void Update()
         {
-            // 按指定按键跳过动画
-            if (!skipAnimation && !isSkipped && Input.GetKeyDown(skipKey))
+            if (skipAnimation || isSkipped) return;
+
+            // InputLock 激活时 Update 仍会执行（MonoBehaviour.Update 独立于 InputManager.Update）
+            // 但 SplashScreen 的跳过是本地检测，不受 InputManager 管
+            // InputLock 期间 SplashScreen 自己也不跳过
+            if (Wargame.Instance?.InputManager?.IsInputLocked == true) return;
+
+            if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
             {
                 SkipAnimation();
             }
         }
+
+        private void OnDestroy()
+        {
+            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            // 兜底：SkipAnimation 的 StopAllCoroutines 可能中断 ReleaseProtectionAfter
+            InputLocks.PopAll(this);
+        }
         
         private void SkipAnimation()
         {
+            if (isSkipped) return;
             isSkipped = true;
             Debug.Log("跳过启动动画");
             
-            // 停止所有协程
             StopAllCoroutines();
-            
-            // 直接进入大厅
             SceneType.MainHall.Load();
         }
         
         private IEnumerator PlayLogoAnimation()
         {
-            // 淡入
             yield return StartCoroutine(FadeLogo(0f, 1f, fadeInDuration));
-            
-            // 保持
             yield return new WaitForSeconds(holdDuration);
-            
-            // 淡出
             yield return StartCoroutine(FadeLogo(1f, 0f, fadeOutDuration));
             
-            // 动画完成，进入大厅
             SceneType.MainHall.Load();
         }
         
@@ -131,5 +140,3 @@ namespace GIC.UI
         }
     }
 }
-
-

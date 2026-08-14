@@ -11,7 +11,7 @@ namespace GIC.UI
 {
 
 
-    public partial class WishScreen : MonoBehaviour
+    public partial class WishScreen : MonoBehaviour, IClosable
     {
         [Serializable]
         public class CharacterEntry
@@ -87,6 +87,8 @@ namespace GIC.UI
 
         private void Start()
         {
+            Wargame.Instance?.InputManager?.RegisterClosable(this);
+
             if (wishClip != null)
             {
                 AudioManager.Instance.PushMusicState(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
@@ -125,9 +127,17 @@ namespace GIC.UI
 
         private void Close()
         {
+            if (isClosing) return;
+            isClosing = true;
+            InputLocks.Push(this, InputLockReason.Closing);
             AudioManager.Instance.PopMusicState();
             StartCoroutine(CloseCoroutine());
         }
+
+        // ── IClosable 实现 ──
+        void IClosable.Close() => Close();
+
+        private bool isClosing = false;
 
         private IEnumerator CloseCoroutine()
         {
@@ -137,6 +147,7 @@ namespace GIC.UI
                 characters[currentIndex].panel.FadeOut();
 
             yield return slideOut;
+            InputLocks.Pop(this, InputLockReason.Closing);
             GameScene.Instance.GoBack();
         }
 
@@ -255,6 +266,7 @@ namespace GIC.UI
 
         private IEnumerator PlaySlideInAnimation()
         {
+            InputLocks.Push(this, InputLockReason.Entering);
             // Awake 已设置偏移位，这里只做动画
 
             float startTime = Time.realtimeSinceStartup;
@@ -283,6 +295,7 @@ namespace GIC.UI
 
             SnapPanelsToTarget();
             if (panelCanvasGroup != null) panelCanvasGroup.alpha = 1f;
+            InputLocks.Pop(this, InputLockReason.Entering);
         }
 
         private IEnumerator PlaySlideOutAnimation()
