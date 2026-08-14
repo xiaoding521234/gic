@@ -69,6 +69,11 @@ namespace GIC.UI
 
             _isVideoPlaying = true;
 
+            // 立即显示黑屏覆盖，防止视频准备期间卡片内容泄露
+            _star5VideoRawImage.color = Color.black;
+            _star5VideoRawImage.raycastTarget = true;
+            if (_edgeGlow != null) _edgeGlow.enabled = false;
+
             if (!_star5VideoPlayer.isPrepared)
                 _star5VideoPlayer.Prepare();
 
@@ -83,16 +88,16 @@ namespace GIC.UI
             if (!_star5VideoPlayer.isPrepared)
             {
                 _isVideoPlaying = false;
+                _star5VideoRawImage.color = new Color(1f, 1f, 1f, 0f);
+                _star5VideoRawImage.raycastTarget = false;
+                if (_edgeGlow != null) _edgeGlow.enabled = true;
                 yield break;
             }
 
             _star5VideoPlayer.Play();
 
+            // 切换为白色以显示视频内容
             _star5VideoRawImage.color = Color.white;
-            _star5VideoRawImage.raycastTarget = true;
-
-            // 视频播放期间禁用边缘泛光，防止穿透视频覆盖层
-            if (_edgeGlow != null) _edgeGlow.enabled = false;
 
             while (_star5VideoPlayer.isPlaying)
                 yield return null;

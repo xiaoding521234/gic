@@ -322,7 +322,16 @@ namespace GIC.UI
                 switch (step.type)
                 {
                     case WishRevealStep.StepType.Star5Video:
+                        // 立即隐藏卡片，防止视频播放前泄露抽卡结果
+                        var cardCG = card.GetComponent<CanvasGroup>();
+                        if (cardCG == null)
+                            cardCG = card.gameObject.AddComponent<CanvasGroup>();
+                        cardCG.alpha = 0f;
+
                         yield return PlayStar5TransitionCoroutine();
+
+                        // 视频结束后恢复卡片可见
+                        cardCG.alpha = 1f;
                         break;
 
                     case WishRevealStep.StepType.CardEffects:
