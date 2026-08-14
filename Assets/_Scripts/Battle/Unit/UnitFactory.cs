@@ -32,28 +32,39 @@ namespace GIC.Battle
         public static void Initialize()
         {
             if (_isInitialized) return;
-            
+
             // 从 Resources 加载预制体
             _unitPrefab = Resources.Load<GameObject>("Prefabs/Units/NormalUnit");
-            
+            if (_unitPrefab == null)
+            {
+                Debug.LogError("[UnitFactory] 未找到单位预制体 Prefabs/Units/NormalUnit，请确认 Resources 目录");
+                return; // 不置 _isInitialized，下次调用重试加载
+            }
+
             _isInitialized = true;
             Debug.Log($"[UnitFactory] 初始化完成");
         }
-        
-        
+
+
         // ==================== 创建方法 ====================
-        
+
         /// <summary>
         /// 创建单位实例
         /// </summary>
         public static Unit CreateUnitWithData(UnitConfig.UnitData data)
         {
             if (!_isInitialized) Initialize();
-            
+
+            if (_unitPrefab == null)
+            {
+                Debug.LogError("[UnitFactory] 预制体未就绪，无法创建单位");
+                return null;
+            }
+
             GameObject unitObj = UnityEngine.Object.Instantiate(_unitPrefab);
             Unit unit = unitObj.GetComponent<Unit>();
             unit.InitWithData(data);
-            
+
             return unit;
         }
         

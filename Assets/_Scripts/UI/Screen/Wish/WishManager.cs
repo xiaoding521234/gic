@@ -259,14 +259,18 @@ namespace GIC.UI
                 }
             }
 
-            // 新卡
+            // 新卡（走统一入口，自动失效 ownedCards 缓存）
             var newCard = new SaveCardData();
             if (isUnit)
+            {
                 newCard.SaveUnit(cardId.AsUnitName(), 1);
+                save.AddOwnedUnit(newCard);
+            }
             else
+            {
                 newCard.SaveItem(cardId.AsItemName(), addCount);
-            list.Add(newCard);
-            save.RebuildOwnedCards();
+                save.AddOwnedItem(newCard);
+            }
         }
 
         /// <summary>
@@ -287,7 +291,7 @@ namespace GIC.UI
             // 星辉不在存档中（初始为0未创建），新建
             var newCard = new SaveCardData();
             newCard.SaveItem(ItemName.Starglitter, amount);
-            save.ownedNormalItems.Add(newCard);
+            save.AddOwnedItem(newCard);
         }
 
         /// <summary>

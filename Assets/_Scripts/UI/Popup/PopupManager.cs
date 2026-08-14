@@ -23,12 +23,6 @@ namespace GIC.UI
         private float _canvasHeight;
         private float _toastHeight;
 
-
-        private void Awake()
-        {
-            
-        }
-
         public void ShowModalPopup(string message)
         {
             if (popupPrefab == null)
@@ -179,8 +173,9 @@ namespace GIC.UI
         private void OnToastComplete(PopupDialog dialog)
         {
             int index = _activeToasts.IndexOf(dialog);
-            if (index >= 0)
-                _activeToasts.RemoveAt(index);
+            if (index < 0) return;
+
+            _activeToasts.RemoveAt(index);
 
             // 重排剩余提示
             for (int i = index; i < _activeToasts.Count; i++)

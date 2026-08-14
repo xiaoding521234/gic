@@ -51,6 +51,20 @@ namespace GIC.Framework
             _ownedCards = null;
         }
 
+        /// <summary>添加已拥有角色 —— 外部改库存的统一入口，自动失效 ownedCards 缓存</summary>
+        public void AddOwnedUnit(SaveCardData card)
+        {
+            ownedUnits.Add(card);
+            RebuildOwnedCards();
+        }
+
+        /// <summary>添加已拥有物品 —— 外部改库存的统一入口，自动失效 ownedCards 缓存</summary>
+        public void AddOwnedItem(SaveCardData card)
+        {
+            ownedNormalItems.Add(card);
+            RebuildOwnedCards();
+        }
+
 
         // ========== 音量设置 ==========
         [Range(0f, 1f)]
@@ -132,7 +146,7 @@ namespace GIC.Framework
             {
                 SaveCardData cardData = new SaveCardData();
                 cardData.SaveUnit(unitName, 1);
-                ownedUnits.Add(cardData);
+                AddOwnedUnit(cardData);
             });
 
             // 卡组1：前三个蒙德角色（Amber, Kaeya, Barbara）
@@ -179,7 +193,7 @@ namespace GIC.Framework
                     _ => 1
                 };
                 cardData.SaveItem(itemID, count);
-                ownedNormalItems.Add(cardData);
+                AddOwnedItem(cardData);
             });
 
             // 纠缠之缘和体力加入卡组1
@@ -201,7 +215,7 @@ namespace GIC.Framework
             {
                 SaveCardData cardData = new SaveCardData();
                 cardData.SaveItem(itemID, 10);
-                ownedNormalItems.Add(cardData);
+                AddOwnedItem(cardData);
             });
 
             // ==================== 默认卡组 ====================

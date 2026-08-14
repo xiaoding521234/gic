@@ -71,8 +71,7 @@ namespace GIC.UI
             {
                 return;
             }
-            Debug.Log("变化");
-            
+
             skillSelect.gameObject.SetActive(isOn);
             
             
@@ -89,10 +88,12 @@ namespace GIC.UI
             {
                 return;
             }
+        }
 
-            Debug.Log("再次选中");
-            
-            
+        private void OnDestroy()
+        {
+            if (toggle != null)
+                toggle.onValueChanged.RemoveListener(OnToggleValueChanged);
         }
 
         

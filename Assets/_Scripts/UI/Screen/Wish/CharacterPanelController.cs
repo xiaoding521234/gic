@@ -80,13 +80,13 @@ namespace GIC.UI
             var data = config.GetUnitData(unitName);
             if (data == null) return;
 
-            // 名称
+            // 名称（TextCombiner 统一本地化，语言切换自动刷新）
             if (nameText != null)
-                nameText.text = unitName.GetEntry().GetLocalizedString();
+                EnsureTextCombiner(nameText).SetSingleEntry(unitName.GetEntry());
 
             // 称号
             if (titleText != null)
-                titleText.text = data.GetTitleEntry().GetLocalizedString();
+                EnsureTextCombiner(titleText).SetSingleEntry(data.GetTitleEntry());
 
             // 元素图标
             var iconConfig = Wargame.Instance?.ConfigManager?.GetElementFactionIconConfig();
@@ -103,7 +103,15 @@ namespace GIC.UI
 
             // 描述
             if (descriptionText != null)
-                descriptionText.text = data.GetDescriptionEntry().GetLocalizedString();
+                EnsureTextCombiner(descriptionText).SetSingleEntry(data.GetDescriptionEntry());
+        }
+
+        /// <summary>确保目标文本挂有 TextCombiner（本地化统一入口）</summary>
+        private static TextCombiner EnsureTextCombiner(TextMeshProUGUI tmp)
+        {
+            var tc = tmp.GetComponent<TextCombiner>();
+            if (tc == null) tc = tmp.gameObject.AddComponent<TextCombiner>();
+            return tc;
         }
 
         public void SetFadeInState()

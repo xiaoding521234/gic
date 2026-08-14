@@ -47,10 +47,15 @@ namespace GIC.Framework
 
         public PlayerSaveData CurrentSave { get; private set; } = new PlayerSaveData();
 
-        // 删档测试模式：true = 每次启动都用新存档（旧存档会被忽略/覆盖）
-        // 当前处于快速迭代开发阶段，频繁修改数据结构，每次启动删档是正确行为
-        // 正式上线时改为 false
-        private const bool IS_DELETION_TEST_MODE = true;
+        // 删档测试模式：仅编辑器内可通过菜单 Tools/存档/删档测试模式 显式开启（EditorPrefs 持久化），
+        // 打包版本恒为 false —— 上线不再依赖人工改回常量
+#if UNITY_EDITOR
+        public const string DeletionTestModeKey = "GIC.SaveManager.DeletionTestMode";
+        private static bool IsDeletionTestMode =>
+            UnityEditor.EditorPrefs.GetBool(DeletionTestModeKey, false);
+#else
+        private const bool IsDeletionTestMode = false;
+#endif
 
         // 删档测试模式下，旧存档的备份标识（可选，用于调试）
         private const string BACKUP_SUFFIX = ".backup";
@@ -71,7 +76,7 @@ namespace GIC.Framework
             Debug.Log($"存档路径: {SavePath}");
 
             // 删档测试模式：备份或删除旧存档
-            if (IS_DELETION_TEST_MODE)
+            if (IsDeletionTestMode)
             {
                 HandleDeletionTestMode();
             }
