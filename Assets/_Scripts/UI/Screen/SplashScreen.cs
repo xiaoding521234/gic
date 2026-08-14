@@ -52,7 +52,7 @@ namespace GIC.UI
 
             if (skipAnimation)
             {
-                Debug.Log("跳过启动动画，直接进入大厅");
+                GICLog.Info("跳过启动动画，直接进入大厅");
                 SceneType.MainHall.Load();
                 return;
             }
@@ -92,7 +92,7 @@ namespace GIC.UI
         {
             if (isSkipped) return;
             isSkipped = true;
-            Debug.Log("跳过启动动画");
+            GICLog.Info("跳过启动动画");
             
             StopAllCoroutines();
             SceneType.MainHall.Load();

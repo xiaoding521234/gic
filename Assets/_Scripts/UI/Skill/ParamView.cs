@@ -28,7 +28,7 @@ namespace GIC.UI
         {
             if (paramNameEntry == null || paramValueEntry == null)
             {
-                Debug.LogWarning("Param-View InitWithParam: paramNameEntry or paramValueEntry is null, skipping");
+                GICLog.Warn("Param-View InitWithParam: paramNameEntry or paramValueEntry is null, skipping");
                 return;
             }
 

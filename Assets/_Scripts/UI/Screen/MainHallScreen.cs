@@ -168,7 +168,7 @@ namespace GIC.UI
 
         private void OnReturnedFromScene(string fromScene)
         {
-            Debug.Log($"从 {fromScene} 返回到大厅");
+            GICLog.Info($"从 {fromScene} 返回到大厅");
             // 可以在这里添加返回时的特殊处理
         }
         
@@ -273,7 +273,7 @@ namespace GIC.UI
                 }
                 else
                 {
-                    Debug.LogWarning($"未找到背景图片: {address}");
+                    GICLog.Warn($"未找到背景图片: {address}");
                 }
             }, LoadPriority.High);
         }
@@ -427,7 +427,7 @@ namespace GIC.UI
         
         if (asyncLoad == null)
         {
-            Debug.LogError("无法预加载场景");
+            GICLog.Error("无法预加载场景");
             isExiting = false;
             SetButtonsInteractable(true);
             yield break;
@@ -477,7 +477,7 @@ namespace GIC.UI
         #region 左侧按钮回调
         private void OnMissionButtonClick()
         {
-            Debug.Log("打开任务界面");
+            GICLog.Info("打开任务界面");
         }
 
         private void OnMapButtonClick()
@@ -487,7 +487,7 @@ namespace GIC.UI
 
         private void OnAchievementButtonClick()
         {
-            Debug.Log("打开成就界面");
+            GICLog.Info("打开成就界面");
         }
 
         private void OnSettingsButtonClick()
@@ -514,7 +514,7 @@ namespace GIC.UI
 
         private void OnTutorialButtonClick()
         {
-            Debug.Log("打开教程界面");
+            GICLog.Info("打开教程界面");
         }
         #endregion
     }

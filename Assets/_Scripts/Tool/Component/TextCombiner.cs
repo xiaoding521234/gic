@@ -52,7 +52,7 @@ namespace GIC.Tool
             if (textComponent == null)
             {
                 
-                Debug.LogError($"TMP_TextCombiner: 在 {gameObject.name} 上未找到 TMP_Text 组件", this);
+                GICLog.Error($"TMP_TextCombiner: 在 {gameObject.name} 上未找到 TMP_Text 组件", this);
                 return;
             }
 
@@ -68,21 +68,21 @@ namespace GIC.Tool
                     }
                     else
                     {
-                        Debug.LogWarning($"TextCombiner [{gameObject.name}]: 条目 {i} 是空的（既无 localizedString 也无文本内容），请检查是否误添加了空 Entry", this);
+                        GICLog.Warn($"TextCombiner [{gameObject.name}]: 条目 {i} 是空的（既无 localizedString 也无文本内容），请检查是否误添加了空 Entry", this);
                     }
                     _activeHandlers.Add(null);
                     continue;
                 }
                 if (entry.localizedString.IsEmpty)
                 {
-                    Debug.LogWarning($"TextCombiner [{gameObject.name}]: 条目 {i} 的 localizedString 未配置（Table 或 Key 为空），请检查 Inspector", this);
+                    GICLog.Warn($"TextCombiner [{gameObject.name}]: 条目 {i} 的 localizedString 未配置（Table 或 Key 为空），请检查 Inspector", this);
                     _activeHandlers.Add(null);
                     continue;
                 }
                 string key = entry.localizedString.TableEntryReference.Key;
                 long keyId = entry.localizedString.TableEntryReference.KeyId;
                 string tableName = entry.localizedString.TableReference.TableCollectionName;
-                Debug.Log($"TextCombiner [{gameObject.name}] 条目 {i}: Table={tableName}, Key={key}, KeyId={keyId}");
+                GICLog.Info($"TextCombiner [{gameObject.name}] 条目 {i}: Table={tableName}, Key={key}, KeyId={keyId}");
 
                 LocalizedString.ChangeHandler OnEntryChanged = (value) => OnEntryUpdated(index, value);
                 entry.localizedString.StringChanged += OnEntryChanged;
@@ -174,7 +174,7 @@ namespace GIC.Tool
         {
             if (index < 0 || index >= entries.Count)
             {
-                Debug.LogWarning($"TMP_TextCombiner: 移除条目失败，索引 {index} 越界");
+                GICLog.Warn($"TMP_TextCombiner: 移除条目失败，索引 {index} 越界");
                 return;
             }
 
@@ -228,7 +228,7 @@ namespace GIC.Tool
         {
             if (entry == null)
             {
-                Debug.LogWarning("TextCombiner.SetSingleEntry: entry 为空", this);
+                GICLog.Warn("TextCombiner.SetSingleEntry: entry 为空", this);
                 return;
             }
 

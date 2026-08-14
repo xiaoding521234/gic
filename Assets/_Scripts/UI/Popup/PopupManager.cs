@@ -27,7 +27,7 @@ namespace GIC.UI
         {
             if (popupPrefab == null)
             {
-                Debug.LogError("PopupManager: popupPrefab 未设置");
+                GICLog.Error("PopupManager: popupPrefab 未设置");
                 return;
             }
 
@@ -39,7 +39,7 @@ namespace GIC.UI
             }
             else
             {
-                Debug.LogError("PopupManager: popupPrefab 上未找到 PopupDialog 组件");
+                GICLog.Error("PopupManager: popupPrefab 上未找到 PopupDialog 组件");
             }
         }
 
@@ -47,7 +47,7 @@ namespace GIC.UI
         {
             if (popupPrefab == null)
             {
-                Debug.LogError("PopupManager: popupPrefab 未设置");
+                GICLog.Error("PopupManager: popupPrefab 未设置");
                 return;
             }
 
@@ -59,7 +59,7 @@ namespace GIC.UI
             }
             else
             {
-                Debug.LogError("PopupManager: popupPrefab 上未找到 PopupDialog 组件");
+                GICLog.Error("PopupManager: popupPrefab 上未找到 PopupDialog 组件");
             }
         }
 
@@ -115,7 +115,7 @@ namespace GIC.UI
             var prefab = toastPrefab != null ? toastPrefab : popupPrefab;
             if (prefab == null)
             {
-                Debug.LogError("PopupManager: popupPrefab 未设置");
+                GICLog.Error("PopupManager: popupPrefab 未设置");
                 return null;
             }
 
@@ -123,7 +123,7 @@ namespace GIC.UI
             var dialog = instance.GetComponent<PopupDialog>();
             if (dialog == null)
             {
-                Debug.LogError("PopupManager: 预制体上未找到 PopupDialog 组件");
+                GICLog.Error("PopupManager: 预制体上未找到 PopupDialog 组件");
                 Destroy(instance);
                 return null;
             }

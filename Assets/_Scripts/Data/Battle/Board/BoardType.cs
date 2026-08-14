@@ -43,7 +43,7 @@ namespace GIC.Data
             if (System.Enum.TryParse<BoardType>(str, out var result))
                 return result;
             
-            Debug.LogWarning($"无法解析棋盘类型: {str}");
+            GICLog.Warn($"无法解析棋盘类型: {str}");
             return BoardType.MainWorld;
         }
 

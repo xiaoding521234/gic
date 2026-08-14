@@ -67,7 +67,7 @@ namespace GIC.Framework
             {
                 if (_inputLocks[i].Owner != owner) continue;
 
-                Debug.LogWarning($"[InputLock] 释放泄漏锁: {DescribeLock(_inputLocks[i])}");
+                GICLog.Warn($"[InputLock] 释放泄漏锁: {DescribeLock(_inputLocks[i])}");
                 _inputLocks.RemoveAt(i);
                 removed++;
             }

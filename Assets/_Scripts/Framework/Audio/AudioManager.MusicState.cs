@@ -97,7 +97,7 @@ namespace GIC.Framework
         {
             if (musicStateStack.Count == 0)
             {
-                Debug.LogWarning("没有可恢复的音乐状态");
+                GICLog.Warn("没有可恢复的音乐状态");
                 return;
             }
 

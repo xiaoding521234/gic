@@ -202,7 +202,7 @@ namespace GIC.Data
             if (Enum.TryParse<UnitName>(str, out var result))
                 return result;
 
-            Debug.LogWarning($"无法解析角色名称: {str}");
+            GICLog.Warn($"无法解析角色名称: {str}");
             return UnitName.Traveler;
         }
     }

@@ -124,7 +124,7 @@ namespace GIC.Framework
 
             ApplyAllVolumes();
 
-            Debug.Log($"音量设置已加载: 总={masterVolume:F2} 音乐={musicVolume:F2} 音效={sfxVolume:F2} 语音={voiceVolume:F2}");
+            GICLog.Info($"音量设置已加载: 总={masterVolume:F2} 音乐={musicVolume:F2} 音效={sfxVolume:F2} 语音={voiceVolume:F2}");
         }
 
         /// <summary>

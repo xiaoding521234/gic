@@ -43,7 +43,7 @@ namespace GIC.Framework
                 RegisterType(type);
             }
 
-            Debug.Log($"[NetworkEventRegistry] 自动扫描注册 {_typeToId.Count} 种网络事件类型");
+            GICLog.Info($"[NetworkEventRegistry] 自动扫描注册 {_typeToId.Count} 种网络事件类型");
         }
 
         /// <summary>
@@ -68,7 +68,7 @@ namespace GIC.Framework
 
             // 冲突检测
             if (_idToType.TryGetValue(id, out var existing) && existing != type)
-                Debug.LogWarning($"[NetworkEventRegistry] ID 冲突: {id} 已被 {existing.Name} 占用，{type.Name} 使用备用 ID");
+                GICLog.Warn($"[NetworkEventRegistry] ID 冲突: {id} 已被 {existing.Name} 占用，{type.Name} 使用备用 ID");
 
             // 线性探测解冲突
             while (_idToType.ContainsKey(id))
@@ -104,7 +104,7 @@ namespace GIC.Framework
 
             if (msg.EventId == 0 || !_idToType.TryGetValue(msg.EventId, out var type))
             {
-                Debug.LogWarning($"[NetworkEventRegistry] 未知的 EventId: {msg.EventId}");
+                GICLog.Warn($"[NetworkEventRegistry] 未知的 EventId: {msg.EventId}");
                 return null;
             }
 
@@ -117,7 +117,7 @@ namespace GIC.Framework
             }
             catch (Exception e)
             {
-                Debug.LogError($"[NetworkEventRegistry] 反序列化失败: {type.Name}, error={e.Message}");
+                GICLog.Error($"[NetworkEventRegistry] 反序列化失败: {type.Name}, error={e.Message}");
                 return null;
             }
         }

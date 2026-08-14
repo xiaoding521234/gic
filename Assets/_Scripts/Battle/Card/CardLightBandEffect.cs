@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
+using GIC.Framework;
 namespace GIC.Battle
 {
     /// <summary>
@@ -60,7 +61,7 @@ namespace GIC.Battle
         {
             if (BandShader == null)
             {
-                Debug.LogError("[CardLightBandEffect] 找不到 Shader: UI/CardLightBand");
+                GICLog.Error("[CardLightBandEffect] 找不到 Shader: UI/CardLightBand");
                 return;
             }
 

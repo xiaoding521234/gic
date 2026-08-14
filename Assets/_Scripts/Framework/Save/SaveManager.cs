@@ -73,7 +73,7 @@ namespace GIC.Framework
         [PostConstruct]
         public void Init()
         {
-            Debug.Log($"存档路径: {SavePath}");
+            GICLog.Info($"存档路径: {SavePath}");
 
             // 删档测试模式：备份或删除旧存档
             if (IsDeletionTestMode)
@@ -97,11 +97,11 @@ namespace GIC.Framework
                 try
                 {
                     File.Delete(SavePath);
-                    Debug.Log("删档测试模式：已删除旧存档，将创建新存档");
+                    GICLog.Info("删档测试模式：已删除旧存档，将创建新存档");
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning($"删档测试模式删除失败: {e.Message}");
+                    GICLog.Warn($"删档测试模式删除失败: {e.Message}");
                 }
             }
 
@@ -129,11 +129,11 @@ namespace GIC.Framework
                 CurrentSave.saveVersion = CURRENT_SAVE_VERSION;
                 string json = JsonUtility.ToJson(CurrentSave, true);
                 File.WriteAllText(SavePath, json, System.Text.Encoding.UTF8);
-                Debug.Log($"存档成功: {SavePath}");
+                GICLog.Info($"存档成功: {SavePath}");
             }
             catch (Exception e)
             {
-                Debug.LogError($"保存失败: {e.Message}");
+                GICLog.Error($"保存失败: {e.Message}");
             }
         }
 
@@ -142,7 +142,7 @@ namespace GIC.Framework
 
             if (!File.Exists(SavePath))
             {
-                Debug.Log("未找到存档，创建新存档");
+                GICLog.Info("未找到存档，创建新存档");
                 CreateNewSave();
             }
 
@@ -163,11 +163,11 @@ namespace GIC.Framework
                 // 4. 保存一次，确保补充和排序的结果持久化
                 SaveGame();
 
-                Debug.Log($"读档成功，当前版本: {CurrentSave.saveVersion}");
+                GICLog.Info($"读档成功，当前版本: {CurrentSave.saveVersion}");
             }
             catch (Exception e)
             {
-                Debug.LogError($"读取失败: {e.Message}");
+                GICLog.Error($"读取失败: {e.Message}");
                 CreateNewSave();
             }
         }
@@ -189,11 +189,11 @@ namespace GIC.Framework
                 try
                 {
                     File.Delete(SavePath);
-                    Debug.Log($"已删除存档: {SavePath}");
+                    GICLog.Info($"已删除存档: {SavePath}");
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"删除存档失败: {e.Message}");
+                    GICLog.Error($"删除存档失败: {e.Message}");
                 }
             }
 
@@ -204,11 +204,11 @@ namespace GIC.Framework
                 try
                 {
                     File.Delete(backupPath);
-                    Debug.Log($"已删除备份存档: {backupPath}");
+                    GICLog.Info($"已删除备份存档: {backupPath}");
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"删除备份存档失败: {e.Message}");
+                    GICLog.Error($"删除备份存档失败: {e.Message}");
                 }
             }
 
@@ -235,7 +235,7 @@ namespace GIC.Framework
         {
             if (unitConfig == null)
             {
-                Debug.LogWarning("UnitConfig 为空，跳过角色同步");
+                GICLog.Warn("UnitConfig 为空，跳过角色同步");
                 return;
             }
 
@@ -269,7 +269,7 @@ namespace GIC.Framework
             }
 
             if (added > 0)
-                Debug.Log($"补充缺失角色 {added} 个");
+                GICLog.Info($"补充缺失角色 {added} 个");
 
             CurrentSave.ownedUnits = newList;
         }
@@ -281,7 +281,7 @@ namespace GIC.Framework
         {
             if (itemConfig == null)
             {
-                Debug.LogWarning("ItemConfig 为空，跳过物品同步");
+                GICLog.Warn("ItemConfig 为空，跳过物品同步");
                 return;
             }
 
@@ -315,7 +315,7 @@ namespace GIC.Framework
             }
 
             if (added > 0)
-                Debug.Log($"补充缺失物品 {added} 个");
+                GICLog.Info($"补充缺失物品 {added} 个");
 
             CurrentSave.ownedNormalItems = newList;
         }
@@ -340,7 +340,7 @@ namespace GIC.Framework
         {
             if (unitConfig == null)
             {
-                Debug.LogWarning("UnitConfig 为空，跳过角色排序");
+                GICLog.Warn("UnitConfig 为空，跳过角色排序");
                 return;
             }
 
@@ -361,7 +361,7 @@ namespace GIC.Framework
         {
             if (itemConfig == null)
             {
-                Debug.LogWarning("ItemConfig 为空，跳过物品排序");
+                GICLog.Warn("ItemConfig 为空，跳过物品排序");
                 return;
             }
 
@@ -390,7 +390,7 @@ namespace GIC.Framework
 
             if (CurrentSave.saveVersion > CURRENT_SAVE_VERSION)
             {
-                Debug.LogWarning($"存档版本({CurrentSave.saveVersion})高于游戏版本({CURRENT_SAVE_VERSION})，可能存在兼容性问题");
+                GICLog.Warn($"存档版本({CurrentSave.saveVersion})高于游戏版本({CURRENT_SAVE_VERSION})，可能存在兼容性问题");
                 return;
             }
 
@@ -402,7 +402,7 @@ namespace GIC.Framework
                         UpgradeFromV1ToV2(CurrentSave);
                         break;
                     default:
-                        Debug.LogWarning($"未知的存档版本: {CurrentSave.saveVersion}，直接升级到最新");
+                        GICLog.Warn($"未知的存档版本: {CurrentSave.saveVersion}，直接升级到最新");
                         CurrentSave.saveVersion = CURRENT_SAVE_VERSION;
                         break;
                 }
@@ -410,14 +410,14 @@ namespace GIC.Framework
 
             if (oldVersion != CurrentSave.saveVersion)
             {
-                Debug.Log($"存档已从 V{oldVersion} 升级到 V{CurrentSave.saveVersion}");
+                GICLog.Info($"存档已从 V{oldVersion} 升级到 V{CurrentSave.saveVersion}");
                 SaveGame();
             }
         }
 
         private void UpgradeFromV1ToV2(PlayerSaveData saveData)
         {
-            Debug.Log("执行存档升级: V1 → V2");
+            GICLog.Info("执行存档升级: V1 → V2");
 
             saveData.masterVolume = Mathf.Clamp01(saveData.masterVolume);
             saveData.bgmVolume = Mathf.Clamp01(saveData.bgmVolume);

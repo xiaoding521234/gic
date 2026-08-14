@@ -31,7 +31,7 @@ namespace GIC.Framework
 
         private IEnumerator RunAllTests()
         {
-            Debug.Log("[EventBus测试] ========== 开始测试 ==========");
+            GICLog.Info("[EventBus测试] ========== 开始测试 ==========");
 
             foreach (int fps in testFrameRates)
             {
@@ -40,12 +40,12 @@ namespace GIC.Framework
             }
 
             Application.targetFrameRate = -1; // 恢复默认
-            Debug.Log("[EventBus测试] ========== 全部测试完成 ==========");
+            GICLog.Info("[EventBus测试] ========== 全部测试完成 ==========");
         }
 
         private IEnumerator RunSingleTest(int targetFps)
         {
-            Debug.Log($"[EventBus测试] --- 渲染帧率 {targetFps} fps ---");
+            GICLog.Info($"[EventBus测试] --- 渲染帧率 {targetFps} fps ---");
 
             Application.targetFrameRate = targetFps;
 
@@ -88,7 +88,7 @@ namespace GIC.Framework
             bool pass = Mathf.Abs(actualRate - expectedRate) <= expectedRate * 0.15f;
 
             string result = pass ? "✅ 通过" : "❌ 失败";
-            Debug.Log($"[EventBus测试] 渲染帧率={targetFps}fps | 入队={enqueued} | 处理={_processedCount} | "
+            GICLog.Info($"[EventBus测试] 渲染帧率={targetFps}fps | 入队={enqueued} | 处理={_processedCount} | "
                     + $"实际耗时={actualElapsed:F2}s | 速率={actualRate:F1}/s (期望~{expectedRate:F0}/s) | {result}");
         }
 

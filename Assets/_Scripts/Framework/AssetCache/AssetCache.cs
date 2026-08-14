@@ -273,7 +273,7 @@ namespace GIC.Framework
                 }
                 else
                 {
-                    Debug.LogWarning($"[AssetCache] 加载失败: {address}");
+                    GICLog.Warn($"[AssetCache] 加载失败: {address}");
                     // 失败也回调（传 null），避免调用方永久阻塞
                     foreach (var cb in entry.PendingCallbacks)
                         cb?.Invoke(null);

@@ -94,7 +94,7 @@ namespace GIC.UI
             var data = mapConfig.GetRegion(region);
             if (data == null)
             {
-                Debug.LogWarning($"[MapScreen] 未找到区域配置: {region}");
+                GICLog.Warn($"[MapScreen] 未找到区域配置: {region}");
                 return;
             }
 

@@ -43,11 +43,11 @@ namespace GIC.Battle
                 // 创建工厂委托
                 _creators[skillId] = () => (BaseSkill)Activator.CreateInstance(type);
                 
-                Debug.Log($"[SkillFactory] 注册技能: {skillId} -> {type.Name}");
+                GICLog.Info($"[SkillFactory] 注册技能: {skillId} -> {type.Name}");
             }
             
             _isInitialized = true;
-            Debug.Log($"[SkillFactory] 初始化完成，共注册 {_creators.Count} 个技能");
+            GICLog.Info($"[SkillFactory] 初始化完成，共注册 {_creators.Count} 个技能");
         }
         
         /// <summary>
@@ -64,7 +64,7 @@ namespace GIC.Battle
                 return creator();
             }
             
-            Debug.LogWarning($"[SkillFactory] 未注册的技能: {skillID}");
+            GICLog.Warn($"[SkillFactory] 未注册的技能: {skillID}");
             return null;
         }
 

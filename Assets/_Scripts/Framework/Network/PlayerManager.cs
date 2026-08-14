@@ -46,7 +46,7 @@ namespace GIC.Framework
         {
             if (string.IsNullOrEmpty(playerID) || playerID == PlayerID.Offline || playerID == "Client")
             {
-                Debug.LogWarning($"[PlayerManager] SetSelfPlayerID: 无效的 ID: {playerID}");
+                GICLog.Warn($"[PlayerManager] SetSelfPlayerID: 无效的 ID: {playerID}");
                 return;
             }
 
@@ -54,7 +54,7 @@ namespace GIC.Framework
             {
                 string oldID = _selfPlayerID;
                 _selfPlayerID = playerID;
-                Debug.Log($"[PlayerManager] SelfPlayerID 已设置: {oldID} -> {playerID}");
+                GICLog.Info($"[PlayerManager] SelfPlayerID 已设置: {oldID} -> {playerID}");
                 OnSelfPlayerIDChanged?.Invoke(playerID);
             }
         }
@@ -110,7 +110,7 @@ namespace GIC.Framework
             // 订阅网络事件
             SubscribeEvents();
 
-            Debug.Log("[PlayerManager] 启动完成，等待网络初始化");
+            GICLog.Info("[PlayerManager] 启动完成，等待网络初始化");
         }
 
         public void Start() { }
@@ -217,7 +217,7 @@ namespace GIC.Framework
         {
             if (_allPlayers.ContainsKey(playerID))
             {
-                Debug.LogWarning($"[PlayerManager] 玩家已存在: {playerID}");
+                GICLog.Warn($"[PlayerManager] 玩家已存在: {playerID}");
                 return;
             }
 
@@ -237,7 +237,7 @@ namespace GIC.Framework
 
             _allPlayers[playerID] = playerInfo;
 
-            Debug.Log($"[PlayerManager] 注册玩家: {playerID} ({playerName}) - 队伍: {team} - 颜色: {color} - 房主: {isHost} - 是否是自己: {IsSelfPlayer(playerID)}");
+            GICLog.Info($"[PlayerManager] 注册玩家: {playerID} ({playerName}) - 队伍: {team} - 颜色: {color} - 房主: {isHost} - 是否是自己: {IsSelfPlayer(playerID)}");
 
             OnPlayerCountChanged?.Invoke(_allPlayers.Count);
             OnPlayerInfoUpdated?.Invoke(playerID, playerInfo);
@@ -250,7 +250,7 @@ namespace GIC.Framework
         {
             if (!_allPlayers.ContainsKey(playerID))
             {
-                Debug.LogWarning($"[PlayerManager] 尝试移除不存在的玩家: {playerID}");
+                GICLog.Warn($"[PlayerManager] 尝试移除不存在的玩家: {playerID}");
                 return;
             }
 
@@ -259,7 +259,7 @@ namespace GIC.Framework
 
             _allPlayers.Remove(playerID);
 
-            Debug.Log($"[PlayerManager] 移除玩家: {playerID} ({playerName})");
+            GICLog.Info($"[PlayerManager] 移除玩家: {playerID} ({playerName})");
 
             OnPlayerCountChanged?.Invoke(_allPlayers.Count);
         }
@@ -290,7 +290,7 @@ namespace GIC.Framework
 
             if (info == null)
             {
-                Debug.LogWarning($"[PlayerManager] 未找到玩家: {playerID}");
+                GICLog.Warn($"[PlayerManager] 未找到玩家: {playerID}");
             }
 
             return info;
@@ -312,7 +312,7 @@ namespace GIC.Framework
             {
                 info.PlayerName = newName;
                 _allPlayers[playerID] = info;
-                Debug.Log($"[PlayerManager] 玩家 {playerID} 设置名称: {newName}");
+                GICLog.Info($"[PlayerManager] 玩家 {playerID} 设置名称: {newName}");
                 OnPlayerInfoUpdated?.Invoke(playerID, info);
             }
         }
@@ -324,7 +324,7 @@ namespace GIC.Framework
                 var oldTeam = info.Team;
                 info.Team = team;
                 _allPlayers[playerID] = info;
-                Debug.Log($"[PlayerManager] 玩家 {playerID} 更换队伍: {oldTeam} -> {team}");
+                GICLog.Info($"[PlayerManager] 玩家 {playerID} 更换队伍: {oldTeam} -> {team}");
                 OnPlayerInfoUpdated?.Invoke(playerID, info);
             }
         }
@@ -336,7 +336,7 @@ namespace GIC.Framework
                 var oldColor = info.Color;
                 info.Color = color;
                 _allPlayers[playerID] = info;
-                Debug.Log($"[PlayerManager] 玩家 {playerID} 更换颜色: {oldColor} -> {color}");
+                GICLog.Info($"[PlayerManager] 玩家 {playerID} 更换颜色: {oldColor} -> {color}");
                 OnPlayerInfoUpdated?.Invoke(playerID, info);
             }
         }
@@ -348,7 +348,7 @@ namespace GIC.Framework
                 var oldSpawn = info.SpawnPosition;
                 info.SpawnPosition = spawnPosition;
                 _allPlayers[playerID] = info;
-                Debug.Log($"[PlayerManager] 玩家 {playerID} 更换出生点: {oldSpawn} -> {spawnPosition}");
+                GICLog.Info($"[PlayerManager] 玩家 {playerID} 更换出生点: {oldSpawn} -> {spawnPosition}");
                 OnPlayerInfoUpdated?.Invoke(playerID, info);
             }
         }
@@ -359,7 +359,7 @@ namespace GIC.Framework
             {
                 info.IsReady = !info.IsReady;
                 _allPlayers[playerID] = info;
-                Debug.Log($"[PlayerManager] 玩家 {playerID} 准备状态: {info.IsReady}");
+                GICLog.Info($"[PlayerManager] 玩家 {playerID} 准备状态: {info.IsReady}");
                 OnPlayerInfoUpdated?.Invoke(playerID, info);
             }
         }
@@ -411,7 +411,7 @@ namespace GIC.Framework
             int usedCount = _allPlayers.Count;
             var colors = (PlayerColor[])Enum.GetValues(typeof(PlayerColor));
             var color = colors[usedCount % colors.Length];
-            Debug.Log($"[PlayerManager] 分配颜色: {color} (第 {usedCount + 1} 位玩家)");
+            GICLog.Info($"[PlayerManager] 分配颜色: {color} (第 {usedCount + 1} 位玩家)");
             return color;
         }
 
@@ -443,15 +443,15 @@ namespace GIC.Framework
 
         public void DebugPrintAllPlayers()
         {
-            Debug.Log($"[PlayerManager] ========== 玩家列表 ({_allPlayers.Count}人) ==========");
-            Debug.Log($"[PlayerManager]   我的ID: {SelfPlayerID}");
-            Debug.Log($"[PlayerManager]   我的信息: {(GetSelfPlayerInfo() != null ? GetSelfPlayerInfo().PlayerName : "未找到")}");
+            GICLog.Info($"[PlayerManager] ========== 玩家列表 ({_allPlayers.Count}人) ==========");
+            GICLog.Info($"[PlayerManager]   我的ID: {SelfPlayerID}");
+            GICLog.Info($"[PlayerManager]   我的信息: {(GetSelfPlayerInfo() != null ? GetSelfPlayerInfo().PlayerName : "未找到")}");
             foreach (var kvp in _allPlayers)
             {
                 var info = kvp.Value;
-                Debug.Log($"[PlayerManager]   {(IsSelfPlayer(info.PlayerID) ? "→ [我] " : "   ")}ID: {info.PlayerID} | 名称: {info.PlayerName} | 队伍: {info.Team} | 颜色: {info.Color} | 准备: {info.IsReady} | 房主: {info.IsHost} | IP: {info.IPAddress}");
+                GICLog.Info($"[PlayerManager]   {(IsSelfPlayer(info.PlayerID) ? "→ [我] " : "   ")}ID: {info.PlayerID} | 名称: {info.PlayerName} | 队伍: {info.Team} | 颜色: {info.Color} | 准备: {info.IsReady} | 房主: {info.IsHost} | IP: {info.IPAddress}");
             }
-            Debug.Log("[PlayerManager] ==================================");
+            GICLog.Info("[PlayerManager] ==================================");
         }
 
         // ==================== 清理 ====================
@@ -489,7 +489,7 @@ namespace GIC.Framework
             public void Handle(T evt)
             {
                 string pid = GetPlayerID(evt);
-                Debug.Log($"[PlayerManager.{GetType().Name}] 收到请求: PlayerID={pid}");
+                GICLog.Info($"[PlayerManager.{GetType().Name}] 收到请求: PlayerID={pid}");
 
                 ApplyChange(evt, pid);
 
@@ -497,7 +497,7 @@ namespace GIC.Framework
                 if (info != null)
                     EventBusHub.Instance.Send(new UpdatePlayerInfoEvent { UpdatedInfo = info });
                 else
-                    Debug.LogWarning($"[PlayerManager.{GetType().Name}] 未找到玩家: PlayerID={pid}");
+                    GICLog.Warn($"[PlayerManager.{GetType().Name}] 未找到玩家: PlayerID={pid}");
             }
 
             protected abstract string GetPlayerID(T evt);

@@ -65,14 +65,14 @@ namespace GIC.Framework
             if (NetworkServer.active)
             {
                 AdvertiseServer();
-                Debug.Log("[MyNetworkDiscovery] 开始广播房间信息");
+                GICLog.Info("[MyNetworkDiscovery] 开始广播房间信息");
             }
         }
 
         public void StopBroadcast()
         {
             StopDiscovery();
-            Debug.Log("[MyNetworkDiscovery] 停止广播");
+            GICLog.Info("[MyNetworkDiscovery] 停止广播");
         }
 
         // ========== 修改点：替换默认的广播发现为单播扫描 ==========
@@ -80,7 +80,7 @@ namespace GIC.Framework
 
         public void StartDiscovering()
         {
-            Debug.Log("[MyNetworkDiscovery] 开始扫描局域网（单播模式）...");
+            GICLog.Info("[MyNetworkDiscovery] 开始扫描局域网（单播模式）...");
 
             // 先调用基类方法初始化 clientUdpClient
             StartDiscovery();
@@ -97,7 +97,7 @@ namespace GIC.Framework
                 _scanCoroutine = null;
             }
             StopDiscovery();
-            Debug.Log("[MyNetworkDiscovery] 停止扫描");
+            GICLog.Info("[MyNetworkDiscovery] 停止扫描");
         }
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace GIC.Framework
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[MyNetworkDiscovery] 获取IP失败: {ex.Message}");
+            GICLog.Error($"[MyNetworkDiscovery] 获取IP失败: {ex.Message}");
         }
         
         // 兜底
@@ -129,7 +129,7 @@ namespace GIC.Framework
             ips.Add("127.0.0.1");
         }
         
-        Debug.Log($"[MyNetworkDiscovery] 本机所有局域网IP: [{string.Join(", ", ips)}]");
+        GICLog.Info($"[MyNetworkDiscovery] 本机所有局域网IP: [{string.Join(", ", ips)}]");
         return ips;
     }
 
@@ -141,17 +141,17 @@ namespace GIC.Framework
         List<string> myIps = GetAllLocalIPs();
         if (myIps.Count == 0 || (myIps.Count == 1 && myIps[0] == "127.0.0.1"))
         {
-            Debug.LogError("[MyNetworkDiscovery] 无法获取有效的本机IP");
+            GICLog.Error("[MyNetworkDiscovery] 无法获取有效的本机IP");
             yield break;
         }
 
         int port = GetServerBroadcastListenPort();
-        Debug.Log($"[MyNetworkDiscovery] 目标端口: {port}");
+        GICLog.Info($"[MyNetworkDiscovery] 目标端口: {port}");
 
         UdpClient client = GetClientUdpClient();
         if (client == null)
         {
-            Debug.LogError("[MyNetworkDiscovery] clientUdpClient 为空");
+            GICLog.Error("[MyNetworkDiscovery] clientUdpClient 为空");
             yield break;
         }
 
@@ -162,7 +162,7 @@ namespace GIC.Framework
             string baseIp = myIp.Substring(0, myIp.LastIndexOf('.') + 1);
             if (scannedBases.Add(baseIp))
             {
-                Debug.Log($"[MyNetworkDiscovery] 加入扫描网段: {baseIp}1 - {baseIp}254");
+                GICLog.Info($"[MyNetworkDiscovery] 加入扫描网段: {baseIp}1 - {baseIp}254");
             }
         }
 
@@ -202,7 +202,7 @@ namespace GIC.Framework
             }
         }
 
-        Debug.Log($"[MyNetworkDiscovery] 扫描完成，共扫描 {scannedBases.Count} 个网段，发送 {totalScanned} 个请求");
+        GICLog.Info($"[MyNetworkDiscovery] 扫描完成，共扫描 {scannedBases.Count} 个网段，发送 {totalScanned} 个请求");
     }
 
         /// <summary>
@@ -235,7 +235,7 @@ namespace GIC.Framework
                 return (int)field.GetValue(this);
             }
             
-            Debug.LogWarning("[MyNetworkDiscovery] 无法获取 serverBroadcastListenPort，使用默认值 47777");
+            GICLog.Warn("[MyNetworkDiscovery] 无法获取 serverBroadcastListenPort，使用默认值 47777");
             return 47777; // 默认端口
         }
 
@@ -278,19 +278,19 @@ namespace GIC.Framework
                     uri = builder.Uri
                 };
 
-                Debug.Log($"[MyNetworkDiscovery] 响应发现请求: {endpoint.Address}:{endpoint.Port} - 房主: {HostPlayerName} - 玩家: {CurrentPlayers}/{MaxPlayers}");
+                GICLog.Info($"[MyNetworkDiscovery] 响应发现请求: {endpoint.Address}:{endpoint.Port} - 房主: {HostPlayerName} - 玩家: {CurrentPlayers}/{MaxPlayers}");
                 return response;
             }
             catch (NotImplementedException)
             {
-                Debug.LogError($"Transport {transport} 不支持网络发现");
+                GICLog.Error($"Transport {transport} 不支持网络发现");
                 throw;
             }
         }
 
         protected override void ProcessResponse(ServerResponse response, IPEndPoint endpoint)
         {
-            Debug.Log($"[MyNetworkDiscovery] 收到服务器响应 - IP: {endpoint.Address}, Port: {endpoint.Port}");
+            GICLog.Info($"[MyNetworkDiscovery] 收到服务器响应 - IP: {endpoint.Address}, Port: {endpoint.Port}");
 
             response.EndPoint = endpoint;
 
@@ -316,7 +316,7 @@ namespace GIC.Framework
 
             OnServerFound.Invoke(response);
             
-            Debug.Log($"[MyNetworkDiscovery] 发现房间: {response.EndPoint.Address}:{response.uri.Port} 房主: {hostName} ({cur}/{max})");
+            GICLog.Info($"[MyNetworkDiscovery] 发现房间: {response.EndPoint.Address}:{response.uri.Port} 房主: {hostName} ({cur}/{max})");
         }
 
         void OnDestroy()

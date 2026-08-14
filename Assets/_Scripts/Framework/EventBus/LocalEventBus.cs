@@ -109,7 +109,7 @@ namespace GIC.Framework
 
             if (_processingEvents.Contains(eventData))
             {
-                Debug.LogWarning($"[LocalEventBus] 事件循环检测: {type.Name}");
+                GICLog.Warn($"[LocalEventBus] 事件循环检测: {type.Name}");
                 queued.State = EventProcessState.Completed;
                 return;
             }
@@ -149,7 +149,7 @@ namespace GIC.Framework
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"[LocalEventBus] 处理事件出错: {ex.Message}\n{ex.StackTrace}");
+                        GICLog.Error($"[LocalEventBus] 处理事件出错: {ex.Message}\n{ex.StackTrace}");
                     }
 
                     if (!eventData.Active)
@@ -255,7 +255,7 @@ namespace GIC.Framework
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"[LocalEventBus] 立即执行出错: {ex.Message}");
+                    GICLog.Error($"[LocalEventBus] 立即执行出错: {ex.Message}");
                 }
             }
         }
@@ -268,7 +268,7 @@ namespace GIC.Framework
         {
             if (eventHandler == null)
             {
-                Debug.LogError("[LocalEventBus] 尝试注册空的 IEventHandler");
+                GICLog.Error("[LocalEventBus] 尝试注册空的 IEventHandler");
                 return;
             }
 
@@ -366,7 +366,7 @@ namespace GIC.Framework
                 return true;
             }
 
-            Debug.LogWarning($"[LocalEventBus] 无法设置锁状态 {newState}，当前锁 {_currentLockState} 优先级更高");
+            GICLog.Warn($"[LocalEventBus] 无法设置锁状态 {newState}，当前锁 {_currentLockState} 优先级更高");
             return false;
         }
 
@@ -378,7 +378,7 @@ namespace GIC.Framework
                 return true;
             }
 
-            Debug.LogWarning($"[LocalEventBus] 无法释放锁 {state}，当前锁状态为 {_currentLockState}");
+            GICLog.Warn($"[LocalEventBus] 无法释放锁 {state}，当前锁状态为 {_currentLockState}");
             return false;
         }
 

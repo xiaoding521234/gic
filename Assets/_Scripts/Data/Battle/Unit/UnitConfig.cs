@@ -159,7 +159,7 @@ namespace GIC.Data
                 // 确保索引在有效范围内
                 if (skin < 0 || skin >= cards.Count)
                 {
-                    Debug.LogWarning($"GetCard: 皮肤索引 {skin} 超出范围 (0-{cards.Count - 1})，返回默认卡片");
+                    GICLog.Warn($"GetCard: 皮肤索引 {skin} 超出范围 (0-{cards.Count - 1})，返回默认卡片");
                     return cards[0]; // 返回第一张卡片作为默认
                 }
 

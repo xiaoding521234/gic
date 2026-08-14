@@ -55,7 +55,7 @@ namespace GIC.Framework
             // 初始播放当前位置的音乐
             PlayCurrentPositionMusic();
 
-            Debug.Log($"PositionManager 启动完成，当前位置: {CurrentPosition}");
+            GICLog.Info($"PositionManager 启动完成，当前位置: {CurrentPosition}");
         }
 
         public void Start() { }
@@ -66,7 +66,7 @@ namespace GIC.Framework
 
         private void OnPositionChanged()
         {
-            Debug.Log($"位置改变: {CurrentPosition}");
+            GICLog.Info($"位置改变: {CurrentPosition}");
 
             // 切换位置时播放新位置的音乐
             PlayCurrentPositionMusic();
@@ -112,7 +112,7 @@ namespace GIC.Framework
             }
             else
             {
-                Debug.LogWarning($"位置 {CurrentPosition} 在 {timePeriod} 时段没有配置音乐");
+                GICLog.Warn($"位置 {CurrentPosition} 在 {timePeriod} 时段没有配置音乐");
             }
         }
 
@@ -157,19 +157,19 @@ namespace GIC.Framework
             var targetData = positionConfig?.GetPositionData(targetPosition);
             if (targetData == null)
             {
-                Debug.LogError($"找不到位置: {targetPosition}");
+                GICLog.Error($"找不到位置: {targetPosition}");
                 return false;
             }
 
             if (!targetData.isUnlocked)
             {
-                Debug.Log($"位置未解锁: {targetPosition}");
+                GICLog.Info($"位置未解锁: {targetPosition}");
                 return false;
             }
 
             CurrentPosition = targetPosition;
 
-            Debug.Log($"移动到: {targetPosition}");
+            GICLog.Info($"移动到: {targetPosition}");
             // 场景切换由调用方（MapScreen）负责，这里只更新位置数据
             return true;
         }
@@ -183,7 +183,7 @@ namespace GIC.Framework
             if (data != null && !data.isUnlocked)
             {
                 data.isUnlocked = true;
-                Debug.Log($"解锁位置: {position}");
+                GICLog.Info($"解锁位置: {position}");
                 return true;
             }
             return false;

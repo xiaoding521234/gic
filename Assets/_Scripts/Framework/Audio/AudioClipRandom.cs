@@ -93,7 +93,7 @@ namespace GIC.Framework
         {
             if (clips.Count == 0)
             {
-                Debug.LogWarning("AudioClipRandomSelector: 没有可用的音频片段");
+                GICLog.Warn("AudioClipRandomSelector: 没有可用的音频片段");
                 return null;
             }
 

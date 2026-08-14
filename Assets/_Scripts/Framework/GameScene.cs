@@ -161,15 +161,15 @@ namespace GIC.Framework
                 DontDestroyOnLoad(gameObject);
 
 #if !UNITY_EDITOR
-                // Release 构建：抑制 Debug.Log（保留 LogWarning / LogError 用于诊断）
-                Debug.unityLogger.filterLogType = LogType.Warning;
+                // Release 构建：日志策略统一由 GICLog 接管（压制 Info，保留 Warning/Error）
+                GICLog.ConfigureForRelease();
 #endif
             }
             else if (Instance != this)
             {
                 Destroy(gameObject);
             }
-            Debug.Log("初始化单例");
+            GICLog.Info("初始化单例");
         }
 
         private void InitializeSceneEvents()
@@ -181,13 +181,13 @@ namespace GIC.Framework
         {
             try
             {
-                Debug.Log("开始初始化Wargame");
+                GICLog.Info("开始初始化Wargame");
                 Wargame.Instance.Init();
 
             }
             catch (Exception ex)
             {
-                Debug.LogError($"游戏初始化失败: {ex.Message}");
+                GICLog.Error($"游戏初始化失败: {ex.Message}");
             }
         }
 
@@ -196,7 +196,7 @@ namespace GIC.Framework
             currentRootScene = SceneType.Boot;
             CurrentScene = SceneType.Boot;
             Wargame.Instance?.Start();
-            Debug.Log("初始化场景设置，加载 SplashScreen");
+            GICLog.Info("初始化场景设置，加载 SplashScreen");
 
             // 从 Boot 场景加载 SplashScreen（Single 模式，Boot 场景被卸载，持久化管理器通过 DontDestroyOnLoad 存活）
             SceneType.SplashScreen.Load();
@@ -223,7 +223,7 @@ namespace GIC.Framework
 
             if (enableDebugLog)
             {
-                Debug.Log($"场景激活: {previousScene.name} -> {newScene.name}");
+                GICLog.Info($"场景激活: {previousScene.name} -> {newScene.name}");
             }
         }
 
@@ -239,7 +239,7 @@ namespace GIC.Framework
             // 只在真正的场景切换期间拦截（入场动画等其它输入锁不阻塞导航）
             if (Wargame.Instance?.InputManager?.HasInputLock(InputLockReason.SceneTransition) == true)
             {
-                Debug.LogWarning("场景正在切换中，请稍后再试");
+                GICLog.Warn("场景正在切换中，请稍后再试");
                 return;
             }
 
@@ -262,17 +262,17 @@ namespace GIC.Framework
 
                     if (enableDebugLog)
                     {
-                        Debug.Log($"开始预加载场景: {scene.SceneName}");
+                        GICLog.Info($"开始预加载场景: {scene.SceneName}");
                     }
                 }
                 else
                 {
-                    Debug.LogError($"无法预加载场景: {scene.SceneName}");
+                    GICLog.Error($"无法预加载场景: {scene.SceneName}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"预加载场景失败: {scene.SceneName}, 错误: {ex.Message}");
+                GICLog.Error($"预加载场景失败: {scene.SceneName}, 错误: {ex.Message}");
             }
 
             // 让出主线程一帧，确保UI有机会更新
@@ -288,7 +288,7 @@ namespace GIC.Framework
         {
             if (asyncLoad == null)
             {
-                Debug.LogError("AsyncOperation 为空，无法激活场景");
+                GICLog.Error("AsyncOperation 为空，无法激活场景");
                 yield break;
             }
 
@@ -328,7 +328,7 @@ namespace GIC.Framework
 
             if (enableDebugLog)
             {
-                Debug.Log($"场景激活完成: {scene.SceneName}");
+                GICLog.Info($"场景激活完成: {scene.SceneName}");
             }
         }
 
@@ -353,7 +353,7 @@ namespace GIC.Framework
         {
             if (scene.LoadMode != LoadSceneMode.Single)
             {
-                Debug.LogError("根场景必须使用 Single 加载模式");
+                GICLog.Error("根场景必须使用 Single 加载模式");
                 return;
             }
 
@@ -401,7 +401,7 @@ namespace GIC.Framework
 
             if (asyncLoad == null)
             {
-                Debug.LogError($"无法加载场景: {scene.SceneName}");
+                GICLog.Error($"无法加载场景: {scene.SceneName}");
                 yield break;
             }
 
@@ -414,7 +414,7 @@ namespace GIC.Framework
             Scene loadedScene = SceneManager.GetSceneByName(scene.SceneName);
             if (!loadedScene.isLoaded)
             {
-                Debug.LogError($"场景加载失败: {scene.SceneName}");
+                GICLog.Error($"场景加载失败: {scene.SceneName}");
                 yield break;
             }
 
@@ -433,7 +433,7 @@ namespace GIC.Framework
             }
             else
             {
-                Debug.LogError($"无法设置活动场景: {scene.SceneName} 未加载");
+                GICLog.Error($"无法设置活动场景: {scene.SceneName} 未加载");
             }
         }
 
@@ -501,7 +501,7 @@ namespace GIC.Framework
 
             if (asyncUnload == null)
             {
-                Debug.LogWarning($"场景可能已卸载或不存在: {sceneName}");
+                GICLog.Warn($"场景可能已卸载或不存在: {sceneName}");
                 yield break;
             }
 
@@ -512,7 +512,7 @@ namespace GIC.Framework
 
             if (enableDebugLog)
             {
-                Debug.Log($"场景卸载完成: {sceneName}");
+                GICLog.Info($"场景卸载完成: {sceneName}");
             }
         }
 
@@ -537,7 +537,7 @@ namespace GIC.Framework
 
             if (enableDebugLog)
             {
-                Debug.Log("资源清理完成");
+                GICLog.Info("资源清理完成");
             }
         }
 
@@ -604,7 +604,7 @@ namespace GIC.Framework
             }
             else
             {
-                Debug.LogError($"上一个场景未加载且无法重新加载: {scene.SceneName}");
+                GICLog.Error($"上一个场景未加载且无法重新加载: {scene.SceneName}");
             }
         }
 
@@ -630,7 +630,7 @@ namespace GIC.Framework
         private void LogMemoryUsage()
         {
             long totalMemory = GC.GetTotalMemory(false) / 1024 / 1024;
-            Debug.Log($"内存使用: {totalMemory} MB");
+            GICLog.Info($"内存使用: {totalMemory} MB");
         }
 
         #endregion
@@ -660,7 +660,7 @@ namespace GIC.Framework
             if (popupManager != null)
                 popupManager.ShowToast(message);
             else
-                Debug.LogWarning(message);
+                GICLog.Warn(message);
         }
 
         public void ShowToast(UnityEngine.Localization.LocalizedString localizedString)

@@ -25,7 +25,7 @@ namespace GIC.Framework
                 
                 if (textCombiner == null)
                 {
-                    Debug.LogWarning($"TestText: 在 {gameObject.name} 上未找到 TextCombiner 组件", this);
+                    GICLog.Warn($"TestText: 在 {gameObject.name} 上未找到 TextCombiner 组件", this);
                 }
             }
         }

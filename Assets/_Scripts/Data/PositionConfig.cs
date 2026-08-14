@@ -78,7 +78,7 @@ namespace GIC.Data
             if (dataCache.TryGetValue(position, out var data))
                 return data;
 
-            Debug.LogWarning($"[PositionConfig] 未找到位置: {position}");
+            GICLog.Warn($"[PositionConfig] 未找到位置: {position}");
             return null;
         }
     }

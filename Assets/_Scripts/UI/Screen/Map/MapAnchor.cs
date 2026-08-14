@@ -68,11 +68,11 @@ namespace GIC.UI
         {
             if(cachedData == null)
             {
-                Debug.Log($"未配置: {positionName}");
+                GICLog.Info($"未配置: {positionName}");
             }
             if (cachedData != null && cachedData.isUnlocked)
             {
-                Debug.Log($"移动到: {positionName}");
+                GICLog.Info($"移动到: {positionName}");
                 Wargame.Instance.Context.Inject(this);
 
                 // 切换位置（触发 OnPositionChangedEvent，大厅开始预加载新背景），
@@ -82,7 +82,7 @@ namespace GIC.UI
             }
             else
             {
-                Debug.Log($"未解锁: {positionName}");
+                GICLog.Info($"未解锁: {positionName}");
             }
         }
     }

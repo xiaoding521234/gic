@@ -159,7 +159,7 @@ namespace GIC.Data
             if (System.Enum.TryParse<TileType>(str, out var result))
                 return result;
             
-            Debug.LogWarning($"无法解析地形类型: {str}");
+            GICLog.Warn($"无法解析地形类型: {str}");
             return TileType.Plain;
         }
     }

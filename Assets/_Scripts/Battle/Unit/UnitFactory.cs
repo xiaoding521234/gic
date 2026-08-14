@@ -37,12 +37,12 @@ namespace GIC.Battle
             _unitPrefab = Resources.Load<GameObject>("Prefabs/Units/NormalUnit");
             if (_unitPrefab == null)
             {
-                Debug.LogError("[UnitFactory] 未找到单位预制体 Prefabs/Units/NormalUnit，请确认 Resources 目录");
+                GICLog.Error("[UnitFactory] 未找到单位预制体 Prefabs/Units/NormalUnit，请确认 Resources 目录");
                 return; // 不置 _isInitialized，下次调用重试加载
             }
 
             _isInitialized = true;
-            Debug.Log($"[UnitFactory] 初始化完成");
+            GICLog.Info($"[UnitFactory] 初始化完成");
         }
 
 
@@ -57,7 +57,7 @@ namespace GIC.Battle
 
             if (_unitPrefab == null)
             {
-                Debug.LogError("[UnitFactory] 预制体未就绪，无法创建单位");
+                GICLog.Error("[UnitFactory] 预制体未就绪，无法创建单位");
                 return null;
             }
 

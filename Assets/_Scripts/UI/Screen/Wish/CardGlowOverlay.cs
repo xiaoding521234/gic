@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using GIC.Data;
 
+using GIC.Framework;
 namespace GIC.UI
 {
     /// <summary>
@@ -35,7 +36,7 @@ namespace GIC.UI
         {
             if (GlowShader == null)
             {
-                Debug.LogError("[CardGlowOverlay] 找不到 Shader: UI/CardGlowOverlay");
+                GICLog.Error("[CardGlowOverlay] 找不到 Shader: UI/CardGlowOverlay");
                 return null;
             }
 

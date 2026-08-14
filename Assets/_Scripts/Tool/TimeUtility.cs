@@ -27,7 +27,7 @@ namespace GIC.Tool
         public static string GetTimeSuffix()
         {
             string result = GetTimeSuffix(DayStartHour, DayEndHour);
-            Debug.Log($"[TimeUtility] GetTimeSuffix() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
+            GICLog.Info($"[TimeUtility] GetTimeSuffix() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
             return result;
         }
         
@@ -43,7 +43,7 @@ namespace GIC.Tool
             
             string result = isDaytime ? "daytime" : "night";
             
-            Debug.Log($"[TimeUtility] GetTimeSuffix({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
+            GICLog.Info($"[TimeUtility] GetTimeSuffix({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
             
             return result;
         }
@@ -54,7 +54,7 @@ namespace GIC.Tool
         public static TimePeriod GetCurrentTimePeriod()
         {
             TimePeriod result = GetCurrentTimePeriod(DayStartHour, DayEndHour);
-            Debug.Log($"[TimeUtility] GetCurrentTimePeriod() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
+            GICLog.Info($"[TimeUtility] GetCurrentTimePeriod() 返回: {result} (当前时间: {DateTime.Now:HH:mm})");
             return result;
         }
         
@@ -65,7 +65,7 @@ namespace GIC.Tool
             
             TimePeriod result = isDaytime ? TimePeriod.Daytime : TimePeriod.Night;
             
-            Debug.Log($"[TimeUtility] GetCurrentTimePeriod({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
+            GICLog.Info($"[TimeUtility] GetCurrentTimePeriod({dayStartHour}, {dayEndHour}) - 当前小时: {hour}, 是否为白天: {isDaytime}, 返回: {result}");
             
             return result;
         }

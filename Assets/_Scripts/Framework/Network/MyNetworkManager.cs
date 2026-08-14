@@ -44,7 +44,7 @@ namespace GIC.Framework
             _kcpTransport = transport as KcpTransport;
             if (_kcpTransport == null)
             {
-                Debug.LogError("[MyNetworkManager] 传输组件不是 KcpTransport，请检查 NetworkManager 配置");
+                GICLog.Error("[MyNetworkManager] 传输组件不是 KcpTransport，请检查 NetworkManager 配置");
             }
 
             if (discovery == null)
@@ -53,7 +53,7 @@ namespace GIC.Framework
             Wargame.Instance.Context.Inject(this);
             _playerManager?.SetNetworkManager(this);
 
-            Debug.Log("[MyNetworkManager] 初始化完成");
+            GICLog.Info("[MyNetworkManager] 初始化完成");
         }
 
         public override void Start()
@@ -62,10 +62,10 @@ namespace GIC.Framework
 
             if (_playerManager == null)
             {
-                Debug.LogError("[MyNetworkManager] PlayerManager 不存在！");
+                GICLog.Error("[MyNetworkManager] PlayerManager 不存在！");
             }
 
-            Debug.Log("[MyNetworkManager] 启动完成，等待用户操作");
+            GICLog.Info("[MyNetworkManager] 启动完成，等待用户操作");
         }
 
         // ==================== 公共方法 ====================
@@ -74,7 +74,7 @@ namespace GIC.Framework
         {
             if (NetworkServer.active || NetworkClient.isConnected)
             {
-                Debug.Log("[MyNetworkManager] 检测到已有连接，先停止");
+                GICLog.Info("[MyNetworkManager] 检测到已有连接，先停止");
                 StopHost();
                 _hostStarted = false;
             }
@@ -86,7 +86,7 @@ namespace GIC.Framework
                 {
                     _hostStarted = true;
                     CurrentPort = port;
-                    Debug.Log($"[MyNetworkManager] 主机模式启动成功，端口: {port}");
+                    GICLog.Info($"[MyNetworkManager] 主机模式启动成功，端口: {port}");
                 }
                 else
                 {
@@ -96,7 +96,7 @@ namespace GIC.Framework
 
             if (!_hostStarted)
             {
-                Debug.LogError($"[MyNetworkManager] 无法启动主机模式，所有端口被占用");
+                GICLog.Error($"[MyNetworkManager] 无法启动主机模式，所有端口被占用");
             }
         }
 
@@ -110,7 +110,7 @@ namespace GIC.Framework
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"[MyNetworkManager] 端口 {port} 启动失败: {ex.Message}");
+                GICLog.Warn($"[MyNetworkManager] 端口 {port} 启动失败: {ex.Message}");
                 return false;
             }
         }
@@ -119,21 +119,21 @@ namespace GIC.Framework
         {
             if (_hostStarted && NetworkServer.active)
             {
-                Debug.Log("[MyNetworkManager] 先停止主机模式再加入其他房间");
+                GICLog.Info("[MyNetworkManager] 先停止主机模式再加入其他房间");
                 StopHost();
                 _hostStarted = false;
             }
 
             if (NetworkClient.isConnected)
             {
-                Debug.Log("[MyNetworkManager] 先断开当前客户端连接");
+                GICLog.Info("[MyNetworkManager] 先断开当前客户端连接");
                 NetworkClient.Disconnect();
             }
 
             networkAddress = ip;
             SetPort(port);
             StartClient();
-            Debug.Log($"[MyNetworkManager] 正在加入房间: {ip}:{port}");
+            GICLog.Info($"[MyNetworkManager] 正在加入房间: {ip}:{port}");
         }
 
         public void MarkAsKicked()
@@ -172,12 +172,12 @@ namespace GIC.Framework
                 discovery.StartBroadcast();
             }
 
-            Debug.Log($"[MyNetworkManager] ========================================");
-            Debug.Log($"[MyNetworkManager] 服务器启动");
-            Debug.Log($"[MyNetworkManager]   端口: {CurrentPort}");
-            Debug.Log($"[MyNetworkManager]   最大玩家: {maxPlayers}");
-            Debug.Log($"[MyNetworkManager]   等待玩家连接...");
-            Debug.Log($"[MyNetworkManager] ========================================");
+            GICLog.Info($"[MyNetworkManager] ========================================");
+            GICLog.Info($"[MyNetworkManager] 服务器启动");
+            GICLog.Info($"[MyNetworkManager]   端口: {CurrentPort}");
+            GICLog.Info($"[MyNetworkManager]   最大玩家: {maxPlayers}");
+            GICLog.Info($"[MyNetworkManager]   等待玩家连接...");
+            GICLog.Info($"[MyNetworkManager] ========================================");
         }
 
         public override void OnStopServer()
@@ -191,7 +191,7 @@ namespace GIC.Framework
                 discovery.StopDiscovering();
             }
 
-            Debug.Log("[MyNetworkManager] 服务器停止");
+            GICLog.Info("[MyNetworkManager] 服务器停止");
         }
 
         public override void OnStartClient()
@@ -203,8 +203,8 @@ namespace GIC.Framework
                 discovery.StartDiscovering();
             }
 
-            Debug.Log("[MyNetworkManager] 客户端启动，正在连接...");
-            Debug.Log($"[MyNetworkManager]   目标地址: {networkAddress}:{GetCurrentPort()}");
+            GICLog.Info("[MyNetworkManager] 客户端启动，正在连接...");
+            GICLog.Info($"[MyNetworkManager]   目标地址: {networkAddress}:{GetCurrentPort()}");
         }
 
         public override void OnStopClient()
@@ -216,7 +216,7 @@ namespace GIC.Framework
                 discovery.StopDiscovering();
             }
 
-            Debug.Log("[MyNetworkManager] 客户端停止");
+            GICLog.Info("[MyNetworkManager] 客户端停止");
         }
 
         public override void OnServerConnect(NetworkConnectionToClient conn)
@@ -226,18 +226,18 @@ namespace GIC.Framework
             if (numPlayers >= maxPlayers)
             {
                 conn.Disconnect();
-                Debug.Log($"[MyNetworkManager] 连接被拒绝：房间已满 ({numPlayers}/{maxPlayers})");
+                GICLog.Info($"[MyNetworkManager] 连接被拒绝：房间已满 ({numPlayers}/{maxPlayers})");
                 return;
             }
 
-            Debug.Log($"[MyNetworkManager] 新连接 connectionId={conn.connectionId}, 地址={conn.address}, 当前在线={numPlayers}/{maxPlayers}");
+            GICLog.Info($"[MyNetworkManager] 新连接 connectionId={conn.connectionId}, 地址={conn.address}, 当前在线={numPlayers}/{maxPlayers}");
 
             _playerManager?.HandleServerConnect(conn);
         }
 
         public override void OnServerDisconnect(NetworkConnectionToClient conn)
         {
-            Debug.Log($"[MyNetworkManager] 玩家断开 connectionId={conn.connectionId}");
+            GICLog.Info($"[MyNetworkManager] 玩家断开 connectionId={conn.connectionId}");
             _playerManager?.HandleServerDisconnect(conn);
             base.OnServerDisconnect(conn);
         }
@@ -249,20 +249,20 @@ namespace GIC.Framework
             // 提前注册 NetworkEventMessage handler，防止服务器在 OnStartClient 之前发消息
             NetworkClient.ReplaceHandler<NetworkEventMessage>(OnClientReceiveNetworkEvent);
 
-            Debug.Log($"[MyNetworkManager] ========================================");
-            Debug.Log($"[MyNetworkManager] 已成功连接到服务器");
-            Debug.Log($"[MyNetworkManager]   我的角色: {(NetworkServer.active ? "房主" : "客户端")}");
+            GICLog.Info($"[MyNetworkManager] ========================================");
+            GICLog.Info($"[MyNetworkManager] 已成功连接到服务器");
+            GICLog.Info($"[MyNetworkManager]   我的角色: {(NetworkServer.active ? "房主" : "客户端")}");
 
             if (NetworkServer.active)
             {
-                Debug.Log($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID}");
+                GICLog.Info($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID}");
             }
             else
             {
-                Debug.Log($"[MyNetworkManager]   我的ID: 等待服务器分配... (当前: {_playerManager?.SelfPlayerID})");
+                GICLog.Info($"[MyNetworkManager]   我的ID: 等待服务器分配... (当前: {_playerManager?.SelfPlayerID})");
             }
 
-            Debug.Log($"[MyNetworkManager] ========================================");
+            GICLog.Info($"[MyNetworkManager] ========================================");
 
             _isKicked = false;
             _isIntentionalDisconnect = false;
@@ -279,12 +279,12 @@ namespace GIC.Framework
 
         public override void OnClientDisconnect()
         {
-            Debug.Log($"[MyNetworkManager] ========================================");
-            Debug.Log($"[MyNetworkManager] 与服务器断开连接");
-            Debug.Log($"[MyNetworkManager]   主动断开: {_isIntentionalDisconnect}");
-            Debug.Log($"[MyNetworkManager]   被踢: {_isKicked}");
-            Debug.Log($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID ?? "未设置"}");
-            Debug.Log($"[MyNetworkManager] ========================================");
+            GICLog.Info($"[MyNetworkManager] ========================================");
+            GICLog.Info($"[MyNetworkManager] 与服务器断开连接");
+            GICLog.Info($"[MyNetworkManager]   主动断开: {_isIntentionalDisconnect}");
+            GICLog.Info($"[MyNetworkManager]   被踢: {_isKicked}");
+            GICLog.Info($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID ?? "未设置"}");
+            GICLog.Info($"[MyNetworkManager] ========================================");
 
             _playerManager?.ClearPlayers();
             _playerManager?.Cleanup();
@@ -296,7 +296,7 @@ namespace GIC.Framework
 
             base.OnClientDisconnect();
 
-            Debug.Log("[MyNetworkManager] 已断开连接，回到未连接状态");
+            GICLog.Info("[MyNetworkManager] 已断开连接，回到未连接状态");
         }
 
         public int OnlinePlayers => NetworkServer.connections.Count;

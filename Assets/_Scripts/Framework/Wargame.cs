@@ -58,8 +58,8 @@ namespace GIC.Framework
             // 构建 managers 列表（用于 Update 循环）
             managers = new List<IWargameManager> { ConfigManager, AssetCache, SaveManager, InputManager, UIManager, CardManager, PositionManager, PlayerManager, SkillManager, UnitManager };
 
-            Debug.Log("Wargame初始化完成");
-            Debug.Log(Application.consoleLogPath);
+            GICLog.Info("Wargame初始化完成");
+            GICLog.Info(Application.consoleLogPath);
 
         }
 

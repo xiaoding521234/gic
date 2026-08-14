@@ -109,7 +109,7 @@ namespace GIC.Battle
             }
             else
             {
-                Debug.LogWarning($"[UnitStats] 单位 {owner.name} 没有 rawData，使用模板默认值");
+                GICLog.Warn($"[UnitStats] 单位 {owner.name} 没有 rawData，使用模板默认值");
             }
         }
 
@@ -118,7 +118,7 @@ namespace GIC.Battle
         {
             if (!_stats.TryGetValue(statType, out RangedInt template))
             {
-                Debug.LogWarning($"[UnitStats] 未找到属性: {statType}");
+                GICLog.Warn($"[UnitStats] 未找到属性: {statType}");
                 return 0;
             }
 
@@ -182,7 +182,7 @@ namespace GIC.Battle
             }
             else
             {
-                Debug.LogWarning($"[UnitStats] 未找到属性: {statType}");
+                GICLog.Warn($"[UnitStats] 未找到属性: {statType}");
             }
         }
 

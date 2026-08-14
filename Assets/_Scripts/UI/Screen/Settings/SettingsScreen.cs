@@ -570,7 +570,7 @@ namespace GIC.UI
                 {
                     ShowInputPanel(commandSetting, "", (newCommand) =>
                     {
-                        Debug.Log($"玩家指令: {newCommand}");
+                        GICLog.Info($"玩家指令: {newCommand}");
                     });
                 },
                 onValueConfirmed: null,

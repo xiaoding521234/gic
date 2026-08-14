@@ -121,7 +121,7 @@ namespace GIC.Framework
         {
             if (audioMixer == null)
             {
-                Debug.LogWarning("AudioMixer未指定，请在Inspector中指定AudioMixer");
+                GICLog.Warn("AudioMixer未指定，请在Inspector中指定AudioMixer");
             }
 
             SetAudioSource2D(musicSource);

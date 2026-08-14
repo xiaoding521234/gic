@@ -37,7 +37,7 @@ namespace GIC.Framework
             // 检查优先级：如果新音乐优先级低于当前音乐，丢弃
             if (track.musicType < currentMusicType)
             {
-                Debug.Log($"音乐被丢弃：{track.clip.name}（优先级{track.musicType} < 当前{currentMusicType}）");
+                GICLog.Info($"音乐被丢弃：{track.clip.name}（优先级{track.musicType} < 当前{currentMusicType}）");
                 return;
             }
 
@@ -46,7 +46,7 @@ namespace GIC.Framework
                 musicSource.isPlaying && 
                 musicSource.clip == track.clip)
             {
-                Debug.Log($"同一首音乐已在播放：{track.clip.name}");
+                GICLog.Info($"同一首音乐已在播放：{track.clip.name}");
                 return;
             }
 
@@ -128,7 +128,7 @@ namespace GIC.Framework
             // 触发之前的回调（如果被中断）
             if (currentOnCompleteCallback != null && musicSource != null && musicSource.isPlaying)
             {
-                Debug.Log("音乐被中断，不触发完成回调");
+                GICLog.Info("音乐被中断，不触发完成回调");
                 currentOnCompleteCallback = null;
             }
         }
@@ -285,7 +285,7 @@ namespace GIC.Framework
             // 确认没有被中断（clip没有被改变）
             if (musicSource != null && musicSource.clip == track.clip && !musicSource.isPlaying)
             {
-                Debug.Log($"音乐播放完毕：{track.clip.name}");
+                GICLog.Info($"音乐播放完毕：{track.clip.name}");
                 
                 // 触发回调
                 track.onComplete?.Invoke();

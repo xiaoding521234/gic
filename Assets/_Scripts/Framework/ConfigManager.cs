@@ -45,11 +45,11 @@ namespace GIC.Framework
 
             if (config == null)
             {
-                Debug.LogError($"无法加载 {typeof(T).Name}，请确保文件在 Resources 文件夹下: {path}");
+                GICLog.Error($"无法加载 {typeof(T).Name}，请确保文件在 Resources 文件夹下: {path}");
                 return null;
             }
 
-            Debug.Log($"加载 {typeof(T).Name} 成功");
+            GICLog.Info($"加载 {typeof(T).Name} 成功");
 
             // 通过反射调用 BuildCache（如果存在）
             var method = typeof(T).GetMethod("BuildCache",

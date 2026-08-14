@@ -32,11 +32,11 @@ namespace GIC.Framework
             var itemConfig = LoadAsset<ItemConfig>("ItemConfig");
             if (pool == null || unitConfig == null || itemConfig == null)
             {
-                Debug.LogError("[祈愿测试] 配置加载失败。");
+                GICLog.Error("[祈愿测试] 配置加载失败。");
                 return;
             }
 
-            Debug.Log($"[祈愿测试] 卡池: {pool.poolName} ({AssetDatabase.GetAssetPath(pool)})");
+            GICLog.Info($"[祈愿测试] 卡池: {pool.poolName} ({AssetDatabase.GetAssetPath(pool)})");
 
             // ── 构建星级缓存 ──
             var unitsByStar = new Dictionary<int, List<UnitName>>();
@@ -297,7 +297,7 @@ namespace GIC.Framework
             if (moraFallbackCount > 0)
                 sb.AppendLine($"\n  ⚠️ Mora兜底: {moraFallbackCount} 次");
 
-            Debug.Log(sb.ToString());
+            GICLog.Info(sb.ToString());
         }
 
         // ── 工具 ──

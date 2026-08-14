@@ -187,7 +187,7 @@ namespace GIC.UI
 
             if (index == ACTION_REMIND)
             {
-                Debug.Log($"提醒玩家: {_player.PlayerName}");
+                GICLog.Info($"提醒玩家: {_player.PlayerName}");
             }
             else if (index == ACTION_KICK)
             {
