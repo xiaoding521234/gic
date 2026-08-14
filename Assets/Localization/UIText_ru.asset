@@ -418,6 +418,70 @@ MonoBehaviour:
     m_Localized: "\u0410\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440"
     m_Metadata:
       m_Items: []
+  - m_Id: 31424716493893632
+    m_Localized: "\u0412\u0432\u043E\u0434"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9021
+    m_Localized: "\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C \u0438\u043C\u044F"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9022
+    m_Localized: "\u0412\u0432\u0435\u0441\u0442\u0438 \u043A\u043E\u043C\u0430\u043D\u0434\u0443"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9023
+    m_Localized: "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0442\u0435\u043A\u0441\u0442..."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9024
+    m_Localized: "\u041F\u043E\u0438\u0441\u043A..."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9025
+    m_Localized: "\u0414\u0440\u0443\u0433\u0438\u0435 \u0438\u0433\u0440\u043E\u043A\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9026
+    m_Localized: "\u041F\u043E\u043A\u0438\u043D\u0443\u0442\u044C \u043A\u043E\u043C\u043D\u0430\u0442\u0443"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9027
+    m_Localized: "\u041C\u043E\u044F \u043A\u043E\u043C\u043D\u0430\u0442\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9028
+    m_Localized: "\u041A\u043E\u043C\u043D\u0430\u0442\u0430 \u0441\u043E\u043F\u0435\u0440\u043D\u0438\u043A\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9029
+    m_Localized: "\u041F\u043E\u0440\u0442"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9030
+    m_Localized: "\u041A\u0430\u0440\u0442\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9031
+    m_Localized: "\u041A\u043E\u043C\u043D\u0430\u0442\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9032
+    m_Localized: "\u0414\u043E\u0441\u043A\u0430 1"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9033
+    m_Localized: "\u0414\u043E\u0441\u043A\u0430 2"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9034
+    m_Localized: "\u0414\u043E\u0441\u043A\u0430 3"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9035
+    m_Localized: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u043E\u043C\u043D\u0430\u0442\u0443"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -20,13 +20,15 @@ namespace GIC.UI
         private System.Action<string> onValueConfirmed;
         private string currentValue;
         private string defaultValue;
+        private string placeholderKey;
 
-        public void Setup(string labelKey, string defaultValue, System.Action onClick, System.Action<string> onValueConfirmed)
+        public void Setup(string labelKey, string defaultValue, System.Action onClick, System.Action<string> onValueConfirmed, string placeholderKey = null)
         {
             labelText.SetSingleEntry(new LocalizedString("UIText", labelKey));
             this.defaultValue = defaultValue;
             this.onClick = onClick;
             this.onValueConfirmed = onValueConfirmed;
+            this.placeholderKey = placeholderKey;
 
             button.onClick.AddListener(OnButtonClicked);
         }
@@ -34,7 +36,23 @@ namespace GIC.UI
         public override void Initialize()
         {
             currentValue = LoadValue();
-            valueText.SetSingleEntry(currentValue);
+            UpdateDisplayText();
+        }
+
+        private void UpdateDisplayText()
+        {
+            if (!string.IsNullOrEmpty(currentValue))
+            {
+                valueText.SetSingleEntry(currentValue);
+            }
+            else if (!string.IsNullOrEmpty(placeholderKey))
+            {
+                valueText.SetSingleEntry(new LocalizedString("UIText", placeholderKey));
+            }
+            else
+            {
+                valueText.SetSingleEntry(currentValue);
+            }
         }
 
         private void OnButtonClicked()
@@ -48,7 +66,7 @@ namespace GIC.UI
         public void UpdateValue(string newValue)
         {
             currentValue = newValue;
-            valueText.SetSingleEntry(newValue);
+            UpdateDisplayText();
             onValueConfirmed?.Invoke(newValue);
             SaveValue(newValue);
         }
@@ -61,7 +79,7 @@ namespace GIC.UI
         public override void ResetToDefault()
         {
             currentValue = defaultValue;
-            valueText.SetSingleEntry(defaultValue);
+            UpdateDisplayText();
         }
 
         protected virtual void SaveValue(string value) { }

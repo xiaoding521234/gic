@@ -641,7 +641,7 @@ namespace GIC.Framework
         public void ShowLocalizedPopup(string key)
         {
             var localized = new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), key);
-            popupManager.ShowPopup(localized.GetLocalizedString());
+            popupManager.ShowPopup(localized);
         }
 
         #endregion

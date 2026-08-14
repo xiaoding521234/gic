@@ -84,7 +84,10 @@ namespace GIC.UI
                 if (isUnit)
                     newSaveData.SaveUnit(upgraded.cardId.AsUnitName(), 1);
                 else
-                    newSaveData.SaveItem(upgraded.cardId.AsItemName(), 1);
+                {
+                    int item_count = _wishManager.GetItemConfig().GetItemData(upgraded.cardId.AsItemName())?.countPerServing ?? 1;
+                    newSaveData.SaveItem(upgraded.cardId.AsItemName(), item_count);
+                }
                 card.Init(newSaveData, null);
 
                 // 本级新卡：展示特效 + 检查重复 → 发放星辉

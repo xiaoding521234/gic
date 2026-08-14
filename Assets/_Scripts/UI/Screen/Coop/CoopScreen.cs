@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Localization;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using TMPro;
 using Mirror;
@@ -19,10 +21,10 @@ namespace GIC.UI
     {
         [Header("房间详情")]
         public GameObject roomPanel;
-        public TextMeshProUGUI roomTitleText;
-        public TextMeshProUGUI roomIPText;
-        public TextMeshProUGUI roomPortText;
-        public TextMeshProUGUI roomBoardText;
+        [FormerlySerializedAs("roomTitleText")] public TextMeshProUGUI roomTitleObj;
+        [FormerlySerializedAs("roomIPText")] public TextMeshProUGUI roomIPObj;
+        [FormerlySerializedAs("roomPortText")] public TextMeshProUGUI roomPortObj;
+        [FormerlySerializedAs("roomBoardText")] public TextMeshProUGUI roomBoardObj;
         public Transform playerListContent;
         public GameObject playerRowPrefab;
         public Button leaveRoomButton;
@@ -33,7 +35,7 @@ namespace GIC.UI
         public GameObject serverListPanel;
         public GameObject serverButtonPrefab;
         public Transform serverListContent;
-        public TextMeshProUGUI emptyRoomHint;
+        [FormerlySerializedAs("emptyRoomHint")] public TextMeshProUGUI emptyRoomHintObj;
 
         [Header("地图选择")]
         public TMP_Dropdown boardDropdown;
@@ -43,8 +45,52 @@ namespace GIC.UI
         private MyNetworkManager _netMgr;
         private MyNetworkDiscovery _discovery;
 
+        private TextCombiner _roomTitle;
+        private TextCombiner _roomIP;
+        private TextCombiner _roomPort;
+        private TextCombiner _roomBoard;
+        private TextCombiner _emptyRoomHint;
+        private TextCombiner _leaveRoomText;
+        private TextCombiner _createRoomText;
+        private TextCombiner _startGameText;
+
         private enum RoomState { DisconnectedClient, Host, ConnectedClient }
         private RoomState _currentState = RoomState.DisconnectedClient;
+
+        private void EnsureTextCombiners()
+        {
+            _roomTitle = EnsureTC(roomTitleObj);
+            _roomIP = EnsureTC(roomIPObj);
+            _roomPort = EnsureTC(roomPortObj);
+            _roomBoard = EnsureTC(roomBoardObj);
+            _emptyRoomHint = EnsureTC(emptyRoomHintObj);
+
+            if (_leaveRoomText == null && leaveRoomButton != null)
+            {
+                var tmp = leaveRoomButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null) _leaveRoomText = EnsureTC(tmp);
+            }
+
+            if (_createRoomText == null && createRoomButton != null)
+            {
+                var tmp = createRoomButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null) _createRoomText = EnsureTC(tmp);
+            }
+
+            if (_startGameText == null && startButton != null)
+            {
+                var tmp = startButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null) _startGameText = EnsureTC(tmp);
+            }
+        }
+
+        private static TextCombiner EnsureTC(TextMeshProUGUI tmp)
+        {
+            if (tmp == null) return null;
+            var tc = tmp.GetComponent<TextCombiner>();
+            if (tc == null) tc = tmp.gameObject.AddComponent<TextCombiner>();
+            return tc;
+        }
 
         void Awake()
         {
@@ -55,7 +101,11 @@ namespace GIC.UI
 
             ClearPlayerList();
             ClearServerList();
-            if (emptyRoomHint) emptyRoomHint.text = "世界树搜索中……";
+            EnsureTextCombiners();
+            _emptyRoomHint?.SetSingleEntry(new LocalizedString("UIText", "SearchingServers"));
+            _createRoomText?.SetSingleEntry(new LocalizedString("UIText", "CreateRoom"));
+            _startGameText?.SetSingleEntry(new LocalizedString("UIText", "StartGame"));
+            _leaveRoomText?.SetSingleEntry(new LocalizedString("UIText", "Back"));
         }
 
         void Start()
@@ -164,16 +214,24 @@ namespace GIC.UI
             roomPanel.SetActive(!isDisconnected);
 
             if (startButton) startButton.gameObject.SetActive(isHost);
-            if (leaveRoomButton)
-                leaveRoomButton.GetComponentInChildren<TextMeshProUGUI>().text =
-                    isDisconnected ? "返回" : "离开房间";
+            if (leaveRoomButton && _leaveRoomText != null)
+            {
+                if (isDisconnected)
+                    _leaveRoomText.SetSingleEntry(new LocalizedString("UIText", "Back"));
+                else
+                    _leaveRoomText.SetSingleEntry(new LocalizedString("UIText", "LeaveRoom"));
+            }
             if (createRoomButton) createRoomButton.gameObject.SetActive(isDisconnected);
 
-            if (roomTitleText)
-                roomTitleText.text = isHost ? "我的房间" : "对方房间";
+            if (_roomTitle != null)
+            {
+                _roomTitle.SetSingleEntry(isHost
+                    ? new LocalizedString("UIText", "MyRoom")
+                    : new LocalizedString("UIText", "OpponentRoom"));
+            }
 
-            if (emptyRoomHint)
-                emptyRoomHint.gameObject.SetActive(isDisconnected);
+            if (emptyRoomHintObj)
+                emptyRoomHintObj.gameObject.SetActive(isDisconnected);
 
             if (!isDisconnected)
             {
@@ -302,10 +360,25 @@ namespace GIC.UI
 
         void UpdateRoomPanel()
         {
-            if (roomIPText) roomIPText.text = $"IP: {_network.GetLocalIP()}";
-            if (roomPortText) roomPortText.text = $"端口: {_network.GetCurrentPort()}";
-            if (roomBoardText && boardDropdown && boardDropdown.options.Count > boardDropdown.value)
-                roomBoardText.text = $"地图: {boardDropdown.options[boardDropdown.value].text}";
+            if (_roomIP != null)
+            {
+                _roomIP.ClearAllEntries();
+                _roomIP.AddStaticEntry($"IP: {_network.GetLocalIP()}");
+            }
+
+            if (_roomPort != null)
+            {
+                _roomPort.ClearAllEntries();
+                _roomPort.AddEntry(new LocalizedString("UIText", "Port"));
+                _roomPort.AddStaticEntry($": {_network.GetCurrentPort()}");
+            }
+
+            if (_roomBoard != null && boardDropdown && boardDropdown.options.Count > boardDropdown.value)
+            {
+                _roomBoard.ClearAllEntries();
+                _roomBoard.AddEntry(new LocalizedString("UIText", "MapLabel"));
+                _roomBoard.AddStaticEntry($": {boardDropdown.options[boardDropdown.value].text}");
+            }
         }
 
         void RefreshPlayerList()
@@ -358,23 +431,47 @@ namespace GIC.UI
         {
             var buttonObj = Instantiate(serverButtonPrefab, serverListContent);
             var button = buttonObj.GetComponent<Button>();
-            var text = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
+            var tmp = buttonObj.GetComponentInChildren<TextMeshProUGUI>();
 
             string ip = response.EndPoint.Address.ToString();
             int port = response.uri.Port;
 
             // 从 MyNetworkDiscovery.DiscoveredRooms 获取房间显示信息
-            string displayText;
-            if (MyNetworkDiscovery.DiscoveredRooms.TryGetValue(response.serverId, out var info))
+            string hostName;
+            int currentPlayers, maxPlayers;
+            bool hasInfo = MyNetworkDiscovery.DiscoveredRooms.TryGetValue(response.serverId, out var info);
+            if (hasInfo)
             {
-                displayText = $"{info.HostName} 的房间  ({info.CurrentPlayers}/{info.MaxPlayers})";
+                hostName = info.HostName;
+                currentPlayers = info.CurrentPlayers;
+                maxPlayers = info.MaxPlayers;
             }
             else
             {
-                displayText = $"房间 ({ip}:{port})";
+                hostName = $"{ip}:{port}";
+                currentPlayers = 0;
+                maxPlayers = 0;
             }
 
-            if (text) text.text = displayText;
+            if (tmp != null)
+            {
+                var tc = tmp.GetComponent<TextCombiner>();
+                if (tc == null) tc = tmp.gameObject.AddComponent<TextCombiner>();
+                tc.ClearAllEntries();
+                tc.AddStaticEntry(hostName);
+
+                if (hasInfo)
+                {
+                    tc.AddEntry(new LocalizedString("UIText", "Room"), " ");
+                    tc.AddStaticEntry($"  ({currentPlayers}/{maxPlayers})");
+                }
+                else
+                {
+                    tc.AddEntry(new LocalizedString("UIText", "Room"), " (");
+                    tc.AddStaticEntry($"{ip}:{port})");
+                }
+            }
+
             if (button) button.onClick.AddListener(() => JoinServer(ip, port));
         }
 
@@ -403,11 +500,11 @@ namespace GIC.UI
 
         void UpdateEmptyRoomHint()
         {
-            if (!emptyRoomHint || _currentState != RoomState.DisconnectedClient) return;
+            if (!emptyRoomHintObj || _currentState != RoomState.DisconnectedClient) return;
 
             if (!_network.FoundServers.Any())
             {
-                emptyRoomHint.text = "世界树未发现其它降临者";
+                _emptyRoomHint?.SetSingleEntry(new LocalizedString("UIText", "NoServersFound"));
             }
         }
 
@@ -426,12 +523,15 @@ namespace GIC.UI
             if (boardDropdown == null) return;
             boardDropdown.onValueChanged.AddListener(_ => UpdateRoomPanel());
             boardDropdown.ClearOptions();
-            boardDropdown.AddOptions(new List<string> { "棋盘1", "棋盘2", "棋盘3" });
+            var options = new List<string>
+            {
+                new LocalizedString("UIText", "Board1").GetLocalizedString(),
+                new LocalizedString("UIText", "Board2").GetLocalizedString(),
+                new LocalizedString("UIText", "Board3").GetLocalizedString()
+            };
+            boardDropdown.AddOptions(options);
         }
 
         #endregion
     }
 }
-
-
-

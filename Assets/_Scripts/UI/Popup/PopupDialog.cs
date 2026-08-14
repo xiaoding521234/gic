@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Localization;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
@@ -13,7 +15,8 @@ namespace GIC.UI
 
     public class PopupDialog : MonoBehaviour
     {
-        public TextMeshProUGUI messageText;
+        [FormerlySerializedAs("messageText")]
+        [SerializeField] private TextMeshProUGUI messageTextObj;
         public Button backPanel;
         public CanvasGroup canvasGroup;
 
@@ -22,11 +25,35 @@ namespace GIC.UI
         [SerializeField] private float displayDuration = 1.5f;
         [SerializeField] private float fadeOutDuration = 0.08f;
 
+        private TextCombiner _messageText;
         private Coroutine currentCoroutine;
+
+        private void EnsureTextCombiner()
+        {
+            if (_messageText == null && messageTextObj != null)
+            {
+                _messageText = messageTextObj.GetComponent<TextCombiner>();
+                if (_messageText == null)
+                    _messageText = messageTextObj.gameObject.AddComponent<TextCombiner>();
+            }
+        }
 
         public void Init(string message)
         {
-            messageText.text = message;
+            EnsureTextCombiner();
+            _messageText.SetSingleEntry(message);
+            Show();
+        }
+
+        public void Init(LocalizedString localizedString)
+        {
+            EnsureTextCombiner();
+            _messageText.SetSingleEntry(localizedString);
+            Show();
+        }
+
+        private void Show()
+        {
             backPanel.onClick.AddListener(Close);
             gameObject.SetActive(true);
             currentCoroutine = StartCoroutine(ShowCoroutine());
@@ -74,4 +101,3 @@ namespace GIC.UI
     }
 
 }
-

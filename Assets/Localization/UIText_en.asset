@@ -414,6 +414,70 @@ MonoBehaviour:
     m_Localized: Accessory
     m_Metadata:
       m_Items: []
+  - m_Id: 31424716493893632
+    m_Localized: Input
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9021
+    m_Localized: Modify Name
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9022
+    m_Localized: Input Command
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9023
+    m_Localized: Enter text...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9024
+    m_Localized: Searching...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9025
+    m_Localized: No other players found
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9026
+    m_Localized: Leave Room
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9027
+    m_Localized: My Room
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9028
+    m_Localized: Opponent's Room
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9029
+    m_Localized: Port
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9030
+    m_Localized: Map
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9031
+    m_Localized: Room
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9032
+    m_Localized: Board 1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9033
+    m_Localized: Board 2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9034
+    m_Localized: Board 3
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9035
+    m_Localized: Create Room
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

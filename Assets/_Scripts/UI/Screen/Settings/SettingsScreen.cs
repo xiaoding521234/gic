@@ -534,6 +534,7 @@ namespace GIC.UI
             );
             playerNameSetting.Initialize();
 
+            // TODO: 指令功能暂未实现，仅预留输入弹窗入口
             commandSetting.Setup("Command", "",
                 onClick: () =>
                 {
@@ -542,7 +543,8 @@ namespace GIC.UI
                         Debug.Log($"玩家指令: {newCommand}");
                     });
                 },
-                onValueConfirmed: null
+                onValueConfirmed: null,
+                placeholderKey: "Input"
             );
             commandSetting.Initialize();
         }
@@ -617,35 +619,20 @@ namespace GIC.UI
 
         #region 输入弹窗
 
-        public GameObject inputPanel;
-        public TMPro.TMP_InputField nameInputField;
-        public Button confirmButton;
-        public Button cancelButton;
-        private Action<string> pendingInputCallback;
+        [SerializeField] private InputPopupDialog inputPopupPrefab;
+        private InputPopupDialog inputPopupInstance;
 
         private void ShowInputPanel(ButtonSettingItem settingItem, string currentValue, Action<string> callback)
         {
-            if (inputPanel == null) return;
+            if (inputPopupPrefab == null) return;
 
-            pendingInputCallback = callback;
-            nameInputField.text = currentValue;
-            inputPanel.SetActive(true);
-            nameInputField.Select();
-        }
-
-        public void OnConfirmInput()
-        {
-            string newValue = nameInputField.text.Trim();
-            if (!string.IsNullOrEmpty(newValue))
+            if (inputPopupInstance == null)
             {
-                pendingInputCallback?.Invoke(newValue);
+                inputPopupInstance = Instantiate(inputPopupPrefab, transform);
             }
-            inputPanel.SetActive(false);
-        }
 
-        public void OnCancelInput()
-        {
-            inputPanel.SetActive(false);
+            string titleKey = settingItem == playerNameSetting ? "ModifyName" : "InputCommand";
+            inputPopupInstance.Show(titleKey, currentValue, callback);
         }
 
         #endregion

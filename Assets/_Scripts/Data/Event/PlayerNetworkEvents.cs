@@ -80,6 +80,7 @@ namespace GIC.Data
         public SetTeamRequestEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
         }
     }
 
@@ -94,6 +95,7 @@ namespace GIC.Data
         public SetColorRequestEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
         }
     }
 
@@ -108,6 +110,7 @@ namespace GIC.Data
         public SetSpawnRequestEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
         }
     }
 
@@ -121,6 +124,7 @@ namespace GIC.Data
         public ToggleReadyRequestEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
         }
     }
 
@@ -134,6 +138,7 @@ namespace GIC.Data
         public KickPlayerRequestEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
         }
     }
 
@@ -161,6 +166,7 @@ namespace GIC.Data
         public SetPlayerNameRequestEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
         }
     }
 }

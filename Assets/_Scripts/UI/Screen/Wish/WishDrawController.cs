@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,6 +18,8 @@ namespace GIC.UI
     [RequireComponent(typeof(RectTransform))]
     public partial class WishDrawController : MonoBehaviour
     {
+        /// <summary>抽卡存盘后回调（通知外部刷新货币显示）</summary>
+        public event Action OnWishComplete;
         [Header("卡牌预制体")]
         [SerializeField] private GameObject cardPrefab;
 
@@ -235,6 +238,7 @@ namespace GIC.UI
                     yield return null;
 
                 _wishManager.SaveGame();
+                OnWishComplete?.Invoke();
                 StartCoroutine(ShowFinalDisplay());
             }
         }

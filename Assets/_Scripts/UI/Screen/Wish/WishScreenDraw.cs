@@ -47,7 +47,16 @@ namespace GIC.UI
             if (wish10Button != null)
                 wish10Button.onClick.AddListener(() => StartDraw(10));
 
+            if (drawController != null)
+                drawController.OnWishComplete += UpdateFateCount;
+
             UpdateFateCount();
+        }
+
+        private void OnDestroy()
+        {
+            if (drawController != null)
+                drawController.OnWishComplete -= UpdateFateCount;
         }
 
         private void StartDraw(int count)

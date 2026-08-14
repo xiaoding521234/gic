@@ -2641,10 +2641,7 @@ MonoBehaviour:
   topPanelSlideOffset: 80
   leftPanelSlideOffset: 100
   centerFadeOffset: 50
-  inputPanel: {fileID: 0}
-  nameInputField: {fileID: 0}
-  confirmButton: {fileID: 0}
-  cancelButton: {fileID: 0}
+  inputPopupPrefab: {fileID: 5786617238283984623, guid: f8a2592b6eb832e419fbee6d0c66dc11, type: 3}
 --- !u!4 &956934351
 Transform:
   m_ObjectHideFlags: 0

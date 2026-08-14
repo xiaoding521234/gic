@@ -6,6 +6,7 @@ using Mirror;
 using GIC.Battle;
 using GIC.Data;
 using GIC.Data.Event;
+using GIC.Framework;
 using GIC.UI;
 using GIC.Tool;
 namespace GIC.Framework
@@ -100,7 +101,8 @@ namespace GIC.Framework
 
         // ==================== IWargameManager 实现 ====================
 
-        public void Start()
+        [PostConstruct]
+        public void Init()
         {
             // 创建 Handler 实例并保存引用
             CreateHandlers();
@@ -110,6 +112,8 @@ namespace GIC.Framework
 
             Debug.Log("[PlayerManager] 启动完成，等待网络初始化");
         }
+
+        public void Start() { }
 
         public void Update(float deltaTime)
         {

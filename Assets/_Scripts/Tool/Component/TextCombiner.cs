@@ -88,6 +88,9 @@ namespace GIC.Tool
                 entry.localizedString.StringChanged += OnEntryChanged;
                 _activeHandlers.Add(OnEntryChanged);
             }
+
+            // 确保在 Awake 后立即渲染已存在的静态条目（修复 inactive GameObject 上 SetSingleEntry 被提前调用导致 textComponent 为 null 的问题）
+            UpdateDisplay();
         }
 
         void Start()
