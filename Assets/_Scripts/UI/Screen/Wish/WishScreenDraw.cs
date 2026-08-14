@@ -68,13 +68,13 @@ namespace GIC.UI
 
             if (_currentPool == null || _currentPool.units.Count == 0 && _currentPool.items.Count == 0)
             {
-                GameScene.Instance.ShowLocalizedPopup("Wish_PoolNotAvailable");
+                GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_PoolNotAvailable"));
                 return;
             }
 
             if (!_wishManager.CanAfford(count))
             {
-                GameScene.Instance.ShowLocalizedPopup("Wish_NoPrimogem");
+                GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_NoPrimogem"));
                 return;
             }
 

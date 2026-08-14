@@ -607,13 +607,13 @@ namespace GIC.Framework
         {
             if (sceneHistory.Count == 0)
             {
-                Debug.LogWarning("没有上一个场景可返回");
+                ShowToast("没有上一个场景可返回");
                 return false;
             }
 
             if (isTransitioning)
             {
-                Debug.LogWarning("场景正在切换中，无法返回");
+                ShowToast("场景正在切换中，请稍后再试");
                 return false;
             }
 
@@ -630,18 +630,36 @@ namespace GIC.Framework
 
         #region 弹窗
 
-        public void ShowPopup(string message)
+        public void ShowModalPopup(string message)
         {
-            popupManager.ShowPopup(message);
+            popupManager.ShowModalPopup(message);
         }
 
         /// <summary>
         /// 本地化弹窗 — 从 PopupText 表中取 key 对应的本地化文本显示
         /// </summary>
-        public void ShowLocalizedPopup(string key)
+        public void ShowModalLocalizedPopup(string key)
         {
             var localized = new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), key);
-            popupManager.ShowPopup(localized);
+            popupManager.ShowModalPopup(localized);
+        }
+
+        #endregion
+
+        #region 轻提示
+
+        public void ShowToast(string message)
+        {
+            if (popupManager != null)
+                popupManager.ShowToast(message);
+            else
+                Debug.LogWarning(message);
+        }
+
+        public void ShowToast(UnityEngine.Localization.LocalizedString localizedString)
+        {
+            if (popupManager != null)
+                popupManager.ShowToast(localizedString);
         }
 
         #endregion

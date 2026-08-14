@@ -156,7 +156,7 @@ namespace GIC.UI
 
             if (!manager.ConsumePrimogem(count))
             {
-                Debug.LogWarning("[WishDrawController] 原石不足");
+                GameScene.Instance?.ShowToast("原石不足");
                 _flow.Reset();
                 return;
             }

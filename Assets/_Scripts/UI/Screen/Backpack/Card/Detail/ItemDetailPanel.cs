@@ -144,11 +144,11 @@ namespace GIC.UI
                     if (_usable == null || _saveData == null) return;
                     if (_usable.TryUse(_saveData, out var msg))
                     {
-                        GameScene.Instance?.ShowPopup(msg);
+                        GameScene.Instance?.ShowToast(msg);
                     }
                     else
                     {
-                        GameScene.Instance?.ShowPopup(msg);
+                        GameScene.Instance?.ShowToast(msg);
                     }
                 });
             }

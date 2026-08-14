@@ -930,6 +930,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   popupPrefab: {fileID: 7149037203528289380, guid: bda0a7dd7c2ab8a49b366d0e96f76ea9, type: 3}
+  toastPrefab: {fileID: 0}
+  "\u8F7B\u63D0\u793A\u95F4\u8DDD": 10
+  "\u8F7B\u63D0\u793A\u4F4D\u7F6E\u6BD4\u4F8B": 0.05
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
