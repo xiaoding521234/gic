@@ -24,6 +24,7 @@ namespace GIC.Framework
 
         [Autowired] private UnitConfig _unitConfig;
         [Autowired] private ItemConfig _itemConfig;
+        [Autowired] private CardConfigResolver _cardResolver;
         [Bean] public CardConfigResolver GetCardConfigResolver() => new CardConfigResolver(_unitConfig, _itemConfig);
 
         [PostConstruct]
@@ -31,6 +32,8 @@ namespace GIC.Framework
         {
             // StarVisualConfig 静态访问兼容
             StarVisualConfig.Initialize(GetStarVisualConfig());
+            // CardConfigResolver 静态访问兼容（SaveCardData.Config / 卡牌视图策略）
+            CardConfigResolver.Initialize(_cardResolver);
         }
 
         public void Start() { }
@@ -59,15 +62,6 @@ namespace GIC.Framework
 
             return config;
         }
-
-        // 保留 Getter 方法供 Service Locator 风格调用（UI 层等）
-        // 优先推荐通过 [Autowired] 或 ApplicationContext.Get<T>() 获取
-        public PositionConfig PositionConfig => Wargame.Instance.Context.Get<PositionConfig>();
-        public UnitConfig UnitConfig => Wargame.Instance.Context.Get<UnitConfig>();
-        public ItemConfig ItemConfig => Wargame.Instance.Context.Get<ItemConfig>();
-        public ElementFactionIconConfig ElementFactionIconConfig => Wargame.Instance.Context.Get<ElementFactionIconConfig>();
-        public StarVisualConfig StarVisualConfig => Wargame.Instance.Context.Get<StarVisualConfig>();
-        public CardConfigResolver CardResolver => Wargame.Instance.Context.Get<CardConfigResolver>();
     }
 
 }

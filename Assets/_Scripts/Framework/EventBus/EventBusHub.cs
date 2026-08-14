@@ -50,6 +50,19 @@ namespace GIC.Framework
 
         #region 核心路由逻辑
 
+        // 依赖注入：EventBusHub 与 GameScene 的 Awake 顺序无保证，采用懒注入（首次使用时注入）。
+        // 以此解除 Wargame→PlayerManager→EventBusHub→Wargame.Instance 的回指环。
+        [Autowired] private PlayerManager _playerManager;
+        private PlayerManager PlayerManagerRef
+        {
+            get
+            {
+                if (_playerManager == null)
+                    Wargame.Instance?.Context?.Inject(this);
+                return _playerManager;
+            }
+        }
+
         /// <summary>
         /// 自动填充 SourcePlayerID
         /// </summary>
@@ -63,7 +76,7 @@ namespace GIC.Framework
 
             // 备用：从 PlayerManager 获取
             if (string.IsNullOrEmpty(senderId) || senderId == PlayerID.Offline)
-                senderId = Wargame.Instance?.PlayerManager?.SelfPlayerID;
+                senderId = PlayerManagerRef?.SelfPlayerID;
 
             if (!string.IsNullOrEmpty(senderId) && senderId != PlayerID.Offline)
                 eventData.SourcePlayerID = senderId;

@@ -107,12 +107,24 @@ namespace GIC.Framework
             return musicVolume;
         }
 
+        // 依赖注入：AudioManager 与 GameScene 的 Awake 顺序无保证，采用懒注入（首次使用时注入）
+        [Autowired] private SaveManager _saveManager;
+        private SaveManager SaveManagerRef
+        {
+            get
+            {
+                if (_saveManager == null)
+                    Wargame.Instance?.Context?.Inject(this);
+                return _saveManager;
+            }
+        }
+
         /// <summary>
         /// 从存档加载音量设置并立即应用
         /// </summary>
         public void LoadVolumeSettings()
         {
-            var saveManager = Wargame.Instance?.SaveManager;
+            var saveManager = SaveManagerRef;
             if (saveManager?.CurrentSave == null) return;
 
             var save = saveManager.CurrentSave;
@@ -132,7 +144,7 @@ namespace GIC.Framework
         /// </summary>
         private void SaveVolumeSettings()
         {
-            var saveManager = Wargame.Instance?.SaveManager;
+            var saveManager = SaveManagerRef;
             if (saveManager?.CurrentSave == null) return;
 
             var save = saveManager.CurrentSave;

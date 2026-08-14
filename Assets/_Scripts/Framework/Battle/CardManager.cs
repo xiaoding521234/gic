@@ -31,7 +31,7 @@ namespace GIC.Framework
         {
             decks = new CardDeck[DeckCount];
             for (int i = 0; i < DeckCount; i++)
-                decks[i] = new CardDeck(i);
+                decks[i] = new CardDeck(i, saveManager);
 
             BuildAllDecks();
         }

@@ -15,13 +15,18 @@ namespace GIC.Framework
     public class CardDeck
     {
         private readonly int _deckId;
+        private readonly SaveManager _saveManager;
         private  List<SaveCardData> _cards = new();
         private bool _dirty = true;
 
         public int DeckId => _deckId;
         public int Count  { get { EnsureFresh(); return _cards.Count; } }
 
-        public CardDeck(int deckId) => _deckId = deckId;
+        public CardDeck(int deckId, SaveManager saveManager)
+        {
+            _deckId = deckId;
+            _saveManager = saveManager;
+        }
 
         /// <summary>获取卡牌列表（自动重建）</summary>
         public IReadOnlyList<SaveCardData> Cards
@@ -76,7 +81,7 @@ namespace GIC.Framework
         private void Rebuild()
         {
             _cards.Clear();
-            var save = Wargame.Instance?.SaveManager?.CurrentSave;
+            var save = _saveManager?.CurrentSave;
             if (save == null) return;
 
             // 收集所有卡牌中属于本卡组的

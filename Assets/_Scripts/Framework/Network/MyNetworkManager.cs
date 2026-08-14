@@ -34,6 +34,7 @@ namespace GIC.Framework
         public int CurrentPort { get; private set; }
 
         [Autowired] private PlayerManager _playerManager;
+        [Autowired] private SaveManager _saveManager;
 
         public override void Awake()
         {
@@ -270,7 +271,7 @@ namespace GIC.Framework
             // 客户端连接后发送自己的名称给服务器
             if (!NetworkServer.active)
             {
-                string myName = Wargame.Instance?.SaveManager?.CurrentSave?.playerName ?? "旅行者";
+                string myName = _saveManager?.CurrentSave?.playerName ?? "旅行者";
                 EventBusHub.Instance.Send(new SetPlayerNameRequestEvent { PlayerName = myName });
             }
 

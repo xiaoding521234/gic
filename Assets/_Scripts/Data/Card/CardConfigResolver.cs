@@ -12,6 +12,14 @@ namespace GIC.Data
     /// </summary>
     public class CardConfigResolver
     {
+        /// <summary>
+        /// 静态实例 — 由 ConfigManager [PostConstruct] 注册（同 StarVisualConfig.Initialize 先例），
+        /// 供无法走注入的存档数据对象（SaveCardData.Config）与卡牌视图策略访问。
+        /// </summary>
+        public static CardConfigResolver Instance { get; private set; }
+
+        public static void Initialize(CardConfigResolver resolver) => Instance = resolver;
+
         public UnitConfig UnitConfig { get; }
         public ItemConfig ItemConfig { get; }
 

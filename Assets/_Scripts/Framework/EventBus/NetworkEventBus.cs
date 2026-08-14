@@ -13,11 +13,23 @@ namespace GIC.Framework
 
     public class NetworkEventBus : NetworkBehaviour
     {
+        // 懒注入（与 GameScene 的 Awake 顺序无保证，首次使用时注入）
+        [Autowired] private PlayerManager _playerManager;
+        private PlayerManager PlayerManagerRef
+        {
+            get
+            {
+                if (_playerManager == null)
+                    Wargame.Instance?.Context?.Inject(this);
+                return _playerManager;
+            }
+        }
+
         public string SelfConnectionId
         {
             get
             {
-                var pm = Wargame.Instance?.PlayerManager;
+                var pm = PlayerManagerRef;
                 if (pm != null)
                 {
                     string id = pm.SelfPlayerID;

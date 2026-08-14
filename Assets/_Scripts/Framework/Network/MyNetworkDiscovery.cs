@@ -35,6 +35,7 @@ namespace GIC.Framework
         }
         
         [Autowired] private PlayerManager _playerManager;
+        [Autowired] private SaveManager _saveManager;
 
         void Awake()
         {
@@ -263,7 +264,7 @@ namespace GIC.Framework
                 }
 
                 // 从存档获取 Host 名称
-                HostPlayerName = Wargame.Instance?.SaveManager?.CurrentSave?.playerName ?? "旅行者";
+                HostPlayerName = _saveManager?.CurrentSave?.playerName ?? "旅行者";
 
                 var baseUri = transport.ServerUri();
                 // 将房间信息编码到 URI 查询参数中

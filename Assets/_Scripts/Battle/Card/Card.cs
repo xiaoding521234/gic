@@ -48,8 +48,11 @@ namespace GIC.Battle
 
         private ICardViewStrategy _strategy;
 
+        [Autowired] private SaveManager _saveManager;
+
         public void Awake()
         {
+            Wargame.Instance?.Context?.Inject(this);
             toggle.onValueChanged.AddListener(OnToggleValueChanged);
         }
 
@@ -165,7 +168,7 @@ namespace GIC.Battle
 
         private int GetCurrentDeckId()
         {
-            return Wargame.Instance?.SaveManager?.CurrentSave?.currentDeck ?? 0;
+            return _saveManager?.CurrentSave?.currentDeck ?? 0;
         }
 
         public void SetCount(int count)

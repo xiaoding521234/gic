@@ -69,7 +69,7 @@ namespace GIC.Framework
         }
 
         public bool IsTransitioning
-            => Wargame.Instance?.InputManager?.HasInputLock(InputLockReason.SceneTransition) ?? false;
+            => InputLocks.HasLock(InputLockReason.SceneTransition);
 
         #endregion
 
@@ -237,7 +237,7 @@ namespace GIC.Framework
         public void LoadSceneWithConfig(SceneType scene)
         {
             // 只在真正的场景切换期间拦截（入场动画等其它输入锁不阻塞导航）
-            if (Wargame.Instance?.InputManager?.HasInputLock(InputLockReason.SceneTransition) == true)
+            if (InputLocks.HasLock(InputLockReason.SceneTransition))
             {
                 GICLog.Warn("场景正在切换中，请稍后再试");
                 return;

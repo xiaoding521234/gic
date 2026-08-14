@@ -245,7 +245,7 @@ namespace GIC.Framework
             {
                 if (!_configResolved)
                 {
-                    _config = Wargame.Instance.Context.Get<CardConfigResolver>()?.Resolve(id);
+                    _config = CardConfigResolver.Instance?.Resolve(id);
                     _configResolved = true;
                 }
                 return _config;

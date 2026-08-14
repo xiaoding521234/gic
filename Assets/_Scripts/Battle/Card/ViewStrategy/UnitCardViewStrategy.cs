@@ -15,7 +15,7 @@ namespace GIC.Battle
     {
         public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
         {
-            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.UnitConfig?.GetUnitData(data.id.AsUnitName());
+            var raw = CardConfigResolver.Instance?.UnitConfig?.GetUnitData(data.id.AsUnitName());
             if (raw != null)
             {
                 card.cardBack.color = StarVisualConfig.GetStarColor(raw.starLevel);

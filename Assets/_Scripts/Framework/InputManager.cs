@@ -174,6 +174,7 @@ namespace GIC.Framework
         [PostConstruct]
         public void Init()
         {
+            InputLocks.RegisterBackend(this); // 静态门面后端注册（此前门面调用为空操作）
             LoadBindings();
         }
 
