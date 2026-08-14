@@ -42,6 +42,7 @@ namespace GIC.UI
 
         private CoopNetworkController _network;
         [Autowired] private PlayerManager _playerManager;
+        [Autowired] private InputManager _inputManager;
         private MyNetworkManager _netMgr;
         private MyNetworkDiscovery _discovery;
 
@@ -117,7 +118,7 @@ namespace GIC.UI
             StopCurrentConnection();
             AudioManager.Instance.PushMusicVolume();
 
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            _inputManager?.RegisterClosable(this);
 
             BindButtonEvents();
             BindDiscoveryEvents();
@@ -137,7 +138,7 @@ namespace GIC.UI
 
         void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：释放本类持有的全部输入锁
             InputLocks.PopAll(this);
             UnbindPlayerEvents();

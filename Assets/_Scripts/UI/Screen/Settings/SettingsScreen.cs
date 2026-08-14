@@ -90,6 +90,8 @@ namespace GIC.UI
         private Coroutine moveCoroutine;
         private const float MOVE_DURATION = 0.2f;
 
+        [Autowired] private InputManager _inputManager;
+
         // 动画缓存
         private RectTransform topPanelRect;
         private RectTransform leftPanelRect;
@@ -151,7 +153,7 @@ namespace GIC.UI
             InitAccountSettings();
 
             // 注册为可关闭 UI
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            _inputManager?.RegisterClosable(this);
 
             // 缓存动画位置
             CacheAnimationPositions();
@@ -682,7 +684,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：动画协程被销毁中断时释放本类持有的锁
             InputLocks.PopAll(this);
         }

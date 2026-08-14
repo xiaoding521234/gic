@@ -73,6 +73,7 @@ namespace GIC.UI
         [Autowired] private SaveManager saveManager;
         [Autowired] private UnitConfig unitConfig;
         [Autowired] private ItemConfig itemConfig;
+        [Autowired] private InputManager inputManager;
         private BackpackCategoryChangedHandler _categoryChangedHandler;
         private DeckChangedHandler _deckChangedHandler;
         private CardClickedInEditHandler _cardClickedHandler;
@@ -88,7 +89,7 @@ namespace GIC.UI
             AudioManager.Instance.PushMusicVolume();
 
             Wargame.Instance.Context.Inject(this);
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            inputManager?.RegisterClosable(this);
 
             currentDeckId = saveManager.CurrentSave.currentDeck;
 
@@ -133,7 +134,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            inputManager?.UnregisterClosable(this);
             // 兜底：动画协程被销毁中断时释放本类持有的锁
             InputLocks.PopAll(this);
 

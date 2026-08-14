@@ -59,6 +59,8 @@ namespace GIC.UI
 
         public void Awake()
         {
+            Wargame.Instance?.Context?.Inject(this); // 容器已就绪（Boot 链路），Awake 注入
+
             closeButton.onClick.AddListener(Close);
 
             if (selector != null)
@@ -87,7 +89,7 @@ namespace GIC.UI
 
         private void Start()
         {
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            _inputManager?.RegisterClosable(this);
 
             if (wishClip != null)
             {
@@ -138,6 +140,9 @@ namespace GIC.UI
         void IClosable.Close() => Close();
 
         private bool isClosing = false;
+
+        [Autowired] private InputManager _inputManager;
+        [Autowired] private UnitConfig _unitConfig;
 
         private IEnumerator CloseCoroutine()
         {
@@ -201,8 +206,7 @@ namespace GIC.UI
             // 更新氛围特效的元素颜色
             if (ambience != null)
             {
-                var config = Wargame.Instance?.ConfigManager?.GetUnitConfig();
-                var unitData = config?.GetUnitData(newEntry.panel.UnitName);
+                var unitData = _unitConfig?.GetUnitData(newEntry.panel.UnitName);
                 if (unitData != null)
                     ambience.SetElementColor(ElementColor.GetColor(unitData.selfElement));
             }

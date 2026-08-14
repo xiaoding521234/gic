@@ -14,18 +14,6 @@ namespace GIC.Framework
     {
         public ApplicationContext Context { get; private set; }
 
-        // 兼容旧调用：通过 Context 获取
-        public ConfigManager ConfigManager => Context?.Get<ConfigManager>();
-        public SaveManager SaveManager => Context?.Get<SaveManager>();
-        public InputManager InputManager => Context?.Get<InputManager>();
-        public UIManager UIManager => Context?.Get<UIManager>();
-        public CardManager CardManager => Context?.Get<CardManager>();
-        public PositionManager PositionManager => Context?.Get<PositionManager>();
-        public PlayerManager PlayerManager => Context?.Get<PlayerManager>();
-        public SkillManager SkillManager => Context?.Get<SkillManager>();
-        public UnitManager UnitManager => Context?.Get<UnitManager>();
-        public AssetCache AssetCache => Context?.Get<AssetCache>();
-
         List<IWargameManager> managers;
 
         public override void Init()
@@ -56,7 +44,13 @@ namespace GIC.Framework
             Context.Validate();
 
             // 构建 managers 列表（用于 Update 循环）
-            managers = new List<IWargameManager> { ConfigManager, AssetCache, SaveManager, InputManager, UIManager, CardManager, PositionManager, PlayerManager, SkillManager, UnitManager };
+            var configManager = Context.Get<ConfigManager>();
+            managers = new List<IWargameManager> {
+                configManager,
+                Context.Get<AssetCache>(), Context.Get<SaveManager>(), Context.Get<InputManager>(),
+                Context.Get<UIManager>(), Context.Get<CardManager>(), Context.Get<PositionManager>(),
+                Context.Get<PlayerManager>(), Context.Get<SkillManager>(), Context.Get<UnitManager>()
+            };
 
             GICLog.Info("Wargame初始化完成");
             GICLog.Info(Application.consoleLogPath);

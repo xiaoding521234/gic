@@ -57,8 +57,13 @@ namespace GIC.UI
         private string _currentAddress;
         private bool _spriteLoadDone;
 
+        [Autowired] private UnitConfig _unitConfig;
+        [Autowired] private ElementFactionIconConfig _iconConfig;
+        [Autowired] private AssetCache _assetCache;
+
         private void Awake()
         {
+            Wargame.Instance?.Context?.Inject(this); // 容器已就绪，Awake 注入
             SetAlpha(0f);
             FillContentFromConfig();
         }
@@ -71,9 +76,8 @@ namespace GIC.UI
             if (contentFilled) return;
             contentFilled = true;
 
-            var configManager = Wargame.Instance?.ConfigManager;
-            var config = configManager != null
-                ? configManager.GetUnitConfig()
+            var config = _unitConfig != null
+                ? _unitConfig
                 : Resources.Load<UnitConfig>("Configs/UnitConfig");
             if (config == null) return;
 
@@ -89,13 +93,12 @@ namespace GIC.UI
                 EnsureTextCombiner(titleText).SetSingleEntry(data.GetTitleEntry());
 
             // 元素图标
-            var iconConfig = Wargame.Instance?.ConfigManager?.GetElementFactionIconConfig();
-            if (elementIcon != null && iconConfig != null)
-                elementIcon.sprite = iconConfig.GetElementIconDeep(data.selfElement);
+            if (elementIcon != null && _iconConfig != null)
+                elementIcon.sprite = _iconConfig.GetElementIconDeep(data.selfElement);
 
             // 势力图标（取第一个 faction）
-            if (factionIcon != null && iconConfig != null && data.factions?.Length > 0)
-                factionIcon.sprite = iconConfig.GetFactionIcon(data.factions[0]);
+            if (factionIcon != null && _iconConfig != null && data.factions?.Length > 0)
+                factionIcon.sprite = _iconConfig.GetFactionIcon(data.factions[0]);
 
             // 立绘背景色 = 元素对应颜色
             if (colorImage != null)
@@ -157,7 +160,7 @@ namespace GIC.UI
             _currentAddress = $"WishArt/{unitName.ToString().ToLower()}";
             _spriteLoadDone = false;
 
-            Wargame.Instance?.AssetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
+            _assetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
             {
                 if (this != null && characterImage != null && sprite != null)
                     characterImage.sprite = sprite;
@@ -200,7 +203,7 @@ namespace GIC.UI
                 _currentAddress = $"WishArt/{unitName.ToString().ToLower()}";
                 _spriteLoadDone = false;
 
-                Wargame.Instance?.AssetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
+                _assetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
                 {
                     if (this != null && characterImage != null && sprite != null)
                         characterImage.sprite = sprite;
@@ -307,7 +310,7 @@ namespace GIC.UI
         {
             // 通过 AssetCache 释放引用（引用计数 -1）
             if (_currentAddress != null)
-                Wargame.Instance?.AssetCache?.Release(_currentAddress);
+                _assetCache?.Release(_currentAddress);
         }
     }
 

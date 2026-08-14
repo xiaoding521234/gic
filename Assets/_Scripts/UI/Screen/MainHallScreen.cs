@@ -48,6 +48,8 @@ namespace GIC.UI
         private bool isExiting = false;
 
         private Wargame wargame;
+        [Autowired] private PositionManager _positionManager;
+        [Autowired] private AssetCache _assetCache;
         private PositionChangedHandler _positionHandler;
         private SceneActivatedHandler _sceneActivatedHandler;
         private GoBackHandler _goBackHandler;
@@ -55,6 +57,7 @@ namespace GIC.UI
         private void Start()
         {
             wargame = Wargame.Instance;
+            wargame?.Context?.Inject(this);
 
             InitializeButtons();
             InitializeAnimation();
@@ -69,7 +72,7 @@ namespace GIC.UI
             EventBusHub.Instance.Subscribe(_sceneActivatedHandler);
             EventBusHub.Instance.Subscribe(_goBackHandler);
 
-            UpdateBackground(wargame.PositionManager.CurrentPosition);
+            UpdateBackground(_positionManager.CurrentPosition);
 
             // 播放入场动画
             PlayEnterAnimation();
@@ -88,10 +91,10 @@ namespace GIC.UI
             }
 
             if (_lastBgAddress != null)
-                Wargame.Instance?.AssetCache?.Release(_lastBgAddress);
+                _assetCache?.Release(_lastBgAddress);
             // 若有正在加载但未完成的新背景，也释放
             if (_pendingBgAddress != null && _pendingBgAddress != _lastBgAddress)
-                Wargame.Instance?.AssetCache?.Release(_pendingBgAddress);
+                _assetCache?.Release(_pendingBgAddress);
         }
 
         #region 事件处理器
@@ -195,9 +198,9 @@ namespace GIC.UI
             SetButtonsInteractable(true);
             
             // 更新背景
-            if (wargame != null)
+            if (_positionManager != null)
             {
-                UpdateBackground(wargame.PositionManager.CurrentPosition);
+                UpdateBackground(_positionManager.CurrentPosition);
             }
             
             isExiting = false;
@@ -234,7 +237,7 @@ namespace GIC.UI
         {
             if (backgroundRenderer == null) return;
 
-            var positionData = wargame.PositionManager.GetPositionData(position);
+            var positionData = _positionManager.GetPositionData(position);
             if (positionData == null) return;
 
             RegionName region = positionData.region;
@@ -255,7 +258,7 @@ namespace GIC.UI
             _pendingBgAddress = address;
             string oldAddress = _lastBgAddress;
 
-            wargame.AssetCache?.LoadAsync<Sprite>(address, sprite =>
+            _assetCache?.LoadAsync<Sprite>(address, sprite =>
             {
                 if (this == null || backgroundRenderer == null) return;
 
@@ -269,7 +272,7 @@ namespace GIC.UI
 
                     // 新背景已上屏，释放旧背景
                     if (oldAddress != null && oldAddress != address)
-                        wargame.AssetCache?.Release(oldAddress);
+                        _assetCache?.Release(oldAddress);
                 }
                 else
                 {

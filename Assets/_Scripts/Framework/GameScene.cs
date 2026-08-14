@@ -79,7 +79,8 @@ namespace GIC.Framework
         {
             InitializeSingleton();
             InitializeSceneEvents();
-            InitializeGame();
+            InitializeGame();   // Wargame.Init 完成，容器就绪
+            Context?.Inject(this); // 注入 GameScene 自身的 [Autowired] 字段
 
             InitSaveSettings();
 
@@ -113,13 +114,18 @@ namespace GIC.Framework
 
         #region 初始化方法
 
+        // 注入字段：GameScene.Awake 自身完成 Wargame.Init 后注入（InitSaveSettings 调用点在其后）
+        [Autowired] private SaveManager _saveManager;
+
+        private ApplicationContext Context => Wargame.Instance?.Context;
+
         private void InitSaveSettings()
         {
             Cursor.SetCursor(cursor, Vector2.zero, CursorMode.Auto);
             Application.runInBackground = true;
 
             // 应用存档中的显示设置
-            var saveManager = Wargame.Instance?.SaveManager;
+            var saveManager = _saveManager;
             if (saveManager?.CurrentSave == null) return;
 
             var save = saveManager.CurrentSave;

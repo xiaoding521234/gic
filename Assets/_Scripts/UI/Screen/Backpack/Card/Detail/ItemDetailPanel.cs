@@ -61,7 +61,7 @@ namespace GIC.UI
 
         private void InitInternal(SaveCardData data, bool isReadOnly)
         {
-            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.ItemConfig?.GetItemData(data.id.AsItemName());
+            var raw = CardConfigResolver.Instance?.ItemConfig?.GetItemData(data.id.AsItemName());
             if (raw == null) return;
 
             _top.color = StarVisualConfig.GetStarColor(raw.starLevel);

@@ -52,6 +52,14 @@ namespace GIC.UI
         private TextCombiner _messageText;
         private Coroutine currentCoroutine;
 
+        [Autowired] private InputManager _inputManager;
+
+        private void Awake()
+        {
+            // 运行时实例化的弹窗：容器早已就绪，Awake 注入
+            Wargame.Instance?.Context?.Inject(this);
+        }
+
         private void EnsureTextCombiner()
         {
             if (_messageText == null && messageTextObj != null)
@@ -224,7 +232,8 @@ namespace GIC.UI
         {
             if (_mode == PopupMode.Modal)
             {
-                Wargame.Instance?.InputManager?.RegisterClosable(this);
+                Wargame.Instance?.Context?.Inject(this); // 幂等补注入（Awake 未执行的边缘时序）
+                _inputManager?.RegisterClosable(this);
                 if (backPanel != null)
                     backPanel.onClick.AddListener(Close);
             }
@@ -314,7 +323,7 @@ namespace GIC.UI
 
         private void Close()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
 
             if (currentCoroutine != null)
             {
@@ -333,7 +342,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：淡入期间被外部销毁时释放本类持有的锁
             InputLocks.PopAll(this);
 

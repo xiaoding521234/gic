@@ -29,10 +29,17 @@ namespace GIC.UI
         private CanvasGroup logoCanvasGroup;
         private bool isSkipped = false;
 
+        [Autowired] private InputManager _inputManager;
+        [Autowired] private AssetCache _assetCache;
+        [Autowired] private PositionManager _positionManager;
+
         void IClosable.Close() => SkipAnimation();
-        
+
         private void Awake()
         {
+            // Boot 链路：GameScene.Awake 已完成 Wargame.Init，容器就绪，Awake 注入
+            Wargame.Instance?.Context?.Inject(this);
+
             logoCanvasGroup = logoImage.GetComponent<CanvasGroup>();
             if (logoCanvasGroup == null)
                 logoCanvasGroup = logoImage.gameObject.AddComponent<CanvasGroup>();
@@ -41,13 +48,13 @@ namespace GIC.UI
         
         private void Start()
         {
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            _inputManager?.RegisterClosable(this);
 
             // 启动后 0.3 秒内锁定输入，防止误触
             InputLocks.Push(this, InputLockReason.SplashProtection);
             StartCoroutine(ReleaseProtectionAfter(0.3f));
 
-            Wargame.Instance?.AssetCache?.Preload<Sprite>("WishArt/columbina");
+            _assetCache?.Preload<Sprite>("WishArt/columbina");
             PreloadMainHallBackground();
 
             if (skipAnimation)
@@ -73,7 +80,7 @@ namespace GIC.UI
             // InputLock 激活时 Update 仍会执行（MonoBehaviour.Update 独立于 InputManager.Update）
             // 但 SplashScreen 的跳过是本地检测，不受 InputManager 管
             // InputLock 期间 SplashScreen 自己也不跳过
-            if (Wargame.Instance?.InputManager?.IsInputLocked == true) return;
+            if (InputLocks.IsLocked) return;
 
             if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
             {
@@ -83,7 +90,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：SkipAnimation 的 StopAllCoroutines 可能中断 ReleaseProtectionAfter
             InputLocks.PopAll(this);
         }
@@ -109,11 +116,10 @@ namespace GIC.UI
         
         private void PreloadMainHallBackground()
         {
-            var wargame = Wargame.Instance;
-            if (wargame?.PositionManager == null || wargame.AssetCache == null) return;
+            if (_positionManager == null || _assetCache == null) return;
 
-            var position = wargame.PositionManager.CurrentPosition;
-            var positionData = wargame.PositionManager.GetPositionData(position);
+            var position = _positionManager.CurrentPosition;
+            var positionData = _positionManager.GetPositionData(position);
             if (positionData == null) return;
 
             string regionName = positionData.region.ToString();
@@ -121,7 +127,7 @@ namespace GIC.UI
             string timeSuffix = TimeUtility.GetTimeSuffix();
             string bgAddress = $"PositionBack/{regionName}/{positionName}_{timeSuffix}";
 
-            wargame.AssetCache.Preload<Sprite>(bgAddress);
+            _assetCache.Preload<Sprite>(bgAddress);
         }
 
         private IEnumerator FadeLogo(float startAlpha, float targetAlpha, float duration)

@@ -49,12 +49,13 @@ namespace GIC.UI
         void IClosable.Close() => OnCloseClick();
 
         [Autowired] private PositionManager _positionManager;
+        [Autowired] private InputManager _inputManager;
 
 
         private void Start()
         {
             Wargame.Instance.Context.Inject(this);
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            _inputManager?.RegisterClosable(this);
             if (closeButton != null)
                 closeButton.onClick.AddListener(OnCloseClick);
             if (nodkraiButton != null)
@@ -197,7 +198,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：淡出协程被销毁中断时释放本类持有的锁
             InputLocks.PopAll(this);
             ClearAnchors();

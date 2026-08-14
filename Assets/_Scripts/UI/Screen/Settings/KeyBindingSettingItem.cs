@@ -30,6 +30,19 @@ namespace GIC.UI
         // 全部键位缓存 — 避免监听期间每帧 Enum.GetValues 分配新数组
         private static readonly KeyCode[] AllKeyCodes = (KeyCode[])Enum.GetValues(typeof(KeyCode));
 
+        [Autowired] private InputManager _inputManager;
+
+        /// <summary>容器已就绪（Boot 链路），懒获取注入（prefab 实例化由 SettingsScreen Setup 触发）</summary>
+        private InputManager IM
+        {
+            get
+            {
+                if (_inputManager == null)
+                    Wargame.Instance?.Context?.Inject(this);
+                return _inputManager;
+            }
+        }
+
         /// <summary>
         /// 设置动作和槽位。标签显示为「{动作名} - {主键/副键}」。
         /// </summary>
@@ -46,7 +59,7 @@ namespace GIC.UI
 
             button.onClick.AddListener(OnButtonClicked);
 
-            var im = Wargame.Instance?.InputManager;
+            var im = IM;
             if (im != null)
                 im.OnRebindCancelled += OnRebindCancelled;
         }
@@ -66,7 +79,7 @@ namespace GIC.UI
 
             _isListening = true;
             _skipFrame = true;
-            Wargame.Instance?.InputManager?.BeginRebind();
+            IM?.BeginRebind();
             valueText.SetSingleEntry(new LocalizedString("UIText", "PressKey"));
 
             // 取消按钮选中状态，防止 Space/Enter 被 EventSystem 当作 Submit 触发 onClick
@@ -108,7 +121,7 @@ namespace GIC.UI
         private void ConfirmRebind(KeyCode key)
         {
             _isListening = false;
-            var im = Wargame.Instance?.InputManager;
+            var im = IM;
             if (im != null)
             {
                 var conflict = im.FindKeyConflict(key, _action);
@@ -129,13 +142,13 @@ namespace GIC.UI
         private void CancelRebind()
         {
             _isListening = false;
-            Wargame.Instance?.InputManager?.EndRebind();
+            IM?.EndRebind();
             UpdateDisplayText();
         }
 
         private void UpdateDisplayText()
         {
-            var im = Wargame.Instance?.InputManager;
+            var im = IM;
             KeyCode key = im != null ? im.GetKey(_action, _slot) : KeyCode.None;
 
             if (key == KeyCode.None)
@@ -186,13 +199,13 @@ namespace GIC.UI
 
         public override void ResetToDefault()
         {
-            Wargame.Instance?.InputManager?.ResetAction(_action);
+            IM?.ResetAction(_action);
             UpdateDisplayText();
         }
 
         private void OnDestroy()
         {
-            var im = Wargame.Instance?.InputManager;
+            var im = _inputManager;
             if (im != null)
             {
                 im.OnRebindCancelled -= OnRebindCancelled;

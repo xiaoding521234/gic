@@ -105,6 +105,8 @@ namespace GIC.UI
         // 屏幕边缘泛光
         protected ScreenEdgeGlow _edgeGlow;
 
+        [Autowired] private InputManager _inputManager;
+
         // 进度条流彩协程
         protected Coroutine _progressBarGlowCoroutine;
 
@@ -133,6 +135,7 @@ namespace GIC.UI
 
         private void Awake()
         {
+            Wargame.Instance?.Context?.Inject(this); // 容器已就绪，Awake 注入
             if (drawRoot != null) drawRoot.SetActive(false);
             CreateEdgeGlow();
             CreateStar5VideoOverlay();
@@ -262,7 +265,7 @@ namespace GIC.UI
         {
             if (Input.GetMouseButtonDown(0)) return true;
 
-            var im = Wargame.Instance?.InputManager;
+            var im = _inputManager;
             if (im == null) return false;
 
             for (int slot = 0; slot < 2; slot++)

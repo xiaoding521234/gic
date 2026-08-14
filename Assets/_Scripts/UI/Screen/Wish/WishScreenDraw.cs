@@ -29,17 +29,18 @@ namespace GIC.UI
         private WishManager _wishManager;
         private WishPoolConfig _currentPool;
 
+        // 注入字段（partial 共享，主文件 Awake 注入）
+        [Autowired] private SaveManager saveManager;
+        [Autowired] private UnitConfig unitConfig;
+        [Autowired] private ItemConfig itemConfig;
+
         /// <summary>
         /// 祈愿部分的初始化（由 WishScreen.Start 调用）
         /// </summary>
         private void InitWishDraw()
         {
-            var saveManager = Wargame.Instance?.SaveManager;
-            var configManager = Wargame.Instance?.ConfigManager;
-            if (saveManager == null || configManager == null) return;
+            if (saveManager == null) return;
 
-            var unitConfig = configManager.GetUnitConfig();
-            var itemConfig = configManager.GetItemConfig();
             _wishManager = new WishManager(saveManager, unitConfig, itemConfig);
 
             if (wish1Button != null)
@@ -55,7 +56,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：释放 WishScreen 及其祈愿流程持有的全部锁
             InputLocks.PopAll(this);
 
@@ -96,7 +97,7 @@ namespace GIC.UI
         private void UpdateFateCount()
         {
             if (fateCountText == null) return;
-            var save = Wargame.Instance?.SaveManager?.CurrentSave;
+            var save = saveManager?.CurrentSave;
             if (save == null) return;
 
             int primogem = 0;

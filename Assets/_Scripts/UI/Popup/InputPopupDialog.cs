@@ -35,6 +35,14 @@ namespace GIC.UI
         private Action<string> onConfirmCallback;
         private Coroutine currentCoroutine;
 
+        [Autowired] private InputManager _inputManager;
+
+        private void Awake()
+        {
+            // 运行时实例化的弹窗：容器早已就绪，Awake 注入
+            Wargame.Instance?.Context?.Inject(this);
+        }
+
         // ── IClosable 实现 ──
         void IClosable.Close() => OnCancel();
 
@@ -64,7 +72,8 @@ namespace GIC.UI
             canvasGroup.interactable = true;
             canvasGroup.blocksRaycasts = true;
 
-            Wargame.Instance?.InputManager?.RegisterClosable(this);
+            Wargame.Instance?.Context?.Inject(this); // 幂等：Awake 未执行（激活即调 Show）时补注入
+            _inputManager?.RegisterClosable(this);
             InputLocks.Push(this, InputLockReason.InputPopupEntering);
 
             gameObject.SetActive(true);
@@ -152,7 +161,7 @@ namespace GIC.UI
 
         private void Hide()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
 
             if (currentCoroutine != null)
             {
@@ -181,7 +190,7 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            Wargame.Instance?.InputManager?.UnregisterClosable(this);
+            _inputManager?.UnregisterClosable(this);
             // 兜底：淡入期间被外部销毁时释放本类持有的锁
             InputLocks.PopAll(this);
             confirmButton?.onClick.RemoveAllListeners();

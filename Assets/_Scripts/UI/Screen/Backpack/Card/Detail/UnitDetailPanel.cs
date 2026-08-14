@@ -53,14 +53,14 @@ namespace GIC.UI
 
         public void Init(Card card)
         {
-            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
+            var raw = CardConfigResolver.Instance?.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
             if (raw == null) return;
             InitInternal(raw, card.saveCardData, card?.cardDetailView?.tagContainer);
         }
 
         public void Init(SaveCardData data, bool isReadOnly = false)
         {
-            var raw = Wargame.Instance.Context.Get<CardConfigResolver>()?.UnitConfig?.GetUnitData(data.id.AsUnitName());
+            var raw = CardConfigResolver.Instance?.UnitConfig?.GetUnitData(data.id.AsUnitName());
             if (raw == null) return;
             InitInternal(raw, data, null);
         }
