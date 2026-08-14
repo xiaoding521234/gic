@@ -60,27 +60,43 @@ namespace GIC.UI
 
         #region 星辉雨
 
+        private bool _isRainActive;
+        private int _rainSpawned;
+        private int _rainTotal;
+
+        /// <summary>
+        /// 请求星辉雨——若已有雨在进行中，追加数量而非启动新协程
+        /// （避免多个协程同时遍历 _activeDrops 导致重复更新、速度倍增）
+        /// </summary>
+        private void RequestStarglitterRain(int amount)
+        {
+            if (starglitterRainContainer == null || starglitterSprite == null) return;
+            _rainTotal += amount;
+            if (!_isRainActive)
+                StartCoroutine(StarglitterRainCoroutine());
+        }
+
         /// <summary>
         /// 星辉雨动画——单协程批量管理所有下落，分批错落生成
         /// </summary>
-        private IEnumerator StarglitterRainCoroutine(int totalAmount)
+        private IEnumerator StarglitterRainCoroutine()
         {
-            if (starglitterRainContainer == null || starglitterSprite == null) yield break;
+            _isRainActive = true;
+            _rainSpawned = 0;
 
             float parentWidth = ((RectTransform)starglitterRainContainer).rect.width;
             float parentHeight = ((RectTransform)starglitterRainContainer).rect.height;
             float startY = parentHeight * 0.5f + 50f;
             float fallHeight = startY + parentHeight * 0.5f + 100f;
 
-            int batchSize = Mathf.Clamp(totalAmount / 4, 2, 5);
-            int spawned = 0;
             float nextSpawnTime = 0f;
 
-            while (spawned < totalAmount || _activeDrops.Count > 0)
+            while (_rainSpawned < _rainTotal || _activeDrops.Count > 0)
             {
-                if (spawned < totalAmount && Time.time >= nextSpawnTime)
+                if (_rainSpawned < _rainTotal && Time.time >= nextSpawnTime)
                 {
-                    int batch = Mathf.Min(batchSize, totalAmount - spawned);
+                    int batchSize = Mathf.Clamp(_rainTotal / 4, 2, 5);
+                    int batch = Mathf.Min(batchSize, _rainTotal - _rainSpawned);
                     for (int i = 0; i < batch; i++)
                     {
                         var go = GetPooledStarglitter();
@@ -111,7 +127,7 @@ namespace GIC.UI
                         d.endRot = d.startRot + Random.Range(180f, 540f);
                         _activeDrops[idx] = d;
 
-                        spawned++;
+                        _rainSpawned++;
                     }
                     nextSpawnTime = Time.time + Random.Range(0.15f, 0.35f);
                 }
@@ -142,6 +158,9 @@ namespace GIC.UI
 
                 yield return null;
             }
+
+            _isRainActive = false;
+            _rainTotal = 0;
         }
 
         private GameObject GetPooledStarglitter()

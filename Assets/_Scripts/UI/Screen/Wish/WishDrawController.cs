@@ -379,7 +379,7 @@ namespace GIC.UI
             result.starglitterAmount = starglitter;
             _results.Add(result);
             if (starglitter > 0)
-                StartCoroutine(StarglitterRainCoroutine(starglitter));
+                RequestStarglitterRain(starglitter);
         }
 
         /// <summary>
@@ -443,6 +443,8 @@ namespace GIC.UI
 
         protected void ClearStarglitterPool()
         {
+            _isRainActive = false;
+            _rainTotal = 0;
             foreach (var go in _starglitterPool)
             {
                 if (go != null) Destroy(go);

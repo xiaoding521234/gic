@@ -8,12 +8,11 @@ Shader "UI/ScreenEdgeGlow"
     }
     SubShader
     {
-        Tags { "Queue"="Overlay" "RenderType"="Transparent" }
+        Tags { "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
 
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
         Cull Off
-        ZTest Always
 
         Pass
         {

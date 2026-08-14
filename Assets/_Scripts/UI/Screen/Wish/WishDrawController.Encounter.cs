@@ -144,7 +144,7 @@ namespace GIC.UI
             int sg = _wishManager.AwardDuplicateStarglitter(result);
             if (sg > 0)
             {
-                StartCoroutine(StarglitterRainCoroutine(sg));
+                RequestStarglitterRain(sg);
                 UpdateStarglitterProgressBar();
             }
         }

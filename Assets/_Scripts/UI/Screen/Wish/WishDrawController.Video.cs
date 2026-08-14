@@ -91,8 +91,13 @@ namespace GIC.UI
             _star5VideoRawImage.color = Color.white;
             _star5VideoRawImage.raycastTarget = true;
 
+            // 视频播放期间禁用边缘泛光，防止穿透视频覆盖层
+            if (_edgeGlow != null) _edgeGlow.enabled = false;
+
             while (_star5VideoPlayer.isPlaying)
                 yield return null;
+
+            if (_edgeGlow != null) _edgeGlow.enabled = true;
 
             _star5VideoPlayer.Stop();
 
@@ -113,6 +118,7 @@ namespace GIC.UI
                 _star5VideoRawImage.color = new Color(1f, 1f, 1f, 0f);
                 _star5VideoRawImage.raycastTarget = false;
             }
+            if (_edgeGlow != null) _edgeGlow.enabled = true;
             _isVideoPlaying = false;
         }
 
