@@ -12,14 +12,15 @@ using GIC.Tool;
 namespace GIC.UI
 {
     /// <summary>
-    /// 祈愿动画控制器 — 控制卡道出卡、命运之线射击、倒计时、结果展示
-    /// UI 层级在场景中提前建好，通过 SerializeField 引用
+    /// 祈愿动画控制器 — 表现层协调者
+    /// 业务逻辑由 WishFlowController 预计算，本类只负责按序播放动画。
     /// </summary>
     [RequireComponent(typeof(RectTransform))]
     public partial class WishDrawController : MonoBehaviour
     {
         /// <summary>抽卡存盘后回调（通知外部刷新货币显示）</summary>
         public event Action OnWishComplete;
+
         [Header("卡牌预制体")]
         [SerializeField] private GameObject cardPrefab;
 
@@ -73,15 +74,13 @@ namespace GIC.UI
         [SerializeField] private Color encounterLineColor = new Color(1f, 0.85f, 0.3f, 1f);
 
         /// <summary>抽卡流程是否进行中（防重入）</summary>
-        public bool IsWishInProgress => _isActive;
+        public bool IsWishInProgress => _flow != null && _flow.CurrentState != WishFlowController.State.Idle;
 
         #region 运行时状态
 
         protected WishManager _wishManager;
         protected WishPoolConfig _pool;
-        protected List<WishResult> _results;
-        protected int _totalShots;
-        protected int _shotsCompleted;
+        protected WishFlowController _flow;
 
         protected List<WishTrackCard> _activeCards = new();
 
@@ -89,17 +88,13 @@ namespace GIC.UI
         protected bool _isInCooldown;
         protected float _cooldownTimer;
         protected float _totalCooldownTime;
-        protected bool _isActive;
 
         protected List<RectTransform> _resultCards = new();
         protected List<GameObject> _cardPool = new();
         protected readonly List<Coroutine> _holdThenFlyCoroutines = new();
         protected int _holdThenFlyRemaining;
 
-        protected bool _isEncounterShot;
-        protected bool _isEncounterAnimating;
-
-        // 星级→候选列表预缓存
+        // 星级→候选列表预缓存（由 _flow 提供）
         protected Dictionary<int, List<UnitName>> _unitsByStar;
         protected Dictionary<int, List<ItemName>> _itemsByStar;
 
@@ -111,6 +106,9 @@ namespace GIC.UI
 
         // 进度条流彩协程
         protected Coroutine _progressBarGlowCoroutine;
+
+        // 当前正在播放的 step 协程
+        protected Coroutine _stepsCoroutine;
 
         #endregion
 
@@ -153,19 +151,24 @@ namespace GIC.UI
         {
             _wishManager = manager;
             _pool = pool;
-            _totalShots = count;
-            _shotsCompleted = 0;
-            _isActive = true;
+            _flow = new WishFlowController(manager, pool);
+            _flow.StartFlow(count);
 
-            if (!_wishManager.ConsumePrimogem(count))
+            if (!manager.ConsumePrimogem(count))
             {
                 Debug.LogWarning("[WishDrawController] 原石不足");
-                _isActive = false;
+                _flow.Reset();
                 return;
             }
 
-            _results = new List<WishResult>();
-            BuildStarLevelCache();
+            // 从 flow 获取星级缓存
+            _unitsByStar = new Dictionary<int, List<UnitName>>();
+            _itemsByStar = new Dictionary<int, List<ItemName>>();
+            for (int star = 1; star <= 5; star++)
+            {
+                _unitsByStar[star] = _flow.GetCachedUnitsByStar(star);
+                _itemsByStar[star] = _flow.GetCachedItemsByStar(star);
+            }
 
             ClearResultCards();
             ClearTrackCards();
@@ -204,11 +207,13 @@ namespace GIC.UI
         {
             yield return null;
 
-            while (_isActive && _shotsCompleted < _totalShots)
+            while (_flow.CurrentState != WishFlowController.State.Idle &&
+                   _flow.CurrentState != WishFlowController.State.Finished)
             {
                 if (_isInCooldown)
                 {
-                    if (!_isEncounterAnimating && !_isVideoPlaying)
+                    // 揭示动画中冻结倒计时
+                    if (_flow.CurrentState == WishFlowController.State.Drawing)
                     {
                         _cooldownTimer -= Time.deltaTime;
                         UpdateCountdownBar(1f - _cooldownTimer / _totalCooldownTime);
@@ -232,9 +237,10 @@ namespace GIC.UI
                 yield return null;
             }
 
-            if (_shotsCompleted >= _totalShots)
+            if (_flow.CurrentState == WishFlowController.State.Finished)
             {
-                while (_isEncounterAnimating || _isVideoPlaying)
+                // 等待最后的 step 协程完成
+                while (_stepsCoroutine != null)
                     yield return null;
 
                 _wishManager.SaveGame();
@@ -245,39 +251,28 @@ namespace GIC.UI
 
         private void Shoot()
         {
-            if (_isInCooldown || _shotsCompleted >= _totalShots) return;
-
-            _shotsCompleted++;
-
-            _isEncounterShot = _wishManager.IsEncounterReady();
-            if (_isEncounterShot) _wishManager.ConsumeEncounter();
+            if (_isInCooldown || _flow.CurrentState != WishFlowController.State.Drawing) return;
 
             if (shootSFX != null)
                 AudioManager.Instance?.PlaySFX(shootSFX, sfxVolume);
 
-            StartCoroutine(FateLineCoroutine(_isEncounterShot));
+            StartCoroutine(FateLineCoroutine(_flow.IsEncounterReady));
 
             _isInCooldown = true;
 
-            int starLevel = RevealAndPopResultCard(_shotsCompleted - 1);
-
-            if (_isEncounterShot)
-                _cooldownTimer = StarVisualConfig.BaseShotCooldown;
-            else
-                _cooldownTimer = StarVisualConfig.GetShotCooldown(starLevel);
-            _totalCooldownTime = _cooldownTimer;
-
-            UpdateStarglitterProgressBar();
-        }
-
-        private int RevealAndPopResultCard(int index)
-        {
+            // 找到中心卡
             WishTrackCard centerCard = FindCardNearestCenter();
             if (centerCard == null)
             {
                 SpawnTrackCard();
                 centerCard = FindCardNearestCenter();
-                if (centerCard == null) return 1;
+            }
+
+            if (centerCard == null)
+            {
+                _cooldownTimer = StarVisualConfig.GetShotCooldown(1);
+                _totalCooldownTime = _cooldownTimer;
+                return;
             }
 
             _activeCards.Remove(centerCard);
@@ -290,55 +285,109 @@ namespace GIC.UI
             rect.localScale = Vector3.one * (holdCardSize / 160f);
             _resultCards.Add(rect);
 
-            if (_isEncounterShot && card != null && card.saveCardData != null)
-            {
-                StartCoroutine(EncounterRevealCoroutine(card, rect, index));
-                return 5;
-            }
+            // 预计算射击结果（全部业务逻辑在此完成）
+            int shotIndex = _flow.ShotsCompleted;
+            var shotResult = _flow.PlanShot(card, shotIndex);
 
-            // ── 普通射击 ──
-            int starLevel = 1;
-            if (card != null && card.saveCardData != null)
-            {
-                starLevel = card.saveCardData.StarLevel;
-                var result = BuildResultFromCard(card);
-                AddResultAndStarglitter(result);
-                card.PlayLightBand();
-            }
+            // 按序播放动画
+            _stepsCoroutine = StartCoroutine(PlayStepsCoroutine(shotResult, card, rect, shotIndex));
 
-            if (starLevel >= 5)
-            {
-                StartCoroutine(Star5NormalRevealCoroutine(starLevel, rect, index));
-            }
+            // 设置冷却
+            int starLevel = shotResult?.finalStarLevel ?? 1;
+            if (shotResult != null && shotResult.isEncounter)
+                _cooldownTimer = StarVisualConfig.BaseShotCooldown;
             else
+                _cooldownTimer = StarVisualConfig.GetShotCooldown(starLevel);
+            _totalCooldownTime = _cooldownTimer;
+
+            UpdateStarglitterProgressBar();
+        }
+
+        /// <summary>
+        /// 统一步骤播放器 — 按预计算的 steps 有序播放动画
+        /// </summary>
+        private IEnumerator PlayStepsCoroutine(WishShotResult result, Card card, RectTransform rect, int shotIndex)
+        {
+            if (result == null)
             {
-                PlayCardHitEffects(starLevel);
-                StartHoldThenFly(rect, index, starLevel);
-                UpdateStarglitterProgressBar();
+                _stepsCoroutine = null;
+                yield break;
             }
-            return starLevel;
+
+            Coroutine shakeGlow = null;
+            bool hasGlow = card.glowImage != null;
+
+            foreach (var step in result.steps)
+            {
+                switch (step.type)
+                {
+                    case WishRevealStep.StepType.Star5Video:
+                        yield return PlayStar5TransitionCoroutine();
+                        break;
+
+                    case WishRevealStep.StepType.CardEffects:
+                        PlayCardHitEffects(step.starLevel, card);
+                        break;
+
+                    case WishRevealStep.StepType.StarglitterRain:
+                        if (step.starglitterAmount > 0)
+                            RequestStarglitterRain(step.starglitterAmount);
+                        UpdateStarglitterProgressBar();
+                        break;
+
+                    case WishRevealStep.StepType.EncounterShakeStart:
+                        if (hasGlow) card.glowImage.gameObject.SetActive(true);
+                        shakeGlow = StartCoroutine(CardShakeGlowCoroutine(
+                            rect, card.glowImage, step.baseStarLevel, step.upgradeCount, StarVisualConfig.ShakeBaseDuration));
+                        break;
+
+                    case WishRevealStep.StepType.EncounterUpgrade:
+                        if (step.shakeDelay > 0f)
+                            yield return new WaitForSeconds(step.shakeDelay);
+
+                        // 换卡显示
+                        if (step.cardData != null)
+                            card.Init(step.cardData, null);
+
+                        // 特效
+                        PlayCardHitEffects(step.starLevel, card);
+
+                        // 星辉雨
+                        if (step.starglitterAmount > 0)
+                        {
+                            RequestStarglitterRain(step.starglitterAmount);
+                            UpdateStarglitterProgressBar();
+                        }
+                        break;
+
+                    case WishRevealStep.StepType.EncounterShakeEnd:
+                        if (shakeGlow != null) StopCoroutine(shakeGlow);
+                        if (hasGlow && card.glowImage != null)
+                        {
+                            card.glowImage.color = new Color(1f, 0.95f, 0.6f, 0f);
+                            card.glowImage.gameObject.SetActive(false);
+                        }
+                        // 恢复位置
+                        rect.localEulerAngles = Vector3.zero;
+                        break;
+
+                    case WishRevealStep.StepType.HoldThenFly:
+                        StartHoldThenFly(rect, shotIndex, step.starLevel);
+                        // 覆盖冷却时长
+                        _cooldownTimer = StarVisualConfig.GetHoldTime(step.starLevel) + 0.5f;
+                        _totalCooldownTime = _cooldownTimer;
+                        UpdateStarglitterProgressBar();
+                        break;
+                }
+            }
+
+            _flow.OnRevealComplete();
+            _stepsCoroutine = null;
         }
 
         #endregion
 
-        #region Helper 方法（消除重复代码）
-
-        /// <summary>
-        /// 从 card.saveCardData 构造 WishResult（含 sprite 获取）
-        /// </summary>
-        protected WishResult BuildResultFromCard(Card card)
-        {
-            bool isUnit = card.saveCardData.cardType == CardType.Unit;
-            return new WishResult(
-                card.saveCardData.id,
-                card.saveCardData.StarLevel,
-                card.saveCardData.cardType,
-                isUnit
-                    ? _wishManager.GetUnitConfig().GetUnitData(card.saveCardData.id.AsUnitName())?.GetCard(0)
-                    : _wishManager.GetItemConfig().GetItemData(card.saveCardData.id.AsItemName())?.GetIcon(0),
-                false
-            );
-        }
+        #region Helper 方法
 
         /// <summary>
         /// 播放卡片命中特效：光带 + 光柱 + 边缘泛光
@@ -355,7 +404,7 @@ namespace GIC.UI
         /// </summary>
         protected float ComputeResultY(int index)
         {
-            float startY = -(_totalShots - 1) * (resultCardSize + resultCardSpacing) * 0.5f;
+            float startY = -(_flow.TotalShots - 1) * (resultCardSize + resultCardSpacing) * 0.5f;
             return startY + index * (resultCardSize + resultCardSpacing);
         }
 
@@ -370,36 +419,13 @@ namespace GIC.UI
             _holdThenFlyCoroutines.Add(StartCoroutine(HoldThenFlyAndCount(rect, targetPos, holdTime)));
         }
 
-        /// <summary>
-        /// 入账 + 星辉雨
-        /// </summary>
-        protected void AddResultAndStarglitter(WishResult result)
-        {
-            _wishManager.AddResultToInventory(result, out int starglitter);
-            result.starglitterAmount = starglitter;
-            _results.Add(result);
-            if (starglitter > 0)
-                RequestStarglitterRain(starglitter);
-        }
-
-        /// <summary>
-        /// 五星普通射击揭示：先播放过渡视频，再展示特效+飞行
-        /// </summary>
-        private IEnumerator Star5NormalRevealCoroutine(int starLevel, RectTransform rect, int index)
-        {
-            yield return PlayStar5TransitionCoroutine();
-            PlayCardHitEffects(starLevel);
-            StartHoldThenFly(rect, index, starLevel);
-            UpdateStarglitterProgressBar();
-        }
-
         #endregion
 
         #region 清理
 
         private void OnDisable()
         {
-            _isActive = false;
+            _flow?.Reset();
             StopHoldThenFlyCoroutines();
             ClearTrackCards();
             ClearCardPool();

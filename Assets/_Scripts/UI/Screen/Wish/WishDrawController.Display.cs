@@ -48,7 +48,8 @@ namespace GIC.UI
 
         private IEnumerator ShowFinalDisplay()
         {
-            _isActive = false;
+            int totalShots = _flow.TotalShots;
+            _flow?.Reset();
 
             StopHoldThenFlyCoroutines();
 
@@ -58,7 +59,7 @@ namespace GIC.UI
             finalDisplayContainer.gameObject.SetActive(true);
             finalDisplayCanvasGroup.alpha = 0f;
 
-            float startX = -(_totalShots - 1) * (finalCardSize + resultCardSpacing) * 0.5f;
+            float startX = -(totalShots - 1) * (finalCardSize + resultCardSpacing) * 0.5f;
             for (int i = 0; i < _resultCards.Count; i++)
             {
                 var rect = _resultCards[i];

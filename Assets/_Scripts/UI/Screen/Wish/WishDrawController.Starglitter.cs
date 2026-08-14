@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace GIC.UI
 {
     /// <summary>
-    /// 星辉雨 + 进度条
+    /// 星辉雨 + 进度条（纯表现层）
     /// </summary>
     public partial class WishDrawController
     {
@@ -16,10 +16,11 @@ namespace GIC.UI
         /// </summary>
         private void UpdateStarglitterProgressBar()
         {
-            if (starglitterProgressFill == null) return;
+            if (starglitterProgressFill == null || _wishManager == null) return;
 
             // 相遇之线射击中 或 有可用相遇之线：填满 + 持续抖动+流彩
-            if (_isEncounterShot || _wishManager.GetEncounterCharges() > 0)
+            bool encounterActive = _flow != null && _flow.IsEncounterReady;
+            if (encounterActive)
             {
                 starglitterProgressFill.localScale = new Vector3(1f, 1f, 1f);
                 if (_progressBarGlowCoroutine == null)

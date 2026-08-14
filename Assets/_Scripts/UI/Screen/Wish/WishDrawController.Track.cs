@@ -15,7 +15,8 @@ namespace GIC.UI
     {
         private IEnumerator SpawnCardsCoroutine()
         {
-            while (_isActive)
+            while (_flow != null && _flow.CurrentState != WishFlowController.State.Idle &&
+                   _flow.CurrentState != WishFlowController.State.Finished)
             {
                 SpawnTrackCard();
                 yield return new WaitForSeconds(cardSpawnInterval);
@@ -23,10 +24,11 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 预构建星级→候选列表缓存，避免每张卡道卡都遍历全表
+        /// 预构建星级→候选列表缓存（在 StartWish 中从 _flow 获取，此方法保留兼容）
         /// </summary>
         private void BuildStarLevelCache()
         {
+            if (_flow == null) return;
             var unitConfig = _wishManager.GetUnitConfig();
             var itemConfig = _wishManager.GetItemConfig();
 
