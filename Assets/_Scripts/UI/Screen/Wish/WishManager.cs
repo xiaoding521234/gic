@@ -177,22 +177,11 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 消耗原石
+        /// 消耗原石（数量不足返回 false）
         /// </summary>
         public bool ConsumePrimogem(int count)
         {
-            int cost = SingleWishCost * count;
-            var save = _saveManager.CurrentSave;
-            foreach (var card in save.ownedNormalItems)
-            {
-                if (card.id.AsItemName() == ItemName.Primogem)
-                {
-                    if (card.count < cost) return false;
-                    card.count -= cost;
-                    return true;
-                }
-            }
-            return false;
+            return _saveManager.CurrentSave.TryConsumeItem(ItemName.Primogem, SingleWishCost * count);
         }
 
         /// <summary>
@@ -200,13 +189,7 @@ namespace GIC.UI
         /// </summary>
         public int GetPrimogemCount()
         {
-            var save = _saveManager.CurrentSave;
-            foreach (var card in save.ownedNormalItems)
-            {
-                if (card.id.AsItemName() == ItemName.Primogem)
-                    return card.count;
-            }
-            return 0;
+            return _saveManager.CurrentSave.GetItemCount(ItemName.Primogem);
         }
 
         /// <summary>
@@ -279,19 +262,7 @@ namespace GIC.UI
         private void AddStarglitter(PlayerSaveData save, int amount)
         {
             save.starglitterEarned += amount;
-
-            foreach (var card in save.ownedNormalItems)
-            {
-                if (card.id.AsItemName() == ItemName.Starglitter)
-                {
-                    card.count += amount;
-                    return;
-                }
-            }
-            // 星辉不在存档中（初始为0未创建），新建
-            var newCard = new SaveCardData();
-            newCard.SaveItem(ItemName.Starglitter, amount);
-            save.AddOwnedItem(newCard);
+            save.AddItemCount(ItemName.Starglitter, amount);
         }
 
         /// <summary>

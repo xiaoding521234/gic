@@ -13,7 +13,7 @@ namespace GIC.UI
     /// 跳过方式：任意键或鼠标按钮。
     /// 启动后 0.3 秒内通过 InputLock 保护，防止误触。
     /// </summary>
-    public class SplashScreen : MonoBehaviour, IClosable
+    public class SplashScreen : ScreenBase
     {
         [Header("UI组件")]
         [SerializeField] private Image logoImage;
@@ -29,16 +29,15 @@ namespace GIC.UI
         private CanvasGroup logoCanvasGroup;
         private bool isSkipped = false;
 
-        [Autowired] private InputManager _inputManager;
         [Autowired] private AssetCache _assetCache;
         [Autowired] private PositionManager _positionManager;
 
-        void IClosable.Close() => SkipAnimation();
+        // ── IClosable 实现：跳过动画直接进大厅（不走标准关闭模板，Splash 无 GoBack 语义） ──
+        public override void Close() => SkipAnimation();
 
-        private void Awake()
+        protected override void Awake()
         {
-            // Boot 链路：GameScene.Awake 已完成 Wargame.Init，容器就绪，Awake 注入
-            Wargame.Instance?.Context?.Inject(this);
+            base.Awake(); // 注入（Boot 链路容器已就绪）
 
             logoCanvasGroup = logoImage.GetComponent<CanvasGroup>();
             if (logoCanvasGroup == null)
@@ -48,7 +47,7 @@ namespace GIC.UI
         
         private void Start()
         {
-            _inputManager?.RegisterClosable(this);
+            RegisterClosableSelf();
 
             // 启动后 0.3 秒内锁定输入，防止误触
             InputLocks.Push(this, InputLockReason.SplashProtection);
@@ -88,13 +87,8 @@ namespace GIC.UI
             }
         }
 
-        private void OnDestroy()
-        {
-            _inputManager?.UnregisterClosable(this);
-            // 兜底：SkipAnimation 的 StopAllCoroutines 可能中断 ReleaseProtectionAfter
-            InputLocks.PopAll(this);
-        }
-        
+        // OnDestroy 兜底（注销可关闭 + PopAll 输入锁）由 ScreenBase 统一处理
+
         private void SkipAnimation()
         {
             if (isSkipped) return;

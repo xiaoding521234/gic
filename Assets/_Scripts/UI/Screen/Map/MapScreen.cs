@@ -11,7 +11,7 @@ namespace GIC.UI
 {
 
 
-    public class MapScreen : MonoBehaviour, IClosable
+    public class MapScreen : ScreenBase
     {
         [Header("固定UI")]
         [SerializeField] private Button closeButton;
@@ -43,19 +43,16 @@ namespace GIC.UI
 
         private RegionName currentRegion;
         private readonly List<GameObject> _spawnedAnchors = new();
-        private bool isClosing = false;
 
         // ── IClosable 实现 ──
-        void IClosable.Close() => OnCloseClick();
+        public override void Close() => OnCloseClick();
 
         [Autowired] private PositionManager _positionManager;
-        [Autowired] private InputManager _inputManager;
 
 
         private void Start()
         {
-            Wargame.Instance.Context.Inject(this);
-            _inputManager?.RegisterClosable(this);
+            RegisterClosableSelf();
             if (closeButton != null)
                 closeButton.onClick.AddListener(OnCloseClick);
             if (nodkraiButton != null)
@@ -77,7 +74,7 @@ namespace GIC.UI
             if (khaenriahButton != null)
                 khaenriahButton.onClick.AddListener(() => ShowRegion(RegionName.Khaenriah));
 
-            AudioManager.Instance.PushMusicVolume();
+            PushMusicVolumeSafe();
             ShowRegion(_positionManager.GetCurrentRegion());
         }
 
@@ -157,22 +154,20 @@ namespace GIC.UI
 
         private void OnCloseClick()
         {
-            if (isClosing) return;
-            isClosing = true;
-            InputLocks.Push(this, InputLockReason.Closing);
-            AudioManager.Instance.PopMusicVolume();
-            CloseWithFade();
+            CloseScreen(ExitFadeCoroutine);
         }
 
         /// <summary>
-        /// 淡出后返回大厅（关闭按钮和锚点传送共用）
+        /// 淡出后返回大厅（关闭按钮和锚点传送共用）。
+        /// 走标准关闭模板：补上此前传送路径缺失的防重入守卫、Closing 锁与音乐恢复。
         /// </summary>
         public void CloseWithFade()
         {
-            StartCoroutine(CloseWithFadeCoroutine());
+            CloseScreen(ExitFadeCoroutine);
         }
 
-        private IEnumerator CloseWithFadeCoroutine()
+        /// <summary>纯淡出动画（模板负责锁与 GoBack 收尾）</summary>
+        private IEnumerator ExitFadeCoroutine()
         {
             // 淡出动画，给大厅背景加载留出时间
             if (canvasGroup != null)
@@ -191,16 +186,11 @@ namespace GIC.UI
                 }
                 canvasGroup.alpha = 0f;
             }
-
-            InputLocks.Pop(this, InputLockReason.Closing);
-            GameScene.Instance.GoBack();
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            _inputManager?.UnregisterClosable(this);
-            // 兜底：淡出协程被销毁中断时释放本类持有的锁
-            InputLocks.PopAll(this);
+            base.OnDestroy();
             ClearAnchors();
         }
     }

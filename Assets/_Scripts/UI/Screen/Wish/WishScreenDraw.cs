@@ -54,14 +54,13 @@ namespace GIC.UI
             UpdateFateCount();
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            _inputManager?.UnregisterClosable(this);
-            // 兜底：释放 WishScreen 及其祈愿流程持有的全部锁
-            InputLocks.PopAll(this);
-
             if (drawController != null)
                 drawController.OnWishComplete -= UpdateFateCount;
+
+            // 基类收尾：注销可关闭 + PopAll 输入锁 + 音乐 pop 兜底（UnsubscribeOwner 此前无订阅）
+            base.OnDestroy();
         }
 
         private void StartDraw(int count)
@@ -100,31 +99,10 @@ namespace GIC.UI
             var save = saveManager?.CurrentSave;
             if (save == null) return;
 
-            int primogem = 0;
-            foreach (var card in save.ownedNormalItems)
-            {
-                if (card.id.AsItemName() == ItemName.Primogem)
-                {
-                    primogem = card.count;
-                    break;
-                }
-            }
-            fateCountText.text = primogem.ToString();
+            fateCountText.text = save.GetItemCount(ItemName.Primogem).ToString();
 
-            // 星辉数量
             if (starglitterCountText != null)
-            {
-                int starglitter = 0;
-                foreach (var card in save.ownedNormalItems)
-                {
-                    if (card.id.AsItemName() == ItemName.Starglitter)
-                    {
-                        starglitter = card.count;
-                        break;
-                    }
-                }
-                starglitterCountText.text = starglitter.ToString();
-            }
+                starglitterCountText.text = save.GetItemCount(ItemName.Starglitter).ToString();
         }
 
         /// <summary>

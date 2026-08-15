@@ -17,7 +17,7 @@ namespace GIC.UI
 {
 
 
-    public class CoopScreen : MonoBehaviour, IClosable
+    public class CoopScreen : ScreenBase
     {
         [Header("房间详情")]
         public GameObject roomPanel;
@@ -43,7 +43,6 @@ namespace GIC.UI
         private CoopNetworkController _network;
         [Autowired] private PlayerManager _playerManager;
         [Autowired] private RoomManager _roomManager;
-        [Autowired] private InputManager _inputManager;
         private MyNetworkManager _netMgr;
         private MyNetworkDiscovery _discovery;
 
@@ -58,10 +57,9 @@ namespace GIC.UI
 
         private enum RoomState { DisconnectedClient, Host, ConnectedClient }
         private RoomState _currentState = RoomState.DisconnectedClient;
-        private bool _isClosing = false;
 
         // ── IClosable 实现 ──
-        void IClosable.Close() => OnLeaveRoomClick();
+        public override void Close() => OnLeaveRoomClick();
 
         private void EnsureTextCombiners()
         {
@@ -98,11 +96,12 @@ namespace GIC.UI
             return tc;
         }
 
-        void Awake()
+        protected override void Awake()
         {
+            base.Awake(); // 注入（Boot 链路容器已就绪）
+
             _netMgr = FindObjectOfType<MyNetworkManager>();
             _discovery = FindObjectOfType<MyNetworkDiscovery>();
-            Wargame.Instance.Context.Inject(this);
             _network = new CoopNetworkController(_netMgr, _discovery);
 
             ClearPlayerList();
@@ -117,9 +116,8 @@ namespace GIC.UI
         void Start()
         {
             StopCurrentConnection();
-            AudioManager.Instance.PushMusicVolume();
-
-            _inputManager?.RegisterClosable(this);
+            PushMusicVolumeSafe();
+            RegisterClosableSelf();
 
             BindButtonEvents();
             BindDiscoveryEvents();
@@ -137,15 +135,15 @@ namespace GIC.UI
                 StopDiscoveryAndUpdateUI();
         }
 
-        void OnDestroy()
+        protected override void OnDestroy()
         {
-            _inputManager?.UnregisterClosable(this);
-            // 兜底：释放本类持有的全部输入锁
-            InputLocks.PopAll(this);
             UnbindPlayerEvents();
             UnbindNetworkEvents();
             UnbindDiscoveryEvents();
             CancelInvoke();
+
+            // 基类收尾：注销可关闭 + PopAll 输入锁 + 音乐 pop 兜底
+            base.OnDestroy();
         }
 
         #region 按钮绑定
@@ -307,13 +305,13 @@ namespace GIC.UI
 
         void OnLeaveRoomClick()
         {
-            if (_isClosing) return;
+            if (isClosing) return;
 
             switch (_currentState)
             {
                 case RoomState.DisconnectedClient:
-                    _isClosing = true;
-                    AudioManager.Instance.PopMusicVolume();
+                    isClosing = true;
+                    PopMusicSafe();
                     // 无退场动画 — 转场期间输入由 GoBackCoroutine 的 SceneTransition 锁封锁
                     GameScene.Instance.GoBack();
                     break;

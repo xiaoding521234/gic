@@ -130,16 +130,12 @@ namespace GIC.UI
         private void OnClose()
         {
             if (isClosing) return;
-            isClosing = true;
-            InputLocks.Push(this, InputLockReason.Closing);
-
             if (isEditMode)
             {
                 ExitEditMode();
             }
-
-            AudioManager.Instance.PopMusicVolume();
-            StartCoroutine(CloseWithAnimation());
+            // 标准关闭模板：防重入 + Closing 锁 + 音乐恢复 + 动画 + GoBack
+            CloseScreen(CloseWithAnimation);
         }
     }
 

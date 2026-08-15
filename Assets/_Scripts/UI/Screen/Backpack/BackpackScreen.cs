@@ -14,7 +14,7 @@ namespace GIC.UI
 {
 
 
-    public partial class BackpackScreen : MonoBehaviour, IClosable
+    public partial class BackpackScreen : ScreenBase
     {
         [Header("卡片展示")]
         public GameObject cardContent;
@@ -73,23 +73,19 @@ namespace GIC.UI
         [Autowired] private SaveManager saveManager;
         [Autowired] private UnitConfig unitConfig;
         [Autowired] private ItemConfig itemConfig;
-        [Autowired] private InputManager inputManager;
         private BackpackCategoryChangedHandler _categoryChangedHandler;
         private DeckChangedHandler _deckChangedHandler;
         private CardClickedInEditHandler _cardClickedHandler;
 
         private bool isEditMode = false;
-        private bool isClosing = false;
 
         // ── IClosable 实现 ──
-        void IClosable.Close() => OnClose();
+        public override void Close() => OnClose();
 
         private void Start()
         {
-            AudioManager.Instance.PushMusicVolume();
-
-            Wargame.Instance.Context.Inject(this);
-            inputManager?.RegisterClosable(this);
+            PushMusicVolumeSafe();
+            RegisterClosableSelf();
 
             currentDeckId = saveManager.CurrentSave.currentDeck;
 
@@ -132,22 +128,18 @@ namespace GIC.UI
             CacheEditPanelPosition();
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
-            inputManager?.UnregisterClosable(this);
-            // 兜底：动画协程被销毁中断时释放本类持有的锁
-            InputLocks.PopAll(this);
-
             nextButtonLeft.onClick.RemoveListener(OnPreviousCategory);
             nextButtonRight.onClick.RemoveListener(OnNextCategory);
             editDeck.onClick.RemoveListener(OnToggleEditMode);
             closeButton.onClick.RemoveListener(OnClose);
 
-            // owner 登记制：一行退订全部事件
-            EventBusHub.Instance?.UnsubscribeOwner(this);
-
             _cardPool?.Clear();
             _deckCardPool?.Clear();
+
+            // 基类收尾：注销可关闭 + PopAll 输入锁 + UnsubscribeOwner + 音乐 pop 兜底
+            base.OnDestroy();
         }
 
         private void CacheEditPanelPosition()

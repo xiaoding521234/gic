@@ -346,7 +346,11 @@ namespace GIC.Tool
 
         private void ApplyFont()
         {
-            if (currentFont != null && textComponent != null)
+            if (currentFont == null || textComponent == null) return;
+
+            // 仅在字体真正变更时整体切换（含材质）；字体已一致时保留场景配置的材质变体
+            // （如 zh-cn SDF.mat 描边材质），否则每次刷新都会把描边/配色覆盖回基础材质
+            if (textComponent.font != currentFont)
             {
                 textComponent.font = currentFont;
                 if (currentFont.material != null)

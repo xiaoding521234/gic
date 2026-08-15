@@ -11,7 +11,7 @@ namespace GIC.UI
 {
 
 
-    public partial class WishScreen : MonoBehaviour, IClosable
+    public partial class WishScreen : ScreenBase
     {
         [Serializable]
         public class CharacterEntry
@@ -57,9 +57,9 @@ namespace GIC.UI
         private Vector2 leftPanelTargetPos;
         private Vector2 bottomPanelTargetPos;
 
-        public void Awake()
+        protected override void Awake()
         {
-            Wargame.Instance?.Context?.Inject(this); // 容器已就绪（Boot 链路），Awake 注入
+            base.Awake(); // 注入（Boot 链路容器已就绪）
 
             closeButton.onClick.AddListener(Close);
 
@@ -89,11 +89,11 @@ namespace GIC.UI
 
         private void Start()
         {
-            _inputManager?.RegisterClosable(this);
+            RegisterClosableSelf();
 
             if (wishClip != null)
             {
-                AudioManager.Instance.PushMusicState(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
+                PushMusicStateSafe(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
             }
 
             InitWishDraw();
@@ -127,33 +127,22 @@ namespace GIC.UI
             SelectCharacter(0);
         }
 
-        private void Close()
+        // ── IClosable 实现（标准关闭模板 + 三面板退场） ──
+        public override void Close()
         {
-            if (isClosing) return;
-            isClosing = true;
-            InputLocks.Push(this, InputLockReason.Closing);
-            AudioManager.Instance.PopMusicState();
-            StartCoroutine(CloseCoroutine());
+            CloseScreen(ExitAnimation);
         }
 
-        // ── IClosable 实现 ──
-        void IClosable.Close() => Close();
-
-        private bool isClosing = false;
-
-        [Autowired] private InputManager _inputManager;
         [Autowired] private UnitConfig _unitConfig;
 
-        private IEnumerator CloseCoroutine()
+        /// <summary>退场动画：三面板滑出 + 当前角色面板淡出（收尾由模板统一处理）</summary>
+        private IEnumerator ExitAnimation()
         {
-            // 三面板退场 + 角色面板淡出 同时进行
             Coroutine slideOut = StartCoroutine(PlaySlideOutAnimation());
             if (currentIndex >= 0 && characters[currentIndex].panel != null)
                 characters[currentIndex].panel.FadeOut();
 
             yield return slideOut;
-            InputLocks.Pop(this, InputLockReason.Closing);
-            GameScene.Instance.GoBack();
         }
 
         public void SelectCharacter(int index)

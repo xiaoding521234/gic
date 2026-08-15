@@ -14,7 +14,7 @@ namespace GIC.UI
 {
 
 
-    public class SettingsScreen : MonoBehaviour, IClosable
+    public class SettingsScreen : ScreenBase
     {
         [Autowired] private SaveManager _saveManager;
 
@@ -90,8 +90,6 @@ namespace GIC.UI
         private Coroutine moveCoroutine;
         private const float MOVE_DURATION = 0.2f;
 
-        [Autowired] private InputManager _inputManager;
-
         // 动画缓存
         private RectTransform topPanelRect;
         private RectTransform leftPanelRect;
@@ -103,7 +101,7 @@ namespace GIC.UI
 
         void Start()
         {
-            Wargame.Instance.Context.Inject(this);
+            RegisterClosableSelf();
 
             // 收集所有设置面板
             settingPanels.Add(displaySettings);
@@ -153,7 +151,7 @@ namespace GIC.UI
             InitAccountSettings();
 
             // 注册为可关闭 UI
-            _inputManager?.RegisterClosable(this);
+            RegisterClosableSelf();
 
             // 缓存动画位置
             CacheAnimationPositions();
@@ -318,9 +316,7 @@ namespace GIC.UI
             }
 
             if (centerGroup != null) centerGroup.alpha = 0f;
-
-            InputLocks.Pop(this, InputLockReason.Closing);
-            GameScene.Instance.GoBack();
+            // 收尾（Closing 锁 Pop + GoBack）由 ScreenBase.CloseScreen 模板统一处理
         }
 
         #endregion
@@ -669,24 +665,10 @@ namespace GIC.UI
 
         #endregion
 
-        public void Close()
+        // ── IClosable 实现（标准关闭模板 + 退场动画） ──
+        public override void Close()
         {
-            if (isClosing) return;
-            isClosing = true;
-            InputLocks.Push(this, InputLockReason.Closing);
-            StartCoroutine(PlayExitAnimationCoroutine());
-        }
-
-        // ── IClosable 实现 ──
-        void IClosable.Close() => Close();
-
-        private bool isClosing = false;
-
-        private void OnDestroy()
-        {
-            _inputManager?.UnregisterClosable(this);
-            // 兜底：动画协程被销毁中断时释放本类持有的锁
-            InputLocks.PopAll(this);
+            CloseScreen(PlayExitAnimationCoroutine);
         }
     }
 }

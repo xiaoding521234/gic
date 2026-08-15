@@ -65,6 +65,53 @@ namespace GIC.Framework
             RebuildOwnedCards();
         }
 
+        // ========== 物品数量查询/变更（货币等，统一入口） ==========
+
+        /// <summary>查询物品持有数量（不在存档中返回 0）</summary>
+        public int GetItemCount(ItemName item)
+        {
+            foreach (var card in ownedNormalItems)
+            {
+                if (card.id.AsItemName() == item)
+                    return card.count;
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// 增加物品数量（不存在则新建卡片），自动失效 ownedCards 缓存。
+        /// 原石/星辉等货币变动的统一入口。
+        /// </summary>
+        public void AddItemCount(ItemName item, int amount)
+        {
+            foreach (var card in ownedNormalItems)
+            {
+                if (card.id.AsItemName() == item)
+                {
+                    card.count += amount;
+                    return;
+                }
+            }
+            var newCard = new SaveCardData();
+            newCard.SaveItem(item, amount);
+            AddOwnedItem(newCard);
+        }
+
+        /// <summary>尝试消耗物品数量（数量不足返回 false 且不改动）</summary>
+        public bool TryConsumeItem(ItemName item, int count)
+        {
+            foreach (var card in ownedNormalItems)
+            {
+                if (card.id.AsItemName() == item)
+                {
+                    if (card.count < count) return false;
+                    card.count -= count;
+                    return true;
+                }
+            }
+            return false;
+        }
+
 
         // ========== 音量设置 ==========
         [Range(0f, 1f)]

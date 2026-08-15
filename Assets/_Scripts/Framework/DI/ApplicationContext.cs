@@ -77,18 +77,31 @@ namespace GIC.Framework
         }
 
         /// <summary>
-        /// 注入 [Autowired] 字段到任意对象
+        /// 注入 [Autowired] 字段到任意对象。
+        /// 沿继承链逐层扫描（.NET 反射 GetFields 不返回基类的 private 字段，
+        /// 基类声明的 [Autowired] 字段必须逐级取 DeclaredOnly 才能命中）。
         /// </summary>
         public void Inject(object instance)
         {
-            var fields = instance.GetType().GetFields(
-                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
-                .Where(f => f.GetCustomAttribute<AutowiredAttribute>() != null);
-
-            foreach (var field in fields)
+            foreach (var field in GetAutowiredFields(instance.GetType()))
             {
                 if (_beans.TryGetValue(field.FieldType, out var dependency))
                     field.SetValue(instance, dependency);
+            }
+        }
+
+        /// <summary>收集类型及其全部基类上标记 [Autowired] 的字段（含 private）</summary>
+        private static IEnumerable<FieldInfo> GetAutowiredFields(Type type)
+        {
+            for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+            {
+                var fields = t.GetFields(BindingFlags.NonPublic | BindingFlags.Public |
+                                         BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                foreach (var f in fields)
+                {
+                    if (f.GetCustomAttribute<AutowiredAttribute>() != null)
+                        yield return f;
+                }
             }
         }
 
@@ -259,11 +272,7 @@ namespace GIC.Framework
 
             foreach (var instance in _instances)
             {
-                var fields = instance.GetType().GetFields(
-                    BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
-                    .Where(f => f.GetCustomAttribute<AutowiredAttribute>() != null);
-
-                foreach (var field in fields)
+                foreach (var field in GetAutowiredFields(instance.GetType()))
                 {
                     if (field.GetValue(instance) == null)
                     {

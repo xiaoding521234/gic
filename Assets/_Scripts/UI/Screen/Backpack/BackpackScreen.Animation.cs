@@ -96,8 +96,7 @@ namespace GIC.UI
 
             if (centerCanvasGroup != null) centerCanvasGroup.alpha = 0f;
             if (cardDetailCanvasGroup != null) cardDetailCanvasGroup.alpha = 0f;
-            InputLocks.Pop(this, InputLockReason.Closing);
-            GameScene.Instance.GoBack();
+            // 收尾（Closing 锁 Pop + GoBack）由 ScreenBase.CloseScreen 模板统一处理
         }
 
         private void AnimateSlide(float t, bool isOut)
