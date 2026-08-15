@@ -18,7 +18,6 @@ namespace GIC.UI
     {
         private readonly MyNetworkManager _networkManager;
         private readonly MyNetworkDiscovery _discovery;
-        private readonly PlayerManager _playerManager;
 
         private readonly Dictionary<string, ServerResponse> _foundServers = new();
         private bool _isDiscovering;
@@ -29,12 +28,10 @@ namespace GIC.UI
         public bool IsTimedOut => _isDiscovering && Time.time - _discoveryStartTime > DiscoveryTimeout;
         public IReadOnlyDictionary<string, ServerResponse> FoundServers => _foundServers;
 
-        public CoopNetworkController(MyNetworkManager networkManager, MyNetworkDiscovery discovery,
-            PlayerManager playerManager)
+        public CoopNetworkController(MyNetworkManager networkManager, MyNetworkDiscovery discovery)
         {
             _networkManager = networkManager;
             _discovery = discovery;
-            _playerManager = playerManager;
         }
 
         public void StartDiscovery()

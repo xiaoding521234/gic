@@ -1,37 +1,31 @@
-﻿// PlayerManager.cs - 玩家管理器（普通类，实现 IWargameManager）
+﻿// PlayerManager.cs - 玩家数据管理器（名册数据层：玩家增删改查 + 自身 PlayerID）
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Mirror;
 using GIC.Battle;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.Framework;
-using GIC.UI;
 using GIC.Tool;
 namespace GIC.Framework
 {
 
 
     /// <summary>
-    /// 玩家管理器（普通类，由 Wargame 统一管理生命周期）
+    /// 玩家数据管理器：持有全体玩家名册与自身 PlayerID，负责数据增删改查与变更事件。
+    /// 联机房间流程（连接/断开、网络事件处理、颜色分配）在 RoomManager。
     /// </summary>
     [Component]
-    public class PlayerManager : IWargameManager
+    public class PlayerManager
     {
-        // 自身 PlayerID（由服务器通过 SetSelfPlayerEvent 设置）
+        // 自身 PlayerID（由服务器通过 SetSelfPlayerEvent 设置，RoomManager.SetSelfPlayerHandler 调用）
         private string _selfPlayerID = PlayerID.Offline;
 
-        private readonly SaveManager saveManager;
-
-        public PlayerManager(SaveManager saveManager)
-        {
-            this.saveManager = saveManager;
-        }
+        // 所有玩家的信息
+        private readonly Dictionary<string, PlayerInfo> _allPlayers = new();
 
         /// <summary>
         /// 获取自身 PlayerID（connectionId）
-        /// 服务器端：由 MyNetworkManager.OnServerConnect 设置
+        /// 服务器端：由 RoomManager.HandleServerConnect 设置
         /// 客户端：由 SetSelfPlayerHandler 从服务器发来的事件中设置
         /// </summary>
         public string SelfPlayerID
@@ -59,32 +53,6 @@ namespace GIC.Framework
             }
         }
 
-        // 所有玩家的信息
-        private readonly Dictionary<string, PlayerInfo> _allPlayers = new();
-
-        // 网络引用
-        private MyNetworkManager _networkManager;
-
-        /// <summary>由 MyNetworkManager 在 Awake 中反向注入</summary>
-        public void SetNetworkManager(MyNetworkManager networkManager)
-        {
-            _networkManager = networkManager;
-        }
-
-        // ==================== Handler 引用（用于取消订阅） ====================
-
-        private SetTeamHandler _setTeamHandler;
-        private SetColorHandler _setColorHandler;
-        private SetSpawnHandler _setSpawnHandler;
-        private ToggleReadyHandler _toggleReadyHandler;
-        private KickPlayerHandler _kickPlayerHandler;
-        private AddPlayerHandler _addPlayerHandler;
-        private RemovePlayerHandler _removePlayerHandler;
-        private UpdatePlayerInfoHandler _updatePlayerInfoHandler;
-        private KickedFromRoomHandler _kickedFromRoomHandler;
-        private SetSelfPlayerHandler _setSelfPlayerHandler;
-        private SetPlayerNameHandler _setPlayerNameHandler;
-
         // ==================== 事件 ====================
 
         // 玩家数量变化事件
@@ -93,67 +61,10 @@ namespace GIC.Framework
         // 玩家信息更新事件（用于刷新 UI）
         public event Action<string, PlayerInfo> OnPlayerInfoUpdated;
 
-        // 被踢出事件
-        public event Action OnKickedFromRoom;
-
         // 自身 PlayerID 变化事件
         public event Action<string> OnSelfPlayerIDChanged;
 
-        // ==================== IWargameManager 实现 ====================
-
-        [PostConstruct]
-        public void Init()
-        {
-            // 创建 Handler 实例并保存引用
-            CreateHandlers();
-
-            // 订阅网络事件
-            SubscribeEvents();
-
-            GICLog.Info("[PlayerManager] 启动完成，等待网络初始化");
-        }
-
-        public void Start() { }
-
-        public void Update(float deltaTime)
-        {
-
-        }
-
-        private void CreateHandlers()
-        {
-            _setTeamHandler = new SetTeamHandler(this);
-            _setColorHandler = new SetColorHandler(this);
-            _setSpawnHandler = new SetSpawnHandler(this);
-            _toggleReadyHandler = new ToggleReadyHandler(this);
-            _kickPlayerHandler = new KickPlayerHandler(this);
-            _addPlayerHandler = new AddPlayerHandler(this);
-            _removePlayerHandler = new RemovePlayerHandler(this);
-            _updatePlayerInfoHandler = new UpdatePlayerInfoHandler(this);
-            _kickedFromRoomHandler = new KickedFromRoomHandler(this);
-            _setSelfPlayerHandler = new SetSelfPlayerHandler(this);
-            _setPlayerNameHandler = new SetPlayerNameHandler(this);
-        }
-
-        private void SubscribeEvents()
-        {
-            // 订阅服务器端收到的客户端请求
-            EventBusHub.Instance.Subscribe<SetTeamRequestEvent>(_setTeamHandler, this);
-            EventBusHub.Instance.Subscribe<SetColorRequestEvent>(_setColorHandler, this);
-            EventBusHub.Instance.Subscribe<SetSpawnRequestEvent>(_setSpawnHandler, this);
-            EventBusHub.Instance.Subscribe<ToggleReadyRequestEvent>(_toggleReadyHandler, this);
-            EventBusHub.Instance.Subscribe<KickPlayerRequestEvent>(_kickPlayerHandler, this);
-
-            // 订阅网络事件（所有客户端收到）
-            EventBusHub.Instance.Subscribe<AddPlayerEvent>(_addPlayerHandler, this);
-            EventBusHub.Instance.Subscribe<RemovePlayerEvent>(_removePlayerHandler, this);
-            EventBusHub.Instance.Subscribe<UpdatePlayerInfoEvent>(_updatePlayerInfoHandler, this);
-            EventBusHub.Instance.Subscribe<KickedFromRoomEvent>(_kickedFromRoomHandler, this);
-            EventBusHub.Instance.Subscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler, this);
-            EventBusHub.Instance.Subscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler, this);
-        }
-
-        // ==================== 玩家管理 ====================
+        // ==================== 玩家名册管理 ====================
 
         public void ClearPlayers()
         {
@@ -161,58 +72,9 @@ namespace GIC.Framework
         }
 
         /// <summary>
-        /// 处理服务器端新连接（由 MyNetworkManager.OnServerConnect 调用）
-        /// 封装玩家注册 + 事件同步全套逻辑
+        /// 注册玩家（由 RoomManager 的连接流程与 AddPlayerHandler 调用）
         /// </summary>
-        public void HandleServerConnect(NetworkConnectionToClient conn)
-        {
-            string playerID = conn.connectionId.ToString();
-            bool isHost = playerID == PlayerID.Host;
-            string playerName = isHost
-                ? (saveManager?.CurrentSave?.playerName ?? "旅行者")
-                : ("玩家" + conn.connectionId);
-
-            RegisterPlayer(playerID, playerName, TeamType.A,
-                          GetNextAvailableColorPublic(), isHost, conn.address, conn);
-
-            // 1. 告诉新客户端它自己的 PlayerID
-            EventBusHub.Instance.PublishToPlayer(playerID, new SetSelfPlayerEvent { TargetPlayerID = playerID });
-
-            // Host 自己也设置 ID（服务器不会收到发给自己的 TargetRpc）
-            if (isHost) SetSelfPlayerID(playerID);
-
-            // 2. 通知新客户端所有已有玩家
-            foreach (var player in GetAllPlayers())
-            {
-                if (player.PlayerID != playerID)
-                    EventBusHub.Instance.PublishToPlayer(playerID, new AddPlayerEvent { PlayerInfo = player });
-            }
-
-            // 3. 广播新玩家加入
-            var newPlayerInfo = GetPlayerInfo(playerID);
-            if (newPlayerInfo != null)
-                EventBusHub.Instance.Send(new AddPlayerEvent { PlayerInfo = newPlayerInfo });
-        }
-
-        /// <summary>
-        /// 处理服务器端断开连接（由 MyNetworkManager.OnServerDisconnect 调用）
-        /// </summary>
-        public void HandleServerDisconnect(NetworkConnectionToClient conn)
-        {
-            string playerID = conn.connectionId.ToString();
-            UnregisterPlayer(playerID);
-            EventBusHub.Instance.Send(new RemovePlayerEvent { TargetPlayerID = playerID });
-        }
-
-        public void HandleClientDisconnect()
-        {
-            ClearPlayers();
-        }
-
-        /// <summary>
-        /// 注册玩家（内部方法，外部通过 HandleServerConnect 调用）
-        /// </summary>
-        private void RegisterPlayer(string playerID, string playerName, TeamType team, PlayerColor color,
+        public void RegisterPlayer(string playerID, string playerName, TeamType team, PlayerColor color,
                                   bool isHost, string ipAddress, NetworkConnectionToClient conn = null)
         {
             if (_allPlayers.ContainsKey(playerID))
@@ -279,6 +141,8 @@ namespace GIC.Framework
             }
         }
 
+        // ==================== 查询方法 ====================
+
         public PlayerInfo GetSelfPlayerInfo()
         {
             return GetPlayerInfo(SelfPlayerID);
@@ -302,6 +166,11 @@ namespace GIC.Framework
         }
 
         public int GetPlayerCount() => _allPlayers.Count;
+
+        public bool IsSelfPlayer(string playerID)
+        {
+            return playerID == SelfPlayerID;
+        }
 
         // ==================== 属性修改 ====================
 
@@ -364,7 +233,7 @@ namespace GIC.Framework
             }
         }
 
-        // ==================== 队伍管理 ====================
+        // ==================== 队伍查询 ====================
 
         public List<string> GetPlayersInTeam(TeamType team)
         {
@@ -393,50 +262,12 @@ namespace GIC.Framework
             return !IsSameTeam(playerID1, playerID2);
         }
 
-        // ==================== 颜色管理 ====================
+        // ==================== 颜色查询 ====================
 
         public Color GetPlayerColor(string playerID)
         {
             var info = GetPlayerInfo(playerID);
             return info?.Color.ToColor() ?? Color.white;
-        }
-
-        public PlayerColor GetNextAvailableColorPublic()
-        {
-            return GetNextAvailableColor();
-        }
-
-        private PlayerColor GetNextAvailableColor()
-        {
-            int usedCount = _allPlayers.Count;
-            var colors = (PlayerColor[])Enum.GetValues(typeof(PlayerColor));
-            var color = colors[usedCount % colors.Length];
-            GICLog.Info($"[PlayerManager] 分配颜色: {color} (第 {usedCount + 1} 位玩家)");
-            return color;
-        }
-
-        // ==================== 查询方法 ====================
-
-        public bool IsSelfPlayer(string playerID)
-        {
-            return playerID == SelfPlayerID;
-        }
-
-        public bool IsOwnUnit(Unit unit)
-        {
-            if (unit == null) return false;
-            var identity = unit.GetUnitComponent<UnitIdentity>();
-            return identity != null && identity.OwnerPlayerID.ToString() == SelfPlayerID;
-        }
-
-        public bool CanControlUnit(Unit unit)
-        {
-            if (unit == null) return false;
-            var identity = unit.GetUnitComponent<UnitIdentity>();
-            if (identity == null) return false;
-
-            if (identity.OwnerPlayerID.ToString() == SelfPlayerID) return true;
-            return IsSameTeam(SelfPlayerID, identity.OwnerPlayerID.ToString());
         }
 
         // ==================== 调试 ====================
@@ -453,170 +284,5 @@ namespace GIC.Framework
             }
             GICLog.Info("[PlayerManager] ==================================");
         }
-
-        // ==================== 清理 ====================
-
-        public void Cleanup()
-        {
-            // owner 登记制：一行退订 SubscribeEvents 中登记的全部订阅
-            EventBusHub.Instance?.UnsubscribeOwner(this);
-        }
-
-
-        // ==================== 内部事件处理器 ====================
-
-        /// <summary>
-        /// 更新请求处理器模板 — CanHandle（服务器端检查）+ Handle（修改属性 → 广播更新）
-        /// 子类只需实现 GetPlayerID 和 ApplyChange
-        /// </summary>
-        private abstract class PlayerInfoUpdateRequestHandler<T> : IEventHandler<T> where T : BaseEvent
-        {
-            protected readonly PlayerManager _mgr;
-            protected PlayerInfoUpdateRequestHandler(PlayerManager manager) => _mgr = manager;
-
-            public bool CanHandle(T evt) => NetworkServer.active;
-
-            public void Handle(T evt)
-            {
-                string pid = GetPlayerID(evt);
-                GICLog.Info($"[PlayerManager.{GetType().Name}] 收到请求: PlayerID={pid}");
-
-                ApplyChange(evt, pid);
-
-                var info = _mgr.GetPlayerInfo(pid);
-                if (info != null)
-                    EventBusHub.Instance.Send(new UpdatePlayerInfoEvent { UpdatedInfo = info });
-                else
-                    GICLog.Warn($"[PlayerManager.{GetType().Name}] 未找到玩家: PlayerID={pid}");
-            }
-
-            protected abstract string GetPlayerID(T evt);
-            protected abstract void ApplyChange(T evt, string playerID);
-        }
-
-        // --- 服务器端请求处理器 ---
-
-        private class SetTeamHandler : PlayerInfoUpdateRequestHandler<SetTeamRequestEvent>
-        {
-            public SetTeamHandler(PlayerManager m) : base(m) { }
-            protected override string GetPlayerID(SetTeamRequestEvent e) => e.TargetPlayerID;
-            protected override void ApplyChange(SetTeamRequestEvent e, string pid) => _mgr.SetPlayerTeam(pid, e.Team);
-        }
-
-        private class SetColorHandler : PlayerInfoUpdateRequestHandler<SetColorRequestEvent>
-        {
-            public SetColorHandler(PlayerManager m) : base(m) { }
-            protected override string GetPlayerID(SetColorRequestEvent e) => e.TargetPlayerID;
-            protected override void ApplyChange(SetColorRequestEvent e, string pid) => _mgr.SetPlayerColor(pid, e.Color);
-        }
-
-        private class SetSpawnHandler : PlayerInfoUpdateRequestHandler<SetSpawnRequestEvent>
-        {
-            public SetSpawnHandler(PlayerManager m) : base(m) { }
-            protected override string GetPlayerID(SetSpawnRequestEvent e) => e.PlayerID;
-            protected override void ApplyChange(SetSpawnRequestEvent e, string pid) => _mgr.SetPlayerSpawnPosition(pid, e.SpawnPosition);
-        }
-
-        private class ToggleReadyHandler : PlayerInfoUpdateRequestHandler<ToggleReadyRequestEvent>
-        {
-            public ToggleReadyHandler(PlayerManager m) : base(m) { }
-            protected override string GetPlayerID(ToggleReadyRequestEvent e) => e.TargetPlayerID;
-            protected override void ApplyChange(ToggleReadyRequestEvent e, string pid) => _mgr.ToggleReady(pid);
-        }
-
-        private class KickPlayerHandler : IEventHandler<KickPlayerRequestEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public KickPlayerHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(KickPlayerRequestEvent e) => NetworkServer.active;
-
-            public void Handle(KickPlayerRequestEvent e)
-            {
-                var info = _mgr.GetPlayerInfo(e.TargetPlayerID);
-                if (info == null) return;
-
-                if (info.connectionToClient != null)
-                {
-                    EventBusHub.Instance.PublishToPlayer(e.TargetPlayerID, new KickedFromRoomEvent());
-                    info.connectionToClient.Disconnect();
-                }
-
-                _mgr.UnregisterPlayer(e.TargetPlayerID);
-                EventBusHub.Instance.Send(new RemovePlayerEvent { TargetPlayerID = e.TargetPlayerID });
-            }
-        }
-
-        // --- 网络同步事件处理器 ---
-
-        private class AddPlayerHandler : IEventHandler<AddPlayerEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public AddPlayerHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(AddPlayerEvent e) => e.Source == EventSource.Network;
-
-            public void Handle(AddPlayerEvent e)
-            {
-                if (_mgr.GetPlayerInfo(e.PlayerInfo.PlayerID) != null) return;
-                _mgr.RegisterPlayer(e.PlayerInfo.PlayerID, e.PlayerInfo.PlayerName,
-                                   e.PlayerInfo.Team, e.PlayerInfo.Color,
-                                   e.PlayerInfo.IsHost, e.PlayerInfo.IPAddress);
-            }
-        }
-
-        private class RemovePlayerHandler : IEventHandler<RemovePlayerEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public RemovePlayerHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(RemovePlayerEvent e) => e.Source == EventSource.Network;
-            public void Handle(RemovePlayerEvent e) => _mgr.UnregisterPlayer(e.TargetPlayerID);
-        }
-
-        private class UpdatePlayerInfoHandler : IEventHandler<UpdatePlayerInfoEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public UpdatePlayerInfoHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(UpdatePlayerInfoEvent e) => e.Source == EventSource.Network;
-            public void Handle(UpdatePlayerInfoEvent e) => _mgr.UpdatePlayerInfo(e.UpdatedInfo.PlayerID, e.UpdatedInfo);
-        }
-
-        private class KickedFromRoomHandler : IEventHandler<KickedFromRoomEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public KickedFromRoomHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(KickedFromRoomEvent e) => e.Source == EventSource.Network;
-
-            public void Handle(KickedFromRoomEvent e)
-            {
-                _mgr._networkManager?.MarkAsKicked();
-                _mgr.OnKickedFromRoom?.Invoke();
-            }
-        }
-
-        private class SetSelfPlayerHandler : IEventHandler<SetSelfPlayerEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public SetSelfPlayerHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(SetSelfPlayerEvent e) => e.Source == EventSource.Network;
-            public void Handle(SetSelfPlayerEvent e) => _mgr.SetSelfPlayerID(e.TargetPlayerID);
-        }
-
-        private class SetPlayerNameHandler : IEventHandler<SetPlayerNameRequestEvent>
-        {
-            private readonly PlayerManager _mgr;
-            public SetPlayerNameHandler(PlayerManager m) => _mgr = m;
-            public bool CanHandle(SetPlayerNameRequestEvent e) => NetworkServer.active;
-            public void Handle(SetPlayerNameRequestEvent e)
-            {
-                string pid = e.SourcePlayerID;
-                if (string.IsNullOrEmpty(pid) || pid == PlayerID.Unknown) pid = _mgr.SelfPlayerID;
-                _mgr.SetPlayerName(pid, e.PlayerName);
-                var info = _mgr.GetPlayerInfo(pid);
-                if (info != null)
-                    EventBusHub.Instance.Send(new UpdatePlayerInfoEvent { UpdatedInfo = info });
-            }
-        }
     }
 }
-
-
-

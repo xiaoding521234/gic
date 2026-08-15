@@ -42,6 +42,7 @@ namespace GIC.UI
 
         private CoopNetworkController _network;
         [Autowired] private PlayerManager _playerManager;
+        [Autowired] private RoomManager _roomManager;
         [Autowired] private InputManager _inputManager;
         private MyNetworkManager _netMgr;
         private MyNetworkDiscovery _discovery;
@@ -102,7 +103,7 @@ namespace GIC.UI
             _netMgr = FindObjectOfType<MyNetworkManager>();
             _discovery = FindObjectOfType<MyNetworkDiscovery>();
             Wargame.Instance.Context.Inject(this);
-            _network = new CoopNetworkController(_netMgr, _discovery, _playerManager);
+            _network = new CoopNetworkController(_netMgr, _discovery);
 
             ClearPlayerList();
             ClearServerList();
@@ -163,10 +164,16 @@ namespace GIC.UI
 
         private void BindPlayerEvents()
         {
-            if (_playerManager == null) return;
-            _playerManager.OnPlayerCountChanged += OnPlayerCountChanged;
-            _playerManager.OnPlayerInfoUpdated += OnPlayerInfoUpdated;
-            _playerManager.OnKickedFromRoom += OnKickedFromRoom;
+            // 名册数据事件来自 PlayerManager；被踢事件来自 RoomManager
+            if (_playerManager != null)
+            {
+                _playerManager.OnPlayerCountChanged += OnPlayerCountChanged;
+                _playerManager.OnPlayerInfoUpdated += OnPlayerInfoUpdated;
+            }
+            if (_roomManager != null)
+            {
+                _roomManager.OnKickedFromRoom += OnKickedFromRoom;
+            }
         }
 
         private void BindNetworkEvents()
@@ -178,10 +185,15 @@ namespace GIC.UI
 
         private void UnbindPlayerEvents()
         {
-            if (_playerManager == null) return;
-            _playerManager.OnPlayerCountChanged -= OnPlayerCountChanged;
-            _playerManager.OnPlayerInfoUpdated -= OnPlayerInfoUpdated;
-            _playerManager.OnKickedFromRoom -= OnKickedFromRoom;
+            if (_playerManager != null)
+            {
+                _playerManager.OnPlayerCountChanged -= OnPlayerCountChanged;
+                _playerManager.OnPlayerInfoUpdated -= OnPlayerInfoUpdated;
+            }
+            if (_roomManager != null)
+            {
+                _roomManager.OnKickedFromRoom -= OnKickedFromRoom;
+            }
         }
 
         private void UnbindNetworkEvents()

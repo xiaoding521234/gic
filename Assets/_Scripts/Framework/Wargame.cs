@@ -31,7 +31,8 @@ namespace GIC.Framework
             Context.Register<SaveManager>();       // deps: UnitConfig, ItemConfig
             Context.Register<CardManager>();       // deps: SaveManager, ItemConfig, UnitConfig
             Context.Register<PositionManager>();   // deps: SaveManager, PositionConfig
-            Context.Register<PlayerManager>();     // deps: SaveManager
+            Context.Register<PlayerManager>();     // 玩家名册数据层（无依赖）
+            Context.Register<RoomManager>();       // deps: SaveManager, PlayerManager（联机房间流程）
             Context.Register<UnitManager>();       // deps: UnitConfig
             Context.Register<InputManager>();
             Context.Register<UIManager>();
@@ -49,7 +50,7 @@ namespace GIC.Framework
                 configManager,
                 Context.Get<AssetCache>(), Context.Get<SaveManager>(), Context.Get<InputManager>(),
                 Context.Get<UIManager>(), Context.Get<CardManager>(), Context.Get<PositionManager>(),
-                Context.Get<PlayerManager>(), Context.Get<SkillManager>(), Context.Get<UnitManager>()
+                Context.Get<SkillManager>(), Context.Get<UnitManager>()
             };
 
             GICLog.Info("Wargame初始化完成");

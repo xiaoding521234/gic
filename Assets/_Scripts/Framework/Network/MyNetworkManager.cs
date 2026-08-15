@@ -34,6 +34,7 @@ namespace GIC.Framework
         public int CurrentPort { get; private set; }
 
         [Autowired] private PlayerManager _playerManager;
+        [Autowired] private RoomManager _roomManager;
         [Autowired] private SaveManager _saveManager;
 
         public override void Awake()
@@ -52,7 +53,7 @@ namespace GIC.Framework
                 discovery = GetComponent<MyNetworkDiscovery>();
 
             Wargame.Instance.Context.Inject(this);
-            _playerManager?.SetNetworkManager(this);
+            _roomManager?.SetNetworkManager(this);
 
             GICLog.Info("[MyNetworkManager] 初始化完成");
         }
@@ -61,9 +62,9 @@ namespace GIC.Framework
         {
             base.Start();
 
-            if (_playerManager == null)
+            if (_roomManager == null)
             {
-                GICLog.Error("[MyNetworkManager] PlayerManager 不存在！");
+                GICLog.Error("[MyNetworkManager] RoomManager 不存在！");
             }
 
             GICLog.Info("[MyNetworkManager] 启动完成，等待用户操作");
@@ -233,13 +234,13 @@ namespace GIC.Framework
 
             GICLog.Info($"[MyNetworkManager] 新连接 connectionId={conn.connectionId}, 地址={conn.address}, 当前在线={numPlayers}/{maxPlayers}");
 
-            _playerManager?.HandleServerConnect(conn);
+            _roomManager?.HandleServerConnect(conn);
         }
 
         public override void OnServerDisconnect(NetworkConnectionToClient conn)
         {
             GICLog.Info($"[MyNetworkManager] 玩家断开 connectionId={conn.connectionId}");
-            _playerManager?.HandleServerDisconnect(conn);
+            _roomManager?.HandleServerDisconnect(conn);
             base.OnServerDisconnect(conn);
         }
 
@@ -287,8 +288,9 @@ namespace GIC.Framework
             GICLog.Info($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID ?? "未设置"}");
             GICLog.Info($"[MyNetworkManager] ========================================");
 
+            // 只清名册，不退订事件：Handler 常驻订阅（CanHandle 有 NetworkServer.active / Source==Network 守卫），
+            // 若此处调 RoomManager.Cleanup() 会在首次断线后杀掉全部 Handler，同会话重连/再建房时名册不再同步
             _playerManager?.ClearPlayers();
-            _playerManager?.Cleanup();
             OnClientDisconnectedEvent?.Invoke();
 
             _hostStarted = false;
