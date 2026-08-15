@@ -11,9 +11,9 @@ namespace GIC.Battle
     /// <summary>
     /// 物品卡牌的视图策略 — 处理 Card 本身的显示逻辑
     /// </summary>
-    public class ItemCardViewStrategy : ICardViewStrategy
+    public class ItemCardViewStrategy : CardViewStrategyBase
     {
-        public void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
+        public override void InitCardDisplay(Card card, SaveCardData data, CardDetailView detailView)
         {
             var cfg = data.Config;
             if (cfg != null)
@@ -26,34 +26,23 @@ namespace GIC.Battle
 
             card.unitImage.gameObject.SetActive(false);
 
-            card.cardDetailView = detailView;
-            card.saveCardData   = data;
-            card.countText.text = data.count.ToString();
+            InitCommon(card, data, detailView);
         }
 
-        public void EnterEditMode(Card card)
+        public override void EnterEditMode(Card card)
         {
             var raw = CardConfigResolver.Instance?.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
             if (raw != null && raw.maxPrepareCount == 0)
                 card.overlay.gameObject.SetActive(true);
         }
 
-        public int GetTotalSkins(Card card) =>
-            card.saveCardData.Config?.GetTotalSkins() ?? 0;
+        public override void ApplySkin(Card card, int skinIndex) =>
+            ApplySkinTo(card, skinIndex, card.itemImage);
 
-        public void ApplySkin(Card card, int skinIndex)
-        {
-            card.saveCardData.skin = skinIndex;
-            card.itemImage.sprite  = card.saveCardData.Config?.GetSprite(skinIndex);
-        }
-
-        public bool ShouldOverlayInEditMode(Card card)
+        public override bool ShouldOverlayInEditMode(Card card)
         {
             var raw = CardConfigResolver.Instance?.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
             return raw != null && raw.maxPrepareCount == 0;
         }
     }
-
 }
-
-

@@ -28,8 +28,8 @@ namespace GIC.UI
         [Header("关联面板")]
         public GameObject relatedPanel;
         public GameObject cardModeContainer;
-        [Tooltip("场景中背包的 CardDetailView，用于运行时实例化副本")]
-        public CardDetailView cardDetailViewTemplate;
+        [Tooltip("CardModeContainer 下静态预设的只读卡牌详情（场景接线，替代旧版运行时克隆）")]
+        public CardDetailView cardDetailView;
         public GameObject ruleModeContainer;
         public TextCombiner relatedName;
         public TextCombiner relatedDescription;
@@ -100,7 +100,7 @@ namespace GIC.UI
                     }
                 }
 
-                bool isClickOnSourceIcon = IsPointerOverSourceIcon();
+                bool isClickOnSourceIcon = IsPointerOverUI(sourceSkillIconView != null ? sourceSkillIconView.gameObject : null);
 
                 if (isClickOnSourceIcon)
                 {
@@ -161,44 +161,18 @@ namespace GIC.UI
 
         #region 关联面板 — 卡片模式
 
-        private CardDetailView _cardDetailClone;
-
         void ShowCardMode(CardId cardId)
         {
-            // 清理上一次的副本
-            ClearCardDetailClone();
-
-            // 从场景中已配好的 CardDetailView 实例化副本
-            var cloneGO = Instantiate(cardDetailViewTemplate.gameObject, cardModeContainer.transform, false);
-            var cloneRect = cloneGO.GetComponent<RectTransform>();
-            cloneRect.anchorMin = Vector2.zero;
-            cloneRect.anchorMax = Vector2.one;
-            cloneRect.offsetMin = Vector2.zero;
-            cloneRect.offsetMax = Vector2.zero;
-
-            _cardDetailClone = cloneGO.GetComponent<CardDetailView>();
-
-            // 副本的 UnitDetailPanel.skillDetailView 指向当前 SkillDetailView（Layer 2）
-            var unitPanel = _cardDetailClone.GetComponentInChildren<UnitDetailPanel>(true);
-            if (unitPanel != null)
-                unitPanel.skillDetailView = this;
-
             cardModeContainer.SetActive(true);
             ruleModeContainer.SetActive(false);
 
+            // 静态预设实例默认未激活，进入卡片模式时显式激活（旧克隆流程 Instantiate 出来即为激活态）
+            cardDetailView.gameObject.SetActive(true);
+            // 静态预设实例重复 Init 即可（Init 为幂等重置：重建标签芯片/技能图标/子面板切换）
             var saveData = new SaveCardData { id = cardId, count = 1, skin = 0 };
-            _cardDetailClone.Init(saveData);
+            cardDetailView.Init(saveData);
 
             ShowRelatedPanel();
-        }
-
-        void ClearCardDetailClone()
-        {
-            if (_cardDetailClone != null)
-            {
-                Destroy(_cardDetailClone.gameObject);
-                _cardDetailClone = null;
-            }
         }
 
         #endregion
@@ -222,16 +196,6 @@ namespace GIC.UI
 
         #endregion
 
-        bool IsPointerOverSourceIcon()
-        {
-            if (sourceSkillIconView == null) return false;
-            GameObject target = sourceSkillIconView.gameObject;
-            if (target == null || !target.activeInHierarchy) return false;
-            RectTransform rectTransform = target.GetComponent<RectTransform>();
-            if (rectTransform == null) return false;
-            return RectTransformUtility.RectangleContainsScreenPoint(rectTransform, Input.mousePosition, null);
-        }
-
         bool IsPointerOverUI(GameObject target)
         {
             if (target == null || !target.activeInHierarchy) return false;
@@ -247,7 +211,6 @@ namespace GIC.UI
             if (relatedSlideCoroutine != null)
                 StopCoroutine(relatedSlideCoroutine);
 
-            ClearCardDetailClone();
             skillDetailPanel.SetActive(false);
             relatedPanel.SetActive(false);
         }
@@ -257,7 +220,6 @@ namespace GIC.UI
             if (relatedSlideCoroutine != null)
                 StopCoroutine(relatedSlideCoroutine);
 
-            ClearCardDetailClone();
             relatedPanel.SetActive(false);
         }
 
