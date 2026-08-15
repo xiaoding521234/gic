@@ -119,14 +119,14 @@ namespace GIC.UI
 
             if (card == null)
             {
-                GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Skin_OnlyOne"));
+                PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Skin_OnlyOne"));
                 return;
             }
 
             int totalSkins = _strategy.GetTotalSkins(card);
             if (totalSkins <= 1)
             {
-                GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Skin_OnlyOne"));
+                PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Skin_OnlyOne"));
                 return;
             }
 

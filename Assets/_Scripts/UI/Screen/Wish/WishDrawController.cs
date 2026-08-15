@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -161,7 +161,7 @@ namespace GIC.UI
 
             if (!manager.ConsumePrimogem(count))
             {
-                GameScene.Instance?.ShowToast("原石不足");
+                PopupManager.Instance?.ShowToast("原石不足");
                 _flow.Reset();
                 _isWishActive = false;
                 return;

@@ -17,15 +17,7 @@ namespace GIC.Data.Event
     {
         public string SceneName;
     }
-    
-    /// <summary>
-    /// 场景即将卸载事件
-    /// </summary>
-    public class OnSceneWillUnloadEvent : BaseEvent
-    {
-        public string SceneName;
-    }
-    
+
     /// <summary>
     /// 返回上一个场景事件
     /// </summary>

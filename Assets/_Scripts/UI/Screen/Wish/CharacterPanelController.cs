@@ -61,9 +61,23 @@ namespace GIC.UI
         [Autowired] private ElementFactionIconConfig _iconConfig;
         [Autowired] private AssetCache _assetCache;
 
+        /// <summary>
+        /// 懒注入：面板在场景中保存为未激活时 Awake 不会运行，
+        /// WishScreen.Awake 的 PreloadSprite 先于本组件注入执行 —— 此处必须兜底注入。
+        /// </summary>
+        private AssetCache AssetCacheRef
+        {
+            get
+            {
+                if (_assetCache == null)
+                    Wargame.Instance?.Context?.Inject(this);
+                return _assetCache;
+            }
+        }
+
         private void Awake()
         {
-            Wargame.Instance?.Context?.Inject(this); // 容器已就绪，Awake 注入
+            Wargame.Instance?.Context?.Inject(this); // 容器已就绪，Awake 注入（未激活时由 AssetCacheRef 兜底）
             SetAlpha(0f);
             FillContentFromConfig();
         }
@@ -160,7 +174,7 @@ namespace GIC.UI
             _currentAddress = $"WishArt/{unitName.ToString().ToLower()}";
             _spriteLoadDone = false;
 
-            _assetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
+            AssetCacheRef?.LoadAsync<Sprite>(_currentAddress, sprite =>
             {
                 if (this != null && characterImage != null && sprite != null)
                     characterImage.sprite = sprite;
@@ -203,7 +217,7 @@ namespace GIC.UI
                 _currentAddress = $"WishArt/{unitName.ToString().ToLower()}";
                 _spriteLoadDone = false;
 
-                _assetCache?.LoadAsync<Sprite>(_currentAddress, sprite =>
+                AssetCacheRef?.LoadAsync<Sprite>(_currentAddress, sprite =>
                 {
                     if (this != null && characterImage != null && sprite != null)
                         characterImage.sprite = sprite;
@@ -310,7 +324,7 @@ namespace GIC.UI
         {
             // 通过 AssetCache 释放引用（引用计数 -1）
             if (_currentAddress != null)
-                _assetCache?.Release(_currentAddress);
+                AssetCacheRef?.Release(_currentAddress);
         }
     }
 

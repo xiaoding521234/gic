@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -73,13 +73,13 @@ namespace GIC.UI
 
             if (_currentPool == null || _currentPool.units.Count == 0 && _currentPool.items.Count == 0)
             {
-                GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_PoolNotAvailable"));
+                PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_PoolNotAvailable"));
                 return;
             }
 
             if (!_wishManager.CanAfford(count))
             {
-                GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_NoPrimogem"));
+                PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_NoPrimogem"));
                 return;
             }
 

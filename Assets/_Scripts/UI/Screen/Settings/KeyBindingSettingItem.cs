@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Localization;
@@ -127,7 +127,7 @@ namespace GIC.UI
                 var conflict = im.FindKeyConflict(key, _action);
                 if (conflict.HasValue)
                 {
-                    GameScene.Instance?.ShowToast(new LocalizedString("UIText", "KeyConflict"));
+                    PopupManager.Instance?.ShowToast(new LocalizedString("UIText", "KeyConflict"));
                     im.EndRebind();
                     UpdateDisplayText();
                     return;

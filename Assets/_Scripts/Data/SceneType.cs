@@ -43,28 +43,6 @@ namespace GIC.Data
             GameScene.Instance.LoadSceneWithConfig(this);
         }
 
-        /// <summary>
-        /// 卸载此场景（仅对 Additive 模式加载的场景有效）
-        /// </summary>
-        public void Unload()
-        {
-            GameScene.Instance.UnloadSceneAsync(this);
-        }
-
-        /// <summary>
-        /// 获取所有场景实例
-        /// </summary>
-        public static System.Collections.Generic.IEnumerable<SceneType> GetAllScenes()
-        {
-            yield return Boot;
-            yield return SplashScreen;
-            yield return MainHall;
-            yield return MapScreen;
-            yield return WishScreen;
-            yield return CoopScreen;
-            yield return BattleScreen;
-        }
-
         public static implicit operator string(SceneType scene) => scene.SceneName;
         public override string ToString() => SceneName;
     }

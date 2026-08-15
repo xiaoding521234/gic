@@ -31,7 +31,6 @@ namespace GIC.Framework
 
         [Header("性能配置")]
         [SerializeField] private bool autoCleanupResources = true;
-        [SerializeField] private float cleanupDelay = 0.5f;
 
         [Header("调试配置")]
         [SerializeField] private bool enableDebugLog = true;
@@ -52,9 +51,6 @@ namespace GIC.Framework
         // 当前活动的场景类型
         private SceneType currentScene;
         private SceneType currentRootScene;
-
-        // 资源清理协程
-        private Coroutine currentLoadCoroutine;
 
         // 场景切换锁已由 InputManager.InputLock 替代
 
@@ -124,39 +120,8 @@ namespace GIC.Framework
             Cursor.SetCursor(cursor, Vector2.zero, CursorMode.Auto);
             Application.runInBackground = true;
 
-            // 应用存档中的显示设置
-            var saveManager = _saveManager;
-            if (saveManager?.CurrentSave == null) return;
-
-            var save = saveManager.CurrentSave;
-
-            // 应用语言
-            var locales = LocalizationSettings.AvailableLocales.Locales;
-            if (save.languageIndex >= 0 && save.languageIndex < locales.Count)
-            {
-                LocalizationSettings.SelectedLocale = locales[save.languageIndex];
-            }
-
-            // 应用帧率
-            Application.targetFrameRate = save.frameRate;
-
-            // 应用分辨率
-            if (save.resolutionIndex == 0)
-            {
-                // 全屏
-                Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
-            }
-            else
-            {
-                // 窗口化指定分辨率
-                var resolutions = Screen.resolutions;
-                int resIndex = save.resolutionIndex - 1;
-                if (resIndex >= 0 && resIndex < resolutions.Length)
-                {
-                    var res = resolutions[resIndex];
-                    Screen.SetResolution(res.width, res.height, FullScreenMode.Windowed);
-                }
-            }
+            // 应用存档中的显示设置（语言/帧率/分辨率）
+            SettingsApplier.ApplyFromSave(_saveManager?.CurrentSave);
         }
 
         private void InitializeSingleton()
@@ -352,28 +317,6 @@ namespace GIC.Framework
             return true;
         }
 
-        /// <summary>
-        /// 加载新的根场景（Single模式）
-        /// </summary>
-        public void LoadNewRootScene(SceneType scene)
-        {
-            if (scene.LoadMode != LoadSceneMode.Single)
-            {
-                GICLog.Error("根场景必须使用 Single 加载模式");
-                return;
-            }
-
-            StartCoroutine(LoadNewRootSceneCoroutine(scene));
-        }
-
-        /// <summary>
-        /// 卸载场景
-        /// </summary>
-        public void UnloadSceneAsync(SceneType scene)
-        {
-            StartCoroutine(UnloadSceneWithEventsCoroutine(scene));
-        }
-
         #endregion
 
         #region 场景加载 - 协程实现
@@ -477,30 +420,6 @@ namespace GIC.Framework
             InputLocks.Pop(this, InputLockReason.SceneTransition);
         }
 
-        private IEnumerator LoadNewRootSceneCoroutine(SceneType scene)
-        {
-            InputLocks.Push(this, InputLockReason.SceneTransition);
-
-            ClearHistory();
-            currentRootScene = scene;
-            CurrentScene = scene;
-
-            yield return LoadSceneAsync(scene);
-
-            InputLocks.Pop(this, InputLockReason.SceneTransition);
-        }
-
-        private IEnumerator UnloadSceneWithEventsCoroutine(SceneType scene)
-        {
-            // 发送卸载前事件
-            EventBusHub.Instance?.Send(new OnSceneWillUnloadEvent
-            {
-                SceneName = scene.SceneName
-            });
-
-            yield return UnloadSceneInternal(scene.SceneName);
-        }
-
         private IEnumerator UnloadSceneInternal(string sceneName)
         {
             AsyncOperation asyncUnload = SceneManager.UnloadSceneAsync(sceneName);
@@ -545,12 +464,6 @@ namespace GIC.Framework
             {
                 GICLog.Info("资源清理完成");
             }
-        }
-
-        private IEnumerator DelayedCleanup()
-        {
-            yield return new WaitForSeconds(cleanupDelay);
-            yield return CleanupUnusedResources();
         }
 
         #endregion
@@ -641,91 +554,20 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 弹窗
-
-        public void ShowModalPopup(string message)
-        {
-            popupManager.ShowModalPopup(message);
-        }
-
-        /// <summary>
-        /// 本地化弹窗 — 从 PopupText 表中取 key 对应的本地化文本显示
-        /// </summary>
-        public void ShowModalLocalizedPopup(string key)
-        {
-            var localized = new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), key);
-            popupManager.ShowModalPopup(localized);
-        }
-
-        #endregion
-
-        #region 轻提示
-
-        public void ShowToast(string message)
-        {
-            if (popupManager != null)
-                popupManager.ShowToast(message);
-            else
-                GICLog.Warn(message);
-        }
-
-        public void ShowToast(UnityEngine.Localization.LocalizedString localizedString)
-        {
-            if (popupManager != null)
-                popupManager.ShowToast(localizedString);
-        }
-
+        #region 弹窗/轻提示
+        // 弹窗与轻提示已收敛到 PopupManager（静态 Instance 直连），GameScene 不再转发
         #endregion
 
         #region 公共查询方法
-
-        public bool IsSceneLoaded(SceneType scene)
-        {
-            Scene loadedScene = SceneManager.GetSceneByName(scene.SceneName);
-            return loadedScene.isLoaded;
-        }
 
         public bool HasPreviousScene()
         {
             return sceneHistory.Count > 0;
         }
 
-        public bool TryPeekPreviousScene(out SceneType previousScene)
-        {
-            if (sceneHistory.Count == 0)
-            {
-                previousScene = default;
-                return false;
-            }
-
-            previousScene = sceneHistory.Peek();
-            return true;
-        }
-
-        public int GetHistoryCount()
-        {
-            return sceneHistory.Count;
-        }
-
         public void ClearHistory()
         {
             sceneHistory.Clear();
-        }
-
-        public void SetCurrentScene(SceneType scene)
-        {
-            CurrentScene = scene;
-        }
-
-        public bool PopHistory()
-        {
-            if (sceneHistory.Count == 0)
-            {
-                return false;
-            }
-
-            sceneHistory.Pop();
-            return true;
         }
 
         #endregion

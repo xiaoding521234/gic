@@ -12,6 +12,9 @@ namespace GIC.UI
 
     public class PopupManager : MonoBehaviour
     {
+        /// <summary>静态访问入口（场景唯一实例，Boot 场景建立）</summary>
+        public static PopupManager Instance { get; private set; }
+
         public GameObject popupPrefab;
 
         [Header("轻提示")]
@@ -22,6 +25,14 @@ namespace GIC.UI
         private readonly List<PopupDialog> _activeToasts = new();
         private float _canvasHeight;
         private float _toastHeight;
+
+        private void Awake()
+        {
+            if (Instance == null)
+                Instance = this;
+            else if (Instance != this)
+                Destroy(gameObject);
+        }
 
         public void ShowModalPopup(string message)
         {

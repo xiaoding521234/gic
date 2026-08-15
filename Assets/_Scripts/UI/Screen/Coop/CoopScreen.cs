@@ -281,7 +281,7 @@ namespace GIC.UI
             else
             {
                 GICLog.Error("[CoopScreen] 主机启动超时，请检查端口是否被占用");
-                GameScene.Instance?.ShowToast("主机启动超时，请检查端口是否被占用");
+                PopupManager.Instance?.ShowToast("主机启动超时，请检查端口是否被占用");
             }
         }
 

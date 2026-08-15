@@ -159,7 +159,7 @@ namespace GIC.UI
                 }
                 else
                 {
-                    GameScene.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Deck_Full"));
+                    PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Deck_Full"));
                 }
             }
 
