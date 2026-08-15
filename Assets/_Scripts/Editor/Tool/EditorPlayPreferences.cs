@@ -98,7 +98,7 @@ namespace GIC.Editor
                 try
                 {
                     System.IO.File.Delete(STOP_SIGNAL_FILE);
-                    Debug.Log("[EditorPlayPreferences] Clone 收到 Stop 信号，退出 Play 模式");
+                    GICLog.Info("[EditorPlayPreferences] Clone 收到 Stop 信号，退出 Play 模式");
                     EditorApplication.ExitPlaymode();
                     return;
                 }
@@ -115,7 +115,7 @@ namespace GIC.Editor
             if (!EditorApplication.isPlaying && System.IO.File.Exists(REFRESH_SIGNAL_FILE))
             {
                 try { System.IO.File.Delete(REFRESH_SIGNAL_FILE); } catch { }
-                Debug.Log("[EditorPlayPreferences] Clone 收到 Refresh 信号，刷新资源");
+                GICLog.Info("[EditorPlayPreferences] Clone 收到 Refresh 信号，刷新资源");
                 UnityEditor.AssetDatabase.Refresh();
             }
 
@@ -133,7 +133,7 @@ namespace GIC.Editor
                         var signalTime = System.DateTime.FromBinary(binaryTime);
                         if ((System.DateTime.UtcNow - signalTime).TotalSeconds < SIGNAL_TIMEOUT)
                         {
-                            Debug.Log("[EditorPlayPreferences] Clone 收到 Play 信号，进入 Play 模式");
+                            GICLog.Info("[EditorPlayPreferences] Clone 收到 Play 信号，进入 Play 模式");
                             System.IO.File.Delete(PLAY_SIGNAL_FILE);
                             EditorSceneManager.OpenScene(SCENE_PATH);
                             EditorApplication.EnterPlaymode();
@@ -207,7 +207,7 @@ namespace GIC.Editor
         private static void EnableFullscreen()
         {
             AutoFullscreen = true;
-            Debug.Log("[EditorPlayPreferences] 自动全屏: 开");
+            GICLog.Info("[EditorPlayPreferences] 自动全屏: 开");
         }
 
         [MenuItem("Tools/编辑器启动/自动全屏", true)]
@@ -221,7 +221,7 @@ namespace GIC.Editor
         private static void DisableFullscreen()
         {
             AutoFullscreen = false;
-            Debug.Log("[EditorPlayPreferences] 自动全屏: 关");
+            GICLog.Info("[EditorPlayPreferences] 自动全屏: 关");
         }
 
         [MenuItem("Tools/编辑器启动/不全屏", true)]
@@ -237,7 +237,7 @@ namespace GIC.Editor
         private static void EnableStartScene()
         {
             StartFromBoot = true;
-            Debug.Log("[EditorPlayPreferences] 从 Boot 启动: 开");
+            GICLog.Info("[EditorPlayPreferences] 从 Boot 启动: 开");
         }
 
         [MenuItem("Tools/编辑器启动/从 Boot 场景启动", true)]
@@ -251,7 +251,7 @@ namespace GIC.Editor
         private static void DisableStartScene()
         {
             StartFromBoot = false;
-            Debug.Log("[EditorPlayPreferences] 从 Boot 启动: 关");
+            GICLog.Info("[EditorPlayPreferences] 从 Boot 启动: 关");
         }
 
         [MenuItem("Tools/编辑器启动/从当前场景启动", true)]
@@ -267,7 +267,7 @@ namespace GIC.Editor
         private static void EnableSyncClone()
         {
             SyncClonePlay = true;
-            Debug.Log("[EditorPlayPreferences] 同步 Clone Play: 开");
+            GICLog.Info("[EditorPlayPreferences] 同步 Clone Play: 开");
         }
 
         [MenuItem("Tools/编辑器启动/同步 Clone Play", true)]
@@ -281,7 +281,7 @@ namespace GIC.Editor
         private static void DisableSyncClone()
         {
             SyncClonePlay = false;
-            Debug.Log("[EditorPlayPreferences] 同步 Clone Play: 关");
+            GICLog.Info("[EditorPlayPreferences] 同步 Clone Play: 关");
         }
 
         [MenuItem("Tools/编辑器启动/不同步 Clone Play", true)]
@@ -298,7 +298,7 @@ namespace GIC.Editor
             var clonePaths = ClonesManager.GetCloneProjectsPath();
             if (clonePaths.Count == 0)
             {
-                Debug.LogWarning("[EditorPlayPreferences] 未找到 Clone 项目，请先通过 ParrelSync 创建 Clone");
+                GICLog.Warn("[EditorPlayPreferences] 未找到 Clone 项目，请先通过 ParrelSync 创建 Clone");
                 return;
             }
 
@@ -313,11 +313,11 @@ namespace GIC.Editor
                     if (!System.IO.Directory.Exists(tempDir))
                         System.IO.Directory.CreateDirectory(tempDir);
                     System.IO.File.WriteAllText(signalPath, System.DateTime.UtcNow.ToBinary().ToString());
-                    Debug.Log($"[EditorPlayPreferences] 已发送 Play 信号给 Clone: {clonePath}");
+                    GICLog.Info($"[EditorPlayPreferences] 已发送 Play 信号给 Clone: {clonePath}");
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"[EditorPlayPreferences] 写信号文件失败: {e.Message}");
+                    GICLog.Error($"[EditorPlayPreferences] 写信号文件失败: {e.Message}");
                 }
             }
         }
@@ -334,11 +334,11 @@ namespace GIC.Editor
                     if (!System.IO.Directory.Exists(tempDir))
                         System.IO.Directory.CreateDirectory(tempDir);
                     System.IO.File.WriteAllText(signalPath, System.DateTime.UtcNow.ToBinary().ToString());
-                    Debug.Log($"[EditorPlayPreferences] 已发送 Stop 信号给 Clone: {clonePath}");
+                    GICLog.Info($"[EditorPlayPreferences] 已发送 Stop 信号给 Clone: {clonePath}");
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogError($"[EditorPlayPreferences] 写 Stop 信号失败: {e.Message}");
+                    GICLog.Error($"[EditorPlayPreferences] 写 Stop 信号失败: {e.Message}");
                 }
             }
         }

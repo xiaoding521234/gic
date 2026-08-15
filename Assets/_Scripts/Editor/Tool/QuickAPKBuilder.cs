@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
+using GIC.Framework;
 
 namespace GIC.Editor
 {
@@ -34,7 +35,7 @@ namespace GIC.Editor
             if (!string.IsNullOrEmpty(path))
             {
                 EditorPrefs.SetString("QuickAPKBuilder_OutputPath", path);
-                Debug.Log($"[QuickAPKBuilder] 导出路径已设为: {path}");
+                GICLog.Info($"[QuickAPKBuilder] 导出路径已设为: {path}");
             }
         }
 
@@ -49,14 +50,14 @@ namespace GIC.Editor
             // 如果不在 Android 平台，需要切换（Addressables bundle 按活动平台打包，不切换会导致纹理格式错误）
             if (originalTarget != BuildTarget.Android)
             {
-                Debug.Log($"[QuickAPKBuilder] 当前平台: {originalTarget}，切换到 Android...");
+                GICLog.Info($"[QuickAPKBuilder] 当前平台: {originalTarget}，切换到 Android...");
                 var switchOk = EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
                 if (!switchOk)
                 {
                     EditorUtility.DisplayDialog("错误", "切换到 Android 平台失败", "确定");
                     return;
                 }
-                Debug.Log("[QuickAPKBuilder] 已切换到 Android 平台");
+                GICLog.Info("[QuickAPKBuilder] 已切换到 Android 平台");
             }
 
             // 保存当前 scripting backend 和 architecture
@@ -103,25 +104,25 @@ namespace GIC.Editor
                     options = BuildOptions.None
                 };
 
-                Debug.Log($"[QuickAPKBuilder] 开始构建 ({(testBuild ? "测试" : "发布")}) → {outputPath}");
-                Debug.Log($"  Backend: {PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android)}");
-                Debug.Log($"  Architecture: {PlayerSettings.Android.targetArchitectures}");
-                Debug.Log($"  Scenes: {scenes.Count}");
-                Debug.Log($"  Output: {outputPath}");
+                GICLog.Info($"[QuickAPKBuilder] 开始构建 ({(testBuild ? "测试" : "发布")}) → {outputPath}");
+                GICLog.Info($"  Backend: {PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android)}");
+                GICLog.Info($"  Architecture: {PlayerSettings.Android.targetArchitectures}");
+                GICLog.Info($"  Scenes: {scenes.Count}");
+                GICLog.Info($"  Output: {outputPath}");
 
                 var report = BuildPipeline.BuildPlayer(options);
 
                 if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
                 {
                     var sizeMB = new System.IO.FileInfo(outputPath).Length / 1024f / 1024f;
-                    Debug.Log($"[QuickAPKBuilder] ✅ 构建成功! 大小: {sizeMB:F1}MB, 耗时: {report.summary.totalTime.TotalSeconds:F0}秒");
+                    GICLog.Info($"[QuickAPKBuilder] ✅ 构建成功! 大小: {sizeMB:F1}MB, 耗时: {report.summary.totalTime.TotalSeconds:F0}秒");
                     EditorUtility.DisplayDialog("构建成功",
                         $"APK 已导出到:\n{outputPath}\n\n大小: {sizeMB:F1}MB\n耗时: {report.summary.totalTime.TotalSeconds:F0}秒",
                         "确定");
                 }
                 else
                 {
-                    Debug.LogError($"[QuickAPKBuilder] ❌ 构建失败! Result: {report.summary.result}");
+                    GICLog.Error($"[QuickAPKBuilder] ❌ 构建失败! Result: {report.summary.result}");
                     EditorUtility.DisplayDialog("构建失败", $"构建结果: {report.summary.result}", "确定");
                 }
             }
@@ -131,11 +132,11 @@ namespace GIC.Editor
                 PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, originalBackend);
                 PlayerSettings.Android.targetArchitectures = originalArch;
                 PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Android, originalStripping);
-                Debug.Log($"[QuickAPKBuilder] 已恢复原始构建设置: Backend={originalBackend}, Arch={originalArch}, Stripping={originalStripping}");
+                GICLog.Info($"[QuickAPKBuilder] 已恢复原始构建设置: Backend={originalBackend}, Arch={originalArch}, Stripping={originalStripping}");
 
                 // 不切回原平台 — 避免触发第二次纹理重导入
                 if (originalTarget != BuildTarget.Android)
-                    Debug.Log($"[QuickAPKBuilder] 编辑器当前已留在 Android 平台（未切回 {originalTarget}，避免重复重导入纹理）");
+                    GICLog.Info($"[QuickAPKBuilder] 编辑器当前已留在 Android 平台（未切回 {originalTarget}，避免重复重导入纹理）");
             }
         }
     }

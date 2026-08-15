@@ -1,6 +1,8 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.UIElements;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
@@ -17,7 +19,7 @@ namespace GIC.Editor
     /// </summary>
     public class ElementFactionIconAutoLoader : EditorWindow
     {
-        private ElementFactionIconConfig targetConfig;
+        [SerializeField] private ElementFactionIconConfig targetConfig;
         private const string ElementStrokePath = "UI/Other/Element/Stroke/";
         private const string ElementDeepPath   = "UI/Other/Element/Deep/";
         private const string FactionPath       = "UI/Other/Faction/";
@@ -26,43 +28,60 @@ namespace GIC.Editor
         public static void ShowWindow()
         {
             var window = GetWindow<ElementFactionIconAutoLoader>("自动加载图标");
-            window.minSize = new Vector2(400, 200);
+            window.minSize = new Vector2(400, 260);
             window.Show();
         }
 
-        private void OnGUI()
+        // CreateGUI 为按名调用的魔法方法（Tuanjie 中非虚方法），不加 override
+        private void CreateGUI()
         {
-            EditorGUILayout.LabelField("元素 & 势力图标自动加载", EditorStyles.boldLabel);
-            EditorGUILayout.Space();
+            var root = rootVisualElement;
+            root.style.paddingLeft = 10;
+            root.style.paddingRight = 10;
+            root.style.paddingTop = 8;
 
-            targetConfig = (ElementFactionIconConfig)EditorGUILayout.ObjectField(
-                "图标配置", targetConfig, typeof(ElementFactionIconConfig), false);
+            root.Add(ConfigEditorUITK.CreateTitleRow("元素 & 势力图标自动加载", 0));
+
+            var objField = new ObjectField("图标配置")
+            {
+                objectType = typeof(ElementFactionIconConfig),
+                allowSceneObjects = false,
+            };
+            objField.value = targetConfig;
+            objField.RegisterValueChangedCallback(e => targetConfig = (ElementFactionIconConfig)e.newValue);
+            root.Add(objField);
 
             if (targetConfig == null)
             {
-                EditorGUILayout.HelpBox(
+                root.Add(new HelpBox(
                     "请先在 Resources/Configs/ 下创建 ElementFactionIconConfig.asset\n"
-                    + "右键 → Create → Game → ElementFactionIconConfig", MessageType.Info);
+                    + "右键 → Create → Game → ElementFactionIconConfig", HelpBoxMessageType.Info));
                 return;
             }
 
-            EditorGUILayout.Space();
+            var loadBtn = ConfigEditorUITK.CreatePrimaryButton("自动加载全部图标", LoadAll);
+            loadBtn.style.height = 40;
+            loadBtn.style.marginTop = 12;
+            root.Add(loadBtn);
 
-            if (GUILayout.Button("自动加载全部图标", GUILayout.Height(40)))
-            {
-                LoadAll();
-            }
+            root.Add(ConfigEditorUITK.CreateSectionHeader("资源路径"));
+            AddMiniLabel(root, $"元素 Stroke: Resources/{ElementStrokePath}");
+            AddMiniLabel(root, $"元素 Deep:   Resources/{ElementDeepPath}");
+            AddMiniLabel(root, $"势力:       Resources/{FactionPath}");
+        }
 
-            EditorGUILayout.Space();
-
-            EditorGUILayout.LabelField("资源路径:", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"  元素 Stroke: Resources/{ElementStrokePath}", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"  元素 Deep:   Resources/{ElementDeepPath}", EditorStyles.miniLabel);
-            EditorGUILayout.LabelField($"  势力:       Resources/{FactionPath}", EditorStyles.miniLabel);
+        private static void AddMiniLabel(VisualElement parent, string text)
+        {
+            var label = new Label(text);
+            label.style.fontSize = 11;
+            label.style.color = new Color(0.6f, 0.6f, 0.6f);
+            label.style.marginLeft = 9;
+            parent.Add(label);
         }
 
         private void LoadAll()
         {
+            if (targetConfig == null) return;
             Undo.RecordObject(targetConfig, "Auto-load element & faction icons");
 
             // 元素图标 — Stroke 风格
@@ -103,7 +122,7 @@ namespace GIC.Editor
             EditorUtility.SetDirty(targetConfig);
             AssetDatabase.SaveAssets();
 
-            Debug.Log("[ElementFactionIconAutoLoader] 图标加载完成，请检查 fallback 项并手动替换缺失图标。");
+            GICLog.Info("[ElementFactionIconAutoLoader] 图标加载完成，请检查 fallback 项并手动替换缺失图标。");
         }
 
         private static Sprite LoadSprite(string path)
@@ -111,7 +130,7 @@ namespace GIC.Editor
             var sprite = Resources.Load<Sprite>(path);
             if (sprite != null) return sprite;
 
-            Debug.LogWarning($"[ElementFactionIconAutoLoader] 未找到: Resources/{path}");
+            GICLog.Warn($"[ElementFactionIconAutoLoader] 未找到: Resources/{path}");
             return null;
         }
     }

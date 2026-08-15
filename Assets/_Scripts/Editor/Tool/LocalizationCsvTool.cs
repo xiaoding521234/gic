@@ -1,6 +1,8 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.UIElements;
 using UnityEngine.Localization.Tables;
 using UnityEditor.Localization;
 using System;
@@ -25,9 +27,9 @@ namespace GIC.Editor
     /// </summary>
     public class LocalizationCsvTool : EditorWindow
     {
-        private Vector2 scrollPosition;
-        private string csvFolder = "Export/Localization";
+        [SerializeField] private string csvFolder = "Export/Localization";
         private Dictionary<string, bool> tableSelectionMap = new Dictionary<string, bool>();
+        private VisualElement tableListContainer;
 
         [MenuItem("Tools/Localization/CSV 导出导入")]
         public static void ShowWindow()
@@ -47,41 +49,107 @@ namespace GIC.Editor
             }
         }
 
-        private void OnGUI()
+        // CreateGUI 为按名调用的魔法方法（Tuanjie 中非虚方法），不加 override
+        private void CreateGUI()
         {
-            EditorGUILayout.LabelField("本地化 CSV 导出导入工具", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
+            if (tableSelectionMap.Count == 0) Initialize();
 
-            // CSV folder path
-            EditorGUILayout.LabelField("CSV 文件夹路径（相对项目根目录）:");
-            csvFolder = EditorGUILayout.TextField(csvFolder);
-            EditorGUILayout.HelpBox(
+            var root = rootVisualElement;
+            root.style.paddingLeft = 10;
+            root.style.paddingRight = 10;
+            root.style.paddingTop = 8;
+
+            root.Add(ConfigEditorUITK.CreateTitleRow("本地化 CSV 导出导入工具", 0));
+
+            var pathField = new TextField("CSV 文件夹路径（相对项目根目录）");
+            pathField.value = csvFolder;
+            pathField.RegisterValueChangedCallback(e => csvFolder = e.newValue);
+            root.Add(pathField);
+
+            root.Add(new HelpBox(
                 "导出: 每张表生成 {TableName}.csv 文件\n" +
                 "导入: 从该文件夹读取 {TableName}.csv 文件\n" +
-                "CSV 可用 Excel / Google Sheets / VSCode 编辑", MessageType.Info);
+                "CSV 可用 Excel / Google Sheets / VSCode 编辑", HelpBoxMessageType.Info));
 
-            EditorGUILayout.Space(10);
+            // ===== 工具行：全选/全不选 | 打开文件夹 | 刷新 =====
+            var toolbar = new VisualElement();
+            toolbar.style.flexDirection = FlexDirection.Row;
+            toolbar.style.marginTop = 8;
+            root.Add(toolbar);
 
-            // Select all / none
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("全选", GUILayout.Width(60))) SetAll(true);
-            if (GUILayout.Button("全不选", GUILayout.Width(60))) SetAll(false);
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("打开文件夹", GUILayout.Width(90)))
+            var selectAllBtn = new Button(() => { SetAll(true); RebuildTableList(); }) { text = "全选" };
+            selectAllBtn.style.width = 60;
+            toolbar.Add(selectAllBtn);
+
+            var selectNoneBtn = new Button(() => { SetAll(false); RebuildTableList(); }) { text = "全不选" };
+            selectNoneBtn.style.width = 60;
+            selectNoneBtn.style.marginLeft = 4;
+            toolbar.Add(selectNoneBtn);
+
+            var spacer = new VisualElement();
+            spacer.style.flexGrow = 1f;
+            toolbar.Add(spacer);
+
+            var openBtn = new Button(OpenFolder) { text = "打开文件夹" };
+            openBtn.style.width = 90;
+            toolbar.Add(openBtn);
+
+            var refreshBtn = new Button(RebuildTableList) { text = "刷新" };
+            refreshBtn.style.width = 60;
+            refreshBtn.style.marginLeft = 4;
+            toolbar.Add(refreshBtn);
+
+            // ===== 表列表 =====
+            root.Add(ConfigEditorUITK.CreateSectionHeader("选择要操作的表"));
+
+            var scroll = new ScrollView();
+            scroll.style.flexGrow = 1f;
+            tableListContainer = new VisualElement();
+            scroll.Add(tableListContainer);
+            root.Add(scroll);
+
+            // ===== 动作按钮 =====
+            var actions = new VisualElement();
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.marginTop = 10;
+            root.Add(actions);
+
+            var exportBtn = ConfigEditorUITK.CreatePrimaryButton("导出选中 → CSV", () =>
             {
-                string fullPath = Path.GetFullPath(csvFolder);
-                if (Directory.Exists(fullPath))
-                    EditorUtility.RevealInFinder(fullPath);
-                else
-                    EditorUtility.DisplayDialog("提示", $"文件夹不存在: {fullPath}\n请先导出一次", "确定");
-            }
-            EditorGUILayout.EndHorizontal();
+                ExportSelected();
+                RebuildTableList();
+            });
+            exportBtn.style.height = 40;
+            exportBtn.style.flexGrow = 1f;
+            actions.Add(exportBtn);
 
-            EditorGUILayout.Space(5);
+            var importBtn = ConfigEditorUITK.CreatePrimaryButton("CSV → 导入选中", () =>
+            {
+                ImportSelected();
+                RebuildTableList();
+            });
+            importBtn.style.height = 40;
+            importBtn.style.flexGrow = 1f;
+            importBtn.style.marginLeft = 8;
+            actions.Add(importBtn);
 
-            // Table list
-            EditorGUILayout.LabelField("选择要操作的表:", EditorStyles.boldLabel);
-            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, GUILayout.ExpandHeight(true));
+            RebuildTableList();
+        }
+
+        private void OpenFolder()
+        {
+            string fullPath = Path.GetFullPath(csvFolder);
+            if (Directory.Exists(fullPath))
+                EditorUtility.RevealInFinder(fullPath);
+            else
+                EditorUtility.DisplayDialog("提示", $"文件夹不存在: {fullPath}\n请先导出一次", "确定");
+        }
+
+        /// <summary>重建表列表（条目数只在此处查询，不再每帧刷新）</summary>
+        private void RebuildTableList()
+        {
+            if (tableListContainer == null) return;
+            tableListContainer.Clear();
 
             foreach (TableName name in Enum.GetValues(typeof(TableName)))
             {
@@ -96,28 +164,30 @@ namespace GIC.Editor
                 int entryCount = collection?.SharedData?.Entries?.Count ?? 0;
                 string info = entryCount > 0 ? $"({entryCount}条)" : "(空)";
 
-                EditorGUILayout.BeginHorizontal();
-                tableSelectionMap[enumName] = EditorGUILayout.ToggleLeft(
-                    new GUIContent($"{displayName} [{enumName}] {info}", enumName),
-                    tableSelectionMap[enumName]);
-                EditorGUILayout.EndHorizontal();
-            }
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.paddingLeft = 4;
+                row.style.paddingTop = 2;
+                row.style.paddingBottom = 2;
 
-            EditorGUILayout.EndScrollView();
+                var toggle = new Toggle($"{displayName} [{enumName}]")
+                {
+                    value = tableSelectionMap[enumName],
+                    tooltip = enumName,
+                };
+                toggle.style.flexGrow = 1f;
+                toggle.RegisterValueChangedCallback(e => tableSelectionMap[enumName] = e.newValue);
+                row.Add(toggle);
 
-            EditorGUILayout.Space(10);
+                var count = new Label(info);
+                count.style.color = new Color(0.6f, 0.6f, 0.6f);
+                count.style.fontSize = 11;
+                count.style.marginRight = 6;
+                row.Add(count);
 
-            // Action buttons
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("导出选中 → CSV", GUILayout.Height(40)))
-            {
-                ExportSelected();
+                tableListContainer.Add(row);
             }
-            if (GUILayout.Button("CSV → 导入选中", GUILayout.Height(40)))
-            {
-                ImportSelected();
-            }
-            EditorGUILayout.EndHorizontal();
         }
 
         private void SetAll(bool selected)
@@ -161,7 +231,7 @@ namespace GIC.Editor
             AssetDatabase.Refresh();
             EditorUtility.DisplayDialog("导出完成",
                 $"已导出 {totalTables} 张表，共 {totalEntries} 条数据\n跳过 {skipped} 张（不存在）\n路径: {folderPath}", "确定");
-            Debug.Log($"[LocalizationCsvTool] 导出完成: {totalTables} 表, {totalEntries} 条, 跳过 {skipped}, 路径: {folderPath}");
+            GICLog.Info($"[LocalizationCsvTool] 导出完成: {totalTables} 表, {totalEntries} 条, 跳过 {skipped}, 路径: {folderPath}");
         }
 
         private int ExportTable(StringTableCollection collection, string tableName, string folderPath)
@@ -209,7 +279,7 @@ namespace GIC.Editor
             string filePath = Path.Combine(folderPath, $"{tableName}.csv");
             File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
 
-            Debug.Log($"[LocalizationCsvTool] 导出 {tableName}: {entries.Count} 条, {localeCodes.Count} 语言 → {filePath}");
+            GICLog.Info($"[LocalizationCsvTool] 导出 {tableName}: {entries.Count} 条, {localeCodes.Count} 语言 → {filePath}");
             return entries.Count;
         }
 
@@ -245,7 +315,7 @@ namespace GIC.Editor
                 var collection = LocalizationEditorSettings.GetStringTableCollection(kvp.Key);
                 if (collection == null)
                 {
-                    Debug.LogWarning($"[LocalizationCsvTool] 表 {kvp.Key} 在 Unity 中不存在，跳过。请先在 Localization Window 中创建。");
+                    GICLog.Warn($"[LocalizationCsvTool] 表 {kvp.Key} 在 Unity 中不存在，跳过。请先在 Localization Window 中创建。");
                     skipped++;
                     continue;
                 }
@@ -261,7 +331,7 @@ namespace GIC.Editor
             AssetDatabase.Refresh();
             EditorUtility.DisplayDialog("导入完成",
                 $"已导入 {totalTables} 张表\n更新 {totalUpdated} 条，新增 {totalCreated} 条\n跳过 {skipped} 张", "确定");
-            Debug.Log($"[LocalizationCsvTool] 导入完成: {totalTables} 表, 更新 {totalUpdated}, 新增 {totalCreated}, 跳过 {skipped}");
+            GICLog.Info($"[LocalizationCsvTool] 导入完成: {totalTables} 表, 更新 {totalUpdated}, 新增 {totalCreated}, 跳过 {skipped}");
         }
 
         private void ImportTable(StringTableCollection collection, string tableName, string filePath,
@@ -290,7 +360,7 @@ namespace GIC.Editor
             var header = rows[0];
             if (header.Length < 2 || header[0] != "Key" || header[1] != "Id")
             {
-                Debug.LogWarning($"[LocalizationCsvTool] {tableName}.csv 格式错误: 首行应为 Key,Id,locale1,locale2,...");
+                GICLog.Warn($"[LocalizationCsvTool] {tableName}.csv 格式错误: 首行应为 Key,Id,locale1,locale2,...");
                 return;
             }
 
@@ -302,7 +372,7 @@ namespace GIC.Editor
                 if (localeMap.TryGetValue(code, out var t))
                     localeColumns[i] = t;
                 else
-                    Debug.LogWarning($"[LocalizationCsvTool] {tableName}: 找不到 locale '{code}' 的表，该列将被忽略");
+                    GICLog.Warn($"[LocalizationCsvTool] {tableName}: 找不到 locale '{code}' 的表，该列将被忽略");
             }
 
             // 数据行
@@ -375,7 +445,7 @@ namespace GIC.Editor
             foreach (var t in localeMap.Values)
                 EditorUtility.SetDirty(t);
 
-            Debug.Log($"[LocalizationCsvTool] 导入 {tableName}: 更新 {updateCount}, 新增 {createCount}");
+            GICLog.Info($"[LocalizationCsvTool] 导入 {tableName}: 更新 {updateCount}, 新增 {createCount}");
         }
 
         #endregion

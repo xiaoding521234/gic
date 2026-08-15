@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 using UnityEditor;
+using UnityEditor.UIElements;
+using UnityEngine.UIElements;
 using TMPro;
 using GIC.Framework;
 using GIC.Data;
@@ -13,7 +15,8 @@ namespace GIC.Editor
 
     public class TMPFontReplacer : EditorWindow
     {
-        public TMP_FontAsset newFontAsset;
+        // EditorWindow 序列化字段，脚本重编译后保留选择
+        [SerializeField] private TMP_FontAsset newFontAsset;
 
         [MenuItem("Tools/批量替换 TMP 字体")]
         public static void ShowWindow()
@@ -21,21 +24,45 @@ namespace GIC.Editor
             GetWindow<TMPFontReplacer>("批量替换TMP字体");
         }
 
-        private void OnGUI()
+        // CreateGUI 为按名调用的魔法方法（Tuanjie 中非虚方法），不加 override
+        private void CreateGUI()
         {
-            GUILayout.Label("批量替换所有预制体和场景中的 TMP 字体", EditorStyles.boldLabel);
-            newFontAsset = (TMP_FontAsset)EditorGUILayout.ObjectField("目标字体", newFontAsset, typeof(TMP_FontAsset), false);
+            var root = rootVisualElement;
+            root.style.paddingLeft = 10;
+            root.style.paddingRight = 10;
+            root.style.paddingTop = 8;
 
-            EditorGUI.BeginDisabledGroup(newFontAsset == null);
-            if (GUILayout.Button("一键替换所有 Prefab 和场景"))
+            root.Add(ConfigEditorUITK.CreateTitleRow("批量替换 TMP 字体", 0));
+
+            var objField = new ObjectField("目标字体")
             {
+                objectType = typeof(TMP_FontAsset),
+                allowSceneObjects = false,
+            };
+            objField.value = newFontAsset;
+            root.Add(objField);
+
+            Button replaceBtn = null;
+            void SyncEnabled() => replaceBtn?.SetEnabled(newFontAsset != null);
+            objField.RegisterValueChangedCallback(e =>
+            {
+                newFontAsset = (TMP_FontAsset)e.newValue;
+                SyncEnabled();
+            });
+
+            replaceBtn = ConfigEditorUITK.CreatePrimaryButton("一键替换所有 Prefab 和场景", () =>
+            {
+                if (newFontAsset == null) return;
                 if (EditorUtility.DisplayDialog("确认替换",
                     $"确定要把所有 TMP 字体重置为 {newFontAsset.name} 吗？\n此操作支持撤销。", "确定", "取消"))
                 {
                     ReplaceAll();
                 }
-            }
-            EditorGUI.EndDisabledGroup();
+            });
+            replaceBtn.style.height = 40;
+            replaceBtn.style.marginTop = 12;
+            root.Add(replaceBtn);
+            SyncEnabled();
         }
 
         private void ReplaceAll()
@@ -84,4 +111,3 @@ namespace GIC.Editor
         }
     }
 }
-

@@ -18,7 +18,7 @@ namespace GIC.Editor
         [MenuItem("Tools/查找丢失的脚本引用")]
         static void FindMissingScriptsInAll()
         {
-            Debug.Log("========== 开始查找丢失的脚本 ==========");
+            GICLog.Info("========== 开始查找丢失的脚本 ==========");
             int count = 0;
             
             // 1. 保存当前场景
@@ -69,7 +69,7 @@ namespace GIC.Editor
                 {
                     if (comp == null)
                     {
-                        Debug.LogError($"Prefab 发现丢失脚本: {path}", prefab);
+                        GICLog.Error($"Prefab 发现丢失脚本: {path}", prefab);
                         count++;
                     }
                 }
@@ -93,13 +93,13 @@ namespace GIC.Editor
                         !string.IsNullOrEmpty(iterator.displayName) &&
                         iterator.objectReferenceInstanceIDValue != 0)
                     {
-                        Debug.LogError($"ScriptableObject 发现丢失引用: {path} -> {iterator.propertyPath}", so);
+                        GICLog.Error($"ScriptableObject 发现丢失引用: {path} -> {iterator.propertyPath}", so);
                         count++;
                     }
                 }
             }
             
-            Debug.Log($"========== 找到 {count} 个丢失的脚本引用 ==========");
+            GICLog.Info($"========== 找到 {count} 个丢失的脚本引用 ==========");
             if (count == 0)
             {
                 EditorUtility.DisplayDialog("完成", "未发现丢失的脚本引用！", "好的");
@@ -117,7 +117,7 @@ namespace GIC.Editor
             {
                 if (components[i] == null)
                 {
-                    Debug.LogError($"发现丢失脚本: {GetGameObjectPath(obj)}", obj);
+                    GICLog.Error($"发现丢失脚本: {GetGameObjectPath(obj)}", obj);
                     count++;
                 }
             }

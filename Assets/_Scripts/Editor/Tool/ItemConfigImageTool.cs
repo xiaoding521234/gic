@@ -1,6 +1,8 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.UIElements;
 using System.IO;
 using System.Collections.Generic;
 using GIC.Framework;
@@ -18,40 +20,101 @@ namespace GIC.Editor
     /// </summary>
     public class ItemConfigImageTool : EditorWindow
     {
-        private ItemConfig targetConfig;
-        private Vector2 scrollPosition;
+        [SerializeField] private ItemConfig targetConfig;
+        // 旧 IMGUI 版 TextField 传常量导致编辑不生效，改为序列化字段持久化
+        [SerializeField] private string itemIconPath = "Resources/UI/Items/";
+
+        private VisualElement statsContainer;
+        private VisualElement itemListContainer;
 
         [MenuItem("Tools/ItemConfig/自动加载图片")]
         public static void ShowWindow()
         {
             var window = GetWindow<ItemConfigImageTool>("自动加载图片");
-            window.minSize = new Vector2(500, 400);
+            window.minSize = new Vector2(500, 500);
             window.Show();
         }
 
-        private void OnGUI()
+        // CreateGUI 为按名调用的魔法方法（Tuanjie 中非虚方法），不加 override
+        private void CreateGUI()
         {
-            EditorGUILayout.LabelField("ItemConfig 图片自动加载工具", EditorStyles.boldLabel);
-            EditorGUILayout.Space();
+            var root = rootVisualElement;
+            root.style.paddingLeft = 10;
+            root.style.paddingRight = 10;
+            root.style.paddingTop = 8;
 
-            // 选择 ItemConfig
-            targetConfig = (ItemConfig)EditorGUILayout.ObjectField("ItemConfig", targetConfig, typeof(ItemConfig), false);
+            root.Add(ConfigEditorUITK.CreateTitleRow("ItemConfig 图片自动加载工具", 0));
+
+            var objField = new ObjectField("ItemConfig")
+            {
+                objectType = typeof(ItemConfig),
+                allowSceneObjects = false,
+            };
+            objField.value = targetConfig;
+            objField.RegisterValueChangedCallback(e =>
+            {
+                targetConfig = (ItemConfig)e.newValue;
+                RefreshOverview();
+                buttonsContainer.SetEnabled(targetConfig != null);
+            });
+            root.Add(objField);
 
             if (targetConfig == null)
             {
-                EditorGUILayout.HelpBox("请拖入 ItemConfig 资源", MessageType.Info);
+                root.Add(new HelpBox("请拖入 ItemConfig 资源", HelpBoxMessageType.Info));
                 return;
             }
 
-            EditorGUILayout.Space();
+            root.Add(ConfigEditorUITK.CreateSectionHeader("图片路径设置"));
+            var pathField = new TextField("物品图标路径");
+            pathField.value = itemIconPath;
+            pathField.RegisterValueChangedCallback(e => itemIconPath = e.newValue);
+            root.Add(pathField);
 
-            // 图片路径设置
-            EditorGUILayout.LabelField("图片路径设置", EditorStyles.boldLabel);
-            string itemIconPath = EditorGUILayout.TextField("物品图标路径", "Resources/UI/Items/");
+            statsContainer = new VisualElement();
+            statsContainer.style.marginTop = 8;
+            root.Add(statsContainer);
 
-            EditorGUILayout.Space();
+            var scroll = new ScrollView();
+            scroll.style.flexGrow = 1f;
+            scroll.style.marginTop = 6;
+            itemListContainer = new VisualElement();
+            scroll.Add(itemListContainer);
+            root.Add(scroll);
 
-            // 预览和按钮
+            buttonsContainer = new VisualElement();
+            buttonsContainer.Add(ConfigEditorUITK.CreatePrimaryButton("自动加载所有图片", () =>
+            {
+                LoadAllImages(targetConfig, itemIconPath);
+                RefreshOverview();
+            }));
+            buttonsContainer[0].style.height = 40;
+            buttonsContainer.Add(ConfigEditorUITK.CreateToolButton("仅加载缺失的图片", () =>
+            {
+                LoadMissingImages(targetConfig, itemIconPath);
+                RefreshOverview();
+            }));
+            buttonsContainer.Add(ConfigEditorUITK.CreateToolButton("清除所有图标", () =>
+            {
+                ClearAllIcons(targetConfig);
+                RefreshOverview();
+            }, danger: true));
+            root.Add(buttonsContainer);
+
+            RefreshOverview();
+        }
+
+        private VisualElement buttonsContainer;
+
+        private void RefreshOverview()
+        {
+            if (statsContainer == null || itemListContainer == null) return;
+
+            statsContainer.Clear();
+            itemListContainer.Clear();
+
+            if (targetConfig == null) return;
+
             int totalIcons = 0;
             foreach (var itemData in targetConfig.itemDataList)
             {
@@ -59,48 +122,42 @@ namespace GIC.Editor
                     totalIcons += itemData.icon.Count;
             }
 
-            EditorGUILayout.LabelField($"待处理物品数量: {targetConfig.itemDataList.Count}", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"当前图标总数: {totalIcons}", EditorStyles.boldLabel);
-
-            EditorGUILayout.Space();
-
-            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+            AddStatLabel($"待处理物品数量: {targetConfig.itemDataList.Count}");
+            AddStatLabel($"当前图标总数: {totalIcons}");
 
             foreach (var itemData in targetConfig.itemDataList)
             {
                 if (itemData == null) continue;
 
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.LabelField($"物品: {itemData.itemID}", EditorStyles.boldLabel);
-
-                // 显示当前状态
                 int iconCount = itemData.icon != null ? itemData.icon.Count : 0;
-                EditorGUILayout.LabelField($"  图标数量: {iconCount}");
 
-                EditorGUILayout.EndVertical();
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.paddingLeft = 6;
+                row.style.paddingTop = 3;
+                row.style.paddingBottom = 3;
+                row.style.borderBottomWidth = 1;
+                row.style.borderBottomColor = new Color(0.4f, 0.4f, 0.4f, 0.25f);
+
+                var name = new Label($"物品: {itemData.itemID}");
+                name.style.flexGrow = 1f;
+                row.Add(name);
+
+                var count = new Label($"图标数量: {iconCount}");
+                count.style.color = new Color(0.6f, 0.6f, 0.6f);
+                row.Add(count);
+
+                itemListContainer.Add(row);
             }
+        }
 
-            EditorGUILayout.EndScrollView();
-
-            EditorGUILayout.Space();
-
-            GUI.enabled = targetConfig != null;
-            if (GUILayout.Button("自动加载所有图片", GUILayout.Height(40)))
-            {
-                LoadAllImages(targetConfig, itemIconPath);
-            }
-
-            if (GUILayout.Button("仅加载缺失的图片", GUILayout.Height(30)))
-            {
-                LoadMissingImages(targetConfig, itemIconPath);
-            }
-
-            if (GUILayout.Button("清除所有图标", GUILayout.Height(30)))
-            {
-                ClearAllIcons(targetConfig);
-            }
-
-            GUI.enabled = true;
+        private void AddStatLabel(string text)
+        {
+            var label = new Label(text);
+            label.style.fontSize = 13;
+            label.style.color = new Color(0.85f, 0.87f, 0.9f);
+            statsContainer.Add(label);
         }
 
         private void LoadAllImages(ItemConfig config, string iconPath)
@@ -123,10 +180,10 @@ namespace GIC.Editor
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"物品图片加载完成: 成功 {successCount}, 失败 {failCount}");
+            GICLog.Info($"物品图片加载完成: 成功 {successCount}, 失败 {failCount}");
             if (missingFiles.Count > 0)
             {
-                Debug.LogWarning($"缺失的图片文件 ({missingFiles.Count}个):\n" + string.Join("\n", missingFiles));
+                GICLog.Warn($"缺失的图片文件 ({missingFiles.Count}个):\n" + string.Join("\n", missingFiles));
             }
 
             EditorUtility.DisplayDialog("完成", $"图片加载完成\n成功: {successCount}\n失败: {failCount}\n缺失文件数: {missingFiles.Count}", "确定");
@@ -159,10 +216,10 @@ namespace GIC.Editor
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"物品图片加载完成: 加载 {loadedCount}, 跳过 {skipCount}");
+            GICLog.Info($"物品图片加载完成: 加载 {loadedCount}, 跳过 {skipCount}");
             if (missingFiles.Count > 0)
             {
-                Debug.LogWarning($"缺失的图片文件 ({missingFiles.Count}个):\n" + string.Join("\n", missingFiles));
+                GICLog.Warn($"缺失的图片文件 ({missingFiles.Count}个):\n" + string.Join("\n", missingFiles));
             }
 
             EditorUtility.DisplayDialog("完成", $"图片加载完成\n加载: {loadedCount}\n跳过: {skipCount}\n缺失文件数: {missingFiles.Count}", "确定");
@@ -222,11 +279,11 @@ namespace GIC.Editor
                 {
                     itemData.icon.Add(nullSprite);
                     missingFiles?.Add($"{iconPath}{itemName}_主图标");
-                    Debug.LogWarning($"物品 {itemName} 没有任何真实图标，已自动添加 null 占位");
+                    GICLog.Warn($"物品 {itemName} 没有任何真实图标，已自动添加 null 占位");
                 }
                 else
                 {
-                    Debug.LogError($"物品 {itemName} 连 null 占位图片都找不到！请确保 {iconPath}null 图片存在");
+                    GICLog.Error($"物品 {itemName} 连 null 占位图片都找不到！请确保 {iconPath}null 图片存在");
                 }
             }
 
@@ -280,11 +337,11 @@ namespace GIC.Editor
             if (nullSprite != null)
             {
                 missingFiles?.Add($"{folderPath}{fileName}");
-                Debug.LogWarning($"未找到图片: {fileName}，使用 null 默认图片");
+                GICLog.Warn($"未找到图片: {fileName}，使用 null 默认图片");
                 return nullSprite;
             }
 
-            Debug.LogWarning($"未找到图片: {fileName}，且未找到 null 默认图片");
+            GICLog.Warn($"未找到图片: {fileName}，且未找到 null 默认图片");
             return null;
         }
 
@@ -325,11 +382,12 @@ namespace GIC.Editor
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"已清除 {clearedCount} 个物品的图标");
+            GICLog.Info($"已清除 {clearedCount} 个物品的图标");
             EditorUtility.DisplayDialog("完成", $"已清除 {clearedCount} 个物品的图标", "确定");
         }
     }
     #endif
+
 }
 
 

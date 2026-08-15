@@ -16,7 +16,7 @@ namespace GIC.Editor
             bool next = !current;
             EditorPrefs.SetBool(SaveManager.DeletionTestModeKey, next);
             Menu.SetChecked("Tools/存档/删档测试模式", next);
-            Debug.Log($"删档测试模式: {(next ? "开启（每次启动清空存档）" : "关闭")}");
+            GICLog.Info($"删档测试模式: {(next ? "开启（每次启动清空存档）" : "关闭")}");
         }
 
         [MenuItem("Tools/存档/删档测试模式", true)]

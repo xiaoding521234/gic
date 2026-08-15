@@ -1,116 +1,59 @@
 ﻿// ============================================
-// UnitConfigEditor - 精简后的 Inspector
+// UnitConfigEditor - UI Toolkit 版 Inspector 与编辑窗口
 // ============================================
+// UnitDataEditorWindow 布局（与 IMGUI 版一致）：
+//   左=单位属性字段（排除 skills）；右=技能 ListView + 选中技能字段编辑区；
+//   左右分栏可拖拽。旧版 customParamsListWithMenu 从未被渲染（死 UI），不再重建，
+//   选中技能的 customParams 由默认数组 PropertyField 绘制。
+// 保存语义：绑定后修改即时写入 SerializedObject（可 Ctrl+Z 撤销），
+// "保存到磁盘"负责落盘；不再有"未保存更改"拦截弹窗。
 
-using UnityEditor;
-using UnityEditorInternal;
-using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using UnityEditor;
+using UnityEditor.UIElements;
+using UnityEngine;
+using UnityEngine.UIElements;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
 using GIC.Battle;
 using GIC.Tool;
+
 namespace GIC.Editor
 {
-
-
     [CustomEditor(typeof(UnitConfig))]
-    public class UnitConfigEditor : UnityEditor.Editor
+    public class UnitConfigEditor : ConfigInspectorBase
     {
         private const string VOICE_ROOT_PATH = "Assets/Resources/Audios/Voices/";
 
-        private ReorderableListWithMenu listWithMenu;
+        protected override string ListPropertyName => "unitDataList";
+        protected override string ListHeaderTitle => "单位数据列表";
 
-        private void OnEnable()
+        protected override string GetElementName(SerializedProperty element)
+            => ((UnitName)element.FindPropertyRelative("unitName").intValue).GetInspectorName();
+
+        protected override string GetElementBadge(SerializedProperty element)
+            => GetCombinedTag(
+                element.FindPropertyRelative("unitType"),
+                element.FindPropertyRelative("factions"));
+
+        protected override int GetElementStars(SerializedProperty element)
+            => element.FindPropertyRelative("starLevel").intValue;
+
+        protected override void EditElement(int index)
+            => UnitDataEditorWindow.OpenWindow((UnitConfig)target, index);
+
+        protected override VisualElement BuildTools(SerializedObject so)
         {
-            var listProperty = serializedObject.FindProperty("unitDataList");
-
-            listWithMenu = new ReorderableListWithMenu(
-                serializedObject, listProperty,
-                draggable: true, displayHeader: true, displayAdd: true, displayRemove: true,
-                headerText: "单位数据列表",
-                drawElement: DrawElement,
-                elementHeight: EditorGUIUtility.singleLineHeight + 2f,
-                onEdit: (index) => UnitDataEditorWindow.OpenWindow((UnitConfig)target, index)
-            );
-        }
-
-        private void DrawElement(Rect rect, int index)
-        {
-            rect.x += 20f;
-            rect.width -= 20f;
-
-            var listProperty = serializedObject.FindProperty("unitDataList");
-            var element = listProperty.GetArrayElementAtIndex(index);
-            var unitNameProperty = element.FindPropertyRelative("unitName");
-            var starLevelProperty = element.FindPropertyRelative("starLevel");
-            var unitTypeProperty = element.FindPropertyRelative("unitType");
-            var factionsProperty = element.FindPropertyRelative("factions");
-
-            // 修正：使用 intValue 而不是 enumValueIndex
-            var unitNameValue = (UnitName)unitNameProperty.intValue;
-            var starLevel = starLevelProperty.intValue;
-
-            string displayName = unitNameValue.GetInspectorName();
-
-            string starIcons = new string('★', starLevel);
-            string combinedTag = GetCombinedTag(unitTypeProperty, factionsProperty);
-            string title = $"{combinedTag} {displayName}  {starIcons}";
-
-            Rect summaryRect = new Rect(rect.x, rect.y, rect.width - 60f, EditorGUIUtility.singleLineHeight);
-            Rect buttonRect = new Rect(rect.x + rect.width - 55f, rect.y, 55f, EditorGUIUtility.singleLineHeight);
-
-            EditorGUI.LabelField(summaryRect, title);
-
-            if (GUI.Button(buttonRect, "编辑"))
-            {
-                UnitDataEditorWindow.OpenWindow((UnitConfig)target, index);
-            }
-        }
-
-        public override void OnInspectorGUI()
-        {
-            serializedObject.Update();
-
-            listWithMenu.DoLayoutList();
-
-            if (Event.current.type == UnityEngine.EventType.ContextClick)
-            {
-                listWithMenu.ShowContextMenu();
-            }
-
-            // ========== 批量填充工具 ==========
-            EditorGUILayout.Space(20);
-            EditorGUILayout.LabelField("批量填充工具", EditorStyles.boldLabel);
-
-            if (GUILayout.Button("自动加载所有角色语音", GUILayout.Height(30)))
-            {
-                AutoFillAllVoices((UnitConfig)target);
-            }
-
-            if (GUILayout.Button("仅加载缺失的语音", GUILayout.Height(30)))
-            {
-                AutoFillMissingVoices((UnitConfig)target);
-            }
-
-            EditorGUILayout.Space(10);
-
-            if (GUILayout.Button("自动加载所有图片", GUILayout.Height(30)))
-            {
-                AutoFillAllImages((UnitConfig)target);
-            }
-
-            if (GUILayout.Button("仅加载缺失的图片", GUILayout.Height(30)))
-            {
-                AutoFillMissingImages((UnitConfig)target);
-            }
-
-            serializedObject.ApplyModifiedProperties();
+            var config = (UnitConfig)target;
+            var section = ConfigEditorUITK.CreateToolsSection("批量填充工具");
+            section.Add(ConfigEditorUITK.CreateToolButton("自动加载所有角色语音", () => AutoFillAllVoices(config)));
+            section.Add(ConfigEditorUITK.CreateToolButton("仅加载缺失的语音", () => AutoFillMissingVoices(config)));
+            section.Add(ConfigEditorUITK.CreateToolButton("自动加载所有图片", () => AutoFillAllImages(config)));
+            section.Add(ConfigEditorUITK.CreateToolButton("仅加载缺失的图片", () => AutoFillMissingImages(config)));
+            return section;
         }
 
         private string GetCombinedTag(SerializedProperty unitTypeProperty, SerializedProperty factionsProperty)
@@ -119,21 +62,20 @@ namespace GIC.Editor
             string factionName = GetFirstFactionDisplayName(factionsProperty);
 
             if (!string.IsNullOrEmpty(factionName) && !string.IsNullOrEmpty(typeName))
-                return $"[{factionName}{typeName}]";
-            if (!string.IsNullOrEmpty(typeName)) return $"[{typeName}]";
-            if (!string.IsNullOrEmpty(factionName)) return $"[{factionName}]";
-            return "[未知]";
+                return $"{factionName}{typeName}";
+            if (!string.IsNullOrEmpty(typeName)) return typeName;
+            if (!string.IsNullOrEmpty(factionName)) return factionName;
+            return "未知";
         }
 
         private string GetFirstFactionDisplayName(SerializedProperty factionsProperty)
         {
             if (factionsProperty == null || factionsProperty.arraySize == 0) return "";
-            // 修正：使用 intValue 获取实际枚举值
             int enumValue = factionsProperty.GetArrayElementAtIndex(0).intValue;
             return ((FactionType)enumValue).GetInspectorName();
         }
 
-        #region 语音自动填充
+        #region 语音自动填充（逻辑与 IMGUI 版一致，日志走 GICLog）
 
         private void AutoFillAllVoices(UnitConfig config)
         {
@@ -149,9 +91,9 @@ namespace GIC.Editor
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"语音加载完成: 成功 {success}, 失败 {fail}");
+            GICLog.Info($"语音加载完成: 成功 {success}, 失败 {fail}");
             if (warnings.Count > 0)
-                Debug.LogWarning($"语音加载警告 ({warnings.Count}):\n" + string.Join("\n", warnings));
+                GICLog.Warn($"语音加载警告 ({warnings.Count}):\n" + string.Join("\n", warnings));
         }
 
         private void AutoFillMissingVoices(UnitConfig config)
@@ -173,9 +115,9 @@ namespace GIC.Editor
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"语音加载完成: 加载 {loaded}, 跳过 {skipped}");
+            GICLog.Info($"语音加载完成: 加载 {loaded}, 跳过 {skipped}");
             if (warnings.Count > 0)
-                Debug.LogWarning($"语音加载警告 ({warnings.Count}):\n" + string.Join("\n", warnings));
+                GICLog.Warn($"语音加载警告 ({warnings.Count}):\n" + string.Join("\n", warnings));
         }
 
         private bool LoadVoicesForUnit(UnitConfig.UnitData unitData, List<string> warnings)
@@ -329,7 +271,7 @@ namespace GIC.Editor
 
         #endregion
 
-        #region 图片自动填充
+        #region 图片自动填充（逻辑与 IMGUI 版一致，日志走 GICLog）
 
         private const string AVATAR_PATH = "Resources/UI/Avatars/";
         private const string CARD_PATH = "Resources/UI/Cards/";
@@ -351,9 +293,9 @@ namespace GIC.Editor
 
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
-            Debug.Log($"图片加载完成: 成功 {success}, 失败 {fail}");
+            GICLog.Info($"图片加载完成: 成功 {success}, 失败 {fail}");
             if (missing.Count > 0)
-                Debug.LogWarning($"缺失的图片文件 ({missing.Count}个):\n" + string.Join("\n", missing));
+                GICLog.Warn($"缺失的图片文件 ({missing.Count}个):\n" + string.Join("\n", missing));
             EditorUtility.DisplayDialog("完成", $"图片加载完成\n成功: {success}\n失败: {fail}\n缺失文件数: {missing.Count}", "确定");
         }
 
@@ -402,9 +344,9 @@ namespace GIC.Editor
 
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
-            Debug.Log($"图片加载完成: 加载 {loaded}, 跳过 {skipped}");
+            GICLog.Info($"图片加载完成: 加载 {loaded}, 跳过 {skipped}");
             if (missing.Count > 0)
-                Debug.LogWarning($"缺失的图片文件 ({missing.Count}个):\n" + string.Join("\n", missing));
+                GICLog.Warn($"缺失的图片文件 ({missing.Count}个):\n" + string.Join("\n", missing));
             EditorUtility.DisplayDialog("完成", $"图片加载完成\n加载: {loaded}\n跳过: {skipped}\n缺失文件数: {missing.Count}", "确定");
         }
 
@@ -460,7 +402,7 @@ namespace GIC.Editor
                 if (nullSprite != null)
                 {
                     unitData.cards.Add(nullSprite);
-                    Debug.LogWarning($"角色 {unitData.unitName} 没有真实卡片，已添加 null 占位");
+                    GICLog.Warn($"角色 {unitData.unitName} 没有真实卡片，已添加 null 占位");
                 }
             }
         }
@@ -509,439 +451,264 @@ namespace GIC.Editor
     }
 
     // ============================================
-    // UnitDataEditorWindow - 精简后的编辑窗口
+    // UnitDataEditorWindow - UI Toolkit 版编辑窗口（左右分栏 + 技能子列表）
     // ============================================
 
     public class UnitDataEditorWindow : EditorWindow
     {
-        // 数据
+        private static readonly Color SplitterBase = new Color(0.45f, 0.45f, 0.45f, 0.5f);
+        private static readonly Color SplitterHot = new Color(0.25f, 0.5f, 0.85f, 0.9f);
+
         private UnitConfig targetConfig;
-        private int elementIndex;
-        private SerializedObject configSerializedObject;
-        private string unitDisplayName;
-        private bool dataChanged = false;
+        private int elementIndex = -1;
+        private SerializedObject serializedObj;
+        private string unitDisplayName = "";
 
-        // 滚动
-        private Vector2 unitScrollPosition;
-        private Vector2 skillScrollPosition;
+        private ListView skillsList;
+        private ScrollView skillEditorScroll;
 
-        // 技能列表
-        private ReorderableListWithMenu skillsListWithMenu;
-        private int selectedSkillIndex = -1;
-        private SerializedProperty selectedSkillProperty;
+        private VisualElement mainRow;
+        private VisualElement leftPane;
 
-        // 自定义参数列表
-        private ReorderableListWithMenu customParamsListWithMenu;
-        private SerializedProperty currentCustomParamsProperty;
-
-        // 分栏
         private float splitRatio = 0.45f;
         private bool isDraggingSplit = false;
+
+        private string SkillsPath => $"unitDataList.Array.data[{elementIndex}].skills";
 
         public static void OpenWindow(UnitConfig config, int index)
         {
             var window = GetWindow<UnitDataEditorWindow>("编辑单位数据");
             window.targetConfig = config;
             window.elementIndex = index;
-            window.dataChanged = false;
-            window.selectedSkillIndex = -1;
-            window.selectedSkillProperty = null;
-            window.customParamsListWithMenu = null;
-            window.currentCustomParamsProperty = null;
-            window.configSerializedObject = new SerializedObject(config);
+            window.serializedObj = new SerializedObject(config);
 
-            // 获取显示名称
-            var listProp = window.configSerializedObject.FindProperty("unitDataList");
+            var listProp = window.serializedObj.FindProperty("unitDataList");
             if (listProp != null && index < listProp.arraySize)
             {
                 var element = listProp.GetArrayElementAtIndex(index);
-                var unitNameProp = element.FindPropertyRelative("unitName");
-                // 修正：使用 intValue 而不是 enumValueIndex
-                var unitNameValue = (UnitName)unitNameProp.intValue;
-                window.unitDisplayName = unitNameValue.GetInspectorName();
+                window.unitDisplayName = ((UnitName)element.FindPropertyRelative("unitName").intValue).GetInspectorName();
             }
 
-            window.InitializeSkillsList();
-
-            float width = 1200, height = 900;
             window.minSize = new Vector2(800, 600);
-            var mainPos = EditorGUIUtility.GetMainWindowPosition();
+            var main = EditorGUIUtility.GetMainWindowPosition();
             window.position = new Rect(
-                mainPos.x + (mainPos.width - width) / 2,
-                mainPos.y + (mainPos.height - height) / 2,
-                width, height);
-            window.Show();
+                main.x + (main.width - 1200) / 2,
+                main.y + (main.height - 900) / 2,
+                1200, 900);
+
+            // GetWindow 复用已打开的窗口时，CreateGUI 不会再触发，需手动重建
+            if (window.rootVisualElement.childCount > 0)
+            {
+                window.rootVisualElement.Clear();
+                window.BuildUI();
+            }
         }
 
-        #region 初始化列表
+        // CreateGUI 为按名调用的魔法方法（Tuanjie 中非虚方法），不加 override
+        protected void CreateGUI() => BuildUI();
 
-        private void InitializeSkillsList()
+        private void BuildUI()
         {
-            if (targetConfig == null || configSerializedObject == null) return;
+            var root = rootVisualElement;
+            root.style.paddingLeft = 10;
+            root.style.paddingRight = 10;
+            root.style.paddingTop = 8;
 
-            var listProp = configSerializedObject.FindProperty("unitDataList");
-            if (elementIndex < 0 || elementIndex >= listProp.arraySize) return;
+            if (targetConfig == null || serializedObj == null)
+            {
+                root.Add(new Label("无数据可编辑"));
+                return;
+            }
+
+            var listProp = serializedObj.FindProperty("unitDataList");
+            if (elementIndex < 0 || elementIndex >= listProp.arraySize)
+            {
+                root.Add(new Label("单位数据不存在，可能已被删除"));
+                return;
+            }
 
             var element = listProp.GetArrayElementAtIndex(elementIndex);
-            var skillsProperty = element.FindPropertyRelative("skills");
+            int starLevel = element.FindPropertyRelative("starLevel").intValue;
+            root.Add(ConfigEditorUITK.CreateTitleRow($"编辑: {unitDisplayName}", starLevel));
 
-            skillsListWithMenu = new ReorderableListWithMenu(
-                configSerializedObject, skillsProperty,
-                draggable: true, displayHeader: true, displayAdd: true, displayRemove: true,
-                headerText: "技能列表",
-                drawElement: DrawSkillElement,
-                elementHeight: EditorGUIUtility.singleLineHeight + 4f,
-                onEdit: (index) => { },
-                onChanged: () => dataChanged = true,
-                onAdd: (list) =>
-                {
-                    list.serializedProperty.arraySize++;
-                    var newEl = list.serializedProperty.GetArrayElementAtIndex(list.serializedProperty.arraySize - 1);
-                    newEl.FindPropertyRelative("skillID").intValue = 0;
-                    newEl.FindPropertyRelative("skillType").intValue = 0;
-                    newEl.FindPropertyRelative("energyCost").intValue = 0;
-                    newEl.FindPropertyRelative("moraCost").intValue = 0;
-                    newEl.FindPropertyRelative("staminaCost").intValue = 0;
-                    configSerializedObject.ApplyModifiedProperties();
-                    dataChanged = true;
-                    SelectSkill(list.serializedProperty.arraySize - 1);
-                },
-                onRemove: (list) =>
-                {
-                    if (selectedSkillIndex >= list.serializedProperty.arraySize - 1)
-                    {
-                        selectedSkillIndex = -1;
-                        selectedSkillProperty = null;
-                        customParamsListWithMenu = null;
-                        currentCustomParamsProperty = null;
-                    }
-                    ReorderableList.defaultBehaviours.DoRemoveButton(list);
-                    dataChanged = true;
-                },
-                onReorder: (list) =>
-                {
-                    if (selectedSkillProperty != null)
-                    {
-                        string path = selectedSkillProperty.propertyPath;
-                        for (int i = 0; i < list.serializedProperty.arraySize; i++)
-                        {
-                            if (list.serializedProperty.GetArrayElementAtIndex(i).propertyPath == path)
-                            {
-                                selectedSkillIndex = i;
-                                break;
-                            }
-                        }
-                    }
-                    dataChanged = true;
-                }
-            );
+            // ===== 主行：左=单位属性 / 分栏条 / 右=技能配置 =====
+            mainRow = new VisualElement();
+            mainRow.style.flexDirection = FlexDirection.Row;
+            mainRow.style.flexGrow = 1f;
+            root.Add(mainRow);
+
+            BuildLeftPane();
+            var divider = BuildSplitDivider();
+            mainRow.Add(divider);
+            BuildRightPane();
+
+            root.Bind(serializedObj);
+
+            root.Add(ConfigEditorUITK.CreateFooterBar(
+                "修改即时生效（可 Ctrl+Z 撤销），保存到磁盘后写入文件", SaveToDisk));
+
+            ApplySplit();
         }
 
-        private void DrawSkillElement(Rect rect, int index)
+        private void BuildLeftPane()
         {
-            rect.y += 2f;
-            rect.height = EditorGUIUtility.singleLineHeight;
+            leftPane = new VisualElement();
+            leftPane.style.minWidth = 280;
+            mainRow.Add(leftPane);
 
-            var skillsProperty = configSerializedObject.FindProperty("unitDataList")
-                .GetArrayElementAtIndex(elementIndex).FindPropertyRelative("skills");
-            var skillElement = skillsProperty.GetArrayElementAtIndex(index);
+            leftPane.Add(ConfigEditorUITK.CreateSectionHeader("单位属性"));
 
-            var skillIDValue = (SkillName)skillElement.FindPropertyRelative("skillID").intValue;
-            var skillType = (SkillType)skillElement.FindPropertyRelative("skillType").intValue;
+            var scroll = new ScrollView();
+            var element = serializedObj.FindProperty("unitDataList").GetArrayElementAtIndex(elementIndex);
 
-            string summary = $"[{skillType.GetInspectorName()}] {skillIDValue.GetInspectorName()}";
-
-            if (index == selectedSkillIndex)
-                EditorGUI.DrawRect(rect, new Color(0.3f, 0.5f, 0.8f, 0.3f));
-
-            Rect summaryRect = new Rect(rect.x, rect.y, rect.width, rect.height);
-
-            EditorGUI.LabelField(summaryRect, summary);
-
-            if (Event.current.type == UnityEngine.EventType.MouseDown &&
-                Event.current.button == 0 &&
-                summaryRect.Contains(Event.current.mousePosition))
+            // 绘制所有属性，排除 skills 和 displayName（Sprite 走预览控件）
+            var it = element.Copy();
+            var end = element.GetEndProperty();
+            bool enterChildren = true;
+            while (it.NextVisible(enterChildren) && !SerializedProperty.EqualContents(it, end))
             {
-                SelectSkill(index);
-                Event.current.Use();
+                enterChildren = false;
+                if (it.name == "skills") continue;
+                if (it.name == "displayName") continue;
+                scroll.Add(ConfigEditorUITK.CreateField(serializedObj, it.Copy()));
             }
+            leftPane.Add(scroll);
         }
 
-        private void InitializeCustomParamsList(SerializedProperty customParamsProperty)
+        private void BuildRightPane()
         {
-            currentCustomParamsProperty = customParamsProperty;
+            var rightPane = new VisualElement();
+            rightPane.style.flexGrow = 1f;
+            rightPane.style.minWidth = 350;
+            mainRow.Add(rightPane);
 
-            customParamsListWithMenu = new ReorderableListWithMenu(
-                configSerializedObject, customParamsProperty,
-                draggable: true, displayHeader: true, displayAdd: true, displayRemove: true,
-                headerText: "自定义参数",
-                drawElement: DrawCustomParamElement,
-                elementHeight: EditorGUIUtility.singleLineHeight * 2 + 12f,
-                onChanged: () => dataChanged = true,
-                onAdd: (list) =>
-                {
-                    list.serializedProperty.arraySize++;
-                    var newEl = list.serializedProperty.GetArrayElementAtIndex(list.serializedProperty.arraySize - 1);
-                    newEl.FindPropertyRelative("key").intValue = 0;
-                    newEl.FindPropertyRelative("value").intValue = 0;
-                    newEl.FindPropertyRelative("baseType").intValue = 0;
-                    configSerializedObject.ApplyModifiedProperties();
-                    dataChanged = true;
-                },
-                onRemove: (list) =>
-                {
-                    ReorderableList.defaultBehaviours.DoRemoveButton(list);
-                    dataChanged = true;
-                },
-                onReorder: (list) => dataChanged = true
-            );
+            rightPane.Add(ConfigEditorUITK.CreateSectionHeader("技能配置"));
+
+            var rightRow = new VisualElement();
+            rightRow.style.flexDirection = FlexDirection.Row;
+            rightRow.style.flexGrow = 1f;
+            rightPane.Add(rightRow);
+
+            // 技能列表（点击行选中；类型徽标 + 技能名）
+            var skillsPane = new VisualElement();
+            skillsPane.style.width = Length.Percent(45f);
+            rightRow.Add(skillsPane);
+
+            skillsList = ConfigEditorUITK.CreateList(serializedObj, SkillsPath, new ConfigEditorUITK.ListConfig
+            {
+                HeaderTitle = "技能列表",
+                NameProvider = skillElement => ((SkillName)skillElement.FindPropertyRelative("skillID").intValue).GetInspectorName(),
+                BadgeProvider = skillElement => ((SkillType)skillElement.FindPropertyRelative("skillType").intValue).GetInspectorName(),
+                OnSelectionChanged = SelectSkill,
+            });
+            skillsPane.Add(skillsList);
+
+            // 选中技能编辑区
+            var editorPane = new VisualElement();
+            editorPane.style.flexGrow = 1f;
+            editorPane.style.paddingLeft = 8;
+            rightRow.Add(editorPane);
+
+            skillEditorScroll = new ScrollView();
+            editorPane.Add(skillEditorScroll);
+            ShowSkillHint("请选择左侧技能进行编辑");
         }
 
-        private void DrawCustomParamElement(Rect rect, int index)
+        private VisualElement BuildSplitDivider()
         {
-            float dragHandleWidth = 15f;
-            Rect contentRect = new Rect(rect.x + dragHandleWidth, rect.y + 2f,
-                rect.width - dragHandleWidth, rect.height - 4f);
+            var divider = new VisualElement();
+            divider.style.width = 5;
+            ConfigEditorUITK.SetBorderRadius(divider, 2);
+            divider.style.backgroundColor = SplitterBase;
 
-            var paramElement = currentCustomParamsProperty.GetArrayElementAtIndex(index);
-            var keyProperty = paramElement.FindPropertyRelative("key");
-            var valueProperty = paramElement.FindPropertyRelative("value");
-            var baseTypeProperty = paramElement.FindPropertyRelative("baseType");
-
-            float lineH = EditorGUIUtility.singleLineHeight;
-            float pad = 2f;
-
-            Rect row1 = new Rect(contentRect.x, contentRect.y, contentRect.width, lineH);
-            float labelW1 = 30f, labelW2 = 30f;
-            float fieldW = (row1.width - labelW1 - labelW2 - pad) / 2;
-
-            EditorGUI.LabelField(new Rect(row1.x, row1.y, labelW1, lineH), "参数");
-            keyProperty.intValue = EditorGUI.Popup(
-                new Rect(row1.x + labelW1, row1.y, fieldW, lineH),
-                keyProperty.intValue, keyProperty.enumDisplayNames);
-
-            EditorGUI.LabelField(new Rect(row1.x + labelW1 + fieldW + pad, row1.y, labelW2, lineH), "类型");
-            baseTypeProperty.intValue = EditorGUI.Popup(
-                new Rect(row1.x + labelW1 + fieldW + pad + labelW2, row1.y, fieldW, lineH),
-                baseTypeProperty.intValue, baseTypeProperty.enumDisplayNames);
-
-            Rect row2 = new Rect(contentRect.x, contentRect.y + lineH + pad, contentRect.width, lineH);
-            float vw1 = 30f;
-            float vFieldW = row2.width - vw1 - pad;
-
-            EditorGUI.LabelField(new Rect(row2.x, row2.y, vw1, lineH), "值");
-            valueProperty.intValue = EditorGUI.IntField(
-                new Rect(row2.x + vw1, row2.y, vFieldW, lineH), valueProperty.intValue);
+            divider.RegisterCallback<PointerEnterEvent>(_ => divider.style.backgroundColor = SplitterHot);
+            divider.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                if (!isDraggingSplit) divider.style.backgroundColor = SplitterBase;
+            });
+            divider.RegisterCallback<PointerDownEvent>(e =>
+            {
+                isDraggingSplit = true;
+                divider.style.backgroundColor = SplitterHot;
+                divider.CapturePointer(e.pointerId);
+                e.StopPropagation();
+            });
+            divider.RegisterCallback<PointerMoveEvent>(e =>
+            {
+                if (!isDraggingSplit) return;
+                UpdateSplit(e.position);
+            });
+            divider.RegisterCallback<PointerUpEvent>(e =>
+            {
+                isDraggingSplit = false;
+                divider.ReleasePointer(e.pointerId);
+                divider.style.backgroundColor = SplitterHot; // 指针仍在其上
+            });
+            return divider;
         }
 
-        #endregion
+        private void UpdateSplit(Vector3 panelPosition)
+        {
+            if (mainRow == null) return;
+            var local = mainRow.WorldToLocal(panelPosition);
+            float width = mainRow.resolvedStyle.width;
+            if (width > 1f)
+                splitRatio = Mathf.Clamp(local.x / width, 0.3f, 0.7f);
+            ApplySplit();
+        }
 
-        #region 技能选择
+        private void ApplySplit()
+        {
+            leftPane.style.width = Length.Percent(splitRatio * 100f);
+        }
+
+        #region 技能选择与编辑区
+
+        private void ShowSkillHint(string message)
+        {
+            skillEditorScroll.Clear();
+            skillEditorScroll.Add(new HelpBox(message, HelpBoxMessageType.Info));
+        }
 
         private void SelectSkill(int index)
         {
-            selectedSkillIndex = index;
-            customParamsListWithMenu = null;
-            currentCustomParamsProperty = null;
+            if (skillEditorScroll == null) return;
 
-            var listProp = configSerializedObject.FindProperty("unitDataList");
-            if (listProp == null || elementIndex >= listProp.arraySize) return;
-
-            var element = listProp.GetArrayElementAtIndex(elementIndex);
-            var skillsProperty = element.FindPropertyRelative("skills");
-
-            if (skillsProperty != null && index < skillsProperty.arraySize)
+            var skillsProp = serializedObj.FindProperty(SkillsPath);
+            if (index < 0 || skillsProp == null || index >= skillsProp.arraySize)
             {
-                selectedSkillProperty = skillsProperty.GetArrayElementAtIndex(index);
-                var customParamsProperty = selectedSkillProperty.FindPropertyRelative("customParams");
-                if (customParamsProperty != null)
-                    InitializeCustomParamsList(customParamsProperty);
-            }
-
-            Repaint();
-        }
-
-        #endregion
-
-        #region GUI 绘制
-
-        private void OnGUI()
-        {
-            if (targetConfig == null || configSerializedObject == null)
-            {
-                EditorGUILayout.LabelField("无数据可编辑");
+                ShowSkillHint("请选择左侧技能进行编辑");
                 return;
             }
 
-            var listProperty = configSerializedObject.FindProperty("unitDataList");
-            if (elementIndex < 0 || elementIndex >= listProperty.arraySize)
-            {
-                EditorGUILayout.LabelField("单位数据不存在，可能已被删除");
-                return;
-            }
+            skillEditorScroll.Clear();
+            var skillProp = skillsProp.GetArrayElementAtIndex(index);
 
-            var element = listProperty.GetArrayElementAtIndex(elementIndex);
-
-            EditorGUILayout.LabelField($"编辑: {unitDisplayName}", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
-
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.BeginHorizontal();
-
-            // === 左侧：单位属性 ===
-            float leftWidth = position.width * splitRatio;
-            EditorGUILayout.BeginVertical(GUILayout.Width(leftWidth));
-            EditorGUILayout.LabelField("单位属性", EditorStyles.boldLabel);
-            EditorGUILayout.Space(2);
-            unitScrollPosition = EditorGUILayout.BeginScrollView(unitScrollPosition);
-            
-            // 绘制所有属性，排除 skills 和 displayName（已移除）
-            SerializedProperty property = element.Copy();
-            SerializedProperty endProperty = element.GetEndProperty();
+            var it = skillProp.Copy();
+            var end = skillProp.GetEndProperty();
             bool enterChildren = true;
-            while (property.NextVisible(enterChildren) && !SerializedProperty.EqualContents(property, endProperty))
+            while (it.NextVisible(enterChildren) && !SerializedProperty.EqualContents(it, end))
             {
                 enterChildren = false;
-                if (property.name == "skills") continue;
-                if (property.name == "displayName") continue;
-                
-                EditorGUILayout.PropertyField(property, true);
+                skillEditorScroll.Add(ConfigEditorUITK.CreateField(serializedObj, it.Copy()));
             }
-            
-            EditorGUILayout.EndScrollView();
-            EditorGUILayout.EndVertical();
-
-            // 分割线
-            DrawSplitDivider();
-
-            // === 右侧：技能配置 ===
-            EditorGUILayout.BeginVertical();
-            EditorGUILayout.LabelField("技能配置", EditorStyles.boldLabel);
-            EditorGUILayout.Space(2);
-            EditorGUILayout.BeginHorizontal();
-
-            // 技能列表
-            EditorGUILayout.BeginVertical(GUILayout.Width(position.width * (1 - splitRatio) * 0.45f));
-            if (skillsListWithMenu != null)
-                skillsListWithMenu.DoLayoutList();
-            EditorGUILayout.EndVertical();
-
-            // 技能编辑区
-            EditorGUILayout.BeginVertical();
-            if (selectedSkillProperty != null && selectedSkillIndex >= 0)
-            {
-                skillScrollPosition = EditorGUILayout.BeginScrollView(skillScrollPosition);
-                
-                // 绘制技能属性
-                SerializedProperty skillProp = selectedSkillProperty.Copy();
-                SerializedProperty skillEnd = selectedSkillProperty.GetEndProperty();
-                bool skillEnterChildren = true;
-                while (skillProp.NextVisible(skillEnterChildren) && !SerializedProperty.EqualContents(skillProp, skillEnd))
-                {
-                    skillEnterChildren = false;
-                    EditorGUILayout.PropertyField(skillProp, true);
-                }
-                
-                EditorGUILayout.EndScrollView();
-            }
-            else
-            {
-                EditorGUILayout.HelpBox("请选择左侧技能进行编辑", MessageType.Info);
-            }
-            EditorGUILayout.EndVertical();
-
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.EndHorizontal();
-
-            // 处理右键菜单
-            if (Event.current.type == UnityEngine.EventType.ContextClick)
-            {
-                if (skillsListWithMenu?.ContextClickIndex >= 0)
-                    skillsListWithMenu.ShowContextMenu();
-                else if (customParamsListWithMenu?.ContextClickIndex >= 0)
-                    customParamsListWithMenu.ShowContextMenu();
-            }
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                dataChanged = true;
-                configSerializedObject.SetIsDifferentCacheDirty();
-            }
-
-            DrawBottomButtons();
-        }
-
-        private void DrawSplitDivider()
-        {
-            Rect dividerRect = GUILayoutUtility.GetRect(5f, 5f, GUILayout.ExpandHeight(true));
-            EditorGUI.DrawRect(new Rect(dividerRect.x + 2, dividerRect.y, 1, dividerRect.height), Color.gray);
-            EditorGUIUtility.AddCursorRect(dividerRect, MouseCursor.ResizeHorizontal);
-
-            if (Event.current.type == UnityEngine.EventType.MouseDown && dividerRect.Contains(Event.current.mousePosition))
-                isDraggingSplit = true;
-
-            if (isDraggingSplit)
-            {
-                if (Event.current.type == UnityEngine.EventType.MouseDrag)
-                {
-                    splitRatio = Mathf.Clamp(Event.current.mousePosition.x / position.width, 0.3f, 0.7f);
-                    Repaint();
-                }
-                if (Event.current.type == UnityEngine.EventType.MouseUp)
-                    isDraggingSplit = false;
-            }
-        }
-
-        private void DrawBottomButtons()
-        {
-            EditorGUILayout.Space(10);
-            if (dataChanged)
-                EditorGUILayout.HelpBox("数据已修改，请点击保存", MessageType.Info);
-
-            EditorGUILayout.BeginHorizontal();
-            GUI.enabled = dataChanged;
-            if (GUILayout.Button("保存", GUILayout.Height(35))) ApplyAndSaveChanges();
-            GUI.enabled = true;
-            if (GUILayout.Button("取消", GUILayout.Height(35))) Close();
-            EditorGUILayout.EndHorizontal();
+            skillEditorScroll.Bind(serializedObj);
         }
 
         #endregion
 
-        #region 保存
-
-        private void ApplyAndSaveChanges()
+        private void SaveToDisk()
         {
-            if (configSerializedObject != null)
-            {
-                configSerializedObject.ApplyModifiedProperties();
-                EditorUtility.SetDirty(targetConfig);
-                AssetDatabase.SaveAssets();
-                dataChanged = false;
-                Debug.Log($"单位数据 '{unitDisplayName}' 已保存");
-            }
+            if (serializedObj == null || targetConfig == null) return;
+            serializedObj.ApplyModifiedProperties();
+            EditorUtility.SetDirty(targetConfig);
+            AssetDatabase.SaveAssets();
+            GICLog.Info($"单位数据 '{unitDisplayName}' 已保存到磁盘");
         }
 
         private void OnDestroy()
         {
-            if (configSerializedObject == null) return;
-            if (dataChanged)
-            {
-                bool shouldSave = EditorUtility.DisplayDialog("未保存的更改",
-                    $"是否保存对 '{unitDisplayName}' 的更改？", "保存", "放弃");
-                if (shouldSave)
-                {
-                    configSerializedObject.ApplyModifiedProperties();
-                    EditorUtility.SetDirty(targetConfig);
-                    AssetDatabase.SaveAssets();
-                }
-            }
-            configSerializedObject.Dispose();
+            serializedObj?.Dispose();
         }
-
-        #endregion
     }
 }
-
-

@@ -38,11 +38,11 @@ namespace GIC.Editor
                 rendererListProp.arraySize = 1;
                 rendererListProp.GetArrayElementAtIndex(0).objectReferenceValue = rendererData;
                 serializedAsset.ApplyModifiedProperties();
-                Debug.Log("[URP Setup] m_RendererDataList 已设置");
+                GICLog.Info("[URP Setup] m_RendererDataList 已设置");
             }
             else
             {
-                Debug.LogError("[URP Setup] 找不到 m_RendererDataList 属性");
+                GICLog.Error("[URP Setup] 找不到 m_RendererDataList 属性");
             }
 
             AssetDatabase.CreateAsset(urpAsset, "Assets/Settings/URPAsset.asset");
@@ -55,7 +55,7 @@ namespace GIC.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"[URP Setup] 完成! URP Asset: {AssetDatabase.GetAssetPath(urpAsset)}, Renderer: {AssetDatabase.GetAssetPath(rendererData)}, Active: {GraphicsSettings.defaultRenderPipeline != null}");
+            GICLog.Info($"[URP Setup] 完成! URP Asset: {AssetDatabase.GetAssetPath(urpAsset)}, Renderer: {AssetDatabase.GetAssetPath(rendererData)}, Active: {GraphicsSettings.defaultRenderPipeline != null}");
         }
     }
     #endif
