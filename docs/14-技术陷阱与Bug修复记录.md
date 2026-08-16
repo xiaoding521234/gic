@@ -210,3 +210,24 @@ CSV 导入后检查 `SharedData.Entries` 中的 Id 是否与枚举值一致；�
 **修复**：仅在 `textComponent.font != currentFont`（字体真正变更，如语言切换）时才同时切 font + fontMaterial；字体已一致时不动材质，保留场景变体。
 
 **规则**：需要描边/特殊配色的 TMP 文本 = 同字体 + 变体材质（放 `TextMesh Pro/Resources/Fonts & Materials/`，该目录 git 忽略，改材质不入库，重装环境需手动备份）。另注意 rg/搜索工具默认跳过 git 忽略目录，排查 TextMesh Pro/ 下资产时需加 `--no-ignore`。
+
+---
+
+## 7. Tuanjie UITK 编辑器工具陷阱（P12b 期间，2026-08-16）
+
+> 完整陷阱表与标准骨架见 skill `gic-editor-tool`；此处只记当次踩坑实录。
+
+### 7.1 SerializedObject.GetIterator() 上直接 GetEndProperty() 触发 Assert
+
+根级全字段遍历若写成 `var it = so.GetIterator(); var end = it.GetEndProperty(); while (it.NextVisible(true) && !EqualContents(it, end))`，Inspector 首帧即 Assert "Invalid iteration - (You need to call Next (true) on the first element)"。
+
+**正解**：根级遍历不配 end——`bool enterChildren = true; while (it.NextVisible(enterChildren)) { enterChildren = false; ... }`。元素级子属性遍历（`element.Copy()` 后配 `element.GetEndProperty()`）则正常（ConfigEditorUITK.CreateList/编辑窗口均用此模式）。症状在"资产恰好被选中"时立即暴露，平时静默。
+
+### 7.2 VisualElement.Bind() 扩展方法不可用（CS1061）
+
+Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIElements** 命名空间（标准 Unity 同款但 IDE 默认 using 不会带上）。新写 Inspector/窗口报 CS1061 时补 `using UnityEditor.UIElements;` 即可。
+
+### 7.3 编辑器窗口换游戏字体
+
+`root.style.unityFontDefinition = FontDefinition.FromFont(font)` 在根元素设一次即可全树继承（UITK 字体继承）。字体源文件用游戏 TMP 字体对应的 ttf（`TextMesh Pro/Resources/Fonts & Materials/zh-cn.ttf`，即 zh-cn SDF 的 m_SourceFontFile）；LoadAssetAtPath 失败时静默保持默认字体，勿因字体缺失抛错。封装：`ConfigEditorUITK.ApplyGameFont(root)`。
+

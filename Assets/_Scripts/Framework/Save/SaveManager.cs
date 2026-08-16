@@ -40,7 +40,8 @@ namespace GIC.Framework
             }
         }
 
-        private const int CURRENT_SAVE_VERSION = 1;
+        // 存档版本策略：低于该版本的旧档不做迁移，直接删旧档创建新档（开发期无真实玩家，语义变更即升版重置）
+        private const int CURRENT_SAVE_VERSION = 3;
 
         private float lastSaveTime = -999f;
         private const float SAVE_CD = 1f;
@@ -151,13 +152,21 @@ namespace GIC.Framework
                 string json = File.ReadAllText(SavePath, System.Text.Encoding.UTF8);
                 CurrentSave = JsonUtility.FromJson<PlayerSaveData>(json);
 
+                // 0. 版本过低：不迁移，直接删旧档创建新档
+                if (CurrentSave.saveVersion < CURRENT_SAVE_VERSION)
+                {
+                    GICLog.Warn($"存档版本 {CurrentSave.saveVersion} 低于当前版本 {CURRENT_SAVE_VERSION}，旧档不迁移，创建新存档");
+                    CreateNewSave();
+                    return;
+                }
+
                 // 1. 先补充缺失的角色/物品
                 SyncMissingCards();
 
                 // 2. 排序
                 SortAllCategories();
 
-                // 3. 版本兼容升级
+                // 3. 版本兼容检查（高于当前版本仅警告）
                 ApplySaveCompatibility();
 
                 // 4. 保存一次，确保补充和排序的结果持久化
@@ -377,54 +386,21 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 存档兼容性升级
+        #region 存档兼容性
 
         /// <summary>
-        /// 应用存档兼容性处理（版本号控制）
+        /// 存档兼容性检查。
+        /// 低于 CURRENT_SAVE_VERSION 的旧档已在 LoadSaveData 中直接重置（无迁移链），
+        /// 这里只处理"存档版本高于游戏版本"的前向兼容警告。
         /// </summary>
         private void ApplySaveCompatibility()
         {
             if (CurrentSave == null) return;
 
-            int oldVersion = CurrentSave.saveVersion;
-
             if (CurrentSave.saveVersion > CURRENT_SAVE_VERSION)
             {
                 GICLog.Warn($"存档版本({CurrentSave.saveVersion})高于游戏版本({CURRENT_SAVE_VERSION})，可能存在兼容性问题");
-                return;
             }
-
-            while (CurrentSave.saveVersion < CURRENT_SAVE_VERSION)
-            {
-                switch (CurrentSave.saveVersion)
-                {
-                    case 1:
-                        UpgradeFromV1ToV2(CurrentSave);
-                        break;
-                    default:
-                        GICLog.Warn($"未知的存档版本: {CurrentSave.saveVersion}，直接升级到最新");
-                        CurrentSave.saveVersion = CURRENT_SAVE_VERSION;
-                        break;
-                }
-            }
-
-            if (oldVersion != CurrentSave.saveVersion)
-            {
-                GICLog.Info($"存档已从 V{oldVersion} 升级到 V{CurrentSave.saveVersion}");
-                SaveGame();
-            }
-        }
-
-        private void UpgradeFromV1ToV2(PlayerSaveData saveData)
-        {
-            GICLog.Info("执行存档升级: V1 → V2");
-
-            saveData.masterVolume = Mathf.Clamp01(saveData.masterVolume);
-            saveData.bgmVolume = Mathf.Clamp01(saveData.bgmVolume);
-            saveData.sfxVolume = Mathf.Clamp01(saveData.sfxVolume);
-            saveData.voiceVolume = Mathf.Clamp01(saveData.voiceVolume);
-
-            saveData.saveVersion = 2;
         }
 
         #endregion
