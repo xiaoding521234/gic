@@ -2,17 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using GIC.UI;
-using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
+
 namespace GIC.Tool
 {
-
-
     /// <summary>
-    /// UGUI 竖直光柱爆发特效
+    /// UGUI 竖直光柱爆发特效（主组件 — 配置/生命周期/编排）
     /// 从中心向上下双向爆发出一道竖直光柱，包含核心光束、外层光晕、中心闪光和双向飞溅粒子
     /// 爆发后光柱持续保持并带轻微脉冲，适合抽卡场景停留欣赏
     ///
@@ -22,13 +16,15 @@ namespace GIC.Tool
     /// 3. 调用 Play() 或 Play(Color) 播放特效
     /// 4. 调用 Stop() 淡出并清理
     ///
+    /// 拆分文件：Animations（光柱/地面闪光动画）、Sparks（飞溅粒子）、Resources（共享纹理与材质）
+    ///
     /// 注意：依赖 Assets/Shaders/UIAdditive.shader（加法混合）。
     /// 若在 Build 中使用，请将 "UI/Additive" shader 添加到
     /// ProjectSettings → Graphics → Always Included Shaders，
     /// 或在 Inspector 中指定 加法材质。
     /// </summary>
     [RequireComponent(typeof(RectTransform))]
-    public class LightPillarEffect : MonoBehaviour
+    public partial class LightPillarEffect : MonoBehaviour
     {
         #region 配置
 
@@ -75,12 +71,6 @@ namespace GIC.Tool
 
         private RectTransform _rectTransform;
         private Material _additiveMat;
-
-        // 纹理和 Sprite 是无状态纯像素数据，所有实例共享，避免每次射击重建
-        private static Texture2D _sharedBeamTexture;
-        private static Sprite _sharedBeamSprite;
-        private static Texture2D _sharedRadialTexture;
-        private static Sprite _sharedRadialSprite;
 
         private readonly List<GameObject> _spawnedObjects = new();
         private readonly List<Image> _sustainedBeams = new();
@@ -225,88 +215,6 @@ namespace GIC.Tool
             // 粒子自行消亡，光柱持续保持（需调用 Stop() 淡出）
         }
 
-        #endregion
-
-        #region 各部分动画
-
-        /// <summary>
-        /// 光柱上升 → 过冲回弹 → 持续脉冲（直到 Stop() 被调用）
-        /// </summary>
-        private IEnumerator AnimateBeam(Image img, Color color, float burstAlpha, float sustainAlpha, float delay, bool useOvershoot)
-        {
-            if (delay > 0f)
-                yield return new WaitForSecondsRealtime(delay);
-
-            RectTransform rect = img.rectTransform;
-            img.color = new Color(color.r, color.g, color.b, burstAlpha);
-            rect.localScale = new Vector3(1f, 0f, 1f);
-
-            // 上升
-            float t = 0f;
-            float targetScale = useOvershoot ? 核心过冲 : 1f;
-            while (t < 上升时间)
-            {
-                t += Time.unscaledDeltaTime;
-                float p = t / 上升时间;
-                float scaleY = Mathf.LerpUnclamped(0f, targetScale, EaseOutCubic(p));
-                // 上升过程中 alpha 从爆发值过渡到持续值
-                float alpha = Mathf.Lerp(burstAlpha, sustainAlpha, p);
-                img.color = new Color(color.r, color.g, color.b, alpha);
-                rect.localScale = new Vector3(1f, scaleY, 1f);
-                yield return null;
-            }
-
-            // 过冲回弹
-            if (useOvershoot && 核心过冲 > 1f)
-            {
-                t = 0f;
-                float settleDur = 0.08f;
-                while (t < settleDur)
-                {
-                    t += Time.unscaledDeltaTime;
-                    float p = t / settleDur;
-                    float scaleY = Mathf.Lerp(核心过冲, 1f, EaseOutCubic(p));
-                    rect.localScale = new Vector3(1f, scaleY, 1f);
-                    yield return null;
-                }
-            }
-
-            rect.localScale = Vector3.one;
-
-            // 持续脉冲（无限循环，由 Stop 中断）
-            float pulseT = 0f;
-            while (true)
-            {
-                if (img == null) yield break;
-                pulseT += Time.unscaledDeltaTime;
-                float pulse = 1f + Mathf.Sin(pulseT * 脉冲速度) * 脉冲幅度;
-                img.color = new Color(color.r, color.g, color.b, sustainAlpha * pulse);
-                yield return null;
-            }
-        }
-
-        /// <summary>
-        /// 地面闪光：从中心向外扩散并淡出
-        /// </summary>
-        private IEnumerator AnimateGroundFlash(Image img, Color color, float maxAlpha)
-        {
-            img.transform.localScale = Vector3.zero;
-
-            float t = 0f;
-            while (t < 闪光时间)
-            {
-                t += Time.unscaledDeltaTime;
-                float p = t / 闪光时间;
-                float scale = Mathf.LerpUnclamped(0f, 1.6f, EaseOutCubic(p));
-                float alpha = Mathf.Lerp(maxAlpha, 0f, p * p);
-                img.transform.localScale = Vector3.one * scale;
-                img.color = new Color(color.r, color.g, color.b, alpha);
-                yield return null;
-            }
-
-            img.gameObject.SetActive(false);
-        }
-
         /// <summary>
         /// 淡出所有持续光柱，完成后清理
         /// </summary>
@@ -351,81 +259,6 @@ namespace GIC.Tool
 
         #endregion
 
-        #region 粒子
-
-        private void SpawnSparks(Color color)
-        {
-            for (int i = 0; i < 粒子数量; i++)
-            {
-                var go = new GameObject("Spark");
-                go.transform.SetParent(_rectTransform, false);
-
-                var img = go.AddComponent<Image>();
-                img.sprite = _sharedRadialSprite;
-                img.raycastTarget = false;
-                img.material = _additiveMat;
-
-                RectTransform rect = go.transform as RectTransform;
-                rect.sizeDelta = Vector2.one * 粒子大小 * Random.Range(0.6f, 1.4f);
-                rect.anchoredPosition = Vector2.zero;
-                rect.localScale = Vector3.zero;
-
-                // 方向：上下双向飞溅，带少量水平扩散
-                float angle = Random.Range(-粒子扩散, 粒子扩散) * Mathf.PI;
-                float ySign = Random.value > 0.5f ? 1f : -1f;
-                Vector2 dir = new Vector2(Mathf.Sin(angle), Mathf.Cos(angle) * ySign).normalized;
-                float speed = 粒子速度 * Random.Range(0.6f, 1.2f);
-                float lifetime = 粒子时长 * Random.Range(0.7f, 1.3f);
-                float delay = Random.Range(0f, 0.1f);
-
-                img.color = new Color(color.r, color.g, color.b, 0f);
-                // 粒子协程不追踪，由 ClearSpawned 直接销毁对象
-                StartCoroutine(AnimateSpark(rect, img, dir, speed, lifetime, delay, color, 粒子不透明度 * 爆发强度));
-                _spawnedObjects.Add(go);
-            }
-        }
-
-        private IEnumerator AnimateSpark(RectTransform rect, Image img, Vector2 dir, float speed,
-            float lifetime, float delay, Color color, float maxAlpha)
-        {
-            if (delay > 0f)
-                yield return new WaitForSecondsRealtime(delay);
-
-            float t = 0f;
-            Vector2 pos = Vector2.zero;
-            float initialSpeed = speed;
-            float alpha = Mathf.Min(maxAlpha, 1f);
-
-            while (t < lifetime && rect != null)
-            {
-                t += Time.unscaledDeltaTime;
-                float p = t / lifetime;
-
-                // 速度持续衰减但不停止（飞到终点不停留）
-                float curSpeed = initialSpeed * (1f - p * 0.7f);
-                pos += dir * curSpeed * Time.unscaledDeltaTime;
-                rect.anchoredPosition = pos;
-
-                // 前期快速放大，后期缓慢缩小
-                float scaleP = p < 0.1f
-                    ? Mathf.Lerp(0f, 1f, p / 0.1f)
-                    : Mathf.Lerp(1f, 0.2f, (p - 0.1f) / 0.9f);
-                rect.localScale = Vector3.one * scaleP;
-
-                // 前 60% 保持高透明度，后 40% 平滑淡出
-                float fade = p < 0.6f
-                    ? alpha
-                    : alpha * (1f - Mathf.Pow((p - 0.6f) / 0.4f, 2f));
-                img.color = new Color(color.r, color.g, color.b, fade);
-                yield return null;
-            }
-
-            if (rect != null)
-                Destroy(rect.gameObject);
-        }
-
-        #endregion
-
         #region 辅助方法
 
         private RectTransform CreateImage(string name, Sprite sprite, Vector2 size)
@@ -455,81 +288,6 @@ namespace GIC.Tool
             _spawnedObjects.Clear();
         }
 
-        private static float EaseOutCubic(float t) => 1f - Mathf.Pow(1f - t, 3f);
-
-        #endregion
-
-        #region 资源创建
-
-        private void CreateMaterial()
-        {
-            if (加法材质 != null)
-            {
-                _additiveMat = new Material(加法材质);
-                return;
-            }
-
-            Shader shader = Shader.Find("UI/Additive");
-            if (shader == null)
-                shader = Shader.Find("UI/Default");
-            if (shader != null)
-                _additiveMat = new Material(shader);
-        }
-
-        private void CreateTextures()
-        {
-            if (_sharedBeamTexture != null) return;
-
-            // 光柱纹理：水平高斯衰减 + 竖向中心亮两端暗（上下对称）
-            int w = 32, h = 128;
-            _sharedBeamTexture = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            _sharedBeamTexture.filterMode = FilterMode.Bilinear;
-            _sharedBeamTexture.wrapMode = TextureWrapMode.Clamp;
-            for (int y = 0; y < h; y++)
-            {
-                float vy = (float)y / (h - 1);
-                float vAlpha = 1f - Mathf.Abs(vy - 0.5f) * 2f;
-                vAlpha = Mathf.Pow(vAlpha, 0.6f);
-                for (int x = 0; x < w; x++)
-                {
-                    float vx = (x - w * 0.5f) / (w * 0.5f);
-                    float hAlpha = Mathf.Exp(-vx * vx * 3f);
-                    float alpha = hAlpha * vAlpha;
-                    _sharedBeamTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
-                }
-            }
-            _sharedBeamTexture.Apply();
-            _sharedBeamSprite = Sprite.Create(_sharedBeamTexture,
-                new Rect(0, 0, w, h),
-                new Vector2(w * 0.5f, h * 0.5f), 100f);
-
-            // 径向纹理：圆形渐变（用于地面闪光、粒子）
-            int s = 64;
-            _sharedRadialTexture = new Texture2D(s, s, TextureFormat.RGBA32, false);
-            _sharedRadialTexture.filterMode = FilterMode.Bilinear;
-            _sharedRadialTexture.wrapMode = TextureWrapMode.Clamp;
-            float center = (s - 1) * 0.5f;
-            for (int y = 0; y < s; y++)
-            {
-                for (int x = 0; x < s; x++)
-                {
-                    float dx = (x - center) / center;
-                    float dy = (y - center) / center;
-                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                    float alpha = Mathf.Clamp01(1f - dist);
-                    alpha = Mathf.Pow(alpha, 1.5f);
-                    _sharedRadialTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
-                }
-            }
-            _sharedRadialTexture.Apply();
-            _sharedRadialSprite = Sprite.Create(_sharedRadialTexture,
-                new Rect(0, 0, s, s),
-                new Vector2(s * 0.5f, s * 0.5f), 100f);
-        }
-
         #endregion
     }
-
 }
-
-

@@ -27,7 +27,7 @@ namespace GIC.Editor
         private VisualElement statsContainer;
         private VisualElement itemListContainer;
 
-        [MenuItem("Tools/ItemConfig/自动加载图片")]
+        [MenuItem("Tools/ItemConfig/自动加载图片", priority = -80)]
         public static void ShowWindow()
         {
             var window = GetWindow<ItemConfigImageTool>("自动加载图片");

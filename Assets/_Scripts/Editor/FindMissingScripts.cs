@@ -15,7 +15,7 @@ namespace GIC.Editor
 
     public class FindMissingScripts : EditorWindow
     {
-        [MenuItem("Tools/查找丢失的脚本引用")]
+        [MenuItem("Tools/查找丢失的脚本引用", priority = -19)]
         static void FindMissingScriptsInAll()
         {
             GICLog.Info("========== 开始查找丢失的脚本 ==========");

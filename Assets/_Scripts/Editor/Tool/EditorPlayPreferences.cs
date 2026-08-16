@@ -201,94 +201,48 @@ namespace GIC.Editor
             }
         }
 
-        // ==================== 菜单：自动全屏 ====================
+        // ==================== 菜单：勾选式开关 ====================
 
-        [MenuItem("Tools/编辑器启动/自动全屏")]
-        private static void EnableFullscreen()
+        [MenuItem("Tools/编辑器启动/自动全屏", priority = -90)]
+        private static void ToggleFullscreen()
         {
-            AutoFullscreen = true;
-            GICLog.Info("[EditorPlayPreferences] 自动全屏: 开");
+            AutoFullscreen = !AutoFullscreen;
+            GICLog.Info($"[EditorPlayPreferences] 自动全屏: {(AutoFullscreen ? "开" : "关")}");
         }
 
         [MenuItem("Tools/编辑器启动/自动全屏", true)]
-        private static bool EnableFullscreenValidate()
+        private static bool ToggleFullscreenValidate()
         {
             Menu.SetChecked("Tools/编辑器启动/自动全屏", AutoFullscreen);
-            return !AutoFullscreen;
+            return true;
         }
 
-        [MenuItem("Tools/编辑器启动/不全屏")]
-        private static void DisableFullscreen()
+        [MenuItem("Tools/编辑器启动/从 Boot 场景启动", priority = -89)]
+        private static void ToggleStartScene()
         {
-            AutoFullscreen = false;
-            GICLog.Info("[EditorPlayPreferences] 自动全屏: 关");
-        }
-
-        [MenuItem("Tools/编辑器启动/不全屏", true)]
-        private static bool DisableFullscreenValidate()
-        {
-            Menu.SetChecked("Tools/编辑器启动/不全屏", !AutoFullscreen);
-            return AutoFullscreen;
-        }
-
-        // ==================== 菜单：从 Boot 启动 ====================
-
-        [MenuItem("Tools/编辑器启动/从 Boot 场景启动")]
-        private static void EnableStartScene()
-        {
-            StartFromBoot = true;
-            GICLog.Info("[EditorPlayPreferences] 从 Boot 启动: 开");
+            StartFromBoot = !StartFromBoot;
+            GICLog.Info($"[EditorPlayPreferences] 从 Boot 启动: {(StartFromBoot ? "开" : "关")}");
         }
 
         [MenuItem("Tools/编辑器启动/从 Boot 场景启动", true)]
-        private static bool EnableStartSceneValidate()
+        private static bool ToggleStartSceneValidate()
         {
             Menu.SetChecked("Tools/编辑器启动/从 Boot 场景启动", StartFromBoot);
-            return !StartFromBoot;
+            return true;
         }
 
-        [MenuItem("Tools/编辑器启动/从当前场景启动")]
-        private static void DisableStartScene()
+        [MenuItem("Tools/编辑器启动/同步 Clone Play", priority = -88)]
+        private static void ToggleSyncClone()
         {
-            StartFromBoot = false;
-            GICLog.Info("[EditorPlayPreferences] 从 Boot 启动: 关");
-        }
-
-        [MenuItem("Tools/编辑器启动/从当前场景启动", true)]
-        private static bool DisableStartSceneValidate()
-        {
-            Menu.SetChecked("Tools/编辑器启动/从当前场景启动", !StartFromBoot);
-            return StartFromBoot;
-        }
-
-        // ==================== 菜单：同步 Clone Play ====================
-
-        [MenuItem("Tools/编辑器启动/同步 Clone Play")]
-        private static void EnableSyncClone()
-        {
-            SyncClonePlay = true;
-            GICLog.Info("[EditorPlayPreferences] 同步 Clone Play: 开");
+            SyncClonePlay = !SyncClonePlay;
+            GICLog.Info($"[EditorPlayPreferences] 同步 Clone Play: {(SyncClonePlay ? "开" : "关")}");
         }
 
         [MenuItem("Tools/编辑器启动/同步 Clone Play", true)]
-        private static bool EnableSyncCloneValidate()
+        private static bool ToggleSyncCloneValidate()
         {
             Menu.SetChecked("Tools/编辑器启动/同步 Clone Play", SyncClonePlay);
-            return !SyncClonePlay;
-        }
-
-        [MenuItem("Tools/编辑器启动/不同步 Clone Play")]
-        private static void DisableSyncClone()
-        {
-            SyncClonePlay = false;
-            GICLog.Info("[EditorPlayPreferences] 同步 Clone Play: 关");
-        }
-
-        [MenuItem("Tools/编辑器启动/不同步 Clone Play", true)]
-        private static bool DisableSyncCloneValidate()
-        {
-            Menu.SetChecked("Tools/编辑器启动/不同步 Clone Play", !SyncClonePlay);
-            return SyncClonePlay;
+            return true;
         }
 
         // ==================== Clone Play 模式启动 ====================

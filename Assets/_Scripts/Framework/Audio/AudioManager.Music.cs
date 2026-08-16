@@ -211,7 +211,7 @@ namespace GIC.Framework
 
         private IEnumerator DelayedMusicCoroutine(MusicTrack track)
         {
-            yield return new WaitForSeconds(track.intervalBefore);
+            yield return Wait.Seconds(track.intervalBefore);
             StartMusicPlayback(track);
         }
 
@@ -254,7 +254,7 @@ namespace GIC.Framework
                 // 等待后置间隔
                 if (track.intervalAfter > 0f)
                 {
-                    yield return new WaitForSeconds(track.intervalAfter);
+                    yield return Wait.Seconds(track.intervalAfter);
                     
                     // 再次检查是否被中断
                     if (musicSource == null || musicSource.clip != track.clip)
@@ -279,7 +279,7 @@ namespace GIC.Framework
             // 等待后置间隔
             if (track.intervalAfter > 0f)
             {
-                yield return new WaitForSeconds(track.intervalAfter);
+                yield return Wait.Seconds(track.intervalAfter);
             }
 
             // 确认没有被中断（clip没有被改变）

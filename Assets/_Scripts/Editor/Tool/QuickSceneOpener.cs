@@ -16,7 +16,7 @@ namespace GIC.Editor
     {
         private const string MENU_BASE = "Tools/快速打开场景/";
 
-        [MenuItem(MENU_BASE + "Boot", priority = 0)]
+        [MenuItem(MENU_BASE + "Boot", priority = -100)]
         private static void OpenBoot() => OpenScene("Assets/Scenes/Boot.unity");
 
         [MenuItem(MENU_BASE + "Boot", true)]
@@ -26,7 +26,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "SplashScreen", priority = 1)]
+        [MenuItem(MENU_BASE + "SplashScreen", priority = -99)]
         private static void OpenSplash() => OpenScene("Assets/Scenes/SplashScreen.unity");
 
         [MenuItem(MENU_BASE + "SplashScreen", true)]
@@ -36,7 +36,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "MainHall", priority = 2)]
+        [MenuItem(MENU_BASE + "MainHall", priority = -98)]
         private static void OpenMainHall() => OpenScene("Assets/Scenes/MainHall.unity");
 
         [MenuItem(MENU_BASE + "MainHall", true)]
@@ -46,7 +46,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "CoopScreen", priority = 3)]
+        [MenuItem(MENU_BASE + "CoopScreen", priority = -97)]
         private static void OpenCoop() => OpenScene("Assets/Scenes/CoopScreen.unity");
 
         [MenuItem(MENU_BASE + "CoopScreen", true)]
@@ -56,7 +56,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "BackpackScreen", priority = 4)]
+        [MenuItem(MENU_BASE + "BackpackScreen", priority = -96)]
         private static void OpenBackpack() => OpenScene("Assets/Scenes/BackpackScreen.unity");
 
         [MenuItem(MENU_BASE + "BackpackScreen", true)]
@@ -66,7 +66,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "MapScreen", priority = 5)]
+        [MenuItem(MENU_BASE + "MapScreen", priority = -95)]
         private static void OpenMap() => OpenScene("Assets/Scenes/MapScreen.unity");
 
         [MenuItem(MENU_BASE + "MapScreen", true)]
@@ -76,7 +76,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "WishScreen", priority = 6)]
+        [MenuItem(MENU_BASE + "WishScreen", priority = -94)]
         private static void OpenWish() => OpenScene("Assets/Scenes/WishScreen.unity");
 
         [MenuItem(MENU_BASE + "WishScreen", true)]
@@ -86,7 +86,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "SettingsScreen", priority = 7)]
+        [MenuItem(MENU_BASE + "SettingsScreen", priority = -93)]
         private static void OpenSettings() => OpenScene("Assets/Scenes/SettingsScreen.unity");
 
         [MenuItem(MENU_BASE + "SettingsScreen", true)]
@@ -96,7 +96,7 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "GlowTest", priority = 100)]
+        [MenuItem(MENU_BASE + "GlowTest", priority = -92)]
         private static void OpenGlowTest() => OpenScene("Assets/Scenes/GlowTest.scene");
 
         [MenuItem(MENU_BASE + "GlowTest", true)]

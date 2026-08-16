@@ -15,19 +15,19 @@ namespace GIC.Editor
 
         private const string DefaultOutputPath = "D:/Tuanjie_test/gic.apk";
 
-        [MenuItem(MENU_BASE + "快速导出 (Mono/ARMv7 测试)", priority = 0)]
+        [MenuItem(MENU_BASE + "快速导出 (Mono/ARMv7 测试)", priority = -70)]
         public static void BuildTestAPK()
         {
             BuildAPK(testBuild: true);
         }
 
-        [MenuItem(MENU_BASE + "正式导出 (IL2CPP/ARM64 发布)", priority = 1)]
+        [MenuItem(MENU_BASE + "正式导出 (IL2CPP/ARM64 发布)", priority = -69)]
         public static void BuildReleaseAPK()
         {
             BuildAPK(testBuild: false);
         }
 
-        [MenuItem(MENU_BASE + "设置导出路径", priority = 10)]
+        [MenuItem(MENU_BASE + "设置导出路径", priority = -68)]
         public static void SetOutputPath()
         {
             var current = EditorPrefs.GetString("QuickAPKBuilder_OutputPath", DefaultOutputPath);

@@ -19,7 +19,7 @@ namespace GIC.UI
                    _flow.CurrentState != WishFlowController.State.Finished)
             {
                 SpawnTrackCard();
-                yield return new WaitForSeconds(cardSpawnInterval);
+                yield return Wait.Seconds(cardSpawnInterval);
             }
         }
 

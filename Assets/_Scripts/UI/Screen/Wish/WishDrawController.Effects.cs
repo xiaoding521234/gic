@@ -61,11 +61,11 @@ namespace GIC.UI
             var pillar = pillarObj.AddComponent<LightPillarEffect>();
             pillar.Play(starColor);
 
-            yield return new WaitForSeconds(0.5f);
+            yield return Wait.Seconds(0.5f);
 
             pillar.Stop();
 
-            yield return new WaitForSeconds(0.6f);
+            yield return Wait.Seconds(0.6f);
             Destroy(pillarObj);
         }
 

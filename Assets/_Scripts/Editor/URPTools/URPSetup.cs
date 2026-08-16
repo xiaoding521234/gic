@@ -15,7 +15,7 @@ namespace GIC.Editor
 
     public static class URPSetup
     {
-        [MenuItem("Tools/Setup URP")]
+        [MenuItem("Tools/Setup URP", priority = -18)]
         public static void Setup()
         {
             if (!AssetDatabase.IsValidFolder("Assets/Settings"))

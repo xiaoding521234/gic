@@ -380,7 +380,7 @@ namespace GIC.UI
 
                     case WishRevealStep.StepType.EncounterUpgrade:
                         if (step.shakeDelay > 0f)
-                            yield return new WaitForSeconds(step.shakeDelay);
+                            yield return Wait.Seconds(step.shakeDelay);
 
                         // 换卡显示
                         if (step.cardData != null)

@@ -68,7 +68,7 @@ namespace GIC.UI
 
         private IEnumerator ReleaseProtectionAfter(float delay)
         {
-            yield return new WaitForSeconds(delay);
+            yield return Wait.Seconds(delay);
             InputLocks.Pop(this, InputLockReason.SplashProtection);
         }
 
@@ -102,7 +102,7 @@ namespace GIC.UI
         private IEnumerator PlayLogoAnimation()
         {
             yield return StartCoroutine(FadeLogo(0f, 1f, fadeInDuration));
-            yield return new WaitForSeconds(holdDuration);
+            yield return Wait.Seconds(holdDuration);
             yield return StartCoroutine(FadeLogo(1f, 0f, fadeOutDuration));
             
             SceneType.MainHall.Load();

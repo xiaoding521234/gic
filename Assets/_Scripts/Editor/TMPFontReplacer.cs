@@ -18,7 +18,7 @@ namespace GIC.Editor
         // EditorWindow 序列化字段，脚本重编译后保留选择
         [SerializeField] private TMP_FontAsset newFontAsset;
 
-        [MenuItem("Tools/批量替换 TMP 字体")]
+        [MenuItem("Tools/批量替换 TMP 字体", priority = -20)]
         public static void ShowWindow()
         {
             GetWindow<TMPFontReplacer>("批量替换TMP字体");

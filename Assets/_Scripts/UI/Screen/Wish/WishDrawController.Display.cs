@@ -19,7 +19,7 @@ namespace GIC.UI
 
         private IEnumerator HoldThenFly(RectTransform rect, Vector2 targetPos, float holdTime)
         {
-            yield return new WaitForSeconds(holdTime);
+            yield return Wait.Seconds(holdTime);
             yield return FlyToPosition(rect, targetPos, resultCardSize / 160f);
         }
 

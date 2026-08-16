@@ -9,7 +9,7 @@ namespace GIC.Editor
     /// </summary>
     public static class SaveDeletionTestModeMenu
     {
-        [MenuItem("Tools/存档/删档测试模式")]
+        [MenuItem("Tools/存档/删档测试模式", priority = -77)]
         private static void Toggle()
         {
             bool current = EditorPrefs.GetBool(SaveManager.DeletionTestModeKey, false);

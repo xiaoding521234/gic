@@ -159,7 +159,7 @@ namespace GIC.Framework
 
         private IEnumerator DelayedRestoreMusic(MusicState state, float delay, float fadeInTime)
         {
-            yield return new WaitForSeconds(delay);
+            yield return Wait.Seconds(delay);
             RestoreMusicState(state, fadeInTime);
         }
 

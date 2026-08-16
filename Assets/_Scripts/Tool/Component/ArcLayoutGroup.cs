@@ -274,7 +274,7 @@ namespace GIC.Tool
             
             // 错开动画开始时间
             float delay = index * 0.05f;
-            yield return new WaitForSeconds(delay);
+            yield return Wait.Seconds(delay);
             
             while (elapsed < animationDuration)
             {

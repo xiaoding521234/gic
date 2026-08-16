@@ -260,7 +260,7 @@ namespace GIC.UI
             canvasGroup.alpha = 1f;
             InputLocks.Pop(this, InputLockReason.PopupEntering);
 
-            yield return new WaitForSeconds(displayDuration);
+            yield return Wait.Seconds(displayDuration);
 
             elapsed = 0f;
             while (elapsed < fadeOutDuration)
@@ -301,7 +301,7 @@ namespace GIC.UI
                 _toastContentRect.anchoredPosition = _toastTargetPos;
 
             // 停留
-            yield return new WaitForSeconds(轻提示停留时长);
+            yield return Wait.Seconds(轻提示停留时长);
 
             // 滑出 + 淡出
             elapsed = 0f;

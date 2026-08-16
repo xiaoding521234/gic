@@ -24,7 +24,7 @@ namespace GIC.Editor
         private const string ElementDeepPath   = "UI/Other/Element/Deep/";
         private const string FactionPath       = "UI/Other/Faction/";
 
-        [MenuItem("Tools/图标/自动加载元素 & 势力图标")]
+        [MenuItem("Tools/图标Config/自动加载元素 & 势力图标", priority = -79)]
         public static void ShowWindow()
         {
             var window = GetWindow<ElementFactionIconAutoLoader>("自动加载图标");

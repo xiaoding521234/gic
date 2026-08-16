@@ -59,34 +59,16 @@ namespace GIC.Tool
             // 注册条目更新回调
             for (int i = 0; i < entries.Count; i++)
             {
-                int index = i;
                 var entry = entries[i];
-                if (entry.localizedString == null)
+                if (entry.localizedString == null && string.IsNullOrEmpty(entry.leadingSeparator))
                 {
-                    if (!string.IsNullOrEmpty(entry.leadingSeparator))
-                    {
-                    }
-                    else
-                    {
-                        GICLog.Warn($"TextCombiner [{gameObject.name}]: 条目 {i} 是空的（既无 localizedString 也无文本内容），请检查是否误添加了空 Entry", this);
-                    }
-                    _activeHandlers.Add(null);
-                    continue;
+                    GICLog.Warn($"TextCombiner [{gameObject.name}]: 条目 {i} 是空的（既无 localizedString 也无文本内容），请检查是否误添加了空 Entry", this);
                 }
-                if (entry.localizedString.IsEmpty)
+                else if (entry.localizedString != null && entry.localizedString.IsEmpty)
                 {
                     GICLog.Warn($"TextCombiner [{gameObject.name}]: 条目 {i} 的 localizedString 未配置（Table 或 Key 为空），请检查 Inspector", this);
-                    _activeHandlers.Add(null);
-                    continue;
                 }
-                string key = entry.localizedString.TableEntryReference.Key;
-                long keyId = entry.localizedString.TableEntryReference.KeyId;
-                string tableName = entry.localizedString.TableReference.TableCollectionName;
-                GICLog.Info($"TextCombiner [{gameObject.name}] 条目 {i}: Table={tableName}, Key={key}, KeyId={keyId}");
-
-                LocalizedString.ChangeHandler OnEntryChanged = (value) => OnEntryUpdated(index, value);
-                entry.localizedString.StringChanged += OnEntryChanged;
-                _activeHandlers.Add(OnEntryChanged);
+                RegisterEntryCallback(i);
             }
 
             // 确保在 Awake 后立即渲染已存在的静态条目（修复 inactive GameObject 上 SetSingleEntry 被提前调用导致 textComponent 为 null 的问题）
@@ -135,20 +117,11 @@ namespace GIC.Tool
             int index = entries.Count;
             entries.Add(entry);
 
-            // 如果是有效的本地化条目，注册回调并刷新
-            if (entry.localizedString != null && !entry.localizedString.IsEmpty)
-            {
-                LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
-                entry.localizedString.StringChanged += handler;
-                _activeHandlers.Add(handler);
-                entry.localizedString.RefreshString();
-            }
-            else
-            {
-                _activeHandlers.Add(null);
-                // 静态条目直接刷新显示
+            RegisterEntryCallback(index);
+
+            // 静态条目无回调触发，直接刷新显示
+            if (entry.localizedString == null || entry.localizedString.IsEmpty)
                 UpdateDisplay();
-            }
         }
 
         /// <summary>
@@ -206,14 +179,7 @@ namespace GIC.Tool
         /// </summary>
         public void ClearAllEntries()
         {
-            // 清理所有回调
-            for (int i = 0; i < entries.Count; i++)
-            {
-                var entry = entries[i];
-                if (entry.localizedString != null && i < _activeHandlers.Count && _activeHandlers[i] != null)
-                    entry.localizedString.StringChanged -= _activeHandlers[i];
-            }
-            _activeHandlers.Clear();
+            DetachAllHandlers();
 
             entries.Clear();
             resolvedValues.Clear();
@@ -232,31 +198,8 @@ namespace GIC.Tool
                 return;
             }
 
-            // 清空所有现有条目
             ClearAllEntries();
-
-            // 添加新条目
-            int index = entries.Count;
-            entries.Add(entry);
-
-            // 如果是有效的本地化条目，注册回调并刷新
-            if (entry.localizedString != null && !entry.localizedString.IsEmpty)
-            {
-                LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
-                entry.localizedString.StringChanged += handler;
-                _activeHandlers.Add(handler);
-                entry.localizedString.RefreshString();
-            }
-            else if (!string.IsNullOrEmpty(entry.leadingSeparator))
-            {
-                // 纯连接符的情况（没有本地化字符串但有连接符）
-                UpdateDisplay();
-            }
-            else
-            {
-                // 空条目
-                UpdateDisplay();
-            }
+            AddEntry(entry);
         }
 
         /// <summary>
@@ -286,7 +229,40 @@ namespace GIC.Tool
         /// </summary>
         private void RebuildCallbacks()
         {
-            // 先清除所有回调
+            DetachAllHandlers();
+            resolvedValues.Clear();
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                RegisterEntryCallback(i);
+            }
+        }
+
+        /// <summary>
+        /// 为指定索引的条目注册 StringChanged 回调并主动刷新；
+        /// 无效条目补 null 占位，保持与 entries 索引对齐
+        /// </summary>
+        private void RegisterEntryCallback(int index)
+        {
+            var entry = entries[index];
+            if (entry.localizedString != null && !entry.localizedString.IsEmpty)
+            {
+                LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
+                entry.localizedString.StringChanged += handler;
+                _activeHandlers.Add(handler);
+                entry.localizedString.RefreshString();
+            }
+            else
+            {
+                _activeHandlers.Add(null);
+            }
+        }
+
+        /// <summary>
+        /// 退订全部 StringChanged 回调并清空记录（不改动条目与缓存值）
+        /// </summary>
+        private void DetachAllHandlers()
+        {
             for (int i = 0; i < entries.Count; i++)
             {
                 var entry = entries[i];
@@ -294,27 +270,6 @@ namespace GIC.Tool
                     entry.localizedString.StringChanged -= _activeHandlers[i];
             }
             _activeHandlers.Clear();
-
-            resolvedValues.Clear();
-
-            // 重新注册
-            for (int i = 0; i < entries.Count; i++)
-            {
-                int index = i;
-                var entry = entries[index];
-                if (entry.localizedString != null && !entry.localizedString.IsEmpty)
-                {
-                    LocalizedString.ChangeHandler handler = (value) => OnEntryUpdated(index, value);
-                    entry.localizedString.StringChanged += handler;
-                    _activeHandlers.Add(handler);
-                    // 主动刷新一次获取当前值
-                    entry.localizedString.RefreshString();
-                }
-                else
-                {
-                    _activeHandlers.Add(null);
-                }
-            }
         }
 
         private void LoadFont()
@@ -448,12 +403,7 @@ namespace GIC.Tool
         {
             if (entries != null)
             {
-                for (int i = 0; i < entries.Count; i++)
-                {
-                    var entry = entries[i];
-                    if (entry.localizedString != null && i < _activeHandlers.Count && _activeHandlers[i] != null)
-                        entry.localizedString.StringChanged -= _activeHandlers[i];
-                }
+                DetachAllHandlers();
             }
         }
     }

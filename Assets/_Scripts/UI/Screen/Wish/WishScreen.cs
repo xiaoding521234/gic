@@ -123,7 +123,7 @@ namespace GIC.UI
         /// </summary>
         private IEnumerator SelectFirstCharacterDelayed()
         {
-            yield return new WaitForSeconds(0.1f);
+            yield return Wait.Seconds(0.1f);
             SelectCharacter(0);
         }
 
@@ -172,7 +172,7 @@ namespace GIC.UI
             if (oldEntry?.panel != null)
             {
                 oldEntry.panel.FadeOut();
-                yield return new WaitForSeconds(oldEntry.panel.FadeDuration);
+                yield return Wait.Seconds(oldEntry.panel.FadeDuration);
             }
 
             currentIndex = newIndex;

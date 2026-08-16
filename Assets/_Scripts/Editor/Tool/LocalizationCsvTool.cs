@@ -31,7 +31,7 @@ namespace GIC.Editor
         private Dictionary<string, bool> tableSelectionMap = new Dictionary<string, bool>();
         private VisualElement tableListContainer;
 
-        [MenuItem("Tools/Localization/CSV 导出导入")]
+        [MenuItem("Tools/Localization/CSV 导出导入", priority = -78)]
         public static void ShowWindow()
         {
             var window = GetWindow<LocalizationCsvTool>("本地化 CSV 工具");

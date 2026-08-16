@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using GIC.Framework;
 using GIC.Data;
 using GIC.Battle;
 
-namespace GIC.Framework
+namespace GIC.Editor
 {
     /// <summary>
     /// 祈愿概率完整模拟 — 10万次连续祈愿，忠实复现完整流程：
@@ -24,7 +25,7 @@ namespace GIC.Framework
         // 星辉转换表
         private static readonly int[] StarglitterByStar = { 0, 3, 8, 15, 25, 50 }; // index 1~5
 
-        [MenuItem("Tools/测试/祈愿概率测试 (10万次)")]
+        [MenuItem("Tools/测试/祈愿概率测试 (10万次)", priority = -76)]
         public static void RunTest()
         {
             var pool = LoadAsset<WishPoolConfig>("WishPoolConfig");

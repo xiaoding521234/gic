@@ -166,7 +166,7 @@ namespace GIC.UI
             emission.rateOverTime = _origEmissionRate * multiplier;
 
             // 加速持续 duration 秒
-            yield return new WaitForSeconds(duration);
+            yield return Wait.Seconds(duration);
 
             // 0.5 秒平滑减速回原速 + 同步降低发射率
             float decelTime = 0.5f;
