@@ -36,3 +36,7 @@ Export/
 *.apk
 *.aab
 *.unitypackage
+.utmp/
+.gradle/
+*.keystore
+*.keystore.meta
