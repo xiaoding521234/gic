@@ -38,7 +38,7 @@ namespace GIC.UI
             _star5VideoRawImage.color = new Color(1f, 1f, 1f, 0f); // 不可见
             _star5VideoRawImage.raycastTarget = false;              // 不拦截输入
 
-            _star5VideoRT = new RenderTexture(1920, 1080, 0);
+            _star5VideoRT = new RenderTexture(1920, 1200, 0);
             _star5VideoRawImage.texture = _star5VideoRT;
 
             _star5VideoPlayer = videoObj.GetComponent<VideoPlayer>();
@@ -47,7 +47,7 @@ namespace GIC.UI
             _star5VideoPlayer.playOnAwake = false;
             _star5VideoPlayer.isLooping = false;
             _star5VideoPlayer.audioOutputMode = VideoAudioOutputMode.Direct;
-            _star5VideoPlayer.url = System.IO.Path.Combine(Application.streamingAssetsPath, "mc.mp4");
+            _star5VideoPlayer.url = System.IO.Path.Combine(Application.streamingAssetsPath, "mc_16x10.mp4");
         }
 
         /// <summary>
