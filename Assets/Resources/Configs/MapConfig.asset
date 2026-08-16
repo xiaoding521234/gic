@@ -14,10 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   regions:
   - region: 1
-    mapImageAnchoredPosition: {x: 4666, y: -3963.6}
-    mapImageSize: {x: 21504, y: 13824.5625}
-    contentAnchoredPosition: {x: -2.68, y: 1415.07}
-    contentSizeDelta: {x: 3661.34, y: 5897.38}
+    viewCenter: {x: 0.343, y: 0.264}
+    viewHeight: 0
     anchors:
     - positionName: 1001
       normalizedX: 0.2929
@@ -29,10 +27,8 @@ MonoBehaviour:
       normalizedX: 0.2991
       normalizedY: 0.3693
   - region: 2
-    mapImageAnchoredPosition: {x: -6136, y: -2783}
-    mapImageSize: {x: 21504, y: 13824.5625}
-    contentAnchoredPosition: {x: 0, y: 229.14}
-    contentSizeDelta: {x: 3975.66, y: 4173.33}
+    viewCenter: {x: 0.845, y: 0.263}
+    viewHeight: 0
     anchors:
     - positionName: 2001
       normalizedX: 0.7316
@@ -47,32 +43,22 @@ MonoBehaviour:
       normalizedX: 0.7768
       normalizedY: 0.3195
   - region: 3
-    mapImageAnchoredPosition: {x: -4076, y: -871}
-    mapImageSize: {x: 21504, y: 13824.5625}
-    contentAnchoredPosition: {x: -819, y: 1103}
-    contentSizeDelta: {x: 4542.14, y: 4328.66}
+    viewCenter: {x: 0.787, y: 0.465}
+    viewHeight: 0
     anchors: []
   - region: 4
-    mapImageAnchoredPosition: {x: -961, y: 645}
-    mapImageSize: {x: 5586.7573, y: 6085.9995}
-    contentAnchoredPosition: {x: -517.56, y: -2041.73}
-    contentSizeDelta: {x: 6141.13, y: 6416.03}
+    viewCenter: {x: 0.994, y: 0.152}
+    viewHeight: 0
     anchors: []
   - region: 5
-    mapImageAnchoredPosition: {x: -649, y: 798}
-    mapImageSize: {x: 21504, y: 13824.5625}
-    contentAnchoredPosition: {x: -1366.15, y: -539}
-    contentSizeDelta: {x: 5294.29, y: 5500.75}
+    viewCenter: {x: 0.653, y: 0.467}
+    viewHeight: 0
     anchors: []
   - region: 6
-    mapImageAnchoredPosition: {x: -1294, y: -3217}
-    mapImageSize: {x: 21504, y: 13824.5625}
-    contentAnchoredPosition: {x: 453.32, y: -482}
-    contentSizeDelta: {x: 3466.64, y: 4631.44}
+    viewCenter: {x: 0.599, y: 0.18}
+    viewHeight: 0
     anchors: []
   - region: 7
-    mapImageAnchoredPosition: {x: 5946.4, y: 977}
-    mapImageSize: {x: 21504, y: 13824.5625}
-    contentAnchoredPosition: {x: -1955.91, y: 843.68}
-    contentSizeDelta: {x: 9380.95, y: 6624.99}
+    viewCenter: {x: 0.374, y: 0.58}
+    viewHeight: 0
     anchors: []

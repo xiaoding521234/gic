@@ -13,6 +13,7 @@
 .codely.packages/
 .claude/
 .com-unity-codely.json
+.com-unity-codely.json.tmp
 .codelyignore
 
 # IDE

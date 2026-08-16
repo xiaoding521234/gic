@@ -18,21 +18,15 @@ namespace GIC.Data
         {
             public RegionName region;
 
-            [Header("地图显示定位")]
-            [Tooltip("地图原点：MapImage 在 Content 中的 anchoredPosition。所有锚点均以此为基准，图片尺寸变化时只需改此值")]
-            public Vector2 mapImageAnchoredPosition;
+            [Header("区域视野（3D 相机）")]
+            [Tooltip("区域视野中心（归一化 0-1：0=地图左/上，1=地图右/下）。相机聚焦此点，锚点为空的区域也能定位")]
+            public Vector2 viewCenter = new Vector2(0.5f, 0.5f);
 
-            [Tooltip("MapImage 的 sizeDelta（图片尺寸）。图片替换后改此值，锚点自动按比例重新定位")]
-            public Vector2 mapImageSize = new Vector2(21504, 13824.5625f);
-
-            [Tooltip("Content 的 anchoredPosition（初始滚动位置）")]
-            public Vector2 contentAnchoredPosition;
-
-            [Tooltip("Content 的 sizeDelta（滚动范围）")]
-            public Vector2 contentSizeDelta;
+            [Tooltip("区域视野尺寸（正交相机垂直半高，世界单位）。0 = 使用相机默认视野尺寸")]
+            public float viewHeight;
 
             [Header("锚点")]
-            [Tooltip("归一化坐标 (0-1)：0=图片左/上，1=图片右/下。图片尺寸变化时自动适配")]
+            [Tooltip("归一化坐标 (0-1)：0=地图左/上，1=地图右/下。地图尺寸变化时自动适配")]
             public List<AnchorData> anchors = new();
         }
 

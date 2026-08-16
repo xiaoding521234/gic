@@ -211,6 +211,18 @@ CSV 导入后检查 `SharedData.Entries` 中的 Id 是否与枚举值一致；�
 
 **规则**：需要描边/特殊配色的 TMP 文本 = 同字体 + 变体材质（放 `TextMesh Pro/Resources/Fonts & Materials/`，该目录 git 忽略，改材质不入库，重装环境需手动备份）。另注意 rg/搜索工具默认跳过 git 忽略目录，排查 TextMesh Pro/ 下资产时需加 `--no-ignore`。
 
+### 6.3 引用相等判断在打包后误判字体变更（真机描边二次丢失，2026-08-16）
+
+6.2 的修复（`font != currentFont` 引用比较）在编辑器正常、**导出 APK 后描边仍丢失**。根因：`zh-cn SDF.asset` 被三路引用——场景/Prefab 直引、`Resources/` 目录、Addressables（`Localization-Assets-Shared` 组，UIAssets 表 MainFont 按其 GUID 加载）。打包后玩家包内容与 Addressables bundle 各持一份实例；编辑器 Play 时 Addressables 走 AssetDatabase，两处为**同一实例**。于是 `textComponent.font != currentFont`：编辑器判"没变"（保留变体材质），真机判"变了"（font+fontMaterial 被覆盖回 `_OutlineWidth=0` 的 Atlas Material）——典型的"编辑器正常真机异常"源于 Addressables 实例重复。
+
+**修复（两阶段）**：
+- **止血**：引用比较改按逻辑身份（`font.name`），实例不同但同一字体资产时不切换、不动材质。
+- **根治（同日）**：删除 TextCombiner 整条运行时字体加载链（fontTable/fontEntryKey/LoadFont/ApplyFont），并删除 UIAssets 资产表 5 个语言表的 MainFont 条目 + SharedData key（该表本来只有中文配了字体、且唯一消费者就是 TextCombiner——纯死代码路径）。字体只剩两条固有打包路径：场景/Prefab 直引（sharedassets）+ TMP Settings 默认字体（resources.assets，TMP 机制要求 defaultFontAsset 必须在 `TextMesh Pro/Resources/Fonts & Materials/`）。运行时再无代码触碰 font/fontMaterial，描边永不丢失，并省掉 Addressables bundle 里的一份字体。
+
+**操作记录**：删表条目用 LocalizationEditorSettings API（`UnityEditor.Localization` 命名空间）；Addressables read-only 组 `Localization-Assets-Shared.asset` 的残留条目不会因表变更自动同步，需手删 m_Entries 中该条目块 + `AssetDatabase.ImportAsset(ForceUpdate)` 重载，再用 FindGroup 验证 entries 归零。
+
+**规则**：凡"按资产引用相等做幂等判断"的代码，在 Addressables 项目里打包后都可能因实例重复而失效——要么按 GUID/名称等逻辑身份比较，要么保证资产只进一条加载路径。多语言字体切换若将来要做，重新设计时勿恢复"运行时整体赋 font+fontMaterial"的写法（应只换 fontAsset 并保留目标材质变体的映射）。
+
 ---
 
 ## 7. Tuanjie UITK 编辑器工具陷阱（P12b 期间，2026-08-16）
@@ -230,4 +242,31 @@ Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIEl
 ### 7.3 编辑器窗口换游戏字体
 
 `root.style.unityFontDefinition = FontDefinition.FromFont(font)` 在根元素设一次即可全树继承（UITK 字体继承）。字体源文件用游戏 TMP 字体对应的 ttf（`TextMesh Pro/Resources/Fonts & Materials/zh-cn.ttf`，即 zh-cn SDF 的 m_SourceFontFile）；LoadAssetAtPath 失败时静默保持默认字体，勿因字体缺失抛错。封装：`ConfigEditorUITK.ApplyGameFont(root)`。
+
+## 8. 3D 相机俯角陷阱（大地图 3D 化，2026-08-16）
+
+### 8.1 Quaternion.Euler 的俯仰符号：正 X = 向下俯视
+
+想写"相机俯角 55° 斜俯视地面"，直觉写 `Quaternion.Euler(-pitch, 0, 0)` 是**错的**——那是 55° **仰视天空**。Unity 旋转约定：绕 X 正角度使 forward 转向 -Y（`Euler(90,0,0)` = 垂直向下看）。因此俯视相机应为 **`Euler(+pitch, 0, 0)`**，相机位置在注视点北侧：`pos = (focusX, height, focusZ - height/tan(pitch))`。
+
+症状：MapCamera 只渲染出 SolidColor 深色背景（近似黑屏），Overlay Canvas 的 UI 正常显示；诊断手法 = `camera.ViewportPointToRay(0.5,0.5)` 检查 `direction.y` 是否为负（朝下）。
+
+同源错误：面向相机的 billboard 面片（SpriteRenderer 直立面）倾角也是 `Euler(+pitch)`（法线才正对相机，图标屏幕直立），不是 `Euler(180-pitch)`。
+
+**后续定稿**（用户不要 3D 透视效果）：最终相机为**正交垂直俯视**（`Euler(90,0,0)`，ortho size 5–45），锚点图标平铺在地图平面上（与 MapPlane 同旋转 `Euler(90,0,0)`），俯视观感等同 2D 平面地图。正交缩放锚点公式：`newFocus = g - (g - oldFocus) × (newSize / oldSize)`（屏幕偏移与尺寸成线性关系）。
+
+### 8.2 Tuanjie 块压缩两大拦路虎：mipmap 开启即失效 + 巨图编辑器内重导入 OOM（2026-08-16，两轮定位）
+
+大地图贴图 `all_map.jpg` 曾长期以**未压缩 RGBA32** 运行（16384×10533 时 658MB，10752×6912 时 756MB），进 MapScreen 场景同步解码上传 → 明显卡顿。
+
+**第一轮修复**（外部缩图至 8064×5184）后加载恢复，但**根因判断不全**——当时归因于"高度非 4 倍数致 BC7 失效"。第二轮为提升清晰度升到 10752×6912（宽高均 4 倍数）后压缩再次失效，系统排查（多组对照实验）得出真正结论：
+
+**① mipmap 开启 → 块压缩静默失效（真元凶）**。Tuanjie 1.9.3 中 `mipmapEnabled=true` 的纹理导入时直接回退未压缩格式（RGB24/RGBA32），**无任何警告**。关闭 mipmap 后同尺寸立即 DXT1（8120×5220：RGBA32→DXT1 20MB；10752×6912：→DXT1 71MB）。对照证据：项目内 map_back.png（无 mip）DXT1 ✓，nodkrai/mondstadt_map.png（有 mip）RGBA32 ✗。**推论：项目里所有开了 mipmap 的贴图可能都在未压缩运行，值得专项排查**。
+- 取舍依据：正交相机缩放范围 8–15 内画面恒为放大显示（最远 1.27×），mipmap 本就无用，关掉零损失。
+- **② 显式格式覆盖不可靠**：`format=BC7(25)` / `AutomaticCompressed(0)` 均被无视仍回退；必须 `textureFormat=-1（Automatic）+ textureCompression=Compressed` 才生效。平台 override 意义存疑，统一走 Default 平台最稳。
+- **③ 巨图编辑器内重导入会 OOM 崩编辑器**：Worker 解码 21504×13824 源图需一次性分配 1.19GB 连续内存 → Fatal Error（2026-08-16 实崩一次）。**缩源图必须在 Unity 外部做**（PowerShell System.Drawing，q92-95）；10752 档（解码 ~297MB）编辑器内安全。编辑器死后进程僵死，需循环 taskkill。源图备份 `Export/all_map_source_21504.jpg`。
+- **④ PPU 手动补偿**：外部换文件后无钳制就无自动补偿，必须手改 meta（当前 10752 档 PPU=50，世界尺寸 215.04×138.24 恒定，锚点/相机参数不联动）。
+
+**最终定稿**：10752×6912（0.5×源图，50px/世界单位）+ DXT1 无 mip + Sprite PPU50，71MB，清晰度比 8064 档（37.5px/单位）提升 33%。若将来要更极致，方向是原神式**切片+流式加载**（AssetCache 预载），个人 Demo 无必要。
+
 
