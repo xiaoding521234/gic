@@ -32,6 +32,8 @@ namespace GIC.Editor
             root.style.paddingRight = 10;
             root.style.paddingTop = 8;
 
+            ConfigEditorUITK.ApplyGameFont(root);
+
             root.Add(ConfigEditorUITK.CreateTitleRow("批量替换 TMP 字体", 0));
 
             var objField = new ObjectField("目标字体")

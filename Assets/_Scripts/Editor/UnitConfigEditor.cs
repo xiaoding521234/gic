@@ -514,6 +514,8 @@ namespace GIC.Editor
             root.style.paddingRight = 10;
             root.style.paddingTop = 8;
 
+            ConfigEditorUITK.ApplyGameFont(root);
+
             if (targetConfig == null || serializedObj == null)
             {
                 root.Add(new Label("无数据可编辑"));

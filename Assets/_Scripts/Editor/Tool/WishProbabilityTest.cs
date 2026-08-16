@@ -15,7 +15,7 @@ namespace GIC.Editor
     ///   2. 重复角色卡→星辉→累积→满20触发相遇之线
     ///   3. 相遇之线：RollUpgradeCount→逐级提升→每级判重发星辉→最终卡入账
     ///
-    /// 菜单：Tools/测试/祈愿概率测试 (10万次)
+    /// 入口：WishPoolConfig Inspector 底部「概率模拟测试」按钮（测试当前选中卡池）
     /// </summary>
     public static class WishProbabilityTest
     {
@@ -25,10 +25,8 @@ namespace GIC.Editor
         // 星辉转换表
         private static readonly int[] StarglitterByStar = { 0, 3, 8, 15, 25, 50 }; // index 1~5
 
-        [MenuItem("Tools/测试/祈愿概率测试 (10万次)", priority = -76)]
-        public static void RunTest()
+        public static void RunTest(WishPoolConfig pool)
         {
-            var pool = LoadAsset<WishPoolConfig>("WishPoolConfig");
             var unitConfig = LoadAsset<UnitConfig>("UnitConfig");
             var itemConfig = LoadAsset<ItemConfig>("ItemConfig");
             if (pool == null || unitConfig == null || itemConfig == null)

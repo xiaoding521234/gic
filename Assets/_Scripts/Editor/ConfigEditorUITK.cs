@@ -240,6 +240,23 @@ namespace GIC.Editor
 
         // ==================== 视觉组件 ====================
 
+        private const string GameFontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/zh-cn.ttf";
+        private static Font _gameFont;
+
+        /// <summary>
+        /// 将编辑器窗口字体切换为游戏主字体（zh-cn SDF 的源 ttf）。
+        /// 字体沿 visual tree 继承，根元素设一次即可覆盖全部子控件；
+        /// 字体文件缺失时静默保持编辑器默认字体。
+        /// </summary>
+        public static void ApplyGameFont(VisualElement root)
+        {
+            if (root == null) return;
+            if (_gameFont == null)
+                _gameFont = AssetDatabase.LoadAssetAtPath<Font>(GameFontPath);
+            if (_gameFont != null)
+                root.style.unityFontDefinition = FontDefinition.FromFont(_gameFont);
+        }
+
         /// <summary>Tuanjie 的 IStyle 无 borderRadius/borderWidth 简写，用四边属性设置</summary>
         public static void SetBorderRadius(VisualElement ve, float radius)
         {
@@ -567,6 +584,8 @@ namespace GIC.Editor
             var so = serializedObject;
             var root = new VisualElement();
 
+            ConfigEditorUITK.ApplyGameFont(root);
+
             root.Add(ConfigEditorUITK.CreateList(so, ListPropertyName, new ConfigEditorUITK.ListConfig
             {
                 HeaderTitle = ListHeaderTitle,
@@ -644,6 +663,8 @@ namespace GIC.Editor
             root.style.paddingLeft = 10;
             root.style.paddingRight = 10;
             root.style.paddingTop = 8;
+
+            ConfigEditorUITK.ApplyGameFont(root);
 
             if (targetConfig == null || serializedObj == null)
             {

@@ -59,6 +59,8 @@ namespace GIC.Editor
             root.style.paddingRight = 10;
             root.style.paddingTop = 8;
 
+            ConfigEditorUITK.ApplyGameFont(root);
+
             root.Add(ConfigEditorUITK.CreateTitleRow("本地化 CSV 导出导入工具", 0));
 
             var pathField = new TextField("CSV 文件夹路径（相对项目根目录）");
