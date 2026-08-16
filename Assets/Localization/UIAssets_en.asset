@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17,11 +17,7 @@ MonoBehaviour:
   m_SharedData: {fileID: 11400000, guid: d695502cccb3ad6499c097f28c8505b3, type: 2}
   m_Metadata:
     m_Items: []
-  m_TableData:
-  - m_Id: 8351461376
-    m_Localized: ae92b2313842dac4c9b23dbc8ea48d8e
-    m_Metadata:
-      m_Items: []
+  m_TableData: []
   references:
     version: 2
     RefIds: []

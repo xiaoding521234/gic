@@ -1,7 +1,5 @@
 ﻿using UnityEngine;
 using UnityEngine.Localization;
-using UnityEngine.Localization.Tables;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using TMPro;
 using System.Collections.Generic;
 using System.Text;
@@ -26,12 +24,6 @@ namespace GIC.Tool
         public System.Func<string, string> textProcessor;
 
         [Header("字体设置")]
-        [Tooltip("本地化字体资产表")]
-        private LocalizedAssetTable fontTable = new LocalizedAssetTable(TableName.UIAssets.ToString());
-
-        [Tooltip("字体在资产表中的Key")]
-        private string fontEntryKey = "MainFont";
-
         [Header("全局设置")]
         public string globalPrefix = "";
         public string globalSuffix = "";
@@ -39,7 +31,6 @@ namespace GIC.Tool
 
         public TMP_Text textComponent;
         private Dictionary<string, string> resolvedValues = new Dictionary<string, string>();
-        private TMP_FontAsset currentFont;
         private List<LocalizedString.ChangeHandler> _activeHandlers = new();
 
         void Awake()
@@ -82,7 +73,6 @@ namespace GIC.Tool
 
         public void RefreshAll()
         {
-            LoadFont();
             foreach (var entry in entries)
             {
                 if (entry.localizedString != null && !entry.localizedString.IsEmpty)
@@ -272,49 +262,6 @@ namespace GIC.Tool
             _activeHandlers.Clear();
         }
 
-        private void LoadFont()
-        {
-            if (fontTable == null || string.IsNullOrEmpty(fontEntryKey))
-                return;
-
-            var tableOp = fontTable.GetTableAsync();
-            tableOp.Completed += (op) =>
-            {
-                if (op.Status == AsyncOperationStatus.Succeeded && op.Result != null)
-                {
-                    var entry = op.Result.GetEntry(fontEntryKey);
-                    if (entry != null && !entry.IsEmpty)
-                    {
-                        var assetOp = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<TMP_FontAsset>(entry.Guid);
-                        assetOp.Completed += (assetHandle) =>
-                        {
-                            if (assetHandle.Status == AsyncOperationStatus.Succeeded)
-                            {
-                                currentFont = assetHandle.Result;
-                                ApplyFont();
-                            }
-                        };
-                    }
-                }
-            };
-        }
-
-        private void ApplyFont()
-        {
-            if (currentFont == null || textComponent == null) return;
-
-            // 仅在字体真正变更时整体切换（含材质）；字体已一致时保留场景配置的材质变体
-            // （如 zh-cn SDF.mat 描边材质），否则每次刷新都会把描边/配色覆盖回基础材质
-            if (textComponent.font != currentFont)
-            {
-                textComponent.font = currentFont;
-                if (currentFont.material != null)
-                {
-                    textComponent.fontMaterial = currentFont.material;
-                }
-            }
-        }
-
         private void OnEntryUpdated(int index, string value)
         {
             if (index < 0 || index >= entries.Count) return;
@@ -349,8 +296,6 @@ namespace GIC.Tool
         private void UpdateDisplay()
         {
             if (textComponent == null) return;
-
-            ApplyFont();
 
             StringBuilder sb = new StringBuilder();
             if (!string.IsNullOrEmpty(globalPrefix))
