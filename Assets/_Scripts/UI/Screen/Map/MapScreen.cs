@@ -141,6 +141,35 @@ namespace GIC.UI
 
                 _spawnedAnchors.Add(go);
             }
+
+            UpdateAnchorConstantScale(force: true);
+        }
+
+        /// <summary>上次应用锚点缩放时的相机尺寸（变更检测）</summary>
+        private float _anchorScaleCamSize = -1f;
+
+        /// <summary>
+        /// 锚点恒定视觉尺寸：正交相机缩放时，锚点根节点按 相机尺寸/基准尺寸 比例缩放，
+        /// 与相机的视野变化正好抵消——无论缩放如何，锚点在屏幕上看起来一样大。
+        /// </summary>
+        private void UpdateAnchorConstantScale(bool force = false)
+        {
+            if (地图相机 == null) return;
+            float camSize = 地图相机.CurrentSize;
+            if (!force && Mathf.Approximately(camSize, _anchorScaleCamSize)) return;
+            _anchorScaleCamSize = camSize;
+
+            float scale = 地图相机.BaseViewSize > 0f ? camSize / 地图相机.BaseViewSize : 1f;
+            foreach (var go in _spawnedAnchors)
+            {
+                if (go != null)
+                    go.transform.localScale = Vector3.one * scale;
+            }
+        }
+
+        private void Update()
+        {
+            UpdateAnchorConstantScale();
         }
 
         private void ClearAnchors()

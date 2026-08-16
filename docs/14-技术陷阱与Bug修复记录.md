@@ -261,9 +261,10 @@ Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIEl
 
 **第一轮修复**（外部缩图至 8064×5184）后加载恢复，但**根因判断不全**——当时归因于"高度非 4 倍数致 BC7 失效"。第二轮为提升清晰度升到 10752×6912（宽高均 4 倍数）后压缩再次失效，系统排查（多组对照实验）得出真正结论：
 
-**① mipmap 开启 → 块压缩静默失效（真元凶）**。Tuanjie 1.9.3 中 `mipmapEnabled=true` 的纹理导入时直接回退未压缩格式（RGB24/RGBA32），**无任何警告**。关闭 mipmap 后同尺寸立即 DXT1（8120×5220：RGBA32→DXT1 20MB；10752×6912：→DXT1 71MB）。对照证据：项目内 map_back.png（无 mip）DXT1 ✓，nodkrai/mondstadt_map.png（有 mip）RGBA32 ✗。**推论：项目里所有开了 mipmap 的贴图可能都在未压缩运行，值得专项排查**。
+**① mipmap 开启 → 大图块压缩静默失效**。Tuanjie 1.9.3 中大图（如 4096+ Sprite）`mipmapEnabled=true` 时直接回退未压缩格式（RGB24/RGBA32），**无任何警告**；关闭后同尺寸立即 DXT1（8120×5220：→20MB；10752×6912：→71MB）。all_map 实验复现（同文件仅切 mip：RGBA32↔DXT1）。⚠️ 范围修正（2026-08-16 全项目排查 212 张后）：此阻断**并非对所有贴图生效**——17 张开 mip 的贴图中 16 张小图压缩正常，仅大图中招；此前"项目里 mip 贴图全部未压缩"的推论过度泛化，nodkrai/mondstadt 等区域图实为 mip 关闭状态下未压缩（见②b）。
 - 取舍依据：正交相机缩放范围 8–15 内画面恒为放大显示（最远 1.27×），mipmap 本就无用，关掉零损失。
 - **② 显式格式覆盖不可靠**：`format=BC7(25)` / `AutomaticCompressed(0)` 均被无视仍回退；必须 `textureFormat=-1（Automatic）+ textureCompression=Compressed` 才生效。平台 override 意义存疑，统一走 Default 平台最稳。
+- **②b NPOT 尺寸（非 4 倍数）→ 块压缩拒绝（排查实锤的主要浪费源）**：任一边非 4 倍数即回退未压缩，mip 开关无关。6 张旧区域图（4096×3829/8192×5799 等，合计 505MB RGBA32）全因此未压缩——属旧 UGUI 方案零引用遗留，直接删除而非修复；在用待修（外部补齐 4 倍数即可压缩，约省 55MB）：Wish 背景 back.png 3199×1799(16.5MB)、logo 1716×1073(12.3MB)、元素图标 Deep/Stroke 801×801×14(34MB)。
 - **③ 巨图编辑器内重导入会 OOM 崩编辑器**：Worker 解码 21504×13824 源图需一次性分配 1.19GB 连续内存 → Fatal Error（2026-08-16 实崩一次）。**缩源图必须在 Unity 外部做**（PowerShell System.Drawing，q92-95）；10752 档（解码 ~297MB）编辑器内安全。编辑器死后进程僵死，需循环 taskkill。源图备份 `Export/all_map_source_21504.jpg`。
 - **④ PPU 手动补偿**：外部换文件后无钳制就无自动补偿，必须手改 meta（当前 10752 档 PPU=50，世界尺寸 215.04×138.24 恒定，锚点/相机参数不联动）。
 

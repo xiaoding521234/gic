@@ -28,7 +28,6 @@ namespace GIC.UI
         [Header("区域聚焦")]
         [SerializeField] private float 默认视野尺寸 = 8f;
         [SerializeField] private float 入场时长 = 0.2f;
-        [SerializeField] private float 入场起始倍数 = 1.35f;
 
         [Header("点击判定")]
         [SerializeField] private float 点击位移阈值 = 12f;
@@ -122,9 +121,16 @@ namespace GIC.UI
         /// </summary>
         public void FocusRegion(Vector2 focusXZ, float viewSize = 0f)
         {
-            float targetSize = viewSize > 0f ? Mathf.Clamp(viewSize, 最小尺寸, 最大尺寸) : 默认视野尺寸;
+            // 未配置区域视野时落点 = 缩放区间中点（居中视野，非最大也非最底）
+            float targetSize = viewSize > 0f ? Mathf.Clamp(viewSize, 最小尺寸, 最大尺寸) : Mathf.Lerp(最小尺寸, 最大尺寸, 0.5f);
             PlayEntryAnimation(ClampFocus(focusXZ, targetSize), targetSize);
         }
+
+        /// <summary>当前正交尺寸（锚点恒定视觉尺寸等外部逻辑用）</summary>
+        public float CurrentSize => _size;
+
+        /// <summary>基准视野尺寸（锚点视觉尺寸在此缩放下为 1:1 prefab 原大）</summary>
+        public float BaseViewSize => 默认视野尺寸;
 
         // ==================== 每帧交互 ====================
 
@@ -318,7 +324,8 @@ namespace GIC.UI
 
         private IEnumerator EntryAnimationCoroutine(Vector2 targetFocus, float targetSize)
         {
-            float startSize = Mathf.Min(targetSize * 入场起始倍数, 最大尺寸);
+            // 起点 = 最大上限（远景），快→慢落到目标（居中视野）
+            float startSize = 最大尺寸;
 
             float elapsed = 0f;
             while (elapsed < 入场时长)
