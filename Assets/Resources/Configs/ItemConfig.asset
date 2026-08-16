@@ -13,11 +13,10 @@ MonoBehaviour:
   m_Name: ItemConfig
   m_EditorClassIdentifier: 
   itemDataList:
-  - _isInitialized: 1
-    itemID: 1001
+  - itemID: 1001
     icon:
     - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
-    starLevel: 3
+    starLevel: 2
     elements:
     - elementType: 7
       stacks: 1
@@ -28,8 +27,21 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 60
     customParams: []
-  - _isInitialized: 1
-    itemID: 1002
+  - itemID: 1006
+    icon:
+    - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
+    starLevel: 3
+    elements:
+    - elementType: 8
+      stacks: 1
+    subType: 0
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - itemID: 1002
     icon:
     - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
     starLevel: 4
@@ -43,8 +55,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 60
     customParams: []
-  - _isInitialized: 1
-    itemID: 1003
+  - itemID: 1003
     icon:
     - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
     starLevel: 4
@@ -58,8 +69,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 1005
+  - itemID: 1005
     icon:
     - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
     starLevel: 5
@@ -73,23 +83,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 1006
-    icon:
-    - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
-    starLevel: 4
-    elements:
-    - elementType: 8
-      stacks: 1
-    subType: 0
-    maxStack: 9999
-    maxPrepareCount: 10
-    countPerServing: 1
-    recycleAfterBattle: 1
-    recycleLossCount: 0
-    customParams: []
-  - _isInitialized: 1
-    itemID: 3001
+  - itemID: 3001
     icon:
     - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
     starLevel: 4
@@ -103,8 +97,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 4001
+  - itemID: 4001
     icon:
     - {fileID: 21300000, guid: 9af9caa073664874787b3310147653e9, type: 3}
     starLevel: 1
@@ -118,8 +111,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 4002
+  - itemID: 4002
     icon:
     - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
     starLevel: 1
@@ -133,8 +125,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 4003
+  - itemID: 4003
     icon:
     - {fileID: 21300000, guid: 4f97dfa0394017848b683bb6d38591f9, type: 3}
     starLevel: 1
@@ -148,8 +139,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 4004
+  - itemID: 4004
     icon:
     - {fileID: 21300000, guid: 4eaca57f760d8864ab50b40d6d5d65bb, type: 3}
     starLevel: 1
@@ -163,8 +153,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 4005
+  - itemID: 4005
     icon:
     - {fileID: 21300000, guid: 32d5c04fc5004494888bc64d1adceffe, type: 3}
     starLevel: 1
@@ -178,8 +167,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - _isInitialized: 1
-    itemID: 5001
+  - itemID: 5001
     icon:
     - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
     starLevel: 2
