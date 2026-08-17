@@ -99,11 +99,11 @@ namespace GIC.UI
             地图贴图.transform.localScale = new Vector3(w / b.x, d / b.y, 1f);
 
             // 图片左上角 = mapOrigin（图片顶边在世界 +Y 上方）→ 中心 = origin + (w/2, -d/2)
-            地图贴图.transform.localPosition = new Vector3(
-                mapConfig.MapOrigin.x + w * 0.5f,
-                mapConfig.MapOrigin.y - d * 0.5f, 0f);
+            var mapCenter = new Vector2(mapConfig.MapOrigin.x + w * 0.5f, mapConfig.MapOrigin.y - d * 0.5f);
+            地图贴图.transform.localPosition = new Vector3(mapCenter.x, mapCenter.y, 0f);
 
-            地图相机.InitBounds(w, d);
+            // 相机边界围绕图中心（勿以世界原点为界——换图标定后中心会移动）
+            地图相机.InitBounds(mapCenter, w, d);
         }
 
         /// <summary>

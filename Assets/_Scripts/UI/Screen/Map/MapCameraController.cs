@@ -34,8 +34,9 @@ namespace GIC.UI
         [SerializeField] private float 锚点射线最大距离 = 500f;
 
         private Camera _camera;
+        private Vector2 _mapCenter;        // 地图矩形中心（世界 XY，由 InitBounds 按标定计算）
         private float _mapHalfW = 107.5f;   // 地图半宽（世界单位，X 方向）
-        private float _mapHalfH = 69f;      // 地图半高（世界单位，Z 方向）
+        private float _mapHalfH = 69f;      // 地图半高（世界单位，Y 方向）
 
         // 相机状态：画布注视点（x→世界X，y→世界Y）+ 正交尺寸（垂直半高，世界单位）
         private Vector2 _focus;
@@ -108,9 +109,11 @@ namespace GIC.UI
 
         // ==================== 公共接口 ====================
 
-        /// <summary>初始化地图边界（世界单位），限制相机注视点范围</summary>
-        public void InitBounds(float mapWidth, float mapHeight)
+        /// <summary>初始化地图边界：中心（世界 XY）+ 尺寸（世界单位），限制相机注视点范围。
+        /// 边界围绕图中心而非世界原点——标定改变 mapOrigin 后图中心会移动（旧图恰好居中原点是巧合，勿依赖）</summary>
+        public void InitBounds(Vector2 mapCenter, float mapWidth, float mapHeight)
         {
+            _mapCenter = mapCenter;
             _mapHalfW = mapWidth * 0.5f;
             _mapHalfH = mapHeight * 0.5f;
         }
@@ -277,16 +280,16 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 注视点限制在地图矩形内：按当前正交尺寸算可见半宽/半高，
-        /// 保证画面四边不露出地图外（地图比可视区小时居中）
+        /// 注视点限制在地图矩形内：按当前正交尺寸算可见半宽/半高，围绕图中心 clamp，
+        /// 保证画面四边不露出地图外（地图比可视区小时居中于图中心）
         /// </summary>
         private Vector2 ClampFocus(Vector2 focus, float size)
         {
             float aspect = _camera != null ? _camera.aspect : 16f / 9f;
             float lx = Mathf.Max(0f, _mapHalfW - size * aspect);
-            float lz = Mathf.Max(0f, _mapHalfH - size);
-            focus.x = Mathf.Clamp(focus.x, -lx, lx);
-            focus.y = Mathf.Clamp(focus.y, -lz, lz);
+            float ly = Mathf.Max(0f, _mapHalfH - size);
+            focus.x = Mathf.Clamp(focus.x, _mapCenter.x - lx, _mapCenter.x + lx);
+            focus.y = Mathf.Clamp(focus.y, _mapCenter.y - ly, _mapCenter.y + ly);
             return focus;
         }
 
