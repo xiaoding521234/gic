@@ -242,19 +242,28 @@ namespace GIC.Editor
 
         private const string GameFontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/zh-cn.ttf";
         private static Font _gameFont;
+        private static UnityEngine.TextCore.Text.FontAsset _gameFontAsset;
 
         /// <summary>
-        /// 将编辑器窗口字体切换为游戏主字体（zh-cn SDF 的源 ttf）。
-        /// 字体沿 visual tree 继承，根元素设一次即可覆盖全部子控件；
-        /// 字体文件缺失时静默保持编辑器默认字体。
+        /// 将编辑器窗口字体切换为游戏主字体。
+        /// Tuanjie 1.9.3 两条坑：① FromFont(动态 ttf) 走 UITK 内部动态图集，域重载后抛
+        /// "m_AtlasTextures of FontAsset doesn't exist anymore" 持续刷屏；② FromSDFFont 只收
+        /// TextCore.FontAsset，TMP_FontAsset 不兼容。正解：CreateFontAsset(ttf) 显式构建
+        /// TextCore 动态字图集（实例归本类持有，生命周期可控）。
+        /// 字体沿 visual tree 继承，根元素设一次即可覆盖全部子控件；构建失败保持编辑器默认字体。
         /// </summary>
         public static void ApplyGameFont(VisualElement root)
         {
             if (root == null) return;
-            if (_gameFont == null)
-                _gameFont = AssetDatabase.LoadAssetAtPath<Font>(GameFontPath);
-            if (_gameFont != null)
-                root.style.unityFontDefinition = FontDefinition.FromFont(_gameFont);
+            if (_gameFontAsset == null)
+            {
+                if (_gameFont == null)
+                    _gameFont = AssetDatabase.LoadAssetAtPath<Font>(GameFontPath);
+                if (_gameFont != null)
+                    _gameFontAsset = UnityEngine.TextCore.Text.FontAsset.CreateFontAsset(_gameFont);
+            }
+            if (_gameFontAsset != null)
+                root.style.unityFontDefinition = FontDefinition.FromSDFFont(_gameFontAsset);
         }
 
         /// <summary>Tuanjie 的 IStyle 无 borderRadius/borderWidth 简写，用四边属性设置</summary>

@@ -1,12 +1,11 @@
 ﻿// MapScreen.cs - 大地图弹层 Screen（3D 地图 + 相机交互版）
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.UI
 {
@@ -16,16 +15,16 @@ namespace GIC.UI
     {
         [Header("固定UI")]
         [SerializeField] private Button closeButton;
-        [SerializeField] private Button nodkraiButton;
-        [SerializeField] private Button mondstadtButton;
-        [SerializeField] private Button liyueButton;
-        [SerializeField] private Button inazumaButton;
-        [SerializeField] private Button sumeruButton;
-        [SerializeField] private Button fontaineButton;
-        [SerializeField] private Button natlanButton;
-        [SerializeField] private Button snezhnayaButton;
-        [SerializeField] private Button khaenriahButton;
+        [Tooltip("区域按钮 → RegionName 映射。新增区域：数组加一条 + 场景拖入按钮即可，无需改代码")]
+        [SerializeField] private List<RegionButtonEntry> regionButtons = new();
         [SerializeField] private TextCombiner titleText;
+
+        [Serializable]
+        public class RegionButtonEntry
+        {
+            public RegionName region;
+            public Button button;
+        }
 
         [Header("3D 地图结构引用（场景中静态）")]
         [SerializeField] private MapCameraController 地图相机;      // MapCamera 上的相机控制器
@@ -43,7 +42,7 @@ namespace GIC.UI
         [SerializeField] private AnimationCurve fadeOutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
         private RegionName currentRegion;
-        private readonly List<GameObject> _spawnedAnchors = new();
+        private readonly List<MapAnchor> _spawnedAnchors = new();
 
         // ── IClosable 实现 ──
         public override void Close() => OnCloseClick();
@@ -56,46 +55,72 @@ namespace GIC.UI
             RegisterClosableSelf();
             if (closeButton != null)
                 closeButton.onClick.AddListener(OnCloseClick);
-            if (nodkraiButton != null)
-                nodkraiButton.onClick.AddListener(() => ShowRegion(RegionName.Nodkrai));
-            if (mondstadtButton != null)
-                mondstadtButton.onClick.AddListener(() => ShowRegion(RegionName.Mondstadt));
-            if (liyueButton != null)
-                liyueButton.onClick.AddListener(() => ShowRegion(RegionName.Liyue));
-            if (inazumaButton != null)
-                inazumaButton.onClick.AddListener(() => ShowRegion(RegionName.Inazuma));
-            if (sumeruButton != null)
-                sumeruButton.onClick.AddListener(() => ShowRegion(RegionName.Sumeru));
-            if (fontaineButton != null)
-                fontaineButton.onClick.AddListener(() => ShowRegion(RegionName.Fontaine));
-            if (natlanButton != null)
-                natlanButton.onClick.AddListener(() => ShowRegion(RegionName.Natlan));
-            if (snezhnayaButton != null)
-                snezhnayaButton.onClick.AddListener(() => ShowRegion(RegionName.Snezhnaya));
-            if (khaenriahButton != null)
-                khaenriahButton.onClick.AddListener(() => ShowRegion(RegionName.Khaenriah));
+            foreach (var entry in regionButtons)
+            {
+                if (entry.button != null)
+                    entry.button.onClick.AddListener(() => ShowRegion(entry.region));
+            }
 
             PushMusicVolumeSafe();
 
-            // 以地图贴图实际尺寸初始化相机边界，聚焦当前区域并播放入场动画
-            var mapSize = 地图贴图.bounds.size;
-            地图相机.InitBounds(mapSize.x, mapSize.z);
-            ShowRegion(_positionManager.GetCurrentRegion());
+            // 固定世界坐标系：按 MapConfig 标定参数摆放地图图片 + 初始化相机边界
+            ApplyMapCalibration();
+
+            // 原神式：全图锚点常驻显示（可自由拖拽浏览），区域按钮只移动相机视野
+            SpawnAllAnchors();
+            ShowRegion(_positionManager.GetCurrentRegion(), fromMaxZoom: true);
 
             // 3D 地图不吃 CanvasGroup，入场直接揭开（遮罩归零）
             if (淡入淡出遮罩 != null)
                 淡入淡出遮罩.alpha = 0f;
         }
 
-        public void ShowRegion(RegionName region)
+        /// <summary>
+        /// 原神式固定世界坐标系标定：按 MapConfig 的原点/单位长度摆放地图图片并初始化相机边界。
+        /// 标定不依赖 sprite 导入设置（缩放按像素数×单位长度计算，PPU 变化无影响）。
+        /// 扩图/换图后只需在 MapConfig 改 mapOrigin/worldUnitsPerPixel，锚点与区域数据一律不动。
+        /// </summary>
+        public void ApplyMapCalibration()
         {
-            if (currentRegion == region) return;
-            currentRegion = region;
-
-            if (titleText != null)
+            var sprite = 地图贴图.sprite;
+            if (sprite == null)
             {
-                titleText.ClearAllEntries();
-                titleText.AddEntry(region.GetEntry());
+                GICLog.Warn("[MapScreen] 地图贴图未指定 sprite，跳过标定");
+                return;
+            }
+
+            // 图片世界尺寸 = 像素数 × 单位长度
+            float w = sprite.rect.width * mapConfig.WorldUnitsPerPixel;
+            float d = sprite.rect.height * mapConfig.WorldUnitsPerPixel;
+
+            // 用缩放抵消 PPU 差异。注意用 sprite.bounds（本地空间）：SpriteRenderer.bounds 是世界
+            // AABB，MapPlane 旋转 90° 后其 y 是 quad 厚度(0.2)而非 sprite 高度，不可用
+            var b = sprite.bounds.size;
+            地图贴图.transform.localScale = new Vector3(w / b.x, d / b.y, 1f);
+
+            // 图片左上角 = mapOrigin（图片顶边在世界 +Z）→ 中心 = origin + (w/2, -d/2)
+            地图贴图.transform.localPosition = new Vector3(
+                mapConfig.MapOrigin.x + w * 0.5f, 0f,
+                mapConfig.MapOrigin.y - d * 0.5f);
+
+            地图相机.InitBounds(w, d);
+        }
+
+        /// <summary>
+        /// 切换区域视野：只更新标题并移动相机，锚点全图常驻不受影响。
+        /// 重复点击当前区域 = 重新居中该区域视野。
+        /// fromMaxZoom=true 时从最大远景落下（仅初次打开地图用）。
+        /// </summary>
+        public void ShowRegion(RegionName region, bool fromMaxZoom = false)
+        {
+            if (currentRegion != region)
+            {
+                currentRegion = region;
+                if (titleText != null)
+                {
+                    titleText.ClearAllEntries();
+                    titleText.AddEntry(region.GetEntry());
+                }
             }
 
             var data = mapConfig.GetRegion(region);
@@ -105,41 +130,42 @@ namespace GIC.UI
                 return;
             }
 
-            ClearAnchors();
-
-            // 区域视野中心（归一化）→ 世界坐标，相机聚焦（含入场动画）
-            var mapSize = 地图贴图.bounds.size;
-            Vector2 focusXZ = new(
-                (data.viewCenter.x - 0.5f) * mapSize.x,
-                (data.viewCenter.y - 0.5f) * mapSize.z);
-            地图相机.FocusRegion(focusXZ, data.viewHeight);
-
-            SpawnAnchors(data);
+            // 区域视野中心为固定世界坐标，相机直接聚焦（区域切换为平滑滑移）
+            地图相机.FocusRegion(data.viewCenterWorld, data.viewHeight, fromMaxZoom);
         }
 
-        private void SpawnAnchors(MapConfig.RegionData data)
+        /// <summary>生成全图所有区域的锚点（打开地图时调用一次，原神式常驻显示）</summary>
+        private void SpawnAllAnchors()
         {
-            var mapSize = 地图贴图.bounds.size;
+            ClearAnchors();
             var posManager = _positionManager;
 
-            foreach (var anchor in data.anchors)
+            foreach (var data in mapConfig.AllRegions)
             {
-                var go = Instantiate(anchorPrefab, 锚点容器);
-                var mapAnchor = go.GetComponent<MapAnchor>();
+                if (data == null) continue;
+                foreach (var anchor in data.anchors)
+                {
+                    var go = Instantiate(anchorPrefab, 锚点容器);
+                    var mapAnchor = go.GetComponent<MapAnchor>();
 
-                // 归一化坐标 → 地面世界坐标（0=图片左/上；XZ 平面上 +Z 朝南）
-                float wx = (anchor.normalizedX - 0.5f) * mapSize.x;
-                float wz = (anchor.normalizedY - 0.5f) * mapSize.z;
-                go.transform.localPosition = new Vector3(wx, 0f, wz);
+                    // 锚点坐标为固定世界 XZ 坐标（扩图不变），直接落位
+                    go.transform.localPosition = new Vector3(anchor.world.x, 0f, anchor.world.y);
 
-                mapAnchor.RefreshVisual();
-                mapAnchor.SetPositionName(anchor.positionName);
-                mapAnchor.SetMapScreen(this);
-                var posData = posManager.GetPositionData(anchor.positionName);
-                if (posData != null && posData.region == data.region)
-                    mapAnchor.SetData(posData);
+                    mapAnchor.RefreshVisual();
+                    mapAnchor.SetPositionName(anchor.positionName);
+                    mapAnchor.SetMapScreen(this);
 
-                _spawnedAnchors.Add(go);
+                    // 配置错误显性化：缺失或区域冲突直接 Warn，便于排查（不中断生成）
+                    var posData = posManager.GetPositionData(anchor.positionName);
+                    if (posData == null)
+                        GICLog.Warn($"[MapScreen] 锚点 {anchor.positionName} 在 PositionConfig 中未配置");
+                    else if (posData.region != data.region)
+                        GICLog.Warn($"[MapScreen] 锚点 {anchor.positionName} 区域不匹配：MapConfig={data.region}, PositionConfig={posData.region}");
+                    else
+                        mapAnchor.SetData(posData);
+
+                    _spawnedAnchors.Add(mapAnchor);
+                }
             }
 
             UpdateAnchorConstantScale(force: true);
@@ -160,10 +186,10 @@ namespace GIC.UI
             _anchorScaleCamSize = camSize;
 
             float scale = 地图相机.BaseViewSize > 0f ? camSize / 地图相机.BaseViewSize : 1f;
-            foreach (var go in _spawnedAnchors)
+            foreach (var anchor in _spawnedAnchors)
             {
-                if (go != null)
-                    go.transform.localScale = Vector3.one * scale;
+                if (anchor != null)
+                    anchor.ApplyCameraScale(scale);
             }
         }
 
@@ -174,9 +200,9 @@ namespace GIC.UI
 
         private void ClearAnchors()
         {
-            foreach (var go in _spawnedAnchors)
+            foreach (var anchor in _spawnedAnchors)
             {
-                if (go != null) Destroy(go);
+                if (anchor != null) Destroy(anchor.gameObject);
             }
             _spawnedAnchors.Clear();
         }
@@ -221,12 +247,6 @@ namespace GIC.UI
                 canvasGroup.alpha = 0f;
             if (淡入淡出遮罩 != null)
                 淡入淡出遮罩.alpha = 1f;
-        }
-
-        protected override void OnDestroy()
-        {
-            base.OnDestroy();
-            ClearAnchors();
         }
     }
 }

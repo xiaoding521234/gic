@@ -3,8 +3,6 @@ using UnityEngine;
 using static GIC.Data.PositionConfig;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
-using GIC.Tool;
 namespace GIC.UI
 {
 
@@ -31,8 +29,21 @@ namespace GIC.UI
         private PositionData cachedData;
         private MapScreen _mapScreen;
         private bool _interactable;
+        private Vector3 _baseScale;
 
         public PositionName PositionName => positionName;
+
+        /// <summary>基准缩放（Awake 时取 prefab 根缩放；视觉大小直接改 prefab 根缩放即可）</summary>
+        public Vector3 BaseScale => _baseScale;
+
+        /// <summary>
+        /// 应用相机比例缩放（恒定视觉尺寸）：根缩放 = prefab 基准 × 相机视野比例。
+        /// 由 MapScreen 在相机尺寸变化时调用。
+        /// </summary>
+        public void ApplyCameraScale(float scale)
+        {
+            transform.localScale = _baseScale * scale;
+        }
 
         public void SetPositionName(PositionName name)
         {
@@ -47,6 +58,8 @@ namespace GIC.UI
         private void Awake()
         {
             _icon = GetComponentInChildren<SpriteRenderer>();
+            // Instantiate 时 Awake 先于任何外部改动执行，此时即 prefab 原始根缩放
+            _baseScale = transform.localScale;
         }
 
         /// <summary>

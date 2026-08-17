@@ -116,14 +116,16 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 聚焦区域：以世界坐标点为中心播放入场动画（尺寸从倍数回落）。
+        /// 聚焦区域：以世界坐标点为中心播放动画。
         /// viewSize &lt;= 0 时使用默认视野尺寸。
+        /// fromMaxZoom=true 从最大远景落下（初次打开地图）；
+        /// false（默认）从当前视野平滑滑移到目标（原神式区域切换）。
         /// </summary>
-        public void FocusRegion(Vector2 focusXZ, float viewSize = 0f)
+        public void FocusRegion(Vector2 focusXZ, float viewSize = 0f, bool fromMaxZoom = false)
         {
             // 未配置区域视野时落点 = 缩放区间中点（居中视野，非最大也非最底）
             float targetSize = viewSize > 0f ? Mathf.Clamp(viewSize, 最小尺寸, 最大尺寸) : Mathf.Lerp(最小尺寸, 最大尺寸, 0.5f);
-            PlayEntryAnimation(ClampFocus(focusXZ, targetSize), targetSize);
+            PlayEntryAnimation(ClampFocus(focusXZ, targetSize), targetSize, fromMaxZoom);
         }
 
         /// <summary>当前正交尺寸（锚点恒定视觉尺寸等外部逻辑用）</summary>
@@ -175,8 +177,9 @@ namespace GIC.UI
             else if (_dragging && Input.GetMouseButtonUp(0))
             {
                 _dragging = false;
-                Vector2 upPos = Input.mousePosition;
-                if (Vector2.Distance(upPos, _pressScreenPos) < 点击位移阈值)
+                // 抬起点也须不在 UI 上（按下于地图、滑到按钮上抬起的场景不分发点击）
+                if (!IsPointerOverUI(-1) &&
+                    Vector2.Distance(Input.mousePosition, _pressScreenPos) < 点击位移阈值)
                     DispatchAnchorClick(Input.mousePosition);
             }
         }
@@ -207,7 +210,9 @@ namespace GIC.UI
                 else if (_dragging && (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled))
                 {
                     _dragging = false;
-                    if (Vector2.Distance(t.position, _pressScreenPos) < 点击位移阈值)
+                    // 抬起点也须不在 UI 上（同鼠标路径）
+                    if (!IsPointerOverUI(t.fingerId) &&
+                        Vector2.Distance(t.position, _pressScreenPos) < 点击位移阈值)
                         DispatchAnchorClick(t.position);
                 }
             }
@@ -305,12 +310,12 @@ namespace GIC.UI
 
         // ==================== 入场动画 ====================
 
-        private void PlayEntryAnimation(Vector2 targetFocus, float targetSize)
+        private void PlayEntryAnimation(Vector2 targetFocus, float targetSize, bool fromMaxZoom = false)
         {
             StopEntryAnimation();
 
             InputLocks.Push(this, InputLockReason.MapEntering);
-            _entryCoroutine = StartCoroutine(EntryAnimationCoroutine(targetFocus, targetSize));
+            _entryCoroutine = StartCoroutine(EntryAnimationCoroutine(targetFocus, targetSize, fromMaxZoom));
         }
 
         private void StopEntryAnimation()
@@ -322,10 +327,12 @@ namespace GIC.UI
             InputLocks.Pop(this, InputLockReason.MapEntering);
         }
 
-        private IEnumerator EntryAnimationCoroutine(Vector2 targetFocus, float targetSize)
+        private IEnumerator EntryAnimationCoroutine(Vector2 targetFocus, float targetSize, bool fromMaxZoom)
         {
-            // 起点 = 最大上限（远景），快→慢落到目标（居中视野）
-            float startSize = 最大尺寸;
+            // 初次打开：从最大上限远景快→慢落到目标；区域切换：从当前视野/注视点平滑滑移（原神式）
+            float startSize = fromMaxZoom ? 最大尺寸 : _size;
+            Vector2 startFocus = _focus;
+            bool glide = !fromMaxZoom;
 
             float elapsed = 0f;
             while (elapsed < 入场时长)
@@ -335,7 +342,7 @@ namespace GIC.UI
                 float curveValue = _easeCurve.Evaluate(t);
 
                 _size = Mathf.Lerp(startSize, targetSize, curveValue);
-                _focus = targetFocus;
+                _focus = glide ? Vector2.Lerp(startFocus, targetFocus, curveValue) : targetFocus;
                 ApplyCameraSetup();
                 yield return null;
             }

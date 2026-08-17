@@ -170,15 +170,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   closeButton: {fileID: 2147421547}
-  nodkraiButton: {fileID: 1556797595}
-  mondstadtButton: {fileID: 148976100}
-  liyueButton: {fileID: 1003152370}
-  inazumaButton: {fileID: 1696752857}
-  sumeruButton: {fileID: 380966907}
-  fontaineButton: {fileID: 1750605578}
-  natlanButton: {fileID: 937096206}
-  snezhnayaButton: {fileID: 0}
-  khaenriahButton: {fileID: 0}
+  regionButtons:
+  - region: 1
+    button: {fileID: 1556797595}
+  - region: 2
+    button: {fileID: 148976100}
+  - region: 3
+    button: {fileID: 1003152370}
+  - region: 4
+    button: {fileID: 1696752857}
+  - region: 5
+    button: {fileID: 380966907}
+  - region: 6
+    button: {fileID: 1750605578}
+  - region: 7
+    button: {fileID: 937096206}
   titleText: {fileID: 2060948902}
   "\u5730\u56FE\u76F8\u673A": {fileID: 1990878231}
   "\u5730\u56FE\u8D34\u56FE": {fileID: 1100937211}
@@ -865,8 +871,8 @@ Transform:
   m_GameObject: {fileID: 1100937209}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.0000076293945}
+  m_LocalScale: {x: 1, y: 0.9999999, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 999282267}

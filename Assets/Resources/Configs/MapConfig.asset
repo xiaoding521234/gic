@@ -12,53 +12,48 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a5d6e617ab14d54d992c97e27801355, type: 3}
   m_Name: MapConfig
   m_EditorClassIdentifier: 
+  mapOrigin: {x: -107.52, y: 69.12}
+  worldUnitsPerPixel: 0.02
   regions:
   - region: 1
-    viewCenter: {x: 0.343, y: 0.264}
+    viewCenterWorld: {x: -46.6909, y: 26.901167}
     viewHeight: 0
     anchors:
     - positionName: 1001
-      normalizedX: 0.2929
-      normalizedY: 0.3208
+      world: {x: -44.534782, y: 24.772608}
     - positionName: 1002
-      normalizedX: 0.2958
-      normalizedY: 0.357
+      world: {x: -43.911167, y: 19.768322}
     - positionName: 1003
-      normalizedX: 0.2991
-      normalizedY: 0.3693
+      world: {x: -43.20153, y: 18.067968}
   - region: 2
-    viewCenter: {x: 0.845, y: 0.263}
+    viewCenterWorld: {x: 59.271896, y: 26.505373}
     viewHeight: 0
     anchors:
     - positionName: 2001
-      normalizedX: 0.7316
-      normalizedY: 0.2888
+      world: {x: 49.80326, y: 29.19629}
     - positionName: 2002
-      normalizedX: 0.7517
-      normalizedY: 0.3522
+      world: {x: 54.125565, y: 20.431873}
     - positionName: 2003
-      normalizedX: 0.79
-      normalizedY: 0.3267
+      world: {x: 62.361603, y: 23.956993}
     - positionName: 2004
-      normalizedX: 0.7768
-      normalizedY: 0.3195
+      world: {x: 59.523064, y: 24.952322}
   - region: 3
-    viewCenter: {x: 0.787, y: 0.465}
+    viewCenterWorld: {x: 45.71186, y: 3.021074}
     viewHeight: 0
     anchors: []
   - region: 4
-    viewCenter: {x: 0.994, y: 0.152}
+    viewCenterWorld: {x: 87.30472, y: -27.030466}
     viewHeight: 0
     anchors: []
   - region: 5
-    viewCenter: {x: 0.653, y: 0.467}
+    viewCenterWorld: {x: 21.11829, y: -5.3008494}
     viewHeight: 0
     anchors: []
   - region: 6
-    viewCenter: {x: 0.599, y: 0.18}
+    viewCenterWorld: {x: 10.580601, y: 34.517483}
     viewHeight: 0
     anchors: []
   - region: 7
-    viewCenter: {x: 0.374, y: 0.58}
+    viewCenterWorld: {x: -37.669533, y: -17.515236}
     viewHeight: 0
     anchors: []
