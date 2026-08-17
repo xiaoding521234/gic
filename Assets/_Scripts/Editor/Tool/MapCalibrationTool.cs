@@ -39,6 +39,8 @@ namespace GIC.Editor
 
             EditorSceneManager.MarkSceneDirty(scene);
             bool saved = EditorSceneManager.SaveScene(scene);
+            // 保存后再换全图（SceneView 目测对齐用全分辨率；只改内存不落盘，sceneSaving 守卫保证场景 YAML 只含预览图）
+            MapEditorFullRes.换上();
             GICLog.Info($"[MapCalibrationTool] 标定已应用到 MapPlane 并保存场景（saved={saved}）。请目测地图与锚点对齐情况\n" +
                         "撤回说明：场景摆放可 Ctrl+Z；但 MapConfig 标定参数才是源头——参数撤回用取点器 Ctrl+Z（未保存时）或 git checkout");
         }

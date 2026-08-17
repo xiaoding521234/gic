@@ -21,6 +21,20 @@ namespace GIC.Data
         [Tooltip("坐标单位长度：每图片像素对应的世界单位数。当前图宽 10752px = 215.04 世界单位 → 0.02")]
         [SerializeField] private float worldUnitsPerPixel = 0.02f;
 
+        [Header("瓦片化（Tools/地图/生成地图瓦片 自动写入，勿手改）")]
+        [Tooltip("源图像素宽高（标定基准）。运行时 MapPlane 显示低清预览图，世界尺寸按此值计算而非 sprite.rect")]
+        [SerializeField] private int sourcePixelWidth;
+        [SerializeField] private int sourcePixelHeight;
+        [Tooltip("瓦片网格列数/行数")]
+        [SerializeField] private int tileColumns;
+        [SerializeField] private int tileRows;
+        [Tooltip("单瓦片像素边长")]
+        [SerializeField] private int tilePixelSize = 2048;
+        [Tooltip("相邻瓦片重叠像素数（防双线性接缝）")]
+        [SerializeField] private int tileOverlapPx = 4;
+        [Tooltip("瓦片 Addressables 地址前缀，瓦片地址 = 前缀 + {x}_{y}")]
+        [SerializeField] private string tileAddressPrefix = "MapAssets/Tiles/tile_";
+
         [SerializeField] private List<RegionData> regions = new();
 
         private Dictionary<RegionName, RegionData> _cache;
@@ -30,6 +44,21 @@ namespace GIC.Data
 
         /// <summary>每图片像素的世界单位数</summary>
         public float WorldUnitsPerPixel => worldUnitsPerPixel;
+
+        /// <summary>源图像素宽（0 = 未瓦片化）</summary>
+        public int SourcePixelWidth => sourcePixelWidth;
+
+        /// <summary>源图像素高（0 = 未瓦片化）</summary>
+        public int SourcePixelHeight => sourcePixelHeight;
+
+        public int TileColumns => tileColumns;
+        public int TileRows => tileRows;
+        public int TilePixelSize => tilePixelSize;
+        public int TileOverlapPx => tileOverlapPx;
+        public string TileAddressPrefix => tileAddressPrefix;
+
+        /// <summary>是否已瓦片化（MapTileLayer 与标定尺寸换算的开关）</summary>
+        public bool IsTiled => sourcePixelWidth > 0 && sourcePixelHeight > 0 && tileColumns > 0 && tileRows > 0;
 
         /// <summary>世界 XY 坐标 → 图片像素坐标（左上原点，向下为 +y；垂直画布下世界 Y 向上，故 y 取差值）</summary>
         public Vector2 WorldToPixel(Vector2 worldXY)

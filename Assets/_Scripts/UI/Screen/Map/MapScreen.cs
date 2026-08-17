@@ -89,9 +89,14 @@ namespace GIC.UI
                 return;
             }
 
+            // 世界尺寸按源图像素计算（瓦片化后 MapPlane 显示的是低清预览图，直接用 sprite.rect
+            // 会把世界尺寸缩小预览倍数；未瓦片化时回退 sprite.rect）
+            float srcW = mapConfig.SourcePixelWidth > 0 ? mapConfig.SourcePixelWidth : sprite.rect.width;
+            float srcH = mapConfig.SourcePixelHeight > 0 ? mapConfig.SourcePixelHeight : sprite.rect.height;
+
             // 图片世界尺寸 = 像素数 × 单位长度
-            float w = sprite.rect.width * mapConfig.WorldUnitsPerPixel;
-            float d = sprite.rect.height * mapConfig.WorldUnitsPerPixel;
+            float w = srcW * mapConfig.WorldUnitsPerPixel;
+            float d = srcH * mapConfig.WorldUnitsPerPixel;
 
             // 垂直画布：MapPlane rotation 归零（XY 平面），缩放直接 XY，sprite.bounds 即本地尺寸
             var b = sprite.bounds.size;

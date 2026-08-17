@@ -205,11 +205,14 @@ namespace GIC.Editor
         {
             SceneView.duringSceneGui += OnSceneGUI;
             Undo.undoRedoPerformed += OnUndoRedo;
+            // 瓦片化后场景只挂预览图，取点/标定需要全分辨率目测 → 编辑器临时换全图（守卫见 MapEditorFullRes）
+            MapEditorFullRes.换上();
         }
         private void OnDisable()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
             Undo.undoRedoPerformed -= OnUndoRedo;
+            MapEditorFullRes.还原();
         }
 
         /// <summary>Undo/Redo 后同步：锚点索引重建 + 面板刷新（撤销改的是 MapConfig 对象，窗口与 Gizmo 需跟随）</summary>
