@@ -28,7 +28,7 @@ namespace GIC.UI
 
         [Header("3D 地图结构引用（场景中静态）")]
         [SerializeField] private MapCameraController 地图相机;      // MapCamera 上的相机控制器
-        [SerializeField] private SpriteRenderer 地图贴图;           // MapPlane（平铺 XZ 地面的大地图）
+        [SerializeField] private SpriteRenderer 地图贴图;           // MapPlane（垂直画布 XY 平面上的大地图）
         [SerializeField] private Transform 锚点容器;                // MapWorld/Anchors，动态锚点挂载点
 
         [Header("配置")]
@@ -93,15 +93,15 @@ namespace GIC.UI
             float w = sprite.rect.width * mapConfig.WorldUnitsPerPixel;
             float d = sprite.rect.height * mapConfig.WorldUnitsPerPixel;
 
-            // 用缩放抵消 PPU 差异。注意用 sprite.bounds（本地空间）：SpriteRenderer.bounds 是世界
-            // AABB，MapPlane 旋转 90° 后其 y 是 quad 厚度(0.2)而非 sprite 高度，不可用
+            // 垂直画布：MapPlane rotation 归零（XY 平面），缩放直接 XY，sprite.bounds 即本地尺寸
             var b = sprite.bounds.size;
+            地图贴图.transform.localRotation = Quaternion.identity;
             地图贴图.transform.localScale = new Vector3(w / b.x, d / b.y, 1f);
 
-            // 图片左上角 = mapOrigin（图片顶边在世界 +Z）→ 中心 = origin + (w/2, -d/2)
+            // 图片左上角 = mapOrigin（图片顶边在世界 +Y 上方）→ 中心 = origin + (w/2, -d/2)
             地图贴图.transform.localPosition = new Vector3(
-                mapConfig.MapOrigin.x + w * 0.5f, 0f,
-                mapConfig.MapOrigin.y - d * 0.5f);
+                mapConfig.MapOrigin.x + w * 0.5f,
+                mapConfig.MapOrigin.y - d * 0.5f, 0f);
 
             地图相机.InitBounds(w, d);
         }
@@ -148,8 +148,8 @@ namespace GIC.UI
                     var go = Instantiate(anchorPrefab, 锚点容器);
                     var mapAnchor = go.GetComponent<MapAnchor>();
 
-                    // 锚点坐标为固定世界 XZ 坐标（扩图不变），直接落位
-                    go.transform.localPosition = new Vector3(anchor.world.x, 0f, anchor.world.y);
+                    // 锚点坐标为固定世界 XY 坐标（垂直画布 z=0，扩图不变），直接落位
+                    go.transform.localPosition = new Vector3(anchor.world.x, anchor.world.y, 0f);
 
                     mapAnchor.RefreshVisual();
                     mapAnchor.SetPositionName(anchor.positionName);

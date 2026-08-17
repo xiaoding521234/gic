@@ -33,6 +33,22 @@ namespace GIC.Editor
         private int _calibAnchorA = -1, _calibAnchorB = -1;
         private bool _hasPickA;
         private Vector2 _pickA;
+        private bool _hasPickB;   // 解算完成后保留 B 点白圈（可视化"点了哪里"），重取/换参照时清除
+        private Vector2 _pickB;
+
+        /// <summary>方向校验容差（度）：图片轴与世界轴平行的模型下，两次点击连线方向必须与锚点已知位移方向一致。
+        /// 超差=点错位置或图有旋转，拒绝解算（斜率是固定约束，不是自由量）</summary>
+        private const float 标定方向容差 = 3f;
+
+        /// <summary>
+        /// 把点投影到「过点 P、方向 dir」的直线上（B 点硬约束：第二次点击只能落在此线）。
+        /// 返回投影点与原点的距离（用于判断点击是否离谱地远）。
+        /// </summary>
+        private static Vector2 ProjectOntoLine(Vector2 point, Vector2 linePoint, Vector2 dir)
+        {
+            dir.Normalize();
+            return linePoint + dir * Vector2.Dot(point - linePoint, dir);
+        }
 
         // 锚点平铺索引 → (RegionData, AnchorData)
         private readonly List<(GIC.Data.MapConfig.RegionData region, GIC.Data.MapConfig.AnchorData anchor)> _allAnchors = new();
@@ -50,7 +66,7 @@ namespace GIC.Editor
             FrameMap();
         }
 
-        /// <summary>把 SceneView 相机对准地图中心（正交俯视，整图可见）。地图不可见时先点这个。</summary>
+        /// <summary>把 SceneView 相机对准地图中心（垂直画布正视，整图可见）。地图不可见时先点这个。</summary>
         private static void FrameMap()
         {
             var sv = SceneView.lastActiveSceneView;
@@ -88,7 +104,7 @@ namespace GIC.Editor
             // 退出 2D 模式：2D 模式强制相机沿 +Z 水平看，地图侧对相机呈一条线（什么都看不见）
             sv.in2DMode = false;
             sv.orthographic = true;
-            sv.LookAtDirect(new Vector3(center.x, 0f, center.y), Quaternion.Euler(90f, 0f, 0f), viewSize);
+            sv.LookAtDirect(new Vector3(center.x, center.y, 0f), Quaternion.identity, viewSize);
             SceneView.RepaintAll();
         }
 
@@ -96,16 +112,16 @@ namespace GIC.Editor
 
         private const float 目标对准视野尺寸 = 12f; // 单点目标的对准视野（正交半高，看得清标记又不失上下文）
 
-        /// <summary>通用对准：正交俯视注视目标点（退 2D 模式），失败提示原因</summary>
-        private static bool LookAtPoint(Vector2 worldXZ, float viewSize, string what)
+        /// <summary>通用对准：正交注视目标点（退 2D 模式），失败提示原因</summary>
+        private static bool LookAtPoint(Vector2 worldXY, float viewSize, string what)
         {
             var sv = SceneView.lastActiveSceneView;
             if (sv == null) { GICLog.Warn("[MapPickPointTool] 无活动 SceneView"); return false; }
             sv.in2DMode = false;
             sv.orthographic = true;
-            sv.LookAtDirect(new Vector3(worldXZ.x, 0f, worldXZ.y), Quaternion.Euler(90f, 0f, 0f), viewSize);
+            sv.LookAtDirect(new Vector3(worldXY.x, worldXY.y, 0f), Quaternion.identity, viewSize);
             SceneView.RepaintAll();
-            GICLog.Info($"[MapPickPointTool] 视角已对准{what} ({worldXZ.x:F2}, {worldXZ.y:F2})");
+            GICLog.Info($"[MapPickPointTool] 视角已对准{what} ({worldXY.x:F2}, {worldXY.y:F2})");
             return true;
         }
 
@@ -346,19 +362,21 @@ namespace GIC.Editor
                         _calibAnchorB = (_calibAnchorA + 1) % names.Count;
 
                     _modeContainer.Add(new Label(
-                        "换图/扩图后的重对齐（两次点击解出原点+单位长度）：\n" +
+                        "原理：锚点世界坐标固定不动；标定调整图片位置/缩放，\n" +
+                        "使你点击的图上内容移动到锚点正下方（图向锚点靠拢，锚点不移动）。\n" +
                         "① 选两个相距较远的参照锚点 A、B\n" +
-                        "② Ctrl+左键点 A 在图上的实际位置\n" +
-                        "③ 再点 B 的实际位置 → 自动写入新标定") { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 4 } });
+                        "② Ctrl+左键点 A 在图上的实际位置（绿圈处）\n" +
+                        "③ 再点 B 的实际位置（自动吸附到过 A 的约束线，只需点对远近）\n" +
+                        "✎ 自检：未换图时点在 A/B 绿圈正中心 → 解出的标定应与当前一致（图不动）") { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 4 } });
 
                     // 标签用短名（A/B）：中文长标签在 SDF 字体度量下横向溢出会与字段值重叠
                     var ddA = new DropdownField("A", names, _calibAnchorA);
                     ddA.style.marginBottom = 2;
-                    ddA.RegisterValueChangedCallback(_ => { _calibAnchorA = ddA.index; _hasPickA = false; });
+                    ddA.RegisterValueChangedCallback(_ => { _calibAnchorA = ddA.index; _hasPickA = false; _hasPickB = false; });
                     _modeContainer.Add(ddA);
                     var ddB = new DropdownField("B", names, _calibAnchorB);
                     ddB.style.marginBottom = 4;
-                    ddB.RegisterValueChangedCallback(_ => { _calibAnchorB = ddB.index; _hasPickA = false; });
+                    ddB.RegisterValueChangedCallback(_ => { _calibAnchorB = ddB.index; _hasPickA = false; _hasPickB = false; });
                     _modeContainer.Add(ddB);
 
                     _modeContainer.Add(new Label(CalibrationStepHint()) { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 2 } });
@@ -369,6 +387,7 @@ namespace GIC.Editor
                     var resetBtn = ConfigEditorUITK.CreateToolButton("重取（清除已点击的点）", () =>
                     {
                         _hasPickA = false;
+                        _hasPickB = false;
                         RebuildModeControls();
                         SceneView.RepaintAll();
                     });
@@ -382,6 +401,8 @@ namespace GIC.Editor
         {
             if (_calibAnchorA < 0 || _calibAnchorB < 0 || _calibAnchorA >= _allAnchors.Count || _calibAnchorB >= _allAnchors.Count)
                 return "▶ 请先选择参照锚点 A、B";
+            if (_hasPickB)
+                return "✓ 标定完成（两白圈=你的点击点）。下一步：「保存到磁盘」+ 菜单 Tools/地图/应用地图标定";
             var a = _allAnchors[_calibAnchorA].anchor;
             var b = _allAnchors[_calibAnchorB].anchor;
             float knownDist = Vector2.Distance(a.world, b.world);
@@ -414,12 +435,15 @@ namespace GIC.Editor
             if (e.type == UnityEngine.EventType.MouseDown && e.button == 0 && e.control && !e.alt)
             {
                 var ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-                if (ray.direction.y < -0.0001f)
+                if (Mathf.Abs(ray.direction.z) > 0.0001f)
                 {
-                    float t = -ray.origin.y / ray.direction.y;
-                    var p = ray.origin + ray.direction * t;
-                    ApplyPick(new Vector2(p.x, p.z));
-                    e.Use();
+                    float t = -ray.origin.z / ray.direction.z;
+                    if (t > 0f)
+                    {
+                        var p = ray.origin + ray.direction * t;
+                        ApplyPick(new Vector2(p.x, p.y));
+                        e.Use();
+                    }
                 }
             }
         }
@@ -431,22 +455,19 @@ namespace GIC.Editor
 
             foreach (var r in cfg.AllRegions)
             {
-                var pos = new Vector3(r.viewCenterWorld.x, 0f, r.viewCenterWorld.y);
-                Handles.color = new Color(1f, 0.85f, 0.2f);
-                DrawMarker(pos, 2.2f);
-                Handles.Label(pos + Vector3.up * 3f + Vector3.forward * 2f, $"◆ {r.region} 视野中心");
+                var pos = new Vector3(r.viewCenterWorld.x, r.viewCenterWorld.y, 0f);
+                DrawMarker(pos, 1.1f, new Color(1f, 0.85f, 0.2f, 0.35f));
+                Handles.Label(pos + Vector3.up * 1.5f + Vector3.back * 2f, $"◆ {r.region} 视野中心");
             }
 
             foreach (var (region, anchor) in _allAnchors)
             {
-                var pos = new Vector3(anchor.world.x, 0f, anchor.world.y);
-                Handles.color = new Color(0.2f, 0.9f, 0.9f);
-                DrawMarker(pos, 1.4f);
-                Handles.Label(pos + Vector3.up * 2f + Vector3.forward * 1.2f, anchor.positionName.ToString());
+                var pos = new Vector3(anchor.world.x, anchor.world.y, 0f);
+                DrawMarker(pos, 0.7f, new Color(0.2f, 0.9f, 0.9f, 0.35f));
+                Handles.Label(pos + Vector3.up * 1f + Vector3.back * 1.2f, anchor.positionName.ToString());
             }
 
             // 当前编辑目标红色高亮
-            Handles.color = Color.red;
             Vector3 target = default;
             bool has = false;
             switch (_mode)
@@ -454,42 +475,53 @@ namespace GIC.Editor
                 case PickMode.区域视野中心:
                 {
                     var r = cfg.GetRegion(_region);
-                    if (r != null) { target = new Vector3(r.viewCenterWorld.x, 0f, r.viewCenterWorld.y); has = true; }
+                    if (r != null) { target = new Vector3(r.viewCenterWorld.x, r.viewCenterWorld.y, 0f); has = true; }
                     break;                }
                 case PickMode.已有锚点 when _anchorIndex >= 0 && _anchorIndex < _allAnchors.Count:
                 {
                     var a = _allAnchors[_anchorIndex].anchor;
-                    target = new Vector3(a.world.x, 0f, a.world.y);
+                    target = new Vector3(a.world.x, a.world.y, 0f);
                     has = true;
                     break;
                 }
                 case PickMode.标定地图 when _calibAnchorA >= 0 && _calibAnchorB >= 0 &&
                     _calibAnchorA < _allAnchors.Count && _calibAnchorB < _allAnchors.Count:
                 {
-                    // 参照锚点 A/B 绿色十字标记其"应在"位置；已点击的 A 点画白圈
+                    // 参照锚点 A/B 绿色标记其"应在"位置；已点击的位置画白标记（解算后保留两个）
                     var wa = _allAnchors[_calibAnchorA].anchor.world;
                     var wb = _allAnchors[_calibAnchorB].anchor.world;
-                    Handles.color = new Color(0.3f, 1f, 0.4f);
-                    DrawMarker(new Vector3(wa.x, 0f, wa.y), 2.6f);
-                    DrawMarker(new Vector3(wb.x, 0f, wb.y), 2.6f);
-                    Handles.Label(new Vector3(wa.x, 0f, wa.y) + Vector3.up * 3f, $"A {_allAnchors[_calibAnchorA].anchor.positionName}（应在此）");
-                    Handles.Label(new Vector3(wb.x, 0f, wb.y) + Vector3.up * 3f, $"B {_allAnchors[_calibAnchorB].anchor.positionName}（应在此）");
+                    DrawMarker(new Vector3(wa.x, wa.y, 0f), 1.3f, new Color(0.3f, 1f, 0.4f, 0.35f));
+                    DrawMarker(new Vector3(wb.x, wb.y, 0f), 1.3f, new Color(0.3f, 1f, 0.4f, 0.35f));
+                    Handles.Label(new Vector3(wa.x, wa.y, 0f) + Vector3.up * 1.5f + Vector3.back * 2f, $"A {_allAnchors[_calibAnchorA].anchor.positionName}（应在此）");
+                    Handles.Label(new Vector3(wb.x, wb.y, 0f) + Vector3.up * 1.5f + Vector3.back * 2f, $"B {_allAnchors[_calibAnchorB].anchor.positionName}（应在此）");
+
+                    // B 点约束线：过已点击的 A 点、方向=A→B 已知位移。第二击只能落在此线上（自动投影）
                     if (_hasPickA)
                     {
-                        Handles.color = Color.white;
-                        DrawMarker(new Vector3(_pickA.x, 0f, _pickA.y), 2.0f);
+                        Vector2 dir = (wb - wa).normalized;
+                        var p0 = new Vector3(_pickA.x, _pickA.y, -0.1f);
+                        var p1 = p0 + new Vector3(dir.x, dir.y, 0f) * 200f;
+                        var p2 = p0 - new Vector3(dir.x, dir.y, 0f) * 200f;
+                        Handles.color = new Color(1f, 1f, 1f, 0.35f);
+                        Handles.DrawLine(p2, p1);
+                        Handles.Label(p0 + Vector3.up * 1f + Vector3.back * 1.5f, "B 须落在此线上");
                     }
+
+                    if (_hasPickA) DrawMarker(new Vector3(_pickA.x, _pickA.y, 0f), 1.0f, new Color(1f, 1f, 1f, 0.35f));
+                    if (_hasPickB) DrawMarker(new Vector3(_pickB.x, _pickB.y, 0f), 1.0f, new Color(1f, 1f, 1f, 0.35f));
                     break;
                 }
             }
-            if (has) DrawMarker(target, 3.2f);
+            if (has) DrawMarker(target, 1.6f, new Color(1f, 0.25f, 0.2f, 0.35f));
         }
 
-        private static void DrawMarker(Vector3 pos, float size)
+        /// <summary>标记 = 1 个圆环 + 中心半透明小实心圆（半径=圆环 20%，半透明可见底下地图）</summary>
+        private static void DrawMarker(Vector3 pos, float size, Color fill)
         {
-            // 正交俯视场景：画两个交叉的圆环（水平），任意视角可见
-            Handles.DrawWireDisc(pos, Vector3.up, size);
-            Handles.DrawWireDisc(pos, Vector3.up, size * 0.55f);
+            Handles.color = fill;
+            Handles.DrawSolidDisc(pos, Vector3.back, size * 0.2f);
+            Handles.color = new Color(fill.r, fill.g, fill.b, 1f); // 圆环不透明，轮廓清晰
+            Handles.DrawWireDisc(pos, Vector3.back, size);
         }
 
         // ==================== 取点写回 ====================
@@ -569,11 +601,16 @@ namespace GIC.Editor
                     {
                         _pickA = world;
                         _hasPickA = true;
+                        _hasPickB = false;
                         _lastPick = $"① 已点击 {anchorA.positionName} 的实际位置 ({world.x:F2}, {world.y:F2})\n请继续点击 {anchorB.positionName}";
                     }
                     else
                     {
-                        Vector2 pickB = world;
+                        // B 点硬约束：第二次点击只能落在「过 A 点、方向=已知位移向量」的直线上（斜率固定）。
+                        // 点击位置投影到该线——用户横着点歪了，落点自动滑到线上正确的纵向位置
+                        Vector2 knownDir = (anchorB.world - anchorA.world).normalized;
+                        Vector2 pickB = ProjectOntoLine(world, _pickA, knownDir);
+
                         // 点击的世界坐标 → 新图上的像素坐标（按当前标定换算）
                         var pxA = cfg.WorldToPixel(_pickA);
                         var pxB = cfg.WorldToPixel(pickB);
@@ -584,9 +621,20 @@ namespace GIC.Editor
                         {
                             _lastPick = "两次点击位置过近（像素距离 < 1），请重取（选相距更远的两个锚点）";
                             _hasPickA = false;
+                            _hasPickB = false;
                         }
                         else
                         {
+                            // 投影点落在 A 的反方向（点反了）：提示但不硬拒（用户可有意为之的场景不存在，直接提示重取）
+                            float sign = Vector2.Dot(world - _pickA, knownDir);
+                            if (sign < 0f)
+                            {
+                                _lastPick = $"点击位置在参照线反方向（B 应在 A 的 {knownDir} 方向侧），请重新点击 B";
+                                _hasPickB = false;
+                                // 保留 _hasPickA，继续等第二次点击
+                            }
+                            else
+                            {
                             // 两点解标定：新单位 = 已知世界距离 ÷ 新图像素距离；
                             // 新原点使 pxA 映射回 anchorA.world（Y 翻转：图片 y 向下、世界 z 向上）
                             float newUnit = known / pxDistance;
@@ -595,12 +643,17 @@ namespace GIC.Editor
                                 anchorA.world.y + pxA.y * newUnit);
                             SetCalibration(cfg, newOrigin, newUnit);
 
-                            _hasPickA = false;
+                            // 保留两个点击点白圈（可视化），重取/换参照时清除
+                            _pickB = pickB;
+                            _hasPickA = true;
+                            _hasPickB = true;
                             _lastPick =
-                                $"② 标定完成：原点 ({newOrigin.x:F2}, {newOrigin.y:F2})，单位长度 {newUnit:F6}\n" +
+                                $"✓ 标定完成：原点 ({newOrigin.x:F2}, {newOrigin.y:F2})，单位长度 {newUnit:F6}\n" +
                                 $"（世界 {known:F2} ÷ 像素 {pxDistance:F0}）\n" +
                                 "锚点/区域数据未动。请点「保存到磁盘」，再运行菜单\n" +
                                 "Tools/地图/应用地图标定到 MapScreen 场景（场景内图片即时重摆，目测对齐）";
+                            GICLog.Info($"[MapPickPointTool] 标定完成 origin=({newOrigin.x:F2},{newOrigin.y:F2}) unit={newUnit:F6}");
+                            }
                         }
                     }
 

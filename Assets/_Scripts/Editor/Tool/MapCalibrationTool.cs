@@ -27,11 +27,18 @@ namespace GIC.Editor
                 return;
             }
 
+            var planeField = typeof(GIC.UI.MapScreen).GetField("地图贴图",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var plane = planeField?.GetValue(screens[0]) as SpriteRenderer;
+            if (plane != null)
+                Undo.RegisterCompleteObjectUndo(plane.transform, "应用地图标定");
+
             screens[0].ApplyMapCalibration();
 
             EditorSceneManager.MarkSceneDirty(scene);
             bool saved = EditorSceneManager.SaveScene(scene);
-            GICLog.Info($"[MapCalibrationTool] 标定已应用到 MapPlane 并保存场景（saved={saved}）。请目测地图与锚点对齐情况");
+            GICLog.Info($"[MapCalibrationTool] 标定已应用到 MapPlane 并保存场景（saved={saved}）。请目测地图与锚点对齐情况\n" +
+                        "撤回说明：场景摆放可 Ctrl+Z；但 MapConfig 标定参数才是源头——参数撤回用取点器 Ctrl+Z（未保存时）或 git checkout");
         }
     }
 }

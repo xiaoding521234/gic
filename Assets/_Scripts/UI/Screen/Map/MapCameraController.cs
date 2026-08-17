@@ -1,4 +1,4 @@
-// MapCameraController.cs - 3D 大地图相机控制器（正交俯视平面版）
+// MapCameraController.cs - 大地图相机控制器（垂直画布正交版，Unity 2D 约定）
 using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -7,9 +7,9 @@ using GIC.Framework;
 namespace GIC.UI
 {
     /// <summary>
-    /// 大地图相机控制器（正交垂直俯视，无 3D 透视效果）。
-    /// 地图平铺在 XZ 地面，相机从正上方往下看，观感等同原 UGUI 平面地图：
-    /// - 拖拽平移：抓取地面点跟随（鼠标/单指）
+    /// 大地图相机控制器（垂直画布正交版，Unity 2D 约定）。
+    /// 地图平铺在 XY 竖直平面（z=0），相机沿 -Z 看，rotation 归零：
+    /// - 拖拽平移：抓取画布点跟随（鼠标/单指）
     /// - 缩放：滚轮/双指捏合调整正交尺寸（比例式）
     /// - 边界：注视点按当前可见范围限制在地图矩形内（画面不露出地图外）
     /// - 入场动画：尺寸从倍数回落（快进慢出），期间持有 MapEntering 输入锁
@@ -17,7 +17,7 @@ namespace GIC.UI
     /// </summary>
     public class MapCameraController : MonoBehaviour
     {
-        private const float 相机固定高度 = 100f;
+        private const float 相机固定距离 = 100f;
 
         [Header("缩放")]
         [SerializeField] private float 最小尺寸 = 5f;
@@ -37,7 +37,7 @@ namespace GIC.UI
         private float _mapHalfW = 107.5f;   // 地图半宽（世界单位，X 方向）
         private float _mapHalfH = 69f;      // 地图半高（世界单位，Z 方向）
 
-        // 相机状态：地面注视点（x→世界X，y→世界Z）+ 正交尺寸（垂直半高，世界单位）
+        // 相机状态：画布注视点（x→世界X，y→世界Y）+ 正交尺寸（垂直半高，世界单位）
         private Vector2 _focus;
         private float _size = 8f;
 
@@ -101,9 +101,9 @@ namespace GIC.UI
             _camera.orthographic = true;
             _size = Mathf.Clamp(_size, 最小尺寸, 最大尺寸); // 硬 clamp：任何来源的尺寸都不越界
             _camera.orthographicSize = _size;
-            // 正交俯视：绕 X 正 90° = 垂直向下看（Unity 旋转约定，勿写负值）
-            _camera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            _camera.transform.position = new Vector3(_focus.x, 相机固定高度, _focus.y);
+            // 垂直画布（Unity 2D 约定）：地图平铺 XY 竖直平面，相机沿 -Z 看，rotation 归零
+            _camera.transform.rotation = Quaternion.identity;
+            _camera.transform.position = new Vector3(_focus.x, _focus.y, -相机固定距离);
         }
 
         // ==================== 公共接口 ====================
@@ -121,11 +121,11 @@ namespace GIC.UI
         /// fromMaxZoom=true 从最大远景落下（初次打开地图）；
         /// false（默认）从当前视野平滑滑移到目标（原神式区域切换）。
         /// </summary>
-        public void FocusRegion(Vector2 focusXZ, float viewSize = 0f, bool fromMaxZoom = false)
+        public void FocusRegion(Vector2 focusXY, float viewSize = 0f, bool fromMaxZoom = false)
         {
             // 未配置区域视野时落点 = 缩放区间中点（居中视野，非最大也非最底）
             float targetSize = viewSize > 0f ? Mathf.Clamp(viewSize, 最小尺寸, 最大尺寸) : Mathf.Lerp(最小尺寸, 最大尺寸, 0.5f);
-            PlayEntryAnimation(ClampFocus(focusXZ, targetSize), targetSize, fromMaxZoom);
+            PlayEntryAnimation(ClampFocus(focusXY, targetSize), targetSize, fromMaxZoom);
         }
 
         /// <summary>当前正交尺寸（锚点恒定视觉尺寸等外部逻辑用）</summary>
@@ -154,7 +154,7 @@ namespace GIC.UI
 
         private void HandleMouse()
         {
-            // 滚轮缩放（以鼠标地面点为锚；乘法缩放）
+            // 滚轮缩放（以鼠标画布点为锚；乘法缩放）
             if (Input.mouseScrollDelta.y != 0f && TryGetGroundPoint(Input.mousePosition, out Vector2 anchor))
                 SetSizeAtScreenPoint(Input.mousePosition, _size * Mathf.Pow(滚轮缩放步进, -Input.mouseScrollDelta.y), anchor);
 
@@ -248,30 +248,30 @@ namespace GIC.UI
 
         // ==================== 几何计算 ====================
 
-        /// <summary>屏幕点射线与地面（y=0）的交点（x→世界X，y→世界Z）。正交相机射线方向为垂直向下</summary>
-        private bool TryGetGroundPoint(Vector3 screenPos, out Vector2 groundXZ)
+        /// <summary>屏幕点射线与画布平面（z=0）的交点（x→世界X，y→世界Y）。相机位于 -Z 侧朝 +Z 看，交点在相机前方（t&gt;0）即有效</summary>
+        private bool TryGetGroundPoint(Vector3 screenPos, out Vector2 planeXY)
         {
-            groundXZ = default;
+            planeXY = default;
             if (_camera == null) return false;
             Ray ray = _camera.ScreenPointToRay(screenPos);
-            if (ray.direction.y >= -0.0001f) return false;
-            float t = -ray.origin.y / ray.direction.y;
-            if (t < 0f) return false;
-            groundXZ = new Vector2(ray.origin.x + ray.direction.x * t, ray.origin.z + ray.direction.z * t);
+            if (Mathf.Abs(ray.direction.z) < 0.0001f) return false; // 射线近乎平行画布
+            float t = -ray.origin.z / ray.direction.z;
+            if (t < 0f) return false; // 交点在相机背后
+            planeXY = new Vector2(ray.origin.x + ray.direction.x * t, ray.origin.y + ray.direction.y * t);
             return true;
         }
 
         /// <summary>
-        /// 缩放到新尺寸，并保持锚定地面点仍位于指定屏幕点下方。
+        /// 缩放到新尺寸，并保持锚定画布点仍位于指定屏幕点下方。
         /// 正交相机下屏幕偏移与尺寸成线性关系，可直接按比例换算注视点。
         /// </summary>
-        private void SetSizeAtScreenPoint(Vector3 screenPos, float newSize, Vector2 anchorXZ)
+        private void SetSizeAtScreenPoint(Vector3 screenPos, float newSize, Vector2 anchorXY)
         {
             newSize = Mathf.Clamp(newSize, 最小尺寸, 最大尺寸);
             if (Mathf.Approximately(newSize, _size)) return;
 
             float ratio = newSize / _size;
-            _focus = ClampFocus(anchorXZ - (anchorXZ - _focus) * ratio, newSize);
+            _focus = ClampFocus(anchorXY - (anchorXY - _focus) * ratio, newSize);
             _size = newSize;
             ApplyCameraSetup();
         }

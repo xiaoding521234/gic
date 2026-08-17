@@ -10,7 +10,7 @@ namespace GIC.UI
     /// <summary>
     /// 3D 大地图锚点：SpriteRenderer 直立面片 + BoxCollider，
     /// 点击由 MapCameraController 射线检测后分发到 HandleClick()。
-    /// 图标面片在 RefreshVisual 中按相机俯角倾斜并抬离地面。
+    /// 图标面片在 RefreshVisual 中直立面向相机，沿画布法线抬离地图。
     /// </summary>
     public class MapAnchor : MonoBehaviour
     {
@@ -22,8 +22,8 @@ namespace GIC.UI
         [Header("显示状态")]
         [SerializeField] private Color 解锁颜色 = Color.white;
         [SerializeField] private Color 未解锁颜色 = new Color(0.5f, 0.5f, 0.5f, 1f);
-        [Tooltip("图标面片中心离地高度（世界单位）")]
-        [SerializeField] private float 悬浮高度 = 0.7f;
+        [Tooltip("图标面片沿画布法线抬离地图的偏移（世界单位，-Z 靠相机侧）")]
+        [SerializeField] private float 悬浮偏移 = 0.7f;
 
         private SpriteRenderer _icon;
         private PositionData cachedData;
@@ -63,14 +63,15 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 摆放图标面片（正交俯视相机：平铺在地图平面上方，与 MapPlane 同旋转）。
-        /// 在锚点被摆到地面点之后由 MapScreen 调用。
+        /// 摆放图标面片（垂直画布：icon 直立即面向相机，与 MapPlane 同朝向）。
+        /// 在锚点被摆到画布点之后由 MapScreen 调用。
         /// </summary>
         public void RefreshVisual()
         {
             if (_icon == null) return;
-            _icon.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            _icon.transform.localPosition = new Vector3(0f, 悬浮高度, 0f);
+            _icon.transform.localRotation = Quaternion.identity;
+            // 悬浮偏移：向画布外侧（-Z，靠相机侧）抬离，避免与地图穿插
+            _icon.transform.localPosition = new Vector3(0f, 0f, -悬浮偏移);
         }
 
         /// <summary>按解锁状态刷新颜色与可点击标记</summary>

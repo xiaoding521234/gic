@@ -15,7 +15,7 @@ namespace GIC.Data
     public class MapConfig : ScriptableObject
     {
         [Header("地图标定（固定世界坐标系，扩图后只改这两项）")]
-        [Tooltip("原点坐标：地图图片左上角在世界坐标（XZ）中的位置。扩图后调整此值，使旧内容对齐原位（如向北扩 100 单位，则 y 增加 100）")]
+        [Tooltip("原点坐标：地图图片左上角在世界坐标（垂直画布 XY，图片顶边在世界 +Y）中的位置。扩图后调整此值，使旧内容对齐原位")]
         [SerializeField] private Vector2 mapOrigin = new Vector2(-107.52f, 69.12f);
 
         [Tooltip("坐标单位长度：每图片像素对应的世界单位数。当前图宽 10752px = 215.04 世界单位 → 0.02")]
@@ -31,12 +31,12 @@ namespace GIC.Data
         /// <summary>每图片像素的世界单位数</summary>
         public float WorldUnitsPerPixel => worldUnitsPerPixel;
 
-        /// <summary>世界 XZ 坐标 → 图片像素坐标（左上原点，向下为 +y；供编辑器取点工具对照 Photoshop）</summary>
-        public Vector2 WorldToPixel(Vector2 worldXZ)
+        /// <summary>世界 XY 坐标 → 图片像素坐标（左上原点，向下为 +y；垂直画布下世界 Y 向上，故 y 取差值）</summary>
+        public Vector2 WorldToPixel(Vector2 worldXY)
         {
             return new Vector2(
-                (worldXZ.x - mapOrigin.x) / worldUnitsPerPixel,
-                (mapOrigin.y - worldXZ.y) / worldUnitsPerPixel);
+                (worldXY.x - mapOrigin.x) / worldUnitsPerPixel,
+                (mapOrigin.y - worldXY.y) / worldUnitsPerPixel);
         }
 
         [Serializable]
@@ -44,15 +44,15 @@ namespace GIC.Data
         {
             public RegionName region;
 
-            [Header("区域视野（3D 相机）")]
-            [Tooltip("区域视野中心（固定世界 XZ 坐标，扩图不变）。相机聚焦此点，锚点为空的区域也能定位")]
+            [Header("区域视野")]
+            [Tooltip("区域视野中心（固定世界 XY 坐标，垂直画布，扩图不变）。相机聚焦此点，锚点为空的区域也能定位")]
             public Vector2 viewCenterWorld = Vector2.zero;
 
             [Tooltip("区域视野尺寸（正交相机垂直半高，世界单位）。0 = 使用相机默认视野尺寸")]
             public float viewHeight;
 
             [Header("锚点")]
-            [Tooltip("锚点位置存固定世界 XZ 坐标（换算公式：worldX = mapOrigin.x + px×单位长度，worldZ = mapOrigin.y + py×单位长度，px/py 为图片左上起像素）")]
+            [Tooltip("锚点位置存固定世界 XY 坐标（换算：worldX = mapOrigin.x + px×单位长度，worldY = mapOrigin.y − py×单位长度，px/py 为图片左上起像素）")]
             public List<AnchorData> anchors = new();
         }
 
@@ -61,15 +61,15 @@ namespace GIC.Data
         {
             public PositionName positionName;
 
-            [Tooltip("锚点位置（固定世界 XZ 坐标，扩图不变）")]
+            [Tooltip("锚点位置（固定世界 XY 坐标，扩图不变）")]
             public Vector2 world;
 
             public AnchorData() { }
 
-            public AnchorData(PositionName name, Vector2 worldXZ)
+            public AnchorData(PositionName name, Vector2 worldXY)
             {
                 positionName = name;
-                world = worldXZ;
+                world = worldXY;
             }
         }
 
