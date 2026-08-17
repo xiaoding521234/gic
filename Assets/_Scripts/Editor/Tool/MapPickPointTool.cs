@@ -297,6 +297,10 @@ namespace GIC.Editor
             var saveBtn = ConfigEditorUITK.CreatePrimaryButton("保存到磁盘 (SetDirty + SaveAssets)", SaveToDisk);
             content.Add(saveBtn);
 
+            // 应用标定到场景：工作流闭环（标定→保存→应用→目测），全部在面板内完成
+            var applyBtn = ConfigEditorUITK.CreateToolButton("应用地图标定到场景（重摆 MapPlane + 保存场景）", MapCalibrationTool.ApplyFromPickTool);
+            content.Add(applyBtn);
+
             var help = new Label(
                 "用法：SceneView 中 Ctrl+左键点击地图位置取点（普通点击仍是选择物体）。\n" +
                 "黄色圆 = 区域视野中心（附区域名）；青色 = 锚点（附地名）；红色 = 当前编辑目标。\n" +
@@ -365,7 +369,7 @@ namespace GIC.Editor
                         "原理：锚点世界坐标固定不动；标定调整图片位置/缩放，\n" +
                         "使你点击的图上内容移动到锚点正下方（图向锚点靠拢，锚点不移动）。\n" +
                         "① 选两个相距较远的参照锚点 A、B\n" +
-                        "② Ctrl+左键点 A 在图上的实际位置（绿圈处）\n" +
+                        "② Ctrl+左键点 A 对应地点在图上的实际位置（换图后城市通常不在绿圈处，绿圈=锚点应在位置）\n" +
                         "③ 再点 B 的实际位置（自动吸附到过 A 的约束线，只需点对远近）\n" +
                         "✎ 自检：未换图时点在 A/B 绿圈正中心 → 解出的标定应与当前一致（图不动）") { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 4 } });
 
@@ -402,7 +406,7 @@ namespace GIC.Editor
             if (_calibAnchorA < 0 || _calibAnchorB < 0 || _calibAnchorA >= _allAnchors.Count || _calibAnchorB >= _allAnchors.Count)
                 return "▶ 请先选择参照锚点 A、B";
             if (_hasPickB)
-                return "✓ 标定完成（两白圈=你的点击点）。下一步：「保存到磁盘」+ 菜单 Tools/地图/应用地图标定";
+                return "✓ 标定完成（两白圈=你的点击点）。下一步：面板「保存到磁盘」→「应用地图标定到场景」";
             var a = _allAnchors[_calibAnchorA].anchor;
             var b = _allAnchors[_calibAnchorB].anchor;
             float knownDist = Vector2.Distance(a.world, b.world);
@@ -625,19 +629,37 @@ namespace GIC.Editor
                         }
                         else
                         {
-                            // 投影点落在 A 的反方向（点反了）：提示但不硬拒（用户可有意为之的场景不存在，直接提示重取）
-                            float sign = Vector2.Dot(world - _pickA, knownDir);
-                            if (sign < 0f)
+                            // 方向校验（硬约束）：图与世界轴平行（无旋转）模型下，两次点击连线方向必须与锚点已知
+                            // 位移方向一致（容差 标定方向容差 度）。超差=下拉所选 A/B 与实际点击的两处地点不对应
+                            // （或点错位置），拒绝解算——斜率是固定约束，不是自由量。
+                            // 2026-08-18 补上：此常量曾声明未用，离谱解算（unit=0.5，25 倍偏差）被静默写入并应用
+                            float 偏差角 = Vector2.SignedAngle(knownDir, (world - _pickA).normalized);
+                            if (Mathf.Abs(偏差角) > 标定方向容差)
                             {
-                                _lastPick = $"点击位置在参照线反方向（B 应在 A 的 {knownDir} 方向侧），请重新点击 B";
+                                _lastPick = $"✗ 点击方向与 {anchorA.positionName}→{anchorB.positionName} 已知方向偏差 {偏差角:F1}°（容差 {标定方向容差}°），未解算。\n" +
+                                            "多为下拉框所选锚点与图上实际点击的两处地点不对应，请核对后重取（配置未改动）";
                                 _hasPickB = false;
-                                // 保留 _hasPickA，继续等第二次点击
+                                GICLog.Warn($"[MapPickPointTool] 标定被拒：点击方向偏差 {偏差角:F1}° 超容差 {标定方向容差}°（疑似下拉选择与点击地点不匹配）");
+                                // 保留 _hasPickA，重新点击 B 即可
                             }
                             else
                             {
                             // 两点解标定：新单位 = 已知世界距离 ÷ 新图像素距离；
                             // 新原点使 pxA 映射回 anchorA.world（Y 翻转：图片 y 向下、世界 z 向上）
                             float newUnit = known / pxDistance;
+
+                            // 合理性校验：换图前后地理比例不变，单位长度应与当前值同量级（±3 倍内）。
+                            // 大幅偏离=两处点击识别错误（如把邻近两地点当成 A/B），拒绝写入，防止保存+应用后全图错位
+                            float 比例 = newUnit / cfg.WorldUnitsPerPixel;
+                            if (比例 > 3f || 比例 < 1f / 3f)
+                            {
+                                _lastPick = $"✗ 解算单位长度 {newUnit:F4} 与当前 {cfg.WorldUnitsPerPixel:F4} 相差 {比例:F1} 倍（超出 ±3 倍），已拒绝写入。\n" +
+                                            "请核对：①下拉框 A/B 就是图上点击的两处地点 ②两处相距足够远";
+                                _hasPickB = false;
+                                GICLog.Warn($"[MapPickPointTool] 标定被拒：unit={newUnit:F4} 与当前 {cfg.WorldUnitsPerPixel:F4} 比值 {比例:F1} 超出 ±3 倍");
+                            }
+                            else
+                            {
                             var newOrigin = new Vector2(
                                 anchorA.world.x - pxA.x * newUnit,
                                 anchorA.world.y + pxA.y * newUnit);
@@ -650,9 +672,10 @@ namespace GIC.Editor
                             _lastPick =
                                 $"✓ 标定完成：原点 ({newOrigin.x:F2}, {newOrigin.y:F2})，单位长度 {newUnit:F6}\n" +
                                 $"（世界 {known:F2} ÷ 像素 {pxDistance:F0}）\n" +
-                                "锚点/区域数据未动。请点「保存到磁盘」，再运行菜单\n" +
-                                "Tools/地图/应用地图标定到 MapScreen 场景（场景内图片即时重摆，目测对齐）";
+                                "锚点/区域数据未动。请点「保存到磁盘」，再点面板下方\n" +
+                                "「应用地图标定到场景」按钮（图片即时重摆，目测对齐）";
                             GICLog.Info($"[MapPickPointTool] 标定完成 origin=({newOrigin.x:F2},{newOrigin.y:F2}) unit={newUnit:F6}");
+                            }
                             }
                         }
                     }

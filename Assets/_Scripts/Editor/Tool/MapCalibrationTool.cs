@@ -7,17 +7,19 @@ using GIC.Framework;
 namespace GIC.Editor
 {
     /// <summary>
-    /// 地图标定工具 — 原神式固定世界坐标系的手动标定入口。
-    /// 扩图/换图流程：替换 all_map.jpg → 在 MapConfig.asset 调整 mapOrigin / worldUnitsPerPixel
-    /// → 运行本工具把标定应用到 MapScreen 场景（保存），即可在编辑器中检查对齐。
+    /// 地图标定工具 — 场景应用逻辑（无菜单入口，由取点器面板按钮调用）。
+    /// 换图流程：替换 all_map.jpg → 取点器「标定地图」两点解算 → 保存到磁盘 →
+    /// 面板「应用地图标定到场景」重摆 MapPlane 并保存，编辑器中目测对齐。
     /// 运行时 MapScreen.Start 会按同样参数重新应用，场景值仅用于编辑期可视化。
     /// </summary>
     public static class MapCalibrationTool
     {
         private const string MapScreenScenePath = "Assets/Scenes/MapScreen.unity";
 
-        [MenuItem("Tools/地图/应用地图标定到 MapScreen 场景", priority = -59)]
-        public static void Apply()
+        /// <summary>
+        /// 应用标定到 MapScreen 场景（唯一入口）：开场景 → Undo 注册 → 重摆 → 保存。
+        /// </summary>
+        public static void ApplyFromPickTool()
         {
             var scene = EditorSceneManager.OpenScene(MapScreenScenePath, OpenSceneMode.Single);
             var screens = Object.FindObjectsOfType<GIC.UI.MapScreen>(true);
