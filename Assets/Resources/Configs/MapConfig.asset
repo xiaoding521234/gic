@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a5d6e617ab14d54d992c97e27801355, type: 3}
   m_Name: MapConfig
   m_EditorClassIdentifier: 
-  mapOrigin: {x: -107.52, y: 69.12}
-  worldUnitsPerPixel: 0.02
+  mapOrigin: {x: -108.59422, y: 114.94008}
+  worldUnitsPerPixel: 0.013347972
   regions:
   - region: 1
     viewCenterWorld: {x: -46.6909, y: 26.901167}
