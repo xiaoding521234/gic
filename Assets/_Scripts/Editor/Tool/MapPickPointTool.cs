@@ -19,7 +19,7 @@ namespace GIC.Editor
     /// </summary>
     public class MapPickPointTool : EditorWindow
     {
-        private const string MapScreenScenePath = "Assets/Scenes/MapScreen.unity";
+        private const string MapScreenScenePath = MapPaths.MapScreen场景;
 
         private enum PickMode { 区域视野中心, 已有锚点, 新建锚点, 标定地图 }
 
@@ -73,18 +73,32 @@ namespace GIC.Editor
             if (sv == null) { GICLog.Warn("[MapPickPointTool] 无活动 SceneView"); return; }
             var cfg = LoadConfig();
 
-            // 中心与视野范围：优先按标定参数计算整图范围；无图时退化为全部标记点的包围盒中心
-            Vector2 center;
+            // 中心与视野范围：按标定参数计算整图范围（SourcePixel×unit，与运行时 ApplyMapCalibration 同源；
+            // 瓦片化后勿用 sprite.rect——全图 16384 副本与源图 21900 像素尺寸不同，两套换算会造成编辑器/运行时错位分叉）；
+            // 无图时退化为全部标记点的包围盒中心
+            Vector2 center = Vector2.zero;
             float viewSize = 80f;
-            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Map/Textures/all_map.jpg");
-            if (cfg != null && sprite != null)
+            bool have = false;
+            if (cfg != null)
             {
-                float w = sprite.rect.width * cfg.WorldUnitsPerPixel;
-                float d = sprite.rect.height * cfg.WorldUnitsPerPixel;
-                center = new Vector2(cfg.MapOrigin.x + w * 0.5f, cfg.MapOrigin.y - d * 0.5f);
-                viewSize = d * 0.55f;
+                float srcW = cfg.SourcePixelWidth, srcH = cfg.SourcePixelHeight;
+                if (!cfg.IsTiled)
+                {
+                    // 未瓦片化回退：全图副本自身即源图，像素尺寸取 sprite.rect
+                    var cfgSprite = AssetDatabase.LoadAssetAtPath<Sprite>(MapPaths.全图副本);
+                    srcW = cfgSprite != null ? (int)cfgSprite.rect.width : 0;
+                    srcH = cfgSprite != null ? (int)cfgSprite.rect.height : 0;
+                }
+                if (srcW > 0 && srcH > 0)
+                {
+                    float w = srcW * cfg.WorldUnitsPerPixel;
+                    float d = srcH * cfg.WorldUnitsPerPixel;
+                    center = new Vector2(cfg.MapOrigin.x + w * 0.5f, cfg.MapOrigin.y - d * 0.5f);
+                    viewSize = d * 0.55f;
+                    have = true;
+                }
             }
-            else if (cfg != null)
+            if (!have && cfg != null)
             {
                 var all = new List<Vector2>();
                 foreach (var r in cfg.AllRegions)
@@ -97,9 +111,7 @@ namespace GIC.Editor
                     center = all.Aggregate(Vector2.zero, (s, p) => s + p) / all.Count;
                     viewSize = all.Max(p => Mathf.Abs(p.x - center.x)) * 1.2f;
                 }
-                else center = Vector2.zero;
             }
-            else center = Vector2.zero;
 
             // 退出 2D 模式：2D 模式强制相机沿 +Z 水平看，地图侧对相机呈一条线（什么都看不见）
             sv.in2DMode = false;
@@ -420,7 +432,7 @@ namespace GIC.Editor
         }
 
         private static GIC.Data.MapConfig LoadConfig()
-            => AssetDatabase.LoadAssetAtPath<GIC.Data.MapConfig>("Assets/Resources/Configs/MapConfig.asset");
+            => AssetDatabase.LoadAssetAtPath<GIC.Data.MapConfig>(MapPaths.MapConfig);
 
         private void RebuildAnchorIndex()
         {

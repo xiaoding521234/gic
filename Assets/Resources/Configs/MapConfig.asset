@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: MapConfig
   m_EditorClassIdentifier: 
   mapOrigin: {x: -108.59422, y: 114.94008}
-  worldUnitsPerPixel: 0.013347972
-  sourcePixelWidth: 16384
-  sourcePixelHeight: 13896
-  tileColumns: 8
-  tileRows: 7
+  worldUnitsPerPixel: 0.00998599
+  sourcePixelWidth: 21900
+  sourcePixelHeight: 18576
+  tileColumns: 11
+  tileRows: 10
   tilePixelSize: 2048
   tileOverlapPx: 4
   tileAddressPrefix: MapAssets/Tiles/tile_

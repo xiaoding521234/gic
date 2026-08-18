@@ -206,24 +206,8 @@ namespace GIC.UI
         /// <summary>按标定参数把瓦片 sprite 摆进世界（重叠边使瓦片间有 2×重叠像素带，内容一致无接缝）</summary>
         private void PlaceTile(Vector2Int id, Sprite sprite)
         {
-            var cfg = mapConfig;
-            float u = cfg.WorldUnitsPerPixel;
-            int t = cfg.TilePixelSize, o = cfg.TileOverlapPx;
-            int w = cfg.SourcePixelWidth, h = cfg.SourcePixelHeight;
-
-            // 瓦片像素矩形（含重叠边，地图边缘钳制）
-            int px0 = Mathf.Max(0, id.x * t - o);
-            int py0 = Mathf.Max(0, id.y * t - o);
-            int px1 = Mathf.Min(w, (id.x + 1) * t + o);
-            int py1 = Mathf.Min(h, (id.y + 1) * t + o);
-
-            float worldW = (px1 - px0) * u;
-            float worldH = (py1 - py0) * u;
-            // 图片像素 → 世界：左上角 + (px, −py)
-            var center = new Vector3(
-                cfg.MapOrigin.x + (px0 + px1) * 0.5f * u,
-                cfg.MapOrigin.y - (py0 + py1) * 0.5f * u,
-                瓦片前移);
+            GetTileWorldRect(mapConfig, id, out var center2, out var worldSize);
+            var center = new Vector3(center2.x, center2.y, 瓦片前移);
 
             if (!_live.TryGetValue(id, out var renderer) || renderer == null)
             {
@@ -236,8 +220,30 @@ namespace GIC.UI
             var b = sprite.bounds.size;
             renderer.transform.localPosition = center;
             renderer.transform.localRotation = Quaternion.identity;
-            renderer.transform.localScale = new Vector3(worldW / b.x, worldH / b.y, 1f);
+            renderer.transform.localScale = new Vector3(worldSize.x / b.x, worldSize.y / b.y, 1f);
             renderer.sprite = sprite;
+        }
+
+        /// <summary>
+        /// 瓦片（含重叠边）的世界中心与尺寸（图片左上原点、Y 向下，地图边缘钳制）。
+        /// 运行时铺放与编辑器高清瓦片层（MapEditorFullRes）共用此几何，勿在他处复制公式。
+        /// </summary>
+        public static void GetTileWorldRect(MapConfig cfg, Vector2Int id, out Vector2 center, out Vector2 size)
+        {
+            float u = cfg.WorldUnitsPerPixel;
+            int t = cfg.TilePixelSize, o = cfg.TileOverlapPx;
+
+            // 瓦片像素矩形（含重叠边，地图边缘钳制）
+            int px0 = Mathf.Max(0, id.x * t - o);
+            int py0 = Mathf.Max(0, id.y * t - o);
+            int px1 = Mathf.Min(cfg.SourcePixelWidth, (id.x + 1) * t + o);
+            int py1 = Mathf.Min(cfg.SourcePixelHeight, (id.y + 1) * t + o);
+
+            size = new Vector2((px1 - px0) * u, (py1 - py0) * u);
+            // 图片像素 → 世界：左上角 + (px, −py)
+            center = new Vector2(
+                cfg.MapOrigin.x + (px0 + px1) * 0.5f * u,
+                cfg.MapOrigin.y - (py0 + py1) * 0.5f * u);
         }
     }
 }

@@ -14,7 +14,7 @@ namespace GIC.Editor
     /// </summary>
     public static class MapCalibrationTool
     {
-        private const string MapScreenScenePath = "Assets/Scenes/MapScreen.unity";
+        private const string MapScreenScenePath = MapPaths.MapScreen场景;
 
         /// <summary>
         /// 应用标定到 MapScreen 场景（唯一入口）：开场景 → Undo 注册 → 重摆 → 保存。
