@@ -45,6 +45,7 @@
 
 - [2026-08-18 01:26:36] [feedback] git checkout 回滚 Unity 资产后必须强制重载编辑器内已打开的场景（EditorSceneManager.OpenScene 同路径 Single），否则磁盘已还原但 SceneView 仍是旧画面，易在错位现场上二次返工。**Why:** OpenScene 才丢弃内存态，git 只动磁盘（2026-08-17 标定事故实证）。**How to apply:** 任何对"编辑器中已打开场景文件"的 git 恢复操作，收尾必须 OpenScene 重载+断言现场；标定自测/换图工作流见 gic-map skill。
 - [2026-08-18 02:37:55] [feedback] unity_menu 执行超过 330s 的编辑器工具会在桥侧超时并自动重试（2026-08-18 瓦片工具被执行 4 次实证）。**Why:** 长工具（ffmpeg 切图+批量重导入）必然超时，靠幂等设计（先清后建、CreateOrMoveEntry、保存后重开断言）扛住了 4 次重复执行。**How to apply:** 经 unity_menu/execute_csharp_script 跑长编辑器工具时必须幂等；或把重活拆成多次短调用（如 ffmpeg 在外部 shell 跑完再让编辑器只做导入）。
+- [2026-08-18 14:12:23] [feedback] unity_menu 桥超时重试链会导致"必超时工具"无限叠轮（2026-08-18 110 片烘焙实证：单轮 4-5 分钟 > 330s，重试无限循环，主线程模态框僵尸化 85 分钟，最终被迫杀编辑器重启）。**Why:** 桥对超时命令自动重试且无上限，单轮耗时超过 330s 的编辑器工具会每轮必超时必重试。**How to apply:** ①预计 >4 分钟的烘焙/批量操作必须拆两段：重活（切图/转码）在 Unity 外部进程跑，编辑器内只做导入/接线（<1 分钟）；②MapTileBakeTool 已拆为「生成地图瓦片」（完整版）+「导入已切瓦片」（ImportOnly，外部切图后用）；③编辑器主线程僵尸（Hold on busy 模态 >10 分钟不释放）时直接杀进程重启，磁盘资产无损（场景已保存，烘焙幂等）。
 
 ### Project
 
@@ -156,6 +157,7 @@
 
 - [2026-08-16 15:45:02] [2026-08-16] GIC 真机描边丢失已根治（docs/14 §6.3）：zh-cn SDF.asset 三路引用（场景直引+TMP Settings 默认字体+Addressables UIAssets MainFont），打包后 Addressables 份与场景份是不同实例，TextCombiner.ApplyFont 引用比较误判字体变更→fontMaterial 覆盖回 _OutlineWidth=0。**根治=删除 TextCombiner 运行时字体加载链（LoadFont/ApplyFont/fontTable/fontEntryKey 全删）+ 删 UIAssets 表 5 语言 MainFont 条目 + 手清 Addressables Localization-Assets-Shared 组残留条目（read-only 组不随表变更自动同步，改后须 ImportAsset(ForceUpdate) 重载）**。字体仅剩场景直引+TMP 默认字体两条固有路径，运行时无代码动 font/fontMaterial。7 个祈愿面板共用 VentiPanel.prefab（描边材质在源 prefab 上：名称黑0.15+称号白0.08）。**Why:** UIAssets 表只有中文配过字体、唯一消费者是 TextCombiner，属死代码路径。**How to apply:** 勿恢复"运行时整体赋 font+fontMaterial"写法；将来做多语言字体切换时只换 fontAsset 并保留材质变体映射。
 - [2026-08-18 12:33:04] [project] 大地图瓦片化已落地（2026-08-18，ae853d6+bc25df3）：源图 all_map.jpg 16384×13896 不上屏不进构建（移出 MapAssets 组+场景零引用）；MapPlane 挂 2048×1736 预览图（DXT1），56 片 2048px DXT1 瓦片（4px 重叠边防接缝）按视野经 AssetCache 动态加载（MapTileLayer，High 优先级，预载1格+滞回1格）；MapTilePreloader 大厅按当前区域初始视野预载（Persistent ≈65-88MB），区域切换 AssetCache.UnloadPreload 换血防累积，打开即清晰。跳非当前区域首跳冷加载糊 1-3 秒（同包热后全快）——**用户已拍板保持现状**（A 全预载 118MB / D 原神式中景 LOD 均讨论后否决，将来换更大源图或低端机适配再议 D）。换图工作流=覆盖 all_map.jpg → Tools/地图/生成地图瓦片（MapTileBakeTool，幂等）→ 标定；取点器打开时编辑器临时换全图（MapEditorFullRes，sceneSaving 守卫防全图引用写入场景 YAML）。世界尺寸换算用 MapConfig.sourcePixelWidth/Height 勿用 sprite.rect。**How to apply:** 换图/标定/新区域见 gic-map skill；方案细节 docs/13 §9.1、docs/14 §8.2.1。
+- [2026-08-18 16:44:46] [project] 大地图 v7.0 高清母版切换（2026-08-18 完成）：母版 Export/all_map_source.jpg 21900×18576；110 片瓦片入库；换图错位已根治（unit 等比换算 0.0099860，烘焙工具自动换算，全链路统一 SourcePixel×unit）；Addressables 组损坏已重建；路径常量收敛 MapPaths.cs。**取点器高清目测已升级为编辑器瓦片层（MapEditorFullRes 重写）**：打开铺 110 片母版原生像素瓦片（DontSave 不落盘，关窗/存场景/进 Play 自动销毁，Z 读场景瓦片层 瓦片前移），几何与运行时共用 MapTileLayer.GetTileWorldRect；16384 all_map.jpg 降级为烘焙回退源不再上屏。用户已 Play 验证通过。**剩余：相机上限 15 待拍板。**
 
 
 
