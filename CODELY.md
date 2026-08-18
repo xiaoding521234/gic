@@ -44,8 +44,7 @@
 
 
 - [2026-08-18 01:26:36] [feedback] git checkout 回滚 Unity 资产后必须强制重载编辑器内已打开的场景（EditorSceneManager.OpenScene 同路径 Single），否则磁盘已还原但 SceneView 仍是旧画面，易在错位现场上二次返工。**Why:** OpenScene 才丢弃内存态，git 只动磁盘（2026-08-17 标定事故实证）。**How to apply:** 任何对"编辑器中已打开场景文件"的 git 恢复操作，收尾必须 OpenScene 重载+断言现场；标定自测/换图工作流见 gic-map skill。
-
-
+- [2026-08-18 02:37:55] [feedback] unity_menu 执行超过 330s 的编辑器工具会在桥侧超时并自动重试（2026-08-18 瓦片工具被执行 4 次实证）。**Why:** 长工具（ffmpeg 切图+批量重导入）必然超时，靠幂等设计（先清后建、CreateOrMoveEntry、保存后重开断言）扛住了 4 次重复执行。**How to apply:** 经 unity_menu/execute_csharp_script 跑长编辑器工具时必须幂等；或把重活拆成多次短调用（如 ffmpeg 在外部 shell 跑完再让编辑器只做导入）。
 
 ### Project
 
@@ -156,7 +155,8 @@
 - [2026-08-16 11:21:24] [project] Tuanjie 1.9.3 加密资产 GUID 机制（2026-08-16 删错材质事故实证）：部分资产（tag:yousandi.cn 新建）meta 里的 base64 guid 是**密文**，资产真实 hex GUID 不出现在 meta 文本中——场景/Prefab 引用的是真实 hex GUID（如 UIBlur.meta 写 base64 但 AssetDatabase 报 6a85668ad20282f4aa90aa58828cdc43，场景正是引用这个 hex）。**Why:** 文本 GUID 审计（meta 提取 guid 全文检索）对加密资产必然误判"零引用"——2026-08-16 据此删了 UIBlur/WishSmoke 等 8 个材质，用户反馈毛玻璃+祈愿烟雾立即失效，git checkout HEAD 恢复后验证引用链完好。**How to apply:** 判定资产是否被引用禁止用文本检索，用 unity_asset get_info 查真实 GUID（或 execute_csharp_script 走 AssetDatabase.GetDependencies，edit mode 安全）；真实 hex GUID 可再对场景文本 Select-String 确认。
 
 - [2026-08-16 15:45:02] [2026-08-16] GIC 真机描边丢失已根治（docs/14 §6.3）：zh-cn SDF.asset 三路引用（场景直引+TMP Settings 默认字体+Addressables UIAssets MainFont），打包后 Addressables 份与场景份是不同实例，TextCombiner.ApplyFont 引用比较误判字体变更→fontMaterial 覆盖回 _OutlineWidth=0。**根治=删除 TextCombiner 运行时字体加载链（LoadFont/ApplyFont/fontTable/fontEntryKey 全删）+ 删 UIAssets 表 5 语言 MainFont 条目 + 手清 Addressables Localization-Assets-Shared 组残留条目（read-only 组不随表变更自动同步，改后须 ImportAsset(ForceUpdate) 重载）**。字体仅剩场景直引+TMP 默认字体两条固有路径，运行时无代码动 font/fontMaterial。7 个祈愿面板共用 VentiPanel.prefab（描边材质在源 prefab 上：名称黑0.15+称号白0.08）。**Why:** UIAssets 表只有中文配过字体、唯一消费者是 TextCombiner，属死代码路径。**How to apply:** 勿恢复"运行时整体赋 font+fontMaterial"写法；将来做多语言字体切换时只换 fontAsset 并保留材质变体映射。
-- [2026-08-18 01:26:31] 大地图改版定案（用户以原神+大厂实践为基准）：锚点全图常驻、区域按钮只动相机、区域切换平滑滑移；坐标=固定世界坐标系+垂直画布（Unity 2D 约定，z 直接作 y 勿做镜像；射线守卫=不平行且 t>0，勿按相机朝向假设符号）；地图工具收敛为 Tools/地图/坐标取点器（用户拍板）。瓦片化曾完整实现后被用户要求全量撤回（未提交一行），重做前必须先问清用户顾虑。**2026-08-18 补充**：新版地图 16384×13896 已换+标定（origin=-108.59,114.94/unit=0.013348）；旧区域 Prefab×8+旧贴图×8 已删（零引用核验）；新图未压缩 RGBA32 ≈868MB 显存待拍板。**How to apply:** 换图/标定/新区域工作流与铁律见 gic-map skill；状态快照与待拍板见 .codely-cli/HANDOFF-大地图.md；新代码勿再引入 XZ/Euler(90) 旧轴向。
+- [2026-08-18 02:37:55] [project] 大地图瓦片化已落地（2026-08-18，提交 ae853d6，用户拍板）：源图 all_map.jpg 16384×13896 不上屏不进构建（移出 MapAssets 组+场景零引用）；MapPlane 挂 2048×1736 预览图（DXT1），56 片 2048px DXT1 瓦片（4px 重叠边防接缝）按视野经 AssetCache 动态加载（MapTileLayer，预载1格+滞回1格）；换图工作流=覆盖 all_map.jpg → Tools/地图/生成地图瓦片（MapTileBakeTool，幂等，ffmpeg 单趟切图）→ 标定；取点器打开时编辑器临时换全图（MapEditorFullRes，sceneSaving 守卫防全图引用写入场景 YAML）。世界尺寸换算用 MapConfig.sourcePixelWidth/Height，勿用 sprite.rect（预览图会小8倍）。**Why:** 进图卡顿（868MB RGBA32 首帧上传）+ 显存；2026-08-17 首版瓦片化被用户撤回原因不明，本次用户明确拍板采用后重做成功。**How to apply:** 换图/标定/新区域工作流见 gic-map skill；方案细节 docs/13 §9.1 与 docs/14 §8.2.1。
+
 
 
 ### Reference

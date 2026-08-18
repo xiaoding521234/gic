@@ -76,6 +76,9 @@ namespace GIC.UI
 
             UpdateBackground(_positionManager.CurrentPosition);
 
+            // 预载大地图初始视野瓦片（Persistent）：打开地图时缓存命中，首帧即清晰（不先糊后清）
+            MapTilePreloader.PreloadInitialTiles(_positionManager, _assetCache);
+
             // 播放入场动画
             PlayEnterAnimation();
         }
@@ -111,6 +114,8 @@ namespace GIC.UI
             public void Handle(OnPositionChangedEvent evt)
             {
                 _screen.UpdateBackground(evt.PositionName);
+                // 传送后初始区域已变，补预载新区域瓦片
+                MapTilePreloader.PreloadInitialTiles(_screen._positionManager, _screen._assetCache);
             }
         }
 

@@ -71,13 +71,38 @@ namespace GIC.UI
 
         private string Address(Vector2Int id) => $"{mapConfig.TileAddressPrefix}{id.x}_{id.y}";
 
+        // ==================== 几何换算（静态，预载器与运行层共用） ====================
+
+        /// <summary>
+        /// 世界矩形（含 margin 格外扩）→ 瓦片索引范围（图片左上原点、Y 向下，与 MapConfig.WorldToPixel 同向）。
+        /// 范围钳制在网格内。
+        /// </summary>
+        public static void CalcTileRange(MapConfig cfg, float minX, float minY, float maxX, float maxY,
+            float marginTiles, out int x0, out int y0, out int x1, out int y1)
+        {
+            float u = cfg.WorldUnitsPerPixel;
+            float tileWorld = cfg.TilePixelSize * u;
+            int TileX(float wx) => Mathf.FloorToInt((wx - cfg.MapOrigin.x) / u / cfg.TilePixelSize);
+            int TileY(float wy) => Mathf.FloorToInt((cfg.MapOrigin.y - wy) / u / cfg.TilePixelSize);
+            x0 = Mathf.Clamp(TileX(minX - tileWorld * marginTiles), 0, cfg.TileColumns - 1);
+            x1 = Mathf.Clamp(TileX(maxX + tileWorld * marginTiles), 0, cfg.TileColumns - 1);
+            y0 = Mathf.Clamp(TileY(maxY + tileWorld * marginTiles), 0, cfg.TileRows - 1); // 世界 Y 大 = 图片 y 小
+            y1 = Mathf.Clamp(TileY(minY - tileWorld * marginTiles), 0, cfg.TileRows - 1);
+        }
+
+        /// <summary>瓦片中心世界坐标（按网格名义区域，忽略重叠边）</summary>
+        public static Vector2 TileCenterWorld(MapConfig cfg, Vector2Int id)
+        {
+            float u = cfg.WorldUnitsPerPixel;
+            return new Vector2(
+                cfg.MapOrigin.x + (id.x + 0.5f) * cfg.TilePixelSize * u,
+                cfg.MapOrigin.y - (id.y + 0.5f) * cfg.TilePixelSize * u);
+        }
+
         /// <summary>按相机可视矩形维护瓦片集：加载需要的、释放滞回区外的</summary>
         private void UpdateVisibleSet()
         {
             var cfg = mapConfig;
-            int cols = cfg.TileColumns, rows = cfg.TileRows;
-            float u = cfg.WorldUnitsPerPixel;
-            float tileWorld = cfg.TilePixelSize * u;
 
             // 相机可视世界矩形
             float halfH = mapCamera.orthographicSize;
@@ -86,30 +111,23 @@ namespace GIC.UI
             float viewMinX = cp.x - halfW, viewMaxX = cp.x + halfW;
             float viewMinY = cp.y - halfH, viewMaxY = cp.y + halfH;
 
-            // 世界→瓦片索引（图片左上原点、Y 向下，与 MapConfig.WorldToPixel 同向）
-            int TileX(float worldX) => Mathf.FloorToInt((worldX - cfg.MapOrigin.x) / u / cfg.TilePixelSize);
-            int TileY(float worldY) => Mathf.FloorToInt((cfg.MapOrigin.y - worldY) / u / cfg.TilePixelSize);
-
             // 需要集 = 可视区外扩 预载边距 格
-            int load = 预载边距;
             _wanted.Clear();
-            int lx0 = Mathf.Clamp(TileX(viewMinX - tileWorld * load), 0, cols - 1);
-            int lx1 = Mathf.Clamp(TileX(viewMaxX + tileWorld * load), 0, cols - 1);
-            int ly0 = Mathf.Clamp(TileY(viewMaxY + tileWorld * load), 0, rows - 1); // 视野上边 = 图片较小 y
-            int ly1 = Mathf.Clamp(TileY(viewMinY - tileWorld * load), 0, rows - 1);
+            CalcTileRange(cfg, viewMinX, viewMinY, viewMaxX, viewMaxY, 预载边距, out int lx0, out int ly0, out int lx1, out int ly1);
             for (int y = ly0; y <= ly1; y++)
                 for (int x = lx0; x <= lx1; x++)
                     _wanted.Add(new Vector2Int(x, y));
 
             // 保活区 = 可视区外扩 预载边距+释放滞回 格；区外的释放
             int keep = 预载边距 + 释放滞回;
+            float tileWorld = cfg.TilePixelSize * cfg.WorldUnitsPerPixel;
             float keepMinX = viewMinX - tileWorld * keep, keepMaxX = viewMaxX + tileWorld * keep;
             float keepMinY = viewMinY - tileWorld * keep, keepMaxY = viewMaxY + tileWorld * keep;
 
             _removalTmp.Clear();
             foreach (var kv in _live)
             {
-                if (!InKeepArea(kv.Key, keepMinX, keepMaxX, keepMinY, keepMaxY, u, cfg))
+                if (!InKeepArea(kv.Key, keepMinX, keepMaxX, keepMinY, keepMaxY, cfg))
                     _removalTmp.Add(kv.Key);
             }
             foreach (var id in _removalTmp)
@@ -123,7 +141,7 @@ namespace GIC.UI
             _removalTmp.Clear();
             foreach (var id in _loading)
             {
-                if (!InKeepArea(id, keepMinX, keepMaxX, keepMinY, keepMaxY, u, cfg))
+                if (!InKeepArea(id, keepMinX, keepMaxX, keepMinY, keepMaxY, cfg))
                     _removalTmp.Add(id);
             }
             foreach (var id in _removalTmp)
@@ -147,32 +165,23 @@ namespace GIC.UI
             foreach (var id in _wanted)
             {
                 if (_live.ContainsKey(id) || _loading.Contains(id)) continue;
-                var tileCenter = TileCenterWorld(id, u, cfg);
+                var tileCenter = TileCenterWorld(cfg, id);
                 _missingTmp.Add((id, (tileCenter - center).sqrMagnitude));
             }
             _missingTmp.Sort((a, b) => a.dist.CompareTo(b.dist));
             foreach (var (id, _) in _missingTmp)
             {
                 _loading.Add(id);
-                _assetCache.LoadAsync<Sprite>(Address(id), sprite => OnTileLoaded(id, sprite));
+                // High 优先级：瓦片是打开地图的主视觉，插队先于大厅背景等低优先级加载
+                _assetCache.LoadAsync<Sprite>(Address(id), sprite => OnTileLoaded(id, sprite), LoadPriority.High);
             }
         }
 
-        private bool InKeepArea(Vector2Int id, float minX, float maxX, float minY, float maxY, float u, MapConfig cfg)
+        private bool InKeepArea(Vector2Int id, float minX, float maxX, float minY, float maxY, MapConfig cfg)
         {
-            var c = TileCenterWorld(id, u, cfg);
-            float half = cfg.TilePixelSize * u * 0.5f;
+            var c = TileCenterWorld(cfg, id);
+            float half = cfg.TilePixelSize * cfg.WorldUnitsPerPixel * 0.5f;
             return c.x + half >= minX && c.x - half <= maxX && c.y + half >= minY && c.y - half <= maxY;
-        }
-
-        /// <summary>瓦片 (x,y) 覆盖的中心世界坐标（按网格名义区域，忽略重叠边）</summary>
-        private Vector2 TileCenterWorld(Vector2Int id, float u, MapConfig cfg)
-        {
-            float pxCenter = (id.x + 0.5f) * cfg.TilePixelSize;
-            float pyCenter = (id.y + 0.5f) * cfg.TilePixelSize;
-            return new Vector2(
-                cfg.MapOrigin.x + pxCenter * u,
-                cfg.MapOrigin.y - pyCenter * u);
         }
 
         private void OnTileLoaded(Vector2Int id, Sprite sprite)

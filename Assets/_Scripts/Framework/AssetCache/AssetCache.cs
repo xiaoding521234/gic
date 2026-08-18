@@ -183,6 +183,37 @@ namespace GIC.Framework
             }
         }
 
+        /// <summary>
+        /// 卸载一个 Persistent 预载：清除 IsPersistent 标记后按普通资源释放。
+        /// 有活跃消费者（RefCount&gt;0，如大地图正开着显示该瓦片）时不释放，等最后一个 Release 归零才真卸。
+        /// 在待启动队列中的预载直接移除（从未加载）。
+        /// </summary>
+        public void UnloadPreload(string address)
+        {
+            if (_cache.TryGetValue(address, out var entry))
+            {
+                entry.IsPersistent = false;
+                if (entry.RefCount <= 0)
+                {
+                    if (entry.IsLoading)
+                        entry.ReleaseOnLoad = true;
+                    else
+                        ReleaseHandle(address, entry);
+                }
+                return;
+            }
+
+            // 尚在待启动队列（未开始加载）→ 直接移除
+            for (int i = 0; i < _pendingQueue.Count; i++)
+            {
+                if (_pendingQueue[i].Address == address)
+                {
+                    _pendingQueue.RemoveAt(i);
+                    return;
+                }
+            }
+        }
+
         /// <summary>资源是否已缓存（加载完成，可直接取用）</summary>
         public bool IsCached(string address)
         {
