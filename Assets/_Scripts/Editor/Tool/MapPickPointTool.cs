@@ -360,11 +360,31 @@ namespace GIC.Editor
                 {
                     var rf = new EnumField("所属区域", _region);
                     rf.RegisterValueChangedCallback(e => _region = (RegionName)e.newValue);
+
+                    // 过滤掉已用作锚点的 PositionName，防止重复创建
+                    var usedNames = new HashSet<System.Enum>();
+                    foreach (var (reg, anch) in _allAnchors)
+                        usedNames.Add(anch.positionName);
+
+                    // 选第一个未使用的 PositionName 作为默认
+                    if (usedNames.Contains(_newAnchorName))
+                    {
+                        foreach (PositionName pn in System.Enum.GetValues(typeof(PositionName)))
+                        {
+                            if (pn == PositionName.StarsandShoal && usedNames.Contains(pn)) continue; // placeholder skip
+                            if (!usedNames.Contains(pn))
+                            {
+                                _newAnchorName = pn;
+                                break;
+                            }
+                        }
+                    }
+
                     var nf = new EnumField("地点", _newAnchorName);
                     nf.RegisterValueChangedCallback(e => _newAnchorName = (PositionName)e.newValue);
                     _modeContainer.Add(rf);
                     _modeContainer.Add(nf);
-                    _modeContainer.Add(new Label("取点后自动创建锚点并切换到「已有锚点」模式") { style = { whiteSpace = WhiteSpace.Normal } });
+                    _modeContainer.Add(new Label("取点后自动：① 创建 MapConfig 锚点 ② 同步 PositionConfig 条目 ③ 触发 Addressables 扫描\n本地化需手动添加") { style = { whiteSpace = WhiteSpace.Normal } });
                     break;
                 }
                 case PickMode.标定地图:
@@ -597,6 +617,13 @@ namespace GIC.Editor
                     var r = cfg.GetRegion(_region);
                     if (r == null) { GICLog.Warn($"[MapPickPointTool] 区域 {_region} 无 RegionData，请先用「区域视野中心」模式创建"); return; }
                     r.anchors.Add(new GIC.Data.MapConfig.AnchorData(_newAnchorName, world));
+
+                    // 自动同步 PositionConfig（缺失才补，不覆盖已有配置）
+                    SyncPositionConfig(_newAnchorName, _region);
+
+                    // 自动同步 Addressables（扫描 PositionBack/PositionVideo 目录）
+                    PositionMediaAddressablesTool.SyncAll();
+
                     _mode = PickMode.已有锚点;
                     RebuildAnchorIndex();
                     _anchorIndex = _allAnchors.Count - 1;
@@ -720,6 +747,45 @@ namespace GIC.Editor
             GICLog.Info("[MapPickPointTool] MapConfig 已保存到磁盘");
             RebuildAnchorIndex();
             if (rootVisualElement.childCount > 0) BuildUI();
+        }
+
+        /// <summary>
+        /// 同步 PositionConfig.asset：若该 PositionName 尚无 PositionData 条目则补一条默认值。
+        /// 不覆盖已有配置（音频/媒体/解锁状态等由用户在 Inspector 手动配）。
+        /// </summary>
+        private static void SyncPositionConfig(PositionName positionName, RegionName region)
+        {
+            var configPath = "Assets/Resources/Configs/PositionConfig.asset";
+            var config = AssetDatabase.LoadAssetAtPath<GIC.Data.PositionConfig>(configPath);
+            if (config == null)
+            {
+                GICLog.Warn("[MapPickPointTool] PositionConfig.asset 未找到，跳过 PositionConfig 同步");
+                return;
+            }
+
+            // 已有条目 → 不动
+            var existing = config.mapDataList?.FirstOrDefault(d => d.position == positionName);
+            if (existing != null)
+            {
+                GICLog.Info($"[MapPickPointTool] PositionConfig 已有 {positionName} 条目，跳过");
+                return;
+            }
+
+            // 新建默认条目
+            var data = new GIC.Data.PositionConfig.PositionData
+            {
+                position = positionName,
+                region = region,
+                audioTheme = GIC.Data.AudioTheme.None,
+                isUnlocked = true
+            };
+            config.mapDataList ??= new System.Collections.Generic.List<GIC.Data.PositionConfig.PositionData>();
+            config.mapDataList.Add(data);
+            config.BuildCache();
+
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssets();
+            GICLog.Info($"[MapPickPointTool] 已自动创建 PositionConfig 条目: {positionName} (region={region})");
         }
     }
 }

@@ -28,10 +28,11 @@ namespace GIC.Editor
             => ((PositionName)element.FindPropertyRelative("position").intValue).GetInspectorName();
 
         protected override string GetElementBadge(SerializedProperty element)
-        {
-            string prefix = element.FindPropertyRelative("audioPrefix").stringValue;
-            return string.IsNullOrEmpty(prefix) ? null : prefix;
-        }
+            => ((AudioTheme)element.FindPropertyRelative("audioTheme").intValue) switch
+            {
+                AudioTheme.None => null,
+                var t => t.GetInspectorName()
+            };
 
         protected override void EditElement(int index)
             => PositionDataEditorWindow.OpenWindow((PositionConfig)target, index);
@@ -59,13 +60,13 @@ namespace GIC.Editor
 
             foreach (var positionData in config.mapDataList)
             {
-                if (string.IsNullOrEmpty(positionData.audioPrefix))
+                if (positionData.audioTheme == AudioTheme.None)
                 {
                     skippedCount++;
                     continue;
                 }
 
-                string prefix = positionData.audioPrefix.ToLower();
+                string prefix = positionData.audioTheme.ToString().ToSnakeCase();
                 bool filled = false;
 
                 var matchedDayClips = FindClipsByPrefix(daytimeClips, prefix);
@@ -109,16 +110,16 @@ namespace GIC.Editor
                 if (filled)
                 {
                     filledCount++;
-                    GICLog.Info($"已填充: {positionData.position} (前缀: {prefix}), 白天:{matchedDayClips.Count}首, 晚上:{matchedNightClips.Count}首");
+                    GICLog.Info($"已填充: {positionData.position} (主题: {prefix}), 白天:{matchedDayClips.Count}首, 晚上:{matchedNightClips.Count}首");
                 }
                 else
                 {
-                    GICLog.Warn($"未找到匹配音频: {positionData.position} (前缀: {prefix})");
+                    GICLog.Warn($"未找到匹配音频: {positionData.position} (主题: {prefix})");
                 }
             }
 
             EditorUtility.SetDirty(config);
-            GICLog.Info($"填充完成: 成功 {filledCount} 个位置, 跳过 {skippedCount} 个位置 (无前缀)");
+            GICLog.Info($"填充完成: 成功 {filledCount} 个位置, 跳过 {skippedCount} 个位置 (无主题)");
         }
 
         private void ClearAllAudios(PositionConfig config)

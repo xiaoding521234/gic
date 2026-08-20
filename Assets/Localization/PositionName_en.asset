@@ -86,6 +86,10 @@ MonoBehaviour:
     m_Localized: Wangshu Inn
     m_Metadata:
       m_Items: []
+  - m_Id: 33019456221949952
+    m_Localized: Snezhnaya Castle
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

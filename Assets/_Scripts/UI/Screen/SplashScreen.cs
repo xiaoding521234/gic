@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;
@@ -116,12 +117,13 @@ namespace GIC.UI
             var positionData = _positionManager.GetPositionData(position);
             if (positionData == null) return;
 
-            string regionName = positionData.region.ToString();
-            string positionName = position.ToString().ToSnakeCase();
-            string timeSuffix = TimeUtility.GetTimeSuffix();
-            string bgAddress = $"PositionBack/{regionName}/{positionName}_{timeSuffix}";
+            var timePeriod = TimeUtility.GetCurrentTimePeriod();
+            string bgAddress = positionData.GetBackgroundAddress(timePeriod);
 
-            _assetCache.Preload<Sprite>(bgAddress);
+            if (positionData.GetMediaType(timePeriod) == PositionMediaType.Video)
+                _assetCache.Preload<VideoClip>(bgAddress);
+            else
+                _assetCache.Preload<Sprite>(bgAddress);
         }
 
         private IEnumerator FadeLogo(float startAlpha, float targetAlpha, float duration)

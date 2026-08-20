@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GIC.Data.Event;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Data;
 namespace GIC.UI
@@ -17,6 +18,7 @@ namespace GIC.UI
     {
         [Header("背景")]
         [SerializeField] private SpriteRenderer backgroundRenderer;
+        [SerializeField] private VideoPlayer backgroundVideoPlayer;
 
         [Header("左侧按钮")]
         [SerializeField] private Button missionButton;
@@ -93,6 +95,9 @@ namespace GIC.UI
             // 若有正在加载但未完成的新背景，也释放
             if (_pendingBgAddress != null && _pendingBgAddress != _lastBgAddress)
                 _assetCache?.Release(_pendingBgAddress);
+
+            // 清理视频背景资源
+            OnDestroyBackground();
         }
 
         #region 事件处理器

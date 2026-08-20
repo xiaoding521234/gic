@@ -41,7 +41,7 @@ namespace GIC.Framework
         }
 
         // 存档版本策略：低于该版本的旧档不做迁移，直接删旧档创建新档（开发期无真实玩家，语义变更即升版重置）
-        private const int CURRENT_SAVE_VERSION = 3;
+        private const int CURRENT_SAVE_VERSION = 10;
 
         private float lastSaveTime = -999f;
         private const float SAVE_CD = 1f;

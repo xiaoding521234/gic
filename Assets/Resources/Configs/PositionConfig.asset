@@ -1,5 +1,5 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16,7 +16,7 @@ MonoBehaviour:
   - position: 1001
     region: 1
     taskNames: []
-    audioPrefix: lempo_isle
+    audioTheme: 1
     dayAudios:
       clips:
       - clip: {fileID: 8300000, guid: 02fa13602f58a8c4f87645ca89ce5cd6, type: 3}
@@ -40,10 +40,14 @@ MonoBehaviour:
       - clip: {fileID: 8300000, guid: 6bc15c36351399143a507bb14c7a7545, type: 3}
         weight: 1
     isUnlocked: 1
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 1002
     region: 1
     taskNames: []
-    audioPrefix: lempo_isle
+    audioTheme: 1
     dayAudios:
       clips:
       - clip: {fileID: 8300000, guid: 02fa13602f58a8c4f87645ca89ce5cd6, type: 3}
@@ -67,10 +71,14 @@ MonoBehaviour:
       - clip: {fileID: 8300000, guid: 6bc15c36351399143a507bb14c7a7545, type: 3}
         weight: 1
     isUnlocked: 1
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 1003
     region: 1
     taskNames: []
-    audioPrefix: nasha_town
+    audioTheme: 2
     dayAudios:
       clips:
       - clip: {fileID: 8300000, guid: e24b089a3b7420748a07900903b2da77, type: 3}
@@ -94,57 +102,98 @@ MonoBehaviour:
       - clip: {fileID: 8300000, guid: 545e4b093b779a94eba344ae08ddb226, type: 3}
         weight: 1
     isUnlocked: 1
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 2001
     region: 2
     taskNames: []
-    audioPrefix: 
+    audioTheme: 0
     dayAudios:
       clips: []
     nightAudios:
       clips: []
     isUnlocked: 1
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 2002
     region: 2
     taskNames: []
-    audioPrefix: 
+    audioTheme: 0
     dayAudios:
       clips: []
     nightAudios:
       clips: []
     isUnlocked: 0
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 2003
     region: 2
     taskNames: []
-    audioPrefix: 
+    audioTheme: 0
     dayAudios:
       clips: []
     nightAudios:
       clips: []
     isUnlocked: 0
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 2004
     region: 2
     taskNames: []
-    audioPrefix: 
+    audioTheme: 0
     dayAudios:
       clips: []
     nightAudios:
       clips: []
     isUnlocked: 0
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 2005
     region: 2
     taskNames: []
-    audioPrefix: 
+    audioTheme: 0
     dayAudios:
       clips: []
     nightAudios:
       clips: []
     isUnlocked: 0
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
   - position: 2006
     region: 2
     taskNames: []
-    audioPrefix: 
+    audioTheme: 0
     dayAudios:
       clips: []
     nightAudios:
       clips: []
     isUnlocked: 0
+    dayMedia:
+      mediaType: 0
+    nightMedia:
+      mediaType: 0
+  - position: 8001
+    region: 8
+    taskNames: []
+    audioTheme: 3
+    dayAudios:
+      clips: []
+    nightAudios:
+      clips: []
+    isUnlocked: 1
+    dayMedia:
+      mediaType: 1
+    nightMedia:
+      mediaType: 1

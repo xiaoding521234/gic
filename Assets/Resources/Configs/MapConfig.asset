@@ -64,3 +64,9 @@ MonoBehaviour:
     viewCenterWorld: {x: -37.669533, y: -17.515236}
     viewHeight: 0
     anchors: []
+  - region: 8
+    viewCenterWorld: {x: -14.871401, y: 93.228226}
+    viewHeight: 0
+    anchors:
+    - positionName: 8001
+      world: {x: -16.04233, y: 97.04237}

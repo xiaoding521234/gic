@@ -85,7 +85,8 @@ namespace GIC.Data
         #endregion
 
         #region 至冬地区 (8000-8999)  // 至冬对应 RegionName.Snezhnaya = 8
-        // 待添加
+        [InspectorName("至冬堡")]
+        SnezhnayaCastle = 8001,
         #endregion
 
         #region 坎瑞亚地区 (9000-9999)  // 坎瑞亚对应 RegionName.Khaenriah = 9

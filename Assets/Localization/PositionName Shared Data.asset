@@ -83,6 +83,10 @@ MonoBehaviour:
     m_Key: WangshuInn
     m_Metadata:
       m_Items: []
+  - m_Id: 33019456221949952
+    m_Key: SnezhnayaCastle
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

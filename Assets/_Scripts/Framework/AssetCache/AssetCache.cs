@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.Video;
 using UObject = UnityEngine.Object;
 
 namespace GIC.Framework
@@ -333,6 +334,8 @@ namespace GIC.Framework
                 return Addressables.LoadAssetAsync<Material>(address);
             if (type == typeof(TextAsset))
                 return Addressables.LoadAssetAsync<TextAsset>(address);
+            if (type == typeof(VideoClip))
+                return Addressables.LoadAssetAsync<VideoClip>(address);
             return Addressables.LoadAssetAsync<UObject>(address);
         }
 

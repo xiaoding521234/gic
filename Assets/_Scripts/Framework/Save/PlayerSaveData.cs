@@ -132,7 +132,7 @@ namespace GIC.Framework
         public int frameRate = 165;              // 帧率
 
         // 锚点位置信息
-        public int currentPosition = (int)PositionName.NashaTown;
+        public int currentPosition = (int)PositionName.SnezhnayaCastle;
 
         // ========== 按键绑定 ==========
         public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();
@@ -162,7 +162,7 @@ namespace GIC.Framework
             resolutionIndex = 0;
             frameRate = 165;
 
-            currentPosition = (int)PositionName.NashaTown;
+            currentPosition = (int)PositionName.SnezhnayaCastle;
 
             keyBindings.Clear();
         }
