@@ -280,4 +280,29 @@ Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIEl
 - **场景保存守卫**：编辑器临时把全图换上 MapPlane 供目测（MapEditorFullRes），sceneSaving 回调先还原预览图再落盘——否则全图引用会写进场景 YAML 悄悄回构建
 - **工具超时重试坑**：unity_menu 执行长工具（>330s）超时后桥会重试，本次工具被执行了 4 次——经 unity_menu 跑的长编辑器工具必须幂等（本次靠"先清后建 + CreateOrMoveEntry + 断言闭环"扛住）
 
+## 9. 桥接脚本僵尸循环：on-demand 导入占死主线程（2026-08-21）
+
+### 现象
+编辑器"导入卡死"假象：主线程忙碌 15+ 分钟无响应，但 Editor.log 仍在持续滚动——同一批 8 个至冬堡 ogg（同 GUID）被反复 on-demand 导入。看似"慢"，实为死循环。
+
+### 根因
+上个会话经 execute_csharp_script 跑的 [FillBGM] 位置 BGM 填充脚本：磁盘上 8 个新 ogg 尚未入库，脚本内"补导缺失音频 → 二次填充"循环未收敛，重跑 34 轮。每轮对每个 ogg 的加载都触发一次 on-demand 导入 + 全量 Asset Pipeline Refresh（~2.5s），单文件 ~12s——主线程被无限占据。与 §8.2.1 的"桥超时自动重试"同族不同源：这次是**脚本内循环**（Phase 1 日志仅出现 1 次、Phase 2 日志出现 34 次可证），更隐蔽——日志持续推进、CPU 缓涨，容易误判为"导入慢"而一直等。
+
+### 诊断通道（主线程卡死时唯一可用）
+- `unity_job list`：走后台线程，主线程僵尸也能响应（用于排除桥自身挂起）
+- Editor.log 尾部分析：时间戳是否推进 + 内容是否重复（**同 GUID 反复导入 = 循环**）
+- `Get-Process` 间隔几秒采样两次 CPU：区分"真死"（CPU 不动）与"慢/循环"（CPU 缓涨）
+- **读 Editor.log 必须 `-Encoding UTF8`**：PowerShell 默认按 GBK 读出乱码，会误判日志内容
+
+### 恢复流程（已验证，磁盘成果无损）
+1. `Get-CimInstance Win32_Process` 按命令行锁定 `-projectPath` 指向本项目的**主编辑器** PID（勿杀 ImportWorker/Hub/Licensing，它们随主进程自动退出）
+2. `Stop-Process -Force` 杀主编辑器
+3. 重启编辑器：Library 中已完成的导入与已保存的 .asset 修改**全部保留**（本次 8 个 ogg 已入库、PositionConfig 填充已落盘，重启后直接可用）
+4. 落盘验证用 `git diff`（本次 clip 引用 27→35，GUID 与导入日志逐一吻合）；**不要用文本 GUID 检索**——Tuanjie 加密 meta GUID 机制下 meta 里是密文，必然误判"零引用"
+
+### 规范（防复发）
+- execute_csharp_script 脚本**禁止在循环里触发 on-demand 导入**（加载未入库资产）。大量新资产先让编辑器自然 Refresh 一次性入库，填充脚本只读写已导入资产、单轮跑完
+- 填充/修复类脚本必须可收敛：跑完即返回并断言结果，不写"未成功就重试"的循环——失败原因（如本次"匹配不到文件"）应打日志退出，由人决定下一步
+
+
 

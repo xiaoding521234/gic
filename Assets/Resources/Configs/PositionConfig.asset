@@ -189,9 +189,25 @@ MonoBehaviour:
     taskNames: []
     audioTheme: 3
     dayAudios:
-      clips: []
+      clips:
+      - clip: {fileID: 8300000, guid: 8d8cf9ecfec3f6441a9bfc7d79403d7f, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: da4d53d34d40fe944960b25dab66679d, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: bcbfb581158cfb041ab2bd864a27a515, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 2e3d5c854a79a6e4ba96531854574516, type: 3}
+        weight: 1
     nightAudios:
-      clips: []
+      clips:
+      - clip: {fileID: 8300000, guid: 298cc4df9e58809418ff5ca04a652e98, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: f26186d5c44d31648a930fff1ec51cb3, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: f90c6ae796e2309419edf1625d8929c4, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 69043d1c936cc3641955e85e78d1cf43, type: 3}
+        weight: 1
     isUnlocked: 1
     dayMedia:
       mediaType: 1
