@@ -199,7 +199,8 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
-    Standalone: com.DefaultCompany.2DProject
+    Android: com.HGAME.gic
+    Standalone: com.HGAME.gic
   buildNumber:
     Standalone: 0
     VisionOS: 0

@@ -345,5 +345,27 @@ Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIEl
 - 响度测量用 `-filter_complex ebur128`（取**最后一条**汇总值，非首条瞬时值）；PS5.1 下 ffmpeg stderr 会触发 NativeCommandError，脚本里别用 $ErrorActionPreference='Stop'
 - 官方 OST 后续发布了就下载替换（同源同质），替换后重新校验 LUFS
 
+## 12. Tuanjie 包名双存储与切平台重置（2026-08-21 根治）
+
+### 现象
+ProjectSettings.asset 的包名（expectedBundleIdentifier）在编辑器切平台后被重置为模板默认值 `com.DefaultCompany.2DProject`，长期靠提交前人肉核对（曾混入一次提交后手动还原）。git 历史佐证：07-25 正常 → 08-09（引入 QuickAPKBuilder、首次切 Android 构建）被重置 → 之后反复人肉改回。
+
+### 根因
+Tuanjie 包名存储两处：
+- `expectedBundleIdentifier`（≈ `PlayerSettings.bundleIdentifier` 反射属性，public；Inspector 的 Package Name 写这里）。**也是 applicationIdentifier 映射表缺条目平台的有效包名回退源**——这解释了为什么 Android 条目缺失时 APK 包名依然正确。
+- `applicationIdentifier` 按平台映射表（Unity 标准）。
+
+本项目映射表自 2D 模板创建起只有 `Standalone: com.DefaultCompany.2DProject` 一条（Android 条目缺失）。切回 Standalone 平台时引擎用 `map[Standalone]`（模板默认值）同步 expectedBundleIdentifier → 正确包名被污染，回退源随之失效。
+
+### 根治（三层防线）
+1. **消灭污染源**：`PlayerSettings.SetApplicationIdentifier` 把映射表 Android + Standalone 两平台条目都写为 `com.HGAME.gic`。切任何已知平台，同步源都是正确值。
+2. **启动自愈守卫**：`Editor/Tool/PackageNameGuard.cs`（[InitializeOnLoad] + delayCall）——校验 expectedBundleIdentifier 与映射表两平台条目，漂移即自动修复 + SaveAssets + 告警（SessionState 去重防刷屏）。覆盖未知的引擎写入路径。
+3. **构建前断言**：QuickAPKBuilder 切平台后强制校验 Android 包名，异常即修——保证 APK 产物正确。
+
+### 规范
+- 以后改包名：改 `PackageNameGuard.CorrectPackageName` 常量 + 菜单 Tools/包名校验/立即校验并修复；不要再手动改 Inspector 后依赖记忆核对
+- 该守卫只认常量一个包名；若未来多平台不同包名需求，守卫需按平台拆常量
+- 旧的"提交前核对 ProjectSettings 包名"纪律可退役；若见 `[PackageNameGuard] 包名被重置为 xxx` 告警，说明存在新写入路径，看告警值即可定位来源
+
 
 

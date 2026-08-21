@@ -60,6 +60,14 @@ namespace GIC.Editor
                 GICLog.Info("[QuickAPKBuilder] 已切换到 Android 平台");
             }
 
+            // 包名守卫：切平台可能触发 Tuanjie 包名同步（详见 PackageNameGuard / docs/14 §12），构建前强制断言
+            var identifier = PlayerSettings.GetApplicationIdentifier(BuildTargetGroup.Android);
+            if (identifier != PackageNameGuard.CorrectPackageName)
+            {
+                GICLog.Info($"[QuickAPKBuilder] Android 包名 {identifier} 异常，已修复为 {PackageNameGuard.CorrectPackageName}");
+                PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, PackageNameGuard.CorrectPackageName);
+            }
+
             // 保存当前 scripting backend 和 architecture
             var originalBackend = PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android);
             var originalArch = PlayerSettings.Android.targetArchitectures;
