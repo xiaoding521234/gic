@@ -15,22 +15,36 @@ namespace GIC.Framework
         #region 音乐状态保存与恢复
 
         /// <summary>
+        /// 音乐生命周期阶段（用于快照/恢复）
+        /// </summary>
+        private enum MusicPhase
+        {
+            None,          // 无活跃生命周期（未播放，或自然结束且冷却已过）
+            DelayBefore,   // intervalBefore 等待中（曲目尚未起播）
+            Playing,       // 正在播放
+            Paused,        // 已暂停（PauseMusic）
+            IntervalAfter  // 播完后的 intervalAfter 冷却等待中
+        }
+
+        /// <summary>
         /// 音乐状态快照
         /// </summary>
         private struct MusicState
         {
             public MusicTrack track;
             public MusicType musicType;
-            public float playbackTime;
-            public bool wasPlaying;
+            public MusicPhase phase;
+            public float playbackTime;    // Playing/Paused 时的播放进度
+            public float pendingInterval; // DelayBefore/IntervalAfter 时的剩余等待秒数
             public Action onComplete;
 
-            public MusicState(MusicTrack track, MusicType musicType, float playbackTime, bool wasPlaying, Action onComplete)
+            public MusicState(MusicTrack track, MusicType musicType, MusicPhase phase, float playbackTime, float pendingInterval, Action onComplete)
             {
                 this.track = track;
                 this.musicType = musicType;
+                this.phase = phase;
                 this.playbackTime = playbackTime;
-                this.wasPlaying = wasPlaying;
+                this.pendingInterval = pendingInterval;
                 this.onComplete = onComplete;
             }
         }
@@ -40,44 +54,67 @@ namespace GIC.Framework
         /// </summary>
         public void PushMusicState(MusicTrack newTrack, bool savePlaybackPosition = true)
         {
-            // 保存当前音乐状态
+            // 快照当前音乐的生命周期阶段（含间隔冷却剩余秒数），Pop 时据此复活播放链
+            float remainingInterval = GetRemainingIntervalTime();
             MusicState currentState;
-            
-            if (musicSource != null && musicSource.clip != null)
+
+            if (currentMusicTrack.clip != null &&
+                currentMusicTrack.intervalBefore > 0f &&
+                musicSource != null && musicSource.clip != currentMusicTrack.clip &&
+                remainingInterval > 0f)
             {
+                // intervalBefore 等待期：曲目尚未起播
                 currentState = new MusicState(
-                    currentMusicTrack,
-                    currentMusicType,
-                    savePlaybackPosition && musicSource.isPlaying ? musicSource.time : 0f,
-                    musicSource.isPlaying,
-                    currentOnCompleteCallback
-                );
+                    currentMusicTrack, currentMusicType, MusicPhase.DelayBefore,
+                    0f, remainingInterval, currentOnCompleteCallback);
+            }
+            else if (musicSource != null && musicSource.clip != null)
+            {
+                MusicPhase phase;
+                float playbackTime = 0f;
+
+                if (isMusicPaused)
+                {
+                    phase = MusicPhase.Paused;
+                }
+                else if (musicSource.isPlaying)
+                {
+                    phase = MusicPhase.Playing;
+                    playbackTime = savePlaybackPosition ? musicSource.time : 0f;
+                }
+                else if (remainingInterval > 0f && currentMusicTrack.clip == musicSource.clip)
+                {
+                    // 播完后的 intervalAfter 冷却期（生命周期协程挂起中）
+                    phase = MusicPhase.IntervalAfter;
+                }
+                else
+                {
+                    phase = MusicPhase.None;
+                }
+
+                currentState = new MusicState(
+                    currentMusicTrack, currentMusicType, phase,
+                    playbackTime, remainingInterval, currentOnCompleteCallback);
             }
             else
             {
                 currentState = new MusicState(
-                    new MusicTrack(null, MusicType.Relaxed),
-                    MusicType.Relaxed,
-                    0f,
-                    false,
-                    null
-                );
+                    new MusicTrack(null, MusicType.Relaxed), MusicType.Relaxed,
+                    MusicPhase.None, 0f, 0f, null);
             }
-            
+
             musicStateStack.Push(currentState);
-            
+
             // 停止当前音乐
             StopCurrentMusic();
-            
-            // 保存暂停状态
-            bool wasPaused = isMusicPaused;
+
             isMusicPaused = false;
-            
+
             if (musicSource != null && musicSource.isPlaying && savePlaybackPosition)
             {
                 musicSource.Pause();
             }
-            
+
             // 播放新音乐（使用高优先级确保能顶掉）
             PlayMusic(newTrack);
         }
@@ -167,40 +204,60 @@ namespace GIC.Framework
         {
             if (musicSource == null) return;
 
-            // 恢复音乐类型和回调
+            // 恢复音乐类型、回调与当前曲目
             currentMusicType = state.musicType;
             currentOnCompleteCallback = state.onComplete;
+            currentMusicTrack = state.track;
 
-            if (state.wasPlaying)
+            switch (state.phase)
             {
-                currentMusicTrack = state.track;
-                
-                if (fadeInTime > 0)
-                {
-                    StartCoroutine(RestoreMusicWithFadeIn(state, fadeInTime));
-                }
-                else
-                {
+                case MusicPhase.Playing:
+                    if (fadeInTime > 0)
+                    {
+                        StartCoroutine(RestoreMusicWithFadeIn(state, fadeInTime));
+                    }
+                    else
+                    {
+                        musicSource.clip = state.track.clip;
+                        musicSource.time = state.playbackTime;
+                        musicSource.loop = false;
+                        musicSource.Play();
+
+                        StartMusicLifecycleCoroutines(state.track);
+                    }
+                    break;
+
+                case MusicPhase.IntervalAfter:
+                    // 歌曲已自然播完：接上剩余冷却，冷却结束后继续 onComplete 链/下一轮循环
+                    musicSource.clip = state.track.clip;
+                    musicSource.loop = false;
+                    if (state.pendingInterval > 0f)
+                    {
+                        GICLog.Info($"恢复音乐冷却：{state.track.clip.name} 剩余 {state.pendingInterval:F1}s");
+                    }
+                    if (state.track.loop)
+                    {
+                        musicLoopCoroutine = StartCoroutine(MusicLoopCoroutine(state.track, state.pendingInterval));
+                    }
+                    else
+                    {
+                        musicCompletionCoroutine = StartCoroutine(MusicCompletionCoroutine(state.track, state.pendingInterval));
+                    }
+                    break;
+
+                case MusicPhase.DelayBefore:
+                    // 起播前延迟：接上剩余延迟后起播
+                    musicLoopCoroutine = StartCoroutine(DelayedMusicCoroutine(state.track, state.pendingInterval));
+                    break;
+
+                case MusicPhase.Paused:
+                case MusicPhase.None:
+                default:
+                    // 恢复为已加载未播放状态（等待 ResumeMusic / 保持静默）
                     musicSource.clip = state.track.clip;
                     musicSource.time = state.playbackTime;
                     musicSource.loop = false;
-                    musicSource.Play();
-
-                    if (state.track.loop)
-                    {
-                        musicLoopCoroutine = StartCoroutine(MusicLoopCoroutine(state.track));
-                    }
-                    else if (state.track.onComplete != null)
-                    {
-                        musicCompletionCoroutine = StartCoroutine(MusicCompletionCoroutine(state.track));
-                    }
-                }
-            }
-            else
-            {
-                musicSource.clip = state.track.clip;
-                musicSource.time = state.playbackTime;
-                musicSource.loop = false;
+                    break;
             }
 
             isMusicPaused = false;
@@ -223,14 +280,32 @@ namespace GIC.Framework
             }
             musicSource.volume = 1f;
 
-            if (state.track.loop)
+            StartMusicLifecycleCoroutines(state.track);
+        }
+
+        /// <summary>
+        /// 重启曲目的生命周期协程（循环播放或播完回调，含各自的间隔冷却）
+        /// </summary>
+        private void StartMusicLifecycleCoroutines(MusicTrack track)
+        {
+            if (track.loop)
             {
-                musicLoopCoroutine = StartCoroutine(MusicLoopCoroutine(state.track));
+                musicLoopCoroutine = StartCoroutine(MusicLoopCoroutine(track));
             }
-            else if (state.track.onComplete != null)
+            else if (track.onComplete != null)
             {
-                musicCompletionCoroutine = StartCoroutine(MusicCompletionCoroutine(state.track));
+                musicCompletionCoroutine = StartCoroutine(MusicCompletionCoroutine(track));
             }
+        }
+
+        /// <summary>
+        /// 当前间隔等待（intervalBefore/intervalAfter）的剩余秒数；无活跃等待时为 0
+        /// </summary>
+        private float GetRemainingIntervalTime()
+        {
+            if (intervalEndTime < 0f) return 0f;
+            float remaining = intervalEndTime - Time.time;
+            return remaining > 0f ? remaining : 0f;
         }
 
         #endregion

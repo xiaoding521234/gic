@@ -50,6 +50,10 @@ namespace GIC.Framework
         private MusicTrack currentMusicTrack;
         private bool isMusicPaused = false;
 
+        // 间隔冷却等待（intervalBefore/intervalAfter）的结束时间戳（Time.time，与 Wait.Seconds 同为缩放时间）
+        // -1 = 无活跃间隔等待；生命周期协程进入等待时写入，等待结束或 StopCurrentMusic 时清除
+        private float intervalEndTime = -1f;
+
         // 音乐状态保存栈（用于临时切换音乐后恢复）
         private Stack<MusicState> musicStateStack = new Stack<MusicState>();
 

@@ -304,5 +304,46 @@ Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIEl
 - execute_csharp_script 脚本**禁止在循环里触发 on-demand 导入**（加载未入库资产）。大量新资产先让编辑器自然 Refresh 一次性入库，填充脚本只读写已导入资产、单轮跑完
 - 填充/修复类脚本必须可收敛：跑完即返回并断言结果，不写"未成功就重试"的循环——失败原因（如本次"匹配不到文件"）应打日志退出，由人决定下一步
 
+## 10. 弹层音乐 Push/Pop 在间隔冷却期打断播放链（2026-08-21）
+
+### 现象
+大厅 BGM（`PositionManager` 的 `PlayMusicWithInterval`，loop=false + intervalAfter=10s + onComplete 链式下一首）播完进入 10 秒冷却时进入祈愿等弹层场景，再退回大厅——大厅音乐**永久静音**，下一首再也不来。冷却期外进出弹层则一切正常。
+
+### 根因
+旧 `PushMusicState` 快照只有 `wasPlaying`（= `musicSource.isPlaying`）。冷却期 isPlaying=false，被误判为"暂停"存入快照；同时 `StopCurrentMusic()` 杀掉了挂起在间隔等待中的 `MusicCompletionCoroutine`——`onComplete`（链式下一首）的唯一触发者随协程一起死亡。Pop 恢复走 wasPlaying=false 分支：只设 clip 不 Play 也不重启协程 → 播放链就地断头。本质是**音乐生命周期状态只存在于匿名协程的挂起点里，不可快照**。
+
+### 修复（MusicPhase 生命周期快照）
+- `AudioManager` 新增 `intervalEndTime` 时间戳（Time.time，与 `Wait.Seconds` 同为缩放时间）：三个生命周期协程（Delayed/MusicLoop/MusicCompletion）进入间隔等待时写入、等待结束或 `StopCurrentMusic` 时清除。**不变量：intervalEndTime > now ⟺ 有存活协程正挂在间隔等待中**。
+- `MusicState` 快照以 `MusicPhase` 枚举（None/DelayBefore/Playing/Paused/IntervalAfter）替代 wasPlaying，IntervalAfter/DelayBefore 额外存 `pendingInterval`（剩余冷却/延迟秒数，由时间戳算出）。
+- Pop 恢复按阶段分发：IntervalAfter → 重启对应生命周期协程并传入剩余秒数（跳过"等播完"，直接等剩余冷却后触发 onComplete/下一轮循环）；DelayBefore → 等剩余延迟后起播。冷却中反复进出弹层可递归正确快照。
+- 恢复时有日志 `恢复音乐冷却：xxx 剩余 Ns`，真机排查看这条即可确认链路复活。
+
+### 规范
+- 带间隔冷却的音乐（位置 BGM 链）一律走 `PlayMusicWithInterval`/`MusicTrack`，不要在业务层自管冷却计时——AudioManager 的 Push/Pop 快照已覆盖冷却期，自管反而脱离快照体系
+- 动 `AudioManager` 生命周期协程时保持不变量：任何新增的间隔等待必须同步维护 `intervalEndTime`，任何终止路径必须走 `StopCurrentMusic`（它会清时间戳）
+
+## 11. 游戏内提取音频与平台 OST 的响度鸿沟（至冬堡 BGM 偏小，2026-08-21）
+
+### 现象
+至冬堡位置 BGM 明显比那夏镇/雷波岛小声。Unity 侧无任何差异（同 AudioImporter 设置、同播放链路、AudioMixer 无分轨）。
+
+### 根因
+**音源响度标准不同**：其它区域音乐来自官方平台直接下载的 OST（发行母带标准，-11~-14 LUFS）；至冬堡音乐从原神游戏内提取（游戏内混音刻意压低留余量——音乐要与语音/音效/环境音共存，差 2~6 LUFS 是行业常态）。属于源文件本身的问题，Unity 侧无解。
+
+辅助结论：
+- **峰值归一 ≠ 响度归一**。第一轮把峰值拉到 -0.5 dB 后听感仍偏小——峰值只对齐"最响一瞬间"，感知响度看 LUFS。位置 BGM 批量响度对齐必须用 loudnorm（两遍法），不能只拉峰值。
+- Unity AudioImporter 的 `normalize: 1` 对 Streaming loadType 的音频不生效（Unity 已知行为），别指望导入归一兜底。
+- loudnorm 传 `linear=true`（纯增益）在"增益后超 TP 上限"时会**静默回退动态模式**（有轻微动态压缩）。位置 BGM 场景可接受（处理后 LRA 5~10 LU，与其它区域同档）。
+
+### 修复记录（至冬堡 8 个 ogg）
+从 git 原始版单遍 loudnorm 重做：白天目标 -11.5 LUFS（对齐那夏镇白天 -11.0~-12.1），夜晚 -13.5 LUFS（对齐那夏镇夜晚），TP=-1.0 dBTP。白天/夜晚分开定目标——昼夜音乐本就有响度差，统一拉到同一响度反而破坏节奏。
+
+**教训**：响度处理前先确认音源血统。同项目混用"游戏内提取 + 平台下载"两种来源时，提取版必须做 loudnorm 对齐；且重编码只做一遍（多遍处理=多代有损叠加，需从原始版重来）。
+
+### 规范
+- 批量响度对齐：ffmpeg 两遍 loudnorm（先测 input_i/tp/lra/thresh 再带 measured_* 编码），目标值=参照组的 LUFS 均值
+- 响度测量用 `-filter_complex ebur128`（取**最后一条**汇总值，非首条瞬时值）；PS5.1 下 ffmpeg stderr 会触发 NativeCommandError，脚本里别用 $ErrorActionPreference='Stop'
+- 官方 OST 后续发布了就下载替换（同源同质），替换后重新校验 LUFS
+
 
 

@@ -125,6 +125,9 @@ namespace GIC.Framework
                 musicCompletionCoroutine = null;
             }
 
+            // 间隔冷却等待随生命周期协程一并终止，清除时间戳
+            intervalEndTime = -1f;
+
             // 触发之前的回调（如果被中断）
             if (currentOnCompleteCallback != null && musicSource != null && musicSource.isPlaying)
             {
@@ -209,9 +212,13 @@ namespace GIC.Framework
             musicLoopCoroutine = StartCoroutine(DelayedMusicCoroutine(track));
         }
 
-        private IEnumerator DelayedMusicCoroutine(MusicTrack track)
+        private IEnumerator DelayedMusicCoroutine(MusicTrack track, float remainingInterval = 0f)
         {
-            yield return Wait.Seconds(track.intervalBefore);
+            // remainingInterval > 0：从快照恢复，只等剩余延迟
+            float wait = remainingInterval > 0f ? remainingInterval : track.intervalBefore;
+            intervalEndTime = Time.time + wait;
+            yield return Wait.Seconds(wait);
+            intervalEndTime = -1f;
             StartMusicPlayback(track);
         }
 
@@ -228,37 +235,45 @@ namespace GIC.Framework
                 musicSource.Play();
             }
 
-            if (track.loop)
-            {
-                // 循环播放
-                musicLoopCoroutine = StartCoroutine(MusicLoopCoroutine(track));
-            }
-            else if (track.onComplete != null)
-            {
-                // 不循环但有回调
-                musicCompletionCoroutine = StartCoroutine(MusicCompletionCoroutine(track));
-            }
+            // 循环播放或带播完回调：启动生命周期协程（间隔冷却时间戳由协程内部维护）
+            StartMusicLifecycleCoroutines(track);
         }
 
-        private IEnumerator MusicLoopCoroutine(MusicTrack track)
+        private IEnumerator MusicLoopCoroutine(MusicTrack track, float remainingInterval = 0f)
         {
+            // remainingInterval > 0：从快照恢复，歌曲已播完，跳过等播完只等剩余间隔
+            bool resumedFromInterval = remainingInterval > 0f;
+
             while (true)
             {
-                // 等待当前音乐播放完毕
-                yield return new WaitWhile(() => musicSource != null && musicSource.isPlaying);
-
-                // 如果被停止或更换音乐，退出循环
-                if (musicSource == null || musicSource.clip != track.clip)
-                    yield break;
-
-                // 等待后置间隔
-                if (track.intervalAfter > 0f)
+                if (resumedFromInterval)
                 {
-                    yield return Wait.Seconds(track.intervalAfter);
-                    
-                    // 再次检查是否被中断
+                    resumedFromInterval = false;
+
+                    intervalEndTime = Time.time + remainingInterval;
+                    yield return Wait.Seconds(remainingInterval);
+                    intervalEndTime = -1f;
+                }
+                else
+                {
+                    // 等待当前音乐播放完毕
+                    yield return new WaitWhile(() => musicSource != null && musicSource.isPlaying);
+
+                    // 如果被停止或更换音乐，退出循环
                     if (musicSource == null || musicSource.clip != track.clip)
                         yield break;
+
+                    // 等待后置间隔
+                    if (track.intervalAfter > 0f)
+                    {
+                        intervalEndTime = Time.time + track.intervalAfter;
+                        yield return Wait.Seconds(track.intervalAfter);
+                        intervalEndTime = -1f;
+
+                        // 再次检查是否被中断
+                        if (musicSource == null || musicSource.clip != track.clip)
+                            yield break;
+                    }
                 }
 
                 // 重新播放
@@ -271,15 +286,21 @@ namespace GIC.Framework
         /// <summary>
         /// 音乐播放完毕回调协程（不循环时使用）
         /// </summary>
-        private IEnumerator MusicCompletionCoroutine(MusicTrack track)
+        private IEnumerator MusicCompletionCoroutine(MusicTrack track, float remainingInterval = 0f)
         {
-            // 等待音乐播放完毕
-            yield return new WaitWhile(() => musicSource != null && musicSource.isPlaying);
-
-            // 等待后置间隔
-            if (track.intervalAfter > 0f)
+            if (remainingInterval <= 0f)
             {
-                yield return Wait.Seconds(track.intervalAfter);
+                // 等待音乐播放完毕（从间隔快照恢复时跳过：歌曲已播完）
+                yield return new WaitWhile(() => musicSource != null && musicSource.isPlaying);
+            }
+
+            // 等待后置间隔（remainingInterval > 0 时只等剩余冷却）
+            if (track.intervalAfter > 0f || remainingInterval > 0f)
+            {
+                float wait = remainingInterval > 0f ? remainingInterval : track.intervalAfter;
+                intervalEndTime = Time.time + wait;
+                yield return Wait.Seconds(wait);
+                intervalEndTime = -1f;
             }
 
             // 确认没有被中断（clip没有被改变）
