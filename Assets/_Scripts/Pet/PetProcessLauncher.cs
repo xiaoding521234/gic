@@ -10,12 +10,14 @@ namespace GIC.Pet
     /// ①拉起前 Mutex 探测，桌面已有派蒙则跳过（防重复）；
     /// ②不绑 Job Object、不持有子进程句柄——游戏退出/崩溃，派蒙照常留在桌面。
     /// 桌宠进程自身不会执行本类（GameScene 提前走了宠物分支）；编辑器内为 no-op。
+    /// 桌面桌宠仅限 Windows——Android 无独立进程形态（游戏内悬浮走别的路径，docs/19 §6），
+    /// 平台守卫避免安卓启动时 kernel32 P/Invoke 抛 DllNotFoundException。
     /// </summary>
     public static class PetProcessLauncher
     {
         public static void Launch()
         {
-#if !UNITY_EDITOR
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
             if (PetMode.Enabled) return; // 双保险：宠物进程不再拉新进程
 
             try

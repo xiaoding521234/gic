@@ -52,5 +52,53 @@ namespace GIC.Pet
             CloseHandle(h);
             return true;
         }
+
+        #region pid 文件（主进程退出时按 pid 找到派蒙进程——跨"游戏重启"场景仍有效，Mutex 只能探测不能定位进程）
+
+        private static string PidFilePath => System.IO.Path.Combine(Application.persistentDataPath, "pet.pid");
+
+        /// <summary>派蒙进程启动时登记自己的 pid；进程被杀时文件残留无害（下次覆盖，读取侧有进程名校验）。</summary>
+        public static void WritePidFile()
+        {
+            try
+            {
+                System.IO.File.WriteAllText(PidFilePath, System.Diagnostics.Process.GetCurrentProcess().Id.ToString());
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PetMode] 写 pet.pid 失败（退出连带关闭将失效）: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 主进程退出钩子调用：按 pid 文件找到派蒙并结束。校验进程名防 PID 复用误杀；
+        /// 派蒙已自行退出/文件缺失/进程名不符时静默跳过。
+        /// </summary>
+        public static void TryKillPet()
+        {
+#if !UNITY_EDITOR
+            try
+            {
+                if (!System.IO.File.Exists(PidFilePath)) return;
+                if (!int.TryParse(System.IO.File.ReadAllText(PidFilePath).Trim(), out int pid)) return;
+
+                var p = System.Diagnostics.Process.GetProcessById(pid); // 不存在会抛 ArgumentException，接住即跳过
+                if (p == null || p.ProcessName != "gic") return;
+
+                p.Kill();
+                Debug.Log($"[PetMode] 游戏退出，已关闭派蒙 pid={pid}");
+            }
+            catch (ArgumentException)
+            {
+                // 派蒙进程已不存在（正常：她可能已被用户双击关闭）
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PetMode] 退出连带关闭派蒙失败（她将独立存活）: {ex.Message}");
+            }
+#endif
+        }
+
+        #endregion
     }
 }

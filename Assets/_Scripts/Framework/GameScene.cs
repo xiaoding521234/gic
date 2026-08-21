@@ -113,6 +113,7 @@ namespace GIC.Framework
                 return;
             }
             Debug.Log("[PetMode] 检测到 --pet-mode，跳过游戏初始化，进入桌宠形态");
+            PetSingleInstance.WritePidFile();
             Destroy(gameObject);
             SceneManager.LoadScene("PaimonPet", LoadSceneMode.Single);
         }
@@ -134,6 +135,15 @@ namespace GIC.Framework
             StopAllCoroutines();
             // 兜底：释放本类持有的全部输入锁（正常流程早已配对 pop）
             InputLocks.PopAll(this);
+        }
+
+        private void OnApplicationQuit()
+        {
+            // 设置开启时退出游戏连带关闭派蒙（设置项 closePetOnExit，默认开；关闭则她独立存活）
+            if (!PetMode.Enabled && _saveManager?.CurrentSave?.closePetOnExit == true)
+            {
+                PetSingleInstance.TryKillPet();
+            }
         }
 
         #endregion

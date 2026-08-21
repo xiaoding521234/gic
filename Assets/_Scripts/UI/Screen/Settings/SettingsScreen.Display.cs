@@ -22,6 +22,27 @@ namespace GIC.UI
             InitLanguageSetting();
             InitResolutionSetting();
             InitFrameRateSetting();
+            InitOtherSettings();
+        }
+
+        private void InitOtherSettings()
+        {
+            // 选项与 PlayerSaveData.closePetOnExit 对应：0=开（随游戏退出），1=关（独立存活）
+            var options = new List<TextEntry>
+            {
+                new TextEntry(new LocalizedString("UIText", "On"), ""),
+                new TextEntry(new LocalizedString("UIText", "Off"), ""),
+            };
+
+            int current = _saveManager.CurrentSave.closePetOnExit ? 0 : 1;
+
+            petCloseSetting.Setup("ClosePetOnExit", options, 0, (index) =>
+            {
+                _saveManager.CurrentSave.closePetOnExit = index == 0;
+                _saveManager.SaveGame();
+            });
+            petCloseSetting.SetValue(current);
+            petCloseSetting.Initialize();
         }
 
         private void InitLanguageSetting()

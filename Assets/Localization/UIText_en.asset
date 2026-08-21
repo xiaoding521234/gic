@@ -578,6 +578,18 @@ MonoBehaviour:
     m_Localized: R-Alt
     m_Metadata:
       m_Items: []
+  - m_Id: 34115195379462144
+    m_Localized: Close Paimon on Exit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34115195425599488
+    m_Localized: On
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34115195425599489
+    m_Localized: Off
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -131,6 +131,10 @@ namespace GIC.Framework
         public int resolutionIndex = 0;         // 0=全屏（当前桌面分辨率）, 1=3840x2160, 2=2560x1440, 3=1920x1080, 4=1280x720
         public int frameRate = 165;              // 帧率
 
+        // ========== 桌宠设置 ==========
+        /// <summary>游戏退出时是否连带关闭派蒙（true=随游戏退出，false=独立存活）</summary>
+        public bool closePetOnExit = true;
+
         // 锚点位置信息
         public int currentPosition = (int)PositionName.SnezhnayaCastle;
 
@@ -161,6 +165,8 @@ namespace GIC.Framework
             languageIndex = 0;
             resolutionIndex = 0;
             frameRate = 165;
+
+            closePetOnExit = true;
 
             currentPosition = (int)PositionName.SnezhnayaCastle;
 

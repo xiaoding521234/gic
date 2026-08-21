@@ -74,6 +74,7 @@ namespace GIC.UI
 
         [Header("其它设置")]
         public GameObject otherSettings;
+        public DropdownSettingItem petCloseSetting;
 
         [Header("动画")]
         [SerializeField] private float panelSlideDuration = 0.2f;
@@ -144,6 +145,7 @@ namespace GIC.UI
             InitSoundSettings();
             InitControlSettings();
             InitAccountSettings();
+            InitOtherSettings();
 
             // 缓存动画位置
             CacheAnimationPositions();

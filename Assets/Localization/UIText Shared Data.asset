@@ -575,6 +575,18 @@ MonoBehaviour:
     m_Key: KeyName_RightAlt
     m_Metadata:
       m_Items: []
+  - m_Id: 34115195379462144
+    m_Key: ClosePetOnExit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34115195425599488
+    m_Key: On
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34115195425599489
+    m_Key: Off
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
