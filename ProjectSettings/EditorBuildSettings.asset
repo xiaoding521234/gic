@@ -29,6 +29,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/WishScreen.unity
     guid: 46325499d59395d4a8fb93d9e8dbc820
+  - enabled: 1
+    path: Assets/Scenes/PaimonPet.unity
+    guid: d90bcf608e754d8499e3fce3b9b8e3a0
   m_BuildProfiles: []
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 22e5059b49680434dae0e20a9738d830, type: 2}

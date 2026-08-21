@@ -11,6 +11,7 @@ using GIC.Data.Event;
 using GIC.UI;
 using GIC.Battle;
 using GIC.Tool;
+using GIC.Pet;
 namespace GIC.Framework
 {
 
@@ -39,6 +40,7 @@ namespace GIC.Framework
 
         void Awake()
         {
+            if (PetMode.Enabled) return; // 桌宠进程无 Wargame 上下文，跳过注入（对象随场景切换销毁）
             Wargame.Instance.Context.Inject(this);
         }
 

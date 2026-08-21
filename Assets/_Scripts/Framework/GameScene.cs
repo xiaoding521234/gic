@@ -10,6 +10,7 @@ using GIC.Framework;
 using GIC.Data;
 using GIC.Battle;
 using GIC.Tool;
+using GIC.Pet;
 namespace GIC.Framework
 {
 
@@ -73,6 +74,13 @@ namespace GIC.Framework
 
         private void Awake()
         {
+            if (PetMode.Enabled)
+            {
+                // 桌宠进程：跳过 Wargame 组合根/存档/场景初始化，直接切换到宠物场景（同 exe 双形态，见 docs/19 §5.2）
+                EnterPetMode();
+                return;
+            }
+
             InitializeSingleton();
             InitializeSceneEvents();
             InitializeGame();   // Wargame.Init 完成，容器就绪
@@ -80,11 +88,33 @@ namespace GIC.Framework
 
             InitSaveSettings();
 
+            // 桌宠与主进程同生共死：启动即拉起子进程，退出/崩溃连带关闭（编辑器 no-op，docs/19 §5.2）
+            PetProcessLauncher.Launch();
+
         }
 
         private void Start()
         {
+            if (PetMode.Enabled)
+            {
+                return;
+            }
+
             InitializeStartupScene();
+        }
+
+        /// <summary>桌宠形态入口：单例声明（桌面已有派蒙则退出）→ 销毁自身并直接加载宠物场景，Boot 其余管理器随场景卸载一并销毁。</summary>
+        private void EnterPetMode()
+        {
+            if (!PetSingleInstance.Acquire())
+            {
+                Debug.Log("[PetMode] 桌上已有派蒙，本实例退出");
+                Application.Quit();
+                return;
+            }
+            Debug.Log("[PetMode] 检测到 --pet-mode，跳过游戏初始化，进入桌宠形态");
+            Destroy(gameObject);
+            SceneManager.LoadScene("PaimonPet", LoadSceneMode.Single);
         }
 
         private void Update()

@@ -8,6 +8,7 @@ using GIC.Data.Event;
 using GIC.UI;
 using GIC.Battle;
 using GIC.Tool;
+using GIC.Pet;
 namespace GIC.Framework
 {
 
@@ -39,6 +40,8 @@ namespace GIC.Framework
 
         public override void Awake()
         {
+            if (PetMode.Enabled) return; // 桌宠进程无 Wargame 上下文，跳过网络初始化（对象随场景切换销毁）
+
             gameObject.SetActive(true);
             base.Awake();
             gameObject.SetActive(true);
