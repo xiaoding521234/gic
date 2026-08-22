@@ -44,6 +44,17 @@ namespace GIC.Editor.Rerig
             {
                 Debug.LogError("[RerigV2] 失败: " + ex + "\n" + log);
             }
+            finally
+            {
+                // 完整日志落盘（console 接口只读首行，诊断靠文件）
+                try
+                {
+                    var logPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "Logs", "rerig_log.txt");
+                    Directory.CreateDirectory(Directory.GetParent(logPath).FullName);
+                    File.WriteAllText(logPath, log.ToString());
+                }
+                catch (System.Exception exF) { Debug.LogError("[RerigV2] 日志写盘失败: " + exF.Message); }
+            }
         }
 
         static void RunInternal(StringBuilder log)
@@ -115,6 +126,17 @@ namespace GIC.Editor.Rerig
             // ---------- 3. 世界矩阵（同一场景） ----------
             var giWorld = boneByPath.Values.ToDictionary(b => b, b => b.localToWorldMatrix);
 
+            // 诊断: GI 骨架世界空间分布（塌缩则覆写失败）
+            {
+                float minY = float.MaxValue, maxY = float.MinValue;
+                foreach (var m in giWorld.Values)
+                {
+                    minY = Mathf.Min(minY, m.m13); maxY = Mathf.Max(maxY, m.m13);
+                }
+                var pelvisM = giWorld[rightBip.Find("Bip001 Pelvis")];
+                log.AppendLine($"3) GI世界Y范围[{minY:F3},{maxY:F3}] Pelvis世界=({pelvisM.m03:F3},{pelvisM.m13:F3},{pelvisM.m23:F3})");
+            }
+
             // ---------- 4. MMD 网格与骨骼 ----------
             var mmdSmr = mmdInst.GetComponentsInChildren<SkinnedMeshRenderer>(true)
                 .OrderByDescending(r => r.sharedMesh != null ? r.sharedMesh.vertexCount : 0).First();
@@ -125,6 +147,21 @@ namespace GIC.Editor.Rerig
             foreach (var b in mmdBones.Where(b => b != null).Distinct())
                 mmdWorld[b] = b.localToWorldMatrix;
             log.AppendLine($"4) MMD 网格 {srcMesh.vertexCount} 顶点 / {mmdWorld.Count} 骨");
+
+            // 诊断: MMD 世界空间 + meshL2W 细节
+            {
+                float minY = float.MaxValue, maxY = float.MinValue;
+                foreach (var m in mmdWorld.Values)
+                {
+                    minY = Mathf.Min(minY, m.m13); maxY = Mathf.Max(maxY, m.m13);
+                }
+                var t = meshL2W.transpose; // 提取缩放（列长度）
+                var sc = new Vector3(
+                    new Vector4(meshL2W.m00, meshL2W.m10, meshL2W.m20, meshL2W.m30).magnitude,
+                    new Vector4(meshL2W.m01, meshL2W.m11, meshL2W.m21, meshL2W.m31).magnitude,
+                    new Vector4(meshL2W.m02, meshL2W.m12, meshL2W.m22, meshL2W.m32).magnitude);
+                log.AppendLine($"4a) MMD骨世界Y范围[{minY:F3},{maxY:F3}] meshL2W平移=({meshL2W.m03:F3},{meshL2W.m13:F3},{meshL2W.m23:F3}) 缩放={sc} SMR节点={mmdSmr.transform.name} 父链={string.Join("/", mmdSmr.transform.parent != null && mmdSmr.transform.parent.parent != null ? new[] { mmdSmr.transform.parent.parent.name, mmdSmr.transform.parent.name } : new[] { mmdSmr.transform.parent != null ? mmdSmr.transform.parent.name : "无" })} 源mesh.bounds={srcMesh.bounds.size}");
+            }
 
             // ---------- 5. 关键点刚体对齐（MMD 世界 → GI 世界） ----------
             Transform FindName(Transform root, string n)
@@ -151,7 +188,8 @@ namespace GIC.Editor.Rerig
             if (gp == Vector3.zero || mp == Vector3.zero || mh == Vector3.zero)
                 throw new System.InvalidOperationException($"关键点缺失 gp={gp} mp={mp} mh={mh}");
 
-            // 三轴基构造旋转（Y=盆→头，X=手L-手R 正交化，Z=叉积），缩放=身高比
+            // v4c 朝向: 回退手轴基（v3 实证: 目.L→+EyeBone 距离仅 8mm，眼睛对位=朝向正确）。
+            // 脚尖参考不可用——派蒙看板待机悬空，脚不朝解剖前方（v4b 实测 GI 脚尖=(−0.90,0,0.43) 全错，误差 mean 0.067→0.159）
             Vector3 OrthonormalBasis(Vector3 pelvis, Vector3 head, Vector3 handL, Vector3 handR, out Vector3 yOut, out Vector3 xOut, out Vector3 zOut)
             {
                 yOut = (head - pelvis).normalized;
@@ -168,7 +206,14 @@ namespace GIC.Editor.Rerig
             var T = gp - scale * (R * mp);
             Matrix4x4 Align(int _) => Matrix4x4.TRS(T, R, Vector3.one * scale);
             var align = Align(0);
-            log.AppendLine($"5) 对齐: scale={scale:F3} rotY={Quaternion.Angle(Quaternion.identity, R):F1}\u00b0 T={T}");
+            // R 质量指标: 对齐后 MMD 眼骨到 GI 眼骨的距离（应 <2cm）
+            var eyeL = MmdPos("\u76ee.L"); var eyeR = MmdPos("\u76ee.R");
+            var geL = GiPos("Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01");
+            var geR = GiPos("Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01");
+            log.AppendLine($"5) 对齐: scale={scale:F3} rotY={Quaternion.Angle(Quaternion.identity, R):F1}\u00b0 T={T} 眼距L={Vector3.Distance(align.MultiplyPoint3x4(eyeL), geL):F3} 眼距R={Vector3.Distance(align.MultiplyPoint3x4(eyeR), geR):F3}");
+            log.AppendLine($"5a) GI: 盆={gp} 头={gh} 手L={glh} 手R={grh}");
+            log.AppendLine($"5b) MMD: 盆={mp} 头={mh} 手L={mlh} 手R={mrh}");
+            log.AppendLine($"5c) 对齐检验(align·mmd盆≈gi盆?): {align.MultiplyPoint3x4(mp)} vs {gp}");
 
             // ---------- 6. 骨骼映射（投影后最近 GI 骨段） ----------
             var giSegs = new List<(Transform bone, Vector3 a, Vector3 b)>();
@@ -194,13 +239,106 @@ namespace GIC.Editor.Rerig
                 }
                 return best;
             }
-            var mmd2gi = new Dictionary<Transform, Transform>();
-            foreach (var mb in mmdBones.Where(b => b != null).Distinct())
+            // 骨映射 v3：同名 → MMD标准名显式表 → 祖先继承。
+            // v2 教训：纯最近骨段匹配在四肢末端漂移 5-10cm（超过左右脚间距），
+            // 主承载骨被映射到错误部位/错误侧（腕→Clavicle、手首→Finger1、つま先.L→R Toe0Nub），
+            // 对应网格区域被逐骨刚体变换"传送"→ 碎片。
+            var giByName = new Dictionary<string, Transform>();
+            foreach (var b in boneByPath.Values)
+                if (!giByName.ContainsKey(b.name)) giByName[b.name] = b;
+            Transform GiGet(string name) => giByName.TryGetValue(name, out var t) ? t : null;
+            Transform GiSide(string tmpl, string s) => s.Length == 0 ? null : GiGet(tmpl.Replace("{S}", s + " "));
+
+            Transform MapMmd(string raw)
             {
-                var pMmd = new Vector3(mmdWorld[mb].m03, mmdWorld[mb].m13, mmdWorld[mb].m23);
-                mmd2gi[mb] = NearestGi(align.MultiplyPoint3x4(pMmd));
+                var n = raw;
+                if (n.StartsWith("_shadow_")) n = n.Substring(8);
+                else if (n.StartsWith("_dummy_")) n = n.Substring(7);
+                if (n.StartsWith("+")) n = n.Substring(1);
+                string s = n.EndsWith(".L") ? "L" : n.EndsWith(".R") ? "R" : "";
+                if (s.Length > 0)
+                {
+                    // D骨（足D/ひざD/足首D = IK用副腿骨，常承载裙摆权重）优先
+                    if (n.StartsWith("足首D")) return GiSide("Bip001 {S}Foot", s);
+                    if (n.StartsWith("ひざ")) return GiSide("Bip001 {S}Calf", s);
+                    if (n.StartsWith("足D")) return GiSide("Bip001 {S}Thigh", s);
+                    if (n.StartsWith("肩")) return GiSide("Bip001 {S}Clavicle", s);
+                    if (n.StartsWith("腕捩") || n.StartsWith("腕")) return GiSide("Bip001 {S}UpperArm", s);
+                    if (n.StartsWith("ひじ")) return GiSide("Bip001 {S}Forearm", s);
+                    if (n.StartsWith("手捩")) return GiSide("Bip001 {S}Forearm", s);
+                    if (n.StartsWith("手首")) return GiSide("Bip001 {S}Hand", s) ?? GiSide("Bip001 {S}Forearm", s);
+                    if (n.StartsWith("手先") || n.StartsWith("親指") || n.StartsWith("人指") || n.StartsWith("中指") || n.StartsWith("薬指") || n.StartsWith("小指"))
+                        return GiSide("Bip001 {S}Hand", s) ?? GiSide("Bip001 {S}Finger1", s);
+                    if (n == "ダミー.L" || n == "ダミー.R") return GiSide("Bip001 {S}Hand", s);
+                    if (n.StartsWith("つま先") || n.StartsWith("足先EX")) return GiSide("Bip001 {S}Toe0", s);
+                    if (n.StartsWith("足IK親") || n.StartsWith("足ＩＫ") || n.StartsWith("足首")) return GiSide("Bip001 {S}Foot", s);
+                    if (n.StartsWith("足")) return GiSide("Bip001 {S}Thigh", s);
+                    if (n.StartsWith("目")) return GiSide("+EyeBone {S}A01", s) ?? GiGet("Bip001 Head");
+                    if (n.StartsWith("腰キャンセル")) return GiSide("Bip001 {S}Thigh", s);
+                }
+                switch (n)
+                {
+                    case "センター": case "腰": case "下半身": case "グルーブ": case "腰パーツ親":
+                    case "全ての親": case "操作中心": return GiGet("Bip001 Pelvis");
+                    case "上半身": return GiGet("Bip001 Spine");
+                    case "上半身1": case "上半身2": return GiGet("Bip001 Spine1");
+                    case "首": return GiGet("Bip001 Neck");
+                    case "頭": case "両目": return GiGet("Bip001 Head");
+                }
+                return null;
             }
-            log.AppendLine($"6) 骨映射 {mmd2gi.Count} 条（\u8170\u2192{(mmd2gi.FirstOrDefault(k => k.Key.name == "\u8170").Value?.name)}, \u982d\u2192{(mmd2gi.FirstOrDefault(k => k.Key.name == "\u982d").Value?.name)}）");
+
+            var mmdAll = mmdBones.Where(b => b != null).Distinct().ToList();
+            var mmd2gi = new Dictionary<Transform, Transform>();
+            // ① 同名（+HairS/+EarB 等物理骨在 GI 侧同名存在，头发/耳物理动画直接可用）
+            foreach (var mb in mmdAll)
+                if (giByName.TryGetValue(mb.name, out var same)) mmd2gi[mb] = same;
+            int byName = mmd2gi.Count;
+            // ② MMD 标准名显式表
+            foreach (var mb in mmdAll)
+                if (!mmd2gi.ContainsKey(mb))
+                {
+                    var t = MapMmd(mb.name);
+                    if (t != null) mmd2gi[mb] = t;
+                }
+            int byTable = mmd2gi.Count - byName;
+            // ③ 其余（物理链/副本/IK骨）沿父链继承最近已映射祖先的目标
+            var inheritMapped = new HashSet<Transform>();
+            foreach (var mb in mmdAll)
+            {
+                if (mmd2gi.ContainsKey(mb)) continue;
+                var p = mb.parent;
+                Transform got = null;
+                while (p != null && p != mmdInst.transform)
+                {
+                    if (mmd2gi.TryGetValue(p, out var t)) { got = t; break; }
+                    got = MapMmd(p.name);
+                    if (got != null) break;
+                    p = p.parent;
+                }
+                mmd2gi[mb] = got ?? GiGet("Bip001 Pelvis");
+                inheritMapped.Add(mb);
+            }
+            int byInherit = mmd2gi.Count - byName - byTable;
+            log.AppendLine($"6) 骨映射v3 {mmd2gi.Count} 条: 同名={byName} 显式表={byTable} 祖先继承={byInherit}");
+            // 诊断: 映射目标直方图（大量骨映射到同一 GI 骨 = 对齐/匹配坏了）
+            foreach (var g in mmd2gi.Values.GroupBy(v => v).OrderByDescending(gr => gr.Count()).Take(6))
+                log.AppendLine($"6a) 映射直方图: {g.Key.name} ← {g.Count()} 个MMD骨");
+            // 诊断: 全量映射 dump + 匹配距离（人工审阅，日文骨名描述性强）
+            {
+                var rows = new List<(string mmd, string gi, float dist)>();
+                foreach (var kv in mmd2gi)
+                {
+                    var pMmd = align.MultiplyPoint3x4(new Vector3(mmdWorld[kv.Key].m03, mmdWorld[kv.Key].m13, mmdWorld[kv.Key].m23));
+                    var gPos = new Vector3(giWorld[kv.Value].m03, giWorld[kv.Value].m13, giWorld[kv.Value].m23);
+                    rows.Add((kv.Key.name, kv.Value.name, Vector3.Distance(pMmd, gPos)));
+                }
+                foreach (var r in rows.OrderByDescending(r => r.dist).Take(30))
+                    log.AppendLine($"6m) 最差匹配: {r.mmd} → {r.gi} 距离={r.dist:F3}m");
+                log.AppendLine("6m) --- 全量映射 ---");
+                foreach (var r in rows.OrderBy(r => r.mmd, System.StringComparer.Ordinal))
+                    log.AppendLine($"6m) {r.mmd} → {r.gi} ({r.dist:F3})");
+            }
 
             // ---------- 7. 顶点换姿势（世界→model 局部） ----------
             var L = modelNode.worldToLocalMatrix; // 网格将挂 model 节点下（恒等局部）
@@ -214,6 +352,137 @@ namespace GIC.Editor.Rerig
             var newVerts = new Vector3[srcVerts.Length];
             var newNormals = new Vector3[srcVerts.Length];
             var newGroups = new Dictionary<Transform, List<(int vi, float w)>>();
+            // 关键: 换姿势用"解剖学方向传递"，不能用骨骼原始局部旋转。
+            // MMD 骨世界矩阵带 ×100 缩放且旋转≈identity；GI Biped 骨旋转沿骨轴指向（Max 导出约定），
+            // 直接 G·B⁻¹ 偏移被旋转到任意方向+缩 100 倍 → 塌缩+断肢（"只剩骨头/砍碎尸体"两个症状同源）。
+            // 正确传递: Q = FromToRotation(R·mmdDir, giDir)·R（骨方向=父→本骨向量，解剖语义稳定）；
+            // xform·p = gPos + s·Q·(p − bPos)；祖先继承骨（披风物理链）不做方向吸附，Q=R 随全局。
+            Vector3 POf(Matrix4x4 m) => new Vector3(m.m03, m.m13, m.m23);
+            // 骨方向: 肢体链骨用"父→主子骨"贯穿段方向（肩→肘=上臂方向）；
+            // 短根骨（大腿根/上臂根离父仅几 cm，self−parent 是横向噪声，v4c 实测足.L 被甩 162°）；
+            // 中枢骨（腰/脊椎/头）与短附属骨（眼/发/耳）保持 self−parent。
+            bool IsGiLimb(string n) =>
+                n.Contains("Thigh") || n.Contains("Calf") || n.Contains("Foot") || n.Contains("Toe")
+                || n.Contains("UpperArm") || n.Contains("Forearm") || n.Contains("Hand")
+                || n.Contains("Finger") || n.Contains("Clavicle") || n.StartsWith("DMZ");
+            bool IsMmdLimb(string n) =>
+                n.StartsWith("足") || n.StartsWith("ひざ") || n.StartsWith("つま先")
+                || n.StartsWith("腕") || n.StartsWith("ひじ") || n.StartsWith("手首") || n.StartsWith("手捩")
+                || n.StartsWith("肩") || n.StartsWith("手先") || n.StartsWith("ダミー")
+                || n.StartsWith("人指") || n.StartsWith("中指") || n.StartsWith("薬指") || n.StartsWith("小指") || n.StartsWith("親指")
+                || n.Contains("先EX");
+            Vector3 GiDirOf(Transform gb)
+            {
+                var p = gb.parent;
+                while (p != null && p != modelNode && !giWorld.ContainsKey(p)) p = p.parent;
+                var pOk = p != null && p != modelNode && giWorld.ContainsKey(p);
+                var selfDir = pOk ? POf(giWorld[gb]) - POf(giWorld[p]) : Vector3.zero;
+                if (IsGiLimb(gb.name) && pOk)
+                {
+                    // 贯穿段: 父骨→本骨主子骨
+                    if (GiChildDirOf(gb, out var ch) is var cd && ch != null && cd.HasValue)
+                    {
+                        var seg = POf(giWorld[ch]) - POf(giWorld[p]);
+                        if (seg.sqrMagnitude > 1e-8f) return seg.normalized;
+                    }
+                }
+                if (selfDir.sqrMagnitude > 1e-8f) return selfDir.normalized;
+                return Vector3.up;
+            }
+            Vector3 MmdDirOf(Transform mb)
+            {
+                var p = mb.parent;
+                while (p != null && p != mmdInst.transform && !mmdWorld.ContainsKey(p)) p = p.parent;
+                var pOk = p != null && p != mmdInst.transform && mmdWorld.ContainsKey(p);
+                var selfDir = pOk ? POf(mmdWorld[mb]) - POf(mmdWorld[p]) : Vector3.zero;
+                if (IsMmdLimb(mb.name) && pOk)
+                {
+                    if (MmdChildDirOf(mb, out var ch) is var cd && ch != null && cd.HasValue)
+                    {
+                        var seg = POf(mmdWorld[ch]) - POf(mmdWorld[p]);
+                        if (seg.sqrMagnitude > 1e-8f) return seg.normalized;
+                    }
+                }
+                if (selfDir.sqrMagnitude > 1e-8f) return selfDir.normalized;
+                return Vector3.up;
+            }
+            Vector3? MmdChildDirOf(Transform mb, out Transform childBone)
+            {
+                // 主子骨 = 偏移最大的直接子骨（跳过零偏移副本骨）
+                childBone = null; float bestD = 1e-6f;
+                foreach (Transform c in mb)
+                {
+                    if (!mmdWorld.ContainsKey(c)) continue;
+                    var d = (POf(mmdWorld[c]) - POf(mmdWorld[mb])).sqrMagnitude;
+                    if (d > bestD) { bestD = d; childBone = c; }
+                }
+                return childBone != null ? (POf(mmdWorld[childBone]) - POf(mmdWorld[mb])).normalized : (Vector3?)null;
+            }
+            Vector3? GiChildDirOf(Transform gb, out Transform childBone)
+            {
+                childBone = null; float bestD = 1e-8f;
+                foreach (Transform c in gb)
+                {
+                    if (!giWorld.ContainsKey(c)) continue;
+                    var d = (POf(giWorld[c]) - POf(giWorld[gb])).sqrMagnitude;
+                    if (d > bestD) { bestD = d; childBone = c; }
+                }
+                return childBone != null ? (POf(giWorld[childBone]) - POf(giWorld[gb])).normalized : (Vector3?)null;
+            }
+            var xferByMmd = new Dictionary<Transform, Matrix4x4>();
+            var giDirCache = new Dictionary<Transform, Vector3>();
+            var mmdDirCache = new Dictionary<Transform, Vector3>();
+            int dirSnap = 0, dirGlobal = 0, rollFix = 0;
+            var rollLog = new List<(string n, float a)>();
+            foreach (var kv in mmd2gi)
+            {
+                var mb = kv.Key; var gb = kv.Value;
+                Quaternion Q = R;
+                if (!inheritMapped.Contains(mb))
+                {
+                    if (!giDirCache.TryGetValue(gb, out var dg)) giDirCache[gb] = dg = GiDirOf(gb);
+                    if (!mmdDirCache.TryGetValue(mb, out var dm)) mmdDirCache[mb] = dm = MmdDirOf(mb);
+                    var dmA = R * dm;
+                    if ((dg - dmA).sqrMagnitude > 1e-10f && (dg + dmA).sqrMagnitude > 1e-10f)
+                    {
+                        Q = Quaternion.FromToRotation(dmA, dg) * R;
+                        dirSnap++;
+                    }
+                    else dirGlobal++;
+                    // 滚转修正: 仅当"本骨主子骨"在两侧也是对应映射对时（如 上臂→肘→前臂 链），
+                    // 用弯平面方向钉死绕骨轴滚转。多对一映射（手指→Hand、腰→Pelvis）子骨不对应，
+                    // 强行滚转会把簇甩飞（v4a 教训: 指骨滚 150°+、腰滚 166°，误差 mean 0.067→0.163）
+                    var cm = MmdChildDirOf(mb, out var mcBone);
+                    var cg = GiChildDirOf(gb, out var gcBone);
+                    bool pairOk = cm.HasValue && cg.HasValue
+                        && mcBone != null && gcBone != null
+                        && mmd2gi.TryGetValue(mcBone, out var mcTarget) && mcTarget == gcBone;
+                    if (pairOk)
+                    {
+                        var cmW = Q * cm.Value;
+                        var cmP = cmW - Vector3.Project(cmW, dg);
+                        var cgP = cg.Value - Vector3.Project(cg.Value, dg);
+                        if (cmP.sqrMagnitude > 1e-6f && cgP.sqrMagnitude > 1e-6f
+                            && (cmP - cgP).sqrMagnitude > 1e-10f && (cmP + cgP).sqrMagnitude > 1e-10f)
+                        {
+                            Q = Quaternion.FromToRotation(cmP.normalized, cgP.normalized) * Q;
+                            rollFix++;
+                        }
+                    }
+                    rollLog.Add((mb.name, Quaternion.Angle(Q, R)));
+                }
+                else dirGlobal++;
+                var bPos = POf(mmdWorld[mb]);
+                var gPos = POf(giWorld[gb]);
+                xferByMmd[mb] = Matrix4x4.TRS(gPos - scale * (Q * bPos), Q, Vector3.one * scale);
+            }
+            log.AppendLine($"7pre) 换姿势矩阵: 方向吸附={dirSnap} 滚转修正(配对子骨)={rollFix} 全局姿态={dirGlobal}");
+            foreach (var r in rollLog.OrderByDescending(x => x.a).Take(10))
+                log.AppendLine($"7pre) 滚转Top: {r.n} ΔR={r.a:F1}\u00b0");
+            // 诊断: 顶点重姿势误差 = |vOut − align·vWorld|（好映射下 ≈0；被传送的碎片区域会很大）
+            float errMax = 0, errSum = 0; int err5 = 0, err20 = 0;
+            var errByDomBone = new Dictionary<string, float>();
+            var weightByBone = new Dictionary<string, float>();
             int wi = 0;
             for (int vi = 0; vi < srcVerts.Length; vi++)
             {
@@ -221,6 +490,7 @@ namespace GIC.Editor.Rerig
                 var nWorld = meshL2W.MultiplyVector(srcNormals[vi]);
                 var vOut = Vector3.zero; var nOut = Vector3.zero;
                 var topPairs = new List<(Transform giBone, float w)>();
+                string domBone = "?"; float domW = 0;
                 int n = (int)bpm[vi];
                 for (int k = 0; k < n; k++)
                 {
@@ -228,11 +498,18 @@ namespace GIC.Editor.Rerig
                     var mb = boneIdx2T[bw.boneIndex];
                     if (mb == null) continue;
                     if (!mmd2gi.TryGetValue(mb, out var gb) || gb == null) continue;
-                    var xform = giWorld[gb] * mmdWorld[mb].inverse;
+                    var xform = xferByMmd[mb];
                     vOut += xform.MultiplyPoint3x4(vWorld) * bw.weight;
                     nOut += xform.MultiplyVector(nWorld) * bw.weight;
                     topPairs.Add((gb, bw.weight));
+                    if (bw.weight > domW) { domW = bw.weight; domBone = mb.name; }
                 }
+                weightByBone[domBone] = weightByBone.TryGetValue(domBone, out var wAcc) ? wAcc + domW : domW;
+                var errVi = Vector3.Distance(vOut, align.MultiplyPoint3x4(vWorld));
+                errMax = Mathf.Max(errMax, errVi); errSum += errVi;
+                if (errVi > 0.05f) err5++;
+                if (errVi > 0.2f) err20++;
+                errByDomBone[domBone] = Mathf.Max(errByDomBone.TryGetValue(domBone, out var eAcc) ? eAcc : 0, errVi);
                 if (topPairs.Count == 0)
                 {
                     var fallback = NearestGi(align.MultiplyPoint3x4(vWorld));
@@ -248,6 +525,31 @@ namespace GIC.Editor.Rerig
                 }
             }
             log.AppendLine($"7) 换姿势完成，新顶点组 {newGroups.Count}");
+            // 诊断: 误差汇总（碎片定位）
+            log.AppendLine($"7c) 顶点误差: max={errMax:F3}m mean={errSum / srcVerts.Length:F4}m >5cm={err5} >20cm={err20}（/ {srcVerts.Length}）");
+            foreach (var kv in errByDomBone.OrderByDescending(k => k.Value).Take(15))
+            {
+                weightByBone.TryGetValue(kv.Key, out var w2);
+                log.AppendLine($"7c) 误差Top: {kv.Key} maxErr={kv.Value:F3}m 总权重={w2:F0}");
+            }
+            // 诊断: newVerts 直接 bounds（L 之前/之后各一份，定位塌缩发生层）
+            {
+                var bmin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+                var bmax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+                foreach (var v in newVerts)
+                {
+                    bmin = Vector3.Min(bmin, v); bmax = Vector3.Max(bmax, v);
+                }
+                log.AppendLine($"7a) newVerts bounds(L后): center={(bmin + bmax) / 2} size={bmax - bmin}");
+                bmin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+                bmax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+                foreach (var v in srcVerts)
+                {
+                    var vw = meshL2W.MultiplyPoint3x4(v);
+                    bmin = Vector3.Min(bmin, vw); bmax = Vector3.Max(bmax, vw);
+                }
+                log.AppendLine($"7b) vWorld bounds(换姿势前): center={(bmin + bmax) / 2} size={bmax - bmin}");
+            }
             // 顶点诊断采样（前 3 个 + 中间 1 个）
             wi = 0;
             int[] probes = { 0, 1, 2, srcVerts.Length / 2 };
@@ -267,7 +569,7 @@ namespace GIC.Editor.Rerig
                         var gb = mmd2gi[mb];
                         var bPos = new Vector3(mmdWorld[mb].m03, mmdWorld[mb].m13, mmdWorld[mb].m23);
                         var gPos = gb != null ? new Vector3(giWorld[gb].m03, giWorld[gb].m13, giWorld[gb].m23) : Vector3.zero;
-                        desc.Append($"[{mb.name}→{(gb != null ? gb.name : "无")} w={bw.weight:F2} B={bPos.y:F2} G={gPos.y:F2}] ");
+                        desc.Append($"[{mb.name}→{(gb != null ? gb.name : "无")} w={bw.weight:F2} B={bPos.ToString("F2")} G={gPos.ToString("F2")}] ");
                     }
                     log.AppendLine($"   v[{vi}] world={vWorld} → out={newVerts[vi]}  {desc}");
                 }
@@ -279,6 +581,11 @@ namespace GIC.Editor.Rerig
             mesh.name = "Paimon_GIRigMesh";
             mesh.vertices = newVerts;
             mesh.normals = newNormals;
+            // 关键: Instantiate 克隆了源 mesh 的塌缩 bounds（MMD 资产空间 0.01 单位），
+            // vertices 赋值不会自动重算，必须显式 RecalculateBounds，否则视锥裁剪异常
+            mesh.RecalculateBounds();
+            if (mesh.bounds.size.y < 0.1f)
+                throw new System.InvalidOperationException($"产物自检失败: mesh.bounds={mesh.bounds.size}（顶点疑似塌缩，勿入库）");
             if (AssetDatabase.LoadAssetAtPath<Mesh>(MESH_ASSET) != null) AssetDatabase.DeleteAsset(MESH_ASSET);
             AssetDatabase.CreateAsset(mesh, MESH_ASSET);
 
@@ -317,6 +624,7 @@ namespace GIC.Editor.Rerig
             smr.rootBone = rightBip;
             smr.sharedMaterials = mmdSmr.sharedMaterials; // 8 材质 1:1
             smr.updateWhenOffscreen = true;
+            log.AppendLine($"8a) mesh.bounds={mesh.bounds.size} SMR骨头={boneList.Count} 材质={smr.sharedMaterials.Length}");
 
             // Animation（model 节点，自动播 legacy）
             var clipLegacy = AssetDatabase.LoadAssetAtPath<AnimationClip>(ANIM_LEGACY);
