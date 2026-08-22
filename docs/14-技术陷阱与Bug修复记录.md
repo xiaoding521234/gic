@@ -367,5 +367,21 @@ Tuanjie 包名存储两处：
 - 该守卫只认常量一个包名；若未来多平台不同包名需求，守卫需按平台拆常量
 - 旧的"提交前核对 ProjectSettings 包名"纪律可退役；若见 `[PackageNameGuard] 包名被重置为 xxx` 告警，说明存在新写入路径，看告警值即可定位来源
 
+## 13. Tuanjie ShaderLab 属性解析器不支持属性值引号/中文（2026-08-22 实测）
+
+### 现象
+新写的角色 shader 导入后 `ShaderUtil.ShaderHasError=True`，`shader.name` 为空串、`isSupported=False`，控制台报 `Parse error: syntax error, unexpected $undefined, expecting TVAL_ID or TVAL_VARREF`，报错行指向 `[Header(...)]` 属性行。且该错误**不一定**实时出现在控制台（shader 解析错误可能只在 ShaderUtil API / 强制导入时冒出，`start_compilation_pipeline` 后的 console 读取可能读不到）——判定 shader 是否编译失败要用 `ShaderUtil.ShaderHasError(shader)`，不能只看 console。
+
+### 根因（最小 shader 二分实测）
+Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropertyDrawer 属性值的支持残缺：
+- `[Header("Quoted Text")]` 引号字符串 → **Parse error**（标准 Unity 支持）
+- `[Header(中文标题)]` 无引号中文 → **Parse error**
+- `[Header(ASCII)]` 无引号 ASCII ✓
+- 属性**显示名**（`_Prop ("中文显示名", Float)`）里的中文/引号 → ✓ 正常（中文注释也正常）
+
+### 规范
+- Tuanjie 下写 shader：属性值一律无引号 ASCII（`[Header(Albedo)]`），中文名放显示名里（`_Prop ("中文", Float)`）
+- 外部写 .shader 文件后验证：`AssetDatabase.ImportAsset(ForceUpdate)` + `ShaderUtil.ShaderHasError` + `GetShaderMessages`（能拿到精确行号），比 console 可靠
+
 
 
