@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -40,14 +39,8 @@ namespace GIC.Editor.Retarget
     /// </summary>
     public static class PaimonRetargetPipeline
     {
-        const string MMD_FBX_PATH = "Assets/Art/PaimonPet/Model/Paimon_MMD.fbx";
-        const string GI_FBX_PATH = "Assets/Art/PaimonPet/Model/NPC_Kanban_Paimon_Model.fbx";
-        const string ANIM_DIR = "Assets/Art/PaimonPet/Animations";
-        const string OUT_DIR = ANIM_DIR + "/MMD";
-        const string TEST_SCENE = "Assets/Scenes/PaimonRetargetTest.unity";
-        // MMD 骨根 全ての親
-        const string MMD_ROOT_NAME = "\u5168\u3066\u306e\u89aa";
-        static readonly string[] CLIPS = { "Standby", "Greet", "Anger" };
+        // 配置见 PetRetargetConfig（ScriptableObject，Assets/Art/PaimonPet/RetargetConfig.asset）
+        static PetRetargetConfig cfg;
 
         [MenuItem("Tools/\u684c\u5ba0/\u65b9\u6848B: GI\u52a8\u753b\u91cd\u5b9a\u5411\u5230MMD\u9aa8\u67b6")]
         public static void Run()
@@ -75,7 +68,7 @@ namespace GIC.Editor.Retarget
             }
         }
 
-        // ==================== .anim 解析（全 keyset，A 期第1段扩展版） ====================
+        // ==================== .anim 读取（AnimationUtility 类型化 API，v9 替代手写 YAML 解析） ====================
 
         class CurveTrack
         {
@@ -106,66 +99,89 @@ namespace GIC.Editor.Retarget
             public List<float> frameTimes; // 全曲线 key time 并集
         }
 
+        /// <summary>
+        /// 用 AnimationUtility.GetCurveBindings/GetEditorCurve 读类型化曲线（替代手写 YAML 解析——
+        /// 格式升级由 Unity 兜底）。哈希数字路径（path_数字）过滤保留；Root/MotionT root motion
+        /// 曲线经 propertyName 前缀过滤（只取 localPosition./localRotation.）。
+        /// </summary>
         static ClipData ParseClip(string file, string name, StringBuilder log)
         {
-            var text = File.ReadAllText(file);
-            string Section(string start, string end)
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(file);
+            if (clip == null) throw new System.InvalidOperationException($"clip \u52a0\u8f7d\u5931\u8d25: {file}");
+            // 注意：Transform 曲线 binding.propertyName 用内部名 m_LocalPosition.x/m_LocalRotation.x
+            //（非动画窗口显示名 localPosition.x），按"含 Position/Rotation + 末位分量字符"匹配；
+            // Root/MotionT/MotionQ root motion 曲线天然被排除；哈希数字路径（blendshape）跳过。
+            var posCurves = new Dictionary<string, AnimationCurve[]>(); // path → [x,y,z]
+            var rotCurves = new Dictionary<string, AnimationCurve[]>(); // path → [x,y,z,w]
+            foreach (var b in AnimationUtility.GetCurveBindings(clip))
             {
-                var i = text.IndexOf(start);
-                var j = text.IndexOf(end, i + 1);
-                if (i < 0 || j < 0 || j < i) throw new System.InvalidOperationException($"段落异常: {start} i={i} j={j}");
-                return text.Substring(i, j - i);
+                if (b.type != typeof(Transform)) continue;
+                if (long.TryParse(b.path, out _)) continue; // 哈希路径对不上，忽略
+                var curve = AnimationUtility.GetEditorCurve(clip, b);
+                if (curve == null || curve.keys.Length == 0) continue;
+                var prop = b.propertyName;
+                char comp = prop[prop.Length - 1];
+                int idx = "xyzw".IndexOf(comp);
+                if (idx < 0) continue;
+                if (prop.Contains("Position") && idx < 3)
+                {
+                    if (!posCurves.TryGetValue(b.path, out var arr)) posCurves[b.path] = arr = new AnimationCurve[3];
+                    arr[idx] = curve;
+                }
+                else if (prop.Contains("Rotation"))
+                {
+                    if (!rotCurves.TryGetValue(b.path, out var arr)) rotCurves[b.path] = arr = new AnimationCurve[4];
+                    arr[idx] = curve;
+                }
             }
-            // YAML 段序：m_RotationCurves → m_CompressedRotationCurves → m_EulerCurves → m_PositionCurves → m_ScaleCurves
             var cd = new ClipData { name = name };
-            int nr = ParseCurves(Section("m_RotationCurves:", "m_CompressedRotationCurves:"), cd.rot);
-            int np = ParseCurves(Section("m_PositionCurves:", "m_ScaleCurves:"), cd.pos);
+            int nr = BuildTrack(rotCurves, cd.rot, true);
+            int np = BuildTrack(posCurves, cd.pos, false);
             var times = new SortedSet<float>();
             foreach (var tr in cd.rot.Values) foreach (var t in tr.times) times.Add(t);
             foreach (var tp in cd.pos.Values) foreach (var t in tp.times) times.Add(t);
             cd.frameTimes = times.ToList();
-            if (cd.frameTimes.Count < 2) throw new System.InvalidOperationException($"[{name}] 帧数异常 {cd.frameTimes.Count}");
-            log.AppendLine($"[parse {name}] rot曲线={nr} pos曲线={np} 帧数={cd.frameTimes.Count} 时长={cd.frameTimes[cd.frameTimes.Count - 1]:F3}s");
+            if (cd.frameTimes.Count < 2) throw new System.InvalidOperationException($"[{name}] \u5e27\u6570\u5f02\u5e38 {cd.frameTimes.Count}");
+            log.AppendLine($"[parse {name}] rot\u66f2\u7ebf={nr} pos\u66f2\u7ebf={np} \u5e27\u6570={cd.frameTimes.Count} \u65f6\u957f={cd.frameTimes[cd.frameTimes.Count - 1]:F3}s");
             return cd;
         }
 
-        /// <summary>逐行解析一个曲线段：每 chunk = "- curve:" 到下一个，path 行在块尾（哈希数字路径跳过）</summary>
-        static int ParseCurves(string section, Dictionary<string, CurveTrack> dict)
+        /// <summary>分量曲线组 → 全 key 并集 CurveTrack（各分量在并集时刻求值重组）</summary>
+        static int BuildTrack(Dictionary<string, AnimationCurve[]> src, Dictionary<string, CurveTrack> dst, bool isRot)
         {
             int count = 0;
-            var chunks = section.Split(new[] { "- curve:" }, System.StringSplitOptions.RemoveEmptyEntries);
-            foreach (var chunk in chunks)
+            foreach (var kv in src)
             {
-                var pi = chunk.IndexOf("path: ");
-                if (pi < 0) continue;
-                var ls = chunk.IndexOf('\n', pi);
-                if (ls < 0) ls = chunk.Length;
-                var path = chunk.Substring(pi + 6, ls - pi - 6).Trim();
-                if (path.Length == 0 || long.TryParse(path, out _)) continue; // path_数字 哈希路径对不上，忽略
+                var arr = kv.Value;
+                var times = new SortedSet<float>();
+                foreach (var c in arr)
+                    if (c != null)
+                        foreach (var k in c.keys) times.Add(k.time);
+                if (times.Count == 0) continue;
                 var track = new CurveTrack();
-                float curTime = 0f;
-                bool inKeys = false;
-                foreach (var rawLine in chunk.Split('\n'))
+                foreach (var t in times)
                 {
-                    var line = rawLine.Trim();
-                    if (line.StartsWith("time: "))
+                    if (isRot)
                     {
-                        curTime = float.Parse(line.Substring(6), CultureInfo.InvariantCulture);
-                        inKeys = true;
+                        var q = new Quaternion(
+                            arr[0] != null ? arr[0].Evaluate(t) : 0f,
+                            arr[1] != null ? arr[1].Evaluate(t) : 0f,
+                            arr[2] != null ? arr[2].Evaluate(t) : 0f,
+                            arr[3] != null ? arr[3].Evaluate(t) : 1f).normalized;
+                        track.times.Add(t);
+                        track.vals.Add(new Vector4(q.x, q.y, q.z, q.w));
                     }
-                    else if (line.StartsWith("value: {") && inKeys)
+                    else
                     {
-                        var body = line.Substring(8).TrimEnd('}');
-                        var parts = body.Split(',');
-                        var v = Vector4.zero;
-                        for (int k = 0; k < parts.Length && k < 4; k++)
-                            v[k] = float.Parse(parts[k].Trim().Split(':')[1], CultureInfo.InvariantCulture);
-                        track.times.Add(curTime);
-                        track.vals.Add(v);
-                        inKeys = false;
+                        track.times.Add(t);
+                        track.vals.Add(new Vector3(
+                            arr[0] != null ? arr[0].Evaluate(t) : 0f,
+                            arr[1] != null ? arr[1].Evaluate(t) : 0f,
+                            arr[2] != null ? arr[2].Evaluate(t) : 0f));
                     }
                 }
-                if (track.times.Count > 0) { dict[path] = track; count++; }
+                dst[kv.Key] = track;
+                count++;
             }
             return count;
         }
@@ -175,20 +191,8 @@ namespace GIC.Editor.Retarget
         static Vector3 VecOf(Vector4 v) => new Vector3(v.x, v.y, v.z);
         static Quaternion QuatOf(Vector4 v) => new Quaternion(v.x, v.y, v.z, v.w).normalized;
 
-        /// <summary>从（可带均匀缩放的）矩阵提取旋转：列向量归一后 LookRotation</summary>
-        static Quaternion ExtractRot(Matrix4x4 m)
-        {
-            var z = (Vector3)m.GetColumn(2); var y = (Vector3)m.GetColumn(1);
-            var zf = z / Mathf.Max(z.magnitude, 1e-8f);
-            var yf = y / Mathf.Max(y.magnitude, 1e-8f);
-            var yO = yf - Vector3.Project(yf, zf);
-            if (yO.sqrMagnitude < 1e-10f)
-            {
-                yO = Vector3.Cross(zf, Vector3.up);
-                if (yO.sqrMagnitude < 1e-6f) yO = Vector3.Cross(zf, Vector3.right);
-            }
-            return Quaternion.LookRotation(zf, yO.normalized);
-        }
+        /// <summary>从（可带均匀缩放的）矩阵提取旋转（数学核心见 PetRetargetMath）</summary>
+        static Quaternion ExtractRot(Matrix4x4 m) => PetRetargetMath.ExtractRot(m);
 
         static string Rel(Transform t, Transform root)
         {
@@ -201,12 +205,20 @@ namespace GIC.Editor.Retarget
 
         static void RunInternal(StringBuilder log)
         {
-            // ---------- 1. 解析全部 clip 曲线 ----------
+            // ---------- 0. 配置加载（缺省自动创建默认资产） ----------
+            cfg = PetRetargetConfig.LoadOrCreate();
+            var MMD_FBX_PATH = cfg.mmdFbxPath;
+            var GI_FBX_PATH = cfg.giFbxPath;
+            var OUT_DIR = cfg.outDir;
+            var TEST_SCENE = cfg.testScene;
+
+            // ---------- 1. 读取全部 clip 曲线 ----------
             var clips = new List<ClipData>();
-            foreach (var name in CLIPS)
+            foreach (var name in cfg.clips)
             {
-                var path = $"{ANIM_DIR}/Ani_NPC_Kanban_Paimon_{name}.anim";
-                if (!File.Exists(path)) throw new System.InvalidOperationException($"动画缺失: {path}");
+                var path = $"{cfg.animDir}/Ani_NPC_Kanban_Paimon_{name}.anim";
+                var clipAsset = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+                if (clipAsset == null) throw new System.InvalidOperationException($"\u52a8\u753b\u7f3a\u5931: {path}");
                 clips.Add(ParseClip(path, name, log));
             }
             var standby = clips[0]; // Standby t=0 = GI 参考绑定姿势（与 A 期对齐一致）
@@ -240,9 +252,9 @@ namespace GIC.Editor.Retarget
                 giBoneByPath[p] = b; giPathByBone[b] = p;
             }
 
-            // MMD：骨根 = Paimon_arm/全ての親 之下全骨；armW = 解算父世界
-            var mmdRoot = mmdInst.transform.Find("Paimon_arm/" + MMD_ROOT_NAME);
-            if (mmdRoot == null) throw new System.InvalidOperationException("MMD 骨根 全ての親 未找到");
+            // MMD：骨根 = {armNode}/{rootBone} 之下全骨；armW = 解算父世界
+            var mmdRoot = mmdInst.transform.Find(cfg.armNodeName + "/" + cfg.rootBoneName);
+            if (mmdRoot == null) throw new System.InvalidOperationException($"MMD \u9aa8\u6839 {cfg.rootBoneName} \u672a\u627e\u5230");
             var armNode = mmdRoot.parent;
             var armW = armNode.localToWorldMatrix;
             var mmdBones = new List<Transform>();
@@ -270,24 +282,24 @@ namespace GIC.Editor.Retarget
             var mmdWorld0 = new Dictionary<Transform, Matrix4x4>(mmdBones.Count); // MMD 绑定世界（对齐/残差用）
             foreach (var b in giBones) giWorld0[b] = b.localToWorldMatrix;
             foreach (var b in mmdBones) mmdWorld0[b] = b.localToWorldMatrix;
-            log.AppendLine($"[setup] MMD骨={mmdBones.Count} GI骨={giBones.Count} t0覆写={overridden} MMD根={MMD_ROOT_NAME} GI根={modelNode.name}");
+            log.AppendLine($"[setup] MMD\u9aa8={mmdBones.Count} GI\u9aa8={giBones.Count} t0\u8986\u5199={overridden} MMD\u6839={cfg.rootBoneName} GI\u6839={modelNode.name}");
 
             // ---------- 3. 手轴对齐（A 期 §5 段原样，实证 rotY≈150.2° scale≈1.158 盆锚点） ----------
             Transform MmdFind(string n) { foreach (var b in mmdBones) if (b.name == n) return b; return null; }
             Transform GiFind(string path) => giBoneByPath.TryGetValue(path, out var b) ? b : null;
             Vector3 POf(Dictionary<Transform, Matrix4x4> w, Transform t) => t != null && w.ContainsKey(t) ? w[t].GetColumn(3) : Vector3.zero;
 
-            const string GI_HAND_L = "Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand";
-            const string GI_HAND_R = "Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand";
-            const string GI_HEAD = "Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head";
-            var gp = POf(giWorld0, GiFind("Bip001/Bip001 Pelvis"));
+            var GI_HAND_L = cfg.giHandLPath;
+            var GI_HAND_R = cfg.giHandRPath;
+            var GI_HEAD = cfg.giHeadPath;
+            var gp = POf(giWorld0, GiFind(cfg.giPelvisPath));
             var gh = POf(giWorld0, GiFind(GI_HEAD));
             var glh = POf(giWorld0, GiFind(GI_HAND_L));
             var grh = POf(giWorld0, GiFind(GI_HAND_R));
-            var mp = POf(mmdWorld0, MmdFind("\u8170"));            // 腰
-            var mh = POf(mmdWorld0, MmdFind("\u982d"));            // 頭
-            var mlh = POf(mmdWorld0, MmdFind("\u624b\u9996.L"));   // 手首.L
-            var mrh = POf(mmdWorld0, MmdFind("\u624b\u9996.R"));   // 手首.R
+            var mp = POf(mmdWorld0, MmdFind(cfg.mmdPelvisName));
+            var mh = POf(mmdWorld0, MmdFind(cfg.mmdHeadName));
+            var mlh = POf(mmdWorld0, MmdFind(cfg.mmdHandLName));
+            var mrh = POf(mmdWorld0, MmdFind(cfg.mmdHandRName));
             if (gp == Vector3.zero || mp == Vector3.zero || mh == Vector3.zero || gh == Vector3.zero)
                 throw new System.InvalidOperationException($"对齐关键点缺失 gp={gp} mp={mp} mh={mh} gh={gh}");
             void Orthon(Vector3 pelvis, Vector3 head, Vector3 handL, Vector3 handR, out Vector3 y, out Vector3 x, out Vector3 z)
@@ -311,52 +323,15 @@ namespace GIC.Editor.Retarget
             var geR = POf(giWorld0, GiFind(GI_HEAD + "/+EyeBone R A01"));
             float edL = Vector3.Distance(align.MultiplyPoint3x4(eyeL), geL);
             float edR = Vector3.Distance(align.MultiplyPoint3x4(eyeR), geR);
-            log.AppendLine($"[align] scale={scale:F3} rotY={Quaternion.Angle(Quaternion.identity, R):F1}\u00b0 T={T} 眼距L={edL:F3} 眼距R={edR:F3}");
-            if (edL > 0.02f || edR > 0.02f)
-                throw new System.InvalidOperationException($"对齐质量异常 眼距L={edL:F3} R={edR:F3}（阈值0.02，A 期实证 3-8mm）");
+            log.AppendLine($"[align] scale={scale:F3} rotY={Quaternion.Angle(Quaternion.identity, R):F1}\u00b0 T={T} \u773c\u8dddL={edL:F3} \u773c\u8dddR={edR:F3}");
+            if (edL > cfg.alignEyeErrMax || edR > cfg.alignEyeErrMax)
+                throw new System.InvalidOperationException($"\u5bf9\u9f50\u8d28\u91cf\u5f02\u5e38 \u773c\u8dddL={edL:F3} R={edR:F3}\uff08\u9608\u503c{cfg.alignEyeErrMax}\uff0cA \u671f\u5b9e\u8bc1 3-8mm\uff09");
 
-            // ---------- 4. 骨映射（A 期 MapMmd 全量复用）+ B 期主骨代表选择 ----------
+            // ---------- 4. 骨映射（配置表驱动）+ 主骨代表选择 ----------
             var giByName = new Dictionary<string, Transform>();
             foreach (var b in giBones) if (!giByName.ContainsKey(b.name)) giByName[b.name] = b;
             Transform GiGet(string n) => giByName.TryGetValue(n, out var t) ? t : null;
-            Transform GiSide(string tmpl, string s) => s.Length == 0 ? null : GiGet(tmpl.Replace("{S}", s + " "));
-            Transform MapMmd(string raw)
-            {
-                var n = raw;
-                if (n.StartsWith("_shadow_")) n = n.Substring(8);
-                else if (n.StartsWith("_dummy_")) n = n.Substring(7);
-                if (n.StartsWith("+")) n = n.Substring(1);
-                string s = n.EndsWith(".L") ? "L" : n.EndsWith(".R") ? "R" : "";
-                if (s.Length > 0)
-                {
-                    if (n.StartsWith("\u8db3\u9996D")) return GiSide("Bip001 {S}Foot", s);          // 足首D
-                    if (n.StartsWith("\u3072\u3056")) return GiSide("Bip001 {S}Calf", s);          // ひざ
-                    if (n.StartsWith("\u8db3D")) return GiSide("Bip001 {S}Thigh", s);              // 足D
-                    if (n.StartsWith("\u80a9")) return GiSide("Bip001 {S}Clavicle", s);            // 肩
-                    if (n.StartsWith("\u8155\u6369") || n.StartsWith("\u8155")) return GiSide("Bip001 {S}UpperArm", s); // 腕捩/腕
-                    if (n.StartsWith("\u3072\u3058")) return GiSide("Bip001 {S}Forearm", s);       // ひじ
-                    if (n.StartsWith("\u624b\u6369")) return GiSide("Bip001 {S}Forearm", s);       // 手捩
-                    if (n.StartsWith("\u624b\u9996")) return GiSide("Bip001 {S}Hand", s) ?? GiSide("Bip001 {S}Forearm", s); // 手首
-                    if (n.StartsWith("\u624b\u5148") || n.StartsWith("\u89aa\u6307") || n.StartsWith("\u4eba\u6307") || n.StartsWith("\u4e2d\u6307") || n.StartsWith("\u85ac\u6307") || n.StartsWith("\u5c0f\u6307"))
-                        return GiSide("Bip001 {S}Hand", s) ?? GiSide("Bip001 {S}Finger1", s);
-                    if (n == "\u30c0\u30df\u30fc.L" || n == "\u30c0\u30df\u30fc.R") return GiSide("Bip001 {S}Hand", s); // ダミー
-                    if (n.StartsWith("\u3064\u307e\u5148") || n.StartsWith("\u8db3\u5148EX")) return GiSide("Bip001 {S}Toe0", s); // つま先/足先EX
-                    if (n.StartsWith("\u8db3IK\u89aa") || n.StartsWith("\u8db3\uff29\uff2b") || n.StartsWith("\u8db3\u9996")) return GiSide("Bip001 {S}Foot", s);
-                    if (n.StartsWith("\u8db3")) return GiSide("Bip001 {S}Thigh", s);
-                    if (n.StartsWith("\u76ee")) return GiSide("+EyeBone {S}A01", s) ?? GiGet("Bip001 Head"); // 目
-                    if (n.StartsWith("\u8170\u30ad\u30e3\u30f3\u30bb\u30eb")) return GiSide("Bip001 {S}Thigh", s); // 腰キャンセル
-                }
-                switch (n)
-                {
-                    case "\u30bb\u30f3\u30bf\u30fc": case "\u8170": case "\u4e0b\u534a\u8eab": case "\u30b0\u30eb\u30fc\u30d6": case "\u8170\u30d1\u30fc\u30c4\u89aa":
-                    case "\u5168\u3066\u306e\u89aa": case "\u64cd\u4f5c\u4e2d\u5fc3": return GiGet("Bip001 Pelvis"); // センター/腰/下半身/グルーブ/腰パーツ親/全ての親/操作中心
-                    case "\u4e0a\u534a\u8eab": return GiGet("Bip001 Spine");       // 上半身
-                    case "\u4e0a\u534a\u8eab1": case "\u4e0a\u534a\u8eab2": return GiGet("Bip001 Spine1"); // 上半身1/2
-                    case "\u9996": return GiGet("Bip001 Neck");                    // 首
-                    case "\u982d": case "\u4e21\u76ee": return GiGet("Bip001 Head"); // 頭/両目
-                }
-                return null;
-            }
+            Transform MapMmd(string raw) => cfg.MapMmdBone(raw, GiGet);
 
             // 三趟映射：同名 → 显式表 → 祖先继承（A 期逻辑）
             var mmd2gi = new Dictionary<Transform, Transform>();
@@ -394,8 +369,10 @@ namespace GIC.Editor.Retarget
             foreach (var kv in standby.pos) if (giBoneByPath.TryGetValue(kv.Key, out var b)) giCurvedBones.Add(b);
             log.AppendLine($"[map] GI \u6709\u66f2\u7ebf\u9aa8 {giCurvedBones.Count}/{giBones.Count}");
 
-            // 代表优先级：0=主链标准名 1=次要显式（捻骨/D骨/指/肩P肩C等）2=同名（+HairS物理链）3=中枢备胎 9=继承不作代表
+            // 代表优先级（配置驱动）：0=主链标准名 1=次要前缀链 2=同名（+HairS物理链）3=中枢备胎 9=继承不作代表
             // _shadow_/_dummy_ 影骨（物理复制骨）劣后于同名本体骨（如 目.L 优先于 _shadow_目.L）
+            var rank0 = new HashSet<string>(cfg.rank0Bones);
+            var rank3 = new HashSet<string>(cfg.rank3Bones);
             int RepRank(Transform mb)
             {
                 bool shadow = mb.name.StartsWith("_shadow_") || mb.name.StartsWith("_dummy_");
@@ -403,28 +380,11 @@ namespace GIC.Editor.Retarget
                 if (n.StartsWith("_shadow_")) n = n.Substring(8);
                 else if (n.StartsWith("_dummy_")) n = n.Substring(7);
                 int r;
-                switch (n)
-                {
-                    case "\u8170": case "\u4e0a\u534a\u8eab": case "\u4e0a\u534a\u8eab2": case "\u9996": case "\u982d":
-                    case "\u8155.L": case "\u8155.R": case "\u3072\u3058.L": case "\u3072\u3058.R":
-                    case "\u624b\u9996.L": case "\u624b\u9996.R":
-                    case "\u8db3.L": case "\u8db3.R": case "\u3072\u3056.L": case "\u3072\u3056.R":
-                    case "\u8db3\u9996.L": case "\u8db3\u9996.R":
-                    case "\u80a9.L": case "\u80a9.R": case "\u76ee.L": case "\u76ee.R":
-                        r = 0; break;
-                    case "\u30bb\u30f3\u30bf\u30fc": case "\u30b0\u30eb\u30fc\u30d6": case "\u4e0b\u534a\u8eab": case "\u64cd\u4f5c\u4e2d\u5fc3": case "\u8170\u30d1\u30fc\u30c4\u89aa":
-                    case "\u4e0a\u534a\u8eab1": case "\u4e21\u76ee":
-                        r = 3; break;
-                    default:
-                        if (n.StartsWith("\u8155\u6369") || n.StartsWith("\u624b\u6369") || n.StartsWith("\u8db3D") || n.StartsWith("\u3072\u3056D") || n.StartsWith("\u8db3\u9996D")
-                            || n.StartsWith("\u8170\u30ad\u30e3\u30f3\u30bb\u30eb") || n.StartsWith("\u3064\u307e\u5148") || n.StartsWith("\u8db3\u5148EX")
-                            || n.StartsWith("\u89aa\u6307") || n.StartsWith("\u4eba\u6307") || n.StartsWith("\u4e2d\u6307") || n.StartsWith("\u85ac\u6307") || n.StartsWith("\u5c0f\u6307")
-                            || n.StartsWith("\u624b\u5148") || n.StartsWith("\u30c0\u30df\u30fc") || n.StartsWith("\u80a9"))
-                            r = 1;
-                        else if (passOf.TryGetValue(mb, out var pass) && pass == 0) r = 2; // +HairS/+EarB 等同名物理骨
-                        else r = 9; // 继承骨：不作代表（保持绑定姿势随父动）
-                        break;
-                }
+                if (rank0.Contains(n)) r = 0;
+                else if (rank3.Contains(n)) r = 3;
+                else if (cfg.rank1Prefixes.Any(p => n.StartsWith(p))) r = 1;
+                else if (passOf.TryGetValue(mb, out var pass) && pass == 0) r = 2; // +HairS/+EarB 等同名物理骨
+                else r = 9; // 继承骨：不作代表（保持绑定姿势随父动）
                 return shadow ? r + 5 : r;
             }
 
@@ -437,11 +397,11 @@ namespace GIC.Editor.Retarget
             // 虹膜沉入眼球后方"只剩眼白"。绑定姿势=编辑模式=用户确认正确，目骨保持绑定即可。
             var giRep = new Dictionary<Transform, Transform>();  // gi → mmd
             var rankByGi = new Dictionary<Transform, int>();
-            var eyeNames = new HashSet<string> { "\u76ee.L", "\u76ee.R" };
+            var eyeNames = cfg.UndrivenSet(); // 目.L/R 等不驱动骨（配置）
             foreach (var mb in mmdBones)
             {
-                if (mb == mmdRoot) continue; // 全ての親 不作代表（Bip001 经盆骨世界链路隐式传递）
-                if (eyeNames.Contains(mb.name)) continue; // 目.L/R 不驱动（见上）
+                if (mb == mmdRoot) continue; // 根骨不作代表（Bip001 经盆骨世界链路隐式传递）
+                if (eyeNames.Contains(mb.name)) continue; // 不驱动（见配置 undrivenBones）
                 if (!mmd2gi.TryGetValue(mb, out var g) || g == null) continue;
                 if (!giCurvedBones.Contains(g)) continue;
                 int r = RepRank(mb);
@@ -468,16 +428,16 @@ namespace GIC.Editor.Retarget
             // （腕→腕捩=179.9°约定），按"世界旋转插值"会捋成同向 → 捻骨翻转 ~170° 蒙皮折叠
             // （"每臂三处塌缩"实测）。v8 捻骨走 v7.1 跟随骨公式（restW 刚体栈保留绑定局部
             // 结构 + 自身映射目标 UpperArm/Forearm 的增量），绑定 180° 结构天然保住。
-            var pelvisAnchor = repByMmd.Keys.FirstOrDefault(k => k.name == "\u8170");
+            var pelvisAnchor = repByMmd.Keys.FirstOrDefault(k => k.name == cfg.anchorBoneName);
             if (pelvisAnchor == null)
-                throw new System.InvalidOperationException("\u8170 \u4e0d\u5728\u4ee3\u8868\u96c6\u4e2d\uff0c\u65e0\u6cd5\u4f5c\u4e3a\u4f4d\u7f6e\u951a\u70b9");
+                throw new System.InvalidOperationException($"{cfg.anchorBoneName} \u4e0d\u5728\u4ee3\u8868\u96c6\u4e2d\uff0c\u65e0\u6cd5\u4f5c\u4e3a\u4f4d\u7f6e\u951a\u70b9");
 
             // ---------- 5. 输出目录 + 逐帧解局部 + 写 clip ----------
             if (!AssetDatabase.IsValidFolder(OUT_DIR))
-                AssetDatabase.CreateFolder(ANIM_DIR, "MMD");
+                AssetDatabase.CreateFolder(cfg.animDir, "MMD");
 
             // 路径自检移至 5c 后（代表骨+跟随骨统一校验；SetCurve 不校验，missing path 只在运行时警告）
-            var pelvisGi = GiFind("Bip001/Bip001 Pelvis");
+            var pelvisGi = GiFind(cfg.giPelvisPath);
             var headGi = GiFind(GI_HEAD);
             var clipAssets = new List<AnimationClip>();
 
@@ -513,7 +473,7 @@ namespace GIC.Editor.Retarget
             // Biped Pelvis→Spine 骨段带水平前倾分量（Max 约定 Spine 挂盆骨前侧），按骨段对齐会把
             // 整个躯干前倾（"肚子前翘"实测 25.7°）；"指向头"在两骨架语义一致（沿链向上）。
             // 四肢骨段方向语义一致（已实测正确），保持不变。
-            var torsoOverride = new HashSet<string> { "\u8170", "\u4e0a\u534a\u8eab", "\u4e0a\u534a\u8eab2", "\u9996" };
+            var torsoOverride = cfg.TorsoSet();
             var headMmdRep = repByMmd.Keys.FirstOrDefault(k => k.name == "\u982d");
             if (headMmdRep != null)
                 foreach (var kv in repByMmd)
@@ -558,7 +518,7 @@ namespace GIC.Editor.Retarget
             // 路径自检（代表骨+跟随骨，含捻骨）
             foreach (var kv in repByMmd.Keys.Concat(driveBones))
             {
-                var p = "Paimon_arm/" + Rel(kv, armNode);
+                var p = cfg.armNodeName + "/" + Rel(kv, armNode);
                 if (mmdInst.transform.Find(p) == null)
                     throw new System.InvalidOperationException($"\u8def\u5f84\u89e3\u6790\u5931\u8d25: {p}");
             }
@@ -734,7 +694,7 @@ namespace GIC.Editor.Retarget
                             }
                         }
                         log.AppendLine($"[{cd.name} f{f}] \u89e3\u7b97\u7cbe\u786e\u6027: \u951a\u4f4d\u8bef\u5dee={eA:F6}m rotMax={aMax:F3}\u00b0 \u53c2\u8003\u65b9\u5411\u6700\u5927\u8bef\u5dee={dMax:F2}\u00b0({dWorst})");
-                        if (eA > 0.0001f || aMax > 0.5f || dMax > 20f)
+                        if (eA > cfg.anchorPosErrMax || aMax > cfg.rotErrMaxDeg || dMax > cfg.dirErrMaxDeg)
                             throw new System.InvalidOperationException($"[{cd.name} f{f}] \u89e3\u7b97\u4e0d\u7cbe\u786e \u951a={eA:F6}m rot={aMax:F3}\u00b0 dir={dMax:F2}\u00b0\uff08\u5e94<0.0001m/0.5\u00b0/20\u00b0\uff09");
                     }
                 }
@@ -804,9 +764,9 @@ namespace GIC.Editor.Retarget
                 if (cd.name == "Standby")
                 {
                     // 对齐参考姿势：盆锚点应精确，頭应 cm 级
-                    if (rPelvis > 0.005f)
+                    if (rPelvis > cfg.anchorResidualMax)
                         throw new System.InvalidOperationException($"[Standby] \u76c6\u951a\u70b9\u6b8b\u5dee {rPelvis:F4}m \u5e94\u7cbe\u786e");
-                    if (rHead > 0.02f)
+                    if (rHead > cfg.headResidualMax)
                         throw new System.InvalidOperationException($"[Standby] \u982d\u62df\u5408\u6b8b\u5dee {rHead:F4}m \u8d85\u9608\u503c\uff08\u5bf9\u9f50\u8d28\u91cf\u5f02\u5e38\uff09");
                 }
                 else if (rPelvis > 0.25f || rHead > 0.25f)
@@ -820,7 +780,7 @@ namespace GIC.Editor.Retarget
                 var clip = new AnimationClip { name = $"Ani_NPC_Kanban_Paimon_{cd.name}_MMD", legacy = true, frameRate = 60f };
                 foreach (var mb in repPos.Keys)
                 {
-                    var path = "Paimon_arm/" + Rel(mb, armNode);
+                    var path = cfg.armNodeName + "/" + Rel(mb, armNode);
                     var rots = repRot[mb];
                     var krx = new Keyframe[frames]; var kry = new Keyframe[frames]; var krz = new Keyframe[frames]; var krw = new Keyframe[frames];
                     for (int f = 0; f < frames; f++)
@@ -881,7 +841,7 @@ namespace GIC.Editor.Retarget
             }
 
             // 相机对准骨骼包围盒（SMR bounds 在 ×100 节点下不可靠）
-            var sceneRoot = pet.transform.Find("Paimon_arm/" + MMD_ROOT_NAME);
+            var sceneRoot = pet.transform.Find(cfg.armNodeName + "/" + cfg.rootBoneName);
             var bmin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
             var bmax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
             foreach (var b in sceneRoot.GetComponentsInChildren<Transform>(true))

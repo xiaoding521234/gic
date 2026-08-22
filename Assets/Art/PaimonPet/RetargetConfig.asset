@@ -1,0 +1,175 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20cd32c36e4284843baa9d08c9806a0c, type: 3}
+  m_Name: RetargetConfig
+  m_EditorClassIdentifier: 
+  mmdFbxPath: Assets/Art/PaimonPet/Model/Paimon_MMD.fbx
+  giFbxPath: Assets/Art/PaimonPet/Model/NPC_Kanban_Paimon_Model.fbx
+  animDir: Assets/Art/PaimonPet/Animations
+  outDir: Assets/Art/PaimonPet/Animations/MMD
+  testScene: Assets/Scenes/PaimonRetargetTest.unity
+  armNodeName: Paimon_arm
+  rootBoneName: "\u5168\u3066\u306E\u89AA"
+  clips:
+  - Standby
+  - Greet
+  - Anger
+  giPelvisPath: Bip001/Bip001 Pelvis
+  giHeadPath: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001
+    Head
+  giHandLPath: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001
+    L UpperArm/Bip001 L Forearm/Bip001 L Hand
+  giHandRPath: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001
+    R UpperArm/Bip001 R Forearm/Bip001 R Hand
+  mmdPelvisName: "\u8170"
+  mmdHeadName: "\u982D"
+  mmdHandLName: "\u624B\u9996.L"
+  mmdHandRName: "\u624B\u9996.R"
+  exactRules:
+  - mmdName: "\u30BB\u30F3\u30BF\u30FC"
+    giName: Bip001 Pelvis
+  - mmdName: "\u8170"
+    giName: Bip001 Pelvis
+  - mmdName: "\u4E0B\u534A\u8EAB"
+    giName: Bip001 Pelvis
+  - mmdName: "\u30B0\u30EB\u30FC\u30D6"
+    giName: Bip001 Pelvis
+  - mmdName: "\u8170\u30D1\u30FC\u30C4\u89AA"
+    giName: Bip001 Pelvis
+  - mmdName: "\u5168\u3066\u306E\u89AA"
+    giName: Bip001 Pelvis
+  - mmdName: "\u64CD\u4F5C\u4E2D\u5FC3"
+    giName: Bip001 Pelvis
+  - mmdName: "\u4E0A\u534A\u8EAB"
+    giName: Bip001 Spine
+  - mmdName: "\u4E0A\u534A\u8EAB1"
+    giName: Bip001 Spine1
+  - mmdName: "\u4E0A\u534A\u8EAB2"
+    giName: Bip001 Spine1
+  - mmdName: "\u9996"
+    giName: Bip001 Neck
+  - mmdName: "\u982D"
+    giName: Bip001 Head
+  - mmdName: "\u4E21\u76EE"
+    giName: Bip001 Head
+  prefixRules:
+  - mmdPrefix: "\u8DB3\u9996D"
+    giTemplate: Bip001 {S}Foot
+  - mmdPrefix: "\u3072\u3056"
+    giTemplate: Bip001 {S}Calf
+  - mmdPrefix: "\u8DB3D"
+    giTemplate: Bip001 {S}Thigh
+  - mmdPrefix: "\u80A9"
+    giTemplate: Bip001 {S}Clavicle
+  - mmdPrefix: "\u8155\u6369"
+    giTemplate: Bip001 {S}UpperArm
+  - mmdPrefix: "\u8155"
+    giTemplate: Bip001 {S}UpperArm
+  - mmdPrefix: "\u3072\u3058"
+    giTemplate: Bip001 {S}Forearm
+  - mmdPrefix: "\u624B\u6369"
+    giTemplate: Bip001 {S}Forearm
+  - mmdPrefix: "\u624B\u9996"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u624B\u5148"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u89AA\u6307"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u4EBA\u6307"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u4E2D\u6307"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u85AC\u6307"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u5C0F\u6307"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u30C0\u30DF\u30FC"
+    giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u3064\u307E\u5148"
+    giTemplate: Bip001 {S}Toe0
+  - mmdPrefix: "\u8DB3\u5148EX"
+    giTemplate: Bip001 {S}Toe0
+  - mmdPrefix: "\u8DB3IK\u89AA"
+    giTemplate: Bip001 {S}Foot
+  - mmdPrefix: "\u8DB3\uFF29\uFF2B"
+    giTemplate: Bip001 {S}Foot
+  - mmdPrefix: "\u8DB3\u9996"
+    giTemplate: Bip001 {S}Foot
+  - mmdPrefix: "\u8DB3"
+    giTemplate: Bip001 {S}Thigh
+  - mmdPrefix: "\u76EE"
+    giTemplate: +EyeBone {S}A01
+  - mmdPrefix: "\u8170\u30AD\u30E3\u30F3\u30BB\u30EB"
+    giTemplate: Bip001 {S}Thigh
+  undrivenBones:
+  - "\u76EE.L"
+  - "\u76EE.R"
+  - "\u64CD\u4F5C\u4E2D\u5FC3"
+  anchorBoneName: "\u8170"
+  torsoHeadRefBones:
+  - "\u8170"
+  - "\u4E0A\u534A\u8EAB"
+  - "\u4E0A\u534A\u8EAB2"
+  - "\u9996"
+  rank0Bones:
+  - "\u8170"
+  - "\u4E0A\u534A\u8EAB"
+  - "\u4E0A\u534A\u8EAB2"
+  - "\u9996"
+  - "\u982D"
+  - "\u8155.L"
+  - "\u8155.R"
+  - "\u3072\u3058.L"
+  - "\u3072\u3058.R"
+  - "\u624B\u9996.L"
+  - "\u624B\u9996.R"
+  - "\u8DB3.L"
+  - "\u8DB3.R"
+  - "\u3072\u3056.L"
+  - "\u3072\u3056.R"
+  - "\u8DB3\u9996.L"
+  - "\u8DB3\u9996.R"
+  - "\u80A9.L"
+  - "\u80A9.R"
+  - "\u76EE.L"
+  - "\u76EE.R"
+  rank3Bones:
+  - "\u30BB\u30F3\u30BF\u30FC"
+  - "\u30B0\u30EB\u30FC\u30D6"
+  - "\u4E0B\u534A\u8EAB"
+  - "\u64CD\u4F5C\u4E2D\u5FC3"
+  - "\u8170\u30D1\u30FC\u30C4\u89AA"
+  - "\u4E0A\u534A\u8EAB1"
+  - "\u4E21\u76EE"
+  rank1Prefixes:
+  - "\u8155\u6369"
+  - "\u624B\u6369"
+  - "\u8DB3D"
+  - "\u3072\u3056D"
+  - "\u8DB3\u9996D"
+  - "\u8170\u30AD\u30E3\u30F3\u30BB\u30EB"
+  - "\u3064\u307E\u5148"
+  - "\u8DB3\u5148EX"
+  - "\u89AA\u6307"
+  - "\u4EBA\u6307"
+  - "\u4E2D\u6307"
+  - "\u85AC\u6307"
+  - "\u5C0F\u6307"
+  - "\u624B\u5148"
+  - "\u30C0\u30DF\u30FC"
+  - "\u80A9"
+  anchorPosErrMax: 0.0001
+  rotErrMaxDeg: 0.5
+  dirErrMaxDeg: 20
+  alignEyeErrMax: 0.02
+  anchorResidualMax: 0.005
+  headResidualMax: 0.02
