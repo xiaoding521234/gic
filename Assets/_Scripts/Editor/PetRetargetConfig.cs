@@ -39,8 +39,8 @@ namespace GIC.Editor.Retarget
         public string armNodeName = "Paimon_arm";          // 缩放100节点（动画path前缀）
         public string rootBoneName = "\u5168\u3066\u306e\u89aa"; // 全ての親
 
-        [Header("转换清单（GI 动画名，不含 Ani_NPC_Kanban_Paimon_ 前后缀）")]
-        public string[] clips = { "Standby", "Greet", "Anger" };
+        [Header("转换清单（GI 动画名，不含前缀；兼容 Ani_NPC_/Ani_Cs_NPC_ 两种命名）")]
+        public string[] clips = { "Standby", "Greet", "Anger", "C01", "C02", "C03", "C04", "C05", "C05_01", "C06", "C07", "C08", "C09", "C10" };
 
         [Header("对齐关键骨（GI 侧为 model 节点下相对路径，MMD 侧为骨名）")]
         public string giPelvisPath = "Bip001/Bip001 Pelvis";

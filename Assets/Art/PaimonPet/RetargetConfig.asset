@@ -23,6 +23,17 @@ MonoBehaviour:
   - Standby
   - Greet
   - Anger
+  - C01
+  - C02
+  - C03
+  - C04
+  - C05
+  - C05_01
+  - C06
+  - C07
+  - C08
+  - C09
+  - C10
   giPelvisPath: Bip001/Bip001 Pelvis
   giHeadPath: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001
     Head
