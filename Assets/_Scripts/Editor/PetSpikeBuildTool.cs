@@ -22,12 +22,28 @@ namespace GIC.Editor
 
         private static void BuildInternal()
         {
+            // 编译竞态守卫：delayCall 排到本帧时若 Refresh 触发的脚本编译/导入尚未落地，
+            // 直接 BuildPlayer 会报 "Error building Player because scripts are compiling"（errors=0 size=0 假失败）。
+            // 持续推迟到编译落地再构建。
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorApplication.delayCall += BuildInternal;
+                return;
+            }
+
             Debug.Log("[PetSpikeBuild] START");
             try
             {
                 // 强制刷新资产库，防止 player 构建吃到不含新脚本的陈旧输入（曾致 GIC.Pet CS0234）
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+
+                // Refresh 可能又排了一轮编译；再次守卫，确保 BuildPlayer 在编译真落地后才调用
+                if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                {
+                    EditorApplication.delayCall += BuildInternal;
+                    return;
+                }
 
                 string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
                 var options = new BuildPlayerOptions

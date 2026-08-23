@@ -341,7 +341,7 @@ namespace GIC.Pet
             int newW = newClientW + frameW;
             int newH = newClientH + frameH;
             int newX = Mathf.RoundToInt(anchorX - newClientW * 0.5f) - frameLeft;
-            int newY = Mathf.RoundToInt(anchorY - newClientH) - frameTop;
+            int newY = Mathf.RoundToInt(anchorY - newClientH * 0.5f) - frameTop;
 
             // 钳制到屏幕工作区（不吞任务栏；拖到屏幕下方放大时窗口会被推回屏内，派蒙上移——
             // 用户拍板 2026-08-23：宁可上移也不让派蒙出屏看不见）
