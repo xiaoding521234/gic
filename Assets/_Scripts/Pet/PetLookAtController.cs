@@ -15,11 +15,17 @@ namespace GIC.Pet
     /// 鼠标来源：PetWindowController.TryGetCursorUnityScreenPos（Win32 全局轮询，窗口无焦点/
     /// 穿透也能追踪；光标在窗口外同样有效，派蒙可追到屏幕任意角落）。
     ///
-    /// 角度映射（v4，2026-08-23）：
+    /// 角度映射（v5，2026-08-23）：
     ///   偏转量 = 光标相对屏幕中心的归一化偏移 × 最大角，绕世界 up/right 轴叠加到骨骼世界旋转上。
     ///   全屏线性跟随（光标远近连续变化）；yaw/pitch 独立映射但同源于连续屏幕坐标，头顶无翻转奇点。
     ///   相机须在派蒙正面（-Z 侧看 +Z），派蒙面向相机——对齐主流桌宠（DesktopMate/Shimeji）。
-    ///   眼球直接叠加"头目标增量 − 头已转增量"的余量（v3 曾把父骨增量重复叠加致眼白翻出）。
+    ///   颈/头分担之和恒为 1（颈 颈分担 + 头 1-颈分担）——v4 头叠加满份致总偏转 1.35× 过冲。
+    ///   眼球（本地基线重建 + 余量）：clip 中目.L/目.R 本体无曲线（曲线在 目戻/_dummy/_shadow
+    ///   子骨上）、动画不覆写、上帧叠加会残留——v3/v4 在残留上每帧累积增量致复利式自转
+    ///   只剩眼白（鼠标不动也转）。现每帧用启动时本地基线重建中性姿态（父骨已应用旋转
+    ///   × 本地基线快照），再叠加余量：余量 = inv(头链本帧实际叠加增量) × 目标增量
+    ///   （基准=本帧动画姿态，不取首帧快照——v4 首帧快照会把待机摇晃漏进眼球反向补偿）。
+    ///   头未转满时眼球快速补足（≤眼球最大角），头收敛后余量归零、眼球随动画回中。
     /// </summary>
     public class PetLookAtController : MonoBehaviour
     {
@@ -41,7 +47,7 @@ namespace GIC.Pet
         [Header("眼球跟随")]
         [SerializeField] private bool 启用眼球 = true;
         [Tooltip("眼球相对头部视线的追加偏转上限（度）")]
-        [SerializeField] private float 眼球最大角 = 8f;
+        [SerializeField] private float 眼球最大角 = 15f;
 
         [Header("平滑")]
         [Tooltip("头/颈指数阻尼速度（越大跟随越快）")]
@@ -54,6 +60,8 @@ namespace GIC.Pet
         private Transform _首, _頭, _目L, _目R;
         // 首帧姿态快照（世界空间增量法的基准：此刻视为"沿中性视线注视"）
         private Quaternion _参考首, _参考头, _参考目L, _参考目R;
+        // 眼球本地基线快照：目.L/目.R 在 clip 中无曲线、动画不覆写，以此为每帧重建基准
+        private Quaternion _目本地基线L, _目本地基线R;
         private Quaternion _平滑首, _平滑头, _平滑目L, _平滑目R;
         private bool _已初始化;
 
@@ -96,6 +104,8 @@ namespace GIC.Pet
                 _参考头 = _頭.rotation;
                 _参考目L = _目L != null ? _目L.rotation : Quaternion.identity;
                 _参考目R = _目R != null ? _目R.rotation : Quaternion.identity;
+                _目本地基线L = _目L != null ? _目L.localRotation : Quaternion.identity;
+                _目本地基线R = _目R != null ? _目R.localRotation : Quaternion.identity;
                 _平滑首 = _参考首; _平滑头 = _参考头; _平滑目L = _参考目L; _平滑目R = _参考目R;
                 _已初始化 = true;
                 return;
@@ -117,14 +127,17 @@ namespace GIC.Pet
                                 * Quaternion.AngleAxis(-pitch, Vector3.right);
 
             // 先颈后头：父骨先应用，子骨后读取的世界旋转已含父级增量
+            // 颈+头分担之和=1，总偏转恰为目标增量（v4 头叠加满份致 1.35× 过冲）
+            Quaternion 头动画世界 = _頭.rotation; // 应用前快照本帧动画姿态：眼球余量的测量基准
             if (_首 != null)
                 应用骨(_首, ref _平滑首, 目标增量, 颈分担, 头平滑速度);
-            应用骨(_頭, ref _平滑头, 目标增量, 1f, 头平滑速度);
+            应用骨(_頭, ref _平滑头, 目标增量, 1f - 颈分担, 头平滑速度);
 
-            // 眼球：目标 = 头目标增量 − 头已转增量 的余量（防父骨增量重复叠加致眼白翻出）
+            // 眼球：余量 = inv(头链本帧实际叠加增量) × 目标增量——头未转满时眼球快速补足，
+            // 头收敛后余量归零、眼球随动画回中（不反向顶眼白、不被待机摇晃带着自转）
             if (启用眼球)
             {
-                Quaternion 头已转 = _頭.rotation * Quaternion.Inverse(_参考头);
+                Quaternion 头已转 = _頭.rotation * Quaternion.Inverse(头动画世界);
                 Quaternion 眼余量 = Quaternion.Inverse(头已转) * 目标增量;
                 眼余量.ToAngleAxis(out float 眼角, out Vector3 眼轴);
                 if (眼角 > 180f) 眼角 -= 360f;
@@ -133,8 +146,8 @@ namespace GIC.Pet
                 {
                     眼轴.Normalize();
                     Quaternion 眼增量 = Quaternion.AngleAxis(眼角, 眼轴);
-                    if (_目L != null) 应用骨增量(_目L, ref _平滑目L, 眼增量, 眼球平滑速度);
-                    if (_目R != null) 应用骨增量(_目R, ref _平滑目R, 眼增量, 眼球平滑速度);
+                    if (_目L != null) 应用眼球(_目L, _目本地基线L, ref _平滑目L, 眼增量);
+                    if (_目R != null) 应用眼球(_目R, _目本地基线R, ref _平滑目R, 眼增量);
                 }
             }
         }
@@ -153,6 +166,16 @@ namespace GIC.Pet
             float k = 1f - Mathf.Exp(-平滑速度 * Time.deltaTime);
             平滑 = Quaternion.Slerp(平滑, 期望, k);
             骨.rotation = 平滑;
+        }
+
+        /// <summary>眼球：本地基线重建中性姿态（父骨当前世界旋转 × 启动时本地快照）后叠加余量并平滑。
+        /// 目骨在 clip 中无曲线、动画不覆写，不能在自身当前旋转上累积（会复利式自转）。</summary>
+        void 应用眼球(Transform 眼, Quaternion 本地基线, ref Quaternion 平滑, Quaternion 余量)
+        {
+            Quaternion 期望 = 余量 * (眼.parent.rotation * 本地基线);
+            float k = 1f - Mathf.Exp(-眼球平滑速度 * Time.deltaTime);
+            平滑 = Quaternion.Slerp(平滑, 期望, k);
+            眼.rotation = 平滑;
         }
     }
 }
