@@ -1116,7 +1116,6 @@ GameObject:
   serializedVersion: 7
   m_Component:
   - component: {fileID: 288543647}
-  - component: {fileID: 288543648}
   - component: {fileID: 288543653}
   - component: {fileID: 288543652}
   - component: {fileID: 288543651}
@@ -1147,27 +1146,6 @@ Transform:
   - {fileID: 1507521473}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &288543648
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288543646}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.56900495, y: 0.8327661, z: 0.3540206}
-  m_Center: {x: -0.022213345, y: 0.40814847, z: -0.055530686}
 --- !u!114 &288543649
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6135,6 +6113,7 @@ MonoBehaviour:
   "\u5141\u8BB8\u53CC\u51FB\u9000\u51FA": 1
   "\u76EE\u6807\u5E27\u7387": 60
   "\u6253\u5370\u72B6\u6001\u65E5\u5FD7": 0
+  "\u70D8\u7119\u95F4\u9694": 0.15
 --- !u!4 &1640153875
 Transform:
   m_ObjectHideFlags: 0

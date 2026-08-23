@@ -28,7 +28,13 @@ namespace GIC.Pet
         [SerializeField] private bool 打印状态日志 = false;
 
         private Camera cam;
-        private Collider 命中碰撞体;
+        // 2026-08-23 像素级命中：MeshCollider 动态烘焙蒙皮网格，替代胶囊链（头冠/脚 100% 贴合、右下零空气）。
+        // BakeMesh(useScale=true) 输出在 SMR 局部空间（骨骼空间），命中节点须与 SMR 同 transform。
+        private SkinnedMeshRenderer 蒙皮渲染器;
+        private MeshCollider 命中网格碰撞体;
+        private Mesh 烘焙网格;
+        private float 上次烘焙时间 = -10f;
+        [Tooltip("蒙皮网格重烘间隔秒（低频即可，呼吸/裙摆微动不需要逐帧）")] [SerializeField] private float 烘焙间隔 = 0.15f;
         private IntPtr hwnd = IntPtr.Zero;
         private bool restyled;
         private bool dragging;
@@ -104,7 +110,28 @@ namespace GIC.Pet
                     cam.backgroundColor = 色键颜色;
                 }
             }
-            命中碰撞体 = GetComponentInChildren<Collider>();
+            // 命中链路：Paimon 下的蒙皮渲染器 + 同 transform 的 MeshCollider 节点（动态烘焙）
+            var paimonRoot = GameObject.Find("Paimon");
+            if (paimonRoot != null)
+            {
+                蒙皮渲染器 = paimonRoot.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                if (蒙皮渲染器 != null)
+                {
+                    var hitGo = new GameObject("_HitMeshProxy");
+                    hitGo.transform.SetParent(蒙皮渲染器.transform.parent, false);
+                    hitGo.transform.localPosition = 蒙皮渲染器.transform.localPosition;
+                    hitGo.transform.localRotation = 蒙皮渲染器.transform.localRotation;
+                    hitGo.transform.localScale = 蒙皮渲染器.transform.localScale;
+                    命中网格碰撞体 = hitGo.AddComponent<MeshCollider>();
+                    烘焙网格 = new Mesh();
+                    蒙皮渲染器.BakeMesh(烘焙网格, true);
+                    命中网格碰撞体.sharedMesh = 烘焙网格;
+                }
+            }
+            if (命中网格碰撞体 == null)
+            {
+                Debug.LogError("[PetSpike] 未找到蒙皮渲染器，命中判定失效");
+            }
 
 #if UNITY_EDITOR
             // 编辑器内禁止 Win32 窗口改造——GetActiveWindow 拿到的是编辑器自身窗口，会破坏编辑器 UI。
@@ -139,7 +166,11 @@ namespace GIC.Pet
             uint key = 0;
             if (使用DWM透明)
             {
-                // DWM 逐像素 alpha：玻璃框架扩展到整个客户区，像素按 swapchain alpha 混合桌面
+                // DWM 逐像素 alpha：玻璃框架扩展到整个客户区，像素按 swapchain alpha 混合桌面。
+                // 必须同时挂 WS_EX_LAYERED（原漏挂）：无 LAYERED 的 DWM 窗口逐像素 alpha 行为不可靠
+                //（可能整窗"玻璃"或矩形不裁剪），穿透/双击因此失效——2026-08-23 实测踩坑。
+                ex |= WS_EX_LAYERED;
+                SetWindowLong(hwnd, GWL_EXSTYLE, ex);
                 var margins = new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyTopHeight = -1, cyBottomHeight = -1 };
                 DwmExtendFrameIntoClientArea(hwnd, ref margins);
             }
@@ -190,14 +221,28 @@ namespace GIC.Pet
             bool inWindow = pt.X >= wr.Left && pt.X < wr.Right && pt.Y >= wr.Top && pt.Y < wr.Bottom;
             bool modelHit = false;
 
-            if (inWindow && cam != null && 命中碰撞体 != null)
+            if (inWindow && cam != null && 命中网格碰撞体 != null)
             {
-                // Win32 客户区坐标（左上原点）→ Unity 屏幕坐标（左下原点）
+                // Win32 客户区坐标（左上原点）→ Unity 屏幕坐标（左下原点）；
+                // 用游戏实际渲染分辨率而非窗口物理像素（DPI 缩放下两者不等，差数倍）。
                 int clientX = pt.X - wr.Left;
                 int clientY = pt.Y - wr.Top;
-                float unityY = (wr.Bottom - wr.Top) - clientY;
-                Ray ray = cam.ScreenPointToRay(new Vector3(clientX, unityY, 0f));
-                modelHit = 命中碰撞体.Raycast(ray, out _, 100f);
+                int winW = wr.Right - wr.Left;
+                int winH = wr.Bottom - wr.Top;
+                float sx = clientX * ((float)Screen.width / winW);
+                float sy = clientY * ((float)Screen.height / winH);
+                float unityY = Screen.height - sy;
+                Ray ray = cam.ScreenPointToRay(new Vector3(sx, unityY, 0f));
+                modelHit = 命中网格碰撞体.Raycast(ray, out _, 100f);
+            }
+
+            // 低频重烘蒙皮网格（跟随呼吸/裙摆/姿势变化；11k 顶点 0.15s 一次开销可忽略）
+            if (蒙皮渲染器 != null && 命中网格碰撞体 != null && Time.unscaledTime - 上次烘焙时间 >= 烘焙间隔)
+            {
+                蒙皮渲染器.BakeMesh(烘焙网格, true);
+                命中网格碰撞体.sharedMesh = null; // 强制碰撞体刷新
+                命中网格碰撞体.sharedMesh = 烘焙网格;
+                上次烘焙时间 = Time.unscaledTime;
             }
 
             // 拖拽：全局轮询左键，不依赖焦点；抓住模型后跟随光标移动窗口
