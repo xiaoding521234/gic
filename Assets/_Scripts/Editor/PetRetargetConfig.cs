@@ -40,8 +40,14 @@ namespace GIC.Editor.Retarget
         public string rootBoneName = "\u5168\u3066\u306e\u89aa"; // 全ての親
 
         [Header("转换清单（GI 动画名，不含前缀；兼容 Ani_NPC_/Ani_Cs_NPC_ 两种命名）")]
-        [Tooltip("C05_01 已剔除（2026-08-23）：其源曲线路径全为哈希数字，管线忽略后输出静姿 Standby——非真实重定向")]
-        public string[] clips = { "Standby", "Greet", "Anger", "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10" };
+        [Tooltip("2026-08-23 修正：剔除 C01–C10 编号过场演出，只转有名字的看板动作；清单与 AnimeStudio 实际提取文件对齐（Shy/Confuse/Think/Like 为 AS/BS/Loop 三段，无单段文件）。Nod02/ShakeHead02 源 rot曲线=0（哈希路径，输出必为静姿伪影）已剔除。Standby 必须首位（t=0 = GI 参考绑定姿势）")]
+        public string[] clips = { "Standby", "Greet", "Anger", "Sneer01", "Clap01", "Nod01",
+                                  "ShakeHead01", "Refuse01", "Run", "SitLoop", "Sleep01",
+                                  "Turnback", "Domagic",
+                                  "Shy01AS", "Shy01BS", "Shy01Loop",
+                                  "Confuse01AS", "Confuse01BS", "Confuse01Loop",
+                                  "Think01AS", "Think01BS", "Think01Loop",
+                                  "Like01AS", "Like01BS", "Like01Loop" };
 
         [Header("对齐关键骨（GI 侧为 model 节点下相对路径，MMD 侧为骨名）")]
         public string giPelvisPath = "Bip001/Bip001 Pelvis";
@@ -83,13 +89,31 @@ namespace GIC.Editor.Retarget
             new PrefixRule { mmdPrefix = "\u3072\u3058", giTemplate = "Bip001 {S}Forearm" },      // ひじ
             new PrefixRule { mmdPrefix = "\u624b\u6369", giTemplate = "Bip001 {S}Forearm" },      // 手捩
             new PrefixRule { mmdPrefix = "\u624b\u9996", giTemplate = "Bip001 {S}Hand" },         // 手首
-            new PrefixRule { mmdPrefix = "\u624b\u5148", giTemplate = "Bip001 {S}Hand" },         // 手先
-            new PrefixRule { mmdPrefix = "\u89aa\u6307", giTemplate = "Bip001 {S}Hand" },         // 親指
-            new PrefixRule { mmdPrefix = "\u4eba\u6307", giTemplate = "Bip001 {S}Hand" },         // 人指
-            new PrefixRule { mmdPrefix = "\u4e2d\u6307", giTemplate = "Bip001 {S}Hand" },         // 中指
-            new PrefixRule { mmdPrefix = "\u85ac\u6307", giTemplate = "Bip001 {S}Hand" },         // 薬指
-            new PrefixRule { mmdPrefix = "\u5c0f\u6307", giTemplate = "Bip001 {S}Hand" },         // 小指
-            new PrefixRule { mmdPrefix = "\u30c0\u30df\u30fc", giTemplate = "Bip001 {S}Hand" },   // ダミー
+            new PrefixRule { mmdPrefix = "手先", giTemplate = "Bip001 {S}Hand" },         // 手先
+            // 手指节级映射（2026-08-23 手指驱动）：GI 源曲线含 Bip001 {S}Finger0/01…4/41，
+            // 精确到节后手指骨经 rank1 升为代表骨被 qPose 方向对齐驱动（此前五指全映 Hand=纹丝不动）。
+            // GI 仅两节（Finger0/01）；MMD 末节（親指２/人指３等）无源 → 回退父级目标成跟随骨（保持绑定随父）。
+            // 注意 MMD 骨名为全角数字（親指０、人指１、中指２、３），前缀必须全角匹配。
+            new PrefixRule { mmdPrefix = "親指０", giTemplate = "Bip001 {S}Finger0" },    // 親指０→拇指根
+            new PrefixRule { mmdPrefix = "親指１", giTemplate = "Bip001 {S}Finger01" },   // 親指１→拇指中
+            new PrefixRule { mmdPrefix = "親指２", giTemplate = "Bip001 {S}Finger01" },   // 親指２ 无源→跟随
+            new PrefixRule { mmdPrefix = "親指", giTemplate = "Bip001 {S}Hand" },         // 親指（兜底）
+            new PrefixRule { mmdPrefix = "人指１", giTemplate = "Bip001 {S}Finger1" },    // 人指１
+            new PrefixRule { mmdPrefix = "人指２", giTemplate = "Bip001 {S}Finger11" },   // 人指２
+            new PrefixRule { mmdPrefix = "人指３", giTemplate = "Bip001 {S}Finger11" },   // 人指３ 无源→跟随
+            new PrefixRule { mmdPrefix = "人指", giTemplate = "Bip001 {S}Hand" },         // 人指（兜底）
+            new PrefixRule { mmdPrefix = "中指１", giTemplate = "Bip001 {S}Finger2" },    // 中指１
+            new PrefixRule { mmdPrefix = "中指２", giTemplate = "Bip001 {S}Finger21" },   // 中指２
+            new PrefixRule { mmdPrefix = "中指３", giTemplate = "Bip001 {S}Finger21" },   // 中指３ 无源→跟随
+            new PrefixRule { mmdPrefix = "中指", giTemplate = "Bip001 {S}Hand" },         // 中指（兜底）
+            new PrefixRule { mmdPrefix = "薬指１", giTemplate = "Bip001 {S}Finger3" },    // 薬指１
+            new PrefixRule { mmdPrefix = "薬指２", giTemplate = "Bip001 {S}Finger31" },   // 薬指２
+            new PrefixRule { mmdPrefix = "薬指３", giTemplate = "Bip001 {S}Finger31" },   // 薬指３ 无源→跟随
+            new PrefixRule { mmdPrefix = "薬指", giTemplate = "Bip001 {S}Hand" },         // 薬指（兜底）
+            new PrefixRule { mmdPrefix = "小指１", giTemplate = "Bip001 {S}Finger4" },    // 小指１
+            new PrefixRule { mmdPrefix = "小指２", giTemplate = "Bip001 {S}Finger41" },   // 小指２
+            new PrefixRule { mmdPrefix = "小指３", giTemplate = "Bip001 {S}Finger41" },   // 小指３ 无源→跟随
+            new PrefixRule { mmdPrefix = "小指", giTemplate = "Bip001 {S}Hand" },         // 小指（兜底）
             new PrefixRule { mmdPrefix = "\u3064\u307e\u5148", giTemplate = "Bip001 {S}Toe0" },   // つま先
             new PrefixRule { mmdPrefix = "\u8db3\u5148EX", giTemplate = "Bip001 {S}Toe0" },       // 足先EX
             new PrefixRule { mmdPrefix = "\u8db3IK\u89aa", giTemplate = "Bip001 {S}Foot" },       // 足IK親
@@ -106,7 +130,13 @@ namespace GIC.Editor.Retarget
         [Tooltip("位置锚骨名（唯一传位置的骨，承载bob/根运动）")]
         public string anchorBoneName = "\u8170"; // 腰
         [Tooltip("躯干骨：姿势参考方向改'指向头骨'（规避Biped骨段结构角）")]
-        public string[] torsoHeadRefBones = { "\u8170", "\u4e0a\u534a\u8eab", "\u4e0a\u534a\u8eab2", "\u9996" }; // 腰/上半身/上半身2/首
+        public string[] torsoHeadRefBones = { "腰", "上半身", "上半身2", "首" }; // 腰/上半身/上半身2/首
+        [Tooltip("手指骨名单（qPose 用 LookRotation 重建——骨段方向来自 GI 共轭，up 用 MMD 掌背方向；2026-08-23 反关节根治）")]
+        public string[] fingerBones = { "親指０.L","親指０.R","親指１.L","親指１.R","親指２.L","親指２.R",
+                                        "人指１.L","人指１.R","人指２.L","人指２.R","人指３.L","人指３.R",
+                                        "中指１.L","中指１.R","中指２.L","中指２.R","中指３.L","中指３.R",
+                                        "薬指１.L","薬指１.R","薬指２.L","薬指２.R","薬指３.L","薬指３.R",
+                                        "小指１.L","小指１.R","小指２.L","小指２.R","小指３.L","小指３.R" };
 
         [Header("代表骨优先级（每GI骨选一个MMD代表；0最高）")]
         [Tooltip("rank0 主链标准名（逗号分隔）")]
@@ -163,6 +193,7 @@ namespace GIC.Editor.Retarget
 
         public HashSet<string> UndrivenSet() => new HashSet<string>(undrivenBones);
         public HashSet<string> TorsoSet() => new HashSet<string>(torsoHeadRefBones);
+        public HashSet<string> FingerSet() => new HashSet<string>(fingerBones);
 
         /// <summary>默认配置资产路径（管线缺失时自动创建）</summary>
         public const string DEFAULT_ASSET = "Assets/Art/PaimonPet/RetargetConfig.asset";

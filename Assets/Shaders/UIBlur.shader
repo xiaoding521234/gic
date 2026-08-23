@@ -107,7 +107,10 @@ Shader "UI/Blur"
                 col.a = 1.0;
 
                 #ifdef UNITY_UI_CLIP_RECT
-                    col.a *= UnityGet2DClipping(input.worldPosition.xy, _ClipRect);
+                    // 内联 UnityGet2DClipping（避免混引 UnityUI.cginc 与 URP HLSL 冲突）：
+                    // 矩形内 1、外 0、边缘 0.3 像素软过渡
+                    float2 inside = step(_ClipRect.xy, input.worldPosition.xy) * step(input.worldPosition.xy, _ClipRect.zw);
+                    col.a *= inside.x * inside.y;
                 #endif
 
                 #ifdef UNITY_UI_ALPHACLIP

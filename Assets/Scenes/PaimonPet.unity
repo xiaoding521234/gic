@@ -1117,6 +1117,11 @@ GameObject:
   m_Component:
   - component: {fileID: 288543647}
   - component: {fileID: 288543648}
+  - component: {fileID: 288543653}
+  - component: {fileID: 288543652}
+  - component: {fileID: 288543651}
+  - component: {fileID: 288543650}
+  - component: {fileID: 288543649}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: Paimon
@@ -1163,6 +1168,130 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.56900495, y: 0.8327661, z: 0.3540206}
   m_Center: {x: -0.022213345, y: 0.40814847, z: -0.055530686}
+--- !u!114 &288543649
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288543646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a80e31994f436844b44a7dd83d99e2b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u751F\u6C14\u59FF\u6001":
+    "\u6743\u91CD": 1
+    "\u62C7\u6307\u6839": 30
+    "\u62C7\u6307\u4E2D": 45
+    "\u62C7\u6307\u672B": 30
+    "\u98DF\u6307\u6839": 70
+    "\u98DF\u6307\u4E2D": 80
+    "\u98DF\u6307\u672B": 60
+    "\u4E2D\u6307\u6839": 75
+    "\u4E2D\u6307\u4E2D": 85
+    "\u4E2D\u6307\u672B": 65
+    "\u65E0\u540D\u6307\u6839": 80
+    "\u65E0\u540D\u6307\u4E2D": 90
+    "\u65E0\u540D\u6307\u672B": 70
+    "\u5C0F\u6307\u6839": 85
+    "\u5C0F\u6307\u4E2D": 95
+    "\u5C0F\u6307\u672B": 75
+  "\u8FC7\u6E21\u79D2": 0.25
+  "\u542F\u7528": 1
+--- !u!114 &288543650
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288543646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7156035d6c9e27d4bab5c41bdbde8ab4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u6700\u5C0F\u95F4\u9694\u79D2": 2.5
+  "\u6700\u5927\u95F4\u9694\u79D2": 5.5
+  "\u7728\u773C\u65F6\u957F\u79D2": 0.13
+--- !u!114 &288543651
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288543646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28b5eb9dfdd82dc4f8d75e2b08ee9e8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u60C5\u7EEA\u8868":
+  - "\u60C5\u7EEA\u540D": Anger
+    "Morph\u540D": "\u6012\u308A"
+    "\u5F3A\u5EA6": 100
+    "\u8FC7\u6E21\u79D2": 0.25
+    "\u5EF6\u8FDF\u79D2": 0
+    "\u4FDD\u6301\u79D2": -1
+    "\u590D\u4F4D\u79D2": 0.33
+--- !u!114 &288543652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288543646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d80a0c825729b2408515573e0ef95a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetAnimation: {fileID: 288543653}
+  "\u60C5\u7EEA\u6620\u5C04":
+  - "\u52A8\u4F5C\u540D\u7247\u6BB5": Anger
+    "\u60C5\u7EEA\u540D": Anger
+  emotionController: {fileID: 288543651}
+  fingerPoseController: {fileID: 288543649}
+--- !u!111 &288543653
+Animation:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288543646}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Animation: {fileID: 7400000, guid: a1deb126d31d03042860ab0c2898493e, type: 2}
+  m_Animations:
+  - {fileID: 7400000, guid: a1deb126d31d03042860ab0c2898493e, type: 2}
+  - {fileID: 7400000, guid: cde4cc79c46ea064cbdc73a4bba52528, type: 2}
+  - {fileID: 7400000, guid: faf0f71a5939a0d41a6cac760a123b0b, type: 2}
+  - {fileID: 7400000, guid: 3658a569fd340f54d98dc12522283cf9, type: 2}
+  - {fileID: 7400000, guid: ce0a35c8d9942454ead55faf9db2ab67, type: 2}
+  - {fileID: 7400000, guid: dba03ea77aad78948928bb7fbe8388a9, type: 2}
+  - {fileID: 7400000, guid: 146905161b472184e8166c84c3098bcd, type: 2}
+  - {fileID: 7400000, guid: 36c08b0a7fd4e2543b7e625dda2f56b1, type: 2}
+  - {fileID: 7400000, guid: f81be64297df78e40a636760c7cc645f, type: 2}
+  - {fileID: 7400000, guid: 9239215ccc3197a458ea198e98c38418, type: 2}
+  - {fileID: 7400000, guid: 2107b2cd5d452924881185c03e220767, type: 2}
+  - {fileID: 7400000, guid: 7296ecf823af21f4a93e556497eefe4c, type: 2}
+  - {fileID: 7400000, guid: d9180c81b9b4ccd4a827008215502f81, type: 2}
+  - {fileID: 7400000, guid: 29f6032f6b3d8d745ad1850230cc51be, type: 2}
+  - {fileID: 7400000, guid: 1b7e7a911d2e2d14e9c9c89fdc969746, type: 2}
+  - {fileID: 7400000, guid: c37879ecc45375247bc281a0ec4ab339, type: 2}
+  - {fileID: 7400000, guid: 595e21345902d2b44ad448da624da566, type: 2}
+  - {fileID: 7400000, guid: ee28506ed8f7eab4496437d0e003cd3d, type: 2}
+  - {fileID: 7400000, guid: 2474bc1a5859e974eb911cf5c385a529, type: 2}
+  - {fileID: 7400000, guid: b5c16b8c87bf64643a022dc8126b5f25, type: 2}
+  - {fileID: 7400000, guid: f03ef56d360dada4e8851f85ca105476, type: 2}
+  - {fileID: 7400000, guid: 6fa24529065648a409c83550253744df, type: 2}
+  - {fileID: 7400000, guid: 687959cd07b27d047bf6d0301cb9140d, type: 2}
+  - {fileID: 7400000, guid: adc7c480e065bfc4a8a1072f652252ef, type: 2}
+  - {fileID: 7400000, guid: 1787fce269b2d2f44adf28cc3042373c, type: 2}
+  m_WrapMode: 0
+  m_PlayAutomatically: 1
+  m_AnimatePhysics: 0
+  m_CullingType: 0
 --- !u!1 &302282615
 GameObject:
   m_ObjectHideFlags: 0
@@ -5999,10 +6128,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a7ef78bbb9b13544aee0ff1dbc55fbf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  "\u4F7F\u7528DWM\u900F\u660E": 1
   "\u8272\u952E\u989C\u8272": {r: 1, g: 0, b: 1, a: 1}
   "\u505C\u9760\u8FB9\u8DDD": 24
   "\u542F\u52A8\u65F6\u505C\u9760\u53F3\u4E0B\u89D2": 1
-  "\u76EE\u6807\u5E27\u7387": 30
+  "\u5141\u8BB8\u53CC\u51FB\u9000\u51FA": 1
+  "\u76EE\u6807\u5E27\u7387": 60
   "\u6253\u5370\u72B6\u6001\u65E5\u5FD7": 0
 --- !u!4 &1640153875
 Transform:

@@ -149,6 +149,8 @@ namespace GIC.Editor.Retarget
             foreach (var tp in cd.pos.Values) foreach (var t in tp.times) times.Add(t);
             cd.frameTimes = times.ToList();
             if (cd.frameTimes.Count < 2) throw new System.InvalidOperationException($"[{name}] \u5e27\u6570\u5f02\u5e38 {cd.frameTimes.Count}");
+            // rot曲线=0 = 源曲线全哈希路径（重定向输出必为静姿伪影，C05_01/Nod02/ShakeHead02 教训）——解析期直接拦截
+            if (nr == 0) throw new System.InvalidOperationException($"[{name}] rot\u66f2\u7ebf=0\uff08\u6e90\u66f2\u7ebf\u5168\u54c8\u5e0c\u8def\u5f84\uff0c\u8f93\u51fa\u5fc5\u4e3a\u9759\u59ff\u4f2a\u5f71\uff09\uff0c\u4ece\u8f6c\u6362\u6e05\u5355\u5254\u9664\u8be5 clip");
             log.AppendLine($"[parse {name}] rot\u66f2\u7ebf={nr} pos\u66f2\u7ebf={np} \u5e27\u6570={cd.frameTimes.Count} \u65f6\u957f={cd.frameTimes[cd.frameTimes.Count - 1]:F3}s");
             return cd;
         }
@@ -203,6 +205,30 @@ namespace GIC.Editor.Retarget
         }
 
         // ==================== 小工具 ====================
+
+        /// <summary>v19 平滑切线 keyframe（2026-08-23 原神流畅度根治）：三点斜率平均（ClampAuto 风格不加 clamp）。
+        /// 此前 new Keyframe(t,v) 切线=0 → 60fps 密集 key 周期性过冲回拉（2% 失真=肉眼顿挫）。</summary>
+        static Keyframe SmoothKey(List<float> times, Quaternion[] vals, int f, int comp)
+        {
+            float t = times[f];
+            float v = comp == 0 ? vals[f].x : comp == 1 ? vals[f].y : comp == 2 ? vals[f].z : vals[f].w;
+            float vp = comp == 0 ? vals[f > 0 ? f - 1 : 0].x : comp == 1 ? vals[f > 0 ? f - 1 : 0].y : comp == 2 ? vals[f > 0 ? f - 1 : 0].z : vals[f > 0 ? f - 1 : 0].w;
+            float vn = comp == 0 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].x : comp == 1 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].y : comp == 2 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].z : vals[f < times.Count - 1 ? f + 1 : times.Count - 1].w;
+            float tp = times[f > 0 ? f - 1 : 0], tn = times[f < times.Count - 1 ? f + 1 : times.Count - 1];
+            float slope = (tn - tp) > 1e-6f ? (vn - vp) / (tn - tp) : 0f;
+            return new Keyframe(t, v, slope, slope);
+        }
+
+        static Keyframe SmoothKey(List<float> times, Vector3[] vals, int f, int comp)
+        {
+            float t = times[f];
+            float v = comp == 0 ? vals[f].x : comp == 1 ? vals[f].y : vals[f].z;
+            float vp = comp == 0 ? vals[f > 0 ? f - 1 : 0].x : comp == 1 ? vals[f > 0 ? f - 1 : 0].y : vals[f > 0 ? f - 1 : 0].z;
+            float vn = comp == 0 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].x : comp == 1 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].y : vals[f < times.Count - 1 ? f + 1 : times.Count - 1].z;
+            float tp = times[f > 0 ? f - 1 : 0], tn = times[f < times.Count - 1 ? f + 1 : times.Count - 1];
+            float slope = (tn - tp) > 1e-6f ? (vn - vp) / (tn - tp) : 0f;
+            return new Keyframe(t, v, slope, slope);
+        }
 
         static Vector3 VecOf(Vector4 v) => new Vector3(v.x, v.y, v.z);
         static Quaternion QuatOf(Vector4 v) => new Quaternion(v.x, v.y, v.z, v.w).normalized;
@@ -516,6 +542,7 @@ namespace GIC.Editor.Retarget
             // 整个躯干前倾（"肚子前翘"实测 25.7°）；"指向头"在两骨架语义一致（沿链向上）。
             // 四肢骨段方向语义一致（已实测正确），保持不变。
             var torsoOverride = cfg.TorsoSet();
+            var fingerSet = cfg.FingerSet(); // v17 手指骨 LookRotation 重建名单（qPose 阶段消费）
             var headMmdRep = repByMmd.Keys.FirstOrDefault(k => k.name == "\u982d");
             if (headMmdRep != null)
                 foreach (var kv in repByMmd)
@@ -562,7 +589,33 @@ namespace GIC.Editor.Retarget
             {
                 var p = cfg.armNodeName + "/" + Rel(kv, armNode);
                 if (mmdInst.transform.Find(p) == null)
-                    throw new System.InvalidOperationException($"\u8def\u5f84\u89e3\u6790\u5931\u8d25: {p}");
+                    throw new System.InvalidOperationException($"路径解析失败: {p}");
+            }
+
+            // v17 手掌背方向预计算（2026-08-23 手指反关节根治，v17.1 掌心方向修正）：
+            // 用 人指根/中指根/小指根 三点定掌面法线 faceN，再用拇指根位置判定掌心朝向
+            // （生理常识：拇指在掌心那一侧）——faceN·拇指>0 则 faceN 即掌心，否则取反。
+            // LookRotation 的 up 参数用 -palmN = 掌背方向。
+            // 教训（v17 初版踩坑）：手首/人指根/中指根 三点叉积的"掌心"在派蒙手上恰好反 180°
+            // （手掌姿态下三点排列顺逆跟人手习惯相反）——必须用拇指独立判定，不能凭叉积顺序假设。
+            var palmBackBySide = new System.Collections.Generic.Dictionary<string, UnityEngine.Vector3>();
+            {
+                System.Func<string, UnityEngine.Transform> FindBone = n => { foreach (var b in mmdBones) if (b.name == n) return b; return null; };
+                foreach (var side in new[]{"L","R"})
+                {
+                    var iM = FindBone($"人指１.{side}");
+                    var mM = FindBone($"中指１.{side}");
+                    var pM = FindBone($"小指１.{side}");
+                    var thM = FindBone($"親指０.{side}");
+                    if (iM == null || mM == null || pM == null || thM == null) continue;
+                    // 四指根掌面法线（人→中 与 人→小 叉积）
+                    var faceN = UnityEngine.Vector3.Cross(mM.position - iM.position, pM.position - iM.position).normalized;
+                    // 拇指位置判掌心：拇指根到掌面的有向距离 >0 则 faceN 朝掌心，否则朝掌背
+                    var thumbOff = UnityEngine.Vector3.Dot(thM.position - iM.position, faceN);
+                    var palmN = thumbOff > 0 ? faceN : -faceN;
+                    palmBackBySide[side] = -palmN;
+                    log.AppendLine($"[v17.1] {side} 手 掌心={palmN}  掌背={palmBackBySide[side]}  拇指离掌面={thumbOff:F4}");
+                }
             }
 
             foreach (var cd in clips)
@@ -629,9 +682,29 @@ namespace GIC.Editor.Retarget
                                 var d0 = (giW[cG].GetColumn(3) - giW[g0].GetColumn(3)).normalized;
                                 dG0Dir[kv.Key] = Quaternion.Inverse(R) * d0;
                             }
-                            qPose[kv.Key] = dG0Dir.TryGetValue(kv.Key, out var d0M)
-                                ? Quaternion.FromToRotation(repDirBind[kv.Key], d0M) * ExtractRot(mmdWorld0[kv.Key])
-                                : ExtractRot(mmdWorld0[kv.Key]);
+                            // v17 手指骨 LookRotation 重建（2026-08-23 根治）：MMD 手指骨绑定姿态 boneFwd⊥骨段
+                            //（Blender 转 FBX 时局部系歪 90°，实测 boneFwd·骨段=0），FromToRotation 只保骨段
+                            // 方向，扭角未定导致弯曲轴歪——手指朝掌心弯过头呈"掐"状。
+                            // 改为：forward=MMD 绑定骨段方向（保持刚性链几何，子骨局部位置不变），
+                            // up=MMD 掌背方向（修正扭角），LookRotation 直接给出世界旋转。
+                            // 后续 GI 增量 delta 应用到修正后的局部系，弯曲轴就对了。
+                            // 注意：不能用 GI 共轭骨段作 forward——会改变骨段方向，破坏 v15 刚性链
+                            //（子骨局部位置恒定铁律），自检会报 90° 误差。
+                            var boneName = kv.Key.name;
+                            bool isFinger = fingerSet.Contains(boneName);
+                            string side = boneName.EndsWith(".L") ? "L" : boneName.EndsWith(".R") ? "R" : null;
+                            if (isFinger && side != null && palmBackBySide.TryGetValue(side, out var palmBack))
+                            {
+                                // forward = MMD 绑定骨段方向（保几何），up = MMD 掌背方向（修扭角）
+                                // GI 弯曲增量 delta 经 QWantOf 逐帧叠加到修正后 qPose——弯向对+幅度对
+                                qPose[kv.Key] = Quaternion.LookRotation(repDirBind[kv.Key], palmBack);
+                            }
+                            else
+                            {
+                                qPose[kv.Key] = dG0Dir.TryGetValue(kv.Key, out var d0M)
+                                    ? Quaternion.FromToRotation(repDirBind[kv.Key], d0M) * ExtractRot(mmdWorld0[kv.Key])
+                                    : ExtractRot(mmdWorld0[kv.Key]);
+                            }
                         }
                         // v10 腰锚舞台偏移扣除：Cs 系列根骨带大幅舞台位移（实测 12m），
                         // 桌宠需原地动作——f0 目标平移到 MMD 绑定盆位，保留 bob/根运动相对 f0 的部分
@@ -738,6 +811,9 @@ namespace GIC.Editor.Retarget
                         foreach (var kv in repByMmd)
                         {
                             aMax = Mathf.Max(aMax, Quaternion.Angle(ExtractRot(mmdW[kv.Key]), repQ[kv.Key][f]));
+                            // v17：手指骨走 LookRotation 重建（保持 MMD 骨段方向，不跟踪 GI 骨段）——
+                            // 自检的"骨段方向跟踪 GI"假设对手指骨不成立，跳过
+                            if (fingerSet.Contains(kv.Key.name)) continue;
                             if (torsoOverride.Contains(kv.Key.name) && headMmdRep != null)
                             {
                                 // v7.2 躯干骨：比较"指向头"向量（链式合成非逐骨恒等，宽松上界）
@@ -849,8 +925,11 @@ namespace GIC.Editor.Retarget
                     for (int f = 0; f < frames; f++)
                     {
                         var tt = cd.frameTimes[f];
-                        krx[f] = new Keyframe(tt, rots[f].x); kry[f] = new Keyframe(tt, rots[f].y);
-                        krz[f] = new Keyframe(tt, rots[f].z); krw[f] = new Keyframe(tt, rots[f].w);
+                        // v19 平滑切线（原神流畅度根治）：new Keyframe(t,v) 切线=0 → 60fps 密集 key 周期性过冲回拉
+                        //（实测 2Hz 正弦失真 2%，肉眼顿挫）。旋转值域广，用首末三点斜率平均（ClampAuto 风格，
+                        // 不加 clamp 防旋转峰谷被压平）。
+                        krx[f] = SmoothKey(cd.frameTimes, rots, f, 0); kry[f] = SmoothKey(cd.frameTimes, rots, f, 1);
+                        krz[f] = SmoothKey(cd.frameTimes, rots, f, 2); krw[f] = SmoothKey(cd.frameTimes, rots, f, 3);
                     }
                     clip.SetCurve(path, typeof(Transform), "localRotation.x", new AnimationCurve(krx));
                     clip.SetCurve(path, typeof(Transform), "localRotation.y", new AnimationCurve(kry));
@@ -862,8 +941,7 @@ namespace GIC.Editor.Retarget
                         var kpx = new Keyframe[frames]; var kpy = new Keyframe[frames]; var kpz = new Keyframe[frames];
                         for (int f = 0; f < frames; f++)
                         {
-                            var tt = cd.frameTimes[f];
-                            kpx[f] = new Keyframe(tt, poss[f].x); kpy[f] = new Keyframe(tt, poss[f].y); kpz[f] = new Keyframe(tt, poss[f].z);
+                            kpx[f] = SmoothKey(cd.frameTimes, poss, f, 0); kpy[f] = SmoothKey(cd.frameTimes, poss, f, 1); kpz[f] = SmoothKey(cd.frameTimes, poss, f, 2);
                         }
                         clip.SetCurve(path, typeof(Transform), "localPosition.x", new AnimationCurve(kpx));
                         clip.SetCurve(path, typeof(Transform), "localPosition.y", new AnimationCurve(kpy));
@@ -898,9 +976,11 @@ namespace GIC.Editor.Retarget
             var swapper = pet.AddComponent<GIC.Pet.PetAnimSwapper>();
             var anim = pet.AddComponent<GIC.Pet.PetEmotionController>();
             pet.AddComponent<GIC.Pet.PetBlinkController>();
+            var fingerPose = pet.AddComponent<GIC.Pet.PetFingerPoseController>(); // v18 程序化手指姿态层
             var sw = new SerializedObject(swapper);
             sw.FindProperty("targetAnimation").objectReferenceValue = animComp;
             sw.FindProperty("emotionController").objectReferenceValue = anim;
+            sw.FindProperty("fingerPoseController").objectReferenceValue = fingerPose;
             sw.ApplyModifiedPropertiesWithoutUndo();
 
             var canvasGo = new GameObject("AnimUICanvas", typeof(UnityEngine.Canvas), typeof(UnityEngine.UI.CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
@@ -945,7 +1025,21 @@ namespace GIC.Editor.Retarget
             scroll.scrollSensitivity = 30;
             scroll.movementType = UnityEngine.UI.ScrollRect.MovementType.Clamped;
 
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            // 中文按钮名映射（2026-08-23）：clip 英文名 → 按钮显示中文；未列名按原名兜底
+            var 中文名 = new Dictionary<string, string>
+            {
+                ["Standby"] = "待机", ["Greet"] = "打招呼", ["Anger"] = "生气", ["Sneer01"] = "坏笑",
+                ["Clap01"] = "鼓掌", ["Nod01"] = "点头", ["ShakeHead01"] = "摇头", ["Refuse01"] = "拒绝",
+                ["Run"] = "跑动", ["SitLoop"] = "坐姿", ["Sleep01"] = "睡觉", ["Turnback"] = "转身",
+                ["Domagic"] = "施法",
+                ["Shy01AS"] = "害羞·入场", ["Shy01BS"] = "害羞·退场", ["Shy01Loop"] = "害羞·循环",
+                ["Confuse01AS"] = "困惑·入场", ["Confuse01BS"] = "困惑·退场", ["Confuse01Loop"] = "困惑·循环",
+                ["Think01AS"] = "思考·入场", ["Think01BS"] = "思考·退场", ["Think01Loop"] = "思考·循环",
+                ["Like01AS"] = "点赞·入场", ["Like01BS"] = "点赞·退场", ["Like01Loop"] = "点赞·循环",
+            };
+            // LegacyRuntime.ttf 无中文字形，按钮名换中文必须换字体（沿用项目 zh-cn.ttf，TMP 目录同款）
+            var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/TextMesh Pro/Resources/Fonts & Materials/zh-cn.ttf");
+            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             foreach (var c in clipAssets)
             {
                 var btnGo = new GameObject(c.name, typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
@@ -958,7 +1052,8 @@ namespace GIC.Editor.Retarget
                 var txt = txtGo.GetComponent<UnityEngine.UI.Text>();
                 txt.font = font; txt.fontSize = 20; txt.color = Color.white;
                 txt.alignment = TextAnchor.MiddleCenter;
-                txt.text = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "Cs:").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");
+                var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");
+                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
                 var tr = txtGo.GetComponent<RectTransform>();
                 tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
                 // 持久监听（存进场景文件，运行时零查找）
@@ -1001,3 +1096,5 @@ namespace GIC.Editor.Retarget
         }
     }
 }
+
+

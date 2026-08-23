@@ -23,16 +23,28 @@ MonoBehaviour:
   - Standby
   - Greet
   - Anger
-  - C01
-  - C02
-  - C03
-  - C04
-  - C05
-  - C06
-  - C07
-  - C08
-  - C09
-  - C10
+  - Sneer01
+  - Clap01
+  - Nod01
+  - ShakeHead01
+  - Refuse01
+  - Run
+  - SitLoop
+  - Sleep01
+  - Turnback
+  - Domagic
+  - Shy01AS
+  - Shy01BS
+  - Shy01Loop
+  - Confuse01AS
+  - Confuse01BS
+  - Confuse01Loop
+  - Think01AS
+  - Think01BS
+  - Think01Loop
+  - Like01AS
+  - Like01BS
+  - Like01Loop
   giPelvisPath: Bip001/Bip001 Pelvis
   giHeadPath: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001
     Head
@@ -92,14 +104,44 @@ MonoBehaviour:
     giTemplate: Bip001 {S}Hand
   - mmdPrefix: "\u624B\u5148"
     giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u89AA\u6307\uFF10"
+    giTemplate: Bip001 {S}Finger0
+  - mmdPrefix: "\u89AA\u6307\uFF11"
+    giTemplate: Bip001 {S}Finger01
+  - mmdPrefix: "\u89AA\u6307\uFF12"
+    giTemplate: Bip001 {S}Finger01
   - mmdPrefix: "\u89AA\u6307"
     giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u4EBA\u6307\uFF11"
+    giTemplate: Bip001 {S}Finger1
+  - mmdPrefix: "\u4EBA\u6307\uFF12"
+    giTemplate: Bip001 {S}Finger11
+  - mmdPrefix: "\u4EBA\u6307\uFF13"
+    giTemplate: Bip001 {S}Finger11
   - mmdPrefix: "\u4EBA\u6307"
     giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u4E2D\u6307\uFF11"
+    giTemplate: Bip001 {S}Finger2
+  - mmdPrefix: "\u4E2D\u6307\uFF12"
+    giTemplate: Bip001 {S}Finger21
+  - mmdPrefix: "\u4E2D\u6307\uFF13"
+    giTemplate: Bip001 {S}Finger21
   - mmdPrefix: "\u4E2D\u6307"
     giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u85AC\u6307\uFF11"
+    giTemplate: Bip001 {S}Finger3
+  - mmdPrefix: "\u85AC\u6307\uFF12"
+    giTemplate: Bip001 {S}Finger31
+  - mmdPrefix: "\u85AC\u6307\uFF13"
+    giTemplate: Bip001 {S}Finger31
   - mmdPrefix: "\u85AC\u6307"
     giTemplate: Bip001 {S}Hand
+  - mmdPrefix: "\u5C0F\u6307\uFF11"
+    giTemplate: Bip001 {S}Finger4
+  - mmdPrefix: "\u5C0F\u6307\uFF12"
+    giTemplate: Bip001 {S}Finger41
+  - mmdPrefix: "\u5C0F\u6307\uFF13"
+    giTemplate: Bip001 {S}Finger41
   - mmdPrefix: "\u5C0F\u6307"
     giTemplate: Bip001 {S}Hand
   - mmdPrefix: "\u30C0\u30DF\u30FC"
@@ -130,6 +172,37 @@ MonoBehaviour:
   - "\u4E0A\u534A\u8EAB"
   - "\u4E0A\u534A\u8EAB2"
   - "\u9996"
+  fingerBones:
+  - "\u89AA\u6307\uFF10.L"
+  - "\u89AA\u6307\uFF10.R"
+  - "\u89AA\u6307\uFF11.L"
+  - "\u89AA\u6307\uFF11.R"
+  - "\u89AA\u6307\uFF12.L"
+  - "\u89AA\u6307\uFF12.R"
+  - "\u4EBA\u6307\uFF11.L"
+  - "\u4EBA\u6307\uFF11.R"
+  - "\u4EBA\u6307\uFF12.L"
+  - "\u4EBA\u6307\uFF12.R"
+  - "\u4EBA\u6307\uFF13.L"
+  - "\u4EBA\u6307\uFF13.R"
+  - "\u4E2D\u6307\uFF11.L"
+  - "\u4E2D\u6307\uFF11.R"
+  - "\u4E2D\u6307\uFF12.L"
+  - "\u4E2D\u6307\uFF12.R"
+  - "\u4E2D\u6307\uFF13.L"
+  - "\u4E2D\u6307\uFF13.R"
+  - "\u85AC\u6307\uFF11.L"
+  - "\u85AC\u6307\uFF11.R"
+  - "\u85AC\u6307\uFF12.L"
+  - "\u85AC\u6307\uFF12.R"
+  - "\u85AC\u6307\uFF13.L"
+  - "\u85AC\u6307\uFF13.R"
+  - "\u5C0F\u6307\uFF11.L"
+  - "\u5C0F\u6307\uFF11.R"
+  - "\u5C0F\u6307\uFF12.L"
+  - "\u5C0F\u6307\uFF12.R"
+  - "\u5C0F\u6307\uFF13.L"
+  - "\u5C0F\u6307\uFF13.R"
   rank0Bones:
   - "\u8170"
   - "\u4E0A\u534A\u8EAB"

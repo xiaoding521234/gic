@@ -26,6 +26,7 @@ namespace GIC.Pet
         };
 
         [SerializeField] private PetEmotionController emotionController; // 情绪层（可空=无表情）
+        [SerializeField] private PetFingerPoseController fingerPoseController; // 手指姿态层（可空=手指走 clip 曲线）
 
         public void Play(string clipName)
         {
@@ -33,9 +34,8 @@ namespace GIC.Pet
             var state = targetAnimation[clipName];
             if (state == null || state.clip == null) return;
             state.wrapMode = WrapMode.Loop;
-            targetAnimation.Stop();
-            targetAnimation.clip = state.clip;
-            targetAnimation.Play(clipName);
+            // v19 流畅度（2026-08-23）：Stop()+Play() 硬切 → CrossFade 0.3s 平滑过渡（原神观感）
+            targetAnimation.CrossFade(clipName, 0.3f);
 
             // 情绪下发：无映射的情绪动作 → 下发空名清回默认脸
             if (emotionController != null)
@@ -45,6 +45,9 @@ namespace GIC.Pet
                     if (!string.IsNullOrEmpty(m.动作名片段) && clipName.Contains(m.动作名片段)) { emo = m.情绪名; break; }
                 emotionController.SetEmotion(emo);
             }
+
+            // 手指姿态切换（2026-08-23 程序化手指层）：按 clip 名让 PetFingerPoseController 接管五指
+            fingerPoseController?.SetPose(clipName);
         }
     }
 }
