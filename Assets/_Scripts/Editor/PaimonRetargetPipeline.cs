@@ -31,6 +31,13 @@ namespace GIC.Editor.Retarget
     /// v8 捻骨（腕捩/手捩）废弃 v4 世界 Slerp 插值：MMD 手臂链绑定相邻骨为反相对齐（179.9°
     /// 约定），世界插值捋成同向 → 捻骨翻转 ~170° 蒙皮折叠（"每臂三处塌缩"实测）；并入跟随骨
     /// 公式后绑定 180° 结构天然保住。
+    /// v14 跟随骨 Δ_rel 回退为绝对世界追踪（2026-08-23 晚）：qWant 是绝对世界旋转
+    ///（解局部 lr=pw⁻¹·qWant 已除父世界），v13 的 Δ(自身)·Δ(父)⁻¹ 叠上 腰キャンセル→Thigh
+    /// 映射后 足D 的 Δ_rel≡单位——大腿段冻结在 f0，盆骨摇摆不传给腿（双腿侧漂实测）。
+    /// v15 D 链腿骨（足D/ひざD/足首D）并入代表骨：腿部蒙皮全在 D 链，跟随公式不穿 f0
+    /// 姿势基准（restW=绑定栈）致待机腿恒为绑定直棍（偏 GI 源 ~37° 常量+脚踝 15cm）；
+    /// 足D→ひざD→足首D ↔ Thigh→Calf→Foot 单链语义干净，qPose 方向对齐后全程精确跟踪
+    ///（腿部方向审计 D 链误差 0°，仅 GI 源符号跳变帧为审计伪影）。
     /// 可泛化：换 MMD 模型只需骨名走标准 MMD 命名（MapMmd 表覆盖），管线不变。
     /// 目.L/R 完全不驱动（v3）：平移虹膜机制下位置保持式的对齐残差（左右 8/3mm 不对称）会变成虹膜
     /// 位移——实测左目被推到绑定位后方 7mm 虹膜沉入眼球后（"左眼只剩眼白"）；绑定=编辑模式=正确。
@@ -146,7 +153,12 @@ namespace GIC.Editor.Retarget
             return cd;
         }
 
-        /// <summary>分量曲线组 → 全 key 并集 CurveTrack（各分量在并集时刻求值重组）</summary>
+        /// <summary>分量曲线组 → 全 key 并集 CurveTrack（各分量在并集时刻求值重组）。
+        /// v11 符号连续化：旋转 track 逐 key 维持与前一 key 的正点积（q≡-q 等价表示，
+        /// GI 源曲线存在符号跳变——并集时刻间的分量线性插值跨跳变会插出过零垃圾四元数，
+        /// 污染该帧解算并永久写入输出 clip。Standby R 膝 171°@1.34s 单帧翻转与
+        /// C05_01 全 clip 恒偏 77.9° 均此根因，2026-08-23 腿部方向审计实证。key 处取值
+        /// 恒安全，此修保证 key 之间任意 t 的插值也安全）。</summary>
         static int BuildTrack(Dictionary<string, AnimationCurve[]> src, Dictionary<string, CurveTrack> dst, bool isRot)
         {
             int count = 0;
@@ -159,6 +171,7 @@ namespace GIC.Editor.Retarget
                         foreach (var k in c.keys) times.Add(k.time);
                 if (times.Count == 0) continue;
                 var track = new CurveTrack();
+                var prevQ = new Vector4(0f, 0f, 0f, 1f);
                 foreach (var t in times)
                 {
                     if (isRot)
@@ -168,8 +181,11 @@ namespace GIC.Editor.Retarget
                             arr[1] != null ? arr[1].Evaluate(t) : 0f,
                             arr[2] != null ? arr[2].Evaluate(t) : 0f,
                             arr[3] != null ? arr[3].Evaluate(t) : 1f).normalized;
+                        var v4 = new Vector4(q.x, q.y, q.z, q.w);
+                        if (Vector4.Dot(v4, prevQ) < 0f) v4 = -v4; // 符号连续化
+                        prevQ = v4;
                         track.times.Add(t);
-                        track.vals.Add(new Vector4(q.x, q.y, q.z, q.w));
+                        track.vals.Add(v4);
                     }
                     else
                     {
@@ -414,11 +430,31 @@ namespace GIC.Editor.Retarget
                 if (r >= 9) continue;
                 if (!giRep.TryGetValue(g, out _) || r < rankByGi[g]) { giRep[g] = mb; rankByGi[g] = r; }
             }
-            if (giRep.Count == 0) throw new System.InvalidOperationException("\u65e0\u4efb\u4f55\u4e3b\u9aa8\u4ee3\u8868");
+            if (giRep.Count == 0) throw new System.InvalidOperationException("\\u65e0\\u4efb\\u4f55\\u4e3b\\u9aa8\\u4ee3\\u8868");
             var repByMmd = new Dictionary<Transform, Transform>(); // mmd → gi
             foreach (var kv in giRep) repByMmd[kv.Value] = kv.Key;
 
-            log.AppendLine($"[rep] \u4e3b\u9aa8\u4ee3\u8868 {giRep.Count} \u6761:");
+            // v15（2026-08-23 晚）：D 链腿骨（足D/ひざD/足首D ×LR）并入代表骨。
+            // 腿部蒙皮全在 D 链（标准腿链零蒙皮），跟随骨公式只传增量不传 f0 姿势基准
+            //（restW=绑定刚体栈），待机腿恒为绑定直棍——偏离 GI 源悬空屈腿 ~37° 常量
+            // + 脚踝 15cm 侧漂（暂停帧实测：GI 源左脚踝应在盆后 12.6cm，MMD 直垂）。
+            // D 链是干净单链（足D→ひざD→足首D ↔ Thigh→Calf→Foot），5b 配对子骨逻辑
+            // 天然命中，与代表骨同式（qPose 方向对齐 + v6 关节角）求解即精确跟踪。
+            // 不并入 下半身/腰キャンセル：多分支骨"最长子延伸"会在躯干/腿间选错段（v5b 已踩）。
+            int dAdded = 0;
+            foreach (var mb in mmdBones)
+            {
+                if (repByMmd.ContainsKey(mb)) continue;
+                var bn = mb.name;
+                bool isDLeg = bn == "足D.L" || bn == "足D.R" || bn == "ひざD.L" || bn == "ひざD.R" || bn == "足首D.L" || bn == "足首D.R";
+                if (!isDLeg) continue;
+                if (!mmd2gi.TryGetValue(mb, out var gD2) || gD2 == null || !giCurvedBones.Contains(gD2)) continue;
+                repByMmd[mb] = gD2;
+                dAdded++;
+            }
+            if (dAdded != 6) throw new System.InvalidOperationException($"D \\u94fe\\u817f\\u9aa8\\u5e76\\u5165\\u4ee3\\u8868\\u5931\\u8d25 {dAdded}/6");
+
+            log.AppendLine($"[rep] \\u4e3b\\u9aa8\\u4ee3\\u8868 {giRep.Count} \\u6761 + D \\u94fe {dAdded} \\u6761:");
             foreach (var kv in repByMmd.OrderBy(k => Rel(k.Key, armNode), System.StringComparer.Ordinal))
                 log.AppendLine($"  {kv.Key.name} \u2190 {kv.Value.name}");
             foreach (var b in giCurvedBones.Where(b => !giRep.ContainsKey(b)).OrderBy(b => b.name))
@@ -547,6 +583,7 @@ namespace GIC.Editor.Retarget
                 var mmdW = new Dictionary<Transform, Matrix4x4>(mmdBones.Count);
                 Dictionary<Transform, Matrix4x4> giW0 = null; // 本 clip 首帧世界（残差自检用）
                 float phMin = float.MaxValue, phMax = float.MinValue;
+                Quaternion BindRot(Transform mb) => ExtractRot(mmdBind[mb]); // 绑定局部旋转（v12.1 提升作用域）
 
                 for (int f = 0; f < frames; f++)
                 {
@@ -608,7 +645,6 @@ namespace GIC.Editor.Retarget
                             if (!quatG0.ContainsKey(gD)) quatG0[gD] = ExtractRot(giW[gD]);
                         }
                         restW.Clear();
-                        Quaternion BindRot(Transform mb) => ExtractRot(mmdBind[mb]);
                         restW[mmdRoot] = ExtractRot(armW); // 根基准 = arm 节点旋转（栈底）
                         void StackRest(Transform mb)
                         {
@@ -624,6 +660,8 @@ namespace GIC.Editor.Retarget
                         var delta = ExtractRot(giW[g]) * Quaternion.Inverse(quatG0[g]);
                         return (Quaternion.Inverse(R) * delta * R) * qPose[mb];
                     }
+                    void SolveFrame(int f)
+                    {
                     foreach (var mb in mmdBones)
                     {
                         var pw = mb == mmdRoot ? armW : mmdW[mb.parent];
@@ -652,11 +690,18 @@ namespace GIC.Editor.Retarget
                         }
                         else if (driveBones.Contains(mb))
                         {
-                            // v7.1 跟随骨：世界旋转 = C·Δg(自身目标)·C⁻¹ · restW（f0 刚体栈基准），
-                            // 局部解算时父级已施加的 Δ 自动抵消（同目标无双重，异目标成相对运动）
+                            // v14 根治（2026-08-23 晚）：跟随骨世界旋转 = C·Δ(自身目标)·C⁻¹·restW（绝对追踪）。
+                            // qWant 是【绝对世界旋转】——解局部时 lr = pw⁻¹·qWant 已把父世界除掉，
+                            // 父增量不存在"双重施加"，每骨世界独立精确跟踪 R⁻¹·Δ(自身目标)·R。
+                            // v13 的 Δ_rel=Δ(自身)·Δ(父)⁻¹ 是错误诊断的回归：叠上 腰キャンセル→Thigh 映射后
+                            // 足D.L 的 Δ_rel=Δ(Thigh)·Δ(Thigh)⁻¹≡单位——大腿骨段全程冻结在 f0，
+                            // 盆骨摇摆完全不传给腿（Standby 双腿向 +x 侧漂，脚踝偏离 GI 源 ~15cm 实测；
+                            // 标准链代表骨全程精确但零蒙皮，D 链才是可视皮）。
+                            // v13 想修的"v7.1 D 链飞膝"实为 v11 之前的 GI 源符号跳变伪影，与裸乘无关。
+                            // 同目标父子（腰キャンセル/足D→Thigh）绝对追踪下局部恒=绑定（v8 捻骨已验证）。
                             var gD = mmd2gi[mb];
-                            var delta = ExtractRot(giW[gD]) * Quaternion.Inverse(quatG0[gD]);
-                            var qWant = (Quaternion.Inverse(R) * delta * R) * restW[mb];
+                            var deltaSelf = ExtractRot(giW[gD]) * Quaternion.Inverse(quatG0[gD]);
+                            var qWant = (Quaternion.Inverse(R) * deltaSelf * R) * restW[mb];
                             var lp = mmdBind[mb].GetColumn(3);
                             var lr = ExtractRot(pw.inverse * Matrix4x4.TRS(lp, qWant, Vector3.one));
                             repPos[mb][f] = lp;
@@ -669,6 +714,17 @@ namespace GIC.Editor.Retarget
                         {
                             mmdW[mb] = pw * mmdBind[mb];
                         }
+                    }
+                    } // SolveFrame
+
+                    SolveFrame(f);
+                    // v12 两遍法（皮肤链 f0 同源）：腿部蒙皮全在 D 链（足D/ひざD/足首D，标准腿链零蒙皮）。
+                    // f0 解完后用实解世界重建 restW，使 D 链 f0 基准 = 标准链 f0 姿势（消除 42mm 分叉，
+                    // Greet 左膝前弯病灶）。同目标父子 Δ 抵消性质保持（restWp⁻¹·restWc = f0 局部结构）。
+                    if (f == 0)
+                    {
+                        foreach (var mb in mmdBones) restW[mb] = ExtractRot(mmdW[mb]);
+                        foreach (var mb in driveBones) { repPos[mb][0] = mmdBind[mb].GetColumn(3); repRot[mb][0] = BindRot(mb); }
                     }
 
                     // 解算精确性断言（首/中/末帧）：
@@ -840,8 +896,11 @@ namespace GIC.Editor.Retarget
 
             // 动作切换 UI：编辑期预置于场景（AnimUICanvas），运行时零生成；布局可在此场景直接调
             var swapper = pet.AddComponent<GIC.Pet.PetAnimSwapper>();
+            var anim = pet.AddComponent<GIC.Pet.PetEmotionController>();
+            pet.AddComponent<GIC.Pet.PetBlinkController>();
             var sw = new SerializedObject(swapper);
             sw.FindProperty("targetAnimation").objectReferenceValue = animComp;
+            sw.FindProperty("emotionController").objectReferenceValue = anim;
             sw.ApplyModifiedPropertiesWithoutUndo();
 
             var canvasGo = new GameObject("AnimUICanvas", typeof(UnityEngine.Canvas), typeof(UnityEngine.UI.CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
