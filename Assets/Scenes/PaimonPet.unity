@@ -1121,6 +1121,7 @@ GameObject:
   - component: {fileID: 288543651}
   - component: {fileID: 288543650}
   - component: {fileID: 288543649}
+  - component: {fileID: 288543654}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: Paimon
@@ -1270,6 +1271,29 @@ Animation:
   m_PlayAutomatically: 1
   m_AnimatePhysics: 0
   m_CullingType: 0
+--- !u!114 &288543654
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288543646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84281da4abc02b1459864dce5342540e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u7A97\u53E3\u63A7\u5236\u5668": {fileID: 1640153874}
+  "\u76F8\u673A": {fileID: 0}
+  "\u5C4F\u5E55\u6700\u5927\u504F\u79FB": 700
+  "\u6C34\u5E73\u6700\u5927\u89D2": 30
+  "\u5782\u76F4\u6700\u5927\u89D2": 22
+  "\u9888\u5206\u62C5": 0.35
+  "\u542F\u7528\u773C\u7403": 1
+  "\u773C\u7403\u6700\u5927\u89D2": 8
+  "\u5934\u5E73\u6ED1\u901F\u5EA6": 8
+  "\u773C\u7403\u5E73\u6ED1\u901F\u5EA6": 14
+  "\u542F\u7528": 1
 --- !u!1 &302282615
 GameObject:
   m_ObjectHideFlags: 0
@@ -3472,8 +3496,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 993468529}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00020825226, y: 0.9990154, z: -0.044114042, w: -0.004716123}
-  m_LocalPosition: {x: 0, y: 0.45000005, z: 1.6550684}
+  m_LocalRotation: {x: -0.00020825212, y: 0.9990154, z: -0.04411405, w: -0.004716119}
+  m_LocalPosition: {x: 0, y: 0.45, z: 1.6550684}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
