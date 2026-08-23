@@ -32,6 +32,8 @@ Thumbs.db
 screenshots/
 mem-log/
 Export/
+Maps/
+Mirror-*-backup-*.zip
 
 # Build artifacts
 *.apk
