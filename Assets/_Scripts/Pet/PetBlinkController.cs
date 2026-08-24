@@ -22,6 +22,18 @@ namespace GIC.Pet
         private SkinnedMeshRenderer smr;
         private int winkL = -1, winkR = -1; // ウィンク / ウィンク右（MMD 无まばたき，双眼同权重合成）
         private Coroutine loop;
+        private bool _静默; // 单次动作期间暂停眨眼（2026-08-24：morph 重评估与动作叠加互相放大顿挫，1-4s 动作少眨一次不可见）
+
+        /// <summary>单次动作期间静默眨眼（PetBehaviorController 调；回待机时恢复）</summary>
+        public void Set静默(bool 静默)
+        {
+            _静默 = 静默;
+            if (静默 && smr != null && winkL >= 0)
+            {
+                smr.SetBlendShapeWeight(winkL, 0f);
+                smr.SetBlendShapeWeight(winkR, 0f);
+            }
+        }
 
         void Awake()
         {
@@ -53,9 +65,13 @@ namespace GIC.Pet
         {
             while (true)
             {
-                yield return new WaitForSeconds(Random.Range(最小间隔秒, 最大间隔秒));
+                // 零分配等待（原 WaitForSeconds 每次 new 一个对象——GC 源之一，2026-08-24 实测基线 GC≈1.2 次/s）
+                float wait = Random.Range(最小间隔秒, 最大间隔秒);
+                float t0 = Time.time;
+                while (Time.time - t0 < wait || _静默) yield return null;
+                PetDiag.上次眨眼 = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
                 float t = 0f;
-                while (t < 眨眼时长秒)
+                while (t < 眨眼时长秒 && !_静默)
                 {
                     t += Time.deltaTime;
                     float w = BlinkWeight(t / 眨眼时长秒) * 100f;

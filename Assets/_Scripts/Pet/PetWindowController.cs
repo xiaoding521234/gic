@@ -23,6 +23,8 @@ namespace GIC.Pet
 
         [Header("性能")]
         [SerializeField] private int 目标帧率 = 30;
+        [Tooltip("垂直同步：0=关（仅用目标帧率限帧，高刷屏上节奏不均会顿挫）/ 1=每个刷新一帧 / 2=隔一个刷新一帧（默认，任何刷新率下节奏均匀）")]
+        [SerializeField] private int 垂直同步 = 2;
 
         [Header("缩放")]
         [Tooltip("滚轮缩放派蒙大小（光标命中模型时生效，与拖拽一致）")] [SerializeField] private bool 允许滚轮缩放 = true;
@@ -44,10 +46,17 @@ namespace GIC.Pet
         private MeshCollider 命中网格碰撞体;
         private Mesh 烘焙网格;
         private float 上次烘焙时间 = -10f;
-        [Tooltip("蒙皮网格重烘间隔秒（低频即可，呼吸/裙摆微动不需要逐帧）")] [SerializeField] private float 烘焙间隔 = 0.15f;
+        [Tooltip("蒙皮网格重烘间隔秒（低频即可，呼吸/裙摆微动不需要逐帧）")] [SerializeField] private float 烘焙间隔 = 0.3f;
+        /// <summary>暂停命中网格重烘（行为层在单次动作期间置真）——运行时 BakeMesh 每次改写顶点，
+        /// MeshCollider 重赋值=PhysX 全量重 cook（实测 15-22ms 主线程尖峰，摆手时每 0.15s 一次=肉眼顿挫，
+        /// 2026-08-24 Player.log 烘焙Δ≈dt 实证）。动作中命中精度无关紧要（拖拽退化用旧壳），暂停零副作用。</summary>
+        public bool 暂停命中烘焙 { get; set; }
         private IntPtr hwnd = IntPtr.Zero;
         private bool restyled;
         private bool dragging;
+
+        /// <summary>是否正在拖拽派蒙（行为层打断打招呼等触发用）</summary>
+        public bool 正在拖拽 => dragging;
         private Vector2Int dragGrabOffset;
         private bool passThroughOn;
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
@@ -62,6 +71,7 @@ namespace GIC.Pet
         // WH_MOUSE_LL 钩子截 WM_MOUSEWHEEL（Input.mouseScrollDelta 在窗口穿透/无焦点时常返回 0）
         private IntPtr _mouseHook = IntPtr.Zero;
         private HookProc _mouseHookProc; // 防 GC 回收委托
+        private float _hookKeepUntil = -10f; // 滞回：离开模型 0.5s 后才摘钩
         private static int _pendingWheelDelta; // 钩子线程累加写入，Update 主线程取走清零（120=一格）
 
         #region Win32
@@ -116,7 +126,23 @@ namespace GIC.Pet
 
         private void Awake()
         {
+#if UNITY_EDITOR
+            // 编辑器预览不碰 QualitySettings（运行时改 vSyncCount 退出 Play 不回滚，会污染编辑器）
+            _ = 垂直同步; // 字段仅供构建版使用，读一次消 CS0414
             Application.targetFrameRate = 目标帧率;
+#else
+            // 2026-08-24 顿挫根治：vsync=0 + 30fps 限帧在高刷屏（实测 165Hz）上不整除——
+            // 33.3ms 帧周期 / 6.06ms 刷新节拍 = 5.5，每帧显示 5/6 个刷新交替 + 无 vblank 约束的
+            // 产出抖动直接透传给 DWM 合成 → 运动节奏忽快忽慢（帧率不低但动作有顿挫感的根因）。
+            // vSyncCount=2：每 2 个刷新呈现一帧，任何刷新率下节奏精确均匀（165Hz→82.5fps，60Hz→30fps）。
+            // 注意 vSyncCount>0 时 Application.targetFrameRate 被忽略（保留作 vsync=0 时的后备）。
+            // 仅宠物进程执行：本组件只在 PaimonPet 场景（--pet-mode 独占），不影响主游戏画质。
+            QualitySettings.vSyncCount = Mathf.Clamp(垂直同步, 0, 4);
+            if (QualitySettings.vSyncCount == 0)
+            {
+                Application.targetFrameRate = 目标帧率;
+            }
+#endif
             Application.runInBackground = true;
         }
 
@@ -254,13 +280,8 @@ namespace GIC.Pet
                 DockBottomRight();
             }
 
-            // 挂低级鼠标钩子截滚轮（窗口穿透/无焦点时 Input.mouseScrollDelta 不可靠）
-            _mouseHookProc = MouseHookCallback;
-            _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseHookProc, GetModuleHandle(null), 0);
-            if (_mouseHook == IntPtr.Zero)
-            {
-                Debug.LogWarning("[PetSpike] 鼠标钩子安装失败，滚轮缩放退回 Input.mouseScrollDelta");
-            }
+            // 鼠标钩子不在此常驻安装——UpdateHookForHit 按命中状态挂/摘（2026-08-24 顿挫优化：
+            // 常驻钩子对全系统鼠标消息做封送分配+主线程回调，鼠标移动时灌爆主线程）
 
             restyled = true;
             Debug.Log($"[PetSpike] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(使用DWM透明 ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} baseClient={基准窗口宽}x{基准窗口高} scale={当前缩放:F2} maxScale={有效缩放最大:F2}");
@@ -292,18 +313,45 @@ namespace GIC.Pet
             SetWindowPos(hwnd, IntPtr.Zero, x, y, winW, winH, SWP_NOZORDER | SWP_SHOWWINDOW);
         }
 
-        /// <summary>WH_MOUSE_LL 回调：截 WM_MOUSEWHEEL 的 delta（高位 short），写入待消费队列</summary>
+        /// <summary>
+        /// WH_MOUSE_LL 回调：截 WM_MOUSEWHEEL 的 delta（高位 short），写入待消费队列。
+        /// 2026-08-24 零分配重写：原 Marshal.PtrToStructure(lParam, typeof(...)) 对每条鼠标消息
+        /// 装箱分配+封送（回调又跑在主线程消息泵）——鼠标移动时分配风暴+主线程灌爆，
+        /// 是顿挫元凶之一（Player.log HITCH 实测）。改为直接 ReadInt32 读
+        /// MSLLHOOKSTRUCT.mouseData（偏移 8），全程零分配零封送。钩子改为"命中模型时才挂"
+        /// （滚轮缩放只在命中时消费，光标不在模型上时钩子毫无用途）——平时零开销。
+        /// </summary>
         private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             if (nCode >= 0 && wParam.ToInt32() == WM_MOUSEWHEEL)
             {
-                var data = (MSLLHOOKSTRUCT)System.Runtime.InteropServices.Marshal.PtrToStructure(lParam, typeof(MSLLHOOKSTRUCT));
-                // mouseData 高位 = wheel delta（120 一格，正=向前/上）
-                short delta = (short)((data.mouseData >> 16) & 0xFFFF);
+                // MSLLHOOKSTRUCT(x64)：POINT pt(8B) @0，DWORD mouseData @8——wheel delta=HIWORD
+                short delta = (short)(Marshal.ReadInt32(lParam, 8) >> 16);
                 // 累加而非覆盖：高分辨率滚轮/触控板一帧内可发多个小 delta，覆盖会丢导致手感发涩
                 System.Threading.Interlocked.Add(ref _pendingWheelDelta, delta);
             }
             return CallNextHookEx(_mouseHook, nCode, wParam, lParam);
+        }
+
+        /// <summary>按命中状态挂/摘鼠标钩子（带 0.5s 滞回防边缘抖动）——平时不挂，零开销</summary>
+        private void UpdateHookForHit(bool hit)
+        {
+            if (hit)
+            {
+                if (_mouseHook == IntPtr.Zero)
+                {
+                    _mouseHookProc = MouseHookCallback;
+                    _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseHookProc, GetModuleHandle(null), 0);
+                    if (_mouseHook == IntPtr.Zero)
+                        Debug.LogWarning("[PetSpike] 鼠标钩子安装失败，滚轮缩放退回 Input.mouseScrollDelta");
+                }
+                _hookKeepUntil = Time.unscaledTime + 0.5f;
+            }
+            else if (_mouseHook != IntPtr.Zero && Time.unscaledTime > _hookKeepUntil)
+            {
+                UnhookWindowsHookEx(_mouseHook);
+                _mouseHook = IntPtr.Zero;
+            }
         }
 
         void OnDestroy()
@@ -416,14 +464,20 @@ namespace GIC.Pet
                 modelHit = 命中网格碰撞体.Raycast(ray, out _, 100f);
             }
 
-            // 低频重烘蒙皮网格（跟随呼吸/裙摆/姿势变化；11k 顶点 0.15s 一次开销可忽略）
-            if (蒙皮渲染器 != null && 命中网格碰撞体 != null && Time.unscaledTime - 上次烘焙时间 >= 烘焙间隔)
+            // 低频重烘蒙皮网格（跟随呼吸/裙摆/姿势变化）。
+            // 光标不在窗口内时命中判定恒 false，重烘结果无人消费——跳过（省无谓的烘焙+碰撞体重建）。
+            // 单次动作期间暂停（2026-08-24 顿挫根治：烘焙帧=掉帧帧，见 暂停命中烘焙 注释）。
+            if (inWindow && !暂停命中烘焙 && 蒙皮渲染器 != null && 命中网格碰撞体 != null && Time.unscaledTime - 上次烘焙时间 >= 烘焙间隔)
             {
                 蒙皮渲染器.BakeMesh(烘焙网格, true);
                 命中网格碰撞体.sharedMesh = null; // 强制碰撞体刷新
                 命中网格碰撞体.sharedMesh = 烘焙网格;
                 上次烘焙时间 = Time.unscaledTime;
+                PetDiag.上次蒙皮重烘 = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
             }
+
+            // 钩子按需挂/摘（2026-08-24：滚轮缩放只在命中模型时消费，常驻钩子平白吃全系统鼠标消息）
+            UpdateHookForHit(modelHit && 允许滚轮缩放);
 
             // 拖拽：全局轮询左键，不依赖焦点；抓住模型后跟随光标移动窗口
             bool lmbDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;

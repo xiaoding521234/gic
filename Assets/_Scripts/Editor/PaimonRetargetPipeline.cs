@@ -212,16 +212,22 @@ namespace GIC.Editor.Retarget
 
         // ==================== 小工具 ====================
 
-        /// <summary>v19 平滑切线 keyframe（2026-08-23 原神流畅度根治）：三点斜率平均（ClampAuto 风格不加 clamp）。
-        /// 此前 new Keyframe(t,v) 切线=0 → 60fps 密集 key 周期性过冲回拉（2% 失真=肉眼顿挫）。</summary>
+        /// <summary>v22 C1 自由平滑切线（2026-08-24）：切线=有限差分 (v[n]-v[p])/(t[n]-t[p])，in=out——
+        /// Hermite 段间速度连续（C1），165fps 播 60Hz 密 key 时无速度脉冲。v21 的精确弦切线（in=前段斜率/
+        /// out=后段斜率）是 C0 折线：key 处速度跳变，高刷细分采样下每个 key 拐点暴露为 60Hz 速度脉冲；
+        /// v19 与 v22 同为 C1（v19 时期的目检卡顿全部来自其他运行时 bug——小动作连环 churn/烘焙尖峰/冷初始化，
+        /// 2026-08-24 逐一修复后回归 C1）。极值处 FD 切线自然为 0（平滑换向，无死点问题——key 均匀 1/60s）。</summary>
         static Keyframe SmoothKey(List<float> times, Quaternion[] vals, int f, int comp)
         {
             float t = times[f];
             float v = comp == 0 ? vals[f].x : comp == 1 ? vals[f].y : comp == 2 ? vals[f].z : vals[f].w;
-            float vp = comp == 0 ? vals[f > 0 ? f - 1 : 0].x : comp == 1 ? vals[f > 0 ? f - 1 : 0].y : comp == 2 ? vals[f > 0 ? f - 1 : 0].z : vals[f > 0 ? f - 1 : 0].w;
-            float vn = comp == 0 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].x : comp == 1 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].y : comp == 2 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].z : vals[f < times.Count - 1 ? f + 1 : times.Count - 1].w;
-            float tp = times[f > 0 ? f - 1 : 0], tn = times[f < times.Count - 1 ? f + 1 : times.Count - 1];
-            float slope = (tn - tp) > 1e-6f ? (vn - vp) / (tn - tp) : 0f;
+            int p = f > 0 ? f - 1 : 0;
+            int n = f < times.Count - 1 ? f + 1 : times.Count - 1;
+            float slope = (times[n] - times[p]) > 1e-6f
+                ? ((comp == 0 ? vals[n].x : comp == 1 ? vals[n].y : comp == 2 ? vals[n].z : vals[n].w)
+                 - (comp == 0 ? vals[p].x : comp == 1 ? vals[p].y : comp == 2 ? vals[p].z : vals[p].w))
+                 / (times[n] - times[p])
+                : 0f;
             return new Keyframe(t, v, slope, slope);
         }
 
@@ -229,10 +235,13 @@ namespace GIC.Editor.Retarget
         {
             float t = times[f];
             float v = comp == 0 ? vals[f].x : comp == 1 ? vals[f].y : vals[f].z;
-            float vp = comp == 0 ? vals[f > 0 ? f - 1 : 0].x : comp == 1 ? vals[f > 0 ? f - 1 : 0].y : vals[f > 0 ? f - 1 : 0].z;
-            float vn = comp == 0 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].x : comp == 1 ? vals[f < times.Count - 1 ? f + 1 : times.Count - 1].y : vals[f < times.Count - 1 ? f + 1 : times.Count - 1].z;
-            float tp = times[f > 0 ? f - 1 : 0], tn = times[f < times.Count - 1 ? f + 1 : times.Count - 1];
-            float slope = (tn - tp) > 1e-6f ? (vn - vp) / (tn - tp) : 0f;
+            int p = f > 0 ? f - 1 : 0;
+            int n = f < times.Count - 1 ? f + 1 : times.Count - 1;
+            float slope = (times[n] - times[p]) > 1e-6f
+                ? ((comp == 0 ? vals[n].x : comp == 1 ? vals[n].y : vals[n].z)
+                 - (comp == 0 ? vals[p].x : comp == 1 ? vals[p].y : vals[p].z))
+                 / (times[n] - times[p])
+                : 0f;
             return new Keyframe(t, v, slope, slope);
         }
 
