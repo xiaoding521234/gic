@@ -110,6 +110,7 @@ namespace GIC.Editor.Retarget
             public readonly Dictionary<string, CurveTrack> pos = new Dictionary<string, CurveTrack>();
             public readonly Dictionary<string, CurveTrack> rot = new Dictionary<string, CurveTrack>();
             public List<float> frameTimes; // 全曲线 key time 并集
+            public readonly HashSet<string> hashPos = new HashSet<string>(); // v24：由哈希还原出的位置曲线真实路径（=辅助骨局部位置动画，主链位置曲线全是具名路径）
         }
 
         /// <summary>
@@ -213,6 +214,34 @@ namespace GIC.Editor.Retarget
         }
 
         // ==================== 小工具 ====================
+
+        /// <summary>Unity 绑定表路径哈希 = 标准 CRC32（IEEE，实测 path_3120751086 = "+EarB CF AF01" 完整路径）。
+        /// GI 骨路径全 ASCII（Bip001/+EarB/DMZ 等），按 UTF-16 char 低位字节逐字符计算与导出工具一致。</summary>
+        static uint Crc32(string s)
+        {
+            uint crc = 0xFFFFFFFF;
+            foreach (var ch in s)
+            {
+                crc ^= (uint)(ch & 0xFF);
+                for (int k = 0; k < 8; k++)
+                    crc = (crc & 1) != 0 ? (0xEDB88320u ^ (crc >> 1)) : (crc >> 1);
+            }
+            return crc ^ 0xFFFFFFFF;
+        }
+
+        /// <summary>v23：把 "path_&lt;哈希&gt;" 键曲线重键到真实骨路径（真实路径已有同源曲线时具名优先不覆盖）。
+        /// 原 path_ 键保留（查表 miss 自然回退，无害）。restored 收集实际还原的真实路径（v24 位置传递判定用）。</summary>
+        static int RekeyHashPaths(Dictionary<string, CurveTrack> tracks, Dictionary<string, string> hashToPath, HashSet<string> restored)
+        {
+            int n = 0;
+            var remap = new List<KeyValuePair<string, CurveTrack>>();
+            foreach (var kv in tracks)
+                if (kv.Key.StartsWith("path_") && hashToPath.TryGetValue(kv.Key, out var real))
+                    remap.Add(new KeyValuePair<string, CurveTrack>(real, kv.Value));
+            foreach (var kv in remap)
+                if (!tracks.ContainsKey(kv.Key)) { tracks[kv.Key] = kv.Value; n++; restored?.Add(kv.Key); }
+            return n;
+        }
 
         /// <summary>v22 C1 自由平滑切线（2026-08-24）：切线=有限差分 (v[n]-v[p])/(t[n]-t[p])，in=out——
         /// Hermite 段间速度连续（C1），165fps 播 60Hz 密 key 时无速度脉冲。v21 的精确弦切线（in=前段斜率/
@@ -328,6 +357,25 @@ namespace GIC.Editor.Retarget
                 var p = Rel(b, modelNode);
                 giBoneByPath[p] = b; giPathByBone[b] = p;
             }
+
+            // ---------- 2b. v23 哈希路径还原（2026-08-24，Show_3 王冠病灶根治） ----------
+            // AssetStudio 导出的 GI 动画中，辅助骨曲线（+EarB 王冠/+HairS 头发/+EyeBone 等）的 path
+            // 是未解析哈希 "path_<CRC32(骨完整路径)>"——ParseClip 按字面收进字典，solve 期按真实骨路径
+            // 查表必然 miss → 辅助骨全程回退参考姿势恒值（Show_3 摘王冠动作王冠纹丝不动的根因）。
+            // 实证（Node CRC32 破解）：path_3120751086 = Bip001/.../Bip001 Head/+EarB CF AF01，
+            // 该曲线 262 帧大角度运动（t≈0-2.5 翻转展示，t≈2.8 起收敛恒值=戴回后静止），与游戏内
+            // 表现完全吻合。还原后曲线经既有机制自动生效：giW 重建取到真值 → 同名映射（+EarB 等
+            // MMD/GI 骨同名）进 driveBones → v14 绝对追踪把增量传到 MMD 骨。
+            var giHashToPath = new Dictionary<string, string>();
+            foreach (var p in giBoneByPath.Keys)
+                giHashToPath["path_" + Crc32(p)] = p;
+            int recovered = 0;
+            foreach (var cd in clips)
+            {
+                recovered += RekeyHashPaths(cd.pos, giHashToPath, cd.hashPos);
+                recovered += RekeyHashPaths(cd.rot, giHashToPath, null);
+            }
+            log.AppendLine($"[v23] \u54c8\u5e0c\u8def\u5f84\u8fd8\u539f: {recovered} \u6761\u66f2\u7ebf\uff08\u8f85\u52a9\u9aa8 +EarB/+HairS \u7b49\u6062\u590d\u52a8\u753b\u6e90\uff09");
 
             // MMD：骨根 = {armNode}/{rootBone} 之下全骨；armW = 解算父世界
             var mmdRoot = mmdInst.transform.Find(cfg.armNodeName + "/" + cfg.rootBoneName);
@@ -647,6 +695,18 @@ namespace GIC.Editor.Retarget
                 }
             }
 
+            // v24 辅助骨位置传递联合集（2026-08-24，Show_3 王冠"翻得够但没跟手移动"根治）：
+            // 任意 clip 带哈希位置曲线的跟随骨全体——输出段对这些骨【每个 clip】都写 localPosition 曲线
+            // （有源 clip 写动画值，无源 clip 写常量绑定值）。不写成"仅有源 clip 才有曲线"：legacy
+            // CrossFade 期 Show_3 淡出而待机无该曲线时，orphan 属性可能塌向局部原点或残留半程偏移，
+            // 常量绑定曲线保证淡出目标恒为绑定，边界干净（Show_3 曲线末端本就收敛回绑定附近）。
+            var auxPosUnion = new HashSet<Transform>();
+            foreach (var cd in clips)
+                foreach (var mb in driveBones)
+                    if (cd.hashPos.Contains(giPathByBone[mmd2gi[mb]])) auxPosUnion.Add(mb);
+            if (auxPosUnion.Count > 0)
+                log.AppendLine($"[v24] \u8f85\u52a9\u9aa8\u4f4d\u7f6e\u4f20\u9012: {auxPosUnion.Count} \u6839\u8ddf\u968f\u9aa8\uff08{string.Join("/", auxPosUnion.Select(b => b.name).Take(6))}{(auxPosUnion.Count > 6 ? "..." : "")}\uff09");
+
             foreach (var cd in clips)
             {
                 int frames = cd.frameTimes.Count;
@@ -659,6 +719,17 @@ namespace GIC.Editor.Retarget
                 var qPose = new Dictionary<Transform, Quaternion>();                // MMD f0 姿势旋转（方向对齐基准 × 绑定）
                 var restW = new Dictionary<Transform, Quaternion>();                // v7.1 全骨 f0 姿势基准（刚体栈）
                 var anchorOffset = Vector3.zero;                                    // v10 腰锚舞台偏移（每 clip f0 计算）
+                // v24 本 clip 位置传递跟随骨 + 各自 GI 位置曲线 f0 值（增量基准；f0 处 delta≡0 → lp=绑定）
+                var auxPosDriven = new HashSet<Transform>();
+                var auxPosF0 = new Dictionary<Transform, Vector3>();
+                foreach (var mb in auxPosUnion)
+                    if (cd.hashPos.Contains(giPathByBone[mmd2gi[mb]]))
+                    {
+                        auxPosDriven.Add(mb);
+                        auxPosF0[mb] = VecOf(cd.pos[giPathByBone[mmd2gi[mb]]].Sample(0f));
+                    }
+                if (auxPosDriven.Count > 0)
+                    log.AppendLine($"[v24] {cd.name}: \u4f4d\u7f6e\u4f20\u9012 {auxPosDriven.Count} \u6839\uff08\u65e0\u6e90\u8054\u5408\u96c6\u9aa8\u5199\u5e38\u91cf\u7ed1\u5b9a\uff09");
                 foreach (var mb in repByMmd.Keys) { repPos[mb] = new Vector3[frames]; repRot[mb] = new Quaternion[frames]; repQ[mb] = new Quaternion[frames]; }
                 foreach (var mb in driveBones) { repPos[mb] = new Vector3[frames]; repRot[mb] = new Quaternion[frames]; } // v7 跟随骨（含捻骨）也写曲线
 
@@ -837,7 +908,7 @@ namespace GIC.Editor.Retarget
                             // qWant 是【绝对世界旋转】——解局部时 lr = pw⁻¹·qWant 已把父世界除掉，
                             // 父增量不存在"双重施加"，每骨世界独立精确跟踪 R⁻¹·Δ(自身目标)·R。
                             // v13 的 Δ_rel=Δ(自身)·Δ(父)⁻¹ 是错误诊断的回归：叠上 腰キャンセル→Thigh 映射后
-                            // 足D.L 的 Δ_rel=Δ(Thigh)·Δ(Thigh)⁻¹≡单位——大腿骨段全程冻结在 f0，
+                            // 足D.L 的 Δ_rel=Δ(Thigh)·Δ(Thigh)⁻¹≡单位——大腿骨全程冻结在 f0，
                             // 盆骨摇摆完全不传给腿（Standby 双腿向 +x 侧漂，脚踝偏离 GI 源 ~15cm 实测；
                             // 标准链代表骨全程精确但零蒙皮，D 链才是可视皮）。
                             // v13 想修的"v7.1 D 链飞膝"实为 v11 之前的 GI 源符号跳变伪影，与裸乘无关。
@@ -846,6 +917,21 @@ namespace GIC.Editor.Retarget
                             var deltaSelf = ExtractRot(giW[gD]) * Quaternion.Inverse(quatG0[gD]);
                             var qWant = (Quaternion.Inverse(R) * deltaSelf * R) * restW[mb];
                             var lp = mmdBind[mb].GetColumn(3);
+                            // v24 位置传递（王冠+EarB 摘下时的"端走"）：GI 辅助骨局部位置增量 → MMD 局部。
+                            // 只传局部曲线增量（非世界位置全量）——父链位置运动 MMD 侧本就未传（位置恒绑定
+                            // 设计），全量会把父链位移泄漏进本骨局部造成"王冠不跟头"的反向漂移。
+                            // 通路：GI父局部 →（GI父本帧线性）GI世界 →（alignInv线性）MMD世界 →（pw⁻¹线性）
+                            // MMD父局部。方向用本帧父旋转——GI 头转动时摘冠方向的朝向自动跟随。
+                            if (auxPosDriven != null && auxPosDriven.Contains(mb))
+                            {
+                                var dLocalGi = VecOf(cd.pos[giPathByBone[gD]].Sample(t)) - auxPosF0[mb];
+                                if (dLocalGi.sqrMagnitude > 1e-12f)
+                                {
+                                    var giParentLinear = gD.parent == modelNode ? modelW : giW[gD.parent];
+                                    lp = (Vector3)mmdBind[mb].GetColumn(3)
+                                       + pw.inverse.MultiplyVector(alignInv.MultiplyVector(giParentLinear.MultiplyVector(dLocalGi)));
+                                }
+                            }
                             var lr = ExtractRot(pw.inverse * Matrix4x4.TRS(lp, qWant, Vector3.one));
                             repPos[mb][f] = lp;
                             repRot[mb][f] = lr;
@@ -983,7 +1069,8 @@ namespace GIC.Editor.Retarget
                         throw new System.InvalidOperationException($"[Standby] \u982d\u62df\u5408\u6b8b\u5dee {rHead:F4}m \u8d85\u9608\u503c\uff08\u5bf9\u9f50\u8d28\u91cf\u5f02\u5e38\uff09");
 
                 // 写 clip（legacy；路径前缀 Paimon_arm/，相对挂 Animation 的 MMD 根节点；代表骨+捻骨）。
-                // 位置曲线只写腰锚——其余骨无位置动画=保持 prefab 绑定值（刚性链，骨长恒定的运行时保证）
+                // 位置曲线写腰锚（bob/根运动）+ v24 辅助骨联合集（有源=动画值，无源=常量绑定值——
+                // 保证属性每 clip 都有曲线，CrossFade 淡出目标恒为绑定，无 orphan 塌陷）
                 var clip = new AnimationClip { name = $"Ani_NPC_Kanban_Paimon_{cd.name}_MMD", legacy = true, frameRate = 60f };
                 foreach (var mb in repPos.Keys)
                 {
@@ -1003,7 +1090,7 @@ namespace GIC.Editor.Retarget
                     clip.SetCurve(path, typeof(Transform), "localRotation.y", new AnimationCurve(kry));
                     clip.SetCurve(path, typeof(Transform), "localRotation.z", new AnimationCurve(krz));
                     clip.SetCurve(path, typeof(Transform), "localRotation.w", new AnimationCurve(krw));
-                    if (mb == pelvisAnchor)
+                    if (mb == pelvisAnchor || auxPosUnion.Contains(mb))
                     {
                         var poss = repPos[mb];
                         var kpx = new Keyframe[frames]; var kpy = new Keyframe[frames]; var kpz = new Keyframe[frames];

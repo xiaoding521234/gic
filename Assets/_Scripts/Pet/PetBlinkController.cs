@@ -19,6 +19,10 @@ namespace GIC.Pet
         [SerializeField] private float 最大间隔秒 = 5.5f;
         [SerializeField] private float 眨眼时长秒 = 0.13f;  // 升 0.05s 保持 0.03s 降 0.05s
 
+        [Header("morph 名（2026-08-24 官方模型适配：默认 MMD 名，GI 官方模型配 Eye_WinkA）")]
+        [SerializeField] private string 左眨眼morph名 = "ウィンク";
+        [SerializeField] private string 右眨眼morph名 = "ウィンク右";
+
         private SkinnedMeshRenderer smr;
         private int winkL = -1, winkR = -1; // ウィンク / ウィンク右（MMD 无まばたき，双眼同权重合成）
         private Coroutine loop;
@@ -37,11 +41,19 @@ namespace GIC.Pet
 
         void Awake()
         {
-            smr = GetComponentInChildren<SkinnedMeshRenderer>();
+            // 多 SMR 场景（2026-08-24 GI 官方模型）：Body/Cloak/EyeStar/Face 并列，morph 全在 Face 上——
+            // 取 morph 数最多的 SMR（MMD 时代唯一 SMR 亦兼容）
+            SkinnedMeshRenderer best = null;
+            foreach (var s in GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (s.sharedMesh == null) continue;
+                if (best == null || s.sharedMesh.blendShapeCount > best.sharedMesh.blendShapeCount) best = s;
+            }
+            smr = best;
             if (smr == null) { enabled = false; return; }
             var mesh = smr.sharedMesh;
-            winkL = mesh.GetBlendShapeIndex("ウィンク");
-            winkR = mesh.GetBlendShapeIndex("ウィンク右");
+            winkL = mesh.GetBlendShapeIndex(左眨眼morph名);
+            winkR = mesh.GetBlendShapeIndex(右眨眼morph名);
             if (winkL < 0 || winkR < 0)
             {
                 Debug.LogWarning($"[PetBlink] 模型缺少眨眼 morph（ウィンク={winkL} ウィンク右={winkR}），眨眼已禁用");

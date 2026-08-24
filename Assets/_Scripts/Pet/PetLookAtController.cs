@@ -56,6 +56,12 @@ namespace GIC.Pet
         [SerializeField] private float 眼球平滑速度 = 14f;
         [Tooltip("关闭 = 完全走 clip 曲线")] [SerializeField] private bool 启用 = true;
 
+        [Header("骨骼名（2026-08-24 官方模型适配：默认 MMD 日文名，GI 官方模型配 Bip001 名）")]
+        [SerializeField] private string 颈骨名 = "首";
+        [SerializeField] private string 头骨名 = "頭";
+        [SerializeField] private string 左眼球骨名 = "目.L";
+        [SerializeField] private string 右眼球骨名 = "目.R";
+
         // 视线静默（出场/退场等仪式动作期间，2026-08-24）：LateUpdate 整体跳过，头链完全交给 clip。
         // 恢复时平滑值可能已偏离——首帧先同步到当前骨骼姿态再叠加，防视线"瞬移归位"
         private bool _静默;
@@ -103,8 +109,8 @@ namespace GIC.Pet
                 foreach (var t in all) if (t.name == n) return t;
                 return null;
             };
-            _首 = F("首"); _頭 = F("頭");
-            _目L = F("目.L"); _目R = F("目.R");
+            _首 = F(颈骨名); _頭 = F(头骨名);
+            _目L = F(左眼球骨名); _目R = F(右眼球骨名);
         }
 
         void LateUpdate()

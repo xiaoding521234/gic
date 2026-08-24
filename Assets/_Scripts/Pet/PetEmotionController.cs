@@ -38,7 +38,14 @@ namespace GIC.Pet
 
         void Awake()
         {
-            smr = GetComponentInChildren<SkinnedMeshRenderer>();
+            // 多 SMR 场景（2026-08-24 GI 官方模型）：morph 全在 Face SMR 上——取 morph 数最多的 SMR
+            SkinnedMeshRenderer best = null;
+            foreach (var s in GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (s.sharedMesh == null) continue;
+                if (best == null || s.sharedMesh.blendShapeCount > best.sharedMesh.blendShapeCount) best = s;
+            }
+            smr = best;
         }
 
         /// <summary>
