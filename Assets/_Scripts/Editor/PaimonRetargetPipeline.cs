@@ -280,7 +280,6 @@ namespace GIC.Editor.Retarget
             var MMD_FBX_PATH = cfg.mmdFbxPath;
             var GI_FBX_PATH = cfg.giFbxPath;
             var OUT_DIR = cfg.outDir;
-            var TEST_SCENE = cfg.testScene;
 
             // ---------- 1. 读取全部 clip 曲线 ----------
             var clips = new List<ClipData>();
@@ -1023,143 +1022,13 @@ namespace GIC.Editor.Retarget
                 log.AppendLine($"[{cd.name}] clip \u5199\u51fa: {outPath} \u9aa8 {repPos.Count}\uff08\u4ee3\u8868{repByMmd.Count}+\u8ddf\u968f{driveBones.Count}\uff09 \u5e27 {frames}");
             }
 
-            // ---------- 6. 测试场景（原生 MMD 模型 + 绿地面 + 自动播转换后 Standby） ----------
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var lightGo = new GameObject("MainLight");
-            var light = lightGo.AddComponent<Light>();
-            light.type = LightType.Directional; light.intensity = 1.2f;
-            lightGo.transform.rotation = Quaternion.Euler(35, -155, 20);
-
-            var pet = (GameObject)PrefabUtility.InstantiatePrefab(mmdFbx);
-            pet.name = "Paimon_MMD";
-            var animComp = pet.AddComponent<Animation>();
-            // 全部转换 clip 注册（供 Play/按钮切换）
-            foreach (var c in clipAssets) animComp.AddClip(c, c.name);
-            animComp.clip = clipAssets[0];
-            animComp.playAutomatically = true;
-            animComp.cullingType = AnimationCullingType.AlwaysAnimate;
-
-            // 动作切换 UI：编辑期预置于场景（AnimUICanvas），运行时零生成；布局可在此场景直接调
-            var swapper = pet.AddComponent<GIC.Pet.PetAnimSwapper>();
-            var anim = pet.AddComponent<GIC.Pet.PetEmotionController>();
-            pet.AddComponent<GIC.Pet.PetBlinkController>();
-            var fingerPose = pet.AddComponent<GIC.Pet.PetFingerPoseController>(); // v18 程序化手指姿态层
-            var sw = new SerializedObject(swapper);
-            sw.FindProperty("targetAnimation").objectReferenceValue = animComp;
-            sw.FindProperty("emotionController").objectReferenceValue = anim;
-            sw.FindProperty("fingerPoseController").objectReferenceValue = fingerPose;
-            sw.ApplyModifiedPropertiesWithoutUndo();
-
-            var canvasGo = new GameObject("AnimUICanvas", typeof(UnityEngine.Canvas), typeof(UnityEngine.UI.CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
-            canvasGo.GetComponent<UnityEngine.Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = canvasGo.GetComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(960, 540);
-
-            // 滚动列表：ScrollView > Viewport(Mask) > Content(VerticalLayout+ContentSizeFitter) > 按钮们
-            var scrollGo = new GameObject("ScrollView", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.ScrollRect));
-            scrollGo.transform.SetParent(canvasGo.transform, false);
-            var scrollRect = scrollGo.GetComponent<RectTransform>();
-            scrollRect.anchorMin = scrollRect.anchorMax = new Vector2(0, 1);
-            scrollRect.pivot = new Vector2(0, 1);
-            scrollRect.anchoredPosition = new Vector2(16, -16);
-            scrollRect.sizeDelta = new Vector2(250, 420);
-            scrollGo.GetComponent<UnityEngine.UI.Image>().color = new Color(0.1f, 0.12f, 0.16f, 0.5f);
-
-            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Mask));
-            viewportGo.transform.SetParent(scrollGo.transform, false);
-            var vpRect = viewportGo.GetComponent<RectTransform>();
-            vpRect.anchorMin = Vector2.zero; vpRect.anchorMax = Vector2.one; vpRect.sizeDelta = Vector2.zero;
-            var vpImg = viewportGo.GetComponent<UnityEngine.UI.Image>();
-            vpImg.color = Color.white; vpImg.raycastTarget = false;
-            viewportGo.GetComponent<UnityEngine.UI.Mask>().showMaskGraphic = false;
-
-            var contentGo = new GameObject("Content", typeof(RectTransform), typeof(UnityEngine.UI.VerticalLayoutGroup), typeof(UnityEngine.UI.ContentSizeFitter));
-            contentGo.transform.SetParent(viewportGo.transform, false);
-            var contentRect = contentGo.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0, 1); contentRect.anchorMax = new Vector2(1, 1);
-            contentRect.pivot = new Vector2(0.5f, 1); contentRect.sizeDelta = Vector2.zero;
-            var vlg = contentGo.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
-            vlg.childAlignment = TextAnchor.UpperCenter;
-            vlg.spacing = 6;
-            vlg.childForceExpandHeight = false; vlg.childForceExpandWidth = false;
-            vlg.childControlWidth = true; vlg.childControlHeight = true;
-            contentGo.GetComponent<UnityEngine.UI.ContentSizeFitter>().verticalFit = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
-
-            var scroll = scrollGo.GetComponent<UnityEngine.UI.ScrollRect>();
-            scroll.viewport = vpRect; scroll.content = contentRect;
-            scroll.horizontal = false; scroll.vertical = true;
-            scroll.scrollSensitivity = 30;
-            scroll.movementType = UnityEngine.UI.ScrollRect.MovementType.Clamped;
-
-            // 中文按钮名映射（2026-08-23）：clip 英文名 → 按钮显示中文；未列名按原名兜底
-            var 中文名 = new Dictionary<string, string>
-            {
-                ["Standby"] = "待机", ["Greet"] = "打招呼", ["Anger"] = "生气", ["Sneer01"] = "坏笑",
-                ["Clap01"] = "鼓掌", ["Nod01"] = "点头", ["ShakeHead01"] = "摇头", ["Refuse01"] = "拒绝",
-                ["Run"] = "跑动", ["SitLoop"] = "坐姿", ["Sleep01"] = "睡觉", ["Turnback"] = "转身",
-                ["Domagic"] = "施法",
-                ["Shy01AS"] = "害羞·入场", ["Shy01BS"] = "害羞·退场", ["Shy01Loop"] = "害羞·循环",
-                ["Confuse01AS"] = "困惑·入场", ["Confuse01BS"] = "困惑·退场", ["Confuse01Loop"] = "困惑·循环",
-                ["Think01AS"] = "思考·入场", ["Think01BS"] = "思考·退场", ["Think01Loop"] = "思考·循环",
-                ["Like01AS"] = "点赞·入场", ["Like01BS"] = "点赞·退场", ["Like01Loop"] = "点赞·循环",
-            };
-            // LegacyRuntime.ttf 无中文字形，按钮名换中文必须换字体（沿用项目 zh-cn.ttf，TMP 目录同款）
-            var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/TextMesh Pro/Resources/Fonts & Materials/zh-cn.ttf");
-            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            foreach (var c in clipAssets)
-            {
-                var btnGo = new GameObject(c.name, typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
-                btnGo.transform.SetParent(contentGo.transform, false);
-                btnGo.GetComponent<UnityEngine.UI.Image>().color = new Color(0.18f, 0.22f, 0.3f, 0.85f);
-                var ble = btnGo.AddComponent<UnityEngine.UI.LayoutElement>();
-                ble.minHeight = 34; ble.minWidth = 220;
-                var txtGo = new GameObject("Label", typeof(RectTransform), typeof(UnityEngine.UI.Text));
-                txtGo.transform.SetParent(btnGo.transform, false);
-                var txt = txtGo.GetComponent<UnityEngine.UI.Text>();
-                txt.font = font; txt.fontSize = 20; txt.color = Color.white;
-                txt.alignment = TextAnchor.MiddleCenter;
-                var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");
-                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
-                var tr = txtGo.GetComponent<RectTransform>();
-                tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
-                // 持久监听（存进场景文件，运行时零查找）
-                UnityEditor.Events.UnityEventTools.AddStringPersistentListener(
-                    btnGo.GetComponent<UnityEngine.UI.Button>().onClick, swapper.Play, c.name);
-            }
-
-            // EventSystem（场景预置）
-            var esGo = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
-
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground";
-            ground.transform.localScale = new Vector3(3, 1, 3);
-            var matGuids = AssetDatabase.FindAssets("RerigGroundMat");
-            if (matGuids.Length > 0)
-            {
-                var mat = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(matGuids[0]));
-                if (mat != null) ground.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            }
-
-            // 相机对准骨骼包围盒（SMR bounds 在 ×100 节点下不可靠）
-            var sceneRoot = pet.transform.Find(cfg.armNodeName + "/" + cfg.rootBoneName);
-            var bmin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var bmax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-            foreach (var b in sceneRoot.GetComponentsInChildren<Transform>(true))
-            {
-                bmin = Vector3.Min(bmin, b.position); bmax = Vector3.Max(bmax, b.position);
-            }
-            var ctr = (bmin + bmax) / 2f; var size = bmax - bmin;
-            var camGo = new GameObject("MainCamera"); camGo.tag = "MainCamera";
-            var cam = camGo.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.15f, 0.15f, 0.18f);
-            camGo.transform.position = ctr + new Vector3(0, 0.05f, size.z + 1.1f);
-            camGo.transform.LookAt(ctr);
-
-            EditorSceneManager.SaveScene(scene, TEST_SCENE);
+            // ---------- 6. 同步 PaimonPet（动画列表注册 + 动作测试 UI 重建） ----------
+            // 2026-08-24 单场景方案：原独立测试场景（PaimonRetargetTest）已废弃——
+            // 模型/相机/构图以 PaimonPet 为唯一权威，动画列表与测试面板由 PetSceneSyncTool 统一维护。
             AssetDatabase.SaveAssets();
-            log.AppendLine($"[scene] \u6d4b\u8bd5\u573a\u666f\u5df2\u5efa: {TEST_SCENE}\uff08\u9aa8\u9abc\u5305\u56f4\u76d2 size={size} \u4e2d\u5fc3={ctr}\uff09");
+            EditorSceneManager.OpenScene("Assets/Scenes/PaimonPet.unity", OpenSceneMode.Single);
+            PetSceneSyncTool.SyncInternal();
+            log.AppendLine("[scene] PaimonPet 已同步（动画列表+测试 UI 重建）——单场景方案，无独立测试场景");
         }
     }
 }

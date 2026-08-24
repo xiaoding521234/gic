@@ -3,8 +3,8 @@ using UnityEngine;
 namespace GIC.Pet
 {
     /// <summary>
-    /// 方案B测试场景动作切换（运行时只管播放）：UI 按钮由管线在编辑期预置于场景
-    /// （PaimonRetargetTest.unity 的 AnimUICanvas），onClick 持久绑定 Play(clip名)。
+    /// 动作切换（运行时只管播放）：UI 按钮由 PetSceneSyncTool 编辑期预置于场景
+    /// （PaimonPet.unity 的 AnimUICanvas，2026-08-24 单场景方案），onClick 持久绑定 Play(clip名)。
     /// 表情走运行时情绪层（PetEmotionController，docs/19 §2.6 三层架构）：
     /// Play 按动作名映射下发情绪指令，映射表 Inspector 中文可配。
     /// </summary>

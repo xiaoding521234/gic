@@ -16,7 +16,6 @@ MonoBehaviour:
   giFbxPath: Assets/Art/PaimonPet/Model/NPC_Kanban_Paimon_Model.fbx
   animDir: Assets/Art/PaimonPet/Animations
   outDir: Assets/Art/PaimonPet/Animations/MMD
-  testScene: Assets/Scenes/PaimonRetargetTest.unity
   armNodeName: Paimon_arm
   rootBoneName: "\u5168\u3066\u306E\u89AA"
   clips:

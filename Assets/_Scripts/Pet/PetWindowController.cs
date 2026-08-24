@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -11,6 +12,8 @@ namespace GIC.Pet
     /// 透明双方案（2026-08-21 拍板主流优先）：默认 DWM 逐像素 alpha（DwmExtendFrameIntoClientArea，
     /// 边缘无毛边、支持半透明）；色键 LWA_COLORKEY 保留作兜底开关。
     /// 命中检测/拖拽全部走 Win32 轮询（GetCursorPos/GetAsyncKeyState），不依赖窗口焦点与 Unity 输入系统。
+    /// 滚轮缩放（2026-08-24 对齐主流桌宠）：固定窗口（=基准×有效缩放上限，运行期不改尺寸）+
+    /// 纯模型缩放平滑过渡（相机/窗口恒定→脚底客户区位置天然锚定，绕脚底原地长高）+ pet.json 持久化（缩放与停留位置）。
     /// </summary>
     public class PetWindowController : MonoBehaviour
     {
@@ -30,11 +33,11 @@ namespace GIC.Pet
         [Tooltip("滚轮缩放派蒙大小（光标命中模型时生效，与拖拽一致）")] [SerializeField] private bool 允许滚轮缩放 = true;
         [Tooltip("缩放倍率下限")] [SerializeField] private float 缩放最小 = 0.4f;
         [Tooltip("缩放倍率上限")] [SerializeField] private float 缩放最大 = 2f;
-        [Tooltip("初始缩放倍率（Start 时应用一次，窗口同步调整，构图全程恒定）")] [SerializeField] private float 初始缩放倍率 = 0.7f;
+        [Tooltip("无 pet.json 存档时的初始缩放倍率（有存档用存档值）")] [SerializeField] private float 初始缩放倍率 = 0.7f;
+        [Tooltip("缩放平滑过渡速度：每秒指数趋近速率，越大越跟手；0=瞬达无平滑。对齐主流桌宠滚轮渐变手感")] [SerializeField] private float 缩放平滑速度 = 12f;
         [Tooltip("每格滚轮的缩放步进（乘法），越小越精细")] [SerializeField] private float 缩放步进 = 1.05f;
-        [Tooltip("窗口尺寸随缩放同步扩大（防模型被窗口截断），以派蒙中心为锚点")] [SerializeField] private bool 窗口随缩放 = true;
-        [Tooltip("缩放=1 时的窗口逻辑宽度（96 DPI 基准像素；物理尺寸=逻辑×dpi/96，对齐主流桌宠 DPI 感知；含阴影落脚边距，2026-08-24 由 480 扩到 550）")] [SerializeField] private int 窗口逻辑宽 = 550;
-        [Tooltip("缩放=1 时的窗口逻辑高度（96 DPI 基准像素；含阴影落脚边距，2026-08-24 由 720 扩到 825，同步 FOV 40→45.27 保持派蒙像素尺寸不变）")] [SerializeField] private int 窗口逻辑高 = 825;
+        [Tooltip("窗口客户区逻辑宽度基准（96 DPI 像素；实际窗口=基准×DPI×有效缩放上限，运行期恒定不随缩放变化——缩放只改模型，杜绝逐帧改窗口的闪烁；含阴影落脚边距，2026-08-24 由 480 扩到 550）")] [SerializeField] private int 窗口逻辑宽 = 550;
+        [Tooltip("窗口客户区逻辑高度基准（96 DPI 像素；含阴影落脚边距，2026-08-24 由 720 扩到 825，同步 FOV 40→45.27 保持派蒙像素尺寸不变）")] [SerializeField] private int 窗口逻辑高 = 825;
 
         [Header("调试")]
         [SerializeField] private bool 打印状态日志 = false;
@@ -62,12 +65,26 @@ namespace GIC.Pet
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
-        private float 当前缩放 = 1f; // 滚轮缩放倍率（叠乘到 Paimon 根 localScale）
+        private float 目标缩放 = 1f; // 滚轮缩放的目标倍率（持久化存这个值）
+        private float 显示缩放 = 1f; // 实际应用倍率（每帧向目标指数平滑趋近）
         private float 初始缩放;       // Start 时 Paimon 根 localScale.x（场景基准值）
         private Transform _paimon根;
-        private int 基准窗口宽, 基准窗口高; // 缩放=1 时的窗口客户区物理像素（=逻辑尺寸×dpi/96，窗口缩放的基准）
+        private int 基准窗口宽, 基准窗口高; // 基准客户区物理像素（=逻辑尺寸×dpi/96）
+        private int 固定窗口宽, 固定窗口高; // 实际窗口客户区物理像素（=基准×有效缩放上限，运行期恒定不随缩放变化）
         private float dpi缩放 = 1f;        // GetDpiForWindow/96（exe 清单 PerMonitorV2：客户区物理像素=渲染像素）
         private float 有效缩放最大 = 2f;    // 钳制到工作区后的实际上限（RestyleWindow 时重算）
+
+        // 独立存档（桌宠永不读写主存档，docs/19 §3.1/§5.8 约定）：{persistentDataPath}/pet.json
+        [Serializable] private class Pet窗口存档
+        {
+            public int 版本 = 1;
+            public float 缩放 = -1f;   // <0 = 无记录
+            public int 客户区X, 客户区Y; // 客户区原点（物理像素，虚拟桌面坐标系）
+            public bool 有位置 = false;
+        }
+        private Pet窗口存档 载入存档;
+        private float 待写入时刻 = -1f; // >0 = 有未落盘修改（防抖：最后一次修改后 1s 写盘）
+        private string 存档路径 => Path.Combine(Application.persistentDataPath, "pet.json");
         // WH_MOUSE_LL 钩子截 WM_MOUSEWHEEL（Input.mouseScrollDelta 在窗口穿透/无焦点时常返回 0）
         private IntPtr _mouseHook = IntPtr.Zero;
         private HookProc _mouseHookProc; // 防 GC 回收委托
@@ -87,6 +104,7 @@ namespace GIC.Pet
         [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
         [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, out RECT pvParam, uint fWinIni);
+        [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
         [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
         [DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
         [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hhk);
@@ -111,6 +129,10 @@ namespace GIC.Pet
         private const uint SWP_SHOWWINDOW = 0x0040;
         private const uint SWP_FRAMECHANGED = 0x0020;
         private const uint SPI_GETWORKAREA = 0x0030;
+        private const int SM_XVIRTUALSCREEN = 76;
+        private const int SM_YVIRTUALSCREEN = 77;
+        private const int SM_CXVIRTUALSCREEN = 78;
+        private const int SM_CYVIRTUALSCREEN = 79;
         private const int VK_LBUTTON = 0x01;
         private const int WH_MOUSE_LL = 14;
         private const int WM_MOUSEWHEEL = 0x020A;
@@ -174,13 +196,14 @@ namespace GIC.Pet
             {
                 _paimon根 = paimonRoot.transform;
                 初始缩放 = _paimon根.localScale.x;
-                // 初始缩放倍率启动时应用一次（相机不动，只改模型缩放；窗口尺寸在 RestyleWindow→DockBottomRight 按同一倍率同步，构图恒定）
-                if (!Mathf.Approximately(初始缩放倍率, 1f))
-                {
-                    当前缩放 = 初始缩放倍率;
-                    float s = 初始缩放 * 当前缩放;
-                    _paimon根.localScale = new Vector3(s, s, s);
-                }
+                // 缩放目标：构建版读 pet.json（持久化），无存档/编辑器用 Inspector 默认倍率。
+                // 启动即到位（无平滑动画），窗口尺寸在 RestyleWindow 按同一倍率同步。
+#if !UNITY_EDITOR
+                读取存档();
+#endif
+                目标缩放 = (载入存档 != null && 载入存档.缩放 > 0f) ? 载入存档.缩放 : 初始缩放倍率;
+                显示缩放 = 目标缩放;
+                应用模型缩放();
                 蒙皮渲染器 = paimonRoot.GetComponentInChildren<SkinnedMeshRenderer>(true);
                 if (蒙皮渲染器 != null)
                 {
@@ -267,15 +290,22 @@ namespace GIC.Pet
             float 限宽 = (work.Right - work.Left) * 0.95f / 基准窗口宽;
             float 限高 = (work.Bottom - work.Top) * 0.95f / 基准窗口高;
             有效缩放最大 = Mathf.Min(缩放最大, 限宽, 限高);
-            当前缩放 = Mathf.Clamp(当前缩放, 缩放最小, 有效缩放最大);
+            目标缩放 = Mathf.Clamp(目标缩放, 缩放最小, 有效缩放最大);
+            显示缩放 = 目标缩放; // 启动直接到位（无平滑动画）
             // 钳制后重放模型缩放（极端小屏：初始倍率超上限时保持模型与窗口同步）
-            if (_paimon根 != null)
-            {
-                float s = 初始缩放 * 当前缩放;
-                _paimon根.localScale = new Vector3(s, s, s);
-            }
+            应用模型缩放();
 
-            if (启动时停靠右下角)
+            // 固定窗口（2026-08-24 闪烁根治）：客户区尺寸恒=基准×有效缩放上限，运行期不随缩放变化——
+            // 滚轮平滑过渡只改模型 localScale，不再逐帧 SetWindowPos 改窗口（逐帧 resize 令 swapchain/DWM
+            // 高频重建合成，派蒙肉眼高频闪烁）。窗口 oversized 部分全透明+穿透，无视觉/交互代价；
+            // 相机与窗口恒定 → 脚底客户区位置天然恒定（缩放绕脚底原地长高）。
+            固定窗口宽 = Mathf.RoundToInt(基准窗口宽 * 有效缩放最大);
+            固定窗口高 = Mathf.RoundToInt(基准窗口高 * 有效缩放最大);
+
+            // 位置恢复优先于右下角停靠（拖拽停留位置持久化，docs/19 §3.1）；
+            // 无存档且未开停靠则维持 Unity 默认位置
+            bool 恢复了位置 = 恢复保存位置();
+            if (!恢复了位置 && 启动时停靠右下角)
             {
                 DockBottomRight();
             }
@@ -284,7 +314,7 @@ namespace GIC.Pet
             // 常驻钩子对全系统鼠标消息做封送分配+主线程回调，鼠标移动时灌爆主线程）
 
             restyled = true;
-            Debug.Log($"[PetSpike] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(使用DWM透明 ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} baseClient={基准窗口宽}x{基准窗口高} scale={当前缩放:F2} maxScale={有效缩放最大:F2}");
+            Debug.Log($"[PetSpike] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(使用DWM透明 ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} fixedClient={固定窗口宽}x{固定窗口高} scale={目标缩放:F2} maxScale={有效缩放最大:F2} pos={(恢复了位置 ? "restored" : "dock/default")}");
         }
 
         /// <summary>窗口矩形与客户区的差值（无边框后理论上≈0，实测兜底；含隐形边框）</summary>
@@ -300,12 +330,12 @@ namespace GIC.Pet
             frameH = (wr.Bottom - wr.Top) - (cr.Bottom - cr.Top);
         }
 
-        /// <summary>停靠右下角：客户区尺寸=基准×当前缩放（初始缩放启动即应用，构图全程恒定），边距按 DPI 换算</summary>
+        /// <summary>停靠右下角：窗口尺寸恒=固定窗口（不随缩放），边距按 DPI 换算</summary>
         private void DockBottomRight()
         {
             GetFrameSize(out int frameW, out int frameH, out _, out _);
-            int winW = Mathf.RoundToInt(基准窗口宽 * 当前缩放) + frameW;
-            int winH = Mathf.RoundToInt(基准窗口高 * 当前缩放) + frameH;
+            int winW = 固定窗口宽 + frameW;
+            int winH = 固定窗口高 + frameH;
             int margin = Mathf.RoundToInt(停靠边距 * dpi缩放);
             SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
             int x = work.Right - winW - margin;
@@ -361,43 +391,90 @@ namespace GIC.Pet
                 UnhookWindowsHookEx(_mouseHook);
                 _mouseHook = IntPtr.Zero;
             }
+            写入存档(); // 进程销毁兜底落盘（无待写入则跳过）
         }
 
-        /// <summary>
-        /// 窗口随缩放同步调整（主流桌宠：窗口=模型包围盒，任何倍率构图恒定）。
-        /// 相机不动（透视构图不变），模型缩放与窗口客户区尺寸 1:1 同步，不截断也不过大。
-        /// 锚点=客户区中心（派蒙身体中心，2026-08-23 用户拍板）——她绕自身中心长个儿/缩小，不随光标漂移。
-        /// 编辑器内不会被调用（restyled 恒 false），无需平台守卫。
-        /// </summary>
-        private void 应用缩放窗口()
+        void OnApplicationQuit()
         {
-            if (hwnd == IntPtr.Zero) return;
+            写入存档(); // 双击退出/正常退出路径兜底（与 OnDestroy 幂等）
+        }
+
+        #region 独立存档（pet.json——桌宠永不读写主存档，docs/19 §5.8 双进程约束）
+
+        private void 标记待写入()
+        {
+            待写入时刻 = Time.unscaledTime + 1f; // 防抖：最后一次修改后 1s 才写盘
+        }
+
+        private void 读取存档()
+        {
+            try
+            {
+                if (!File.Exists(存档路径)) return;
+                载入存档 = JsonUtility.FromJson<Pet窗口存档>(File.ReadAllText(存档路径));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PetSpike] pet.json 读取失败（按无存档处理）：{e.Message}");
+                载入存档 = null;
+            }
+        }
+
+        /// <summary>落盘缩放+停留位置（客户区原点，物理像素）。仅在构建版有待写入时执行，编辑器恒跳过。</summary>
+        private void 写入存档()
+        {
+#if !UNITY_EDITOR
+            if (待写入时刻 <= 0f || hwnd == IntPtr.Zero) return;
+            try
+            {
+                var origin = new POINT { X = 0, Y = 0 };
+                ClientToScreen(hwnd, ref origin);
+                var data = new Pet窗口存档 { 缩放 = 目标缩放, 客户区X = origin.X, 客户区Y = origin.Y, 有位置 = true };
+                File.WriteAllText(存档路径, JsonUtility.ToJson(data, true));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PetSpike] pet.json 写入失败：{e.Message}");
+            }
+            finally
+            {
+                待写入时刻 = -1f;
+            }
+#endif
+        }
+
+        #endregion
+
+        /// <summary>把显示缩放叠乘到 Paimon 根 localScale（相机与窗口均不动——脚底屏幕位置恒定，绕脚底原地长高）</summary>
+        private void 应用模型缩放()
+        {
+            if (_paimon根 == null) return;
+            float s = 初始缩放 * 显示缩放;
+            _paimon根.localScale = new Vector3(s, s, s);
+        }
+
+        /// <summary>恢复存档的窗口位置（客户区原点，钳制到虚拟屏幕防显示器拔掉后找不到派蒙）。成功=true。
+        /// 窗口尺寸恒=固定窗口（旧存档保存时窗口按旧缩放尺寸，恢复后偏大属预期——停留语义不变）。</summary>
+        private bool 恢复保存位置()
+        {
+            if (载入存档 == null || !载入存档.有位置 || hwnd == IntPtr.Zero) return false;
 
             GetFrameSize(out int frameW, out int frameH, out int frameLeft, out int frameTop);
-            GetClientRect(hwnd, out RECT cr);
-            int clientW = cr.Right - cr.Left;
-            int clientH = cr.Bottom - cr.Top;
-            var origin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref origin);
+            int clientW = 固定窗口宽;
+            int clientH = 固定窗口高;
 
-            // 中心锚点：客户区中心（=模型视觉中心）的屏幕物理坐标
-            float anchorX = origin.X + clientW * 0.5f;
-            float anchorY = origin.Y + clientH * 0.5f;
+            // 虚拟屏幕矩形（多显示器并集，物理像素）
+            int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
-            int newClientW = Mathf.RoundToInt(基准窗口宽 * 当前缩放);
-            int newClientH = Mathf.RoundToInt(基准窗口高 * 当前缩放);
-            int newW = newClientW + frameW;
-            int newH = newClientH + frameH;
-            int newX = Mathf.RoundToInt(anchorX - newClientW * 0.5f) - frameLeft;
-            int newY = Mathf.RoundToInt(anchorY - newClientH * 0.5f) - frameTop;
+            // 完整收进虚拟屏幕；范围倒挂（窗口比虚拟屏还大）时居中兜底
+            int cx = vw <= clientW ? vx + (vw - clientW) / 2 : Mathf.Clamp(载入存档.客户区X, vx, vx + vw - clientW);
+            int cy = vh <= clientH ? vy + (vh - clientH) / 2 : Mathf.Clamp(载入存档.客户区Y, vy, vy + vh - clientH);
 
-            // 钳制到屏幕工作区（不吞任务栏；拖到屏幕下方放大时窗口会被推回屏内，派蒙上移——
-            // 用户拍板 2026-08-23：宁可上移也不让派蒙出屏看不见）
-            SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
-            newX = Mathf.Clamp(newX, work.Left, work.Right - newW);
-            newY = Mathf.Clamp(newY, work.Top, work.Bottom - newH);
-
-            SetWindowPos(hwnd, IntPtr.Zero, newX, newY, newW, newH, SWP_NOZORDER | SWP_SHOWWINDOW);
+            SetWindowPos(hwnd, IntPtr.Zero, cx - frameLeft, cy - frameTop, clientW + frameW, clientH + frameH, SWP_NOZORDER | SWP_SHOWWINDOW);
+            return true;
         }
 
         /// <summary>
@@ -511,6 +588,7 @@ namespace GIC.Pet
                         lastClickTime = -10f;
                     }
                     dragging = false;
+                    标记待写入(); // 停留位置持久化（docs/19 §3.1）
                 }
                 else
                 {
@@ -527,18 +605,25 @@ namespace GIC.Pet
                 float scroll = wheelRaw / 120f; // 120=一格，正=向前/上=放大
                 if (Mathf.Abs(scroll) > 0.01f)
                 {
-                    float 新缩放 = Mathf.Clamp(当前缩放 * Mathf.Pow(缩放步进, scroll), 缩放最小, 有效缩放最大);
-                    if (!Mathf.Approximately(新缩放, 当前缩放))
+                    float 新缩放 = Mathf.Clamp(目标缩放 * Mathf.Pow(缩放步进, scroll), 缩放最小, 有效缩放最大);
+                    if (!Mathf.Approximately(新缩放, 目标缩放))
                     {
-                        当前缩放 = 新缩放;
-                        float s = 初始缩放 * 当前缩放;
-                        _paimon根.localScale = new Vector3(s, s, s);
-                        if (窗口随缩放)
-                        {
-                            应用缩放窗口();
-                        }
+                        // 只改目标倍率：实际应用走下方平滑过渡（对齐主流桌宠滚轮渐变手感）；持久化防抖标记
+                        目标缩放 = 新缩放;
+                        标记待写入();
                     }
                 }
+            }
+
+            // 平滑过渡：显示缩放向目标指数趋近，只改模型 localScale——窗口尺寸恒定（2026-08-24 闪烁根治，
+            // 见 RestyleWindow 注释），相机/脚底客户区位置不动，天然绕脚底原地长高；拖拽中同样安全
+            // （唯一窗口写入源是拖拽本身，模型缩放与其无耦合）。速度=0 时步进=1（瞬达，退回离散行为）。
+            if (!Mathf.Approximately(显示缩放, 目标缩放))
+            {
+                float 步进 = 缩放平滑速度 <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 缩放平滑速度);
+                显示缩放 += (目标缩放 - 显示缩放) * 步进;
+                if (Mathf.Abs(目标缩放 - 显示缩放) < 0.0005f) 显示缩放 = 目标缩放;
+                应用模型缩放();
             }
 
             // 命中模型或正在拖拽时可交互，其余区域点击穿透到下层窗口
@@ -560,6 +645,12 @@ namespace GIC.Pet
                 {
                     Debug.Log($"[PetSpike] 穿透切换 -> {wantPassThrough}");
                 }
+            }
+
+            // 存档防抖落盘（缩放/拖拽后 1s 无新修改才写，连续滚轮不产生 IO 风暴）
+            if (待写入时刻 > 0f && Time.unscaledTime >= 待写入时刻)
+            {
+                写入存档();
             }
         }
     }

@@ -106,16 +106,6 @@ namespace GIC.Editor
             return true;
         }
 
-        [MenuItem(MENU_BASE + "PaimonRetargetTest", priority = -91)]
-        private static void OpenPaimonRetargetTest() => OpenScene("Assets/Scenes/PaimonRetargetTest.unity");
-
-        [MenuItem(MENU_BASE + "PaimonRetargetTest", true)]
-        private static bool OpenPaimonRetargetTestValidate()
-        {
-            Menu.SetChecked(MENU_BASE + "PaimonRetargetTest", EditorSceneManager.GetActiveScene().path == "Assets/Scenes/PaimonRetargetTest.unity");
-            return true;
-        }
-
         [MenuItem(MENU_BASE + "PaimonPet", priority = -90)]
         private static void OpenPaimonPet() => OpenScene("Assets/Scenes/PaimonPet.unity");
 

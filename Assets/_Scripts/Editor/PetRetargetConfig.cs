@@ -33,7 +33,6 @@ namespace GIC.Editor.Retarget
         public string giFbxPath = "Assets/Art/PaimonPet/Model/NPC_Kanban_Paimon_Model.fbx";
         public string animDir = "Assets/Art/PaimonPet/Animations";
         public string outDir = "Assets/Art/PaimonPet/Animations/MMD";
-        public string testScene = "Assets/Scenes/PaimonRetargetTest.unity";
 
         [Header("MMD 骨架节点名")]
         public string armNodeName = "Paimon_arm";          // 缩放100节点（动画path前缀）
