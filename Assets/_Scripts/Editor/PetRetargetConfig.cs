@@ -74,7 +74,13 @@ namespace GIC.Editor.Retarget
             new ExactRule { mmdName = "\u4e0a\u534a\u8eab2", giName = "Bip001 Spine1" },                  // 上半身2
             new ExactRule { mmdName = "\u9996", giName = "Bip001 Neck" },                                 // 首
             new ExactRule { mmdName = "\u982d", giName = "Bip001 Head" },                                 // 頭
-            new ExactRule { mmdName = "\u4e21\u76ee", giName = "Bip001 Head" },                           // 両目
+            new ExactRule { mmdName = "両目", giName = "Bip001 Head" },                           // 両目
+            // R 拇指（2026-08-24）：GI R 手无 Bip001 R Finger0/01——R 拇指链是 DMZ R 01→DMZ R 02→Finger0Nub
+            //（骨架实测，L 侧才是标准 Finger0/01）。缺此规则时 親指.R 经前缀兜底全映到 R Hand，
+            // R 拇指在所有动作里纹丝不动。mmdName 带 .R 后缀精确匹配（MapMmdBone 的 n 保留侧缀）。
+            new ExactRule { mmdName = "親指０.R", giName = "DMZ R 01" },                        // 親指０.R→R 拇指根
+            new ExactRule { mmdName = "親指１.R", giName = "DMZ R 02" },                        // 親指１.R→R 拇指中
+            new ExactRule { mmdName = "親指２.R", giName = "DMZ R 02" },                        // 親指２.R 无源→跟随 DMZ R 02
         };
 
         [Header("骨映射——前缀表（有序，首匹配）")]

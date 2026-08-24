@@ -83,6 +83,12 @@ MonoBehaviour:
     giName: Bip001 Head
   - mmdName: "\u4E21\u76EE"
     giName: Bip001 Head
+  - mmdName: "\u89AA\u6307\uFF10.R"
+    giName: DMZ R 01
+  - mmdName: "\u89AA\u6307\uFF11.R"
+    giName: DMZ R 02
+  - mmdName: "\u89AA\u6307\uFF12.R"
+    giName: DMZ R 02
   prefixRules:
   - mmdPrefix: "\u8DB3\u9996D"
     giTemplate: Bip001 {S}Foot

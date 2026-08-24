@@ -38,6 +38,12 @@ namespace GIC.Editor.Retarget
     /// 姿势基准（restW=绑定栈）致待机腿恒为绑定直棍（偏 GI 源 ~37° 常量+脚踝 15cm）；
     /// 足D→ひざD→足首D ↔ Thigh→Calf→Foot 单链语义干净，qPose 方向对齐后全程精确跟踪
     ///（腿部方向审计 D 链误差 0°，仅 GI 源符号跳变帧为审计伪影）。
+    /// v20 手指双约束重建（2026-08-24 根治全 clip"掐爪"）：v17 LookRotation(绑定骨段, 掌背)
+    /// 整体替换手指骨世界旋转——Blender 导出的 MMD 手指子骨局部偏移沿 local+Y，替换后骨段被
+    /// 掰 ~90° 折成掐爪（实测根节弯 76-85° vs GI 22-49°）。
+    /// 正解 qPose = F2·F1⁻¹：骨段 locDir → R⁻¹·dGi(0) + 扭角 palmLocal → R⁻¹·palmBackGi(0)
+    ///（GI 末节段用 Nub 尖定向），骨段/掌心全程精确跟踪 GI（恒等式同 v6），自检纳入手指。
+    /// R 拇指映射 DMZ R 01/02（GI R 手无 Finger0 链，配置表精确规则，此前 R 拇指全静态）。
     /// 可泛化：换 MMD 模型只需骨名走标准 MMD 命名（MapMmd 表覆盖），管线不变。
     /// 目.L/R 完全不驱动（v3）：平移虹膜机制下位置保持式的对齐残差（左右 8/3mm 不对称）会变成虹膜
     /// 位移——实测左目被推到绑定位后方 7mm 虹膜沉入眼球后（"左眼只剩眼白"）；绑定=编辑模式=正确。
@@ -232,6 +238,19 @@ namespace GIC.Editor.Retarget
 
         static Vector3 VecOf(Vector4 v) => new Vector3(v.x, v.y, v.z);
         static Quaternion QuatOf(Vector4 v) => new Quaternion(v.x, v.y, v.z, v.w).normalized;
+
+        /// <summary>v20 手指双约束 look：forward 定骨段方向 + up 定扭角（掌背）。
+        /// 等价 LookRotation(fwd, up) 的鲁棒版——零向量/平行输入显式兜底，保证恒等式
+        /// qWant·locDir = R⁻¹·dGi(f) 的 forward 约束在任何输入下不塌（up 退化只损失扭角）。</summary>
+        static Quaternion LookTwice(Vector3 fwd, Vector3 up)
+        {
+            fwd = fwd.normalized;
+            if (fwd.sqrMagnitude < 0.5f) return Quaternion.identity;
+            var upP = up - Vector3.Project(up, fwd);
+            return upP.sqrMagnitude < 1e-12f
+                ? Quaternion.LookRotation(fwd)
+                : Quaternion.LookRotation(fwd, upP);
+        }
 
         /// <summary>从（可带均匀缩放的）矩阵提取旋转（数学核心见 PetRetargetMath）</summary>
         static Quaternion ExtractRot(Matrix4x4 m) => PetRetargetMath.ExtractRot(m);
@@ -626,6 +645,7 @@ namespace GIC.Editor.Retarget
                 var repQ = new Dictionary<Transform, Quaternion[]>(repByMmd.Count); // 期望世界旋转（v6 关节角式）
                 var quatG0 = new Dictionary<Transform, Quaternion>();               // GI 骨本 clip f0 世界旋转（增量基准）
                 var dG0Dir = new Dictionary<Transform, Vector3>();                  // GI f0 骨段方向（共轭到 MMD 空间，姿势基准）
+                var palmBackGi0BySide = new Dictionary<string, Vector3>();          // v20 GI f0 掌背方向（每 clip 重算，手指双约束扭角目标）
                 var qPose = new Dictionary<Transform, Quaternion>();                // MMD f0 姿势旋转（方向对齐基准 × 绑定）
                 var restW = new Dictionary<Transform, Quaternion>();                // v7.1 全骨 f0 姿势基准（刚体栈）
                 var anchorOffset = Vector3.zero;                                    // v10 腰锚舞台偏移（每 clip f0 计算）
@@ -665,6 +685,24 @@ namespace GIC.Editor.Retarget
                     // 仅腰锚（盆根）位置保持式传递，承载 bob/全身根运动。
                     if (f == 0)
                     {
+                        // v20 GI 掌心方向（每 clip f0 重算）：手指双约束重建的扭角目标。
+                        // 三点定掌面 + 拇指判侧（同 v17.1 MMD 侧逻辑）；R 拇指 = DMZ R 01
+                        //（GI R 手无 Finger0 链，拇指=DMZ R 01→02，骨架实测）。
+                        palmBackGi0BySide.Clear();
+                        foreach (var sideP in new[] { "L", "R" })
+                        {
+                            var iG = GiGet($"Bip001 {sideP} Finger1");
+                            var mG = GiGet($"Bip001 {sideP} Finger2");
+                            var pG = GiGet($"Bip001 {sideP} Finger4");
+                            var thG = sideP == "R" ? GiGet("DMZ R 01") : GiGet($"Bip001 {sideP} Finger0");
+                            if (iG == null || mG == null || pG == null || thG == null) continue;
+                            var ip = (Vector3)giW[iG].GetColumn(3);
+                            var faceN = Vector3.Cross((Vector3)giW[mG].GetColumn(3) - ip, (Vector3)giW[pG].GetColumn(3) - ip);
+                            if (faceN.sqrMagnitude < 1e-12f) continue;
+                            faceN.Normalize();
+                            var palmN = Vector3.Dot((Vector3)giW[thG].GetColumn(3) - ip, faceN) > 0 ? faceN : -faceN;
+                            palmBackGi0BySide[sideP] = -palmN;
+                        }
                         foreach (var kv in repByMmd)
                         {
                             var g0 = kv.Value;
@@ -682,24 +720,46 @@ namespace GIC.Editor.Retarget
                                 var d0 = (giW[cG].GetColumn(3) - giW[g0].GetColumn(3)).normalized;
                                 dG0Dir[kv.Key] = Quaternion.Inverse(R) * d0;
                             }
-                            // v17 手指骨 LookRotation 重建（2026-08-23 根治）：MMD 手指骨绑定姿态 boneFwd⊥骨段
-                            //（Blender 转 FBX 时局部系歪 90°，实测 boneFwd·骨段=0），FromToRotation 只保骨段
-                            // 方向，扭角未定导致弯曲轴歪——手指朝掌心弯过头呈"掐"状。
-                            // 改为：forward=MMD 绑定骨段方向（保持刚性链几何，子骨局部位置不变），
-                            // up=MMD 掌背方向（修正扭角），LookRotation 直接给出世界旋转。
-                            // 后续 GI 增量 delta 应用到修正后的局部系，弯曲轴就对了。
-                            // 注意：不能用 GI 共轭骨段作 forward——会改变骨段方向，破坏 v15 刚性链
-                            //（子骨局部位置恒定铁律），自检会报 90° 误差。
+                            // v20 手指双约束重建（2026-08-24 根治全 clip"掐爪"）：
+                            // v17 LookRotation(绑定骨段, 掌背) 整体替换世界旋转——Blender 导出的 MMD 手指
+                            // 子骨局部偏移沿 local+Y（骨轴约定），替换后骨段被掰向掌背 ~90°，手指在全 clip
+                            // 折成掐爪（手指审计实测：输出根节弯 76-85° vs GI 源 22-49°，首段骨段误差 51-92°）。
+                            // 正解 qPose = F2·F1⁻¹ 双约束：①骨段 子骨局部偏移方向 locDir → R⁻¹·dGi(0)
+                            //（GI 首帧骨段方向；代表配对子骨缺失时取 GI 首子骨——末节即 Nub 尖）
+                            // ②扭角 palmLocal → R⁻¹·palmBackGi(0)（GI 掌心锚定）。
+                            // 数学恒等：qWant(f)·locDir = R⁻¹·Δg·R·(R⁻¹·dGi(0)) = R⁻¹·dGi(f)——
+                            // 骨段与掌心朝向全程精确跟踪 GI（v6 同款恒等式），自检不再豁免手指。
                             var boneName = kv.Key.name;
                             bool isFinger = fingerSet.Contains(boneName);
                             string side = boneName.EndsWith(".L") ? "L" : boneName.EndsWith(".R") ? "R" : null;
-                            if (isFinger && side != null && palmBackBySide.TryGetValue(side, out var palmBack))
+                            bool fingerDone = false;
+                            if (isFinger && side != null
+                                && palmBackBySide.TryGetValue(side, out var palmBackBind)
+                                && palmBackGi0BySide.TryGetValue(side, out var palmBackGi))
                             {
-                                // forward = MMD 绑定骨段方向（保几何），up = MMD 掌背方向（修扭角）
-                                // GI 弯曲增量 delta 经 QWantOf 逐帧叠加到修正后 qPose——弯向对+幅度对
-                                qPose[kv.Key] = Quaternion.LookRotation(repDirBind[kv.Key], palmBack);
+                                // 段定义子骨：优先代表配对子骨；否则同指族首子骨（人指２→人指３，末节同理）；
+                                // GI 侧配对缺失时取首子骨（Finger11→Finger1Nub、DMZ R 02→Finger0Nub 尖）
+                                var segChildM = repChildM[kv.Key];
+                                if (segChildM == null)
+                                {
+                                    var fam = boneName.Length >= 2 ? boneName.Substring(0, 2) : boneName;
+                                    foreach (Transform cM2 in kv.Key)
+                                        if (cM2.name.StartsWith(fam)) { segChildM = cM2; break; }
+                                    if (segChildM == null && kv.Key.childCount > 0) segChildM = kv.Key.GetChild(0);
+                                }
+                                var segChildG = repChildG[kv.Key];
+                                if (segChildG == null && kv.Value.childCount > 0) segChildG = kv.Value.GetChild(0);
+                                if (segChildM != null && segChildG != null)
+                                {
+                                    var locDir = ((Vector3)mmdBind[segChildM].GetColumn(3)).normalized;
+                                    var palmLocal = Quaternion.Inverse(ExtractRot(mmdWorld0[kv.Key])) * palmBackBind;
+                                    var dGiSeg = ((Vector3)(giW[segChildG].GetColumn(3) - giW[g0].GetColumn(3))).normalized;
+                                    qPose[kv.Key] = LookTwice(Quaternion.Inverse(R) * dGiSeg, Quaternion.Inverse(R) * palmBackGi)
+                                                  * Quaternion.Inverse(LookTwice(locDir, palmLocal));
+                                    fingerDone = true;
+                                }
                             }
-                            else
+                            if (!fingerDone)
                             {
                                 qPose[kv.Key] = dG0Dir.TryGetValue(kv.Key, out var d0M)
                                     ? Quaternion.FromToRotation(repDirBind[kv.Key], d0M) * ExtractRot(mmdWorld0[kv.Key])
@@ -811,9 +871,7 @@ namespace GIC.Editor.Retarget
                         foreach (var kv in repByMmd)
                         {
                             aMax = Mathf.Max(aMax, Quaternion.Angle(ExtractRot(mmdW[kv.Key]), repQ[kv.Key][f]));
-                            // v17：手指骨走 LookRotation 重建（保持 MMD 骨段方向，不跟踪 GI 骨段）——
-                            // 自检的"骨段方向跟踪 GI"假设对手指骨不成立，跳过
-                            if (fingerSet.Contains(kv.Key.name)) continue;
+                            // v20：手指双约束重建后骨段恒等跟踪 GI（qWant·locDir=R⁻¹·dGi(f)），纳入自检不再豁免
                             if (torsoOverride.Contains(kv.Key.name) && headMmdRep != null)
                             {
                                 // v7.2 躯干骨：比较"指向头"向量（链式合成非逐骨恒等，宽松上界）
