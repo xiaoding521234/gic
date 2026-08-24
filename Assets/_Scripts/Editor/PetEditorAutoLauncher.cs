@@ -21,7 +21,7 @@ namespace GIC.Editor
         private const string MenuPath = "Tools/桌宠/Play 时自动拉起派蒙";
         private const string ToggleKey = "GIC.Pet.EditorAutoLaunch";
         private const string PidFile = "Temp/_editor_pet.pid";
-        private const string PetArgs = "--pet-mode -screen-fullscreen 0 -screen-width 480 -screen-height 720";
+        private const string PetArgs = "--pet-mode -screen-fullscreen 0 -screen-width 550 -screen-height 825";
 
         private static bool AutoLaunch
         {

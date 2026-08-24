@@ -11,6 +11,8 @@ Shader "GIC/PaimonToon"
     //     光在左侧→镜像采样。亮/暗色取与皮肤同一 ramp 行（面部与身体色调连续）。
     // Pass2 描边：视图空间法线外扩 + 距离补偿（经典壳描边）。
     // 注意：Tuanjie ShaderLab 属性解析器不支持属性值引号/中文（实测 Parse error），Header 只能 ASCII 无引号。
+    // 屏幕投影阴影不在本 shader——URP 只执行第一个 Pass，多 Pass 方案失效；
+    // 实际管线=影子壳剪影 RT + 高斯模糊 + 合成 Quad（PaimonShadowSilhouette/Blur/Composite + PaimonDropShadowController，docs/19 §5.10）。
     // Face/Hair 官方 Lightmap 其余通道（GI 眼影/金属等）依赖完整 GI 材质管线，一期不接入；
     // 披风/表情贴图是改模者自绘布局（相关性 0.1），不接入官方图。
     Properties

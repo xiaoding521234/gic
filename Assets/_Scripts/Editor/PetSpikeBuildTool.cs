@@ -20,6 +20,12 @@ namespace GIC.Editor
             EditorApplication.delayCall += BuildInternal;
         }
 
+        /// <summary>同步直调入口（供 execute_csharp_script 调用）——delayCall 在脚本上下文空闲时不执行，菜单调度会被吞。</summary>
+        public static void BuildImmediate()
+        {
+            BuildInternal();
+        }
+
         private static void BuildInternal()
         {
             // 编译竞态守卫：delayCall 排到本帧时若 Refresh 触发的脚本编译/导入尚未落地，

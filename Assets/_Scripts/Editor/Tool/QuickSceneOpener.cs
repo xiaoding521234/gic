@@ -106,6 +106,26 @@ namespace GIC.Editor
             return true;
         }
 
+        [MenuItem(MENU_BASE + "PaimonRetargetTest", priority = -91)]
+        private static void OpenPaimonRetargetTest() => OpenScene("Assets/Scenes/PaimonRetargetTest.unity");
+
+        [MenuItem(MENU_BASE + "PaimonRetargetTest", true)]
+        private static bool OpenPaimonRetargetTestValidate()
+        {
+            Menu.SetChecked(MENU_BASE + "PaimonRetargetTest", EditorSceneManager.GetActiveScene().path == "Assets/Scenes/PaimonRetargetTest.unity");
+            return true;
+        }
+
+        [MenuItem(MENU_BASE + "PaimonPet", priority = -90)]
+        private static void OpenPaimonPet() => OpenScene("Assets/Scenes/PaimonPet.unity");
+
+        [MenuItem(MENU_BASE + "PaimonPet", true)]
+        private static bool OpenPaimonPetValidate()
+        {
+            Menu.SetChecked(MENU_BASE + "PaimonPet", EditorSceneManager.GetActiveScene().path == "Assets/Scenes/PaimonPet.unity");
+            return true;
+        }
+
         private static void OpenScene(string path)
         {
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())

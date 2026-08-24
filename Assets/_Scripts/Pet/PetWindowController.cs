@@ -31,8 +31,8 @@ namespace GIC.Pet
         [Tooltip("初始缩放倍率（Start 时应用一次，窗口同步调整，构图全程恒定）")] [SerializeField] private float 初始缩放倍率 = 0.7f;
         [Tooltip("每格滚轮的缩放步进（乘法），越小越精细")] [SerializeField] private float 缩放步进 = 1.05f;
         [Tooltip("窗口尺寸随缩放同步扩大（防模型被窗口截断），以派蒙中心为锚点")] [SerializeField] private bool 窗口随缩放 = true;
-        [Tooltip("缩放=1 时的窗口逻辑宽度（96 DPI 基准像素；物理尺寸=逻辑×dpi/96，对齐主流桌宠 DPI 感知）")] [SerializeField] private int 窗口逻辑宽 = 480;
-        [Tooltip("缩放=1 时的窗口逻辑高度（96 DPI 基准像素）")] [SerializeField] private int 窗口逻辑高 = 720;
+        [Tooltip("缩放=1 时的窗口逻辑宽度（96 DPI 基准像素；物理尺寸=逻辑×dpi/96，对齐主流桌宠 DPI 感知；含阴影落脚边距，2026-08-24 由 480 扩到 550）")] [SerializeField] private int 窗口逻辑宽 = 550;
+        [Tooltip("缩放=1 时的窗口逻辑高度（96 DPI 基准像素；含阴影落脚边距，2026-08-24 由 720 扩到 825，同步 FOV 40→45.27 保持派蒙像素尺寸不变）")] [SerializeField] private int 窗口逻辑高 = 825;
 
         [Header("调试")]
         [SerializeField] private bool 打印状态日志 = false;

@@ -33,7 +33,7 @@ namespace GIC.Pet
                 var psi = new ProcessStartInfo
                 {
                     FileName = exe,
-                    Arguments = "--pet-mode -screen-fullscreen 0 -screen-width 480 -screen-height 720",
+                    Arguments = "--pet-mode -screen-fullscreen 0 -screen-width 550 -screen-height 825",
                     UseShellExecute = false,
                     WorkingDirectory = System.IO.Path.GetDirectoryName(exe),
                 };
