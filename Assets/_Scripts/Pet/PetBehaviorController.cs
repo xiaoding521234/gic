@@ -4,9 +4,11 @@ namespace GIC.Pet
 {
     /// <summary>
     /// 桌宠行为层（2026-08-24，docs/19 §3.3 待机动作设计落地）：
-    /// 待机循环之上叠加事件驱动动作——光标在派蒙旁停留 → 打招呼一次；
-    /// 久待机 → 随机小动作轮换。播放统一走 PetAnimSwapper（情绪映射/手指姿态/CrossFade
-    /// 过渡收敛在那一层），本组件只管"何时播什么"。
+    /// 待机循环之上叠加事件驱动动作——出场（进程启动播 Appear 后回待机）；
+    /// 光标在派蒙旁停留 → 打招呼一次；久待机 → 随机小动作轮换；
+    /// 退场（双击退出时播 Disappear，播完才真正关进程，由 PetWindowController 回调执行）。
+    /// 播放统一走 PetAnimSwapper（情绪映射/手指姿态/CrossFade 过渡收敛在那一层），
+    /// 本组件只管"何时播什么"。
     /// 接近判定：模型世界包围盒投影到屏幕矩形，扩边距后含光标即算"在旁边"——
     /// 光标在窗口外也可判定（坐标来自 PetWindowController 的全局轮询）。
     /// </summary>
@@ -16,6 +18,7 @@ namespace GIC.Pet
         [SerializeField] private PetAnimSwapper 动作播放器;
         [SerializeField] private PetWindowController 窗口控制器;
         [SerializeField] private PetBlinkController 眨眼控制器; // 单次动作期间静默（morph 重评估与动作叠加互相放大顿挫）
+        [SerializeField] private PetLookAtController 视线控制器; // 出场/退场期间静默（仪式动作头链全交 clip，2026-08-24）
         [Tooltip("空 = Camera.main")] [SerializeField] private Camera 相机;
         [Tooltip("空 = 自动找非影子壳的蒙皮渲染器（用包围盒做接近判定）")] [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
 
@@ -35,8 +38,18 @@ namespace GIC.Pet
             "Ani_NPC_Kanban_Paimon_ShakeHead01_MMD",
             "Ani_NPC_Kanban_Paimon_Sneer01_MMD",
             "Ani_NPC_Kanban_Paimon_Clap01_MMD",
+            "Ani_NPC_Kanban_Paimon_Show_1_MMD",
+            "Ani_NPC_Kanban_Paimon_Show_2_MMD",
+            "Ani_NPC_Kanban_Paimon_Show_3_MMD",
+            "Ani_NPC_Kanban_Paimon_Show_4_MMD",
         };
         [Tooltip("随机小动作的间隔范围（秒）")] [SerializeField] private Vector2 小动作间隔秒 = new Vector2(25f, 55f);
+
+        [Header("出场/退场")]
+        [Tooltip("进程启动后播的出场动画（完整 clip 名，空=直接待机）——首帧在 PetAnimSwapper 预热完成后播放，播完回待机")]
+        [SerializeField] private string 出场动画名 = "Ani_NPC_Kanban_Paimon_Appear_MMD";
+        [Tooltip("双击退出时播的退场动画（完整 clip 名，空=立即退出）——播完才真正退出进程")]
+        [SerializeField] private string 退场动画名 = "Ani_NPC_Kanban_Paimon_Disappear_MMD";
 
         // 运行时状态
         private bool _单次进行中;
@@ -46,6 +59,10 @@ namespace GIC.Pet
         private float _上次打招呼 = -999f;
         private float _下次小动作时刻;
         private readonly Vector3[] _包围盒角点 = new Vector3[8];
+        private bool _出场未播 = true;      // 首帧播出场动画（所有 Start 完成后=预热已回待机）
+        private bool _退场中;                // 退场动画进行中：屏蔽一切行为触发
+        private System.Action _退场完成回调; // 退场动画播完执行（进程关闭，由窗口控制器注入）
+        private bool _仪式静默中;            // 出场/退场动画期间：眨眼+视线层静默（收尾统一解除）
 
         void Start()
         {
@@ -64,13 +81,41 @@ namespace GIC.Pet
         {
             if (动作播放器 == null || 窗口控制器 == null || 相机 == null) return;
 
+            // 退场收尾：退场动画播完 → 交回退出回调（进程关闭由 PetWindowController 执行）。
+            // 编辑器下 Application.Quit 无效——退完落回 _单次进行中 分支自然回待机，可反复目检
+            if (_退场中)
+            {
+                if (Time.time - _单次开始 > 0.25f && !动作播放器.是否在播(_当前单次名))
+                {
+                    _退场中 = false;
+                    var cb = _退场完成回调;
+                    _退场完成回调 = null;
+                    cb?.Invoke();
+                }
+                return;
+            }
+
+            // 出场：首帧（全部 Start 已完成 = PetAnimSwapper 预热已回待机）播出场动画；
+            // 播完走下方 _单次进行中 分支自然回待机；无出场动画则直接进正常待机逻辑。
+            // 仪式静默（眨眼+视线）由 单次进行中 收尾统一解除
+            if (_出场未播)
+            {
+                _出场未播 = false;
+                if (动作播放器.动作存在(出场动画名))
+                {
+                    置仪式静默(true);
+                    播单次(出场动画名);
+                }
+            }
+
             if (_单次进行中)
             {
                 // 单次动作播完 → 回待机循环（0.25s 宽限防 CrossFade 起始帧误判结束）
                 if (Time.time - _单次开始 > 0.25f && !动作播放器.是否在播(_当前单次名))
                 {
                     _单次进行中 = false;
-                    眨眼控制器?.Set静默(false);
+                    if (_仪式静默中) 置仪式静默(false); // 仪式（出场）静默解除；普通单次动作本来就没静默视线
+                    else 眨眼控制器?.Set静默(false);
                     窗口控制器.暂停命中烘焙 = false;
                     动作播放器.Play(待机动作名);
                 }
@@ -111,6 +156,27 @@ namespace GIC.Pet
             眨眼控制器?.Set静默(true);
             窗口控制器.暂停命中烘焙 = true; // 动作期间停 MeshCollider 重烘（烘焙=掉帧尖峰，2026-08-24）
             动作播放器.PlayOnce(动作名);
+        }
+
+        /// <summary>出场/退场等仪式动作的静默组合：眨眼+视线跟随一起停（头链完全交给动画曲线）</summary>
+        void 置仪式静默(bool 静默)
+        {
+            _仪式静默中 = 静默;
+            眨眼控制器?.Set静默(静默);
+            视线控制器?.Set视线静默(静默);
+        }
+
+        /// <summary>请求退场：播退场动画，播完执行回调（返回 false = 无退场动画可用，调用方直接退出）。
+        /// 退场期间本组件屏蔽一切行为触发（打招呼/小动作/视线判定）。重复请求（退场中再双击）不重播。</summary>
+        public bool 请求退场(System.Action 退场完成回调)
+        {
+            if (_退场中) return true; // 已在退场流程，等待当前动画收尾
+            if (动作播放器 == null || !动作播放器.动作存在(退场动画名)) return false;
+            置仪式静默(true); // 仪式静默持续到进程退出（收尾回调后无后续帧）
+            播单次(退场动画名);
+            _退场中 = true;
+            _退场完成回调 = 退场完成回调;
+            return true;
         }
 
         /// <summary>模型世界包围盒 → 屏幕矩形（扩边距）→ 是否含光标</summary>

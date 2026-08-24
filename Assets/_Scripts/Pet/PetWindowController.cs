@@ -26,8 +26,8 @@ namespace GIC.Pet
 
         [Header("性能")]
         [SerializeField] private int 目标帧率 = 30;
-        [Tooltip("垂直同步：0=关（仅用目标帧率限帧，高刷屏上节奏不均会顿挫）/ 1=每个刷新一帧 / 2=隔一个刷新一帧（默认，任何刷新率下节奏均匀）")]
-        [SerializeField] private int 垂直同步 = 2;
+        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧（默认，随屏幕满刷）/ 2=隔一个刷新一帧（165Hz→82.5fps，60Hz→30fps）")]
+        [SerializeField] private int 垂直同步 = 1;
 
         [Header("缩放")]
         [Tooltip("滚轮缩放派蒙大小（光标命中模型时生效，与拖拽一致）")] [SerializeField] private bool 允许滚轮缩放 = true;
@@ -63,6 +63,8 @@ namespace GIC.Pet
         private Vector2Int dragGrabOffset;
         private bool passThroughOn;
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
+        private PetBehaviorController 行为控制器; // 双击退出的退场动画协作（播 Disappear 后再关进程）
+        private bool 已请求退出;              // 退场动画进行中：屏蔽重复双击与新拖拽
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
         private float 目标缩放 = 1f; // 滚轮缩放的目标倍率（持久化存这个值）
@@ -153,10 +155,10 @@ namespace GIC.Pet
             _ = 垂直同步; // 字段仅供构建版使用，读一次消 CS0414
             Application.targetFrameRate = 目标帧率;
 #else
-            // 2026-08-24 顿挫根治：vsync=0 + 30fps 限帧在高刷屏（实测 165Hz）上不整除——
-            // 33.3ms 帧周期 / 6.06ms 刷新节拍 = 5.5，每帧显示 5/6 个刷新交替 + 无 vblank 约束的
-            // 产出抖动直接透传给 DWM 合成 → 运动节奏忽快忽慢（帧率不低但动作有顿挫感的根因）。
-            // vSyncCount=2：每 2 个刷新呈现一帧，任何刷新率下节奏精确均匀（165Hz→82.5fps，60Hz→30fps）。
+            // 帧节奏演化史：v0=vsync0+30 限帧（165Hz 上 5.5 不整除→顿挫，弃）→ v1=vSyncCount=2
+            // （每 2 刷新一帧节奏均匀，165Hz→82.5fps）→ 2026-08-24 用户拍板改回 vSyncCount=1
+            // （每个刷新一帧=屏幕满刷，165Hz→165fps）。vsync=2 时期配套的 v22 C1 切线本就是为
+            // "播放帧率>key 密度"设计的插值，更高渲染帧率下依然正确（切线插值密度更高更平滑）。
             // 注意 vSyncCount>0 时 Application.targetFrameRate 被忽略（保留作 vsync=0 时的后备）。
             // 仅宠物进程执行：本组件只在 PaimonPet 场景（--pet-mode 独占），不影响主游戏画质。
             QualitySettings.vSyncCount = Mathf.Clamp(垂直同步, 0, 4);
@@ -171,6 +173,7 @@ namespace GIC.Pet
         private void Start()
         {
             cam = Camera.main;
+            行为控制器 = FindObjectOfType<PetBehaviorController>();
             if (cam != null)
             {
                 // 透明要求相机输出恒定背景；关 HDR 防浮点缓冲漂移
@@ -564,16 +567,19 @@ namespace GIC.Pet
             // 启动冷却 1s：防进程启动瞬间误吞"上一次双击退出旧进程"的残余按键状态（2026-08-23 实测）
             if (lmbPressed && modelHit && Time.unscaledTime > 1f)
             {
-                if (允许双击退出 && Time.unscaledTime - lastClickTime < 0.4f)
+                if (允许双击退出 && !已请求退出 && Time.unscaledTime - lastClickTime < 0.4f)
                 {
                     Debug.Log("[PetSpike] 双击退出，桌宠再见");
-                    Application.Quit();
+                    已请求退出 = true;
+                    // 退场动画（2026-08-24）：先播退场动画再真正退出；无动画可用则立即退出
+                    bool 退场接管 = 行为控制器 != null && 行为控制器.请求退场(Application.Quit);
+                    if (!退场接管) Application.Quit();
                 }
                 lastClickTime = Time.unscaledTime;
                 dragStartCursor = new Vector2Int(pt.X, pt.Y);
             }
 
-            if (!dragging && modelHit && lmbDown && !prevLmbDown)
+            if (!dragging && !已请求退出 && modelHit && lmbDown && !prevLmbDown)
             {
                 dragging = true;
                 dragGrabOffset = new Vector2Int(pt.X - wr.Left, pt.Y - wr.Top);

@@ -56,6 +56,20 @@ namespace GIC.Pet
         [SerializeField] private float 眼球平滑速度 = 14f;
         [Tooltip("关闭 = 完全走 clip 曲线")] [SerializeField] private bool 启用 = true;
 
+        // 视线静默（出场/退场等仪式动作期间，2026-08-24）：LateUpdate 整体跳过，头链完全交给 clip。
+        // 恢复时平滑值可能已偏离——首帧先同步到当前骨骼姿态再叠加，防视线"瞬移归位"
+        private bool _静默;
+        private bool _刚恢复; // 静默→恢复的过渡帧标记：重置平滑基准（动画动过头链，旧值失义），本帧不叠加
+
+        /// <summary>仪式动作（出场/退场）期间暂停视线跟随：头/颈/眼球全部交给动画曲线。
+        /// 恢复非静默时置过渡标记——首帧用当前骨骼姿态重置平滑基准，防视线瞬移归位。</summary>
+        public void Set视线静默(bool 静默)
+        {
+            if (_静默 == 静默) return;
+            _静默 = 静默;
+            if (!_静默) _刚恢复 = true; // 解除静默：下一帧重置基准
+        }
+
         // 骨引用（启动时按名查，MMD 日文名）
         private Transform _首, _頭, _目L, _目R;
         // 首帧姿态快照（世界空间增量法的基准：此刻视为"沿中性视线注视"）
@@ -95,7 +109,18 @@ namespace GIC.Pet
 
         void LateUpdate()
         {
-            if (!启用 || 相机 == null) return;
+            if (!启用 || 相机 == null || _静默) return;
+
+            // 静默恢复首帧：动画期间头链被 clip 驱动，旧平滑值失义——重置为当前姿态防瞬移，本帧不叠加
+            if (_刚恢复)
+            {
+                _刚恢复 = false;
+                _平滑首 = _首 != null ? _首.rotation : Quaternion.identity;
+                _平滑头 = _頭.rotation;
+                _平滑目L = _目L != null ? _目L.rotation : Quaternion.identity;
+                _平滑目R = _目R != null ? _目R.rotation : Quaternion.identity;
+                return;
+            }
 
             // 首帧：动画采样完成后快照参考姿态（增量法基准），本帧不叠加
             if (!_已初始化)

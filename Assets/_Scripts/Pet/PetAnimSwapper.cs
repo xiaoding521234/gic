@@ -81,6 +81,14 @@ namespace GIC.Pet
             return targetAnimation != null && targetAnimation.IsPlaying(clipName);
         }
 
+        /// <summary>clip 是否已注册可播（出场/退场等关键动作的存在性判断；空名安全）</summary>
+        public bool 动作存在(string clipName)
+        {
+            if (string.IsNullOrEmpty(clipName) || targetAnimation == null) return false;
+            var state = targetAnimation[clipName];
+            return state != null && state.clip != null;
+        }
+
         void 播放(string clipName, WrapMode 循环模式)
         {
             if (targetAnimation == null) return;

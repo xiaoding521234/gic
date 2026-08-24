@@ -155,8 +155,10 @@ namespace GIC.Editor.Retarget
             foreach (var tp in cd.pos.Values) foreach (var t in tp.times) times.Add(t);
             cd.frameTimes = times.ToList();
             if (cd.frameTimes.Count < 2) throw new System.InvalidOperationException($"[{name}] \u5e27\u6570\u5f02\u5e38 {cd.frameTimes.Count}");
-            // rot曲线=0 = 源曲线全哈希路径（重定向输出必为静姿伪影，C05_01/Nod02/ShakeHead02 教训）——解析期直接拦截
-            if (nr == 0) throw new System.InvalidOperationException($"[{name}] rot\u66f2\u7ebf=0\uff08\u6e90\u66f2\u7ebf\u5168\u54c8\u5e0c\u8def\u5f84\uff0c\u8f93\u51fa\u5fc5\u4e3a\u9759\u59ff\u4f2a\u5f71\uff09\uff0c\u4ece\u8f6c\u6362\u6e05\u5355\u5254\u9664\u8be5 clip");
+            // rot曲线=0 = ①源曲线全哈希路径（C05_01，真死路）或 ②m_Compressed:1 压缩标志
+            //（2026-08-24 Nod02/ShakeHead02 定案：binding 在但 GetEditorCurve 全 null 被误诊哈希——
+            // 文件头 m_Compressed 改 0 + ForceUpdate 重导即修复）——解析期直接拦截，防静姿伪影混入
+            if (nr == 0) throw new System.InvalidOperationException($"[{name}] rot\u66f2\u7ebf=0\uff08\u6e90\u66f2\u7ebf\u5168\u54c8\u5e0c\u8def\u5f84\u6216 m_Compressed=1 \u538b\u7f29\u6807\u5fd7\uff09\uff0c\u4ece\u8f6c\u6362\u6e05\u5355\u5254\u9664\u8be5 clip");
             log.AppendLine($"[parse {name}] rot\u66f2\u7ebf={nr} pos\u66f2\u7ebf={np} \u5e27\u6570={cd.frameTimes.Count} \u65f6\u957f={cd.frameTimes[cd.frameTimes.Count - 1]:F3}s");
             return cd;
         }

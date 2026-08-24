@@ -5,7 +5,7 @@ AnimationClip:
   m_Name: Ani_NPC_Kanban_Paimon_ShakeHead02
   serializedVersion: 6
   m_Legacy: 0
-  m_Compressed: 1
+  m_Compressed: 0
   m_UseHighQualityCurve: 0
   m_RotationCurves:
   - curve:
