@@ -189,13 +189,26 @@ namespace GIC.Pet
             return true;
         }
 
-        /// <summary>模型世界包围盒 → 屏幕矩形（扩边距）→ 是否含光标</summary>
+        /// <summary>模型世界包围盒 → 屏幕矩形（扩边距）→ 是否含光标。
+        /// 包围盒来源=窗口控制器的命中网格碰撞体（BakeMesh 烘的真实蒙皮网格，世界包围盒正确）；
+        /// 旧用 SMR.bounds 是 ×100 垃圾值（GI 模型漏一层缩放，42 单位 vs 可见 0.6），投影恒跨相机平面
+        /// → 判定恒 false → 招手永不触发（2026-08-26 根治）。</summary>
         bool 检测光标接近()
         {
-            if (蒙皮渲染器 == null || 窗口控制器.正在拖拽) return false;
+            if (窗口控制器.正在拖拽) return false;
             if (!窗口控制器.TryGetCursorUnityScreenPos(out Vector2 sp)) return false;
 
-            var b = 蒙皮渲染器.bounds;
+            Bounds b;
+            if (窗口控制器.TryGet命中世界包围盒(out b))
+            {
+                // 命中网格路径（首选）：真实蒙皮世界包围盒
+            }
+            else if (蒙皮渲染器 != null)
+            {
+                b = 蒙皮渲染器.bounds; // 兜底（碰撞体未就绪的首帧）
+            }
+            else return false;
+
             int i = 0;
             for (int xi = 0; xi < 2; xi++)
                 for (int yi = 0; yi < 2; yi++)
@@ -209,8 +222,7 @@ namespace GIC.Pet
             foreach (var c in _包围盒角点)
             {
                 Vector3 p = 相机.WorldToScreenPoint(c);
-                if (p.z <= 0f) return false; // 包围盒跨到相机后=异常状态（纵深位移残余等），不视为接近——
-                                              // 旧版保守 return true 曾致"光标停屏幕任何位置都打招呼"
+                if (p.z <= 0f) return false; // 包围盒跨到相机后=异常状态（纵深位移残余等），不视为接近
                 if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
                 if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
             }

@@ -36,8 +36,8 @@ namespace GIC.Pet
 
         [Header("性能")]
         [SerializeField] private int 目标帧率 = 30;
-        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧（默认，随屏幕满刷）/ 2=隔一个刷新一帧（165Hz→82.5fps，60Hz→30fps）")]
-        [SerializeField] private int 垂直同步 = 1;
+        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧 / 2=隔一个刷新一帧 / 3=自适应（默认：刷新率≥120Hz→2 否则→1，任何屏都≥60fps 且帧预算有余量；60Hz 屏固定 2 会变 30fps 勿用）")]
+        [SerializeField] private int 垂直同步 = 3;
 
         [Header("缩放")]
         [Tooltip("滚轮缩放派蒙大小（光标命中模型时生效，与拖拽一致）")] [SerializeField] private bool 允许滚轮缩放 = true;
@@ -75,6 +75,19 @@ namespace GIC.Pet
 
         /// <summary>是否正在拖拽派蒙（行为层打断打招呼等触发用）</summary>
         public bool 正在拖拽 => dragging;
+
+        /// <summary>命中网格的世界包围盒（行为层接近判定用）。来源=MeshCollider（BakeMesh 烘的真实蒙皮网格
+        /// + 与 SMR 同 transform，PhysX 世界包围盒正确——像素级点击命中一直精准即证明）。
+        /// 勿用 SMR.bounds：GI 模型的它漏一层缩放（世界 42 单位 vs 可见 0.6，×100 错误），投影矩形
+        /// 恒跨相机平面 → 接近判定恒 false（2026-08-26 招手不触发根因）。碰撞体未就绪时返回 false。</summary>
+        public bool TryGet命中世界包围盒(out Bounds bounds)
+        {
+            bounds = default;
+            if (命中网格碰撞体 == null || 命中网格碰撞体.sharedMesh == null) return false;
+            bounds = 命中网格碰撞体.bounds;
+            return true;
+        }
+
         private bool passThroughOn;
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
@@ -192,17 +205,26 @@ namespace GIC.Pet
             _ = 垂直同步; // 字段仅供构建版使用，读一次消 CS0414
             Application.targetFrameRate = 目标帧率;
 #else
-            // 帧节奏演化史：v0=vsync0+30 限帧（165Hz 上 5.5 不整除→顿挫，弃）→ v1=vSyncCount=2
-            // （每 2 刷新一帧节奏均匀，165Hz→82.5fps）→ 2026-08-24 用户拍板改回 vSyncCount=1
-            // （每个刷新一帧=屏幕满刷，165Hz→165fps）。vsync=2 时期配套的 v22 C1 切线本就是为
-            // "播放帧率>key 密度"设计的插值，更高渲染帧率下依然正确（切线插值密度更高更平滑）。
-            // 注意 vSyncCount>0 时 Application.targetFrameRate 被忽略（保留作 vsync=0 时的后备）。
-            // 仅宠物进程执行：本组件只在 PaimonPet 场景（--pet-mode 独占），不影响主游戏画质。
-            QualitySettings.vSyncCount = Mathf.Clamp(垂直同步, 0, 4);
+            // 帧节奏演化史（2026-08-26 终案=自适应分频，Player.log 实证）：
+            // v0=vsync0+30 限帧（165Hz 上 5.5 不整除→顿挫，弃）→ v1=vSyncCount=2 → v1.5=2026-08-24 改
+            // vsync=1 满刷 165fps → v2=2026-08-26 实测打回 vsync=2（满刷是零余量假象：渲染 avg≈6ms 踩线
+            // vsync 间隔 6.06ms，~73% 帧实为 12.1ms（错过刷新）+ 15-21ms 帧成片（94% 无 GC/烘焙/眨眼标记）
+            // → 匀速动画 judder；视线跟随的指数阻尼=低通滤波器对抖动免疫——"头部丝滑、动作不丝滑"的根因）
+            // → v3=**自适应**：固定 vsync=2 在 60Hz 屏=30fps 必卡（vsync 帧率=刷新率÷N）；启动时读刷新率，
+            // ≥120Hz→2（165→82.5/144→72/120→60，帧预算 12.1-16.7ms 余量 100%+）、否则→1（60Hz→60fps
+            // 预算 16.7ms 余量 178%，75Hz→75）。任何屏都≥60fps 且帧预算远超渲染 6ms=节奏恒定无 judder。
+            // 官方文档：vsync=硬件同步（平滑帧节拍），targetFrameRate=软件限帧有 microstutter——勿用
+            // vsync=0+限帧替代。仅宠物进程执行，不影响主游戏画质。
+            int refresh = (int)Screen.currentResolution.refreshRateRatio.value;
+            if (refresh <= 0) refresh = 60; // 取不到时保守按 60Hz 走 vsync=1
+            int vsync = 垂直同步 >= 3 ? (refresh >= 120 ? 2 : 1) : 垂直同步;
+            QualitySettings.vSyncCount = Mathf.Clamp(vsync, 0, 4);
             if (QualitySettings.vSyncCount == 0)
             {
                 Application.targetFrameRate = 目标帧率;
             }
+            Debug.Log($"[PetSpike] 帧节奏：refresh={refresh}Hz vsync={QualitySettings.vSyncCount} → " +
+                      $"{(QualitySettings.vSyncCount > 0 ? $"{refresh / (float)QualitySettings.vSyncCount:F1}fps（帧预算 {1000f * QualitySettings.vSyncCount / refresh:F1}ms）" : $"限帧{目标帧率}")}");
 #endif
             Application.runInBackground = true;
         }
