@@ -43,23 +43,31 @@ namespace GIC.Pet
 
         void Awake()
         {
-            if (影子渲染器 == null)
+            // 影子壳可含多个 SMR（GI 壳=_DropShadow 节点下 Body+Cloak 两副本；MMD 旧壳=节点自身单 SMR）——
+            // 按 _DropShadow 节点收集全部 Renderer 逐个进阴影层；节点缺失时退回序列化引用（2026-08-25 GI 多渲染器改造）
+            var shellNode = transform.Find("_DropShadow");
+            Renderer[] shellRenderers;
+            if (shellNode != null)
             {
-                var t = transform.Find("_DropShadow");
-                if (t != null) 影子渲染器 = t.GetComponent<SkinnedMeshRenderer>();
+                shellRenderers = shellNode.GetComponentsInChildren<Renderer>(true);
+                if (影子渲染器 == null) 影子渲染器 = shellNode.GetComponentInChildren<SkinnedMeshRenderer>(true);
             }
+            else if (影子渲染器 != null)
+                shellRenderers = new[] { (Renderer)影子渲染器 };
+            else
+                shellRenderers = null;
             if (主相机 == null) 主相机 = Camera.main;
             shadowLayer = LayerMask.NameToLayer(ShadowLayerName);
 
-            if (影子渲染器 == null || 主相机 == null || shadowLayer < 0 || 模糊材质 == null || 合成材质 == null)
+            if (shellRenderers == null || shellRenderers.Length == 0 || 主相机 == null || shadowLayer < 0 || 模糊材质 == null || 合成材质 == null)
             {
-                Debug.LogWarning($"[PaimonShadow] 初始化失败：影子渲染器={(影子渲染器 != null)} 主相机={(主相机 != null)} layer={ShadowLayerName}({shadowLayer}) 模糊={(模糊材质 != null)} 合成={(合成材质 != null)}，阴影禁用");
+                Debug.LogWarning($"[PaimonShadow] 初始化失败：壳渲染器={(shellRenderers != null && shellRenderers.Length > 0)} 主相机={(主相机 != null)} layer={ShadowLayerName}({shadowLayer}) 模糊={(模糊材质 != null)} 合成={(合成材质 != null)}，阴影禁用");
                 enabled = false;
                 return;
             }
 
-            // 防线：场景接线漂移也能工作——影子壳进专属层 + 主相机剔除该层
-            影子渲染器.gameObject.layer = shadowLayer;
+            // 防线：场景接线漂移也能工作——影子壳全部渲染器进专属层 + 主相机剔除该层
+            foreach (var r in shellRenderers) r.gameObject.layer = shadowLayer;
             主相机.cullingMask &= ~(1 << shadowLayer);
 
             blurMat = new Material(模糊材质);

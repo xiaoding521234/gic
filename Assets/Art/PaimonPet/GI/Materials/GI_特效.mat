@@ -44,11 +44,16 @@ Material:
     - _FaceShadowSoftness: 0.04
     - _OutlineWidth: 0
     - _RampV: 0.75
+    - _RimPower: 3.5
+    - _RimStrength: 0.35
     - _ShadowSoftness: 0.15
     - _ShadowStrength: 0
     - _ShadowThreshold: 0.55
+    - _StyleVer: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _LightDir: {r: 0.4, g: 0.65, b: 0.65, a: 0}
+    - _OutlineClipUV: {r: 0, g: 0, b: 0, a: 0}
     - _OutlineColor: {r: 0.049999982, g: 0.059999965, b: 0.12999997, a: 1}
+    - _RimColor: {r: 0.9, g: 0.95, b: 1, a: 1}
   m_BuildTextureStacks: []

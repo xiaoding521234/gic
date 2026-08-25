@@ -32,7 +32,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Ramp:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 62330b2c5dc784a4597995398d87b803, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -42,13 +42,18 @@ Material:
     - _FaceShadowOn: 0
     - _FaceShadowRange: 1
     - _FaceShadowSoftness: 0.04
-    - _OutlineWidth: 0.8
-    - _RampV: 0.75
-    - _ShadowSoftness: 0.15
+    - _OutlineWidth: 0.15
+    - _RampV: 0.925
+    - _RimPower: 3.5
+    - _RimStrength: 0
+    - _ShadowSoftness: 0.03
     - _ShadowStrength: 0
     - _ShadowThreshold: 0.55
+    - _StyleVer: 7
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _LightDir: {r: 0.4, g: 0.65, b: 0.65, a: 0}
-    - _OutlineColor: {r: 0.049999982, g: 0.059999965, b: 0.12999997, a: 1}
+    - _OutlineClipUV: {r: 0, g: 0, b: 0, a: 0}
+    - _OutlineColor: {r: 0.14, g: 0.09, b: 0.06, a: 1}
+    - _RimColor: {r: 0.9, g: 0.95, b: 1, a: 1}
   m_BuildTextureStacks: []
