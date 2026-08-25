@@ -144,10 +144,15 @@ namespace GIC.Pet
 
             if (窗口控制器 == null || !窗口控制器.TryGetCursorUnityScreenPos(out Vector2 sp)) return;
 
-            // 归一化屏幕偏移（-1..1）：光标在屏幕中心=0，到 屏幕最大偏移=±1
+            // 归一化偏移（-1..1）基准=头骨屏幕投影（2026-08-25 修复：原以屏幕中心为基准——
+            // 派蒙不在窗口中心（窗口跟随移动+缩放改变屏幕占比），鼠标与眼睛水平时
+            // sp.y-Screen.height*0.5≠0 → 恒定抬头/低头偏差。以头部实际屏幕位置为基准后
+            // "看着眼睛"=零偏转，缩放/窗口位置无关）
+            Vector3 头屏幕 = 相机.WorldToScreenPoint(_頭.position);
+            Vector2 基准 = new Vector2(头屏幕.x, 头屏幕.y);
             Vector2 偏移 = new Vector2(
-                Mathf.Clamp((sp.x - Screen.width * 0.5f) / 屏幕最大偏移, -1f, 1f),
-                Mathf.Clamp((sp.y - Screen.height * 0.5f) / 屏幕最大偏移, -1f, 1f));
+                Mathf.Clamp((sp.x - 基准.x) / 屏幕最大偏移, -1f, 1f),
+                Mathf.Clamp((sp.y - 基准.y) / 屏幕最大偏移, -1f, 1f));
 
             // 目标增量：绕世界 up(yaw)/right(pitch) 轴，与骨骼局部系无关
             // Euler 约定：+X = 向下（docs/14 §8.1），故抬头用 -pitch

@@ -25,7 +25,19 @@ namespace GIC.Pet
         [Header("动作→情绪映射（表情由情绪层驱动，不烘焙进 clip）")]
         [SerializeField] private 动作情绪映射[] 情绪映射 = new[]
         {
+            new 动作情绪映射 { 动作名片段 = "Greet", 情绪名 = "Happy" },
             new 动作情绪映射 { 动作名片段 = "Anger", 情绪名 = "Anger" },
+            new 动作情绪映射 { 动作名片段 = "Sneer", 情绪名 = "Sneer" },
+            new 动作情绪映射 { 动作名片段 = "Clap", 情绪名 = "Happy" },
+            new 动作情绪映射 { 动作名片段 = "Show_", 情绪名 = "得意" },
+            new 动作情绪映射 { 动作名片段 = "Shy", 情绪名 = "Shy" },
+            new 动作情绪映射 { 动作名片段 = "Confuse", 情绪名 = "Confuse" },
+            new 动作情绪映射 { 动作名片段 = "Think", 情绪名 = "Think" },
+            new 动作情绪映射 { 动作名片段 = "Like", 情绪名 = "Happy" },
+            new 动作情绪映射 { 动作名片段 = "Hope", 情绪名 = "期待" },
+            new 动作情绪映射 { 动作名片段 = "Refuse", 情绪名 = "拒绝" },
+            new 动作情绪映射 { 动作名片段 = "Sleep", 情绪名 = "Sleepy" },
+            new 动作情绪映射 { 动作名片段 = "SitLoop", 情绪名 = "Sleepy" },
         };
 
         [SerializeField] private PetEmotionController emotionController; // 情绪层（可空=无表情）
@@ -33,7 +45,7 @@ namespace GIC.Pet
 
         [Header("过渡")]
         [Tooltip("动作切换 CrossFade 时长（秒）——过渡期双 clip 双采样，过长则混合开销放大顿挫（2026-08-24 实验：纯播大摆动动作零掉帧，顿挫全在过渡/叠加层）")]
-        [SerializeField] private float 动作过渡秒 = 0.2f;
+        [SerializeField] private float 动作过渡秒 = 0.3f;
         [Tooltip("启动时预热全部已注册 clip（逐个 Play+Sample 后回待机）——legacy Animation 首播冷初始化实测 150ms 掉帧串（2026-08-24 Player.log 16 连掉帧无任何子系统标记，t=64 首次摆手实证）。开销=启动一次性几十 ms，不增加常驻内存（曲线数据本就随场景加载）")]
         [SerializeField] private bool 启动预热 = true;
 
@@ -90,6 +102,20 @@ namespace GIC.Pet
             if (string.IsNullOrEmpty(clipName) || targetAnimation == null) return false;
             var state = targetAnimation[clipName];
             return state != null && state.clip != null;
+        }
+
+        /// <summary>当前过渡时长（行为层尾段提前过渡用）</summary>
+        public float 过渡秒 => 动作过渡秒;
+
+        /// <summary>单次动作剩余秒数（-1=未注册/未播；0=已播完）。行为层在剩余≈过渡秒时
+        /// 提前切回待机，让 CrossFade 与动作尾部重叠——消除"播完定格→再淡入"的割裂感。</summary>
+        public float 剩余秒(string clipName)
+        {
+            if (targetAnimation == null || string.IsNullOrEmpty(clipName)) return -1f;
+            var state = targetAnimation[clipName];
+            if (state == null || state.clip == null) return -1f;
+            if (!targetAnimation.IsPlaying(clipName)) return 0f;
+            return Mathf.Max(0f, state.clip.length - state.time);
         }
 
         void 播放(string clipName, WrapMode 循环模式)

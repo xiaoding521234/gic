@@ -7,13 +7,18 @@ using UnityEngine.Rendering.Universal;
 namespace GIC.Pet
 {
     /// <summary>
-    /// 桌宠窗口控制器：Win32 无边框 + 透明 + 置顶 + 右下角停靠 +
-    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型拖拽窗口 + 限帧。
+    /// 桌宠窗口控制器：Win32 无边框 + 透明 + 置顶 + 固定小窗跟随 +
+    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型拖拽移动 + 限帧。
     /// 透明双方案（2026-08-21 拍板主流优先）：默认 DWM 逐像素 alpha（DwmExtendFrameIntoClientArea，
     /// 边缘无毛边、支持半透明）；色键 LWA_COLORKEY 保留作兜底开关。
     /// 命中检测/拖拽全部走 Win32 轮询（GetCursorPos/GetAsyncKeyState），不依赖窗口焦点与 Unity 输入系统。
-    /// 滚轮缩放（2026-08-24 对齐主流桌宠）：固定窗口（=基准×有效缩放上限，运行期不改尺寸）+
-    /// 纯模型缩放平滑过渡（相机/窗口恒定→脚底客户区位置天然锚定，绕脚底原地长高）+ pet.json 持久化（缩放与停留位置）。
+    /// 小窗+窗口跟随体制（2026-08-25 定案，对齐 VPet/Desktop Mate 主流）：窗口恒=基准×DPI×缩放上限
+    /// 固定尺寸；GI 编排位移驱动模型根自由移动，相机+窗口每帧跟随根增量（模型窗内渲染恒定、
+    /// 窗口平移=派蒙屏幕上真实移动）——大幅动作满屏游走不被裁且渲染/合成成本保持小窗水平。
+    /// 曾试全屏覆盖体制（同日）：3200×2000@200%DPI 实测帧率腰斩+单核 93%（DWM 整屏合成+fillrate×2.7），
+    /// 违背桌宠常驻功耗定位，废弃。**拖拽/动作移动窗口无任何屏边钳制（2026-08-25 拍板）**——
+    /// 后续做屏幕边缘交互（下水平边框坐下、上水平+竖直边框探头）；待机机架（相机+窗口）整体
+    /// 归位滑回家（只回窗口不回相机会左漂累积）；拖拽=移根+跟随=窗口跟手；pet.json 持久化缩放+窗口原点。
     /// </summary>
     public class PetWindowController : MonoBehaviour
     {
@@ -36,8 +41,13 @@ namespace GIC.Pet
         [Tooltip("无 pet.json 存档时的初始缩放倍率（有存档用存档值）")] [SerializeField] private float 初始缩放倍率 = 0.7f;
         [Tooltip("缩放平滑过渡速度：每秒指数趋近速率，越大越跟手；0=瞬达无平滑。对齐主流桌宠滚轮渐变手感")] [SerializeField] private float 缩放平滑速度 = 12f;
         [Tooltip("每格滚轮的缩放步进（乘法），越小越精细")] [SerializeField] private float 缩放步进 = 1.05f;
-        [Tooltip("窗口客户区逻辑宽度基准（96 DPI 像素；实际窗口=基准×DPI×有效缩放上限，运行期恒定不随缩放变化——缩放只改模型，杜绝逐帧改窗口的闪烁；含阴影落脚边距，2026-08-24 由 480 扩到 550）")] [SerializeField] private int 窗口逻辑宽 = 550;
-        [Tooltip("窗口客户区逻辑高度基准（96 DPI 像素；含阴影落脚边距，2026-08-24 由 720 扩到 825，同步 FOV 40→45.27 保持派蒙像素尺寸不变）")] [SerializeField] private int 窗口逻辑高 = 825;
+        [Tooltip("窗口客户区逻辑宽度基准（96 DPI 像素；实际窗口=基准×DPI×有效缩放上限，运行期恒定不随缩放变化——缩放只改模型，杜绝逐帧改窗口的闪烁；含阴影落脚边距）")] [SerializeField] private int 窗口逻辑宽 = 550;
+        [Tooltip("窗口客户区逻辑高度基准（96 DPI 像素；含阴影落脚边距，与 FOV 45.27 配套保持派蒙像素尺寸）")] [SerializeField] private int 窗口逻辑高 = 825;
+
+        [Header("跟随与归位（小窗跟随体制）")]
+        [Tooltip("跟随锚点骨名（模型根位移经此骨投影换算窗口平移量）")] [SerializeField] private string 骨盆骨名 = "Bip001 Pelvis";
+        [Tooltip("待机时窗口向家位置缓慢滑回的速度（指数阻尼；0=不归位停在动作结束处）")]
+        [SerializeField] private float 归位速度 = 1.2f;
 
         [Header("调试")]
         [SerializeField] private bool 打印状态日志 = false;
@@ -60,8 +70,9 @@ namespace GIC.Pet
 
         /// <summary>是否正在拖拽派蒙（行为层打断打招呼等触发用）</summary>
         public bool 正在拖拽 => dragging;
-        private Vector2Int dragGrabOffset;
         private bool passThroughOn;
+        private Vector3 _拖拽根起点;        // 拖拽中移动模型根（窗口跟随机制自动把窗口带过去=拖窗视觉）
+        private Vector3 _拖拽光标世界起点;   // 拖拽起点光标在模型平面上的世界点
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
         private PetBehaviorController 行为控制器; // 双击退出的退场动画协作（播 Disappear 后再关进程）
         private bool 已请求退出;              // 退场动画进行中：屏蔽重复双击与新拖拽
@@ -76,13 +87,33 @@ namespace GIC.Pet
         private float dpi缩放 = 1f;        // GetDpiForWindow/96（exe 清单 PerMonitorV2：客户区物理像素=渲染像素）
         private float 有效缩放最大 = 2f;    // 钳制到工作区后的实际上限（RestyleWindow 时重算）
 
+        // ---- 小窗跟随体制（2026-08-25）----
+        private Transform _骨盆;            // 跟随锚点骨（本体骨架，排除影子壳）
+        private Vector3 _骨盆基准;           // 上帧骨盆世界位置（每帧跟随后重置）
+        private Vector2 _骨盆基准视口;        // 上帧骨盆视口（相机移动后投影，换算窗口平移量）
+        private bool _跟随基准有效;           // 跟随期间为真；待机退出跟随置假（重进时重取基准）
+        private Vector2Int _家窗口原点;       // 归位目标（客户区原点，物理像素，Win32 屏幕坐标）
+        private Vector3 _家相机位置;          // 归位目标（相机位置——机架整体归位，2026-08-25 左漂根治）
+        private bool _家已记录;
+        private bool _归位完成已标记;         // 归位到位后标记存档（防把中间位置写盘）
+        private bool _待记录家;               // 拖拽松手→本帧 LateUpdate 钳制后记录家（位置才是真实落点）
+
+        /// <summary>单次动作进行中（含仪式/退场）：窗口跟随照常（退场飞离也跟随，2026-08-25 拍板），
+        /// 但归位暂停——动作期间不往家滑。行为层播单次时置真、回待机置假。</summary>
+        public bool 单次动作中 { get; set; }
+
         // 独立存档（桌宠永不读写主存档，docs/19 §3.1/§5.8 约定）：{persistentDataPath}/pet.json
+        // v1（小窗体制，2026-08-25 回归）：缩放 + 窗口客户区原点（物理像素，虚拟桌面坐标系）。
+        // v2（全屏体制，已废弃）的锚点字段保留反序列化兼容：读取时换算迁移为窗口原点。
         [Serializable] private class Pet窗口存档
         {
             public int 版本 = 1;
             public float 缩放 = -1f;   // <0 = 无记录
             public int 客户区X, 客户区Y; // 客户区原点（物理像素，虚拟桌面坐标系）
             public bool 有位置 = false;
+            // v2 兼容字段（读旧档迁移用）
+            public float 锚点X, 锚点Y;
+            public bool 有锚点 = false;
         }
         private Pet窗口存档 载入存档;
         private float 待写入时刻 = -1f; // >0 = 有未落盘修改（防抖：最后一次修改后 1s 写盘）
@@ -198,9 +229,10 @@ namespace GIC.Pet
             if (paimonRoot != null)
             {
                 _paimon根 = paimonRoot.transform;
+                _骨盆 = 找本体骨(骨盆骨名);
                 初始缩放 = _paimon根.localScale.x;
                 // 缩放目标：构建版读 pet.json（持久化），无存档/编辑器用 Inspector 默认倍率。
-                // 启动即到位（无平滑动画），窗口尺寸在 RestyleWindow 按同一倍率同步。
+                // 启动即到位（无平滑动画）。
 #if !UNITY_EDITOR
                 读取存档();
 #endif
@@ -300,8 +332,9 @@ namespace GIC.Pet
 
             // 固定窗口（2026-08-24 闪烁根治）：客户区尺寸恒=基准×有效缩放上限，运行期不随缩放变化——
             // 滚轮平滑过渡只改模型 localScale，不再逐帧 SetWindowPos 改窗口（逐帧 resize 令 swapchain/DWM
-            // 高频重建合成，派蒙肉眼高频闪烁）。窗口 oversized 部分全透明+穿透，无视觉/交互代价；
-            // 相机与窗口恒定 → 脚底客户区位置天然恒定（缩放绕脚底原地长高）。
+            // 高频重建合成，派蒙肉眼高频闪烁）。窗口 oversized 部分全透明+穿透，无视觉/交互代价。
+            // 2026-08-25 小窗跟随体制：窗口移动（move-only）很便宜（不触发 swapchain 重建），
+            // LateUpdate 每帧平移窗口跟随模型根位移=派蒙满屏游走。
             固定窗口宽 = Mathf.RoundToInt(基准窗口宽 * 有效缩放最大);
             固定窗口高 = Mathf.RoundToInt(基准窗口高 * 有效缩放最大);
 
@@ -320,17 +353,44 @@ namespace GIC.Pet
             Debug.Log($"[PetSpike] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(使用DWM透明 ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} fixedClient={固定窗口宽}x{固定窗口高} scale={目标缩放:F2} maxScale={有效缩放最大:F2} pos={(恢复了位置 ? "restored" : "dock/default")}");
         }
 
-        /// <summary>窗口矩形与客户区的差值（无边框后理论上≈0，实测兜底；含隐形边框）</summary>
-        private void GetFrameSize(out int frameW, out int frameH, out int frameLeft, out int frameTop)
+        /// <summary>恢复存档窗口位置（客户区原点，钳制到虚拟屏幕防显示器拔掉后找不到派蒙）。成功=true。
+        /// v2 锚点档（全屏体制遗留）换算迁移：锚点视口×全屏尺寸-窗口半宽高≈旧窗口原点。</summary>
+        private bool 恢复保存位置()
         {
-            GetWindowRect(hwnd, out RECT wr);
-            GetClientRect(hwnd, out RECT cr);
-            var origin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref origin);
-            frameLeft = origin.X - wr.Left;
-            frameTop = origin.Y - wr.Top;
-            frameW = (wr.Right - wr.Left) - (cr.Right - cr.Left);
-            frameH = (wr.Bottom - wr.Top) - (cr.Bottom - cr.Top);
+            if (hwnd == IntPtr.Zero) return false;
+            int clientW = 固定窗口宽;
+            int clientH = 固定窗口高;
+
+            int nx, ny;
+            if (载入存档 != null && 载入存档.有位置)
+            {
+                nx = 载入存档.客户区X;
+                ny = 载入存档.客户区Y;
+            }
+            else if (载入存档 != null && 载入存档.有锚点)
+            {
+                // v2 迁移：全屏体制的骨盆视口锚点（Unity 左下原点）→ 近似窗口原点
+                int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                nx = Mathf.RoundToInt(载入存档.锚点X * vw) - clientW / 2;
+                ny = Mathf.RoundToInt((1f - 载入存档.锚点Y) * vh) - clientH / 2;
+            }
+            else return false;
+
+            // 虚拟屏幕矩形（多显示器并集，物理像素）
+            int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int vw2 = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            int vh2 = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+            // 完整收进虚拟屏幕；范围倒挂（窗口比虚拟屏还大）时居中兜底
+            int cx = vw2 <= clientW ? vx + (vw2 - clientW) / 2 : Mathf.Clamp(nx, vx, vx + vw2 - clientW);
+            int cy = vh2 <= clientH ? vy + (vh2 - clientH) / 2 : Mathf.Clamp(ny, vy, vy + vh2 - clientH);
+
+            GetFrameSize(out int frameW, out int frameH, out int frameLeft, out int frameTop);
+            SetWindowPos(hwnd, IntPtr.Zero, cx - frameLeft, cy - frameTop, clientW + frameW, clientH + frameH, SWP_NOZORDER | SWP_SHOWWINDOW);
+            记录家位置();
+            return true;
         }
 
         /// <summary>停靠右下角：窗口尺寸恒=固定窗口（不随缩放），边距按 DPI 换算</summary>
@@ -344,6 +404,31 @@ namespace GIC.Pet
             int x = work.Right - winW - margin;
             int y = work.Bottom - winH - margin;
             SetWindowPos(hwnd, IntPtr.Zero, x, y, winW, winH, SWP_NOZORDER | SWP_SHOWWINDOW);
+            记录家位置();
+        }
+
+        /// <summary>记录家=当前窗口客户区原点+相机位置（待机归位目标；拖拽松手/停靠/恢复时调用）</summary>
+        private void 记录家位置()
+        {
+            if (hwnd == IntPtr.Zero) return;
+            var origin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref origin);
+            _家窗口原点 = new Vector2Int(origin.X, origin.Y);
+            if (cam != null) _家相机位置 = cam.transform.position;
+            _家已记录 = true;
+        }
+
+        /// <summary>窗口矩形与客户区的差值（无边框后理论上≈0，实测兜底；含隐形边框）</summary>
+        private void GetFrameSize(out int frameW, out int frameH, out int frameLeft, out int frameTop)
+        {
+            GetWindowRect(hwnd, out RECT wr);
+            GetClientRect(hwnd, out RECT cr);
+            var origin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref origin);
+            frameLeft = origin.X - wr.Left;
+            frameTop = origin.Y - wr.Top;
+            frameW = (wr.Right - wr.Left) - (cr.Right - cr.Left);
+            frameH = (wr.Bottom - wr.Top) - (cr.Bottom - cr.Top);
         }
 
         /// <summary>
@@ -423,7 +508,7 @@ namespace GIC.Pet
             }
         }
 
-        /// <summary>落盘缩放+停留位置（客户区原点，物理像素）。仅在构建版有待写入时执行，编辑器恒跳过。</summary>
+        /// <summary>落盘缩放+窗口位置（客户区原点）。仅在构建版有待写入时执行，编辑器恒跳过。</summary>
         private void 写入存档()
         {
 #if !UNITY_EDITOR
@@ -456,32 +541,7 @@ namespace GIC.Pet
             _paimon根.localScale = new Vector3(s, s, s);
         }
 
-        /// <summary>恢复存档的窗口位置（客户区原点，钳制到虚拟屏幕防显示器拔掉后找不到派蒙）。成功=true。
-        /// 窗口尺寸恒=固定窗口（旧存档保存时窗口按旧缩放尺寸，恢复后偏大属预期——停留语义不变）。</summary>
-        private bool 恢复保存位置()
-        {
-            if (载入存档 == null || !载入存档.有位置 || hwnd == IntPtr.Zero) return false;
-
-            GetFrameSize(out int frameW, out int frameH, out int frameLeft, out int frameTop);
-            int clientW = 固定窗口宽;
-            int clientH = 固定窗口高;
-
-            // 虚拟屏幕矩形（多显示器并集，物理像素）
-            int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
-            int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-            int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-            int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-
-            // 完整收进虚拟屏幕；范围倒挂（窗口比虚拟屏还大）时居中兜底
-            int cx = vw <= clientW ? vx + (vw - clientW) / 2 : Mathf.Clamp(载入存档.客户区X, vx, vx + vw - clientW);
-            int cy = vh <= clientH ? vy + (vh - clientH) / 2 : Mathf.Clamp(载入存档.客户区Y, vy, vy + vh - clientH);
-
-            SetWindowPos(hwnd, IntPtr.Zero, cx - frameLeft, cy - frameTop, clientW + frameW, clientH + frameH, SWP_NOZORDER | SWP_SHOWWINDOW);
-            return true;
-        }
-
-        /// <summary>
-        /// 取鼠标光标的 Unity 屏幕坐标（左下原点），供视线跟随等全局追踪使用。
+        /// <summary>取鼠标光标的 Unity 屏幕坐标（左下原点），供视线跟随等全局追踪使用。
         /// 与命中检测不同：光标在窗口外同样有效（线性外推，ScreenPointToRay 可处理屏外点）。
         /// 构建版走 Win32 全局轮询（窗口无焦点/穿透时也能追踪）；编辑器退回 Input.mousePosition。
         /// </summary>
@@ -514,6 +574,141 @@ namespace GIC.Pet
 #endif
         }
 
+        /// <summary>光标屏幕点 → 模型平面（z=Paimon 根平面）上的世界点（拖拽用）。
+        /// 相机看向 +Z，与根平面求交稳定；光标在窗口外同样有效（线性外推）。</summary>
+        private Vector3 光标模型平面世界点(POINT pt)
+        {
+            GetClientRect(hwnd, out RECT cr);
+            var origin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref origin);
+            int winW = Mathf.Max(1, cr.Right - cr.Left);
+            int winH = Mathf.Max(1, cr.Bottom - cr.Top);
+            float sx = (pt.X - origin.X) * ((float)Screen.width / winW);
+            float sy = (pt.Y - origin.Y) * ((float)Screen.height / winH);
+            Ray ray = cam.ScreenPointToRay(new Vector3(sx, Screen.height - sy, 0f));
+            float planeZ = _paimon根 != null ? _paimon根.position.z : 0f;
+            if (Mathf.Abs(ray.direction.z) < 1e-6f) return _paimon根 != null ? _paimon根.position : Vector3.zero;
+            float t = (planeZ - ray.origin.z) / ray.direction.z;
+            return ray.origin + ray.direction * t;
+        }
+
+        /// <summary>
+        /// 小窗跟随（2026-08-25 主流体制核心，VPet/Desktop Mate 同款"窗口跟着角色走"）：
+        /// **仅单次动作/拖拽期间激活**（大幅编排位移才移窗="派蒙真的在动"语义；退场飞离也跟随）；
+        /// 待机时相机+窗口完全静止（呼吸/摇晃微动在窗内呈现，窗边距余量充足——零窗口操作=零 DWM
+        /// 重合成，派蒙停靠感稳定）。实现：骨盆 XY 位置投影到基准深度平面与上帧基准视口作差
+        /// （同深度比较剔除 Z 位移的透视假平移——Z 只呈现窗内近大远小）→ 相机 XY 平移根增量
+        /// （模型窗内渲染恒定不被裁）+ 窗口平移相同屏幕像素量（move-only，不触发 swapchain 重建）。
+        /// 之后窗口钳制虚拟屏（模型贴屏边自然停住）；待机窗口向家缓慢滑回（归位）。
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!restyled || hwnd == IntPtr.Zero || _骨盆 == null || cam == null || _paimon根 == null) return;
+
+            // ---- 1) 跟随（仅单次动作/拖拽期间激活，2026-08-25 晚收紧）----
+            // 待机（呼吸/摇晃微动）不跟随：相机+窗口完全静止，模型在窗内自由微动（窗边距余量充足）
+            // ——窗口零移动=零 DWM 重合成（省电）+ 派蒙停靠感稳定；大幅编排位移/拖拽才移窗。
+            bool 跟随中 = 单次动作中 || dragging;
+            if (跟随中)
+            {
+                if (!_跟随基准有效)
+                {
+                    记录跟随基准(); // 进入跟随首帧：从当前位置起算（不回跳）
+                    _跟随基准有效 = true;
+                }
+                else
+                {
+                    // 纯 XY 投影差：本帧骨盆 XY 位置投影到基准深度平面再比较——剔除 Z 位移的
+                    // 透视假平移（Z 位移只呈现窗内近大远小，不触发窗口移动）
+                    var now = _骨盆.position;
+                    var vpSame = cam.WorldToViewportPoint(new Vector3(now.x, now.y, _骨盆基准.z));
+                    if (vpSame.z > 0f)
+                    {
+                        float dxVP = vpSame.x - _骨盆基准视口.x;
+                        float dyVP = vpSame.y - _骨盆基准视口.y;
+
+                        GetClientRect(hwnd, out RECT cr);
+                        int clientW = cr.Right - cr.Left;
+                        int clientH = cr.Bottom - cr.Top;
+                        if (clientW > 0 && clientH > 0 && (Mathf.Abs(dxVP) > 1e-5f || Mathf.Abs(dyVP) > 1e-5f))
+                        {
+                            // 相机 XY 平移本帧骨盆世界增量（模型窗内渲染恒定；Z 不跟=纵深呈现大小变化）
+                            cam.transform.position += new Vector3(now.x - _骨盆基准.x, now.y - _骨盆基准.y, 0f);
+
+                            // 窗口平移同量像素（视口差 × 客户区物理像素；视口 Y 向上 → Win32 Y 向下取负）
+                            int dxPx = Mathf.RoundToInt(dxVP * clientW);
+                            int dyPx = -Mathf.RoundToInt(dyVP * clientH);
+                            GetWindowRect(hwnd, out RECT wr);
+                            SetWindowPos(hwnd, IntPtr.Zero, wr.Left + dxPx, wr.Top + dyPx, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                        }
+                    }
+                    记录跟随基准(); // 相机移动后投影（含 Z 残留透视=窗内呈现，下帧同深度比较自动剔净）
+                }
+            }
+            else
+            {
+                _跟随基准有效 = false; // 退出跟随：下次进入时从当前位置重取基准
+            }
+
+            // 拖拽刚松手（本帧 Update 已置 dragging=false）：当前位置即家
+            if (_待记录家)
+            {
+                _待记录家 = false;
+                记录家位置();
+                标记待写入();
+            }
+
+            // ---- 待机归位：相机+窗口整体（机架）向家缓慢滑回（动作期/拖拽期暂停）----
+            // 相机必须随窗口一起归位（2026-08-25 左漂根治）：动作期机架跟随骨盆位移、
+            // 动作结束后 Standby 骨盆曲线值≠动作结束值（CrossFade 混回），若只回窗口不回相机，
+            // 模型窗内位置每次动作净偏一段（方向一致）→ 持续漂出窗左边。机架同 k 指数回归，
+            // 模型回到窗内原位（动作期屏幕游走语义完整保留）。
+            if (!单次动作中 && !dragging && 归位速度 > 0f && _家已记录)
+            {
+                GetWindowRect(hwnd, out RECT wr2);
+                var cur = new Vector2Int(wr2.Left, wr2.Top);
+                var delta = _家窗口原点 - cur;
+                bool 相机未归 = cam != null && (cam.transform.position - _家相机位置).sqrMagnitude > 1e-8f;
+                if (Mathf.Abs(delta.x) > 1 || Mathf.Abs(delta.y) > 1 || 相机未归)
+                {
+                    float k = 1f - Mathf.Exp(-归位速度 * Time.deltaTime);
+                    int nx = Mathf.RoundToInt(cur.x + delta.x * k);
+                    int ny = Mathf.RoundToInt(cur.y + delta.y * k);
+                    SetWindowPos(hwnd, IntPtr.Zero, nx, ny, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                    if (相机未归) cam.transform.position = Vector3.Lerp(cam.transform.position, _家相机位置, k);
+                    _归位完成已标记 = false;
+                }
+                else if (!_归位完成已标记)
+                {
+                    _归位完成已标记 = true;
+                    标记待写入(); // 归位到位后把家位置落盘（防把中间位置写进档）
+                }
+            }
+        }
+
+        /// <summary>记录跟随基准：骨盆世界位置与视口（下一帧差分的起点）</summary>
+        private void 记录跟随基准()
+        {
+            _骨盆基准 = _骨盆.position;
+            var vp = cam.WorldToViewportPoint(_骨盆.position);
+            _骨盆基准视口 = new Vector2(vp.x, vp.y);
+        }
+
+        /// <summary>取本体骨架上的骨（排除影子壳 _DropShadow / MMD_DropShadow 下的同名骨拷贝）</summary>
+        private Transform 找本体骨(string boneName)
+        {
+            foreach (var t in _paimon根.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name != boneName) continue;
+                bool 影子下 = false;
+                for (var p = t.parent; p != null && !影子下; p = p.parent)
+                    if (p.name == "_DropShadow" || p.name == "MMD_DropShadow") 影子下 = true;
+                if (影子下) continue;
+                return t;
+            }
+            return null;
+        }
+
         private void Update()
         {
             if (!restyled)
@@ -522,7 +717,6 @@ namespace GIC.Pet
             }
 
             GetCursorPos(out POINT pt);
-            GetWindowRect(hwnd, out RECT wr); // 窗口矩形（含边框）仅供拖拽定位用
             GetClientRect(hwnd, out RECT clientRect);
             var clientOrigin = new POINT { X = 0, Y = 0 };
             ClientToScreen(hwnd, ref clientOrigin);
@@ -582,7 +776,8 @@ namespace GIC.Pet
             if (!dragging && !已请求退出 && modelHit && lmbDown && !prevLmbDown)
             {
                 dragging = true;
-                dragGrabOffset = new Vector2Int(pt.X - wr.Left, pt.Y - wr.Top);
+                _拖拽根起点 = _paimon根.position;
+                _拖拽光标世界起点 = 光标模型平面世界点(pt);
             }
             if (dragging)
             {
@@ -594,11 +789,14 @@ namespace GIC.Pet
                         lastClickTime = -10f;
                     }
                     dragging = false;
-                    标记待写入(); // 停留位置持久化（docs/19 §3.1）
+                    _待记录家 = true; // 松手处即家（docs/19 §3.1；家在 LateUpdate 钳制后记录=真实落点）
                 }
                 else
                 {
-                    SetWindowPos(hwnd, IntPtr.Zero, pt.X - dragGrabOffset.x, pt.Y - dragGrabOffset.y, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
+                    // 拖拽=移动模型根（XY 跟随光标在模型平面上的世界增量）——
+                    // LateUpdate 跟随机制自动把窗口带过去（拖根=拖窗的视觉，VPet 同款）。
+                    var cur = 光标模型平面世界点(pt);
+                    _paimon根.position = _拖拽根起点 + (cur - _拖拽光标世界起点);
                 }
             }
             prevLmbDown = lmbDown;
