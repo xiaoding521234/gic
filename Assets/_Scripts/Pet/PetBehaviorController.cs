@@ -121,7 +121,7 @@ namespace GIC.Pet
                     if (finished || tailBlend)
                     {
                         _单次进行中 = false;
-                        窗口控制器.单次动作中 = false; // 动作结束：窗口归位恢复（动作期跟随的位移优雅滑回家）
+                        窗口控制器.单次动作中 = false; // 动作结束：窗口控制器进入收尾宽限，根/窗口随 CrossFade 回待机平滑归零
                         if (_仪式静默中) 置仪式静默(false); // 仪式（出场）静默解除；普通单次动作本来就没静默视线
                         else 眨眼控制器?.Set静默(false);
                         窗口控制器.暂停命中烘焙 = false;
@@ -209,7 +209,8 @@ namespace GIC.Pet
             foreach (var c in _包围盒角点)
             {
                 Vector3 p = 相机.WorldToScreenPoint(c);
-                if (p.z <= 0f) return true; // 包围盒跨到相机后（透视边缘，理论不发生）保守视为接近
+                if (p.z <= 0f) return false; // 包围盒跨到相机后=异常状态（纵深位移残余等），不视为接近——
+                                              // 旧版保守 return true 曾致"光标停屏幕任何位置都打招呼"
                 if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
                 if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
             }
