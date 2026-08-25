@@ -2926,7 +2926,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_916886706
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -3509,7 +3509,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3361596310
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -4092,7 +4092,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_889785288
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -4675,7 +4675,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2703591064
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -5258,7 +5258,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3290556356
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01/+EyeBone R A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -5841,7 +5841,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2130030459
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -6424,7 +6424,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3805228645
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01/+EyeBone L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -7007,7 +7007,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1972580819
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS R A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -7590,7 +7590,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3829926149
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS R A01/+HairS R A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -8173,7 +8173,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2856523824
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -8756,7 +8756,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_202796663
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS L A01/+HairS L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -9339,7 +9339,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3120751086
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EarB CF AF01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -9922,7 +9922,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1382450884
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -10505,7 +10505,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2146802618
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -11088,7 +11088,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2188519098
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -11671,7 +11671,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_232856728
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -12254,7 +12254,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3613771842
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -12837,7 +12837,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2673311223
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger0/Bip001 L Finger01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -13420,7 +13420,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2690840788
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -14003,7 +14003,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1370410222
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger1/Bip001 L Finger11
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -14586,7 +14586,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_963357038
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger2
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -15169,7 +15169,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3654621572
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger2/Bip001 L Finger21
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -15752,7 +15752,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1315740152
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger3
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -16335,7 +16335,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_388802717
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger3/Bip001 L Finger31
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -16918,7 +16918,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3490188379
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger4
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -17501,7 +17501,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_307475729
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger4/Bip001 L Finger41
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -18084,7 +18084,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1795241887
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -18667,7 +18667,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1440619927
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -19250,7 +19250,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2623770754
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -19833,7 +19833,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3229187146
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -20416,7 +20416,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1343534317
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/DMZ R 01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -20999,7 +20999,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_396127638
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/DMZ R 01/DMZ R 02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -21582,7 +21582,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1775927341
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -22165,7 +22165,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1502952845
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger1/Bip001 R Finger11
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -22748,7 +22748,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4040413591
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger2
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -23331,7 +23331,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3522095335
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger2/Bip001 R Finger21
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -23914,7 +23914,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2278875393
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger3
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -24497,7 +24497,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_521624062
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger3/Bip001 R Finger31
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -25080,7 +25080,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_430994594
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger4
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -25663,7 +25663,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_443040882
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger4/Bip001 R Finger41
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -26246,7 +26246,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1079681950
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -26829,7 +26829,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1084835721
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -27412,7 +27412,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_912844546
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -27995,7 +27995,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2913468570
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01/+AmiceB L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -28578,7 +28578,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1968155301
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01/+AmiceB L A02/+AmiceB L A03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -29161,7 +29161,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_875452763
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -29744,7 +29744,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4235519303
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01/+AmiceB L B02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -30327,7 +30327,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_935032331
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01/+AmiceB L B02/+AmiceB L B03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -30910,7 +30910,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_904672108
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -31493,7 +31493,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2047886387
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01/+AmiceB L C02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -32076,7 +32076,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3208134574
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01/+AmiceB L C02/+AmiceB L C03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -32659,7 +32659,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3114143151
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -33242,7 +33242,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4138384465
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -33825,7 +33825,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2581838634
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf/Bip001 L Foot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -34408,7 +34408,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1584343122
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf/Bip001 L Foot/Bip001 L Toe0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -34991,7 +34991,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2390747708
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -35574,7 +35574,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1465762278
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -36157,7 +36157,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_275359678
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf/Bip001 R Foot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -36740,7 +36740,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_859800726
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf/Bip001 R Foot/Bip001 R Toe0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -40241,7 +40241,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_916886706
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -40824,7 +40824,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3361596310
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -41407,7 +41407,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_889785288
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -41990,7 +41990,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2703591064
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -42573,7 +42573,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3290556356
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01/+EyeBone R A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -43156,7 +43156,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2130030459
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -43739,7 +43739,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3805228645
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01/+EyeBone L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -44322,7 +44322,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1972580819
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS R A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -44905,7 +44905,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3829926149
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS R A01/+HairS R A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -45488,7 +45488,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2856523824
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -46071,7 +46071,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_202796663
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS L A01/+HairS L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -46654,7 +46654,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3120751086
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EarB CF AF01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -47237,7 +47237,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1382450884
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -47820,7 +47820,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2146802618
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -48403,7 +48403,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2188519098
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -48986,7 +48986,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_232856728
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -49569,7 +49569,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3613771842
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -50152,7 +50152,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2673311223
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger0/Bip001 L Finger01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -50735,7 +50735,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2690840788
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -51318,7 +51318,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1370410222
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger1/Bip001 L Finger11
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -51901,7 +51901,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_963357038
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger2
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -52484,7 +52484,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3654621572
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger2/Bip001 L Finger21
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -53067,7 +53067,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1315740152
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger3
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -53650,7 +53650,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_388802717
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger3/Bip001 L Finger31
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -54233,7 +54233,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3490188379
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger4
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -54816,7 +54816,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_307475729
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger4/Bip001 L Finger41
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -55399,7 +55399,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1795241887
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -55982,7 +55982,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1440619927
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -56565,7 +56565,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2623770754
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -57148,7 +57148,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3229187146
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -57731,7 +57731,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1343534317
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/DMZ R 01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -58314,7 +58314,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_396127638
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/DMZ R 01/DMZ R 02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -58897,7 +58897,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1775927341
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -59480,7 +59480,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1502952845
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger1/Bip001 R Finger11
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -60063,7 +60063,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4040413591
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger2
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -60646,7 +60646,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3522095335
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger2/Bip001 R Finger21
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -61229,7 +61229,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2278875393
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger3
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -61812,7 +61812,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_521624062
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger3/Bip001 R Finger31
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -62395,7 +62395,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_430994594
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger4
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -62978,7 +62978,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_443040882
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger4/Bip001 R Finger41
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -63561,7 +63561,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1079681950
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -64144,7 +64144,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1084835721
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -64727,7 +64727,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_912844546
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -65310,7 +65310,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2913468570
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01/+AmiceB L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -65893,7 +65893,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1968155301
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01/+AmiceB L A02/+AmiceB L A03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -66476,7 +66476,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_875452763
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -67059,7 +67059,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4235519303
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01/+AmiceB L B02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -67642,7 +67642,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_935032331
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01/+AmiceB L B02/+AmiceB L B03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -68225,7 +68225,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_904672108
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -68808,7 +68808,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2047886387
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01/+AmiceB L C02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -69391,7 +69391,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3208134574
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01/+AmiceB L C02/+AmiceB L C03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -69974,7 +69974,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3114143151
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -70557,7 +70557,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4138384465
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -71140,7 +71140,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2581838634
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf/Bip001 L Foot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -71723,7 +71723,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1584343122
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf/Bip001 L Foot/Bip001 L Toe0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -72306,7 +72306,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2390747708
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -72889,7 +72889,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1465762278
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -73472,7 +73472,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_275359678
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf/Bip001 R Foot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -74055,7 +74055,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_859800726
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf/Bip001 R Foot/Bip001 R Toe0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -77554,7 +77554,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_916886706
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -78137,7 +78137,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3361596310
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -78720,7 +78720,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_889785288
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -79303,7 +79303,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2703591064
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -79886,7 +79886,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3290556356
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone R A01/+EyeBone R A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -80469,7 +80469,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2130030459
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -81052,7 +81052,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3805228645
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EyeBone L A01/+EyeBone L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -81635,7 +81635,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1972580819
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS R A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -82218,7 +82218,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3829926149
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS R A01/+HairS R A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -82801,7 +82801,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2856523824
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -83384,7 +83384,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_202796663
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+HairS L A01/+HairS L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -83967,7 +83967,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3120751086
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 Neck/Bip001 Head/+EarB CF AF01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -84550,7 +84550,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1382450884
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -85133,7 +85133,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2146802618
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -85716,7 +85716,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2188519098
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -86299,7 +86299,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_232856728
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -86882,7 +86882,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3613771842
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -87465,7 +87465,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2673311223
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger0/Bip001 L Finger01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -88048,7 +88048,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2690840788
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -88631,7 +88631,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1370410222
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger1/Bip001 L Finger11
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -89214,7 +89214,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_963357038
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger2
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -89797,7 +89797,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3654621572
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger2/Bip001 L Finger21
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -90380,7 +90380,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1315740152
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger3
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -90963,7 +90963,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_388802717
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger3/Bip001 L Finger31
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -91546,7 +91546,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3490188379
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger4
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -92129,7 +92129,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_307475729
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 L Clavicle/Bip001 L UpperArm/Bip001 L Forearm/Bip001 L Hand/Bip001 L Finger4/Bip001 L Finger41
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -92712,7 +92712,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1795241887
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -93295,7 +93295,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1440619927
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -93878,7 +93878,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2623770754
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -94461,7 +94461,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3229187146
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -95044,7 +95044,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1343534317
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/DMZ R 01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -95627,7 +95627,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_396127638
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/DMZ R 01/DMZ R 02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -96210,7 +96210,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1775927341
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger1
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -96793,7 +96793,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1502952845
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger1/Bip001 R Finger11
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -97376,7 +97376,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4040413591
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger2
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -97959,7 +97959,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3522095335
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger2/Bip001 R Finger21
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -98542,7 +98542,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2278875393
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger3
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -99125,7 +99125,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_521624062
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger3/Bip001 R Finger31
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -99708,7 +99708,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_430994594
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger4
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -100291,7 +100291,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_443040882
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/Bip001 R Clavicle/Bip001 R UpperArm/Bip001 R Forearm/Bip001 R Hand/Bip001 R Finger4/Bip001 R Finger41
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -100874,7 +100874,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1079681950
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -101457,7 +101457,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1084835721
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -102040,7 +102040,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_912844546
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -102623,7 +102623,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2913468570
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01/+AmiceB L A02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -103206,7 +103206,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1968155301
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L A01/+AmiceB L A02/+AmiceB L A03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -103789,7 +103789,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_875452763
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -104372,7 +104372,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4235519303
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01/+AmiceB L B02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -104955,7 +104955,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_935032331
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L B01/+AmiceB L B02/+AmiceB L B03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -105538,7 +105538,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_904672108
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -106121,7 +106121,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2047886387
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01/+AmiceB L C02
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -106704,7 +106704,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3208134574
+    path: Bip001/Bip001 Pelvis/Bip001 Spine/Bip001 Spine1/CloakRoot/CloakPoint/+AmiceB L C01/+AmiceB L C02/+AmiceB L C03
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -107287,7 +107287,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_3114143151
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -107870,7 +107870,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_4138384465
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -108453,7 +108453,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2581838634
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf/Bip001 L Foot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -109036,7 +109036,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1584343122
+    path: Bip001/Bip001 Pelvis/Bip001 L Thigh/Bip001 L Calf/Bip001 L Foot/Bip001 L Toe0
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -109619,7 +109619,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_2390747708
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -110202,7 +110202,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_1465762278
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -110785,7 +110785,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_275359678
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf/Bip001 R Foot
   - curve:
       serializedVersion: 2
       m_Curve:
@@ -111368,7 +111368,7 @@ AnimationClip:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    path: path_859800726
+    path: Bip001/Bip001 Pelvis/Bip001 R Thigh/Bip001 R Calf/Bip001 R Foot/Bip001 R Toe0
   - curve:
       serializedVersion: 2
       m_Curve:
