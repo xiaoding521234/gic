@@ -19,6 +19,9 @@ namespace GIC.Pet
 
         [SerializeField] private Animation targetAnimation; // Paimon_MMD 根上的 Animation 组件
 
+        /// <summary>当前驱动的 Animation 组件（编辑器同步工具按此注册 clip，勿按 FindObjectsOfType 顺序找）</summary>
+        public Animation TargetAnimation => targetAnimation;
+
         [Header("动作→情绪映射（表情由情绪层驱动，不烘焙进 clip）")]
         [SerializeField] private 动作情绪映射[] 情绪映射 = new[]
         {

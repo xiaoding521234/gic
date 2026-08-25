@@ -23,8 +23,8 @@ namespace GIC.Pet
         [Tooltip("空 = 自动找非影子壳的蒙皮渲染器（用包围盒做接近判定）")] [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
 
         [Header("待机与打招呼")]
-        [SerializeField] private string 待机动作名 = "Ani_NPC_Kanban_Paimon_Standby_MMD";
-        [SerializeField] private string 打招呼动作名 = "Ani_NPC_Kanban_Paimon_Greet_MMD";
+        [SerializeField] private string 待机动作名 = "Ani_NPC_Kanban_Paimon_Standby";
+        [SerializeField] private string 打招呼动作名 = "Ani_NPC_Kanban_Paimon_Greet";
         [Tooltip("光标距模型包围盒多少屏幕像素内算\"在旁边\"")] [SerializeField] private float 触发边距像素 = 90f;
         [Tooltip("光标停留多久触发打招呼")] [SerializeField] private float 触发停留秒 = 1.2f;
         [Tooltip("两次打招呼的最小间隔秒")] [SerializeField] private float 打招呼冷却秒 = 45f;
@@ -34,22 +34,22 @@ namespace GIC.Pet
         [Tooltip("随机轮换的单次动作（完整 clip 名，可增删）")]
         [SerializeField] private string[] 随机小动作列表 =
         {
-            "Ani_NPC_Kanban_Paimon_Nod01_MMD",
-            "Ani_NPC_Kanban_Paimon_ShakeHead01_MMD",
-            "Ani_NPC_Kanban_Paimon_Sneer01_MMD",
-            "Ani_NPC_Kanban_Paimon_Clap01_MMD",
-            "Ani_NPC_Kanban_Paimon_Show_1_MMD",
-            "Ani_NPC_Kanban_Paimon_Show_2_MMD",
-            "Ani_NPC_Kanban_Paimon_Show_3_MMD",
-            "Ani_NPC_Kanban_Paimon_Show_4_MMD",
+            "Ani_NPC_Kanban_Paimon_Nod01",
+            "Ani_NPC_Kanban_Paimon_ShakeHead01",
+            "Ani_NPC_Kanban_Paimon_Sneer01",
+            "Ani_NPC_Kanban_Paimon_Clap01",
+            "Ani_NPC_Kanban_Paimon_Show_1",
+            "Ani_NPC_Kanban_Paimon_Show_2",
+            "Ani_NPC_Kanban_Paimon_Show_3",
+            "Ani_NPC_Kanban_Paimon_Show_4",
         };
         [Tooltip("随机小动作的间隔范围（秒）")] [SerializeField] private Vector2 小动作间隔秒 = new Vector2(25f, 55f);
 
         [Header("出场/退场")]
         [Tooltip("进程启动后播的出场动画（完整 clip 名，空=直接待机）——首帧在 PetAnimSwapper 预热完成后播放，播完回待机")]
-        [SerializeField] private string 出场动画名 = "Ani_NPC_Kanban_Paimon_Appear_MMD";
+        [SerializeField] private string 出场动画名 = "Ani_NPC_Kanban_Paimon_Appear";
         [Tooltip("双击退出时播的退场动画（完整 clip 名，空=立即退出）——播完才真正退出进程")]
-        [SerializeField] private string 退场动画名 = "Ani_NPC_Kanban_Paimon_Disappear_MMD";
+        [SerializeField] private string 退场动画名 = "Ani_NPC_Kanban_Paimon_Disappear";
 
         // 运行时状态
         private bool _单次进行中;

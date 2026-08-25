@@ -7,16 +7,17 @@ using UnityEngine;
 namespace GIC.Editor
 {
     /// <summary>
-    /// PaimonPet 场景动作同步（2026-08-24）：把管线产物（Animations/MMD/ 全部 _MMD.anim）
-    /// 一键注册进 PaimonPet 的 Animation 组件，并重建动作测试 UI（AnimUICanvas，编辑器 Play 专用）。
+    /// PaimonPet 场景动作同步（2026-08-24 建；2026-08-25 切 GI 时代）：把 GI 原始 .anim
+    /// （Assets/Art/PaimonPet/GI/Animations/，199 条零重定向直读）一键注册进 PaimonPet 的
+    /// Animation 组件（PetAnimSwapper.targetAnimation 所指），并重建动作测试 UI（AnimUICanvas，编辑器 Play 专用）。
     /// 单场景方案（2026-08-24）：原 PaimonRetargetTest 独立测试场景已废弃并入本场景——
-    /// 管线对输出 clip 是"删旧建新"（GUID 会换），场景引用靠本工具对齐；测试 UI 也由此重建，
-    /// 不再有第二个场景需要维护。幂等：清空重注册/删旧重建；默认 clip 按名字保持原引用，丢失则回退 Standby。
+    /// 测试 UI 也由此重建。幂等：清空重注册/删旧重建；默认 clip 按名字保持原引用，丢失则回退 Standby。
+    /// MMD 重定向产物（Animations/MMD/）已随官方模型落地退出使用，仅兜底留存不再同步。
     /// </summary>
     public static class PetSceneSyncTool
     {
         private const string ScenePath = "Assets/Scenes/PaimonPet.unity";
-        private const string ClipDir = "Assets/Art/PaimonPet/Animations/MMD";
+        private const string ClipDir = "Assets/Art/PaimonPet/GI/Animations";
 
         [MenuItem("Tools/桌宠/同步 PaimonPet 动作列表")]
         public static void Sync()
@@ -37,28 +38,40 @@ namespace GIC.Editor
         /// <summary>管线（PaimonRetargetPipeline 步骤 6）重定向完成后调用——此时 PaimonPet 已 Single 打开。</summary>
         public static void SyncInternal()
         {
-            var animComps = Object.FindObjectsOfType<Animation>(true);
-            if (animComps.Length == 0)
+            // 目标 Animation = PetAnimSwapper.targetAnimation（唯一权威来源，勿按 FindObjectsOfType 顺序取——场景曾残留空 Animation 组件）
+            var swapper = Object.FindObjectsOfType<GIC.Pet.PetAnimSwapper>(true).FirstOrDefault();
+            if (swapper == null)
             {
-                Debug.LogError("[PetSceneSync] PaimonPet 里没找到 Animation 组件");
+                Debug.LogError("[PetSceneSync] 场景里没找到 PetAnimSwapper");
                 return;
             }
-            if (animComps.Length > 1)
-                Debug.LogWarning($"[PetSceneSync] 场景里有 {animComps.Length} 个 Animation，取第一个（{animComps[0].name}）");
-            var anim = animComps[0];
+            var anim = swapper.TargetAnimation;
+            if (anim == null)
+            {
+                Debug.LogError("[PetSceneSync] PetAnimSwapper.TargetAnimation 未指定");
+                return;
+            }
 
             var clips = AssetDatabase.FindAssets("t:AnimationClip", new[] { ClipDir })
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .Where(p => p.EndsWith(".anim"))
                 .Select(p => AssetDatabase.LoadAssetAtPath<AnimationClip>(p))
-                .Where(c => c != null)
+                .Where(c => c != null && c.legacy)
                 .OrderBy(c => c.name)
                 .ToList();
             if (clips.Count == 0)
             {
-                Debug.LogError($"[PetSceneSync] {ClipDir} 下没有 clip，请先重跑重定向管线");
+                Debug.LogError($"[PetSceneSync] {ClipDir} 下没有 clip");
                 return;
             }
+            // 排除 GI 程序化姿势层（Left/Right Arm/Hand/Forearm/Finger ~100 条 0.017s 单帧姿势——非完整动作，
+            // 列进测试面板只会刷屏；HeadControlRotation 同理）
+            clips = clips.Where(c => !c.name.Contains("LeftArm") && !c.name.Contains("RightArm")
+                                     && !c.name.Contains("LeftHand") && !c.name.Contains("RightHand")
+                                     && !c.name.Contains("LeftForearm") && !c.name.Contains("RightForearm")
+                                     && !c.name.Contains("LeftFinger") && !c.name.Contains("RightFinger")
+                                     && !c.name.Contains("HeadControlRotation"))
+                         .ToList();
 
             // 默认 clip 按名字保留（RemoveClip 后引用会失效，先记名再找回同名新资产）
             var keepDefaultName = anim.clip != null ? anim.clip.name : null;
@@ -77,7 +90,8 @@ namespace GIC.Editor
 
             var keepDefault = keepDefaultName != null ? clips.FirstOrDefault(c => c.name == keepDefaultName) : null;
             anim.clip = keepDefault
-                        ?? clips.FirstOrDefault(c => c.name.EndsWith("Standby_MMD"))
+                        ?? clips.FirstOrDefault(c => c.name.EndsWith("_Standby"))
+                        ?? clips.FirstOrDefault(c => c.name.EndsWith("_Standby_MMD"))
                         ?? clips[0];
 
             EditorUtility.SetDirty(anim);
@@ -202,8 +216,7 @@ namespace GIC.Editor
                 var txt = txtGo.GetComponent<UnityEngine.UI.Text>();
                 txt.font = font; txt.fontSize = 20; txt.color = Color.white;
                 txt.alignment = TextAnchor.MiddleCenter;
-                var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");
-                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
+                var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
                 var tr = txtGo.GetComponent<RectTransform>();
                 tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
                 // 持久监听（存进场景文件，运行时零查找）
