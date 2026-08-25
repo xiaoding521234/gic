@@ -41,14 +41,126 @@ namespace GIC.Editor
             if (!AssetDatabase.IsValidFolder(MatDir))
                 AssetDatabase.CreateFolder("Assets/Art/PaimonPet/GI", "Materials");
 
+            // 披风星空合成（官方银河披风）：Diffuse 只是白→蓝渐变底色，星星/星座线在 Lightmap（黑底星点）里，加法合成成一张贴图
+            ComposeCloakTexture(log);
             CreateMat(log, "GI_身体", "NPC_Kanban_Paimon_Tex_Body_Diffuse", 1.0f);
             CreateMat(log, "GI_脸", "NPC_Kanban_Paimon_Tex_Face_Diffuse", 0.7f);
             CreateMat(log, "GI_头发", "NPC_Kanban_Paimon_Tex_Hair_Diffuse", 1.2f);
-            CreateMat(log, "GI_披风", "NPC_Kanban_Paimon_Tex_Cloak_Diffuse", 0.8f, cullOff: true);
-            // EyeStar 星形瞳孔条带采样脸贴图左下角淡金色纯色块（255,236,173）
+            // 披风用合成贴图（渐变+星光）；合成失败时回退纯 Diffuse
+            var cloakTex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TexDir}/NPC_Kanban_Paimon_Tex_Cloak_Composed.png") != null
+                ? "NPC_Kanban_Paimon_Tex_Cloak_Composed" : "NPC_Kanban_Paimon_Tex_Cloak_Diffuse";
+            CreateMat(log, "GI_披风", cloakTex, 0.8f, cullOff: true);
             CreateMat(log, "GI_特效", "NPC_Kanban_Paimon_Tex_Face_Diffuse", 0f);
             AssetDatabase.SaveAssets();
             log.AppendLine("材质创建完成");
+        }
+
+        /// <summary>
+        /// 披风合成贴图：Cloak_Diffuse（白→蓝渐变底色）+ Cloak_Lightmap 星点。
+        /// 官方披风内衬 = 深蓝底+白色繁星（官方立绘实证）；纯 Diffuse 渲染会丢失全部星空。
+        /// 注意：官方 Lightmap 走光照 UV 通道（本项目网格无 UV1，无法按官方通道对应），星点位置在光照 UV
+        /// 空间与 Diffuse UV 空间不重合——直接原位叠加会全部落在星星稀疏区（实测渲染无星）。
+        /// 因此提取星点后均匀散布到蓝色内衬区（V&lt;0.45），白色外层保持纯白。
+        /// </summary>
+        static void ComposeCloakTexture(System.Text.StringBuilder log)
+        {
+            const string composedPath = TexDir + "/NPC_Kanban_Paimon_Tex_Cloak_Composed.png";
+            if (System.IO.File.Exists(composedPath)) { log.AppendLine("披风合成贴图已存在，跳过"); return; }
+            var diffusePath = TexDir + "/NPC_Kanban_Paimon_Tex_Cloak_Diffuse.png";
+            var lmPath = TexDir + "/NPC_Kanban_Paimon_Tex_Cloak_Lightmap.png";
+            if (!System.IO.File.Exists(diffusePath) || !System.IO.File.Exists(lmPath)) { log.AppendLine("!! 披风源贴图缺失，跳过合成"); return; }
+
+            var diffuse = new Texture2D(2, 2);
+            if (!diffuse.LoadImage(System.IO.File.ReadAllBytes(diffusePath))) { log.AppendLine("!! Diffuse 读取失败"); return; }
+            var lm = new Texture2D(2, 2);
+            if (!lm.LoadImage(System.IO.File.ReadAllBytes(lmPath))) { log.AppendLine("!! Lightmap 读取失败"); return; }
+
+            var dc = diffuse.GetPixels();
+            int dw = diffuse.width, dh = diffuse.height;
+
+            // 从 Lightmap 提取星点（青色亮像素簇，洪泛连通）
+            var lc = lm.GetPixels();
+            int lw = lm.width, lh = lm.height;
+            var stars = new System.Collections.Generic.List<float[]>(); // [半径(px), 亮度]
+            var taken = new bool[lc.Length];
+            for (int y = 0; y < lh; y++)
+            {
+                for (int x = 0; x < lw; x++)
+                {
+                    int i = y * lw + x;
+                    if (taken[i]) continue;
+                    var c = lc[i];
+                    if (c.g < 0.35f && c.b < 0.35f) continue;
+                    var queue = new System.Collections.Generic.Queue<int>();
+                    queue.Enqueue(i); taken[i] = true;
+                    int cnt = 0, maxG = 0;
+                    while (queue.Count > 0)
+                    {
+                        int p = queue.Dequeue(); cnt++;
+                        int px = p % lw, py = p / lw;
+                        if ((int)(lc[p].g * 255f) > maxG) maxG = (int)(lc[p].g * 255f);
+                        for (int dy = -2; dy <= 2; dy++)
+                            for (int dx = -2; dx <= 2; dx++)
+                            {
+                                int nx = px + dx, ny = py + dy;
+                                if (nx < 0 || ny < 0 || nx >= lw || ny >= lh) continue;
+                                int ni = ny * lw + nx;
+                                if (taken[ni]) continue;
+                                var nc = lc[ni];
+                                if (nc.g >= 0.35f || nc.b >= 0.35f) { taken[ni] = true; queue.Enqueue(ni); }
+                            }
+                    }
+                    if (cnt >= 4)
+                    {
+                        float radiusPx = Mathf.Sqrt(cnt / Mathf.PI) * (dw / (float)lw);
+                        stars.Add(new float[] { radiusPx, maxG / 255f });
+                    }
+                }
+            }
+            log.AppendLine($"Lightmap 提取星点 {stars.Count} 颗");
+
+            // 星点伪随机散布到 Diffuse 蓝色内衬区（V<0.45）；白区（V>0.45）不撒星保持纯白
+            var rng = new System.Random(20260825);
+            const float liningTopV = 0.45f;
+            foreach (var s in stars)
+            {
+                float tu = (float)rng.NextDouble();
+                float tv = liningTopV * (float)rng.NextDouble();
+                DrawStar(dc, dw, dh, s[0], s[1], tu, tv);
+            }
+            // 补一轮小星增加"繁星"密度（官方观感）
+            for (int k = 0; k < stars.Count / 2; k++)
+                DrawStar(dc, dw, dh, 2.2f, 0.7f, (float)rng.NextDouble(), liningTopV * (float)rng.NextDouble());
+
+            var composed = new Texture2D(dw, dh, TextureFormat.RGBA32, false);
+            composed.SetPixels(dc);
+            composed.Apply();
+            System.IO.File.WriteAllBytes(composedPath, composed.EncodeToPNG());
+            AssetDatabase.ImportAsset(composedPath);
+            log.AppendLine($"生成披风合成贴图 {dw}x{dh}（渐变+{stars.Count} 颗星散布蓝区）");
+        }
+
+        /// <summary>在 Diffuse 像素上画一颗柔边青白星星（加法提亮）。</summary>
+        static void DrawStar(Color[] pixels, int w, int h, float radiusPx, float intensity, float u, float v)
+        {
+            int cx = (int)(u * w), cy = (int)(v * h);
+            int r = Mathf.Max(1, (int)Mathf.Ceil(radiusPx));
+            for (int dy = -r; dy <= r; dy++)
+            {
+                for (int dx = -r; dx <= r; dx++)
+                {
+                    int x = cx + dx, y = cy + dy;
+                    if (x < 0 || y < 0 || x >= w || y >= h) continue;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy) / Mathf.Max(1f, radiusPx);
+                    if (d > 1f) continue;
+                    float falloff = (1f - d * d) * intensity;
+                    var c = pixels[y * w + x];
+                    c.r = Mathf.Min(1f, c.r + 0.35f * falloff);
+                    c.g = Mathf.Min(1f, c.g + 0.85f * falloff);
+                    c.b = Mathf.Min(1f, c.b + 0.95f * falloff);
+                    pixels[y * w + x] = c;
+                }
+            }
         }
 
         static void CreateMat(System.Text.StringBuilder log, string name, string diffuseTex, float outline, bool cullOff = false)
@@ -121,6 +233,16 @@ namespace GIC.Editor
             SetMats(giRoot, "Face", faceMat);
             SetMats(giRoot, "Face_UV1", faceMat);
             log.AppendLine("材质接线完成（Body 双槽=身体+头发）");
+
+            // EyeStar 条带默认隐藏（2026-08-25 定案）：官方立绘/Q版头像实证默认眼神=干净浅蓝虹膜+黑瞳+白高光，
+            // 无星形图案（"星星眼"是特定表情/近距离特写的星辰细节）；且该星形几何比虹膜盘还大（烘焙实测 Y 向 0.022 vs 0.006），
+            // 金色不透明渲染=巨大金星糊满双眼（用户目检 bug）。MMD 基准版也无此层。保留接线便于日后实验（重新激活即恢复）。
+            var starNode = giRoot.Find("EyeStar");
+            if (starNode != null && starNode.gameObject.activeSelf)
+            {
+                starNode.gameObject.SetActive(false);
+                log.AppendLine("EyeStar 金星条带已隐藏（官方默认眼神无星形，详见工具注释）");
+            }
 
             // Body_UV1/Face_UV1 是 lightmap UV 副本（重复网格）——关闭渲染防重叠
             foreach (var n in new[] { "Body_UV1", "Face_UV1" })
