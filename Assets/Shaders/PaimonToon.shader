@@ -46,7 +46,11 @@ Shader "GIC/PaimonToon"
 
         [Header(Outline)]
         _OutlineWidth ("描边宽度", Range(0, 3)) = 1
+        // 描边颜色模式：0=固定色（_OutlineColor），1=原神式基色暗化（描边=采样主贴图×_OutlineTint）。
+        // 原神描边随被描边区域固有色变化（白衣→冷灰、肤色→暖棕、深发→深发色），非纯黑非固定色。
         _OutlineColor ("描边颜色", Color) = (0.05, 0.06, 0.13, 1)
+        _OutlineTint ("描边基色暗化系数", Color) = (0.5, 0.45, 0.4, 1)
+        [HideInInspector] _OutlineColorMode ("描边颜色模式", Float) = 1
         // 描边 UV 裁剪盒 xy=uv下限 zw=uv上限（z<=x 时禁用）：盒内几何不描边。
         // 用途：GI_头发材质盖住"头发+虹膜+发饰"一整槽——虹膜采样头发贴图右下星空区
         // (0.53,0.01)-(0.99,0.19)，把该 UV 盒裁掉即消掉眼球描边环而保留头发描边（2026-08-25）。
@@ -170,7 +174,11 @@ Shader "GIC/PaimonToon"
 
             float _OutlineWidth;
             fixed4 _OutlineColor;
+            fixed4 _OutlineTint;
+            float _OutlineColorMode;
             float4 _OutlineClipUV;
+            sampler2D _BaseMap;
+            float4 _BaseMap_ST;
 
             struct appdata
             {
@@ -209,6 +217,14 @@ Shader "GIC/PaimonToon"
                 float4 box = _OutlineClipUV;
                 if (box.z > box.x && i.uv.x >= box.x && i.uv.x <= box.z && i.uv.y >= box.y && i.uv.y <= box.w)
                     discard;
+                // 原神式基色暗化描边（2026-08-26）：描边色=该处主贴图像素×暗化系数（RGB 逐通道），
+                // 随固有色变化（白衣→冷灰、肤色→暖棕、深发→深发色）；模式 0 回退固定色。
+                // 采样 UV 与本体 Pass 一致（_BaseMap_ST 变换）。
+                if (_OutlineColorMode > 0.5)
+                {
+                    fixed3 baseCol = tex2D(_BaseMap, TRANSFORM_TEX(i.uv, _BaseMap)).rgb;
+                    return fixed4(baseCol * _OutlineTint.rgb, 1);
+                }
                 return _OutlineColor;
             }
             ENDCG

@@ -5198,7 +5198,6 @@ MonoBehaviour:
   "\u7A97\u53E3\u63A7\u5236\u5668": {fileID: 1640153874}
   "\u7728\u773C\u63A7\u5236\u5668": {fileID: 288543650}
   "\u89C6\u7EBF\u63A7\u5236\u5668": {fileID: 288543654}
-  "\u8FB9\u754C\u7EA6\u675F": {fileID: 288543658}
   "\u76F8\u673A": {fileID: 0}
   "\u8499\u76AE\u6E32\u67D3\u5668": {fileID: 0}
   "\u5F85\u673A\u52A8\u4F5C\u540D": Ani_NPC_Kanban_Paimon_Standby
@@ -5245,11 +5244,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e1c1e1ac39a3ebe4dbe79aa76a2b13fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  "\u76F8\u673A": {fileID: 0}
-  "\u9AA8\u76C6\u9AA8\u540D": Bip001 Pelvis
-  "\u6C34\u5E73\u5BB9\u8BB8": 0.2
-  "\u5782\u76F4\u5BB9\u8BB8": 0.16
-  "\u63A8\u56DE\u901F\u5EA6": 8
 --- !u!4 &290337058 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1105298405864026603, guid: ceac5f2b7419cb84a9735e98307854a2, type: 3}
@@ -29991,6 +29985,8 @@ MonoBehaviour:
   "\u7F29\u653E\u6B65\u8FDB": 1.05
   "\u7A97\u53E3\u903B\u8F91\u5BBD": 550
   "\u7A97\u53E3\u903B\u8F91\u9AD8": 825
+  "\u9AA8\u76C6\u9AA8\u540D": Bip001 Pelvis
+  "\u8DDF\u968F\u6536\u5C3E\u79D2": 0.6
   "\u6253\u5370\u72B6\u6001\u65E5\u5FD7": 0
   "\u70D8\u7119\u95F4\u9694": 0.15
 --- !u!4 &1640153875

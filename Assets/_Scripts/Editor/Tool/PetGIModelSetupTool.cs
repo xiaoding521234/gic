@@ -225,6 +225,9 @@ namespace GIC.Editor
             // 非风格项（接线性质，幂等对齐）
             m.SetFloat("_OutlineWidth", outline);
             m.SetFloat("_Cull", cullOff ? 0f : 2f);
+            // 描边颜色模式（2026-08-26 原神式升级，幂等对齐）：1=基色暗化（描边=主贴图像素×_OutlineTint），
+            // 0=固定色。默认走 1——原神描边随固有色变化（白衣冷灰/肤色暖棕/深发深发色），固定暖棕是旧定妆。
+            m.SetFloat("_OutlineColorMode", 1f);
             if (diffuseTex != null)
             {
                 var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TexDir}/{diffuseTex}.png");
@@ -238,10 +241,13 @@ namespace GIC.Editor
                 m.SetFloat("_StyleVer", styleVer);
                 m.SetFloat("_ShadowStrength", 0f);
                 m.SetFloat("_RimStrength", 0f);
+                // 基色暗化描边系数（2026-08-26）：白衣描边≈0.5 灰、肤色≈0.45 暖棕、深发≈0.4 深发色——
+                // 逐通道系数让暖色暗得暖、冷色暗得冷，比统一系数更贴原神观感
+                m.SetColor("_OutlineTint", new Color(0.5f, 0.45f, 0.4f, 1f));
                 EnableKeyword(m, "_FACESHADOW", false);
                 if (outlineCol.a > 0f) m.SetColor("_OutlineColor", outlineCol); // default(Color) 全零=不覆盖
                 if (clipUV.z > clipUV.x) m.SetVector("_OutlineClipUV", clipUV);
-                log.AppendLine($"风格升级 {name} → v{styleVer}（纯贴图+描边色，UV裁剪={(clipUV.z > clipUV.x ? clipUV.ToString("F2") : "无")}）");
+                log.AppendLine($"风格升级 {name} → v{styleVer}（纯贴图+基色暗化描边，UV裁剪={(clipUV.z > clipUV.x ? clipUV.ToString("F2") : "无")}）");
             }
             EditorUtility.SetDirty(m);
         }
