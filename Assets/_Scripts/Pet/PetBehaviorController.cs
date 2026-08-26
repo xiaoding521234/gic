@@ -19,6 +19,8 @@ namespace GIC.Pet
         [SerializeField] private PetWindowController 窗口控制器;
         [SerializeField] private PetBlinkController 眨眼控制器; // 单次动作期间静默（morph 重评估与动作叠加互相放大顿挫）
         [SerializeField] private PetLookAtController 视线控制器; // 出场/退场期间静默（仪式动作头链全交 clip，2026-08-24）
+        [SerializeField] private PetEmotionController 情绪控制器;   // 拎起期的慌张表情（直接下发，不经动作映射）
+        [Tooltip("被拎起时播的专用动作（Drag01 垂落姿势：四肢常量垂落+躯干保留待机微动，loop 播放；摆动倾斜由拖拽物理倾角叠加）")] [SerializeField] private string 拎起动作名 = "Ani_NPC_Kanban_Paimon_Drag01";
         [Tooltip("空 = Camera.main")] [SerializeField] private Camera 相机;
         [Tooltip("空 = 自动找非影子壳的蒙皮渲染器（用包围盒做接近判定）")] [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
 
@@ -26,6 +28,7 @@ namespace GIC.Pet
         [SerializeField] private string 待机动作名 = "Ani_NPC_Kanban_Paimon_Standby";
         [SerializeField] private string 打招呼动作名 = "Ani_NPC_Kanban_Paimon_Greet";
         [Tooltip("光标距模型包围盒多少屏幕像素内算\"在旁边\"")] [SerializeField] private float 触发边距像素 = 90f;
+        [Tooltip("被拎起时下的表情（情绪表名；空=不表表情）")] [SerializeField] private string 拎起情绪名 = "Confuse";
         [Tooltip("光标停留多久触发打招呼")] [SerializeField] private float 触发停留秒 = 1.2f;
         [Tooltip("两次打招呼的最小间隔秒")] [SerializeField] private float 打招呼冷却秒 = 45f;
 
@@ -51,6 +54,17 @@ namespace GIC.Pet
         [Tooltip("双击退出时播的退场动画（完整 clip 名，空=立即退出）——播完才真正退出进程")]
         [SerializeField] private string 退场动画名 = "Ani_NPC_Kanban_Paimon_Disappear";
 
+        [Header("落地反应（拖拽物理甩出后的反馈）")]
+        [Tooltip("落地冲击速度超过此值（px/s）播反应动作——被甩狠了会生气/发懵/害羞")]
+        [SerializeField] private float 落地反应阈值 = 900f;
+        [Tooltip("落地反应动作池（随机其一；空=不反应）")]
+        [SerializeField] private string[] 落地反应列表 =
+        {
+            "Ani_NPC_Kanban_Paimon_Anger",
+            "Ani_NPC_Kanban_Paimon_Confuse01AS",
+            "Ani_NPC_Kanban_Paimon_Shy01AS",
+        };
+
         // 运行时状态
         private bool _单次进行中;
         private string _当前单次名;
@@ -63,6 +77,9 @@ namespace GIC.Pet
         private bool _退场中;                // 退场动画进行中：屏蔽一切行为触发
         private System.Action _退场完成回调; // 退场动画播完执行（进程关闭，由窗口控制器注入）
         private bool _仪式静默中;            // 出场/退场动画期间：眨眼+视线层静默（收尾统一解除）
+        private bool _拎起视线静默中;        // 拖拽物理期视线静默（2026-08-26：拎起 KO 垂落头被视线层拉向光标=目检"抬头看抓取点"根因）
+        private bool _拎起情绪开着;          // 拖拽物理期的拎起表情状态（边沿检测用）
+        private bool _上帧物理中;             // 物理交互结束边沿：回待机/清拎起表情
 
         void Start()
         {
@@ -93,6 +110,61 @@ namespace GIC.Pet
                     cb?.Invoke();
                 }
                 return;
+            }
+
+            // 拖拽物理期（拎起动画 v3，2026-08-26 用户拍板改主流桌宠式）：播专用 Drag01 垂落动画
+            // （业界 VPet/eSheep 被提起专用动画的 clip 等价物：四肢常量垂落、躯干保留待机微动、
+            // 无程序化骨骼叠加）+ 窗口控制器物理倾角摆动；慌张表情直发情绪层。
+            // 沿革：v1 程序化四肢垂落叠加层（PetDanglePoseController 已弃用留库）→ v2 Sleep01
+            // 躺姿+根旋转 90° 横躺（仓鼠式）→ v3 专用垂落动画。退场优先于物理（退场中抓住：
+            // 物理甩归甩，姿势保持退场动画，几秒后进程退出）。
+            bool 物理中 = 窗口控制器.物理交互中;
+            if (物理中)
+            {
+                if (_单次进行中)
+                {
+                    // 被物理打断的单次动作：恢复其设置的全套标志（收尾分支不走了）
+                    _单次进行中 = false;
+                    窗口控制器.单次动作中 = false;
+                    if (_仪式静默中) 置仪式静默(false); // 出场动画被打断
+                    else 眨眼控制器?.Set静默(false);
+                    窗口控制器.暂停命中烘焙 = false;
+                }
+                if (!string.IsNullOrEmpty(拎起动作名) && 动作播放器.动作存在(拎起动作名) && !动作播放器.是否在播(拎起动作名))
+                    动作播放器.Play(拎起动作名); // loop 播放（Play 会先下发映射情绪，如 Sleep→Sleepy）
+                // 拎起期视线静默（2026-08-26）：光标钉在抓点上，视线层会把 Drag01 垂落的头持续
+                // 拉向光标（KO 瘫软读成"抬头看抓取点"）——头链完全交给 Drag01 曲线；解除时
+                // Set视线静默(false) 内部有 _刚恢复 重同步，头会平滑回到视线跟随而非瞬移
+                if (!_拎起视线静默中)
+                {
+                    _拎起视线静默中 = true;
+                    视线控制器?.Set视线静默(true);
+                }
+                if (!_拎起情绪开着)
+                {
+                    _拎起情绪开着 = true;
+                    // 拎起情绪在动作映射情绪之后下发（覆盖 Sleepy）——慌张感优先
+                    if (情绪控制器 != null) 情绪控制器.SetEmotion(拎起情绪名);
+                }
+                _上帧物理中 = true;
+                return;
+            }
+            if (_上帧物理中)
+            {
+                // 物理刚结束：清拎起表情（落地反应单次刚开播则让位）+ 回待机（CrossFade 从拎起动作平滑过渡）
+                _上帧物理中 = false;
+                if (_拎起视线静默中)
+                {
+                    _拎起视线静默中 = false;
+                    视线控制器?.Set视线静默(false); // 内部 _刚恢复 重同步平滑基准，头平滑回到视线跟随
+                }
+                if (_拎起情绪开着)
+                {
+                    _拎起情绪开着 = false;
+                    if (情绪控制器 != null && !_单次进行中) 情绪控制器.SetEmotion("");
+                }
+                if (!_单次进行中 && 动作播放器.动作存在(待机动作名))
+                    动作播放器.Play(待机动作名);
             }
 
             // 出场：首帧（全部 Start 已完成 = PetAnimSwapper 预热已回待机）播出场动画；
@@ -149,8 +221,9 @@ namespace GIC.Pet
                 _接近计时 = 0f;
             }
 
-            // 随机小动作：光标不在旁边时才轮换（在旁时留给打招呼/视线跟随，避免动作打架）
-            if (启用随机小动作 && !接近 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
+            // 随机小动作：光标不在旁边且无物理交互（拖拽钟摆/飞行/收尾）时才轮换——在旁时留给打招呼/
+            // 视线跟随；物理交互期单次动作的窗口补偿会与物理窗口定位打架（2026-08-26）
+            if (启用随机小动作 && !接近 && !窗口控制器.物理交互中 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
             {
                 播单次(随机小动作列表[Random.Range(0, 随机小动作列表.Length)]);
                 _下次小动作时刻 = Time.time + Random.Range(小动作间隔秒.x, 小动作间隔秒.y);
@@ -174,6 +247,19 @@ namespace GIC.Pet
             _仪式静默中 = 静默;
             眨眼控制器?.Set静默(静默);
             视线控制器?.Set视线静默(静默);
+        }
+
+        /// <summary>拖拽物理落地冲击回调（PetWindowController 在物理交互收口时调用）：
+        /// 冲击速度够大时随机播一个反应动作（生气/发懵/害羞）。单次动作/退场中不叠加。</summary>
+        public void 播落地反应(float 冲击速度)
+        {
+            if (_单次进行中 || _退场中 || _出场未播) return;
+            if (冲击速度 < 落地反应阈值 || 落地反应列表 == null || 落地反应列表.Length == 0) return;
+            var 可用 = new System.Collections.Generic.List<string>(落地反应列表.Length);
+            foreach (var 名 in 落地反应列表)
+                if (动作播放器.动作存在(名)) 可用.Add(名);
+            if (可用.Count == 0) return;
+            播单次(可用[Random.Range(0, 可用.Count)]);
         }
 
         /// <summary>请求退场：播退场动画，播完执行回调（返回 false = 无退场动画可用，调用方直接退出）。

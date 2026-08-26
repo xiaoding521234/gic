@@ -9,7 +9,7 @@ namespace GIC.Editor
     /// <summary>
     /// PaimonPet 场景动作同步（2026-08-24 建；2026-08-25 切 GI 时代）：把 GI 原始 .anim
     /// （Assets/Art/PaimonPet/GI/Animations/，199 条零重定向直读）一键注册进 PaimonPet 的
-    /// Animation 组件（PetAnimSwapper.targetAnimation 所指），并重建动作测试 UI（AnimUICanvas，编辑器 Play 专用）。
+    /// Animation 组件（PetAnimSwapper.目标动画 所指），并重建动作测试 UI（AnimUICanvas，编辑器 Play 专用）。
     /// 单场景方案（2026-08-24）：原 PaimonRetargetTest 独立测试场景已废弃并入本场景——
     /// 测试 UI 也由此重建。幂等：清空重注册/删旧重建；默认 clip 按名字保持原引用，丢失则回退 Standby。
     /// MMD 重定向产物（Animations/MMD/）已随官方模型落地退出使用，仅兜底留存不再同步。
@@ -38,7 +38,7 @@ namespace GIC.Editor
         /// <summary>管线（PaimonRetargetPipeline 步骤 6）重定向完成后调用——此时 PaimonPet 已 Single 打开。</summary>
         public static void SyncInternal()
         {
-            // 目标 Animation = PetAnimSwapper.targetAnimation（唯一权威来源，勿按 FindObjectsOfType 顺序取——场景曾残留空 Animation 组件）
+            // 目标 Animation = PetAnimSwapper.目标动画（唯一权威来源，勿按 FindObjectsOfType 顺序取——场景曾残留空 Animation 组件）
             var swapper = Object.FindObjectsOfType<GIC.Pet.PetAnimSwapper>(true).FirstOrDefault();
             if (swapper == null)
             {
@@ -169,6 +169,7 @@ namespace GIC.Editor
                 ["Standby"] = "待机", ["Greet"] = "打招呼", ["Anger"] = "生气", ["Sneer01"] = "坏笑",
                 ["Clap01"] = "鼓掌", ["Nod01"] = "点头", ["ShakeHead01"] = "摇头", ["Refuse01"] = "拒绝",
                 ["Run"] = "跑动", ["SitLoop"] = "坐姿", ["Sleep01"] = "睡觉", ["Turnback"] = "转身",
+                ["Drag01"] = "拎起",
                 ["Domagic"] = "施法",
                 ["Shy01AS"] = "害羞·入场", ["Shy01BS"] = "害羞·退场", ["Shy01Loop"] = "害羞·循环",
                 ["Confuse01AS"] = "困惑·入场", ["Confuse01BS"] = "困惑·退场", ["Confuse01Loop"] = "困惑·循环",

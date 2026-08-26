@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -17,10 +18,10 @@ namespace GIC.Pet
             [Tooltip("情绪名（PetEmotionController 情绪表中的名，空=不表情绪）")] public string 情绪名;
         }
 
-        [SerializeField] private Animation targetAnimation; // Paimon_MMD 根上的 Animation 组件
+        [SerializeField, FormerlySerializedAs("targetAnimation")] private Animation 目标动画; // GI 官方模型骨节点上的 Animation 组件
 
         /// <summary>当前驱动的 Animation 组件（编辑器同步工具按此注册 clip，勿按 FindObjectsOfType 顺序找）</summary>
-        public Animation TargetAnimation => targetAnimation;
+        public Animation TargetAnimation => 目标动画;
 
         [Header("动作→情绪映射（表情由情绪层驱动，不烘焙进 clip）")]
         [SerializeField] private 动作情绪映射[] 情绪映射 = new[]
@@ -40,8 +41,8 @@ namespace GIC.Pet
             new 动作情绪映射 { 动作名片段 = "SitLoop", 情绪名 = "Sleepy" },
         };
 
-        [SerializeField] private PetEmotionController emotionController; // 情绪层（可空=无表情）
-        [SerializeField] private PetFingerPoseController fingerPoseController; // 手指姿态层（可空=手指走 clip 曲线）
+        [SerializeField, FormerlySerializedAs("emotionController")] private PetEmotionController 情绪控制器; // 情绪层（可空=无表情）
+        [SerializeField, FormerlySerializedAs("fingerPoseController")] private PetFingerPoseController 手指姿态控制器; // 手指姿态层（可空=手指走 clip 曲线）
 
         [Header("过渡")]
         [Tooltip("动作切换 CrossFade 时长（秒）——过渡期双 clip 双采样，过长则混合开销放大顿挫（2026-08-24 实验：纯播大摆动动作零掉帧，顿挫全在过渡/叠加层）")]
@@ -51,7 +52,7 @@ namespace GIC.Pet
 
         void Start()
         {
-            if (启动预热 && targetAnimation != null) 预热全部Clip();
+            if (启动预热 && 目标动画 != null) 预热全部Clip();
         }
 
         /// <summary>逐 clip Play→Sample→Stop（全部在 Start 帧内完成，渲染前无视觉闪现），
@@ -60,21 +61,21 @@ namespace GIC.Pet
         {
             float t0 = Time.realtimeSinceStartup;
             var names = new System.Collections.Generic.List<string>();
-            foreach (AnimationState st in targetAnimation) names.Add(st.name);
+            foreach (AnimationState st in 目标动画) names.Add(st.name);
             foreach (var n in names)
             {
-                var st = targetAnimation[n];
+                var st = 目标动画[n];
                 if (st == null || st.clip == null) continue;
                 st.wrapMode = WrapMode.Loop;
-                targetAnimation.Play(n);
-                targetAnimation.Sample();
-                targetAnimation.Stop();
+                目标动画.Play(n);
+                目标动画.Sample();
+                目标动画.Stop();
             }
             // 回默认待机
-            if (targetAnimation.clip != null)
+            if (目标动画.clip != null)
             {
-                var def = targetAnimation[targetAnimation.clip.name];
-                if (def != null) { def.wrapMode = WrapMode.Loop; targetAnimation.Play(targetAnimation.clip.name); }
+                var def = 目标动画[目标动画.clip.name];
+                if (def != null) { def.wrapMode = WrapMode.Loop; 目标动画.Play(目标动画.clip.name); }
             }
             Debug.Log($"[PetAnimSwapper] 预热 {names.Count} 个 clip 耗时 {(Time.realtimeSinceStartup - t0) * 1000:F0}ms");
         }
@@ -93,14 +94,14 @@ namespace GIC.Pet
         /// <summary>clip 是否正在播放（单次动作结束判定用）</summary>
         public bool 是否在播(string clipName)
         {
-            return targetAnimation != null && targetAnimation.IsPlaying(clipName);
+            return 目标动画 != null && 目标动画.IsPlaying(clipName);
         }
 
         /// <summary>clip 是否已注册可播（出场/退场等关键动作的存在性判断；空名安全）</summary>
         public bool 动作存在(string clipName)
         {
-            if (string.IsNullOrEmpty(clipName) || targetAnimation == null) return false;
-            var state = targetAnimation[clipName];
+            if (string.IsNullOrEmpty(clipName) || 目标动画 == null) return false;
+            var state = 目标动画[clipName];
             return state != null && state.clip != null;
         }
 
@@ -111,34 +112,34 @@ namespace GIC.Pet
         /// 提前切回待机，让 CrossFade 与动作尾部重叠——消除"播完定格→再淡入"的割裂感。</summary>
         public float 剩余秒(string clipName)
         {
-            if (targetAnimation == null || string.IsNullOrEmpty(clipName)) return -1f;
-            var state = targetAnimation[clipName];
+            if (目标动画 == null || string.IsNullOrEmpty(clipName)) return -1f;
+            var state = 目标动画[clipName];
             if (state == null || state.clip == null) return -1f;
-            if (!targetAnimation.IsPlaying(clipName)) return 0f;
+            if (!目标动画.IsPlaying(clipName)) return 0f;
             return Mathf.Max(0f, state.clip.length - state.time);
         }
 
         void 播放(string clipName, WrapMode 循环模式)
         {
-            if (targetAnimation == null) return;
-            var state = targetAnimation[clipName];
+            if (目标动画 == null) return;
+            var state = 目标动画[clipName];
             if (state == null || state.clip == null) return;
             state.wrapMode = 循环模式;
             // v19 流畅度（2026-08-23）：Stop()+Play() 硬切 → CrossFade 平滑过渡（原神观感）；
             // 2026-08-24 0.3→0.2：过渡期双 clip 双采样是顿挫放大器，收紧窗口
-            targetAnimation.CrossFade(clipName, 动作过渡秒);
+            目标动画.CrossFade(clipName, 动作过渡秒);
 
             // 情绪下发：无映射的情绪动作 → 下发空名清回默认脸
-            if (emotionController != null)
+            if (情绪控制器 != null)
             {
                 var emo = "";
                 foreach (var m in 情绪映射)
                     if (!string.IsNullOrEmpty(m.动作名片段) && clipName.Contains(m.动作名片段)) { emo = m.情绪名; break; }
-                emotionController.SetEmotion(emo);
+                情绪控制器.SetEmotion(emo);
             }
 
             // 手指姿态切换（2026-08-23 程序化手指层）：按 clip 名让 PetFingerPoseController 接管五指
-            fingerPoseController?.SetPose(clipName);
+            手指姿态控制器?.SetPose(clipName);
         }
     }
 }

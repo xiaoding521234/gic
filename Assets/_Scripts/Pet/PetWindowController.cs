@@ -8,7 +8,7 @@ namespace GIC.Pet
 {
     /// <summary>
     /// 桌宠窗口控制器：Win32 无边框 + 透明 + 置顶 + 固定小窗跟随 +
-    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型拖拽移动 + 限帧。
+    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型物理拖拽（斗篷钟摆+甩起飞行，2026-08-26）+ 限帧。
     /// 透明双方案（2026-08-21 拍板主流优先）：默认 DWM 逐像素 alpha（DwmExtendFrameIntoClientArea，
     /// 边缘无毛边、支持半透明）；色键 LWA_COLORKEY 保留作兜底开关。
     /// 命中检测/拖拽全部走 Win32 轮询（GetCursorPos/GetAsyncKeyState），不依赖窗口焦点与 Unity 输入系统。
@@ -22,8 +22,22 @@ namespace GIC.Pet
     /// 清除后 CrossFade 回待机的尾段混合期继续补偿，根/窗口随混合平滑归零（替代旧"三件套归位 lerp"，
     /// 无 lerp 状态）。待机（模式 0）相机+根+窗口全静止，模型窗内自由微动（VPet 画布余量哲学）。
     /// 曾试全屏覆盖体制：3200×2000@200%DPI 实测帧率腰斩+单核 93%，废弃。**拖拽/动作移动窗口无屏边
-    /// 钳制（2026-08-25 拍板，为边缘交互铺路）**；拖拽松手窗口完全出虚拟屏时拉回屏内（VPet
+    /// 钳制（2026-08-25 拍板，为边缘交互铺路）**；飞行结束窗口完全出虚拟屏才拉回屏内（VPet
     /// CheckCurrentScreen 同款防丢）；pet.json 持久化缩放+窗口原点。
+    ///
+    /// 拖拽物理（2026-08-26，docs/19 §6.1 抓斗篷钟摆，纯模拟在 PetDragPhysicsController）：
+    /// 抓点（光标）钉住斗篷，骨盆做不可伸长绳单摆质量点——窗口按"骨盆客户区投影钉物理目标位"
+    /// 定位（根平移全程不动，仅根旋转=倾角绕Z(父系) × 转身绕Y(父系) × 基准；旋转致骨盆在窗内位移
+    /// 由窗口位置吸收，骨盆屏幕位恒钉物理目标）。快速画圈=绕光标甩转；松手速度超阈值=飞行（重力弹道+
+    /// 当前显示器工作区底弹跳+虚拟屏侧墙反弹），低速松手=原地收尾（保留随意摆放 UX）。
+    /// 旧"窗口 1:1 绝对定位到光标"直移拖拽已废弃。
+    ///
+    /// 拎起姿势（2026-08-26 v6 瘫软式+3/4 偏左转身）：拖拽/飞行期播专用 Drag01 垂落动画（四肢常量垂落+
+    /// 躯干保留待机微动），根姿势基准=拎起转身角（默认 45° 3/4 偏左：用户新参考图，身体略朝左而非全侧挂；
+    /// Drag01 的 C 型前屈朝模型前方，转身后即朝屏幕左前方）×拎起横躺角（默认 0 直立），摆动感由物理倾角
+    /// 单独承担。沿革：v1 程序化四肢垂落叠加层（PetDanglePoseController，已弃用留库）→ v2 Sleep01
+    /// 躺姿+横躺 90°（仓鼠式）→ v3 专用垂落动画 → v4 瘫软低头+90° 侧挂 → v5 全侧挂深化（KO 式头折向地面，
+    /// 已废）→ v6 瘫软 45° 头朝观众+3/4 偏左。
     /// </summary>
     public class PetWindowController : MonoBehaviour
     {
@@ -73,8 +87,14 @@ namespace GIC.Pet
         private bool restyled;
         private bool dragging;
 
-        /// <summary>是否正在拖拽派蒙（行为层打断打招呼等触发用）</summary>
-        public bool 正在拖拽 => dragging;
+        /// <summary>物理交互进行中（拖拽钟摆/甩出飞行/收尾旋转归位）——行为层压制触发用</summary>
+        public bool 物理交互中 => 拖拽物理 != null && 拖拽物理.交互中;
+
+        /// <summary>拖拽物理飞行中（行为层驱动空中扑腾姿势用）</summary>
+        public bool 拖拽飞行中 => 拖拽物理 != null && 拖拽物理.飞行中;
+
+        /// <summary>是否正在拖拽/甩动派蒙（行为层打断打招呼、随机小动作等用；含飞行与收尾全程）</summary>
+        public bool 正在拖拽 => dragging || 物理交互中;
 
         /// <summary>命中网格的世界包围盒（行为层接近判定用）。来源=MeshCollider（BakeMesh 烘的真实蒙皮网格
         /// + 与 SMR 同 transform，PhysX 世界包围盒正确——像素级点击命中一直精准即证明）。
@@ -91,9 +111,22 @@ namespace GIC.Pet
         private bool passThroughOn;
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
-        private Vector2Int _拖拽抓取偏移;    // 拖拽起手时光标在窗口内的偏移：窗口绝对定位=光标-偏移（eSheep 同款 1:1 跟手，零反馈环）
+        private Quaternion _拖拽基准旋转 = Quaternion.identity; // 拖拽物理期的根旋转基准（收尾中被再抓不重取，防旋转叠加）
+        private Vector3 _拖拽基准根位置;   // 拖拽物理期的根位置基准（绕骨盆枢轴旋转的平移补偿会动根位置，收口还原）
+        private float _当前横躺角;         // 平滑中的拎起姿势基准角（度，正=头朝左；0=直立垂落，主流桌宠姿态）
+        private float _当前转身角;         // 平滑中的拎起转身角（度，正=脸朝屏幕左；Drag01 的前屈朝向随之转向左侧）
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
         private PetBehaviorController 行为控制器; // 双击退出的退场动画协作（播 Disappear 后再关进程）
+
+        [Header("拖拽物理（docs/19 §6.1 抓斗篷钟摆）")]
+        [Tooltip("拖拽物理模拟组件（纯数学：钟摆/挣扎/飞行弹跳/倾角弹簧），窗口定位与根旋转由本控制器应用")]
+        [SerializeField] private PetDragPhysicsController 拖拽物理;
+        [Tooltip("被拎起时身体姿势基准角（度）：0=直立垂落（主流桌宠被提起姿态，配 Drag01 专用拎起动画），90=头朝左横躺（旧仓鼠式），-90=头朝右。松手收尾自动平滑归零")]
+        [SerializeField] private float 拎起横躺角 = 0f;
+        [Tooltip("被拎起时身体绕竖直轴转身角（度）：90=侧身脸/肚子朝屏幕左（v5 侧挂式），45=3/4 偏左（v6 用户参考图），0=正对玩家，-90=朝屏幕右。与横躺角独立叠加，松手收尾自动平滑归零")]
+        [SerializeField] private float 拎起转身角 = 45f;
+        [Tooltip("横躺角/转身角淡入淡出速度（每秒指数趋近率）——抓起转过去/松手转回来的快慢")]
+        [SerializeField] private float 横躺融合速度 = 7f;
         private bool 已请求退出;              // 退场动画进行中：屏蔽重复双击与新拖拽
         private float 目标缩放 = 1f; // 滚轮缩放的目标倍率（持久化存这个值）
         private float 显示缩放 = 1f; // 实际应用倍率（每帧向目标指数平滑趋近）
@@ -141,6 +174,7 @@ namespace GIC.Pet
         private IntPtr _mouseHook = IntPtr.Zero;
         private HookProc _mouseHookProc; // 防 GC 回收委托
         private float _hookKeepUntil = -10f; // 滞回：离开模型 0.5s 后才摘钩
+        private float _上次窗口体检 = -10f;  // 防隐形守卫低频节流（0.5s 一次）
         private static int _pendingWheelDelta; // 钩子线程累加写入，Update 主线程取走清零（120=一格）
 
         #region Win32
@@ -157,6 +191,8 @@ namespace GIC.Pet
         [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, out RECT pvParam, uint fWinIni);
         [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
+        [DllImport("user32.dll")] private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
         [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
         [DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
         [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hhk);
@@ -164,6 +200,8 @@ namespace GIC.Pet
         [DllImport("kernel32.dll")] private static extern IntPtr GetModuleHandle(string lpModuleName);
         [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
         [DllImport("dwmapi.dll")] private static extern uint DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
+        [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         private const int GWL_STYLE = -16;
         private const int GWL_EXSTYLE = -20;
@@ -185,6 +223,8 @@ namespace GIC.Pet
         private const int SM_YVIRTUALSCREEN = 77;
         private const int SM_CXVIRTUALSCREEN = 78;
         private const int SM_CYVIRTUALSCREEN = 79;
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
+        private const int SW_SHOWNOACTIVATE = 4;
         private const int VK_LBUTTON = 0x01;
         private const int WH_MOUSE_LL = 14;
         private const int WM_MOUSEWHEEL = 0x020A;
@@ -195,6 +235,7 @@ namespace GIC.Pet
         [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
         [StructLayout(LayoutKind.Sequential)] private struct MARGINS { public int cxLeftWidth; public int cxRightWidth; public int cyTopHeight; public int cyBottomHeight; }
         [StructLayout(LayoutKind.Sequential)] private struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData; public uint flags; public uint time; public IntPtr dwExtraInfo; }
+        [StructLayout(LayoutKind.Sequential)] private struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public int dwFlags; }
 
         #endregion
 
@@ -223,7 +264,7 @@ namespace GIC.Pet
             {
                 Application.targetFrameRate = 目标帧率;
             }
-            Debug.Log($"[PetSpike] 帧节奏：refresh={refresh}Hz vsync={QualitySettings.vSyncCount} → " +
+            Debug.Log($"[PetWindow] 帧节奏：refresh={refresh}Hz vsync={QualitySettings.vSyncCount} → " +
                       $"{(QualitySettings.vSyncCount > 0 ? $"{refresh / (float)QualitySettings.vSyncCount:F1}fps（帧预算 {1000f * QualitySettings.vSyncCount / refresh:F1}ms）" : $"限帧{目标帧率}")}");
 #endif
             Application.runInBackground = true;
@@ -233,6 +274,8 @@ namespace GIC.Pet
         {
             cam = Camera.main;
             行为控制器 = FindObjectOfType<PetBehaviorController>();
+            if (拖拽物理 == null) 拖拽物理 = FindObjectOfType<PetDragPhysicsController>();
+            if (拖拽物理 == null) Debug.LogError("[PetWindow] 未找到 PetDragPhysicsController（拖拽物理）——物理拖拽不可用，检查 PaimonPet 场景接线");
             if (cam != null)
             {
                 // 透明要求相机输出恒定背景；关 HDR 防浮点缓冲漂移
@@ -283,13 +326,13 @@ namespace GIC.Pet
             }
             if (命中网格碰撞体 == null)
             {
-                Debug.LogError("[PetSpike] 未找到蒙皮渲染器，命中判定失效");
+                Debug.LogError("[PetWindow] 未找到蒙皮渲染器，命中判定失效");
             }
 
 #if UNITY_EDITOR
             // 编辑器内禁止 Win32 窗口改造——GetActiveWindow 拿到的是编辑器自身窗口，会破坏编辑器 UI。
             // 桌宠形态仅存在于构建产物（主进程自动拉起 / gic.exe --pet-mode）；编辑器 Play 本场景只做模型预览。
-            Debug.Log("[PetSpike] 编辑器模式：跳过窗口改造。桌宠由主进程自动拉起（Builds/PetSpike/gic.exe）");
+            Debug.Log("[PetWindow] 编辑器模式：跳过窗口改造。桌宠由主进程自动拉起（Builds/PetSpike/gic.exe）");
 #else
             if (Screen.fullScreen)
             {
@@ -299,7 +342,7 @@ namespace GIC.Pet
             hwnd = GetActiveWindow();
             if (hwnd == IntPtr.Zero)
             {
-                Debug.LogError("[PetSpike] 未取到窗口句柄，窗口改造失败");
+                Debug.LogError("[PetWindow] 未取到窗口句柄，窗口改造失败");
                 return;
             }
 
@@ -378,7 +421,7 @@ namespace GIC.Pet
             // 常驻钩子对全系统鼠标消息做封送分配+主线程回调，鼠标移动时灌爆主线程）
 
             restyled = true;
-            Debug.Log($"[PetSpike] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(使用DWM透明 ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} fixedClient={固定窗口宽}x{固定窗口高} scale={目标缩放:F2} maxScale={有效缩放最大:F2} pos={(恢复了位置 ? "restored" : "dock/default")}");
+            Debug.Log($"[PetWindow] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(使用DWM透明 ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} fixedClient={固定窗口宽}x{固定窗口高} scale={目标缩放:F2} maxScale={有效缩放最大:F2} pos={(恢复了位置 ? "restored" : "dock/default")}");
         }
 
         /// <summary>恢复存档窗口位置（客户区原点，钳制到虚拟屏幕防显示器拔掉后找不到派蒙）。成功=true。
@@ -469,6 +512,144 @@ namespace GIC.Pet
             SetWindowPos(hwnd, IntPtr.Zero, nx, ny, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
         }
 
+        #region 拖拽物理（docs/19 §6.1 抓斗篷钟摆：窗口定位/根旋转应用层，纯模拟在 PetDragPhysicsController）
+
+        /// <summary>拖拽起手：采集模型屏幕度量（像素密度/半宽/骨盆到脚底）与骨盆屏幕位，交给物理组件
+        /// 建摆（绳长=光标到骨盆距离，抓哪是哪）；根旋转基准仅在从静止起手时快照（收尾中被再抓不叠加）。</summary>
+        private void 开始物理拖拽(POINT pt)
+        {
+            if (拖拽物理 == null || _骨盆 == null || cam == null || hwnd == IntPtr.Zero || _paimon根 == null) return;
+
+            // 模型屏幕度量（抓取瞬间，直立站姿）：命中包围盒 8 角投影到客户区像素（物理像素）
+            float 每米像素 = 400f, 半宽 = 80f, 骨盆到脚底 = 200f;
+            if (TryGet命中世界包围盒(out Bounds b) && 世界包围盒客户区投影(b, out float minX, out float maxX, out float minY, out float maxY))
+            {
+                if (b.size.y > 0.01f) 每米像素 = (maxY - minY) / b.size.y;
+                半宽 = (maxX - minX) * 0.5f;
+                if (世界坐标转客户区像素(_骨盆.position, out Vector2 骨盆客户)) 骨盆到脚底 = Mathf.Max(10f, maxY - 骨盆客户.y);
+            }
+            if (!世界坐标转客户区像素(_骨盆.position, out Vector2 pc)) return;
+            var origin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref origin);
+            Vector2 骨盆屏幕 = new Vector2(origin.X + pc.x, origin.Y + pc.y);
+
+            if (!拖拽物理.交互中)
+            {
+                _拖拽基准旋转 = _paimon根.localRotation;
+                _拖拽基准根位置 = _paimon根.position;
+            }
+            拖拽物理.开始拖拽(new Vector2(pt.X, pt.Y), 骨盆屏幕, 每米像素, 半宽, 骨盆到脚底);
+            if (打印状态日志)
+                Debug.Log($"[PetWindow] 物理拖拽起手 绳长≈{Vector2.Distance(new Vector2(pt.X, pt.Y), 骨盆屏幕):F0}px 每米像素={每米像素:F0} 半宽={半宽:F0} 脚底偏移={骨盆到脚底:F0}");
+        }
+
+        /// <summary>应用物理帧输出：根旋转 = 倾角绕Z(父系) × 转身绕Y(父系) × 基准（倾角右倾为正故取负号；
+        /// 相机在 -Z 侧看 +Z、屏幕右=+X：+Y 转身 90° 把模型前方(-Z)转到屏幕左(-X)=脸/肚子朝左）。
+        /// 倾角最外层=绕相机轴的屏幕平面摆动（钟摆物理平面），转身在其内=竖直轴自转，二者解耦互不干扰
+        /// （Paimon 根基准为 identity，父系=世界系）。旋转**绕骨盆枢轴**——
+        /// 旋转后补偿根平移把骨盆钉回旋转前位置：横躺 90° 时头/脚以骨盆为中心横向铺开（窗口 550 逻辑宽
+        /// 容纳身高投影），绕根旋转会让头出窗被裁。拖拽/飞行阶段窗口按"骨盆客户区投影钉物理目标位"定位。</summary>
+        private void 应用物理帧()
+        {
+            if (拖拽物理 == null || _paimon根 == null) return;
+            Vector3 骨盆旋转前 = _骨盆 != null ? _骨盆.position : Vector3.zero;
+            _paimon根.localRotation = Quaternion.AngleAxis(_当前横躺角 - 拖拽物理.当前倾角, Vector3.forward)
+                                    * Quaternion.AngleAxis(_当前转身角, Vector3.up)
+                                    * _拖拽基准旋转;
+            if (_骨盆 != null)
+            {
+                // 绕骨盆枢轴补偿：骨盆钉回旋转前世界位（动画微动保留，仅抵消旋转带来的位移）
+                Vector3 位移 = 骨盆旋转前 - _骨盆.position;
+                if (位移.sqrMagnitude > 1e-10f) _paimon根.position += 位移;
+            }
+            if (拖拽物理.阶段 == PetDragPhysicsController.交互阶段.拖拽 || 拖拽物理.飞行中)
+                按骨盆目标定位窗口();
+        }
+
+        /// <summary>窗口定位：客户区原点 = 骨盆屏幕目标 - 本帧骨盆客户区偏移（旋转后动态投影——根平移
+        /// 全程不动，旋转/动画致骨盆在窗内位移由窗口位置吸收，骨盆屏幕位恒钉物理目标）。</summary>
+        private void 按骨盆目标定位窗口()
+        {
+            if (拖拽物理 == null || !世界坐标转客户区像素(_骨盆.position, out Vector2 骨盆客户)) return;
+            GetFrameSize(out _, out _, out int frameLeft, out int frameTop);
+            Vector2 目标 = 拖拽物理.当前骨盆屏幕;
+            SetWindowPos(hwnd, IntPtr.Zero,
+                Mathf.RoundToInt(目标.x - 骨盆客户.x) - frameLeft,
+                Mathf.RoundToInt(目标.y - 骨盆客户.y) - frameTop,
+                0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+        }
+
+        /// <summary>飞行环境（Win32）：地面=骨盆所在显示器工作区底（任务栏上沿，跨屏飞行时逐帧换算），
+        /// 侧墙=虚拟屏左右界（物理像素）。多显示器工作区可能为负坐标，取不到时兜底主屏工作区。</summary>
+        private void 计算飞行环境(Vector2 骨盆屏幕, out float 地面Y, out float 左界, out float 右界)
+        {
+            bool got = false;
+            地面Y = 0f;
+            var ptm = new POINT { X = (int)骨盆屏幕.x, Y = (int)骨盆屏幕.y };
+            IntPtr mon = MonitorFromPoint(ptm, MONITOR_DEFAULTTONEAREST);
+            if (mon != IntPtr.Zero)
+            {
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+                if (GetMonitorInfoW(mon, ref mi)) { 地面Y = mi.rcWork.Bottom; got = true; }
+            }
+            if (!got)
+            {
+                SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
+                地面Y = work.Bottom;
+            }
+            左界 = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            右界 = 左界 + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        }
+
+        /// <summary>物理交互收口（拖拽/飞行/收尾全部结束）：根旋转/根位置精确归位（横躺清零）、窗口完全出
+        /// 虚拟屏才拉回（防丢兜底，VPet CheckCurrentScreen 同款）、位置落盘、落地冲击够大交行为层播反应。</summary>
+        private void 物理交互收口()
+        {
+            if (_paimon根 != null)
+            {
+                _paimon根.localRotation = _拖拽基准旋转;
+                _paimon根.position = _拖拽基准根位置;
+            }
+            _当前横躺角 = 0f;
+            _当前转身角 = 0f;
+            拖拽松手防丢拉回();
+            标记待写入();
+            if (拖拽物理 != null && 拖拽物理.落地冲击速度 > 0f)
+                行为控制器?.播落地反应(拖拽物理.落地冲击速度);
+        }
+
+        /// <summary>世界坐标 → 客户区像素（x 自左、y 自顶，物理像素=渲染像素）。</summary>
+        private bool 世界坐标转客户区像素(Vector3 world, out Vector2 客户像素)
+        {
+            客户像素 = default;
+            if (cam == null || hwnd == IntPtr.Zero) return false;
+            Vector3 vp = cam.WorldToViewportPoint(world);
+            if (vp.z <= 0f) return false;
+            GetClientRect(hwnd, out RECT cr);
+            int cw = cr.Right - cr.Left, ch = cr.Bottom - cr.Top;
+            if (cw <= 0 || ch <= 0) return false;
+            客户像素 = new Vector2(vp.x * cw, (1f - vp.y) * ch);
+            return true;
+        }
+
+        /// <summary>世界包围盒 8 角点 → 客户区像素投影范围（物理像素；角点跨相机平面=异常返回 false）。</summary>
+        private bool 世界包围盒客户区投影(Bounds b, out float minX, out float maxX, out float minY, out float maxY)
+        {
+            minX = float.MaxValue; maxX = float.MinValue; minY = float.MaxValue; maxY = float.MinValue;
+            for (int xi = 0; xi < 2; xi++)
+                for (int yi = 0; yi < 2; yi++)
+                    for (int zi = 0; zi < 2; zi++)
+                    {
+                        var c = new Vector3(xi == 0 ? b.min.x : b.max.x, yi == 0 ? b.min.y : b.max.y, zi == 0 ? b.min.z : b.max.z);
+                        if (!世界坐标转客户区像素(c, out Vector2 p)) return false;
+                        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+                    }
+            return true;
+        }
+
+        #endregion
+
         /// <summary>窗口矩形与客户区的差值（无边框后理论上≈0，实测兜底；含隐形边框）</summary>
         private void GetFrameSize(out int frameW, out int frameH, out int frameLeft, out int frameTop)
         {
@@ -512,7 +693,7 @@ namespace GIC.Pet
                     _mouseHookProc = MouseHookCallback;
                     _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseHookProc, GetModuleHandle(null), 0);
                     if (_mouseHook == IntPtr.Zero)
-                        Debug.LogWarning("[PetSpike] 鼠标钩子安装失败，滚轮缩放退回 Input.mouseScrollDelta");
+                        Debug.LogWarning("[PetWindow] 鼠标钩子安装失败，滚轮缩放退回 Input.mouseScrollDelta");
                 }
                 _hookKeepUntil = Time.unscaledTime + 0.5f;
             }
@@ -554,7 +735,7 @@ namespace GIC.Pet
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[PetSpike] pet.json 读取失败（按无存档处理）：{e.Message}");
+                Debug.LogWarning($"[PetWindow] pet.json 读取失败（按无存档处理）：{e.Message}");
                 载入存档 = null;
             }
         }
@@ -573,7 +754,7 @@ namespace GIC.Pet
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[PetSpike] pet.json 写入失败：{e.Message}");
+                Debug.LogWarning($"[PetWindow] pet.json 写入失败：{e.Message}");
             }
             finally
             {
@@ -628,8 +809,8 @@ namespace GIC.Pet
         /// <summary>
         /// 小窗跟随状态机（2026-08-25 夜重构，严格 VPet/eSheep 体制：相机永不移动、模型窗内构图恒定、
         /// 只有窗口移动）。模式 2=单次动作：根绝对补偿（假想位移=骨盆世界位换算回锚点根坐标系，
-        /// 每帧从动画值重导出，零累积）+窗口跟假想位移屏幕像素；模式 1=拖拽：窗口由 Update 直接
-        /// 绝对定位到光标（根不动）；模式 0=待机：全静止（VPet 画布余量哲学）。
+        /// 每帧从动画值重导出，零累积）+窗口跟假想位移屏幕像素；模式 1=拖拽/物理交互：窗口由 Update
+        /// 物理链路定位（拖拽钟摆/飞行弹跳，2026-08-26），根平移不动；模式 0=待机：全静止（VPet 画布余量哲学）。
         /// 单次动作收尾走"跟随宽限"：行为层标志清除后 跟随收尾秒 内继续补偿——CrossFade 回待机的
         /// 尾段混合期骨盆仍在回位，继续补偿=根/窗口随混合平滑归零（无归位 lerp、无残余状态）。
         /// </summary>
@@ -637,13 +818,16 @@ namespace GIC.Pet
         {
             if (!restyled || hwnd == IntPtr.Zero || _骨盆 == null || cam == null || _paimon根 == null) return;
 
-            // 单次动作标志下降沿（非拖拽时）→启动收尾宽限：覆盖尾段混合期
-            if (_上帧单次动作中 && !单次动作中 && !dragging)
+            // 单次动作标志下降沿（非物理交互时）→启动收尾宽限：覆盖尾段混合期
+            bool 物理中 = 拖拽物理 != null && 拖拽物理.交互中;
+            if (_上帧单次动作中 && !单次动作中 && !物理中)
                 _宽限截止 = Time.unscaledTime + 跟随收尾秒;
             _上帧单次动作中 = 单次动作中;
 
             bool 单次动作或宽限 = 单次动作中 || Time.unscaledTime < _宽限截止;
-            int mode = dragging ? 1 : (单次动作或宽限 ? 2 : 0);
+            // 物理交互（拖拽钟摆/飞行/收尾）期间恒为模式 1：窗口由 Update 物理链路定位，模式 2 的
+            // 根补偿/窗口跟随被压制（抓取时被打断的单次动作在物理结束后自然恢复补偿与收尾宽限）
+            int mode = (dragging || 物理中) ? 1 : (单次动作或宽限 ? 2 : 0);
 
             if (mode != _跟随模式)
             {
@@ -675,8 +859,8 @@ namespace GIC.Pet
                 // 窗口 = 锚点窗 + 假想位移屏幕像素（含 Z 透视效应的完整屏幕轨迹；move-only）
                 窗口跟随平移(hyp);
             }
-            // 模式 1（拖拽）LateUpdate 无事可做：窗口已由 Update 直接绝对定位到光标（1:1 跟手，
-            // 独立于跟随公式），根不动——模式切换的重锚/落盘已在上方状态机收口
+            // 模式 1（拖拽/物理交互）LateUpdate 无事可做：窗口已由 Update 物理链路定位（骨盆客户区
+            // 投影钉物理目标位），根平移不动——模式切换的重锚/落盘已在上方状态机收口
         }
 
         /// <summary>窗口平移到 锚点窗+(骨盆位置-锚点骨盆) 的屏幕像素（绝对定位，无逐帧累积；
@@ -718,6 +902,34 @@ namespace GIC.Pet
                 return;
             }
 
+            // 防隐形守卫（2026-08-26）：Win+D/显示桌面/显示器休眠重排等系统事件会把窗口停靠到
+            // 屏外停车位（实测 -16384,-16384，IsIconic=False——不是真最小化，SW_RESTORE 拉不回），
+            // 桌宠置顶常驻"看不见=死亡"。0.5s 低频体检：iconic→复活（不抢焦点）；整窗与虚拟屏
+            // 零交集且非用户主动拖拽/物理飞行→拉回屏内（复用松手防丢）。用户交互期不干预
+            // （拖拽无屏边钳制是 2026-08-25 拍板，物理飞行有自己的边界反弹）。
+            if (Time.unscaledTime - _上次窗口体检 >= 0.5f)
+            {
+                _上次窗口体检 = Time.unscaledTime;
+                bool 用户在移动 = dragging || (拖拽物理 != null && 拖拽物理.交互中);
+                if (!用户在移动)
+                {
+                    if (IsIconic(hwnd))
+                    {
+                        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+                    }
+                    else
+                    {
+                        GetWindowRect(hwnd, out RECT wr);
+                        int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+                        int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+                        int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                        int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                        if (wr.Right <= vx || wr.Left >= vx + vw || wr.Bottom <= vy || wr.Top >= vy + vh)
+                            拖拽松手防丢拉回();
+                    }
+                }
+            }
+
             GetCursorPos(out POINT pt);
             GetClientRect(hwnd, out RECT clientRect);
             var clientOrigin = new POINT { X = 0, Y = 0 };
@@ -755,7 +967,7 @@ namespace GIC.Pet
             // 钩子按需挂/摘（2026-08-24：滚轮缩放只在命中模型时消费，常驻钩子平白吃全系统鼠标消息）
             UpdateHookForHit(modelHit && 允许滚轮缩放);
 
-            // 拖拽：全局轮询左键，不依赖焦点；抓住模型后跟随光标移动窗口
+            // 拖拽：全局轮询左键，不依赖焦点；抓住模型后由物理组件接管窗口定位
             bool lmbDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
             bool lmbPressed = lmbDown && !prevLmbDown;
 
@@ -765,7 +977,7 @@ namespace GIC.Pet
             {
                 if (允许双击退出 && !已请求退出 && Time.unscaledTime - lastClickTime < 0.4f)
                 {
-                    Debug.Log("[PetSpike] 双击退出，桌宠再见");
+                    Debug.Log("[PetWindow] 双击退出，桌宠再见");
                     已请求退出 = true;
                     // 退场动画（2026-08-24）：先播退场动画再真正退出；无动画可用则立即退出
                     bool 退场接管 = 行为控制器 != null && 行为控制器.请求退场(Application.Quit);
@@ -775,32 +987,58 @@ namespace GIC.Pet
                 dragStartCursor = new Vector2Int(pt.X, pt.Y);
             }
 
-            if (!dragging && !已请求退出 && modelHit && lmbDown && !prevLmbDown)
+            // ---- 拖拽物理（2026-08-26，docs/19 §6.1 抓斗篷钟摆）：抓点（光标）钉住斗篷、骨盆做绳
+            // 单摆质量点；窗口按"骨盆客户区投影钉物理目标位"定位（根平移不动，仅根旋转倾角）。
+            // 快速画圈可甩起（绕光标旋转），松手速度超阈值进入飞行弹跳，低速松手原地放回。
+            if (!dragging && !已请求退出 && modelHit && lmbDown && !prevLmbDown && 拖拽物理 != null)
             {
                 dragging = true;
-                // eSheep/VPet 同款拖拽：窗口直接跟光标（绝对定位），模型根全程不动（被窗口"拎着走"，
-                // 精灵恒钉画布内）。旧"根跟光标+窗口跟骨盆"是双环反馈——窗口位移改写"光标→世界"映射
-                // 自身，不动点=恒半速跟随（拖拽滞后的根因，2026-08-26 根治）。
-                GetWindowRect(hwnd, out RECT dragWr);
-                _拖拽抓取偏移 = new Vector2Int(pt.X - dragWr.Left, pt.Y - dragWr.Top);
+                开始物理拖拽(pt);
             }
-            if (dragging)
+            if (拖拽物理 != null && 拖拽物理.交互中)
             {
-                if (!lmbDown)
+                if (dragging)
                 {
-                    // 发生过实际位移的拖拽不算单击，清除双击计次防误触退出
-                    if (Mathf.Abs(pt.X - dragStartCursor.x) + Mathf.Abs(pt.Y - dragStartCursor.y) > 8)
+                    if (!lmbDown)
                     {
-                        lastClickTime = -10f;
+                        // 发生过实际位移的拖拽不算单击，清除双击计次防误触退出
+                        if (Mathf.Abs(pt.X - dragStartCursor.x) + Mathf.Abs(pt.Y - dragStartCursor.y) > 8)
+                        {
+                            lastClickTime = -10f;
+                        }
+                        dragging = false;
+                        拖拽物理.松手(); // 速度二分：≥阈值起飞飞行，否则原地收尾（松手当帧继续推进）
                     }
-                    dragging = false;
-                    拖拽松手防丢拉回(); // 窗口完全出虚拟屏才拉回（拖拽移动本身无屏边钳制，2026-08-25 拍板；落盘由 LateUpdate 模式切换收口）
+                    else
+                    {
+                        拖拽物理.每帧拖拽(new Vector2(pt.X, pt.Y), Time.unscaledDeltaTime);
+                    }
                 }
-                else
+                if (!dragging)
                 {
-                    // 拖拽=窗口绝对定位到 光标-抓取偏移（1:1 跟手，无窗口位移回馈；move-only）
-                    SetWindowPos(hwnd, IntPtr.Zero, pt.X - _拖拽抓取偏移.x, pt.Y - _拖拽抓取偏移.y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                    if (拖拽物理.飞行中)
+                    {
+                        // 飞行环境（Win32）：地面=当前显示器工作区底（任务栏上沿），侧墙=虚拟屏左右界
+                        计算飞行环境(拖拽物理.当前骨盆屏幕, out float 地面Y, out float 左界, out float 右界);
+                        拖拽物理.每帧飞行(Time.unscaledDeltaTime, 地面Y, 左界, 右界);
+                    }
+                    else
+                    {
+                        拖拽物理.每帧收尾(Time.unscaledDeltaTime);
+                    }
                 }
+                // 拎起姿势基准角平滑：拖拽/飞行期→拎起横躺角/拎起转身角（默认 0 直立+90 侧身朝左），
+                // 收尾期→0 随倾角归零；与物理倾角独立——倾角是钟摆摆动动态，此二角是姿势基准
+                // （横躺 Inspector 可调回 90 复刻旧仓鼠式横躺；转身 90=用户拍板的侧挂式脸朝左）
+                bool 拎起中 = 拖拽物理.阶段 == PetDragPhysicsController.交互阶段.拖拽 || 拖拽物理.飞行中;
+                float 横躺目标 = 拎起中 ? 拎起横躺角 : 0f;
+                float 转身目标 = 拎起中 ? 拎起转身角 : 0f;
+                float k横 = 1f - Mathf.Exp(-横躺融合速度 * Time.unscaledDeltaTime);
+                _当前横躺角 = Mathf.Lerp(_当前横躺角, 横躺目标, k横);
+                _当前转身角 = Mathf.Lerp(_当前转身角, 转身目标, k横);
+
+                if (拖拽物理.交互中) 应用物理帧();
+                else 物理交互收口();
             }
             prevLmbDown = lmbDown;
 
@@ -850,7 +1088,7 @@ namespace GIC.Pet
                 passThroughOn = wantPassThrough;
                 if (打印状态日志)
                 {
-                    Debug.Log($"[PetSpike] 穿透切换 -> {wantPassThrough}");
+                    Debug.Log($"[PetWindow] 穿透切换 -> {wantPassThrough}");
                 }
             }
 
