@@ -8,7 +8,7 @@ namespace GIC.Pet
 {
     /// <summary>
     /// 桌宠窗口控制器：Win32 无边框 + 透明 + 置顶 + 固定小窗画布 +
-    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型物理拖拽（斗篷钟摆+甩起飞行，2026-08-26）+ 限帧。
+    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型物理拖拽（刚体跟随+四肢摆动，2026-08-26）+ 限帧。
     /// 透明双方案（2026-08-21 拍板主流优先）：默认 DWM 逐像素 alpha（DwmExtendFrameIntoClientArea，
     /// 边缘无毛边、支持半透明）；色键 LWA_COLORKEY 保留作兜底开关。
     /// 命中检测/拖拽全部走 Win32 轮询（GetCursorPos/GetAsyncKeyState），不依赖窗口焦点与 Unity 输入系统。
@@ -28,20 +28,22 @@ namespace GIC.Pet
     /// 时窗口也动"）。勿恢复任何形式的"动画期移窗/移根"。
     /// 窗口唯一移动源：①启动停靠/pet.json 恢复 ②拖拽物理绝对定位（骨盆客户区投影钉物理目标）③松手
     /// 防丢拉回+防隐形守卫（完全出虚拟屏才干预）。曾试全屏覆盖体制：3200×2000@200%DPI 实测帧率腰斩+
-    /// 单核 93%，废弃。**拖拽移动窗口无屏边钳制（2026-08-25 拍板，为边缘交互铺路）**；飞行结束窗口
+    /// 单核 93%，废弃。**拖拽移动窗口无屏边钳制（2026-08-25 拍板，为边缘交互铺路）**；松手后窗口
     /// 完全出虚拟屏才拉回屏内（VPet CheckCurrentScreen 同款防丢）；pet.json 持久化缩放+窗口原点。
     ///
-    /// 拖拽物理（2026-08-26，docs/19 §6.1 抓斗篷钟摆，纯模拟在 PetDragPhysicsController）：
-    /// 抓点（光标）钉住斗篷，骨盆做不可伸长绳单摆质量点——窗口按"骨盆客户区投影钉物理目标位"
-    /// 定位（根平移全程不动，仅根旋转=倾角绕Z(父系) × 转身绕Y(父系) × 基准；旋转致骨盆在窗内位移
-    /// 由窗口位置吸收，骨盆屏幕位恒钉物理目标）。快速画圈=绕光标甩转；松手速度超阈值=飞行（重力弹道+
-    /// 当前显示器工作区底弹跳+虚拟屏侧墙反弹），低速松手=原地收尾（保留随意摆放 UX）。
-    /// 旧"窗口 1:1 绝对定位到光标"直移拖拽已废弃。
+    /// 拖拽物理（2026-08-26 深夜定案：刚体跟随+四肢摆动，纯模拟在 PetDragPhysicsController）：
+    /// 身体=刚体 1:1 直跟光标（eSheep 直移语义；骨盆目标=抓取时骨盆位+光标位移）——无钟摆/重力/
+    /// 倾角弹簧（用户拍板"拖拽中不需要任何摆动，摆动的应当只有四肢"）。刚体平移下按住的点天然
+    /// 钉在光标下，旧钟摆的斗篷锚点随之失去意义已移除。窗口按"骨盆客户区投影钉物理目标位"定位
+    /// （根平移全程不动，仅根旋转=拎起姿势基准）。四肢摆动=4 条欠阻尼角弹簧（跟拍 secondary
+    /// motion）：光标速度→肩/大腿骨世界 Z 轴旋转（水平滞后+竖直外展），LateUpdate 叠加在 Drag01
+    /// 垂落姿势之上。松手即停：骨盆停原地，姿势与四肢摆动 ~0.5s 平滑归零。
+    /// 旧钟摆/挣扎/飞行/落地反应链路已全删。
     ///
-    /// 拎起姿势（2026-08-26 v6 瘫软式+3/4 偏左转身）：拖拽/飞行期播专用 Drag01 垂落动画（四肢常量垂落+
+    /// 拎起姿势（2026-08-26 v6 瘫软式+3/4 偏左转身）：拖拽期播专用 Drag01 垂落动画（四肢常量垂落+
     /// 躯干保留待机微动），根姿势基准=拎起转身角（默认 45° 3/4 偏左：用户新参考图，身体略朝左而非全侧挂；
-    /// Drag01 的 C 型前屈朝模型前方，转身后即朝屏幕左前方）×拎起横躺角（默认 0 直立），摆动感由物理倾角
-    /// 单独承担。沿革：v1 程序化四肢垂落叠加层（PetDanglePoseController，已弃用留库）→ v2 Sleep01
+    /// Drag01 的 C 型前屈朝模型前方，转身后即朝屏幕左前方）×拎起横躺角（默认 0 直立），摆动感由
+    /// 四肢跟拍弹簧单独承担。沿革：v1 程序化四肢垂落叠加层（PetDanglePoseController，已弃用留库）→ v2 Sleep01
     /// 躺姿+横躺 90°（仓鼠式）→ v3 专用垂落动画 → v4 瘫软低头+90° 侧挂 → v5 全侧挂深化（KO 式头折向地面，
     /// 已废）→ v6 瘫软 45° 头朝观众+3/4 偏左。
     /// </summary>
@@ -70,7 +72,9 @@ namespace GIC.Pet
         [Tooltip("窗口客户区逻辑高度基准（96 DPI 像素；含阴影落脚边距，与 FOV 45.27 配套保持派蒙像素尺寸——高度动不得：maxScale 由工作区高度钳定，调高基准只会压缩放上限缩小派蒙）")] [SerializeField] private int 窗口逻辑高 = 825;
 
         [Header("拖拽锚点")]
-        [Tooltip("拖拽物理的锚点骨名（骨盆绳单摆质量点与窗口定位投影基准）")] [SerializeField] private string 骨盆骨名 = "Bip001 Pelvis";
+        [Tooltip("拖拽物理的锚点骨名（骨盆目标投影与拎起姿势旋转枢轴基准）")] [SerializeField] private string 骨盆骨名 = "Bip001 Pelvis";
+        [Tooltip("四肢摆动的驱动骨名（拖拽跟拍弹簧），顺序=[左臂,右臂,左腿,右腿]——物理组件按此索引分配增益/频率（手臂摆幅大频率低、腿相反）。取本体骨架骨（自动排除影子壳）")]
+        [SerializeField] private string[] 四肢骨名 = { "Bip001 L UpperArm", "Bip001 R UpperArm", "Bip001 L Thigh", "Bip001 R Thigh" };
 
         [Header("调试")]
         [SerializeField] private bool 打印状态日志 = false;
@@ -91,13 +95,10 @@ namespace GIC.Pet
         private bool restyled;
         private bool dragging;
 
-        /// <summary>物理交互进行中（拖拽钟摆/甩出飞行/收尾旋转归位）——行为层压制触发用</summary>
+        /// <summary>物理交互进行中（拖拽跟随/收尾归零）——行为层压制触发用</summary>
         public bool 物理交互中 => 拖拽物理 != null && 拖拽物理.交互中;
 
-        /// <summary>拖拽物理飞行中（行为层驱动空中扑腾姿势用）</summary>
-        public bool 拖拽飞行中 => 拖拽物理 != null && 拖拽物理.飞行中;
-
-        /// <summary>是否正在拖拽/甩动派蒙（行为层打断打招呼、随机小动作等用；含飞行与收尾全程）</summary>
+        /// <summary>是否正在拖拽派蒙（行为层打断打招呼、随机小动作等用；含收尾全程）</summary>
         public bool 正在拖拽 => dragging || 物理交互中;
 
         /// <summary>命中网格的世界包围盒（行为层接近判定用）。来源=MeshCollider（BakeMesh 烘的真实蒙皮网格
@@ -122,8 +123,8 @@ namespace GIC.Pet
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
         private PetBehaviorController 行为控制器; // 双击退出的退场动画协作（播 Disappear 后再关进程）
 
-        [Header("拖拽物理（docs/19 §6.1 抓斗篷钟摆）")]
-        [Tooltip("拖拽物理模拟组件（纯数学：钟摆/挣扎/飞行弹跳/倾角弹簧），窗口定位与根旋转由本控制器应用")]
+        [Header("拖拽物理（docs/19 §6.1 刚体跟随+四肢摆动）")]
+        [Tooltip("拖拽物理模拟组件（纯数学：刚体直跟+四肢跟拍弹簧，松手即停），窗口定位/根旋转/四肢骨应用由本控制器执行")]
         [SerializeField] private PetDragPhysicsController 拖拽物理;
         [Tooltip("被拎起时身体姿势基准角（度）：0=直立垂落（主流桌宠被提起姿态，配 Drag01 专用拎起动画），90=头朝左横躺（旧仓鼠式），-90=头朝右。松手收尾自动平滑归零")]
         [SerializeField] private float 拎起横躺角 = 0f;
@@ -143,6 +144,7 @@ namespace GIC.Pet
 
         // ---- 固定画布（2026-08-26 终案）：动画期间窗口/根完全静止，无任何跟随状态 ----
         private Transform _骨盆;            // 拖拽物理锚点骨（本体骨架，排除影子壳）
+        private Transform[] _四肢骨;        // 四肢摆动驱动骨（与 PetDragPhysicsController 索引约定一致）
 
         // 独立存档（桌宠永不读写主存档，docs/19 §3.1/§5.8 约定）：{persistentDataPath}/pet.json
         // v1（小窗体制，2026-08-25 回归）：缩放 + 窗口客户区原点（物理像素，虚拟桌面坐标系）。
@@ -291,6 +293,16 @@ namespace GIC.Pet
             {
                 _paimon根 = paimonRoot.transform;
                 _骨盆 = 找本体骨(骨盆骨名);
+                // 四肢摆动骨（拖拽跟拍）：缺失的肢不摆动（告警不阻断）
+                _四肢骨 = new Transform[四肢骨名.Length];
+                int 找到骨数 = 0;
+                for (int i = 0; i < 四肢骨名.Length; i++)
+                {
+                    _四肢骨[i] = 找本体骨(四肢骨名[i]);
+                    if (_四肢骨[i] != null) 找到骨数++;
+                }
+                if (找到骨数 < 四肢骨名.Length)
+                    Debug.LogWarning($"[PetWindow] 四肢摆动骨缺失 {四肢骨名.Length - 找到骨数}/{四肢骨名.Length}（缺失肢不摆动），检查骨架命名");
                 初始缩放 = _paimon根.localScale.x;
                 // 缩放目标：构建版读 pet.json（持久化），无存档/编辑器用 Inspector 默认倍率。
                 // 启动即到位（无平滑动画）。
@@ -507,22 +519,14 @@ namespace GIC.Pet
             SetWindowPos(hwnd, IntPtr.Zero, nx, ny, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
         }
 
-        #region 拖拽物理（docs/19 §6.1 抓斗篷钟摆：窗口定位/根旋转应用层，纯模拟在 PetDragPhysicsController）
+        #region 拖拽物理（docs/19 §6.1 刚体跟随+四肢摆动：窗口定位/根旋转应用层，纯模拟在 PetDragPhysicsController）
 
-        /// <summary>拖拽起手：采集模型屏幕度量（像素密度/半宽/骨盆到脚底）与骨盆屏幕位，交给物理组件
-        /// 建摆（绳长=光标到骨盆距离，抓哪是哪）；根旋转基准仅在从静止起手时快照（收尾中被再抓不叠加）。</summary>
+        /// <summary>拖拽起手（2026-08-26 定案刚体跟随）：快照骨盆屏幕位与光标交给物理组件——
+        /// 骨盆目标=骨盆基准+光标位移（1:1 直跟零摆动），四肢摆动弹簧由光标速度驱动。
+        /// 根旋转基准仅在从静止起手时快照（收尾中被再抓不叠加）。</summary>
         private void 开始物理拖拽(POINT pt)
         {
             if (拖拽物理 == null || _骨盆 == null || cam == null || hwnd == IntPtr.Zero || _paimon根 == null) return;
-
-            // 模型屏幕度量（抓取瞬间，直立站姿）：命中包围盒 8 角投影到客户区像素（物理像素）
-            float 每米像素 = 400f, 半宽 = 80f, 骨盆到脚底 = 200f;
-            if (TryGet命中世界包围盒(out Bounds b) && 世界包围盒客户区投影(b, out float minX, out float maxX, out float minY, out float maxY))
-            {
-                if (b.size.y > 0.01f) 每米像素 = (maxY - minY) / b.size.y;
-                半宽 = (maxX - minX) * 0.5f;
-                if (世界坐标转客户区像素(_骨盆.position, out Vector2 骨盆客户)) 骨盆到脚底 = Mathf.Max(10f, maxY - 骨盆客户.y);
-            }
             if (!世界坐标转客户区像素(_骨盆.position, out Vector2 pc)) return;
             var origin = new POINT { X = 0, Y = 0 };
             ClientToScreen(hwnd, ref origin);
@@ -533,22 +537,20 @@ namespace GIC.Pet
                 _拖拽基准旋转 = _paimon根.localRotation;
                 _拖拽基准根位置 = _paimon根.position;
             }
-            拖拽物理.开始拖拽(new Vector2(pt.X, pt.Y), 骨盆屏幕, 每米像素, 半宽, 骨盆到脚底);
+            拖拽物理.开始拖拽(new Vector2(pt.X, pt.Y), 骨盆屏幕);
             if (打印状态日志)
-                Debug.Log($"[PetWindow] 物理拖拽起手 绳长≈{Vector2.Distance(new Vector2(pt.X, pt.Y), 骨盆屏幕):F0}px 每米像素={每米像素:F0} 半宽={半宽:F0} 脚底偏移={骨盆到脚底:F0}");
+                Debug.Log($"[PetWindow] 物理拖拽起手 骨盆屏幕=({骨盆屏幕.x:F0},{骨盆屏幕.y:F0}) 四肢骨={(_四肢骨 != null ? System.Linq.Enumerable.Count(_四肢骨, b => b != null) : 0)}/{(_四肢骨 != null ? _四肢骨.Length : 0)}");
         }
 
-        /// <summary>应用物理帧输出：根旋转 = 倾角绕Z(父系) × 转身绕Y(父系) × 基准（倾角右倾为正故取负号；
-        /// 相机在 -Z 侧看 +Z、屏幕右=+X：+Y 转身 90° 把模型前方(-Z)转到屏幕左(-X)=脸/肚子朝左）。
-        /// 倾角最外层=绕相机轴的屏幕平面摆动（钟摆物理平面），转身在其内=竖直轴自转，二者解耦互不干扰
-        /// （Paimon 根基准为 identity，父系=世界系）。旋转**绕骨盆枢轴**——
-        /// 旋转后补偿根平移把骨盆钉回旋转前位置：横躺 90° 时头/脚以骨盆为中心横向铺开（窗口 550 逻辑宽
-        /// 容纳身高投影），绕根旋转会让头出窗被裁。拖拽/飞行阶段窗口按"骨盆客户区投影钉物理目标位"定位。</summary>
+        /// <summary>应用物理帧输出：根旋转 = 横躺绕Z(父系) × 转身绕Y(父系) × 基准（纯拎起姿势基准，
+        /// 无动态倾角——身体刚体直跟无摆动，2026-08-26 用户拍板）。旋转**绕骨盆枢轴**——
+        /// 旋转后补偿根平移把骨盆钉回旋转前位置：横躺 90° 时头/脚以骨盆为中心横向铺开（窗口 750 逻辑宽
+        /// 容纳身高投影），绕根旋转会让头出窗被裁。拖拽阶段窗口按"骨盆客户区投影钉物理目标位"定位。</summary>
         private void 应用物理帧()
         {
             if (拖拽物理 == null || _paimon根 == null) return;
             Vector3 骨盆旋转前 = _骨盆 != null ? _骨盆.position : Vector3.zero;
-            _paimon根.localRotation = Quaternion.AngleAxis(_当前横躺角 - 拖拽物理.当前倾角, Vector3.forward)
+            _paimon根.localRotation = Quaternion.AngleAxis(_当前横躺角, Vector3.forward)
                                     * Quaternion.AngleAxis(_当前转身角, Vector3.up)
                                     * _拖拽基准旋转;
             if (_骨盆 != null)
@@ -557,8 +559,29 @@ namespace GIC.Pet
                 Vector3 位移 = 骨盆旋转前 - _骨盆.position;
                 if (位移.sqrMagnitude > 1e-10f) _paimon根.position += 位移;
             }
-            if (拖拽物理.阶段 == PetDragPhysicsController.交互阶段.拖拽 || 拖拽物理.飞行中)
+            if (拖拽物理.阶段 == PetDragPhysicsController.交互阶段.拖拽)
                 按骨盆目标定位窗口();
+        }
+
+        /// <summary>四肢摆动应用（拖拽跟拍，2026-08-26）：物理组件输出的摆动角以世界 Z 轴（屏幕平面
+        /// 法线）旋转叠加到四肢根骨（肩/大腿）——Animation 在 Update 后、LateUpdate 前每帧重写骨骼
+        /// 姿势，本层每帧在其上叠加一次不累积。
+        /// **Transform.rotation 就是世界旋转**（localRotation 才是父系量）——直接前置乘 AngleAxis
+        /// 即为正确的世界轴应用，Unity 内部自动换算回局部。2026-08-26 曾误当局部量做"父系共轭换算"
+        /// （pw⁻¹·R·pw·world），实际把每条肢的旋转轴劫持到各自父骨局部 Z（左右镜像骨互反→
+        /// 左右手反向摆的根因），已回退。方向符号在物理组件按目检标定（滞后=+vx）。
+        /// 交互结束后本层停止应用，动画自然覆盖残留（收尾弹簧已归零，实际残角≈0 无跳变）。</summary>
+        void LateUpdate()
+        {
+            if (拖拽物理 == null || !拖拽物理.交互中 || _四肢骨 == null) return;
+            for (int i = 0; i < _四肢骨.Length; i++)
+            {
+                var 骨 = _四肢骨[i];
+                if (骨 == null) continue;
+                拖拽物理.取四肢摆动(i, out float 摆动角);
+                if (摆动角 != 0f)
+                    骨.rotation = Quaternion.AngleAxis(摆动角, Vector3.forward) * 骨.rotation;
+            }
         }
 
         /// <summary>窗口定位：客户区原点 = 骨盆屏幕目标 - 本帧骨盆客户区偏移（旋转后动态投影——根平移
@@ -574,30 +597,8 @@ namespace GIC.Pet
                 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
         }
 
-        /// <summary>飞行环境（Win32）：地面=骨盆所在显示器工作区底（任务栏上沿，跨屏飞行时逐帧换算），
-        /// 侧墙=虚拟屏左右界（物理像素）。多显示器工作区可能为负坐标，取不到时兜底主屏工作区。</summary>
-        private void 计算飞行环境(Vector2 骨盆屏幕, out float 地面Y, out float 左界, out float 右界)
-        {
-            bool got = false;
-            地面Y = 0f;
-            var ptm = new POINT { X = (int)骨盆屏幕.x, Y = (int)骨盆屏幕.y };
-            IntPtr mon = MonitorFromPoint(ptm, MONITOR_DEFAULTTONEAREST);
-            if (mon != IntPtr.Zero)
-            {
-                var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
-                if (GetMonitorInfoW(mon, ref mi)) { 地面Y = mi.rcWork.Bottom; got = true; }
-            }
-            if (!got)
-            {
-                SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
-                地面Y = work.Bottom;
-            }
-            左界 = GetSystemMetrics(SM_XVIRTUALSCREEN);
-            右界 = 左界 + GetSystemMetrics(SM_CXVIRTUALSCREEN);
-        }
-
-        /// <summary>物理交互收口（拖拽/飞行/收尾全部结束）：根旋转/根位置精确归位（横躺清零）、窗口完全出
-        /// 虚拟屏才拉回（防丢兜底，VPet CheckCurrentScreen 同款）、位置落盘、落地冲击够大交行为层播反应。</summary>
+        /// <summary>物理交互收口（拖拽/收尾全部结束）：根旋转/根位置精确归位（横躺清零）、窗口完全出
+        /// 虚拟屏才拉回（防丢兜底，VPet CheckCurrentScreen 同款）、位置落盘（松手即停=停在摆放处）。</summary>
         private void 物理交互收口()
         {
             if (_paimon根 != null)
@@ -609,8 +610,6 @@ namespace GIC.Pet
             _当前转身角 = 0f;
             拖拽松手防丢拉回();
             标记待写入();
-            if (拖拽物理 != null && 拖拽物理.落地冲击速度 > 0f)
-                行为控制器?.播落地反应(拖拽物理.落地冲击速度);
         }
 
         /// <summary>世界坐标 → 客户区像素（x 自左、y 自顶，物理像素=渲染像素）。</summary>
@@ -624,22 +623,6 @@ namespace GIC.Pet
             int cw = cr.Right - cr.Left, ch = cr.Bottom - cr.Top;
             if (cw <= 0 || ch <= 0) return false;
             客户像素 = new Vector2(vp.x * cw, (1f - vp.y) * ch);
-            return true;
-        }
-
-        /// <summary>世界包围盒 8 角点 → 客户区像素投影范围（物理像素；角点跨相机平面=异常返回 false）。</summary>
-        private bool 世界包围盒客户区投影(Bounds b, out float minX, out float maxX, out float minY, out float maxY)
-        {
-            minX = float.MaxValue; maxX = float.MinValue; minY = float.MaxValue; maxY = float.MinValue;
-            for (int xi = 0; xi < 2; xi++)
-                for (int yi = 0; yi < 2; yi++)
-                    for (int zi = 0; zi < 2; zi++)
-                    {
-                        var c = new Vector3(xi == 0 ? b.min.x : b.max.x, yi == 0 ? b.min.y : b.max.y, zi == 0 ? b.min.z : b.max.z);
-                        if (!世界坐标转客户区像素(c, out Vector2 p)) return false;
-                        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-                        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
-                    }
             return true;
         }
 
@@ -826,8 +809,8 @@ namespace GIC.Pet
             // 防隐形守卫（2026-08-26）：Win+D/显示桌面/显示器休眠重排等系统事件会把窗口停靠到
             // 屏外停车位（实测 -16384,-16384，IsIconic=False——不是真最小化，SW_RESTORE 拉不回），
             // 桌宠置顶常驻"看不见=死亡"。0.5s 低频体检：iconic→复活（不抢焦点）；整窗与虚拟屏
-            // 零交集且非用户主动拖拽/物理飞行→拉回屏内（复用松手防丢）。用户交互期不干预
-            // （拖拽无屏边钳制是 2026-08-25 拍板，物理飞行有自己的边界反弹）。
+            // 零交集且非用户主动拖拽/物理收尾→拉回屏内（复用松手防丢）。用户交互期不干预
+            // （拖拽无屏边钳制是 2026-08-25 拍板）。
             if (Time.unscaledTime - _上次窗口体检 >= 0.5f)
             {
                 _上次窗口体检 = Time.unscaledTime;
@@ -908,9 +891,8 @@ namespace GIC.Pet
                 dragStartCursor = new Vector2Int(pt.X, pt.Y);
             }
 
-            // ---- 拖拽物理（2026-08-26，docs/19 §6.1 抓斗篷钟摆）：抓点（光标）钉住斗篷、骨盆做绳
-            // 单摆质量点；窗口按"骨盆客户区投影钉物理目标位"定位（根平移不动，仅根旋转倾角）。
-            // 快速画圈可甩起（绕光标旋转），松手速度超阈值进入飞行弹跳，低速松手原地放回。
+            // ---- 拖拽物理（docs/19 §6.1 刚体跟随+四肢摆动）：身体 1:1 直跟光标（无任何摆动），
+            // 四肢由物理组件的跟拍弹簧摆动（LateUpdate 应用到肩/大腿骨）。松手即停原地收尾。
             if (!dragging && !已请求退出 && modelHit && lmbDown && !prevLmbDown && 拖拽物理 != null)
             {
                 dragging = true;
@@ -928,30 +910,21 @@ namespace GIC.Pet
                             lastClickTime = -10f;
                         }
                         dragging = false;
-                        拖拽物理.松手(); // 速度二分：≥阈值起飞飞行，否则原地收尾（松手当帧继续推进）
+                        拖拽物理.松手(); // 松手即停：骨盆冻结原地，四肢弹簧收尾归零
                     }
                     else
                     {
                         拖拽物理.每帧拖拽(new Vector2(pt.X, pt.Y), Time.unscaledDeltaTime);
                     }
                 }
-                if (!dragging)
+                else
                 {
-                    if (拖拽物理.飞行中)
-                    {
-                        // 飞行环境（Win32）：地面=当前显示器工作区底（任务栏上沿），侧墙=虚拟屏左右界
-                        计算飞行环境(拖拽物理.当前骨盆屏幕, out float 地面Y, out float 左界, out float 右界);
-                        拖拽物理.每帧飞行(Time.unscaledDeltaTime, 地面Y, 左界, 右界);
-                    }
-                    else
-                    {
-                        拖拽物理.每帧收尾(Time.unscaledDeltaTime);
-                    }
+                    拖拽物理.每帧收尾(Time.unscaledDeltaTime);
                 }
-                // 拎起姿势基准角平滑：拖拽/飞行期→拎起横躺角/拎起转身角（默认 0 直立+90 侧身朝左），
-                // 收尾期→0 随倾角归零；与物理倾角独立——倾角是钟摆摆动动态，此二角是姿势基准
-                // （横躺 Inspector 可调回 90 复刻旧仓鼠式横躺；转身 90=用户拍板的侧挂式脸朝左）
-                bool 拎起中 = 拖拽物理.阶段 == PetDragPhysicsController.交互阶段.拖拽 || 拖拽物理.飞行中;
+                // 拎起姿势基准角平滑：拖拽期→拎起横躺角/拎起转身角（默认 0 直立+45 3/4 偏左），
+                // 收尾期→0 平滑归零；与四肢摆动独立——摆动是跟拍动态，此二角是姿势基准
+                // （横躺 Inspector 可调回 90 复刻旧仓鼠式横躺）
+                bool 拎起中 = 拖拽物理.阶段 == PetDragPhysicsController.交互阶段.拖拽;
                 float 横躺目标 = 拎起中 ? 拎起横躺角 : 0f;
                 float 转身目标 = 拎起中 ? 拎起转身角 : 0f;
                 float k横 = 1f - Mathf.Exp(-横躺融合速度 * Time.unscaledDeltaTime);

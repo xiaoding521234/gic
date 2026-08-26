@@ -20,7 +20,7 @@ namespace GIC.Pet
         [SerializeField] private PetBlinkController 眨眼控制器; // 单次动作期间静默（morph 重评估与动作叠加互相放大顿挫）
         [SerializeField] private PetLookAtController 视线控制器; // 出场/退场期间静默（仪式动作头链全交 clip，2026-08-24）
         [SerializeField] private PetEmotionController 情绪控制器;   // 拎起期的慌张表情（直接下发，不经动作映射）
-        [Tooltip("被拎起时播的专用动作（Drag01 垂落姿势：四肢常量垂落+躯干保留待机微动，loop 播放；摆动倾斜由拖拽物理倾角叠加）")] [SerializeField] private string 拎起动作名 = "Ani_NPC_Kanban_Paimon_Drag01";
+        [Tooltip("被拎起时播的专用动作（Drag01 垂落姿势：四肢常量垂落+躯干保留待机微动，loop 播放；四肢摆动由拖拽物理跟拍弹簧叠加）")] [SerializeField] private string 拎起动作名 = "Ani_NPC_Kanban_Paimon_Drag01";
         [Tooltip("空 = Camera.main")] [SerializeField] private Camera 相机;
         [Tooltip("空 = 自动找非影子壳的蒙皮渲染器（用包围盒做接近判定）")] [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
 
@@ -53,17 +53,6 @@ namespace GIC.Pet
         [SerializeField] private string 出场动画名 = "Ani_NPC_Kanban_Paimon_Appear";
         [Tooltip("双击退出时播的退场动画（完整 clip 名，空=立即退出）——播完才真正退出进程")]
         [SerializeField] private string 退场动画名 = "Ani_NPC_Kanban_Paimon_Disappear";
-
-        [Header("落地反应（拖拽物理甩出后的反馈）")]
-        [Tooltip("落地冲击速度超过此值（px/s）播反应动作——被甩狠了会生气/发懵/害羞")]
-        [SerializeField] private float 落地反应阈值 = 900f;
-        [Tooltip("落地反应动作池（随机其一；空=不反应）")]
-        [SerializeField] private string[] 落地反应列表 =
-        {
-            "Ani_NPC_Kanban_Paimon_Anger",
-            "Ani_NPC_Kanban_Paimon_Confuse01AS",
-            "Ani_NPC_Kanban_Paimon_Shy01AS",
-        };
 
         // 运行时状态
         private bool _单次进行中;
@@ -114,7 +103,7 @@ namespace GIC.Pet
 
             // 拖拽物理期（拎起动画 v3，2026-08-26 用户拍板改主流桌宠式）：播专用 Drag01 垂落动画
             // （业界 VPet/eSheep 被提起专用动画的 clip 等价物：四肢常量垂落、躯干保留待机微动、
-            // 无程序化骨骼叠加）+ 窗口控制器物理倾角摆动；慌张表情直发情绪层。
+            // 无程序化骨骼叠加）+ 拖拽物理四肢跟拍弹簧摆动；慌张表情直发情绪层。
             // 沿革：v1 程序化四肢垂落叠加层（PetDanglePoseController 已弃用留库）→ v2 Sleep01
             // 躺姿+根旋转 90° 横躺（仓鼠式）→ v3 专用垂落动画。退场优先于物理（退场中抓住：
             // 物理甩归甩，姿势保持退场动画，几秒后进程退出）。
@@ -150,7 +139,7 @@ namespace GIC.Pet
             }
             if (_上帧物理中)
             {
-                // 物理刚结束：清拎起表情（落地反应单次刚开播则让位）+ 回待机（CrossFade 从拎起动作平滑过渡）
+                // 物理刚结束：清拎起表情 + 回待机（CrossFade 从拎起动作平滑过渡）
                 _上帧物理中 = false;
                 if (_拎起视线静默中)
                 {
@@ -219,8 +208,8 @@ namespace GIC.Pet
                 _接近计时 = 0f;
             }
 
-            // 随机小动作：光标不在旁边且无物理交互（拖拽钟摆/飞行/收尾）时才轮换——在旁时留给打招呼/
-            // 视线跟随；物理交互期（拎起/飞行/收尾）不叠新动作，保持拖拽体验纯粹（2026-08-26）
+            // 随机小动作：光标不在旁边且无物理交互（拖拽/收尾）时才轮换——在旁时留给打招呼/
+            // 视线跟随；物理交互期（拎起/收尾）不叠新动作，保持拖拽体验纯粹（2026-08-26）
             if (启用随机小动作 && !接近 && !窗口控制器.物理交互中 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
             {
                 播单次(随机小动作列表[Random.Range(0, 随机小动作列表.Length)]);
@@ -244,19 +233,6 @@ namespace GIC.Pet
             _仪式静默中 = 静默;
             眨眼控制器?.Set静默(静默);
             视线控制器?.Set视线静默(静默);
-        }
-
-        /// <summary>拖拽物理落地冲击回调（PetWindowController 在物理交互收口时调用）：
-        /// 冲击速度够大时随机播一个反应动作（生气/发懵/害羞）。单次动作/退场中不叠加。</summary>
-        public void 播落地反应(float 冲击速度)
-        {
-            if (_单次进行中 || _退场中 || _出场未播) return;
-            if (冲击速度 < 落地反应阈值 || 落地反应列表 == null || 落地反应列表.Length == 0) return;
-            var 可用 = new System.Collections.Generic.List<string>(落地反应列表.Length);
-            foreach (var 名 in 落地反应列表)
-                if (动作播放器.动作存在(名)) 可用.Add(名);
-            if (可用.Count == 0) return;
-            播单次(可用[Random.Range(0, 可用.Count)]);
         }
 
         /// <summary>请求退场：播退场动画，播完执行回调（返回 false = 无退场动画可用，调用方直接退出）。
