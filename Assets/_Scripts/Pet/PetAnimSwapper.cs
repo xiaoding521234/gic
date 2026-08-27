@@ -45,8 +45,10 @@ namespace GIC.Pet
         [SerializeField, FormerlySerializedAs("fingerPoseController")] private PetFingerPoseController 手指姿态控制器; // 手指姿态层（可空=手指走 clip 曲线）
 
         [Header("过渡")]
-        [Tooltip("动作切换 CrossFade 时长（秒）——过渡期双 clip 双采样，过长则混合开销放大顿挫（2026-08-24 实验：纯播大摆动动作零掉帧，顿挫全在过渡/叠加层）")]
-        [SerializeField] private float 动作过渡秒 = 0.3f;
+        [Tooltip("动作切换过渡时长（秒）——惯性化模式=偏移衰减时长；CrossFade 兜底模式=线性混合窗口（过渡期双 clip 双采样，过长则混合开销放大顿挫）")]
+        [SerializeField] private float 动作过渡秒 = 0.6f;
+        [Tooltip("惯性化层（Gears of War 4 式切换：硬切+当前姿势/速度 C2 衰减归零）。空/禁用=回退 CrossFade 线性混合")]
+        [SerializeField] private PetInertializer 惯性化器;
         [Tooltip("启动时预热全部已注册 clip（逐个 Play+Sample 后回待机）——legacy Animation 首播冷初始化实测 150ms 掉帧串（2026-08-24 Player.log 16 连掉帧无任何子系统标记，t=64 首次摆手实证）。开销=启动一次性几十 ms，不增加常驻内存（曲线数据本就随场景加载）")]
         [SerializeField] private bool 启动预热 = true;
 
@@ -108,6 +110,10 @@ namespace GIC.Pet
         /// <summary>当前过渡时长（行为层尾段提前过渡用）</summary>
         public float 过渡秒 => 动作过渡秒;
 
+        /// <summary>惯性化路径是否激活（行为层据此关闭尾段截尾——惯性化下速度承接使任意切点
+        /// 无缝，动作播到自然结尾再切保留作者收尾，截尾反而丢动作且 0.6s 窗口下截断明显）</summary>
+        public bool 惯性化启用 => 惯性化器 != null && 惯性化器.启用惯性化;
+
         /// <summary>单次动作剩余秒数（-1=未注册/未播；0=已播完）。行为层在剩余≈过渡秒时
         /// 提前切回待机，让 CrossFade 与动作尾部重叠——消除"播完定格→再淡入"的割裂感。</summary>
         public float 剩余秒(string clipName)
@@ -125,9 +131,20 @@ namespace GIC.Pet
             var state = 目标动画[clipName];
             if (state == null || state.clip == null) return;
             state.wrapMode = 循环模式;
-            // v19 流畅度（2026-08-23）：Stop()+Play() 硬切 → CrossFade 平滑过渡（原神观感）；
-            // 2026-08-24 0.3→0.2：过渡期双 clip 双采样是顿挫放大器，收紧窗口
-            目标动画.CrossFade(clipName, 动作过渡秒);
+            if (惯性化器 != null && 惯性化器.启用惯性化)
+            {
+                // 惯性化切换（2026-08-27，GoW4 技术）：硬切新 clip——单 clip 求值无双采样开销，
+                // 姿态连续性由惯性化层后处理保证（当前姿势+速度 C2 连续衰减归零，
+                // 任意切点/中途打断都平滑，替代旧 CrossFade 的线性权重混合）
+                目标动画.Play(clipName, PlayMode.StopAll);
+                惯性化器.Trigger(动作过渡秒);
+            }
+            else
+            {
+                // v19 流畅度（2026-08-23）：Stop()+Play() 硬切 → CrossFade 平滑过渡（原神观感）；
+                // 2026-08-24 0.3→0.2：过渡期双 clip 双采样是顿挫放大器，收紧窗口
+                目标动画.CrossFade(clipName, 动作过渡秒);
+            }
 
             // 情绪下发：无映射的情绪动作 → 下发空名清回默认脸
             if (情绪控制器 != null)

@@ -58,8 +58,10 @@ namespace GIC.Pet
 
         [Header("性能")]
         [SerializeField] private int 目标帧率 = 30;
-        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧 / 2=隔一个刷新一帧 / 3=自适应（默认：刷新率≥120Hz→2 否则→1，任何屏都≥60fps 且帧预算有余量；60Hz 屏固定 2 会变 30fps 勿用）")]
+        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧 / 2=隔一个刷新一帧 / 3=自适应（默认：刷新率≥120Hz→2 否则→1，任何屏都≥60fps 且帧预算有余量；60Hz 屏固定 2 会变 30fps 勿用）。DWM帧对齐开启时本项被忽略")]
         [SerializeField] private int 垂直同步 = 3;
+        [Tooltip("DWM 帧对齐（2026-08-27 根治匀速动画 judder）：每帧 DwmFlush 把主循环钉到桌面合成网格（刷新率的整数倍间隔）——等效硬件 vsync 的帧节拍整律器。分层窗口 present 不阻塞（blt 模型），vSyncCount 实际无效（Player.log 实证 min=6.05/max=13.3 混杂节拍、有效帧率 82-165 波动=匀速动画全程 judder，头部因指数阻尼免疫）——本开关是唯一有效杠杆。开=强制 vsync=0+不限帧，DwmFlush 吸收渲染方差：165Hz 屏 → 恒 12.1ms 节拍 82.5fps")]
+        [SerializeField] private bool DWM帧对齐 = true;
 
         [Header("缩放")]
         [Tooltip("滚轮缩放派蒙大小（光标命中模型时生效，与拖拽一致）")] [SerializeField] private bool 允许滚轮缩放 = true;
@@ -192,6 +194,7 @@ namespace GIC.Pet
         [DllImport("kernel32.dll")] private static extern IntPtr GetModuleHandle(string lpModuleName);
         [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
         [DllImport("dwmapi.dll")] private static extern uint DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
+        [DllImport("dwmapi.dll")] private static extern int DwmFlush(); // 阻塞到下一次 DWM 合成完成（帧节拍整律：分层窗口 present 不阻塞、vsync 无效时的唯一对齐手段）
         [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
@@ -236,6 +239,7 @@ namespace GIC.Pet
 #if UNITY_EDITOR
             // 编辑器预览不碰 QualitySettings（运行时改 vSyncCount 退出 Play 不回滚，会污染编辑器）
             _ = 垂直同步; // 字段仅供构建版使用，读一次消 CS0414
+            _ = DWM帧对齐; // 同上（DwmFlush/DWM 分支均 #if !UNITY_EDITOR）
             Application.targetFrameRate = 目标帧率;
 #else
             // 帧节奏演化史（2026-08-26 终案=自适应分频，Player.log 实证）：
@@ -248,16 +252,30 @@ namespace GIC.Pet
             // 预算 16.7ms 余量 178%，75Hz→75）。任何屏都≥60fps 且帧预算远超渲染 6ms=节奏恒定无 judder。
             // 官方文档：vsync=硬件同步（平滑帧节拍），targetFrameRate=软件限帧有 microstutter——勿用
             // vsync=0+限帧替代。仅宠物进程执行，不影响主游戏画质。
+            // v4=DWM帧对齐（2026-08-27）：vsync 上述"整律"假设在分层窗口上破产——blt 模型 present
+            // 不阻塞（canvas 矩阵实证 min=6.05ms），自适应 vsync 实为无效设置，节拍仍 6-13ms 混杂
+            // （~130fps 自由跑）→ 匀速动画全程 judder（"任何单动作期间都不丝滑"用户目检实证）。
+            // DwmFlush 每帧阻塞到下一次桌面合成=把主循环钉到刷新率网格，渲染方差被等待吸收：
+            // 165Hz 屏恒 12.1ms 节拍（82.5fps，与 vsync=2 理论值相同但真实生效）。
             int refresh = (int)Screen.currentResolution.refreshRateRatio.value;
             if (refresh <= 0) refresh = 60; // 取不到时保守按 60Hz 走 vsync=1
-            int vsync = 垂直同步 >= 3 ? (refresh >= 120 ? 2 : 1) : 垂直同步;
-            QualitySettings.vSyncCount = Mathf.Clamp(vsync, 0, 4);
-            if (QualitySettings.vSyncCount == 0)
+            if (DWM帧对齐)
             {
-                Application.targetFrameRate = 目标帧率;
+                QualitySettings.vSyncCount = 0;
+                Application.targetFrameRate = -1; // 不限帧：节拍由 DwmFlush 决定（LateUpdate 每帧调用）
+                Debug.Log($"[PetWindow] 帧节奏：DWM帧对齐 开（refresh={refresh}Hz，DwmFlush 钉合成网格）");
             }
-            Debug.Log($"[PetWindow] 帧节奏：refresh={refresh}Hz vsync={QualitySettings.vSyncCount} → " +
-                      $"{(QualitySettings.vSyncCount > 0 ? $"{refresh / (float)QualitySettings.vSyncCount:F1}fps（帧预算 {1000f * QualitySettings.vSyncCount / refresh:F1}ms）" : $"限帧{目标帧率}")}");
+            else
+            {
+                int vsync = 垂直同步 >= 3 ? (refresh >= 120 ? 2 : 1) : 垂直同步;
+                QualitySettings.vSyncCount = Mathf.Clamp(vsync, 0, 4);
+                if (QualitySettings.vSyncCount == 0)
+                {
+                    Application.targetFrameRate = 目标帧率;
+                }
+                Debug.Log($"[PetWindow] 帧节奏：refresh={refresh}Hz vsync={QualitySettings.vSyncCount} → " +
+                          $"{(QualitySettings.vSyncCount > 0 ? $"{refresh / (float)QualitySettings.vSyncCount:F1}fps（帧预算 {1000f * QualitySettings.vSyncCount / refresh:F1}ms）" : $"限帧{目标帧率}")}");
+            }
 #endif
             Application.runInBackground = true;
         }
@@ -573,6 +591,13 @@ namespace GIC.Pet
         /// 交互结束后本层停止应用，动画自然覆盖残留（收尾弹簧已归零，实际残角≈0 无跳变）。</summary>
         void LateUpdate()
         {
+            // DWM 帧对齐（2026-08-27）：阻塞到下一次桌面合成完成——主循环钉到合成网格，渲染方差
+            // 被 flush 等待吸收 → 帧节拍恒为刷新间隔整数倍（165Hz 屏=12.1ms）。分层窗口 present
+            // 不阻塞、vSyncCount 无效（canvas 矩阵 min=6.05 实证），这是匀速动画不 judder 的唯一
+            // 有效节拍器（问题①"任何单动作全程不丝滑"根治）。置于本方法一切早退之前=每帧必执行。
+#if !UNITY_EDITOR
+            if (DWM帧对齐 && restyled) DwmFlush();
+#endif
             if (拖拽物理 == null || !拖拽物理.交互中 || _四肢骨 == null) return;
             for (int i = 0; i < _四肢骨.Length; i++)
             {

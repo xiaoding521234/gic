@@ -96,11 +96,65 @@ namespace GIC.Editor
 
             EditorUtility.SetDirty(anim);
 
+            接线惯性化器(anim, clips, swapper);
+
             重建动作测试UI(clips);
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
             Debug.Log($"[PetSceneSync] 注册 {clips.Count} 个 clip 到 {anim.name}（旧 {oldNames.Count} 个已清）+ 测试 UI 已重建，默认={anim.clip.name}，场景已保存");
+        }
+
+        /// <summary>惯性化器接线（2026-08-27）：确保 swapper 物体上有 PetInertializer，
+        /// 骨列表填为全部 clip 曲线绑定路径的并集（父->子排序）。非动画骨（眼球本体等叠加层
+        /// 地盘）因无曲线天然排除。曲线路径经 SerializedObject 直读 m_*Curves——
+        /// GetCurveBindings 对 legacy clip 不可信（2026-08-25 实证会被 m_EditorCurves 劫持/返回空）。
+        /// 幂等：组件已存在只刷新骨列表；swapper 引用缺失则补。</summary>
+        private static void 接线惯性化器(Animation anim, List<AnimationClip> clips, GIC.Pet.PetAnimSwapper swapper)
+        {
+            var inert = swapper.GetComponent<GIC.Pet.PetInertializer>();
+            if (inert == null) inert = swapper.gameObject.AddComponent<GIC.Pet.PetInertializer>();
+
+            var paths = new HashSet<string>();
+            foreach (var c in clips)
+            {
+                var so = new SerializedObject(c);
+                foreach (var prop in new[] { "m_RotationCurves", "m_PositionCurves", "m_ScaleCurves", "m_FloatCurves" })
+                {
+                    var arr = so.FindProperty(prop);
+                    if (arr == null || !arr.isArray) continue;
+                    for (int i = 0; i < arr.arraySize; i++)
+                    {
+                        var p = arr.GetArrayElementAtIndex(i).FindPropertyRelative("path");
+                        if (p != null && !string.IsNullOrEmpty(p.stringValue)) paths.Add(p.stringValue);
+                    }
+                }
+            }
+
+            var bones = new List<(int depth, Transform t)>();
+            int 未解析 = 0;
+            foreach (var path in paths)
+            {
+                var t = anim.transform.Find(path);
+                if (t == null) { 未解析++; continue; } // 哈希路径骨不在 FBX 骨架（哈希修复工具已知遗留），预期
+                bones.Add((path.Split('/').Length, t));
+            }
+            var sorted = bones.OrderBy(b => b.depth).Select(b => b.t).ToList();
+
+            var soI = new SerializedObject(inert);
+            var arrI = soI.FindProperty("骨列表");
+            arrI.arraySize = sorted.Count;
+            for (int i = 0; i < sorted.Count; i++) arrI.GetArrayElementAtIndex(i).objectReferenceValue = sorted[i];
+            soI.ApplyModifiedPropertiesWithoutUndo();
+
+            var soS = new SerializedObject(swapper);
+            var pRef = soS.FindProperty("惯性化器");
+            if (pRef.objectReferenceValue == null)
+            {
+                pRef.objectReferenceValue = inert;
+                soS.ApplyModifiedPropertiesWithoutUndo();
+            }
+            Debug.Log($"[PetSceneSync] 惯性化器接线：{sorted.Count} 骨入列表（未解析路径 {未解析} 个=哈希遗留骨，预期）");
         }
 
         /// <summary>重建动作测试 UI（AnimUICanvas + EventSystem，编辑器 Play 测动作用；
