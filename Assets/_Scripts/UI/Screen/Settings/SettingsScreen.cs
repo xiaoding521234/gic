@@ -40,6 +40,8 @@ namespace GIC.UI
         public TextCombiner controlButtonText;
         public Button accountButton;
         public TextCombiner accountButtonText;
+        public Button petButton;
+        public TextCombiner petButtonText;
         public Button otherButton;
         public TextCombiner otherButtonText;
 
@@ -72,9 +74,13 @@ namespace GIC.UI
         public ButtonSettingItem playerNameSetting;
         public ButtonSettingItem commandSetting;
 
+        [Header("派蒙设置（docs/19 §6.4，2026-08-27）")]
+        public GameObject petSettings;
+        public DropdownSettingItem petFormSetting;
+        public DropdownSettingItem petCloseSetting; // 2026-08-27 从"其它"栏挪入"派蒙"栏
+
         [Header("其它设置")]
         public GameObject otherSettings;
-        public DropdownSettingItem petCloseSetting;
 
         [Header("动画")]
         [SerializeField] private float panelSlideDuration = 0.2f;
@@ -99,11 +105,12 @@ namespace GIC.UI
         {
             RegisterClosableSelf();
 
-            // 收集所有设置面板
+            // 收集所有设置面板（与导航按钮顺序一致：派蒙=第 5 栏，其它=第 6 栏）
             settingPanels.Add(displaySettings);
             settingPanels.Add(soundSettings);
             settingPanels.Add(controlSettings);
             settingPanels.Add(accountSettings);
+            settingPanels.Add(petSettings);
             settingPanels.Add(otherSettings);
 
             // 收集所有导航按钮
@@ -111,6 +118,7 @@ namespace GIC.UI
             navButtons.Add(soundButton);
             navButtons.Add(controlButton);
             navButtons.Add(accountButton);
+            navButtons.Add(petButton);
             navButtons.Add(otherButton);
 
             // 收集所有导航文本
@@ -118,6 +126,7 @@ namespace GIC.UI
             navTexts.Add(soundButtonText);
             navTexts.Add(controlButtonText);
             navTexts.Add(accountButtonText);
+            navTexts.Add(petButtonText);
             navTexts.Add(otherButtonText);
 
             // 收集所有导航按钮的 RectTransform
@@ -125,6 +134,7 @@ namespace GIC.UI
             navRects.Add(soundButton.GetComponent<RectTransform>());
             navRects.Add(controlButton.GetComponent<RectTransform>());
             navRects.Add(accountButton.GetComponent<RectTransform>());
+            navRects.Add(petButton.GetComponent<RectTransform>());
             navRects.Add(otherButton.GetComponent<RectTransform>());
 
             // 绑定导航按钮
@@ -132,7 +142,8 @@ namespace GIC.UI
             soundButton.onClick.AddListener(() => SwitchPanel(1));
             controlButton.onClick.AddListener(() => SwitchPanel(2));
             accountButton.onClick.AddListener(() => SwitchPanel(3));
-            otherButton.onClick.AddListener(() => SwitchPanel(4));
+            petButton.onClick.AddListener(() => SwitchPanel(4));
+            otherButton.onClick.AddListener(() => SwitchPanel(5));
 
             // 绑定关闭按钮
             closeButton.onClick.AddListener(Close);
@@ -145,7 +156,8 @@ namespace GIC.UI
             InitSoundSettings();
             InitControlSettings();
             InitAccountSettings();
-            InitOtherSettings();
+            InitPetSettings();
+            // "其它"栏 2026-08-27 起暂无条目（petClose 挪入派蒙栏）——面板保留占位
 
             // 缓存动画位置
             CacheAnimationPositions();
@@ -164,6 +176,7 @@ namespace GIC.UI
             soundButtonText.SetSingleEntry(new LocalizedString("UIText", "Sound"));
             controlButtonText.SetSingleEntry(new LocalizedString("UIText", "Control"));
             accountButtonText.SetSingleEntry(new LocalizedString("UIText", "Account"));
+            petButtonText.SetSingleEntry(new LocalizedString("UIText", "Paimon"));
             otherButtonText.SetSingleEntry(new LocalizedString("UIText", "Other"));
         }
 

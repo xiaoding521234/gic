@@ -88,7 +88,9 @@ namespace GIC.Framework
 
             InitSaveSettings();
 
-            // 桌宠与主进程同生共死：启动即拉起子进程，退出/崩溃连带关闭（编辑器 no-op，docs/19 §5.2）
+            // 派蒙形态分发（docs/19 §6.4，设置"派蒙"栏目）：桌面版=拉起独立进程（原逻辑）；
+            // 游戏画面内版=PetInGameHost 本进程内创建实例（其内部抑制桌面拉起）。编辑器内 Launch 为 no-op。
+            PetInGameHost.启动形态(_saveManager?.CurrentSave?.petForm ?? 0);
             PetProcessLauncher.Launch();
 
         }
@@ -139,7 +141,8 @@ namespace GIC.Framework
 
         private void OnApplicationQuit()
         {
-            // 设置开启时退出游戏连带关闭派蒙（设置项 closePetOnExit，默认开；关闭则她独立存活）
+            // 设置开启时退出游戏连带关闭派蒙（设置项 closePetOnExit，默认开；关闭则她独立存活；
+            // 游戏内形态天然随进程销毁，TryKillPet 对无 pid 文件场景为 no-op——2026-08-27 起两形态共用此钩子）
             if (!PetMode.Enabled && _saveManager?.CurrentSave?.closePetOnExit == true)
             {
                 PetSingleInstance.TryKillPet();

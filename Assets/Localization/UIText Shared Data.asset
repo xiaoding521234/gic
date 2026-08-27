@@ -587,6 +587,22 @@ MonoBehaviour:
     m_Key: Off
     m_Metadata:
       m_Items: []
+  - m_Id: 36317855671201792
+    m_Key: Paimon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 36317855755087872
+    m_Key: PetForm
+    m_Metadata:
+      m_Items: []
+  - m_Id: 36317855755087873
+    m_Key: PetFormDesktop
+    m_Metadata:
+      m_Items: []
+  - m_Id: 36317855755087874
+    m_Key: PetFormInGame
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -170,7 +170,9 @@ namespace GIC.Pet
                 return;
             }
 
-            if (窗口控制器 == null || !窗口控制器.TryGetCursorUnityScreenPos(out Vector2 sp)) return;
+            // 宿主分发（IPetHost，2026-08-27 批次 B）：桌面=窗口控制器字段；游戏内=PetInGameHost 注入
+            var 宿主 = 窗口控制器 != null ? (IPetHost)窗口控制器 : PetInGameHost.宿主接口;
+            if (宿主 == null || !宿主.TryGet光标Unity屏幕位置(out Vector2 sp)) return;
 
             // 归一化偏移（-1..1）基准=头骨屏幕投影（2026-08-25 修复：原以屏幕中心为基准——
             // 派蒙不在窗口中心（缩放改变屏幕占比+构图本就偏置），鼠标与眼睛水平时

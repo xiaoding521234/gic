@@ -48,7 +48,7 @@ namespace GIC.Pet
     /// 躺姿+横躺 90°（仓鼠式）→ v3 专用垂落动画 → v4 瘫软低头+90° 侧挂 → v5 全侧挂深化（KO 式头折向地面，
     /// 已废）→ v6 瘫软 45° 头朝观众+3/4 偏左。
     /// </summary>
-    public class PetWindowController : MonoBehaviour
+    public class PetWindowController : MonoBehaviour, IPetHost
     {
         [Header("窗口设置")]
         [SerializeField] private bool 使用DWM透明 = true; // 主流做法；关闭则退回色键（有洋红毛边）
@@ -110,6 +110,10 @@ namespace GIC.Pet
 
         /// <summary>是否正在拖拽派蒙（行为层打断打招呼、随机小动作等用；含收尾全程）</summary>
         public bool 正在拖拽 => dragging || 物理交互中;
+
+        // ---- IPetHost 显式实现（转发到既有公开成员，方法名不动保场景引用） ----
+        bool IPetHost.TryGet光标Unity屏幕位置(out Vector2 pos) => TryGetCursorUnityScreenPos(out pos);
+        bool IPetHost.TryGet命中世界包围盒(out Bounds bounds) => TryGet命中世界包围盒(out bounds);
 
         /// <summary>命中网格的世界包围盒（行为层接近判定用）。来源=MeshCollider（BakeMesh 烘的真实蒙皮网格
         /// + 与 SMR 同 transform，PhysX 世界包围盒正确——像素级点击命中一直精准即证明）。
@@ -790,6 +794,7 @@ namespace GIC.Pet
         /// <summary>取鼠标光标的 Unity 屏幕坐标（左下原点），供视线跟随等全局追踪使用。
         /// 与命中检测不同：光标在窗口外同样有效（线性外推，ScreenPointToRay 可处理屏外点）。
         /// 构建版走 Win32 全局轮询（窗口无焦点/穿透时也能追踪）；编辑器退回 Input.mousePosition。
+        /// IPetHost 接口方法（游戏内版宿主同名实现，行为层经接口分发）。
         /// </summary>
         public bool TryGetCursorUnityScreenPos(out Vector2 unityScreenPos)
         {

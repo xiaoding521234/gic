@@ -91,6 +91,10 @@ namespace GIC.Pet
         /// <summary>边坐坐定中——2026-08-27 用户拍板：坐下就纯坐，打招呼/随机小动作一律不触发</summary>
         private bool 边坐坐定中 => 边坐控制器 != null && 边坐控制器.坐定中;
 
+        /// <summary>宿主分发（IPetHost，docs/19 §6.4 批次 B）：桌面形态=序列化字段 窗口控制器；
+        /// 游戏内形态=PetInGameHost 注入的宿主。字段保留原类型（场景引用零风险），运行时按接线取。</summary>
+        private IPetHost 宿主 => 窗口控制器 != null ? (IPetHost)窗口控制器 : PetInGameHost.宿主接口;
+
         void Start()
         {
             if (相机 == null) 相机 = Camera.main;
@@ -122,7 +126,7 @@ namespace GIC.Pet
                 return;
             }
 
-            bool 物理中 = 窗口控制器.物理交互中;
+            bool 物理中 = 宿主.物理交互中;
             if (物理中)
             {
                 拖拽物理期处理();
@@ -171,7 +175,7 @@ namespace GIC.Pet
             // 随机小动作：光标不在旁边且无物理交互（拖拽/收尾）时才轮换——在旁时留给打招呼/
             // 视线跟随；物理交互期（拎起/收尾）不叠新动作，保持拖拽体验纯粹（2026-08-26）；
             // 边坐掉落中/坐定中同样压制（空中别穿插单次动作；坐下就纯坐——2026-08-27 拍板）
-            if (启用随机小动作 && !接近 && !边坐掉落中 && !边坐坐定中 && !窗口控制器.物理交互中 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
+            if (启用随机小动作 && !接近 && !边坐掉落中 && !边坐坐定中 && !宿主.物理交互中 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
             {
                 播单次(随机小动作列表[Random.Range(0, 随机小动作列表.Length)]);
                 _下次小动作时刻 = Time.time + Random.Range(小动作间隔秒.x, 小动作间隔秒.y);
@@ -192,7 +196,7 @@ namespace GIC.Pet
                 _单次进行中 = false;
                 if (_仪式静默中) 置仪式静默(false); // 出场动画被打断
                 else 眨眼控制器?.Set静默(false);
-                窗口控制器.暂停命中烘焙 = false;
+                宿主.暂停命中烘焙 = false;
             }
             if (!string.IsNullOrEmpty(拎起动作名) && 动作播放器.动作存在(拎起动作名) && !动作播放器.是否在播(拎起动作名))
                 动作播放器.Play(拎起动作名); // loop 播放（Play 会先下发映射情绪，如 Sleep→Sleepy）
@@ -231,7 +235,7 @@ namespace GIC.Pet
             // 拖拽放下反应（2026-08-27）：按本次拖拽时长分档——短拖（<轻阈值）无反应直接回待机
             // （快速挪位置不打扰）；中档（≥轻阈值）害羞；长拖（≥生气阈值）生气。
             // 播单次含情绪映射（Anger→生气表情/Shy→害羞）+动作期烘焙暂停，播完自然回待机。
-            float 拖了秒 = 窗口控制器.拖拽秒;
+            float 拖了秒 = 宿主.拖拽秒;
             string 放下反应 = null;
             if (拖了秒 >= 拖拽生气阈值秒 && 动作播放器.动作存在(拖拽生气动作名))
                 放下反应 = 拖拽生气动作名;
@@ -264,7 +268,7 @@ namespace GIC.Pet
                     _单次进行中 = false;
                     if (_仪式静默中) 置仪式静默(false); // 仪式（出场）静默解除；普通单次动作本来就没静默视线
                     else 眨眼控制器?.Set静默(false);
-                    窗口控制器.暂停命中烘焙 = false;
+                    宿主.暂停命中烘焙 = false;
                     动作播放器.Play(当前待机动作);
                 }
             }
@@ -276,7 +280,7 @@ namespace GIC.Pet
             _单次进行中 = true;
             _单次开始 = Time.time;
             眨眼控制器?.Set静默(true);
-            窗口控制器.暂停命中烘焙 = true; // 动作期间停 MeshCollider 重烘（烘焙=掉帧尖峰，2026-08-24）
+            宿主.暂停命中烘焙 = true; // 动作期间停 MeshCollider 重烘（烘焙=掉帧尖峰，2026-08-24）
             动作播放器.PlayOnce(动作名);
         }
 
@@ -307,11 +311,11 @@ namespace GIC.Pet
         /// → 判定恒 false → 招手永不触发（2026-08-26 根治）。</summary>
         bool 检测光标接近()
         {
-            if (窗口控制器.正在拖拽) return false;
-            if (!窗口控制器.TryGetCursorUnityScreenPos(out Vector2 sp)) return false;
+            if (宿主.正在拖拽) return false;
+            if (!宿主.TryGet光标Unity屏幕位置(out Vector2 sp)) return false;
 
             Bounds b;
-            if (窗口控制器.TryGet命中世界包围盒(out b))
+            if (宿主.TryGet命中世界包围盒(out b))
             {
                 // 命中网格路径（首选）：真实蒙皮世界包围盒
             }

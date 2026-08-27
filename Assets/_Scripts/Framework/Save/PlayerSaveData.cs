@@ -132,8 +132,12 @@ namespace GIC.Framework
         public int frameRate = 165;              // 帧率
 
         // ========== 桌宠设置 ==========
-        /// <summary>游戏退出时是否连带关闭派蒙（true=随游戏退出，false=独立存活）</summary>
+        /// <summary>游戏退出时是否连带关闭派蒙（true=随游戏退出，false=独立存活；仅桌面形态有意义）</summary>
         public bool closePetOnExit = true;
+
+        /// <summary>派蒙形态（0=桌面版，1=游戏画面内版；docs/19 §6.4）。JsonUtility 对缺失字段反序列化为默认值 0
+        /// ——老档升级语义=桌面版，恰与"桌面版一直是唯一形态"的历史一致，无需版本迁移。安卓上 0 由读取侧钳为 1（Win32 不适用）。</summary>
+        public int petForm = 0;
 
         // 锚点位置信息
         public int currentPosition = (int)PositionName.SnezhnayaCastle;
@@ -167,6 +171,7 @@ namespace GIC.Framework
             frameRate = 165;
 
             closePetOnExit = true;
+            petForm = 0;
 
             currentPosition = (int)PositionName.SnezhnayaCastle;
 

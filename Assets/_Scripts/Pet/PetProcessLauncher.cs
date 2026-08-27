@@ -15,10 +15,15 @@ namespace GIC.Pet
     /// </summary>
     public static class PetProcessLauncher
     {
+        /// <summary>抑制开关（PetInGameHost 游戏内形态置真：形态切换/启动分发不拉桌面进程）。
+        /// 桌面形态热切换时复位 false 再 Launch。</summary>
+        public static bool LaunchSuppressed { get; set; }
+
         public static void Launch()
         {
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR
             if (PetMode.Enabled) return; // 双保险：宠物进程不再拉新进程
+            if (LaunchSuppressed) return; // 游戏内形态：不拉桌面进程（PetInGameHost 管形态）
 
             try
             {

@@ -590,6 +590,22 @@ MonoBehaviour:
     m_Localized: "\u5173"
     m_Metadata:
       m_Items: []
+  - m_Id: 36317855671201792
+    m_Localized: "\u6D3E\u8499"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 36317855755087872
+    m_Localized: "\u6D3E\u8499\u5F62\u6001"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 36317855755087873
+    m_Localized: "\u684C\u9762\u7248"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 36317855755087874
+    m_Localized: "\u6E38\u620F\u753B\u9762\u5185"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
