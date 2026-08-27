@@ -20,6 +20,7 @@ namespace GIC.Pet
         [SerializeField] private PetBlinkController 眨眼控制器; // 单次动作期间静默（morph 重评估与动作叠加互相放大顿挫）
         [SerializeField] private PetLookAtController 视线控制器; // 出场/退场期间静默（仪式动作头链全交 clip，2026-08-24）
         [SerializeField] private PetEmotionController 情绪控制器;   // 拎起期的慌张表情（直接下发，不经动作映射）
+        [Tooltip("边缘坐控制器（2026-08-27 坐窗口顶边/任务栏横框）：空=禁用边缘坐，松手行为回退纯待机")] [SerializeField] private PetEdgeSitController 边坐控制器;
         [Tooltip("被拎起时播的专用动作（Drag01 垂落姿势：四肢常量垂落+躯干保留待机微动，loop 播放；四肢摆动由拖拽物理跟拍弹簧叠加）")] [SerializeField] private string 拎起动作名 = "Ani_NPC_Kanban_Paimon_Drag01";
         [Tooltip("空 = Camera.main")] [SerializeField] private Camera 相机;
         [Tooltip("空 = 自动找非影子壳的蒙皮渲染器（用包围盒做接近判定）")] [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
@@ -79,6 +80,16 @@ namespace GIC.Pet
         private bool _拎起视线静默中;        // 拖拽物理期视线静默（2026-08-26：拎起 KO 垂落头被视线层拉向光标=目检"抬头看抓取点"根因）
         private bool _拎起情绪开着;          // 拖拽物理期的拎起表情状态（边沿检测用）
         private bool _上帧物理中;             // 物理交互结束边沿：回待机/清拎起表情
+
+        /// <summary>当前待机动作：边坐坐定中=坐姿（SitLoop，行为层视角的"待机"随坐定切换），
+        /// 否则=站立待机。打招呼/小动作/放下反应播完都回到这里——坐定期间穿插的单次动作自然回坐姿。</summary>
+        private string 当前待机动作 => (边坐控制器 != null && 边坐控制器.坐定中) ? 边坐控制器.坐姿动作 : 待机动作名;
+
+        /// <summary>边缘坐掉落中（锚定窗口消失重力下坠）——期间压制打招呼/小动作新触发</summary>
+        private bool 边坐掉落中 => 边坐控制器 != null && 边坐控制器.掉落中;
+
+        /// <summary>边坐坐定中——2026-08-27 用户拍板：坐下就纯坐，打招呼/随机小动作一律不触发</summary>
+        private bool 边坐坐定中 => 边坐控制器 != null && 边坐控制器.坐定中;
 
         void Start()
         {
@@ -172,8 +183,12 @@ namespace GIC.Pet
                     放下反应 = 拖拽轻反应动作名;
                 if (!string.IsNullOrEmpty(放下反应))
                     播单次(放下反应);
-                else if (!_单次进行中 && 动作播放器.动作存在(待机动作名))
-                    动作播放器.Play(待机动作名);
+                else if (边坐控制器 != null && 边坐控制器.评估吸附并坐())
+                {
+                    // 边坐接管：松手位置附近有横框（窗口顶边/任务栏顶），已磁吸落座播 SitLoop
+                }
+                else if (!_单次进行中 && 动作播放器.动作存在(当前待机动作))
+                    动作播放器.Play(当前待机动作);
             }
 
             // 出场：首帧（全部 Start 已完成 = PetAnimSwapper 预热已回待机）播出场动画；
@@ -205,7 +220,7 @@ namespace GIC.Pet
                         if (_仪式静默中) 置仪式静默(false); // 仪式（出场）静默解除；普通单次动作本来就没静默视线
                         else 眨眼控制器?.Set静默(false);
                         窗口控制器.暂停命中烘焙 = false;
-                        动作播放器.Play(待机动作名);
+                        动作播放器.Play(当前待机动作);
                     }
                 }
                 return; // 单次动作进行中不叠新触发
@@ -213,7 +228,8 @@ namespace GIC.Pet
 
             bool 接近 = 检测光标接近();
 
-            if (接近 && Time.time - _上次打招呼 >= 打招呼冷却秒)
+            // 坐定中不打招呼（2026-08-27 拍板：坐下就纯坐）
+            if (接近 && !边坐掉落中 && !边坐坐定中 && Time.time - _上次打招呼 >= 打招呼冷却秒)
             {
                 _接近计时 += Time.deltaTime;
                 if (_接近计时 >= 触发停留秒)
@@ -230,8 +246,9 @@ namespace GIC.Pet
             }
 
             // 随机小动作：光标不在旁边且无物理交互（拖拽/收尾）时才轮换——在旁时留给打招呼/
-            // 视线跟随；物理交互期（拎起/收尾）不叠新动作，保持拖拽体验纯粹（2026-08-26）
-            if (启用随机小动作 && !接近 && !窗口控制器.物理交互中 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
+            // 视线跟随；物理交互期（拎起/收尾）不叠新动作，保持拖拽体验纯粹（2026-08-26）；
+            // 边坐掉落中/坐定中同样压制（空中别穿插单次动作；坐下就纯坐——2026-08-27 拍板）
+            if (启用随机小动作 && !接近 && !边坐掉落中 && !边坐坐定中 && !窗口控制器.物理交互中 && 随机小动作列表.Length > 0 && Time.time >= _下次小动作时刻)
             {
                 播单次(随机小动作列表[Random.Range(0, 随机小动作列表.Length)]);
                 _下次小动作时刻 = Time.time + Random.Range(小动作间隔秒.x, 小动作间隔秒.y);

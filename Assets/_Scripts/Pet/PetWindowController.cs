@@ -122,6 +122,57 @@ namespace GIC.Pet
             return true;
         }
 
+        /// <summary>窗口是否已完成 Win32 改造（构建版 true；编辑器恒 false——桌宠形态仅存在于构建产物）。
+        /// 边坐等窗口级子系统据此在编辑器内安全空转。</summary>
+        public bool 窗口已改造 => restyled;
+
+        /// <summary>自身窗口句柄（(IntPtr)0 = 未改造）——外部子系统做 Win32 查询/排除自身用</summary>
+        public IntPtr 窗口句柄 => hwnd;
+
+        /// <summary>当前窗口 DPI 缩放（GetDpiForWindow/96）——外部子系统把逻辑像素阈值换算物理像素用</summary>
+        public float Dpi缩放 => dpi缩放 > 0.01f ? dpi缩放 : 1f;
+
+        /// <summary>滚轮缩放目标倍率——边坐层监听缩放变化（坐姿下缩放=切站立重坐）用</summary>
+        public float 目标缩放值 => 目标缩放;
+
+        /// <summary>缩放平滑过渡是否进行中（显示缩放未追上目标倍率）</summary>
+        public bool 缩放过渡中 => !Mathf.Approximately(显示缩放, 目标缩放);
+
+        /// <summary>取接触点屏幕坐标（骨盆=屁股投影，物理像素，y 向下）——边坐判定/贴合基准。
+        /// 2026-08-27 目检纠正：坐姿接触线是屁股不是脚，脚线判定会把整条腿沉入窗下。</summary>
+        public bool TryGet接触点屏幕位置(out Vector2 接触点屏幕)
+        {
+            接触点屏幕 = default;
+            if (hwnd == IntPtr.Zero || cam == null) return false;
+            // 2026-08-27 目检纠正：判定/贴合基准=骨盆（屁股）不是脚（包围盒底）——坐姿时骨盆落在
+            // 横框上、腿垂窗前才是"坐"；脚线判定会把整条腿沉入窗下。骨盆缺失时保底包围盒底中心。
+            Vector3 基准世界;
+            if (_骨盆 != null) 基准世界 = _骨盆.position;
+            else if (TryGet命中世界包围盒(out Bounds b)) 基准世界 = new Vector3(b.center.x, b.min.y, b.center.z);
+            else return false;
+            if (!世界坐标转客户区像素(基准世界, out Vector2 基准客户)) return false;
+            var origin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref origin);
+            接触点屏幕 = new Vector2(origin.X + 基准客户.x, origin.Y + 基准客户.y);
+            return true;
+        }
+
+        /// <summary>移动窗口使接触点（骨盆=屁股）对齐到指定屏幕坐标（物理像素；x=接触点水平位置，y=坐落线）。
+        /// 边坐吸附/跟随/掉落共用；不改变窗口尺寸，动画期间模型照常在画布内演。</summary>
+        public void 设置接触点屏幕位置(float 接触屏幕X, float 接触屏幕Y)
+        {
+            if (hwnd == IntPtr.Zero || cam == null || _骨盆 == null) return;
+            if (!世界坐标转客户区像素(_骨盆.position, out Vector2 基准客户)) return;
+            GetFrameSize(out _, out _, out int frameLeft, out int frameTop);
+            SetWindowPos(hwnd, IntPtr.Zero,
+                Mathf.RoundToInt(接触屏幕X - 基准客户.x) - frameLeft,
+                Mathf.RoundToInt(接触屏幕Y - 基准客户.y) - frameTop,
+                0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+        }
+
+        /// <summary>标记当前窗口位置待落盘（pet.json 防抖写）——外部系统（边坐吸附/落地）移动窗口后调用</summary>
+        public void 标记位置待写入() { 标记待写入(); }
+
         private bool passThroughOn;
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
