@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using static GIC.Pet.PetWin32; // Win32 声明集中在 PetWin32（2026-08-27 抽取去重），调用点免限定
 
 namespace GIC.Pet
 {
@@ -151,8 +152,7 @@ namespace GIC.Pet
             else if (TryGet命中世界包围盒(out Bounds b)) 基准世界 = new Vector3(b.center.x, b.min.y, b.center.z);
             else return false;
             if (!世界坐标转客户区像素(基准世界, out Vector2 基准客户)) return false;
-            var origin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref origin);
+            var origin = 取客户区屏幕原点();
             接触点屏幕 = new Vector2(origin.X + 基准客户.x, origin.Y + 基准客户.y);
             return true;
         }
@@ -229,68 +229,9 @@ namespace GIC.Pet
         private float _上次窗口体检 = -10f;  // 防隐形守卫低频节流（0.5s 一次）
         private static int _pendingWheelDelta; // 钩子线程累加写入，Update 主线程取走清零（120=一格）
 
-        #region Win32
-
-        [DllImport("user32.dll")] private static extern IntPtr GetActiveWindow();
-        [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-        [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
-        [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
-        [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
-        [DllImport("user32.dll")] private static extern bool GetCursorPos(out POINT lpPoint);
-        [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
-        [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
-        [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hWnd);
-        [DllImport("user32.dll")] private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, out RECT pvParam, uint fWinIni);
-        [DllImport("user32.dll")] private static extern int GetSystemMetrics(int nIndex);
-        [DllImport("user32.dll")] private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
-        [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
-        [DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
-        [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-        [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-        [DllImport("kernel32.dll")] private static extern IntPtr GetModuleHandle(string lpModuleName);
-        [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
-        [DllImport("dwmapi.dll")] private static extern uint DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
-        [DllImport("dwmapi.dll")] private static extern int DwmFlush(); // 阻塞到下一次 DWM 合成完成（帧节拍整律：分层窗口 present 不阻塞、vsync 无效时的唯一对齐手段）
-        [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
-        [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        private const int GWL_STYLE = -16;
-        private const int GWL_EXSTYLE = -20;
-        private const int WS_CAPTION = 0x00C00000;
-        private const int WS_THICKFRAME = 0x00040000;
-        private const int WS_SYSMENU = 0x00080000;
-        private const int WS_MINIMIZEBOX = 0x00020000;
-        private const int WS_MAXIMIZEBOX = 0x00010000;
-        private const int WS_EX_LAYERED = 0x00080000;
-        private const int WS_EX_TRANSPARENT = 0x00000020;
-        private const int WS_EX_TOOLWINDOW = 0x00000080;
-        private const uint LWA_COLORKEY = 0x00000001;
-        private const uint SWP_NOSIZE = 0x0001;
-        private const uint SWP_NOZORDER = 0x0004;
-        private const uint SWP_SHOWWINDOW = 0x0040;
-        private const uint SWP_FRAMECHANGED = 0x0020;
-        private const uint SPI_GETWORKAREA = 0x0030;
-        private const int SM_XVIRTUALSCREEN = 76;
-        private const int SM_YVIRTUALSCREEN = 77;
-        private const int SM_CXVIRTUALSCREEN = 78;
-        private const int SM_CYVIRTUALSCREEN = 79;
-        private const uint MONITOR_DEFAULTTONEAREST = 2;
-        private const int SW_SHOWNOACTIVATE = 4;
-        private const int VK_LBUTTON = 0x01;
-        private const int WH_MOUSE_LL = 14;
-        private const int WM_MOUSEWHEEL = 0x020A;
-        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
-
-        private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
-        [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X; public int Y; }
-        [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-        [StructLayout(LayoutKind.Sequential)] private struct MARGINS { public int cxLeftWidth; public int cxRightWidth; public int cyTopHeight; public int cyBottomHeight; }
-        [StructLayout(LayoutKind.Sequential)] private struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData; public uint flags; public uint time; public IntPtr dwExtraInfo; }
-        [StructLayout(LayoutKind.Sequential)] private struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public int dwFlags; }
-
-        #endregion
+        // Win32 互操作（DllImport/结构体/常量）集中在 PetWin32 —— 见文件头 using static
+        // 已随抽取删除的死声明（2026-08-27 核验从未被引用）：MSLLHOOKSTRUCT（滚轮回调走
+        // Marshal.ReadInt32 偏移直读零封送）、GetCurrentThreadId（全局钩子线程号传 0）。
 
         private void Awake()
         {
@@ -608,8 +549,7 @@ namespace GIC.Pet
         {
             if (拖拽物理 == null || _骨盆 == null || cam == null || hwnd == IntPtr.Zero || _paimon根 == null) return;
             if (!世界坐标转客户区像素(_骨盆.position, out Vector2 pc)) return;
-            var origin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref origin);
+            var origin = 取客户区屏幕原点();
             Vector2 骨盆屏幕 = new Vector2(origin.X + pc.x, origin.Y + pc.y);
 
             if (!拖拽物理.交互中)
@@ -716,6 +656,14 @@ namespace GIC.Pet
             return true;
         }
 
+        /// <summary>客户区原点 (0,0) 的屏幕坐标（虚拟桌面物理像素系）——客户区↔屏幕换算的统一基准</summary>
+        private POINT 取客户区屏幕原点()
+        {
+            var origin = new POINT { X = 0, Y = 0 };
+            ClientToScreen(hwnd, ref origin);
+            return origin;
+        }
+
         #endregion
 
         /// <summary>窗口矩形与客户区的差值（无边框后理论上≈0，实测兜底；含隐形边框）</summary>
@@ -723,8 +671,7 @@ namespace GIC.Pet
         {
             GetWindowRect(hwnd, out RECT wr);
             GetClientRect(hwnd, out RECT cr);
-            var origin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref origin);
+            var origin = 取客户区屏幕原点();
             frameLeft = origin.X - wr.Left;
             frameTop = origin.Y - wr.Top;
             frameW = (wr.Right - wr.Left) - (cr.Right - cr.Left);
@@ -815,8 +762,7 @@ namespace GIC.Pet
             if (待写入时刻 <= 0f || hwnd == IntPtr.Zero) return;
             try
             {
-                var origin = new POINT { X = 0, Y = 0 };
-                ClientToScreen(hwnd, ref origin);
+                var origin = 取客户区屏幕原点();
                 var data = new Pet窗口存档 { 缩放 = 目标缩放, 客户区X = origin.X, 客户区Y = origin.Y, 有位置 = true };
                 File.WriteAllText(存档路径, JsonUtility.ToJson(data, true));
             }
@@ -858,8 +804,7 @@ namespace GIC.Pet
             }
             GetCursorPos(out POINT pt);
             GetClientRect(hwnd, out RECT cr);
-            var origin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref origin);
+            var origin = 取客户区屏幕原点();
             int winW = cr.Right - cr.Left;
             int winH = cr.Bottom - cr.Top;
             if (winW <= 0 || winH <= 0)
@@ -891,68 +836,76 @@ namespace GIC.Pet
 
         private void Update()
         {
-            if (!restyled)
+            if (!restyled) return;
+
+            窗口体检帧();
+            bool modelHit = 取命中状态(out POINT pt);
+            补烘命中网格帧();
+            // 钩子按需挂/摘（2026-08-24：滚轮缩放只在命中模型时消费，常驻钩子平白吃全系统鼠标消息）
+            UpdateHookForHit(modelHit && 允许滚轮缩放);
+            拖拽与双击帧(pt, modelHit);
+            滚轮缩放帧(modelHit);
+            缩放平滑帧();
+            穿透切换帧(modelHit);
+            存档防抖帧();
+        }
+
+        /// <summary>防隐形守卫（2026-08-26）：Win+D/显示桌面/显示器休眠重排等系统事件会把窗口停靠到
+        /// 屏外停车位（实测 -16384,-16384，IsIconic=False——不是真最小化，SW_RESTORE 拉不回），
+        /// 桌宠置顶常驻"看不见=死亡"。0.5s 低频体检：iconic→复活（不抢焦点）；整窗与虚拟屏
+        /// 零交集且非用户主动拖拽/物理收尾→拉回屏内（复用松手防丢）。用户交互期不干预
+        /// （拖拽无屏边钳制是 2026-08-25 拍板）。</summary>
+        private void 窗口体检帧()
+        {
+            if (Time.unscaledTime - _上次窗口体检 < 0.5f) return;
+            _上次窗口体检 = Time.unscaledTime;
+            bool 用户在移动 = dragging || (拖拽物理 != null && 拖拽物理.交互中);
+            if (用户在移动) return;
+            if (IsIconic(hwnd))
             {
+                ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                 return;
             }
+            GetWindowRect(hwnd, out RECT wr);
+            int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            if (wr.Right <= vx || wr.Left >= vx + vw || wr.Bottom <= vy || wr.Top >= vy + vh)
+                拖拽松手防丢拉回();
+        }
 
-            // 防隐形守卫（2026-08-26）：Win+D/显示桌面/显示器休眠重排等系统事件会把窗口停靠到
-            // 屏外停车位（实测 -16384,-16384，IsIconic=False——不是真最小化，SW_RESTORE 拉不回），
-            // 桌宠置顶常驻"看不见=死亡"。0.5s 低频体检：iconic→复活（不抢焦点）；整窗与虚拟屏
-            // 零交集且非用户主动拖拽/物理收尾→拉回屏内（复用松手防丢）。用户交互期不干预
-            // （拖拽无屏边钳制是 2026-08-25 拍板）。
-            if (Time.unscaledTime - _上次窗口体检 >= 0.5f)
-            {
-                _上次窗口体检 = Time.unscaledTime;
-                bool 用户在移动 = dragging || (拖拽物理 != null && 拖拽物理.交互中);
-                if (!用户在移动)
-                {
-                    if (IsIconic(hwnd))
-                    {
-                        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-                    }
-                    else
-                    {
-                        GetWindowRect(hwnd, out RECT wr);
-                        int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
-                        int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
-                        int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-                        int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-                        if (wr.Right <= vx || wr.Left >= vx + vw || wr.Bottom <= vy || wr.Top >= vy + vh)
-                            拖拽松手防丢拉回();
-                    }
-                }
-            }
-
-            GetCursorPos(out POINT pt);
+        /// <summary>命中检测：光标→客户区物理像素→Unity 屏幕坐标→射线 vs 烘焙蒙皮碰撞体。
+        /// 输出光标屏幕物理像素 pt（拖拽/双击共用），返回=是否命中模型（穿透/滚轮/抓取判定源）。</summary>
+        private bool 取命中状态(out POINT pt)
+        {
+            GetCursorPos(out pt);
             GetClientRect(hwnd, out RECT clientRect);
-            var clientOrigin = new POINT { X = 0, Y = 0 };
-            ClientToScreen(hwnd, ref clientOrigin);
+            var origin = 取客户区屏幕原点();
             int winW = clientRect.Right - clientRect.Left;
             int winH = clientRect.Bottom - clientRect.Top;
-            int clientX = pt.X - clientOrigin.X;
-            int clientY = pt.Y - clientOrigin.Y;
+            int clientX = pt.X - origin.X;
+            int clientY = pt.Y - origin.Y;
 
             bool inWindow = clientX >= 0 && clientX < winW && clientY >= 0 && clientY < winH;
-            bool modelHit = false;
+            if (!inWindow || cam == null || 命中网格碰撞体 == null) return false;
+            // 客户区物理像素（=渲染像素，PerMonitorV2）→ Unity 屏幕坐标（左下原点）
+            float sx = clientX * ((float)Screen.width / winW);
+            float sy = clientY * ((float)Screen.height / winH);
+            float unityY = Screen.height - sy;
+            Ray ray = cam.ScreenPointToRay(new Vector3(sx, unityY, 0f));
+            return 命中网格碰撞体.Raycast(ray, out _, 100f);
+        }
 
-            if (inWindow && cam != null && 命中网格碰撞体 != null)
-            {
-                // 客户区物理像素（=渲染像素，PerMonitorV2）→ Unity 屏幕坐标（左下原点）
-                float sx = clientX * ((float)Screen.width / winW);
-                float sy = clientY * ((float)Screen.height / winH);
-                float unityY = Screen.height - sy;
-                Ray ray = cam.ScreenPointToRay(new Vector3(sx, unityY, 0f));
-                modelHit = 命中网格碰撞体.Raycast(ray, out _, 100f);
-            }
-
-            // 一次性补烘（2026-08-27 二轮终案，Player.log 诊断实证）：
-            // 周期性 0.3s 重烘全删——待机期姿势近恒定（动作结尾≈Standby t0 实测差<0.06°），
-            // 碰撞体恒有效；旧"光标近旁才烘"门控反把 15-20ms 重 cook 尖峰精确安排在光标接近/
-            // 抓取前一刻（hover 期一串同帧 HITCH 实证）。现在只在交互结束（宽限 烘焙恢复宽限秒
-            // 避开过渡窗）后补烘一次；快速连续交互（宽限期内再抓/再动作）不断顺延补烘——
-            // 期间碰撞体保持待机姿势的旧壳，对命中判定精度无损（±2-3° 姿态差=几像素）。
-            // 启动时 Start 已烘一次。
+        /// <summary>一次性补烘（2026-08-27 二轮终案，Player.log 诊断实证）：
+        /// 周期性 0.3s 重烘全删——待机期姿势近恒定（动作结尾≈Standby t0 实测差<0.06°），
+        /// 碰撞体恒有效；旧"光标近旁才烘"门控反把 15-20ms 重 cook 尖峰精确安排在光标接近/
+        /// 抓取前一刻（hover 期一串同帧 HITCH 实证）。现在只在交互结束（宽限 烘焙恢复宽限秒
+        /// 避开过渡窗）后补烘一次；快速连续交互（宽限期内再抓/再动作）不断顺延补烘——
+        /// 期间碰撞体保持待机姿势的旧壳，对命中判定精度无损（±2-3° 姿态差=几像素）。
+        /// 启动时 Start 已烘一次。</summary>
+        private void 补烘命中网格帧()
+        {
             bool 烘焙被暂停 = 暂停命中烘焙 || (拖拽物理 != null && 拖拽物理.交互中);
             if (烘焙被暂停 && !_上帧烘焙被暂停) _烘焙待补 = true;        // 进入交互：姿势要变了
             if (_上帧烘焙被暂停 && !烘焙被暂停)
@@ -967,11 +920,12 @@ namespace GIC.Pet
                 _烘焙待补 = false;
                 PetDiag.上次蒙皮重烘 = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
             }
+        }
 
-            // 钩子按需挂/摘（2026-08-24：滚轮缩放只在命中模型时消费，常驻钩子平白吃全系统鼠标消息）
-            UpdateHookForHit(modelHit && 允许滚轮缩放);
-
-            // 拖拽：全局轮询左键，不依赖焦点；抓住模型后由物理组件接管窗口定位
+        /// <summary>拖拽与双击交互帧：全局轮询左键（不依赖窗口焦点）——双击退出、拖拽起手/每帧/松手、
+        /// 拎起姿势基准角平滑。抓住模型后由物理组件接管窗口定位。</summary>
+        private void 拖拽与双击帧(POINT pt, bool modelHit)
+        {
             bool lmbDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
             bool lmbPressed = lmbDown && !prevLmbDown;
 
@@ -1035,9 +989,13 @@ namespace GIC.Pet
                 else 物理交互收口();
             }
             prevLmbDown = lmbDown;
+        }
 
-            // 滚轮缩放派蒙大小（WH_MOUSE_LL 钩子截滚轮，穿透/无焦点可靠；
-            // 仅当光标命中模型时响应，与拖拽一致——避免滚其他窗口/桌面时误缩放）
+        /// <summary>滚轮缩放帧：WH_MOUSE_LL 钩子截滚轮（穿透/无焦点可靠）；
+        /// 仅当光标命中模型时响应，与拖拽一致——避免滚其他窗口/桌面时误缩放。
+        /// 只改目标倍率，实际应用走缩放平滑帧（对齐主流桌宠滚轮渐变手感）。</summary>
+        private void 滚轮缩放帧(bool modelHit)
+        {
             int wheelRaw = System.Threading.Interlocked.Exchange(ref _pendingWheelDelta, 0);
             if (允许滚轮缩放 && modelHit && _paimon根 != null && wheelRaw != 0)
             {
@@ -1047,46 +1005,50 @@ namespace GIC.Pet
                     float 新缩放 = Mathf.Clamp(目标缩放 * Mathf.Pow(缩放步进, scroll), 缩放最小, 有效缩放最大);
                     if (!Mathf.Approximately(新缩放, 目标缩放))
                     {
-                        // 只改目标倍率：实际应用走下方平滑过渡（对齐主流桌宠滚轮渐变手感）；持久化防抖标记
                         目标缩放 = 新缩放;
                         标记待写入();
                     }
                 }
             }
+        }
 
-            // 平滑过渡：显示缩放向目标指数趋近，只改模型 localScale——窗口尺寸恒定（2026-08-24 闪烁根治，
-            // 见 RestyleWindow 注释），相机/脚底客户区位置不动，天然绕脚底原地长高；拖拽中同样安全
-            // （唯一窗口写入源是拖拽本身，模型缩放与其无耦合）。速度=0 时步进=1（瞬达，退回离散行为）。
-            if (!Mathf.Approximately(显示缩放, 目标缩放))
-            {
-                float 步进 = 缩放平滑速度 <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 缩放平滑速度);
-                显示缩放 += (目标缩放 - 显示缩放) * 步进;
-                if (Mathf.Abs(目标缩放 - 显示缩放) < 0.0005f) 显示缩放 = 目标缩放;
-                应用模型缩放();
-            }
+        /// <summary>缩放平滑过渡帧：显示缩放向目标指数趋近，只改模型 localScale——窗口尺寸恒定
+        /// （2026-08-24 闪烁根治，见 RestyleWindow 注释），相机/脚底客户区位置不动，天然绕脚底原地长高；
+        /// 拖拽中同样安全（唯一窗口写入源是拖拽本身，模型缩放与其无耦合）。速度=0 时步进=1（瞬达，退回离散行为）。</summary>
+        private void 缩放平滑帧()
+        {
+            if (Mathf.Approximately(显示缩放, 目标缩放)) return;
+            float 步进 = 缩放平滑速度 <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 缩放平滑速度);
+            显示缩放 += (目标缩放 - 显示缩放) * 步进;
+            if (Mathf.Abs(目标缩放 - 显示缩放) < 0.0005f) 显示缩放 = 目标缩放;
+            应用模型缩放();
+        }
 
-            // 命中模型或正在拖拽时可交互，其余区域点击穿透到下层窗口
+        /// <summary>穿透切换帧：命中模型或正在拖拽时可交互，其余区域点击穿透到下层窗口</summary>
+        private void 穿透切换帧(bool modelHit)
+        {
             bool wantPassThrough = !modelHit && !dragging;
-            if (wantPassThrough != passThroughOn)
+            if (wantPassThrough == passThroughOn) return;
+            int exNow = GetWindowLong(hwnd, GWL_EXSTYLE);
+            if (wantPassThrough)
             {
-                int exNow = GetWindowLong(hwnd, GWL_EXSTYLE);
-                if (wantPassThrough)
-                {
-                    exNow |= WS_EX_TRANSPARENT;
-                }
-                else
-                {
-                    exNow &= ~WS_EX_TRANSPARENT;
-                }
-                SetWindowLong(hwnd, GWL_EXSTYLE, exNow);
-                passThroughOn = wantPassThrough;
-                if (打印状态日志)
-                {
-                    Debug.Log($"[PetWindow] 穿透切换 -> {wantPassThrough}");
-                }
+                exNow |= WS_EX_TRANSPARENT;
             }
+            else
+            {
+                exNow &= ~WS_EX_TRANSPARENT;
+            }
+            SetWindowLong(hwnd, GWL_EXSTYLE, exNow);
+            passThroughOn = wantPassThrough;
+            if (打印状态日志)
+            {
+                Debug.Log($"[PetWindow] 穿透切换 -> {wantPassThrough}");
+            }
+        }
 
-            // 存档防抖落盘（缩放/拖拽后 1s 无新修改才写，连续滚轮不产生 IO 风暴）
+        /// <summary>存档防抖落盘帧（缩放/拖拽后 1s 无新修改才写，连续滚轮不产生 IO 风暴）</summary>
+        private void 存档防抖帧()
+        {
             if (待写入时刻 > 0f && Time.unscaledTime >= 待写入时刻)
             {
                 写入存档();

@@ -21,7 +21,7 @@ namespace GIC.Editor
         private const string MenuPath = "Tools/桌宠/Play 时自动拉起派蒙";
         private const string ToggleKey = "GIC.Pet.EditorAutoLaunch";
         private const string PidFile = "Temp/_editor_pet.pid";
-        private const string PetArgs = "--pet-mode -screen-fullscreen 0 -screen-width 550 -screen-height 825";
+        // 启动参数与生产 PetProcessLauncher 共用一份（PetMode.LaunchArgs，防两处漂移）
 
         private static bool AutoLaunch
         {
@@ -113,7 +113,7 @@ namespace GIC.Editor
                 var psi = new ProcessStartInfo
                 {
                     FileName = exe,
-                    Arguments = PetArgs,
+                    Arguments = GIC.Pet.PetMode.LaunchArgs,
                     UseShellExecute = false,
                     WorkingDirectory = Path.GetDirectoryName(exe),
                 };
@@ -130,26 +130,16 @@ namespace GIC.Editor
 
         private static void TryKillEditorPet()
         {
+            // 逻辑与生产 TryKillPet 共用（PetSingleInstance.TryKillByPidFile）；编辑器侧额外删除
+            // Temp pid 文件标记"本次拉起已回收"（原实现读后即删，此语义保留）
+            GIC.Pet.PetSingleInstance.TryKillByPidFile(PidFile, "[Editor] 退出 Play");
             try
             {
-                if (!File.Exists(PidFile)) return; // 本次 Play 没拉起（或已回收）
-                string text = File.ReadAllText(PidFile).Trim();
-                File.Delete(PidFile);
-                if (!int.TryParse(text, out int pid)) return;
-
-                var p = Process.GetProcessById(pid); // 进程已不存在会抛 ArgumentException，接住即跳过
-                if (p == null || p.ProcessName != "gic") return; // 防 PID 复用误杀（与 TryKillPet 同校验）
-
-                p.Kill();
-                GICLog.Info($"[PetMode][Editor] 退出 Play，关闭编辑器拉起的派蒙 pid={pid}");
-            }
-            catch (System.ArgumentException)
-            {
-                // 派蒙已被双击关闭/自行退出
+                if (File.Exists(PidFile)) File.Delete(PidFile);
             }
             catch (System.Exception ex)
             {
-                GICLog.Warn($"[PetMode][Editor] 关闭派蒙失败（可双击派蒙手动关闭）: {ex.Message}");
+                GICLog.Warn($"[PetMode][Editor] 清理 pid 文件失败: {ex.Message}");
             }
         }
 

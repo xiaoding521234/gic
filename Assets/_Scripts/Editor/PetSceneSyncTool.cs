@@ -271,7 +271,8 @@ namespace GIC.Editor
                 var txt = txtGo.GetComponent<UnityEngine.UI.Text>();
                 txt.font = font; txt.fontSize = 20; txt.color = Color.white;
                 txt.alignment = TextAnchor.MiddleCenter;
-                var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
+                var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");
+                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
                 var tr = txtGo.GetComponent<RectTransform>();
                 tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
                 // 持久监听（存进场景文件，运行时零查找）

@@ -40,11 +40,12 @@ namespace GIC.Pet
         private PetFingerPoseController _finger;
         private PetBlinkController _blink;
         private PetEmotionController _emotion;
-        private PetWindowController _window;
         private Animation _anim;
         private Camera _cam;
         private int _camMaskBackup;
 
+        // 2026-08-27 对齐 GI 直读路线：clip 名无 _MMD 后缀（旧 _MMD 名随 MMD 动画退出使用已不存在，
+        // 按旧名播放会静默失败=实验组无效）。原 NodName 常量从未被引用，删。
         private static readonly string[] Phases =
         {
             "0基线全开(自然)",
@@ -56,9 +57,8 @@ namespace GIC.Pet
             "6恢复全开",
         };
 
-        private const string GreetName = "Ani_NPC_Kanban_Paimon_Greet_MMD";
-        private const string StandbyName = "Ani_NPC_Kanban_Paimon_Standby_MMD";
-        private const string NodName = "Ani_NPC_Kanban_Paimon_Nod01_MMD";
+        private const string GreetName = "Ani_NPC_Kanban_Paimon_Greet";
+        private const string StandbyName = "Ani_NPC_Kanban_Paimon_Standby";
         private float _fadeTimer; // 阶段5：每 3s 在 Greet/Standby 间 CrossFade（模拟真实切换节奏）
 
         void Start()
@@ -75,7 +75,6 @@ namespace GIC.Pet
             _finger = GetComponent<PetFingerPoseController>();
             _blink = GetComponent<PetBlinkController>();
             _emotion = GetComponent<PetEmotionController>();
-            _window = Object.FindObjectsOfType<PetWindowController>().Length > 0 ? Object.FindObjectsOfType<PetWindowController>()[0] : null;
             _anim = GetComponent<Animation>();
             _cam = Camera.main;
             if (_cam != null) _camMaskBackup = _cam.cullingMask;

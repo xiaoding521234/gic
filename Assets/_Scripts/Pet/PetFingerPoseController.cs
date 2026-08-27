@@ -3,6 +3,10 @@ using UnityEngine;
 namespace GIC.Pet
 {
     /// <summary>
+    /// 【GI 模型上死代码（2026-08-25 查证，留库备查）】本组件按 MMD 日文骨名（親指０.L 等）找骨，
+    /// GI 官方骨架是 Bip001 名——全部找不到，SetPose/应用姿态实际零效果；GI 路线手指姿态走 clip 曲线。
+    /// 勿把本层（或 PetAnimSwapper 对它的调用）当成手指会动的原因。恢复 MMD 模型时本层随之复活。
+    ///
     /// 桌宠手指姿态控制器（2026-08-23 v18.2 分层叠加）——LateUpdate 在 clip 基础姿势上叠加姿态层。
     ///
     /// 分层叠加（对齐 2026 主流 hand pose layer）：

@@ -71,32 +71,43 @@ namespace GIC.Pet
         }
 
         /// <summary>
-        /// 主进程退出钩子调用：按 pid 文件找到派蒙并结束。校验进程名防 PID 复用误杀；
-        /// 派蒙已自行退出/文件缺失/进程名不符时静默跳过。
+        /// 主进程退出钩子调用：按 pid 文件找到派蒙并结束（文件残留无害，下次覆盖）。
         /// </summary>
         public static void TryKillPet()
         {
 #if !UNITY_EDITOR
+            TryKillByPidFile(PidFilePath, "游戏退出");
+#endif
+        }
+
+        /// <summary>按 pid 文件结束派蒙进程（生产 pet.pid / 编辑器 Temp/_editor_pet.pid 共用一份逻辑，
+        /// 2026-08-27 抽取去重）。校验进程名防 PID 复用误杀；文件缺失/pid 无效/进程已退/名字不符=静默跳过。
+        /// 动作描述仅用于日志（如"游戏退出"）。文件删除策略由调用方自理（生产残留无害，编辑器要删）。
+        /// public：编辑器程序集（PetEditorAutoLauncher）也要调用，internal 跨程序集不可见。</summary>
+        public static bool TryKillByPidFile(string pidFile, string 动作描述)
+        {
             try
             {
-                if (!System.IO.File.Exists(PidFilePath)) return;
-                if (!int.TryParse(System.IO.File.ReadAllText(PidFilePath).Trim(), out int pid)) return;
+                if (!System.IO.File.Exists(pidFile)) return false;
+                if (!int.TryParse(System.IO.File.ReadAllText(pidFile).Trim(), out int pid)) return false;
 
                 var p = System.Diagnostics.Process.GetProcessById(pid); // 不存在会抛 ArgumentException，接住即跳过
-                if (p == null || p.ProcessName != "gic") return;
+                if (p == null || p.ProcessName != "gic") return false;
 
                 p.Kill();
-                Debug.Log($"[PetMode] 游戏退出，已关闭派蒙 pid={pid}");
+                Debug.Log($"[PetMode] {动作描述}，已关闭派蒙 pid={pid}");
+                return true;
             }
             catch (ArgumentException)
             {
                 // 派蒙进程已不存在（正常：她可能已被用户双击关闭）
+                return false;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[PetMode] 退出连带关闭派蒙失败（她将独立存活）: {ex.Message}");
+                Debug.LogWarning($"[PetMode] {动作描述}，关闭派蒙失败（她将独立存活）: {ex.Message}");
+                return false;
             }
-#endif
         }
 
         #endregion

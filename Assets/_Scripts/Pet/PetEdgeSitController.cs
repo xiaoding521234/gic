@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
+using static GIC.Pet.PetWin32; // Win32 声明集中在 PetWin32（2026-08-27 抽取去重），调用点免限定
 
 namespace GIC.Pet
 {
     /// <summary>
     /// 边缘坐控制器（2026-08-27，用户需求"派蒙坐在屏幕或窗口的横框上"）：
-    /// 拖拽松手时探测附近"横框"（窗口顶边=标题栏上沿 / 任务栏顶=工作区底）→ 磁吸贴合播 SitLoop 坐姿；
+    /// 拖拽松手时探测附近"横框"（窗口顶边=标题栏上沿 / 任务栏顶=工作区底）→ 磁吸贴合播坐姿动画
+    /// （SitUpright 合成直坐；SitLoop 原版定性"生病坐姿"已弃用，2026-08-27）；
     /// 坐定后跟随锚定窗口移动（窗口拖走/改尺寸她贴着走）；锚定窗口最小化/关闭/隐藏 → 沿 eSheep 语义
     /// 重力掉落，途中可落在更低窗口顶边，兜底落任务栏顶，全程无缝衔接回坐姿。
     ///
@@ -23,8 +25,8 @@ namespace GIC.Pet
     ///
     /// 设计决策（2026-08-27 V1）：
     /// ①松手触发采用"磁吸窗"而非 Shimeji 式"必掉落"——VPet（无重力派）松手即停 + 本项目已拍板
-    ///   "松手即停原地"（2026-08-26 拖拽终案）不能推翻：仅在松手位置落在横框附近（上 60px/下 36px≈
-    ///   标题栏高度）时磁吸落座，其余位置维持原地站立（既有行为零变化）。
+    ///   "松手即停原地"（2026-08-26 拖拽终案）不能推翻：仅在松手位置落在横框附近（上 120px/下 60px，
+    ///   2026-08-27 目检调大后终值）时磁吸落座，其余位置维持原地站立（既有行为零变化）。
     /// ②窗口消失的掉落是 eSheep 语义（她坐着的东西没了必然下落）：重力加速+逐帧跨越检测+途中窗口
     ///   顶边可接住+任务栏顶兜底，永不无限下落（工作区底恒存在）。
     /// ③窗口顶边取 DWM 可见帧（DWMWA_EXTENDED_FRAME_BOUNDS）而非 GetWindowRect——Win10/11 DWM 窗口
@@ -35,11 +37,11 @@ namespace GIC.Pet
     /// ⑤掉落/坐定期间暂停命中烘焙（姿势在变），坐定 2s 后一次性补烘坐姿碰撞体（既有机制自动接管）。
     ///
     /// 行为层接线：PetBehaviorController 物理收口（无放下反应档）先问 评估吸附并坐()，true=本组件接管
-    /// （播 SitLoop），false=原逻辑回待机；坐定中行为层的"待机动作"动态切换为坐姿；坐定期间
+    /// （播坐姿动画），false=原逻辑回待机；坐定中行为层的"待机动作"动态切换为坐姿；坐定期间
     /// 打招呼/随机小动作一切单次触发全压制（2026-08-27 用户拍板：坐下就纯坐）。被拖拽=立即解除坐定。
     /// 判定/贴合基准=骨盆（屁股）投影（2026-08-27 目检纠正：脚线判定腿沉入窗下）；松手时是站立/
     /// Drag01 姿势、骨盆高于坐姿——落座后 坐定贴正秒 内逐帧把骨盆钉在窗顶（姿势过渡中骨盆渐降=
-    /// 平滑落座观感；SitLoop 骨盆曲线近恒定（范围&lt;0.05），钉住后窗口稳定不抖）。
+    /// 平滑落座观感；坐姿动画骨盆曲线近恒定（范围&lt;0.05），钉住后窗口稳定不抖）。
     /// </summary>
     public class PetEdgeSitController : MonoBehaviour
     {
@@ -49,13 +51,13 @@ namespace GIC.Pet
 
         [Header("动作")]
         [Tooltip("坐姿动作（loop；情绪映射无匹配=默认脸）")] [SerializeField] private string 坐姿动作名 = "Ani_NPC_Kanban_Paimon_SitUpright";
-        [Tooltip("落座后逐帧贴正骨盆的时长（秒）：松手时站立姿势骨盆高于坐姿，SitLoop 过渡期（惯性化 0.6s+余量）骨盆渐降，期间逐帧钉在窗顶=平滑落座观感。SitLoop 骨盆曲线近恒定，钉住后窗口稳定")] [SerializeField] private float 坐定贴正秒 = 1.2f;
+        [Tooltip("落座后逐帧贴正骨盆的时长（秒）：松手时站立姿势骨盆高于坐姿，坐姿动画过渡期（惯性化 0.6s+余量）骨盆渐降，期间逐帧钉在窗顶=平滑落座观感。坐姿骨盆曲线近恒定，钉住后窗口稳定")] [SerializeField] private float 坐定贴正秒 = 1.2f;
         [Tooltip("坐姿下滚轮缩放时切回的站立动作（缩放露馅修正：模型绕脚底长高，骨盆钉窗顶的窗口不动→屁股浮离窗沿；缩放稳定后按锚点重新落座）")] [SerializeField] private string 站立动作名 = "Ani_NPC_Kanban_Paimon_Standby";
 
         [Header("磁吸判定（松手位置探测）")]
-        [Tooltip("横框上方多少物理像素内松手算坐得上（从上往下掉几个像素落座，磁吸直落）")] [SerializeField] private float 上吸附范围像素 = 60f;
-        [Tooltip("横框下方多少物理像素内松手算坐得上（≈标题栏高度：拖到标题栏区域内松手即落座）")] [SerializeField] private float 下吸附范围像素 = 36f;
-        [Tooltip("水平容差：脚底中心超出窗口左右边多少物理像素内仍算坐得上（≈模型半宽）")] [SerializeField] private float 水平容差像素 = 120f;
+        [Tooltip("横框上方多少物理像素内松手算坐得上（从上往下掉几个像素落座，磁吸直落；120=2026-08-27 目检终值）")] [SerializeField] private float 上吸附范围像素 = 120f;
+        [Tooltip("横框下方多少物理像素内松手算坐得上（拖到横框下方区域如标题栏内松手即落座；60=2026-08-27 目检终值）")] [SerializeField] private float 下吸附范围像素 = 60f;
+        [Tooltip("水平容差：接触点超出窗口左右边多少物理像素内仍算坐得上（≈模型半宽+余量；160=2026-08-27 目检终值）")] [SerializeField] private float 水平容差像素 = 160f;
         [Tooltip("可坐窗口的最小宽高（物理像素），滤掉小悬浮窗/提示条")] [SerializeField] private Vector2 最小窗口尺寸 = new Vector2(240f, 160f);
 
         [Header("掉落（锚定窗口消失时）")]
@@ -92,31 +94,7 @@ namespace GIC.Pet
         /// <summary>坐姿动作名（行为层动态待机用）</summary>
         public string 坐姿动作 => 坐姿动作名;
 
-        #region Win32
-
-        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-        [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
-        [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
-        [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
-        [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-        [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
-        [DllImport("user32.dll")] private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
-        [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
-        [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
-
-        [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X; public int Y; }
-        [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left; public int Top; public int Right; public int Bottom; public int 宽 => Right - Left; public int 高 => Bottom - Top; }
-        [StructLayout(LayoutKind.Sequential)] private struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public int dwFlags; }
-
-        private const int GWL_EXSTYLE = -20;
-        private const int WS_EX_TOOLWINDOW = 0x00000080;
-        private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;  // DWM 可见帧（Win10/11 不含阴影边）
-        private const int DWMWA_CLOAKED = 14;                // 挂起/虚拟桌面隐身窗口
-        private const uint MONITOR_DEFAULTTONEAREST = 2;
-
-        #endregion
+        // Win32 互操作（DllImport/结构体/常量）集中在 PetWin32 —— 见文件头 using static
 
         /// <summary>拖拽松手（物理收口，无放下反应档）时由行为层调用：探测附近横框并磁吸落座。
         /// true=已接管（已播坐姿）；false=附近无可坐横框，行为层走原回待机逻辑。
@@ -140,7 +118,7 @@ namespace GIC.Pet
             {
                 if (!水平含(脚底.x, c.rect)) continue;
                 float d = 脚底.y - c.rect.Top;
-                if (d < -上吸附范围像素 || d > 下吸附范围像素) continue; // 磁吸窗：上 60px / 下 36px
+                if (d < -上吸附范围像素 || d > 下吸附范围像素) continue; // 磁吸窗：上 120px / 下 60px（终值，与 Inspector 默认一致）
                 d = Mathf.Abs(d);
                 if (d < 最小距) { 最小距 = d; 找到 = true; best = c; }
             }
@@ -222,8 +200,8 @@ namespace GIC.Pet
         /// +失效检测（关闭/最小化/隐藏/cloaked）→失效即掉落；屏幕锚定（任务栏顶）恒稳态只剩贴正。</summary>
         private void 坐定帧()
         {
-            // 落座贴正：松手时是站立/Drag01 姿势（骨盆高），SitLoop 过渡期骨盆渐降——逐帧把骨盆钉在
-            // (接触x, 坐落线)。窗口随姿势渐降平滑下移=她"缓缓坐进去"。SitLoop 骨盆曲线近恒定，
+            // 落座贴正：松手时是站立/Drag01 姿势（骨盆高），坐姿动画过渡期骨盆渐降——逐帧把骨盆钉在
+            // (接触x, 坐落线)。窗口随姿势渐降平滑下移=她"缓缓坐进去"。坐姿骨盆曲线近恒定，
             // 过渡结束后投影偏移恒定，SetWindowPos 输出稳定（取整后亚像素无感）。
             if (Time.unscaledTime < 贴正截止时刻)
             {

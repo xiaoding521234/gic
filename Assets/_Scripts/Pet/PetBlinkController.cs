@@ -41,15 +41,8 @@ namespace GIC.Pet
 
         void Awake()
         {
-            // 多 SMR 场景（2026-08-24 GI 官方模型）：Body/Cloak/EyeStar/Face 并列，morph 全在 Face 上——
-            // 取 morph 数最多的 SMR（MMD 时代唯一 SMR 亦兼容）
-            SkinnedMeshRenderer best = null;
-            foreach (var s in GetComponentsInChildren<SkinnedMeshRenderer>())
-            {
-                if (s.sharedMesh == null) continue;
-                if (best == null || s.sharedMesh.blendShapeCount > best.sharedMesh.blendShapeCount) best = s;
-            }
-            smr = best;
+            // 多 SMR 场景（2026-08-24 GI 官方模型）：Body/Cloak/EyeStar/Face 并列，morph 全在 Face 上
+            smr = PetMeshQuery.取Morph最多渲染器(transform);
             if (smr == null) { enabled = false; return; }
             var mesh = smr.sharedMesh;
             winkL = mesh.GetBlendShapeIndex(左眨眼morph名);
