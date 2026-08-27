@@ -104,6 +104,9 @@ namespace GIC.Pet
         /// <summary>物理交互进行中（拖拽跟随/收尾归零）——行为层压制触发用</summary>
         public bool 物理交互中 => 拖拽物理 != null && 拖拽物理.交互中;
 
+        /// <summary>最近一次拖拽时长（秒，松手时冻结；-1=无）——行为层放下反应分档用（2026-08-27）</summary>
+        public float 拖拽秒 => 拖拽物理 != null ? 拖拽物理.本次拖拽时长 : -1f;
+
         /// <summary>是否正在拖拽派蒙（行为层打断打招呼、随机小动作等用；含收尾全程）</summary>
         public bool 正在拖拽 => dragging || 物理交互中;
 

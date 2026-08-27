@@ -32,6 +32,16 @@ namespace GIC.Pet
         [Tooltip("光标停留多久触发打招呼")] [SerializeField] private float 触发停留秒 = 1.2f;
         [Tooltip("两次打招呼的最小间隔秒")] [SerializeField] private float 打招呼冷却秒 = 45f;
 
+        [Header("拖拽放下反应（2026-08-27：按时长分档）")]
+        [Tooltip("轻反应阈值（秒）：拖够此时长放下播害羞——被拎了一会儿的不好意思")]
+        [SerializeField] private float 拖拽轻反应阈值秒 = 3f;
+        [Tooltip("轻反应动作名（完整 clip 名；空=该档跳过）")]
+        [SerializeField] private string 拖拽轻反应动作名 = "Ani_NPC_Kanban_Paimon_Shy01AS";
+        [Tooltip("生气阈值（秒）：拖太久放下播生气")]
+        [SerializeField] private float 拖拽生气阈值秒 = 7.5f;
+        [Tooltip("生气反应动作名（完整 clip 名；空=该档跳过）")]
+        [SerializeField] private string 拖拽生气动作名 = "Ani_NPC_Kanban_Paimon_Anger";
+
         [Header("随机小动作")]
         [SerializeField] private bool 启用随机小动作 = true;
         [Tooltip("随机轮换的单次动作（完整 clip 名，可增删）")]
@@ -151,7 +161,18 @@ namespace GIC.Pet
                     _拎起情绪开着 = false;
                     if (情绪控制器 != null && !_单次进行中) 情绪控制器.SetEmotion("");
                 }
-                if (!_单次进行中 && 动作播放器.动作存在(待机动作名))
+                // 拖拽放下反应（2026-08-27）：按本次拖拽时长分档——短拖（<轻阈值）无反应直接回待机
+                // （快速挪位置不打扰）；中档（≥轻阈值）害羞；长拖（≥生气阈值）生气。
+                // 播单次含情绪映射（Anger→生气表情/Shy→害羞）+动作期烘焙暂停，播完自然回待机。
+                float 拖了秒 = 窗口控制器.拖拽秒;
+                string 放下反应 = null;
+                if (拖了秒 >= 拖拽生气阈值秒 && 动作播放器.动作存在(拖拽生气动作名))
+                    放下反应 = 拖拽生气动作名;
+                else if (拖了秒 >= 拖拽轻反应阈值秒 && 动作播放器.动作存在(拖拽轻反应动作名))
+                    放下反应 = 拖拽轻反应动作名;
+                if (!string.IsNullOrEmpty(放下反应))
+                    播单次(放下反应);
+                else if (!_单次进行中 && 动作播放器.动作存在(待机动作名))
                     动作播放器.Play(待机动作名);
             }
 
