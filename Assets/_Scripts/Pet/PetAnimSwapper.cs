@@ -23,6 +23,8 @@ namespace GIC.Pet
         /// <summary>当前驱动的 Animation 组件（编辑器同步工具按此注册 clip，勿按 FindObjectsOfType 顺序找）</summary>
         public Animation TargetAnimation => 目标动画;
 
+        private string _上次播放名 = ""; // 切换诊断日志用（2026-08-27：与 PetInertia 捕获行按时间对齐，定位停顿发生在哪次切换）
+
         [Header("动作→情绪映射（表情由情绪层驱动，不烘焙进 clip）")]
         [SerializeField] private 动作情绪映射[] 情绪映射 = new[]
         {
@@ -131,6 +133,8 @@ namespace GIC.Pet
             var state = 目标动画[clipName];
             if (state == null || state.clip == null) return;
             state.wrapMode = 循环模式;
+            Debug.Log($"[PetAnim] 切换 {_上次播放名} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
+            _上次播放名 = clipName;
             if (惯性化器 != null && 惯性化器.启用惯性化)
             {
                 // 惯性化切换（2026-08-27，GoW4 技术）：硬切新 clip——单 clip 求值无双采样开销，

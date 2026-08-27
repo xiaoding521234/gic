@@ -19,6 +19,9 @@ namespace GIC.Pet
     ///   （Animation 每帧重写骨骼姿势，本层每帧再叠加，不累积）。
     /// - 松手即停（2026-08-26 用户拍板）：骨盆速度清零、窗口停原地，收尾期间姿势基准与
     ///   四肢摆动平滑归零（收尾秒数），绝无甩出/飞行/弹跳。
+    /// - 挣扎（2026-08-27 用户要求"轻微挣扎全身摆动"）：拖拽期全身小幅钟摆+扭动（绕骨盆枢轴，
+    ///   窗口控制器叠加进根旋转）+四肢反相扑腾（叠加进取四肢摆动输出）。两频叠加防机械摆锤感；
+    ///   包络渐入渐出（抓起渐入、收尾随剩余时间衰减），相位全程连续（再抓无跳变）。
     /// </summary>
     public class PetDragPhysicsController : MonoBehaviour
     {
@@ -42,6 +45,20 @@ namespace GIC.Pet
         [Tooltip("松手后收尾时长（秒）：窗口冻结原地，四肢摆动在此期间弹簧归零（姿势基准由窗口控制器同期平滑归零）")]
         [SerializeField] private float 收尾秒数 = 0.5f;
 
+        [Header("挣扎（2026-08-27：拖拽期轻微全身摆动）")]
+        [Tooltip("全身挣扎侧摆幅（度，绕屏幕平面法线）：身体绕骨盆小幅钟摆晃（头/四肢随之反侧摆动），读作\"被拎着挣动\"。0=关闭")]
+        [SerializeField] private float 挣扎摆幅 = 2.5f;
+        [Tooltip("全身挣扎扭幅（度，绕竖直轴小幅扭动——肩部左右拧）")]
+        [SerializeField] private float 挣扎扭幅 = 4f;
+        [Tooltip("挣扎主频率（Hz）：1-2Hz 读作轻挣，过高读作高频发抖")]
+        [SerializeField] private float 挣扎频率 = 1.3f;
+        [Tooltip("次级频率占比（×主频）：两频叠加出非周期感（纯正弦=机械摆锤感）；0=纯正弦")]
+        [SerializeField] private float 挣扎次级频率占比 = 0.53f;
+        [Tooltip("挣扎渐入秒：抓起后包络从 0 升到 1 的时长（瞬间满幅读作受惊抽搐，渐入读作开始挣动）")]
+        [SerializeField] private float 挣扎渐入秒 = 0.4f;
+        [Tooltip("四肢挣扎附加摆幅（度，叠加在跟拍弹簧之上）：左右肢反相=对称扑腾感。0=四肢只留跟拍摆动")]
+        [SerializeField] private float 四肢挣扎摆幅 = 6f;
+
         // ---- 运行时状态 ----
         public 交互阶段 阶段 { get; private set; } = 交互阶段.无;
         public bool 交互中 => 阶段 != 交互阶段.无;
@@ -63,6 +80,37 @@ namespace GIC.Pet
         private static readonly float[] 外展方向 = { -1f, 1f, -1f, 1f };
         // 外展项内收方向限幅占比（上提收拢时手臂横摆过躯干会穿模，内收限 35%）
         private const float 内收占比 = 0.35f;
+
+        // 挣扎（全身轻微摆动，2026-08-27）：相位持续推进（收尾被再抓=相位连续无跳变），
+        // 包络控制幅度进出（拖拽期渐入 / 收尾期随剩余时间线性衰减）
+        private float 挣扎相位主, 挣扎相位次, 挣扎相位扭;
+        private readonly float[] 挣扎四肢相位 = new float[4];
+        private readonly float[] 挣扎四肢摆角 = new float[4];
+        private float 挣扎包络;
+
+        /// <summary>全身挣扎侧摆角（度，绕世界 Z 轴：正=头向屏幕右侧摆）——两频叠加防机械感</summary>
+        public float 当前挣扎摆角 =>
+            (Mathf.Sin(挣扎相位主) + 0.6f * Mathf.Sin(挣扎相位次)) / 1.6f * 挣扎摆幅 * 挣扎包络;
+
+        /// <summary>全身挣扎扭角（度，绕竖直轴：正=肩部向左拧）——第三频率（×1.37）与主次级错开</summary>
+        public float 当前挣扎扭角 =>
+            (Mathf.Sin(挣扎相位扭) + 0.5f * Mathf.Sin(挣扎相位次 + 1.1f)) / 1.5f * 挣扎扭幅 * 挣扎包络;
+
+        /// <summary>挣扎一步：相位推进 + 包络（拖拽期渐入）+ 四肢挣扎角求值（左右肢反相=扑腾）。
+        /// 收尾期由调用方先按剩余时间压包络再调本方法（拖拽期=false 不升包络）。</summary>
+        private void 步进挣扎(float dt, bool 拖拽期)
+        {
+            if (拖拽期)
+                挣扎包络 = Mathf.Min(1f, 挣扎包络 + dt / Mathf.Max(0.01f, 挣扎渐入秒));
+            挣扎相位主 += 挣扎频率 * Mathf.PI * 2f * dt;
+            挣扎相位次 += 挣扎频率 * 挣扎次级频率占比 * Mathf.PI * 2f * dt;
+            挣扎相位扭 += 挣扎频率 * 1.37f * Mathf.PI * 2f * dt;
+            for (int i = 0; i < 4; i++)
+            {
+                挣扎四肢相位[i] += 挣扎频率 * 肢频率倍率[i] * Mathf.PI * 2f * dt;
+                挣扎四肢摆角[i] = Mathf.Sin(挣扎四肢相位[i]) * 外展方向[i] * 四肢挣扎摆幅 * 肢增益倍率[i] * 挣扎包络;
+            }
+        }
 
         /// <summary>骨盆目标屏幕位（物理像素）——窗口控制器据此定位窗口</summary>
         public Vector2 当前骨盆屏幕 => 骨盆目标;
@@ -105,6 +153,7 @@ namespace GIC.Pet
                 float 目标 = Mathf.Clamp(肢增益倍率[i] * (滞后 + 外展方向[i] * 外展), -摆动上限, 摆动上限);
                 步进弹簧(i, dt, 目标);
             }
+            步进挣扎(dt, true); // 全身轻微挣扎（包络渐入）
         }
 
         /// <summary>松手即停（2026-08-26 用户拍板）：骨盆目标冻结原地，转收尾——四肢摆动弹簧
@@ -123,19 +172,25 @@ namespace GIC.Pet
             if (阶段 != 交互阶段.收尾 || dt <= 0f) return false;
             dt = Mathf.Min(dt, 0.05f);
             for (int i = 0; i < 4; i++) 步进弹簧(i, dt, 0f);
+            // 挣扎包络随剩余时间线性衰减（相位继续推进=晃着停下，不是急刹）
+            挣扎包络 = Mathf.Max(0f, 收尾截止时刻 - Time.unscaledTime) / Mathf.Max(0.01f, 收尾秒数);
+            步进挣扎(dt, false);
             if (Time.unscaledTime >= 收尾截止时刻)
             {
                 for (int i = 0; i < 4; i++) { 摆角[i] = 0f; 摆速[i] = 0f; }
+                挣扎包络 = 0f;
+                for (int i = 0; i < 4; i++) 挣扎四肢摆角[i] = 0f;
                 阶段 = 交互阶段.无;
                 return false;
             }
             return true;
         }
 
-        /// <summary>取四肢摆动角（度，绕世界 Z 轴：正=四肢末端向屏幕右摆）。索引 0=左臂 1=右臂 2=左腿 3=右腿。</summary>
+        /// <summary>取四肢摆动角（度，绕世界 Z 轴：正=四肢末端向屏幕右摆）。索引 0=左臂 1=右臂 2=左腿 3=右腿。
+        /// 返回=跟拍弹簧角+挣扎附加角。</summary>
         public void 取四肢摆动(int 索引, out float 摆动角)
         {
-            摆动角 = (uint)索引 < 4 ? 摆角[索引] : 0f;
+            摆动角 = (uint)索引 < 4 ? 摆角[索引] + 挣扎四肢摆角[索引] : 0f;
         }
 
         /// <summary>欠阻尼二阶角弹簧（跟拍核心）：目标角由光标速度连续驱动，欠阻尼比（默认 0.45）

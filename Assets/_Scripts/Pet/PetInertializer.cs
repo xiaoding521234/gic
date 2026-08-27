@@ -24,6 +24,10 @@ namespace GIC.Pet
     /// v2 每帧重解+每帧重注拉引 → 复利加速（0.6s 窗口 0.2s 耗尽、峰值 10.8°/帧，用户目检
     /// "仿佛瞬移"实证）。固定系数版：起步即刻有运动（拉引一次性烘进 v0）、匀速推进、C2
     /// 收尾——三项俱备，且中途打断=从当前输出重新捕获，天然无缝。
+    /// 幅度自适应拉引（2026-08-27 目检"大姿态切换像瞬移"后补）：拉引初速度∝偏移量，全额 2.5 下
+    /// 80° 偏移起步 340°/s、前 0.1s 冲掉 37%——大姿态差被抢跑式吞噬读作瞬移，小偏移却因运动量小
+    /// 看不出问题（"一些瞬移一些正常"的成因）。修正=偏移 <10° 全额拉引（保平台期疗效）、
+    /// ≥60° 退到 30%（大姿态差摊满窗口成平滑曲线），见 拉引倍率()。
     ///
     /// 分层：LateUpdate(-200) 在 Animation 求值后、视线/手指/拖拽物理等叠加层之前——
     /// 叠加层读到的是惯性化后的动画姿势，各自叠加语义不变；本层只对动画流的姿态连续性负责。
@@ -37,9 +41,21 @@ namespace GIC.Pet
         [SerializeField] private bool 启用 = true;
         [Tooltip("参与惯性化的骨（全部 clip 曲线绑定骨并集）——Tools/桌宠/同步 PaimonPet 动作列表 幂等填充，勿手改")]
         [SerializeField] private List<Transform> 骨列表 = new List<Transform>();
-        [Tooltip("起步拉引系数：捕获时给偏移注入朝新姿势的额外初速度=系数×偏移/窗口时长（一次性烘进多项式）——消除 v0≈0 的起步平台期（动作收尾近静止切换读作停顿）。0=纯速度承接（GoW 原味）；2.5=起步加速度恰为 0（单调无过冲的数学最优）")]
+        [Tooltip("起步拉引系数：捕获时给偏移注入朝新姿势的额外初速度=系数×偏移/窗口时长（一次性烘进多项式）——消除 v0≈0 的起步平台期（动作收尾近静止切换读作停顿）。0=纯速度承接（GoW 原味）；2.5=起步加速度恰为 0（单调无过冲的数学最优）。幅度自适应：大偏移自动降倍率（见 拉引全额偏移度）")]
         [Range(0f, 5f)]
         [SerializeField] private float 起步拉引系数 = 2.5f;
+        [Tooltip("幅度自适应拉引（2026-08-27 目检\"大姿态切换像瞬移\"根治）：骨偏移角低于此值用全额拉引——小姿态切换靠全额快起步治平台期")]
+        [Range(0f, 90f)]
+        [SerializeField] private float 拉引全额偏移度 = 10f;
+        [Tooltip("骨偏移角达到/超过此值时拉引退到最低倍率——大姿态差本身运动可见，全额拉引以 v0∝偏移 的速度前 0.1s 冲掉 37%（80° 偏移≈340°/s）读作瞬移")]
+        [Range(0f, 180f)]
+        [SerializeField] private float 拉引衰减参考度 = 60f;
+        [Tooltip("大偏移下的拉引倍率下限（0.3=80° 偏移起步速度从 340°/s 降到 102°/s，整段过渡摊满窗口成平滑曲线；0=纯 GoW 速度承接）")]
+        [Range(0f, 1f)]
+        [SerializeField] private float 拉引最低倍率 = 0.3f;
+        [Tooltip("大偏移窗口秒（2026-08-27 二轮根治\"所有切换可见停顿\"）：骨偏移达到衰减参考度时，该骨过渡窗口收缩到此时长——大姿态差本就该快切（原神级 ~0.3s），实测抓起/松手偏移 86-94°，0.6s 慢窗读作\"悬一下才沉下去\"=停顿感；小偏移保持 动作过渡秒 慢混。")]
+        [Range(0.1f, 1f)]
+        [SerializeField] private float 大偏移窗口秒 = 0.3f;
 
         // 姿态输出流（与骨列表平行）：prev/curr 为本层上一帧输出，供中断时捕获速度
         private Vector3[] _prevPos, _currPos;
@@ -56,6 +72,13 @@ namespace GIC.Pet
         private Vector3[] _旋转轴;        // 旋转偏移轴（捕获时刻）
         private float[] _旋转x0, _旋转v0; // 旋转偏移角（弧度）/初速度
         private bool[] _有效;             // 该骨偏移是否值得惯性化（微小偏移跳过=纯跟动画）
+        private float[] _旋转tf, _位置tf; // 每骨窗口时长（幅度自适应：大偏移收缩到 大偏移窗口秒，≤本次时长）
+
+        // 诊断（2026-08-27 "所有切换可见停顿"定位）：每次捕获输出一行偏移/速度统计 +
+        // 最大偏移骨的闭式衰减采样（剩余@0.1/0.2/0.3s）——从 Player.log 直接读出
+        // 每次切换的"慢起步/反向起步/窗口过慢"客观形态，不再盲猜。
+        [Tooltip("打印惯性化捕获诊断（每次动作切换一行：最大骨偏移/捕获速度方向统计/衰减曲线采样）——切换手感问题定位用，平时关")]
+        [SerializeField] private bool 打印诊断 = true;
 
         /// <summary>惯性化是否可用（PetAnimSwapper 据此选路径：惯性化 or CrossFade 兜底）</summary>
         public bool 启用惯性化 => 启用 && enabled && 骨列表 != null && 骨列表.Count > 0;
@@ -97,8 +120,8 @@ namespace GIC.Pet
 
                 if (_有效[i])
                 {
-                    float offP = 五次衰减(_位置x0[i], _位置v0[i], _本次时长, t);
-                    float offR = 五次衰减(_旋转x0[i], _旋转v0[i], _本次时长, t);
+                    float offP = 五次衰减(_位置x0[i], _位置v0[i], _位置tf[i], t);
+                    float offR = 五次衰减(_旋转x0[i], _旋转v0[i], _旋转tf[i], t);
                     Vector3 pos = targetPos + _偏移方向[i] * offP;
                     Quaternion rot = Quaternion.AngleAxis(offR * Mathf.Rad2Deg, _旋转轴[i]) * targetRot;
                     _currPos[i] = pos;
@@ -135,6 +158,11 @@ namespace GIC.Pet
             float dt = Mathf.Max(1f / 120f, Time.deltaTime); // dt 钳制：帧尖峰时不放大捕获速度
             float tf = _本次时长;
 
+            // 诊断统计（见 打印诊断 注释）
+            float 诊_maxOff = 0f, 诊_sumOff = 0f; int 诊_cnt = 0, 诊_反向 = 0, 诊_正中 = 0;
+            int 诊_maxIdx = -1;
+            float 诊_sumV0 = 0f;
+
             for (int i = 0; i < 骨列表.Count; i++)
             {
                 var 骨 = 骨列表[i];
@@ -154,6 +182,7 @@ namespace GIC.Pet
                     float vCap = Vector3.Dot(currPos - _prevPos[i], dir) / dt;
                     _偏移方向[i] = dir;
                     _位置x0[i] = x0;
+                    _位置tf[i] = tf; // 位置偏移微小（gi_pos_center 后近恒定），窗口时长不敏感
                     _位置v0[i] = vCap - x0 * (起步拉引系数 / tf);
                     _有效[i] = true;
                 }
@@ -183,12 +212,57 @@ namespace GIC.Pet
                         Vector3 dAxis = new Vector3(dq.x, dq.y, dq.z) / ds;
                         v0 = Mathf.Clamp((dAng / dt) * Mathf.Sign(Vector3.Dot(dAxis, axis)), -30f, 30f);
                     }
+                    // 幅度自适应（2026-08-27 二轮）：大偏移骨的窗口收缩到 大偏移窗口秒
+                    //（诊断实证抓起/松手 86-94° 偏移 × 0.6s 慢窗="悬一下才沉下去"停顿感；
+                    // 大姿态差本就该 ~0.3s 快切）。拉引倍率同曲线降低，且拉引分母用收缩后的
+                    // 骨窗（等效把起步速度维持在"全额拉引在慢窗下"的量级而非放大）。
+                    float 进度 = 衰减进度(rx0);
+                    float 骨窗 = Mathf.Min(tf, Mathf.Lerp(tf, Mathf.Max(0.1f, 大偏移窗口秒), 进度));
+                    float 拉引v = rx0 * (起步拉引系数 * Mathf.Lerp(1f, 拉引最低倍率, 进度) / 骨窗);
                     _旋转轴[i] = axis;
                     _旋转x0[i] = rx0;
-                    _旋转v0[i] = v0 - rx0 * (起步拉引系数 / tf);
+                    _旋转tf[i] = 骨窗;
+                    if (x0 <= 1e-6f) _位置tf[i] = 骨窗; // 位置通道无独立判定时随旋转骨窗
+                    _旋转v0[i] = v0 - 拉引v;
                     _有效[i] = true;
+
+                    if (rx0 > 1e-3f) // 诊断只统计可感偏移骨（>0.06°）
+                    {
+                        诊_cnt++; 诊_sumOff += rx0;
+                        if (rx0 > 诊_maxOff) { 诊_maxOff = rx0; 诊_maxIdx = i; }
+                        诊_sumV0 += v0;
+                        if (v0 > 0f) 诊_反向++;       // 捕获速度仍朝远离目标方向（起步先反向走）
+                        if (Mathf.Abs(v0 - 拉引v) < 0.05f) 诊_正中++;
+                    }
                 }
             }
+
+            if (打印诊断 && 诊_cnt > 0)
+            {
+                float maxDeg = 诊_maxOff * Mathf.Rad2Deg;
+                string decay = "";
+                if (诊_maxIdx >= 0)
+                {
+                    float x0 = _旋转x0[诊_maxIdx], v0 = _旋转v0[诊_maxIdx];
+                    float tfm = _旋转tf[诊_maxIdx];
+                    // 闭式求值最大偏移骨的衰减曲线采样（剩余比例，按该骨自己的窗口）
+                    decay = $" 窗{tfm:F2}s 剩余@0.1s={100f * 五次衰减(x0, v0, tfm, 0.1f) / x0:F0}%" +
+                            $" @0.2s={100f * 五次衰减(x0, v0, tfm, 0.2f) / x0:F0}%" +
+                            $" @0.3s={100f * 五次衰减(x0, v0, tfm, 0.3f) / x0:F0}%";
+                }
+                Debug.Log($"[PetInertia] 捕获 骨{诊_cnt}/{骨列表.Count} 最大偏移{maxDeg:F1}°({(诊_maxIdx >= 0 && 骨列表[诊_maxIdx] != null ? 骨列表[诊_maxIdx].name : "?")}) " +
+                          $"平均{诊_sumOff * Mathf.Rad2Deg / 诊_cnt:F2}° 反向v0骨数={诊_反向} 捕获速度均值={诊_sumV0 * Mathf.Rad2Deg / 诊_cnt:F1}°/s 窗口={tf:F2}s{decay}");
+            }
+        }
+
+        /// <summary>衰减进度（0=小偏移全额，1=达到衰减参考度）：拉引倍率与窗口收缩共用此曲线，
+        /// 保证"小差异慢混全额拉引、大差异快切低拉引"的一致语义。</summary>
+        float 衰减进度(float 偏移弧度)
+        {
+            float 满额 = 拉引全额偏移度 * Mathf.Deg2Rad;
+            float 参考 = 拉引衰减参考度 * Mathf.Deg2Rad;
+            if (偏移弧度 <= 满额 || 参考 <= 满额) return 0f;
+            return Mathf.Clamp01((偏移弧度 - 满额) / (参考 - 满额));
         }
 
         void 初始化()
@@ -200,6 +274,8 @@ namespace GIC.Pet
             _位置x0 = new float[n]; _位置v0 = new float[n];
             _旋转轴 = new Vector3[n];
             _旋转x0 = new float[n]; _旋转v0 = new float[n];
+            _旋转tf = new float[n]; _位置tf = new float[n];
+            for (int i = 0; i < n; i++) { _旋转tf[i] = _本次时长; _位置tf[i] = _本次时长; }
             _有效 = new bool[n];
             for (int i = 0; i < n; i++)
             {

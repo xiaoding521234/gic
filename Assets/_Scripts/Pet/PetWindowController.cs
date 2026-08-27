@@ -87,12 +87,16 @@ namespace GIC.Pet
         private SkinnedMeshRenderer 蒙皮渲染器;
         private MeshCollider 命中网格碰撞体;
         private Mesh 烘焙网格;
-        private float 上次烘焙时间 = -10f;
-        [Tooltip("蒙皮网格重烘间隔秒（低频即可，呼吸/裙摆微动不需要逐帧）")] [SerializeField] private float 烘焙间隔 = 0.3f;
+        [Tooltip("交互结束后延迟多久补烘一次（秒）：交互期（动作/拖拽）姿势变了，结束后补烘一次更新碰撞体；延迟避开切换过渡窗口。快速连续交互（宽限期内再抓）会不断顺延——永不打扰正在交互的用户")]
+        [SerializeField] private float 烘焙恢复宽限秒 = 2f;
         /// <summary>暂停命中网格重烘（行为层在单次动作期间置真）——运行时 BakeMesh 每次改写顶点，
         /// MeshCollider 重赋值=PhysX 全量重 cook（实测 15-22ms 主线程尖峰，摆手时每 0.15s 一次=肉眼顿挫，
-        /// 2026-08-24 Player.log 烘焙Δ≈dt 实证）。动作中命中精度无关紧要（拖拽退化用旧壳），暂停零副作用。</summary>
+        /// 2026-08-24 Player.log 烘焙Δ≈dt 实证）。动作中命中精度无关紧要（拖拽退化用旧壳），暂停零副作用。
+        /// 2026-08-27 起"暂停"还包含拖拽物理期（窗口控制器内部判定），且解除后有 烘焙恢复宽限秒 过渡。</summary>
         public bool 暂停命中烘焙 { get; set; }
+        private float 烘焙恢复时刻 = -10f;   // 暂停解除（动作结束/拖拽收口）后补烘的最早时刻
+        private bool _上帧烘焙被暂停;          // 边沿检测：暂停→解除瞬间登记宽限
+        private bool _烘焙待补;                // 交互期姿势变了：解除+宽限期到后补烘一次（2026-08-27 二轮）
         private IntPtr hwnd = IntPtr.Zero;
         private bool restyled;
         private bool dragging;
@@ -339,6 +343,10 @@ namespace GIC.Pet
                     hitGo.transform.localRotation = 蒙皮渲染器.transform.localRotation;
                     hitGo.transform.localScale = 蒙皮渲染器.transform.localScale;
                     命中网格碰撞体 = hitGo.AddComponent<MeshCollider>();
+                    // 快烹饪（2026-08-27）：命中代理只吃 1 条 raycast/帧，不需要默认的顶点焊接/
+                    // 网格清洗/查询优化（CookForFasterSimulation）——全套关掉换取 cook 尖峰显著缩短
+                    // （全量 cook 15-22ms 是动作切换停顿根因之一）
+                    命中网格碰撞体.cookingOptions = MeshColliderCookingOptions.UseFastMidphase;
                     烘焙网格 = new Mesh();
                     蒙皮渲染器.BakeMesh(烘焙网格, true);
                     命中网格碰撞体.sharedMesh = 烘焙网格;
@@ -560,16 +568,19 @@ namespace GIC.Pet
                 Debug.Log($"[PetWindow] 物理拖拽起手 骨盆屏幕=({骨盆屏幕.x:F0},{骨盆屏幕.y:F0}) 四肢骨={(_四肢骨 != null ? System.Linq.Enumerable.Count(_四肢骨, b => b != null) : 0)}/{(_四肢骨 != null ? _四肢骨.Length : 0)}");
         }
 
-        /// <summary>应用物理帧输出：根旋转 = 横躺绕Z(父系) × 转身绕Y(父系) × 基准（纯拎起姿势基准，
-        /// 无动态倾角——身体刚体直跟无摆动，2026-08-26 用户拍板）。旋转**绕骨盆枢轴**——
+        /// <summary>应用物理帧输出：根旋转 = 横躺绕Z(父系) × 转身绕Y(父系) × 基准（拎起姿势基准）
+        /// + 挣扎摆/扭（2026-08-27：拖拽期轻微全身摆动——绕骨盆小幅钟摆+肩部拧动，随包络渐入渐出，
+        /// 松手收尾自动归零）。旋转**绕骨盆枢轴**——
         /// 旋转后补偿根平移把骨盆钉回旋转前位置：横躺 90° 时头/脚以骨盆为中心横向铺开（窗口 750 逻辑宽
         /// 容纳身高投影），绕根旋转会让头出窗被裁。拖拽阶段窗口按"骨盆客户区投影钉物理目标位"定位。</summary>
         private void 应用物理帧()
         {
             if (拖拽物理 == null || _paimon根 == null) return;
             Vector3 骨盆旋转前 = _骨盆 != null ? _骨盆.position : Vector3.zero;
-            _paimon根.localRotation = Quaternion.AngleAxis(_当前横躺角, Vector3.forward)
-                                    * Quaternion.AngleAxis(_当前转身角, Vector3.up)
+            float 挣摆 = 拖拽物理.当前挣扎摆角;
+            float 挣扭 = 拖拽物理.当前挣扎扭角;
+            _paimon根.localRotation = Quaternion.AngleAxis(_当前横躺角 + 挣摆, Vector3.forward)
+                                    * Quaternion.AngleAxis(_当前转身角 + 挣扭, Vector3.up)
                                     * _拖拽基准旋转;
             if (_骨盆 != null)
             {
@@ -881,15 +892,25 @@ namespace GIC.Pet
                 modelHit = 命中网格碰撞体.Raycast(ray, out _, 100f);
             }
 
-            // 低频重烘蒙皮网格（跟随呼吸/裙摆/姿势变化）。
-            // 光标不在窗口内时命中判定恒 false，重烘结果无人消费——跳过（省无谓的烘焙+碰撞体重建）。
-            // 单次动作期间暂停（2026-08-24 顿挫根治：烘焙帧=掉帧帧，见 暂停命中烘焙 注释）。
-            if (inWindow && !暂停命中烘焙 && 蒙皮渲染器 != null && 命中网格碰撞体 != null && Time.unscaledTime - 上次烘焙时间 >= 烘焙间隔)
+            // 一次性补烘（2026-08-27 二轮终案，Player.log 诊断实证）：
+            // 周期性 0.3s 重烘全删——待机期姿势近恒定（动作结尾≈Standby t0 实测差<0.06°），
+            // 碰撞体恒有效；旧"光标近旁才烘"门控反把 15-20ms 重 cook 尖峰精确安排在光标接近/
+            // 抓取前一刻（hover 期一串同帧 HITCH 实证）。现在只在交互结束（宽限 烘焙恢复宽限秒
+            // 避开过渡窗）后补烘一次；快速连续交互（宽限期内再抓/再动作）不断顺延补烘——
+            // 期间碰撞体保持待机姿势的旧壳，对命中判定精度无损（±2-3° 姿态差=几像素）。
+            // 启动时 Start 已烘一次。
+            bool 烘焙被暂停 = 暂停命中烘焙 || (拖拽物理 != null && 拖拽物理.交互中);
+            if (烘焙被暂停 && !_上帧烘焙被暂停) _烘焙待补 = true;        // 进入交互：姿势要变了
+            if (_上帧烘焙被暂停 && !烘焙被暂停)
+                烘焙恢复时刻 = Time.unscaledTime + Mathf.Max(0f, 烘焙恢复宽限秒); // 解除：宽限后补
+            _上帧烘焙被暂停 = 烘焙被暂停;
+            if (_烘焙待补 && !烘焙被暂停 && Time.unscaledTime >= 烘焙恢复时刻
+                && 蒙皮渲染器 != null && 命中网格碰撞体 != null)
             {
                 蒙皮渲染器.BakeMesh(烘焙网格, true);
                 命中网格碰撞体.sharedMesh = null; // 强制碰撞体刷新
                 命中网格碰撞体.sharedMesh = 烘焙网格;
-                上次烘焙时间 = Time.unscaledTime;
+                _烘焙待补 = false;
                 PetDiag.上次蒙皮重烘 = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
             }
 
