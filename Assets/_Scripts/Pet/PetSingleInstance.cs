@@ -70,6 +70,31 @@ namespace GIC.Pet
             }
         }
 
+        /// <summary>退出请求文件路径（热切换形态时写，桌宠进程每帧检测——播放 Disappear 退场动画后再退出，
+        /// 非硬杀。2026-08-28 用户要求"切换时先播退出动作再杀死"）。</summary>
+        public static string QuitRequestPath => System.IO.Path.Combine(Application.persistentDataPath, "pet_quit_request");
+
+        /// <summary>写退出请求（主进程侧调）：桌宠进程检测到此文件后播 Disappear 再 Application.Quit()</summary>
+        public static void RequestQuit()
+        {
+            try { System.IO.File.WriteAllText(QuitRequestPath, ""); }
+            catch (Exception ex) { Debug.LogWarning($"[PetMode] 写退出请求失败: {ex.Message}"); }
+        }
+
+        /// <summary>桌宠进程每帧检测退出请求。返回 true=已检测到，调用方应播退场动画后退出。</summary>
+        public static bool HasQuitRequest()
+        {
+            try { return System.IO.File.Exists(QuitRequestPath); }
+            catch { return false; }
+        }
+
+        /// <summary>清除退出请求（桌宠进程退出时调，防下次启动误触发）</summary>
+        public static void ClearQuitRequest()
+        {
+            try { if (System.IO.File.Exists(QuitRequestPath)) System.IO.File.Delete(QuitRequestPath); }
+            catch { }
+        }
+
         /// <summary>
         /// 关闭桌宠进程：按 pid 文件找到并结束（文件残留无害，下次覆盖）。
         /// 调用方：主进程退出钩子（GameScene.OnApplicationQuit）；PetInGameHost.热切换形态（桌面→游戏内）。

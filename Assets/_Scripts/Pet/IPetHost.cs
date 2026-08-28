@@ -29,5 +29,11 @@ namespace GIC.Pet
 
         /// <summary>命中网格的世界包围盒（接近判定用）。碰撞体未就绪时返回 false。</summary>
         bool TryGet命中世界包围盒(out Bounds bounds);
+
+        /// <summary>坐定中（行为层据此切换待机动作=坐姿）。桌面版=PetEdgeSitController.坐定中；游戏内版=屏幕坐定中。</summary>
+        bool 坐定中 { get; }
+
+        /// <summary>坐姿动作名（行为层据此选 clip 播放）。桌面版=PetEdgeSitController.坐姿动作；游戏内版=Inspector 配置。</summary>
+        string 坐姿动作 { get; }
     }
 }

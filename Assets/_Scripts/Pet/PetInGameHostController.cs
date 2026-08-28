@@ -74,6 +74,14 @@ namespace GIC.Pet
         [Tooltip("松手防丢：骨盆完全出屏时拉回屏内的边距（归一化）")]
         [SerializeField] private float 防丢边距 = 0.05f;
 
+        [Header("屏幕边缘坐（游戏内形态专属，桌面版走 PetEdgeSitController）")]
+        [Tooltip("松手时骨盆距屏幕底部多少归一化距离内触发坐（0.15=底部 15% 区域）")]
+        [SerializeField] private float 坐触发范围 = 0.15f;
+        [Tooltip("坐姿动画名（与桌面版 PetEdgeSitController 同款 SitUpright）")]
+        [SerializeField] private string 坐姿动作名 = "Ani_NPC_Kanban_Paimon_SitUpright";
+        [Tooltip("坐定后骨盆距屏幕底部的归一化偏移（0.0=贴底；微正值让脚不裁）")]
+        [SerializeField] private float 坐定底部偏移 = 0.02f;
+
         // ---- 运行时状态 ----
         private RenderTexture _rt;
         private RawImage _画面;          // 全屏显示层（raycastTarget 恒 false）
@@ -104,10 +112,21 @@ namespace GIC.Pet
         private bool _烘焙待补;
         private bool _上帧烘焙被暂停;
 
+        // 屏幕边缘坐状态（游戏内形态专属；PetBehaviorController 经此属性切换待机动作）
+        private bool _屏幕坐定中;
+        /// <summary>屏幕坐定中（PetBehaviorController 据此切换待机=坐姿）</summary>
+        public bool 屏幕坐定中 => _屏幕坐定中;
+        /// <summary>坐姿动作名（PetBehaviorController 据此选 clip）</summary>
+        public string 屏幕坐姿动作 => 坐姿动作名;
+
         public bool 物理交互中 => 拖拽物理 != null && 拖拽物理.交互中;
         public bool 正在拖拽 => 拖拽中 || 物理交互中;
         public float 拖拽秒 => 拖拽物理 != null ? 拖拽物理.本次拖拽时长 : -1f;
         public bool 暂停命中烘焙 { get; set; }
+
+        // IPetHost 坐定接口实现（转发到屏幕坐定状态）
+        bool IPetHost.坐定中 => _屏幕坐定中;
+        string IPetHost.坐姿动作 => 坐姿动作名;
 
         void Awake()
         {
@@ -386,6 +405,7 @@ namespace GIC.Pet
         void 拖拽起手()
         {
             拖拽中 = true;
+            _屏幕坐定中 = false; // 被拖=立即解除坐定
             拖拽起手指针RT = 指针RT();
             if (!物理交互中)
             {
@@ -453,8 +473,40 @@ namespace GIC.Pet
             }
             当前横躺角 = 0f;
             当前转身角 = 0f;
-            骨盆防丢拉回();
+            // 松手后评估屏幕边坐（桌面版 PetEdgeSitController.评估吸附并坐 的游戏内等价）：
+            // 骨盆在屏幕底部 坐触发范围 内→磁吸落座播 SitUpright
+            if (评估屏幕边坐())
+            {
+                // 已接管：播了坐姿动画
+            }
+            else
+            {
+                骨盆防丢拉回();
+            }
             标记待写入();
+        }
+
+        /// <summary>屏幕底部磁吸坐（游戏内形态专属，桌面版 PetEdgeSitController 的简化等价）：
+        /// 骨盆在屏幕底部 坐触发范围 内→磁吸贴底+播 SitUpright 坐姿+置坐定标志（行为层待机切换坐姿）。
+        /// 返回 true=已落座接管。拖拽中不触发（拖拽起手已清坐定）。</summary>
+        bool 评估屏幕边坐()
+        {
+            if (_骨盆 == null || 派蒙相机 == null || 拖拽物理 == null) return false;
+            // 只在拖拽放下时触发（拖拽时长>0.3s 才算"拖到位置"非误触）
+            if (拖拽物理.本次拖拽时长 < 0.3f) return false;
+            Vector3 vp = 派蒙相机.WorldToViewportPoint(_骨盆.position);
+            if (vp.z <= 0f) return false;
+            if (vp.y > 坐触发范围) return false; // 不在底部范围
+
+            // 磁吸：骨盆贴到屏幕底部（坐定底部偏移）
+            摆位到归一化(new Vector2(Mathf.Clamp01(vp.x), 坐定底部偏移));
+            _屏幕坐定中 = true;
+            // 播坐姿动画
+            var swapper = paimon根.GetComponent<PetAnimSwapper>();
+            if (swapper != null && swapper.动作存在(坐姿动作名))
+                swapper.Play(坐姿动作名);
+            Debug.Log($"[PetInGame] 屏幕边坐触发（骨盆y={vp.y:F2}≤{坐触发范围}）→ 播 {坐姿动作名}");
+            return true;
         }
 
         /// <summary>松手防丢（桌面版 拖拽松手防丢拉回 同款）：骨盆完全出屏才拉回贴边（有交集=用户可及不动）</summary>

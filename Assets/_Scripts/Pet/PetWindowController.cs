@@ -114,6 +114,22 @@ namespace GIC.Pet
         // ---- IPetHost 显式实现（转发到既有公开成员，方法名不动保场景引用） ----
         bool IPetHost.TryGet光标Unity屏幕位置(out Vector2 pos) => TryGetCursorUnityScreenPos(out pos);
         bool IPetHost.TryGet命中世界包围盒(out Bounds bounds) => TryGet命中世界包围盒(out bounds);
+        bool IPetHost.坐定中
+        {
+            get
+            {
+                var es = FindObjectOfType<PetEdgeSitController>();
+                return es != null && es.坐定中;
+            }
+        }
+        string IPetHost.坐姿动作
+        {
+            get
+            {
+                var es = FindObjectOfType<PetEdgeSitController>();
+                return es != null ? es.坐姿动作 : null;
+            }
+        }
 
         /// <summary>命中网格的世界包围盒（行为层接近判定用）。来源=MeshCollider（BakeMesh 烘的真实蒙皮网格
         /// + 与 SMR 同 transform，PhysX 世界包围盒正确——像素级点击命中一直精准即证明）。
@@ -816,6 +832,23 @@ namespace GIC.Pet
         private void Update()
         {
             if (!restyled) return;
+
+            // 退出请求检测（2026-08-28：热切换→游戏内形态时主进程写 quit_request 文件，
+            // 桌宠进程检测到后播 Disappear 退场动画再退出，非硬杀）
+            if (!已请求退出 && PetSingleInstance.HasQuitRequest())
+            {
+                已请求退出 = true;
+                PetSingleInstance.ClearQuitRequest();
+                Debug.Log("[PetWindow] 收到退出请求，播放退场动画");
+                bool 退场接管 = 行为控制器 != null && 行为控制器.请求退场(() =>
+                {
+                    PetSingleInstance.ClearQuitRequest();
+                    Application.Quit();
+                });
+                if (!退场接管) { PetSingleInstance.ClearQuitRequest(); Application.Quit(); }
+                return; // 退场期间不跑常规交互
+            }
+            if (已请求退出) return;
 
             窗口体检帧();
             bool modelHit = 取命中状态(out POINT pt);

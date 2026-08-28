@@ -56,9 +56,8 @@ namespace GIC.Pet
             当前形态 = form;
             if (form == 形态_游戏内)
             {
-                // 游戏内形态：杀掉残留桌面进程（上局桌面形态+closePetOnExit=关 的存活个体/手动拉起的），
-                // 保证"启动即按设置呈现"——否则桌面上会同时存在桌面窗派蒙+画中画双个体
-                PetSingleInstance.TryKillPet();
+                // 游戏内形态：残留桌面进程发退出请求（播 Disappear 再退出），非硬杀
+                PetSingleInstance.RequestQuit();
                 PetProcessLauncher.LaunchSuppressed = true; // 游戏内形态：本轮启动不拉桌面进程
                 实例.创建游戏内实例();
                 Debug.Log("[PetInGameHost] 启动形态=游戏画面内版");
@@ -70,8 +69,9 @@ namespace GIC.Pet
         }
 
         /// <summary>热切换形态（设置"派蒙"栏目下拉回调，即时生效）：
-        /// 桌面→游戏内=关闭桌面进程+创建本进程实例；游戏内→桌面=销毁实例+拉起桌面进程。
-        /// 同形态重复调用幂等。</summary>
+        /// 桌面→游戏内=写退出请求让桌宠播 Disappear 退场→等进程退出→创建本进程实例；
+        /// 游戏内→桌面=播 Disappear 退场→销毁实例+拉起桌面进程。
+        /// 2026-08-28 用户要求"切换时先播退出动作再杀死"。同形态重复调用幂等。</summary>
         public static void 热切换形态(int form)
         {
             form = 钳制合法形态(form);
@@ -81,19 +81,51 @@ namespace GIC.Pet
 
             if (form == 形态_游戏内)
             {
-                // 旧桌面进程关闭（pid 文件+进程名校验，手动启动的旧派蒙关不掉——设置切换前先双击关掉她）
-                PetSingleInstance.TryKillPet();
+                // 桌面→游戏内：写退出请求让桌宠进程播 Disappear 再退出（非硬杀）
+                PetSingleInstance.RequestQuit();
                 PetProcessLauncher.LaunchSuppressed = true;
-                实例.创建游戏内实例();
-                Debug.Log($"[PetInGameHost] 热切换：桌面版→游戏画面内版（旧形态={旧形态}）");
+                实例.StartCoroutine(实例.等桌面退场后创建实例());
+                Debug.Log($"[PetInGameHost] 热切换：桌面版→游戏画面内版（旧形态={旧形态}，等退场动画）");
             }
             else
             {
-                实例.销毁游戏内实例();
-                PetProcessLauncher.LaunchSuppressed = false;
-                PetProcessLauncher.Launch();
-                Debug.Log($"[PetInGameHost] 热切换：游戏画面内版→桌面版（旧形态={旧形态}）");
+                // 游戏内→桌面：播 Disappear 退场→销毁→拉桌面进程
+                实例.StartCoroutine(实例.游戏内退场后拉桌面());
+                Debug.Log($"[PetInGameHost] 热切换：游戏画面内版→桌面版（旧形态={旧形态}，等退场动画）");
             }
+        }
+
+        /// <summary>等桌面进程退出（最多 5s 超时强杀）后创建游戏内实例</summary>
+        System.Collections.IEnumerator 等桌面退场后创建实例()
+        {
+            float deadline = Time.unscaledTime + 5f;
+            while (Time.unscaledTime < deadline)
+            {
+                if (!PetSingleInstance.Probe()) break; // 桌宠进程已退出
+                yield return new UnityEngine.WaitForSeconds(0.2f);
+            }
+            if (PetSingleInstance.Probe()) PetSingleInstance.TryKillPet(); // 超时强杀
+            PetSingleInstance.ClearQuitRequest();
+            创建游戏内实例();
+        }
+
+        /// <summary>游戏内实例播 Disappear 退场→销毁→拉桌面进程</summary>
+        System.Collections.IEnumerator 游戏内退场后拉桌面()
+        {
+            if (_游戏内实例 != null)
+            {
+                var behavior = _游戏内实例.GetComponentInChildren<PetBehaviorController>();
+                bool 退场接管 = behavior != null && behavior.请求退场(() => { });
+                if (退场接管)
+                {
+                    // 等退场动画播完（Disappear clip 约 2s，给 4s 超时兜底）
+                    float deadline = Time.unscaledTime + 4f;
+                    while (Time.unscaledTime < deadline && behavior != null && behavior.enabled) yield return null;
+                }
+            }
+            销毁游戏内实例();
+            PetProcessLauncher.LaunchSuppressed = false;
+            PetProcessLauncher.Launch();
         }
 
         private static int 钳制合法形态(int form)
