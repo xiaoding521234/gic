@@ -16,7 +16,8 @@ namespace GIC.Pet
     {
         [Header("引用")]
         [SerializeField] private PetAnimSwapper 动作播放器;
-        [SerializeField] private PetWindowController 窗口控制器;
+        [Tooltip("宿主（桌面场景=PetWindowController 接线；游戏内形态字段为 null 走 PetInGameHost.宿主接口）。2026-08-28 类型放宽为 PetHostBase 共用基类——场景引用按字段名保留不变")]
+        [SerializeField] private PetHostBase 窗口控制器;
         [SerializeField] private PetBlinkController 眨眼控制器; // 单次动作期间静默（morph 重评估与动作叠加互相放大顿挫）
         [SerializeField] private PetLookAtController 视线控制器; // 出场/退场期间静默（仪式动作头链全交 clip，2026-08-24）
         [SerializeField] private PetEmotionController 情绪控制器;   // 拎起期的慌张表情（直接下发，不经动作映射）
@@ -75,6 +76,7 @@ namespace GIC.Pet
         private readonly Vector3[] _包围盒角点 = new Vector3[8];
         private bool _出场未播 = true;      // 首帧播出场动画（所有 Start 完成后=预热已回待机）
         private bool _退场中;                // 退场动画进行中：屏蔽一切行为触发
+        private bool _退场完成;              // 退场动画播完（回调已发）：冻结一切行为保持退场末帧，直到进程退出/实例销毁
         private System.Action _退场完成回调; // 退场动画播完执行（进程关闭，由窗口控制器注入）
         private bool _仪式静默中;            // 出场/退场动画期间：眨眼+视线层静默（收尾统一解除）
         private bool _拎起视线静默中;        // 拖拽物理期视线静默（2026-08-26：拎起 KO 垂落头被视线层拉向光标=目检"抬头看抓取点"根因）
@@ -109,9 +111,13 @@ namespace GIC.Pet
         /// 游戏内形态无掉落概念，恒 false。</summary>
         private bool 边坐掉落中 => 边坐控制器 != null && 边坐控制器.掉落中;
 
-        /// <summary>宿主分发（IPetHost，docs/19 §6.4 批次 B）：桌面形态=序列化字段 窗口控制器；
-        /// 游戏内形态=PetInGameHost 注入的宿主。字段保留原类型（场景引用零风险），运行时按接线取。</summary>
-        private IPetHost 宿主 => 窗口控制器 != null ? (IPetHost)窗口控制器 : PetInGameHost.宿主接口;
+        /// <summary>宿主分发（IPetHost，docs/19 §6.4 批次 B）：桌面形态=序列化字段 窗口控制器（PetHostBase）；
+        /// 游戏内形态=PetInGameHost 注入的宿主。字段保留宿主基类型（场景引用零风险），运行时按接线取。</summary>
+        private IPetHost 宿主 => 窗口控制器 != null ? 窗口控制器 : PetInGameHost.宿主接口;
+
+        /// <summary>退场流程中（动画播放期+播完冻结期）——宿主层据此冻结拖拽/滚轮交互
+        /// （桌面版 PetWindowController.已请求退出 的同款守卫语义，2026-08-28 游戏内形态补齐）</summary>
+        public bool 退场中 => _退场中 || _退场完成;
 
         void Start()
         {
@@ -128,18 +134,23 @@ namespace GIC.Pet
 
         void Update()
         {
+            // 退场已播完：冻结一切行为，保持 Disappear 末帧直到进程退出/实例销毁
+            //（2026-08-28 游戏内热切换"播完就杀"配套——旧逻辑落回单次动作分支会切回待机"站起来"，
+            // 销毁前多停留数秒且姿势穿帮；编辑器下退完保持末帧，重新 Play 可反复目检）
+            if (_退场完成) return;
+
             // 守卫按宿主判空（游戏内形态窗口控制器字段为 null，宿主由 PetInGameHost 注入——
             // 2026-08-28 修复：原按 窗口控制器==null 早退，游戏内形态行为层全瘫只剩待机）
             var host = 宿主;
             if (动作播放器 == null || host == null || 相机 == null) return;
 
             // 退场收尾：退场动画播完 → 交回退出回调（进程关闭由 PetWindowController 执行）。
-            // 编辑器下 Application.Quit 无效——退完落回 _单次进行中 分支自然回待机，可反复目检
             if (_退场中)
             {
                 if (Time.time - _单次开始 > 0.25f && !动作播放器.是否在播(_当前单次名))
                 {
                     _退场中 = false;
+                    _退场完成 = true;
                     var cb = _退场完成回调;
                     _退场完成回调 = null;
                     cb?.Invoke();
@@ -266,15 +277,15 @@ namespace GIC.Pet
                 播单次(放下反应);
             else if (边坐控制器 != null && 边坐控制器.评估吸附并坐())
             {
-                // 桌面版边坐接管：松手位置附近有横框（窗口顶边/任务栏顶），已磁吸落座播坐姿动画
+                // 桌面版边坐接管：松手位置附近有横框（窗口顶边/底边/任务栏顶），已磁吸落座播坐姿动画
             }
-            else if (宿主 is PetInGameHostController)
+            else if (!坐定中 && !_单次进行中 && 动作播放器.动作存在(当前待机动作))
             {
-                // 游戏内形态：屏幕边坐已在宿主控制器的物理交互收口里评估处理，
-                // 行为层不需要再做什么——宿主控制器已播了坐姿动画或回待机
-            }
-            else if (!_单次进行中 && 动作播放器.动作存在(当前待机动作))
+                // 未被边坐/屏幕坐接管 → 回待机。游戏内形态的屏幕边坐在宿主控制器物理收口里评估
+                // （坐定中=已接管播了坐姿）；原代码这里按 `宿主 is PetInGameHostController` 空跳过，
+                // 游戏内松手后 Drag01 循环永不切回=保持被拖拽姿势（2026-08-28 用户报障根因，已合一）
                 动作播放器.Play(当前待机动作);
+            }
         }
 
         /// <summary>单次动作收尾帧：播完（或 CrossFade 路径的尾段提前过渡）→ 解除静默/烘焙暂停，

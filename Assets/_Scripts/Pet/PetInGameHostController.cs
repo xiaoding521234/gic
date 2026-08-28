@@ -6,7 +6,9 @@ namespace GIC.Pet
 {
     /// <summary>
     /// 游戏画面内版宿主控制器 v2（docs/19 §6.4，2026-08-28 全屏画布重构）——挂 PaimonInGameRoot 实例根，
-    /// 实现 IPetHost。渲染=全屏 RT 画中画：prefab 内 PreviewCamera 渲到屏幕同尺寸 RenderTexture，
+    /// 继承 PetHostBase（2026-08-28 共用化：拎起姿势应用/四肢摆动/命中网格烘焙/缩放平滑/找骨均在基类，
+    /// 宿主只保留差异层——RT 画布/Unity 输入轮询/移根钉骨盆/PetPrefs 持久化/屏幕底坐）。
+    /// 渲染=全屏 RT 画中画：prefab 内 PreviewCamera 渲到屏幕同尺寸 RenderTexture，
     /// DontDestroyOnLoad 的 ScreenSpaceOverlay Canvas + 全屏 RawImage 显示（高 sortingOrder 悬浮层）。
     ///
     /// v2 全屏画布（2026-08-28 用户拍板"画布范围=整个游戏画面"，根治放大到最大被 750×825 小画布截断）：
@@ -20,33 +22,23 @@ namespace GIC.Pet
     /// - 事件挡板：全屏透明 Image，命中派蒙时 raycastTarget=true 吃掉主游戏点击（桌面版
     ///   WS_EX_TRANSPARENT 穿透切换的同构——命中模型=可交互不穿透，未命中=穿透到游戏 UI）
     /// - 拖拽物理：复用 PetDragPhysicsController（四肢跟拍弹簧+挣扎），拎起姿势应用层
-    ///   （横躺/转身角平滑+根旋转绕骨盆枢轴补偿+四肢摆动 LateUpdate 叠加）完整复刻桌面版
-    ///   PetWindowController.应用物理帧——2026-08-28 修复"拖拽时不转身"（旧版只移画布无姿势）。
+    ///   在基类 PetHostBase.拎起姿势角帧（2026-08-28 修复"拖拽时不转身"后合一）
     ///
     /// 缩放基准适配：全屏视野下模型基准 localScale ×(等效画布逻辑高/屏幕参考逻辑高)（825/1080），
     /// 保持屏幕显示尺寸与桌面版 750×825 逻辑窗口一致；缩放上限动态钳制（模型最大屏高占比 ≤95%，
     /// 对齐桌面版"工作区 95% 预算"语义——放大到最大恰好占满屏不截断）。
     /// 持久化：PetPrefs 游戏内字段（骨盆归一化屏幕位+缩放，分辨率无关）。
     /// </summary>
-    public class PetInGameHostController : MonoBehaviour, IPetHost
+    public class PetInGameHostController : PetHostBase
     {
         [Header("引用（空=自动找）")]
         [SerializeField] private Camera 派蒙相机;
-        [SerializeField] private PetDragPhysicsController 拖拽物理;
-        [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
-        [SerializeField] private Transform paimon根;
 
         [Header("全屏画布")]
         [Tooltip("RT 超采样倍率（1=与屏幕 1:1 像素；2=4K 屏超采样，全屏 RT 体积大按需开）")]
         [SerializeField, Range(1f, 2f)] private float rt倍率 = 1f;
 
-        [Header("缩放")]
-        [SerializeField] private float 缩放最小 = 0.4f;
-        [Tooltip("缩放倍率上限（会被 最大屏高占比 动态钳制——放大到最大恰好不截屏）")]
-        [SerializeField] private float 缩放最大 = 2f;
-        [SerializeField] private float 初始缩放倍率 = 0.7f;
-        [SerializeField] private float 缩放平滑速度 = 12f;
-        [SerializeField] private float 缩放步进 = 1.05f;
+        [Header("缩放（其余缩放参数在 PetHostBase）")]
         [Tooltip("模型最大屏高占比（动态缩放上限的预算，对齐桌面版工作区 95% 语义）")]
         [SerializeField, Range(0.5f, 1f)] private float 最大屏高占比 = 0.95f;
 
@@ -56,21 +48,7 @@ namespace GIC.Pet
         [Tooltip("屏幕参考逻辑高（CanvasScaler 旧参考分辨率高度）")]
         [SerializeField] private float 屏幕参考逻辑高 = 1080f;
 
-        [Header("拖拽锚点（与桌面版 PetWindowController 同骨名）")]
-        [SerializeField] private string 骨盆骨名 = "Bip001 Pelvis";
-        [SerializeField] private string[] 四肢骨名 = { "Bip001 L UpperArm", "Bip001 R UpperArm", "Bip001 L Thigh", "Bip001 R Thigh" };
-
-        [Header("拎起姿势（复刻桌面版 v6 瘫软式+3/4 偏左转身）")]
-        [Tooltip("被拎起时身体姿势基准角（度）：0=直立垂落（主流桌宠），90=头朝左横躺")]
-        [SerializeField] private float 拎起横躺角 = 0f;
-        [Tooltip("被拎起时绕竖直轴转身角（度）：45=3/4 偏左（桌面版 v6 用户参考图），0=正对玩家")]
-        [SerializeField] private float 拎起转身角 = 45f;
-        [Tooltip("横躺角/转身角淡入淡出速度（每秒指数趋近率）")]
-        [SerializeField] private float 横躺融合速度 = 7f;
-
         [Header("命中")]
-        [Tooltip("交互结束后延迟多久补烘一次（秒）——对齐桌面版一次性补烘机制")]
-        [SerializeField] private float 烘焙恢复宽限秒 = 2f;
         [Tooltip("松手防丢：骨盆完全出屏时拉回屏内的边距（归一化）")]
         [SerializeField] private float 防丢边距 = 0.05f;
 
@@ -86,59 +64,37 @@ namespace GIC.Pet
         private RenderTexture _rt;
         private RawImage _画面;          // 全屏显示层（raycastTarget 恒 false）
         private Image _挡板;             // 全屏透明事件挡板（raycastTarget 动态=命中状态）
-        private MeshCollider 命中网格碰撞体;
-        private Mesh 烘焙网格;
-        private Transform _骨盆;
-        private Transform[] _四肢骨;
-
-        private float 初始缩放;           // 模型基准 localScale（prefab 值 × 全屏视野折算系数）
-        private float 目标缩放 = 1f;
-        private float 显示缩放 = 1f;
-        private float 有效缩放最大 = 2f;  // 动态上限：Min(缩放最大, 最大屏高占比×H/h)
         private float 世界每屏幕像素;      // 相机平面世界单位 / 屏幕像素（k=H/Screen.height）
         private Vector2Int _上次屏幕尺寸;
+        private PetBehaviorController _行为控制器; // 退场中冻结拖拽/滚轮交互（热切换退场期间不可抓取）
 
         // 拖拽状态（对齐桌面版 PetWindowController 字段语义）
         private bool 拖拽中;
         private bool prevLmbDown;
         private Vector2 拖拽起手指针RT;      // RT 像素系（鼠标×RT/屏比）
         private Vector2 拖拽起手骨盆RT;     // 起手骨盆屏幕投影（RT 像素系）——骨盆钉位基准
-        private Quaternion 拖拽基准旋转 = Quaternion.identity;
-        private float 当前横躺角;
-        private float 当前转身角;
 
         private float 待写入时刻 = -1f;
-        private float 烘焙恢复时刻 = -10f;
-        private bool _烘焙待补;
-        private bool _上帧烘焙被暂停;
 
-        // 屏幕边缘坐状态（游戏内形态专属；PetBehaviorController 经此属性切换待机动作）
+        // 屏幕边缘坐状态（游戏内形态专属；PetBehaviorController 经 IPetHost.坐定中 切换待机动作）
         private bool _屏幕坐定中;
-        /// <summary>屏幕坐定中（PetBehaviorController 据此切换待机=坐姿）</summary>
+        /// <summary>屏幕坐定中（兼容保留的公开查询）</summary>
         public bool 屏幕坐定中 => _屏幕坐定中;
-        /// <summary>坐姿动作名（PetBehaviorController 据此选 clip）</summary>
+        /// <summary>坐姿动作名（兼容保留的公开查询）</summary>
         public string 屏幕坐姿动作 => 坐姿动作名;
 
-        public bool 物理交互中 => 拖拽物理 != null && 拖拽物理.交互中;
-        public bool 正在拖拽 => 拖拽中 || 物理交互中;
-        public float 拖拽秒 => 拖拽物理 != null ? 拖拽物理.本次拖拽时长 : -1f;
-        public bool 暂停命中烘焙 { get; set; }
+        public override bool 正在拖拽 => 拖拽中 || 物理交互中;
+        public override bool 坐定中 => _屏幕坐定中;
+        public override string 坐姿动作 => 坐姿动作名;
 
-        // IPetHost 坐定接口实现（转发到屏幕坐定状态）
-        bool IPetHost.坐定中 => _屏幕坐定中;
-        string IPetHost.坐姿动作 => 坐姿动作名;
+        protected override string 日志标签 => "[PetInGame]";
 
         void Awake()
         {
             派蒙相机 = 派蒙相机 != null ? 派蒙相机 : GetComponentInChildren<Camera>(true);
             拖拽物理 = 拖拽物理 != null ? 拖拽物理 : GetComponentInChildren<PetDragPhysicsController>(true);
-            if (蒙皮渲染器 == null)
-            {
-                var shadowLayer = LayerMask.NameToLayer("PaimonShadow");
-                foreach (var smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                    if (!smr.name.Contains("_DropShadow") && smr.gameObject.layer != shadowLayer)
-                    { 蒙皮渲染器 = smr; break; }
-            }
+            if (蒙皮渲染器 == null) 蒙皮渲染器 = 找本体蒙皮渲染器();
+            _行为控制器 = GetComponentInChildren<PetBehaviorController>(true);
             var paimonGo = transform.Find("Paimon");
             paimon根 = paimon根 != null ? paimon根 : (paimonGo != null ? paimonGo : transform).transform;
 
@@ -173,36 +129,6 @@ namespace GIC.Pet
             建命中代理();
             算基准与上限();
             恢复存档();
-        }
-
-        /// <summary>取本体骨架上的骨（排除影子壳 _DropShadow / MMD_DropShadow 下的同名骨拷贝）——桌面版同款</summary>
-        private Transform 找本体骨(string boneName)
-        {
-            foreach (var t in paimon根.GetComponentsInChildren<Transform>(true))
-            {
-                if (t.name != boneName) continue;
-                bool 影子下 = false;
-                for (var p = t.parent; p != null && !影子下; p = p.parent)
-                    if (p.name == "_DropShadow" || p.name == "MMD_DropShadow") 影子下 = true;
-                if (影子下) continue;
-                return t;
-            }
-            return null;
-        }
-
-        private void 找拖拽骨骼()
-        {
-            if (paimon根 == null) return;
-            _骨盆 = 找本体骨(骨盆骨名);
-            _四肢骨 = new Transform[四肢骨名 != null ? 四肢骨名.Length : 0];
-            int 找到 = 0;
-            for (int i = 0; i < _四肢骨.Length; i++)
-            {
-                _四肢骨[i] = 找本体骨(四肢骨名[i]);
-                if (_四肢骨[i] != null) 找到++;
-            }
-            if (找到 < _四肢骨.Length)
-                Debug.LogWarning($"[PetInGame] 四肢摆动骨缺失 {_四肢骨.Length - 找到}/{_四肢骨.Length}（缺失肢不摆动）");
         }
 
         /// <summary>全屏画中画：RT=屏幕尺寸×rt倍率；RawImage 铺满全屏（raycastTarget=false，
@@ -262,22 +188,6 @@ namespace GIC.Pet
             if (_画面 != null) _画面.texture = _rt;
         }
 
-        /// <summary>像素级命中代理（桌面版配方）：BakeMesh 烘蒙皮网格 + 同 transform MeshCollider</summary>
-        void 建命中代理()
-        {
-            if (蒙皮渲染器 == null) return;
-            var hitGo = new GameObject("_HitMeshProxy");
-            hitGo.transform.SetParent(蒙皮渲染器.transform.parent, false);
-            hitGo.transform.localPosition = 蒙皮渲染器.transform.localPosition;
-            hitGo.transform.localRotation = 蒙皮渲染器.transform.localRotation;
-            hitGo.transform.localScale = 蒙皮渲染器.transform.localScale;
-            命中网格碰撞体 = hitGo.AddComponent<MeshCollider>();
-            命中网格碰撞体.cookingOptions = MeshColliderCookingOptions.UseFastMidphase;
-            烘焙网格 = new Mesh();
-            蒙皮渲染器.BakeMesh(烘焙网格, true);
-            命中网格碰撞体.sharedMesh = 烘焙网格;
-        }
-
         /// <summary>算基准缩放（prefab 值 × 等效画布/屏幕参考 折算——保持屏幕显示尺寸与桌面版一致）
         /// 与动态缩放上限（模型最大屏高占比 ≤95%——放大到最大恰好不截屏）+ 世界/屏幕像素比。
         /// 每次补烘后重算（姿势微变 h 微变，上限跟随）。</summary>
@@ -314,14 +224,23 @@ namespace GIC.Pet
             有效缩放最大 = Mathf.Max(上限, 缩放最小);
         }
 
+        /// <summary>补烘完成钩子：烘焙姿势变→模型高变→动态缩放上限跟随重算</summary>
+        protected override void 烘焙完成后() => 更新有效缩放上限();
+
         void Update()
         {
             分辨率变化帧();
-            bool modelHit = 取命中状态(Input.mousePosition);
+            // 退场中（热切换/退场的 Disappear 播放期+播完冻结期）交互全冻结——拖拽会抓住正在退场的
+            // 模型（桌面版 PetWindowController.已请求退出 同款守卫，2026-08-28 用户要求"播完就杀"配套）
+            bool 交互冻结 = _行为控制器 != null && _行为控制器.退场中;
+            bool modelHit = !交互冻结 && 取命中状态(Input.mousePosition);
             补烘命中网格帧();
             缩放平滑帧();
-            拖拽轮询帧(modelHit);
-            滚轮缩放帧(modelHit);
+            if (!交互冻结)
+            {
+                拖拽轮询帧(modelHit);
+                滚轮缩放帧(modelHit);
+            }
             挡板切换帧(modelHit);
             if (待写入时刻 > 0f && Time.unscaledTime >= 待写入时刻) 写入存档();
         }
@@ -387,13 +306,14 @@ namespace GIC.Pet
                     else
                     {
                         拖拽物理.每帧拖拽(指针RT(), Time.unscaledDeltaTime);
-                        应用拖拽帧();
+                        拎起姿势角帧(true);   // ①姿势旋转（基类：角平滑+挣扎+绕骨盆枢轴补偿）
+                        骨盆钉位到物理目标(); // ②骨盆钉位（刚体 1:1 直跟）
                     }
                 }
                 else
                 {
                     bool 收尾完成 = !拖拽物理.每帧收尾(Time.unscaledDeltaTime);
-                    拎起姿势角帧(false);
+                    拎起姿势角帧(false); // 收尾期角度平滑归零
                     if (!拖拽物理.交互中 || 收尾完成) 物理交互收口();
                 }
             }
@@ -407,26 +327,17 @@ namespace GIC.Pet
             拖拽中 = true;
             _屏幕坐定中 = false; // 被拖=立即解除坐定
             拖拽起手指针RT = 指针RT();
-            if (!物理交互中)
-            {
-                拖拽基准旋转 = paimon根.localRotation;
-            }
+            快照拖拽基准(false); // 根旋转基准（模型位置=拖拽结果，不快照还原基准）
             拖拽起手骨盆RT = 派蒙相机.WorldToScreenPoint(_骨盆.position);
             拖拽物理.开始拖拽(拖拽起手指针RT, 拖拽起手骨盆RT);
         }
 
-        /// <summary>拖拽应用帧（桌面版 应用物理帧+按骨盆目标定位窗口 的游戏内等价）：
-        /// ①拎起姿势根旋转（横躺/转身+挣扎，绕骨盆枢轴补偿——旋转瞬间骨盆不动）；
-        /// ②骨盆钉位（桌面版 按骨盆目标定位窗口 同构）：目标=起手骨盆+光标位移（刚体 1:1 直跟），
-        /// 根平移使骨盆投影钉到目标——Drag01 动画微动/旋转残余位移全部被吸收（桌面版靠移窗吸收，
+        /// <summary>骨盆钉位（桌面版 按骨盆目标定位窗口 的游戏内等价）：目标=起手骨盆+光标位移（刚体 1:1
+        /// 直跟），根平移使骨盆投影钉到目标——Drag01 动画微动/旋转残余位移全部被吸收（桌面版靠移窗吸收，
         /// 此处靠移根，视觉等价）。【2026-08-28 修复：旧版只直跟根位置，动画微动致骨盆漂移】</summary>
-        void 应用拖拽帧()
+        void 骨盆钉位到物理目标()
         {
             if (paimon根 == null || 派蒙相机 == null || _骨盆 == null) return;
-            // ① 姿势旋转（内含绕骨盆枢轴的旋转位移补偿）
-            拎起姿势角帧(true);
-
-            // ② 骨盆钉位：把骨盆屏幕投影钉到物理目标（起手骨盆+光标位移）
             Vector3 当前投影 = 派蒙相机.WorldToScreenPoint(_骨盆.position);
             Vector2 目标 = 拖拽物理.当前骨盆屏幕;
             Vector2 dRT = 目标 - (Vector2)当前投影;
@@ -437,42 +348,12 @@ namespace GIC.Pet
                                + 派蒙相机.transform.up * (d屏幕y * 世界每屏幕像素);
         }
 
-        /// <summary>拎起姿势角平滑+根旋转应用（桌面版 应用物理帧 的旋转部分整段复刻）：
-        /// 拖拽期→拎起横躺/转身角，收尾期→0 平滑归零；旋转绕骨盆枢轴补偿（旋转后把骨盆钉回旋转前位置）。</summary>
-        void 拎起姿势角帧(bool 拖拽期)
-        {
-            if (_骨盆 == null || paimon根 == null || 拖拽物理 == null) return;
-            float 横躺目标 = 拖拽期 ? 拎起横躺角 : 0f;
-            float 转身目标 = 拖拽期 ? 拎起转身角 : 0f;
-            float k = 1f - Mathf.Exp(-横躺融合速度 * Time.unscaledDeltaTime);
-            当前横躺角 = Mathf.Lerp(当前横躺角, 横躺目标, k);
-            当前转身角 = Mathf.Lerp(当前转身角, 转身目标, k);
-
-            float 挣摆 = 拖拽物理.当前挣扎摆角;
-            float 挣扭 = 拖拽物理.当前挣扎扭角;
-            Vector3 骨盆旋转前 = _骨盆.position;
-            paimon根.localRotation = Quaternion.AngleAxis(当前横躺角 + 挣摆, Vector3.forward)
-                                   * Quaternion.AngleAxis(当前转身角 + 挣扭, Vector3.up)
-                                   * 拖拽基准旋转;
-            // 绕骨盆枢轴补偿：骨盆钉回旋转前世界位（动画微动保留，仅抵消旋转带来的位移）
-            Vector3 位移 = 骨盆旋转前 - _骨盆.position;
-            if (位移.sqrMagnitude > 1e-10f) paimon根.position += 位移;
-        }
-
-        /// <summary>物理交互收口（桌面版语义裁剪）：根旋转精确归位+骨盆钉回+松手防丢拉回+位置落盘。
-        /// （桌面版还还原根位置到基准——那是因为桌面模型位置从未被拖拽改（窗口在动）；游戏内版
-        /// 模型位置=拖拽直接结果，只还原旋转。）</summary>
+        /// <summary>物理交互收口：旋转归位（基类默认=骨盆枢轴补偿版——模型位置=拖拽结果保留，只把旋转
+        /// 归回基准）+ 松手后评估屏幕边坐/防丢拉回 + 位置落盘。
+        /// （桌面版 override=旋转+位置精确还原基准——那是因为桌面模型位置从未被拖拽改（窗口在动）。）</summary>
         void 物理交互收口()
         {
-            if (paimon根 != null && _骨盆 != null)
-            {
-                Vector3 骨盆旋转前 = _骨盆.position;
-                paimon根.localRotation = 拖拽基准旋转;
-                Vector3 位移 = 骨盆旋转前 - _骨盆.position;
-                if (位移.sqrMagnitude > 1e-10f) paimon根.position += 位移;
-            }
-            当前横躺角 = 0f;
-            当前转身角 = 0f;
+            拖拽收口归位();
             // 松手后评估屏幕边坐（桌面版 PetEdgeSitController.评估吸附并坐 的游戏内等价）：
             // 骨盆在屏幕底部 坐触发范围 内→磁吸落座播 SitUpright
             if (评估屏幕边坐())
@@ -540,76 +421,25 @@ namespace GIC.Pet
             }
         }
 
-        void 补烘命中网格帧()
-        {
-            bool 烘焙被暂停 = 暂停命中烘焙 || 物理交互中;
-            if (烘焙被暂停 && !_上帧烘焙被暂停) _烘焙待补 = true;
-            if (_上帧烘焙被暂停 && !烘焙被暂停)
-                烘焙恢复时刻 = Time.unscaledTime + Mathf.Max(0f, 烘焙恢复宽限秒);
-            _上帧烘焙被暂停 = 烘焙被暂停;
-            if (_烘焙待补 && !烘焙被暂停 && Time.unscaledTime >= 烘焙恢复时刻
-                && 蒙皮渲染器 != null && 命中网格碰撞体 != null)
-            {
-                蒙皮渲染器.BakeMesh(烘焙网格, true);
-                命中网格碰撞体.sharedMesh = null;
-                命中网格碰撞体.sharedMesh = 烘焙网格;
-                _烘焙待补 = false;
-                PetDiag.上次蒙皮重烘 = Time.unscaledTime;
-                更新有效缩放上限();
-            }
-        }
-
-        void 缩放平滑帧()
-        {
-            if (Mathf.Approximately(显示缩放, 目标缩放)) return;
-            float 步进 = 缩放平滑速度 <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 缩放平滑速度);
-            显示缩放 += (目标缩放 - 显示缩放) * 步进;
-            if (Mathf.Abs(目标缩放 - 显示缩放) < 0.0005f) 显示缩放 = 目标缩放;
-            应用模型缩放();
-        }
-
-        void 应用模型缩放()
-        {
-            if (paimon根 == null) return;
-            float s = 初始缩放 * 显示缩放;
-            paimon根.localScale = new Vector3(s, s, s);
-        }
-
-        /// <summary>四肢摆动叠加（桌面版 LateUpdate 同款）：物理组件输出的摆动角以世界 Z 轴旋转
-        /// 叠加到四肢根骨（肩/大腿）——Animation 每帧重写骨骼姿势，本层在其上叠加一次不累积。
-        /// 交互结束后本层停止应用，动画自然覆盖残留。</summary>
+        /// <summary>四肢摆动叠加走共用基类（PetHostBase.四肢摆动应用帧，2026-08-28 合一）：
+        /// 物理组件输出的摆动角以世界 Z 轴旋转叠加到四肢根骨——Animation 每帧重写骨骼姿势，
+        /// 本层在其上叠加一次不累积。交互结束后停止应用，动画自然覆盖残留。</summary>
         void LateUpdate()
         {
-            if (拖拽物理 == null || !拖拽物理.交互中 || _四肢骨 == null) return;
-            for (int i = 0; i < _四肢骨.Length; i++)
-            {
-                var 骨 = _四肢骨[i];
-                if (骨 == null) continue;
-                拖拽物理.取四肢摆动(i, out float 摆动角);
-                if (摆动角 != 0f)
-                    骨.rotation = Quaternion.AngleAxis(摆动角, Vector3.forward) * 骨.rotation;
-            }
+            四肢摆动应用帧();
         }
 
         // ---- IPetHost：光标位置（视线跟随/接近判定）----
         // 全屏 RT 与屏幕同 aspect：光标屏幕坐标×(RT/屏幕)=RT 像素空间——视线层头骨投影/行为层
         // 包围盒投影（WorldToScreenPoint 输出 RT 像素）同空间，两套坐标一致（2026-08-28 修复
         // 旧版坐标系错位致视线恒满角扭转）。
-        public bool TryGet光标Unity屏幕位置(out Vector2 unityScreenPos)
+        public override bool TryGet光标Unity屏幕位置(out Vector2 unityScreenPos)
         {
             if (_rt == null) { unityScreenPos = default; return false; }
             float sx = (float)_rt.width / Screen.width;
             float sy = (float)_rt.height / Screen.height;
             Vector2 m = Input.mousePosition;
             unityScreenPos = new Vector2(m.x * sx, m.y * sy);
-            return true;
-        }
-
-        public bool TryGet命中世界包围盒(out Bounds bounds)
-        {
-            bounds = default;
-            if (命中网格碰撞体 == null || 命中网格碰撞体.sharedMesh == null) return false;
-            bounds = 命中网格碰撞体.bounds;
             return true;
         }
 

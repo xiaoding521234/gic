@@ -8,8 +8,9 @@ using static GIC.Pet.PetWin32; // Win32 声明集中在 PetWin32（2026-08-27 �
 namespace GIC.Pet
 {
     /// <summary>
-    /// 边缘坐控制器（2026-08-27，用户需求"派蒙坐在屏幕或窗口的横框上"）：
-    /// 拖拽松手时探测附近"横框"（窗口顶边=标题栏上沿 / 任务栏顶=工作区底）→ 磁吸贴合播坐姿动画
+    /// 边缘坐控制器（2026-08-27，用户需求"派蒙坐在屏幕或窗口的横框上"；2026-08-28 补窗口下边框）：
+    /// 拖拽松手时探测附近"横框"（窗口顶边=标题栏上沿 / 窗口底边=坐下沿身体在窗前腿垂窗下 /
+    /// 任务栏顶=工作区底）→ 磁吸贴合播坐姿动画
     /// （SitUpright 合成直坐；SitLoop 原版定性"生病坐姿"已弃用，2026-08-27）；
     /// 坐定后跟随锚定窗口移动（窗口拖走/改尺寸她贴着走）；锚定窗口最小化/关闭/隐藏 → 沿 eSheep 语义
     /// 重力掉落，途中可落在更低窗口顶边，兜底落任务栏顶，全程无缝衔接回坐姿。
@@ -72,6 +73,7 @@ namespace GIC.Pet
 
         /// <summary>坐定中的锚定窗口句柄；IntPtr.Zero=屏幕锚定（任务栏顶/工作区底，永不失效）</summary>
         private IntPtr 锚定窗口 = IntPtr.Zero;
+        private bool 锚定下边;             // true=锚定窗口底边（坐下沿：跟随/贴正取 r.Bottom）；false=顶边（取 r.Top）——2026-08-28 补
         private RECT 锚定矩形;              // 坐定时的锚定窗口可见帧（跟随变化检测）
         private float 水平锚定比;           // 接触x相对窗口宽的比例（eSheep FollowWindow 同款）
         private float 接触x, 接触y;         // 接触线屏幕坐标（物理像素，虚拟桌面系）
@@ -105,7 +107,7 @@ namespace GIC.Pet
             if (!窗口控制器.TryGet接触点屏幕位置(out Vector2 脚底)) return false;
 
             枚举候选边();
-            候选边 best = default; bool 找到 = false; float 最小距 = float.MaxValue;
+            候选边 best = default; bool 找到 = false; float 最小距 = float.MaxValue; bool best下边 = false;
             // 屏幕底横框（任务栏顶）同场参评：拖到任务栏上松手=坐任务栏
             int 工作区底 = 取脚底工作区底(脚底.x);
             if (水平在工作区内(脚底.x) && 脚底.y >= 工作区底 - 上吸附范围像素 && 脚底.y <= 工作区底 + 下吸附范围像素)
@@ -114,19 +116,30 @@ namespace GIC.Pet
                 找到 = true;
                 best = new 候选边 { hwnd = IntPtr.Zero, rect = new RECT { Left = int.MinValue, Top = 工作区底, Right = int.MaxValue, Bottom = int.MaxValue } };
             }
+            // 每个候选窗口两条横框参评（2026-08-28 补下边框）：顶边（坐上沿，腿垂窗前）与底边
+            // （坐下沿，身体在窗前、腿垂窗下）；磁吸窗=边线上 120px / 下 60px（终值，与 Inspector
+            // 默认一致），全体横框（含任务栏顶）里最近者胜
             foreach (var c in 候选)
             {
                 if (!水平含(脚底.x, c.rect)) continue;
-                float d = 脚底.y - c.rect.Top;
-                if (d < -上吸附范围像素 || d > 下吸附范围像素) continue; // 磁吸窗：上 120px / 下 60px（终值，与 Inspector 默认一致）
-                d = Mathf.Abs(d);
-                if (d < 最小距) { 最小距 = d; 找到 = true; best = c; }
+                float dTop = 脚底.y - c.rect.Top;
+                if (dTop >= -上吸附范围像素 && dTop <= 下吸附范围像素)
+                {
+                    float d = Mathf.Abs(dTop);
+                    if (d < 最小距) { 最小距 = d; 找到 = true; best = c; best下边 = false; }
+                }
+                float dBottom = 脚底.y - c.rect.Bottom;
+                if (dBottom >= -上吸附范围像素 && dBottom <= 下吸附范围像素)
+                {
+                    float d = Mathf.Abs(dBottom);
+                    if (d < 最小距) { 最小距 = d; 找到 = true; best = c; best下边 = true; }
+                }
             }
             if (!找到) return false;
 
             接触x = 脚底.x;
-            接触y = best.rect.Top;
-            坐定(best.hwnd, best.rect);
+            接触y = best下边 ? best.rect.Bottom : best.rect.Top;
+            坐定(best.hwnd, best.rect, best下边);
             return true;
         }
 
@@ -175,14 +188,14 @@ namespace GIC.Pet
                     if (锚定窗口 == IntPtr.Zero)
                     {
                         接触y = 取脚底工作区底(接触x);
-                        坐定(IntPtr.Zero, default); // 屏幕锚定（任务栏顶）
+                        坐定(IntPtr.Zero, default, false); // 屏幕锚定（任务栏顶）
                     }
                     else if (IsWindowVisible(锚定窗口) && !IsIconic(锚定窗口)
                              && 取可见矩形(锚定窗口, out RECT r2) && r2.宽 > 0 && r2.高 > 0)
                     {
                         接触x = r2.Left + 水平锚定比 * r2.宽;
-                        接触y = r2.Top;
-                        坐定(锚定窗口, r2);
+                        接触y = 锚定下边 ? r2.Bottom : r2.Top;
+                        坐定(锚定窗口, r2, 锚定下边);
                     }
                     else
                     {
@@ -231,12 +244,13 @@ namespace GIC.Pet
                 窗口失效掉落();
                 return;
             }
-            // 跟随（eSheep FollowWindow）：垂直恒贴顶边，水平按锚定比例随窗口宽度缩放（窗口改宽她按比例挪）
+            // 跟随（eSheep FollowWindow）：垂直恒贴锚定边（顶边=r.Top / 底边=r.Bottom），水平按锚定比例
+            // 随窗口宽度缩放（窗口改宽她按比例挪）
             if (r.Left != 锚定矩形.Left || r.Top != 锚定矩形.Top || r.Right != 锚定矩形.Right || r.Bottom != 锚定矩形.Bottom)
             {
                 锚定矩形 = r;
                 接触x = r.Left + 水平锚定比 * r.宽;
-                接触y = r.Top;
+                接触y = 锚定下边 ? r.Bottom : r.Top;
                 窗口控制器.设置接触点屏幕位置(接触x, 接触y);
                 窗口控制器.标记位置待写入();
             }
@@ -265,7 +279,7 @@ namespace GIC.Pet
             if (停)
             {
                 接触y = crossed.rect.Top;
-                坐定(crossed.hwnd, crossed.rect);
+                坐定(crossed.hwnd, crossed.rect, false); // 下落只能落在上方表面（顶边）——从上往下跨过底边前必先跨过同窗顶边
                 return;
             }
             // 任务栏顶/屏幕底兜底：跨越或已越界都接住（后者覆盖"锚点本就在工作区底以下"的奇态）
@@ -273,18 +287,20 @@ namespace GIC.Pet
             if (接触y >= 工作区底)
             {
                 接触y = 工作区底;
-                坐定(IntPtr.Zero, default); // 屏幕锚定
+                坐定(IntPtr.Zero, default, false); // 屏幕锚定
                 return;
             }
             窗口控制器.设置接触点屏幕位置(接触x, 接触y);
         }
 
-        /// <summary>落座：贴合顶边+播坐姿+登记锚点。hwnd=Zero 是屏幕锚定（任务栏顶）。</summary>
-        private void 坐定(IntPtr hwnd, RECT rect)
+        /// <summary>落座：贴合横框+播坐姿+登记锚点。hwnd=Zero 是屏幕锚定（任务栏顶，恒顶边）；
+        /// 下边=true 锚定窗口底边（坐下沿：身体在窗前、腿垂窗下——2026-08-28 补）。</summary>
+        private void 坐定(IntPtr hwnd, RECT rect, bool 下边)
         {
             状态 = 边坐状态.坐定;
             锚定窗口 = hwnd;
             锚定矩形 = rect;
+            锚定下边 = 下边 && hwnd != IntPtr.Zero;
             水平锚定比 = rect.宽 > 0 ? (接触x - rect.Left) / rect.宽 : 0.5f;
             窗口控制器.设置接触点屏幕位置(接触x, 接触y);
             窗口控制器.暂停命中烘焙 = false; // 解除暂停→2s 宽限后补烘坐姿碰撞体（既有一次性机制）
@@ -294,7 +310,7 @@ namespace GIC.Pet
             if (动作播放器 != null && 动作播放器.动作存在(坐姿动作名))
                 动作播放器.Play(坐姿动作名);
             if (打印状态日志)
-                Debug.Log($"[PetEdgeSit] 坐定 hwnd={(hwnd == IntPtr.Zero ? "屏幕(任务栏顶)" : $"0x{hwnd.ToInt64():X}")} 脚底=({接触x:F0},{接触y:F0}) 比例={水平锚定比:F2}");
+                Debug.Log($"[PetEdgeSit] 坐定 {(锚定下边 ? "底边" : "顶边")} hwnd={(hwnd == IntPtr.Zero ? "屏幕(任务栏顶)" : $"0x{hwnd.ToInt64():X}")} 脚底=({接触x:F0},{接触y:F0}) 比例={水平锚定比:F2}");
         }
 
         /// <summary>锚定窗口失效：原地开始掉落（eSheep 语义——坐着的东西没了）。

@@ -30,8 +30,8 @@ namespace GIC.Pet
     public class PetLookAtController : MonoBehaviour
     {
         [Header("引用")]
-        [Tooltip("光标来源（PetWindow 上的 PetWindowController）")]
-        [SerializeField] private PetWindowController 窗口控制器;
+        [Tooltip("光标来源（PetWindow 上的宿主控制器）。2026-08-28 类型放宽为 PetHostBase 共用基类——场景引用按字段名保留不变")]
+        [SerializeField] private PetHostBase 窗口控制器;
         [Tooltip("空 = Camera.main")] [SerializeField] private Camera 相机;
 
         [Header("跟随范围")]
@@ -170,8 +170,8 @@ namespace GIC.Pet
                 return;
             }
 
-            // 宿主分发（IPetHost，2026-08-27 批次 B）：桌面=窗口控制器字段；游戏内=PetInGameHost 注入
-            var 宿主 = 窗口控制器 != null ? (IPetHost)窗口控制器 : PetInGameHost.宿主接口;
+            // 宿主分发（IPetHost，2026-08-27 批次 B）：桌面=窗口控制器字段（PetHostBase）；游戏内=PetInGameHost 注入
+            var 宿主 = 窗口控制器 != null ? 窗口控制器 : (IPetHost)PetInGameHost.宿主接口;
             if (宿主 == null || !宿主.TryGet光标Unity屏幕位置(out Vector2 sp)) return;
 
             // 归一化偏移（-1..1）基准=头骨屏幕投影（2026-08-25 修复：原以屏幕中心为基准——

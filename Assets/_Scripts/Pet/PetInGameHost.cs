@@ -109,18 +109,22 @@ namespace GIC.Pet
             创建游戏内实例();
         }
 
-        /// <summary>游戏内实例播 Disappear 退场→销毁→拉桌面进程</summary>
+        /// <summary>游戏内实例播 Disappear 退场→销毁→拉桌面进程。
+        /// 2026-08-28 修复"退场播完后仍停留一会"：旧等待条件是 behavior.enabled（永为 true，空等满 4s
+        /// 超时才销毁，期间行为层还落回待机把派蒙"站起来"）——改为退场完成回调标志，动画播完当帧即销毁
+        /// （行为层同步加 _退场完成 冻结保持末帧，宿主控制器按 退场中 冻结拖拽/滚轮）。</summary>
         System.Collections.IEnumerator 游戏内退场后拉桌面()
         {
             if (_游戏内实例 != null)
             {
                 var behavior = _游戏内实例.GetComponentInChildren<PetBehaviorController>();
-                bool 退场接管 = behavior != null && behavior.请求退场(() => { });
+                bool 退场完成 = false;
+                bool 退场接管 = behavior != null && behavior.请求退场(() => 退场完成 = true);
                 if (退场接管)
                 {
-                    // 等退场动画播完（Disappear clip 约 2s，给 4s 超时兜底）
+                    // 等退场动画播完（回调置标志；Disappear clip 约 2s，4s 超时兜底防动画异常卡死）
                     float deadline = Time.unscaledTime + 4f;
-                    while (Time.unscaledTime < deadline && behavior != null && behavior.enabled) yield return null;
+                    while (!退场完成 && Time.unscaledTime < deadline) yield return null;
                 }
             }
             销毁游戏内实例();
