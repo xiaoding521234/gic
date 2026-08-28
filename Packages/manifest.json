@@ -44,7 +44,8 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0",
-    "cn.tuanjie.codely.bridge": "1.0.78"
+    "cn.tuanjie.codely.bridge": "1.0.78",
+    "cn.tuanjie.ai.generators": "file:C:/Users/86139/.codely-cli/extensions/TJGenerators/Packages/cn.tuanjie.ai.generators"
   },
   "testables": [
     "com.besty.unity-skills"

@@ -603,6 +603,18 @@ MonoBehaviour:
     m_Key: PetFormInGame
     m_Metadata:
       m_Items: []
+  - m_Id: 9036
+    m_Key: PetApiKey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9037
+    m_Key: PetApiKeyNotSet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9038
+    m_Key: PetApiKeyInput
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

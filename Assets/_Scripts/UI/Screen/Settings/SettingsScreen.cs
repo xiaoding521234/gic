@@ -78,6 +78,7 @@ namespace GIC.UI
         public GameObject petSettings;
         public DropdownSettingItem petFormSetting;
         public DropdownSettingItem petCloseSetting; // 2026-08-27 从"其它"栏挪入"派蒙"栏
+        public ButtonSettingItem petApiKeySetting;  // 2026-08-28 对话 API Key（玩家自输，加密存储）
 
         [Header("其它设置")]
         public GameObject otherSettings;

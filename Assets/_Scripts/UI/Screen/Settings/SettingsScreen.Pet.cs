@@ -25,6 +25,35 @@ namespace GIC.UI
         {
             InitPetFormSetting();
             InitPetCloseSetting();
+            InitPetApiKeySetting();
+        }
+
+        /// <summary>对话 API Key（2026-08-28 用户拍板：玩家自输自己的 DeepSeek key，不花开发者钱）：
+        /// 按钮→输入弹窗回显脱敏 key→确认后 AES 加密存 petApiKeyCipher（明文永不落盘，PetApiKeyCrypto）。
+        /// 显示=脱敏（前6+****+后4）；空=占位"未设置"。输入弹窗空值不触发回调（OnConfirm 拒空）——
+        /// 清除 key 走删除存档或后续右键菜单，一期不做。</summary>
+        private void InitPetApiKeySetting()
+        {
+            petApiKeySetting.Setup("PetApiKey", "",
+                onClick: () =>
+                {
+                    // 回显当前明文（弹窗内可见全 key——本机用户自己输的，回显方便核对改错）
+                    string 当前明文 = GIC.Pet.PetApiKeyCrypto.解密(_saveManager.CurrentSave.petApiKeyCipher);
+                    ShowInputPanel(petApiKeySetting, 当前明文, (新值) =>
+                    {
+                        新值 = 新值.Trim();
+                        _saveManager.CurrentSave.petApiKeyCipher = GIC.Pet.PetApiKeyCrypto.加密(新值);
+                        _saveManager.SaveGame();
+                        petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.脱敏(新值));
+                    }, "PetApiKeyInput");
+                },
+                onValueConfirmed: null,
+                placeholderKey: "PetApiKeyNotSet");
+            petApiKeySetting.Initialize();
+            // 初始显示：已设置=脱敏；未设置=占位（Initialize 走 LoadValue=defaultValue=""→占位键生效需手动刷新一次）
+            string 已存明文 = GIC.Pet.PetApiKeyCrypto.解密(_saveManager.CurrentSave.petApiKeyCipher);
+            if (!string.IsNullOrEmpty(已存明文))
+                petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.脱敏(已存明文));
         }
 
         /// <summary>派蒙形态：桌面版（仅 Windows）/ 游戏画面内版。切换即时生效（PetInGameHost 热切换；

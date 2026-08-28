@@ -139,6 +139,11 @@ namespace GIC.Framework
         /// ——老档升级语义=桌面版，恰与"桌面版一直是唯一形态"的历史一致，无需版本迁移。安卓上 0 由读取侧钳为 1（Win32 不适用）。</summary>
         public int petForm = 0;
 
+        /// <summary>派蒙对话 API Key 密文（AES-128-CBC+设备指纹派生密钥，Base64(iv+ct)；空串=未设置。
+        /// 2026-08-28 用户拍板：玩家自输自己的 DeepSeek key，存档加密存储——明文永不落盘。
+        /// 加解密/脱敏一律走 PetApiKeyCrypto，勿直接读此字段。</summary>
+        public string petApiKeyCipher = "";
+
         // 锚点位置信息
         public int currentPosition = (int)PositionName.SnezhnayaCastle;
 
@@ -172,6 +177,7 @@ namespace GIC.Framework
 
             closePetOnExit = true;
             petForm = 0;
+            petApiKeyCipher = "";
 
             currentPosition = (int)PositionName.SnezhnayaCastle;
 

@@ -606,6 +606,18 @@ MonoBehaviour:
     m_Localized: In-Game
     m_Metadata:
       m_Items: []
+  - m_Id: 9036
+    m_Localized: Chat API Key
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9037
+    m_Localized: Not Set
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9038
+    m_Localized: Enter DeepSeek API Key (sk-...)
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

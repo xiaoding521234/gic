@@ -585,7 +585,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 34115195379462144
-    m_Localized: "\u0417\u0430\u043A\u0440\u044B\u0432\u0430\u0442\u044C \u043D\u0430\u0441\u0442\u043E\u043B\u044C\u043D\u0443\u044E \u041F\u0430\u0439\u043C\u043E\u043D \u043F\u0440\u0438 \u0432\u044B\u0445\u043E\u0434\u0435"
+    m_Localized: "\u0417\u0430\u043A\u0440\u044B\u0432\u0430\u0442\u044C \u043D\u0430\u0441\u0442\u043E\u043B\u044C\u043D\u0443\u044E
+      \u041F\u0430\u0439\u043C\u043E\u043D \u043F\u0440\u0438 \u0432\u044B\u0445\u043E\u0434\u0435"
     m_Metadata:
       m_Items: []
   - m_Id: 34115195425599488
@@ -610,6 +611,19 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 36317855755087874
     m_Localized: "\u0412 \u0438\u0433\u0440\u0435"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9036
+    m_Localized: "API-\u043A\u043B\u044E\u0447 \u0447\u0430\u0442\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9037
+    m_Localized: "\u041D\u0435 \u0437\u0430\u0434\u0430\u043D"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9038
+    m_Localized: "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 DeepSeek API-\u043A\u043B\u044E\u0447
+      (sk-...)"
     m_Metadata:
       m_Items: []
   references:

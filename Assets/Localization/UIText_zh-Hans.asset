@@ -606,6 +606,18 @@ MonoBehaviour:
     m_Localized: "\u6E38\u620F\u753B\u9762\u5185"
     m_Metadata:
       m_Items: []
+  - m_Id: 9036
+    m_Localized: "\u5BF9\u8BDD API Key"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9037
+    m_Localized: "\u672A\u8BBE\u7F6E"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9038
+    m_Localized: "\u8F93\u5165 DeepSeek API Key\uFF08sk-\u2026\uFF09"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

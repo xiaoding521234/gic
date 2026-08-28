@@ -63,6 +63,10 @@ namespace GIC.Pet
         [SerializeField] private float 坐定底部偏移 = 0.045f;
         [Tooltip("落座后逐帧贴正骨盆的时长（秒）——与桌面版 坐定贴正秒 同参：站→坐姿势过渡期骨盆渐降，逐帧钉回坐线=平滑落座观感（旧版一次性摆位无贴正）")]
         [SerializeField] private float 坐定贴正秒 = 1.2f;
+        [Tooltip("坐定中滚轮缩放时切回的站立待机动作（桌面版 PetEdgeSitController.站立动作名 同参——缩放露馅修正：模型绕脚底长高，骨盆钉坐线的位置不动→屁股浮离坐线；缩放稳定后重新落座）")]
+        [SerializeField] private string 站立动作名 = "Ani_NPC_Kanban_Paimon_Standby";
+        [Tooltip("坐定中缩放后等多久算稳定（秒）——平滑过渡结束+宽限后重新落座（桌面版 0.3s 同参）")]
+        [SerializeField] private float 缩放稳定宽限秒 = 0.3f;
 
         // ---- 运行时状态 ----
         private RenderTexture _rt;
@@ -84,6 +88,10 @@ namespace GIC.Pet
         private bool _屏幕坐定中;
         private float _坐定x;               // 贴正期保持的水平位置
         private float _贴正截止时刻 = -10f;  // 坐定贴正秒 内逐帧钉骨盆到坐线（站→坐过渡平滑）
+        // 坐定中缩放重坐（桌面版 缩放调整中 状态的等价，2026-08-28 移植）
+        private bool _缩放调整中;
+        private float _上次缩放 = -1f;      // 坐定中监听的目标缩放（-1=未初始化）
+        private float _缩放稳定时刻 = -10f;  // 缩放过渡结束后的重新落座时刻（<0=未起算）
         /// <summary>屏幕坐定中（兼容保留的公开查询）</summary>
         public bool 屏幕坐定中 => _屏幕坐定中;
         /// <summary>坐姿动作名（兼容保留的公开查询）</summary>
@@ -92,7 +100,6 @@ namespace GIC.Pet
         public override bool 正在拖拽 => 拖拽中 || 物理交互中;
         public override bool 坐定中 => _屏幕坐定中;
         public override string 坐姿动作 => 坐姿动作名;
-
         protected override string 日志标签 => "[PetInGame]";
 
         void Awake()
@@ -249,7 +256,53 @@ namespace GIC.Pet
             }
             挡板切换帧(modelHit);
             坐定贴正帧();
+            坐定缩放重坐帧();
             if (待写入时刻 > 0f && Time.unscaledTime >= 待写入时刻) 写入存档();
+        }
+
+        /// <summary>坐定中缩放重坐（桌面版 PetEdgeSitController 缩放调整中 状态的等价，2026-08-28 移植）：
+        /// 模型绕脚底长高而坐线不动，坐定中滚轮缩放→屁股浮离坐线（放大上浮/缩小下沉）。处理=坐定中
+        /// 检测目标缩放变化→切站立待机+清坐定标志→缩放平滑落稳+宽限后按原水平位重新落座（贴正钉回）。</summary>
+        void 坐定缩放重坐帧()
+        {
+            if (_缩放调整中)
+            {
+                if (!Mathf.Approximately(目标缩放, _上次缩放)) { _上次缩放 = 目标缩放; _缩放稳定时刻 = -10f; } // 连续滚轮：重等稳定
+                if (缩放过渡中()) { _缩放稳定时刻 = -10f; return; }               // 平滑过渡进行中
+                if (_缩放稳定时刻 < 0f) { _缩放稳定时刻 = Time.unscaledTime + Mathf.Max(0f, 缩放稳定宽限秒); return; } // 刚到位，宽限
+                if (Time.unscaledTime < _缩放稳定时刻) return;
+                _缩放调整中 = false;
+                重新落座();
+                return;
+            }
+            if (!_屏幕坐定中) return;
+            if (!Mathf.Approximately(目标缩放, _上次缩放))
+            {
+                _上次缩放 = 目标缩放;
+                _缩放调整中 = true;
+                _缩放稳定时刻 = -10f;
+                _屏幕坐定中 = false; // 行为层待机切回站立（切动画见下）
+                var swapper = paimon根 != null ? paimon根.GetComponent<PetAnimSwapper>() : null;
+                if (swapper != null && swapper.动作存在(站立动作名))
+                    swapper.Play(站立动作名);
+                Debug.Log("[PetInGame] 坐定中缩放：切站立待机，稳定后重新落座");
+            }
+        }
+
+        /// <summary>缩放显示值未追上目标（对齐桌面版 缩放过渡中 语义）</summary>
+        bool 缩放过渡中() => !Mathf.Approximately(显示缩放, 目标缩放);
+
+        /// <summary>按原水平位重新落座（缩放后骨盆高度变了，重新贴坐线）</summary>
+        void 重新落座()
+        {
+            _屏幕坐定中 = true;
+            _坐定x = Mathf.Clamp01(_坐定x);
+            摆位到归一化(new Vector2(_坐定x, 坐定底部偏移));
+            _贴正截止时刻 = Time.unscaledTime + 坐定贴正秒;
+            _上次缩放 = 目标缩放;
+            var swapper = paimon根 != null ? paimon根.GetComponent<PetAnimSwapper>() : null;
+            if (swapper != null && swapper.动作存在(坐姿动作名))
+                swapper.Play(坐姿动作名);
         }
 
         /// <summary>坐定贴正（桌面版 坐定帧 的贴正段同构）：落座后 坐定贴正秒 内逐帧把骨盆钉在
@@ -343,6 +396,7 @@ namespace GIC.Pet
         {
             拖拽中 = true;
             _屏幕坐定中 = false; // 被拖=立即解除坐定
+            _缩放调整中 = false; // 缩放重坐流程一并取消（拖走了自然不重坐）
             拖拽起手指针RT = 指针RT();
             快照拖拽基准(false); // 根旋转基准（模型位置=拖拽结果，不快照还原基准）
             拖拽起手骨盆RT = 派蒙相机.WorldToScreenPoint(_骨盆.position);
@@ -405,6 +459,8 @@ namespace GIC.Pet
             摆位到归一化(new Vector2(_坐定x, 坐定底部偏移));
             _屏幕坐定中 = true;
             _贴正截止时刻 = Time.unscaledTime + 坐定贴正秒;
+            _上次缩放 = 目标缩放; // 落座时同步当前倍率（防陈旧值立即误触发缩放重坐）
+            _缩放调整中 = false;
             // 播坐姿动画
             var swapper = paimon根.GetComponent<PetAnimSwapper>();
             if (swapper != null && swapper.动作存在(坐姿动作名))
