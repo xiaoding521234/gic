@@ -58,6 +58,8 @@ namespace GIC.Pet
         [DllImport("user32.dll")] internal static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         [DllImport("user32.dll")] internal static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+        [DllImport("user32.dll")] internal static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd); // Z 序导航（GW_HWNDPREV=紧邻上方窗口）
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
 
         // ───────────── dwmapi / kernel32 ─────────────
 
@@ -81,9 +83,12 @@ namespace GIC.Pet
         internal const int WS_EX_TOOLWINDOW = 0x00000080;
         internal const uint LWA_COLORKEY = 0x00000001;
         internal const uint SWP_NOSIZE = 0x0001;
+        internal const uint SWP_NOMOVE = 0x0002;
         internal const uint SWP_NOZORDER = 0x0004;
+        internal const uint SWP_NOACTIVATE = 0x0010;
         internal const uint SWP_SHOWWINDOW = 0x0040;
         internal const uint SWP_FRAMECHANGED = 0x0020;
+        internal const uint GW_HWNDPREV = 3; // GetWindow：Z 序中紧邻上方窗口（链顶返回 NULL）
         internal const uint SPI_GETWORKAREA = 0x0030;
         internal const int SM_XVIRTUALSCREEN = 76;
         internal const int SM_YVIRTUALSCREEN = 77;

@@ -174,6 +174,8 @@ namespace GIC.Pet
         private HookProc _mouseHookProc; // 防 GC 回收委托
         private float _hookKeepUntil = -10f; // 滞回：离开模型 0.5s 后才摘钩
         private float _上次窗口体检 = -10f;  // 防隐形守卫低频节流（0.5s 一次）
+        private float _上次置顶检查 = -10f;  // 置顶守卫低频节流（0.5s 一次）
+        private readonly System.Text.StringBuilder _类名缓存 = new System.Text.StringBuilder(64); // GetClassName 复用（置顶守卫）
         private static int _pendingWheelDelta; // 钩子线程累加写入，Update 主线程取走清零（120=一格）
 
         // Win32 互操作（DllImport/结构体/常量）集中在 PetWin32 —— 见文件头 using static
@@ -689,6 +691,11 @@ namespace GIC.Pet
         {
             if (!restyled) return;
 
+            // 置顶守卫（2026-08-28）：点击任务栏等 shell 窗口激活会被抬到 topmost 链内我们之上——
+            // 坐任务栏时派蒙下半身被任务栏遮挡的根因。退场动画期间同样守卫（Disappear 被
+            // 任务栏盖住半截更难看），故置于 已请求退出 早退之前
+            置顶守卫帧();
+
             // 退出请求检测（2026-08-28：热切换→游戏内形态时主进程写 quit_request 文件，
             // 桌宠进程检测到后播 Disappear 退场动画再退出，非硬杀）
             if (!已请求退出 && PetSingleInstance.HasQuitRequest())
@@ -716,6 +723,36 @@ namespace GIC.Pet
             缩放平滑帧();
             穿透切换帧(modelHit);
             存档防抖帧();
+        }
+
+        /// <summary>置顶守卫（2026-08-28）：点击任务栏/开始菜单等 shell 激活时，Windows 会把任务栏
+        /// 抬到 topmost 链内我们之上（同为 WS_EX_TOPMOST 的窗口间 Z 序重排，EXSTYLE 位不变）——
+        /// 派蒙坐任务栏时下半身被任务栏遮挡的根因（用户实测报障）。0.5s 低频检测：沿 Z 序向上走
+        /// 几步查有没有 Shell_TrayWnd/Shell_SecondaryTrayWnd 插进来，有→重设 HWND_TOPMOST 挂回
+        /// 链顶（SWP_NOACTIVATE 不抢焦点，NOMOVE|NOSIZE 不动位置）。**只对任务栏类窗口触发**：
+        /// 不与其它 topmost 应用（置顶播放器/截图工具等）打 Z 序战争——对方也周期重设会死循环。
+        /// 恒在链顶时 GW_HWNDPREV 返回 NULL，零写放大。VPet 源码核验：其 Topmost 一次性设置无守卫
+        /// （WPF 同款问题），它无"坐任务栏"场景故未暴露——本项目边缘坐强需求此守卫。</summary>
+        private void 置顶守卫帧()
+        {
+            if (Time.unscaledTime - _上次置顶检查 < 0.5f) return;
+            _上次置顶检查 = Time.unscaledTime;
+
+            IntPtr above = GetWindow(hwnd, GW_HWNDPREV);
+            for (int i = 0; i < 8 && above != IntPtr.Zero; i++)
+            {
+                _类名缓存.Clear();
+                if (GetClassName(above, _类名缓存, _类名缓存.Capacity) > 0)
+                {
+                    string cls = _类名缓存.ToString();
+                    if (cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd")
+                    {
+                        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                        return;
+                    }
+                }
+                above = GetWindow(above, GW_HWNDPREV); // 继续向上找（任务栏可能不紧邻）
+            }
         }
 
         /// <summary>防隐形守卫（2026-08-26）：Win+D/显示桌面/显示器休眠重排等系统事件会把窗口停靠到

@@ -53,12 +53,16 @@ namespace GIC.Pet
         [SerializeField] private float 防丢边距 = 0.05f;
 
         [Header("屏幕边缘坐（游戏内形态专属，桌面版走 PetEdgeSitController）")]
-        [Tooltip("松手时骨盆距屏幕底部多少归一化距离内触发坐（0.15=底部 15% 区域）")]
-        [SerializeField] private float 坐触发范围 = 0.15f;
+        [Tooltip("松手时骨盆在坐线上方多少屏幕像素内触发坐（与桌面版 PetEdgeSitController 同参 120px；旧 0.15 归一化在高分屏≈300px+ 太大）")]
+        [SerializeField] private float 上吸附范围像素 = 120f;
+        [Tooltip("坐线下方多少屏幕像素内松手也算坐（与桌面版同参 60px；骨盆被拖出屏底一小段的兜底）")]
+        [SerializeField] private float 下吸附范围像素 = 60f;
         [Tooltip("坐姿动画名（与桌面版 PetEdgeSitController 同款 SitUpright）")]
         [SerializeField] private string 坐姿动作名 = "Ani_NPC_Kanban_Paimon_SitUpright";
-        [Tooltip("坐定后骨盆距屏幕底部的归一化偏移（0.0=贴底；微正值让脚不裁）")]
-        [SerializeField] private float 坐定底部偏移 = 0.02f;
+        [Tooltip("坐定后骨盆距屏幕底部的归一化偏移=坐线高度，对齐桌面版坐任务栏顶——任务栏高度随 DPI 等比（48px@96dpi≈4.4% 屏高），0.045≈任意 DPI 的任务栏顶线；旧值 0.02 目检坐得太低（沉进屏底）")]
+        [SerializeField] private float 坐定底部偏移 = 0.045f;
+        [Tooltip("落座后逐帧贴正骨盆的时长（秒）——与桌面版 坐定贴正秒 同参：站→坐姿势过渡期骨盆渐降，逐帧钉回坐线=平滑落座观感（旧版一次性摆位无贴正）")]
+        [SerializeField] private float 坐定贴正秒 = 1.2f;
 
         // ---- 运行时状态 ----
         private RenderTexture _rt;
@@ -78,6 +82,8 @@ namespace GIC.Pet
 
         // 屏幕边缘坐状态（游戏内形态专属；PetBehaviorController 经 IPetHost.坐定中 切换待机动作）
         private bool _屏幕坐定中;
+        private float _坐定x;               // 贴正期保持的水平位置
+        private float _贴正截止时刻 = -10f;  // 坐定贴正秒 内逐帧钉骨盆到坐线（站→坐过渡平滑）
         /// <summary>屏幕坐定中（兼容保留的公开查询）</summary>
         public bool 屏幕坐定中 => _屏幕坐定中;
         /// <summary>坐姿动作名（兼容保留的公开查询）</summary>
@@ -242,7 +248,18 @@ namespace GIC.Pet
                 滚轮缩放帧(modelHit);
             }
             挡板切换帧(modelHit);
+            坐定贴正帧();
             if (待写入时刻 > 0f && Time.unscaledTime >= 待写入时刻) 写入存档();
+        }
+
+        /// <summary>坐定贴正（桌面版 坐定帧 的贴正段同构）：落座后 坐定贴正秒 内逐帧把骨盆钉在
+        /// (_坐定x, 坐定底部偏移)——站→坐姿势过渡期骨盆渐降，根随之下移=她"缓缓坐进去"。
+        /// 退场中跳过（Disappear 是飞离编排，贴正会把退场动画拽回坐线）。被拖拽=拖拽起手已清坐定。</summary>
+        void 坐定贴正帧()
+        {
+            if (!_屏幕坐定中 || Time.unscaledTime >= _贴正截止时刻) return;
+            if (_行为控制器 != null && _行为控制器.退场中) return;
+            摆位到归一化(new Vector2(_坐定x, 坐定底部偏移));
         }
 
         /// <summary>分辨率变化（全屏切换/窗口拖拽 resize）→ 重建 RT+重摆位+像素比重算</summary>
@@ -367,26 +384,32 @@ namespace GIC.Pet
             标记待写入();
         }
 
-        /// <summary>屏幕底部磁吸坐（游戏内形态专属，桌面版 PetEdgeSitController 的简化等价）：
-        /// 骨盆在屏幕底部 坐触发范围 内→磁吸贴底+播 SitUpright 坐姿+置坐定标志（行为层待机切换坐姿）。
-        /// 返回 true=已落座接管。拖拽中不触发（拖拽起手已清坐定）。</summary>
+        /// <summary>屏幕底部磁吸坐（游戏内形态专属，桌面版 PetEdgeSitController 屏幕锚定分支的等价，
+        /// 参数同款）：坐线=屏底上方 坐定底部偏移（≈桌面版任务栏顶高度）；磁吸窗=坐线上 120px/下 60px
+        /// （桌面版同参，像素语义——归一化随分辨率换算，高分屏不再放大）；落座贴正 骨盆到坐线+播
+        /// SitUpright+置坐定标志。返回 true=已落座接管。拖拽中不触发（拖拽起手已清坐定）。
+        /// 坐标系注意：Unity 视口/屏幕 y=0 是**屏底**（y=1 顶部）——坐线=坐定底部偏移本身；
+        /// 2026-08-28 曾误按 y=1 为底写 `1-偏移`，磁吸窗落到屏幕顶部=拖底不坐/拖顶瞬移坐（用户实测报障）。</summary>
         bool 评估屏幕边坐()
         {
             if (_骨盆 == null || 派蒙相机 == null || 拖拽物理 == null) return false;
-            // 只在拖拽放下时触发（拖拽时长>0.3s 才算"拖到位置"非误触）
-            if (拖拽物理.本次拖拽时长 < 0.3f) return false;
             Vector3 vp = 派蒙相机.WorldToViewportPoint(_骨盆.position);
             if (vp.z <= 0f) return false;
-            if (vp.y > 坐触发范围) return false; // 不在底部范围
+            float 坐线 = 坐定底部偏移; // 视口 y=0=屏底，坐线即"屏底上方偏移量"
+            float 上范围 = 上吸附范围像素 / Mathf.Max(1f, Screen.height);
+            float 下范围 = 下吸附范围像素 / Mathf.Max(1f, Screen.height);
+            if (vp.y < 坐线 - 下范围 || vp.y > 坐线 + 上范围) return false; // 磁吸窗：坐线上 120px / 下 60px
 
-            // 磁吸：骨盆贴到屏幕底部（坐定底部偏移）
-            摆位到归一化(new Vector2(Mathf.Clamp01(vp.x), 坐定底部偏移));
+            // 磁吸：骨盆贴到坐线（贴正期逐帧钉住，见 坐定贴正帧）
+            _坐定x = Mathf.Clamp01(vp.x);
+            摆位到归一化(new Vector2(_坐定x, 坐定底部偏移));
             _屏幕坐定中 = true;
+            _贴正截止时刻 = Time.unscaledTime + 坐定贴正秒;
             // 播坐姿动画
             var swapper = paimon根.GetComponent<PetAnimSwapper>();
             if (swapper != null && swapper.动作存在(坐姿动作名))
                 swapper.Play(坐姿动作名);
-            Debug.Log($"[PetInGame] 屏幕边坐触发（骨盆y={vp.y:F2}≤{坐触发范围}）→ 播 {坐姿动作名}");
+            Debug.Log($"[PetInGame] 屏幕边坐触发（骨盆y={vp.y:F2}∈[{坐线 - 下范围:F2},{坐线 + 上范围:F2}]）→ 播 {坐姿动作名}");
             return true;
         }
 

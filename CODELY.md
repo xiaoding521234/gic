@@ -28,6 +28,7 @@
 - [2026-08-28 01:23:14] [feedback] 【UI 组件克隆到 inactive 面板=Awake 不跑陷阱】（2026-08-28 派蒙形态下拉"点了没反应"实证）：克隆 UI 条目到**初始未激活**的分栏面板（SettingsScreen 各栏）时，组件的 Awake 从未执行——凡"Awake 缓存引用"模式（如 LocalizedDropdown.Awake 里 dropdown=GetComponent）全部静默失效：if(x==null) return 式守卫不报错，选项不重建/监听不挂/值不设=条目彻底假死。语言/帧率正常只因恰在初始激活的 Display 面板。**Why:** Unity 规则 inactive 物体不跑 Awake；克隆面板默认关闭。**How to apply:** ①新条目克隆到分栏面板后必须真实点击验证（显示对了≠回调通了）；②修法=引用改惰性属性（`Dd => dropdown != null ? dropdown : (dropdown = GetComponent<T>())`），已修 LocalizedDropdown（存量 bug 连原 Other 栏 petClose 一起治愈）。
 - [2026-08-28 01:23:19] [feedback] DropdownSettingItem.Setup 的 defaultValue 框架语义=Initialize() 的显示值（非"新玩家默认"）——必须传当前存档值。传错则下拉打开即显示错项，用户点同一项 TMP_Dropdown 值不变不触发 onValueChanged=点了没反应（2026-08-27 派蒙形态首测踩坑）。另：Language/FrameRate/Resolution 全用 TextEntry(null, 静态文本)，PetForm 用 LocalizedString 是少数派——排查下拉问题时"参考帧率设置"做对照组很有效（用户教的方法：正常条目 vs 坏条目逐项 diff）。
 - [2026-08-28 14:15:33] - [2026-08-28 14:15:00] [feedback] 【ScreenBlurRendererFeature 必须按 targetTexture==null 过滤相机】（2026-08-28 游戏内派蒙开启后毛玻璃黑屏实证）：URP ScriptableRendererFeature 对所有 Game 类型相机跑——RT 相机（派蒙 PreviewCamera）的输出（模型+透明黑背景）模糊后覆盖全局 `_ScreenBlurTex`，UIBlur 面板全采样它=黑屏。**How to apply:** 任何给全局 Shader 纹理赋值的 RendererFeature 都要按 `renderingData.cameraData.targetTexture == null` 过滤（只屏幕相机参与，RT 相机跳过）。
+- [2026-08-28 21:05:54] - [2026-08-28 21:06:00] [feedback] 桥包自动升级卡死恢复法（2026-08-28 实证）：cn.tuanjie.codely.bridge 自动更 1.0.77→1.0.78 后 .com-unity-codely.json 卡 "package_updating"/unity_port=-1/心跳停更，编辑器本身空闲无日志，ShowWindow 前置触发刷新无效——唯一恢复=优雅关闭编辑器（CloseMainWindow）再用 D:\Tool\2022.3.62t11\Editor\Tuanjie.exe -projectpath 重启，90s 内桥重新注册端口（ready）。**Why**: 新包 InitializeOnLoad 需要完整编辑器重启周期才写回配置。**How to apply**: 桥 reason=package_updating 且等待>2 分钟无恢复时直接重启编辑器（先确认场景 dirty=false）；勿反复 ShowWindow 空耗。
 
 ### Project
 - [2026-08-16 19:13:23] GIC"协议核心"：同时回合制卡牌战术战棋（原神IP，最多6人，LAN联机 via Mirror）。核心循环：祈愿解锁→局前选8卡→同时选1行动→攻速排序执行→摧毁核心掠夺→原石结算。7势力可混搭，命座0-3重复出战升命。**定位**：单人开发的个人 Demo/作品集，非商业上线；目标全平台互通（PC+移动+主机）。**Why:** solo dev 资源有限，scope 必须从 GDD 雄心大幅裁剪。**How to apply:** 实现战斗/势力/经济系统时参考 docs/；优先 2人1v1 而非 6 人、2-3 势力而非 7、垂直切片优先于铺量。
@@ -87,12 +88,7 @@
 
 
 - [2026-08-28 14:53:45] [project] 游戏内派蒙持续迭代中（docs/19 §6.4）：①2026-08-28 下午共用化重构——抽 PetHostBase 基类（拎起姿势应用/四肢摆动/命中烘焙/缩放平滑/共享序列化字段；实证 [SerializeField] 字段按名移入基类场景/Prefab 引用与调参值全存活），用户拍板"两形态能共用则共用"为持久设计原则，后续新宿主功能优先落基类；②三修复：游戏内松手回待机（物理结束帧空分支漏切）、退场播完当帧销毁（behavior.enabled 永真空等 4s 陷阱→退场完成回调+行为层冻结末帧+宿主冻结交互）、桌面边坐补窗口底边（身体在窗前腿垂窗下，掉落仍只落顶边）。**等用户复测**：底边坐、游戏内松手/退场、共用化回归（桌面拖拽/缩放/边坐）。已知边界：游戏失焦 Input 冻结=拖拽/视线停住。
-
-
-
-
-
-
+- [2026-08-28 21:05:47] - [2026-08-28 21:05:00] [project] 游戏内派蒙坐三轮修正+任务栏遮挡修复（待用户目检后提交）：①坐参数对齐桌面版（磁吸上120/下60px 像素语义+坐线=屏底上方4.5%≈任务栏顶+贴正1.2s，prefab 序列化值已写）；②磁吸窗坐标轴反了（Unity 视口 y=0 是屏底不是 y=1——误写 1-偏移致"拖底不坐/拖顶瞬移坐"，教训：屏幕归一化判定先对齐 y 轴方向）；③桌面版置顶守卫（PetWindowController.置顶守卫帧：0.5s 查 Z 序上方 8 步内有无 Shell_TrayWnd/Shell_SecondaryTrayWnd→重挂 HWND_TOPMOST；只对任务栏触发不打置顶战争；根因=点击任务栏激活会被抬到 topmost 链内我们之上；VPet 无此守卫属场景未暴露）。已提交：1006438（PetHostBase 共用化+下边框坐+三修复）。
 
 ### Reference
 - [2026-08-14 10:16:21] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Picture\gichess\my\wg-0.2.d。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 需要查旧 Java 实现时按路径阅读源码。

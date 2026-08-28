@@ -6794,19 +6794,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00390cfb69281c847a68cd5bce7731d2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  "\u6D3E\u8499\u76F8\u673A": {fileID: 8642857954912725697}
   "\u62D6\u62FD\u7269\u7406": {fileID: 3972859861705368431}
-  "\u8499\u76AE\u6E32\u67D3\u5668": {fileID: 2095296151493405809}
-  "paimon\u6839": {fileID: 7945286511653141383}
-  "rt\u500D\u7387": 1
-  "\u7F29\u653E\u6700\u5C0F": 0.4
-  "\u7F29\u653E\u6700\u5927": 2
-  "\u521D\u59CB\u7F29\u653E\u500D\u7387": 0.7
-  "\u7F29\u653E\u5E73\u6ED1\u901F\u5EA6": 12
-  "\u7F29\u653E\u6B65\u8FDB": 1.05
-  "\u6700\u5927\u5C4F\u9AD8\u5360\u6BD4": 0.95
-  "\u7B49\u6548\u753B\u5E03\u903B\u8F91\u9AD8": 825
-  "\u5C4F\u5E55\u53C2\u8003\u903B\u8F91\u9AD8": 1080
   "\u9AA8\u76C6\u9AA8\u540D": Bip001 Pelvis
   "\u56DB\u80A2\u9AA8\u540D":
   - Bip001 L UpperArm
@@ -6817,7 +6805,21 @@ MonoBehaviour:
   "\u62CE\u8D77\u8F6C\u8EAB\u89D2": 45
   "\u6A2A\u8EBA\u878D\u5408\u901F\u5EA6": 7
   "\u70D8\u7119\u6062\u590D\u5BBD\u9650\u79D2": 2
+  "\u7F29\u653E\u6700\u5C0F": 0.4
+  "\u7F29\u653E\u6700\u5927": 2
+  "\u521D\u59CB\u7F29\u653E\u500D\u7387": 0.7
+  "\u7F29\u653E\u5E73\u6ED1\u901F\u5EA6": 12
+  "\u7F29\u653E\u6B65\u8FDB": 1.05
+  "paimon\u6839": {fileID: 7945286511653141383}
+  "\u6D3E\u8499\u76F8\u673A": {fileID: 8642857954912725697}
+  "rt\u500D\u7387": 1
+  "\u6700\u5927\u5C4F\u9AD8\u5360\u6BD4": 0.95
+  "\u7B49\u6548\u753B\u5E03\u903B\u8F91\u9AD8": 825
+  "\u5C4F\u5E55\u53C2\u8003\u903B\u8F91\u9AD8": 1080
   "\u9632\u4E22\u8FB9\u8DDD": 0.05
+  "\u5750\u89E6\u53D1\u8303\u56F4": 0.15
+  "\u5750\u59FF\u52A8\u4F5C\u540D": Ani_NPC_Kanban_Paimon_SitUpright
+  "\u5750\u5B9A\u5E95\u90E8\u504F\u79FB": 0.045
 --- !u!1 &7323180549741893668
 GameObject:
   m_ObjectHideFlags: 0
@@ -12276,11 +12278,6 @@ Transform:
 --- !u!4 &2069360470594090045 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1658903281961387294, guid: ceac5f2b7419cb84a9735e98307854a2, type: 3}
-  m_PrefabInstance: {fileID: 842810695530000675}
-  m_PrefabAsset: {fileID: 0}
---- !u!137 &2095296151493405809 stripped
-SkinnedMeshRenderer:
-  m_CorrespondingSourceObject: {fileID: 1630794972795428178, guid: ceac5f2b7419cb84a9735e98307854a2, type: 3}
   m_PrefabInstance: {fileID: 842810695530000675}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &2243816504398234035 stripped
