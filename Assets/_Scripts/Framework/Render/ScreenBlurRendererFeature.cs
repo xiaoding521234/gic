@@ -35,7 +35,11 @@ namespace GIC.Framework
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (renderingData.cameraData.cameraType == CameraType.Game)
+            // 仅屏幕相机参与（targetTexture==null）：RT 相机（如游戏内派蒙 PreviewCamera）的画面
+            // 不是"屏幕内容"，若也跑本 pass 会用其输出（模型+透明黑背景）覆盖全局 _ScreenBlurTex
+            // → UIBlur 面板全变黑屏（2026-08-28 游戏内派蒙开启后毛玻璃黑屏根因）。
+            if (renderingData.cameraData.cameraType == CameraType.Game
+                && renderingData.cameraData.targetTexture == null)
                 renderer.EnqueuePass(_blurPass);
         }
 

@@ -1,0 +1,623 @@
+using UnityEngine;
+using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
+
+namespace GIC.Pet
+{
+    /// <summary>
+    /// 游戏画面内版宿主控制器 v2（docs/19 §6.4，2026-08-28 全屏画布重构）——挂 PaimonInGameRoot 实例根，
+    /// 实现 IPetHost。渲染=全屏 RT 画中画：prefab 内 PreviewCamera 渲到屏幕同尺寸 RenderTexture，
+    /// DontDestroyOnLoad 的 ScreenSpaceOverlay Canvas + 全屏 RawImage 显示（高 sortingOrder 悬浮层）。
+    ///
+    /// v2 全屏画布（2026-08-28 用户拍板"画布范围=整个游戏画面"，根治放大到最大被 750×825 小画布截断）：
+    /// - 旧版：RawImage 750×825 小画布在屏幕上移动，模型在 RT 内恒定——放大超过画布即被裁。
+    /// - 新版：RT=整屏，模型根在 RT 相机视野内移动（相机静止）——视野=全屏，放大到上限也不截。
+    /// 与桌面版的窗口体制对应：桌面=固定窗口+模型在窗内演+窗口移动；游戏内=固定"窗口"=整屏+模型移动。
+    ///
+    /// 交互=全轮询（对齐桌面版 Win32 轮询语义：GetCursorPos/GetAsyncKeyState 的 Unity 等价物——
+    /// Input.mousePosition/GetMouseButton/mouseScrollDelta，不依赖 EventSystem 焦点）：
+    /// - 命中检测：光标→RT 视口→射线 vs 烘焙蒙皮 MeshCollider（像素级，桌面版同配方）
+    /// - 事件挡板：全屏透明 Image，命中派蒙时 raycastTarget=true 吃掉主游戏点击（桌面版
+    ///   WS_EX_TRANSPARENT 穿透切换的同构——命中模型=可交互不穿透，未命中=穿透到游戏 UI）
+    /// - 拖拽物理：复用 PetDragPhysicsController（四肢跟拍弹簧+挣扎），拎起姿势应用层
+    ///   （横躺/转身角平滑+根旋转绕骨盆枢轴补偿+四肢摆动 LateUpdate 叠加）完整复刻桌面版
+    ///   PetWindowController.应用物理帧——2026-08-28 修复"拖拽时不转身"（旧版只移画布无姿势）。
+    ///
+    /// 缩放基准适配：全屏视野下模型基准 localScale ×(等效画布逻辑高/屏幕参考逻辑高)（825/1080），
+    /// 保持屏幕显示尺寸与桌面版 750×825 逻辑窗口一致；缩放上限动态钳制（模型最大屏高占比 ≤95%，
+    /// 对齐桌面版"工作区 95% 预算"语义——放大到最大恰好占满屏不截断）。
+    /// 持久化：PetPrefs 游戏内字段（骨盆归一化屏幕位+缩放，分辨率无关）。
+    /// </summary>
+    public class PetInGameHostController : MonoBehaviour, IPetHost
+    {
+        [Header("引用（空=自动找）")]
+        [SerializeField] private Camera 派蒙相机;
+        [SerializeField] private PetDragPhysicsController 拖拽物理;
+        [SerializeField] private SkinnedMeshRenderer 蒙皮渲染器;
+        [SerializeField] private Transform paimon根;
+
+        [Header("全屏画布")]
+        [Tooltip("RT 超采样倍率（1=与屏幕 1:1 像素；2=4K 屏超采样，全屏 RT 体积大按需开）")]
+        [SerializeField, Range(1f, 2f)] private float rt倍率 = 1f;
+
+        [Header("缩放")]
+        [SerializeField] private float 缩放最小 = 0.4f;
+        [Tooltip("缩放倍率上限（会被 最大屏高占比 动态钳制——放大到最大恰好不截屏）")]
+        [SerializeField] private float 缩放最大 = 2f;
+        [SerializeField] private float 初始缩放倍率 = 0.7f;
+        [SerializeField] private float 缩放平滑速度 = 12f;
+        [SerializeField] private float 缩放步进 = 1.05f;
+        [Tooltip("模型最大屏高占比（动态缩放上限的预算，对齐桌面版工作区 95% 语义）")]
+        [SerializeField, Range(0.5f, 1f)] private float 最大屏高占比 = 0.95f;
+
+        [Header("基准适配（全屏视野折算）")]
+        [Tooltip("等效画布逻辑高：桌面版窗口逻辑高 825——全屏视野下模型基准缩放按 825/屏幕参考逻辑高 折算，保持屏幕显示尺寸与桌面版一致")]
+        [SerializeField] private float 等效画布逻辑高 = 825f;
+        [Tooltip("屏幕参考逻辑高（CanvasScaler 旧参考分辨率高度）")]
+        [SerializeField] private float 屏幕参考逻辑高 = 1080f;
+
+        [Header("拖拽锚点（与桌面版 PetWindowController 同骨名）")]
+        [SerializeField] private string 骨盆骨名 = "Bip001 Pelvis";
+        [SerializeField] private string[] 四肢骨名 = { "Bip001 L UpperArm", "Bip001 R UpperArm", "Bip001 L Thigh", "Bip001 R Thigh" };
+
+        [Header("拎起姿势（复刻桌面版 v6 瘫软式+3/4 偏左转身）")]
+        [Tooltip("被拎起时身体姿势基准角（度）：0=直立垂落（主流桌宠），90=头朝左横躺")]
+        [SerializeField] private float 拎起横躺角 = 0f;
+        [Tooltip("被拎起时绕竖直轴转身角（度）：45=3/4 偏左（桌面版 v6 用户参考图），0=正对玩家")]
+        [SerializeField] private float 拎起转身角 = 45f;
+        [Tooltip("横躺角/转身角淡入淡出速度（每秒指数趋近率）")]
+        [SerializeField] private float 横躺融合速度 = 7f;
+
+        [Header("命中")]
+        [Tooltip("交互结束后延迟多久补烘一次（秒）——对齐桌面版一次性补烘机制")]
+        [SerializeField] private float 烘焙恢复宽限秒 = 2f;
+        [Tooltip("松手防丢：骨盆完全出屏时拉回屏内的边距（归一化）")]
+        [SerializeField] private float 防丢边距 = 0.05f;
+
+        // ---- 运行时状态 ----
+        private RenderTexture _rt;
+        private RawImage _画面;          // 全屏显示层（raycastTarget 恒 false）
+        private Image _挡板;             // 全屏透明事件挡板（raycastTarget 动态=命中状态）
+        private MeshCollider 命中网格碰撞体;
+        private Mesh 烘焙网格;
+        private Transform _骨盆;
+        private Transform[] _四肢骨;
+
+        private float 初始缩放;           // 模型基准 localScale（prefab 值 × 全屏视野折算系数）
+        private float 目标缩放 = 1f;
+        private float 显示缩放 = 1f;
+        private float 有效缩放最大 = 2f;  // 动态上限：Min(缩放最大, 最大屏高占比×H/h)
+        private float 世界每屏幕像素;      // 相机平面世界单位 / 屏幕像素（k=H/Screen.height）
+        private Vector2Int _上次屏幕尺寸;
+
+        // 拖拽状态（对齐桌面版 PetWindowController 字段语义）
+        private bool 拖拽中;
+        private bool prevLmbDown;
+        private Vector2 拖拽起手指针RT;      // RT 像素系（鼠标×RT/屏比）
+        private Vector2 拖拽起手骨盆RT;     // 起手骨盆屏幕投影（RT 像素系）——骨盆钉位基准
+        private Quaternion 拖拽基准旋转 = Quaternion.identity;
+        private float 当前横躺角;
+        private float 当前转身角;
+
+        private float 待写入时刻 = -1f;
+        private float 烘焙恢复时刻 = -10f;
+        private bool _烘焙待补;
+        private bool _上帧烘焙被暂停;
+
+        public bool 物理交互中 => 拖拽物理 != null && 拖拽物理.交互中;
+        public bool 正在拖拽 => 拖拽中 || 物理交互中;
+        public float 拖拽秒 => 拖拽物理 != null ? 拖拽物理.本次拖拽时长 : -1f;
+        public bool 暂停命中烘焙 { get; set; }
+
+        void Awake()
+        {
+            派蒙相机 = 派蒙相机 != null ? 派蒙相机 : GetComponentInChildren<Camera>(true);
+            拖拽物理 = 拖拽物理 != null ? 拖拽物理 : GetComponentInChildren<PetDragPhysicsController>(true);
+            if (蒙皮渲染器 == null)
+            {
+                var shadowLayer = LayerMask.NameToLayer("PaimonShadow");
+                foreach (var smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                    if (!smr.name.Contains("_DropShadow") && smr.gameObject.layer != shadowLayer)
+                    { 蒙皮渲染器 = smr; break; }
+            }
+            var paimonGo = transform.Find("Paimon");
+            paimon根 = paimon根 != null ? paimon根 : (paimonGo != null ? paimonGo : transform).transform;
+
+            if (派蒙相机 != null)
+            {
+                派蒙相机.clearFlags = CameraClearFlags.SolidColor;
+                派蒙相机.backgroundColor = new Color(0, 0, 0, 0);
+                派蒙相机.allowHDR = false;
+                派蒙相机.allowMSAA = false;
+                var urpData = 派蒙相机.GetUniversalAdditionalCameraData();
+                if (urpData != null) urpData.renderPostProcessing = false;
+
+                // 透视→正交（2026-08-28 用户复测"越拖到边缘角度越大"根治）：透视投影下模型偏离光轴
+                // 即斜视畸变（视野边缘尤甚）；桌面版模型恒在窗口中心=恒正对。正交投影视线处处平行——
+                // 模型在屏内任何位置都正对玩家，且世界/屏幕像素比恒定（拖拽/缩放标尺不随位置漂移）。
+                // 可见世界高=原透视视野高（FOV 45.27 按模型距离折算），保持模型屏幕占比不变。
+                float d = Vector3.Dot(paimon根.position - 派蒙相机.transform.position, 派蒙相机.transform.forward);
+                if (d <= 0.01f) d = 1f;
+                float 透视视野高 = 2f * d * Mathf.Tan(派蒙相机.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                派蒙相机.orthographic = true;
+                派蒙相机.orthographicSize = 透视视野高 * 0.5f;
+            }
+
+            找拖拽骨骼();
+            建全屏画中画();
+            建命中代理();
+            算基准与上限();
+            恢复存档();
+        }
+
+        /// <summary>取本体骨架上的骨（排除影子壳 _DropShadow / MMD_DropShadow 下的同名骨拷贝）——桌面版同款</summary>
+        private Transform 找本体骨(string boneName)
+        {
+            foreach (var t in paimon根.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name != boneName) continue;
+                bool 影子下 = false;
+                for (var p = t.parent; p != null && !影子下; p = p.parent)
+                    if (p.name == "_DropShadow" || p.name == "MMD_DropShadow") 影子下 = true;
+                if (影子下) continue;
+                return t;
+            }
+            return null;
+        }
+
+        private void 找拖拽骨骼()
+        {
+            if (paimon根 == null) return;
+            _骨盆 = 找本体骨(骨盆骨名);
+            _四肢骨 = new Transform[四肢骨名 != null ? 四肢骨名.Length : 0];
+            int 找到 = 0;
+            for (int i = 0; i < _四肢骨.Length; i++)
+            {
+                _四肢骨[i] = 找本体骨(四肢骨名[i]);
+                if (_四肢骨[i] != null) 找到++;
+            }
+            if (找到 < _四肢骨.Length)
+                Debug.LogWarning($"[PetInGame] 四肢摆动骨缺失 {_四肢骨.Length - 找到}/{_四肢骨.Length}（缺失肢不摆动）");
+        }
+
+        /// <summary>全屏画中画：RT=屏幕尺寸×rt倍率；RawImage 铺满全屏（raycastTarget=false，
+        /// 交互走轮询）；挡板=全屏透明 Image（命中派蒙时开 raycastTarget 吃掉主游戏点击，
+        /// 未命中穿透——桌面版 WS_EX_TRANSPARENT 穿透切换的同构）。</summary>
+        void 建全屏画中画()
+        {
+            if (派蒙相机 == null) { Debug.LogWarning("[PetInGame] 无相机，画中画未建"); return; }
+
+            var canvasGo = new GameObject("PetInGameCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            canvasGo.transform.SetParent(transform, false);
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 500; // 悬浮层：高于常规 UI（弹窗走更高/独立层如需遮挡再调）
+            // ConstantPixelSize：RawImage 直接以屏幕像素铺满（全屏 RT 1:1 显示，无缩放损失）
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+
+            var imageGo = new GameObject("PetImage", typeof(RectTransform), typeof(RawImage));
+            imageGo.transform.SetParent(canvasGo.transform, false);
+            _画面 = imageGo.GetComponent<RawImage>();
+            var rt = imageGo.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            _画面.raycastTarget = false; // 显示层不吃事件——交互全走轮询+挡板
+
+            var blockerGo = new GameObject("PetEventBlocker", typeof(RectTransform), typeof(Image));
+            blockerGo.transform.SetParent(canvasGo.transform, false);
+            var brt = blockerGo.GetComponent<RectTransform>();
+            brt.anchorMin = Vector2.zero;
+            brt.anchorMax = Vector2.one;
+            brt.offsetMin = brt.offsetMax = Vector2.zero;
+            _挡板 = blockerGo.GetComponent<Image>();
+            _挡板.color = new Color(0f, 0f, 0f, 0f); // 全透明纯挡事件
+            _挡板.raycastTarget = false;             // 默认穿透；命中派蒙时逐帧开
+
+            重建RT();
+            _上次屏幕尺寸 = new Vector2Int(Screen.width, Screen.height);
+            Debug.Log($"[PetInGame] 全屏画中画建立 screen={Screen.width}x{Screen.height} rt={(int)(Screen.width * rt倍率)}x{(int)(Screen.height * rt倍率)}");
+        }
+
+        void 重建RT()
+        {
+            int w = Mathf.Max(2, Mathf.RoundToInt(Screen.width * rt倍率));
+            int h = Mathf.Max(2, Mathf.RoundToInt(Screen.height * rt倍率));
+            if (_rt != null)
+            {
+                派蒙相机.targetTexture = null;
+                _rt.Release();
+                Destroy(_rt);
+            }
+            _rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32) { filterMode = FilterMode.Bilinear };
+            _rt.Create();
+            派蒙相机.targetTexture = _rt;
+            派蒙相机.enabled = true;
+            if (_画面 != null) _画面.texture = _rt;
+        }
+
+        /// <summary>像素级命中代理（桌面版配方）：BakeMesh 烘蒙皮网格 + 同 transform MeshCollider</summary>
+        void 建命中代理()
+        {
+            if (蒙皮渲染器 == null) return;
+            var hitGo = new GameObject("_HitMeshProxy");
+            hitGo.transform.SetParent(蒙皮渲染器.transform.parent, false);
+            hitGo.transform.localPosition = 蒙皮渲染器.transform.localPosition;
+            hitGo.transform.localRotation = 蒙皮渲染器.transform.localRotation;
+            hitGo.transform.localScale = 蒙皮渲染器.transform.localScale;
+            命中网格碰撞体 = hitGo.AddComponent<MeshCollider>();
+            命中网格碰撞体.cookingOptions = MeshColliderCookingOptions.UseFastMidphase;
+            烘焙网格 = new Mesh();
+            蒙皮渲染器.BakeMesh(烘焙网格, true);
+            命中网格碰撞体.sharedMesh = 烘焙网格;
+        }
+
+        /// <summary>算基准缩放（prefab 值 × 等效画布/屏幕参考 折算——保持屏幕显示尺寸与桌面版一致）
+        /// 与动态缩放上限（模型最大屏高占比 ≤95%——放大到最大恰好不截屏）+ 世界/屏幕像素比。
+        /// 每次补烘后重算（姿势微变 h 微变，上限跟随）。</summary>
+        void 算基准与上限()
+        {
+            if (paimon根 == null || 派蒙相机 == null) return;
+            float 折算 = 屏幕参考逻辑高 > 1f ? 等效画布逻辑高 / 屏幕参考逻辑高 : 1f;
+            初始缩放 = paimon根.localScale.x * 折算;
+            世界每屏幕像素 = 取视野世界高() / Mathf.Max(1f, Screen.height);
+            更新有效缩放上限();
+        }
+
+        float 取视野世界高()
+        {
+            if (派蒙相机 == null) return 1f;
+            if (派蒙相机.orthographic) return 派蒙相机.orthographicSize * 2f; // 正交：恒定可见高
+            float d = Vector3.Dot(paimon根.position - 派蒙相机.transform.position, 派蒙相机.transform.forward);
+            if (d <= 0.01f) d = 1f;
+            return 2f * d * Mathf.Tan(派蒙相机.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        }
+
+        void 更新有效缩放上限()
+        {
+            float 上限 = 缩放最大;
+            if (命中网格碰撞体 != null && 命中网格碰撞体.sharedMesh != null)
+            {
+                float h = 命中网格碰撞体.bounds.size.y; // 世界包围盒高（烘焙姿势）
+                if (h > 0.01f)
+                {
+                    float H = 取视野世界高();
+                    上限 = Mathf.Min(上限, 最大屏高占比 * H / h);
+                }
+            }
+            有效缩放最大 = Mathf.Max(上限, 缩放最小);
+        }
+
+        void Update()
+        {
+            分辨率变化帧();
+            bool modelHit = 取命中状态(Input.mousePosition);
+            补烘命中网格帧();
+            缩放平滑帧();
+            拖拽轮询帧(modelHit);
+            滚轮缩放帧(modelHit);
+            挡板切换帧(modelHit);
+            if (待写入时刻 > 0f && Time.unscaledTime >= 待写入时刻) 写入存档();
+        }
+
+        /// <summary>分辨率变化（全屏切换/窗口拖拽 resize）→ 重建 RT+重摆位+像素比重算</summary>
+        void 分辨率变化帧()
+        {
+            if (Screen.width == _上次屏幕尺寸.x && Screen.height == _上次屏幕尺寸.y) return;
+            _上次屏幕尺寸 = new Vector2Int(Screen.width, Screen.height);
+            重建RT();
+            世界每屏幕像素 = 取视野世界高() / Mathf.Max(1f, Screen.height);
+            更新有效缩放上限();
+            // 按骨盆归一化位重摆（模型回到屏幕上原相对位置）
+            if (TryGet骨盆归一化屏幕位(out Vector2 uv)) 摆位到归一化(uv);
+            Debug.Log($"[PetInGame] 分辨率变化 → {Screen.width}x{Screen.height}，RT 重建+重摆位");
+        }
+
+        /// <summary>命中检测：屏幕光标→RT 视口→射线 vs 烘焙蒙皮碰撞体（像素级，桌面版同配方）</summary>
+        bool 取命中状态(Vector2 屏幕点)
+        {
+            if (派蒙相机 == null || 命中网格碰撞体 == null || 命中网格碰撞体.sharedMesh == null) return false;
+            if (屏幕点.x < 0f || 屏幕点.x > Screen.width || 屏幕点.y < 0f || 屏幕点.y > Screen.height) return false;
+            Ray ray = 派蒙相机.ScreenPointToRay(屏幕点);
+            return 命中网格碰撞体.Raycast(ray, out _, 100f);
+        }
+
+        /// <summary>挡板穿透切换（桌面版 穿透切换帧 同构）：命中模型或拖拽中=可交互挡板吃点击；
+        /// 其余区域点击穿透到主游戏 UI。</summary>
+        void 挡板切换帧(bool modelHit)
+        {
+            if (_挡板 == null) return;
+            bool want = modelHit || 拖拽中;
+            if (_挡板.raycastTarget != want) _挡板.raycastTarget = want;
+        }
+
+        // ---- 拖拽轮询（桌面版 拖拽与双击帧 的 Unity 轮询等价；双击退出在游戏内形态无意义）----
+
+        /// <summary>鼠标屏幕坐标 → RT 像素系（rt倍率>1 时放大）</summary>
+        Vector2 指针RT() => new Vector2(
+            Input.mousePosition.x * _rt.width / Screen.width,
+            Input.mousePosition.y * _rt.height / Screen.height);
+
+        void 拖拽轮询帧(bool modelHit)
+        {
+            if (拖拽物理 == null || _骨盆 == null || 派蒙相机 == null) return;
+            bool lmbDown = Input.GetMouseButton(0);
+            bool lmbPressed = lmbDown && !prevLmbDown;
+
+            if (!拖拽中 && modelHit && lmbPressed)
+            {
+                拖拽起手();
+            }
+
+            if (拖拽物理.交互中)
+            {
+                if (拖拽中)
+                {
+                    if (!lmbDown)
+                    {
+                        拖拽中 = false;
+                        拖拽物理.松手(); // 松手即停：骨盆冻结原地，四肢弹簧收尾归零
+                    }
+                    else
+                    {
+                        拖拽物理.每帧拖拽(指针RT(), Time.unscaledDeltaTime);
+                        应用拖拽帧();
+                    }
+                }
+                else
+                {
+                    bool 收尾完成 = !拖拽物理.每帧收尾(Time.unscaledDeltaTime);
+                    拎起姿势角帧(false);
+                    if (!拖拽物理.交互中 || 收尾完成) 物理交互收口();
+                }
+            }
+            prevLmbDown = lmbDown;
+        }
+
+        /// <summary>拖拽起手：快照指针/骨盆 RT 位+根旋转基准（收尾中被再抓不重取基准，防旋转叠加——桌面版语义）。
+        /// 物理组件喂 RT 像素系（指针与骨盆同系即可，组件内部只做差分）。</summary>
+        void 拖拽起手()
+        {
+            拖拽中 = true;
+            拖拽起手指针RT = 指针RT();
+            if (!物理交互中)
+            {
+                拖拽基准旋转 = paimon根.localRotation;
+            }
+            拖拽起手骨盆RT = 派蒙相机.WorldToScreenPoint(_骨盆.position);
+            拖拽物理.开始拖拽(拖拽起手指针RT, 拖拽起手骨盆RT);
+        }
+
+        /// <summary>拖拽应用帧（桌面版 应用物理帧+按骨盆目标定位窗口 的游戏内等价）：
+        /// ①拎起姿势根旋转（横躺/转身+挣扎，绕骨盆枢轴补偿——旋转瞬间骨盆不动）；
+        /// ②骨盆钉位（桌面版 按骨盆目标定位窗口 同构）：目标=起手骨盆+光标位移（刚体 1:1 直跟），
+        /// 根平移使骨盆投影钉到目标——Drag01 动画微动/旋转残余位移全部被吸收（桌面版靠移窗吸收，
+        /// 此处靠移根，视觉等价）。【2026-08-28 修复：旧版只直跟根位置，动画微动致骨盆漂移】</summary>
+        void 应用拖拽帧()
+        {
+            if (paimon根 == null || 派蒙相机 == null || _骨盆 == null) return;
+            // ① 姿势旋转（内含绕骨盆枢轴的旋转位移补偿）
+            拎起姿势角帧(true);
+
+            // ② 骨盆钉位：把骨盆屏幕投影钉到物理目标（起手骨盆+光标位移）
+            Vector3 当前投影 = 派蒙相机.WorldToScreenPoint(_骨盆.position);
+            Vector2 目标 = 拖拽物理.当前骨盆屏幕;
+            Vector2 dRT = 目标 - (Vector2)当前投影;
+            // RT 像素 → 屏幕像素（rt倍率>1 时缩回）→ 世界位移（k 对 x/y 同比）
+            float d屏幕x = dRT.x * Screen.width / Mathf.Max(1f, _rt.width);
+            float d屏幕y = dRT.y * Screen.height / Mathf.Max(1f, _rt.height);
+            paimon根.position += 派蒙相机.transform.right * (d屏幕x * 世界每屏幕像素)
+                               + 派蒙相机.transform.up * (d屏幕y * 世界每屏幕像素);
+        }
+
+        /// <summary>拎起姿势角平滑+根旋转应用（桌面版 应用物理帧 的旋转部分整段复刻）：
+        /// 拖拽期→拎起横躺/转身角，收尾期→0 平滑归零；旋转绕骨盆枢轴补偿（旋转后把骨盆钉回旋转前位置）。</summary>
+        void 拎起姿势角帧(bool 拖拽期)
+        {
+            if (_骨盆 == null || paimon根 == null || 拖拽物理 == null) return;
+            float 横躺目标 = 拖拽期 ? 拎起横躺角 : 0f;
+            float 转身目标 = 拖拽期 ? 拎起转身角 : 0f;
+            float k = 1f - Mathf.Exp(-横躺融合速度 * Time.unscaledDeltaTime);
+            当前横躺角 = Mathf.Lerp(当前横躺角, 横躺目标, k);
+            当前转身角 = Mathf.Lerp(当前转身角, 转身目标, k);
+
+            float 挣摆 = 拖拽物理.当前挣扎摆角;
+            float 挣扭 = 拖拽物理.当前挣扎扭角;
+            Vector3 骨盆旋转前 = _骨盆.position;
+            paimon根.localRotation = Quaternion.AngleAxis(当前横躺角 + 挣摆, Vector3.forward)
+                                   * Quaternion.AngleAxis(当前转身角 + 挣扭, Vector3.up)
+                                   * 拖拽基准旋转;
+            // 绕骨盆枢轴补偿：骨盆钉回旋转前世界位（动画微动保留，仅抵消旋转带来的位移）
+            Vector3 位移 = 骨盆旋转前 - _骨盆.position;
+            if (位移.sqrMagnitude > 1e-10f) paimon根.position += 位移;
+        }
+
+        /// <summary>物理交互收口（桌面版语义裁剪）：根旋转精确归位+骨盆钉回+松手防丢拉回+位置落盘。
+        /// （桌面版还还原根位置到基准——那是因为桌面模型位置从未被拖拽改（窗口在动）；游戏内版
+        /// 模型位置=拖拽直接结果，只还原旋转。）</summary>
+        void 物理交互收口()
+        {
+            if (paimon根 != null && _骨盆 != null)
+            {
+                Vector3 骨盆旋转前 = _骨盆.position;
+                paimon根.localRotation = 拖拽基准旋转;
+                Vector3 位移 = 骨盆旋转前 - _骨盆.position;
+                if (位移.sqrMagnitude > 1e-10f) paimon根.position += 位移;
+            }
+            当前横躺角 = 0f;
+            当前转身角 = 0f;
+            骨盆防丢拉回();
+            标记待写入();
+        }
+
+        /// <summary>松手防丢（桌面版 拖拽松手防丢拉回 同款）：骨盆完全出屏才拉回贴边（有交集=用户可及不动）</summary>
+        void 骨盆防丢拉回()
+        {
+            if (_骨盆 == null || 派蒙相机 == null) return;
+            Vector3 vp = 派蒙相机.WorldToViewportPoint(_骨盆.position);
+            if (vp.z <= 0f) return;
+            float 边 = 防丢边距;
+            if (vp.x > -边 && vp.x < 1f + 边 && vp.y > -边 && vp.y < 1f + 边) return; // 屏上或贴边
+            float nx = Mathf.Clamp(vp.x, 边, 1f - 边);
+            float ny = Mathf.Clamp(vp.y, 边, 1f - 边);
+            摆位到归一化(new Vector2(nx, ny));
+        }
+
+        /// <summary>滚轮缩放（桌面版 滚轮缩放帧 同款：仅光标命中模型时响应；只改目标倍率走平滑）</summary>
+        void 滚轮缩放帧(bool modelHit)
+        {
+            float scroll = Input.mouseScrollDelta.y;
+            if (!modelHit || Mathf.Abs(scroll) < 0.01f) return;
+            float 新缩放 = Mathf.Clamp(目标缩放 * Mathf.Pow(缩放步进, scroll), 缩放最小, 有效缩放最大);
+            if (!Mathf.Approximately(新缩放, 目标缩放))
+            {
+                目标缩放 = 新缩放;
+                标记待写入();
+            }
+        }
+
+        void 补烘命中网格帧()
+        {
+            bool 烘焙被暂停 = 暂停命中烘焙 || 物理交互中;
+            if (烘焙被暂停 && !_上帧烘焙被暂停) _烘焙待补 = true;
+            if (_上帧烘焙被暂停 && !烘焙被暂停)
+                烘焙恢复时刻 = Time.unscaledTime + Mathf.Max(0f, 烘焙恢复宽限秒);
+            _上帧烘焙被暂停 = 烘焙被暂停;
+            if (_烘焙待补 && !烘焙被暂停 && Time.unscaledTime >= 烘焙恢复时刻
+                && 蒙皮渲染器 != null && 命中网格碰撞体 != null)
+            {
+                蒙皮渲染器.BakeMesh(烘焙网格, true);
+                命中网格碰撞体.sharedMesh = null;
+                命中网格碰撞体.sharedMesh = 烘焙网格;
+                _烘焙待补 = false;
+                PetDiag.上次蒙皮重烘 = Time.unscaledTime;
+                更新有效缩放上限();
+            }
+        }
+
+        void 缩放平滑帧()
+        {
+            if (Mathf.Approximately(显示缩放, 目标缩放)) return;
+            float 步进 = 缩放平滑速度 <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * 缩放平滑速度);
+            显示缩放 += (目标缩放 - 显示缩放) * 步进;
+            if (Mathf.Abs(目标缩放 - 显示缩放) < 0.0005f) 显示缩放 = 目标缩放;
+            应用模型缩放();
+        }
+
+        void 应用模型缩放()
+        {
+            if (paimon根 == null) return;
+            float s = 初始缩放 * 显示缩放;
+            paimon根.localScale = new Vector3(s, s, s);
+        }
+
+        /// <summary>四肢摆动叠加（桌面版 LateUpdate 同款）：物理组件输出的摆动角以世界 Z 轴旋转
+        /// 叠加到四肢根骨（肩/大腿）——Animation 每帧重写骨骼姿势，本层在其上叠加一次不累积。
+        /// 交互结束后本层停止应用，动画自然覆盖残留。</summary>
+        void LateUpdate()
+        {
+            if (拖拽物理 == null || !拖拽物理.交互中 || _四肢骨 == null) return;
+            for (int i = 0; i < _四肢骨.Length; i++)
+            {
+                var 骨 = _四肢骨[i];
+                if (骨 == null) continue;
+                拖拽物理.取四肢摆动(i, out float 摆动角);
+                if (摆动角 != 0f)
+                    骨.rotation = Quaternion.AngleAxis(摆动角, Vector3.forward) * 骨.rotation;
+            }
+        }
+
+        // ---- IPetHost：光标位置（视线跟随/接近判定）----
+        // 全屏 RT 与屏幕同 aspect：光标屏幕坐标×(RT/屏幕)=RT 像素空间——视线层头骨投影/行为层
+        // 包围盒投影（WorldToScreenPoint 输出 RT 像素）同空间，两套坐标一致（2026-08-28 修复
+        // 旧版坐标系错位致视线恒满角扭转）。
+        public bool TryGet光标Unity屏幕位置(out Vector2 unityScreenPos)
+        {
+            if (_rt == null) { unityScreenPos = default; return false; }
+            float sx = (float)_rt.width / Screen.width;
+            float sy = (float)_rt.height / Screen.height;
+            Vector2 m = Input.mousePosition;
+            unityScreenPos = new Vector2(m.x * sx, m.y * sy);
+            return true;
+        }
+
+        public bool TryGet命中世界包围盒(out Bounds bounds)
+        {
+            bounds = default;
+            if (命中网格碰撞体 == null || 命中网格碰撞体.sharedMesh == null) return false;
+            bounds = 命中网格碰撞体.bounds;
+            return true;
+        }
+
+        // ---- 持久化（PetPrefs 游戏内字段：骨盆归一化屏幕位+缩放）----
+
+        bool TryGet骨盆归一化屏幕位(out Vector2 uv)
+        {
+            uv = default;
+            if (_骨盆 == null || 派蒙相机 == null) return false;
+            Vector3 vp = 派蒙相机.WorldToViewportPoint(_骨盆.position);
+            if (vp.z <= 0f) return false;
+            uv = new Vector2(vp.x, vp.y);
+            return true;
+        }
+
+        /// <summary>把骨盆摆到屏幕归一化点（0..1 左下原点）——移动模型根（相机静止全屏视野）</summary>
+        void 摆位到归一化(Vector2 uv)
+        {
+            if (_骨盆 == null || paimon根 == null || 派蒙相机 == null) return;
+            Vector3 当前RT = 派蒙相机.WorldToScreenPoint(_骨盆.position);
+            Vector3 目标RT = new Vector3(uv.x * Screen.width, uv.y * Screen.height, 当前RT.z);
+            Vector2 dRT = (Vector2)目标RT - (Vector2)当前RT;
+            // RT 像素 → 屏幕像素（rt倍率>1 时）→ 世界位移
+            float d屏幕x = dRT.x * Screen.width / Mathf.Max(1f, _rt.width);
+            float d屏幕y = dRT.y * Screen.height / Mathf.Max(1f, _rt.height);
+            paimon根.position += 派蒙相机.transform.right * (d屏幕x * 世界每屏幕像素)
+                               + 派蒙相机.transform.up * (d屏幕y * 世界每屏幕像素);
+        }
+
+        void 恢复存档()
+        {
+            var d = PetPrefs.读取();
+            目标缩放 = d.游戏内缩放 > 0f ? d.游戏内缩放 : 初始缩放倍率;
+            目标缩放 = Mathf.Clamp(目标缩放, 缩放最小, 有效缩放最大);
+            显示缩放 = 目标缩放;
+            if (初始缩放 <= 0.001f) 算基准与上限(); // Awake 顺序兜底
+            应用模型缩放();
+            // 位置：骨盆归一化屏幕位（旧版语义=画布位置，可兼容——同为屏幕归一化点）
+            if (d.游戏内位置X >= 0f)
+                摆位到归一化(new Vector2(Mathf.Clamp01(d.游戏内位置X), Mathf.Clamp01(d.游戏内位置Y)));
+            else
+                摆位到归一化(new Vector2(0.85f, 0.06f)); // 无存档：右下角（对齐桌面版停靠）
+        }
+
+        void 标记待写入() => 待写入时刻 = Time.unscaledTime + 1f;
+
+        void 写入存档()
+        {
+#if !UNITY_EDITOR
+            try
+            {
+                var d = PetPrefs.读取();
+                d.游戏内缩放 = 目标缩放;
+                if (TryGet骨盆归一化屏幕位(out Vector2 uv))
+                {
+                    d.游戏内位置X = uv.x;
+                    d.游戏内位置Y = uv.y;
+                }
+                PetPrefs.写入();
+            }
+            finally
+            {
+                待写入时刻 = -1f;
+            }
+#endif
+        }
+
+        void OnDestroy()
+        {
+            写入存档();
+            if (_rt != null) { _rt.Release(); Destroy(_rt); _rt = null; }
+        }
+    }
+}

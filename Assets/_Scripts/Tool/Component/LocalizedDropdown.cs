@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using TMPro;
 using System.Collections.Generic;
 using UnityEngine.Localization;
@@ -21,6 +21,13 @@ namespace GIC.Tool
 
         private TMP_Dropdown dropdown;
         private List<string> currentOptions = new List<string>();
+
+        /// <summary>TMP_Dropdown 惰性获取（2026-08-27 根治 inactive 面板条目失效）：
+        /// 旧实现仅 Awake 缓存——非激活面板（SettingsScreen 各分栏克隆体）里的 Awake 从未跑，
+        /// dropdown 恒 null → RefreshOptions/SetOptionsFromEntries/SetValueWithoutNotify 静默跳过
+        /// → 选项不重建/监听不挂/点了没反应（2026-08-27 派蒙形态下拉首测踩坑实证）。
+        /// RequireComponent 保证组件在则 TMP 必在，GetComponent 廉价安全。</summary>
+        private TMP_Dropdown Dd => dropdown != null ? dropdown : (dropdown = GetComponent<TMP_Dropdown>());
 
         private void Awake()
         {
@@ -45,13 +52,13 @@ namespace GIC.Tool
 
         public void RefreshOptions()
         {
-            if (dropdown == null || optionEntries == null || optionEntries.Count == 0) return;
+            if (Dd == null || optionEntries == null || optionEntries.Count == 0) return;
 
             // 保存当前选中值
-            int currentValue = dropdown.value;
+            int currentValue = Dd.value;
 
             // 清空并重建选项
-            dropdown.ClearOptions();
+            Dd.ClearOptions();
             currentOptions.Clear();
 
             var options = new List<TMP_Dropdown.OptionData>();
@@ -63,15 +70,17 @@ namespace GIC.Tool
                 options.Add(new TMP_Dropdown.OptionData(text));
             }
 
-            dropdown.AddOptions(options);
+            Dd.AddOptions(options);
 
-            // 恢复选中值
+            // 恢复选中值——必须走 WithoutNotify：Dd.value 的 setter 每次都 Invoke onValueChanged
+            // （值不变也发）。2026-08-28 实证危害：设置界面各分栏面板首次激活时本组件 Start 才跑，
+            // RefreshOptions 误触发下拉回调——派蒙形态下拉"点开派蒙栏目就热切换形态"即此路径。
             if (currentValue >= 0 && currentValue < options.Count)
-                dropdown.value = currentValue;
+                Dd.SetValueWithoutNotify(currentValue);
             else
-                dropdown.value = 0;
+                Dd.SetValueWithoutNotify(0);
 
-            dropdown.RefreshShownValue();
+            Dd.RefreshShownValue();
         }
 
         private string GetTextFromEntry(TextEntry entry)
@@ -147,9 +156,9 @@ namespace GIC.Tool
         /// </summary>
         public string GetCurrentSelectedText()
         {
-            if (dropdown == null || dropdown.value < 0 || dropdown.value >= currentOptions.Count)
+            if (Dd == null || Dd.value < 0 || Dd.value >= currentOptions.Count)
                 return "";
-            return currentOptions[dropdown.value];
+            return currentOptions[Dd.value];
         }
 
         /// <summary>
@@ -157,27 +166,23 @@ namespace GIC.Tool
         /// </summary>
         public TextEntry GetCurrentSelectedEntry()
         {
-            if (dropdown == null || dropdown.value < 0 || dropdown.value >= optionEntries.Count)
+            if (Dd == null || Dd.value < 0 || Dd.value >= optionEntries.Count)
                 return null;
-            return optionEntries[dropdown.value];
+            return optionEntries[Dd.value];
         }
 
         /// <summary>
-        /// 获取当前的 TMP_Dropdown 组件
+        /// 获取当前的 TMP_Dropdown 组件（惰性——见 Dd 属性注释，inactive 面板场景同样可用）
         /// </summary>
-        public TMP_Dropdown Dropdown => dropdown;
+        public TMP_Dropdown Dropdown => Dd;
 
         /// <summary>
         /// 获取当前选中值
         /// </summary>
         public int Value
         {
-            get => dropdown != null ? dropdown.value : 0;
-            set
-            {
-                if (dropdown != null)
-                    dropdown.value = value;
-            }
+            get => Dd != null ? Dd.value : 0;
+            set => Dd.value = value;
         }
 
         /// <summary>
@@ -185,8 +190,7 @@ namespace GIC.Tool
         /// </summary>
         public void SetValueWithoutNotify(int value)
         {
-            if (dropdown != null)
-                dropdown.SetValueWithoutNotify(value);
+            Dd.SetValueWithoutNotify(value);
         }
 
         /// <summary>
@@ -194,8 +198,7 @@ namespace GIC.Tool
         /// </summary>
         public void AddListener(UnityEngine.Events.UnityAction<int> listener)
         {
-            if (dropdown != null)
-                dropdown.onValueChanged.AddListener(listener);
+            Dd.onValueChanged.AddListener(listener);
         }
 
         /// <summary>
@@ -203,8 +206,7 @@ namespace GIC.Tool
         /// </summary>
         public void RemoveAllListeners()
         {
-            if (dropdown != null)
-                dropdown.onValueChanged.RemoveAllListeners();
+            Dd.onValueChanged.RemoveAllListeners();
         }
 
         /// <summary>
@@ -212,8 +214,7 @@ namespace GIC.Tool
         /// </summary>
         public void ClearOptions()
         {
-            if (dropdown != null)
-                dropdown.ClearOptions();
+            Dd.ClearOptions();
             optionEntries.Clear();
             currentOptions.Clear();
         }
@@ -223,22 +224,21 @@ namespace GIC.Tool
         /// </summary>
         public void SetInteractable(bool interactable)
         {
-            if (dropdown != null)
-                dropdown.interactable = interactable;
+            Dd.interactable = interactable;
         }
 
         /// <summary>
         /// 获取交互性
         /// </summary>
-        public bool IsInteractable => dropdown != null && dropdown.interactable;
+        public bool IsInteractable => Dd != null && Dd.interactable;
 
         /// <summary>
         /// 设置 caption 文本的颜色
         /// </summary>
         public void SetCaptionColor(Color color)
         {
-            if (dropdown != null && dropdown.captionText != null)
-                dropdown.captionText.color = color;
+            if (Dd.captionText != null)
+                Dd.captionText.color = color;
         }
 
         /// <summary>
@@ -246,8 +246,7 @@ namespace GIC.Tool
         /// </summary>
         public void RefreshShownValue()
         {
-            if (dropdown != null)
-                dropdown.RefreshShownValue();
+            Dd.RefreshShownValue();
         }
     }
 }

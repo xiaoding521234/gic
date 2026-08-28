@@ -133,7 +133,8 @@ namespace GIC.Pet
             var state = 目标动画[clipName];
             if (state == null || state.clip == null) return;
             state.wrapMode = 循环模式;
-            Debug.Log($"[PetAnim] 切换 {_上次播放名} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
+            if (PetMode.Enabled) // 切换诊断只在桌宠进程打（2026-08-28：游戏内派蒙形态下同一组件跑在主游戏进程，每次切换刷主游戏控制台）
+                Debug.Log($"[PetAnim] 切换 {_上次播放名} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
             _上次播放名 = clipName;
             if (惯性化器 != null && 惯性化器.启用惯性化)
             {

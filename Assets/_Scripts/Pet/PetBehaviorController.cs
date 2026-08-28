@@ -110,7 +110,10 @@ namespace GIC.Pet
 
         void Update()
         {
-            if (动作播放器 == null || 窗口控制器 == null || 相机 == null) return;
+            // 守卫按宿主判空（游戏内形态窗口控制器字段为 null，宿主由 PetInGameHost 注入——
+            // 2026-08-28 修复：原按 窗口控制器==null 早退，游戏内形态行为层全瘫只剩待机）
+            var host = 宿主;
+            if (动作播放器 == null || host == null || 相机 == null) return;
 
             // 退场收尾：退场动画播完 → 交回退出回调（进程关闭由 PetWindowController 执行）。
             // 编辑器下 Application.Quit 无效——退完落回 _单次进行中 分支自然回待机，可反复目检

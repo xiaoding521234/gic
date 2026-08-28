@@ -48,7 +48,7 @@ namespace GIC.Pet
             }
         }
 
-        /// <summary>启动分发（GameScene.Awake 读档后调用）：按存档形态初始化，不触发切换逻辑</summary>
+        /// <summary>启动分发（GameScene 读档后调用）：按存档形态初始化，不触发切换逻辑</summary>
         public static void 启动形态(int form)
         {
             form = 钳制合法形态(form);
@@ -56,6 +56,9 @@ namespace GIC.Pet
             当前形态 = form;
             if (form == 形态_游戏内)
             {
+                // 游戏内形态：杀掉残留桌面进程（上局桌面形态+closePetOnExit=关 的存活个体/手动拉起的），
+                // 保证"启动即按设置呈现"——否则桌面上会同时存在桌面窗派蒙+画中画双个体
+                PetSingleInstance.TryKillPet();
                 PetProcessLauncher.LaunchSuppressed = true; // 游戏内形态：本轮启动不拉桌面进程
                 实例.创建游戏内实例();
                 Debug.Log("[PetInGameHost] 启动形态=游戏画面内版");
@@ -114,13 +117,19 @@ namespace GIC.Pet
             }
             _游戏内实例 = Instantiate(prefab);
             DontDestroyOnLoad(_游戏内实例);
-            // 批次 B 尾段：RT 相机+RawImage 画中画+输入桥接线（当前仅实例化，行为层空转安全）
-            Debug.Log("[PetInGameHost] 游戏内实例已创建（渲染管线待接）");
+            // 宿主控制器（渲染+交互+IPetHost）——prefab 未预挂，运行时补挂（保 prefab 最小）
+            var ctrl = _游戏内实例.GetComponent<PetInGameHostController>();
+            if (ctrl == null) ctrl = _游戏内实例.AddComponent<PetInGameHostController>();
+            宿主接口 = ctrl;
+            // 实例挪到远离游戏视锥的位置（RT 相机自含视野，主游戏相机不渲染派蒙——免层管理）
+            _游戏内实例.transform.position = new Vector3(0f, 10000f, 0f);
+            Debug.Log("[PetInGameHost] 游戏内实例已创建（RT 画中画）");
         }
 
         private void 销毁游戏内实例()
         {
             if (_游戏内实例 == null) return;
+            宿主接口 = null;
             Destroy(_游戏内实例);
             _游戏内实例 = null;
         }

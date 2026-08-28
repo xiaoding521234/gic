@@ -71,13 +71,14 @@ namespace GIC.Pet
         }
 
         /// <summary>
-        /// 主进程退出钩子调用：按 pid 文件找到派蒙并结束（文件残留无害，下次覆盖）。
+        /// 关闭桌宠进程：按 pid 文件找到并结束（文件残留无害，下次覆盖）。
+        /// 调用方：主进程退出钩子（GameScene.OnApplicationQuit）；PetInGameHost.热切换形态（桌面→游戏内）。
+        /// 2026-08-28 去掉 #if !UNITY_EDITOR 守卫——编辑器内热切换同样要杀桌面版（编辑器 Play 拉起的
+        /// 桌宠也写同一份 pet.pid，杀得到；实测编辑器切游戏内=双派蒙并存就是此守卫造成）。
         /// </summary>
         public static void TryKillPet()
         {
-#if !UNITY_EDITOR
-            TryKillByPidFile(PidFilePath, "游戏退出");
-#endif
+            TryKillByPidFile(PidFilePath, "热切换/退出");
         }
 
         /// <summary>按 pid 文件结束派蒙进程（生产 pet.pid / 编辑器 Temp/_editor_pet.pid 共用一份逻辑，

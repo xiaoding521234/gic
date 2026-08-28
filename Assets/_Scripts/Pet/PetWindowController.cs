@@ -210,22 +210,12 @@ namespace GIC.Pet
         private Transform _骨盆;            // 拖拽物理锚点骨（本体骨架，排除影子壳）
         private Transform[] _四肢骨;        // 四肢摆动驱动骨（与 PetDragPhysicsController 索引约定一致）
 
-        // 独立存档（桌宠永不读写主存档，docs/19 §3.1/§5.8 约定）：{persistentDataPath}/pet.json
-        // v1（小窗体制，2026-08-25 回归）：缩放 + 窗口客户区原点（物理像素，虚拟桌面坐标系）。
-        // v2（全屏体制，已废弃）的锚点字段保留反序列化兼容：读取时换算迁移为窗口原点。
-        [Serializable] private class Pet窗口存档
-        {
-            public int 版本 = 1;
-            public float 缩放 = -1f;   // <0 = 无记录
-            public int 客户区X, 客户区Y; // 客户区原点（物理像素，虚拟桌面坐标系）
-            public bool 有位置 = false;
-            // v2 兼容字段（读旧档迁移用）
-            public float 锚点X, 锚点Y;
-            public bool 有锚点 = false;
-        }
-        private Pet窗口存档 载入存档;
+        // 统一存档（2026-08-27 用户拍板"统一 pet.json"）：桌面/游戏内形态状态共存 PetPrefs.Pet存档
+        // （v2），本控制器只读写桌面字段；旧 v1 字段由 PetPrefs 读取时迁移。锚点字段（v2 全屏体制
+        // 已废弃）的换算迁移保留在 恢复保存位置 内直接读旧文件语义已不可能（缓存统一 v2 结构）——
+        // 桌面侧迁移后的有锚点档极旧（2026-08-25 前后一周），按无位置处理=右下角停靠，可接受。
+        private PetPrefs.Pet存档 载入存档;
         private float 待写入时刻 = -1f; // >0 = 有未落盘修改（防抖：最后一次修改后 1s 写盘）
-        private string 存档路径 => Path.Combine(Application.persistentDataPath, "pet.json");
         // WH_MOUSE_LL 钩子截 WM_MOUSEWHEEL（Input.mouseScrollDelta 在窗口穿透/无焦点时常返回 0）
         private IntPtr _mouseHook = IntPtr.Zero;
         private HookProc _mouseHookProc; // 防 GC 回收委托
@@ -330,7 +320,7 @@ namespace GIC.Pet
 #if !UNITY_EDITOR
                 读取存档();
 #endif
-                目标缩放 = (载入存档 != null && 载入存档.缩放 > 0f) ? 载入存档.缩放 : 初始缩放倍率;
+                目标缩放 = (载入存档 != null && 载入存档.桌面缩放 > 0f) ? 载入存档.桌面缩放 : 初始缩放倍率;
                 显示缩放 = 目标缩放;
                 应用模型缩放();
                 蒙皮渲染器 = paimonRoot.GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -476,7 +466,7 @@ namespace GIC.Pet
         }
 
         /// <summary>恢复存档窗口位置（客户区原点，钳制到虚拟屏幕防显示器拔掉后找不到派蒙）。成功=true。
-        /// v2 锚点档（全屏体制遗留）换算迁移：锚点视口×全屏尺寸-窗口半宽高≈旧窗口原点。</summary>
+        /// v2 锚点档（全屏体制遗留）已随统一存档（PetPrefs v2）退役：桌面位置只认 桌面客户区X/Y。</summary>
         private bool 恢复保存位置()
         {
             if (hwnd == IntPtr.Zero) return false;
@@ -484,18 +474,10 @@ namespace GIC.Pet
             int clientH = 固定窗口高;
 
             int nx, ny;
-            if (载入存档 != null && 载入存档.有位置)
+            if (载入存档 != null && 载入存档.桌面有位置)
             {
-                nx = 载入存档.客户区X;
-                ny = 载入存档.客户区Y;
-            }
-            else if (载入存档 != null && 载入存档.有锚点)
-            {
-                // v2 迁移：全屏体制的骨盆视口锚点（Unity 左下原点）→ 近似窗口原点
-                int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-                int vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-                nx = Mathf.RoundToInt(载入存档.锚点X * vw) - clientW / 2;
-                ny = Mathf.RoundToInt((1f - 载入存档.锚点Y) * vh) - clientH / 2;
+                nx = 载入存档.桌面客户区X;
+                ny = 载入存档.桌面客户区Y;
             }
             else return false;
 
@@ -747,19 +729,11 @@ namespace GIC.Pet
 
         private void 读取存档()
         {
-            try
-            {
-                if (!File.Exists(存档路径)) return;
-                载入存档 = JsonUtility.FromJson<Pet窗口存档>(File.ReadAllText(存档路径));
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[PetWindow] pet.json 读取失败（按无存档处理）：{e.Message}");
-                载入存档 = null;
-            }
+            载入存档 = PetPrefs.读取(); // 统一存档（v2）：桌面/游戏内字段共存，本控制器用桌面侧
         }
 
-        /// <summary>落盘缩放+窗口位置（客户区原点）。仅在构建版有待写入时执行，编辑器恒跳过。</summary>
+        /// <summary>落盘缩放+窗口位置（客户区原点）——写进统一存档桌面字段（PetPrefs.Pet存档，
+        /// 游戏内字段不动）。仅在构建版有待写入时执行，编辑器恒跳过。</summary>
         private void 写入存档()
         {
 #if !UNITY_EDITOR
@@ -767,12 +741,12 @@ namespace GIC.Pet
             try
             {
                 var origin = 取客户区屏幕原点();
-                var data = new Pet窗口存档 { 缩放 = 目标缩放, 客户区X = origin.X, 客户区Y = origin.Y, 有位置 = true };
-                File.WriteAllText(存档路径, JsonUtility.ToJson(data, true));
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[PetWindow] pet.json 写入失败：{e.Message}");
+                var d = PetPrefs.读取();
+                d.桌面缩放 = 目标缩放;
+                d.桌面客户区X = origin.X;
+                d.桌面客户区Y = origin.Y;
+                d.桌面有位置 = true;
+                PetPrefs.写入();
             }
             finally
             {

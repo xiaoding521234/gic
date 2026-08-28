@@ -6751,6 +6751,7 @@ GameObject:
   serializedVersion: 7
   m_Component:
   - component: {fileID: 2034175169055964215}
+  - component: {fileID: 6408145670617592263}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: PaimonInGameRoot
@@ -6759,14 +6760,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &2034175169055964215
-Transform:
+--- !u!224 &2034175169055964215
+RectTransform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7268546341970444311}
-  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
@@ -6777,6 +6777,47 @@ Transform:
   - {fileID: 6750334351502316035}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &6408145670617592263
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7268546341970444311}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00390cfb69281c847a68cd5bce7731d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u6D3E\u8499\u76F8\u673A": {fileID: 8642857954912725697}
+  "\u62D6\u62FD\u7269\u7406": {fileID: 3972859861705368431}
+  "\u8499\u76AE\u6E32\u67D3\u5668": {fileID: 2095296151493405809}
+  "paimon\u6839": {fileID: 7945286511653141383}
+  "rt\u500D\u7387": 1
+  "\u7F29\u653E\u6700\u5C0F": 0.4
+  "\u7F29\u653E\u6700\u5927": 2
+  "\u521D\u59CB\u7F29\u653E\u500D\u7387": 0.7
+  "\u7F29\u653E\u5E73\u6ED1\u901F\u5EA6": 12
+  "\u7F29\u653E\u6B65\u8FDB": 1.05
+  "\u6700\u5927\u5C4F\u9AD8\u5360\u6BD4": 0.95
+  "\u7B49\u6548\u753B\u5E03\u903B\u8F91\u9AD8": 825
+  "\u5C4F\u5E55\u53C2\u8003\u903B\u8F91\u9AD8": 1080
+  "\u9AA8\u76C6\u9AA8\u540D": Bip001 Pelvis
+  "\u56DB\u80A2\u9AA8\u540D":
+  - Bip001 L UpperArm
+  - Bip001 R UpperArm
+  - Bip001 L Thigh
+  - Bip001 R Thigh
+  "\u62CE\u8D77\u6A2A\u8EBA\u89D2": 0
+  "\u62CE\u8D77\u8F6C\u8EAB\u89D2": 45
+  "\u6A2A\u8EBA\u878D\u5408\u901F\u5EA6": 7
+  "\u70D8\u7119\u6062\u590D\u5BBD\u9650\u79D2": 2
+  "\u9632\u4E22\u8FB9\u8DDD": 0.05
 --- !u!1 &7323180549741893668
 GameObject:
   m_ObjectHideFlags: 0
@@ -8186,7 +8227,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   "\u7A97\u53E3\u63A7\u5236\u5668": {fileID: 0}
-  "\u76F8\u673A": {fileID: 0}
+  "\u76F8\u673A": {fileID: 8642857954912725697}
   "\u5C4F\u5E55\u6700\u5927\u504F\u79FB": 700
   "\u6C34\u5E73\u6700\u5927\u89D2": 30
   "\u5782\u76F4\u6700\u5927\u89D2": 22
@@ -8240,7 +8281,7 @@ MonoBehaviour:
   "\u60C5\u7EEA\u63A7\u5236\u5668": {fileID: 6511879956086342942}
   "\u8FB9\u5750\u63A7\u5236\u5668": {fileID: 0}
   "\u62CE\u8D77\u52A8\u4F5C\u540D": Ani_NPC_Kanban_Paimon_Drag01
-  "\u76F8\u673A": {fileID: 0}
+  "\u76F8\u673A": {fileID: 8642857954912725697}
   "\u8499\u76AE\u6E32\u67D3\u5668": {fileID: 0}
   "\u5F85\u673A\u52A8\u4F5C\u540D": Ani_NPC_Kanban_Paimon_Standby
   "\u6253\u62DB\u547C\u52A8\u4F5C\u540D": Ani_NPC_Kanban_Paimon_Greet
@@ -12235,6 +12276,11 @@ Transform:
 --- !u!4 &2069360470594090045 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1658903281961387294, guid: ceac5f2b7419cb84a9735e98307854a2, type: 3}
+  m_PrefabInstance: {fileID: 842810695530000675}
+  m_PrefabAsset: {fileID: 0}
+--- !u!137 &2095296151493405809 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 1630794972795428178, guid: ceac5f2b7419cb84a9735e98307854a2, type: 3}
   m_PrefabInstance: {fileID: 842810695530000675}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &2243816504398234035 stripped

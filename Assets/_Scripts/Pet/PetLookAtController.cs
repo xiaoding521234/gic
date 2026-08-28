@@ -104,7 +104,7 @@ namespace GIC.Pet
                 enabled = false;
                 return;
             }
-            if (窗口控制器 == null)
+            if (窗口控制器 == null && PetInGameHost.宿主接口 == null)
             {
                 Debug.LogWarning("[PetLookAt] 窗口控制器未接线，无法取光标位置");
             }

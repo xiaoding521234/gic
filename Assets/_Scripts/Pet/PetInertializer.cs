@@ -77,8 +77,14 @@ namespace GIC.Pet
         // 诊断（2026-08-27 "所有切换可见停顿"定位）：每次捕获输出一行偏移/速度统计 +
         // 最大偏移骨的闭式衰减采样（剩余@0.1/0.2/0.3s）——从 Player.log 直接读出
         // 每次切换的"慢起步/反向起步/窗口过慢"客观形态，不再盲猜。
-        [Tooltip("打印惯性化捕获诊断（每次动作切换一行：最大骨偏移/捕获速度方向统计/衰减曲线采样）——切换手感问题定位用，平时关")]
+        // 2026-08-28 起仅桌宠进程打印（PetMode.Enabled）：同一组件随 prefab 跑进主游戏进程
+        // （游戏内派蒙形态）后，每次动作切换两行日志刷主游戏控制台（Debug.Log 在 Editor 带
+        // 堆栈提取，量大时拖慢编辑器；构建版写 Player.log）。桌宠进程诊断方法论不变。
+        [Tooltip("打印惯性化捕获诊断（每次动作切换一行：最大骨偏移/捕获速度方向统计/衰减曲线采样）——切换手感问题定位用，平时关。仅桌宠进程生效")]
         [SerializeField] private bool 打印诊断 = true;
+
+        /// <summary>诊断日志开关（运行时等效：桌宠进程才打——见 打印诊断 注释）</summary>
+        private bool 诊断允许 => 打印诊断 && PetMode.Enabled;
 
         /// <summary>惯性化是否可用（PetAnimSwapper 据此选路径：惯性化 or CrossFade 兜底）</summary>
         public bool 启用惯性化 => 启用 && enabled && 骨列表 != null && 骨列表.Count > 0;
@@ -237,7 +243,7 @@ namespace GIC.Pet
                 }
             }
 
-            if (打印诊断 && 诊_cnt > 0)
+            if (诊断允许 && 诊_cnt > 0)
             {
                 float maxDeg = 诊_maxOff * Mathf.Rad2Deg;
                 string decay = "";

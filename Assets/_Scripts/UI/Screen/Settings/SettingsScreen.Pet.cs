@@ -28,7 +28,9 @@ namespace GIC.UI
         }
 
         /// <summary>派蒙形态：桌面版（仅 Windows）/ 游戏画面内版。切换即时生效（PetInGameHost 热切换；
-        /// 桌面版在非 Windows 平台不进选项，读档侧对非法值钳为游戏内版）。</summary>
+        /// 桌面版在非 Windows 平台不进选项，读档侧对非法值钳为游戏内版）。
+        /// 注意：Setup 的 defaultValue 框架语义=Initialize() 的显示值（非"新玩家默认"）——必须传当前存档值；
+        /// 传错则下拉打开即显示错项，再点同项不触发 onValueChanged=点了没反应（2026-08-27 首测踩坑实证）。</summary>
         private void InitPetFormSetting()
         {
             var options = new List<TextEntry>();
@@ -44,14 +46,13 @@ namespace GIC.UI
             int current = 读取有效形态();
             int currentIndex = current == PET_FORM_DESKTOP ? desktopIdx : ingameIdx;
 
-            petFormSetting.Setup("PetForm", options, ingameIdx, (index) =>
+            petFormSetting.Setup("PetForm", options, currentIndex, (index) =>
             {
                 int form = index == desktopIdx ? PET_FORM_DESKTOP : PET_FORM_INGAME;
                 _saveManager.CurrentSave.petForm = form;
                 _saveManager.SaveGame();
                 GIC.Pet.PetInGameHost.热切换形态(form);
             });
-            petFormSetting.SetValue(currentIndex);
             petFormSetting.Initialize();
         }
 
@@ -77,12 +78,11 @@ namespace GIC.UI
 
             int current = _saveManager.CurrentSave.closePetOnExit ? 0 : 1;
 
-            petCloseSetting.Setup("ClosePetOnExit", options, 0, (index) =>
+            petCloseSetting.Setup("ClosePetOnExit", options, current, (index) =>
             {
                 _saveManager.CurrentSave.closePetOnExit = index == 0;
                 _saveManager.SaveGame();
             });
-            petCloseSetting.SetValue(current);
             petCloseSetting.Initialize();
         }
     }

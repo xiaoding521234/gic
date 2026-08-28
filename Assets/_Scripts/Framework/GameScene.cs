@@ -87,12 +87,6 @@ namespace GIC.Framework
             Context?.Inject(this); // 注入 GameScene 自身的 [Autowired] 字段
 
             InitSaveSettings();
-
-            // 派蒙形态分发（docs/19 §6.4，设置"派蒙"栏目）：桌面版=拉起独立进程（原逻辑）；
-            // 游戏画面内版=PetInGameHost 本进程内创建实例（其内部抑制桌面拉起）。编辑器内 Launch 为 no-op。
-            PetInGameHost.启动形态(_saveManager?.CurrentSave?.petForm ?? 0);
-            PetProcessLauncher.Launch();
-
         }
 
         private void Start()
@@ -210,6 +204,14 @@ namespace GIC.Framework
             currentRootScene = SceneType.Boot;
             CurrentScene = SceneType.Boot;
             Wargame.Instance?.Start();
+
+            // 派蒙形态分发（docs/19 §6.4，设置"派蒙"栏目）：桌面版=拉起独立进程（原逻辑）；
+            // 游戏画面内版=PetInGameHost 本进程内创建实例（其内部抑制桌面拉起）。编辑器内 Launch 为 no-op。
+            // 2026-08-28 从 Awake 挪到此处：存档加载在 SaveManager [PostConstruct]（Wargame.Start 内），
+            // Awake 时 CurrentSave.petForm 恒为默认 0（桌面版）——设置"游戏内派蒙"重启仍拉桌面版的根因。
+            PetInGameHost.启动形态(_saveManager?.CurrentSave?.petForm ?? 0);
+            PetProcessLauncher.Launch();
+
             GICLog.Info("初始化场景设置，加载 SplashScreen");
 
             // 从 Boot 场景加载 SplashScreen（Single 模式，Boot 场景被卸载，持久化管理器通过 DontDestroyOnLoad 存活）
