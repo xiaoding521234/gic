@@ -125,6 +125,12 @@ namespace GIC.Pet
 
             if (派蒙相机 != null)
             {
+                // 安全带（2026-08-28 背景"缩的很小"根因）：prefab 相机 tag 遗留 MainCamera——常驻实例
+                // 抢占 Camera.main，MainHall 的 BackgroundParallax3D.FitToScreen（正交铺屏）解析到本相机
+                // （orthoSize 0.7）会把大厅背景缩到 ~0.13 倍（编辑器直开场景 Play 无派蒙实例故正常）。
+                // prefab 已改 Untagged，此行防 prefab 被旧版本覆盖回 MainCamera。
+                if (派蒙相机.CompareTag("MainCamera")) 派蒙相机.tag = "Untagged";
+
                 派蒙相机.clearFlags = CameraClearFlags.SolidColor;
                 派蒙相机.backgroundColor = new Color(0, 0, 0, 0);
                 派蒙相机.allowHDR = false;
@@ -464,7 +470,10 @@ namespace GIC.Pet
             摆位到归一化(new Vector2(nx, ny));
         }
 
-        /// <summary>滚轮缩放（桌面版 滚轮缩放帧 同款：仅光标命中模型时响应；只改目标倍率走平滑）</summary>
+        /// <summary>滚轮缩放（桌面版 滚轮缩放帧 同款：仅光标命中模型时响应；只改目标倍率走平滑）。
+        /// 缩放改变模型尺寸→烘焙碰撞体（按旧尺寸烘的）尺寸失配=点击范围错位（放大后点视觉边缘点不中/
+        /// 缩小后周围空气误中）——目标变化时排一次延迟补烘（2026-08-28 修复"有时候点不中"）。连续滚轮
+        /// 顺延补烘时刻，落稳后一次烘到位。</summary>
         void 滚轮缩放帧(bool modelHit)
         {
             float scroll = Input.mouseScrollDelta.y;
@@ -473,6 +482,8 @@ namespace GIC.Pet
             if (!Mathf.Approximately(新缩放, 目标缩放))
             {
                 目标缩放 = 新缩放;
+                _烘焙待补 = true;                                    // 缩放改了模型尺寸：补烘碰撞体
+                烘焙恢复时刻 = Time.unscaledTime + 烘焙恢复宽限秒;    // 平滑落稳后再烘（连续滚轮顺延）
                 标记待写入();
             }
         }
@@ -589,6 +600,15 @@ namespace GIC.Pet
                 摆位到归一化(new Vector2(Mathf.Clamp01(d.游戏内位置X), Mathf.Clamp01(d.游戏内位置Y)));
             else
                 摆位到归一化(new Vector2(0.85f, 0.06f)); // 无存档：右下角（对齐桌面版停靠）
+
+            // 启动期尺寸诊断（Warning 级=Release 构建日志也可见；对齐桌宠"建成只信日志"方法论）：
+            // 一行打全尺寸链关键值，"导出包派蒙看起来远/小"类问题直接从 Player.log 读数定位
+            TryGet骨盆归一化屏幕位(out Vector2 uvDiag);
+            float 碰撞体高 = (命中网格碰撞体 != null && 命中网格碰撞体.sharedMesh != null) ? 命中网格碰撞体.bounds.size.y : -1f;
+            Debug.LogWarning($"[PetInGame] 状态 screen={Screen.width}x{Screen.height} rt={(_rt != null ? _rt.width + "x" + _rt.height : "null")} " +
+                $"ortho={派蒙相机 != null && 派蒙相机.orthographic} orthoSize={(派蒙相机 != null ? 派蒙相机.orthographicSize : -1f):F3} " +
+                $"初始缩放={初始缩放:F3} 存档缩放={d.游戏内缩放:F3} 目标={目标缩放:F3} 有效最大={有效缩放最大:F2} " +
+                $"碰撞体高={碰撞体高:F3} 骨盆UV=({uvDiag.x:F2},{uvDiag.y:F2}) k={世界每屏幕像素:F5}");
         }
 
         void 标记待写入() => 待写入时刻 = Time.unscaledTime + 1f;
