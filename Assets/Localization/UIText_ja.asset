@@ -618,6 +618,27 @@ MonoBehaviour:
     m_Localized: "DeepSeek API\u30AD\u30FC\u3092\u5165\u529B\uFF08sk-\u2026\uFF09"
     m_Metadata:
       m_Items: []
+  - m_Id: 9039
+    m_Localized: "\u30D1\u30A4\u30E2\u30F3\u306B\u4F55\u304B\u805E\u304F\u2026"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9040
+    m_Localized: "\u9001\u4FE1"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9041
+    m_Localized: "\u307E\u3060 API \u30AD\u30FC\u304C\u672A\u8A2D\u5B9A\uFF01\u8A2D\u5B9A\u2192\u30D1\u30A4\u30E2\u30F3\u2192\u4F1A\u8A71
+      API \u30AD\u30FC\u3067\u5165\u529B\u3057\u3066\u306D\u3002"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9042
+    m_Localized: "\u30D1\u30A4\u30E2\u30F3\u306E\u8A71\u304C\u7D42\u308F\u308B\u307E\u3067\u5F85\u3063\u3066\uFF01"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9043
+    m_Localized: "\u4F1A\u8A71\u30B3\u30F3\u30DD\u30FC\u30CD\u30F3\u30C8\u672A\u63A5\u7D9A"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -33,6 +33,7 @@
 - [2026-08-28 23:42:41] - [2026-08-28 23:43:00] [feedback] 桌宠商业边界拍板（2026-08-28）：LLM 费用玩家自付——设置里提供 API Key 输入条目（玩家自己的 DeepSeek key），开发者不出钱不内嵌自己的 key；存档中 key 必须加密存储（防文本编辑器裸奔）。**Why:** 个人 Demo 分发场景，开发者代付 API 费不可持续；用户明确"让玩家自己输入自己的 key，而不是花费我的钱"。**How to apply:** 一切联网 AI 功能默认玩家自带 key+加密存档；接 DeepSeek（用户指定）；不要在代码/日志/异常栈出现明文 key。
 
 - [2026-08-29 11:01:45] [2026-08-29 12:10:00] [feedback] 通用规则权威文档=docs/20-项目规范.md（2026-08-29 用户拍板建立，c5a21db 已提交）：编码命名/序列化铁律/编辑器红线/数据入口/UI 与本地化/文档维护/术语表/角色文档规范收拢于此。**Why:** 规范原先只活在 CODELY.md 记忆（不随 git 分发、人类协作者不可见）且散落各文档。**How to apply:** ①新通用规则写进 docs/20 对应小节（一行规则+指针到 skill/docs/14，不复制细节）；②CODELY.md 记忆退回记事实与决策背景；③四类分流=工作流→skill、陷阱→docs/14、决策→设计文档、通用规则→docs/20；④新会话读文档顺序=docs/17（架构）→docs/20（规范）。
+- [2026-08-29 16:41:22] [feedback] Skill 触发条件必须写得宽（2026-08-29 拍板"给所有 skill 触发条件改宽"并已全量执行）：description 要覆盖①口语化说法（用户说"改文案"而非"本地化"、"放个音乐"而非"BGM"）②症状式描述（"图加载不出来/点了没反应/为 null"）③兜底句"凡话题涉及X即激活，不确定时也激活"。**Why:** skill 激活=模型语义匹配且只看 description，措辞覆盖窄就漏激活（gic-localization 多次实证）。**How to apply:** 新建/修改任何 SKILL.md 按此三件套写触发条件；用户指出漏激活时先 activate 再干活。
 
 ### Project
 - [2026-08-16 19:13:23] GIC"协议核心"：同时回合制卡牌战术战棋（原神IP，最多6人，LAN联机 via Mirror）。核心循环：祈愿解锁→局前选8卡→同时选1行动→攻速排序执行→摧毁核心掠夺→原石结算。7势力可混搭，命座0-3重复出战升命。**定位**：单人开发的个人 Demo/作品集，非商业上线；目标全平台互通（PC+移动+主机）。**Why:** solo dev 资源有限，scope 必须从 GDD 雄心大幅裁剪。**How to apply:** 实现战斗/势力/经济系统时参考 docs/；优先 2人1v1 而非 6 人、2-3 势力而非 7、垂直切片优先于铺量。
@@ -101,6 +102,7 @@
 - [2026-08-29 11:19:28] 场景脚本接线深拷贝铁律（P10 三次返工教训）：跨场景预设含场景级 override 子物体的面板必须 Object.Instantiate(场景实例) 深拷贝；静态预设实例保存为未激活时，运行时使用前必须显式 SetActive(true)。其余（PrefabUtility 禁用/SerializedObject 赋值写法/保存重开断言闭环/编辑器红线）已收拢 docs/20 §1.3、§1.5。
 - [2026-08-29 11:19:31] 桌面版任务栏置顶守卫（2026-08-28 目检通过，a7f4320）：0.5s 查 Z 序上方 8 步内 Shell_TrayWnd/Shell_SecondaryTrayWnd→重挂 HWND_TOPMOST——只对任务栏触发，不打置顶战争；根因=点击任务栏激活被抬进 topmost 链我们之上（VPet 无此守卫属场景未暴露）。游戏内坐参数与 y=0 视口陷阱已记 docs/19 §6.4。
 - [2026-08-29 11:19:35] 【TMP_InputField 程序化构建赋值顺序陷阱】（2026-08-29 派蒙聊天 UI 两连 NRE 实证）：TMP 3.0.9 的 fontAsset/pointSize setter（SetGlobalFontAsset/SetGlobalPointSize，源码 L4593/L4605）无条件解引用 textComponent（placeholder 有判空、textComponent 没有）——程序化建输入框赋值顺序必须 textComponent→placeholder→fontAsset→pointSize。**How to apply:** 程序化 TMP 构建照此顺序；派蒙对话系统架构/密钥链路见 docs/19 §6.5，聊天 UI 其余陷阱（锚点/九切片/拖拽 NRE）见 docs/14 §14。
+- [2026-08-29 19:12:21] [project] 游戏内派蒙"点不了拖不动"已修（2026-08-29）：根因=d3149aa 引入的 SendBtn 构建代码在已有 Image 的物体上再 AddComponent<TextMeshProUGUI>（一 GameObject 一 Graphic）→失败返回 null→NRE 穿透 PetInGameHostController.Awake→**Unity 官方行为：Awake 抛异常=禁用组件**→Update（全部输入轮询）停摆。修复=①文字挪 SendBtn 子物体 Label（TMP+TextCombiner 同挂 Label）②接聊天() 加 try-catch（聊天失败只禁聊天组件，宿主交互永不陪葬）。**How to apply:** 程序化 UI 文字一律挂子物体；宿主 Awake 内可选功能调用必须 try-catch 防泄漏。同日实证：exec_runtime_script 进 Play（Boot 全游戏启动）卡死编辑器主线程（CPU 满烧+日志零增长+桥任务堆 28 个）→唯一恢复=强杀重启编辑器；纯 UI 构建验证用编辑模式直调 WireHost 即可（3 秒），已记入 gic-pet skill。
 
 ### Reference
 - [2026-08-14 10:16:21] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Picture\gichess\my\wg-0.2.d。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 需要查旧 Java 实现时按路径阅读源码。

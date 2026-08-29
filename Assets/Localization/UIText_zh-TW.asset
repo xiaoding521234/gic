@@ -610,6 +610,27 @@ MonoBehaviour:
     m_Localized: "\u8F38\u5165 DeepSeek API Key\uFF08sk-\u2026\uFF09"
     m_Metadata:
       m_Items: []
+  - m_Id: 9039
+    m_Localized: "\u554F\u6D3E\u8499\u9EDE\u4EC0\u9EBC\u2026"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9040
+    m_Localized: "\u767C\u9001"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9041
+    m_Localized: "\u9084\u6C92\u8A2D\u5B9A API Key \u54E6\uFF01\u53BB \u8A2D\u5B9A\u2192\u6D3E\u8499\u2192\u5C0D\u8A71
+      API Key \u88E1\u586B\u4E00\u500B\u5427\u3002"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9042
+    m_Localized: "\u7B49\u6D3E\u8499\u8AAA\u5B8C\u9019\u53E5\u561B\uFF01"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9043
+    m_Localized: "\u5C0D\u8A71\u7D44\u4EF6\u672A\u63A5\u7DDA"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

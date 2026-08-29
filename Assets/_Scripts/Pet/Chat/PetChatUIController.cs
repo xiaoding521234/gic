@@ -285,14 +285,22 @@ namespace GIC.Pet.Chat
             sendBtnImg.color = 用按钮素材 ? Color.white : new Color(0.83f, 0.66f, 0.34f, 0.9f); // 素材自带配色勿染色
             sendBtn.onClick.AddListener(Send);
             // 发送按钮文字=静态标签，挂 TextCombiner（语言切换即时刷新——项目 UI 本地化铁律）。
-            // TMP 直接挂 SendBtn 本体（TextCombiner.Awake 只 GetComponent 同物体，不查子级——
-            // 勿用 建文本 建子物体），再挂 Combiner+AddEntry。
-            var sendText = sendBtnObj.AddComponent<TextMeshProUGUI>();
+            // TMP 挂子物体 Label：SendBtn 本体已有 Image，一个 GameObject 只能一个 Graphic，
+            // 同物体再加 TMP 必失败（AddComponent 返回 null，2026-08-29 实证：下一行赋值 NRE
+            // 上抛穿透宿主 Awake → Unity 禁用宿主 → 拖拽/单击全灭）。TextCombiner 与 TMP
+            // 同挂 Label（Awake 里 GetComponent 同物体找得到）。
+            var sendLabelObj = new GameObject("Label", typeof(RectTransform));
+            sendLabelObj.transform.SetParent(sendBtnObj.transform, false);
+            var sendLabelRect = sendLabelObj.GetComponent<RectTransform>();
+            sendLabelRect.anchorMin = Vector2.zero;
+            sendLabelRect.anchorMax = Vector2.one;
+            sendLabelRect.offsetMin = sendLabelRect.offsetMax = Vector2.zero;
+            var sendText = sendLabelObj.AddComponent<TextMeshProUGUI>();
             sendText.font = _inputField.fontAsset;
             sendText.fontSize = 22;
             sendText.alignment = TextAlignmentOptions.Center;
             sendText.raycastTarget = false;
-            var sendCombiner = sendBtnObj.AddComponent<GIC.Tool.TextCombiner>();
+            var sendCombiner = sendLabelObj.AddComponent<GIC.Tool.TextCombiner>();
             sendCombiner.AddEntry(new UnityEngine.Localization.LocalizedString("UIText", "PetChatSend"), "");
             sendText.color = 用按钮素材 ? new Color(0.98f, 0.95f, 0.88f) : new Color(0.35f, 0.25f, 0.12f); // 素材深青底配浅字
 

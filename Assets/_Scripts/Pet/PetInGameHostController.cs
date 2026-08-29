@@ -179,12 +179,31 @@ namespace GIC.Pet
             _聊天UI = GetComponentInChildren<GIC.Pet.Chat.PetChatUIController>(true);
             if (_聊天UI == null) return;
             if (_canvas == null) return; // 无画中画（异常态）不接
-            _聊天UI.WireHost(_canvas); // 此刻才建界面（建到画中画 Canvas 下）
-            // 头锚点：头骨 → RT 相机屏幕位 → Canvas 坐标（ConstantPixelSize：canvas=屏幕像素系直通）
+            // 聊天是可选功能：构建失败绝不能上抛——本方法在 Awake 末尾，任何异常都会让 Unity
+            // 禁用整个宿主组件 → Update（全部输入轮询）停摆=点不了拖不动（2026-08-29 实证：
+            // BuildUI 里 SendBtn 的 Image+TMP 同物体冲突 NRE 一路穿透，宿主陪葬）。失败=禁用
+            // 聊天组件+置空引用，交互照常。
+            try
+            {
+                _聊天UI.WireHost(_canvas); // 此刻才建界面（建到画中画 Canvas 下）
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PetInGame] 聊天 UI 构建失败，已禁用（派蒙交互不受影响）：{e.Message}");
+                _聊天UI.enabled = false;
+                _聊天UI = null;
+                return;
+            }
+            // 头锚点：模型包围盒顶（x 跟头骨水平位）→ RT 相机屏幕位 → Canvas 坐标（ConstantPixelSize：
+            // canvas=屏幕像素系直通）。2026-08-29 修"气泡遮住头一部分"：旧版锚头骨+固定 60px 偏移——
+            // 骨锚在颈部，Q 版头高出骨锚 100px+（缩放 1.365 实测），气泡底压在头发/脸上；改锚包围盒顶
+            // =任意缩放恒在头顶之上，抬手类动作包围盒顶升高时气泡随让位（顺带正确）。
             _聊天UI.headAnchorProvider = () =>
             {
-                if (_头骨 == null || petCamera == null) return Vector2.zero;
-                Vector3 sp = petCamera.WorldToScreenPoint(_头骨.position);
+                if (petCamera == null || hitMeshCollider == null || hitMeshCollider.sharedMesh == null) return Vector2.zero;
+                var bounds = hitMeshCollider.bounds;
+                float x = _头骨 != null ? _头骨.position.x : bounds.center.x; // 水平跟头骨（歪头/侧移气泡跟脸）
+                Vector3 sp = petCamera.WorldToScreenPoint(new Vector3(x, bounds.max.y, bounds.center.z));
                 return new Vector2(sp.x * Screen.width / Mathf.Max(1f, _rt.width), sp.y * Screen.height / Mathf.Max(1f, _rt.height));
             };
             // 底锚点：模型包围盒底中心（烘焙命中碰撞体的世界包围盒）→ RT 相机屏幕位 → Canvas 坐标

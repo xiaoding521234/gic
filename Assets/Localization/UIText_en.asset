@@ -618,6 +618,27 @@ MonoBehaviour:
     m_Localized: Enter DeepSeek API Key (sk-...)
     m_Metadata:
       m_Items: []
+  - m_Id: 9039
+    m_Localized: Ask Paimon something...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9040
+    m_Localized: Send
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9041
+    m_Localized: "No API Key set yet! Add one in Settings \u2192 Paimon \u2192 Chat
+      API Key."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9042
+    m_Localized: Wait for Paimon to finish!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9043
+    m_Localized: Chat component not wired
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

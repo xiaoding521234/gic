@@ -615,6 +615,26 @@ MonoBehaviour:
     m_Key: PetApiKeyInput
     m_Metadata:
       m_Items: []
+  - m_Id: 9039
+    m_Key: PetChatPlaceholder
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9040
+    m_Key: PetChatSend
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9041
+    m_Key: PetChatNoKey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9042
+    m_Key: PetChatBusy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9043
+    m_Key: PetChatNotWired
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
