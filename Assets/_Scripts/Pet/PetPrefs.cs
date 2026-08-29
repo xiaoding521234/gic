@@ -25,7 +25,7 @@ namespace GIC.Pet
         [Serializable]
         public class Pet存档
         {
-            public int 版本 = 2;
+            public int 版本 = 3;
             // 桌面版（物理像素，虚拟桌面系）
             public float 桌面缩放 = -1f;        // <0 = 无记录
             public int 桌面客户区X, 桌面客户区Y;
@@ -33,6 +33,10 @@ namespace GIC.Pet
             // 游戏画面内版（UI 归一化坐标 0..1，分辨率无关）
             public float 游戏内缩放 = -1f;      // <0 = 无记录
             public float 游戏内位置X = -1f, 游戏内位置Y = -1f; // <0 = 无记录
+            // v3（2026-08-28 对话功能）：对话 API Key 密文（PetApiKeyCrypto AES+设备指纹）。
+            // 写入方=设置界面（主进程，同步写主存档与 pet.json）；读取方=两形态的 DeepSeekClient——
+            // 桌面进程永不读主存档（双进程铁律），靠 pet.json 这条既有共享通道拿密文（加密态传输安全）。
+            public string 对话密文 = "";
             // v1 兼容字段（旧档迁移读）
             public float 缩放 = -1f;
             public int 客户区X, 客户区Y;

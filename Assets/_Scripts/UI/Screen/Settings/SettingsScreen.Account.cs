@@ -55,8 +55,8 @@ namespace GIC.UI
             ShowInputPanel(settingItem, currentValue, callback, null);
         }
 
-        /// <summary>带自定义标题键（空=按设置项推断——玩家名/指令的既有键）</summary>
-        private void ShowInputPanel(ButtonSettingItem settingItem, string currentValue, Action<string> callback, string titleKey)
+        /// <summary>带自定义标题键（空=按设置项推断——玩家名/指令的既有键）；maxChars=输入弹窗字符上限（0=沿用弹窗默认）</summary>
+        private void ShowInputPanel(ButtonSettingItem settingItem, string currentValue, Action<string> callback, string titleKey, int maxChars = 0)
         {
             if (inputPopupPrefab == null) return;
 
@@ -67,7 +67,7 @@ namespace GIC.UI
 
             if (string.IsNullOrEmpty(titleKey))
                 titleKey = settingItem == playerNameSetting ? "ModifyName" : "InputCommand";
-            inputPopupInstance.Show(titleKey, currentValue, callback);
+            inputPopupInstance.Show(titleKey, currentValue, callback, maxChars);
         }
     }
 }

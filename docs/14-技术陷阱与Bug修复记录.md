@@ -383,5 +383,19 @@ Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropert
 - Tuanjie 下写 shader：属性值一律无引号 ASCII（`[Header(Albedo)]`），中文名放显示名里（`_Prop ("中文", Float)`）
 - 外部写 .shader 文件后验证：`AssetDatabase.ImportAsset(ForceUpdate)` + `ShaderUtil.ShaderHasError` + `GetShaderMessages`（能拿到精确行号），比 console 可靠
 
+## 14. 程序化 UI 锚点双陷阱（派蒙聊天气泡错位，2026-08-29）
+
+### 现象
+聊天输入条正确挂在派蒙模型脚底下方，回复气泡却出现在"派蒙右上方非常远"处。
+
+### 根因（两个叠加）
+1. **程序化新建 RectTransform 默认锚=画布中心**：`new GameObject("X", typeof(RectTransform))` 后不设 anchorMin/anchorMax，默认值是 (0.5,0.5) 中心锚——而代码按"左下原点画布绝对坐标"写 `anchoredPosition`（锚点提供器返回的世界投影就是这套坐标），中心锚下实际位置=画布中心+anchoredPosition，系统性偏移 **(+半屏宽, +半屏高)**，正好把气泡推到右上远处。同文件里输入条显式设了左下锚所以正常——一个设了一个没设，肉眼直接对比出差异。
+2. **找本体骨 不过滤 MMD 兜底模型**：`PetHostBase.找本体骨` 只排除影子壳（_DropShadow/MMD_DropShadow），不过滤禁用留存的 MMD 兜底模型（Paimon_arm，日文骨名系）。查 `"頭"` 命中的是**不动的 MMD 头骨**而非 GI 本体（Bip001 系）——气泡锚点追踪错误目标。
+
+### 规范
+- 程序化建 UI 元素（气泡/输入条/图标等）必须在创建后**显式设 anchorMin=anchorMax**（本项目约定=左下锚 (0,0)，anchoredPosition 即画布绝对坐标），再设 pivot——绝不信默认锚。同批创建的元素锚约定必须一致，否则跟随逻辑混用两套坐标系。
+- 按骨名找骨（找本体骨/transform.Find）先确认骨名属于**当前激活模型**的命名系：GI 官方模型=Bip001 系（骨盆 Bip001 Pelvis/头 Bip001 Head），MMD=日文系（全ての親/頭）；PetLookAtController 的头骨名走 Inspector 序列化值按模型切换配置，新代码找骨照此办理，勿硬编码另一个模型的骨名。
+
+
 
 

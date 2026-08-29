@@ -42,10 +42,16 @@ namespace GIC.UI
                     ShowInputPanel(petApiKeySetting, 当前明文, (新值) =>
                     {
                         新值 = 新值.Trim();
-                        _saveManager.CurrentSave.petApiKeyCipher = GIC.Pet.PetApiKeyCrypto.加密(新值);
+                        string 密文 = GIC.Pet.PetApiKeyCrypto.加密(新值);
+                        _saveManager.CurrentSave.petApiKeyCipher = 密文;
                         _saveManager.SaveGame();
+                        // 同步密文到 pet.json（桌面桌宠进程永不读主存档——靠这条共享通道取 key，
+                        // 密文传输安全；编辑器跳过=PetPrefs.写入 的既有语义）
+                        var pet档 = GIC.Pet.PetPrefs.读取();
+                        pet档.对话密文 = 密文;
+                        GIC.Pet.PetPrefs.写入();
                         petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.脱敏(新值));
-                    }, "PetApiKeyInput");
+                    }, "PetApiKeyInput", 64); // DeepSeek key=sk-+32hex 共 35 字符，64 富余（弹窗默认 16 会截断）
                 },
                 onValueConfirmed: null,
                 placeholderKey: "PetApiKeyNotSet");

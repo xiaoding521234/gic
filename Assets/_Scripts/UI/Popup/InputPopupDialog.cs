@@ -50,10 +50,13 @@ namespace GIC.UI
         /// 显示输入弹窗。
         /// </summary>
         /// <param name="titleKey">UIText 表中的本地化 Key</param>
-        public void Show(string titleKey, string currentValue, Action<string> onConfirm)
+        /// <param name="maxChars">字符上限：0=沿用 prefab 序列化值（玩家名 16）；正数=按调用方覆盖
+        /// （API Key 等长文本——2026-08-29 修"key 输不完"：prefab 上 16 截断了 35 字符的 DeepSeek key）</param>
+        public void Show(string titleKey, string currentValue, Action<string> onConfirm, int maxChars = 0)
         {
             EnsureTextCombiners();
             _titleText.SetSingleEntry(new LocalizedString("UIText", titleKey));
+            if (maxChars > 0) inputField.characterLimit = maxChars; // 先放宽上限再回显（长 key 不被截断）
             inputField.text = currentValue;
             onConfirmCallback = onConfirm;
 

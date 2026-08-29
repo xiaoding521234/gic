@@ -71,6 +71,7 @@ namespace GIC.Pet
         // ---- 运行时状态 ----
         private RenderTexture _rt;
         private RawImage _画面;          // 全屏显示层（raycastTarget 恒 false）
+        private Canvas _画布;            // 画中画 Canvas（对话 UI 接线用）
         private Image _挡板;             // 全屏透明事件挡板（raycastTarget 动态=命中状态）
         private float 世界每屏幕像素;      // 相机平面世界单位 / 屏幕像素（k=H/Screen.height）
         private Vector2Int _上次屏幕尺寸;
@@ -79,8 +80,15 @@ namespace GIC.Pet
         // 拖拽状态（对齐桌面版 PetWindowController 字段语义）
         private bool 拖拽中;
         private bool prevLmbDown;
+        private bool _按下待定;           // 命中模型已按下但未升级为拖拽（单击判定窗口内）
         private Vector2 拖拽起手指针RT;      // RT 像素系（鼠标×RT/屏比）
         private Vector2 拖拽起手骨盆RT;     // 起手骨盆屏幕投影（RT 像素系）——骨盆钉位基准
+        private float _单击按下时刻 = -10f;   // 单击（非拖拽）判定：按下时刻
+        private Vector3 _单击按下位置;        // 按下时鼠标位（<8px 位移=没拖=单击）
+
+        // 对话（2026-08-28）：单击弹输入框+流式回复气泡；组件随 prefab 预挂（素材/字体接线在 prefab）
+        private GIC.Pet.Chat.PetChatUIController _聊天UI;
+        private Transform _头骨;              // 气泡锚点（头骨屏幕投影）
 
         private float 待写入时刻 = -1f;
 
@@ -138,10 +146,45 @@ namespace GIC.Pet
             }
 
             找拖拽骨骼();
+            // 头骨锚点取 GI 本体（Bip001 系——视线层同款配置）。勿用日文名"頭"：那是 MMD 兜底模型
+            // （Paimon_arm，禁用留存）的骨名，找本体骨 只过滤影子壳不过滤它——命中后气泡锚在
+            // 不动的 MMD 头上（2026-08-29 首测气泡错位根因之一）
+            _头骨 = 找本体骨("Bip001 Head");
             建全屏画中画();
             建命中代理();
             算基准与上限();
             恢复存档();
+            接聊天();
+        }
+
+        /// <summary>对话接线（2026-08-28 docs/19 §6.5）：聊天三组件（PetChatUIController+会话+客户端）
+        /// 挂 prefab 根，素材/字体在 prefab 接线。Canvas 由宿主直传——不挪物体（2026-08-29 修单击 NRE：
+        /// 组件在 prefab 根=宿主根，旧版 SetParent 把宿主根挪进自己的子 Canvas=循环父子被拒→组件向上
+        /// 找不到 Canvas→自禁用→_输入条根 恒 null→单击必炸）。prefab 未挂（旧 prefab/裁剪安装）
+        /// =对话功能缺席，其余交互不受影响。</summary>
+        void 接聊天()
+        {
+            _聊天UI = GetComponentInChildren<GIC.Pet.Chat.PetChatUIController>(true);
+            if (_聊天UI == null) return;
+            if (_画布 == null) return; // 无画中画（异常态）不接
+            _聊天UI.宿主接线(_画布); // 此刻才建界面（建到画中画 Canvas 下）
+            // 头锚点：头骨 → RT 相机屏幕位 → Canvas 坐标（ConstantPixelSize：canvas=屏幕像素系直通）
+            _聊天UI.头部锚点提供器 = () =>
+            {
+                if (_头骨 == null || 派蒙相机 == null) return Vector2.zero;
+                Vector3 sp = 派蒙相机.WorldToScreenPoint(_头骨.position);
+                return new Vector2(sp.x * Screen.width / Mathf.Max(1f, _rt.width), sp.y * Screen.height / Mathf.Max(1f, _rt.height));
+            };
+            // 底锚点：模型包围盒底中心（烘焙命中碰撞体的世界包围盒）→ RT 相机屏幕位 → Canvas 坐标
+            // ——输入条挂在模型脚底下方（2026-08-29 布局重构：聊天 UI 跟随模型，不再钉屏底）
+            _聊天UI.底部锚点提供器 = () =>
+            {
+                if (命中网格碰撞体 == null || 派蒙相机 == null) return Vector2.zero;
+                var 包围盒 = 命中网格碰撞体.bounds;
+                Vector3 sp = 派蒙相机.WorldToScreenPoint(new Vector3(包围盒.center.x, 包围盒.min.y, 包围盒.center.z));
+                return new Vector2(sp.x * Screen.width / Mathf.Max(1f, _rt.width), sp.y * Screen.height / Mathf.Max(1f, _rt.height));
+            };
+            Debug.Log("[PetInGame] 对话已接线（单击派蒙开输入条）");
         }
 
         /// <summary>全屏画中画：RT=屏幕尺寸×rt倍率；RawImage 铺满全屏（raycastTarget=false，
@@ -156,6 +199,7 @@ namespace GIC.Pet
             var canvas = canvasGo.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 500; // 悬浮层：高于常规 UI（弹窗走更高/独立层如需遮挡再调）
+            _画布 = canvas;
             // ConstantPixelSize：RawImage 直接以屏幕像素铺满（全屏 RT 1:1 显示，无缩放损失）
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
@@ -253,6 +297,10 @@ namespace GIC.Pet
             {
                 拖拽轮询帧(modelHit);
                 滚轮缩放帧(modelHit);
+            }
+            else
+            {
+                _按下待定 = false; // 退场冻结期作废待定按下（防解冻松手误判单击）
             }
             挡板切换帧(modelHit);
             坐定贴正帧();
@@ -356,12 +404,50 @@ namespace GIC.Pet
         void 拖拽轮询帧(bool modelHit)
         {
             if (拖拽物理 == null || _骨盆 == null || 派蒙相机 == null) return;
+            // 聊天输入期：拖拽/滚轮冻结（光标点模型拖动会误触输入焦点），但**单击派蒙仍可收起输入框**
+            // （2026-08-29 修 UX 死局：旧版输入期整体 return=输入框打开后关不掉，唯一出路是发送，
+            // 发送又关输入框——用户被困"打开→发送→消失"循环）。点输入条本身不算（正常 UI 交互）。
+            bool 聊天输入中 = _聊天UI != null && _聊天UI.输入开着;
+            if (聊天输入中)
+            {
+                bool lmbDownChat = Input.GetMouseButton(0);
+                bool lmbPressedChat = lmbDownChat && !prevLmbDown;
+                if (lmbPressedChat && !_聊天UI.点在输入条上(Input.mousePosition) && 取命中状态(Input.mousePosition))
+                    _聊天UI.切换输入(); // 单击派蒙=收起输入框
+                prevLmbDown = lmbDownChat;
+                _按下待定 = false;
+                return;
+            }
             bool lmbDown = Input.GetMouseButton(0);
             bool lmbPressed = lmbDown && !prevLmbDown;
 
-            if (!拖拽中 && modelHit && lmbPressed)
+            // 按下待定（2026-08-29 修"单击也立刻摆出拖拽姿势"）：命中模型按下**不立刻起手**——按住超时
+            // （0.15s，用户拍板的单击阈值）或位移超阈值（8px）才升级为真拖拽（此刻才起手+拎起姿势+物理）；
+            // 期间松手且几乎没动=单击→切对话输入框。单击全程零姿势零物理。升级不看当前命中（按下起点
+            // 在模型上，快速甩出模型的拖拽也要能抓——桌面版"按下即抓"的同构语义）。
+            if (_按下待定)
             {
-                拖拽起手();
+                if (!lmbDown)
+                {
+                    _按下待定 = false;
+                    if (Time.unscaledTime - _单击按下时刻 <= 0.15f
+                        && (Input.mousePosition - _单击按下位置).magnitude < 8f)
+                    {
+                        _聊天UI?.切换输入();
+                    }
+                }
+                else if (Time.unscaledTime - _单击按下时刻 > 0.15f
+                         || (Input.mousePosition - _单击按下位置).magnitude >= 8f)
+                {
+                    _按下待定 = false;
+                    拖拽起手();
+                }
+            }
+            else if (!拖拽中 && modelHit && lmbPressed)
+            {
+                _按下待定 = true;
+                _单击按下时刻 = Time.unscaledTime;
+                _单击按下位置 = Input.mousePosition;
             }
 
             if (拖拽物理.交互中)
