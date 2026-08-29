@@ -68,15 +68,15 @@ namespace GIC.Pet
         [InspectorName("启用")]
         [Tooltip("关闭 = 完全走 clip 曲线")] [SerializeField] private bool enableLookAt = true;
 
-        [Header("骨骼名（2026-08-24 官方模型适配：默认 MMD 日文名，GI 官方模型配 Bip001 名）")]
+        [Header("骨骼名（2026-08-29 默认值对齐 GI 官方模型骨架——模型基底已是 GI（Bip001/+EyeBone），旧 MMD 日文名默认值是遗留；曾致命名迁移丢场景值后查骨必失败、视线跟随全灭）")]
         [InspectorName("颈骨名")]
-        [SerializeField] private string neckBoneName = "首";
+        [SerializeField] private string neckBoneName = "Bip001 Neck";
         [InspectorName("头骨名")]
-        [SerializeField] private string headBoneName = "頭";
+        [SerializeField] private string headBoneName = "Bip001 Head";
         [InspectorName("左眼球骨名")]
-        [SerializeField] private string leftEyeBoneName = "目.L";
+        [SerializeField] private string leftEyeBoneName = "+EyeBone L A01";
         [InspectorName("右眼球骨名")]
-        [SerializeField] private string rightEyeBoneName = "目.R";
+        [SerializeField] private string rightEyeBoneName = "+EyeBone R A01";
 
         // 视线静默（出场/退场等仪式动作期间，2026-08-24）：头链完全交给 clip。
         // 恢复时平滑值可能已偏离——首帧先同步到当前骨骼姿态再叠加，防视线"瞬移归位"

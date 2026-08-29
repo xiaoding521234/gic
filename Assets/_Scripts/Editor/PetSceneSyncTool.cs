@@ -142,13 +142,13 @@ namespace GIC.Editor
             var sorted = bones.OrderBy(b => b.depth).Select(b => b.t).ToList();
 
             var soI = new SerializedObject(inert);
-            var arrI = soI.FindProperty("骨列表");
+            var arrI = soI.FindProperty("boneList");
             arrI.arraySize = sorted.Count;
             for (int i = 0; i < sorted.Count; i++) arrI.GetArrayElementAtIndex(i).objectReferenceValue = sorted[i];
             soI.ApplyModifiedPropertiesWithoutUndo();
 
             var soS = new SerializedObject(swapper);
-            var pRef = soS.FindProperty("惯性化器");
+            var pRef = soS.FindProperty("inertializer");
             if (pRef.objectReferenceValue == null)
             {
                 pRef.objectReferenceValue = inert;

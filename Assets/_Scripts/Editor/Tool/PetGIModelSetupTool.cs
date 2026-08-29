@@ -481,14 +481,14 @@ namespace GIC.Editor
             if (ctrl != null)
             {
                 var so = new SerializedObject(ctrl);
-                var prop = so.FindProperty("影子渲染器");
+                var prop = so.FindProperty("shadowRenderer");
                 var firstSmr = shell.GetComponentInChildren<SkinnedMeshRenderer>(true);
                 if (prop != null && firstSmr != null && prop.objectReferenceValue != firstSmr)
                 {
                     prop.objectReferenceValue = firstSmr;
                     log.AppendLine("阴影控制器引用已改绑 GI 壳");
                 }
-                var en = so.FindProperty("启用");
+                var en = so.FindProperty("enableShadow");
                 if (en != null && !en.boolValue)
                 {
                     en.boolValue = true;

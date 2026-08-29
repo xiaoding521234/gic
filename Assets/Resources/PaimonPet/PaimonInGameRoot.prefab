@@ -6839,8 +6839,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7c782401da008054eaa24555afc9f2c0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  endpoint: https://api.deepseek.com
-  modelName: deepseek-v4-flash
+  endpointOverride: 
+  modelOverride: 
   temperature: 0.8
   apiKeyOverride: 
   timeoutSec: 30
@@ -6884,8 +6884,6 @@ MonoBehaviour:
   screenMargin: 30
   inputBarH: 56
   inputBarToModelBottom: 20
-  bubbleHoldSec: 6
-  fadeOutSec: 0.4
   typeIntervalSec: 0.02
   noKeyPrompt: "\u8FD8\u6CA1\u8BBE\u7F6E API Key \u54E6\uFF01\u53BB \u8BBE\u7F6E\u2192\u6D3E\u8499\u2192\u5BF9\u8BDD
     API Key \u91CC\u586B\u4E00\u4E2A\u5427\u3002"
@@ -8308,10 +8306,10 @@ MonoBehaviour:
   headSmoothSpeed: 8
   eyeSmoothSpeed: 14
   enableLookAt: 1
-  neckBoneName: "\u9996"
-  headBoneName: "\u982D"
-  leftEyeBoneName: "\u76EE.L"
-  rightEyeBoneName: "\u76EE.R"
+  neckBoneName: Bip001 Neck
+  headBoneName: Bip001 Head
+  leftEyeBoneName: +EyeBone L A01
+  rightEyeBoneName: +EyeBone R A01
 --- !u!114 &1688681390943768412
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8357,7 +8355,7 @@ MonoBehaviour:
   idleAnimName: Ani_NPC_Kanban_Paimon_Standby
   greetAnimName: Ani_NPC_Kanban_Paimon_Greet
   triggerMarginPx: 90
-  liftEmotionName: Confuse
+  liftEmotionName: Sleepy
   triggerHoldSec: 1.2
   greetCooldownSec: 20
   dragLightThresholdSec: 3
@@ -8390,7 +8388,82 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   enableInertia: 1
-  boneList: []
+  boneList:
+  - {fileID: 8041103611600864892}
+  - {fileID: 5393662398760291893}
+  - {fileID: 3254242520267889262}
+  - {fileID: 2046599350542599854}
+  - {fileID: 1316026665922115554}
+  - {fileID: 7077455398595503500}
+  - {fileID: 5251074917002703639}
+  - {fileID: 6714185565671450502}
+  - {fileID: 62762858161278874}
+  - {fileID: 3041598101989259219}
+  - {fileID: 7968343316579646464}
+  - {fileID: 8192905914008854619}
+  - {fileID: 5821279498173901775}
+  - {fileID: 2893411750597441095}
+  - {fileID: 2639813815555005290}
+  - {fileID: 8608120659615162762}
+  - {fileID: 8856110443010848244}
+  - {fileID: 2243816504398234035}
+  - {fileID: 234782069794988596}
+  - {fileID: 5295386019468853204}
+  - {fileID: 8270730705270825487}
+  - {fileID: 7858562100001928519}
+  - {fileID: 701790888205273027}
+  - {fileID: 6676802906989719348}
+  - {fileID: 5637300152732018725}
+  - {fileID: 6675415835249347789}
+  - {fileID: 1175347639134017429}
+  - {fileID: 458307566211431364}
+  - {fileID: 589781490194071682}
+  - {fileID: 8073493215980046919}
+  - {fileID: 4491126251982450808}
+  - {fileID: 3668706174334575168}
+  - {fileID: 4134156129121983417}
+  - {fileID: 939907847598622254}
+  - {fileID: 7661584646196332658}
+  - {fileID: 2045921852136470568}
+  - {fileID: 5187732761516160436}
+  - {fileID: 7790817438315582315}
+  - {fileID: 3727418881747047253}
+  - {fileID: 454822557400162729}
+  - {fileID: 4524492165326457732}
+  - {fileID: 5314499498152066807}
+  - {fileID: 5300140270934787546}
+  - {fileID: 710833802939605801}
+  - {fileID: 3590066766067341617}
+  - {fileID: 1590678067506434688}
+  - {fileID: 3103512944980187371}
+  - {fileID: 7822523453941266731}
+  - {fileID: 6919868534933562089}
+  - {fileID: 1403522703882088757}
+  - {fileID: 3938555493672241630}
+  - {fileID: 906714814340632511}
+  - {fileID: 3072737371463210994}
+  - {fileID: 3922885278969583070}
+  - {fileID: 2975336336207199898}
+  - {fileID: 1165942255966139562}
+  - {fileID: 5063114010670302203}
+  - {fileID: 4894493887508159882}
+  - {fileID: 4059329778908514340}
+  - {fileID: 3551834875921160100}
+  - {fileID: 6701246070438955387}
+  - {fileID: 1434412205252329741}
+  - {fileID: 267457370532300303}
+  - {fileID: 7477631315292179291}
+  - {fileID: 2069360470594090045}
+  - {fileID: 6372233897034136805}
+  - {fileID: 2746034913664141556}
+  - {fileID: 8197733572491795059}
+  - {fileID: 8092433250880633704}
+  - {fileID: 7765193269965739886}
+  - {fileID: 5384018603950238764}
+  - {fileID: 9198541599974205449}
+  - {fileID: 352561529975177416}
+  - {fileID: 5098510887569785263}
+  - {fileID: 5071420037428293209}
   pullCoef: 2.5
   pullFullOffset: 10
   pullFadeRef: 60
