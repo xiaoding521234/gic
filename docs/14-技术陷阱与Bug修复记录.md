@@ -396,6 +396,18 @@ Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropert
 - 程序化建 UI 元素（气泡/输入条/图标等）必须在创建后**显式设 anchorMin=anchorMax**（本项目约定=左下锚 (0,0)，anchoredPosition 即画布绝对坐标），再设 pivot——绝不信默认锚。同批创建的元素锚约定必须一致，否则跟随逻辑混用两套坐标系。
 - 按骨名找骨（找本体骨/transform.Find）先确认骨名属于**当前激活模型**的命名系：GI 官方模型=Bip001 系（骨盆 Bip001 Pelvis/头 Bip001 Head），MMD=日文系（全ての親/頭）；PetLookAtController 的头骨名走 Inspector 序列化值按模型切换配置，新代码找骨照此办理，勿硬编码另一个模型的骨名。
 
+### 追加根因（同日二测："能看见文字，但看不见 UI 本身"）
+贴图层面第三因：**"九切片"素材实为整图+透明边距**。pet_chat_bubble_9slice.png 不透明 bbox 上下各留 66px/左右 48px 透明，按 border=56 切 3×3 后**四角+上下边条全是透明像素**（仅中心 82% 不透明）；而输入条高 56、气泡最小高 72 都 < 上下 border 和 112 → Sliced 中心行被压成零/负高 → 整个 UI 只画透明像素=不可见（TMP 文字是独立子物体不受影响）。修复=程序化生成规范九切片（128×128 纯白圆角矩形 border=24，白底供 Image.color 染色，角 78%/边条/中心 100% 不透明——78%=圆角裁切 π/4 理论值）；发送按钮矩形 < border×2 改 Simple 防退化。
+
+### 规范（九切片素材审计）
+- **导入九切片素材前按 border 切 3×3 分区测不透明率**：四角应≈100%-π/4（圆角裁切）、边条/中心≈100%；四角或边条≈0%=不是九切片结构（整图带透明边距），Sliced 会只画中心区——小矩形（高 < 上下 border 和）时整体不可见。TextureImporter 的 border 数值不会校验素材结构。
+- 目标矩形任一边 < 对应 border×2 时 Sliced 退化（中心行零/负高）——小元素（按钮）用 Simple，或换更小 border 的素材。
+
+### 追加根因（同日三测：控制台 NRE 刷屏）
+**TMP_InputField 拖拽选字在无 MainCamera 场景必炸（TMP 3.0.9）**：输入框内按住拖动 → 基类 OnDrag 启动 `MouseDragOutsideRect` 协程 → `ScreenPointToLocalPointInRectangle(textViewport, pos, eventData.pressEventCamera, ...)`——ScreenSpaceOverlay 画布下 pressEventCamera 恒 null → Unity 内部回退 `Camera.main.ScreenPointToRay` → GIC 纯 UI 场景（SettingsScreen 等）无 MainCamera tag 相机 = 每帧 NullReferenceException（源码 L1759 实证）。
+**修复**：子类 `PetChatInputField` 覆写 OnDrag 为空（掐掉协程路径；代价=拖出矩形选字失效，单击定位/双击选词/Shift+方向键选区不受影响）。**勿给聊天画布配 MainCamera tag 相机**（DontDestroyOnLoad 相机抢 Camera.main 是另一坑，见 §6.4 教训）；也勿把聊天画布改 ScreenSpaceCamera（会被游戏 Overlay UI 盖住，layering 语义反了）。
+另：程序化 TMP 文本勿用"➤"等装饰符号——zh-cn SDF 无此字形（警告+显示方块），按钮文字用中文（"发送"）。
+
 
 
 
