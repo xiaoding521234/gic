@@ -41,7 +41,7 @@ namespace GIC.Editor
             try
             {
                 var result = FixInternal(dryRun, log);
-                Debug.Log($"{Marker} {(dryRun ? "干跑完成" : "完成")} {result}\n{log}");
+                Debug.Log($"{Marker} {(dryRun ? "干跑完成" : "onComplete")} {result}\n{log}");
                 return $"{Marker} {(dryRun ? "DRY" : "DONE")} {result}";
             }
             catch (System.Exception ex)

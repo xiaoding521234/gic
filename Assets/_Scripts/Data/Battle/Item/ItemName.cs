@@ -17,7 +17,7 @@ namespace GIC.Data
         [InspectorName("无")]
         None = 0,
 
-        #region 货币
+        #region currency
 
         [InspectorName("摩拉")]
         Mora = 1001,
@@ -36,7 +36,7 @@ namespace GIC.Data
 
         #endregion
 
-        #region 武器
+        #region weapon
 
         [InspectorName("铁剑")]
         IronSword = 2001,
@@ -47,14 +47,14 @@ namespace GIC.Data
 
         #endregion
 
-        #region 配件
+        #region accessory
 
         [InspectorName("勾玉")]
         Magatama = 3001,
 
         #endregion
 
-        #region 食物
+        #region food
 
         [InspectorName("苹果")]
         Apple = 4001,
@@ -69,7 +69,7 @@ namespace GIC.Data
 
         #endregion
 
-        #region 饮品
+        #region drink
 
         [InspectorName("蒲公英酒")]
         DandelionWine = 5001,
@@ -78,7 +78,7 @@ namespace GIC.Data
 
         #endregion
 
-        #region 材料
+        #region material
 
         [InspectorName("火晶体")]
         FireCrystal = 6001,
@@ -97,7 +97,7 @@ namespace GIC.Data
 
         #endregion
 
-        #region 任务物品
+        #region questItem
 
         [InspectorName("神秘钥匙")]
         MysteryKey = 7001,

@@ -96,9 +96,9 @@ namespace GIC.Editor
 
             EditorUtility.SetDirty(anim);
 
-            接线惯性化器(anim, clips, swapper);
+            WireInertializer(anim, clips, swapper);
 
-            重建动作测试UI(clips);
+            RebuildAnimTestUI(clips);
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
@@ -110,7 +110,7 @@ namespace GIC.Editor
         /// 地盘）因无曲线天然排除。曲线路径经 SerializedObject 直读 m_*Curves——
         /// GetCurveBindings 对 legacy clip 不可信（2026-08-25 实证会被 m_EditorCurves 劫持/返回空）。
         /// 幂等：组件已存在只刷新骨列表；swapper 引用缺失则补。</summary>
-        private static void 接线惯性化器(Animation anim, List<AnimationClip> clips, GIC.Pet.PetAnimSwapper swapper)
+        private static void WireInertializer(Animation anim, List<AnimationClip> clips, GIC.Pet.PetAnimSwapper swapper)
         {
             var inert = swapper.GetComponent<GIC.Pet.PetInertializer>();
             if (inert == null) inert = swapper.gameObject.AddComponent<GIC.Pet.PetInertializer>();
@@ -132,11 +132,11 @@ namespace GIC.Editor
             }
 
             var bones = new List<(int depth, Transform t)>();
-            int 未解析 = 0;
+            int unparsed = 0;
             foreach (var path in paths)
             {
                 var t = anim.transform.Find(path);
-                if (t == null) { 未解析++; continue; } // 哈希路径骨不在 FBX 骨架（哈希修复工具已知遗留），预期
+                if (t == null) { unparsed++; continue; } // 哈希路径骨不在 FBX 骨架（哈希修复工具已知遗留），预期
                 bones.Add((path.Split('/').Length, t));
             }
             var sorted = bones.OrderBy(b => b.depth).Select(b => b.t).ToList();
@@ -154,13 +154,13 @@ namespace GIC.Editor
                 pRef.objectReferenceValue = inert;
                 soS.ApplyModifiedPropertiesWithoutUndo();
             }
-            Debug.Log($"[PetSceneSync] 惯性化器接线：{sorted.Count} 骨入列表（未解析路径 {未解析} 个=哈希遗留骨，预期）");
+            Debug.Log($"[PetSceneSync] 惯性化器接线：{sorted.Count} 骨入列表（未解析路径 {unparsed} 个=哈希遗留骨，预期）");
         }
 
         /// <summary>重建动作测试 UI（AnimUICanvas + EventSystem，编辑器 Play 测动作用；
         /// 构建版由 PetEditorOnly 在 Awake 自禁用——桌宠进程不出现测试面板）。
         /// 按钮持久绑定场景内 PetAnimSwapper.Play(clip名)，运行时零查找。</summary>
-        private static void 重建动作测试UI(List<AnimationClip> clips)
+        private static void RebuildAnimTestUI(List<AnimationClip> clips)
         {
             var swapper = Object.FindObjectsOfType<GIC.Pet.PetAnimSwapper>(true).FirstOrDefault();
             if (swapper == null)
@@ -218,7 +218,7 @@ namespace GIC.Editor
             scroll.movementType = UnityEngine.UI.ScrollRect.MovementType.Clamped;
 
             // 中文按钮名映射（2026-08-23）：clip 英文名 → 按钮显示中文；未列名按原名兜底
-            var 中文名 = new Dictionary<string, string>
+            var cnName = new Dictionary<string, string>
             {
                 ["Standby"] = "待机", ["Greet"] = "打招呼", ["Anger"] = "生气", ["Sneer01"] = "坏笑",
                 ["Clap01"] = "鼓掌", ["Nod01"] = "点头", ["ShakeHead01"] = "摇头", ["Refuse01"] = "拒绝",
@@ -272,7 +272,7 @@ namespace GIC.Editor
                 txt.font = font; txt.fontSize = 20; txt.color = Color.white;
                 txt.alignment = TextAnchor.MiddleCenter;
                 var en = c.name.Replace("Ani_Cs_NPC_Kanban_Paimon_", "").Replace("Ani_NPC_Kanban_Paimon_", "").Replace("_MMD", "");
-                txt.text = 中文名.TryGetValue(en, out var zh) ? zh : en;
+                txt.text = cnName.TryGetValue(en, out var zh) ? zh : en;
                 var tr = txtGo.GetComponent<RectTransform>();
                 tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.sizeDelta = Vector2.zero;
                 // 持久监听（存进场景文件，运行时零查找）

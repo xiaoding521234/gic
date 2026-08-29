@@ -12,7 +12,7 @@ namespace GIC.UI
 
     public partial class CoopScreen
     {
-        #region PlayerManager 事件
+        #region PlayerManager evt
 
         void OnPlayerCountChanged(int count) { if (_currentState != RoomState.DisconnectedClient) RefreshPlayerList(); }
 

@@ -12,7 +12,7 @@ namespace GIC.Framework
 
     public partial class AudioManager
     {
-        #region 音乐播放
+        #region musicPlay
 
         // 当前播放的音乐信息
         private MusicType currentMusicType = MusicType.Relaxed;
@@ -203,7 +203,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 内部播放逻辑
+        #region internalPlayLogic
 
         private Coroutine musicCompletionCoroutine;
 

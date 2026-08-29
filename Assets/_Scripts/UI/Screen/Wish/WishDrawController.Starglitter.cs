@@ -9,7 +9,7 @@ namespace GIC.UI
     /// </summary>
     public partial class WishDrawController
     {
-        #region 星辉进度条
+        #region stardustProgress
 
         /// <summary>
         /// 更新星辉进度条
@@ -59,7 +59,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 星辉雨
+        #region stardustRain
 
         private bool _isRainActive;
         private int _rainSpawned;

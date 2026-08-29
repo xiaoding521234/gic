@@ -53,7 +53,7 @@ namespace GIC.Pet
             return true;
         }
 
-        #region pid 文件（主进程退出时按 pid 找到派蒙进程——跨"游戏重启"场景仍有效，Mutex 只能探测不能定位进程）
+        #region pid 文件（mainProcExitOn pid foundPaimonProc——cross"游戏重启"sceneStillValid，Mutex detectOnlyNoLocateProc）
 
         private static string PidFilePath => System.IO.Path.Combine(Application.persistentDataPath, "pet.pid");
 

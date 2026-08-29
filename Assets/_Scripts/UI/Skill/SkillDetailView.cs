@@ -159,7 +159,7 @@ namespace GIC.UI
             }
         }
 
-        #region 关联面板 — 卡片模式
+        #region relatedPanel — cardMode
 
         void ShowCardMode(CardId cardId)
         {
@@ -177,7 +177,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 关联面板 — 规则模式
+        #region relatedPanel — strictMode
 
         void ShowRuleMode(string id)
         {

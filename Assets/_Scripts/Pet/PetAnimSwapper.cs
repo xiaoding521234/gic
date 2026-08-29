@@ -12,156 +12,163 @@ namespace GIC.Pet
     public class PetAnimSwapper : MonoBehaviour
     {
         [System.Serializable]
-        public class 动作情绪映射
+        public class AnimEmotionMap
         {
-            [Tooltip("动作名片段（clip 名包含即命中，如 Anger）")] public string 动作名片段;
-            [Tooltip("情绪名（PetEmotionController 情绪表中的名，空=不表情绪）")] public string 情绪名;
+            [InspectorName("动作名片段")]
+            [Tooltip("动作名片段（clip 名包含即命中，如 Anger）")] public string animNameFrag;
+            [InspectorName("情绪名")]
+            [Tooltip("情绪名（PetEmotionController 情绪表中的名，空=不表情绪）")] public string emotionName;
         }
 
-        [SerializeField, FormerlySerializedAs("targetAnimation")] private Animation 目标动画; // GI 官方模型骨节点上的 Animation 组件
+        [InspectorName("目标动画")]
+        [SerializeField] private Animation targetAnimation; // GI 官方模型骨节点上的 Animation 组件
 
         /// <summary>当前驱动的 Animation 组件（编辑器同步工具按此注册 clip，勿按 FindObjectsOfType 顺序找）</summary>
-        public Animation TargetAnimation => 目标动画;
+        public Animation TargetAnimation => targetAnimation;
 
         private string _上次播放名 = ""; // 切换诊断日志用（2026-08-27：与 PetInertia 捕获行按时间对齐，定位停顿发生在哪次切换）
 
         [Header("动作→情绪映射（表情由情绪层驱动，不烘焙进 clip）")]
-        [SerializeField] private 动作情绪映射[] 情绪映射 = new[]
+        [InspectorName("情绪映射")]
+        [SerializeField] private AnimEmotionMap[] emotionMap = new[]
         {
-            new 动作情绪映射 { 动作名片段 = "Greet", 情绪名 = "Happy" },
-            new 动作情绪映射 { 动作名片段 = "Anger", 情绪名 = "Anger" },
-            new 动作情绪映射 { 动作名片段 = "Sneer", 情绪名 = "Sneer" },
-            new 动作情绪映射 { 动作名片段 = "Clap", 情绪名 = "Happy" },
-            new 动作情绪映射 { 动作名片段 = "Show_", 情绪名 = "得意" },
-            new 动作情绪映射 { 动作名片段 = "Shy", 情绪名 = "Shy" },
-            new 动作情绪映射 { 动作名片段 = "Confuse", 情绪名 = "Confuse" },
-            new 动作情绪映射 { 动作名片段 = "Think", 情绪名 = "Think" },
-            new 动作情绪映射 { 动作名片段 = "Like", 情绪名 = "Happy" },
-            new 动作情绪映射 { 动作名片段 = "Hope", 情绪名 = "期待" },
-            new 动作情绪映射 { 动作名片段 = "Refuse", 情绪名 = "拒绝" },
-            new 动作情绪映射 { 动作名片段 = "Sleep", 情绪名 = "Sleepy" },
-            new 动作情绪映射 { 动作名片段 = "SitLoop", 情绪名 = "Sleepy" },
+            new AnimEmotionMap { animNameFrag = "Greet", emotionName = "Happy" },
+            new AnimEmotionMap { animNameFrag = "Anger", emotionName = "Anger" },
+            new AnimEmotionMap { animNameFrag = "Sneer", emotionName = "Sneer" },
+            new AnimEmotionMap { animNameFrag = "Clap", emotionName = "Happy" },
+            new AnimEmotionMap { animNameFrag = "Show_", emotionName = "得意" },
+            new AnimEmotionMap { animNameFrag = "Shy", emotionName = "Shy" },
+            new AnimEmotionMap { animNameFrag = "Confuse", emotionName = "Confuse" },
+            new AnimEmotionMap { animNameFrag = "Think", emotionName = "Think" },
+            new AnimEmotionMap { animNameFrag = "Like", emotionName = "Happy" },
+            new AnimEmotionMap { animNameFrag = "Hope", emotionName = "期待" },
+            new AnimEmotionMap { animNameFrag = "Refuse", emotionName = "拒绝" },
+            new AnimEmotionMap { animNameFrag = "Sleep", emotionName = "Sleepy" },
+            new AnimEmotionMap { animNameFrag = "SitLoop", emotionName = "Sleepy" },
         };
 
-        [SerializeField, FormerlySerializedAs("emotionController")] private PetEmotionController 情绪控制器; // 情绪层（可空=无表情）
-        [SerializeField, FormerlySerializedAs("fingerPoseController")] private PetFingerPoseController 手指姿态控制器; // 手指姿态层（可空=手指走 clip 曲线）
+        [SerializeField, InspectorName("情绪控制器")] private PetEmotionController emotionCtrl; // 情绪层（可空=无表情）
+        [SerializeField, InspectorName("手指姿态控制器")] private PetFingerPoseController fingerPoseCtrl; // 手指姿态层（可空=手指走 clip 曲线）
 
         [Header("过渡")]
         [Tooltip("动作切换过渡时长（秒）——惯性化模式=偏移衰减时长；CrossFade 兜底模式=线性混合窗口（过渡期双 clip 双采样，过长则混合开销放大顿挫）")]
-        [SerializeField] private float 动作过渡秒 = 0.6f;
+        [InspectorName("动作过渡秒")]
+        [SerializeField] private float animTransitionSec = 0.6f;
         [Tooltip("惯性化层（Gears of War 4 式切换：硬切+当前姿势/速度 C2 衰减归零）。空/禁用=回退 CrossFade 线性混合")]
-        [SerializeField] private PetInertializer 惯性化器;
+        [InspectorName("惯性化器")]
+        [SerializeField] private PetInertializer inertializer;
         [Tooltip("启动时预热全部已注册 clip（逐个 Play+Sample 后回待机）——legacy Animation 首播冷初始化实测 150ms 掉帧串（2026-08-24 Player.log 16 连掉帧无任何子系统标记，t=64 首次摆手实证）。开销=启动一次性几十 ms，不增加常驻内存（曲线数据本就随场景加载）")]
-        [SerializeField] private bool 启动预热 = true;
+        [InspectorName("启动预热")]
+        [SerializeField] private bool prewarmOnStart = true;
 
         void Start()
         {
-            if (启动预热 && 目标动画 != null) 预热全部Clip();
+            if (prewarmOnStart && targetAnimation != null) prewarmAllClips();
         }
 
         /// <summary>逐 clip Play→Sample→Stop（全部在 Start 帧内完成，渲染前无视觉闪现），
         /// 触发每个 clip 的首次求值（绑定/采样器构建），把冷初始化成本从"首次播放"挪到启动期。</summary>
-        void 预热全部Clip()
+        void prewarmAllClips()
         {
             float t0 = Time.realtimeSinceStartup;
             var names = new System.Collections.Generic.List<string>();
-            foreach (AnimationState st in 目标动画) names.Add(st.name);
+            foreach (AnimationState st in targetAnimation) names.Add(st.name);
             foreach (var n in names)
             {
-                var st = 目标动画[n];
+                var st = targetAnimation[n];
                 if (st == null || st.clip == null) continue;
                 st.wrapMode = WrapMode.Loop;
-                目标动画.Play(n);
-                目标动画.Sample();
-                目标动画.Stop();
+                targetAnimation.Play(n);
+                targetAnimation.Sample();
+                targetAnimation.Stop();
             }
             // 回默认待机
-            if (目标动画.clip != null)
+            if (targetAnimation.clip != null)
             {
-                var def = 目标动画[目标动画.clip.name];
-                if (def != null) { def.wrapMode = WrapMode.Loop; 目标动画.Play(目标动画.clip.name); }
+                var def = targetAnimation[targetAnimation.clip.name];
+                if (def != null) { def.wrapMode = WrapMode.Loop; targetAnimation.Play(targetAnimation.clip.name); }
             }
             Debug.Log($"[PetAnimSwapper] 预热 {names.Count} 个 clip 耗时 {(Time.realtimeSinceStartup - t0) * 1000:F0}ms");
         }
 
         public void Play(string clipName)
         {
-            播放(clipName, WrapMode.Loop);
+            play(clipName, WrapMode.Loop);
         }
 
         /// <summary>单次播放（播完停住，回什么由调用方决定）——行为层打招呼/随机小动作用</summary>
         public void PlayOnce(string clipName)
         {
-            播放(clipName, WrapMode.Once);
+            play(clipName, WrapMode.Once);
         }
 
         /// <summary>clip 是否正在播放（单次动作结束判定用）</summary>
-        public bool 是否在播(string clipName)
+        public bool IsPlaying(string clipName)
         {
-            return 目标动画 != null && 目标动画.IsPlaying(clipName);
+            return targetAnimation != null && targetAnimation.IsPlaying(clipName);
         }
 
         /// <summary>clip 是否已注册可播（出场/退场等关键动作的存在性判断；空名安全）</summary>
-        public bool 动作存在(string clipName)
+        public bool HasAnim(string clipName)
         {
-            if (string.IsNullOrEmpty(clipName) || 目标动画 == null) return false;
-            var state = 目标动画[clipName];
+            if (string.IsNullOrEmpty(clipName) || targetAnimation == null) return false;
+            var state = targetAnimation[clipName];
             return state != null && state.clip != null;
         }
 
         /// <summary>当前过渡时长（行为层尾段提前过渡用）</summary>
-        public float 过渡秒 => 动作过渡秒;
+        public float TransitionSeconds => animTransitionSec;
 
         /// <summary>惯性化路径是否激活（行为层据此关闭尾段截尾——惯性化下速度承接使任意切点
         /// 无缝，动作播到自然结尾再切保留作者收尾，截尾反而丢动作且 0.6s 窗口下截断明显）</summary>
-        public bool 惯性化启用 => 惯性化器 != null && 惯性化器.启用惯性化;
+        public bool IsInertializationOn => inertializer != null && inertializer.IsInertializationOn;
 
         /// <summary>单次动作剩余秒数（-1=未注册/未播；0=已播完）。行为层在剩余≈过渡秒时
         /// 提前切回待机，让 CrossFade 与动作尾部重叠——消除"播完定格→再淡入"的割裂感。</summary>
-        public float 剩余秒(string clipName)
+        public float RemainingSeconds(string clipName)
         {
-            if (目标动画 == null || string.IsNullOrEmpty(clipName)) return -1f;
-            var state = 目标动画[clipName];
+            if (targetAnimation == null || string.IsNullOrEmpty(clipName)) return -1f;
+            var state = targetAnimation[clipName];
             if (state == null || state.clip == null) return -1f;
-            if (!目标动画.IsPlaying(clipName)) return 0f;
+            if (!targetAnimation.IsPlaying(clipName)) return 0f;
             return Mathf.Max(0f, state.clip.length - state.time);
         }
 
-        void 播放(string clipName, WrapMode 循环模式)
+        void play(string clipName, WrapMode loopMode)
         {
-            if (目标动画 == null) return;
-            var state = 目标动画[clipName];
+            if (targetAnimation == null) return;
+            var state = targetAnimation[clipName];
             if (state == null || state.clip == null) return;
-            state.wrapMode = 循环模式;
+            state.wrapMode = loopMode;
             if (PetMode.Enabled) // 切换诊断只在桌宠进程打（2026-08-28：游戏内派蒙形态下同一组件跑在主游戏进程，每次切换刷主游戏控制台）
                 Debug.Log($"[PetAnim] 切换 {_上次播放名} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
             _上次播放名 = clipName;
-            if (惯性化器 != null && 惯性化器.启用惯性化)
+            if (inertializer != null && inertializer.IsInertializationOn)
             {
                 // 惯性化切换（2026-08-27，GoW4 技术）：硬切新 clip——单 clip 求值无双采样开销，
                 // 姿态连续性由惯性化层后处理保证（当前姿势+速度 C2 连续衰减归零，
                 // 任意切点/中途打断都平滑，替代旧 CrossFade 的线性权重混合）
-                目标动画.Play(clipName, PlayMode.StopAll);
-                惯性化器.Trigger(动作过渡秒);
+                targetAnimation.Play(clipName, PlayMode.StopAll);
+                inertializer.Trigger(animTransitionSec);
             }
             else
             {
                 // v19 流畅度（2026-08-23）：Stop()+Play() 硬切 → CrossFade 平滑过渡（原神观感）；
                 // 2026-08-24 0.3→0.2：过渡期双 clip 双采样是顿挫放大器，收紧窗口
-                目标动画.CrossFade(clipName, 动作过渡秒);
+                targetAnimation.CrossFade(clipName, animTransitionSec);
             }
 
             // 情绪下发：无映射的情绪动作 → 下发空名清回默认脸
-            if (情绪控制器 != null)
+            if (emotionCtrl != null)
             {
                 var emo = "";
-                foreach (var m in 情绪映射)
-                    if (!string.IsNullOrEmpty(m.动作名片段) && clipName.Contains(m.动作名片段)) { emo = m.情绪名; break; }
-                情绪控制器.SetEmotion(emo);
+                foreach (var m in emotionMap)
+                    if (!string.IsNullOrEmpty(m.animNameFrag) && clipName.Contains(m.animNameFrag)) { emo = m.emotionName; break; }
+                emotionCtrl.SetEmotion(emo);
             }
 
             // 手指姿态切换（2026-08-23 程序化手指层）：按 clip 名让 PetFingerPoseController 接管五指
-            手指姿态控制器?.SetPose(clipName);
+            fingerPoseCtrl?.SetPose(clipName);
         }
     }
 }

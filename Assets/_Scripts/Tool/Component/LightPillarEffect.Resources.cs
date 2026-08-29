@@ -13,13 +13,13 @@ namespace GIC.Tool
         private static Texture2D _sharedRadialTexture;
         private static Sprite _sharedRadialSprite;
 
-        #region 资源创建
+        #region resCreate
 
         private void CreateMaterial()
         {
-            if (加法材质 != null)
+            if (addMat != null)
             {
-                _additiveMat = new Material(加法材质);
+                _additiveMat = new Material(addMat);
                 return;
             }
 

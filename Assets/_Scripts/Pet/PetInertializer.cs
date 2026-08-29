@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -38,24 +39,31 @@ namespace GIC.Pet
     public class PetInertializer : MonoBehaviour
     {
         [Tooltip("启用惯性化过渡（关=PetAnimSwapper 回退 CrossFade 线性混合，A/B 对比用）")]
-        [SerializeField] private bool 启用 = true;
+        [InspectorName("启用")]
+        [SerializeField] private bool enableInertia = true;
         [Tooltip("参与惯性化的骨（全部 clip 曲线绑定骨并集）——Tools/桌宠/同步 PaimonPet 动作列表 幂等填充，勿手改")]
-        [SerializeField] private List<Transform> 骨列表 = new List<Transform>();
+        [InspectorName("骨列表")]
+        [SerializeField] private List<Transform> boneList = new List<Transform>();
         [Tooltip("起步拉引系数：捕获时给偏移注入朝新姿势的额外初速度=系数×偏移/窗口时长（一次性烘进多项式）——消除 v0≈0 的起步平台期（动作收尾近静止切换读作停顿）。0=纯速度承接（GoW 原味）；2.5=起步加速度恰为 0（单调无过冲的数学最优）。幅度自适应：大偏移自动降倍率（见 拉引全额偏移度）")]
         [Range(0f, 5f)]
-        [SerializeField] private float 起步拉引系数 = 2.5f;
+        [InspectorName("起步拉引系数")]
+        [SerializeField] private float pullCoef = 2.5f;
         [Tooltip("幅度自适应拉引（2026-08-27 目检\"大姿态切换像瞬移\"根治）：骨偏移角低于此值用全额拉引——小姿态切换靠全额快起步治平台期")]
         [Range(0f, 90f)]
-        [SerializeField] private float 拉引全额偏移度 = 10f;
+        [InspectorName("拉引全额偏移度")]
+        [SerializeField] private float pullFullOffset = 10f;
         [Tooltip("骨偏移角达到/超过此值时拉引退到最低倍率——大姿态差本身运动可见，全额拉引以 v0∝偏移 的速度前 0.1s 冲掉 37%（80° 偏移≈340°/s）读作瞬移")]
         [Range(0f, 180f)]
-        [SerializeField] private float 拉引衰减参考度 = 60f;
+        [InspectorName("拉引衰减参考度")]
+        [SerializeField] private float pullFadeRef = 60f;
         [Tooltip("大偏移下的拉引倍率下限（0.3=80° 偏移起步速度从 340°/s 降到 102°/s，整段过渡摊满窗口成平滑曲线；0=纯 GoW 速度承接）")]
         [Range(0f, 1f)]
-        [SerializeField] private float 拉引最低倍率 = 0.3f;
+        [InspectorName("拉引最低倍率")]
+        [SerializeField] private float pullMinRatio = 0.3f;
         [Tooltip("大偏移窗口秒（2026-08-27 二轮根治\"所有切换可见停顿\"）：骨偏移达到衰减参考度时，该骨过渡窗口收缩到此时长——大姿态差本就该快切（原神级 ~0.3s），实测抓起/松手偏移 86-94°，0.6s 慢窗读作\"悬一下才沉下去\"=停顿感；小偏移保持 动作过渡秒 慢混。")]
         [Range(0.1f, 1f)]
-        [SerializeField] private float 大偏移窗口秒 = 0.3f;
+        [InspectorName("大偏移窗口秒")]
+        [SerializeField] private float largeOffsetWinSec = 0.3f;
 
         // 姿态输出流（与骨列表平行）：prev/curr 为本层上一帧输出，供中断时捕获速度
         private Vector3[] _prevPos, _currPos;
@@ -81,44 +89,45 @@ namespace GIC.Pet
         // （游戏内派蒙形态）后，每次动作切换两行日志刷主游戏控制台（Debug.Log 在 Editor 带
         // 堆栈提取，量大时拖慢编辑器；构建版写 Player.log）。桌宠进程诊断方法论不变。
         [Tooltip("打印惯性化捕获诊断（每次动作切换一行：最大骨偏移/捕获速度方向统计/衰减曲线采样）——切换手感问题定位用，平时关。仅桌宠进程生效")]
-        [SerializeField] private bool 打印诊断 = true;
+        [InspectorName("打印诊断")]
+        [SerializeField] private bool printDiag = true;
 
         /// <summary>诊断日志开关（运行时等效：桌宠进程才打——见 打印诊断 注释）</summary>
-        private bool 诊断允许 => 打印诊断 && PetMode.Enabled;
+        private bool diagAllowed => printDiag && PetMode.Enabled;
 
         /// <summary>惯性化是否可用（PetAnimSwapper 据此选路径：惯性化 or CrossFade 兜底）</summary>
-        public bool 启用惯性化 => 启用 && enabled && 骨列表 != null && 骨列表.Count > 0;
+        public bool IsInertializationOn => enableInertia && this.enableInertia && boneList != null && boneList.Count > 0;
 
         void LateUpdate()
         {
-            if (骨列表 == null || 骨列表.Count == 0) return;
-            if (!_已初始化) 初始化();
+            if (boneList == null || boneList.Count == 0) return;
+            if (!_已初始化) init();
 
-            bool 过渡中 = _首帧待捕获 || Time.time < _触发时刻 + _本次时长;
-            if (!过渡中)
+            bool transitioning = _首帧待捕获 || Time.time < _触发时刻 + _本次时长;
+            if (!transitioning)
             {
                 // 被动跟踪：此时骨=动画本帧姿势（叠加层尚未写入），维护 prev/curr 供下次 Trigger 捕获速度
-                for (int i = 0; i < 骨列表.Count; i++)
+                for (int i = 0; i < boneList.Count; i++)
                 {
-                    var 骨 = 骨列表[i];
-                    if (骨 == null) continue;
+                    var bone = boneList[i];
+                    if (bone == null) continue;
                     _prevPos[i] = _currPos[i];
                     _prevRot[i] = _currRot[i];
-                    _currPos[i] = 骨.localPosition;
-                    _currRot[i] = 骨.localRotation;
+                    _currPos[i] = bone.localPosition;
+                    _currRot[i] = bone.localRotation;
                 }
                 return;
             }
 
-            if (_首帧待捕获) 捕获窗口系数();
+            if (_首帧待捕获) captureWinCoef();
 
             float t = Time.time - _触发时刻; // 首帧 ≈0：x(0)=x0，输出=旧姿势（位置连续）
-            for (int i = 0; i < 骨列表.Count; i++)
+            for (int i = 0; i < boneList.Count; i++)
             {
-                var 骨 = 骨列表[i];
-                if (骨 == null) continue;
-                Vector3 targetPos = 骨.localPosition;     // 新 clip 本帧姿势
-                Quaternion targetRot = 骨.localRotation;
+                var bone = boneList[i];
+                if (bone == null) continue;
+                Vector3 targetPos = bone.localPosition;     // 新 clip 本帧姿势
+                Quaternion targetRot = bone.localRotation;
 
                 // 输出流维护（中断捕获的速度来源）+ 写回
                 _prevPos[i] = _currPos[i];
@@ -132,8 +141,8 @@ namespace GIC.Pet
                     Quaternion rot = Quaternion.AngleAxis(offR * Mathf.Rad2Deg, _旋转轴[i]) * targetRot;
                     _currPos[i] = pos;
                     _currRot[i] = rot;
-                    骨.localPosition = pos;
-                    骨.localRotation = rot;
+                    bone.localPosition = pos;
+                    bone.localRotation = rot;
                 }
                 else
                 {
@@ -148,8 +157,8 @@ namespace GIC.Pet
         /// 捕获（需新 clip 首帧已采样为 target）。过渡中重复触发=从当前输出重新捕获（打断无缝）。</summary>
         public void Trigger(float blend秒)
         {
-            if (骨列表 == null || 骨列表.Count == 0) return;
-            if (!_已初始化) 初始化(); // 首次触发（如出场动画在第一帧 Update 期）：先快照当前姿势作基准
+            if (boneList == null || boneList.Count == 0) return;
+            if (!_已初始化) init(); // 首次触发（如出场动画在第一帧 Update 期）：先快照当前姿势作基准
             _本次时长 = Mathf.Max(0.01f, blend秒);
             _首帧待捕获 = true;
         }
@@ -157,7 +166,7 @@ namespace GIC.Pet
         /// <summary>捕获窗口系数：此刻骨=新 clip 首帧（Animation 在 Update 后 LateUpdate 前已采样）。
         /// x0=上一帧输出−target；v0=捕获速度（输出流）+起步拉引（一次性）。中断时同理：
         /// curr=当前输出、prev=上一帧输出 → 捕获的是实际运动速度，物理且连续。</summary>
-        void 捕获窗口系数()
+        void captureWinCoef()
         {
             _首帧待捕获 = false;
             _触发时刻 = Time.time;
@@ -165,17 +174,17 @@ namespace GIC.Pet
             float tf = _本次时长;
 
             // 诊断统计（见 打印诊断 注释）
-            float 诊_maxOff = 0f, 诊_sumOff = 0f; int 诊_cnt = 0, 诊_反向 = 0, 诊_正中 = 0;
-            int 诊_maxIdx = -1;
-            float 诊_sumV0 = 0f;
+            float diag_maxOff = 0f, diag_sumOff = 0f; int diag_cnt = 0, diag_reverse = 0, diag_center = 0;
+            int diag_maxIdx = -1;
+            float diag_sumV0 = 0f;
 
-            for (int i = 0; i < 骨列表.Count; i++)
+            for (int i = 0; i < boneList.Count; i++)
             {
-                var 骨 = 骨列表[i];
+                var bone = boneList[i];
                 _有效[i] = false;
-                if (骨 == null) continue;
-                Vector3 targetPos = 骨.localPosition;
-                Quaternion targetRot = 骨.localRotation;
+                if (bone == null) continue;
+                Vector3 targetPos = bone.localPosition;
+                Quaternion targetRot = bone.localRotation;
                 Vector3 currPos = _currPos[i];
                 Quaternion currRot = _currRot[i];
 
@@ -189,7 +198,7 @@ namespace GIC.Pet
                     _偏移方向[i] = dir;
                     _位置x0[i] = x0;
                     _位置tf[i] = tf; // 位置偏移微小（gi_pos_center 后近恒定），窗口时长不敏感
-                    _位置v0[i] = vCap - x0 * (起步拉引系数 / tf);
+                    _位置v0[i] = vCap - x0 * (pullCoef / tf);
                     _有效[i] = true;
                 }
 
@@ -223,57 +232,57 @@ namespace GIC.Pet
                     // 大姿态差本就该 ~0.3s 快切）。拉引倍率同曲线降低，且拉引分母用收缩后的
                     // 骨窗（等效把起步速度维持在"全额拉引在慢窗下"的量级而非放大）。
                     float 进度 = 衰减进度(rx0);
-                    float 骨窗 = Mathf.Min(tf, Mathf.Lerp(tf, Mathf.Max(0.1f, 大偏移窗口秒), 进度));
-                    float 拉引v = rx0 * (起步拉引系数 * Mathf.Lerp(1f, 拉引最低倍率, 进度) / 骨窗);
+                    float boneWin = Mathf.Min(tf, Mathf.Lerp(tf, Mathf.Max(0.1f, largeOffsetWinSec), 进度));
+                    float 拉引v = rx0 * (pullCoef * Mathf.Lerp(1f, pullMinRatio, 进度) / boneWin);
                     _旋转轴[i] = axis;
                     _旋转x0[i] = rx0;
-                    _旋转tf[i] = 骨窗;
-                    if (x0 <= 1e-6f) _位置tf[i] = 骨窗; // 位置通道无独立判定时随旋转骨窗
+                    _旋转tf[i] = boneWin;
+                    if (x0 <= 1e-6f) _位置tf[i] = boneWin; // 位置通道无独立判定时随旋转骨窗
                     _旋转v0[i] = v0 - 拉引v;
                     _有效[i] = true;
 
                     if (rx0 > 1e-3f) // 诊断只统计可感偏移骨（>0.06°）
                     {
-                        诊_cnt++; 诊_sumOff += rx0;
-                        if (rx0 > 诊_maxOff) { 诊_maxOff = rx0; 诊_maxIdx = i; }
-                        诊_sumV0 += v0;
-                        if (v0 > 0f) 诊_反向++;       // 捕获速度仍朝远离目标方向（起步先反向走）
-                        if (Mathf.Abs(v0 - 拉引v) < 0.05f) 诊_正中++;
+                        diag_cnt++; diag_sumOff += rx0;
+                        if (rx0 > diag_maxOff) { diag_maxOff = rx0; diag_maxIdx = i; }
+                        diag_sumV0 += v0;
+                        if (v0 > 0f) diag_reverse++;       // 捕获速度仍朝远离目标方向（起步先反向走）
+                        if (Mathf.Abs(v0 - 拉引v) < 0.05f) diag_center++;
                     }
                 }
             }
 
-            if (诊断允许 && 诊_cnt > 0)
+            if (diagAllowed && diag_cnt > 0)
             {
-                float maxDeg = 诊_maxOff * Mathf.Rad2Deg;
+                float maxDeg = diag_maxOff * Mathf.Rad2Deg;
                 string decay = "";
-                if (诊_maxIdx >= 0)
+                if (diag_maxIdx >= 0)
                 {
-                    float x0 = _旋转x0[诊_maxIdx], v0 = _旋转v0[诊_maxIdx];
-                    float tfm = _旋转tf[诊_maxIdx];
+                    float x0 = _旋转x0[diag_maxIdx], v0 = _旋转v0[diag_maxIdx];
+                    float tfm = _旋转tf[diag_maxIdx];
                     // 闭式求值最大偏移骨的衰减曲线采样（剩余比例，按该骨自己的窗口）
                     decay = $" 窗{tfm:F2}s 剩余@0.1s={100f * 五次衰减(x0, v0, tfm, 0.1f) / x0:F0}%" +
                             $" @0.2s={100f * 五次衰减(x0, v0, tfm, 0.2f) / x0:F0}%" +
                             $" @0.3s={100f * 五次衰减(x0, v0, tfm, 0.3f) / x0:F0}%";
                 }
-                Debug.Log($"[PetInertia] 捕获 骨{诊_cnt}/{骨列表.Count} 最大偏移{maxDeg:F1}°({(诊_maxIdx >= 0 && 骨列表[诊_maxIdx] != null ? 骨列表[诊_maxIdx].name : "?")}) " +
-                          $"平均{诊_sumOff * Mathf.Rad2Deg / 诊_cnt:F2}° 反向v0骨数={诊_反向} 捕获速度均值={诊_sumV0 * Mathf.Rad2Deg / 诊_cnt:F1}°/s 窗口={tf:F2}s{decay}");
+                Debug.Log($"[PetInertia] 捕获 骨{diag_cnt}/{boneList.Count} 最大偏移{maxDeg:F1}°({(diag_maxIdx >= 0 && boneList[diag_maxIdx] != null ? boneList[diag_maxIdx].name : "?")}) " +
+                          $"平均{diag_sumOff * Mathf.Rad2Deg / diag_cnt:F2}° 反向v0骨数={diag_reverse} 捕获速度均值={diag_sumV0 * Mathf.Rad2Deg / diag_cnt:F1}°/s 窗口={tf:F2}s{decay}");
             }
         }
 
         /// <summary>衰减进度（0=小偏移全额，1=达到衰减参考度）：拉引倍率与窗口收缩共用此曲线，
         /// 保证"小差异慢混全额拉引、大差异快切低拉引"的一致语义。</summary>
-        float 衰减进度(float 偏移弧度)
+        float 衰减进度(float offsetRad)
         {
-            float 满额 = 拉引全额偏移度 * Mathf.Deg2Rad;
-            float 参考 = 拉引衰减参考度 * Mathf.Deg2Rad;
-            if (偏移弧度 <= 满额 || 参考 <= 满额) return 0f;
-            return Mathf.Clamp01((偏移弧度 - 满额) / (参考 - 满额));
+            float fullAmount = pullFullOffset * Mathf.Deg2Rad;
+            float reference = pullFadeRef * Mathf.Deg2Rad;
+            if (offsetRad <= fullAmount || reference <= fullAmount) return 0f;
+            return Mathf.Clamp01((offsetRad - fullAmount) / (reference - fullAmount));
         }
 
-        void 初始化()
+        void init()
         {
-            int n = 骨列表.Count;
+            int n = boneList.Count;
             _prevPos = new Vector3[n]; _currPos = new Vector3[n];
             _prevRot = new Quaternion[n]; _currRot = new Quaternion[n];
             _偏移方向 = new Vector3[n];
@@ -285,9 +294,9 @@ namespace GIC.Pet
             _有效 = new bool[n];
             for (int i = 0; i < n; i++)
             {
-                var 骨 = 骨列表[i];
-                _prevPos[i] = _currPos[i] = 骨 != null ? 骨.localPosition : Vector3.zero;
-                _prevRot[i] = _currRot[i] = 骨 != null ? 骨.localRotation : Quaternion.identity;
+                var bone = boneList[i];
+                _prevPos[i] = _currPos[i] = bone != null ? bone.localPosition : Vector3.zero;
+                _prevRot[i] = _currRot[i] = bone != null ? bone.localRotation : Quaternion.identity;
             }
             _已初始化 = true;
         }

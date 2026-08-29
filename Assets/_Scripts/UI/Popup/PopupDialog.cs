@@ -15,7 +15,6 @@ namespace GIC.UI
 
     public class PopupDialog : MonoBehaviour, IClosable
     {
-        [FormerlySerializedAs("messageText")]
         [SerializeField] private TextMeshProUGUI messageTextObj;
         public Button backPanel;
         public CanvasGroup canvasGroup;
@@ -26,15 +25,22 @@ namespace GIC.UI
         [SerializeField] private float fadeOutDuration = 0.08f;
 
         [Header("轻提示动画")]
-        [SerializeField] private float 滑入时长 = 0.3f;
-        [SerializeField] private float 轻提示停留时长 = 2f;
-        [SerializeField] private float 滑出时长 = 0.2f;
-        [SerializeField] private float 滑出距离 = 150f;
+        [InspectorName("滑入时长")]
+        [SerializeField] private float slideInDuration = 0.3f;
+        [InspectorName("轻提示停留时长")]
+        [SerializeField] private float toastHoldDuration = 2f;
+        [InspectorName("滑出时长")]
+        [SerializeField] private float slideOutDuration = 0.2f;
+        [InspectorName("滑出距离")]
+        [SerializeField] private float slideOutDist = 150f;
 
         [Header("重复提示反馈")]
-        [SerializeField] private Color 强调颜色 = new Color(1f, 0.3f, 0.3f, 1f);
-        [SerializeField] private float 强调时长 = 0.4f;
-        [SerializeField] private float 抖动强度 = 20f;
+        [InspectorName("强调颜色")]
+        [SerializeField] private Color emphasizeColor = new Color(1f, 0.3f, 0.3f, 1f);
+        [InspectorName("强调时长")]
+        [SerializeField] private float emphasizeDuration = 0.4f;
+        [InspectorName("抖动强度")]
+        [SerializeField] private float shakeIntensity = 20f;
 
         public enum PopupMode { Modal, Toast }
 
@@ -135,16 +141,16 @@ namespace GIC.UI
             Vector2 basePos = _toastTargetPos;
             float elapsed = 0f;
 
-            while (elapsed < 强调时长)
+            while (elapsed < emphasizeDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / 强调时长;
+                float t = elapsed / emphasizeDuration;
 
                 // 颜色闪烁：红→原色
-                _toastBgImage.color = Color.Lerp(强调颜色, _toastBgOriginalColor, t);
+                _toastBgImage.color = Color.Lerp(emphasizeColor, _toastBgOriginalColor, t);
 
                 // 抖动：衰减
-                float shake = 抖动强度 * (1f - t);
+                float shake = shakeIntensity * (1f - t);
                 if (_toastContentRect != null)
                     _toastContentRect.anchoredPosition = basePos + new Vector2(
                         Random.Range(-shake, shake), 0f);
@@ -198,7 +204,7 @@ namespace GIC.UI
                     _toastContentRect.anchorMax = new Vector2(0.5f, 0.5f);
                     _toastContentRect.pivot = new Vector2(0.5f, 0.5f);
                     // 起始位置：屏幕顶部边缘之上（子节点锚定在屏幕中心，Y=半屏高度即顶部）
-                    _toastContentRect.anchoredPosition = new Vector2(0f, canvasHeight * 0.5f + 滑出距离);
+                    _toastContentRect.anchoredPosition = new Vector2(0f, canvasHeight * 0.5f + slideOutDist);
 
                     // 记录背景 Image 供强调动画使用
                     _toastBgImage = child.GetComponent<Image>();
@@ -281,14 +287,14 @@ namespace GIC.UI
             // 初始状态已在 SetupToastLayout 中设置（alpha=0, 内容位于 startPos）
             Vector2 startPos = _toastContentRect != null
                 ? _toastContentRect.anchoredPosition
-                : _toastTargetPos + new Vector2(0f, 滑出距离);
+                : _toastTargetPos + new Vector2(0f, slideOutDist);
 
             // 滑入 + 淡入
             float elapsed = 0f;
-            while (elapsed < 滑入时长)
+            while (elapsed < slideInDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / 滑入时长;
+                float t = elapsed / slideInDuration;
                 float eased = 1f - Mathf.Pow(1f - t, 3f);
                 if (canvasGroup != null) canvasGroup.alpha = eased;
                 if (_toastContentRect != null)
@@ -301,14 +307,14 @@ namespace GIC.UI
                 _toastContentRect.anchoredPosition = _toastTargetPos;
 
             // 停留
-            yield return Wait.Seconds(轻提示停留时长);
+            yield return Wait.Seconds(toastHoldDuration);
 
             // 滑出 + 淡出
             elapsed = 0f;
-            while (elapsed < 滑出时长)
+            while (elapsed < slideOutDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / 滑出时长;
+                float t = elapsed / slideOutDuration;
                 canvasGroup.alpha = 1f - t;
                 if (_toastContentRect != null)
                     _toastContentRect.anchoredPosition = Vector2.Lerp(_toastTargetPos, startPos, t);

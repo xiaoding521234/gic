@@ -247,7 +247,7 @@ namespace GIC.Editor
                 EnableKeyword(m, "_FACESHADOW", false);
                 if (outlineCol.a > 0f) m.SetColor("_OutlineColor", outlineCol); // default(Color) 全零=不覆盖
                 if (clipUV.z > clipUV.x) m.SetVector("_OutlineClipUV", clipUV);
-                log.AppendLine($"风格升级 {name} → v{styleVer}（纯贴图+基色暗化描边，UV裁剪={(clipUV.z > clipUV.x ? clipUV.ToString("F2") : "无")}）");
+                log.AppendLine($"风格升级 {name} → v{styleVer}（纯贴图+基色暗化描边，UV裁剪={(clipUV.z > clipUV.x ? clipUV.ToString("F2") : "none")}）");
             }
             EditorUtility.SetDirty(m);
         }

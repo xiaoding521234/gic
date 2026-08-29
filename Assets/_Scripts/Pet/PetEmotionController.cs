@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -17,36 +18,41 @@ namespace GIC.Pet
     public class PetEmotionController : MonoBehaviour
     {
         [System.Serializable]
-        public class Morph目标
+        public class MorphTarget
         {
-            [Tooltip("BlendShape 名")] public string Morph名;
-            [Tooltip("目标权重 0-100")] public float 权重 = 100f;
+            [Tooltip("BlendShape 名"), InspectorName("Morph名")] public string morphName;
+            [Tooltip("目标权重 0-100"), InspectorName("权重")] public float weight = 100f;
         }
 
         [System.Serializable]
-        public class 情绪配置
+        public class EmotionConfig
         {
-            [Tooltip("情绪名，与动作映射表对应")] public string 情绪名;
-            [Tooltip("morph 组合（同组同时淡入/保持/复位）")] public Morph目标[] Morph组合;
-            [Tooltip("淡入时长（秒）")] public float 过渡秒 = 0.25f;
-            [Tooltip("指令下发后延迟生效（秒，表情先行于动作爆发）")] public float 延迟秒 = 0f;
-            [Tooltip("保持时长（秒）；<0 = 持续到下一次指令；>0 = 到时自动回默认脸")] public float 保持秒 = -1f;
-            [Tooltip("复位时长（秒）")] public float 复位秒 = 0.33f;
+            [InspectorName("情绪名")]
+            [Tooltip("情绪名，与动作映射表对应")] public string emotionName;
+            [Tooltip("morph 组合（同组同时淡入/保持/复位）"), InspectorName("Morph组合")] public MorphTarget[] morphSet;
+            [Tooltip("淡入时长（秒）"), InspectorName("过渡秒")] public float TransitionSeconds = 0.25f;
+            [InspectorName("延迟秒")]
+            [Tooltip("指令下发后延迟生效（秒，表情先行于动作爆发）")] public float delaySec = 0f;
+            [InspectorName("保持秒")]
+            [Tooltip("保持时长（秒）；<0 = 持续到下一次指令；>0 = 到时自动回默认脸")] public float holdSec = -1f;
+            [InspectorName("复位秒")]
+            [Tooltip("复位时长（秒）")] public float resetSec = 0.33f;
         }
 
         [Header("情绪表（morph 组合映射，GI 官方 Face 网格 49 morph）")]
-        [SerializeField] private 情绪配置[] 情绪表 = new[]
+        [InspectorName("情绪表")]
+        [SerializeField] private EmotionConfig[] emotionTable = new[]
         {
-            new 情绪配置 { 情绪名 = "Anger", Morph组合 = new[] { new Morph目标 { Morph名 = "Mouth_Angry01" }, new Morph目标 { Morph名 = "Brow_Angry_L", 权重 = 80 }, new Morph目标 { Morph名 = "Brow_Angry_R", 权重 = 80 }, new Morph目标 { Morph名 = "Eye_Hostility", 权重 = 45 } } },
-            new 情绪配置 { 情绪名 = "Happy", Morph组合 = new[] { new Morph目标 { Morph名 = "Mouth_Smile01" }, new Morph目标 { Morph名 = "Brow_Smily_L", 权重 = 55 }, new Morph目标 { Morph名 = "Brow_Smily_R", 权重 = 55 } } },
-            new 情绪配置 { 情绪名 = "Sneer", Morph组合 = new[] { new Morph目标 { Morph名 = "Mouth_Smile04" }, new Morph目标 { Morph名 = "Eye_Jito", 权重 = 35 } } },
-            new 情绪配置 { 情绪名 = "Shy", Morph组合 = new[] { new Morph目标 { Morph名 = "Mouth_Smile05", 权重 = 85 }, new Morph目标 { Morph名 = "Brow_Shy_L", 权重 = 70 }, new Morph目标 { Morph名 = "Brow_Shy_R", 权重 = 70 } } },
-            new 情绪配置 { 情绪名 = "Confuse", Morph组合 = new[] { new Morph目标 { Morph名 = "Brow_Trouble_L" }, new Morph目标 { Morph名 = "Brow_Trouble_R" }, new Morph目标 { Morph名 = "Mouth_E01", 权重 = 30 } } },
-            new 情绪配置 { 情绪名 = "Think", Morph组合 = new[] { new Morph目标 { Morph名 = "Brow_Serious_L", 权重 = 65 }, new Morph目标 { Morph名 = "Brow_Serious_R", 权重 = 65 }, new Morph目标 { Morph名 = "Mouth_U01", 权重 = 30 } } },
-            new 情绪配置 { 情绪名 = "得意", Morph组合 = new[] { new Morph目标 { Morph名 = "Mouth_Doya01" }, new Morph目标 { Morph名 = "Brow_Up_L", 权重 = 45 }, new Morph目标 { Morph名 = "Brow_Up_R", 权重 = 45 } } },
-            new 情绪配置 { 情绪名 = "期待", Morph组合 = new[] { new Morph目标 { Morph名 = "Brow_Up_L", 权重 = 80 }, new Morph目标 { Morph名 = "Brow_Up_R", 权重 = 80 }, new Morph目标 { Morph名 = "Mouth_Smile03", 权重 = 55 } } },
-            new 情绪配置 { 情绪名 = "拒绝", Morph组合 = new[] { new Morph目标 { Morph名 = "Brow_Angry_L", 权重 = 55 }, new Morph目标 { Morph名 = "Brow_Angry_R", 权重 = 55 }, new Morph目标 { Morph名 = "Mouth_Line01", 权重 = 60 } } },
-            new 情绪配置 { 情绪名 = "Sleepy", Morph组合 = new[] { new Morph目标 { Morph名 = "Eye_Tired" }, new Morph目标 { Morph名 = "Mouth_N01", 权重 = 35 } } },
+            new EmotionConfig { emotionName = "Anger", morphSet = new[] { new MorphTarget { morphName = "Mouth_Angry01" }, new MorphTarget { morphName = "Brow_Angry_L", weight = 80 }, new MorphTarget { morphName = "Brow_Angry_R", weight = 80 }, new MorphTarget { morphName = "Eye_Hostility", weight = 45 } } },
+            new EmotionConfig { emotionName = "Happy", morphSet = new[] { new MorphTarget { morphName = "Mouth_Smile01" }, new MorphTarget { morphName = "Brow_Smily_L", weight = 55 }, new MorphTarget { morphName = "Brow_Smily_R", weight = 55 } } },
+            new EmotionConfig { emotionName = "Sneer", morphSet = new[] { new MorphTarget { morphName = "Mouth_Smile04" }, new MorphTarget { morphName = "Eye_Jito", weight = 35 } } },
+            new EmotionConfig { emotionName = "Shy", morphSet = new[] { new MorphTarget { morphName = "Mouth_Smile05", weight = 85 }, new MorphTarget { morphName = "Brow_Shy_L", weight = 70 }, new MorphTarget { morphName = "Brow_Shy_R", weight = 70 } } },
+            new EmotionConfig { emotionName = "Confuse", morphSet = new[] { new MorphTarget { morphName = "Brow_Trouble_L" }, new MorphTarget { morphName = "Brow_Trouble_R" }, new MorphTarget { morphName = "Mouth_E01", weight = 30 } } },
+            new EmotionConfig { emotionName = "Think", morphSet = new[] { new MorphTarget { morphName = "Brow_Serious_L", weight = 65 }, new MorphTarget { morphName = "Brow_Serious_R", weight = 65 }, new MorphTarget { morphName = "Mouth_U01", weight = 30 } } },
+            new EmotionConfig { emotionName = "得意", morphSet = new[] { new MorphTarget { morphName = "Mouth_Doya01" }, new MorphTarget { morphName = "Brow_Up_L", weight = 45 }, new MorphTarget { morphName = "Brow_Up_R", weight = 45 } } },
+            new EmotionConfig { emotionName = "期待", morphSet = new[] { new MorphTarget { morphName = "Brow_Up_L", weight = 80 }, new MorphTarget { morphName = "Brow_Up_R", weight = 80 }, new MorphTarget { morphName = "Mouth_Smile03", weight = 55 } } },
+            new EmotionConfig { emotionName = "拒绝", morphSet = new[] { new MorphTarget { morphName = "Brow_Angry_L", weight = 55 }, new MorphTarget { morphName = "Brow_Angry_R", weight = 55 }, new MorphTarget { morphName = "Mouth_Line01", weight = 60 } } },
+            new EmotionConfig { emotionName = "Sleepy", morphSet = new[] { new MorphTarget { morphName = "Eye_Tired" }, new MorphTarget { morphName = "Mouth_N01", weight = 35 } } },
         };
 
         private SkinnedMeshRenderer smr;
@@ -56,33 +62,33 @@ namespace GIC.Pet
         void Awake()
         {
             // 多 SMR 场景（2026-08-24 GI 官方模型）：morph 全在 Face SMR 上——取 morph 数最多的 SMR
-            smr = PetMeshQuery.取Morph最多渲染器(transform);
+            smr = PetMeshQuery.GetRichestMorphRenderer(transform);
         }
 
         /// <summary>
         /// 下发情绪（按情绪名查表）。重复下发同名情绪幂等重启；下发未知名清空当前情绪回默认脸。
         /// </summary>
-        public void SetEmotion(string 情绪名)
+        public void SetEmotion(string emotionName)
         {
             if (smr == null) return;
             if (activeRoutine != null) StopCoroutine(activeRoutine);
             ResetCurrent();
 
             int idx = -1;
-            for (int i = 0; i < 情绪表.Length; i++)
-                if (情绪表[i].情绪名 == 情绪名) { idx = i; break; }
+            for (int i = 0; i < emotionTable.Length; i++)
+                if (emotionTable[i].emotionName == emotionName) { idx = i; break; }
             if (idx < 0) return; // 未知名=仅清空
 
             currentIdx = idx;
-            activeRoutine = StartCoroutine(EmotionRoutine(情绪表[idx]));
+            activeRoutine = StartCoroutine(EmotionRoutine(emotionTable[idx]));
         }
 
         void ResetCurrent()
         {
             if (currentIdx < 0) return;
-            foreach (var m in 情绪表[currentIdx].Morph组合)
+            foreach (var m in emotionTable[currentIdx].morphSet)
             {
-                var idx = MorphIndex(m.Morph名);
+                var idx = MorphIndex(m.morphName);
                 if (idx >= 0) smr.SetBlendShapeWeight(idx, 0f);
             }
             currentIdx = -1;
@@ -96,23 +102,23 @@ namespace GIC.Pet
             return idx;
         }
 
-        IEnumerator EmotionRoutine(情绪配置 cfg)
+        IEnumerator EmotionRoutine(EmotionConfig cfg)
         {
-            var targets = new (int idx, float weight)[cfg.Morph组合.Length];
-            for (int i = 0; i < cfg.Morph组合.Length; i++)
+            var targets = new (int idx, float weight)[cfg.morphSet.Length];
+            for (int i = 0; i < cfg.morphSet.Length; i++)
             {
-                var idx = MorphIndex(cfg.Morph组合[i].Morph名);
+                var idx = MorphIndex(cfg.morphSet[i].morphName);
                 if (idx < 0) yield break;
-                targets[i] = (idx, cfg.Morph组合[i].权重);
+                targets[i] = (idx, cfg.morphSet[i].weight);
             }
-            if (cfg.延迟秒 > 0f) yield return new WaitForSeconds(cfg.延迟秒);
+            if (cfg.delaySec > 0f) yield return new WaitForSeconds(cfg.delaySec);
 
             // 淡入
             float t = 0f;
-            while (t < cfg.过渡秒)
+            while (t < cfg.TransitionSeconds)
             {
                 t += Time.deltaTime;
-                float k = Mathf.Clamp01(t / Mathf.Max(cfg.过渡秒, 1e-5f));
+                float k = Mathf.Clamp01(t / Mathf.Max(cfg.TransitionSeconds, 1e-5f));
                 foreach (var (idx, weight) in targets)
                     smr.SetBlendShapeWeight(idx, k * weight);
                 yield return null;
@@ -121,15 +127,15 @@ namespace GIC.Pet
                 smr.SetBlendShapeWeight(idx, weight);
 
             // 保持（<0 = 持续到下一次指令）
-            if (cfg.保持秒 >= 0f)
+            if (cfg.holdSec >= 0f)
             {
-                yield return new WaitForSeconds(cfg.保持秒);
+                yield return new WaitForSeconds(cfg.holdSec);
                 // 复位（动作被打断时 SetEmotion 会 StopCoroutine，复位中断=正确）
                 float r = 0f;
-                while (r < cfg.复位秒)
+                while (r < cfg.resetSec)
                 {
                     r += Time.deltaTime;
-                    float k = 1f - Mathf.Clamp01(r / Mathf.Max(cfg.复位秒, 1e-5f));
+                    float k = 1f - Mathf.Clamp01(r / Mathf.Max(cfg.resetSec, 1e-5f));
                     foreach (var (idx, weight) in targets)
                         smr.SetBlendShapeWeight(idx, k * weight);
                     yield return null;

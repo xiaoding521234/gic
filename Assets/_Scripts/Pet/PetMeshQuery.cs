@@ -11,10 +11,10 @@ namespace GIC.Pet
     {
         /// <summary>取子树下 BlendShape 数最多的蒙皮渲染器（morph 全在 Face 网格上）。
         /// 无 SMR 或网格全空时返回 null。</summary>
-        public static SkinnedMeshRenderer 取Morph最多渲染器(Transform 根)
+        public static SkinnedMeshRenderer GetRichestMorphRenderer(Transform root)
         {
             SkinnedMeshRenderer best = null;
-            foreach (var s in 根.GetComponentsInChildren<SkinnedMeshRenderer>())
+            foreach (var s in root.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
                 if (s.sharedMesh == null) continue;
                 if (best == null || s.sharedMesh.blendShapeCount > best.sharedMesh.blendShapeCount) best = s;

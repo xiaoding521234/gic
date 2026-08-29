@@ -43,49 +43,49 @@ namespace GIC.Pet.Chat
     {
         [Header("端点与模型（模型名 2026-07-24 已换代，勿用 deepseek-chat）")]
         [Tooltip("OpenAI 兼容端点。strict 工具校验用 https://api.deepseek.com/beta（Beta）")]
-        [FormerlySerializedAs("baseUrl")]
-        [SerializeField] private string 端点地址 = "https://api.deepseek.com";
+        [InspectorName("端点地址")]
+        [SerializeField] private string endpoint = "https://api.deepseek.com";
         [Tooltip("模型名：deepseek-v4-flash（默认，便宜/并发高）/ deepseek-v4-pro（高质量配置项）")]
-        [FormerlySerializedAs("model")]
-        [SerializeField] private string 模型名 = "deepseek-v4-flash";
+        [InspectorName("模型名")]
+        [SerializeField] private string modelName = "deepseek-v4-flash";
         [Tooltip("温度。陪伴对话 0.7~0.9 自然；工具规划场景可低")]
-        [FormerlySerializedAs("temperature")]
-        [SerializeField, Range(0f, 2f)] private float 温度 = 0.8f;
+        [InspectorName("温度")]
+        [SerializeField, Range(0f, 2f)] private float temperature = 0.8f;
 
         [Header("密钥（留空=读玩家存档密文，再兜底环境变量）")]
-        [FormerlySerializedAs("apiKeyOverride")]
-        [SerializeField] private string 密钥覆盖 = "";
+        [InspectorName("密钥覆盖")]
+        [SerializeField] private string apiKeyOverride = "";
 
         [Header("网络")]
         [Tooltip("请求超时秒（流式=首字节超时；流开始后不限）")]
-        [FormerlySerializedAs("timeoutSeconds")]
-        [SerializeField] private float 超时秒 = 30f;
+        [InspectorName("超时秒")]
+        [SerializeField] private float timeoutSec = 30f;
 
         // 薄层回调（非 event：字段可直接赋值。约定——会话层只摘自己接的处理器（持引用 -=），
         // 勿整体置 null：UI 层的 正文增量/错误 先于会话接线，整体置 null 会抹掉它们——
         // 2026-08-29 "发送后无回复无报错" 事故实证）
         [Tooltip("流式事件：正文增量（打字机）/思考增量（可忽略显示）/工具调用完成（Intent 层执行）/完成/错误")]
-        public Action<string> 正文增量;
-        public Action<string> 思考增量;
-        public Action<List<ToolCallResult>> 工具调用;
-        public Action<string> 完成;       // 全量正文（无工具时=回复全文）
-        public Action<string> 错误;
+        public Action<string> onContentDelta;
+        public Action<string> onReasoningDelta;
+        public Action<List<ToolCallResult>> onToolCalls;
+        public Action<string> onComplete;       // 全量正文（无工具时=回复全文）
+        public Action<string> onError;
 
-        private HttpClient _网络客户端;
+        private HttpClient _http;
 
         /// <summary>取 key（2026-08-29 改为不缓存——每请求现读 pet.json 解密）：原"缓存到首次成功"
         /// 有死雷——设置里改 key 后无人调 清除密钥缓存（方法零调用方），游戏内形态实例不重启=永远用
         /// 旧 key（上轮被截断的残 key 重输也无效）。聊天是用户触发的低频操作，每请求一次小文件读+
         /// AES 解密开销可忽略，换来"改 key 即生效"。优先级：Inspector override > 存档密文 > 环境变量。</summary>
-        private string 密钥
+        private string apiKey
         {
             get
             {
-                if (!string.IsNullOrEmpty(密钥覆盖)) return 密钥覆盖;
+                if (!string.IsNullOrEmpty(apiKeyOverride)) return apiKeyOverride;
                 // 玩家设置的 key：设置界面写入 pet.json 对话密文（桌面进程与主进程共用 persistentDataPath）
-                string 存档密文 = PetPrefs.读取().对话密文;
-                string 明文 = PetApiKeyCrypto.解密(存档密文);
-                if (!string.IsNullOrEmpty(明文)) return 明文;
+                string saveCipher = PetPrefs.Load().chatCipher;
+                string plain = PetApiKeyCrypto.Decrypt(saveCipher);
+                if (!string.IsNullOrEmpty(plain)) return plain;
                 // 开发兜底：环境变量（编辑器/本机调试）
                 return Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
             }
@@ -138,171 +138,171 @@ namespace GIC.Pet.Chat
 
         void Awake()
         {
-            _网络客户端 = new HttpClient(new HttpClientHandler());
-            _网络客户端.Timeout = TimeSpan.FromSeconds(超时秒);
-            _网络客户端.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            _http = new HttpClient(new HttpClientHandler());
+            _http.Timeout = TimeSpan.FromSeconds(timeoutSec);
+            _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
         void OnDestroy()
         {
-            _网络客户端?.Dispose();
-            _网络客户端 = null;
+            _http?.Dispose();
+            _http = null;
         }
 
         /// <summary>流式对话（桌宠主路径：打字机气泡+工具指令）。可取消（CancellationToken）。
         /// 完成时 完成 给全量正文；有工具调用时 工具调用 给解析好的调用列表（Intent 层执行后
         /// 把 role:"tool" 结果 append 进历史再发起下一轮流式——工具循环由调用方驱动，本层不自动循环）。</summary>
-        public async void 请求流式(List<ChatMessage> 消息列表, List<ToolDefinition> 工具列表 = null, CancellationToken 取消令牌 = default)
+        public async void RequestStream(List<ChatMessage> messages, List<ToolDefinition> tools = null, CancellationToken ct = default)
         {
-            if (string.IsNullOrEmpty(密钥))
+            if (string.IsNullOrEmpty(apiKey))
             {
-                错误?.Invoke("未设置对话 API Key（设置→派蒙→对话 API Key；开发可用环境变量 DEEPSEEK_API_KEY）");
+                onError?.Invoke("未设置对话 API Key（设置→派蒙→对话 API Key；开发可用环境变量 DEEPSEEK_API_KEY）");
                 return;
             }
             try
             {
-                var 请求体 = 构建请求体(消息列表, 工具列表, 流式: true);
-                using (var 请求 = new HttpRequestMessage(HttpMethod.Post, 端点地址.TrimEnd('/') + "/chat/completions"))
+                var requestBody = BuildRequestBody(messages, tools, stream: true);
+                using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint.TrimEnd('/') + "/chat/completions"))
                 {
-                    请求.Content = new StringContent(请求体, Encoding.UTF8, "application/json");
-                    请求.Headers.Authorization = new AuthenticationHeaderValue("Bearer", 密钥);
-                    using (var 响应 = await _网络客户端.SendAsync(请求, HttpCompletionOption.ResponseHeadersRead, 取消令牌))
+                    request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                    using (var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct))
                     {
-                        响应.EnsureSuccessStatusCode();
-                        await 解析流式响应(响应, 取消令牌);
+                        response.EnsureSuccessStatusCode();
+                        await ParseStreamResponse(response, ct);
                     }
                 }
             }
             catch (Exception e)
             {
                 if (!(e is OperationCanceledException))
-                    错误?.Invoke(e.Message);
+                    onError?.Invoke(e.Message);
             }
         }
 
         // ---- 内部：请求体与 SSE ----
 
-        private string 构建请求体(List<ChatMessage> 消息列表, List<ToolDefinition> 工具列表, bool 流式)
+        private string BuildRequestBody(List<ChatMessage> messages, List<ToolDefinition> tools, bool stream)
         {
-            var 根对象 = new Newtonsoft.Json.Linq.JObject
+            var rootObj = new Newtonsoft.Json.Linq.JObject
             {
-                ["model"] = 模型名,
-                ["messages"] = 序列化消息(消息列表),
-                ["stream"] = 流式,
-                ["temperature"] = 温度,
+                ["model"] = modelName,
+                ["messages"] = SerializeMessages(messages),
+                ["stream"] = stream,
+                ["temperature"] = temperature,
             };
-            if (工具列表 != null && 工具列表.Count > 0)
+            if (tools != null && tools.Count > 0)
             {
-                var 工具数组 = new Newtonsoft.Json.Linq.JArray();
-                foreach (var 工具 in 工具列表)
-                    工具数组.Add(new Newtonsoft.Json.Linq.JObject
+                var toolsArr = new Newtonsoft.Json.Linq.JArray();
+                foreach (var tool in tools)
+                    toolsArr.Add(new Newtonsoft.Json.Linq.JObject
                     {
                         ["type"] = "function",
                         ["function"] = new Newtonsoft.Json.Linq.JObject
                         {
-                            ["name"] = 工具.function.name,
-                            ["description"] = 工具.function.description,
-                            ["parameters"] = Newtonsoft.Json.Linq.JObject.Parse(工具.function.parameters),
+                            ["name"] = tool.function.name,
+                            ["description"] = tool.function.description,
+                            ["parameters"] = Newtonsoft.Json.Linq.JObject.Parse(tool.function.parameters),
                         }
                     });
-                根对象["tools"] = 工具数组;
+                rootObj["tools"] = toolsArr;
             }
-            return 根对象.ToString(Newtonsoft.Json.Formatting.None);
+            return rootObj.ToString(Newtonsoft.Json.Formatting.None);
         }
 
         /// <summary>消息序列化（含 assistant.tool_calls / role:"tool" 回执——薄层全量支持，勿裁剪）</summary>
-        internal static Newtonsoft.Json.Linq.JArray 序列化消息(List<ChatMessage> 消息列表)
+        internal static Newtonsoft.Json.Linq.JArray SerializeMessages(List<ChatMessage> messages)
         {
-            var 数组 = new Newtonsoft.Json.Linq.JArray();
-            foreach (var 消息 in 消息列表)
+            var arr = new Newtonsoft.Json.Linq.JArray();
+            foreach (var msg in messages)
             {
-                var 消息对象 = new Newtonsoft.Json.Linq.JObject { ["role"] = 消息.role };
-                if (消息.content != null) 消息对象["content"] = 消息.content; else 消息对象["content"] = "";
-                if (消息.tool_calls != null && 消息.tool_calls.Count > 0)
+                var msgObj = new Newtonsoft.Json.Linq.JObject { ["role"] = msg.role };
+                if (msg.content != null) msgObj["content"] = msg.content; else msgObj["content"] = "";
+                if (msg.tool_calls != null && msg.tool_calls.Count > 0)
                 {
-                    var 调用数组 = new Newtonsoft.Json.Linq.JArray();
-                    foreach (var 调用 in 消息.tool_calls)
-                        调用数组.Add(new Newtonsoft.Json.Linq.JObject
+                    var callArr = new Newtonsoft.Json.Linq.JArray();
+                    foreach (var call in msg.tool_calls)
+                        callArr.Add(new Newtonsoft.Json.Linq.JObject
                         {
-                            ["id"] = 调用.id,
+                            ["id"] = call.id,
                             ["type"] = "function",
                             ["function"] = new Newtonsoft.Json.Linq.JObject
                             {
-                                ["name"] = 调用.function.name,
-                                ["arguments"] = 调用.function.arguments,
+                                ["name"] = call.function.name,
+                                ["arguments"] = call.function.arguments,
                             }
                         });
-                    消息对象["tool_calls"] = 调用数组;
+                    msgObj["tool_calls"] = callArr;
                 }
-                if (!string.IsNullOrEmpty(消息.tool_call_id)) 消息对象["tool_call_id"] = 消息.tool_call_id;
-                数组.Add(消息对象);
+                if (!string.IsNullOrEmpty(msg.tool_call_id)) msgObj["tool_call_id"] = msg.tool_call_id;
+                arr.Add(msgObj);
             }
-            return 数组;
+            return arr;
         }
 
         /// <summary>SSE 流式响应逐行解析（2026-08-28 网检规格）：delta 三通道（reasoning_content 思考
         /// 增量 / content 正文增量 / tool_calls 按 index 拼接：name 首块、arguments 分片累加）；
         /// data: [DONE] 结束。finish_reason=tool_calls 时把拼接结果经 工具调用 交 Intent 层。</summary>
-        private async Task 解析流式响应(HttpResponseMessage 响应, CancellationToken 取消令牌)
+        private async Task ParseStreamResponse(HttpResponseMessage response, CancellationToken ct)
         {
-            var 正文拼接 = new StringBuilder();
-            var 工具调用表 = new Dictionary<int, ToolCallResult>();
-            string 结束原因 = null;
+            var contentJoin = new StringBuilder();
+            var toolCallTable = new Dictionary<int, ToolCallResult>();
+            string finishReason = null;
 
-            using (var 流 = await 响应.Content.ReadAsStreamAsync())
-            using (var 读取器 = new System.IO.StreamReader(流, Encoding.UTF8))
+            using (var 流 = await response.Content.ReadAsStreamAsync())
+            using (var reader = new System.IO.StreamReader(流, Encoding.UTF8))
             {
-                while (!读取器.EndOfStream && !取消令牌.IsCancellationRequested)
+                while (!reader.EndOfStream && !ct.IsCancellationRequested)
                 {
-                    string 行 = await 读取器.ReadLineAsync();
-                    if (string.IsNullOrEmpty(行) || !行.StartsWith("data:", StringComparison.Ordinal)) continue;
-                    string 数据 = 行.Substring(5).Trim();
-                    if (数据 == "[DONE]") break;
+                    string line = await reader.ReadLineAsync();
+                    if (string.IsNullOrEmpty(line) || !line.StartsWith("data:", StringComparison.Ordinal)) continue;
+                    string data = line.Substring(5).Trim();
+                    if (data == "[DONE]") break;
 
-                    var 块 = Newtonsoft.Json.Linq.JObject.Parse(数据);
-                    var 增量 = 块["choices"]?[0]?["delta"];
-                    if (增量 == null) continue;
+                    var block = Newtonsoft.Json.Linq.JObject.Parse(data);
+                    var delta = block["choices"]?[0]?["delta"];
+                    if (delta == null) continue;
 
-                    if (增量["reasoning_content"] is Newtonsoft.Json.Linq.JValue 思考值 && 思考值.Value != null)
-                        思考增量?.Invoke(思考值.Value<string>());
+                    if (delta["reasoning_content"] is Newtonsoft.Json.Linq.JValue thinkingValue && thinkingValue.Value != null)
+                        onReasoningDelta?.Invoke(thinkingValue.Value<string>());
 
-                    if (增量["content"] is Newtonsoft.Json.Linq.JValue 正文值 && 正文值.Value != null)
+                    if (delta["content"] is Newtonsoft.Json.Linq.JValue contentValue && contentValue.Value != null)
                     {
-                        string 片段 = 正文值.Value<string>();
-                        正文拼接.Append(片段);
-                        正文增量?.Invoke(片段);
+                        string clip = contentValue.Value<string>();
+                        contentJoin.Append(clip);
+                        onContentDelta?.Invoke(clip);
                     }
 
-                    if (增量["tool_calls"] is Newtonsoft.Json.Linq.JArray 调用块数组)
+                    if (delta["tool_calls"] is Newtonsoft.Json.Linq.JArray callBlocks)
                     {
-                        foreach (var 调用块 in 调用块数组)
+                        foreach (var callBlock in callBlocks)
                         {
-                            int 序号 = 调用块["index"]?.Value<int>() ?? 0;
-                            if (!工具调用表.TryGetValue(序号, out var 调用结果))
-                                工具调用表[序号] = 调用结果 = new ToolCallResult { index = 序号 };
-                            if (调用块["id"] is Newtonsoft.Json.Linq.JValue 标识值 && 标识值.Value != null)
-                                调用结果.id = 标识值.Value<string>();
-                            var 函数块 = 调用块["function"];
-                            if (函数块?["name"] is Newtonsoft.Json.Linq.JValue 名称值 && 名称值.Value != null)
-                                调用结果.function.name = 名称值.Value<string>();
-                            if (函数块?["arguments"] is Newtonsoft.Json.Linq.JValue 参数值 && 参数值.Value != null)
-                                调用结果.function.arguments = (调用结果.function.arguments ?? "") + 参数值.Value<string>();
+                            int serialNum = callBlock["index"]?.Value<int>() ?? 0;
+                            if (!toolCallTable.TryGetValue(serialNum, out var callResult))
+                                toolCallTable[serialNum] = callResult = new ToolCallResult { index = serialNum };
+                            if (callBlock["id"] is Newtonsoft.Json.Linq.JValue idValue && idValue.Value != null)
+                                callResult.id = idValue.Value<string>();
+                            var 函数块 = callBlock["function"];
+                            if (函数块?["name"] is Newtonsoft.Json.Linq.JValue nameValue && nameValue.Value != null)
+                                callResult.function.name = nameValue.Value<string>();
+                            if (函数块?["arguments"] is Newtonsoft.Json.Linq.JValue paramValue && paramValue.Value != null)
+                                callResult.function.arguments = (callResult.function.arguments ?? "") + paramValue.Value<string>();
                         }
                     }
 
-                    var 结束原因块 = 块["choices"]?[0]?["finish_reason"];
-                    if (结束原因块 is Newtonsoft.Json.Linq.JValue 结束原因值 && 结束原因值.Value != null)
-                        结束原因 = 结束原因值.Value<string>();
+                    var finishReasonBlock = block["choices"]?[0]?["finish_reason"];
+                    if (finishReasonBlock is Newtonsoft.Json.Linq.JValue finishReasonValue && finishReasonValue.Value != null)
+                        finishReason = finishReasonValue.Value<string>();
                 }
             }
 
-            if (!string.IsNullOrEmpty(结束原因) && 结束原因 == "tool_calls")
+            if (!string.IsNullOrEmpty(finishReason) && finishReason == "tool_calls")
             {
-                var 调用列表 = new List<ToolCallResult>(工具调用表.Values);
-                调用列表.Sort((a, b) => a.index.CompareTo(b.index));
-                工具调用?.Invoke(调用列表);
+                var callList = new List<ToolCallResult>(toolCallTable.Values);
+                callList.Sort((a, b) => a.index.CompareTo(b.index));
+                onToolCalls?.Invoke(callList);
             }
-            完成?.Invoke(正文拼接.ToString());
+            onComplete?.Invoke(contentJoin.ToString());
         }
     }
 }

@@ -487,7 +487,6 @@ MonoBehaviour:
   holdDuration: 0.5
   fadeOutDuration: 0.7
   skipAnimation: 0
-  skipKey: 32
 --- !u!1 &1700607984
 GameObject:
   m_ObjectHideFlags: 0

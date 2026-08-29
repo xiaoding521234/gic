@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -15,13 +16,18 @@ namespace GIC.Pet
     public class PetBlinkController : MonoBehaviour
     {
         [Header("眨眼参数")]
-        [SerializeField] private float 最小间隔秒 = 2.5f;   // 真人眨眼间隔 2-10s，取下段贴近原神观感
-        [SerializeField] private float 最大间隔秒 = 5.5f;
-        [SerializeField] private float 眨眼时长秒 = 0.13f;  // 升 0.05s 保持 0.03s 降 0.05s
+        [InspectorName("最小间隔秒")]
+        [SerializeField] private float minIntervalSec = 2.5f;   // 真人眨眼间隔 2-10s，取下段贴近原神观感
+        [InspectorName("最大间隔秒")]
+        [SerializeField] private float maxIntervalSec = 5.5f;
+        [InspectorName("眨眼时长秒")]
+        [SerializeField] private float blinkDurationSec = 0.13f;  // 升 0.05s 保持 0.03s 降 0.05s
 
         [Header("morph 名（2026-08-24 官方模型适配：默认 MMD 名，GI 官方模型配 Eye_WinkA）")]
-        [SerializeField] private string 左眨眼morph名 = "ウィンク";
-        [SerializeField] private string 右眨眼morph名 = "ウィンク右";
+        [InspectorName("左眨眼morph名")]
+        [SerializeField] private string leftBlinkMorph = "ウィンク";
+        [InspectorName("右眨眼morph名")]
+        [SerializeField] private string rightBlinkMorph = "ウィンク右";
 
         private SkinnedMeshRenderer smr;
         private int winkL = -1, winkR = -1; // ウィンク / ウィンク右（MMD 无まばたき，双眼同权重合成）
@@ -29,10 +35,10 @@ namespace GIC.Pet
         private bool _静默; // 单次动作期间暂停眨眼（2026-08-24：morph 重评估与动作叠加互相放大顿挫，1-4s 动作少眨一次不可见）
 
         /// <summary>单次动作期间静默眨眼（PetBehaviorController 调；回待机时恢复）</summary>
-        public void Set静默(bool 静默)
+        public void Set静默(bool silent)
         {
-            _静默 = 静默;
-            if (静默 && smr != null && winkL >= 0)
+            _静默 = silent;
+            if (silent && smr != null && winkL >= 0)
             {
                 smr.SetBlendShapeWeight(winkL, 0f);
                 smr.SetBlendShapeWeight(winkR, 0f);
@@ -42,11 +48,11 @@ namespace GIC.Pet
         void Awake()
         {
             // 多 SMR 场景（2026-08-24 GI 官方模型）：Body/Cloak/EyeStar/Face 并列，morph 全在 Face 上
-            smr = PetMeshQuery.取Morph最多渲染器(transform);
+            smr = PetMeshQuery.GetRichestMorphRenderer(transform);
             if (smr == null) { enabled = false; return; }
             var mesh = smr.sharedMesh;
-            winkL = mesh.GetBlendShapeIndex(左眨眼morph名);
-            winkR = mesh.GetBlendShapeIndex(右眨眼morph名);
+            winkL = mesh.GetBlendShapeIndex(leftBlinkMorph);
+            winkR = mesh.GetBlendShapeIndex(rightBlinkMorph);
             if (winkL < 0 || winkR < 0)
             {
                 Debug.LogWarning($"[PetBlink] 模型缺少眨眼 morph（ウィンク={winkL} ウィンク右={winkR}），眨眼已禁用");
@@ -71,15 +77,15 @@ namespace GIC.Pet
             while (true)
             {
                 // 零分配等待（原 WaitForSeconds 每次 new 一个对象——GC 源之一，2026-08-24 实测基线 GC≈1.2 次/s）
-                float wait = Random.Range(最小间隔秒, 最大间隔秒);
+                float wait = Random.Range(minIntervalSec, maxIntervalSec);
                 float t0 = Time.time;
                 while (Time.time - t0 < wait || _静默) yield return null;
-                PetDiag.上次眨眼 = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
+                PetDiag.LastBlink = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
                 float t = 0f;
-                while (t < 眨眼时长秒 && !_静默)
+                while (t < blinkDurationSec && !_静默)
                 {
                     t += Time.deltaTime;
-                    float w = BlinkWeight(t / 眨眼时长秒) * 100f;
+                    float w = BlinkWeight(t / blinkDurationSec) * 100f;
                     smr.SetBlendShapeWeight(winkL, w);
                     smr.SetBlendShapeWeight(winkR, w);
                     yield return null;

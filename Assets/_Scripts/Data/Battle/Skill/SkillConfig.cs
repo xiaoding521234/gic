@@ -57,7 +57,7 @@ namespace GIC.Data
                 return defaultValue;
             }
 
-            #region 本地化 Entry 获取方法
+            #region localization Entry 获取方法
 
             /// <summary>
             /// 获取技能名称的 Entry（用于 TextCombiner）

@@ -143,7 +143,7 @@ namespace GIC.UI
             base.OnDestroy();
         }
 
-        #region 事件绑定
+        #region evtBind
 
         private void BindButtonEvents()
         {

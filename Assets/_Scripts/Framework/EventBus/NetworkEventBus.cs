@@ -108,7 +108,7 @@ namespace GIC.Framework
             }
         }
 
-        #region 发送
+        #region Send
 
         public void SendToAll(BaseEvent eventData)
         {

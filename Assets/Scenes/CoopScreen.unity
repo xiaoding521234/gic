@@ -4327,10 +4327,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   roomPanel: {fileID: 381494345}
-  roomTitleText: {fileID: 1641048479}
-  roomIPText: {fileID: 2114907711}
-  roomPortText: {fileID: 1509814158}
-  roomBoardText: {fileID: 1176793314}
+  roomTitleObj: {fileID: 1641048479}
+  roomIPObj: {fileID: 2114907711}
+  roomPortObj: {fileID: 1509814158}
+  roomBoardObj: {fileID: 1176793314}
   playerListContent: {fileID: 970459012}
   playerRowPrefab: {fileID: 3826886442150762736, guid: 7a945575b59f0f84187aeb577c5c3a09, type: 3}
   leaveRoomButton: {fileID: 1811818630}
@@ -4339,7 +4339,7 @@ MonoBehaviour:
   serverListPanel: {fileID: 758336477}
   serverButtonPrefab: {fileID: 6928491403180633054, guid: 770541cbfb4b09a4a87e2ce00c1d9b51, type: 3}
   serverListContent: {fileID: 747978172}
-  emptyRoomHint: {fileID: 141982217}
+  emptyRoomHintObj: {fileID: 141982217}
   boardDropdown: {fileID: 1216869303}
 --- !u!4 &1363252939
 Transform:

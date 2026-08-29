@@ -11,7 +11,7 @@ namespace GIC.Data
 
     public enum PositionName
     {
-        #region 挪德地区 (1000-1999)  // 挪德对应 RegionName.Nodkrai = 1
+        #region NordRegion (1000-1999)  // 挪德对应 RegionName.Nodkrai = 1
         [InspectorName("星砂滩")]
         StarsandShoal = 1001,
         
@@ -22,7 +22,7 @@ namespace GIC.Data
         NashaTown = 1003,
         #endregion
 
-        #region 蒙德地区 (2000-2999)  // 蒙德对应 RegionName.Mondstadt = 2
+        #region MondRegion (2000-2999)  // 蒙德对应 RegionName.Mondstadt = 2
         [InspectorName("风龙废墟")]
         StormterrorLair = 2001,
 
@@ -45,7 +45,7 @@ namespace GIC.Data
         DragonspineFoot = 2007,
         #endregion
 
-        #region 璃月地区 (3000-3999)  // 璃月对应 RegionName.Liyue = 3
+        #region LiyueRegion (3000-3999)  // 璃月对应 RegionName.Liyue = 3
         [InspectorName("瑶光滩")]
         YaoguangShoal = 3001,
 
@@ -68,28 +68,28 @@ namespace GIC.Data
         WangshuInn = 3007,
         #endregion
 
-        #region 稻妻地区 (4000-4999)  // 稻妻对应 RegionName.Inazuma = 4
+        #region InazumaRegion (4000-4999)  // 稻妻对应 RegionName.Inazuma = 4
         // 待添加
         #endregion
 
-        #region 须弥地区 (5000-5999)  // 须弥对应 RegionName.Sumeru = 5
+        #region SumeruRegion (5000-5999)  // 须弥对应 RegionName.Sumeru = 5
         // 待添加
         #endregion
 
-        #region 枫丹地区 (6000-6999)  // 枫丹对应 RegionName.Fontaine = 6
+        #region FontaineRegion (6000-6999)  // 枫丹对应 RegionName.Fontaine = 6
         // 待添加
         #endregion
 
-        #region 纳塔地区 (7000-7999)  // 纳塔对应 RegionName.Natlan = 7
+        #region NatlanRegion (7000-7999)  // 纳塔对应 RegionName.Natlan = 7
         // 待添加
         #endregion
 
-        #region 至冬地区 (8000-8999)  // 至冬对应 RegionName.Snezhnaya = 8
+        #region SnezhnayaRegion (8000-8999)  // 至冬对应 RegionName.Snezhnaya = 8
         [InspectorName("至冬堡")]
         SnezhnayaCastle = 8001,
         #endregion
 
-        #region 坎瑞亚地区 (9000-9999)  // 坎瑞亚对应 RegionName.Khaenriah = 9
+        #region KhaenriahRegion (9000-9999)  // 坎瑞亚对应 RegionName.Khaenriah = 9
         // 待添加
         #endregion
     }

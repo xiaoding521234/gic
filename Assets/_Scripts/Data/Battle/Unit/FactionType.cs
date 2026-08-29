@@ -14,57 +14,57 @@ namespace GIC.Data
     /// </summary>
     public enum FactionType
     {
-        #region 天空岛 (1001)
+        #region Celestia (1001)
         [InspectorName("天空岛")]
         Celestia = 1001,
         #endregion
 
-        #region 挪德卡莱 (2001)
+        #region Nordkalai (2001)
         [InspectorName("挪德")]
         Nodkrai = 2001,
         #endregion
 
-        #region 蒙德 (3001)
+        #region Mondstadt (3001)
         [InspectorName("蒙德")]
         Mondstadt = 3001,
         #endregion
 
-        #region 璃月 (4001)
+        #region Liyue (4001)
         [InspectorName("璃月")]
         Liyue = 4001,
         #endregion
 
-        #region 稻妻 (5001)
+        #region Inazuma (5001)
         [InspectorName("稻妻")]
         Inazuma = 5001,
         #endregion
 
-        #region 须弥 (6001)
+        #region Sumeru (6001)
         [InspectorName("须弥")]
         Sumeru = 6001,
         #endregion
 
-        #region 枫丹 (7001)
+        #region Fontaine (7001)
         [InspectorName("枫丹")]
         Fontaine = 7001,
         #endregion
 
-        #region 纳塔 (8001)
+        #region Natlan (8001)
         [InspectorName("纳塔")]
         Natlan = 8001,
         #endregion
 
-        #region 至冬 (9001)
+        #region Snezhnaya (9001)
         [InspectorName("至冬")]
         Snezhnaya = 9001,
         #endregion
 
-        #region 坎瑞亚 (10001)
+        #region Khaenriah (10001)
         [InspectorName("坎瑞亚")]
         Khaenriah = 10001,
         #endregion
 
-        #region 特殊 (11001)
+        #region special (11001)
         [InspectorName("特殊")]
         Special = 11001,
         #endregion

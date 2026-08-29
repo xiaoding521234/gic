@@ -386,7 +386,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 存档兼容性
+        #region saveCompat
 
         /// <summary>
         /// 存档兼容性检查。

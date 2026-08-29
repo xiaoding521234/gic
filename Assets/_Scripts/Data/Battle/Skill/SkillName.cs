@@ -142,7 +142,7 @@ namespace GIC.Data
         Venti_Constellation = 3008005,
         #endregion
 
-        #region 空/旅行者 (11002)
+        #region empty/旅行者 (11002)
         [InspectorName("风涡剑")]
         Traveler_WindBlade = 11002001,
 

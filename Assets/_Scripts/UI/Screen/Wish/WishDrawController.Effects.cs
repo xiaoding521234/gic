@@ -12,7 +12,7 @@ namespace GIC.UI
     /// </summary>
     public partial class WishDrawController
     {
-        #region 边缘泛光
+        #region edgeBloom
 
         /// <summary>
         /// 创建屏幕边缘泛光 Image（drawRoot 的子物体，随 drawRoot 显隐）
@@ -36,7 +36,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 光柱爆发
+        #region pillarBurst
 
         /// <summary>
         /// 光柱爆发特效——在卡道中心播放，颜色和强度取决于星级
@@ -71,7 +71,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 命运之线
+        #region fateLine
 
         private IEnumerator FateLineCoroutine(bool isEncounter = false)
         {

@@ -16,12 +16,12 @@ namespace GIC.Data
     /// </summary>
     public enum UnitName
     {
-        #region 天空岛 (1001)
+        #region Celestia (1001)
         [InspectorName("派蒙")]
         Paimon = 1001,
         #endregion
 
-        #region 挪德卡莱 (2001-2999)
+        #region Nordkalai (2001-2999)
         [InspectorName("兹白")]
         Zibai = 2001,
 
@@ -34,7 +34,7 @@ namespace GIC.Data
         Columbina = 2004,
         #endregion
 
-        #region 蒙德 (3001-3999)
+        #region Mondstadt (3001-3999)
         [InspectorName("安柏")]
         Amber = 3001,
 
@@ -72,7 +72,7 @@ namespace GIC.Data
         Noelle = 3012,
         #endregion
 
-        #region 璃月 (4001-4999)
+        #region Liyue (4001-4999)
         [InspectorName("行秋")]
         Xingqiu = 4001,
 
@@ -95,7 +95,7 @@ namespace GIC.Data
         Zhongli = 4007,
         #endregion
 
-        #region 稻妻 (5001-5999)
+        #region Inazuma (5001-5999)
         [InspectorName("梦见月瑞希")]
         Mizuki = 5001,
 
@@ -109,7 +109,7 @@ namespace GIC.Data
         Ei = 5004,
         #endregion
 
-        #region 须弥 (6001-6999)
+        #region Sumeru (6001-6999)
         [InspectorName("艾尔海森")]
         Alhaitham = 6001,
 
@@ -123,7 +123,7 @@ namespace GIC.Data
         Nahida = 6004,
         #endregion
 
-        #region 枫丹 (7001-7999)
+        #region Fontaine (7001-7999)
         [InspectorName("希格雯")]
         Sigewinne = 7001,
 
@@ -137,16 +137,16 @@ namespace GIC.Data
         Furina = 7004,
         #endregion
 
-        #region 纳塔 (8001-8999)
+        #region Natlan (8001-8999)
         [InspectorName("玛薇卡")]
         Mavuika = 8001,
         #endregion
 
-        #region 至冬 (9001-9999)
+        #region Snezhnaya (9001-9999)
         // 至冬角色待添加
         #endregion
 
-        #region 坎瑞亚 (10001-10999)
+        #region Khaenriah (10001-10999)
         [InspectorName("火斧丘丘暴徒")]
         PyroAxeHilichurlBrute = 10001,
 
@@ -154,7 +154,7 @@ namespace GIC.Data
         Hilichurl = 10002,
         #endregion
 
-        #region 特殊 (11001-11999)
+        #region special (11001-11999)
         [InspectorName("协议核心")]
         ProtocolCore = 11001,
         [InspectorName("空")]

@@ -75,7 +75,7 @@ namespace GIC.Editor
             return ((FactionType)enumValue).GetInspectorName();
         }
 
-        #region 语音自动填充（逻辑与 IMGUI 版一致，日志走 GICLog）
+        #region autoFillVoices（logicAnd IMGUI versionConsistent，logVia GICLog）
 
         private void AutoFillAllVoices(UnitConfig config)
         {
@@ -271,7 +271,7 @@ namespace GIC.Editor
 
         #endregion
 
-        #region 图片自动填充（逻辑与 IMGUI 版一致，日志走 GICLog）
+        #region autoFillImages（logicAnd IMGUI versionConsistent，logVia GICLog）
 
         private const string AVATAR_PATH = "Resources/UI/Avatars/";
         private const string CARD_PATH = "Resources/UI/Cards/";
@@ -664,7 +664,7 @@ namespace GIC.Editor
             leftPane.style.width = Length.Percent(splitRatio * 100f);
         }
 
-        #region 技能选择与编辑区
+        #region skillSelectEditArea
 
         private void ShowSkillHint(string message)
         {

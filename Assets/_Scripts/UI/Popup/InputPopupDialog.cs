@@ -17,7 +17,6 @@ namespace GIC.UI
     public class InputPopupDialog : MonoBehaviour, IClosable
     {
         [Header("UI组件")]
-        [FormerlySerializedAs("titleText")]
         [SerializeField] private TextMeshProUGUI titleTextObj;
         public TMP_InputField inputField;
         public Button confirmButton;

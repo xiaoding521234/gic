@@ -160,7 +160,7 @@ namespace GIC.Editor.Rerig
                     new Vector4(meshL2W.m00, meshL2W.m10, meshL2W.m20, meshL2W.m30).magnitude,
                     new Vector4(meshL2W.m01, meshL2W.m11, meshL2W.m21, meshL2W.m31).magnitude,
                     new Vector4(meshL2W.m02, meshL2W.m12, meshL2W.m22, meshL2W.m32).magnitude);
-                log.AppendLine($"4a) MMD骨世界Y范围[{minY:F3},{maxY:F3}] meshL2W平移=({meshL2W.m03:F3},{meshL2W.m13:F3},{meshL2W.m23:F3}) 缩放={sc} SMR节点={mmdSmr.transform.name} 父链={string.Join("/", mmdSmr.transform.parent != null && mmdSmr.transform.parent.parent != null ? new[] { mmdSmr.transform.parent.parent.name, mmdSmr.transform.parent.name } : new[] { mmdSmr.transform.parent != null ? mmdSmr.transform.parent.name : "无" })} 源mesh.bounds={srcMesh.bounds.size}");
+                log.AppendLine($"4a) MMD骨世界Y范围[{minY:F3},{maxY:F3}] meshL2W平移=({meshL2W.m03:F3},{meshL2W.m13:F3},{meshL2W.m23:F3}) 缩放={sc} SMR节点={mmdSmr.transform.name} 父链={string.Join("/", mmdSmr.transform.parent != null && mmdSmr.transform.parent.parent != null ? new[] { mmdSmr.transform.parent.parent.name, mmdSmr.transform.parent.name } : new[] { mmdSmr.transform.parent != null ? mmdSmr.transform.parent.name : "none" })} 源mesh.bounds={srcMesh.bounds.size}");
             }
 
             // ---------- 5. 关键点刚体对齐（MMD 世界 → GI 世界） ----------
@@ -569,7 +569,7 @@ namespace GIC.Editor.Rerig
                         var gb = mmd2gi[mb];
                         var bPos = new Vector3(mmdWorld[mb].m03, mmdWorld[mb].m13, mmdWorld[mb].m23);
                         var gPos = gb != null ? new Vector3(giWorld[gb].m03, giWorld[gb].m13, giWorld[gb].m23) : Vector3.zero;
-                        desc.Append($"[{mb.name}→{(gb != null ? gb.name : "无")} w={bw.weight:F2} B={bPos.ToString("F2")} G={gPos.ToString("F2")}] ");
+                        desc.Append($"[{mb.name}→{(gb != null ? gb.name : "none")} w={bw.weight:F2} B={bPos.ToString("F2")} G={gPos.ToString("F2")}] ");
                     }
                     log.AppendLine($"   v[{vi}] world={vWorld} → out={newVerts[vi]}  {desc}");
                 }

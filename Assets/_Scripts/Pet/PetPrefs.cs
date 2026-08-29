@@ -23,9 +23,9 @@ namespace GIC.Pet
     public static class PetPrefs
     {
         [Serializable]
-        public class Pet存档
+        public class PetSave
         {
-            public int 版本 = 3;
+            public int version = 3;
             // 桌面版（物理像素，虚拟桌面系）
             public float 桌面缩放 = -1f;        // <0 = 无记录
             public int 桌面客户区X, 桌面客户区Y;
@@ -36,33 +36,33 @@ namespace GIC.Pet
             // v3（2026-08-28 对话功能）：对话 API Key 密文（PetApiKeyCrypto AES+设备指纹）。
             // 写入方=设置界面（主进程，同步写主存档与 pet.json）；读取方=两形态的 DeepSeekClient——
             // 桌面进程永不读主存档（双进程铁律），靠 pet.json 这条既有共享通道拿密文（加密态传输安全）。
-            public string 对话密文 = "";
+            public string chatCipher = "";
             // v1 兼容字段（旧档迁移读）
-            public float 缩放 = -1f;
+            public float scale = -1f;
             public int 客户区X, 客户区Y;
             public bool 有位置 = false;
         }
 
-        public static string 存档路径 => Path.Combine(Application.persistentDataPath, "pet.json");
+        public static string SavePath => Path.Combine(Application.persistentDataPath, "pet.json");
 
-        static Pet存档 _缓存;
+        static PetSave _cache;
 
         /// <summary>读档（进程内缓存，首个读取者落盘缓存；文件缺失/损坏返回默认实例不抛）</summary>
-        public static Pet存档 读取()
+        public static PetSave Load()
         {
-            if (_缓存 != null) return _缓存;
+            if (_cache != null) return _cache;
             try
             {
-                if (File.Exists(存档路径))
+                if (File.Exists(SavePath))
                 {
-                    var d = JsonUtility.FromJson<Pet存档>(File.ReadAllText(存档路径));
+                    var d = JsonUtility.FromJson<PetSave>(File.ReadAllText(SavePath));
                     if (d != null)
                     {
                         // v1→v2 迁移：桌面字段空而 v1 字段有值
-                        if (d.桌面缩放 < 0f && d.缩放 >= 0f) d.桌面缩放 = d.缩放;
+                        if (d.桌面缩放 < 0f && d.scale >= 0f) d.桌面缩放 = d.scale;
                         if (!d.桌面有位置 && d.有位置) { d.桌面客户区X = d.客户区X; d.桌面客户区Y = d.客户区Y; d.桌面有位置 = true; }
-                        _缓存 = d;
-                        return _缓存;
+                        _cache = d;
+                        return _cache;
                     }
                 }
             }
@@ -70,17 +70,17 @@ namespace GIC.Pet
             {
                 Debug.LogWarning($"[PetPrefs] pet.json 读取失败（按无存档处理）：{e.Message}");
             }
-            _缓存 = new Pet存档();
-            return _缓存;
+            _cache = new PetSave();
+            return _cache;
         }
 
         /// <summary>落盘（同步写；调用方自行做防抖节流）。编辑器恒跳过（桌宠状态不入编辑器会话）。</summary>
-        public static void 写入()
+        public static void Save()
         {
 #if !UNITY_EDITOR
             try
             {
-                File.WriteAllText(存档路径, JsonUtility.ToJson(读取(), true));
+                File.WriteAllText(SavePath, JsonUtility.ToJson(Load(), true));
             }
             catch (Exception e)
             {

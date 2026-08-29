@@ -13,7 +13,7 @@ namespace GIC.Tool
 
         private void SpawnSparks(Color color)
         {
-            for (int i = 0; i < 粒子数量; i++)
+            for (int i = 0; i < particleCount; i++)
             {
                 var go = new GameObject("Spark");
                 go.transform.SetParent(_rectTransform, false);
@@ -24,21 +24,21 @@ namespace GIC.Tool
                 img.material = _additiveMat;
 
                 RectTransform rect = go.transform as RectTransform;
-                rect.sizeDelta = Vector2.one * 粒子大小 * Random.Range(0.6f, 1.4f);
+                rect.sizeDelta = Vector2.one * particleSize * Random.Range(0.6f, 1.4f);
                 rect.anchoredPosition = Vector2.zero;
                 rect.localScale = Vector3.zero;
 
                 // 方向：上下双向飞溅，带少量水平扩散
-                float angle = Random.Range(-粒子扩散, 粒子扩散) * Mathf.PI;
+                float angle = Random.Range(-particleSpread, particleSpread) * Mathf.PI;
                 float ySign = Random.value > 0.5f ? 1f : -1f;
                 Vector2 dir = new Vector2(Mathf.Sin(angle), Mathf.Cos(angle) * ySign).normalized;
-                float speed = 粒子速度 * Random.Range(0.6f, 1.2f);
-                float lifetime = 粒子时长 * Random.Range(0.7f, 1.3f);
+                float speed = particleSpeed * Random.Range(0.6f, 1.2f);
+                float lifetime = particleDuration * Random.Range(0.7f, 1.3f);
                 float delay = Random.Range(0f, 0.1f);
 
                 img.color = new Color(color.r, color.g, color.b, 0f);
                 // 粒子协程不追踪，由 ClearSpawned 直接销毁对象
-                StartCoroutine(AnimateSpark(rect, img, dir, speed, lifetime, delay, color, 粒子不透明度 * 爆发强度));
+                StartCoroutine(AnimateSpark(rect, img, dir, speed, lifetime, delay, color, particleOpacity * burstIntensity));
                 _spawnedObjects.Add(go);
             }
         }

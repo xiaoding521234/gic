@@ -23,11 +23,11 @@ namespace GIC.Tool
 
             // 上升
             float t = 0f;
-            float targetScale = useOvershoot ? 核心过冲 : 1f;
-            while (t < 上升时间)
+            float targetScale = useOvershoot ? coreOvershoot : 1f;
+            while (t < riseTime)
             {
                 t += Time.unscaledDeltaTime;
-                float p = t / 上升时间;
+                float p = t / riseTime;
                 float scaleY = Mathf.LerpUnclamped(0f, targetScale, EaseOutCubic(p));
                 // 上升过程中 alpha 从爆发值过渡到持续值
                 float alpha = Mathf.Lerp(burstAlpha, sustainAlpha, p);
@@ -37,7 +37,7 @@ namespace GIC.Tool
             }
 
             // 过冲回弹
-            if (useOvershoot && 核心过冲 > 1f)
+            if (useOvershoot && coreOvershoot > 1f)
             {
                 t = 0f;
                 float settleDur = 0.08f;
@@ -45,7 +45,7 @@ namespace GIC.Tool
                 {
                     t += Time.unscaledDeltaTime;
                     float p = t / settleDur;
-                    float scaleY = Mathf.Lerp(核心过冲, 1f, EaseOutCubic(p));
+                    float scaleY = Mathf.Lerp(coreOvershoot, 1f, EaseOutCubic(p));
                     rect.localScale = new Vector3(1f, scaleY, 1f);
                     yield return null;
                 }
@@ -59,7 +59,7 @@ namespace GIC.Tool
             {
                 if (img == null) yield break;
                 pulseT += Time.unscaledDeltaTime;
-                float pulse = 1f + Mathf.Sin(pulseT * 脉冲速度) * 脉冲幅度;
+                float pulse = 1f + Mathf.Sin(pulseT * pulseSpeed) * pulseAmp;
                 img.color = new Color(color.r, color.g, color.b, sustainAlpha * pulse);
                 yield return null;
             }
@@ -73,10 +73,10 @@ namespace GIC.Tool
             img.transform.localScale = Vector3.zero;
 
             float t = 0f;
-            while (t < 闪光时间)
+            while (t < flashTime)
             {
                 t += Time.unscaledDeltaTime;
-                float p = t / 闪光时间;
+                float p = t / flashTime;
                 float scale = Mathf.LerpUnclamped(0f, 1.6f, EaseOutCubic(p));
                 float alpha = Mathf.Lerp(maxAlpha, 0f, p * p);
                 img.transform.localScale = Vector3.one * scale;

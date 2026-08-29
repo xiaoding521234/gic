@@ -22,10 +22,10 @@ namespace GIC.UI
     {
         /// <summary>预载视野半高（世界单位）。须 ≥ MapCameraController 最大尺寸（场景覆盖 15），
         /// 入场动画从最大远景落下，此值保证动画首帧瓦片已在</summary>
-        private const float 预载视野半高 = 17f;
+        private const float PreloadHalfHeight = 17f;
 
         /// <summary>预载外扩瓦片数（比 MapTileLayer 预载边距 多 1 格余量）</summary>
-        private const float 预载外扩格数 = 2f;
+        private const float PreloadPadCells = 2f;
 
         private static MapConfig _cfg;
         private static readonly List<string> _lastPreloaded = new();
@@ -47,11 +47,11 @@ namespace GIC.UI
             }
 
             float aspect = (float)Screen.width / Screen.height;
-            float halfW = 预载视野半高 * aspect;
+            float halfW = PreloadHalfHeight * aspect;
             var c = data.viewCenterWorld;
 
-            MapTileLayer.CalcTileRange(_cfg, c.x - halfW, c.y - 预载视野半高, c.x + halfW, c.y + 预载视野半高,
-                预载外扩格数, out int x0, out int y0, out int x1, out int y1);
+            MapTileLayer.CalcTileRange(_cfg, c.x - halfW, c.y - PreloadHalfHeight, c.x + halfW, c.y + PreloadHalfHeight,
+                PreloadPadCells, out int x0, out int y0, out int x1, out int y1);
 
             // 本轮预载集（先记旧集，重进大厅/同区域重复调用时与旧集一致则零卸载）
             var newSet = new List<string>();

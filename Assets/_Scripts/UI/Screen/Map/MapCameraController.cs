@@ -3,6 +3,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using GIC.Framework;
+using UnityEngine.Serialization;
 
 namespace GIC.UI
 {
@@ -17,21 +18,28 @@ namespace GIC.UI
     /// </summary>
     public class MapCameraController : MonoBehaviour
     {
-        private const float 相机固定距离 = 100f;
+        private const float cameraFixedDist = 100f;
 
         [Header("缩放")]
-        [SerializeField] private float 最小尺寸 = 5f;
-        [SerializeField] private float 最大尺寸 = 45f;
+        [InspectorName("最小尺寸")]
+        [SerializeField] private float minSize = 5f;
+        [InspectorName("最大尺寸")]
+        [SerializeField] private float maxSize = 45f;
         [Tooltip("每滚轮一格的缩放比例（0.85 = 每格缩小 15%）。乘法缩放保证任意级别下视觉变化一致，到上下限有明确停顿感")]
-        [SerializeField, Range(0.5f, 0.99f)] private float 滚轮缩放步进 = 0.85f;
+        [InspectorName("滚轮缩放步进")]
+        [SerializeField, Range(0.5f, 0.99f)] private float scrollStep = 0.85f;
 
         [Header("区域聚焦")]
-        [SerializeField] private float 默认视野尺寸 = 8f;
-        [SerializeField] private float 入场时长 = 0.2f;
+        [InspectorName("默认视野尺寸")]
+        [SerializeField] private float defaultViewSize = 8f;
+        [InspectorName("入场时长")]
+        [SerializeField] private float enterDuration = 0.2f;
 
         [Header("点击判定")]
-        [SerializeField] private float 点击位移阈值 = 12f;
-        [SerializeField] private float 锚点射线最大距离 = 500f;
+        [InspectorName("点击位移阈值")]
+        [SerializeField] private float clickMoveThreshold = 12f;
+        [InspectorName("锚点射线最大距离")]
+        [SerializeField] private float anchorRayMaxDist = 500f;
 
         private Camera _camera;
         private Vector2 _mapCenter;        // 地图矩形中心（世界 XY，由 InitBounds 按标定计算）
@@ -100,11 +108,11 @@ namespace GIC.UI
             if (_camera == null) _camera = GetComponent<Camera>();
             if (_camera == null) return;
             _camera.orthographic = true;
-            _size = Mathf.Clamp(_size, 最小尺寸, 最大尺寸); // 硬 clamp：任何来源的尺寸都不越界
+            _size = Mathf.Clamp(_size, minSize, maxSize); // 硬 clamp：任何来源的尺寸都不越界
             _camera.orthographicSize = _size;
             // 垂直画布（Unity 2D 约定）：地图平铺 XY 竖直平面，相机沿 -Z 看，rotation 归零
             _camera.transform.rotation = Quaternion.identity;
-            _camera.transform.position = new Vector3(_focus.x, _focus.y, -相机固定距离);
+            _camera.transform.position = new Vector3(_focus.x, _focus.y, -cameraFixedDist);
         }
 
         // ==================== 公共接口 ====================
@@ -127,7 +135,7 @@ namespace GIC.UI
         public void FocusRegion(Vector2 focusXY, float viewSize = 0f, bool fromMaxZoom = false)
         {
             // 未配置区域视野时落点 = 缩放区间中点（居中视野，非最大也非最底）
-            float targetSize = viewSize > 0f ? Mathf.Clamp(viewSize, 最小尺寸, 最大尺寸) : Mathf.Lerp(最小尺寸, 最大尺寸, 0.5f);
+            float targetSize = viewSize > 0f ? Mathf.Clamp(viewSize, minSize, maxSize) : Mathf.Lerp(minSize, maxSize, 0.5f);
             PlayEntryAnimation(ClampFocus(focusXY, targetSize), targetSize, fromMaxZoom);
         }
 
@@ -135,7 +143,7 @@ namespace GIC.UI
         public float CurrentSize => _size;
 
         /// <summary>基准视野尺寸（锚点视觉尺寸在此缩放下为 1:1 prefab 原大）</summary>
-        public float BaseViewSize => 默认视野尺寸;
+        public float BaseViewSize => defaultViewSize;
 
         // ==================== 每帧交互 ====================
 
@@ -159,7 +167,7 @@ namespace GIC.UI
         {
             // 滚轮缩放（以鼠标画布点为锚；乘法缩放）
             if (Input.mouseScrollDelta.y != 0f && TryGetGroundPoint(Input.mousePosition, out Vector2 anchor))
-                SetSizeAtScreenPoint(Input.mousePosition, _size * Mathf.Pow(滚轮缩放步进, -Input.mouseScrollDelta.y), anchor);
+                SetSizeAtScreenPoint(Input.mousePosition, _size * Mathf.Pow(scrollStep, -Input.mouseScrollDelta.y), anchor);
 
             if (Input.GetMouseButtonDown(0) && !IsPointerOverUI(-1))
             {
@@ -182,7 +190,7 @@ namespace GIC.UI
                 _dragging = false;
                 // 抬起点也须不在 UI 上（按下于地图、滑到按钮上抬起的场景不分发点击）
                 if (!IsPointerOverUI(-1) &&
-                    Vector2.Distance(Input.mousePosition, _pressScreenPos) < 点击位移阈值)
+                    Vector2.Distance(Input.mousePosition, _pressScreenPos) < clickMoveThreshold)
                     DispatchAnchorClick(Input.mousePosition);
             }
         }
@@ -215,7 +223,7 @@ namespace GIC.UI
                     _dragging = false;
                     // 抬起点也须不在 UI 上（同鼠标路径）
                     if (!IsPointerOverUI(t.fingerId) &&
-                        Vector2.Distance(t.position, _pressScreenPos) < 点击位移阈值)
+                        Vector2.Distance(t.position, _pressScreenPos) < clickMoveThreshold)
                         DispatchAnchorClick(t.position);
                 }
             }
@@ -270,7 +278,7 @@ namespace GIC.UI
         /// </summary>
         private void SetSizeAtScreenPoint(Vector3 screenPos, float newSize, Vector2 anchorXY)
         {
-            newSize = Mathf.Clamp(newSize, 最小尺寸, 最大尺寸);
+            newSize = Mathf.Clamp(newSize, minSize, maxSize);
             if (Mathf.Approximately(newSize, _size)) return;
 
             float ratio = newSize / _size;
@@ -299,7 +307,7 @@ namespace GIC.UI
         {
             if (_camera == null) return;
             Ray ray = _camera.ScreenPointToRay(screenPos);
-            if (!Physics.Raycast(ray, out RaycastHit hit, 锚点射线最大距离)) return;
+            if (!Physics.Raycast(ray, out RaycastHit hit, anchorRayMaxDist)) return;
             var anchor = hit.collider.GetComponentInParent<MapAnchor>();
             if (anchor != null)
                 anchor.HandleClick();
@@ -333,15 +341,15 @@ namespace GIC.UI
         private IEnumerator EntryAnimationCoroutine(Vector2 targetFocus, float targetSize, bool fromMaxZoom)
         {
             // 初次打开：从最大上限远景快→慢落到目标；区域切换：从当前视野/注视点平滑滑移（原神式）
-            float startSize = fromMaxZoom ? 最大尺寸 : _size;
+            float startSize = fromMaxZoom ? maxSize : _size;
             Vector2 startFocus = _focus;
             bool glide = !fromMaxZoom;
 
             float elapsed = 0f;
-            while (elapsed < 入场时长)
+            while (elapsed < enterDuration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / 入场时长);
+                float t = Mathf.Clamp01(elapsed / enterDuration);
                 float curveValue = _easeCurve.Evaluate(t);
 
                 _size = Mathf.Lerp(startSize, targetSize, curveValue);

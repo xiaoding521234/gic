@@ -20,21 +20,21 @@ namespace GIC.Pet
     public class PetInGameHost : MonoBehaviour
     {
         /// <summary>形态常量（与 PlayerSaveData.petForm / SettingsScreen 对应）</summary>
-        public const int 形态_桌面 = 0;
-        public const int 形态_游戏内 = 1;
+        public const int FormDesktop = 0;
+        public const int FormInGame = 1;
 
         private static PetInGameHost _instance;
         private GameObject _游戏内实例;
 
         /// <summary>游戏内宿主接口（IPetHost）——行为层/视线层经此分发（桌面形态走 PetWindowController 字段）。
         /// 由游戏内宿主组件（渲染管线批次 B 落地后）在 Awake 注入。</summary>
-        public static IPetHost 宿主接口 { get; internal set; }
+        public static IPetHost HostInterface { get; internal set; }
 
         /// <summary>当前实际生效形态（-1=未初始化；启动分发/热切换后更新）</summary>
-        public static int 当前形态 { get; private set; } = -1;
+        public static int CurrentForm { get; private set; } = -1;
 
         /// <summary>宿主单例（按需创建，DontDestroyOnLoad 跨场景存活）</summary>
-        private static PetInGameHost 实例
+        private static PetInGameHost instance
         {
             get
             {
@@ -49,17 +49,17 @@ namespace GIC.Pet
         }
 
         /// <summary>启动分发（GameScene 读档后调用）：按存档形态初始化，不触发切换逻辑</summary>
-        public static void 启动形态(int form)
+        public static void StartupDispatch(int form)
         {
-            form = 钳制合法形态(form);
-            if (当前形态 == form) return;
-            当前形态 = form;
-            if (form == 形态_游戏内)
+            form = ClampForm(form);
+            if (CurrentForm == form) return;
+            CurrentForm = form;
+            if (form == FormInGame)
             {
                 // 游戏内形态：残留桌面进程发退出请求（播 Disappear 再退出），非硬杀
                 PetSingleInstance.RequestQuit();
                 PetProcessLauncher.LaunchSuppressed = true; // 游戏内形态：本轮启动不拉桌面进程
-                实例.创建游戏内实例();
+                instance.CreateInGameInstance();
                 Debug.Log("[PetInGameHost] 启动形态=游戏画面内版");
             }
             else
@@ -72,26 +72,26 @@ namespace GIC.Pet
         /// 桌面→游戏内=写退出请求让桌宠播 Disappear 退场→等进程退出→创建本进程实例；
         /// 游戏内→桌面=播 Disappear 退场→销毁实例+拉起桌面进程。
         /// 2026-08-28 用户要求"切换时先播退出动作再杀死"。同形态重复调用幂等。</summary>
-        public static void 热切换形态(int form)
+        public static void HotSwitchForm(int form)
         {
-            form = 钳制合法形态(form);
-            if (当前形态 == form) return;
-            int 旧形态 = 当前形态;
-            当前形态 = form;
+            form = ClampForm(form);
+            if (CurrentForm == form) return;
+            int oldForm = CurrentForm;
+            CurrentForm = form;
 
-            if (form == 形态_游戏内)
+            if (form == FormInGame)
             {
                 // 桌面→游戏内：写退出请求让桌宠进程播 Disappear 再退出（非硬杀）
                 PetSingleInstance.RequestQuit();
                 PetProcessLauncher.LaunchSuppressed = true;
-                实例.StartCoroutine(实例.等桌面退场后创建实例());
-                Debug.Log($"[PetInGameHost] 热切换：桌面版→游戏画面内版（旧形态={旧形态}，等退场动画）");
+                instance.StartCoroutine(instance.等桌面退场后创建实例());
+                Debug.Log($"[PetInGameHost] 热切换：桌面版→游戏画面内版（旧形态={oldForm}，等退场动画）");
             }
             else
             {
                 // 游戏内→桌面：播 Disappear 退场→销毁→拉桌面进程
-                实例.StartCoroutine(实例.游戏内退场后拉桌面());
-                Debug.Log($"[PetInGameHost] 热切换：游戏画面内版→桌面版（旧形态={旧形态}，等退场动画）");
+                instance.StartCoroutine(instance.游戏内退场后拉桌面());
+                Debug.Log($"[PetInGameHost] 热切换：游戏画面内版→桌面版（旧形态={oldForm}，等退场动画）");
             }
         }
 
@@ -106,7 +106,7 @@ namespace GIC.Pet
             }
             if (PetSingleInstance.Probe()) PetSingleInstance.TryKillPet(); // 超时强杀
             PetSingleInstance.ClearQuitRequest();
-            创建游戏内实例();
+            CreateInGameInstance();
         }
 
         /// <summary>游戏内实例播 Disappear 退场→销毁→拉桌面进程。
@@ -118,31 +118,31 @@ namespace GIC.Pet
             if (_游戏内实例 != null)
             {
                 var behavior = _游戏内实例.GetComponentInChildren<PetBehaviorController>();
-                bool 退场完成 = false;
-                bool 退场接管 = behavior != null && behavior.请求退场(() => 退场完成 = true);
-                if (退场接管)
+                bool exitDone = false;
+                bool exitTakeover = behavior != null && behavior.RequestExit(() => exitDone = true);
+                if (exitTakeover)
                 {
                     // 等退场动画播完（回调置标志；Disappear clip 约 2s，4s 超时兜底防动画异常卡死）
                     float deadline = Time.unscaledTime + 4f;
-                    while (!退场完成 && Time.unscaledTime < deadline) yield return null;
+                    while (!exitDone && Time.unscaledTime < deadline) yield return null;
                 }
             }
-            销毁游戏内实例();
+            DestroyInGameInstance();
             PetProcessLauncher.LaunchSuppressed = false;
             PetProcessLauncher.Launch();
         }
 
-        private static int 钳制合法形态(int form)
+        private static int ClampForm(int form)
         {
-            if (form != 形态_桌面 && form != 形态_游戏内) return 形态_游戏内;
+            if (form != FormDesktop && form != FormInGame) return FormInGame;
 #if !UNITY_STANDALONE_WIN
-            if (form == 形态_桌面) return 形态_游戏内; // 非 Windows：桌面版不可用恒游戏内
+            if (form == FormDesktop) return FormInGame; // 非 Windows：桌面版不可用恒游戏内
 #endif
             return form;
         }
 
         /// <summary>创建游戏内派蒙实例（渲染管线批次 B 落地：RT 画中画+Paimon prefab 化+宿主接口接线）</summary>
-        private void 创建游戏内实例()
+        private void CreateInGameInstance()
         {
             if (_游戏内实例 != null) return;
             var prefab = Resources.Load<GameObject>("PaimonPet/PaimonInGameRoot");
@@ -156,16 +156,16 @@ namespace GIC.Pet
             // 宿主控制器（渲染+交互+IPetHost）——prefab 未预挂，运行时补挂（保 prefab 最小）
             var ctrl = _游戏内实例.GetComponent<PetInGameHostController>();
             if (ctrl == null) ctrl = _游戏内实例.AddComponent<PetInGameHostController>();
-            宿主接口 = ctrl;
+            HostInterface = ctrl;
             // 实例挪到远离游戏视锥的位置（RT 相机自含视野，主游戏相机不渲染派蒙——免层管理）
             _游戏内实例.transform.position = new Vector3(0f, 10000f, 0f);
             Debug.Log("[PetInGameHost] 游戏内实例已创建（RT 画中画）");
         }
 
-        private void 销毁游戏内实例()
+        private void DestroyInGameInstance()
         {
             if (_游戏内实例 == null) return;
-            宿主接口 = null;
+            HostInterface = null;
             Destroy(_游戏内实例);
             _游戏内实例 = null;
         }

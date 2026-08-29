@@ -12,7 +12,7 @@ namespace GIC.Framework
 
     public partial class AudioManager
     {
-        #region 语音播放
+        #region voicePlay
 
         public void PlayVoice(UnitName unitName, AudioClip clip, float volumeScale = 1f)
         {

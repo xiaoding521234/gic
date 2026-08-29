@@ -9307,12 +9307,9 @@ MonoBehaviour:
   cardSpawnInterval: 0.09
   cardWidth: 100
   cardHeight: 150
-  fateLineSpeed: 4000
   fateLineThickness: 3
   fateLineColor: {r: 1, g: 1, b: 1, a: 1}
   clickTimeLimit: 1.5
-  baseShotCooldown: 0.3
-  cooldownPerStar: 0.15
   resultCardSize: 80
   resultCardSpacing: 10
   holdCardSize: 280

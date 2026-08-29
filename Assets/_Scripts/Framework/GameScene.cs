@@ -28,7 +28,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 配置参数
+        #region configParams
 
         [Header("性能配置")]
         [SerializeField] private bool autoCleanupResources = true;
@@ -44,7 +44,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 私有字段
+        #region privateField
 
         // 场景历史记录栈
         private Stack<SceneType> sceneHistory = new Stack<SceneType>();
@@ -57,7 +57,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 公共属性
+        #region publicProperty
 
         public SceneType CurrentScene
         {
@@ -70,7 +70,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region Unity 生命周期
+        #region Unity lifecycle
 
         private void Awake()
         {
@@ -145,7 +145,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 初始化方法
+        #region initMethod
 
         // 注入字段：GameScene.Awake 自身完成 Wargame.Init 后注入（InitSaveSettings 调用点在其后）
         [Autowired] private SaveManager _saveManager;
@@ -209,7 +209,7 @@ namespace GIC.Framework
             // 游戏画面内版=PetInGameHost 本进程内创建实例（其内部抑制桌面拉起）。编辑器内 Launch 为 no-op。
             // 2026-08-28 从 Awake 挪到此处：存档加载在 SaveManager [PostConstruct]（Wargame.Start 内），
             // Awake 时 CurrentSave.petForm 恒为默认 0（桌面版）——设置"游戏内派蒙"重启仍拉桌面版的根因。
-            PetInGameHost.启动形态(_saveManager?.CurrentSave?.petForm ?? 0);
+            PetInGameHost.StartupDispatch(_saveManager?.CurrentSave?.petForm ?? 0);
             PetProcessLauncher.Launch();
 
             GICLog.Info("初始化场景设置，加载 SplashScreen");
@@ -225,7 +225,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 事件处理
+        #region evtHandle
 
         private void OnActiveSceneChangedInternal(Scene previousScene, Scene newScene)
         {
@@ -245,7 +245,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 场景加载 - 公共接口
+        #region sceneLoad - publicInterface
 
         /// <summary>
         /// 使用配置加载场景
@@ -364,7 +364,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 场景加载 - 协程实现
+        #region sceneLoad - 协程实现
 
         private IEnumerator LoadSceneWithConfigCoroutine(SceneType scene)
         {
@@ -488,7 +488,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 资源清理
+        #region resCleanup
 
         private IEnumerator CleanupUnusedResources()
         {
@@ -513,7 +513,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 辅助方法
+        #region helperMethod
 
         private void RecordSceneHistory(SceneType scene)
         {
@@ -599,11 +599,11 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 弹窗/轻提示
+        #region 弹窗/toast
         // 弹窗与轻提示已收敛到 PopupManager（静态 Instance 直连），GameScene 不再转发
         #endregion
 
-        #region 公共查询方法
+        #region publicQueryMethod
 
         public bool HasPreviousScene()
         {

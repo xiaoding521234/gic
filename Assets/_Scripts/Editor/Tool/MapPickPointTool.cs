@@ -19,11 +19,11 @@ namespace GIC.Editor
     /// </summary>
     public class MapPickPointTool : EditorWindow
     {
-        private const string MapScreenScenePath = MapPaths.MapScreen场景;
+        private const string MapScreenScenePath = MapPaths.MapScreenScene;
 
-        private enum PickMode { 区域视野中心, 已有锚点, 新建锚点, 标定地图 }
+        private enum PickMode { regionFocusCenter, existingAnchor, newAnchor, calibrateMap }
 
-        private PickMode _mode = PickMode.区域视野中心;
+        private PickMode _mode = PickMode.regionFocusCenter;
         private RegionName _region = RegionName.Mondstadt;
         private PositionName _newAnchorName = PositionName.StarsandShoal;
         private int _anchorIndex = -1;
@@ -38,7 +38,7 @@ namespace GIC.Editor
 
         /// <summary>方向校验容差（度）：图片轴与世界轴平行的模型下，两次点击连线方向必须与锚点已知位移方向一致。
         /// 超差=点错位置或图有旋转，拒绝解算（斜率是固定约束，不是自由量）</summary>
-        private const float 标定方向容差 = 3f;
+        private const float CalibrationAngleTolerance = 3f;
 
         /// <summary>
         /// 把点投影到「过点 P、方向 dir」的直线上（B 点硬约束：第二次点击只能落在此线）。
@@ -85,7 +85,7 @@ namespace GIC.Editor
                 if (!cfg.IsTiled)
                 {
                     // 未瓦片化回退：全图副本自身即源图，像素尺寸取 sprite.rect
-                    var cfgSprite = AssetDatabase.LoadAssetAtPath<Sprite>(MapPaths.全图副本);
+                    var cfgSprite = AssetDatabase.LoadAssetAtPath<Sprite>(MapPaths.FullCopy);
                     srcW = cfgSprite != null ? (int)cfgSprite.rect.width : 0;
                     srcH = cfgSprite != null ? (int)cfgSprite.rect.height : 0;
                 }
@@ -122,7 +122,7 @@ namespace GIC.Editor
 
         // ==================== 视角对准 ====================
 
-        private const float 目标对准视野尺寸 = 12f; // 单点目标的对准视野（正交半高，看得清标记又不失上下文）
+        private const float TargetFocusSize = 12f; // 单点目标的对准视野（正交半高，看得清标记又不失上下文）
 
         /// <summary>通用对准：正交注视目标点（退 2D 模式），失败提示原因</summary>
         private static bool LookAtPoint(Vector2 worldXY, float viewSize, string what)
@@ -144,29 +144,29 @@ namespace GIC.Editor
             if (cfg == null) return;
             switch (_mode)
             {
-                case PickMode.区域视野中心:
+                case PickMode.regionFocusCenter:
                 {
                     var r = cfg.GetRegion(_region);
                     if (r == null) { GICLog.Warn($"[MapPickPointTool] 区域 {_region} 无 RegionData"); return; }
-                    LookAtPoint(r.viewCenterWorld, 目标对准视野尺寸, $"区域 {_region} 视野中心");
+                    LookAtPoint(r.viewCenterWorld, TargetFocusSize, $"区域 {_region} 视野中心");
                     return;
                 }
-                case PickMode.已有锚点:
-                case PickMode.新建锚点:
+                case PickMode.existingAnchor:
+                case PickMode.newAnchor:
                 {
                     // 已有锚点模式用下拉选中项；新建模式对准已选区域视野中心（新锚点尚不存在）
-                    if (_mode == PickMode.已有锚点 && _anchorIndex >= 0 && _anchorIndex < _allAnchors.Count)
+                    if (_mode == PickMode.existingAnchor && _anchorIndex >= 0 && _anchorIndex < _allAnchors.Count)
                     {
                         var a = _allAnchors[_anchorIndex].anchor;
-                        LookAtPoint(a.world, 目标对准视野尺寸, $"锚点 {a.positionName}");
+                        LookAtPoint(a.world, TargetFocusSize, $"锚点 {a.positionName}");
                         return;
                     }
                     var r2 = cfg.GetRegion(_region);
                     if (r2 == null) { GICLog.Warn($"[MapPickPointTool] 区域 {_region} 无 RegionData"); return; }
-                    LookAtPoint(r2.viewCenterWorld, 目标对准视野尺寸, $"区域 {_region} 视野中心");
+                    LookAtPoint(r2.viewCenterWorld, TargetFocusSize, $"区域 {_region} 视野中心");
                     return;
                 }
-                case PickMode.标定地图:
+                case PickMode.calibrateMap:
                 {
                     // 对准 A/B 两参照点的中点，视野取两点距离的 1.4 倍保证都在画面内
                     if (_calibAnchorA < 0 || _calibAnchorB < 0 ||
@@ -178,7 +178,7 @@ namespace GIC.Editor
                     var a = _allAnchors[_calibAnchorA].anchor.world;
                     var b = _allAnchors[_calibAnchorB].anchor.world;
                     var mid = (a + b) * 0.5f;
-                    LookAtPoint(mid, Mathf.Max(目标对准视野尺寸, Vector2.Distance(a, b) * 0.7f), "标定参照 A/B 中点");
+                    LookAtPoint(mid, Mathf.Max(TargetFocusSize, Vector2.Distance(a, b) * 0.7f), "标定参照 A/B 中点");
                     return;
                 }
             }
@@ -190,7 +190,7 @@ namespace GIC.Editor
             var cfg = LoadConfig();
             var r = cfg?.GetRegion(_region);
             if (r == null) { GICLog.Warn($"[MapPickPointTool] 区域 {_region} 无 RegionData"); return; }
-            LookAtPoint(r.viewCenterWorld, 目标对准视野尺寸, $"区域 {_region} 视野中心");
+            LookAtPoint(r.viewCenterWorld, TargetFocusSize, $"区域 {_region} 视野中心");
         }
 
         /// <summary>对准下拉选中的锚点（已有锚点模式的选择）</summary>
@@ -202,7 +202,7 @@ namespace GIC.Editor
                 return;
             }
             var a = _allAnchors[_anchorIndex].anchor;
-            LookAtPoint(a.world, 目标对准视野尺寸, $"锚点 {a.positionName}");
+            LookAtPoint(a.world, TargetFocusSize, $"锚点 {a.positionName}");
         }
 
         /// <summary>对准坐标原点（mapOrigin，图片左上角在世界中的位置）</summary>
@@ -210,7 +210,7 @@ namespace GIC.Editor
         {
             var cfg = LoadConfig();
             if (cfg == null) return;
-            LookAtPoint(cfg.MapOrigin, 目标对准视野尺寸, "坐标原点");
+            LookAtPoint(cfg.MapOrigin, TargetFocusSize, "坐标原点");
         }
 
         private void OnEnable()
@@ -218,13 +218,13 @@ namespace GIC.Editor
             SceneView.duringSceneGui += OnSceneGUI;
             Undo.undoRedoPerformed += OnUndoRedo;
             // 瓦片化后场景只挂预览图，取点/标定需要全分辨率目测 → 编辑器临时换全图（守卫见 MapEditorFullRes）
-            MapEditorFullRes.换上();
+            MapEditorFullRes.Apply();
         }
         private void OnDisable()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
             Undo.undoRedoPerformed -= OnUndoRedo;
-            MapEditorFullRes.还原();
+            MapEditorFullRes.Restore();
         }
 
         /// <summary>Undo/Redo 后同步：锚点索引重建 + 面板刷新（撤销改的是 MapConfig 对象，窗口与 Gizmo 需跟随）</summary>
@@ -329,7 +329,7 @@ namespace GIC.Editor
             _modeContainer.Clear();
             switch (_mode)
             {
-                case PickMode.区域视野中心:
+                case PickMode.regionFocusCenter:
                 {
                     var f = new EnumField("区域", _region);
                     f.RegisterValueChangedCallback(e => _region = (RegionName)e.newValue);
@@ -342,7 +342,7 @@ namespace GIC.Editor
                         { style = { whiteSpace = WhiteSpace.Normal } });
                     break;
                 }
-                case PickMode.已有锚点:
+                case PickMode.existingAnchor:
                 {
                     var choices = _allAnchors.Select(t => $"{t.region.region} · {t.anchor.positionName}").ToList();
                     if (choices.Count == 0)
@@ -356,7 +356,7 @@ namespace GIC.Editor
                     _modeContainer.Add(dd);
                     break;
                 }
-                case PickMode.新建锚点:
+                case PickMode.newAnchor:
                 {
                     var rf = new EnumField("所属区域", _region);
                     rf.RegisterValueChangedCallback(e => _region = (RegionName)e.newValue);
@@ -387,7 +387,7 @@ namespace GIC.Editor
                     _modeContainer.Add(new Label("取点后自动：① 创建 MapConfig 锚点 ② 同步 PositionConfig 条目 ③ 触发 Addressables 扫描\n本地化需手动添加") { style = { whiteSpace = WhiteSpace.Normal } });
                     break;
                 }
-                case PickMode.标定地图:
+                case PickMode.calibrateMap:
                 {
                     var cfg = LoadConfig();
                     var names = _allAnchors.Select(t => t.anchor.positionName.ToString()).ToList();
@@ -511,19 +511,19 @@ namespace GIC.Editor
             bool has = false;
             switch (_mode)
             {
-                case PickMode.区域视野中心:
+                case PickMode.regionFocusCenter:
                 {
                     var r = cfg.GetRegion(_region);
                     if (r != null) { target = new Vector3(r.viewCenterWorld.x, r.viewCenterWorld.y, 0f); has = true; }
                     break;                }
-                case PickMode.已有锚点 when _anchorIndex >= 0 && _anchorIndex < _allAnchors.Count:
+                case PickMode.existingAnchor when _anchorIndex >= 0 && _anchorIndex < _allAnchors.Count:
                 {
                     var a = _allAnchors[_anchorIndex].anchor;
                     target = new Vector3(a.world.x, a.world.y, 0f);
                     has = true;
                     break;
                 }
-                case PickMode.标定地图 when _calibAnchorA >= 0 && _calibAnchorB >= 0 &&
+                case PickMode.calibrateMap when _calibAnchorA >= 0 && _calibAnchorB >= 0 &&
                     _calibAnchorA < _allAnchors.Count && _calibAnchorB < _allAnchors.Count:
                 {
                     // 参照锚点 A/B 绿色标记其"应在"位置；已点击的位置画白标记（解算后保留两个）
@@ -584,7 +584,7 @@ namespace GIC.Editor
 
             switch (_mode)
             {
-                case PickMode.区域视野中心:
+                case PickMode.regionFocusCenter:
                 {
                     var r = cfg.GetRegion(_region);
                     if (r != null)
@@ -606,13 +606,13 @@ namespace GIC.Editor
                     }
                     break;
                 }
-                case PickMode.已有锚点:
+                case PickMode.existingAnchor:
                 {
                     if (_anchorIndex < 0 || _anchorIndex >= _allAnchors.Count) { GICLog.Warn("[MapPickPointTool] 未选择锚点"); return; }
                     _allAnchors[_anchorIndex].anchor.world = world;
                     break;
                 }
-                case PickMode.新建锚点:
+                case PickMode.newAnchor:
                 {
                     var r = cfg.GetRegion(_region);
                     if (r == null) { GICLog.Warn($"[MapPickPointTool] 区域 {_region} 无 RegionData，请先用「区域视野中心」模式创建"); return; }
@@ -624,13 +624,13 @@ namespace GIC.Editor
                     // 自动同步 Addressables（扫描 PositionBack/PositionVideo 目录）
                     PositionMediaAddressablesTool.SyncAll();
 
-                    _mode = PickMode.已有锚点;
+                    _mode = PickMode.existingAnchor;
                     RebuildAnchorIndex();
                     _anchorIndex = _allAnchors.Count - 1;
                     if (rootVisualElement.childCount > 0) BuildUI();
                     break;
                 }
-                case PickMode.标定地图:
+                case PickMode.calibrateMap:
                 {
                     if (_calibAnchorA < 0 || _calibAnchorB < 0 ||
                         _calibAnchorA >= _allAnchors.Count || _calibAnchorB >= _allAnchors.Count ||
@@ -675,13 +675,13 @@ namespace GIC.Editor
                             // 位移方向一致（容差 标定方向容差 度）。超差=下拉所选 A/B 与实际点击的两处地点不对应
                             // （或点错位置），拒绝解算——斜率是固定约束，不是自由量。
                             // 2026-08-18 补上：此常量曾声明未用，离谱解算（unit=0.5，25 倍偏差）被静默写入并应用
-                            float 偏差角 = Vector2.SignedAngle(knownDir, (world - _pickA).normalized);
-                            if (Mathf.Abs(偏差角) > 标定方向容差)
+                            float deviationAngle = Vector2.SignedAngle(knownDir, (world - _pickA).normalized);
+                            if (Mathf.Abs(deviationAngle) > CalibrationAngleTolerance)
                             {
-                                _lastPick = $"✗ 点击方向与 {anchorA.positionName}→{anchorB.positionName} 已知方向偏差 {偏差角:F1}°（容差 {标定方向容差}°），未解算。\n" +
+                                _lastPick = $"✗ 点击方向与 {anchorA.positionName}→{anchorB.positionName} 已知方向偏差 {deviationAngle:F1}°（容差 {CalibrationAngleTolerance}°），未解算。\n" +
                                             "多为下拉框所选锚点与图上实际点击的两处地点不对应，请核对后重取（配置未改动）";
                                 _hasPickB = false;
-                                GICLog.Warn($"[MapPickPointTool] 标定被拒：点击方向偏差 {偏差角:F1}° 超容差 {标定方向容差}°（疑似下拉选择与点击地点不匹配）");
+                                GICLog.Warn($"[MapPickPointTool] 标定被拒：点击方向偏差 {deviationAngle:F1}° 超容差 {CalibrationAngleTolerance}°（疑似下拉选择与点击地点不匹配）");
                                 // 保留 _hasPickA，重新点击 B 即可
                             }
                             else
@@ -692,13 +692,13 @@ namespace GIC.Editor
 
                             // 合理性校验：换图前后地理比例不变，单位长度应与当前值同量级（±3 倍内）。
                             // 大幅偏离=两处点击识别错误（如把邻近两地点当成 A/B），拒绝写入，防止保存+应用后全图错位
-                            float 比例 = newUnit / cfg.WorldUnitsPerPixel;
-                            if (比例 > 3f || 比例 < 1f / 3f)
+                            float ratio = newUnit / cfg.WorldUnitsPerPixel;
+                            if (ratio > 3f || ratio < 1f / 3f)
                             {
-                                _lastPick = $"✗ 解算单位长度 {newUnit:F4} 与当前 {cfg.WorldUnitsPerPixel:F4} 相差 {比例:F1} 倍（超出 ±3 倍），已拒绝写入。\n" +
+                                _lastPick = $"✗ 解算单位长度 {newUnit:F4} 与当前 {cfg.WorldUnitsPerPixel:F4} 相差 {ratio:F1} 倍（超出 ±3 倍），已拒绝写入。\n" +
                                             "请核对：①下拉框 A/B 就是图上点击的两处地点 ②两处相距足够远";
                                 _hasPickB = false;
-                                GICLog.Warn($"[MapPickPointTool] 标定被拒：unit={newUnit:F4} 与当前 {cfg.WorldUnitsPerPixel:F4} 比值 {比例:F1} 超出 ±3 倍");
+                                GICLog.Warn($"[MapPickPointTool] 标定被拒：unit={newUnit:F4} 与当前 {cfg.WorldUnitsPerPixel:F4} 比值 {ratio:F1} 超出 ±3 倍");
                             }
                             else
                             {

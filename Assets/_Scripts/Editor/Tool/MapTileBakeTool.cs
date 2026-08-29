@@ -33,24 +33,24 @@ namespace GIC.Editor
     /// </summary>
     public static class MapTileBakeTool
     {
-        private const string 预览图路径 = MapPaths.预览图;
-        private const string 瓦片目录 = MapPaths.瓦片目录;
+        private const string previewPath = MapPaths.preview;
+        private const string TileDir = MapPaths.TileDir;
         private const string MapConfig路径 = MapPaths.MapConfig;
-        private const string MapScreen场景 = MapPaths.MapScreen场景;
-        private const string 组名 = "MapAssets";
-        private const string 地址前缀 = "MapAssets/Tiles/tile_";
-        private const string 全图地址 = "MapAssets/Textures/all_map";
-        private const int 瓦片像素 = 2048;
-        private const int 重叠像素 = 4;
+        private const string MapScreenScene = MapPaths.MapScreenScene;
+        private const string groupName = "MapAssets";
+        private const string addrPrefix = "MapAssets/Tiles/tile_";
+        private const string fullAddr = "MapAssets/Textures/all_map";
+        private const int tilePx = 2048;
+        private const int overlapPx = 4;
 
         [MenuItem("Tools/地图/生成地图瓦片", priority = -57)]
         public static void Bake()
         {
             // ── 源图解析：母版优先，回退编辑器副本 ──
-            string srcAbs = 选源图(out bool 用母版);
+            string srcAbs = ResolveSourceImage(out bool useMaster);
             if (srcAbs == null) return;
 
-            var size = 解析Jpeg尺寸(srcAbs);
+            var size = ParseJpegSize(srcAbs);
             if (size == null)
             {
                 GICLog.Error($"[MapTileBakeTool] JPEG 头解析失败（非 JPEG 或文件损坏）: {srcAbs}");
@@ -64,21 +64,21 @@ namespace GIC.Editor
             }
 
             // 1. 清空旧瓦片 + 预览尺寸计算
-            if (AssetDatabase.IsValidFolder(瓦片目录))
-                AssetDatabase.DeleteAsset(瓦片目录);
+            if (AssetDatabase.IsValidFolder(TileDir))
+                AssetDatabase.DeleteAsset(TileDir);
             AssetDatabase.CreateFolder("Assets/Art/Map", "Tiles");
-            string tileAbsDir = Path.GetFullPath(瓦片目录);
+            string tileAbsDir = Path.GetFullPath(TileDir);
             int pvW = Mathf.Max(4, W / 8 / 4 * 4);
             int pvH = Mathf.Max(4, H / 8 / 4 * 4);
 
             // 2. GDI+ 切图（外部进程）
-            int cols = Mathf.CeilToInt(W / (float)瓦片像素);
-            int rows = Mathf.CeilToInt(H / (float)瓦片像素);
-            GICLog.Info($"[MapTileBakeTool] 开始切图（{(用母版 ? "母版" : "编辑器副本")} {W}x{H}）→ {cols}x{rows} = {cols * rows} 瓦片");
-            if (!运行切图脚本(srcAbs, tileAbsDir, cols, rows, W, H, pvW, pvH, Path.GetFullPath(预览图路径)))
+            int cols = Mathf.CeilToInt(W / (float)tilePx);
+            int rows = Mathf.CeilToInt(H / (float)tilePx);
+            GICLog.Info($"[MapTileBakeTool] 开始切图（{(useMaster ? "MasterImage" : "编辑器副本")} {W}x{H}）→ {cols}x{rows} = {cols * rows} 瓦片");
+            if (!RunTileScript(srcAbs, tileAbsDir, cols, rows, W, H, pvW, pvH, Path.GetFullPath(previewPath)))
                 return;
 
-            导入接线(W, H, cols, rows);
+            ImportAndWire(W, H, cols, rows);
         }
 
         /// <summary>
@@ -90,22 +90,22 @@ namespace GIC.Editor
         [MenuItem("Tools/地图/导入已切瓦片", priority = -56)]
         public static void ImportOnly()
         {
-            string src = 选源图(out _);
-            var s2 = src != null ? 解析Jpeg尺寸(src) : null;
+            string src = ResolveSourceImage(out _);
+            var s2 = src != null ? ParseJpegSize(src) : null;
             if (s2 == null)
             {
                 GICLog.Error("[MapTileBakeTool] 找不到可解析尺寸的源图（母版/编辑器副本均失败）");
                 return;
             }
             int W = s2.Value.x, H = s2.Value.y;
-            int cols = Mathf.CeilToInt(W / (float)瓦片像素);
-            int rows = Mathf.CeilToInt(H / (float)瓦片像素);
+            int cols = Mathf.CeilToInt(W / (float)tilePx);
+            int rows = Mathf.CeilToInt(H / (float)tilePx);
 
             // 完整性校验：瓦片文件必须齐（切图已在外部完成）
             int found = 0;
             for (int y = 0; y < rows; y++)
                 for (int x = 0; x < cols; x++)
-                    if (File.Exists($"{瓦片目录}/tile_{x}_{y}.jpg")) found++;
+                    if (File.Exists($"{TileDir}/tile_{x}_{y}.jpg")) found++;
             if (found < cols * rows)
             {
                 GICLog.Error($"[MapTileBakeTool] 瓦片不全：{found}/{cols * rows}。请先在外部完成切图（Temp/map_tile_bake.ps1），再跑本入口");
@@ -113,23 +113,23 @@ namespace GIC.Editor
             }
 
             AssetDatabase.Refresh();
-            导入接线(W, H, cols, rows);
+            ImportAndWire(W, H, cols, rows);
         }
 
         /// <summary>源图路径解析（Bake/ImportOnly 共用）：母版优先，无母版回退编辑器全图副本；均不存在返回 null</summary>
-        private static string 选源图(out bool 用母版)
+        private static string ResolveSourceImage(out bool useMaster)
         {
-            string 母版 = Path.GetFullPath(MapPaths.母版);
-            if (File.Exists(母版)) { 用母版 = true; return 母版; }
-            string 副本 = Path.GetFullPath(MapPaths.全图副本);
-            if (File.Exists(副本)) { 用母版 = false; return 副本; }
-            GICLog.Error($"[MapTileBakeTool] 源图未找到：{MapPaths.母版} 与 {MapPaths.全图副本} 均不存在");
-            用母版 = false;
+            string MasterImage = Path.GetFullPath(MapPaths.MasterImage);
+            if (File.Exists(MasterImage)) { useMaster = true; return MasterImage; }
+            string copy = Path.GetFullPath(MapPaths.FullCopy);
+            if (File.Exists(copy)) { useMaster = false; return copy; }
+            GICLog.Error($"[MapTileBakeTool] 源图未找到：{MapPaths.MasterImage} 与 {MapPaths.FullCopy} 均不存在");
+            useMaster = false;
             return null;
         }
 
         /// <summary>导入器设置 + Addressables + MapConfig + 场景接线（切图完成后的编辑器内收尾）</summary>
-        private static void 导入接线(int W, int H, int cols, int rows)
+        private static void ImportAndWire(int W, int H, int cols, int rows)
         {
             int count = cols * rows;
             int pvW = Mathf.Max(4, W / 8 / 4 * 4);
@@ -137,9 +137,9 @@ namespace GIC.Editor
 
             // 3. 导入设置：mip 关（大图开 mip 块压缩失效，docs/14 §8.2）+ Automatic+Compressed +
             //    Sprite 单模式 + maxSize 4096（>2056 防缩，Android 默认上限 2048 会截掉重叠边）
-            foreach (var path in 所有瓦片路径(cols, rows))
-                设置导入参数(path);
-            设置导入参数(预览图路径);
+            foreach (var path in AllTilePaths(cols, rows))
+                ApplyImportSettings(path);
+            ApplyImportSettings(previewPath);
 
             // 5. Addressables：移除全图与旧瓦片条目，瓦片入 MapAssets 组
             var settings = AddressableAssetSettingsDefaultObject.Settings;
@@ -148,29 +148,29 @@ namespace GIC.Editor
                 GICLog.Error("[MapTileBakeTool] AddressableAssetSettings 未初始化");
                 return;
             }
-            var group = settings.FindGroup(组名);
+            var group = settings.FindGroup(groupName);
             if (group == null)
             {
-                GICLog.Error($"[MapTileBakeTool] Addressables 组 {组名} 不存在");
+                GICLog.Error($"[MapTileBakeTool] Addressables 组 {groupName} 不存在");
                 return;
             }
             var toRemove = new List<AddressableAssetEntry>();
             foreach (var e in group.entries)
-                if (e.address == 全图地址 || e.address.StartsWith(地址前缀))
+                if (e.address == fullAddr || e.address.StartsWith(addrPrefix))
                     toRemove.Add(e);
             foreach (var e in toRemove)
                 group.RemoveAssetEntry(e);
 
-            foreach (var path in 所有瓦片路径(cols, rows))
+            foreach (var path in AllTilePaths(cols, rows))
             {
                 string name = Path.GetFileNameWithoutExtension(path); // tile_x_y
                 string guid = AssetDatabase.AssetPathToGUID(path);
                 var entry = settings.CreateOrMoveEntry(guid, group, false, false);
-                entry.address = 地址前缀 + name.Substring(5); // 去掉 "tile_" 前缀重复
+                entry.address = addrPrefix + name.Substring(5); // 去掉 "tile_" 前缀重复
             }
             EditorUtility.SetDirty(group);
             AssetDatabase.SaveAssets();
-            GICLog.Info($"[MapTileBakeTool] Addressables 组 {组名}：移除 {toRemove.Count} 条（含全图），新增 {count} 瓦片");
+            GICLog.Info($"[MapTileBakeTool] Addressables 组 {groupName}：移除 {toRemove.Count} 条（含全图），新增 {count} 瓦片");
 
             // 6. 网格参数写入 MapConfig（瓦片层与标定尺寸换算的数据源）
             var cfg = AssetDatabase.LoadAssetAtPath<MapConfig>(MapConfig路径);
@@ -198,15 +198,15 @@ namespace GIC.Editor
             oldHProp.intValue = H;
             so.FindProperty("tileColumns").intValue = cols;
             so.FindProperty("tileRows").intValue = rows;
-            so.FindProperty("tilePixelSize").intValue = 瓦片像素;
-            so.FindProperty("tileOverlapPx").intValue = 重叠像素;
-            so.FindProperty("tileAddressPrefix").stringValue = 地址前缀;
+            so.FindProperty("tilePixelSize").intValue = tilePx;
+            so.FindProperty("tileOverlapPx").intValue = overlapPx;
+            so.FindProperty("tileAddressPrefix").stringValue = addrPrefix;
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(cfg);
             AssetDatabase.SaveAssets();
 
             // 7. 场景接线：MapPlane 底图保持预览图 + TileRoot 挂 MapTileLayer（幂等）
-            接线场景();
+            WireScene();
 
             GICLog.Info($"[MapTileBakeTool] ✓ 完成：{count} 瓦片 + 预览图 {pvW}x{pvH}。" +
                         "请 Play 目测瓦片加载、接缝与锚点对齐");
@@ -216,7 +216,7 @@ namespace GIC.Editor
         /// 解析 JPEG SOF0-SOF15 段取像素宽高（纯 IO，不解码像素）。
         /// 处理标记前填充字节（0xFF×n）、跳过普通段。
         /// </summary>
-        private static Vector2Int? 解析Jpeg尺寸(string path)
+        private static Vector2Int? ParseJpegSize(string path)
         {
             using var fs = File.OpenRead(path);
             int b0 = fs.ReadByte(), b1 = fs.ReadByte();
@@ -250,7 +250,7 @@ namespace GIC.Editor
         }
 
         /// <summary>生成并运行 GDI+ 切图 PowerShell 脚本（瓦片 + 预览图一次跑完）</summary>
-        private static bool 运行切图脚本(string srcAbs, string tileAbsDir, int cols, int rows,
+        private static bool RunTileScript(string srcAbs, string tileAbsDir, int cols, int rows,
             int W, int H, int pvW, int pvH, string pvAbs)
         {
             string script = new StringBuilder()
@@ -302,14 +302,14 @@ namespace GIC.Editor
             return true;
         }
 
-        private static IEnumerable<string> 所有瓦片路径(int cols, int rows)
+        private static IEnumerable<string> AllTilePaths(int cols, int rows)
         {
             for (int y = 0; y < rows; y++)
                 for (int x = 0; x < cols; x++)
-                    yield return $"{瓦片目录}/tile_{x}_{y}.jpg";
+                    yield return $"{TileDir}/tile_{x}_{y}.jpg";
         }
 
-        private static void 设置导入参数(string path)
+        private static void ApplyImportSettings(string path)
         {
             if (AssetImporter.GetAtPath(path) is not TextureImporter imp) return;
             imp.textureType = TextureImporterType.Sprite;
@@ -322,9 +322,9 @@ namespace GIC.Editor
         }
 
         /// <summary>MapScreen 场景：MapPlane 保持预览图 + TileRoot/MapTileLayer 接线，保存后重开断言</summary>
-        private static void 接线场景()
+        private static void WireScene()
         {
-            var scene = EditorSceneManager.OpenScene(MapScreen场景, OpenSceneMode.Single);
+            var scene = EditorSceneManager.OpenScene(MapScreenScene, OpenSceneMode.Single);
             var screens = Object.FindObjectsOfType<MapScreen>(true);
             if (screens.Length != 1)
             {
@@ -337,7 +337,7 @@ namespace GIC.Editor
             var mapWorld = plane.transform.parent;
 
             // MapPlane → 预览图（若已是则空操作；瓦片化后全图永不进场景）
-            var preview = AssetDatabase.LoadAssetAtPath<Sprite>(预览图路径);
+            var preview = AssetDatabase.LoadAssetAtPath<Sprite>(previewPath);
             var planeSo = new SerializedObject(plane);
             planeSo.FindProperty("m_Sprite").objectReferenceValue = preview;
             planeSo.ApplyModifiedPropertiesWithoutUndo();
@@ -363,7 +363,7 @@ namespace GIC.Editor
             EditorSceneManager.SaveScene(scene);
 
             // 保存→重开→断言闭环（P10 铁律）
-            EditorSceneManager.OpenScene(MapScreen场景, OpenSceneMode.Single);
+            EditorSceneManager.OpenScene(MapScreenScene, OpenSceneMode.Single);
             var re = Object.FindObjectsOfType<MapScreen>(true);
             var reSo = new SerializedObject(re[0]);
             var rePlane = reSo.FindProperty("地图贴图").objectReferenceValue as SpriteRenderer;

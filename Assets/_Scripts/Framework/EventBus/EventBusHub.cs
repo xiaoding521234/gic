@@ -193,7 +193,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 公共静态 API
+        #region publicStatic API
 
         /// <summary>
         /// 发布事件 — 自动判断本地/网络路由

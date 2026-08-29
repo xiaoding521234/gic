@@ -46,7 +46,7 @@ namespace GIC.Editor
             return section;
         }
 
-        #region 批量填充（逻辑与 IMGUI 版一致，日志走 GICLog）
+        #region batchFill（logicAnd IMGUI versionConsistent，logVia GICLog）
 
         private void AutoFillAllPositions(PositionConfig config)
         {

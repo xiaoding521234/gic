@@ -21,8 +21,8 @@ namespace GIC.Pet
         [StructLayout(LayoutKind.Sequential)] internal struct RECT
         {
             public int Left; public int Top; public int Right; public int Bottom;
-            public int 宽 => Right - Left;
-            public int 高 => Bottom - Top;
+            public int Width => Right - Left;
+            public int Height => Bottom - Top;
         }
 
         [StructLayout(LayoutKind.Sequential)] internal struct MARGINS { public int cxLeftWidth; public int cxRightWidth; public int cyTopHeight; public int cyBottomHeight; }

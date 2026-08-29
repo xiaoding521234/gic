@@ -186,13 +186,13 @@ MonoBehaviour:
   - region: 7
     button: {fileID: 937096206}
   titleText: {fileID: 2060948902}
-  "\u5730\u56FE\u76F8\u673A": {fileID: 1990878231}
-  "\u5730\u56FE\u8D34\u56FE": {fileID: 1100937211}
-  "\u951A\u70B9\u5BB9\u5668": {fileID: 1330320070}
+  mapCamera: {fileID: 1990878231}
+  mapSprite: {fileID: 1100937211}
+  anchorContainer: {fileID: 1330320070}
   mapConfig: {fileID: 11400000, guid: ece0a0d1b4ff9c7408f25d5eb4f5e719, type: 2}
   anchorPrefab: {fileID: 5926113756565173545, guid: d7a3e2e0e1cb94240994bede756a58e7, type: 3}
   canvasGroup: {fileID: 1555992354}
-  "\u6DE1\u5165\u6DE1\u51FA\u906E\u7F69": {fileID: 1661793801}
+  fadeMask: {fileID: 1661793801}
   fadeOutDuration: 0.3
   fadeOutCurve:
     serializedVersion: 2
@@ -1141,9 +1141,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mapConfig: {fileID: 11400000, guid: ece0a0d1b4ff9c7408f25d5eb4f5e719, type: 2}
   mapCamera: {fileID: 1990878229}
-  "\u74E6\u7247\u524D\u79FB": -0.02
-  "\u9884\u8F7D\u8FB9\u8DDD": 1
-  "\u91CA\u653E\u6EDE\u56DE": 1
+  tileZOffset: -0.02
+  preloadMargin: 1
+  releaseHysteresis: 1
 --- !u!1 &1330320069
 GameObject:
   m_ObjectHideFlags: 0
@@ -1938,13 +1938,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd9fbac9a2c58cd479f13a26412913f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  "\u6700\u5C0F\u5C3A\u5BF8": 8
-  "\u6700\u5927\u5C3A\u5BF8": 15
-  "\u6EDA\u8F6E\u7F29\u653E\u6B65\u8FDB": 0.925
-  "\u9ED8\u8BA4\u89C6\u91CE\u5C3A\u5BF8": 8
-  "\u5165\u573A\u65F6\u957F": 0.2
-  "\u70B9\u51FB\u4F4D\u79FB\u9608\u503C": 12
-  "\u951A\u70B9\u5C04\u7EBF\u6700\u5927\u8DDD\u79BB": 500
+  minSize: 8
+  maxSize: 15
+  scrollStep: 0.925
+  defaultViewSize: 8
+  enterDuration: 0.2
+  clickMoveThreshold: 12
+  anchorRayMaxDist: 500
 --- !u!1 &2060948897
 GameObject:
   m_ObjectHideFlags: 0

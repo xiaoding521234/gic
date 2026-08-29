@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
+using UnityEngine.Serialization;
 namespace GIC.UI
 {
 
@@ -27,9 +28,12 @@ namespace GIC.UI
         }
 
         [Header("3D 地图结构引用（场景中静态）")]
-        [SerializeField] private MapCameraController 地图相机;      // MapCamera 上的相机控制器
-        [SerializeField] private SpriteRenderer 地图贴图;           // MapPlane（垂直画布 XY 平面上的大地图）
-        [SerializeField] private Transform 锚点容器;                // MapWorld/Anchors，动态锚点挂载点
+        [InspectorName("地图相机")]
+        [SerializeField] private MapCameraController mapCamera;      // MapCamera 上的相机控制器
+        [InspectorName("地图贴图")]
+        [SerializeField] private SpriteRenderer mapSprite;           // MapPlane（垂直画布 XY 平面上的大地图）
+        [InspectorName("锚点容器")]
+        [SerializeField] private Transform anchorContainer;                // MapWorld/Anchors，动态锚点挂载点
 
         [Header("配置")]
         [SerializeField] private MapConfig mapConfig;
@@ -37,7 +41,8 @@ namespace GIC.UI
 
         [Header("淡入淡出")]
         [SerializeField] private CanvasGroup canvasGroup;      // UI 淡出（画布层）
-        [SerializeField] private CanvasGroup 淡入淡出遮罩;     // 全屏黑遮罩（覆盖 3D 地图，ignoreParentGroups）
+        [InspectorName("淡入淡出遮罩")]
+        [SerializeField] private CanvasGroup fadeMask;     // 全屏黑遮罩（覆盖 3D 地图，ignoreParentGroups）
         [SerializeField] private float fadeOutDuration = 0.3f;
         [SerializeField] private AnimationCurve fadeOutCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
@@ -71,8 +76,8 @@ namespace GIC.UI
             ShowRegion(_positionManager.GetCurrentRegion(), fromMaxZoom: true);
 
             // 3D 地图不吃 CanvasGroup，入场直接揭开（遮罩归零）
-            if (淡入淡出遮罩 != null)
-                淡入淡出遮罩.alpha = 0f;
+            if (fadeMask != null)
+                fadeMask.alpha = 0f;
         }
 
         /// <summary>
@@ -82,7 +87,7 @@ namespace GIC.UI
         /// </summary>
         public void ApplyMapCalibration()
         {
-            var sprite = 地图贴图.sprite;
+            var sprite = mapSprite.sprite;
             if (sprite == null)
             {
                 GICLog.Warn("[MapScreen] 地图贴图未指定 sprite，跳过标定");
@@ -100,15 +105,15 @@ namespace GIC.UI
 
             // 垂直画布：MapPlane rotation 归零（XY 平面），缩放直接 XY，sprite.bounds 即本地尺寸
             var b = sprite.bounds.size;
-            地图贴图.transform.localRotation = Quaternion.identity;
-            地图贴图.transform.localScale = new Vector3(w / b.x, d / b.y, 1f);
+            mapSprite.transform.localRotation = Quaternion.identity;
+            mapSprite.transform.localScale = new Vector3(w / b.x, d / b.y, 1f);
 
             // 图片左上角 = mapOrigin（图片顶边在世界 +Y 上方）→ 中心 = origin + (w/2, -d/2)
             var mapCenter = new Vector2(mapConfig.MapOrigin.x + w * 0.5f, mapConfig.MapOrigin.y - d * 0.5f);
-            地图贴图.transform.localPosition = new Vector3(mapCenter.x, mapCenter.y, 0f);
+            mapSprite.transform.localPosition = new Vector3(mapCenter.x, mapCenter.y, 0f);
 
             // 相机边界围绕图中心（勿以世界原点为界——换图标定后中心会移动）
-            地图相机.InitBounds(mapCenter, w, d);
+            mapCamera.InitBounds(mapCenter, w, d);
         }
 
         /// <summary>
@@ -136,7 +141,7 @@ namespace GIC.UI
             }
 
             // 区域视野中心为固定世界坐标，相机直接聚焦（区域切换为平滑滑移）
-            地图相机.FocusRegion(data.viewCenterWorld, data.viewHeight, fromMaxZoom);
+            mapCamera.FocusRegion(data.viewCenterWorld, data.viewHeight, fromMaxZoom);
         }
 
         /// <summary>生成全图所有区域的锚点（打开地图时调用一次，原神式常驻显示）</summary>
@@ -150,7 +155,7 @@ namespace GIC.UI
                 if (data == null) continue;
                 foreach (var anchor in data.anchors)
                 {
-                    var go = Instantiate(anchorPrefab, 锚点容器);
+                    var go = Instantiate(anchorPrefab, anchorContainer);
                     var mapAnchor = go.GetComponent<MapAnchor>();
 
                     // 锚点坐标为固定世界 XY 坐标（垂直画布 z=0，扩图不变），直接落位
@@ -185,12 +190,12 @@ namespace GIC.UI
         /// </summary>
         private void UpdateAnchorConstantScale(bool force = false)
         {
-            if (地图相机 == null) return;
-            float camSize = 地图相机.CurrentSize;
+            if (mapCamera == null) return;
+            float camSize = mapCamera.CurrentSize;
             if (!force && Mathf.Approximately(camSize, _anchorScaleCamSize)) return;
             _anchorScaleCamSize = camSize;
 
-            float scale = 地图相机.BaseViewSize > 0f ? camSize / 地图相机.BaseViewSize : 1f;
+            float scale = mapCamera.BaseViewSize > 0f ? camSize / mapCamera.BaseViewSize : 1f;
             foreach (var anchor in _spawnedAnchors)
             {
                 if (anchor != null)
@@ -233,7 +238,7 @@ namespace GIC.UI
         {
             float startTime = Time.realtimeSinceStartup;
             float startAlpha = canvasGroup != null ? canvasGroup.alpha : 1f;
-            float startMask = 淡入淡出遮罩 != null ? 淡入淡出遮罩.alpha : 0f;
+            float startMask = fadeMask != null ? fadeMask.alpha : 0f;
 
             while (true)
             {
@@ -243,15 +248,15 @@ namespace GIC.UI
                 float t = fadeOutCurve.Evaluate(elapsed / fadeOutDuration);
                 if (canvasGroup != null)
                     canvasGroup.alpha = Mathf.LerpUnclamped(startAlpha, 0f, t);
-                if (淡入淡出遮罩 != null)
-                    淡入淡出遮罩.alpha = Mathf.LerpUnclamped(startMask, 1f, t);
+                if (fadeMask != null)
+                    fadeMask.alpha = Mathf.LerpUnclamped(startMask, 1f, t);
                 yield return null;
             }
 
             if (canvasGroup != null)
                 canvasGroup.alpha = 0f;
-            if (淡入淡出遮罩 != null)
-                淡入淡出遮罩.alpha = 1f;
+            if (fadeMask != null)
+                fadeMask.alpha = 1f;
         }
     }
 }

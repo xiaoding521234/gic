@@ -14,7 +14,7 @@ namespace GIC.UI
         private const int PET_FORM_INGAME = 1;
 
         /// <summary>当前平台是否可选桌面版（Win32 专属形态；安卓等平台恒游戏内版）</summary>
-        public static bool 桌面版可用 =>
+        public static bool DesktopFormAvailable =>
 #if UNITY_STANDALONE_WIN
             true;
 #else
@@ -38,28 +38,28 @@ namespace GIC.UI
                 onClick: () =>
                 {
                     // 回显当前明文（弹窗内可见全 key——本机用户自己输的，回显方便核对改错）
-                    string 当前明文 = GIC.Pet.PetApiKeyCrypto.解密(_saveManager.CurrentSave.petApiKeyCipher);
-                    ShowInputPanel(petApiKeySetting, 当前明文, (新值) =>
+                    string currentPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.petApiKeyCipher);
+                    ShowInputPanel(petApiKeySetting, currentPlain, (newValue) =>
                     {
-                        新值 = 新值.Trim();
-                        string 密文 = GIC.Pet.PetApiKeyCrypto.加密(新值);
-                        _saveManager.CurrentSave.petApiKeyCipher = 密文;
+                        newValue = newValue.Trim();
+                        string cipher = GIC.Pet.PetApiKeyCrypto.Encrypt(newValue);
+                        _saveManager.CurrentSave.petApiKeyCipher = cipher;
                         _saveManager.SaveGame();
                         // 同步密文到 pet.json（桌面桌宠进程永不读主存档——靠这条共享通道取 key，
                         // 密文传输安全；编辑器跳过=PetPrefs.写入 的既有语义）
-                        var pet档 = GIC.Pet.PetPrefs.读取();
-                        pet档.对话密文 = 密文;
-                        GIC.Pet.PetPrefs.写入();
-                        petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.脱敏(新值));
+                        var pet档 = GIC.Pet.PetPrefs.Load();
+                        pet档.chatCipher = cipher;
+                        GIC.Pet.PetPrefs.Save();
+                        petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(newValue));
                     }, "PetApiKeyInput", 64); // DeepSeek key=sk-+32hex 共 35 字符，64 富余（弹窗默认 16 会截断）
                 },
                 onValueConfirmed: null,
                 placeholderKey: "PetApiKeyNotSet");
             petApiKeySetting.Initialize();
             // 初始显示：已设置=脱敏；未设置=占位（Initialize 走 LoadValue=defaultValue=""→占位键生效需手动刷新一次）
-            string 已存明文 = GIC.Pet.PetApiKeyCrypto.解密(_saveManager.CurrentSave.petApiKeyCipher);
-            if (!string.IsNullOrEmpty(已存明文))
-                petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.脱敏(已存明文));
+            string storedPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.petApiKeyCipher);
+            if (!string.IsNullOrEmpty(storedPlain))
+                petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(storedPlain));
         }
 
         /// <summary>派蒙形态：桌面版（仅 Windows）/ 游戏画面内版。切换即时生效（PetInGameHost 热切换；
@@ -70,7 +70,7 @@ namespace GIC.UI
         {
             var options = new List<TextEntry>();
             int desktopIdx = -1, ingameIdx = -1;
-            if (桌面版可用)
+            if (DesktopFormAvailable)
             {
                 desktopIdx = options.Count;
                 options.Add(new TextEntry(new LocalizedString("UIText", "PetFormDesktop"), ""));
@@ -78,7 +78,7 @@ namespace GIC.UI
             ingameIdx = options.Count;
             options.Add(new TextEntry(new LocalizedString("UIText", "PetFormInGame"), ""));
 
-            int current = 读取有效形态();
+            int current = GetEffectiveForm();
             int currentIndex = current == PET_FORM_DESKTOP ? desktopIdx : ingameIdx;
 
             petFormSetting.Setup("PetForm", options, currentIndex, (index) =>
@@ -86,17 +86,17 @@ namespace GIC.UI
                 int form = index == desktopIdx ? PET_FORM_DESKTOP : PET_FORM_INGAME;
                 _saveManager.CurrentSave.petForm = form;
                 _saveManager.SaveGame();
-                GIC.Pet.PetInGameHost.热切换形态(form);
+                GIC.Pet.PetInGameHost.HotSwitchForm(form);
             });
             petFormSetting.Initialize();
         }
 
         /// <summary>读档侧钳制：非 Windows 平台/非法值恒游戏内版（存 0 的老档在安卓上跑=钳 1）</summary>
-        private int 读取有效形态()
+        private int GetEffectiveForm()
         {
             int form = _saveManager.CurrentSave.petForm;
             if (form != PET_FORM_DESKTOP && form != PET_FORM_INGAME) form = PET_FORM_INGAME;
-            if (form == PET_FORM_DESKTOP && !桌面版可用) form = PET_FORM_INGAME;
+            if (form == PET_FORM_DESKTOP && !DesktopFormAvailable) form = PET_FORM_INGAME;
             return form;
         }
 

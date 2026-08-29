@@ -80,7 +80,7 @@ namespace GIC.Data
                 return icon[index];
             }
 
-            #region 本地化 Entry 获取方法
+            #region localization Entry 获取方法
 
             /// <summary>
             /// 获取物品名称的 Entry（用于 TextCombiner）

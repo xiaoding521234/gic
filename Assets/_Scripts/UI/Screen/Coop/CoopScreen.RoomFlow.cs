@@ -16,7 +16,7 @@ namespace GIC.UI
         internal enum RoomState { DisconnectedClient, Host, ConnectedClient }
         internal RoomState _currentState = RoomState.DisconnectedClient;
 
-        #region 连接管理
+        #region connManage
 
         private void StopCurrentConnection()
         {
@@ -134,7 +134,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 网络回调
+        #region networkCallback
 
         void OnClientConnected()
         {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -26,38 +27,40 @@ namespace GIC.Pet
         [System.Serializable]
         public class 手指姿态
         {
-            [Tooltip("姿态叠加权重（0=纯 clip，1=完全叠加）")] public float 权重 = 1f;
-            [Tooltip("拇指根节（親指０）屈曲°")] public float 拇指根 = 5f;
-            [Tooltip("拇指中节（親指１）屈曲°")] public float 拇指中 = 8f;
-            [Tooltip("拇指末节（親指２）屈曲°")] public float 拇指末 = 5f;
-            [Tooltip("食指根节（人指１）屈曲°")] public float 食指根 = 5f;
-            [Tooltip("食指中节（人指２）屈曲°")] public float 食指中 = 10f;
-            [Tooltip("食指末节（人指３）屈曲°")] public float 食指末 = 8f;
-            [Tooltip("中指根节（中指１）屈曲°")] public float 中指根 = 8f;
-            [Tooltip("中指中节（中指２）屈曲°")] public float 中指中 = 12f;
-            [Tooltip("中指末节（中指３）屈曲°")] public float 中指末 = 8f;
-            [Tooltip("无名指根节（薬指１）屈曲°")] public float 无名指根 = 10f;
-            [Tooltip("无名指中节（薬指２）屈曲°")] public float 无名指中 = 15f;
-            [Tooltip("无名指末节（薬指３）屈曲°")] public float 无名指末 = 10f;
-            [Tooltip("小指根节（小指１）屈曲°")] public float 小指根 = 12f;
-            [Tooltip("小指中节（小指２）屈曲°")] public float 小指中 = 18f;
-            [Tooltip("小指末节（小指３）屈曲°")] public float 小指末 = 12f;
+            [Tooltip("姿态叠加权重（0=纯 clip，1=完全叠加）")] public float weight = 1f;
+            [Tooltip("拇指根节（親指０）屈曲°")] public float thumbRoot = 5f;
+            [Tooltip("拇指中节（親指１）屈曲°")] public float thumbMid = 8f;
+            [Tooltip("拇指末节（親指２）屈曲°")] public float thumbTip = 5f;
+            [Tooltip("食指根节（人指１）屈曲°")] public float indexRoot = 5f;
+            [Tooltip("食指中节（人指２）屈曲°")] public float indexMid = 10f;
+            [Tooltip("食指末节（人指３）屈曲°")] public float indexTip = 8f;
+            [Tooltip("中指根节（中指１）屈曲°")] public float middleRoot = 8f;
+            [Tooltip("中指中节（中指２）屈曲°")] public float middleMid = 12f;
+            [Tooltip("中指末节（中指３）屈曲°")] public float middleTip = 8f;
+            [Tooltip("无名指根节（薬指１）屈曲°")] public float ringRoot = 10f;
+            [Tooltip("无名指中节（薬指２）屈曲°")] public float ringMid = 15f;
+            [Tooltip("无名指末节（薬指３）屈曲°")] public float ringTip = 10f;
+            [Tooltip("小指根节（小指１）屈曲°")] public float pinkyRoot = 12f;
+            [Tooltip("小指中节（小指２）屈曲°")] public float pinkyMid = 18f;
+            [Tooltip("小指末节（小指３）屈曲°")] public float pinkyTip = 12f;
         }
 
         [Header("姿态参数集（按 clip 名匹配）")]
         [SerializeField] private 手指姿态 生气姿态 = new 手指姿态
         {
-            权重 = 1f,
-            拇指根 = 30f, 拇指中 = 45f, 拇指末 = 30f,
-            食指根 = 70f, 食指中 = 80f, 食指末 = 60f,
-            中指根 = 75f, 中指中 = 85f, 中指末 = 65f,
-            无名指根 = 80f, 无名指中 = 90f, 无名指末 = 70f,
-            小指根 = 85f, 小指中 = 95f, 小指末 = 75f,
+            weight = 1f,
+            thumbRoot = 30f, thumbMid = 45f, thumbTip = 30f,
+            indexRoot = 70f, indexMid = 80f, indexTip = 60f,
+            middleRoot = 75f, middleMid = 85f, middleTip = 65f,
+            ringRoot = 80f, ringMid = 90f, ringTip = 70f,
+            pinkyRoot = 85f, pinkyMid = 95f, pinkyTip = 75f,
         };
 
         [Header("过渡")]
-        [Tooltip("姿态切换平滑过渡秒数")] [SerializeField] private float 过渡秒 = 0.25f;
-        [Tooltip("是否启用手手指姿态层（关=完全走 clip 曲线）")] [SerializeField] private bool 启用 = true;
+        [InspectorName("过渡秒")]
+        [Tooltip("姿态切换平滑过渡秒数")] [SerializeField] private float TransitionSeconds = 0.25f;
+        [InspectorName("启用")]
+        [Tooltip("是否启用手手指姿态层（关=完全走 clip 曲线）")] [SerializeField] private bool enableFinger = true;
 
         // 运行时状态
         private 手指姿态 _当前姿态;      // 插值后的实时姿态
@@ -79,10 +82,10 @@ namespace GIC.Pet
             _目标姿态 = new 手指姿态();
             _过渡起点 = new 手指姿态();
             _当前权重 = 0f;
-            缓存骨引用();
+            CacheBoneRefs();
         }
 
-        void 缓存骨引用()
+        void CacheBoneRefs()
         {
             var all = GetComponentsInChildren<Transform>(true);
             System.Func<string, Transform> F = n =>
@@ -105,9 +108,9 @@ namespace GIC.Pet
         /// <summary>PetAnimSwapper.Play 调用：按 clip 名切换姿态</summary>
         public void SetPose(string clipName)
         {
-            if (!启用) return;
+            if (!enableFinger) return;
             _过渡起点 = _当前姿态;
-            _过渡起点.权重 = _当前权重;
+            _过渡起点.weight = _当前权重;
             if (clipName.Contains("Anger"))
             {
                 _目标姿态 = 生气姿态;
@@ -116,65 +119,65 @@ namespace GIC.Pet
             {
                 // Standby/其他 clip 纯走源数据（叠加权重渐隐到 0）
                 _目标姿态 = new 手指姿态();
-                _目标姿态.权重 = 0f;
+                _目标姿态.weight = 0f;
             }
             _过渡进度 = 0f;
         }
 
         void LateUpdate()
         {
-            if (!启用) return;
+            if (!enableFinger) return;
             if (_过渡进度 < 1f)
             {
-                _过渡进度 = Mathf.Min(1f, _过渡进度 + Time.deltaTime / Mathf.Max(0.001f, 过渡秒));
-                插值姿态(_过渡起点, _目标姿态, _过渡进度, _当前姿态);
-                _当前权重 = Mathf.Lerp(_过渡起点.权重, _目标姿态.权重, _过渡进度);
+                _过渡进度 = Mathf.Min(1f, _过渡进度 + Time.deltaTime / Mathf.Max(0.001f, TransitionSeconds));
+                interpPose(_过渡起点, _目标姿态, _过渡进度, _当前姿态);
+                _当前权重 = Mathf.Lerp(_过渡起点.weight, _目标姿态.weight, _过渡进度);
             }
             else
             {
-                _当前权重 = _目标姿态.权重;
+                _当前权重 = _目标姿态.weight;
             }
             if (_当前权重 > 0.001f)
-                应用姿态(_当前姿态, _当前权重);
+                applyPose(_当前姿态, _当前权重);
         }
 
-        static void 插值姿态(手指姿态 a, 手指姿态 b, float t, 手指姿态 o)
+        static void interpPose(手指姿态 a, 手指姿态 b, float t, 手指姿态 o)
         {
-            o.拇指根 = Mathf.LerpAngle(a.拇指根, b.拇指根, t); o.拇指中 = Mathf.LerpAngle(a.拇指中, b.拇指中, t); o.拇指末 = Mathf.LerpAngle(a.拇指末, b.拇指末, t);
-            o.食指根 = Mathf.LerpAngle(a.食指根, b.食指根, t); o.食指中 = Mathf.LerpAngle(a.食指中, b.食指中, t); o.食指末 = Mathf.LerpAngle(a.食指末, b.食指末, t);
-            o.中指根 = Mathf.LerpAngle(a.中指根, b.中指根, t); o.中指中 = Mathf.LerpAngle(a.中指中, b.中指中, t); o.中指末 = Mathf.LerpAngle(a.中指末, b.中指末, t);
-            o.无名指根 = Mathf.LerpAngle(a.无名指根, b.无名指根, t); o.无名指中 = Mathf.LerpAngle(a.无名指中, b.无名指中, t); o.无名指末 = Mathf.LerpAngle(a.无名指末, b.无名指末, t);
-            o.小指根 = Mathf.LerpAngle(a.小指根, b.小指根, t); o.小指中 = Mathf.LerpAngle(a.小指中, b.小指中, t); o.小指末 = Mathf.LerpAngle(a.小指末, b.小指末, t);
+            o.thumbRoot = Mathf.LerpAngle(a.thumbRoot, b.thumbRoot, t); o.thumbMid = Mathf.LerpAngle(a.thumbMid, b.thumbMid, t); o.thumbTip = Mathf.LerpAngle(a.thumbTip, b.thumbTip, t);
+            o.indexRoot = Mathf.LerpAngle(a.indexRoot, b.indexRoot, t); o.indexMid = Mathf.LerpAngle(a.indexMid, b.indexMid, t); o.indexTip = Mathf.LerpAngle(a.indexTip, b.indexTip, t);
+            o.middleRoot = Mathf.LerpAngle(a.middleRoot, b.middleRoot, t); o.middleMid = Mathf.LerpAngle(a.middleMid, b.middleMid, t); o.middleTip = Mathf.LerpAngle(a.middleTip, b.middleTip, t);
+            o.ringRoot = Mathf.LerpAngle(a.ringRoot, b.ringRoot, t); o.ringMid = Mathf.LerpAngle(a.ringMid, b.ringMid, t); o.ringTip = Mathf.LerpAngle(a.ringTip, b.ringTip, t);
+            o.pinkyRoot = Mathf.LerpAngle(a.pinkyRoot, b.pinkyRoot, t); o.pinkyMid = Mathf.LerpAngle(a.pinkyMid, b.pinkyMid, t); o.pinkyTip = Mathf.LerpAngle(a.pinkyTip, b.pinkyTip, t);
         }
 
-        void 应用姿态(手指姿态 p, float weight)
+        void applyPose(手指姿态 p, float weight)
         {
             // v18.2 分层叠加：在 clip 基础姿势上叠加弯曲增量（权重缩放）
             // 四指：第 1/2 节绕 X+，第 3 节绕 X-（局部系翻转）
             // 拇指：绕 Y+（屈曲+内收混合轴）
-            应用骨(_亲指０L, _亲指１L, _亲指２L, p.拇指根, p.拇指中, p.拇指末, true, weight);
-            应用骨(_亲指０R, _亲指１R, _亲指２R, p.拇指根, p.拇指中, p.拇指末, true, weight);
-            应用骨(_人指１L, _人指２L, _人指３L, p.食指根, p.食指中, p.食指末, false, weight);
-            应用骨(_人指１R, _人指２R, _人指３R, p.食指根, p.食指中, p.食指末, false, weight);
-            应用骨(_中指１L, _中指２L, _中指３L, p.中指根, p.中指中, p.中指末, false, weight);
-            应用骨(_中指１R, _中指２R, _中指３R, p.中指根, p.中指中, p.中指末, false, weight);
-            应用骨(_薬指１L, _薬指２L, _薬指３L, p.无名指根, p.无名指中, p.无名指末, false, weight);
-            应用骨(_薬指１R, _薬指２R, _薬指３R, p.无名指根, p.无名指中, p.无名指末, false, weight);
-            应用骨(_小指１L, _小指２L, _小指３L, p.小指根, p.小指中, p.小指末, false, weight);
-            应用骨(_小指１R, _小指２R, _小指３R, p.小指根, p.小指中, p.小指末, false, weight);
+            applyBone(_亲指０L, _亲指１L, _亲指２L, p.thumbRoot, p.thumbMid, p.thumbTip, true, weight);
+            applyBone(_亲指０R, _亲指１R, _亲指２R, p.thumbRoot, p.thumbMid, p.thumbTip, true, weight);
+            applyBone(_人指１L, _人指２L, _人指３L, p.indexRoot, p.indexMid, p.indexTip, false, weight);
+            applyBone(_人指１R, _人指２R, _人指３R, p.indexRoot, p.indexMid, p.indexTip, false, weight);
+            applyBone(_中指１L, _中指２L, _中指３L, p.middleRoot, p.middleMid, p.middleTip, false, weight);
+            applyBone(_中指１R, _中指２R, _中指３R, p.middleRoot, p.middleMid, p.middleTip, false, weight);
+            applyBone(_薬指１L, _薬指２L, _薬指３L, p.ringRoot, p.ringMid, p.ringTip, false, weight);
+            applyBone(_薬指１R, _薬指２R, _薬指３R, p.ringRoot, p.ringMid, p.ringTip, false, weight);
+            applyBone(_小指１L, _小指２L, _小指３L, p.pinkyRoot, p.pinkyMid, p.pinkyTip, false, weight);
+            applyBone(_小指１R, _小指２R, _小指３R, p.pinkyRoot, p.pinkyMid, p.pinkyTip, false, weight);
         }
 
-        void 应用骨(Transform 根, Transform 中, Transform 末, float 根角, float 中角, float 末角, bool 是拇指, float weight)
+        void applyBone(Transform root, Transform mid, Transform tip, float rootAngle, float midAngle, float tipAngle, bool isThumb, float weight)
         {
             // 弯曲轴：四指 X+/X+/X-；拇指 Y+/Y+/Y+
-            Vector3 轴根 = 是拇指 ? Vector3.up : Vector3.right;
-            Vector3 轴中 = 是拇指 ? Vector3.up : Vector3.right;
-            Vector3 轴末 = 是拇指 ? Vector3.up : Vector3.left; // 四指末节局部系翻 180°
+            Vector3 axisRoot = isThumb ? Vector3.up : Vector3.right;
+            Vector3 axisMid = isThumb ? Vector3.up : Vector3.right;
+            Vector3 axisTip = isThumb ? Vector3.up : Vector3.left; // 四指末节局部系翻 180°
 
             // 叠加：在 clip 写入的 localRotation 基础上，按权重叠加弯曲增量
-            if (根 != null) 根.localRotation = 根.localRotation * Quaternion.AngleAxis(根角 * weight, 轴根);
-            if (中 != null) 中.localRotation = 中.localRotation * Quaternion.AngleAxis(中角 * weight, 轴中);
-            if (末 != null) 末.localRotation = 末.localRotation * Quaternion.AngleAxis(末角 * weight, 轴末);
+            if (root != null) root.localRotation = root.localRotation * Quaternion.AngleAxis(rootAngle * weight, axisRoot);
+            if (mid != null) mid.localRotation = mid.localRotation * Quaternion.AngleAxis(midAngle * weight, axisMid);
+            if (tip != null) tip.localRotation = tip.localRotation * Quaternion.AngleAxis(tipAngle * weight, axisTip);
         }
     }
 }

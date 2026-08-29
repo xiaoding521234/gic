@@ -20,70 +20,70 @@ namespace GIC.Editor
     [InitializeOnLoad]
     public static class MapEditorFullRes
     {
-        private const string 层名 = "EditorMapTiles";
+        private const string LayerName = "EditorMapTiles";
 
         private static GameObject _tileRoot;
         private static Sprite _预览图缓存;
 
-        private static Sprite 预览图 => _预览图缓存 != null
+        private static Sprite preview => _预览图缓存 != null
             ? _预览图缓存
-            : (_预览图缓存 = AssetDatabase.LoadAssetAtPath<Sprite>(MapPaths.预览图));
+            : (_预览图缓存 = AssetDatabase.LoadAssetAtPath<Sprite>(MapPaths.preview));
 
         static MapEditorFullRes()
         {
             // DontSave 已排除序列化，此守卫为双保险：保存/关闭 MapScreen 场景前销毁，存后重铺
             EditorSceneManager.sceneSaving += (scene, _) =>
             {
-                if (_tileRoot != null && scene.path == MapPaths.MapScreen场景) 销毁瓦片层();
+                if (_tileRoot != null && scene.path == MapPaths.MapScreenScene) DestroyTileLayer();
             };
             EditorSceneManager.sceneSaved += scene =>
             {
-                if (scene.path == MapPaths.MapScreen场景 && EditorWindow.HasOpenInstances<MapPickPointTool>())
-                    换上();
+                if (scene.path == MapPaths.MapScreenScene && EditorWindow.HasOpenInstances<MapPickPointTool>())
+                    Apply();
             };
-            EditorSceneManager.sceneClosing += (_, _) => 销毁瓦片层();
+            EditorSceneManager.sceneClosing += (_, _) => DestroyTileLayer();
             // 进 Play 前必须销毁：运行时 MapTileLayer 会铺正式瓦片，编辑器层会与之重叠
             EditorApplication.playModeStateChanged += s =>
             {
-                if (s == PlayModeStateChange.ExitingEditMode) 销毁瓦片层();
+                if (s == PlayModeStateChange.ExitingEditMode) DestroyTileLayer();
                 else if (s == PlayModeStateChange.EnteredEditMode
                          && EditorWindow.HasOpenInstances<MapPickPointTool>())
-                    换上();
+                    Apply();
             };
         }
 
-        public static void 换上()
+        public static void Apply()
         {
-            销毁瓦片层();
-            var plane = 找MapPlane();
+            DestroyTileLayer();
+            var plane = FindMapPlane();
             if (plane == null || !plane.gameObject.scene.IsValid()) return;
-            if (预览图 != null && plane.sprite != 预览图)
+            if (preview != null && plane.sprite != preview)
             {
-                plane.sprite = 预览图;
-                重摆标定();
+                plane.sprite = preview;
+                Recalibrate();
             }
-            生成瓦片层(plane);
+            GenerateTileLayer(plane);
         }
 
-        public static void 还原() => 销毁瓦片层();
+        public static void Restore() => DestroyTileLayer();
 
-        private static void 生成瓦片层(SpriteRenderer plane)
+        private static void GenerateTileLayer(SpriteRenderer plane)
         {
             var cfg = 取MapConfig(plane);
             if (cfg == null || !cfg.IsTiled) return;
 
-            var root = new GameObject(层名) { hideFlags = HideFlags.DontSave };
+            var root = new GameObject(LayerName) { hideFlags = HideFlags.DontSave };
             root.transform.SetParent(plane.transform.parent, false);
             root.transform.localPosition = Vector3.zero;
             root.transform.localRotation = Quaternion.identity;
             root.transform.localScale = Vector3.one;
 
-            float z = 取瓦片Z();
+            float z = GetTileZ();
             int missing = 0;
             for (int y = 0; y < cfg.TileRows; y++)
                 for (int x = 0; x < cfg.TileColumns; x++)
                 {
-                    var sprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{MapPaths.瓦片目录}/tile_{x}_{y}.jpg");
+                    var sprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{MapPaths.TileDir}/tile_{x}_{y}.jpg");
                     if (sprite == null) { missing++; continue; }
                     MapTileLayer.GetTileWorldRect(cfg, new Vector2Int(x, y), out var center, out var size);
                     var b = sprite.bounds.size;
@@ -100,7 +100,7 @@ namespace GIC.Editor
             GICLog.Info($"[MapEditorFullRes] 已铺编辑器瓦片层（母版级 {cfg.TileColumns}x{cfg.TileRows} 片，编辑器专用不落盘）");
         }
 
-        private static void 销毁瓦片层()
+        private static void DestroyTileLayer()
         {
             if (_tileRoot == null) return;
             Object.DestroyImmediate(_tileRoot);
@@ -108,7 +108,7 @@ namespace GIC.Editor
         }
 
         /// <summary>瓦片 Z 偏移：读场景瓦片层的 瓦片前移 序列化值（无瓦片层时兜底默认）</summary>
-        private static float 取瓦片Z()
+        private static float GetTileZ()
         {
             var layers = Object.FindObjectsOfType<MapTileLayer>(true);
             if (layers.Length == 1)
@@ -127,7 +127,7 @@ namespace GIC.Editor
         }
 
         /// <summary>按 MapScreen.ApplyMapCalibration（SourcePixel×unit，与运行时同源）重摆 MapPlane</summary>
-        private static void 重摆标定()
+        private static void Recalibrate()
         {
             var screens = Object.FindObjectsOfType<MapScreen>(true);
             if (screens.Length != 1) return;
@@ -135,7 +135,7 @@ namespace GIC.Editor
         }
 
         /// <summary>取 MapScreen.地图贴图（场景未开/组件异常时返回 null）</summary>
-        private static SpriteRenderer 找MapPlane()
+        private static SpriteRenderer FindMapPlane()
         {
             var screens = Object.FindObjectsOfType<MapScreen>(true);
             if (screens.Length != 1) return null;

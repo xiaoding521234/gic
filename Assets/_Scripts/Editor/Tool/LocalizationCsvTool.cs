@@ -199,7 +199,7 @@ namespace GIC.Editor
                 tableSelectionMap[key] = selected;
         }
 
-        #region 导出
+        #region export
 
         private void ExportSelected()
         {
@@ -287,7 +287,7 @@ namespace GIC.Editor
 
         #endregion
 
-        #region 导入
+        #region import
 
         private void ImportSelected()
         {
@@ -452,7 +452,7 @@ namespace GIC.Editor
 
         #endregion
 
-        #region CSV 工具
+        #region CSV tool
 
         /// <summary>
         /// 转义 CSV 字段（RFC 4180）

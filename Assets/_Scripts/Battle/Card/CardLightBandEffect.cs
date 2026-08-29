@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 using GIC.Framework;
+using UnityEngine.Serialization;
 namespace GIC.Battle
 {
     /// <summary>
@@ -14,8 +15,10 @@ namespace GIC.Battle
     {
         [Header("光带设置")]
         [SerializeField] private float 持续时间 = 0.3f;
-        [SerializeField] private Color 光带颜色 = new Color(1f, 0.95f, 0.6f, 1f);
-        [SerializeField] private float 光带宽度 = 0.15f;
+        [InspectorName("光带颜色")]
+        [SerializeField] private Color bandColor = new Color(1f, 0.95f, 0.6f, 1f);
+        [InspectorName("光带宽度")]
+        [SerializeField] private float bandWidth = 0.15f;
 
         private static Shader _bandShader;
 
@@ -38,7 +41,7 @@ namespace GIC.Battle
         /// </summary>
         public void Play()
         {
-            PlayBand(true, 光带颜色);
+            PlayBand(true, bandColor);
         }
 
         /// <summary>
@@ -54,7 +57,7 @@ namespace GIC.Battle
         /// </summary>
         public void PlayReverse()
         {
-            PlayBand(false, 光带颜色);
+            PlayBand(false, bandColor);
         }
 
         private void PlayBand(bool forward, Color color)
@@ -116,7 +119,7 @@ namespace GIC.Battle
 
             _bandMaterial = new Material(BandShader);
             _bandMaterial.SetColor("_GlowColor", color);
-            _bandMaterial.SetFloat("_BandWidth", 光带宽度);
+            _bandMaterial.SetFloat("_BandWidth", bandWidth);
             _bandMaterial.SetFloat("_Progress", -0.3f);
             _bandGraphic.material = _bandMaterial;
             _bandGraphic.SetAllDirty();

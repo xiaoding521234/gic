@@ -17,7 +17,7 @@ namespace GIC.Data
         [InspectorName("无")]
         None = 0,
 
-        #region 增益效果
+        #region buffEffect
         [InspectorName("攻击提升")]
         AttackUp = 1001,
 
@@ -43,7 +43,7 @@ namespace GIC.Data
         TenacityUp = 1008,
         #endregion
 
-        #region 减益效果
+        #region debuffEffect
         [InspectorName("攻击削弱")]
         AttackDown = 2001,
 
@@ -54,7 +54,7 @@ namespace GIC.Data
         MoveSpeedDown = 2003,
         #endregion
 
-        #region 战斗特点
+        #region battleFeature
         [InspectorName("承伤")]
         DamageAbsorption = 3001,
 
@@ -83,7 +83,7 @@ namespace GIC.Data
         Push = 3009,
         #endregion
 
-        #region 功能特性
+        #region featureSpec
         [InspectorName("采集")]
         Gathering = 4001,
 
@@ -106,12 +106,12 @@ namespace GIC.Data
         EnergyRecharge = 4007,
         #endregion
 
-        #region 势力特点
+        #region factionFeature
         [InspectorName("快速延奏")]
         FastEnso = 5001,
         #endregion
 
-        #region 上手难度
+        #region difficulty
         [InspectorName("入门")]
         DifficultyBeginner = 6001,
 

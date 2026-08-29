@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using GIC.Framework;
 using GIC.Data;
+using UnityEngine.Serialization;
 
 namespace GIC.UI
 {
@@ -21,13 +22,14 @@ namespace GIC.UI
 
         [Header("显示")]
         [Tooltip("瓦片相对 MapPlane(z=0) 的 Z 偏移（负值靠相机侧，须小于锚点悬浮偏移 -0.7 的绝对值）")]
-        [SerializeField] private float 瓦片前移 = -0.02f;
+        [InspectorName("瓦片前移")]
+        [SerializeField] private float tileZOffset = -0.02f;
 
         [Tooltip("可视范围外扩瓦片数：提前加载，平移时不易露底")]
-        [SerializeField, Range(0, 3)] private int 预载边距 = 1;
+        [SerializeField, Range(0, 3)] private int preloadMargin = 1;
 
         [Tooltip("释放滞回瓦片数：超出 可视+预载 此距离才释放，避免边缘反复加载/卸载")]
-        [SerializeField, Range(0, 3)] private int 释放滞回 = 1;
+        [SerializeField, Range(0, 3)] private int releaseHysteresis = 1;
 
         [Autowired] private AssetCache _assetCache;
 
@@ -113,13 +115,13 @@ namespace GIC.UI
 
             // 需要集 = 可视区外扩 预载边距 格
             _wanted.Clear();
-            CalcTileRange(cfg, viewMinX, viewMinY, viewMaxX, viewMaxY, 预载边距, out int lx0, out int ly0, out int lx1, out int ly1);
+            CalcTileRange(cfg, viewMinX, viewMinY, viewMaxX, viewMaxY, preloadMargin, out int lx0, out int ly0, out int lx1, out int ly1);
             for (int y = ly0; y <= ly1; y++)
                 for (int x = lx0; x <= lx1; x++)
                     _wanted.Add(new Vector2Int(x, y));
 
             // 保活区 = 可视区外扩 预载边距+释放滞回 格；区外的释放
-            int keep = 预载边距 + 释放滞回;
+            int keep = preloadMargin + releaseHysteresis;
             float tileWorld = cfg.TilePixelSize * cfg.WorldUnitsPerPixel;
             float keepMinX = viewMinX - tileWorld * keep, keepMaxX = viewMaxX + tileWorld * keep;
             float keepMinY = viewMinY - tileWorld * keep, keepMaxY = viewMaxY + tileWorld * keep;
@@ -207,7 +209,7 @@ namespace GIC.UI
         private void PlaceTile(Vector2Int id, Sprite sprite)
         {
             GetTileWorldRect(mapConfig, id, out var center2, out var worldSize);
-            var center = new Vector3(center2.x, center2.y, 瓦片前移);
+            var center = new Vector3(center2.x, center2.y, tileZOffset);
 
             if (!_live.TryGetValue(id, out var renderer) || renderer == null)
             {

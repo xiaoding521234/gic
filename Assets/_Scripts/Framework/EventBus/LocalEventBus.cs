@@ -34,7 +34,7 @@ namespace GIC.Framework
         public EventBusLockState CurrentLockState => _currentLockState;
         public bool IsLocked => _currentLockState != EventBusLockState.None;
 
-        #region 事件处理
+        #region evtHandle
 
         /// <summary>
         /// 每个 FixedUpdate 调用一次，处理一个 handler
@@ -177,7 +177,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 发送API
+        #region sendApi
 
         public void Send(BaseEvent eventData)
         {
@@ -262,7 +262,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 订阅管理
+        #region subManage
 
         public void Subscribe<T>(IEventHandler<T> eventHandler) where T : BaseEvent
         {
@@ -428,7 +428,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 锁管理
+        #region lockManage
 
         public bool SetLockState(EventBusLockState newState)
         {
@@ -464,7 +464,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 事件废弃
+        #region evtDiscard
 
         public void CancelEvents<T>() where T : BaseEvent
         {
@@ -493,7 +493,7 @@ namespace GIC.Framework
 
         #endregion
 
-        #region 内部类型
+        #region internalType
 
         public abstract class BaseEventHandler
         {

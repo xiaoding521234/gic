@@ -16,24 +16,24 @@ namespace GIC.Pet
         bool TryGet光标Unity屏幕位置(out Vector2 unityScreenPos);
 
         /// <summary>物理交互进行中（拖拽跟随/收尾归零）——行为层压制触发用</summary>
-        bool 物理交互中 { get; }
+        bool PhysicsBusy { get; }
 
         /// <summary>正在拖拽派蒙（行为层打断打招呼/小动作用；含收尾全程）</summary>
-        bool 正在拖拽 { get; }
+        bool IsDragging { get; }
 
         /// <summary>最近一次拖拽时长（秒，松手冻结；-1=无）——放下反应分档用</summary>
-        float 拖拽秒 { get; }
+        float DragSeconds { get; }
 
         /// <summary>暂停命中网格重烘（行为层在单次动作期间置真）</summary>
-        bool 暂停命中烘焙 { get; set; }
+        bool PauseHitBaking { get; set; }
 
         /// <summary>命中网格的世界包围盒（接近判定用）。碰撞体未就绪时返回 false。</summary>
         bool TryGet命中世界包围盒(out Bounds bounds);
 
         /// <summary>坐定中（行为层据此切换待机动作=坐姿）。桌面版=PetEdgeSitController.坐定中；游戏内版=屏幕坐定中。</summary>
-        bool 坐定中 { get; }
+        bool IsSeated { get; }
 
         /// <summary>坐姿动作名（行为层据此选 clip 播放）。桌面版=PetEdgeSitController.坐姿动作；游戏内版=Inspector 配置。</summary>
-        string 坐姿动作 { get; }
+        string SitAnim { get; }
     }
 }

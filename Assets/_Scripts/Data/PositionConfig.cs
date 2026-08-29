@@ -62,7 +62,7 @@ namespace GIC.Data
             [Tooltip("夜晚背景媒体类型")]
             public PositionMedia nightMedia = new PositionMedia();
 
-            #region 本地化 Entry 获取方法
+            #region localization Entry 获取方法
 
             /// <summary>
             /// 获取地点名称的 Entry（用于 TextCombiner）
@@ -91,7 +91,7 @@ namespace GIC.Data
 
             #endregion
 
-            #region 背景媒体地址（数据驱动）
+            #region bgMediaAddr（dataDriven）
 
             /// <summary>
             /// 获取指定时段的媒体类型

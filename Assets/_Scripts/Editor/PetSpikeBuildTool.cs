@@ -14,13 +14,13 @@ namespace GIC.Editor
     /// </summary>
     public static class PetSpikeBuildTool
     {
-        private const string 输出目录 = "Builds/PetSpike";
-        private const string 输出路径 = 输出目录 + "/gic.exe";
+        private const string OutputDir = "Builds/PetSpike";
+        private const string OutputPath = OutputDir + "/gic.exe";
 
         [MenuItem("Tools/桌宠/构建 Windows 桌宠测试包")]
         public static void Build()
         {
-            经update调度(BuildInternal);
+            ScheduleViaUpdate(BuildInternal);
         }
 
         /// <summary>同步直调入口（供 execute_csharp_script 调用）——调度器在编辑器空闲时不执行，菜单调度会被吞。
@@ -40,25 +40,25 @@ namespace GIC.Editor
         {
             if (_已排队) return;
             _已排队 = true;
-            经update调度(队列构建);
+            ScheduleViaUpdate(EnqueueBuild);
         }
 
         private static bool _已排队;
 
         /// <summary>update 一次性调度（替代 delayCall 的标准姿势）：注册 update 回调，首个 tick 执行后自注销。
         /// 空闲节流下编辑器 tick 变慢但不断（后台实测 30s 内必触发）；delayCall 则要等 repaint/交互。</summary>
-        private static void 经update调度(System.Action 动作)
+        private static void ScheduleViaUpdate(System.Action anim)
         {
             EditorApplication.CallbackFunction cb = null;
             cb = () =>
             {
                 EditorApplication.update -= cb;
-                动作();
+                anim();
             };
             EditorApplication.update += cb;
         }
 
-        private static void 队列构建()
+        private static void EnqueueBuild()
         {
             _已排队 = false;
             BuildInternal();
@@ -72,7 +72,7 @@ namespace GIC.Editor
             if (EditorApplication.isCompiling || EditorApplication.isUpdating)
             {
                 _已排队 = true; // 保持排队态：推迟期间 ScheduleBuild 再调直接吞（防叠场）
-                经update调度(队列构建);
+                ScheduleViaUpdate(EnqueueBuild);
                 return;
             }
 
@@ -87,7 +87,7 @@ namespace GIC.Editor
                 if (EditorApplication.isCompiling || EditorApplication.isUpdating)
                 {
                     _已排队 = true; // 同上：推迟期间保持排队态
-                    经update调度(队列构建);
+                    ScheduleViaUpdate(EnqueueBuild);
                     return;
                 }
 
@@ -95,13 +95,13 @@ namespace GIC.Editor
                 var options = new BuildPlayerOptions
                 {
                     scenes = scenes,
-                    locationPathName = 输出路径,
+                    locationPathName = OutputPath,
                     target = BuildTarget.StandaloneWindows64,
                     options = BuildOptions.Development,
                 };
                 BuildReport report = BuildPipeline.BuildPlayer(options);
                 bool ok = report.summary.result == BuildResult.Succeeded && report.summary.totalErrors == 0;
-                Debug.Log($"[PetSpikeBuild] RESULT {(ok ? "OK" : "FAIL")} errors={report.summary.totalErrors} size={report.summary.totalSize} path={输出路径}");
+                Debug.Log($"[PetSpikeBuild] RESULT {(ok ? "OK" : "FAIL")} errors={report.summary.totalErrors} size={report.summary.totalSize} path={OutputPath}");
             }
             catch (System.Exception ex)
             {

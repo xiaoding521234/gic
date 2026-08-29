@@ -157,7 +157,7 @@ namespace GIC.UI
             return nearest;
         }
 
-        #region 卡片对象池
+        #region cardPool
 
         private GameObject GetPooledCard()
         {

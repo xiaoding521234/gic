@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -21,10 +22,14 @@ namespace GIC.Pet
         private const string ShadowLayerName = "PaimonShadow";
 
         [Header("引用")]
-        [SerializeField] private SkinnedMeshRenderer 影子渲染器; // _DropShadow（缺省按名找）
-        [SerializeField] private Camera 主相机;                  // 缺省 Camera.main
-        [SerializeField] private Material 模糊材质;              // PaimonShadowBlur.mat
-        [SerializeField] private Material 合成材质;              // PaimonShadowComposite.mat（模板，运行时克隆后改参）
+        [InspectorName("影子渲染器")]
+        [SerializeField] private SkinnedMeshRenderer shadowRenderer; // _DropShadow（缺省按名找）
+        [InspectorName("主相机")]
+        [SerializeField] private Camera mainCam;                  // 缺省 Camera.main
+        [InspectorName("模糊材质")]
+        [SerializeField] private Material blurTemplate;              // PaimonShadowBlur.mat（模板，运行时克隆后改参）
+        [InspectorName("合成材质")]
+        [SerializeField] private Material compositeTemplate;              // PaimonShadowComposite.mat（模板，运行时克隆后改参）
 
         // 注：不能用 Shader.Find("Hidden/...") 加载内部 shader——构建期无引用会被裁剪致 null（2026-08-24 构建实测）。
 
@@ -33,11 +38,12 @@ namespace GIC.Pet
         [SerializeField] private Vector2 阴影偏移像素 = new Vector2(0f, -24f);  // x 向右为正，y 向上为正（负=影子下垂，光源在上方）
         [SerializeField, Range(0f, 60f)] private float 模糊半径像素 = 14f;      // 阴影贴图 texel 为单位，越大越柔（内部按 0.66×拆两轮模糊，总量即此值）
         [SerializeField, Range(64, 2048)] private int 阴影贴图高度 = 512;       // 宽度随相机 aspect 自动换算
-        [SerializeField] private bool 启用 = true;
+        [InspectorName("启用")]
+        [SerializeField] private bool enableShadow = true;
 
         private Camera shadowCam;
         private RenderTexture rtA, rtB;   // A=剪影/最终模糊结果，B=模糊中转
-        private Material blurMat, compositeMat;   // 运行时克隆自 模糊材质/合成材质
+        private Material blurMat, compositeMat;   // 运行时克隆自 blurTemplate/compositeTemplate
         private Transform quad;
         private int shadowLayer = -1;
 
@@ -50,32 +56,32 @@ namespace GIC.Pet
             if (shellNode != null)
             {
                 shellRenderers = shellNode.GetComponentsInChildren<Renderer>(true);
-                if (影子渲染器 == null) 影子渲染器 = shellNode.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                if (shadowRenderer == null) shadowRenderer = shellNode.GetComponentInChildren<SkinnedMeshRenderer>(true);
             }
-            else if (影子渲染器 != null)
-                shellRenderers = new[] { (Renderer)影子渲染器 };
+            else if (shadowRenderer != null)
+                shellRenderers = new[] { (Renderer)shadowRenderer };
             else
                 shellRenderers = null;
-            if (主相机 == null) 主相机 = Camera.main;
+            if (mainCam == null) mainCam = Camera.main;
             shadowLayer = LayerMask.NameToLayer(ShadowLayerName);
 
-            if (shellRenderers == null || shellRenderers.Length == 0 || 主相机 == null || shadowLayer < 0 || 模糊材质 == null || 合成材质 == null)
+            if (shellRenderers == null || shellRenderers.Length == 0 || mainCam == null || shadowLayer < 0 || blurTemplate == null || compositeTemplate == null)
             {
-                Debug.LogWarning($"[PaimonShadow] 初始化失败：壳渲染器={(shellRenderers != null && shellRenderers.Length > 0)} 主相机={(主相机 != null)} layer={ShadowLayerName}({shadowLayer}) 模糊={(模糊材质 != null)} 合成={(合成材质 != null)}，阴影禁用");
-                enabled = false;
+                Debug.LogWarning($"[PaimonShadow] 初始化失败：壳渲染器={(shellRenderers != null && shellRenderers.Length > 0)} 主相机={(mainCam != null)} layer={ShadowLayerName}({shadowLayer}) 模糊={(blurTemplate != null)} 合成={(compositeTemplate != null)}，阴影禁用");
+                enableShadow = false;
                 return;
             }
 
             // 防线：场景接线漂移也能工作——影子壳全部渲染器进专属层 + 主相机剔除该层
             foreach (var r in shellRenderers) r.gameObject.layer = shadowLayer;
-            主相机.cullingMask &= ~(1 << shadowLayer);
+            mainCam.cullingMask &= ~(1 << shadowLayer);
 
-            blurMat = new Material(模糊材质);
-            compositeMat = new Material(合成材质);
+            blurMat = new Material(blurTemplate);
+            compositeMat = new Material(compositeTemplate);
 
             var camGo = new GameObject("_ShadowCam");
             camGo.hideFlags = HideFlags.DontSave;
-            camGo.transform.SetParent(主相机.transform, false);
+            camGo.transform.SetParent(mainCam.transform, false);
             camGo.transform.localPosition = Vector3.zero;
             camGo.transform.localRotation = Quaternion.identity;
             shadowCam = camGo.AddComponent<Camera>();
@@ -85,13 +91,13 @@ namespace GIC.Pet
             shadowCam.cullingMask = 1 << shadowLayer;
             shadowCam.allowHDR = false;
             shadowCam.allowMSAA = false;
-            shadowCam.depth = 主相机.depth - 1f;
+            shadowCam.depth = mainCam.depth - 1f;
 
             var quadGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
             quadGo.name = "_ShadowComposite";
             quadGo.hideFlags = HideFlags.DontSave;
             Destroy(quadGo.GetComponent<Collider>());
-            quadGo.transform.SetParent(主相机.transform, false);
+            quadGo.transform.SetParent(mainCam.transform, false);
             quadGo.transform.localRotation = Quaternion.identity;
             var mr = quadGo.GetComponent<MeshRenderer>();
             mr.sharedMaterial = compositeMat;
@@ -114,11 +120,11 @@ namespace GIC.Pet
         }
 
         void OnDisable() { if (quad != null) quad.gameObject.SetActive(false); }
-        void OnEnable() { if (quad != null && 启用) quad.gameObject.SetActive(true); }
+        void OnEnable() { if (quad != null && enableShadow) quad.gameObject.SetActive(true); }
 
         void LateUpdate()
         {
-            if (!启用) { if (quad.gameObject.activeSelf) quad.gameObject.SetActive(false); return; }
+            if (!enableShadow) { if (quad.gameObject.activeSelf) quad.gameObject.SetActive(false); return; }
             if (!quad.gameObject.activeSelf) quad.gameObject.SetActive(true);
 
             EnsureRTs();
@@ -142,30 +148,30 @@ namespace GIC.Pet
                 阴影偏移像素.x / Screen.width, 阴影偏移像素.y / Screen.height, 0f, 0f));
 
             // 全屏 Quad 贴合近裁面（透视/正交都兼容；缩放窗口改 aspect 时逐帧跟随）
-            float d = 主相机.nearClipPlane + 0.05f;
+            float d = mainCam.nearClipPlane + 0.05f;
             quad.localPosition = new Vector3(0f, 0f, d);
-            float h = 主相机.orthographic
-                ? 2f * 主相机.orthographicSize
-                : 2f * d * Mathf.Tan(主相机.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            float w = h * 主相机.aspect;
+            float h = mainCam.orthographic
+                ? 2f * mainCam.orthographicSize
+                : 2f * d * Mathf.Tan(mainCam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float w = h * mainCam.aspect;
             quad.localScale = new Vector3(w * 1.02f, h * 1.02f, 1f);
         }
 
         /// <summary>影子相机逐帧与主相机同姿同投影（桌宠缩放/窗口变化都会改 aspect）</summary>
         private void SyncShadowCamera()
         {
-            shadowCam.orthographic = 主相机.orthographic;
-            shadowCam.orthographicSize = 主相机.orthographicSize;
-            shadowCam.fieldOfView = 主相机.fieldOfView;
-            shadowCam.nearClipPlane = 主相机.nearClipPlane;
-            shadowCam.farClipPlane = 主相机.farClipPlane;
-            shadowCam.aspect = 主相机.aspect;
+            shadowCam.orthographic = mainCam.orthographic;
+            shadowCam.orthographicSize = mainCam.orthographicSize;
+            shadowCam.fieldOfView = mainCam.fieldOfView;
+            shadowCam.nearClipPlane = mainCam.nearClipPlane;
+            shadowCam.farClipPlane = mainCam.farClipPlane;
+            shadowCam.aspect = mainCam.aspect;
         }
 
         private void EnsureRTs()
         {
             int h = Mathf.Max(64, 阴影贴图高度);
-            int w = Mathf.Max(64, Mathf.RoundToInt(h * Mathf.Max(0.05f, 主相机.aspect)));
+            int w = Mathf.Max(64, Mathf.RoundToInt(h * Mathf.Max(0.05f, mainCam.aspect)));
             if (rtA != null && rtA.width == w && rtA.height == h) return;
 
             ReleaseRTs();

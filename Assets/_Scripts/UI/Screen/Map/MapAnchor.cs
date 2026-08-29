@@ -3,6 +3,7 @@ using UnityEngine;
 using static GIC.Data.PositionConfig;
 using GIC.Framework;
 using GIC.Data;
+using UnityEngine.Serialization;
 namespace GIC.UI
 {
 
@@ -20,10 +21,13 @@ namespace GIC.UI
         [SerializeField] private PositionName positionName;
 
         [Header("显示状态")]
-        [SerializeField] private Color 解锁颜色 = Color.white;
-        [SerializeField] private Color 未解锁颜色 = new Color(0.5f, 0.5f, 0.5f, 1f);
+        [InspectorName("解锁颜色")]
+        [SerializeField] private Color unlockedColor = Color.white;
+        [InspectorName("未解锁颜色")]
+        [SerializeField] private Color lockedColor = new Color(0.5f, 0.5f, 0.5f, 1f);
         [Tooltip("图标面片沿画布法线抬离地图的偏移（世界单位，-Z 靠相机侧）")]
-        [SerializeField] private float 悬浮偏移 = 0.7f;
+        [InspectorName("悬浮偏移")]
+        [SerializeField] private float floatOffset = 0.7f;
 
         private SpriteRenderer _icon;
         private PositionData cachedData;
@@ -71,7 +75,7 @@ namespace GIC.UI
             if (_icon == null) return;
             _icon.transform.localRotation = Quaternion.identity;
             // 悬浮偏移：向画布外侧（-Z，靠相机侧）抬离，避免与地图穿插
-            _icon.transform.localPosition = new Vector3(0f, 0f, -悬浮偏移);
+            _icon.transform.localPosition = new Vector3(0f, 0f, -floatOffset);
         }
 
         /// <summary>按解锁状态刷新颜色与可点击标记</summary>
@@ -82,7 +86,7 @@ namespace GIC.UI
 
             // 图标变灰，但不隐藏
             if (_icon != null)
-                _icon.color = data.isUnlocked ? 解锁颜色 : 未解锁颜色;
+                _icon.color = data.isUnlocked ? unlockedColor : lockedColor;
         }
 
         /// <summary>点击处理（由 MapCameraController 分发；含锁定与未配置守卫）</summary>

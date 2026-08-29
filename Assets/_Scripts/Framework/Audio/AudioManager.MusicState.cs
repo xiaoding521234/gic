@@ -12,7 +12,7 @@ namespace GIC.Framework
 
     public partial class AudioManager
     {
-        #region 音乐状态保存与恢复
+        #region musicStateSaveRestore
 
         /// <summary>
         /// 音乐生命周期阶段（用于快照/恢复）

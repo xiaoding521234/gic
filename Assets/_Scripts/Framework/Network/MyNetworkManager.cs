@@ -256,7 +256,7 @@ namespace GIC.Framework
 
             GICLog.Info($"[MyNetworkManager] ========================================");
             GICLog.Info($"[MyNetworkManager] 已成功连接到服务器");
-            GICLog.Info($"[MyNetworkManager]   我的角色: {(NetworkServer.active ? "房主" : "客户端")}");
+            GICLog.Info($"[MyNetworkManager]   我的角色: {(NetworkServer.active ? "房主" : "client")}");
 
             if (NetworkServer.active)
             {

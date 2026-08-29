@@ -23,7 +23,7 @@ namespace GIC.Pet
     public static class PetApiKeyCrypto
     {
         /// <summary>存档字段名（PlayerSaveData.petApiKeyCipher，Base64 密文；空串=未设置）</summary>
-        public const string 存档字段 = "petApiKeyCipher";
+        public const string saveField = "petApiKeyCipher";
 
         private static byte[] _密钥缓存;
 
@@ -33,10 +33,10 @@ namespace GIC.Pet
             if (_密钥缓存 != null) return _密钥缓存;
             // 固定盐：与代码同生命周期（改盐=全体密文失效，勿随意改）
             const string 盐 = "GIC-Pet-APIKey-Salt-v1";
-            string 指纹 = $"{Environment.MachineName}|{Environment.UserName}|{Application.productName}|{盐}";
+            string fingerprint = $"{Environment.MachineName}|{Environment.UserName}|{Application.productName}|{盐}";
             using (var sha = SHA256.Create())
             {
-                var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(指纹));
+                var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(fingerprint));
                 _密钥缓存 = new byte[16];
                 Array.Copy(hash, _密钥缓存, 16);
             }
@@ -44,9 +44,9 @@ namespace GIC.Pet
         }
 
         /// <summary>明文 → Base64(iv+ciphertext)。空串返回空串。异常返回空串（调用方按未设置处理）。</summary>
-        public static string 加密(string 明文)
+        public static string Encrypt(string plain)
         {
-            if (string.IsNullOrEmpty(明文)) return string.Empty;
+            if (string.IsNullOrEmpty(plain)) return string.Empty;
             try
             {
                 using (var aes = Aes.Create())
@@ -58,7 +58,7 @@ namespace GIC.Pet
                     aes.Padding = PaddingMode.PKCS7;
                     using (var enc = aes.CreateEncryptor())
                     {
-                        var data = Encoding.UTF8.GetBytes(明文);
+                        var data = Encoding.UTF8.GetBytes(plain);
                         var cipher = enc.TransformFinalBlock(data, 0, data.Length);
                         var outBuf = new byte[aes.IV.Length + cipher.Length];
                         Array.Copy(aes.IV, 0, outBuf, 0, aes.IV.Length);
@@ -75,12 +75,12 @@ namespace GIC.Pet
         }
 
         /// <summary>Base64(iv+ciphertext) → 明文。空串返回空串；密文损坏/跨机器 → 空串（不抛）。</summary>
-        public static string 解密(string 密文)
+        public static string Decrypt(string cipher)
         {
-            if (string.IsNullOrEmpty(密文)) return string.Empty;
+            if (string.IsNullOrEmpty(cipher)) return string.Empty;
             try
             {
-                var buf = Convert.FromBase64String(密文);
+                var buf = Convert.FromBase64String(cipher);
                 if (buf.Length < 32) return string.Empty; // iv(16)+至少一个块(16)
                 using (var aes = Aes.Create())
                 {
@@ -106,11 +106,11 @@ namespace GIC.Pet
         }
 
         /// <summary>显示用脱敏（设置界面回显）：sk-1234…wxyz → 前 6 + … + 后 4；短 key 全打码</summary>
-        public static string 脱敏(string 明文)
+        public static string MaskKey(string plain)
         {
-            if (string.IsNullOrEmpty(明文)) return string.Empty;
-            if (明文.Length <= 10) return new string('*', 明文.Length);
-            return 明文.Substring(0, 6) + new string('*', 6) + 明文.Substring(明文.Length - 4);
+            if (string.IsNullOrEmpty(plain)) return string.Empty;
+            if (plain.Length <= 10) return new string('*', plain.Length);
+            return plain.Substring(0, 6) + new string('*', 6) + plain.Substring(plain.Length - 4);
         }
     }
 }

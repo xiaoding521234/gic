@@ -40,7 +40,7 @@ namespace GIC.Data
     /// </summary>
     public enum TileType
     {
-        #region 基础地形 (1-99)
+        #region basicTerrain (1-99)
         [InspectorName("平原")]
         [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
         Plain = 1,
@@ -62,7 +62,7 @@ namespace GIC.Data
         Ice = 5,
         #endregion
 
-        #region 水域地形 (100-199)
+        #region waterTerrain (100-199)
         [InspectorName("水面")]
         [TileTag(TileTag.AllowFly, TileTag.WaterTerrain)]
         Water = 101,

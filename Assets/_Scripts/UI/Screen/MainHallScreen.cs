@@ -100,7 +100,7 @@ namespace GIC.UI
             OnDestroyBackground();
         }
 
-        #region 事件处理器
+        #region evtHandler
 
         private class PositionChangedHandler : IEventHandler<OnPositionChangedEvent>
         {
@@ -166,7 +166,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 事件响应方法
+        #region evtResponseMethod
 
         private void OnSceneActivated()
         {
@@ -263,7 +263,7 @@ namespace GIC.UI
 
         // ==================== 按钮回调 ====================
 
-        #region 左侧按钮回调
+        #region leftBtnCallback
         private void OnMissionButtonClick()
         {
             GICLog.Info("打开任务界面");
@@ -285,7 +285,7 @@ namespace GIC.UI
         }
         #endregion
 
-        #region 右侧按钮回调
+        #region rightBtnCallback
         private void OnWishButtonClick()
         {
             ExitToSceneAsync(SceneType.WishScreen);

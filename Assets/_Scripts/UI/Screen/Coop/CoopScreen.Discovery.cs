@@ -17,7 +17,7 @@ namespace GIC.UI
 
     public partial class CoopScreen
     {
-        #region 房间发现
+        #region roomDiscovery
 
         void InitializeDiscovery()
         {

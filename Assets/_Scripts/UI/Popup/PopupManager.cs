@@ -6,6 +6,7 @@ using GIC.Data;
 using GIC.Data.Event;
 using GIC.Battle;
 using GIC.Tool;
+using UnityEngine.Serialization;
 namespace GIC.UI
 {
 
@@ -19,8 +20,10 @@ namespace GIC.UI
 
         [Header("轻提示")]
         [SerializeField] private GameObject toastPrefab;
-        [SerializeField] private float 轻提示间距 = 10f;
-        [SerializeField] private float 轻提示位置比例 = 0.05f;
+        [InspectorName("轻提示间距")]
+        [SerializeField] private float toastGap = 10f;
+        [InspectorName("轻提示位置比例")]
+        [SerializeField] private float toastPosRatio = 0.05f;
 
         private readonly List<PopupDialog> _activeToasts = new();
         private float _canvasHeight;
@@ -147,7 +150,7 @@ namespace GIC.UI
             float toastH = GetToastHeight();
             // 子节点锚定在屏幕中心 (0.5, 0.5)，Y=0 是中心，正值向上
             // 目标位置：距顶部 20%（从顶部向下 0.2*height）
-            float y = height * 0.5f - height * 轻提示位置比例 - index * (toastH + 轻提示间距);
+            float y = height * 0.5f - height * toastPosRatio - index * (toastH + toastGap);
             return new Vector2(0f, y);
         }
 

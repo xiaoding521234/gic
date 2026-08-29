@@ -9,7 +9,7 @@ namespace GIC.UI
     /// </summary>
     public partial class WishDrawController
     {
-        #region 停留+飞行
+        #region hold+fly
 
         private IEnumerator HoldThenFlyAndCount(RectTransform rect, Vector2 targetPos, float holdTime)
         {

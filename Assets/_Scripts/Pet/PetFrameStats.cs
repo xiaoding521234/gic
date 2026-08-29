@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {
@@ -6,9 +7,9 @@ namespace GIC.Pet
     /// PetFrameStats 在掉帧时刻回查"刚才发生了什么"做相关性分析。</summary>
     public static class PetDiag
     {
-        public static float 上次蒙皮重烘 = -999f;  // PetWindowController BakeMesh
-        public static float 上次眨眼 = -999f;      // PetBlinkController 眨眼开始
-        public static float 上次GC = -999f;        // PetFrameStats 逐帧检测
+        public static float LastSkinRebake = -999f;  // PetWindowController BakeMesh
+        public static float LastBlink = -999f;      // PetBlinkController 眨眼开始
+        public static float LastGC = -999f;        // PetFrameStats 逐帧检测
     }
 
     /// <summary>
@@ -20,8 +21,10 @@ namespace GIC.Pet
     /// </summary>
     public class PetFrameStats : MonoBehaviour
     {
-        [Tooltip("每阶段时长秒")] [SerializeField] private float 统计间隔秒 = 12f;
-        [Tooltip("运行针对性实验（关=false 只做常规统计）")] [SerializeField] private bool 自动二分 = true;
+        [InspectorName("统计间隔秒")]
+        [Tooltip("每阶段时长秒")] [SerializeField] private float statIntervalSec = 12f;
+        [InspectorName("自动二分")]
+        [Tooltip("运行针对性实验（关=false 只做常规统计）")] [SerializeField] private bool autoBisect = true;
 
         private float _t, _min = float.MaxValue, _max;
         private double _sum;
@@ -143,7 +146,7 @@ namespace GIC.Pet
                 }
             }
 
-            if (自动二分 && _t >= 统计间隔秒 && _phase < Phases.Length - 1)
+            if (autoBisect && _t >= statIntervalSec && _phase < Phases.Length - 1)
             {
                 ReportPhase();
                 EnterPhase(_phase + 1);
@@ -154,7 +157,7 @@ namespace GIC.Pet
             float ms = dt * 1000f;
 
             int gcNow = System.GC.CollectionCount(0);
-            if (gcNow != _lastGc0) { _lastGc0 = gcNow; PetDiag.上次GC = Time.unscaledTime; }
+            if (gcNow != _lastGc0) { _lastGc0 = gcNow; PetDiag.LastGC = Time.unscaledTime; }
 
             bool count = _warmup <= 0f; // 预热帧不计入统计
             if (_warmup > 0f) _warmup -= dt;
@@ -173,10 +176,10 @@ namespace GIC.Pet
             {
                 float now = Time.unscaledTime;
                 Debug.Log($"[PetFrameStats] HITCH t={now:F2} [{_phaseName}] dt={ms:F1}ms " +
-                          $"gcΔ={(now - PetDiag.上次GC) * 1000:F0}ms 烘焙Δ={(now - PetDiag.上次蒙皮重烘) * 1000:F0}ms 眨眼Δ={(now - PetDiag.上次眨眼) * 1000:F0}ms");
+                          $"gcΔ={(now - PetDiag.LastGC) * 1000:F0}ms 烘焙Δ={(now - PetDiag.LastSkinRebake) * 1000:F0}ms 眨眼Δ={(now - PetDiag.LastBlink) * 1000:F0}ms");
             }
 
-            if (_t >= 统计间隔秒 && !自动二分)
+            if (_t >= statIntervalSec && !autoBisect)
             {
                 ReportPhase();
                 _t = 0; _sum = 0; _n = 0; _min = float.MaxValue; _max = 0;

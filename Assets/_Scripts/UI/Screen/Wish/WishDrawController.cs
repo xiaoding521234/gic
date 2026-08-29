@@ -76,7 +76,7 @@ namespace GIC.UI
         /// <summary>抽卡流程是否进行中（供 StartDraw 防重入检查）</summary>
         public bool IsWishInProgress => _isWishActive;
 
-        #region 运行时状态
+        #region runtimeState
 
         protected WishManager _wishManager;
         protected WishPoolConfig _pool;
@@ -115,7 +115,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 星辉雨数据
+        #region stardustRainData
 
         protected readonly List<GameObject> _starglitterPool = new();
         protected struct StarglitterDropData
@@ -146,7 +146,7 @@ namespace GIC.UI
             OnDestroyStar5Video();
         }
 
-        #region 公共入口
+        #region publicEntry
 
         /// <summary>
         /// 开始祈愿流程
@@ -458,7 +458,7 @@ namespace GIC.UI
 
         #endregion
 
-        #region 清理
+        #region cleanup
 
         private void OnDisable()
         {

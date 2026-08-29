@@ -12,7 +12,7 @@ namespace GIC.Framework
 
     public partial class AudioManager
     {
-        #region 音量控制
+        #region volumeCtrl
 
         public void SetMasterVolume(float volume)
         {
