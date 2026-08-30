@@ -623,12 +623,12 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 9040
-    m_Localized: "\u53D1\u9001"
+    m_Localized: "DeepSeek\uFF08\u6DF1\u5EA6\u6C42\u7D22\uFF09"
     m_Metadata:
       m_Items: []
   - m_Id: 9041
-    m_Localized: "\u8FD8\u6CA1\u8BBE\u7F6E API Key \u54E6\uFF01\u53BB \u8BBE\u7F6E\u2192\u6D3E\u8499\u2192\u5BF9\u8BDD
-      API Key \u91CC\u586B\u4E00\u4E2A\u5427\u3002"
+    m_Localized: "\u8FD8\u6CA1\u8BBE\u7F6E API Key \u54E6\uFF01\u53BB \u8BBE\u7F6E\u2192\u6D3E\u8499\u2192\u5BF9\u8BDD\nAPI
+      Key \u91CC\u586B\u4E00\u4E2A\u5427\u3002"
     m_Metadata:
       m_Items: []
   - m_Id: 9042
@@ -637,6 +637,26 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 9043
     m_Localized: "\u5BF9\u8BDD\u7EC4\u4EF6\u672A\u63A5\u7EBF"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9044
+    m_Localized: OpenAI
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9045
+    m_Localized: "\u5BF9\u8BDD\u6A21\u578B\u4F9B\u5E94\u5546"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9046
+    m_Localized: "Kimi\uFF08\u6708\u4E4B\u6697\u9762\uFF09"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9047
+    m_Localized: "\u667A\u8C31 GLM"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9048
+    m_Localized: "\u901A\u4E49\u5343\u95EE\uFF08\u963F\u91CC\u4E91\u767E\u70BC\uFF09"
     m_Metadata:
       m_Items: []
   references:

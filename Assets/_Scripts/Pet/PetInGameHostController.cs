@@ -215,6 +215,35 @@ namespace GIC.Pet
                 Vector3 sp = petCamera.WorldToScreenPoint(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z));
                 return new Vector2(sp.x * Screen.width / Mathf.Max(1f, _rt.width), sp.y * Screen.height / Mathf.Max(1f, _rt.height));
             };
+
+            // Intent 工具接线（2026-08-29 首批指令，docs/19 §6.5）：set_game_time / get_game_time /
+            // open_screen——游戏内形态直调主进程系统。桌面形态是独立进程（IPC 未建，§8 遗留），
+            // 不注册这批工具。注册失败只少工具不影响聊天（防泄漏结构同上）。
+            try
+            {
+                var session = _聊天UI.sessionRef;
+                if (session != null)
+                {
+                    var tools = new System.Collections.Generic.List<GIC.Pet.Chat.PetChatClient.ToolDefinition>
+                    {
+                        GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
+                        GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
+                        GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
+                        GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
+                    };
+                    session.RegisterTools(tools, (toolName, toolArgs) =>
+                    {
+                        // 打开界面前先收聊天输入条：释放输入锁，让新打开的界面可交互
+                        if (toolName == "open_screen") _聊天UI.CloseChat();
+                        return GIC.Pet.Chat.PetChatIntent.Execute(toolName, toolArgs, this);
+                    });
+                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间/打开界面）");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PetInGame] 对话指令工具注册失败（聊天基础功能不受影响）：{e.Message}");
+            }
             Debug.Log("[PetInGame] 对话已接线（单击派蒙开输入条）");
         }
 
@@ -435,27 +464,55 @@ namespace GIC.Pet
         void dragPollFrame(bool modelHit)
         {
             if (dragPhysics == null || _骨盆 == null || petCamera == null) return;
-            // 聊天输入期：拖拽/滚轮冻结（光标点模型拖动会误触输入焦点），但**单击派蒙仍可收起输入框**
-            // （2026-08-29 修 UX 死局：旧版输入期整体 return=输入框打开后关不掉，唯一出路是发送，
-            // 发送又关输入框——用户被困"打开→发送→消失"循环）。点输入条本身不算（正常 UI 交互）。
-            bool chatInputActive = _聊天UI != null && _聊天UI.IsInputVisible;
-            if (chatInputActive)
-            {
-                bool lmbDownChat = Input.GetMouseButton(0);
-                bool lmbPressedChat = lmbDownChat && !prevLmbDown;
-                if (lmbPressedChat && !_聊天UI.IsPointOnInputBar(Input.mousePosition) && GetHitState(Input.mousePosition))
-                    _聊天UI.ToggleInput(); // 单击派蒙=收起输入框
-                prevLmbDown = lmbDownChat;
-                _pressPending = false;
-                return;
-            }
             bool lmbDown = Input.GetMouseButton(0);
             bool lmbPressed = lmbDown && !prevLmbDown;
 
-            // 按下待定（2026-08-29 修"单击也立刻摆出拖拽姿势"）：命中模型按下**不立刻起手**——按住超时
-            // （0.15s，用户拍板的单击阈值）或位移超阈值（8px）才升级为真拖拽（此刻才起手+拎起姿势+物理）；
-            // 期间松手且几乎没动=单击→切对话输入框。单击全程零姿势零物理。升级不看当前命中（按下起点
-            // 在模型上，快速甩出模型的拖拽也要能抓——桌面版"按下即抓"的同构语义）。
+            // ①物理推进（含松手与收尾）**不受聊天输入门控**（2026-08-29 修双报障：旧版输入期整体早退
+            // =收尾轮询停摆，dragPhysics.IsActive 永真 → 行为层卡 dragPhysicsPhase（Drag01 循环+视线
+            // 静默）=永久拎起姿势+头不再跟踪鼠标——两症状同根）。输入期不会开着 dragging（新拖拽被
+            // ③拦截），此处恒走收尾分支。
+            if (dragPhysics.IsActive)
+            {
+                if (dragging)
+                {
+                    if (!lmbDown)
+                    {
+                        dragging = false;
+                        dragPhysics.Release(); // 松手即停：骨盆冻结原地，四肢弹簧收尾归零
+                    }
+                    else
+                    {
+                        dragPhysics.DragFrame(指针RT(), Time.unscaledDeltaTime);
+                        LiftPoseAngleFrame(true);   // ①姿势旋转（基类：角平滑+挣扎+绕骨盆枢轴补偿）
+                        PelvisPinToTarget(); // ②骨盆钉位（刚体 1:1 直跟）
+                    }
+                }
+                else
+                {
+                    bool 收尾完成 = !dragPhysics.SettleFrame(Time.unscaledDeltaTime);
+                    LiftPoseAngleFrame(false); // 收尾期角度平滑归零
+                    if (!dragPhysics.IsActive || 收尾完成) PhysicsSettle();
+                }
+            }
+
+            // ②聊天输入期：不起新拖拽；点击"对话元素（输入条/气泡）以外"任何地方=关闭对话
+            //（2026-08-29 用户拍板：点派蒙=原有 Toggle 收起，点游戏其它区域同样收——含气泡判定，
+            // 回看气泡时不误关）。点输入条本身=正常 UI 交互（EventSystem 吃掉，这里仍会看到一次
+            // 按下——靠 IsPointOnInputBar 排除）。
+            bool chatInputActive = _聊天UI != null && _聊天UI.IsInputVisible;
+            if (chatInputActive)
+            {
+                if (lmbPressed && !_聊天UI.IsPointOnInputBar(Input.mousePosition) && !_聊天UI.IsPointOnBubble(Input.mousePosition))
+                    _聊天UI.CloseChat();
+                _pressPending = false;
+                prevLmbDown = lmbDown;
+                return;
+            }
+
+            // ③正常交互：按下待定（2026-08-29 修"单击也立刻摆出拖拽姿势"）：命中模型按下**不立刻起手**
+            // ——按住超时（0.15s，用户拍板的单击阈值）或位移超阈值（8px）才升级为真拖拽（此刻才起手
+            // +拎起姿势+物理）；期间松手且几乎没动=单击→切对话输入框。单击全程零姿势零物理。升级不看
+            // 当前命中（按下起点在模型上，快速甩出模型的拖拽也要能抓——桌面版"按下即抓"的同构语义）。
             if (_pressPending)
             {
                 if (!lmbDown)
@@ -479,30 +536,6 @@ namespace GIC.Pet
                 _pressPending = true;
                 _单击按下时刻 = Time.unscaledTime;
                 _单击按下位置 = Input.mousePosition;
-            }
-
-            if (dragPhysics.IsActive)
-            {
-                if (dragging)
-                {
-                    if (!lmbDown)
-                    {
-                        dragging = false;
-                        dragPhysics.Release(); // 松手即停：骨盆冻结原地，四肢弹簧收尾归零
-                    }
-                    else
-                    {
-                        dragPhysics.DragFrame(指针RT(), Time.unscaledDeltaTime);
-                        LiftPoseAngleFrame(true);   // ①姿势旋转（基类：角平滑+挣扎+绕骨盆枢轴补偿）
-                        PelvisPinToTarget(); // ②骨盆钉位（刚体 1:1 直跟）
-                    }
-                }
-                else
-                {
-                    bool 收尾完成 = !dragPhysics.SettleFrame(Time.unscaledDeltaTime);
-                    LiftPoseAngleFrame(false); // 收尾期角度平滑归零
-                    if (!dragPhysics.IsActive || 收尾完成) PhysicsSettle();
-                }
             }
             prevLmbDown = lmbDown;
         }

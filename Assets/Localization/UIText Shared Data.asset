@@ -619,10 +619,6 @@ MonoBehaviour:
     m_Key: PetChatPlaceholder
     m_Metadata:
       m_Items: []
-  - m_Id: 9040
-    m_Key: PetChatSend
-    m_Metadata:
-      m_Items: []
   - m_Id: 9041
     m_Key: PetChatNoKey
     m_Metadata:
@@ -633,6 +629,30 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 9043
     m_Key: PetChatNotWired
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9045
+    m_Key: PetChatProvider
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9040
+    m_Key: PetProvider_deepseek
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9046
+    m_Key: PetProvider_kimi
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9047
+    m_Key: PetProvider_glm
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9048
+    m_Key: PetProvider_qwen
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9044
+    m_Key: PetProvider_openai
     m_Metadata:
       m_Items: []
   m_Metadata:

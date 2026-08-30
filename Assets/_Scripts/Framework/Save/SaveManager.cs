@@ -185,6 +185,12 @@ namespace GIC.Framework
         {
             CurrentSave = new PlayerSaveData();
             CurrentSave.InitDefault();
+#if UNITY_EDITOR
+            // 开发 key 同步落 pet.json（2026-08-30）：聊天客户端每请求 PetPrefs.ReadChatCipher 直读
+            // pet.json 密文——只写主存档不写 pet.json 的话编辑器/桌宠构建版聊天仍报未设置 key。
+            // 编辑器与构建共享 persistentDataPath+同机设备指纹=密文互通。构建产物无此代码路径。
+            GIC.Pet.PetPrefs.WriteChatCipher(CurrentSave.petApiKeyCipher);
+#endif
             SaveGame();
         }
 

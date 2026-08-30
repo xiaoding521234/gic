@@ -623,12 +623,12 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 9040
-    m_Localized: Send
+    m_Localized: DeepSeek
     m_Metadata:
       m_Items: []
   - m_Id: 9041
-    m_Localized: "No API Key set yet! Add one in Settings \u2192 Paimon \u2192 Chat
-      API Key."
+    m_Localized: "No API Key set yet! Add one in Settings \u2192 Paimon \u2192 Chat\nAPI
+      Key."
     m_Metadata:
       m_Items: []
   - m_Id: 9042
@@ -637,6 +637,26 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 9043
     m_Localized: Chat component not wired
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9044
+    m_Localized: OpenAI
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9045
+    m_Localized: Chat Model Provider
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9046
+    m_Localized: Kimi (Moonshot)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9047
+    m_Localized: Zhipu GLM
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9048
+    m_Localized: Tongyi Qwen (Alibaba)
     m_Metadata:
       m_Items: []
   references:

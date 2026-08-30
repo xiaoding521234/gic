@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
 using static GIC.Pet.PetWin32; // Win32 声明集中在 PetWin32（2026-08-27 抽取去重），调用点免限定
 using UnityEngine.Serialization;
 
@@ -170,6 +171,14 @@ namespace GIC.Pet
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
         private PetBehaviorController behaviorCtrl; // 双击退出的退场动画协作（播 Disappear 后再关进程）
 
+        // ---- 对话（2026-08-29 桌面版补齐，复用游戏内形态三组件 docs/19 §6.5）----
+        private GIC.Pet.Chat.PetChatUIController _聊天UI;
+        private Transform _头骨;                    // 气泡水平锚（同游戏内：包围盒顶+头骨水平位）
+        private float _单击待开对话时刻 = -1f;      // 单击→过 0.4s 双击窗口才开对话（不与双击退出互抢）
+        private bool _pressPending;                 // 命中模型按下但未升级为拖拽（单击判定窗口内，2026-08-29 移植游戏内单击阈值）
+        private float _单击按下时刻 = -10f;
+        private POINT _单击按下pt;
+
         private bool exitRequested;              // 退场动画进行中：屏蔽重复双击与新拖拽
         private int baseWinW, baseWinH; // 基准客户区物理像素（=逻辑尺寸×dpi/96）
         private int fixedWinW, fixedWinH; // 实际窗口客户区物理像素（=基准×有效缩放上限，运行期恒定不随缩放变化）
@@ -307,6 +316,60 @@ namespace GIC.Pet
 
             RestyleWindow();
 #endif
+            接聊天();
+        }
+
+        /// <summary>对话接线（2026-08-29 桌面版补齐，docs/19 §6.5）：聊天三组件挂 PetWindow 物体
+        /// （场景序列化接线素材/字体/会话），此处运行时建画布+EventSystem 并注入锚点——复刻游戏内
+        /// PetInGameHostController.接聊天 的模式。桌面差异：①无 RT——锚点=相机屏幕位直通
+        /// （Overlay 画布 ConstantPixelSize=客户像素系，与 WorldToScreenPoint 同空间）；
+        /// ②场景自带 EventSystem 是 PetEditorOnly（构建版自禁用）——构建版此处补建；
+        /// ③交互走本控制器的 Win32 轮询（DragAndClickFrame 单击开对话/外点关闭）。
+        /// 聊天是可选功能：构建失败绝不能上抛（同游戏内防泄漏结构——Awake/Start 异常会禁用组件）。</summary>
+        void 接聊天()
+        {
+            _聊天UI = GetComponentInChildren<GIC.Pet.Chat.PetChatUIController>(true);
+            if (_聊天UI == null) return; // 场景未挂（旧场景/裁剪安装）=对话功能缺席，其余交互不受影响
+            try
+            {
+                var canvasGo = new GameObject("PetChatCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
+                canvasGo.transform.SetParent(transform, false); // 挂 PetWindow 下（随宿主销毁）
+                var canvas = canvasGo.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay; // 恒铺客户区（固定窗口=客户像素）
+                canvas.sortingOrder = 10;
+                var scaler = canvasGo.GetComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; // 屏幕像素系（锚点直通的前提）
+                // 桌宠场景的 EventSystem 是编辑器测试面板配套（PetEditorOnly 构建自禁用）——构建版补建
+                if (UnityEngine.EventSystems.EventSystem.current == null)
+                    new GameObject("PetChatEventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
+                _聊天UI.WireHost(canvas);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PetWindow] 聊天 UI 构建失败，已禁用（桌宠交互不受影响）：{e.Message}");
+                _聊天UI.enabled = false;
+                _聊天UI = null;
+                return;
+            }
+            // 头骨锚（水平跟头骨，同游戏内）；找本体骨过滤 MMD 兜底（日文骨名系）——GI=Bip001 系
+            _头骨 = FindBodyBone("Bip001 Head");
+            // 锚点提供器：烘焙碰撞体包围盒 → 相机屏幕位（桌面无 RT 换算，屏幕像素=画布像素直通）
+            _聊天UI.headAnchorProvider = () =>
+            {
+                if (cam == null || hitMeshCollider == null || hitMeshCollider.sharedMesh == null) return Vector2.zero;
+                var bounds = hitMeshCollider.bounds;
+                float x = _头骨 != null ? _头骨.position.x : bounds.center.x; // 水平跟头骨（歪头/侧移气泡跟脸）
+                Vector3 sp = cam.WorldToScreenPoint(new Vector3(x, bounds.max.y, bounds.center.z));
+                return new Vector2(sp.x, sp.y);
+            };
+            _聊天UI.footAnchorProvider = () =>
+            {
+                if (hitMeshCollider == null || cam == null) return Vector2.zero;
+                var bounds = hitMeshCollider.bounds;
+                Vector3 sp = cam.WorldToScreenPoint(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z));
+                return new Vector2(sp.x, sp.y);
+            };
+            Debug.Log("[PetWindow] 对话已接线（单击派蒙开输入条）");
         }
 
         /// <summary>去掉标题栏边框，透明化（DWM 或色键），置顶并停靠。</summary>
@@ -733,8 +796,17 @@ namespace GIC.Pet
             DragAndClickFrame(pt, modelHit);
             ScrollZoomFrame(modelHit);
             ScaleSmoothFrame();
-            PassthroughFrame(modelHit);
+            PassthroughFrame(modelHit || ChatUiHitFrame());
             SaveDebounceFrame();
+        }
+
+        /// <summary>光标是否在聊天对话元素（输入条/气泡）上（2026-08-29 桌面对话补齐）：输入期这些
+        /// 区域必须非穿透（uGUI 要吃到点击/聚焦输入框）；未开输入条时恒 false（气泡只读不挡桌面）。</summary>
+        private bool ChatUiHitFrame()
+        {
+            if (_聊天UI == null || !_聊天UI.IsInputVisible) return false;
+            if (!TryGet光标Unity屏幕位置(out Vector2 cursor)) return false;
+            return _聊天UI.IsPointOnInputBar(cursor) || _聊天UI.IsPointOnBubble(cursor);
         }
 
         /// <summary>置顶守卫（2026-08-28）：点击任务栏/开始菜单等 shell 激活时，Windows 会把任务栏
@@ -816,8 +888,12 @@ namespace GIC.Pet
 
         /// <summary>一次性补烘与烘焙暂停机制已上移 PetHostBase（两形态同款，2026-08-28 共用化）。</summary>
 
-        /// <summary>拖拽与双击交互帧：全局轮询左键（不依赖窗口焦点）——双击退出、拖拽起手/每帧/松手、
-        /// 拎起姿势基准角平滑。抓住模型后由物理组件接管窗口定位。</summary>
+        /// <summary>拖拽与双击交互帧：全局轮询左键（不依赖窗口焦点）——双击退出、单击开对话
+        /// （2026-08-29：过 0.4s 双击窗口才开，不与双击退出互抢）、拖拽起手/每帧/松手、拎起姿势基准
+        /// 角平滑。抓住模型后由物理组件接管窗口定位。
+        /// 帧序铁律（2026-08-29 游戏内形态双报障教训）：物理推进（含收尾）**不受聊天输入门控**——
+        /// 输入期停摆收尾=dragPhysics.IsActive 永真→行为层卡 Drag01 循环+视线静默=永久拎起姿势+
+        /// 头不跟踪鼠标。聊天门控只拦"新拖拽起手/单击判定"。</summary>
         private void DragAndClickFrame(POINT pt, bool modelHit)
         {
             bool lmbDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
@@ -829,6 +905,7 @@ namespace GIC.Pet
             {
                 if (allowDoubleClickExit && !exitRequested && Time.unscaledTime - lastClickTime < 0.4f)
                 {
+                    _单击待开对话时刻 = -1f; // 双击退出优先：取消待开的对话
                     Debug.Log("[PetWindow] 双击退出，桌宠再见");
                     exitRequested = true;
                     // 退场动画（2026-08-24）：先播退场动画再真正退出；无动画可用则立即退出
@@ -841,11 +918,6 @@ namespace GIC.Pet
 
             // ---- 拖拽物理（docs/19 §6.1 刚体跟随+四肢摆动）：身体 1:1 直跟光标（无任何摆动），
             // 四肢由物理组件的跟拍弹簧摆动（LateUpdate 应用到肩/大腿骨）。松手即停原地收尾。
-            if (!dragging && !exitRequested && modelHit && lmbDown && !prevLmbDown && dragPhysics != null)
-            {
-                dragging = true;
-                BeginPhysicalDrag(pt);
-            }
             if (dragPhysics != null && dragPhysics.IsActive)
             {
                 if (dragging)
@@ -879,6 +951,61 @@ namespace GIC.Pet
                     if (lifting) PositionWindowByPelvis();
                 }
                 else PhysicsSettle();
+            }
+
+            // ---- 聊天输入期：点击对话元素（输入条/气泡）以外任何地方=关闭对话（2026-08-29 用户拍板，
+            // 游戏内形态同款）；不起新拖拽/不推进待定按下。全局轮询看得见穿透到别处的点击——
+            // 点其它应用同样收对话。物理收尾已在上方无条件推进（勿挪进门控内）。
+            if (_聊天UI != null && _聊天UI.IsInputVisible)
+            {
+                if (lmbPressed)
+                {
+                    bool 在对话元素上 = TryGet光标Unity屏幕位置(out Vector2 cursor)
+                        && (_聊天UI.IsPointOnInputBar(cursor) || _聊天UI.IsPointOnBubble(cursor));
+                    if (!在对话元素上) _聊天UI.CloseChat();
+                }
+                _pressPending = false;
+                prevLmbDown = lmbDown;
+                return;
+            }
+
+            // ---- 单击待开对话：0.4s 双击窗口过后才开（窗口内来了第二次点击=退出路径已取消）
+            if (_单击待开对话时刻 > 0f && Time.unscaledTime >= _单击待开对话时刻)
+            {
+                _单击待开对话时刻 = -1f;
+                if (!exitRequested) _聊天UI?.ToggleInput();
+            }
+
+            // ---- 按下待定（2026-08-29 移植游戏内单击阈值）：命中模型按下不立刻起手——按住超时
+            // （0.15s）或位移超阈值（8px）才升级为真拖拽；期间松手且几乎没动=单击（对话在双击窗口
+            // 后开，见上）。单击全程零姿势零物理（旧版按下即抓=每次单击闪拎起姿势，开对话高频后不可接受）。
+            if (_pressPending)
+            {
+                if (!lmbDown)
+                {
+                    _pressPending = false;
+                    if (Time.unscaledTime - _单击按下时刻 <= 0.15f
+                        && Mathf.Abs(pt.X - _单击按下pt.X) + Mathf.Abs(pt.Y - _单击按下pt.Y) < 8)
+                    {
+                        _单击待开对话时刻 = Time.unscaledTime + 0.4f;
+                    }
+                }
+                else if (Time.unscaledTime - _单击按下时刻 > 0.15f
+                         || Mathf.Abs(pt.X - _单击按下pt.X) + Mathf.Abs(pt.Y - _单击按下pt.Y) >= 8)
+                {
+                    _pressPending = false;
+                    if (!exitRequested)
+                    {
+                        dragging = true;
+                        BeginPhysicalDrag(pt);
+                    }
+                }
+            }
+            else if (!dragging && !exitRequested && modelHit && lmbPressed && dragPhysics != null)
+            {
+                _pressPending = true;
+                _单击按下时刻 = Time.unscaledTime;
+                _单击按下pt = pt;
             }
             prevLmbDown = lmbDown;
         }

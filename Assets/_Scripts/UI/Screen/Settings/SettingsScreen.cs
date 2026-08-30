@@ -77,6 +77,7 @@ namespace GIC.UI
         [Header("派蒙设置（docs/19 §6.4，2026-08-27）")]
         public GameObject petSettings;
         public DropdownSettingItem petFormSetting;
+        public DropdownSettingItem petProviderSetting; // 2026-08-29 对话模型供应商（多供应商支持）
         public DropdownSettingItem petCloseSetting; // 2026-08-27 从"其它"栏挪入"派蒙"栏
         public ButtonSettingItem petApiKeySetting;  // 2026-08-28 对话 API Key（玩家自输，加密存储）
 

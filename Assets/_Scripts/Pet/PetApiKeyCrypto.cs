@@ -25,6 +25,14 @@ namespace GIC.Pet
         /// <summary>存档字段名（PlayerSaveData.petApiKeyCipher，Base64 密文；空串=未设置）</summary>
         public const string saveField = "petApiKeyCipher";
 
+#if UNITY_EDITOR
+        /// <summary>开发用对话 API Key（2026-08-30 用户拍板）：**const 声明整体在 UNITY_EDITOR 内——
+        /// 任何构建产物（测试包/正式导出）不含此字面量**，导出后玩家存档初始化恒为空 key（玩家自输
+        /// 自己的 key，商业边界不变）。消费方=PlayerSaveData.InitDefault 预填（删档测试后聊天免重输）。
+        /// 注意：key 已进 git 历史——仓库公开/协作前先去供应商后台吊销换新。</summary>
+        public const string DevKey = "REDACTED-DEVKEY-2026-09-07";
+#endif
+
         private static byte[] _密钥缓存;
 
         /// <summary>设备指纹派生 AES-128 密钥（16 字节；进程内缓存一次）</summary>

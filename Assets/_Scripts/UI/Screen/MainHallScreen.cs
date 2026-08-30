@@ -57,6 +57,7 @@ namespace GIC.UI
         private PositionChangedHandler _positionHandler;
         private SceneActivatedHandler _sceneActivatedHandler;
         private GoBackHandler _goBackHandler;
+        private GameTimeChangedHandler _gameTimeHandler;
 
         private void Start()
         {
@@ -70,11 +71,13 @@ namespace GIC.UI
             _positionHandler = new PositionChangedHandler(this);
             _sceneActivatedHandler = new SceneActivatedHandler(this);
             _goBackHandler = new GoBackHandler(this);
+            _gameTimeHandler = new GameTimeChangedHandler(this);
 
             // 订阅事件
             EventBusHub.Instance.Subscribe(_positionHandler, this);
             EventBusHub.Instance.Subscribe(_sceneActivatedHandler, this);
             EventBusHub.Instance.Subscribe(_goBackHandler, this);
+            EventBusHub.Instance.Subscribe(_gameTimeHandler, this);
 
             UpdateBackground(_positionManager.CurrentPosition);
 
@@ -141,6 +144,28 @@ namespace GIC.UI
             public void Handle(OnSceneActivatedEvent evt)
             {
                 _screen.OnSceneActivated();
+            }
+        }
+
+        /// <summary>游戏内时间变更（派蒙对话 set_game_time 工具，2026-08-29）：重载背景——
+        /// 时段切换立即生效（白天↔夜晚换图/换视频）；同时段内调时间同地址自动跳过重载</summary>
+        private class GameTimeChangedHandler : IEventHandler<OnGameTimeChangedEvent>
+        {
+            private MainHallScreen _screen;
+
+            public GameTimeChangedHandler(MainHallScreen screen)
+            {
+                _screen = screen;
+            }
+
+            public bool CanHandle(OnGameTimeChangedEvent evt)
+            {
+                return _screen != null && _screen.gameObject.activeInHierarchy;
+            }
+
+            public void Handle(OnGameTimeChangedEvent evt)
+            {
+                _screen.UpdateBackground(_screen._positionManager.CurrentPosition);
             }
         }
 

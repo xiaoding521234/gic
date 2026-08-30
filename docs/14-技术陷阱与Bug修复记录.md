@@ -408,6 +408,60 @@ Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropert
 **修复**：子类 `PetChatInputField` 覆写 OnDrag 为空（掐掉协程路径；代价=拖出矩形选字失效，单击定位/双击选词/Shift+方向键选区不受影响）。**勿给聊天画布配 MainCamera tag 相机**（DontDestroyOnLoad 相机抢 Camera.main 是另一坑，见 §6.4 教训）；也勿把聊天画布改 ScreenSpaceCamera（会被游戏 Overlay UI 盖住，layering 语义反了）。
 另：程序化 TMP 文本勿用"➤"等装饰符号——zh-cn SDF 无此字形（警告+显示方块），按钮文字用中文（"发送"）。
 
+## 15. Unity Mono 的 HttpClient SSE 假流式（派蒙聊天整局卡住后一次性出全文，2026-08-29）
+
+### 现象
+发送对话后无流式打字机效果，整个游戏卡住一会后一次性出现完整回复。
+
+### 根因
+`HttpClient.SendAsync(..., ResponseHeadersRead)` + `HttpContent.ReadAsStreamAsync` + `StreamReader.ReadLineAsync` 在 **Unity Mono/.NET Standard 2.1** 上是假流式：ReadAsStreamAsync 沿 .NET Framework 血统**整体缓冲响应**（MS 文档明示：Task 在表示内容的流全部读完后才完成），SSE 增量无法逐块送达——连接建立后所有 `data:` 行一次性到达。叠加 `StreamReader.EndOfStream` 的同步读可能落在主线程上，体感=卡顿后整段弹出。
+
+### 修复与规范
+- **Unity 内消费 SSE/流式响应一律用 `UnityWebRequest` + `DownloadHandlerScript` 子类**（官方文档：下载在 worker 线程，`ReceiveData(byte[] data, int dataLength)` 回调在主线程被逐块调用）——重写字节→字符→行三层：跨块 UTF-8 多字节序列用**持久 Decoder** 续解（直接 `Encoding.UTF8.GetString(data)` 在中文被块边界切开时产生替换字符）；行按 `\n` 切并容错剥 `\r`。
+- **超时自制看门狗**：`UnityWebRequest.timeout` 语义含糊（"未收到响应则中止"——长流式会被腰斩），恒置 0；改为协程每帧查 `lastDataAt`（首字节超时=Inspector 超时秒，流开始后 90s 无数据才算卡死→Abort）。
+- HTTP 错误响应体（非 SSE、无 `data:` 前缀）累积在 rawBody 供收尾提取 `error.message`——DownloadHandlerScript 不区分响应类型，行级解析器按前缀分流即可。
+- 中途半截 JSON（断流截断）在行解析层 try-catch 静默跳过——容错优先于严格报错。
+- **解码缓冲容量铁律（2026-08-30 "打开界面后报错 chars 溢出"实证）**：`DownloadHandlerScript` 预分配**字节**缓冲 16KB ≠ 可以只配 4K **字符**缓冲——单次 `ReceiveData` 回调最多 16KB 字节，而 UTF-8 解码输出字符数上限=输入字节数（纯 ASCII 1:1，多字节只缩不涨），流快时多个 TCP 段合并成一次大回调 → `Decoder.GetChars` 直接抛 `The output char buffer is too small` → Unity 回 0 给 curl → `Curl error 23`，整请求崩。修法：char 缓冲 ≥ 字节缓冲 + 挂起余量（16400），外加 `GetCharCount` 先数后解的防御性兜底（数含 Decoder 挂起字节，永不抛；不够临时扩，宁分配不崩溃）。**任何"字节缓冲→字符缓冲"转换都要按 1 byte : 1 char 上限配容量**。
+
+## 16. pet.json 密文双进程持久化两雷（"重启后设置里有 key 对话报未设置"，2026-08-29）
+
+### 现象
+导出构建后设置界面显示已设 key（主存档 petApiKeyCipher 有密文），但对话报未设置；重新点开 key 弹窗确认一次后才正常。
+
+### 根因（两个叠加）
+1. **编辑器会话 `PetPrefs.Save()` 恒跳过**（`#if !UNITY_EDITOR` 门）：设置写入密文走 `PetPrefs.Load().chatCipher = x; Save()`——编辑器里调试时密文从未落盘；且与构建共享 persistentDataPath 的场景下（编辑器设 key→构建版测试）构建版读到的 pet.json 里根本没有密文。
+2. **跨进程陈旧缓存整体覆写**：桌面桌宠进程与主进程共享 pet.json（双进程铁律的共享通道）。桌面进程先启动→缓存了无密文的档→用户在主进程设置 key→桌面进程一次滚轮缩放触发防抖 Save()=**进程内陈旧缓存整体覆写 pet.json，密文被抹**。
+
+### 修复与规范
+- **"设置类"字段（密文/供应商索引）与"易变状态"（缩放/位置）走不同通道**：设置类经 `WriteChatCipher/WriteChatProvider` 磁盘读改写（保留其它字段含另一进程刚落的缩放）且**编辑器也生效**（无 #if 门——key 是玩家设置不是易变桌宠状态）；易变状态路径 `Save()` 落盘前**设置类字段一律取磁盘现值**（陈旧缓存防抹除合并）。
+- **读侧同样直读磁盘**（`ReadChatCipher/ReadChatProvider`）：跨进程新鲜（另一进程刚写入立即可见）+ 天然"改 key 即生效"；聊天是低频操作，每请求一次小文件读+AES 解密开销可忽略。
+- 排查"设置里有 X 但运行时说没有"类问题：先分清**两个存档域**（主存档 vs pet.json）与**两个进程**——显示走主存档、桌面进程读 pet.json，中间靠设置界面同步；同步点断在哪一环（编辑器跳过/缓存覆写/读缓存）用"删 pet.json 后只设 key 不做其它操作再查文件"定位。
+
+## 17. 聊天输入期冻结物理收尾=永久拎起姿势+视线失联（2026-08-29 两形态同坑）
+
+### 现象
+①派蒙头不再跟踪鼠标；②拖拽后放下反应还没播就单击开对话→永远卡在被拖拽后的姿势。两症状同根。
+
+### 根因
+宿主拖拽轮询的"聊天输入期"分支整体早退（防输入焦点误触拖拽），**把物理收尾轮询也一并跳过**：`dragPhysics.IsActive`（松手后的四肢弹簧收尾期）永真 → 行为层 Update 恒走 `dragPhysicsPhase`（Drag01 拎起动画循环 + `Set视线静默(true)`）→ 永久拎起姿势 + 视线层静默（头不跟鼠标）。输入条若常开（发送后保留），冻结无限期。
+
+### 修复与规范
+- **帧序铁律：物理推进（松手/收尾）在交互轮询里无条件先行，聊天输入门控只拦"新拖拽起手/单击判定"**——两形态（PetInGameHostController.dragPollFrame / PetWindowController.DragAndClickFrame）同构重排。
+- 桌面版同坑在补聊天时一并规避（物理块上移到门控前）；今后任何"输入期冻结交互"的新分支都不得包裹物理收尾帧。
+
+## 18. 本地化脚本 RemapId 静默失败后的错位写值（"输入条显示输入供应商"，2026-08-29）
+
+### 现象
+聊天输入条占位文本显示"对话模型供应商"（用户读作"输入供应商"）；错误/忙碌提示语也变成了供应商名。
+
+### 根因
+加键脚本的流程：`AddKey(key)`（拿大数 id）→ `RemapId(大数, 目标分段 id)` → 按目标 id 写值。**RemapId 在目标 id 已被占用时返回 False（静默失败）**，脚本未检查返回值继续按目标 id 写值——写进了**占用该 id 的既有键**（PetChatPlaceholder/PetChatNoKey/PetChatBusy/PetChatNotWired 四键被供应商名覆盖）。目标 id"看似空闲"是凭记忆拍的（9039~9043 实际已被聊天域键占用）。
+
+### 修复与规范
+- **AddKey 前必须真查表**：`Entries.Any(e => e.Id == 目标)` 确认空闲（"查该域现有最大序号"不能凭记忆）；**RemapId 返回值必须检查**，False=目标占用或 currentId 不存在，立刻停手换 id。
+- 事故恢复：git diff 语言表 .asset 取原值（含 YAML 折行=\n 的多行值）→ 脚本直改恢复 → 重导出 CSV。
+- 已把完整绕行流程与三坑（AddKey(key,id) NRE / 同 key 重复条目 / 半执行状态）记入 gic-localization skill。
+
 
 
 

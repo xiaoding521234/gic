@@ -25,13 +25,43 @@ namespace GIC.UI
         {
             InitPetFormSetting();
             InitPetCloseSetting();
+            InitPetProviderSetting();
             InitPetApiKeySetting();
         }
 
-        /// <summary>对话 API Key（2026-08-28 用户拍板：玩家自输自己的 DeepSeek key，不花开发者钱）：
+        /// <summary>对话模型供应商（2026-08-29 多供应商支持，Spring AI 式"选供应商+填自己的 key"）：
+        /// PetChatProviders 注册表（DeepSeek/Kimi/GLM/通义/OpenAI，全部 OpenAI 兼容）——玩家选一家、
+        /// 填该家的 key 即可对话，模型名/端点对玩家不可见。切换供应商=旧 key 对新家无效，清空密文
+        /// 引导重填（防静默 401——聊天报错文案比"看似已设置实则错 key"更可诊断）。注意 Setup 的
+        /// defaultValue 框架语义=Initialize() 的显示值——必须传当前存档值（2026-08-27 首测踩坑）。</summary>
+        private void InitPetProviderSetting()
+        {
+            var options = new List<TextEntry>();
+            foreach (var p in GIC.Pet.Chat.PetChatProviders.table)
+                options.Add(new TextEntry(new UnityEngine.Localization.LocalizedString("UIText", "PetProvider_" + p.id), ""));
+
+            int current = Mathf.Clamp(_saveManager.CurrentSave.petChatProvider, 0, options.Count - 1);
+
+            petProviderSetting.Setup("PetChatProvider", options, current, (index) =>
+            {
+                if (index == _saveManager.CurrentSave.petChatProvider) return; // 同项重选不触发清 key
+                _saveManager.CurrentSave.petChatProvider = index;
+                _saveManager.CurrentSave.petApiKeyCipher = ""; // 旧 key 对新供应商无效
+                _saveManager.SaveGame();
+                GIC.Pet.PetPrefs.WriteChatProvider(index);
+                GIC.Pet.PetPrefs.WriteChatCipher("");
+                petApiKeySetting.UpdateValue(""); // 显示回"未设置"占位，引导填新家的 key
+            });
+            petProviderSetting.Initialize();
+        }
+
+        /// <summary>对话 API Key（2026-08-28 用户拍板：玩家自输自己的 key，不花开发者钱）：
         /// 按钮→输入弹窗回显脱敏 key→确认后 AES 加密存 petApiKeyCipher（明文永不落盘，PetApiKeyCrypto）。
         /// 显示=脱敏（前6+****+后4）；空=占位"未设置"。输入弹窗空值不触发回调（OnConfirm 拒空）——
-        /// 清除 key 走删除存档或后续右键菜单，一期不做。</summary>
+        /// 清除 key 走删除存档或后续右键菜单，一期不做。
+        /// 2026-08-29：落盘改走 PetPrefs.WriteChatCipher（磁盘读改写+编辑器也生效——旧走
+        /// PetPrefs.Save() 在编辑器恒跳过=密文从未落盘，且跨进程陈旧缓存整体覆写会抹密文，
+        /// "重启后设置里有 key 但对话报未设置"两根因）；上限 64→200（OpenAI key 可超百字符）。</summary>
         private void InitPetApiKeySetting()
         {
             petApiKeySetting.Setup("PetApiKey", "",
@@ -46,12 +76,10 @@ namespace GIC.UI
                         _saveManager.CurrentSave.petApiKeyCipher = cipher;
                         _saveManager.SaveGame();
                         // 同步密文到 pet.json（桌面桌宠进程永不读主存档——靠这条共享通道取 key，
-                        // 密文传输安全；编辑器跳过=PetPrefs.写入 的既有语义）
-                        var pet档 = GIC.Pet.PetPrefs.Load();
-                        pet档.chatCipher = cipher;
-                        GIC.Pet.PetPrefs.Save();
+                        // 密文传输安全；WriteChatCipher 磁盘读改写保留其它字段+编辑器也生效）
+                        GIC.Pet.PetPrefs.WriteChatCipher(cipher);
                         petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(newValue));
-                    }, "PetApiKeyInput", 64); // DeepSeek key=sk-+32hex 共 35 字符，64 富余（弹窗默认 16 会截断）
+                    }, "PetApiKeyInput", 200); // 上限 200：DeepSeek sk-35 字符，OpenAI sk-proj- 可超百字符（旧 64 会截断）
                 },
                 onValueConfirmed: null,
                 placeholderKey: "PetApiKeyNotSet");

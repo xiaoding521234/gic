@@ -30,6 +30,10 @@ namespace GIC.Framework
         // 音乐间隔时间（秒）
         private const float MUSIC_INTERVAL = 10f;
 
+        // 当前曲目按哪个时段选的（游戏内时间变更事件判定用——同时段调时间不打断当前曲）
+        private TimePeriod? _currentMusicPeriod;
+        private GameTimeChangedHandler _gameTimeHandler;
+
         // 公共属性
         public PositionName CurrentPosition
         {
@@ -52,10 +56,39 @@ namespace GIC.Framework
         {
             audioManager = AudioManager.Instance;
 
+            // 游戏内时间变更（派蒙对话 set_game_time 工具，2026-08-29）：时段变了立即换当前
+            // 位置的时段曲（对齐 OnPositionChanged 的立即换曲语义）。Manager 与容器同寿命，
+            // 订阅常驻不退订（RoomManager 同款）。主进程形态才有意义——桌面宠进程不初始化容器。
+            _gameTimeHandler = new GameTimeChangedHandler(this);
+            EventBusHub.Instance.Subscribe(_gameTimeHandler, this);
+
             // 初始播放当前位置的音乐
             PlayCurrentPositionMusic();
 
             GICLog.Info($"PositionManager 启动完成，当前位置: {CurrentPosition}");
+        }
+
+        /// <summary>游戏内时间变更处理器：时段变了才重新选曲（白天→夜晚/夜晚→白天立即切；
+        /// 白天内 14 点调 15 点等同时段变更不打断正在播的曲子）</summary>
+        private class GameTimeChangedHandler : IEventHandler<OnGameTimeChangedEvent>
+        {
+            private readonly PositionManager _manager;
+
+            public GameTimeChangedHandler(PositionManager manager)
+            {
+                _manager = manager;
+            }
+
+            public bool CanHandle(OnGameTimeChangedEvent evt)
+            {
+                return _manager != null;
+            }
+
+            public void Handle(OnGameTimeChangedEvent evt)
+            {
+                if (_manager._currentMusicPeriod == evt.NewPeriod) return;
+                _manager.PlayCurrentPositionMusic();
+            }
         }
 
         public void Start() { }
@@ -88,6 +121,7 @@ namespace GIC.Framework
             if (positionData == null) return;
 
             TimePeriod timePeriod = TimeUtility.GetCurrentTimePeriod();
+            _currentMusicPeriod = timePeriod;
             AudioClip clip = null;
 
             switch (timePeriod)

@@ -19,6 +19,15 @@ namespace GIC.Data.Event
     }
 
     /// <summary>
+    /// 游戏内时间变更事件（TimeUtility.SetGameTime/ResetToSystemTime 广播——派蒙对话 set_game_time
+    /// 工具触发；大厅背景与位置音乐订阅方据此切换白天/夜晚表现）
+    /// </summary>
+    public class OnGameTimeChangedEvent : BaseEvent
+    {
+        public TimePeriod NewPeriod;
+    }
+
+    /// <summary>
     /// 返回上一个场景事件
     /// </summary>
     public class OnGoBackEvent : BaseEvent

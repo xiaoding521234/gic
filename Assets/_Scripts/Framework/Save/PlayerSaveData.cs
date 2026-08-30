@@ -140,9 +140,14 @@ namespace GIC.Framework
         public int petForm = 0;
 
         /// <summary>派蒙对话 API Key 密文（AES-128-CBC+设备指纹派生密钥，Base64(iv+ct)；空串=未设置。
-        /// 2026-08-28 用户拍板：玩家自输自己的 DeepSeek key，存档加密存储——明文永不落盘。
+        /// 2026-08-28 用户拍板：玩家自输自己的 key，存档加密存储——明文永不落盘。
         /// 加解密/脱敏一律走 PetApiKeyCrypto，勿直接读此字段。</summary>
         public string petApiKeyCipher = "";
+
+        /// <summary>派蒙对话供应商（PetChatProviders 表下标，0=DeepSeek；2026-08-29 多供应商支持）。
+        /// JsonUtility 对缺失字段反序列化为默认值 0——老档升级语义=DeepSeek，与历史唯一供应商一致，无需迁移。
+        /// 同步双通道写：本字段（主存档，设置界面回显）+ pet.json chatProvider（桌面进程读取通道）。</summary>
+        public int petChatProvider = 0;
 
         // 锚点位置信息
         public int currentPosition = (int)PositionName.SnezhnayaCastle;
@@ -177,7 +182,14 @@ namespace GIC.Framework
 
             closePetOnExit = true;
             petForm = 0;
+#if UNITY_EDITOR
+            // 开发 key 预填（2026-08-30）：编辑器新档自带对话 key（AES 加密后入档），删档测试后聊天免重输。
+            // DevKey 的 const 声明在 UNITY_EDITOR 内——构建产物无此代码路径，导出的存档初始化恒为空 key。
+            petApiKeyCipher = GIC.Pet.PetApiKeyCrypto.Encrypt(GIC.Pet.PetApiKeyCrypto.DevKey);
+#else
             petApiKeyCipher = "";
+#endif
+            petChatProvider = 0;
 
             currentPosition = (int)PositionName.SnezhnayaCastle;
 

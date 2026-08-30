@@ -12,7 +12,7 @@ namespace GIC.Pet.Chat
     /// 未命中的 1/31，人设卡保持逐字节稳定）+ 滑窗对话历史 + 长期记忆（Mem0 式：LLM 经 memory_update
     /// 工具写入/更新事实条目，JSON 文件持久化，规模小到全量注入&lt;2K token——不上向量库不上摘要管线，
     /// 2026-08-28 网检拍板）。
-    /// 会话消息模型与工具定义经 DeepSeekClient 序列化；工具循环（收到 tool_calls→执行→append role:"tool"→
+    /// 会话消息模型与工具定义经 PetChatClient 序列化；工具循环（收到 tool_calls→执行→append role:"tool"→
     /// 再请求）由本组件驱动。
     /// </summary>
     public class PaimonChatSession : MonoBehaviour
@@ -37,19 +37,19 @@ namespace GIC.Pet.Chat
 
         [Header("引用")]
         [InspectorName("客户端")]
-        [SerializeField] private DeepSeekClient client;
+        [SerializeField] private PetChatClient client;
 
         /// <summary>客户端公开只读（UI 层发送前接流式事件）</summary>
-        public DeepSeekClient clientRef => client;
+        public PetChatClient clientRef => client;
 
         // 运行时状态
-        private readonly List<DeepSeekClient.ChatMessage> _history = new List<DeepSeekClient.ChatMessage>();
+        private readonly List<PetChatClient.ChatMessage> _history = new List<PetChatClient.ChatMessage>();
         private readonly List<string> _longTermMemory = new List<string>();
-        private List<DeepSeekClient.ToolDefinition> _toolTable = new List<DeepSeekClient.ToolDefinition>();
+        private List<PetChatClient.ToolDefinition> _toolTable = new List<PetChatClient.ToolDefinition>();
         private Func<string, string, string> _toolExecutor; // (工具名, 参数JSON) → 结果JSON
         private bool _busy;
         // 会话层事件处理器（持引用可摘——工具循环多轮重接防堆叠；**禁止整体置 null**，见 组装消息并请求）
-        private Action<List<DeepSeekClient.ToolCallResult>> _toolCallHandler;
+        private Action<List<PetChatClient.ToolCallResult>> _toolCallHandler;
         private Action<string> _completeHandler;
         private Action<string> _errorHandler;
 
@@ -58,15 +58,15 @@ namespace GIC.Pet.Chat
 
         void Awake()
         {
-            if (client == null) client = GetComponent<DeepSeekClient>();
+            if (client == null) client = GetComponent<PetChatClient>();
             LoadLongTermMemory();
         }
 
         /// <summary>注册工具表与执行器（Intent 层接线：游戏内形态=直调主进程系统；
         /// 桌面形态=走 IPC 转发到主进程。工具集由调用方组装，本层不关心语义）</summary>
-        public void RegisterTools(List<DeepSeekClient.ToolDefinition> tools, Func<string, string, string> executor)
+        public void RegisterTools(List<PetChatClient.ToolDefinition> tools, Func<string, string, string> executor)
         {
-            _toolTable = tools ?? new List<DeepSeekClient.ToolDefinition>();
+            _toolTable = tools ?? new List<PetChatClient.ToolDefinition>();
             _toolExecutor = executor;
         }
 
@@ -84,15 +84,15 @@ namespace GIC.Pet.Chat
         {
             if (!string.IsNullOrEmpty(userInput))
             {
-                _history.Add(new DeepSeekClient.ChatMessage("user", userInput));
+                _history.Add(new PetChatClient.ChatMessage("user", userInput));
             }
             BuildMessagesAndRequest(toolDepth);
         }
 
         private void BuildMessagesAndRequest(int toolDepth)
         {
-            var msgTable = new List<DeepSeekClient.ChatMessage>();
-            msgTable.Add(new DeepSeekClient.ChatMessage("system", BuildSystemPrompt()));
+            var msgTable = new List<PetChatClient.ChatMessage>();
+            msgTable.Add(new PetChatClient.ChatMessage("system", BuildSystemPrompt()));
             // 滑窗：保留最近 历史轮数*2 条（user+assistant 成对；含工具回执轮）
             int retainCount = Mathf.Min(_history.Count, historyRounds * 4);
             msgTable.AddRange(_history.Skip(_history.Count - retainCount));
@@ -110,14 +110,14 @@ namespace GIC.Pet.Chat
                 try
                 {
                     // assistant 消息带 tool_calls 进历史（OpenAI 协议：下一轮要回执）
-                    var assistantMsg = new DeepSeekClient.ChatMessage("assistant", "") { tool_calls = callList };
+                    var assistantMsg = new PetChatClient.ChatMessage("assistant", "") { tool_calls = callList };
                     _history.Add(assistantMsg);
                     foreach (var call in callList)
                     {
                         string result = "{}";
                         try { result = ExecuteTool(call.function.name, call.function.arguments); }
                         catch (Exception e) { result = Newtonsoft.Json.JsonConvert.SerializeObject(new { error = e.Message }); }
-                        _history.Add(new DeepSeekClient.ChatMessage("tool", result) { tool_call_id = call.id });
+                        _history.Add(new PetChatClient.ChatMessage("tool", result) { tool_call_id = call.id });
                     }
                     if (toolDepth < 3)
                     {
@@ -131,14 +131,14 @@ namespace GIC.Pet.Chat
             {
                 // 正常完成：assistant 回复进历史
                 if (!string.IsNullOrEmpty(全量))
-                    _history.Add(new DeepSeekClient.ChatMessage("assistant", 全量));
+                    _history.Add(new PetChatClient.ChatMessage("assistant", 全量));
                 // 注意：工具调用轮的 完成 全量为空，不进历史（assistant 消息已在工具回调里登记）
                 _busy = false;
             };
 
             _errorHandler = 错误信息 =>
             {
-                Debug.LogWarning($"[PetChat] DeepSeek 错误: {错误信息}");
+                Debug.LogWarning($"[PetChat] 对话请求错误: {错误信息}");
                 _busy = false;
             };
 
@@ -227,11 +227,11 @@ namespace GIC.Pet.Chat
         }
 
         /// <summary>内置记忆工具定义（Intent 层组装工具表时并入）</summary>
-        public static DeepSeekClient.ToolDefinition MemoryToolDefinition()
+        public static PetChatClient.ToolDefinition MemoryToolDefinition()
         {
-            return new DeepSeekClient.ToolDefinition
+            return new PetChatClient.ToolDefinition
             {
-                function = new DeepSeekClient.ToolDefinition.ToolFunction
+                function = new PetChatClient.ToolDefinition.ToolFunction
                 {
                     name = "memory_update",
                     description = "记住或更新关于旅行者（用户）的长期事实，供以后对话使用。只在有值得长期记住的新信息时调用（偏好/习惯/重要事件），闲聊不要调用。",
