@@ -110,7 +110,9 @@
 
 - [2026-08-30 12:27:10] [project] 桌面版聊天指令 IPC 已落地（2026-08-30，PetIntentIpc.cs+PetIntentIpcHost.cs）：桌面形态工具经文件通道转发主进程执行——persistentDataPath 下 pet_intent_req/resp.json（Guid id 匹配防陈旧响应+Unix 秒戳 3s 陈旧丢弃+已消费 id 缓存防重执行），主进程 PetIntentIpcHost 250ms 轮询（GameScene.InitializeStartupScene 挂，DontDestroyOnLoad），桌面侧同步等超时 1.5s（Thread.Sleep——桌宠主线程短暂停顿，聊天场景可接受；主游戏未运行=超时报错，语义正确）。**Why:** 桌面宠是独立进程无主进程引用，聊天指令低频（人打字速度），文件通道是轻量过渡（正式 IPC 仍无需求）。**How to apply:** 两形态同套 PetChatIntent.Execute 行为对齐；编辑器与构建共享 persistentDataPath=编辑器 Play 可联调桌宠 exe；指令执行改语义时两形态同查。同日提交 36605fe。现有工具=set/get_game_time（open_screen 已于同日移除）。
 
-- [2026-08-30 10:53:13] [project] 桌宠窗口句柄修复已验证（2026-08-30，手动启动场景日志铁证：窗口改造完成 hwnd=0x1802AE mode=DWM-alpha + 指令工具已注册 + 对话已接线 + NRE=0）：PetWindowController.acquireWindow 三级获取（GetActiveWindow→findOwnMainWindow 枚举本进程主窗口→acquireWindowRetry 协程 5s 重试）+ 接聊天() 不再被窗口失败陪葬 + PetChatUIController.Update 判空防御。**待办**：主游戏拉起+快速跳 Splash 的焦点竞争场景待用户复测；通过后提交（句柄修复+桌面版 IPC 共约 8 文件）。编辑器许可曾过期（License error 弹窗→点 Exit 重启即自动续期，entitlement resolved——遇同款弹窗处置=重启编辑器）。
+- [2026-08-30 12:32:53] [project] 桌宠窗口句柄修复已验证并提交（2026-08-30，01ef996）：PetWindowController.acquireWindow 三级获取（GetActiveWindow→findOwnMainWindow 枚举本进程主窗口→acquireWindowRetry 协程 5s 重试）+ 接聊天() 不再被窗口失败陪葬 + PetChatUIController.Update 判空防御。手动启动与主游戏拉起+快速跳 Splash 焦点竞争两场景均通过（2026-08-30 用户复测）。编辑器许可曾过期（License error 弹窗→点 Exit 重启即自动续期——遇同款弹窗处置=重启编辑器）。
+
+
 
 ### Reference
 - [2026-08-14 10:16:21] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Picture\gichess\my\wg-0.2.d。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 需要查旧 Java 实现时按路径阅读源码。
