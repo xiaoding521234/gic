@@ -212,6 +212,11 @@ namespace GIC.Framework
             PetInGameHost.StartupDispatch(_saveManager?.CurrentSave?.petForm ?? 0);
             PetProcessLauncher.Launch();
 
+            // 桌宠聊天指令消费宿主（2026-08-30，docs/19 §6.5）：桌面宠进程经 PetIntentIpc 文件通道
+            // 转发的指令（游戏时间/打开界面）由本 host 轮询执行。主进程常建（无请求时开销可忽略）；
+            // 桌宠进程在 EnterPetMode 已早退，不会走到这里。
+            GIC.Pet.Chat.PetIntentIpcHost.EnsureExists();
+
             GICLog.Info("初始化场景设置，加载 SplashScreen");
 
             // 从 Boot 场景加载 SplashScreen（Single 模式，Boot 场景被卸载，持久化管理器通过 DontDestroyOnLoad 存活）

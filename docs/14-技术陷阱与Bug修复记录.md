@@ -423,6 +423,21 @@ Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropert
 - 中途半截 JSON（断流截断）在行解析层 try-catch 静默跳过——容错优先于严格报错。
 - **解码缓冲容量铁律（2026-08-30 "打开界面后报错 chars 溢出"实证）**：`DownloadHandlerScript` 预分配**字节**缓冲 16KB ≠ 可以只配 4K **字符**缓冲——单次 `ReceiveData` 回调最多 16KB 字节，而 UTF-8 解码输出字符数上限=输入字节数（纯 ASCII 1:1，多字节只缩不涨），流快时多个 TCP 段合并成一次大回调 → `Decoder.GetChars` 直接抛 `The output char buffer is too small` → Unity 回 0 给 curl → `Curl error 23`，整请求崩。修法：char 缓冲 ≥ 字节缓冲 + 挂起余量（16400），外加 `GetCharCount` 先数后解的防御性兜底（数含 Decoder 挂起字节，永不抛；不够临时扩，宁分配不崩溃）。**任何"字节缓冲→字符缓冲"转换都要按 1 byte : 1 char 上限配容量**。
 
+## 16a. GetActiveWindow 后台启动返回 0——主游戏拉起桌宠的句柄竞态（"快速跳过启动动画后派蒙报错"，2026-08-30）
+
+### 现象
+主游戏启动期（用户按键快速跳过 Splash）拉起桌宠进程后，桌宠报 `未取到窗口句柄，窗口改造失败`，随后 `PetChatUIController.Update` 每帧 NullReferenceException 刷屏（单会话 9.6 万条）；桌宠显示为带边框普通窗口（无透明/置顶）。
+
+### 根因（两个叠加）
+1. **`GetActiveWindow()` 语义误用**：它返回*调用线程消息队列的激活窗口*——桌宠进程在后台被拉起、焦点一直在主游戏窗口（用户正按键跳动画）时，桌宠自己的窗口从未被激活 → 返回 IntPtr.Zero。这是颗从立项起就存在的隐形雷：手动启动桌宠（窗口天然获得焦点）永远不会踩到，"主游戏拉起+用户抢焦点"才触发。
+2. **Start() 提前 return 吞掉后续接线**：旧代码句柄失败就 return——把与 Win32 窗口毫无依赖关系的 `接聊天()` 一起吞了（聊天只依赖 Unity Canvas）→ 聊天 UI 无 Canvas → Update 裸炸。**Start 里的 return 会跳过其后全部初始化——可选功能必须放 return 之前或独立 try-catch**（宿主 Awake 防泄漏同款教训）。
+
+### 修复与规范
+- 句柄获取三级化（`PetWindowController.acquireWindow`）：①`GetActiveWindow`（有焦点最快）②**`EnumWindows` 按进程 PID+可见+标题=产品名找本进程主窗口（焦点无关，根治手段——Unity 播放器主窗口标题=Application.productName）**③窗口创建晚于 Start 的竞态→协程每帧重试 5s。
+- `接聊天()` 挪到窗口改造之后但**不受其失败影响**：窗口改造整体失败=普通带边框窗口+聊天照常（降级而非瘫痪）。
+- `PetChatUIController.Update` 开头 `_canvas == null` 防御 return——宿主接线前恒静默。
+- **任何"取自己窗口句柄"的需求勿用 GetActiveWindow**（焦点依赖）；EnumWindows 按 PID 匹配是标准做法（VPet 同款思路）。
+
 ## 16. pet.json 密文双进程持久化两雷（"重启后设置里有 key 对话报未设置"，2026-08-29）
 
 ### 现象

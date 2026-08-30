@@ -216,9 +216,9 @@ namespace GIC.Pet
                 return new Vector2(sp.x * Screen.width / Mathf.Max(1f, _rt.width), sp.y * Screen.height / Mathf.Max(1f, _rt.height));
             };
 
-            // Intent 工具接线（2026-08-29 首批指令，docs/19 §6.5）：set_game_time / get_game_time /
-            // open_screen——游戏内形态直调主进程系统。桌面形态是独立进程（IPC 未建，§8 遗留），
-            // 不注册这批工具。注册失败只少工具不影响聊天（防泄漏结构同上）。
+            // Intent 工具接线（2026-08-29 首批指令，docs/19 §6.5）：set_game_time / get_game_time
+            // ——游戏内形态直调主进程系统。open_screen 已按用户拍板移除（2026-08-30）。
+            // 注册失败只少工具不影响聊天（防泄漏结构同上）。
             try
             {
                 var session = _聊天UI.sessionRef;
@@ -229,15 +229,12 @@ namespace GIC.Pet
                         GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
                         GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
-                        GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
                     };
                     session.RegisterTools(tools, (toolName, toolArgs) =>
                     {
-                        // 打开界面前先收聊天输入条：释放输入锁，让新打开的界面可交互
-                        if (toolName == "open_screen") _聊天UI.CloseChat();
-                        return GIC.Pet.Chat.PetChatIntent.Execute(toolName, toolArgs, this);
+                        return GIC.Pet.Chat.PetChatIntent.Execute(toolName, toolArgs);
                     });
-                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间/打开界面）");
+                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间）");
                 }
             }
             catch (System.Exception e)

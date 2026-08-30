@@ -161,6 +161,7 @@ namespace GIC.Pet.Chat
             // ESC 收起输入条（2026-08-29：旧版输入期宿主交互全冻结+无 ESC=输入条打开后只能靠发送
             // 消失，用户被困在"打开→发送→消失"循环——多一条退出途径）。ESC=完整关闭对话（含气泡）。
             if (_输入开着 && Input.GetKeyDown(KeyCode.Escape)) { CloseChat(); return; }
+            if (_canvas == null) return; // 宿主接线前的防御（WireHost 未调用时恒静默——2026-08-30 桌面版窗口句柄事故：Start 提前 return 吞掉接线=此处每帧 NRE 刷屏 9.6 万条）
             var canvasRect = (_canvas.transform as RectTransform).rect;
             // 回复气泡跟随头部锚点（拖拽/移动/动画头部都在动——每帧跟；按半宽钳回屏内防贴边裁切）
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf && headAnchorProvider != null)

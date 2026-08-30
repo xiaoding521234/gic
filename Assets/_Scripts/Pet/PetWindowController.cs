@@ -298,25 +298,140 @@ namespace GIC.Pet
             }
 
 #if UNITY_EDITOR
+
             // 编辑器内禁止 Win32 窗口改造——GetActiveWindow 拿到的是编辑器自身窗口，会破坏编辑器 UI。
+
             // 桌宠形态仅存在于构建产物（主进程自动拉起 / gic.exe --pet-mode）；编辑器 Play 本场景只做模型预览。
+
             Debug.Log("[PetWindow] 编辑器模式：跳过窗口改造。桌宠由主进程自动拉起（Builds/PetSpike/gic.exe）");
+
 #else
+
             if (Screen.fullScreen)
+
             {
+
                 Screen.fullScreen = false;
+
             }
 
+            acquireWindow();
+
+#endif
+
+            // 聊天接线放在窗口改造之后、且不受改造失败影响（2026-08-30 事故：句柄获取竞态 return 把
+
+            // 接聊天() 一起吞掉=聊天 UI 无 Canvas 每帧 NRE 刷屏 9.6 万条）。聊天只依赖 Unity Canvas，
+
+            // 与 Win32 窗口无关——窗口改造整体失败（5s 重试超时）也只是"普通带边框窗口"，聊天照常。
+
+            接聊天();
+
+        }
+
+
+        /// <summary>取窗口句柄并改造（2026-08-30 事故根治）：主游戏在启动期拉起桌宠时，用户焦点
+
+        /// 常在游戏窗口（快速跳过启动动画按键时尤其）——桌宠窗口从未被激活，GetActiveWindow() 返回 0
+
+        /// （它只返回调用线程消息队列的激活窗口，与进程自己拥有窗口无关）。三级获取：
+
+        /// ①GetActiveWindow（有焦点时，最快）②EnumWindows 按进程号+标题找本进程主窗口（焦点无关）
+
+        /// ③窗口创建晚于 Start 的竞态→协程每帧重试 5s。</summary>
+
+        void acquireWindow()
+
+        {
+
             hwnd = GetActiveWindow();
+
+            if (hwnd == IntPtr.Zero) hwnd = findOwnMainWindow();
+
             if (hwnd == IntPtr.Zero)
+
             {
-                Debug.LogError("[PetWindow] 未取到窗口句柄，窗口改造失败");
+
+                StartCoroutine(acquireWindowRetry());
+
                 return;
+
             }
 
             RestyleWindow();
-#endif
-            接聊天();
+
+        }
+
+
+        System.Collections.IEnumerator acquireWindowRetry()
+
+        {
+
+            float deadline = Time.realtimeSinceStartup + 5f;
+
+            while (Time.realtimeSinceStartup < deadline)
+
+            {
+
+                yield return null;
+
+                hwnd = GetActiveWindow();
+
+                if (hwnd == IntPtr.Zero) hwnd = findOwnMainWindow();
+
+                if (hwnd != IntPtr.Zero)
+
+                {
+
+                    RestyleWindow();
+
+                    yield break;
+
+                }
+
+            }
+
+            Debug.LogError("[PetWindow] 5 秒内未取到窗口句柄，窗口改造失败（透明/置顶/拖拽不可用，聊天不受影响）");
+
+        }
+
+
+        /// <summary>枚举顶层窗口找本进程主窗口（GetActiveWindow 的焦点无关替代）：按进程 PID +
+
+        /// 可见 + 标题=产品名匹配（Unity 播放器主窗口标题=Application.productName；进程内的隐藏
+
+        /// 辅助窗口按可见性排除）。EnumWindows 同步执行，lambda 闭包无生命周期问题。</summary>
+
+        static IntPtr findOwnMainWindow()
+
+        {
+
+            IntPtr found = IntPtr.Zero;
+
+            uint selfPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+
+            var title = new System.Text.StringBuilder(64);
+
+            EnumWindows((h, l) =>
+
+            {
+
+                GetWindowThreadProcessId(h, out uint pid);
+
+                if (pid != selfPid || !IsWindowVisible(h)) return true;
+
+                title.Length = 0;
+
+                GetWindowText(h, title, title.Capacity);
+
+                if (title.ToString() == Application.productName) { found = h; return false; }
+
+                return true;
+
+            }, IntPtr.Zero);
+
+            return found;
+
         }
 
         /// <summary>对话接线（2026-08-29 桌面版补齐，docs/19 §6.5）：聊天三组件挂 PetWindow 物体
@@ -369,6 +484,33 @@ namespace GIC.Pet
                 Vector3 sp = cam.WorldToScreenPoint(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z));
                 return new Vector2(sp.x, sp.y);
             };
+
+            // Intent 工具接线（2026-08-30 桌面版补齐，docs/19 §6.5）：桌面形态是独立进程、无主进程
+            // 引用——工具经 PetIntentIpc 文件通道转发主游戏进程执行（主进程 PetIntentIpcHost 消费），
+            // 与游戏内形态的直调执行行为对齐。主游戏未运行时通道超时报错（LLM 自行解释）。
+            // open_screen 已按用户拍板移除（2026-08-30）。注册失败只少工具不影响聊天（防泄漏结构同上）。
+            try
+            {
+                var session = _聊天UI.sessionRef;
+                if (session != null)
+                {
+                    var tools = new System.Collections.Generic.List<GIC.Pet.Chat.PetChatClient.ToolDefinition>
+                    {
+                        GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
+                        GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
+                        GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
+                    };
+                    session.RegisterTools(tools, (toolName, toolArgs) =>
+                    {
+                        return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgs);
+                    });
+                    Debug.Log("[PetWindow] 对话指令工具已注册（文件通道转发主游戏进程执行）");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PetWindow] 对话指令工具注册失败（聊天基础功能不受影响）：{e.Message}");
+            }
             Debug.Log("[PetWindow] 对话已接线（单击派蒙开输入条）");
         }
 
