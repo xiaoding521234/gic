@@ -42,6 +42,9 @@ namespace GIC.Pet.Chat
         /// <summary>客户端公开只读（UI 层发送前接流式事件）</summary>
         public PetChatClient clientRef => client;
 
+        /// <summary>人设提示词公开只读（反应生成复用——PetReactionConsumer 按同一人设现编反馈）</summary>
+        public string PersonaPrompt => personaPrompt;
+
         // 运行时状态
         private readonly List<PetChatClient.ChatMessage> _history = new List<PetChatClient.ChatMessage>();
         private readonly List<string> _longTermMemory = new List<string>();
@@ -68,6 +71,44 @@ namespace GIC.Pet.Chat
         {
             _toolTable = tools ?? new List<PetChatClient.ToolDefinition>();
             _toolExecutor = executor;
+        }
+
+        /// <summary>动作播放回调（宿主接线：LLM 对话自主选动作 2026-08-31）。参数=完整 clip 名；
+        /// 宿主接 PlayReaction（拖拽/退场中静默跳过）。null=未接线，do_action 回执错误。</summary>
+        [HideInInspector] public Action<string> onPlayAction;
+
+        // ---- LLM 可选动作表（do_action 工具；key=LLM 枚举值 → clip 全名） ----
+
+        public static readonly (string key, string clip, string desc)[] ActionTable =
+        {
+            ("greet",      "Ani_NPC_Kanban_Paimon_Greet",      "打招呼/迎接"),
+            ("clap",       "Ani_NPC_Kanban_Paimon_Clap01",     "拍手/庆祝/叫好"),
+            ("show",       "Ani_NPC_Kanban_Paimon_Show_1",     "得意展示/炫耀好东西"),
+            ("shy",        "Ani_NPC_Kanban_Paimon_Shy01AS",    "害羞/不好意思"),
+            ("anger",      "Ani_NPC_Kanban_Paimon_Anger",      "生气/不满/抗议"),
+            ("confuse",    "Ani_NPC_Kanban_Paimon_Confuse01AS","困惑/不解/犯难"),
+            ("nod",        "Ani_NPC_Kanban_Paimon_Nod01",      "点头/赞同/肯定"),
+            ("shake_head", "Ani_NPC_Kanban_Paimon_ShakeHead01","摇头/否认/惋惜"),
+            ("sneer",      "Ani_NPC_Kanban_Paimon_Sneer01",    "撇嘴/吐槽/小嫌弃"),
+            ("hope",       "Ani_NPC_Kanban_Paimon_Hope",       "期待/盼望/憧憬"),
+            ("refuse",     "Ani_NPC_Kanban_Paimon_Refuse01",   "拒绝/才不要"),
+        };
+
+        /// <summary>do_action 工具定义（聊天情绪动作——LLM 在回复时自主挑选；宿主记得同时接 onPlayAction）</summary>
+        public static PetChatClient.ToolDefinition DoActionTool()
+        {
+            // enum 数组元素手拼带引号（string.Join 已含引号分隔符——勿再用 Replace 转义）
+            var enums = string.Join(",", System.Linq.Enumerable.Select(ActionTable, a => $"\"{a.key}\""));
+            var descs = string.Join("；", System.Linq.Enumerable.Select(ActionTable, a => $"{a.key}={a.desc}"));
+            return new PetChatClient.ToolDefinition
+            {
+                function = new PetChatClient.ToolDefinition.ToolFunction
+                {
+                    name = "do_action",
+                    description = $"让你说话时身体也做出对应的动作。当你这句回复带有明显情绪（庆祝、害羞、生气、困惑、期待等）时，选一个最贴合的动作一起表达。每次回复最多调用一次；普通平淡的回复不用调用。可选动作：{descs}。",
+                    parameters = $"{{\"type\":\"object\",\"properties\":{{\"action\":{{\"type\":\"string\",\"enum\":[{enums}],\"description\":\"要做的动作\"}}}},\"required\":[\"action\"]}}",
+                }
+            };
         }
 
         /// <summary>用户输入 → 流式回复（含工具循环）。事件转发客户端流式事件。
@@ -151,13 +192,30 @@ namespace GIC.Pet.Chat
 
         private string ExecuteTool(string toolName, string args)
         {
-            // 内置记忆工具直接消化；其余转发给注册的执行器（Intent 层）
+            // 本地工具（宠物进程内直接消化，不经注册执行器/IPC）：
+            // ①memory_update 记忆 ②do_action 情绪动作（模型在本进程，绝不能转发主进程）
             if (toolName == "memory_update")
             {
                 try
                 {
                     var paramObj = Newtonsoft.Json.Linq.JObject.Parse(args);
                     return WriteMemory(paramObj["content"]?.Value<string>(), paramObj["op"]?.Value<string>() ?? "add");
+                }
+                catch (Exception e) { return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = e.Message }); }
+            }
+            if (toolName == "do_action")
+            {
+                try
+                {
+                    var paramObj = Newtonsoft.Json.Linq.JObject.Parse(args);
+                    string key = paramObj["action"]?.Value<string>() ?? "";
+                    var entry = Array.Find(ActionTable, a => a.key == key);
+                    if (entry.clip == null)
+                        return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = $"未知动作 {key}" });
+                    if (onPlayAction == null)
+                        return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = "动作播放未接线" });
+                    onPlayAction.Invoke(entry.clip);
+                    return "{\"ok\":true,\"message\":\"已播放动作\"}";
                 }
                 catch (Exception e) { return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = e.Message }); }
             }

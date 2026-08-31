@@ -704,6 +704,18 @@ MonoBehaviour:
     m_Localized: Hmm... couldn't open the wish screen. Try again?
     m_Metadata:
       m_Items: []
+  - m_Id: 9060
+    m_Localized: Traveler, amazing! {1} gold and {2} 4-stars in {0} pulls!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9061
+    m_Localized: Done! {1} 4-stars in {0} pulls. Gold next time for sure!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9062
+    m_Localized: Ugh... all {0} were junk. Don't lose heart, Traveler...
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

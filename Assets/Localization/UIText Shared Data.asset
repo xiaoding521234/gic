@@ -699,6 +699,18 @@ MonoBehaviour:
     m_Key: PetWishFailed
     m_Metadata:
       m_Items: []
+  - m_Id: 9060
+    m_Key: PetWishPlayerDoneGold
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9061
+    m_Key: PetWishPlayerDonePurple
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9062
+    m_Key: PetWishPlayerDoneBad
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

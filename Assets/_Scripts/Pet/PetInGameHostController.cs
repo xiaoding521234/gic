@@ -227,6 +227,7 @@ namespace GIC.Pet
                     var tools = new System.Collections.Generic.List<GIC.Pet.Chat.PetChatClient.ToolDefinition>
                     {
                         GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
+                        GIC.Pet.Chat.PaimonChatSession.DoActionTool(), // 情绪动作（LLM 对话自主选，2026-08-31）
                         GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
@@ -236,7 +237,10 @@ namespace GIC.Pet
                     {
                         return GIC.Pet.Chat.PetChatIntent.Execute(toolName, toolArgs);
                     });
-                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间/界面/自动抽卡）");
+                    // do_action 动作回调（会话层本地拦截后回调）：行为层播单次动作
+                    //（拖拽物理中/退场中 PlayReaction 内部静默跳过——反应错失可接受）
+                    session.onPlayAction = anim => _行为控制器?.PlayReaction(anim);
+                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间/界面/自动抽卡/情绪动作）");
                 }
             }
             catch (System.Exception e)

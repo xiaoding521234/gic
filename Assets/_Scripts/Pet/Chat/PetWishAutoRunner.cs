@@ -22,18 +22,18 @@ namespace GIC.Pet.Chat
     /// </summary>
     public class PetWishAutoRunner : MonoBehaviour
     {
-        // 反应动作（GI 官方 clip 全名；均为单次动作——与行为层随机小动作同池）
-        const string AnimMagic = "Ani_NPC_Kanban_Paimon_Domagic";   // 开抽仪式
-        const string AnimGold = "Ani_NPC_Kanban_Paimon_Clap01";     // 出金庆祝
-        const string AnimPurple = "Ani_NPC_Kanban_Paimon_Show_1";   // 四星得意
-        const string AnimBadStreak = "Ani_NPC_Kanban_Paimon_ShakeHead01"; // 连续烂卡失望
-        const string AnimDoneGold = "Ani_NPC_Kanban_Paimon_Show_2"; // 结算-有金
-        const string AnimDonePurple = "Ani_NPC_Kanban_Paimon_Nod01";// 结算-有紫无金
-        const string AnimDoneBad = "Ani_NPC_Kanban_Paimon_Sneer01"; // 结算-全烂
-        const string AnimError = "Ani_NPC_Kanban_Paimon_Confuse01AS"; // 各类失败
+        // 反应动作（GI 官方 clip 全名；均为单次动作——与行为层随机小动作同池；PetWishPlayerObserver 共用）
+        internal const string AnimMagic = "Ani_NPC_Kanban_Paimon_Domagic";   // 开抽仪式
+        internal const string AnimGold = "Ani_NPC_Kanban_Paimon_Clap01";     // 出金庆祝
+        internal const string AnimPurple = "Ani_NPC_Kanban_Paimon_Show_1";   // 四星得意
+        internal const string AnimBadStreak = "Ani_NPC_Kanban_Paimon_ShakeHead01"; // 连续烂卡失望
+        internal const string AnimDoneGold = "Ani_NPC_Kanban_Paimon_Show_2"; // 结算-有金
+        internal const string AnimDonePurple = "Ani_NPC_Kanban_Paimon_Nod01";// 结算-有紫无金
+        internal const string AnimDoneBad = "Ani_NPC_Kanban_Paimon_Sneer01"; // 结算-全烂
+        internal const string AnimError = "Ani_NPC_Kanban_Paimon_Confuse01AS"; // 各类失败
 
-        const int BadStreakThreshold1 = 5; // 连续烂卡反应阈值（第一档）
-        const int BadStreakThreshold2 = 9; // 连续烂卡反应阈值（第二档）
+        internal const int BadStreakThreshold1 = 5; // 连续烂卡反应阈值（第一档）
+        internal const int BadStreakThreshold2 = 9; // 连续烂卡反应阈值（第二档）
 
         static PetWishAutoRunner _instance;
 
@@ -102,7 +102,7 @@ namespace GIC.Pet.Chat
             if (wish == null || !wish.IsBaseReady)
             {
                 Debug.LogWarning($"[PetWish] 祈愿界面未就绪（超时）wish={wish != null}");
-                Reaction("PetWishFailed", AnimError);
+                Reaction(AnimError, "你想帮旅行者抽卡，但没能打开祈愿界面", "PetWishFailed");
                 _running = false;
                 yield break;
             }
@@ -112,7 +112,7 @@ namespace GIC.Pet.Chat
             if (!wish.EnsurePoolSelected())
             {
                 Debug.LogWarning("[PetWish] 无可用卡池（所有角色均未绑定卡池）");
-                Reaction("PetWishPoolEmpty", AnimError);
+                Reaction(AnimError, "你想帮旅行者抽卡，但现在的卡池都还没开放", "PetWishPoolEmpty");
                 _running = false;
                 yield break;
             }
@@ -121,7 +121,7 @@ namespace GIC.Pet.Chat
             if (!wish.IsAutoDrawReady)
             {
                 Debug.LogWarning("[PetWish] 卡池选择后仍未就绪（超时）");
-                Reaction("PetWishFailed", AnimError);
+                Reaction(AnimError, "你想帮旅行者抽卡，但没能打开祈愿界面", "PetWishFailed");
                 _running = false;
                 yield break;
             }
@@ -134,14 +134,16 @@ namespace GIC.Pet.Chat
                 switch (start)
                 {
                     case WishScreen.AutoDrawStartResult.Busy:
-                        Reaction("PetWishBusy", AnimError);
+                        Reaction(AnimError, "旅行者想让你抽卡，但抽卡已经在进行中了", "PetWishBusy");
                         break;
                     case WishScreen.AutoDrawStartResult.NoPrimogem:
                         int have = Wargame.Instance?.Context?.Get<SaveManager>()?.CurrentSave?.GetItemCount(ItemName.Primogem) ?? 0;
-                        Reaction("PetWishNoPrimogem", AnimError, null, count, WishManager.SingleWishCost * count, have);
+                        Reaction(AnimError,
+                            $"旅行者想让你抽{count}次卡，但原石不够：需要{WishManager.SingleWishCost * count}，只有{have}",
+                            "PetWishNoPrimogem", count, WishManager.SingleWishCost * count, have);
                         break;
                     default:
-                        Reaction("PetWishPoolEmpty", AnimError);
+                        Reaction(AnimError, "你想帮旅行者抽卡，但现在的卡池都还没开放", "PetWishPoolEmpty");
                         break;
                 }
                 _running = false;
@@ -156,7 +158,7 @@ namespace GIC.Pet.Chat
             _watch.OnShotPlanned += HandleShot;
             _watch.OnWishComplete += HandleComplete;
 
-            Reaction("PetWishStart", AnimMagic, null, count);
+            Reaction(AnimMagic, $"你刚开始帮旅行者抽卡（共{count}发）", "PetWishStart", count);
 
             // 6. 等完成（OnWishComplete=最终展示开始；异常路径=界面被销毁）+5 分钟安全兜底
             float done = Time.unscaledTime + 300f;
@@ -172,6 +174,7 @@ namespace GIC.Pet.Chat
 
         void HandleShot(WishShotResult shot)
         {
+            int shotNo = shot.shotIndex + 1; // 发数（1-based，反应文案用）
             int star = shot.finalStarLevel;
             if (star >= 5)
             {
@@ -179,20 +182,20 @@ namespace GIC.Pet.Chat
                 _badStreak = 0;
                 string cardName = CardName(shot.finalCardId);
                 _goldNames.Add(cardName);
-                Reaction("PetWishGold", AnimGold, null, cardName);
+                Reaction(AnimGold, $"你刚帮旅行者抽卡，第{shotNo}发抽到了五星「{cardName}」！", "PetWishGold", cardName);
             }
             else if (star == 4)
             {
                 _purple++;
                 _badStreak = 0;
-                Reaction("PetWishPurple", AnimPurple, null, CardName(shot.finalCardId));
+                Reaction(AnimPurple, $"你刚帮旅行者抽卡，第{shotNo}发抽到了四星「{CardName(shot.finalCardId)}」", "PetWishPurple", CardName(shot.finalCardId));
             }
             else if (star <= 2)
             {
                 _bad++;
                 _badStreak++;
                 if (_badStreak == BadStreakThreshold1 || _badStreak == BadStreakThreshold2)
-                    Reaction("PetWishBadStreak", AnimBadStreak, null, _badStreak);
+                    Reaction(AnimBadStreak, $"你已经连续{_badStreak}发都是两星以下的烂卡了", "PetWishBadStreak", _badStreak);
             }
             else
             {
@@ -206,21 +209,24 @@ namespace GIC.Pet.Chat
             string names = string.Join("、", _goldNames);
             if (_gold >= 1)
             {
-                Reaction("PetWishDoneGold", AnimDoneGold,
+                string desc = $"你刚帮旅行者抽完了{_count}发卡：出金{_gold}次（{names}）、四星{_purple}次、烂卡{_bad}次";
+                Reaction(AnimDoneGold, desc,
                     $"派蒙刚帮旅行者抽了{_count}次卡：出金{_gold}次（{names}）、四星{_purple}次、烂卡{_bad}次",
-                    _count, _gold, _purple);
+                    "PetWishDoneGold", _count, _gold, _purple);
             }
             else if (_purple >= 1)
             {
-                Reaction("PetWishDonePurple", AnimDonePurple,
+                string desc = $"你刚帮旅行者抽完了{_count}发卡：没出金，四星{_purple}次、烂卡{_bad}次";
+                Reaction(AnimDonePurple, desc,
                     $"派蒙刚帮旅行者抽了{_count}次卡：没出金，四星{_purple}次、烂卡{_bad}次",
-                    _count, _purple);
+                    "PetWishDonePurple", _count, _purple);
             }
             else
             {
-                Reaction("PetWishDoneBad", AnimDoneBad,
+                string desc = $"你刚帮旅行者抽完了{_count}发卡：全部是烂卡（两星以下），没出金也没四星";
+                Reaction(AnimDoneBad, desc,
                     $"派蒙刚帮旅行者抽了{_count}次卡：全部是烂卡（≤2星），没出金也没四星",
-                    _count);
+                    "PetWishDoneBad", _count);
             }
         }
 
@@ -239,13 +245,20 @@ namespace GIC.Pet.Chat
         static WishScreen FindWishScreen() =>
             FindFirstObjectByType<WishScreen>(FindObjectsInactive.Exclude);
 
-        /// <summary>推送一条本地化反应（args 填充模板 {0}{1}{2} 占位符；note=LLM 后台注记，空=无）</summary>
-        static void Reaction(string key, string anim, string note = null, params object[] args)
+        /// <summary>推送一条反应：anim=动作（消费侧即时播），desc=LLM 生成素材（结构化短句，
+        /// 宠进程 LLM 现编话语），fallbackKey/args=本地化兜底模板（LLM 失败/无 key 时直出）</summary>
+        static void Reaction(string anim, string desc, string fallbackKey, params object[] fallbackArgs)
         {
-            PetReactionChannel.Push(Localize(key, args), anim, note);
+            PetReactionChannel.Push(desc, anim, Localize(fallbackKey, fallbackArgs));
         }
 
-        static string Localize(string key, params object[] args)
+        /// <summary>结算反应（多带 LLM 历史注记 note——之后问"抽得怎么样"能答上）</summary>
+        static void Reaction(string anim, string desc, string note, string fallbackKey, params object[] fallbackArgs)
+        {
+            PetReactionChannel.Push(desc, anim, Localize(fallbackKey, fallbackArgs), note);
+        }
+
+        internal static string Localize(string key, params object[] args)
         {
             var table = UnityEngine.Localization.Settings.LocalizationSettings.Instance.GetStringDatabase()
                 .GetTable("UIText") as UnityEngine.Localization.Tables.StringTable;
@@ -256,7 +269,7 @@ namespace GIC.Pet.Chat
         }
 
         /// <summary>卡牌显示名（UnitName/ItemName 本地化表；查不到回退枚举名）</summary>
-        static string CardName(CardId id)
+        internal static string CardName(CardId id)
         {
             bool isUnit = id.cardType == CardType.Unit;
             string tableName = isUnit ? "UnitName" : "ItemName";
@@ -264,6 +277,118 @@ namespace GIC.Pet.Chat
             var table = UnityEngine.Localization.Settings.LocalizationSettings.Instance.GetStringDatabase()
                 .GetTable(tableName) as UnityEngine.Localization.Tables.StringTable;
             return table?.GetEntry(key)?.GetLocalizedString() ?? key;
+        }
+    }
+
+    /// <summary>
+    /// 玩家手抽观察者（2026-08-31，用户需求"玩家自己抽卡派蒙也应有回复和动作"）：玩家自己点
+    /// "祈愿 1 次/10 次"按钮抽卡时，派蒙对玩家的手气做出反应——与派蒙代抽严格区分：
+    /// 事件描述以"旅行者自己抽卡"框架书写（LLM 据此切换成喝彩/心疼的观赛语气，而非"我抽到了"
+    /// 的得意语气）；LLM 历史注记同步区分（之后问"我刚才手气怎么样"答得对得上）。
+    /// 防串场：射击/完成事件里校验 IsAutoDraw——AI 代抽轮的反应归 PetWishAutoRunner，观察者跳过
+    ///（同一控制器先玩家抽后代抽的少见序列也安全）。
+    /// 挂接：WishScreen.StartDraw 玩家路径（TryStartAutoDraw 不挂——那是 AI 路径）。
+    /// </summary>
+    public static class PetWishPlayerObserver
+    {
+        static WishDrawController _watch;
+        static int _count, _gold, _purple, _bad, _badStreak;
+        static readonly List<string> _goldNames = new();
+
+        /// <summary>开始观察一轮玩家手抽（WishScreen.StartDraw 调用；重复调用自动换靶重置）</summary>
+        public static void Observe(WishDrawController controller, int count)
+        {
+            Detach();
+            if (controller == null) return;
+            _watch = controller;
+            _count = count;
+            _gold = _purple = _bad = _badStreak = 0;
+            _goldNames.Clear();
+            controller.OnShotPlanned += HandleShot;
+            controller.OnWishComplete += HandleComplete;
+        }
+
+        static void Detach()
+        {
+            if (_watch != null)
+            {
+                _watch.OnShotPlanned -= HandleShot;
+                _watch.OnWishComplete -= HandleComplete;
+                _watch = null;
+            }
+        }
+
+        static void HandleShot(WishShotResult shot)
+        {
+            if (_watch == null || _watch.IsAutoDraw) return; // AI 代抽轮：反应归 PetWishAutoRunner
+            int shotNo = shot.shotIndex + 1;
+            int star = shot.finalStarLevel;
+            if (star >= 5)
+            {
+                _gold++;
+                _badStreak = 0;
+                string cardName = PetWishAutoRunner.CardName(shot.finalCardId);
+                _goldNames.Add(cardName);
+                PetReactionChannel.Push(
+                    $"旅行者自己抽卡，第{shotNo}发抽到了五星「{cardName}」！",
+                    PetWishAutoRunner.AnimGold,
+                    PetWishAutoRunner.Localize("PetWishGold", cardName)); // 逐发兜底与代抽共用（语境中性）
+            }
+            else if (star == 4)
+            {
+                _purple++;
+                _badStreak = 0;
+                string cardName = PetWishAutoRunner.CardName(shot.finalCardId);
+                PetReactionChannel.Push(
+                    $"旅行者自己抽卡，第{shotNo}发抽到了四星「{cardName}」",
+                    PetWishAutoRunner.AnimPurple,
+                    PetWishAutoRunner.Localize("PetWishPurple", cardName));
+            }
+            else if (star <= 2)
+            {
+                _bad++;
+                _badStreak++;
+                if (_badStreak == PetWishAutoRunner.BadStreakThreshold1 || _badStreak == PetWishAutoRunner.BadStreakThreshold2)
+                    PetReactionChannel.Push(
+                        $"旅行者已经连续{_badStreak}发都是两星以下的烂卡了",
+                        PetWishAutoRunner.AnimBadStreak,
+                        PetWishAutoRunner.Localize("PetWishBadStreak", _badStreak));
+            }
+            else
+            {
+                _badStreak = 0; // 3★ 中性：重置连击
+            }
+        }
+
+        static void HandleComplete()
+        {
+            if (_watch == null || _watch.IsAutoDraw) return;
+            Detach(); // 先摘订阅（本轮结束）再推事件
+            string names = string.Join("、", _goldNames);
+            if (_gold >= 1)
+            {
+                PetReactionChannel.Push(
+                    $"旅行者自己抽完了{_count}发卡：出金{_gold}次（{names}）、四星{_purple}次、烂卡{_bad}次",
+                    PetWishAutoRunner.AnimDoneGold,
+                    PetWishAutoRunner.Localize("PetWishPlayerDoneGold", _count, _gold, _purple),
+                    $"旅行者自己抽了{_count}次卡：出金{_gold}次（{names}）、四星{_purple}次、烂卡{_bad}次");
+            }
+            else if (_purple >= 1)
+            {
+                PetReactionChannel.Push(
+                    $"旅行者自己抽完了{_count}发卡：没出金，四星{_purple}次、烂卡{_bad}次",
+                    PetWishAutoRunner.AnimDonePurple,
+                    PetWishAutoRunner.Localize("PetWishPlayerDonePurple", _count, _purple),
+                    $"旅行者自己抽了{_count}次卡：没出金，四星{_purple}次、烂卡{_bad}次");
+            }
+            else
+            {
+                PetReactionChannel.Push(
+                    $"旅行者自己抽完了{_count}发卡：全部是烂卡（两星以下），没出金也没四星",
+                    PetWishAutoRunner.AnimDoneBad,
+                    PetWishAutoRunner.Localize("PetWishPlayerDoneBad", _count),
+                    $"旅行者自己抽了{_count}次卡：全部是烂卡（≤2星），没出金也没四星");
+            }
         }
     }
 }

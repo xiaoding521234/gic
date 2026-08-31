@@ -22,8 +22,12 @@ namespace GIC.UI
         public event Action OnWishComplete;
 
         /// <summary>单发射击业务结算完成回调（预计算完毕即触发，早于揭示动画）——
-        /// AI 自动抽卡反应监听用（PetWishAutoRunner 订阅）</summary>
+        /// 派蒙反应监听用（AI 代抽=PetWishAutoRunner；玩家手抽=PetWishPlayerObserver）</summary>
         public event Action<WishShotResult> OnShotPlanned;
+
+        /// <summary>本轮抽卡是否 AI 自动抽卡（PetWishPlayerObserver 据此区分"玩家自己抽"与
+        /// "派蒙代抽"——只对玩家手抽做反应，AI 抽的反应由 PetWishAutoRunner 负责，防串场）</summary>
+        public bool IsAutoDraw => _autoShoot;
 
         [Header("卡牌预制体")]
         [SerializeField] private GameObject cardPrefab;

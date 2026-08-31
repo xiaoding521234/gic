@@ -72,6 +72,15 @@ namespace GIC.Pet.Chat
         [Tooltip("未设置 API Key 时的提示语（Inspector 兜底；正常路径走 UIText 表 PetChatNoKey 键，2026-08-29 本地化）")]
         [InspectorName("未设密钥提示")]
         [SerializeField] private string noKeyPrompt = "还没设置 API Key 哦！去 设置→派蒙→对话 API Key 里填一个吧。";
+        [Tooltip("主动气泡（AI 抽卡反应等非对话消息）打字完成后停留秒数，到时自动淡出——对话回复气泡不在此列（维持常驻规则）")]
+        [InspectorName("主动气泡停留秒")]
+        [SerializeField] private float proactiveHoldSec = 6f;
+        [Tooltip("主动气泡/输入条/关闭气泡的淡出时长")]
+        [InspectorName("淡出时长")]
+        [SerializeField] private float fadeSec = 0.25f;
+        [Tooltip("输入条打开/关闭的过渡时长")]
+        [InspectorName("输入条过渡秒")]
+        [SerializeField] private float inputFadeSec = 0.15f;
 
         // ---- 运行时 ----
         private Canvas _canvas;
@@ -80,6 +89,10 @@ namespace GIC.Pet.Chat
         private RectTransform _bubbleRoot;
         private TextMeshProUGUI _bubbleText;
         private CanvasGroup _气泡组;
+        private CanvasGroup _输入条组;   // 输入条淡入淡出（2026-08-31）
+        private Coroutine _输入条动画;
+        private Coroutine _气泡淡出协程; // 主动气泡/关闭对话的气泡淡出（新内容到达即取消）
+        private bool _proactiveMode;    // 主动气泡模式（AI 反应）：完成后自动淡出；对话 Send 切回常驻模式
         private RectTransform _星形;
         private readonly StringBuilder _打字缓存 = new StringBuilder();
         private Coroutine _打字协程;
@@ -114,26 +127,51 @@ namespace GIC.Pet.Chat
         }
 
         /// <summary>关闭对话（2026-08-29 外点关闭/ESC 共用入口）：收输入条+藏气泡——气泡不再随时间
-        /// 消失（用户拍板），生命周期=显式关闭（点对话元素以外的地方/ESC/收起）或下一条回复覆盖。</summary>
+        /// 消失（用户拍板），生命周期=显式关闭（点对话元素以外的地方/ESC/收起）或下一条回复覆盖。
+        /// 2026-08-31 改为淡出（输入条与气泡都有过渡动画）。</summary>
         public void CloseChat()
         {
             closeInput();
             if (_打字协程 != null) { StopCoroutine(_打字协程); _打字协程 = null; }
             _等待首字节 = false;
+            _proactiveMode = false;
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf)
-            {
-                _bubbleRoot.gameObject.SetActive(false);
-                _气泡组.alpha = 1f;
-                _打字缓存.Length = 0;
-            }
+                起气泡淡出(0f); // 立即淡出（无停留）
         }
 
-        /// <summary>主动气泡（非 LLM 流程的外部消息——AI 抽卡反应等，2026-08-30）：整段直出、
-        /// 常驻到下一条内容覆盖。UI 未接线（无 Canvas）时静默。</summary>
+        /// <summary>主动气泡（LLM 失败兜底直出——AI 抽卡反应等）：整段显示，
+        /// 停留 主动气泡停留秒 后自动淡出（2026-08-31：主动消息不常驻）。
+        /// UI 未接线（无 Canvas）时静默。</summary>
         public void ShowProactive(string text)
         {
             if (string.IsNullOrEmpty(text) || _bubbleText == null) return;
+            _proactiveMode = true;
             showBubble(text);
+            起气泡淡出(proactiveHoldSec);
+        }
+
+        // ---- 主动气泡流式入口（PetReactionConsumer 的 LLM 反应生成驱动，2026-08-31） ----
+
+        /// <summary>开始一条主动流式反应（清场+进入主动模式；首字节前不显示占位）</summary>
+        public void BeginProactiveStream()
+        {
+            if (_bubbleText == null) return;
+            _proactiveMode = true;
+            取消气泡淡出();
+            if (_打字协程 != null) { StopCoroutine(_打字协程); _打字协程 = null; }
+            _打字缓存.Length = 0;
+            _气泡组.alpha = 1f;
+            _bubbleRoot.gameObject.SetActive(true);
+        }
+
+        /// <summary>主动流式增量（打字机追加——与对话流共用 typewriter；typewriter 内会取消淡出计时）</summary>
+        public void ProactiveDelta(string delta) => typewriter(delta);
+
+        /// <summary>主动流式完成：起自动淡出计时（停留 → 淡出 → 隐藏）</summary>
+        public void ProactiveStreamDone()
+        {
+            if (!_proactiveMode) return;
+            起气泡淡出(proactiveHoldSec);
         }
 
         /// <summary>会话客户端（发送前接流式事件用）——转发私有字段</summary>
@@ -231,6 +269,7 @@ namespace GIC.Pet.Chat
             _inputBarRoot.gameObject.SetActive(true);
             跟随输入条((_canvas.transform as RectTransform).rect); // 立即摆位，防一帧闪在旧位置
             InputLocks.Push(this, InputLockReason.InputPopupEntering); // 输入期按键不漏进游戏
+            输入条过渡(1f); // 淡入（2026-08-31）
             _inputField.text = "";
             _inputField.ActivateInputField();
             _inputField.Select();
@@ -241,7 +280,72 @@ namespace GIC.Pet.Chat
             if (!_输入开着) return;
             _输入开着 = false;
             InputLocks.Pop(this, InputLockReason.InputPopupEntering);
-            _inputBarRoot.gameObject.SetActive(false);
+            输入条过渡(0f); // 淡出后自动隐藏（2026-08-31）
+        }
+
+        /// <summary>输入条透明度过渡（打开淡入/关闭淡出；关闭到位后 SetActive(false)）。
+        /// 淡出开始即不挡点击（blocksRaycasts=false），淡入即恢复。</summary>
+        void 输入条过渡(float targetAlpha)
+        {
+            if (_输入条组 == null)
+            {
+                // 无 CanvasGroup（异常兜底）：退回硬切
+                if (_inputBarRoot != null && targetAlpha <= 0f) _inputBarRoot.gameObject.SetActive(false);
+                return;
+            }
+            if (_输入条动画 != null) StopCoroutine(_输入条动画);
+            _输入条组.blocksRaycasts = targetAlpha > 0.5f;
+            _输入条动画 = StartCoroutine(inputFadeRoutine(targetAlpha));
+        }
+
+        IEnumerator inputFadeRoutine(float target)
+        {
+            float from = _输入条组.alpha;
+            float el = 0f;
+            while (el < inputFadeSec)
+            {
+                el += Time.deltaTime;
+                _输入条组.alpha = Mathf.Lerp(from, target, el / inputFadeSec);
+                yield return null;
+            }
+            _输入条组.alpha = target;
+            if (target <= 0f) _inputBarRoot.gameObject.SetActive(false);
+            _输入条动画 = null;
+        }
+
+        // ---- 气泡自动淡出（主动消息/关闭对话，2026-08-31） ----
+
+        /// <summary>起气泡淡出：延迟后淡出再隐藏（主动气泡停留 → 自动消失；关闭对话=延迟 0 立即淡出）</summary>
+        void 起气泡淡出(float 延迟秒)
+        {
+            取消气泡淡出();
+            if (_bubbleRoot == null || !_bubbleRoot.gameObject.activeSelf) return;
+            _气泡淡出协程 = StartCoroutine(bubbleFadeRoutine(延迟秒));
+        }
+
+        /// <summary>取消未完成的自动淡出并恢复不透明（新内容到达/对话流接管时调用）</summary>
+        void 取消气泡淡出()
+        {
+            if (_气泡淡出协程 == null) return;
+            StopCoroutine(_气泡淡出协程);
+            _气泡淡出协程 = null;
+            if (_气泡组 != null) _气泡组.alpha = 1f;
+        }
+
+        IEnumerator bubbleFadeRoutine(float 延迟秒)
+        {
+            if (延迟秒 > 0f) yield return Wait.Seconds(延迟秒);
+            float el = 0f;
+            while (el < fadeSec)
+            {
+                el += Time.deltaTime;
+                _气泡组.alpha = 1f - el / fadeSec;
+                yield return null;
+            }
+            _bubbleRoot.gameObject.SetActive(false);
+            _气泡组.alpha = 1f;
+            _打字缓存.Length = 0;
+            _气泡淡出协程 = null;
         }
 
         // ---- 界面构建（程序化） ----
@@ -259,6 +363,8 @@ namespace GIC.Pet.Chat
             _inputBarRoot.pivot = new Vector2(0.5f, 1f); // 顶中心：anchoredPosition.y=输入条顶边
             _inputBarRoot.anchoredPosition = new Vector2(0f, -inputBarH * 2f);
             _inputBarRoot.sizeDelta = new Vector2(Mathf.Min(bubbleMaxW, canvasRect.rect.width - screenMargin * 2f), inputBarH);
+
+            _输入条组 = inputBarObj.AddComponent<CanvasGroup>(); // 淡入淡出过渡（2026-08-31）
 
             var inputBottom = inputBarObj.AddComponent<Image>();
             inputBottom.sprite = inputBottomSprite != null ? inputBottomSprite : bubbleSprite;
@@ -418,6 +524,7 @@ namespace GIC.Pet.Chat
             // 连续对话：只清文本保持焦点，回复气泡照常显示；收起走 单击派蒙/ESC）
             _inputField.text = "";
             _inputField.ActivateInputField();
+            _proactiveMode = false; // 用户发话=进入对话流：回复气泡恢复常驻规则（不自动淡出）
             showBubble("…"); // 等待首字节
             _等待首字节 = true;
             if (client == null) { showBubble(取本地文本("PetChatNotWired", "对话组件未接线")); return; }
@@ -438,11 +545,13 @@ namespace GIC.Pet.Chat
             session.Send(文本);
         }
 
-        /// <summary>打字机追加（流式增量逐段追加；间隔=0 直出）</summary>
+        /// <summary>打字机追加（流式增量逐段追加；间隔=0 直出）——新内容到达自动取消未完成的
+        /// 主动气泡淡出计时（下一条反应重新起表）</summary>
         void typewriter(string delta)
         {
             if (string.IsNullOrEmpty(delta)) return;
             if (_打字协程 != null) StopCoroutine(_打字协程);
+            取消气泡淡出();
             if (_等待首字节) { _打字缓存.Length = 0; _等待首字节 = false; } // 清"…"占位（错误文案同理——增量代表新回复）
             _气泡组.alpha = 1f;
             _bubbleRoot.gameObject.SetActive(true);
@@ -465,6 +574,7 @@ namespace GIC.Pet.Chat
         void showBubble(string 文本)
         {
             if (_打字协程 != null) { StopCoroutine(_打字协程); _打字协程 = null; }
+            取消气泡淡出();
             _打字缓存.Length = 0;
             _打字缓存.Append(文本);
             _bubbleText.text = 文本;

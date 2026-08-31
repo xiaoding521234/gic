@@ -497,6 +497,7 @@ namespace GIC.Pet
                     var tools = new System.Collections.Generic.List<GIC.Pet.Chat.PetChatClient.ToolDefinition>
                     {
                         GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
+                        GIC.Pet.Chat.PaimonChatSession.DoActionTool(), // 情绪动作（LLM 对话自主选，会话层本地拦截不经 IPC，2026-08-31）
                         GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
@@ -506,7 +507,10 @@ namespace GIC.Pet
                     {
                         return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgs);
                     });
-                    Debug.Log("[PetWindow] 对话指令工具已注册（文件通道转发主游戏进程执行，含界面/自动抽卡）");
+                    // do_action 动作回调（会话层本地消化——模型在本进程，走 IPC 转发主进程是错的）：
+                    // 行为层播单次动作（拖拽物理中/退场中 PlayReaction 内部静默跳过——反应错失可接受）
+                    session.onPlayAction = anim => behaviorCtrl?.PlayReaction(anim);
+                    Debug.Log("[PetWindow] 对话指令工具已注册（文件通道转发主游戏进程执行，含界面/自动抽卡；情绪动作本地播放）");
                 }
             }
             catch (System.Exception e)

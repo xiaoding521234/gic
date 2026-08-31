@@ -88,6 +88,9 @@ namespace GIC.UI
             if (drawController != null)
             {
                 drawController.StartWish(_wishManager, _currentPool, count);
+                // 派蒙对玩家手气的反应（2026-08-31）：玩家手抽轮挂观察者——抽到好卡/连烂时
+                // 派蒙有动作+LLM 话语（与派蒙代抽严格区分，观察者内部校验 IsAutoDraw 防串场）
+                GIC.Pet.Chat.PetWishPlayerObserver.Observe(drawController, count);
             }
 
             UpdateFateCount();
