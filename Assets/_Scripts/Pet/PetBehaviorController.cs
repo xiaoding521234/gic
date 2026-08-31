@@ -365,6 +365,17 @@ namespace GIC.Pet
             return true;
         }
 
+        /// <summary>外部反应动作（AI 抽卡反馈等，2026-08-30）：单次播放，播完自然回当前待机。
+        /// 拖拽物理中/退场中跳过（反应错失可接受）；进行中的单次动作被新反应顶替（新反应优先）。</summary>
+        public void PlayReaction(string animName)
+        {
+            if (animPlayer == null || string.IsNullOrEmpty(animName) || !animPlayer.HasAnim(animName)) return;
+            if (_退场中 || _退场完成) return;
+            var h = host;
+            if (h != null && h.PhysicsBusy) return;
+            播单次(animName);
+        }
+
         /// <summary>模型世界包围盒 → 屏幕矩形（扩边距）→ 是否含光标。
         /// 包围盒来源=窗口控制器的命中网格碰撞体（BakeMesh 烘的真实蒙皮网格，世界包围盒正确）；
         /// 旧用 SMR.bounds 是 ×100 垃圾值（GI 模型漏一层缩放，42 单位 vs 可见 0.6），投影恒跨相机平面

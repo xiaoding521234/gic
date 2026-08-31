@@ -499,19 +499,39 @@ namespace GIC.Pet
                         GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
                         GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
+                        GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
+                        GIC.Pet.Chat.PetChatIntent.AutoWishTool(),
                     };
                     session.RegisterTools(tools, (toolName, toolArgs) =>
                     {
                         return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgs);
                     });
-                    Debug.Log("[PetWindow] 对话指令工具已注册（文件通道转发主游戏进程执行）");
+                    Debug.Log("[PetWindow] 对话指令工具已注册（文件通道转发主游戏进程执行，含界面/自动抽卡）");
                 }
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[PetWindow] 对话指令工具注册失败（聊天基础功能不受影响）：{e.Message}");
             }
+            接反应通道();
             Debug.Log("[PetWindow] 对话已接线（单击派蒙开输入条）");
+        }
+
+        /// <summary>反应通道消费接线（2026-08-30 AI 抽卡配套）：主进程写入的反应事件
+        /// （文本+动作+LLM 注记）→ 行为层播动作 + 气泡直出 + 会话历史注记。
+        /// 独立 try-catch 防泄漏（接聊天 内可选功能结构同款）。</summary>
+        void 接反应通道()
+        {
+            try
+            {
+                var consumer = GetComponent<GIC.Pet.Chat.PetReactionConsumer>();
+                if (consumer == null) consumer = gameObject.AddComponent<GIC.Pet.Chat.PetReactionConsumer>();
+                consumer.Wire(behaviorCtrl, _聊天UI);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PetWindow] 反应通道接线失败（其余功能不受影响）：{e.Message}");
+            }
         }
 
         /// <summary>去掉标题栏边框，透明化（DWM 或色键），置顶并停靠。</summary>

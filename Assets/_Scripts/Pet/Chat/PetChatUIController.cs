@@ -128,6 +128,14 @@ namespace GIC.Pet.Chat
             }
         }
 
+        /// <summary>主动气泡（非 LLM 流程的外部消息——AI 抽卡反应等，2026-08-30）：整段直出、
+        /// 常驻到下一条内容覆盖。UI 未接线（无 Canvas）时静默。</summary>
+        public void ShowProactive(string text)
+        {
+            if (string.IsNullOrEmpty(text) || _bubbleText == null) return;
+            showBubble(text);
+        }
+
         /// <summary>会话客户端（发送前接流式事件用）——转发私有字段</summary>
         public PetChatClient client => session != null ? session.clientRef : null;
 

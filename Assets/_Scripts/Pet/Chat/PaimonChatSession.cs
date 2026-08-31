@@ -242,5 +242,14 @@ namespace GIC.Pet.Chat
 
         /// <summary>清空会话历史（长期记忆保留）</summary>
         public void ClearHistory() => _history.Clear();
+
+        /// <summary>后台事件注记（AI 抽卡结果等，2026-08-30）：以 system 消息进历史——
+        /// 不触发回复，但下次对话时 LLM 可引用（用户问"刚才抽得怎么样"能答上）。
+        /// 五家供应商均为 OpenAI 兼容，messages 中段 system 消息合法。</summary>
+        public void AppendBackgroundNote(string note)
+        {
+            if (string.IsNullOrEmpty(note)) return;
+            _history.Add(new PetChatClient.ChatMessage("system", $"（事件通知，无需回应）{note}"));
+        }
     }
 }

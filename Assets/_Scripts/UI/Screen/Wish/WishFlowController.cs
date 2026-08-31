@@ -136,6 +136,7 @@ namespace GIC.UI
             var result = new WishShotResult
             {
                 finalStarLevel = starLevel,
+                finalCardId = card.saveCardData.id,
             };
 
             // 5★: 视频在最前
@@ -270,6 +271,7 @@ namespace GIC.UI
             // 6. 最终卡入账
             _wishManager.AddFinalResultToInventory(currentResult);
             result.finalStarLevel = starLevel;
+            result.finalCardId = currentResult.cardId;
 
             // 7. 5★过渡视频（在特效之前）
             if (starLevel >= 5)

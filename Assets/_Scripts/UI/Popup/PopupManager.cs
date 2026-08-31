@@ -82,10 +82,10 @@ namespace GIC.UI
         /// </summary>
         public void ShowToast(string message)
         {
-            // 去重：相同内容的 toast 仍在显示时，刷新而非新建
+            // 去重：相同内容的 toast 仍在显示时，刷新而非新建（移出中的不刷新——让它走完，新建替代）
             foreach (var existing in _activeToasts)
             {
-                if (existing != null && existing.GetToastMessage() == message)
+                if (existing != null && !existing.IsDismissing && existing.GetToastMessage() == message)
                 {
                     existing.RefreshToast();
                     return;
@@ -109,7 +109,7 @@ namespace GIC.UI
 
             foreach (var existing in _activeToasts)
             {
-                if (existing != null && existing.GetToastMessage() == key)
+                if (existing != null && !existing.IsDismissing && existing.GetToastMessage() == key)
                 {
                     existing.RefreshToast();
                     return;

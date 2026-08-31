@@ -217,7 +217,7 @@ namespace GIC.Pet
             };
 
             // Intent 工具接线（2026-08-29 首批指令，docs/19 §6.5）：set_game_time / get_game_time
-            // ——游戏内形态直调主进程系统。open_screen 已按用户拍板移除（2026-08-30）。
+            // ——游戏内形态直调主进程系统。open_screen 2026-08-30 重做恢复（与手动同路径）+ auto_wish 自动抽卡。
             // 注册失败只少工具不影响聊天（防泄漏结构同上）。
             try
             {
@@ -229,19 +229,39 @@ namespace GIC.Pet
                         GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
                         GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
                         GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
+                        GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
+                        GIC.Pet.Chat.PetChatIntent.AutoWishTool(),
                     };
                     session.RegisterTools(tools, (toolName, toolArgs) =>
                     {
                         return GIC.Pet.Chat.PetChatIntent.Execute(toolName, toolArgs);
                     });
-                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间）");
+                    Debug.Log("[PetInGame] 对话指令工具已注册（游戏时间/界面/自动抽卡）");
                 }
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[PetInGame] 对话指令工具注册失败（聊天基础功能不受影响）：{e.Message}");
             }
+            接反应通道();
             Debug.Log("[PetInGame] 对话已接线（单击派蒙开输入条）");
+        }
+
+        /// <summary>反应通道消费接线（2026-08-30 AI 抽卡配套）：主进程写入的反应事件
+        /// （文本+动作+LLM 注记）→ 行为层播动作 + 气泡直出 + 会话历史注记。
+        /// 独立 try-catch 防泄漏（接聊天 内可选功能结构同款）。</summary>
+        void 接反应通道()
+        {
+            try
+            {
+                var consumer = GetComponent<GIC.Pet.Chat.PetReactionConsumer>();
+                if (consumer == null) consumer = gameObject.AddComponent<GIC.Pet.Chat.PetReactionConsumer>();
+                consumer.Wire(_行为控制器, _聊天UI);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PetInGame] 反应通道接线失败（其余功能不受影响）：{e.Message}");
+            }
         }
 
         /// <summary>全屏画中画：RT=屏幕尺寸×rt倍率；RawImage 铺满全屏（raycastTarget=false，

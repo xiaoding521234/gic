@@ -17,6 +17,9 @@ namespace GIC.UI
         /// <summary>最终星级</summary>
         public int finalStarLevel;
 
+        /// <summary>最终卡牌标识（相遇之线升级后为最终卡；AI 自动抽卡反应取卡名用）</summary>
+        public CardId finalCardId;
+
         /// <summary>是否为相遇之线射击</summary>
         public bool isEncounter;
 

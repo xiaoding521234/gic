@@ -659,6 +659,51 @@ MonoBehaviour:
     m_Localized: Tongyi Qwen (Alibaba)
     m_Metadata:
       m_Items: []
+  - m_Id: 9049
+    m_Localized: Alright! Paimon's off to wish {0} times!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9050
+    m_Localized: WOW!! It's {0}!! GOLD!!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9051
+    m_Localized: Ooh, {0}! A 4-star, not bad~
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9052
+    m_Localized: Ugh... {0} bad cards in a row now...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9053
+    m_Localized: All done! {1} gold and {2} 4-stars in {0} pulls. Thank Paimon!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9054
+    m_Localized: Done! {1} 4-stars in {0} pulls, but no gold...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9055
+    m_Localized: D-done... all {0} were junk. Paimon doesn't wanna talk...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9056
+    m_Localized: Paimon's already wishing! Wait for this round!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9057
+    m_Localized: "Huh? Not enough Primogems \u2014 {0} pulls need {1}, but you only
+      have {2}..."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9058
+    m_Localized: Hmm, the current banner doesn't seem to be available...
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9059
+    m_Localized: Hmm... couldn't open the wish screen. Try again?
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

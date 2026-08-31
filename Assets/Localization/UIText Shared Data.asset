@@ -655,6 +655,50 @@ MonoBehaviour:
     m_Key: PetProvider_openai
     m_Metadata:
       m_Items: []
+  - m_Id: 9049
+    m_Key: PetWishStart
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9050
+    m_Key: PetWishGold
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9051
+    m_Key: PetWishPurple
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9052
+    m_Key: PetWishBadStreak
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9053
+    m_Key: PetWishDoneGold
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9054
+    m_Key: PetWishDonePurple
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9055
+    m_Key: PetWishDoneBad
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9056
+    m_Key: PetWishBusy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9057
+    m_Key: PetWishNoPrimogem
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9058
+    m_Key: PetWishPoolEmpty
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9059
+    m_Key: PetWishFailed
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

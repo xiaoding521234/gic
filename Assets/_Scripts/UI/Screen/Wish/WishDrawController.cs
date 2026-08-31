@@ -21,8 +21,17 @@ namespace GIC.UI
         /// <summary>抽卡存盘后回调（通知外部刷新货币显示）</summary>
         public event Action OnWishComplete;
 
+        /// <summary>单发射击业务结算完成回调（预计算完毕即触发，早于揭示动画）——
+        /// AI 自动抽卡反应监听用（PetWishAutoRunner 订阅）</summary>
+        public event Action<WishShotResult> OnShotPlanned;
+
         [Header("卡牌预制体")]
         [SerializeField] private GameObject cardPrefab;
+
+        [Header("自动模式（AI 抽卡）")]
+        [Tooltip("随机点击窗口（秒）：自动模式下每发在倒计时内随机时刻'手点'开枪（模拟玩家节奏，不卡点倒计时归零）。窗口须小于倒计时秒；超界时倒计时归零兜底")]
+        [InspectorName("随机点击窗口秒")]
+        [SerializeField] private Vector2 autoClickWindowSec = new Vector2(0.4f, 1.35f);
 
         [Header("场景 UI 引用")]
         [SerializeField] private GameObject drawRoot;
@@ -82,6 +91,8 @@ namespace GIC.UI
         protected WishPoolConfig _pool;
         protected WishFlowController _flow;
         private bool _isWishActive;
+        private bool _autoShoot;       // AI 自动抽卡模式：倒计时内随机时刻自动开枪（随 StartWish 参数重置）
+        private float _nextAutoClickElapsed; // 本发的随机"点击"时刻（倒计时已流逝秒数；每发重掷）
 
         protected List<WishTrackCard> _activeCards = new();
 
@@ -151,8 +162,10 @@ namespace GIC.UI
         /// <summary>
         /// 开始祈愿流程
         /// </summary>
-        public void StartWish(WishManager manager, WishPoolConfig pool, int count)
+        /// <param name="autoShoot">自动射击（AI 抽卡）：倒计时余 自动射击提前秒 时自动开枪，不等玩家点击</param>
+        public void StartWish(WishManager manager, WishPoolConfig pool, int count, bool autoShoot = false)
         {
+            _autoShoot = autoShoot;
             _wishManager = manager;
             _pool = pool;
             _flow = new WishFlowController(manager, pool);
@@ -202,6 +215,7 @@ namespace GIC.UI
             _currentTimer = clickTimeLimit;
             _isInCooldown = false;
             _cooldownTimer = 0f;
+            RollAutoClickDelay(); // 自动模式第一发的随机"点击"时刻
 
             UpdateStarglitterProgressBar();
 
@@ -231,6 +245,7 @@ namespace GIC.UI
                         {
                             _isInCooldown = false;
                             _currentTimer = clickTimeLimit;
+                            RollAutoClickDelay(); // 下一发的随机"点击"时刻
                         }
                     }
                 }
@@ -239,7 +254,9 @@ namespace GIC.UI
                     _currentTimer -= Time.deltaTime;
                     UpdateCountdownBar(_currentTimer / clickTimeLimit);
 
-                    if (_currentTimer <= 0f || IsConfirmPressed())
+                    // 自动射击：随机时刻"手点"（AI 抽卡模拟玩家节奏）；玩家点击仍可提前；倒计时归零兜底
+                    if (_currentTimer <= 0f || IsConfirmPressed()
+                        || (_autoShoot && (clickTimeLimit - _currentTimer) >= _nextAutoClickElapsed))
                         Shoot();
                 }
 
@@ -256,6 +273,15 @@ namespace GIC.UI
                 OnWishComplete?.Invoke();
                 StartCoroutine(ShowFinalDisplay());
             }
+        }
+
+        /// <summary>掷本发的随机"点击"时刻（自动模式）：模拟玩家在倒计时内随机时刻手点开枪，
+        /// 每发独立重掷——节奏不机械。窗口钳在 (0, 倒计时秒) 内防越界。</summary>
+        void RollAutoClickDelay()
+        {
+            float min = Mathf.Max(0.05f, Mathf.Min(autoClickWindowSec.x, autoClickWindowSec.y));
+            float max = Mathf.Min(Mathf.Max(autoClickWindowSec.x, autoClickWindowSec.y), clickTimeLimit - 0.05f);
+            _nextAutoClickElapsed = max > min ? UnityEngine.Random.Range(min, max) : min;
         }
 
         /// <summary>
@@ -316,6 +342,10 @@ namespace GIC.UI
             // 预计算射击结果（全部业务逻辑在此完成）
             int shotIndex = _flow.ShotsCompleted;
             var shotResult = _flow.PlanShot(card, shotIndex);
+
+            // 单发结果事件（AI 自动抽卡反应；null=守卫拦截的异常发）
+            if (shotResult != null)
+                OnShotPlanned?.Invoke(shotResult);
 
             // 按序播放动画
             _stepsCoroutine = StartCoroutine(PlayStepsCoroutine(shotResult, card, rect, shotIndex));
@@ -463,6 +493,7 @@ namespace GIC.UI
         private void OnDisable()
         {
             _isWishActive = false;
+            _autoShoot = false;
             InputLocks.Pop(this, InputLockReason.WishInProgress);
             _flow?.Reset();
             StopHoldThenFlyCoroutines();

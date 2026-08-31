@@ -57,6 +57,8 @@ namespace GIC.UI
 
         private TextCombiner _messageText;
         private Coroutine currentCoroutine;
+        private Button _toastClickBtn;   // 点击移出（2026-08-31）
+        private bool _toastDismissing;   // 移出中（连点防重入 + 管理器去重跳过）
 
         [Autowired] private InputManager _inputManager;
 
@@ -127,6 +129,8 @@ namespace GIC.UI
         /// </summary>
         public void RefreshToast()
         {
+            if (_toastDismissing) return; // 移出中不复活（管理器去重会跳过并新建）
+
             // 重启生命协程
             if (currentCoroutine != null) StopCoroutine(currentCoroutine);
             currentCoroutine = StartCoroutine(ToastShowCoroutine());
@@ -134,6 +138,47 @@ namespace GIC.UI
             // 播放强调动画
             if (_toastBgImage != null)
                 StartCoroutine(FlashShakeCoroutine());
+        }
+
+        /// <summary>移出中（管理器去重跳过用：移出中的实例不刷新、新建替代）</summary>
+        public bool IsDismissing => _toastDismissing;
+
+        /// <summary>点击 toast 立即移出（2026-08-31）——快速淡出+滑出后走正常完成路径
+        /// （管理器移除+重排+销毁）。连点防重入。</summary>
+        public void DismissToastNow()
+        {
+            if (_mode != PopupMode.Toast || _toastDismissing) return;
+            _toastDismissing = true;
+            if (currentCoroutine != null) StopCoroutine(currentCoroutine);
+            currentCoroutine = StartCoroutine(ToastDismissCoroutine());
+        }
+
+        private IEnumerator ToastDismissCoroutine()
+        {
+            // 半个滑入时长（≈0.15s）：读作"立刻消失"但不闪断
+            float dur = slideInDuration * 0.5f;
+            Vector2 startPos = _toastContentRect != null
+                ? _toastContentRect.anchoredPosition
+                : _toastTargetPos;
+            Vector2 endPos = startPos + new Vector2(0f, slideOutDist);
+
+            float elapsed = 0f;
+            while (elapsed < dur)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / dur;
+                if (canvasGroup != null) canvasGroup.alpha = 1f - t;
+                if (_toastContentRect != null)
+                    _toastContentRect.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
+                yield return null;
+            }
+            if (canvasGroup != null) canvasGroup.alpha = 0f;
+
+            currentCoroutine = null;
+            var cb = _onToastComplete;
+            _onToastComplete = null;   // 先摘再调（OnDestroy 兜底不会二次触发）
+            cb?.Invoke(this);
+            Destroy(gameObject);
         }
 
         private IEnumerator FlashShakeCoroutine()
@@ -177,11 +222,13 @@ namespace GIC.UI
                 if (bgImg != null) bgImg.raycastTarget = false;
             }
 
-            // CanvasGroup 不拦截点击
+            // CanvasGroup 放行点击（2026-08-31 点击移出）：只有内容 Image 吃点击
+            //（根节点无 Graphic、backPanel 已禁用），游戏其余区域不受影响；
+            // interactable=false 会禁掉子 Button 的响应，须保持 true
             if (canvasGroup != null)
             {
-                canvasGroup.blocksRaycasts = false;
-                canvasGroup.interactable = false;
+                canvasGroup.blocksRaycasts = true;
+                canvasGroup.interactable = true;
                 canvasGroup.alpha = 0f;
             }
 
@@ -212,6 +259,20 @@ namespace GIC.UI
                         _toastBgOriginalColor = _toastBgImage.color;
                     break;
                 }
+            }
+
+            // 点击移出（2026-08-31）：内容区挂 Button——点中 toast 立即移出。
+            // 实例每次 Instantiate 新建，监听挂在实例上随实例销毁，无泄漏
+            if (_toastContentRect != null)
+            {
+                if (_toastBgImage != null) _toastBgImage.raycastTarget = true;
+                _toastClickBtn = _toastContentRect.GetComponent<Button>();
+                if (_toastClickBtn == null)
+                {
+                    _toastClickBtn = _toastContentRect.gameObject.AddComponent<Button>();
+                    _toastClickBtn.transition = Button.Transition.None; // 纯点击区，无按钮变色
+                }
+                _toastClickBtn.onClick.AddListener(DismissToastNow);
             }
         }
 

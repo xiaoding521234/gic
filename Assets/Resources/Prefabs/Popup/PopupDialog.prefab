@@ -1,17 +1,18 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!1 &4234971406241323363
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 2893445110597121171}
   - component: {fileID: 7910935647281823381}
   - component: {fileID: 4405020853417260027}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -82,12 +83,13 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 597724967507489065}
   - component: {fileID: 6530980544591846855}
   - component: {fileID: 4008304894518313204}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: Text (TMP)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -142,6 +144,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: New Text
+  m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
   m_sharedMaterial: {fileID: -4192194038158232135, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
@@ -216,13 +219,14 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 631279860555168359}
   - component: {fileID: 6013367574238478493}
   - component: {fileID: 5226379704026833747}
   - component: {fileID: 631244270389893660}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: BackPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -336,7 +340,7 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 2709380841065910883}
   - component: {fileID: 8126368234891682442}
@@ -345,6 +349,7 @@ GameObject:
   - component: {fileID: 8715980344904440180}
   - component: {fileID: 6508981954966096521}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: PopupDialog
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -447,12 +452,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 115bd5b093d43ad4cab9b1a2c3289db7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  messageText: {fileID: 4008304894518313204}
+  messageTextObj: {fileID: 4008304894518313204}
   backPanel: {fileID: 631244270389893660}
   canvasGroup: {fileID: 6508981954966096521}
   fadeInDuration: 0.2
   displayDuration: 2
   fadeOutDuration: 0.2
+  slideInDuration: 0.3
+  toastHoldDuration: 2
+  slideOutDuration: 0.2
+  slideOutDist: 150
+  emphasizeColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  emphasizeDuration: 0.4
+  shakeIntensity: 20
 --- !u!225 &6508981954966096521
 CanvasGroup:
   m_ObjectHideFlags: 0
