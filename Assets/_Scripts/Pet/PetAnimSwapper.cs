@@ -26,7 +26,7 @@ namespace GIC.Pet
         /// <summary>当前驱动的 Animation 组件（编辑器同步工具按此注册 clip，勿按 FindObjectsOfType 顺序找）</summary>
         public Animation TargetAnimation => targetAnimation;
 
-        private string _上次播放名 = ""; // 切换诊断日志用（2026-08-27：与 PetInertia 捕获行按时间对齐，定位停顿发生在哪次切换）
+        private string _lastPlayedName = ""; // 切换诊断日志用（2026-08-27：与 PetInertia 捕获行按时间对齐，定位停顿发生在哪次切换）
 
         [Header("动作→情绪映射（表情由情绪层驱动，不烘焙进 clip）")]
         [InspectorName("情绪映射")]
@@ -48,7 +48,6 @@ namespace GIC.Pet
         };
 
         [SerializeField, InspectorName("情绪控制器")] private PetEmotionController emotionCtrl; // 情绪层（可空=无表情）
-        [SerializeField, InspectorName("手指姿态控制器")] private PetFingerPoseController fingerPoseCtrl; // 手指姿态层（可空=手指走 clip 曲线）
 
         [Header("过渡")]
         [Tooltip("动作切换过渡时长（秒）——惯性化模式=偏移衰减时长；CrossFade 兜底模式=线性混合窗口（过渡期双 clip 双采样，过长则混合开销放大顿挫）")]
@@ -141,8 +140,8 @@ namespace GIC.Pet
             if (state == null || state.clip == null) return;
             state.wrapMode = loopMode;
             if (PetMode.Enabled) // 切换诊断只在桌宠进程打（2026-08-28：游戏内派蒙形态下同一组件跑在主游戏进程，每次切换刷主游戏控制台）
-                Debug.Log($"[PetAnim] 切换 {_上次播放名} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
-            _上次播放名 = clipName;
+                Debug.Log($"[PetAnim] 切换 {_lastPlayedName} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
+            _lastPlayedName = clipName;
             if (inertializer != null && inertializer.IsInertializationOn)
             {
                 // 惯性化切换（2026-08-27，GoW4 技术）：硬切新 clip——单 clip 求值无双采样开销，
@@ -167,8 +166,8 @@ namespace GIC.Pet
                 emotionCtrl.SetEmotion(emo);
             }
 
-            // 手指姿态切换（2026-08-23 程序化手指层）：按 clip 名让 PetFingerPoseController 接管五指
-            fingerPoseCtrl?.SetPose(clipName);
+            // 手指姿态层已删除（2026-08-31：PetFingerPoseController 按 MMD 日文骨名找骨，GI 官方
+            // 骨架 Bip001 名全找不到=零效果死代码；GI 路线手指姿态走 clip 曲线）
         }
     }
 }

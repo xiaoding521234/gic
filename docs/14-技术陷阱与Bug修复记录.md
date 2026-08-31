@@ -477,6 +477,21 @@ Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropert
 - 事故恢复：git diff 语言表 .asset 取原值（含 YAML 折行=\n 的多行值）→ 脚本直改恢复 → 重导出 CSV。
 - 已把完整绕行流程与三坑（AddKey(key,id) NRE / 同 key 重复条目 / 半执行状态）记入 gic-localization skill。
 
+## 19. 聊天流式回调三方互踩与 AbortActive 假静默（"反应文本从此全灭+对话气泡闪假错"，2026-08-31）
+
+### 现象
+①AI 抽卡反应只有动作没有 LLM 话语（fallback 模板兜底掩盖了症状）；②用户发消息瞬间偶尔气泡闪一条"哎呀…Request aborted"。两症状同根。
+
+### 根因
+PetChatClient 的流式回调是**公共 Action 字段**（onContentDelta/onError/onComplete），UI 层（对话 Send）与 PetReactionConsumer（反应生成）轮流接线：
+- **互踩**：两方都用 `=` 整体赋值——后接的一方顶掉先接一方的处理器；
+- **假静默**：`AbortActive()` 注释写"静默：不触发 onError"，实现却是设共享布尔 `_watchdogAbort=true`——新请求的 `RequestStream` 会立刻把它重置 false，被 Abort 的旧请求下一帧收尾读到 false 走 ConnectionError 分支照样触发 onError（此时回调已被新请求方重接=对话气泡闪假错）；而真正依赖"被中止请求不再回调"来复位反应侧 `_generating` 标志的路径彻底失效 → **_generating 永久卡 true，此后反应文本生成全灭**。
+
+### 修复与规范
+- **AbortActive 真静默**：按请求引用标记（`_silentlyAborted = _activeRequest`），finishRequest 里 `req == _silentlyAborted` 的收尾不触发任何回调——"要报错的看门狗路径"与"要静默的主动中止路径"彻底分流。
+- **回调接线三铁律**：①任何一方只 `-= 自己持引用的处理器` 后 `+=` 新的，**禁止 `=` 整体赋值/置 null**（会顶掉同链上他方处理器）；②"靠回调复位状态"的组件必须有**兜底复位通道**（本例=UI Send 发起对话前广播 `chatStreamTakingOver` 事件，反应侧收到即复位 _generating+摘自己的处理器）；③新消费者挂载前要摘链上可能存在的上一方处理器（防增量双重消费=双重打字）。
+- 次要修复同批：pet_react.jsonl 续号解析的 `break` 写在 try/catch 之外——注释宣称"坏行继续往前找"实际不执行，坏尾行时 `_seq` 归 0、重启后新事件被消费基线当旧事件跳过。**教训：声明式注释（"继续找"）必须与命令式代码（break 位置）对得上，改控制流时连注释一起核对。**
+
 
 
 

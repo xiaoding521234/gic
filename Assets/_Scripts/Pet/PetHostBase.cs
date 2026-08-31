@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.Serialization;
 
 namespace GIC.Pet
@@ -59,25 +60,26 @@ namespace GIC.Pet
         [Tooltip("每格滚轮的缩放步进（乘法），越小越精细")] [SerializeField] protected float scaleStep = 1.05f;
 
         [Tooltip("派蒙模型根（游戏内 prefab 接线；桌面场景未接线=运行时找场景内 Paimon）")]
-        [SerializeField] protected Transform paimon根;
+        [InspectorName("派蒙模型根")]
+        [SerializeField] protected Transform paimonRoot;
 
         // ---- 共用运行时状态 ----
         protected SkinnedMeshRenderer bodyRenderer;
         protected MeshCollider hitMeshCollider;
         protected Mesh bakedMesh;
-        protected Transform _骨盆;            // 拖拽物理锚点骨（本体骨架，排除影子壳）
-        protected Transform[] _四肢骨;        // 四肢摆动驱动骨（与 PetDragPhysicsController 索引约定一致）
-        protected Quaternion _拖拽基准旋转 = Quaternion.identity; // 拖拽物理期根旋转基准（收尾中被再抓不重取，防旋转叠加）
-        protected Vector3 _拖拽基准根位置;    // 桌面版收口精确还原根位置用（桌面模型位置本不被拖拽改，窗口在动）
-        protected float _当前横躺角;          // 平滑中的拎起姿势基准角（度）
+        protected Transform _pelvis;            // 拖拽物理锚点骨（本体骨架，排除影子壳）
+        protected Transform[] _limbBones;        // 四肢摆动驱动骨（与 PetDragPhysicsController 索引约定一致）
+        protected Quaternion _dragBaseRotation = Quaternion.identity; // 拖拽物理期根旋转基准（收尾中被再抓不重取，防旋转叠加）
+        protected Vector3 _dragBaseRootPos;    // 桌面版收口精确还原根位置用（桌面模型位置本不被拖拽改，窗口在动）
+        protected float _currentLyingAngle;          // 平滑中的拎起姿势基准角（度）
         protected float _currentYaw;          // 平滑中的拎起转身角（度）
         protected float targetScale = 1f;        // 滚轮缩放的目标倍率（持久化存这个值）
         protected float displayScale = 1f;        // 实际应用倍率（每帧向目标指数平滑趋近）
         protected float baseScale;             // 模型根基准 localScale.x（子类按各自画布语义折算）
         protected float effectiveMaxScale = 2f;    // 钳制后的实际上限（桌面=工作区预算；游戏内=屏高占比，烘焙后重算）
         protected float reBakeAt = -10f;
-        protected bool _上帧烘焙被暂停;
-        protected bool _烘焙待补;
+        protected bool _bakePausedLastFrame;
+        protected bool _bakePending;
 
         /// <summary>日志前缀（子类按形态标注）</summary>
         protected virtual string logTag => "[PetHost]";
@@ -97,7 +99,7 @@ namespace GIC.Pet
         /// 与 SMR 同 transform，PhysX 世界包围盒正确）。勿用 SMR.bounds：GI 模型的它漏一层缩放
         /// （世界 42 单位 vs 可见 0.6，×100 错误），投影恒跨相机平面→接近判定恒 false（2026-08-26 根治）。
         /// 碰撞体未就绪时返回 false。</summary>
-        public bool TryGet命中世界包围盒(out Bounds bounds)
+        public bool TryGetHitWorldBounds(out Bounds bounds)
         {
             bounds = default;
             if (hitMeshCollider == null || hitMeshCollider.sharedMesh == null) return false;
@@ -106,16 +108,22 @@ namespace GIC.Pet
         }
 
         public abstract bool IsDragging { get; }
-        public abstract bool TryGet光标Unity屏幕位置(out Vector2 unityScreenPos);
+        public abstract bool TryGetCursorUnityScreenPos(out Vector2 unityScreenPos);
         public abstract bool IsSeated { get; }
         public abstract string SitAnim { get; }
+
+        /// <summary>边缘坐接管默认=不支持（游戏内形态：屏幕坐已在物理收口评估恒 false）；桌面 override 转发边坐控制器</summary>
+        public virtual bool TrySnapAndSit() => false;
+
+        /// <summary>边缘坐掉落中默认 false（游戏内无掉落概念）；桌面 override</summary>
+        public virtual bool IsEdgeFalling => false;
 
         // ---- 找骨/找蒙皮（排除影子壳 _DropShadow / MMD_DropShadow 下的同名骨拷贝） ----
 
         protected Transform FindBodyBone(string boneName)
         {
-            if (paimon根 == null) return null;
-            foreach (var t in paimon根.GetComponentsInChildren<Transform>(true))
+            if (paimonRoot == null) return null;
+            foreach (var t in paimonRoot.GetComponentsInChildren<Transform>(true))
             {
                 if (t.name != boneName) continue;
                 bool shadowBelow = false;
@@ -127,11 +135,12 @@ namespace GIC.Pet
             return null;
         }
 
-        /// <summary>取本体蒙皮渲染器（排除影子壳/PaimonShadow 层）——两形态同款兜底查找</summary>
-        protected SkinnedMeshRenderer FindBodyRenderer()
+        /// <summary>取本体蒙皮渲染器（排除影子壳 _DropShadow/PaimonShadow 层）——static 供行为层
+        /// 等非宿主继承链共用（旧版 protected 实例方法逼得行为层复制了一份过滤循环，2026-08-31 收拢）</summary>
+        public static SkinnedMeshRenderer FindBodyRenderer(Transform root)
         {
             var shadowLayer = LayerMask.NameToLayer("PaimonShadow");
-            foreach (var smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            foreach (var smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 if (!smr.name.Contains("_DropShadow") && smr.gameObject.layer != shadowLayer)
                     return smr;
             return null;
@@ -140,17 +149,17 @@ namespace GIC.Pet
         /// <summary>接线拖拽骨骼（骨盆+四肢）。缺失肢不摆动（告警不阻断）。</summary>
         protected void WireDragBones()
         {
-            if (paimon根 == null) return;
-            _骨盆 = FindBodyBone(pelvisBoneName);
-            _四肢骨 = new Transform[limbBoneNames != null ? limbBoneNames.Length : 0];
+            if (paimonRoot == null) return;
+            _pelvis = FindBodyBone(pelvisBoneName);
+            _limbBones = new Transform[limbBoneNames != null ? limbBoneNames.Length : 0];
             int found = 0;
-            for (int i = 0; i < _四肢骨.Length; i++)
+            for (int i = 0; i < _limbBones.Length; i++)
             {
-                _四肢骨[i] = FindBodyBone(limbBoneNames[i]);
-                if (_四肢骨[i] != null) found++;
+                _limbBones[i] = FindBodyBone(limbBoneNames[i]);
+                if (_limbBones[i] != null) found++;
             }
-            if (found < _四肢骨.Length)
-                Debug.LogWarning($"{logTag} 四肢摆动骨缺失 {_四肢骨.Length - found}/{_四肢骨.Length}（缺失肢不摆动）");
+            if (found < _limbBones.Length)
+                Debug.LogWarning($"{logTag} 四肢摆动骨缺失 {_limbBones.Length - found}/{_limbBones.Length}（缺失肢不摆动）");
         }
 
         // ---- 命中代理与一次性补烘（docs/19 §6.4：两形态像素级命中同配方） ----
@@ -178,18 +187,18 @@ namespace GIC.Pet
         /// 启动时 建命中代理 已烘一次。</summary>
         protected void RebakeHitMeshFrame()
         {
-            bool 烘焙被暂停 = PauseHitBaking || PhysicsBusy;
-            if (烘焙被暂停 && !_上帧烘焙被暂停) _烘焙待补 = true;        // 进入交互：姿势要变了
-            if (_上帧烘焙被暂停 && !烘焙被暂停)
+            bool bakePaused = PauseHitBaking || PhysicsBusy;
+            if (bakePaused && !_bakePausedLastFrame) _bakePending = true;        // 进入交互：姿势要变了
+            if (_bakePausedLastFrame && !bakePaused)
                 reBakeAt = Time.unscaledTime + Mathf.Max(0f, bakeGraceSec); // 解除：宽限后补
-            _上帧烘焙被暂停 = 烘焙被暂停;
-            if (_烘焙待补 && !烘焙被暂停 && Time.unscaledTime >= reBakeAt
+            _bakePausedLastFrame = bakePaused;
+            if (_bakePending && !bakePaused && Time.unscaledTime >= reBakeAt
                 && bodyRenderer != null && hitMeshCollider != null)
             {
                 bodyRenderer.BakeMesh(bakedMesh, true);
                 hitMeshCollider.sharedMesh = null; // 强制碰撞体刷新
                 hitMeshCollider.sharedMesh = bakedMesh;
-                _烘焙待补 = false;
+                _bakePending = false;
                 PetDiag.LastSkinRebake = Time.unscaledTime; // 顿挫诊断标记（PetFrameStats 回查）
                 OnBakeCompleted();
             }
@@ -204,9 +213,9 @@ namespace GIC.Pet
         /// include位置=桌面版附加快照根位置（收口精确还原）；游戏内版模型位置=拖拽结果不还原。</summary>
         protected void SnapshotDragBaseline(bool include位置)
         {
-            if (PhysicsBusy || paimon根 == null) return;
-            _拖拽基准旋转 = paimon根.localRotation;
-            if (include位置) _拖拽基准根位置 = paimon根.position;
+            if (PhysicsBusy || paimonRoot == null) return;
+            _dragBaseRotation = paimonRoot.localRotation;
+            if (include位置) _dragBaseRootPos = paimonRoot.position;
         }
 
         /// <summary>拎起姿势角平滑+根旋转应用（桌面版 应用物理帧 的旋转部分与游戏内版同一段，2026-08-28 合一）：
@@ -214,21 +223,21 @@ namespace GIC.Pet
         /// 旋转后补偿根平移把骨盆钉回旋转前世界位（动画微动保留，仅抵消旋转带来的位移）。</summary>
         protected void LiftPoseAngleFrame(bool isDragging)
         {
-            if (_骨盆 == null || paimon根 == null || dragPhysics == null) return;
-            float 横躺目标 = isDragging ? liftLyingAngle : 0f;
+            if (_pelvis == null || paimonRoot == null || dragPhysics == null) return;
+            float lyingTarget = isDragging ? liftLyingAngle : 0f;
             float yawTarget = isDragging ? liftYawAngle : 0f;
             float k = 1f - Mathf.Exp(-lyingBlendSpeed * Time.unscaledDeltaTime);
-            _当前横躺角 = Mathf.Lerp(_当前横躺角, 横躺目标, k);
+            _currentLyingAngle = Mathf.Lerp(_currentLyingAngle, lyingTarget, k);
             _currentYaw = Mathf.Lerp(_currentYaw, yawTarget, k);
 
             float struggleSwing_ = dragPhysics.CurrentStruggleSwing;
             float struggleTwist_ = dragPhysics.CurrentStruggleTwist;
-            Vector3 pelvisBeforeRotation = _骨盆.position;
-            paimon根.localRotation = Quaternion.AngleAxis(_当前横躺角 + struggleSwing_, Vector3.forward)
+            Vector3 pelvisBeforeRotation = _pelvis.position;
+            paimonRoot.localRotation = Quaternion.AngleAxis(_currentLyingAngle + struggleSwing_, Vector3.forward)
                                    * Quaternion.AngleAxis(_currentYaw + struggleTwist_, Vector3.up)
-                                   * _拖拽基准旋转;
-            Vector3 位移 = pelvisBeforeRotation - _骨盆.position;
-            if (位移.sqrMagnitude > 1e-10f) paimon根.position += 位移;
+                                   * _dragBaseRotation;
+            Vector3 offset = pelvisBeforeRotation - _pelvis.position;
+            if (offset.sqrMagnitude > 1e-10f) paimonRoot.position += offset;
         }
 
         /// <summary>四肢摆动叠加（Animation 每帧重写骨骼姿势后在其上叠加一次，不累积）：
@@ -238,10 +247,10 @@ namespace GIC.Pet
         /// 由子类 LateUpdate 调用。</summary>
         protected void LimbSwingApplyFrame()
         {
-            if (dragPhysics == null || !dragPhysics.IsActive || _四肢骨 == null) return;
-            for (int i = 0; i < _四肢骨.Length; i++)
+            if (dragPhysics == null || !dragPhysics.IsActive || _limbBones == null) return;
+            for (int i = 0; i < _limbBones.Length; i++)
             {
-                var bone = _四肢骨[i];
+                var bone = _limbBones[i];
                 if (bone == null) continue;
                 dragPhysics.GetLimbSwing(i, out float swingOut);
                 if (swingOut != 0f)
@@ -253,14 +262,14 @@ namespace GIC.Pet
         /// 枢轴补偿把旋转归回基准）；桌面版 override=旋转+位置精确还原基准（桌面模型位置本不动，窗口在动）。</summary>
         protected virtual void DragSettleRestore()
         {
-            if (paimon根 != null && _骨盆 != null)
+            if (paimonRoot != null && _pelvis != null)
             {
-                Vector3 pelvisBeforeRotation = _骨盆.position;
-                paimon根.localRotation = _拖拽基准旋转;
-                Vector3 位移 = pelvisBeforeRotation - _骨盆.position;
-                if (位移.sqrMagnitude > 1e-10f) paimon根.position += 位移;
+                Vector3 pelvisBeforeRotation = _pelvis.position;
+                paimonRoot.localRotation = _dragBaseRotation;
+                Vector3 offset = pelvisBeforeRotation - _pelvis.position;
+                if (offset.sqrMagnitude > 1e-10f) paimonRoot.position += offset;
             }
-            _当前横躺角 = 0f;
+            _currentLyingAngle = 0f;
             _currentYaw = 0f;
         }
 
@@ -271,8 +280,8 @@ namespace GIC.Pet
         protected void ScaleSmoothFrame()
         {
             if (Mathf.Approximately(displayScale, targetScale)) return;
-            float 步进 = scaleSmoothSpeed <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * scaleSmoothSpeed);
-            displayScale += (targetScale - displayScale) * 步进;
+            float t = scaleSmoothSpeed <= 0f ? 1f : 1f - Mathf.Exp(-Time.unscaledDeltaTime * scaleSmoothSpeed);
+            displayScale += (targetScale - displayScale) * t;
             if (Mathf.Abs(targetScale - displayScale) < 0.0005f) displayScale = targetScale;
             ApplyModelScale();
         }
@@ -280,9 +289,109 @@ namespace GIC.Pet
         /// <summary>把显示缩放叠乘基准缩放应用到 Paimon 根 localScale</summary>
         protected void ApplyModelScale()
         {
-            if (paimon根 == null) return;
+            if (paimonRoot == null) return;
             float s = baseScale * displayScale;
-            paimon根.localScale = new Vector3(s, s, s);
+            paimonRoot.localScale = new Vector3(s, s, s);
+        }
+
+        // ---- 对话装配（2026-08-31 批 5 下沉：两宿主 WireChat/WireReactionChannel 整段重复收拢） ----
+
+        protected PetBehaviorController behaviorCtrl;                       // 行为层（聊天动作回调/反应通道用；两宿主各自在 Start/Awake 缓存）
+        protected Chat.PetChatUIController _chatUI;                         // 聊天 UI 组件（未挂/接线失败=null）
+
+        /// <summary>对话装配共用主体：查组件 → 建画布（宿主差异）→ WireHost → 锚点/工具注册 → 反应通道。
+        /// Canvas 由宿主直传不挪物体（2026-08-29 修单击 NRE：组件挂 prefab 根时 SetParent 挪根=循环父子被拒）。
+        /// 聊天是可选功能：任一环节失败只禁用聊天组件，绝不上抛（Awake/Start 异常会禁用整个宿主组件
+        /// → Update 全停=点不了拖不动，2026-08-29 事故防泄漏结构——全 try-catch）。</summary>
+        protected void WireChat()
+        {
+            _chatUI = GetComponentInChildren<Chat.PetChatUIController>(true);
+            if (_chatUI == null) return; // 场景/prefab 未挂（旧场景/裁剪安装）=对话功能缺席，其余交互不受影响
+            try
+            {
+                var canvas = EnsureChatCanvas();
+                if (canvas == null) return; // 无画布（异常态）不接
+                _chatUI.WireHost(canvas);
+                _chatUI.headAnchorProvider = ChatHeadAnchor;
+                _chatUI.footAnchorProvider = ChatFootAnchor;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"{logTag} 聊天 UI 构建失败，已禁用（交互不受影响）：{e.Message}");
+                _chatUI.enabled = false;
+                _chatUI = null;
+                return;
+            }
+            RegisterChatTools();
+            WireReactionChannel();
+            Debug.Log($"{logTag} 对话已接线（单击派蒙开输入条）");
+        }
+
+        /// <summary>聊天画布（宿主差异）：桌面=运行时建 Overlay 画布（含 EventSystem 补建）；游戏内=既有画中画画布</summary>
+        protected abstract Canvas EnsureChatCanvas();
+        /// <summary>头锚点（宿主差异：投影链路——桌面无 RT 直通，游戏内 RT→屏幕换算）</summary>
+        protected abstract Vector2 ChatHeadAnchor();
+        /// <summary>脚锚点（输入条挂模型脚底下方用，宿主差异同上）</summary>
+        protected abstract Vector2 ChatFootAnchor();
+        /// <summary>Intent 工具执行分发（宿主差异）：桌面=PetIntentIpc 文件通道转发主进程；游戏内=主进程内直调。
+        /// 本地工具（memory_update/do_action）由会话层拦截不经此分发（模型在宠物进程，转发主进程是错的）</summary>
+        protected abstract string ExecuteChatTool(string toolName, string toolArgsJson);
+
+        /// <summary>Intent 工具表注册（两形态同表：记忆/情绪动作/游戏时间×2/界面导航/自动抽卡）。
+        /// 注册失败只少工具不影响聊天（防泄漏结构同上）。</summary>
+        void RegisterChatTools()
+        {
+            try
+            {
+                var session = _chatUI != null ? _chatUI.sessionRef : null;
+                if (session == null) return;
+                var tools = new System.Collections.Generic.List<Chat.PetChatClient.ToolDefinition>
+                {
+                    Chat.PaimonChatSession.MemoryToolDefinition(),
+                    Chat.PaimonChatSession.DoActionTool(), // 情绪动作（LLM 对话自主选，会话层本地拦截不经 IPC）
+                    Chat.PetChatIntent.SetGameTimeTool(),
+                    Chat.PetChatIntent.GetGameTimeTool(),
+                    Chat.PetChatIntent.OpenScreenTool(),
+                    Chat.PetChatIntent.AutoWishTool(),
+                };
+                session.RegisterTools(tools, (toolName, toolArgs) => ExecuteChatTool(toolName, toolArgs));
+                // do_action 动作回调（会话层本地消化后回调）：行为层播单次动作
+                //（拖拽物理中/退场中 PlayReaction 内部静默跳过——反应错失可接受）
+                session.onPlayAction = anim => behaviorCtrl?.PlayReaction(anim);
+                Debug.Log($"{logTag} 对话指令工具已注册（游戏时间/界面/自动抽卡/情绪动作）");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"{logTag} 对话指令工具注册失败（聊天基础功能不受影响）：{e.Message}");
+            }
+        }
+
+        /// <summary>反应通道消费接线：主进程写入的反应事件（文本+动作+LLM 注记）→ 行为层播动作 +
+        /// 气泡直出 + 会话历史注记。独立 try-catch 防泄漏（同上结构）。</summary>
+        void WireReactionChannel()
+        {
+            try
+            {
+                var consumer = GetComponent<Chat.PetReactionConsumer>();
+                if (consumer == null) consumer = gameObject.AddComponent<Chat.PetReactionConsumer>();
+                consumer.Wire(behaviorCtrl, _chatUI);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"{logTag} 反应通道接线失败（其余功能不受影响）：{e.Message}");
+            }
+        }
+
+        /// <summary>透明隔光相机统一配置（两形态同款：SolidColor 透明底 + 关 HDR/MSAA/后处理——
+        /// DWM 逐像素 alpha 与 RT 光隔离的共同前提；后处理破坏 alpha 通道）</summary>
+        protected static void ConfigureTransparentCamera(Camera target, Color background)
+        {
+            target.clearFlags = CameraClearFlags.SolidColor;
+            target.backgroundColor = background;
+            target.allowHDR = false;
+            target.allowMSAA = false;
+            var urp = target.GetUniversalAdditionalCameraData();
+            if (urp != null) urp.renderPostProcessing = false;
         }
     }
 }

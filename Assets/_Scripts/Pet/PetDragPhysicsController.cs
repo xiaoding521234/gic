@@ -169,11 +169,11 @@ namespace GIC.Pet
             // 四肢弹簧目标：水平滞后（迎风倾斜）+ 竖直外展（下落张开/上提收拢）。
             // 滞后符号=目检标定（2026-08-26 两轮）：应用层为真世界 Z 轴旋转，负角实测四肢向屏幕
             // 右甩（旧 -vx 版"往右拖四肢全往右摆"被否决）——取 +vx 使往右拖时四肢向左甩（惯性滞后）。
-            float 外展 = Mathf.Clamp(smoothVel.y * abductGain, -abductMax * AdductionRatio, abductMax);
+            float abduct = Mathf.Clamp(smoothVel.y * abductGain, -abductMax * AdductionRatio, abductMax);
             for (int i = 0; i < 4; i++)
             {
-                float 滞后 = smoothVel.x * swingGain;
-                float target = Mathf.Clamp(limbGainScale[i] * (滞后 + abductDir[i] * 外展), -swingMax, swingMax);
+                float lag = smoothVel.x * swingGain;
+                float target = Mathf.Clamp(limbGainScale[i] * (lag + abductDir[i] * abduct), -swingMax, swingMax);
                 StepSpring(i, dt, target);
             }
             StepStruggle(dt, true); // 全身轻微挣扎（包络渐入）

@@ -10,45 +10,22 @@ using UnityEngine.Serialization;
 namespace GIC.Pet
 {
     /// <summary>
-    /// 桌宠窗口控制器：Win32 无边框 + 透明 + 置顶 + 固定小窗画布 +
-    /// 鼠标轮询命中检测动态切换 WS_EX_TRANSPARENT 输入穿透 + 抓住模型物理拖拽（刚体跟随+四肢摆动，2026-08-26）+ 限帧。
-    /// 透明双方案（2026-08-21 拍板主流优先）：默认 DWM 逐像素 alpha（DwmExtendFrameIntoClientArea，
-    /// 边缘无毛边、支持半透明）；色键 LWA_COLORKEY 保留作兜底开关。
-    /// 命中检测/拖拽全部走 Win32 轮询（GetCursorPos/GetAsyncKeyState），不依赖窗口焦点与 Unity 输入系统。
-    /// 固定画布体制（2026-08-26 夜三次重构，VPet/eSheep 源码逐行核验终案）：窗口恒=基准×DPI×缩放上限
-    /// 固定尺寸；**相机/模型根/窗口在一切动画期间完全静止**——待机/单次/仪式动作只在固定相机画布内演
-    /// （VPet 画布余量哲学），窗口位置绝不作为"播动画的副作用"改变。
-    /// 源码实证（2026-08-26 拉 GitHub main）：VPet PNGAnimation img.Width=500——全部动画渲染进固定
-    /// 500px 逻辑画布；Main.xaml.cs MoveTimer_Elapsed 仅 GraphType.Move（走路图）按显式速度向量
-    /// MoveTimerPoint 移窗，其余动画一律 MoveTimer.Stop() 窗口静止；画布出界只打日志"当前动画移动
-    /// 设计错误"不修正（接受裁剪）。eSheep FormPet 唯一权威状态 PositionX/Y 仅由动画 XML 显式编写的
-    /// TMovement 步进累加（待机步进=0），窗位每帧=取整(Position)。主流桌宠位置精确=结构性：位置只经
-    /// 显式移动（走路步进/拖拽/飞行）变更，绝无动画副作用。
-    /// 旧"窗口跟随动画编排位移"体制（2026-08-25~26 根绝对补偿版）两轮实证失败废弃：归零依赖"混合回
-    /// 待机恰好回到锚点捕获时的待机相位"——待机是带骨盆微动的循环，相位永不对齐；动作被拖拽打断时
-    /// 拖拽基准根=动作中途补偿值；落地反应在混合中途重锚。每次偏差成为永久残差烤进下一锚点→随机游走
-    /// 漂出窗口被截断（用户 2026-08-26 报"动作越多越漂，最终完全不可见"）+宽限期窗口跟待机微摆（"待机
-    /// 时窗口也动"）。勿恢复任何形式的"动画期移窗/移根"。
-    /// 窗口唯一移动源：①启动停靠/pet.json 恢复 ②拖拽物理绝对定位（骨盆客户区投影钉物理目标）③松手
-    /// 防丢拉回+防隐形守卫（完全出虚拟屏才干预）。曾试全屏覆盖体制：3200×2000@200%DPI 实测帧率腰斩+
-    /// 单核 93%，废弃。**拖拽移动窗口无屏边钳制（2026-08-25 拍板，为边缘交互铺路）**；松手后窗口
-    /// 完全出虚拟屏才拉回屏内（VPet CheckCurrentScreen 同款防丢）；pet.json 持久化缩放+窗口原点。
+    /// 桌宠窗口控制器（桌面形态宿主）：Win32 无边框 + 透明 + 置顶 + 固定小窗画布 +
+    /// 鼠标轮询命中动态切换 WS_EX_TRANSPARENT 输入穿透 + 拖拽物理（刚体跟随+四肢摆动）+ 帧节奏。
+    /// 共用层（找骨/命中烘焙/拎起姿势应用/缩放平滑/对话装配）在 PetHostBase。
     ///
-    /// 拖拽物理（2026-08-26 深夜定案：刚体跟随+四肢摆动，纯模拟在 PetDragPhysicsController）：
-    /// 身体=刚体 1:1 直跟光标（eSheep 直移语义；骨盆目标=抓取时骨盆位+光标位移）——无钟摆/重力/
-    /// 倾角弹簧（用户拍板"拖拽中不需要任何摆动，摆动的应当只有四肢"）。刚体平移下按住的点天然
-    /// 钉在光标下，旧钟摆的斗篷锚点随之失去意义已移除。窗口按"骨盆客户区投影钉物理目标位"定位
-    /// （根平移全程不动，仅根旋转=拎起姿势基准）。四肢摆动=4 条欠阻尼角弹簧（跟拍 secondary
-    /// motion）：光标速度→肩/大腿骨世界 Z 轴旋转（水平滞后+竖直外展），LateUpdate 叠加在 Drag01
-    /// 垂落姿势之上。松手即停：骨盆停原地，姿势与四肢摆动 ~0.5s 平滑归零。
-    /// 旧钟摆/挣扎/飞行/落地反应链路已全删。
-    ///
-    /// 拎起姿势（2026-08-26 v6 瘫软式+3/4 偏左转身）：拖拽期播专用 Drag01 垂落动画（四肢常量垂落+
-    /// 躯干保留待机微动），根姿势基准=拎起转身角（默认 45° 3/4 偏左：用户新参考图，身体略朝左而非全侧挂；
-    /// Drag01 的 C 型前屈朝模型前方，转身后即朝屏幕左前方）×拎起横躺角（默认 0 直立），摆动感由
-    /// 四肢跟拍弹簧单独承担。沿革：v1 程序化四肢垂落叠加层（PetDanglePoseController，已弃用留库）→ v2 Sleep01
-    /// 躺姿+横躺 90°（仓鼠式）→ v3 专用垂落动画 → v4 瘫软低头+90° 侧挂 → v5 全侧挂深化（KO 式头折向地面，
-    /// 已废）→ v6 瘫软 45° 头朝观众+3/4 偏左。
+    /// 【铁律——勿破坏，完整决策依据与演化史见 docs/19 §3.1/§6.1】
+    /// ① 固定画布体制（VPet/eSheep 源码核验终案）：窗口恒=基准×DPI×缩放上限固定尺寸；
+    ///    **相机/模型根/窗口在一切动画期间完全静止**——窗口位置绝不作为"播动画的副作用"改变。
+    ///    旧"窗口跟随动画编排位移"体制两轮实证失败（随机游走漂移）：勿恢复任何形式的"动画期移窗/移根"。
+    /// ② 窗口唯一移动源：启动停靠/pet.json 恢复 → 拖拽物理绝对定位（骨盆客户区投影钉物理目标）→
+    ///    松手防丢拉回+防隐形守卫（完全出虚拟屏才干预）。拖拽移动无屏边钳制（拍板，为边缘交互铺路）。
+    /// ③ 透明=默认 DWM 逐像素 alpha（色键 LWA_COLORKEY 为兜底开关）；命中/拖拽全走 Win32 轮询
+    ///    （GetCursorPos/GetAsyncKeyState），不依赖窗口焦点与 Unity 输入系统。
+    /// ④ 拖拽终案（2026-08-26 用户拍板）：身体刚体 1:1 直跟光标（无钟摆/重力/倾角），
+    ///    摆动只由四肢跟拍弹簧承担（纯模拟在 PetDragPhysicsController）；松手即停 ~0.5s 归零。
+    /// ⑤ 帧节奏=dwmFrameAlign（DwmFlush 钉桌面合成网格）——分层窗口 present 不阻塞、vSyncCount
+    ///    实际无效，这是唯一有效节拍器（勿改回任何 vsync-only 方案）。
     /// </summary>
     public class PetWindowController : PetHostBase
     {
@@ -67,11 +44,12 @@ namespace GIC.Pet
         [Header("性能")]
         [InspectorName("目标帧率")]
         [SerializeField] private int targetFramerate = 30;
-        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧 / 2=隔一个刷新一帧 / 3=自适应（默认：刷新率≥120Hz→2 否则→1，任何屏都≥60fps 且帧预算有余量；60Hz 屏固定 2 会变 30fps 勿用）。DWM帧对齐开启时本项被忽略")]
+        [Tooltip("垂直同步：0=关（仅用目标帧率限帧）/ 1=每个刷新一帧 / 2=隔一个刷新一帧 / 3=自适应（默认：刷新率≥120Hz→2 否则→1，任何屏都≥60fps 且帧预算有余量；60Hz 屏固定 2 会变 30fps 勿用）。dwmFrameAlign开启时本项被忽略")]
         [InspectorName("垂直同步")]
         [SerializeField] private int vSyncCount = 3;
         [Tooltip("DWM 帧对齐（2026-08-27 根治匀速动画 judder）：每帧 DwmFlush 把主循环钉到桌面合成网格（刷新率的整数倍间隔）——等效硬件 vsync 的帧节拍整律器。分层窗口 present 不阻塞（blt 模型），vSyncCount 实际无效（Player.log 实证 min=6.05/max=13.3 混杂节拍、有效帧率 82-165 波动=匀速动画全程 judder，头部因指数阻尼免疫）——本开关是唯一有效杠杆。开=强制 vsync=0+不限帧，DwmFlush 吸收渲染方差：165Hz 屏 → 恒 12.1ms 节拍 82.5fps")]
-        [SerializeField] private bool DWM帧对齐 = true;
+        [InspectorName("DWM帧对齐")]
+        [SerializeField] private bool dwmFrameAlign = true;
 
         [Header("缩放（共用缩放参数在 PetHostBase）")]
         [InspectorName("允许滚轮缩放")]
@@ -94,24 +72,13 @@ namespace GIC.Pet
         public override bool IsDragging => dragging || PhysicsBusy;
 
         // ---- IPetHost 宿主实现（其余共用成员在 PetHostBase，2026-08-28 共用化重构） ----
-        public override bool TryGet光标Unity屏幕位置(out Vector2 pos) => TryGetCursorUnityScreenPos(out pos);
+        // 原为独立方法+转发包装，2026-08-31 随接口成员英文化合并：实现直接作为 override
 
-        public override bool IsSeated
-        {
-            get
-            {
-                var es = FindObjectOfType<PetEdgeSitController>();
-                return es != null && es.IsSeated;
-            }
-        }
-        public override string SitAnim
-        {
-            get
-            {
-                var es = FindObjectOfType<PetEdgeSitController>();
-                return es != null ? es.SitAnim : null;
-            }
-        }
+        private PetEdgeSitController _edgeSitCtrl; // Start 缓存（场景预挂不动态增删；IsSeated/SitAnim 被行为层每帧轮询——每帧 FindObjectOfType 是全场景扫描，2026-08-31 批 6 修复）
+        public override bool IsSeated => _edgeSitCtrl != null && _edgeSitCtrl.IsSeated;
+        public override string SitAnim => _edgeSitCtrl != null ? _edgeSitCtrl.SitAnim : null;
+        public override bool TrySnapAndSit() => _edgeSitCtrl != null && _edgeSitCtrl.EvaluateSnapAndSit();
+        public override bool IsEdgeFalling => _edgeSitCtrl != null && _edgeSitCtrl.IsFalling;
 
         protected override string logTag => "[PetWindow]";
 
@@ -123,7 +90,7 @@ namespace GIC.Pet
         public IntPtr WindowHandle => hwnd;
 
         /// <summary>当前窗口 DPI 缩放（GetDpiForWindow/96）——外部子系统把逻辑像素阈值换算物理像素用</summary>
-        public float Dpi缩放 => dpi缩放 > 0.01f ? dpi缩放 : 1f;
+        public float Dpi缩放 => dpiScale > 0.01f ? dpiScale : 1f;
 
         /// <summary>滚轮缩放目标倍率——边坐层监听缩放变化（坐姿下缩放=切站立重坐）用</summary>
         public float TargetScaleValue => targetScale;
@@ -133,15 +100,15 @@ namespace GIC.Pet
 
         /// <summary>取接触点屏幕坐标（骨盆=屁股投影，物理像素，y 向下）——边坐判定/贴合基准。
         /// 2026-08-27 目检纠正：坐姿接触线是屁股不是脚，脚线判定会把整条腿沉入窗下。</summary>
-        public bool TryGet接触点屏幕位置(out Vector2 contactScreen)
+        public bool TryGetContactScreenPos(out Vector2 contactScreen)
         {
             contactScreen = default;
             if (hwnd == IntPtr.Zero || cam == null) return false;
             // 2026-08-27 目检纠正：判定/贴合基准=骨盆（屁股）不是脚（包围盒底）——坐姿时骨盆落在
             // 横框上、腿垂窗前才是"坐"；脚线判定会把整条腿沉入窗下。骨盆缺失时保底包围盒底中心。
             Vector3 baseWorld;
-            if (_骨盆 != null) baseWorld = _骨盆.position;
-            else if (TryGet命中世界包围盒(out Bounds b)) baseWorld = new Vector3(b.center.x, b.min.y, b.center.z);
+            if (_pelvis != null) baseWorld = _pelvis.position;
+            else if (TryGetHitWorldBounds(out Bounds b)) baseWorld = new Vector3(b.center.x, b.min.y, b.center.z);
             else return false;
             if (!WorldToClientPixel(baseWorld, out Vector2 baseClient)) return false;
             var origin = GetClientOriginScreen();
@@ -153,8 +120,8 @@ namespace GIC.Pet
         /// 边坐吸附/跟随/掉落共用；不改变窗口尺寸，动画期间模型照常在画布内演。</summary>
         public void SetContactScreenPos(float screenX, float screenY)
         {
-            if (hwnd == IntPtr.Zero || cam == null || _骨盆 == null) return;
-            if (!WorldToClientPixel(_骨盆.position, out Vector2 baseClient)) return;
+            if (hwnd == IntPtr.Zero || cam == null || _pelvis == null) return;
+            if (!WorldToClientPixel(_pelvis.position, out Vector2 baseClient)) return;
             GetFrameSize(out _, out _, out int frameLeft, out int frameTop);
             SetWindowPos(hwnd, IntPtr.Zero,
                 Mathf.RoundToInt(screenX - baseClient.x) - frameLeft,
@@ -169,20 +136,19 @@ namespace GIC.Pet
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
         private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
-        private PetBehaviorController behaviorCtrl; // 双击退出的退场动画协作（播 Disappear 后再关进程）
+        // behaviorCtrl 已上移 PetHostBase（protected；Start 里 FindObjectOfType 赋值不变）
 
-        // ---- 对话（2026-08-29 桌面版补齐，复用游戏内形态三组件 docs/19 §6.5）----
-        private GIC.Pet.Chat.PetChatUIController _聊天UI;
-        private Transform _头骨;                    // 气泡水平锚（同游戏内：包围盒顶+头骨水平位）
-        private float _单击待开对话时刻 = -1f;      // 单击→过 0.4s 双击窗口才开对话（不与双击退出互抢）
+        // ---- 对话（2026-08-29 桌面版补齐，复用游戏内形态三组件 docs/19 §6.5；_chatUI/behaviorCtrl 在 PetHostBase）----
+        private Transform _headBone;                    // 气泡水平锚（同游戏内：包围盒顶+头骨水平位）
+        private float _pendingChatOpenAt = -1f;      // 单击→过 0.4s 双击窗口才开对话（不与双击退出互抢）
         private bool _pressPending;                 // 命中模型按下但未升级为拖拽（单击判定窗口内，2026-08-29 移植游戏内单击阈值）
-        private float _单击按下时刻 = -10f;
-        private POINT _单击按下pt;
+        private float _pressDownAt = -10f;
+        private POINT _pressDownPt;
 
         private bool exitRequested;              // 退场动画进行中：屏蔽重复双击与新拖拽
         private int baseWinW, baseWinH; // 基准客户区物理像素（=逻辑尺寸×dpi/96）
         private int fixedWinW, fixedWinH; // 实际窗口客户区物理像素（=基准×有效缩放上限，运行期恒定不随缩放变化）
-        private float dpi缩放 = 1f;        // GetDpiForWindow/96（exe 清单 PerMonitorV2：客户区物理像素=渲染像素）
+        private float dpiScale = 1f;        // GetDpiForWindow/96（exe 清单 PerMonitorV2：客户区物理像素=渲染像素）
 
         // 统一存档（2026-08-27 用户拍板"统一 pet.json"）：桌面/游戏内形态状态共存 PetPrefs.Pet存档
         // （v2），本控制器只读写桌面字段；旧 v1 字段由 PetPrefs 读取时迁移。锚点字段（v2 全屏体制
@@ -194,9 +160,9 @@ namespace GIC.Pet
         private IntPtr _mouseHook = IntPtr.Zero;
         private HookProc _mouseHookProc; // 防 GC 回收委托
         private float _hookKeepUntil = -10f; // 滞回：离开模型 0.5s 后才摘钩
-        private float _上次窗口体检 = -10f;  // 防隐形守卫低频节流（0.5s 一次）
-        private float _上次置顶检查 = -10f;  // 置顶守卫低频节流（0.5s 一次）
-        private readonly System.Text.StringBuilder _类名缓存 = new System.Text.StringBuilder(64); // GetClassName 复用（置顶守卫）
+        private float _lastHealthCheckAt = -10f;  // 防隐形守卫低频节流（0.5s 一次）
+        private float _lastTopmostCheckAt = -10f;  // 置顶守卫低频节流（0.5s 一次）
+        private readonly System.Text.StringBuilder _classNameBuf = new System.Text.StringBuilder(64); // GetClassName 复用（置顶守卫）
         private static int _pendingWheelDelta; // 钩子线程累加写入，Update 主线程取走清零（120=一格）
 
         // Win32 互操作（DllImport/结构体/常量）集中在 PetWin32 —— 见文件头 using static
@@ -208,7 +174,7 @@ namespace GIC.Pet
 #if UNITY_EDITOR
             // 编辑器预览不碰 QualitySettings（运行时改 vSyncCount 退出 Play 不回滚，会污染编辑器）
             _ = vSyncCount; // 字段仅供构建版使用，读一次消 CS0414
-            _ = DWM帧对齐; // 同上（DwmFlush/DWM 分支均 #if !UNITY_EDITOR）
+            _ = dwmFrameAlign; // 同上（DwmFlush/DWM 分支均 #if !UNITY_EDITOR）
             Application.targetFrameRate = targetFramerate;
 #else
             // 帧节奏演化史（2026-08-26 终案=自适应分频，Player.log 实证）：
@@ -221,18 +187,18 @@ namespace GIC.Pet
             // 预算 16.7ms 余量 178%，75Hz→75）。任何屏都≥60fps 且帧预算远超渲染 6ms=节奏恒定无 judder。
             // 官方文档：vsync=硬件同步（平滑帧节拍），targetFrameRate=软件限帧有 microstutter——勿用
             // vsync=0+限帧替代。仅宠物进程执行，不影响主游戏画质。
-            // v4=DWM帧对齐（2026-08-27）：vsync 上述"整律"假设在分层窗口上破产——blt 模型 present
+            // v4=dwmFrameAlign（2026-08-27）：vsync 上述"整律"假设在分层窗口上破产——blt 模型 present
             // 不阻塞（canvas 矩阵实证 min=6.05ms），自适应 vsync 实为无效设置，节拍仍 6-13ms 混杂
             // （~130fps 自由跑）→ 匀速动画全程 judder（"任何单动作期间都不丝滑"用户目检实证）。
             // DwmFlush 每帧阻塞到下一次桌面合成=把主循环钉到刷新率网格，渲染方差被等待吸收：
             // 165Hz 屏恒 12.1ms 节拍（82.5fps，与 vsync=2 理论值相同但真实生效）。
             int refresh = (int)Screen.currentResolution.refreshRateRatio.value;
             if (refresh <= 0) refresh = 60; // 取不到时保守按 60Hz 走 vsync=1
-            if (DWM帧对齐)
+            if (dwmFrameAlign)
             {
                 QualitySettings.vSyncCount = 0;
                 Application.targetFrameRate = -1; // 不限帧：节拍由 DwmFlush 决定（LateUpdate 每帧调用）
-                Debug.Log($"[PetWindow] 帧节奏：DWM帧对齐 开（refresh={refresh}Hz，DwmFlush 钉合成网格）");
+                Debug.Log($"[PetWindow] 帧节奏：dwmFrameAlign 开（refresh={refresh}Hz，DwmFlush 钉合成网格）");
             }
             else
             {
@@ -253,43 +219,30 @@ namespace GIC.Pet
         {
             cam = Camera.main;
             behaviorCtrl = FindObjectOfType<PetBehaviorController>();
+            _edgeSitCtrl = FindObjectOfType<PetEdgeSitController>();
             if (dragPhysics == null) dragPhysics = FindObjectOfType<PetDragPhysicsController>();
             if (dragPhysics == null) Debug.LogError("[PetWindow] 未找到 PetDragPhysicsController（拖拽物理）——物理拖拽不可用，检查 PaimonPet 场景接线");
             if (cam != null)
             {
-                // 透明要求相机输出恒定背景；关 HDR 防浮点缓冲漂移
-                cam.clearFlags = CameraClearFlags.SolidColor;
-                cam.allowHDR = false;
-                if (useDwmTransparent)
-                {
-                    // DWM：alpha=0 全透明背景（HUD 之外的像素透出桌面）；MSAA/后处理会破坏 alpha 通道，须关
-                    cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
-                    cam.allowMSAA = false;
-                    var urpData = cam.GetUniversalAdditionalCameraData();
-                    if (urpData != null) urpData.renderPostProcessing = false;
-                }
-                else
-                {
-                    // 色键兜底：背景与抠色完全一致
-                    cam.backgroundColor = colorKey;
-                }
+                // 透明要求相机输出恒定背景；关 HDR/MSAA/后处理（破坏 alpha 通道；色键兜底模式同理无害）
+                ConfigureTransparentCamera(cam, useDwmTransparent ? new Color(0f, 0f, 0f, 0f) : colorKey);
             }
             // 命中链路：Paimon 下的蒙皮渲染器 + 同 transform 的 MeshCollider 节点（动态烘焙，共用基类配方）
-            var paimonRoot = GameObject.Find("Paimon");
-            if (paimonRoot != null)
+            var paimonGo = GameObject.Find("Paimon");
+            if (paimonGo != null)
             {
-                paimon根 = paimonRoot.transform;
+                paimonRoot = paimonGo.transform;
                 WireDragBones();
-                baseScale = paimon根.localScale.x;
+                baseScale = paimonRoot.localScale.x;
                 // 缩放目标：构建版读 pet.json（持久化），无存档/编辑器用 Inspector 默认倍率。
                 // 启动即到位（无平滑动画）。
 #if !UNITY_EDITOR
                 LoadPrefs();
 #endif
-                targetScale = (loadedPrefs != null && loadedPrefs.桌面缩放 > 0f) ? loadedPrefs.桌面缩放 : initScaleFactor;
+                targetScale = (loadedPrefs != null && loadedPrefs.desktopScale > 0f) ? loadedPrefs.desktopScale : initScaleFactor;
                 displayScale = targetScale;
                 ApplyModelScale();
-                bodyRenderer = paimonRoot.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                bodyRenderer = paimonGo.GetComponentInChildren<SkinnedMeshRenderer>(true);
                 BuildHitProxy();
             }
             if (hitMeshCollider == null)
@@ -321,11 +274,11 @@ namespace GIC.Pet
 
             // 聊天接线放在窗口改造之后、且不受改造失败影响（2026-08-30 事故：句柄获取竞态 return 把
 
-            // 接聊天() 一起吞掉=聊天 UI 无 Canvas 每帧 NRE 刷屏 9.6 万条）。聊天只依赖 Unity Canvas，
+            // WireChat() 一起吞掉=聊天 UI 无 Canvas 每帧 NRE 刷屏 9.6 万条）。聊天只依赖 Unity Canvas，
 
             // 与 Win32 窗口无关——窗口改造整体失败（5s 重试超时）也只是"普通带边框窗口"，聊天照常。
 
-            接聊天();
+            WireChat();
 
         }
 
@@ -434,108 +387,53 @@ namespace GIC.Pet
 
         }
 
-        /// <summary>对话接线（2026-08-29 桌面版补齐，docs/19 §6.5）：聊天三组件挂 PetWindow 物体
-        /// （场景序列化接线素材/字体/会话），此处运行时建画布+EventSystem 并注入锚点——复刻游戏内
-        /// PetInGameHostController.接聊天 的模式。桌面差异：①无 RT——锚点=相机屏幕位直通
-        /// （Overlay 画布 ConstantPixelSize=客户像素系，与 WorldToScreenPoint 同空间）；
-        /// ②场景自带 EventSystem 是 PetEditorOnly（构建版自禁用）——构建版此处补建；
-        /// ③交互走本控制器的 Win32 轮询（DragAndClickFrame 单击开对话/外点关闭）。
-        /// 聊天是可选功能：构建失败绝不能上抛（同游戏内防泄漏结构——Awake/Start 异常会禁用组件）。</summary>
-        void 接聊天()
-        {
-            _聊天UI = GetComponentInChildren<GIC.Pet.Chat.PetChatUIController>(true);
-            if (_聊天UI == null) return; // 场景未挂（旧场景/裁剪安装）=对话功能缺席，其余交互不受影响
-            try
-            {
-                var canvasGo = new GameObject("PetChatCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
-                canvasGo.transform.SetParent(transform, false); // 挂 PetWindow 下（随宿主销毁）
-                var canvas = canvasGo.GetComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay; // 恒铺客户区（固定窗口=客户像素）
-                canvas.sortingOrder = 10;
-                var scaler = canvasGo.GetComponent<CanvasScaler>();
-                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; // 屏幕像素系（锚点直通的前提）
-                // 桌宠场景的 EventSystem 是编辑器测试面板配套（PetEditorOnly 构建自禁用）——构建版补建
-                if (UnityEngine.EventSystems.EventSystem.current == null)
-                    new GameObject("PetChatEventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
-                _聊天UI.WireHost(canvas);
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[PetWindow] 聊天 UI 构建失败，已禁用（桌宠交互不受影响）：{e.Message}");
-                _聊天UI.enabled = false;
-                _聊天UI = null;
-                return;
-            }
-            // 头骨锚（水平跟头骨，同游戏内）；找本体骨过滤 MMD 兜底（日文骨名系）——GI=Bip001 系
-            _头骨 = FindBodyBone("Bip001 Head");
-            // 锚点提供器：烘焙碰撞体包围盒 → 相机屏幕位（桌面无 RT 换算，屏幕像素=画布像素直通）
-            _聊天UI.headAnchorProvider = () =>
-            {
-                if (cam == null || hitMeshCollider == null || hitMeshCollider.sharedMesh == null) return Vector2.zero;
-                var bounds = hitMeshCollider.bounds;
-                float x = _头骨 != null ? _头骨.position.x : bounds.center.x; // 水平跟头骨（歪头/侧移气泡跟脸）
-                Vector3 sp = cam.WorldToScreenPoint(new Vector3(x, bounds.max.y, bounds.center.z));
-                return new Vector2(sp.x, sp.y);
-            };
-            _聊天UI.footAnchorProvider = () =>
-            {
-                if (hitMeshCollider == null || cam == null) return Vector2.zero;
-                var bounds = hitMeshCollider.bounds;
-                Vector3 sp = cam.WorldToScreenPoint(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z));
-                return new Vector2(sp.x, sp.y);
-            };
+        // ---- 对话装配差异钩子（共用主体在 PetHostBase.WireChat，2026-08-31 批 5 下沉） ----
 
-            // Intent 工具接线（2026-08-30 桌面版补齐，docs/19 §6.5）：桌面形态是独立进程、无主进程
-            // 引用——工具经 PetIntentIpc 文件通道转发主游戏进程执行（主进程 PetIntentIpcHost 消费），
-            // 与游戏内形态的直调执行行为对齐。主游戏未运行时通道超时报错（LLM 自行解释）。
-            // open_screen 已按用户拍板移除（2026-08-30）。注册失败只少工具不影响聊天（防泄漏结构同上）。
-            try
-            {
-                var session = _聊天UI.sessionRef;
-                if (session != null)
-                {
-                    var tools = new System.Collections.Generic.List<GIC.Pet.Chat.PetChatClient.ToolDefinition>
-                    {
-                        GIC.Pet.Chat.PaimonChatSession.MemoryToolDefinition(),
-                        GIC.Pet.Chat.PaimonChatSession.DoActionTool(), // 情绪动作（LLM 对话自主选，会话层本地拦截不经 IPC，2026-08-31）
-                        GIC.Pet.Chat.PetChatIntent.SetGameTimeTool(),
-                        GIC.Pet.Chat.PetChatIntent.GetGameTimeTool(),
-                        GIC.Pet.Chat.PetChatIntent.OpenScreenTool(),
-                        GIC.Pet.Chat.PetChatIntent.AutoWishTool(),
-                    };
-                    session.RegisterTools(tools, (toolName, toolArgs) =>
-                    {
-                        return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgs);
-                    });
-                    // do_action 动作回调（会话层本地消化——模型在本进程，走 IPC 转发主进程是错的）：
-                    // 行为层播单次动作（拖拽物理中/退场中 PlayReaction 内部静默跳过——反应错失可接受）
-                    session.onPlayAction = anim => behaviorCtrl?.PlayReaction(anim);
-                    Debug.Log("[PetWindow] 对话指令工具已注册（文件通道转发主游戏进程执行，含界面/自动抽卡；情绪动作本地播放）");
-                }
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[PetWindow] 对话指令工具注册失败（聊天基础功能不受影响）：{e.Message}");
-            }
-            接反应通道();
-            Debug.Log("[PetWindow] 对话已接线（单击派蒙开输入条）");
+        /// <summary>桌面聊天画布：运行时建 Overlay 画布（客户像素系——ConstantPixelSize 与
+        /// WorldToScreenPoint 同空间，锚点直通无需 RT 换算）+ EventSystem 补建（桌宠场景自带的
+        /// 是 PetEditorOnly 构建自禁用）。交互走本控制器的 Win32 轮询（单击开对话/外点关闭）。</summary>
+        protected override Canvas EnsureChatCanvas()
+        {
+            var canvasGo = new GameObject("PetChatCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
+            canvasGo.transform.SetParent(transform, false); // 挂 PetWindow 下（随宿主销毁）
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay; // 恒铺客户区（固定窗口=客户像素）
+            canvas.sortingOrder = 10;
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; // 屏幕像素系（锚点直通的前提）
+            // 桌宠场景的 EventSystem 是编辑器测试面板配套（PetEditorOnly 构建自禁用）——构建版补建
+            if (UnityEngine.EventSystems.EventSystem.current == null)
+                new GameObject("PetChatEventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
+            // 头骨锚（水平跟头骨，同游戏内）；找本体骨过滤 MMD 兜底（日文骨名系）——GI=Bip001 系
+            _headBone = FindBodyBone("Bip001 Head");
+            return canvas;
         }
 
-        /// <summary>反应通道消费接线（2026-08-30 AI 抽卡配套）：主进程写入的反应事件
-        /// （文本+动作+LLM 注记）→ 行为层播动作 + 气泡直出 + 会话历史注记。
-        /// 独立 try-catch 防泄漏（接聊天 内可选功能结构同款）。</summary>
-        void 接反应通道()
+        /// <summary>头锚点：烘焙碰撞体包围盒顶 → 相机屏幕位（桌面无 RT 换算，屏幕像素=画布像素直通）。
+        /// 水平跟头骨（歪头/侧移气泡跟脸）；改锚包围盒顶=任意缩放恒在头顶之上（2026-08-29 教训）。</summary>
+        protected override Vector2 ChatHeadAnchor()
         {
-            try
-            {
-                var consumer = GetComponent<GIC.Pet.Chat.PetReactionConsumer>();
-                if (consumer == null) consumer = gameObject.AddComponent<GIC.Pet.Chat.PetReactionConsumer>();
-                consumer.Wire(behaviorCtrl, _聊天UI);
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[PetWindow] 反应通道接线失败（其余功能不受影响）：{e.Message}");
-            }
+            if (cam == null || hitMeshCollider == null || hitMeshCollider.sharedMesh == null) return Vector2.zero;
+            var bounds = hitMeshCollider.bounds;
+            float x = _headBone != null ? _headBone.position.x : bounds.center.x;
+            Vector3 sp = cam.WorldToScreenPoint(new Vector3(x, bounds.max.y, bounds.center.z));
+            return new Vector2(sp.x, sp.y);
+        }
+
+        /// <summary>脚锚点：包围盒底中心 → 相机屏幕位（输入条挂模型脚底下方用）</summary>
+        protected override Vector2 ChatFootAnchor()
+        {
+            if (hitMeshCollider == null || cam == null) return Vector2.zero;
+            var bounds = hitMeshCollider.bounds;
+            Vector3 sp = cam.WorldToScreenPoint(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z));
+            return new Vector2(sp.x, sp.y);
+        }
+
+        /// <summary>Intent 工具执行分发（桌面差异）：独立进程无主进程引用——经 PetIntentIpc 文件通道
+        /// 转发主游戏进程执行（主进程 PetIntentIpcHost 消费）；主游戏未运行时通道超时报错（LLM 自行解释）。</summary>
+        protected override string ExecuteChatTool(string toolName, string toolArgsJson)
+        {
+            return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgsJson);
         }
 
         /// <summary>去掉标题栏边框，透明化（DWM 或色键），置顶并停靠。</summary>
@@ -574,10 +472,10 @@ namespace GIC.Pet
 
             // DPI 换算（主流桌宠做法：任何显示器缩放下派蒙视觉物理大小一致）。
             // exe 清单 PerMonitorV2 → 客户区物理像素=渲染像素；物理尺寸 = 逻辑尺寸 × dpi/96。
-            dpi缩放 = GetDpiForWindow(hwnd) / 96f;
-            if (dpi缩放 <= 0.01f) dpi缩放 = 1f;
-            baseWinW = Mathf.RoundToInt(windowLogicW * dpi缩放);
-            baseWinH = Mathf.RoundToInt(windowLogicH * dpi缩放);
+            dpiScale = GetDpiForWindow(hwnd) / 96f;
+            if (dpiScale <= 0.01f) dpiScale = 1f;
+            baseWinW = Mathf.RoundToInt(windowLogicW * dpiScale);
+            baseWinH = Mathf.RoundToInt(windowLogicH * dpiScale);
 
             // 有效缩放上限：窗口不超过工作区 95%（防巨大化后被屏幕裁切/吞任务栏）
             SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
@@ -633,7 +531,7 @@ namespace GIC.Pet
             // 常驻钩子对全系统鼠标消息做封送分配+主线程回调，鼠标移动时灌爆主线程）
 
             restyled = true;
-            Debug.Log($"[PetWindow] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(useDwmTransparent ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpi缩放:F2} fixedClient={fixedWinW}x{fixedWinH} scale={targetScale:F2} maxScale={effectiveMaxScale:F2} pos={(restoredPos ? "restored" : "dock/default")}");
+            Debug.Log($"[PetWindow] 窗口改造完成 hwnd=0x{hwnd.ToInt64():X} mode={(useDwmTransparent ? "DWM-alpha" : $"colorKey=0x{key:X6}")} render={Screen.width}x{Screen.height} dpi={dpiScale:F2} fixedClient={fixedWinW}x{fixedWinH} scale={targetScale:F2} maxScale={effectiveMaxScale:F2} pos={(restoredPos ? "restored" : "dock/default")}");
         }
 
         /// <summary>恢复存档窗口位置（客户区原点，钳制到虚拟屏幕防显示器拔掉后找不到派蒙）。成功=true。
@@ -645,10 +543,10 @@ namespace GIC.Pet
             int clientH = fixedWinH;
 
             int nx, ny;
-            if (loadedPrefs != null && loadedPrefs.桌面有位置)
+            if (loadedPrefs != null && loadedPrefs.desktopHasPos)
             {
-                nx = loadedPrefs.桌面客户区X;
-                ny = loadedPrefs.桌面客户区Y;
+                nx = loadedPrefs.desktopClientX;
+                ny = loadedPrefs.desktopClientY;
             }
             else return false;
 
@@ -673,7 +571,7 @@ namespace GIC.Pet
             GetFrameSize(out int frameW, out int frameH, out _, out _);
             int winW = fixedWinW + frameW;
             int winH = fixedWinH + frameH;
-            int margin = Mathf.RoundToInt(dockMargin * dpi缩放);
+            int margin = Mathf.RoundToInt(dockMargin * dpiScale);
             SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
             int x = work.Right - winW - margin;
             int y = work.Bottom - winH - margin;
@@ -704,15 +602,15 @@ namespace GIC.Pet
         /// 根旋转基准仅在从静止起手时快照（收尾中被再抓不叠加）。</summary>
         private void BeginPhysicalDrag(POINT pt)
         {
-            if (dragPhysics == null || _骨盆 == null || cam == null || hwnd == IntPtr.Zero || paimon根 == null) return;
-            if (!WorldToClientPixel(_骨盆.position, out Vector2 pc)) return;
+            if (dragPhysics == null || _pelvis == null || cam == null || hwnd == IntPtr.Zero || paimonRoot == null) return;
+            if (!WorldToClientPixel(_pelvis.position, out Vector2 pc)) return;
             var origin = GetClientOriginScreen();
             Vector2 pelvisScreen = new Vector2(origin.X + pc.x, origin.Y + pc.y);
 
             SnapshotDragBaseline(true); // 根旋转+位置基准（收尾中被再抓不重取，防旋转叠加）
             dragPhysics.BeginDrag(new Vector2(pt.X, pt.Y), pelvisScreen);
             if (printStateLog)
-                Debug.Log($"[PetWindow] 物理拖拽起手 骨盆屏幕=({pelvisScreen.x:F0},{pelvisScreen.y:F0}) 四肢骨={(_四肢骨 != null ? System.Linq.Enumerable.Count(_四肢骨, b => b != null) : 0)}/{(_四肢骨 != null ? _四肢骨.Length : 0)}");
+                Debug.Log($"[PetWindow] 物理拖拽起手 骨盆屏幕=({pelvisScreen.x:F0},{pelvisScreen.y:F0}) 四肢骨={(_limbBones != null ? System.Linq.Enumerable.Count(_limbBones, b => b != null) : 0)}/{(_limbBones != null ? _limbBones.Length : 0)}");
         }
 
         /// <summary>DWM 帧对齐（2026-08-27）：阻塞到下一次桌面合成完成——主循环钉到合成网格，渲染方差
@@ -723,7 +621,7 @@ namespace GIC.Pet
         void LateUpdate()
         {
 #if !UNITY_EDITOR
-            if (DWM帧对齐 && restyled) DwmFlush();
+            if (dwmFrameAlign && restyled) DwmFlush();
 #endif
             LimbSwingApplyFrame();
         }
@@ -733,7 +631,7 @@ namespace GIC.Pet
         /// 拎起姿势旋转（含挣扎+绕骨盆枢轴补偿）已合一进 PetHostBase.拎起姿势角帧（2026-08-28 共用化）。</summary>
         private void PositionWindowByPelvis()
         {
-            if (dragPhysics == null || !WorldToClientPixel(_骨盆.position, out Vector2 pelvisClient)) return;
+            if (dragPhysics == null || !WorldToClientPixel(_pelvis.position, out Vector2 pelvisClient)) return;
             GetFrameSize(out _, out _, out int frameLeft, out int frameTop);
             Vector2 target = dragPhysics.CurrentPelvisScreen;
             SetWindowPos(hwnd, IntPtr.Zero,
@@ -746,12 +644,12 @@ namespace GIC.Pet
         /// 游戏内版基类默认=骨盆枢轴补偿归位保留拖拽位置，模型位置=拖拽结果）。</summary>
         protected override void DragSettleRestore()
         {
-            if (paimon根 != null)
+            if (paimonRoot != null)
             {
-                paimon根.localRotation = _拖拽基准旋转;
-                paimon根.position = _拖拽基准根位置;
+                paimonRoot.localRotation = _dragBaseRotation;
+                paimonRoot.position = _dragBaseRootPos;
             }
-            _当前横躺角 = 0f;
+            _currentLyingAngle = 0f;
             _currentYaw = 0f;
         }
 
@@ -878,10 +776,10 @@ namespace GIC.Pet
             {
                 var origin = GetClientOriginScreen();
                 var d = PetPrefs.Load();
-                d.桌面缩放 = targetScale;
-                d.桌面客户区X = origin.X;
-                d.桌面客户区Y = origin.Y;
-                d.桌面有位置 = true;
+                d.desktopScale = targetScale;
+                d.desktopClientX = origin.X;
+                d.desktopClientY = origin.Y;
+                d.desktopHasPos = true;
                 PetPrefs.Save();
             }
             finally
@@ -898,7 +796,7 @@ namespace GIC.Pet
         /// 构建版走 Win32 全局轮询（窗口无焦点/穿透时也能追踪）；编辑器退回 Input.mousePosition。
         /// IPetHost 接口方法（游戏内版宿主同名实现，行为层经接口分发）。
         /// </summary>
-        public bool TryGetCursorUnityScreenPos(out Vector2 unityScreenPos)
+        public override bool TryGetCursorUnityScreenPos(out Vector2 unityScreenPos)
         {
 #if UNITY_EDITOR
             unityScreenPos = Input.mousePosition;
@@ -970,9 +868,9 @@ namespace GIC.Pet
         /// 区域必须非穿透（uGUI 要吃到点击/聚焦输入框）；未开输入条时恒 false（气泡只读不挡桌面）。</summary>
         private bool ChatUiHitFrame()
         {
-            if (_聊天UI == null || !_聊天UI.IsInputVisible) return false;
-            if (!TryGet光标Unity屏幕位置(out Vector2 cursor)) return false;
-            return _聊天UI.IsPointOnInputBar(cursor) || _聊天UI.IsPointOnBubble(cursor);
+            if (_chatUI == null || !_chatUI.IsInputVisible) return false;
+            if (!TryGetCursorUnityScreenPos(out Vector2 cursor)) return false;
+            return _chatUI.IsPointOnInputBar(cursor) || _chatUI.IsPointOnBubble(cursor);
         }
 
         /// <summary>置顶守卫（2026-08-28）：点击任务栏/开始菜单等 shell 激活时，Windows 会把任务栏
@@ -985,16 +883,16 @@ namespace GIC.Pet
         /// （WPF 同款问题），它无"坐任务栏"场景故未暴露——本项目边缘坐强需求此守卫。</summary>
         private void TopmostGuardFrame()
         {
-            if (Time.unscaledTime - _上次置顶检查 < 0.5f) return;
-            _上次置顶检查 = Time.unscaledTime;
+            if (Time.unscaledTime - _lastTopmostCheckAt < 0.5f) return;
+            _lastTopmostCheckAt = Time.unscaledTime;
 
             IntPtr above = GetWindow(hwnd, GW_HWNDPREV);
             for (int i = 0; i < 8 && above != IntPtr.Zero; i++)
             {
-                _类名缓存.Clear();
-                if (GetClassName(above, _类名缓存, _类名缓存.Capacity) > 0)
+                _classNameBuf.Clear();
+                if (GetClassName(above, _classNameBuf, _classNameBuf.Capacity) > 0)
                 {
-                    string cls = _类名缓存.ToString();
+                    string cls = _classNameBuf.ToString();
                     if (cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd")
                     {
                         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -1012,10 +910,10 @@ namespace GIC.Pet
         /// （拖拽无屏边钳制是 2026-08-25 拍板）。</summary>
         private void WindowHealthCheckFrame()
         {
-            if (Time.unscaledTime - _上次窗口体检 < 0.5f) return;
-            _上次窗口体检 = Time.unscaledTime;
-            bool 用户在移动 = dragging || (dragPhysics != null && dragPhysics.IsActive);
-            if (用户在移动) return;
+            if (Time.unscaledTime - _lastHealthCheckAt < 0.5f) return;
+            _lastHealthCheckAt = Time.unscaledTime;
+            bool userMoving = dragging || (dragPhysics != null && dragPhysics.IsActive);
+            if (userMoving) return;
             if (IsIconic(hwnd))
             {
                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
@@ -1071,7 +969,7 @@ namespace GIC.Pet
             {
                 if (allowDoubleClickExit && !exitRequested && Time.unscaledTime - lastClickTime < 0.4f)
                 {
-                    _单击待开对话时刻 = -1f; // 双击退出优先：取消待开的对话
+                    _pendingChatOpenAt = -1f; // 双击退出优先：取消待开的对话
                     Debug.Log("[PetWindow] 双击退出，桌宠再见");
                     exitRequested = true;
                     // 退场动画（2026-08-24）：先播退场动画再真正退出；无动画可用则立即退出
@@ -1122,13 +1020,13 @@ namespace GIC.Pet
             // ---- 聊天输入期：点击对话元素（输入条/气泡）以外任何地方=关闭对话（2026-08-29 用户拍板，
             // 游戏内形态同款）；不起新拖拽/不推进待定按下。全局轮询看得见穿透到别处的点击——
             // 点其它应用同样收对话。物理收尾已在上方无条件推进（勿挪进门控内）。
-            if (_聊天UI != null && _聊天UI.IsInputVisible)
+            if (_chatUI != null && _chatUI.IsInputVisible)
             {
                 if (lmbPressed)
                 {
-                    bool 在对话元素上 = TryGet光标Unity屏幕位置(out Vector2 cursor)
-                        && (_聊天UI.IsPointOnInputBar(cursor) || _聊天UI.IsPointOnBubble(cursor));
-                    if (!在对话元素上) _聊天UI.CloseChat();
+                    bool onChatElement = TryGetCursorUnityScreenPos(out Vector2 cursor)
+                        && (_chatUI.IsPointOnInputBar(cursor) || _chatUI.IsPointOnBubble(cursor));
+                    if (!onChatElement) _chatUI.CloseChat();
                 }
                 _pressPending = false;
                 prevLmbDown = lmbDown;
@@ -1136,10 +1034,10 @@ namespace GIC.Pet
             }
 
             // ---- 单击待开对话：0.4s 双击窗口过后才开（窗口内来了第二次点击=退出路径已取消）
-            if (_单击待开对话时刻 > 0f && Time.unscaledTime >= _单击待开对话时刻)
+            if (_pendingChatOpenAt > 0f && Time.unscaledTime >= _pendingChatOpenAt)
             {
-                _单击待开对话时刻 = -1f;
-                if (!exitRequested) _聊天UI?.ToggleInput();
+                _pendingChatOpenAt = -1f;
+                if (!exitRequested) _chatUI?.ToggleInput();
             }
 
             // ---- 按下待定（2026-08-29 移植游戏内单击阈值）：命中模型按下不立刻起手——按住超时
@@ -1150,14 +1048,14 @@ namespace GIC.Pet
                 if (!lmbDown)
                 {
                     _pressPending = false;
-                    if (Time.unscaledTime - _单击按下时刻 <= 0.15f
-                        && Mathf.Abs(pt.X - _单击按下pt.X) + Mathf.Abs(pt.Y - _单击按下pt.Y) < 8)
+                    if (Time.unscaledTime - _pressDownAt <= 0.15f
+                        && Mathf.Abs(pt.X - _pressDownPt.X) + Mathf.Abs(pt.Y - _pressDownPt.Y) < 8)
                     {
-                        _单击待开对话时刻 = Time.unscaledTime + 0.4f;
+                        _pendingChatOpenAt = Time.unscaledTime + 0.4f;
                     }
                 }
-                else if (Time.unscaledTime - _单击按下时刻 > 0.15f
-                         || Mathf.Abs(pt.X - _单击按下pt.X) + Mathf.Abs(pt.Y - _单击按下pt.Y) >= 8)
+                else if (Time.unscaledTime - _pressDownAt > 0.15f
+                         || Mathf.Abs(pt.X - _pressDownPt.X) + Mathf.Abs(pt.Y - _pressDownPt.Y) >= 8)
                 {
                     _pressPending = false;
                     if (!exitRequested)
@@ -1170,8 +1068,8 @@ namespace GIC.Pet
             else if (!dragging && !exitRequested && modelHit && lmbPressed && dragPhysics != null)
             {
                 _pressPending = true;
-                _单击按下时刻 = Time.unscaledTime;
-                _单击按下pt = pt;
+                _pressDownAt = Time.unscaledTime;
+                _pressDownPt = pt;
             }
             prevLmbDown = lmbDown;
         }
@@ -1182,7 +1080,7 @@ namespace GIC.Pet
         private void ScrollZoomFrame(bool modelHit)
         {
             int wheelRaw = System.Threading.Interlocked.Exchange(ref _pendingWheelDelta, 0);
-            if (allowScrollZoom && modelHit && paimon根 != null && wheelRaw != 0)
+            if (allowScrollZoom && modelHit && paimonRoot != null && wheelRaw != 0)
             {
                 float scroll = wheelRaw / 120f; // 120=一格，正=向前/上=放大
                 if (Mathf.Abs(scroll) > 0.01f)

@@ -9,10 +9,10 @@ namespace GIC.Pet
     /// <summary>
     /// 派蒙对话 API Key 加密存储（2026-08-28，用户拍板"玩家自输自己的 key，存档加密存储"）：
     /// AES-128-CBC（System.Security.Cryptography，Unity/Mono/IL2CPP 全可用，零外部依赖）+
-    /// **设备指纹派生密钥**（机器名+用户名+Application.productName+固定盐 → SHA256 截 16 字节）。
+    /// **设备指纹DeriveKey**（机器名+用户名+Application.productName+固定盐 → SHA256 截 16 字节）。
     ///
     /// 威胁模型与边界（防呆不防专家）：加密目标是①存档文本编辑器打开看不到明文 key（防"顺手复制泄露"）
-    /// ②key 不出现在日志/异常栈。**防不了**本机恶意软件（同机可复现派生密钥）——本地单机存档的
+    /// ②key 不出现在日志/异常栈。**防不了**本机恶意软件（同机可复现DeriveKey）——本地单机存档的
     /// 通行边界（浏览器保存密码同级别），要更高安全性得走系统凭据库（Windows DPAPI ——
     /// System.Security.Cryptography.ProtectedData 在 IL2CPP 不可用，Mono 可用但跨平台断裂，弃）。
     ///
@@ -33,22 +33,22 @@ namespace GIC.Pet
         public const string DevKey = "REDACTED-DEVKEY-2026-09-07";
 #endif
 
-        private static byte[] _密钥缓存;
+        private static byte[] _keyCache;
 
         /// <summary>设备指纹派生 AES-128 密钥（16 字节；进程内缓存一次）</summary>
-        static byte[] 派生密钥()
+        static byte[] DeriveKey()
         {
-            if (_密钥缓存 != null) return _密钥缓存;
+            if (_keyCache != null) return _keyCache;
             // 固定盐：与代码同生命周期（改盐=全体密文失效，勿随意改）
-            const string 盐 = "GIC-Pet-APIKey-Salt-v1";
-            string fingerprint = $"{Environment.MachineName}|{Environment.UserName}|{Application.productName}|{盐}";
+            const string salt = "GIC-Pet-APIKey-Salt-v1";
+            string fingerprint = $"{Environment.MachineName}|{Environment.UserName}|{Application.productName}|{salt}";
             using (var sha = SHA256.Create())
             {
                 var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(fingerprint));
-                _密钥缓存 = new byte[16];
-                Array.Copy(hash, _密钥缓存, 16);
+                _keyCache = new byte[16];
+                Array.Copy(hash, _keyCache, 16);
             }
-            return _密钥缓存;
+            return _keyCache;
         }
 
         /// <summary>明文 → Base64(iv+ciphertext)。空串返回空串。异常返回空串（调用方按未设置处理）。</summary>
@@ -60,7 +60,7 @@ namespace GIC.Pet
                 using (var aes = Aes.Create())
                 {
                     aes.KeySize = 128;
-                    aes.Key = 派生密钥();
+                    aes.Key = DeriveKey();
                     aes.GenerateIV();
                     aes.Mode = CipherMode.CBC;
                     aes.Padding = PaddingMode.PKCS7;
@@ -93,7 +93,7 @@ namespace GIC.Pet
                 using (var aes = Aes.Create())
                 {
                     aes.KeySize = 128;
-                    aes.Key = 派生密钥();
+                    aes.Key = DeriveKey();
                     aes.Mode = CipherMode.CBC;
                     aes.Padding = PaddingMode.PKCS7;
                     var iv = new byte[16];

@@ -127,7 +127,17 @@ namespace GIC.Pet.Chat
             {
                 _history.Add(new PetChatClient.ChatMessage("user", userInput));
             }
+            TrimHistory();
             BuildMessagesAndRequest(toolDepth);
+        }
+
+        /// <summary>滑窗历史物理封顶（2026-08-31 修复"只增不裁"内存缓增）：保留最近 历史轮数*4 条
+        ///（user+assistant+工具回执轮），更旧的从 List 头部移除——与 BuildMessagesAndRequest 的
+        /// 发送滑窗取值完全一致（取的就是最后 N 条），裁掉头部不改变发送内容。</summary>
+        void TrimHistory()
+        {
+            int retain = historyRounds * 4;
+            if (_history.Count > retain) _history.RemoveRange(0, _history.Count - retain);
         }
 
         private void BuildMessagesAndRequest(int toolDepth)
@@ -267,8 +277,8 @@ namespace GIC.Pet.Chat
                 string path = System.IO.Path.Combine(Application.persistentDataPath, memoryFileName);
                 if (System.IO.File.Exists(path))
                 {
-                    var 记忆数组 = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(System.IO.File.ReadAllText(path));
-                    if (记忆数组 != null) _longTermMemory.AddRange(记忆数组);
+                    var memoryList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<string>>(System.IO.File.ReadAllText(path));
+                    if (memoryList != null) _longTermMemory.AddRange(memoryList);
                 }
             }
             catch (Exception e) { Debug.LogWarning($"[PetChat] 记忆载入失败: {e.Message}"); }
@@ -308,6 +318,7 @@ namespace GIC.Pet.Chat
         {
             if (string.IsNullOrEmpty(note)) return;
             _history.Add(new PetChatClient.ChatMessage("system", $"（事件通知，无需回应）{note}"));
+            TrimHistory(); // 后台注记也计入滑窗预算（高频事件不撑大 List）
         }
     }
 }

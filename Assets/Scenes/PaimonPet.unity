@@ -4919,7 +4919,6 @@ GameObject:
   - component: {fileID: 288543652}
   - component: {fileID: 288543651}
   - component: {fileID: 288543650}
-  - component: {fileID: 288543649}
   - component: {fileID: 288543654}
   - component: {fileID: 288543655}
   - component: {fileID: 288543656}
@@ -4953,37 +4952,6 @@ Transform:
   - {fileID: 1739030587}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &288543649
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288543646}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0a80e31994f436844b44a7dd83d99e2b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  "\u751F\u6C14\u59FF\u6001":
-    weight: 1
-    thumbRoot: 30
-    thumbMid: 45
-    thumbTip: 30
-    indexRoot: 70
-    indexMid: 80
-    indexTip: 60
-    middleRoot: 75
-    middleMid: 85
-    middleTip: 65
-    ringRoot: 80
-    ringMid: 90
-    ringTip: 70
-    pinkyRoot: 85
-    pinkyMid: 95
-    pinkyTip: 75
-  TransitionSeconds: 0.25
-  enableFinger: 1
 --- !u!114 &288543650
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5173,7 +5141,6 @@ MonoBehaviour:
   - animNameFrag: SitLoop
     emotionName: 
   emotionCtrl: {fileID: 288543651}
-  fingerPoseCtrl: {fileID: 288543649}
   animTransitionSec: 0.6
   inertializer: {fileID: 288543658}
   prewarmOnStart: 1
@@ -5220,10 +5187,10 @@ MonoBehaviour:
   mainCam: {fileID: 993468530}
   blurTemplate: {fileID: 2100000, guid: c293a4a8de5f5ed4b9f7185a19a87ec3, type: 2}
   compositeTemplate: {fileID: 2100000, guid: c2da19c292c4fd04d9a3e3f5cd8724c3, type: 2}
-  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.6}
-  "\u9634\u5F71\u504F\u79FB\u50CF\u7D20": {x: 0, y: -24}
-  "\u6A21\u7CCA\u534A\u5F84\u50CF\u7D20": 14
-  "\u9634\u5F71\u8D34\u56FE\u9AD8\u5EA6": 512
+  shadowColor: {r: 0, g: 0, b: 0, a: 0.6}
+  shadowOffsetPx: {x: 0, y: -24}
+  blurRadiusPx: 14
+  shadowTexHeight: 512
   enableShadow: 1
 --- !u!114 &288543656
 MonoBehaviour:
@@ -5242,7 +5209,6 @@ MonoBehaviour:
   blinkCtrl: {fileID: 288543650}
   lookAtCtrl: {fileID: 288543654}
   emotionCtrl: {fileID: 288543651}
-  edgeSitCtrl: {fileID: 1640153877}
   liftAnimName: Ani_NPC_Kanban_Paimon_Drag01
   mainCamera: {fileID: 0}
   bodyRenderer: {fileID: 0}
@@ -5266,7 +5232,7 @@ MonoBehaviour:
   - Ani_NPC_Kanban_Paimon_Show_2
   - Ani_NPC_Kanban_Paimon_Show_3
   - Ani_NPC_Kanban_Paimon_Show_4
-  "\u5C0F\u52A8\u4F5C\u95F4\u9694\u79D2": {x: 15, y: 20}
+  randomAnimIntervalSec: {x: 15, y: 20}
   appearAnimName: Ani_NPC_Kanban_Paimon_Appear
   exitAnimName: Ani_NPC_Kanban_Paimon_Disappear
 --- !u!114 &288543657
@@ -29356,7 +29322,7 @@ MonoBehaviour:
   initScaleFactor: 0.7
   scaleSmoothSpeed: 12
   scaleStep: 1.05
-  "paimon\u6839": {fileID: 0}
+  paimonRoot: {fileID: 0}
   useDwmTransparent: 1
   colorKey: {r: 1, g: 0, b: 1, a: 1}
   dockMargin: 24
@@ -29364,7 +29330,7 @@ MonoBehaviour:
   allowDoubleClickExit: 1
   targetFramerate: 165
   vSyncCount: 3
-  "DWM\u5E27\u5BF9\u9F50": 1
+  dwmFrameAlign: 1
   allowScrollZoom: 1
   windowLogicW: 750
   windowLogicH: 825
@@ -29493,6 +29459,9 @@ MonoBehaviour:
   typeIntervalSec: 0.02
   noKeyPrompt: "\u8FD8\u6CA1\u8BBE\u7F6E API Key \u54E6\uFF01\u53BB \u8BBE\u7F6E\u2192\u6D3E\u8499\u2192\u5BF9\u8BDD
     API Key \u91CC\u586B\u4E00\u4E2A\u5427\u3002"
+  proactiveHoldSec: 6
+  fadeSec: 0.25
+  inputFadeSec: 0.15
 --- !u!1 &1641180019
 GameObject:
   m_ObjectHideFlags: 0

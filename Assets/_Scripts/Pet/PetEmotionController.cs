@@ -58,11 +58,18 @@ namespace GIC.Pet
         private SkinnedMeshRenderer smr;
         private int currentIdx = -1;      // 当前激活情绪（-1=无）
         private Coroutine activeRoutine;
+        private readonly System.Collections.Generic.HashSet<string> _warnedMorphs = new System.Collections.Generic.HashSet<string>(); // 告警去重（错配名反复触发不再刷屏）
 
         void Awake()
         {
             // 多 SMR 场景（2026-08-24 GI 官方模型）：morph 全在 Face SMR 上——取 morph 数最多的 SMR
             smr = PetMeshQuery.GetRichestMorphRenderer(transform);
+        }
+
+        void OnDisable()
+        {
+            // 组件禁用/协程中断兜底：morph 权重清零防停留半权重表情（SetActive(false) 或依赖断连时）
+            ResetCurrent();
         }
 
         /// <summary>
@@ -98,7 +105,8 @@ namespace GIC.Pet
         {
             var mesh = smr.sharedMesh;
             var idx = mesh.GetBlendShapeIndex(morphName);
-            if (idx < 0) Debug.LogWarning($"[PetEmotion] morph 缺失: {morphName}");
+            if (idx < 0 && _warnedMorphs.Add(morphName)) // 同名只警告一次（情绪表反复触发不刷屏）
+                Debug.LogWarning($"[PetEmotion] morph 缺失: {morphName}");
             return idx;
         }
 

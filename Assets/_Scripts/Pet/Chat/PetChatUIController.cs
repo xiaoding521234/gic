@@ -62,7 +62,7 @@ namespace GIC.Pet.Chat
         [InspectorName("输入条高")]
         [SerializeField] private float inputBarH = 56f;
         [Tooltip("输入条顶边距模型脚底的间距（输入条挂在模型下方；翻转时也用作与气泡的间距）")]
-        [InspectorName("输入条距模型底")]
+        [InspectorName("输入条距modelBottom")]
         [SerializeField] private float inputBarToModelBottom = 20f;
 
         [Header("行为")]
@@ -79,7 +79,7 @@ namespace GIC.Pet.Chat
         [InspectorName("淡出时长")]
         [SerializeField] private float fadeSec = 0.25f;
         [Tooltip("输入条打开/关闭的过渡时长")]
-        [InspectorName("输入条过渡秒")]
+        [InspectorName("AnimateInputBar秒")]
         [SerializeField] private float inputFadeSec = 0.15f;
 
         // ---- 运行时 ----
@@ -88,17 +88,25 @@ namespace GIC.Pet.Chat
         private TMP_InputField _inputField;
         private RectTransform _bubbleRoot;
         private TextMeshProUGUI _bubbleText;
-        private CanvasGroup _气泡组;
-        private CanvasGroup _输入条组;   // 输入条淡入淡出（2026-08-31）
-        private Coroutine _输入条动画;
-        private Coroutine _气泡淡出协程; // 主动气泡/关闭对话的气泡淡出（新内容到达即取消）
+        private CanvasGroup _bubbleGroup;
+        private CanvasGroup _inputBarGroup;   // 输入条淡入淡出（2026-08-31）
+        private Coroutine _inputBarAnim;
+        private Coroutine _bubbleFadeCoroutine; // 主动气泡/关闭对话的气泡淡出（新内容到达即取消）
         private bool _proactiveMode;    // 主动气泡模式（AI 反应）：完成后自动淡出；对话 Send 切回常驻模式
-        private RectTransform _星形;
-        private readonly StringBuilder _打字缓存 = new StringBuilder();
-        private Coroutine _打字协程;
-        private bool _输入开着;
-        private bool _等待首字节; // 发送后的"…"占位：首个流式增量到达时清掉再追加（防"…回复"拼接）
-        private Action<string> _界面完成处理器; // 界面侧 完成 事件处理器（持引用可摘——会话层也接此事件，勿整体赋值）
+        private RectTransform _starIcon;
+        private readonly StringBuilder _typingBuffer = new StringBuilder();
+        private Coroutine _typingCoroutine;
+        private bool _inputVisible;
+        private bool _awaitingFirstByte; // 发送后的"…"占位：首个流式增量到达时清掉再追加（防"…回复"拼接）
+        private Action<string> _uiCompleteHandler; // 界面侧 完成 事件处理器（持引用可摘——会话层也接此事件，勿整体赋值）
+        private Action<string> _uiDeltaHandler; // 界面侧 正文增量 处理器（持引用摘挂——2026-08-31 前 Send 用 = 整体
+                                                // 覆盖，会把 PetReactionConsumer 挂的反应处理器一起顶掉）
+        private Action<string> _uiErrorHandler; // 界面侧 错误 处理器（持引用摘挂，同上）
+
+        /// <summary>对话流接管通知（Send 重接流式回调前触发，2026-08-31）：PetReactionConsumer 订阅——
+        /// 在途的反应流将被新请求 AbortActive **静默**中止（onComplete/onError 均不触发），
+        /// 其 _generating 状态靠本通知复位并摘除自己的处理器（对话优先，本批反应错失不弹 fallback）。</summary>
+        public event Action chatStreamTakingOver;
 
         /// <summary>头部锚点提供器（宿主注入：返回派蒙头顶的 Canvas 屏幕坐标；null=气泡藏屏顶中央）</summary>
         [HideInInspector] public System.Func<Vector2> headAnchorProvider;
@@ -108,7 +116,7 @@ namespace GIC.Pet.Chat
         [HideInInspector] public System.Func<Vector2> footAnchorProvider;
 
         /// <summary>输入框当前打开（宿主据此冻结拖拽误判；未接线=恒 false 不挡交互）</summary>
-        public bool IsInputVisible => _输入开着 && _inputBarRoot != null;
+        public bool IsInputVisible => _inputVisible && _inputBarRoot != null;
 
         /// <summary>屏幕点是否落在输入条矩形内（宿主区分"单击派蒙收起输入框"与"点输入条本身"——
         /// 输入期点派蒙=收起，点输入条（含发送按钮）=正常 UI 交互不收起）</summary>
@@ -132,11 +140,11 @@ namespace GIC.Pet.Chat
         public void CloseChat()
         {
             closeInput();
-            if (_打字协程 != null) { StopCoroutine(_打字协程); _打字协程 = null; }
-            _等待首字节 = false;
+            if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
+            _awaitingFirstByte = false;
             _proactiveMode = false;
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf)
-                起气泡淡出(0f); // 立即淡出（无停留）
+                StartBubbleFade(0f); // 立即淡出（无停留）
         }
 
         /// <summary>主动气泡（LLM 失败兜底直出——AI 抽卡反应等）：整段显示，
@@ -147,7 +155,7 @@ namespace GIC.Pet.Chat
             if (string.IsNullOrEmpty(text) || _bubbleText == null) return;
             _proactiveMode = true;
             showBubble(text);
-            起气泡淡出(proactiveHoldSec);
+            StartBubbleFade(proactiveHoldSec);
         }
 
         // ---- 主动气泡流式入口（PetReactionConsumer 的 LLM 反应生成驱动，2026-08-31） ----
@@ -157,10 +165,10 @@ namespace GIC.Pet.Chat
         {
             if (_bubbleText == null) return;
             _proactiveMode = true;
-            取消气泡淡出();
-            if (_打字协程 != null) { StopCoroutine(_打字协程); _打字协程 = null; }
-            _打字缓存.Length = 0;
-            _气泡组.alpha = 1f;
+            CancelBubbleFade();
+            if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
+            _typingBuffer.Length = 0;
+            _bubbleGroup.alpha = 1f;
             _bubbleRoot.gameObject.SetActive(true);
         }
 
@@ -171,7 +179,7 @@ namespace GIC.Pet.Chat
         public void ProactiveStreamDone()
         {
             if (!_proactiveMode) return;
-            起气泡淡出(proactiveHoldSec);
+            StartBubbleFade(proactiveHoldSec);
         }
 
         /// <summary>会话客户端（发送前接流式事件用）——转发私有字段</summary>
@@ -206,7 +214,7 @@ namespace GIC.Pet.Chat
         {
             // ESC 收起输入条（2026-08-29：旧版输入期宿主交互全冻结+无 ESC=输入条打开后只能靠发送
             // 消失，用户被困在"打开→发送→消失"循环——多一条退出途径）。ESC=完整关闭对话（含气泡）。
-            if (_输入开着 && Input.GetKeyDown(KeyCode.Escape)) { CloseChat(); return; }
+            if (_inputVisible && Input.GetKeyDown(KeyCode.Escape)) { CloseChat(); return; }
             if (_canvas == null) return; // 宿主接线前的防御（WireHost 未调用时恒静默——2026-08-30 桌面版窗口句柄事故：Start 提前 return 吞掉接线=此处每帧 NRE 刷屏 9.6 万条）
             var canvasRect = (_canvas.transform as RectTransform).rect;
             // 回复气泡跟随头部锚点（拖拽/移动/动画头部都在动——每帧跟；按半宽钳回屏内防贴边裁切）
@@ -221,33 +229,33 @@ namespace GIC.Pet.Chat
                 _bubbleRoot.anchoredPosition = p;
             }
             // 输入条跟随模型（开着才需要；翻转判定依赖气泡当前高度，故在气泡跟随之后算）
-            if (_输入开着 && _inputBarRoot != null) 跟随输入条(canvasRect);
+            if (_inputVisible && _inputBarRoot != null) FollowInputBar(canvasRect);
         }
 
         /// <summary>输入条跟随模型（每帧，输入开着时）：默认挂模型脚底下方（底部锚点=模型包围盒底
         /// 中心）；脚底放不下（贴屏底/坐任务栏腿垂出屏）时翻转到气泡上方——输入条与气泡都不遮模型。
         /// 宿主未注入 底部锚点提供器 时退回屏底居中（理论兜底——现行宿主都会注入）。</summary>
-        void 跟随输入条(Rect canvasRect)
+        void FollowInputBar(Rect canvasRect)
         {
             if (footAnchorProvider == null)
             {
-                // 顶中心 pivot：y=条底距屏底+条高，使条底贴 输入条距模型底
+                // 顶中心 pivot：y=条底距屏底+条高，使条底贴 输入条距modelBottom
                 _inputBarRoot.anchoredPosition = new Vector2(canvasRect.width * 0.5f, inputBarToModelBottom + inputBarH);
                 return;
             }
-            Vector2 模型底 = footAnchorProvider();
+            Vector2 modelBottom = footAnchorProvider();
             float halfWidth = _inputBarRoot.sizeDelta.x * 0.5f;
-            float x = Mathf.Clamp(模型底.x,
+            float x = Mathf.Clamp(modelBottom.x,
                 Mathf.Min(screenMargin + halfWidth, canvasRect.width * 0.5f),
                 Mathf.Max(canvasRect.width - screenMargin - halfWidth, canvasRect.width * 0.5f));
             // 默认：输入条顶边贴模型脚底下方（pivot=顶中心）
-            float y = 模型底.y - inputBarToModelBottom;
+            float y = modelBottom.y - inputBarToModelBottom;
             if (y - inputBarH < screenMargin)
             {
                 // 脚底放不下：翻转到气泡上方（气泡隐藏时按头锚点+偏移估气泡底）
                 float bubbleTop = _bubbleRoot != null && _bubbleRoot.gameObject.activeSelf
                     ? _bubbleRoot.anchoredPosition.y + _bubbleRoot.sizeDelta.y
-                    : (headAnchorProvider != null ? headAnchorProvider().y + bubbleOffset.y : 模型底.y + 240f);
+                    : (headAnchorProvider != null ? headAnchorProvider().y + bubbleOffset.y : modelBottom.y + 240f);
                 y = Mathf.Min(bubbleTop + inputBarToModelBottom + inputBarH, canvasRect.height - screenMargin);
             }
             _inputBarRoot.anchoredPosition = new Vector2(x, y);
@@ -259,17 +267,17 @@ namespace GIC.Pet.Chat
         public void ToggleInput()
         {
             if (_inputBarRoot == null) return; // UI 未建（未接线/接线失败）——单击静默忽略，不再炸 NRE
-            if (_输入开着) closeInput();
+            if (_inputVisible) closeInput();
             else openInput();
         }
 
         void openInput()
         {
-            _输入开着 = true;
+            _inputVisible = true;
             _inputBarRoot.gameObject.SetActive(true);
-            跟随输入条((_canvas.transform as RectTransform).rect); // 立即摆位，防一帧闪在旧位置
+            FollowInputBar((_canvas.transform as RectTransform).rect); // 立即摆位，防一帧闪在旧位置
             InputLocks.Push(this, InputLockReason.InputPopupEntering); // 输入期按键不漏进游戏
-            输入条过渡(1f); // 淡入（2026-08-31）
+            AnimateInputBar(1f); // 淡入（2026-08-31）
             _inputField.text = "";
             _inputField.ActivateInputField();
             _inputField.Select();
@@ -277,75 +285,75 @@ namespace GIC.Pet.Chat
 
         void closeInput()
         {
-            if (!_输入开着) return;
-            _输入开着 = false;
+            if (!_inputVisible) return;
+            _inputVisible = false;
             InputLocks.Pop(this, InputLockReason.InputPopupEntering);
-            输入条过渡(0f); // 淡出后自动隐藏（2026-08-31）
+            AnimateInputBar(0f); // 淡出后自动隐藏（2026-08-31）
         }
 
         /// <summary>输入条透明度过渡（打开淡入/关闭淡出；关闭到位后 SetActive(false)）。
         /// 淡出开始即不挡点击（blocksRaycasts=false），淡入即恢复。</summary>
-        void 输入条过渡(float targetAlpha)
+        void AnimateInputBar(float targetAlpha)
         {
-            if (_输入条组 == null)
+            if (_inputBarGroup == null)
             {
                 // 无 CanvasGroup（异常兜底）：退回硬切
                 if (_inputBarRoot != null && targetAlpha <= 0f) _inputBarRoot.gameObject.SetActive(false);
                 return;
             }
-            if (_输入条动画 != null) StopCoroutine(_输入条动画);
-            _输入条组.blocksRaycasts = targetAlpha > 0.5f;
-            _输入条动画 = StartCoroutine(inputFadeRoutine(targetAlpha));
+            if (_inputBarAnim != null) StopCoroutine(_inputBarAnim);
+            _inputBarGroup.blocksRaycasts = targetAlpha > 0.5f;
+            _inputBarAnim = StartCoroutine(inputFadeRoutine(targetAlpha));
         }
 
         IEnumerator inputFadeRoutine(float target)
         {
-            float from = _输入条组.alpha;
+            float from = _inputBarGroup.alpha;
             float el = 0f;
             while (el < inputFadeSec)
             {
                 el += Time.deltaTime;
-                _输入条组.alpha = Mathf.Lerp(from, target, el / inputFadeSec);
+                _inputBarGroup.alpha = Mathf.Lerp(from, target, el / inputFadeSec);
                 yield return null;
             }
-            _输入条组.alpha = target;
+            _inputBarGroup.alpha = target;
             if (target <= 0f) _inputBarRoot.gameObject.SetActive(false);
-            _输入条动画 = null;
+            _inputBarAnim = null;
         }
 
         // ---- 气泡自动淡出（主动消息/关闭对话，2026-08-31） ----
 
-        /// <summary>起气泡淡出：延迟后淡出再隐藏（主动气泡停留 → 自动消失；关闭对话=延迟 0 立即淡出）</summary>
-        void 起气泡淡出(float 延迟秒)
+        /// <summary>StartBubbleFade：延迟后淡出再隐藏（主动气泡停留 → 自动消失；关闭对话=延迟 0 立即淡出）</summary>
+        void StartBubbleFade(float delaySec)
         {
-            取消气泡淡出();
+            CancelBubbleFade();
             if (_bubbleRoot == null || !_bubbleRoot.gameObject.activeSelf) return;
-            _气泡淡出协程 = StartCoroutine(bubbleFadeRoutine(延迟秒));
+            _bubbleFadeCoroutine = StartCoroutine(bubbleFadeRoutine(delaySec));
         }
 
         /// <summary>取消未完成的自动淡出并恢复不透明（新内容到达/对话流接管时调用）</summary>
-        void 取消气泡淡出()
+        void CancelBubbleFade()
         {
-            if (_气泡淡出协程 == null) return;
-            StopCoroutine(_气泡淡出协程);
-            _气泡淡出协程 = null;
-            if (_气泡组 != null) _气泡组.alpha = 1f;
+            if (_bubbleFadeCoroutine == null) return;
+            StopCoroutine(_bubbleFadeCoroutine);
+            _bubbleFadeCoroutine = null;
+            if (_bubbleGroup != null) _bubbleGroup.alpha = 1f;
         }
 
-        IEnumerator bubbleFadeRoutine(float 延迟秒)
+        IEnumerator bubbleFadeRoutine(float delaySec)
         {
-            if (延迟秒 > 0f) yield return Wait.Seconds(延迟秒);
+            if (delaySec > 0f) yield return Wait.Seconds(delaySec);
             float el = 0f;
             while (el < fadeSec)
             {
                 el += Time.deltaTime;
-                _气泡组.alpha = 1f - el / fadeSec;
+                _bubbleGroup.alpha = 1f - el / fadeSec;
                 yield return null;
             }
             _bubbleRoot.gameObject.SetActive(false);
-            _气泡组.alpha = 1f;
-            _打字缓存.Length = 0;
-            _气泡淡出协程 = null;
+            _bubbleGroup.alpha = 1f;
+            _typingBuffer.Length = 0;
+            _bubbleFadeCoroutine = null;
         }
 
         // ---- 界面构建（程序化） ----
@@ -354,17 +362,17 @@ namespace GIC.Pet.Chat
         {
             var canvasRect = _canvas.transform as RectTransform;
 
-            // 输入条（挂模型下方，位置每帧由 跟随输入条 算——建时先藏屏外）
+            // 输入条（挂模型下方，位置每帧由 FollowInputBar 算——建时先藏屏外）
             var inputBarObj = new GameObject("PetChatInputBar", typeof(RectTransform));
             inputBarObj.transform.SetParent(_canvas.transform, false);
             _inputBarRoot = inputBarObj.GetComponent<RectTransform>();
             _inputBarRoot.anchorMin = new Vector2(0f, 0f);
-            _inputBarRoot.anchorMax = new Vector2(0f, 0f); // 左下锚：anchoredPosition 即画布绝对坐标（与气泡同约定，跟随输入条 按绝对坐标摆位）
+            _inputBarRoot.anchorMax = new Vector2(0f, 0f); // 左下锚：anchoredPosition 即画布绝对坐标（与气泡同约定，FollowInputBar 按绝对坐标摆位）
             _inputBarRoot.pivot = new Vector2(0.5f, 1f); // 顶中心：anchoredPosition.y=输入条顶边
             _inputBarRoot.anchoredPosition = new Vector2(0f, -inputBarH * 2f);
             _inputBarRoot.sizeDelta = new Vector2(Mathf.Min(bubbleMaxW, canvasRect.rect.width - screenMargin * 2f), inputBarH);
 
-            _输入条组 = inputBarObj.AddComponent<CanvasGroup>(); // 淡入淡出过渡（2026-08-31）
+            _inputBarGroup = inputBarObj.AddComponent<CanvasGroup>(); // 淡入淡出过渡（2026-08-31）
 
             var inputBottom = inputBarObj.AddComponent<Image>();
             inputBottom.sprite = inputBottomSprite != null ? inputBottomSprite : bubbleSprite;
@@ -410,12 +418,12 @@ namespace GIC.Pet.Chat
             sendBtnRect.sizeDelta = new Vector2(44f, 44f);
             var sendBtn = sendBtnObj.AddComponent<Button>();
             var sendBtnImg = sendBtnObj.AddComponent<Image>();
-            bool 用按钮素材 = sendBtnSprite != null;
-            sendBtnImg.sprite = 用按钮素材 ? sendBtnSprite : bubbleSprite;
+            bool useBtnSprite = sendBtnSprite != null;
+            sendBtnImg.sprite = useBtnSprite ? sendBtnSprite : bubbleSprite;
             // Simple：素材是整图按钮（非九切片）；兜底路径气泡贴图小矩形 Sliced 也会退化（border×2>高）
             sendBtnImg.type = Image.Type.Simple;
             sendBtnImg.preserveAspect = true;
-            sendBtnImg.color = 用按钮素材 ? Color.white : new Color(0.83f, 0.66f, 0.34f, 0.9f); // 素材自带配色勿染色
+            sendBtnImg.color = useBtnSprite ? Color.white : new Color(0.83f, 0.66f, 0.34f, 0.9f); // 素材自带配色勿染色
             sendBtn.onClick.AddListener(Send);
             // 图标按钮无文字子物体：一 GameObject 一 Graphic 的陷阱源头已随 Label 一并移除
             //（2026-08-29 版本前 Label 挂 TMP+TextCombiner 做"发送"静态标签——用户拍板删除）。
@@ -431,8 +439,8 @@ namespace GIC.Pet.Chat
             _bubbleRoot.anchorMax = new Vector2(0f, 0f);
             _bubbleRoot.pivot = new Vector2(0.5f, 0f); // 底中心=头顶锚点
             _bubbleRoot.sizeDelta = new Vector2(bubbleMaxW, 120f);
-            _气泡组 = bubbleGO.AddComponent<CanvasGroup>();
-            _气泡组.blocksRaycasts = false; // 气泡不挡点击
+            _bubbleGroup = bubbleGO.AddComponent<CanvasGroup>();
+            _bubbleGroup.blocksRaycasts = false; // 气泡不挡点击
 
             var bubbleBottomObj = new GameObject("BG", typeof(RectTransform));
             bubbleBottomObj.transform.SetParent(bubbleGO.transform, false);
@@ -464,11 +472,11 @@ namespace GIC.Pet.Chat
             {
                 var starObj = new GameObject("Star", typeof(RectTransform));
                 starObj.transform.SetParent(bubbleGO.transform, false);
-                _星形 = starObj.GetComponent<RectTransform>();
-                _星形.anchorMin = _星形.anchorMax = new Vector2(0f, 1f);
-                _星形.pivot = new Vector2(0.5f, 0.5f);
-                _星形.anchoredPosition = new Vector2(6f, 6f); // 左上角探出一点
-                _星形.sizeDelta = new Vector2(36f, 36f);
+                _starIcon = starObj.GetComponent<RectTransform>();
+                _starIcon.anchorMin = _starIcon.anchorMax = new Vector2(0f, 1f);
+                _starIcon.pivot = new Vector2(0.5f, 0.5f);
+                _starIcon.anchoredPosition = new Vector2(6f, 6f); // 左上角探出一点
+                _starIcon.sizeDelta = new Vector2(36f, 36f);
                 var starImg = starObj.AddComponent<Image>();
                 starImg.sprite = starSprite;
                 starImg.raycastTarget = false;
@@ -477,72 +485,99 @@ namespace GIC.Pet.Chat
             inputBarObj.SetActive(false); // 输入条初始隐藏（旧版建完不藏=接线即常驻屏底）
         }
 
-        TextMeshProUGUI BuildText(Transform 父级, TMP_FontAsset fontAsset, float fontSize, TMPro.TextAlignmentOptions 对齐)
+        TextMeshProUGUI BuildText(Transform parent, TMP_FontAsset fontAsset, float fontSize, TMPro.TextAlignmentOptions alignment)
         {
             var textObj = new GameObject("TMP", typeof(RectTransform));
-            textObj.transform.SetParent(父级, false);
+            textObj.transform.SetParent(parent, false);
             var textRect = textObj.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            var 文本 = textObj.AddComponent<TextMeshProUGUI>();
-            文本.font = fontAsset != null ? fontAsset : TMP_Settings.defaultFontAsset;
-            文本.fontSize = fontSize;
-            文本.alignment = 对齐;
-            文本.raycastTarget = false;
-            return 文本;
+            var label = textObj.AddComponent<TextMeshProUGUI>();
+            label.font = fontAsset != null ? fontAsset : TMP_Settings.defaultFontAsset;
+            label.fontSize = fontSize;
+            label.alignment = alignment;
+            label.raycastTarget = false;
+            return label;
         }
 
-        TextMeshProUGUI BuildPlaceholder(Transform 父级, TMP_FontAsset fontAsset, float fontSize)
+        TextMeshProUGUI BuildPlaceholder(Transform parent, TMP_FontAsset fontAsset, float fontSize)
         {
-            var 文本 = BuildText(父级, fontAsset, fontSize, TextAlignmentOptions.MidlineLeft);
+            var label = BuildText(parent, fontAsset, fontSize, TextAlignmentOptions.MidlineLeft);
             // 占位文本本地化：TMP_InputField placeholder 无法挂 TextCombiner（InputField 会覆写 text），
             // 同步解析直赋——InputPopupDialog placeholder 同款例外（项目 UI 规范既定例外）
-            文本.text = 取本地文本("PetChatPlaceholder", "问派蒙点什么…");
-            文本.fontStyle = FontStyles.Italic;
-            文本.color = new Color(0.5f, 0.45f, 0.4f, 0.7f);
-            return 文本;
+            label.text = GetLocalizedText("PetChatPlaceholder", "问派蒙点什么…");
+            label.fontStyle = FontStyles.Italic;
+            label.color = new Color(0.5f, 0.45f, 0.4f, 0.7f);
+            return label;
         }
 
         /// <summary>运行时取 UIText 本地化文本（语言切换不自动刷新——仅用于 placeholder/动态气泡
         /// 文案等 TextCombiner 不适用的位置；静态标签一律挂 TextCombiner）</summary>
-        static string 取本地文本(string key, string 兜底)
+        static string GetLocalizedText(string key, string fallback)
         {
             var table = UnityEngine.Localization.Settings.LocalizationSettings.Instance.GetStringDatabase()
                 .GetTable("UIText") as UnityEngine.Localization.Tables.StringTable;
-            return table?.GetEntry(key)?.GetLocalizedString() ?? 兜底;
+            return table?.GetEntry(key)?.GetLocalizedString() ?? fallback;
         }
 
         // ---- 发送与流式回复 ----
 
         void Send()
         {
-            string 文本 = _inputField.text.Trim();
-            if (string.IsNullOrEmpty(文本)) return;
+            string text = _inputField.text.Trim();
+            if (string.IsNullOrEmpty(text)) return;
             // 流式进行中再发送=会话层静默丢弃（_请求中 直接 return）——给出可见反馈并保留输入
-            if (session != null && session.IsBusy) { showBubble(取本地文本("PetChatBusy", "等派蒙说完这句嘛！")); return; }
+            if (session != null && session.IsBusy) { showBubble(GetLocalizedText("PetChatBusy", "等派蒙说完这句嘛！")); return; }
             // 发送后输入框保留（2026-08-29 用户实测反馈"点击发送后输入框按钮直接消失了"——聊天软件式
             // 连续对话：只清文本保持焦点，回复气泡照常显示；收起走 单击派蒙/ESC）
             _inputField.text = "";
             _inputField.ActivateInputField();
             _proactiveMode = false; // 用户发话=进入对话流：回复气泡恢复常驻规则（不自动淡出）
             showBubble("…"); // 等待首字节
-            _等待首字节 = true;
-            if (client == null) { showBubble(取本地文本("PetChatNotWired", "对话组件未接线")); return; }
+            _awaitingFirstByte = true;
+            if (client == null) { showBubble(GetLocalizedText("PetChatNotWired", "对话组件未接线")); return; }
 
-            client.onContentDelta = delta => typewriter(delta);
-            client.onError = 错误信息 =>
+            // 先通知反应消费方复位+摘自己的处理器（对话优先：在途反应流将被新请求 AbortActive
+            // 静默中止，其 onComplete/onError 不再触发——_generating 只能靠本通知复位，2026-08-31）
+            chatStreamTakingOver?.Invoke();
+            AttachStreamHandlers();
+            session.Send(text);
+        }
+
+        /// <summary>重接对话流回调（Send 用）：三个处理器持引用摘旧挂新——链上恒最多一份界面处理器，
+        /// 不整体覆盖（=）PetReactionConsumer 挂的反应处理器（2026-08-31 修复回调互踩）。</summary>
+        void AttachStreamHandlers()
+        {
+            if (_uiDeltaHandler != null) client.onContentDelta -= _uiDeltaHandler;
+            _uiDeltaHandler = delta => typewriter(delta);
+            client.onContentDelta += _uiDeltaHandler;
+
+            if (_uiErrorHandler != null) client.onError -= _uiErrorHandler;
+            _uiErrorHandler = err =>
             {
                 // 无 key 的错误给引导文案，其它原样
-                string 文案 = 错误信息 != null && 错误信息.Contains("API Key")
-                    ? 取本地文本("PetChatNoKey", noKeyPrompt)
-                    : $"哎呀…{错误信息}";
-                showBubble(文案);
+                string display = err != null && err.Contains("API Key")
+                    ? GetLocalizedText("PetChatNoKey", noKeyPrompt)
+                    : $"哎呀…{err}";
+                showBubble(display);
             };
+            client.onError += _uiErrorHandler;
+
             // 气泡常驻（2026-08-29 用户拍板：不随时间主动消失——显示到下一条回复/显式关闭为止）
-            if (_界面完成处理器 != null) client.onComplete -= _界面完成处理器;
-            _界面完成处理器 = 全量 => { };
-            client.onComplete += _界面完成处理器;
-            session.Send(文本);
+            if (_uiCompleteHandler != null) client.onComplete -= _uiCompleteHandler;
+            _uiCompleteHandler = 全量 => { };
+            client.onComplete += _uiCompleteHandler;
+        }
+
+        /// <summary>摘除界面侧流式回调（PetReactionConsumer 发起反应流前调用——防反应增量同时触发
+        /// 界面 typewriter 与反应打字=双重打字；UI 销毁清理也复用）</summary>
+        public void DetachStreamHandlers()
+        {
+            var c = client;
+            if (c == null) return;
+            if (_uiDeltaHandler != null) { c.onContentDelta -= _uiDeltaHandler; _uiDeltaHandler = null; }
+            if (_uiErrorHandler != null) { c.onError -= _uiErrorHandler; _uiErrorHandler = null; }
+            if (_uiCompleteHandler != null) { c.onComplete -= _uiCompleteHandler; _uiCompleteHandler = null; }
         }
 
         /// <summary>打字机追加（流式增量逐段追加；间隔=0 直出）——新内容到达自动取消未完成的
@@ -550,35 +585,35 @@ namespace GIC.Pet.Chat
         void typewriter(string delta)
         {
             if (string.IsNullOrEmpty(delta)) return;
-            if (_打字协程 != null) StopCoroutine(_打字协程);
-            取消气泡淡出();
-            if (_等待首字节) { _打字缓存.Length = 0; _等待首字节 = false; } // 清"…"占位（错误文案同理——增量代表新回复）
-            _气泡组.alpha = 1f;
+            if (_typingCoroutine != null) StopCoroutine(_typingCoroutine);
+            CancelBubbleFade();
+            if (_awaitingFirstByte) { _typingBuffer.Length = 0; _awaitingFirstByte = false; } // 清"…"占位（错误文案同理——增量代表新回复）
+            _bubbleGroup.alpha = 1f;
             _bubbleRoot.gameObject.SetActive(true);
-            _打字协程 = StartCoroutine(typingRoutineBody(delta));
+            _typingCoroutine = StartCoroutine(typingRoutineBody(delta));
         }
 
         IEnumerator typingRoutineBody(string delta)
         {
-            _打字缓存.Append(delta);
-            _bubbleText.text = _打字缓存.ToString();
+            _typingBuffer.Append(delta);
+            _bubbleText.text = _typingBuffer.ToString();
             autoBubbleH();
             if (typeIntervalSec > 0f)
             {
                 yield return new WaitForSeconds(typeIntervalSec); // 微停顿观感（增量本身已是分片，无需逐字符）
             }
-            _打字协程 = null;
+            _typingCoroutine = null;
         }
 
         /// <summary>整段显示（错误/提示/非流式完成）</summary>
-        void showBubble(string 文本)
+        void showBubble(string msg)
         {
-            if (_打字协程 != null) { StopCoroutine(_打字协程); _打字协程 = null; }
-            取消气泡淡出();
-            _打字缓存.Length = 0;
-            _打字缓存.Append(文本);
-            _bubbleText.text = 文本;
-            _气泡组.alpha = 1f;
+            if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
+            CancelBubbleFade();
+            _typingBuffer.Length = 0;
+            _typingBuffer.Append(msg);
+            _bubbleText.text = msg;
+            _bubbleGroup.alpha = 1f;
             _bubbleRoot.gameObject.SetActive(true);
             autoBubbleH();
         }
@@ -594,7 +629,8 @@ namespace GIC.Pet.Chat
 
         void OnDestroy()
         {
-            if (_输入开着) InputLocks.Pop(this, InputLockReason.InputPopupEntering);
+            DetachStreamHandlers(); // 摘界面侧流式回调（防 UI 销毁后回调仍指向 typewriter）
+            if (_inputVisible) InputLocks.Pop(this, InputLockReason.InputPopupEntering);
             InputLocks.PopAll(this);
         }
     }

@@ -34,10 +34,14 @@ namespace GIC.Pet
         // 注：不能用 Shader.Find("Hidden/...") 加载内部 shader——构建期无引用会被裁剪致 null（2026-08-24 构建实测）。
 
         [Header("外观")]
-        [SerializeField] private Color 阴影颜色 = new Color(0f, 0f, 0f, 0.6f); // Alpha=浓度
-        [SerializeField] private Vector2 阴影偏移像素 = new Vector2(0f, -24f);  // x 向右为正，y 向上为正（负=影子下垂，光源在上方）
-        [SerializeField, Range(0f, 60f)] private float 模糊半径像素 = 14f;      // 阴影贴图 texel 为单位，越大越柔（内部按 0.66×拆两轮模糊，总量即此值）
-        [SerializeField, Range(64, 2048)] private int 阴影贴图高度 = 512;       // 宽度随相机 aspect 自动换算
+        [InspectorName("阴影颜色")]
+        [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.6f); // Alpha=浓度
+        [InspectorName("阴影偏移像素")]
+        [SerializeField] private Vector2 shadowOffsetPx = new Vector2(0f, -24f);  // x 向右为正，y 向上为正（负=影子下垂，光源在上方）
+        [InspectorName("模糊半径像素")]
+        [SerializeField, Range(0f, 60f)] private float blurRadiusPx = 14f;      // 阴影贴图 texel 为单位，越大越柔（内部按 0.66×拆两轮模糊，总量即此值）
+        [InspectorName("阴影贴图高度")]
+        [SerializeField, Range(64, 2048)] private int shadowTexHeight = 512;       // 宽度随相机 aspect 自动换算
         [InspectorName("启用")]
         [SerializeField] private bool enableShadow = true;
 
@@ -135,7 +139,7 @@ namespace GIC.Pet
             // 17-tap 细间距（radius/8）+ 二次迭代把第一轮残余台阶再抹平——旧 9-tap 间距 radius/4 的
             // 平台状阶梯条带即"影子像多个格子"的根因（2026-08-24）
             shadowCam.Render();
-            blurMat.SetFloat("_BlurRadius", 模糊半径像素 * 0.66f);
+            blurMat.SetFloat("_BlurRadius", blurRadiusPx * 0.66f);
             blurMat.SetVector("_TexelSize", new Vector4(1f / rtA.width, 1f / rtA.height, 0f, 0f));
             Graphics.Blit(rtA, rtB, blurMat, 0);
             Graphics.Blit(rtB, rtA, blurMat, 1);
@@ -143,9 +147,9 @@ namespace GIC.Pet
             Graphics.Blit(rtB, rtA, blurMat, 1);
 
             // 合成参数（逐帧写，Inspector 调整即时生效）
-            compositeMat.SetColor("_Color", 阴影颜色);
+            compositeMat.SetColor("_Color", shadowColor);
             compositeMat.SetVector("_OffsetUV", new Vector4(
-                阴影偏移像素.x / Screen.width, 阴影偏移像素.y / Screen.height, 0f, 0f));
+                shadowOffsetPx.x / Screen.width, shadowOffsetPx.y / Screen.height, 0f, 0f));
 
             // 全屏 Quad 贴合近裁面（透视/正交都兼容；缩放窗口改 aspect 时逐帧跟随）
             float d = mainCam.nearClipPlane + 0.05f;
@@ -170,7 +174,7 @@ namespace GIC.Pet
 
         private void EnsureRTs()
         {
-            int h = Mathf.Max(64, 阴影贴图高度);
+            int h = Mathf.Max(64, shadowTexHeight);
             int w = Mathf.Max(64, Mathf.RoundToInt(h * Mathf.Max(0.05f, mainCam.aspect)));
             if (rtA != null && rtA.width == w && rtA.height == h) return;
 

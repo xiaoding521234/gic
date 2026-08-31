@@ -80,10 +80,14 @@ namespace GIC.Pet.Chat
                     try
                     {
                         var last = JsonUtility.FromJson<ReactionEvent>(lines[i]);
-                        if (last != null && last.seq > _seq) _seq = last.seq;
+                        if (last != null && last.seq > _seq)
+                        {
+                            _seq = last.seq;
+                            break; // 尾部第一条完好行=最大 seq（单调递增），续号完成
+                        }
                     }
-                    catch { /* 半行/坏行：继续往前找 */ }
-                    break; // 只看最后一个非空行
+                    catch { /* 半行/坏行：继续往前找——坏行即 break 会把 _seq 归 0，主进程重启后
+                            新事件 seq 从 1 开号，被消费侧旧基线（如 500）当旧事件全跳过（2026-08-31 修复） */ }
                 }
             }
             catch { /* 读失败从 0 开号（罕见，可接受） */ }
@@ -128,6 +132,12 @@ namespace GIC.Pet.Chat
         bool _generating;                                // LLM 生成中（防叠请求）
         string _currentFallback;                         // 本批事件的兜底文案（失败时直出最后一条）
 
+        // 流式回调引用（2026-08-31 持引用摘挂修复）：onComplete/onError/onContentDelta 是共享
+        // Action 字段（UI 层 Send 也接）——必须 += 挂/-= 摘，整体赋值（=）会顶掉另一方的处理器
+        //（旧版正是如此：反应流被用户对话 Abort 后静默收尾，复位 _generating 的回调已不在链上
+        //  =反应文本从此全灭；且旧 = 写法会把 UI 的完成处理器顶掉）。收尾/对话接管时统一回摘。
+        Action<string> _onDelta, _onError, _onComplete;
+
         [Tooltip("文本反应生成的最小间隔秒（事件快于生成时自动合并——攒几发一起说）")]
         [InspectorName("生成间隔秒")]
         [SerializeField] private float generateIntervalSec = 2.5f;
@@ -135,9 +145,35 @@ namespace GIC.Pet.Chat
         /// <summary>接线（宿主聊天接线后调用；任一引用空=对应反馈通道缺席，其余照常）</summary>
         public void Wire(PetBehaviorController behavior, PetChatUIController chatUI)
         {
+            if (_chatUI != null && _chatUI != chatUI) _chatUI.chatStreamTakingOver -= OnChatTakeOver;
             _behavior = behavior;
             _chatUI = chatUI;
             _session = chatUI != null ? chatUI.sessionRef : null;
+            if (_chatUI != null) _chatUI.chatStreamTakingOver += OnChatTakeOver;
+        }
+
+        /// <summary>对话流接管（用户 Send 时）：在途反应流将被新请求 AbortActive 静默中止，
+        /// 复位 _generating+摘自己的处理器（对话优先——本批反应错失，不弹 fallback 打扰对话）。</summary>
+        void OnChatTakeOver()
+        {
+            _generating = false;
+            DetachHandlers();
+        }
+
+        void OnDestroy()
+        {
+            if (_chatUI != null) _chatUI.chatStreamTakingOver -= OnChatTakeOver;
+            DetachHandlers();
+        }
+
+        /// <summary>摘除自己挂的流式回调（收尾/接管/销毁共用）</summary>
+        void DetachHandlers()
+        {
+            var client = _session != null ? _session.clientRef : null;
+            if (client == null) return;
+            client.onContentDelta -= _onDelta;
+            client.onError -= _onError;
+            client.onComplete -= _onComplete;
         }
 
         void Start()
@@ -239,21 +275,27 @@ namespace GIC.Pet.Chat
             _generating = true;
             _nextGenAt = Time.unscaledTime + generateIntervalSec;
 
-            // 复用会话客户端（key/供应商链路现成）。事件处理器接在 client 上：
-            // 用户发起对话时 UI 层会重接这些字段（对话优先，反应被 Abort 属预期）
+            // 摘 UI 侧流式处理器（上次对话 Send 挂的仍留在链上——不摘则反应增量同时触发
+            // typewriter+反应打字=双重打字），再 += 挂自己的（持引用，收尾/对话接管时回摘）
             _chatUI.BeginProactiveStream();
-            client.onContentDelta = delta => _chatUI.ProactiveDelta(delta);
-            client.onError = err =>
+            _chatUI.DetachStreamHandlers();
+            _onDelta = delta => _chatUI.ProactiveDelta(delta);
+            _onError = err =>
             {
                 _generating = false;
+                DetachHandlers();
                 ShowFallback();
             };
-            client.onComplete = full =>
+            _onComplete = full =>
             {
                 _generating = false;
+                DetachHandlers();
                 if (string.IsNullOrEmpty(full)) ShowFallback(); // 空回复（异常）也走兜底
                 else _chatUI.ProactiveStreamDone(); // 完成通知（UI 起自动淡出计时）
             };
+            client.onContentDelta += _onDelta;
+            client.onError += _onError;
+            client.onComplete += _onComplete;
             client.RequestStream(messages);
         }
 

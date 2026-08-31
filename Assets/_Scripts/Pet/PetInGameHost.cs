@@ -24,7 +24,7 @@ namespace GIC.Pet
         public const int FormInGame = 1;
 
         private static PetInGameHost _instance;
-        private GameObject _游戏内实例;
+        private GameObject _inGameInstance;
 
         /// <summary>游戏内宿主接口（IPetHost）——行为层/视线层经此分发（桌面形态走 PetWindowController 字段）。
         /// 由游戏内宿主组件（渲染管线批次 B 落地后）在 Awake 注入。</summary>
@@ -84,19 +84,19 @@ namespace GIC.Pet
                 // 桌面→游戏内：写退出请求让桌宠进程播 Disappear 再退出（非硬杀）
                 PetSingleInstance.RequestQuit();
                 PetProcessLauncher.LaunchSuppressed = true;
-                instance.StartCoroutine(instance.等桌面退场后创建实例());
+                instance.StartCoroutine(instance.CreateInstanceAfterDesktopExit());
                 Debug.Log($"[PetInGameHost] 热切换：桌面版→游戏画面内版（旧形态={oldForm}，等退场动画）");
             }
             else
             {
                 // 游戏内→桌面：播 Disappear 退场→销毁→拉桌面进程
-                instance.StartCoroutine(instance.游戏内退场后拉桌面());
+                instance.StartCoroutine(instance.LaunchDesktopAfterInGameExit());
                 Debug.Log($"[PetInGameHost] 热切换：游戏画面内版→桌面版（旧形态={oldForm}，等退场动画）");
             }
         }
 
         /// <summary>等桌面进程退出（最多 5s 超时强杀）后创建游戏内实例</summary>
-        System.Collections.IEnumerator 等桌面退场后创建实例()
+        System.Collections.IEnumerator CreateInstanceAfterDesktopExit()
         {
             float deadline = Time.unscaledTime + 5f;
             while (Time.unscaledTime < deadline)
@@ -113,11 +113,11 @@ namespace GIC.Pet
         /// 2026-08-28 修复"退场播完后仍停留一会"：旧等待条件是 behavior.enabled（永为 true，空等满 4s
         /// 超时才销毁，期间行为层还落回待机把派蒙"站起来"）——改为退场完成回调标志，动画播完当帧即销毁
         /// （行为层同步加 _退场完成 冻结保持末帧，宿主控制器按 退场中 冻结拖拽/滚轮）。</summary>
-        System.Collections.IEnumerator 游戏内退场后拉桌面()
+        System.Collections.IEnumerator LaunchDesktopAfterInGameExit()
         {
-            if (_游戏内实例 != null)
+            if (_inGameInstance != null)
             {
-                var behavior = _游戏内实例.GetComponentInChildren<PetBehaviorController>();
+                var behavior = _inGameInstance.GetComponentInChildren<PetBehaviorController>();
                 bool exitDone = false;
                 bool exitTakeover = behavior != null && behavior.RequestExit(() => exitDone = true);
                 if (exitTakeover)
@@ -144,30 +144,30 @@ namespace GIC.Pet
         /// <summary>创建游戏内派蒙实例（渲染管线批次 B 落地：RT 画中画+Paimon prefab 化+宿主接口接线）</summary>
         private void CreateInGameInstance()
         {
-            if (_游戏内实例 != null) return;
+            if (_inGameInstance != null) return;
             var prefab = Resources.Load<GameObject>("PaimonPet/PaimonInGameRoot");
             if (prefab == null)
             {
                 Debug.LogWarning("[PetInGameHost] PaimonInGameRoot prefab 未找到（Resources/PaimonPet/），游戏内派蒙不可用");
                 return;
             }
-            _游戏内实例 = Instantiate(prefab);
-            DontDestroyOnLoad(_游戏内实例);
+            _inGameInstance = Instantiate(prefab);
+            DontDestroyOnLoad(_inGameInstance);
             // 宿主控制器（渲染+交互+IPetHost）——prefab 未预挂，运行时补挂（保 prefab 最小）
-            var ctrl = _游戏内实例.GetComponent<PetInGameHostController>();
-            if (ctrl == null) ctrl = _游戏内实例.AddComponent<PetInGameHostController>();
+            var ctrl = _inGameInstance.GetComponent<PetInGameHostController>();
+            if (ctrl == null) ctrl = _inGameInstance.AddComponent<PetInGameHostController>();
             HostInterface = ctrl;
             // 实例挪到远离游戏视锥的位置（RT 相机自含视野，主游戏相机不渲染派蒙——免层管理）
-            _游戏内实例.transform.position = new Vector3(0f, 10000f, 0f);
+            _inGameInstance.transform.position = new Vector3(0f, 10000f, 0f);
             Debug.Log("[PetInGameHost] 游戏内实例已创建（RT 画中画）");
         }
 
         private void DestroyInGameInstance()
         {
-            if (_游戏内实例 == null) return;
+            if (_inGameInstance == null) return;
             HostInterface = null;
-            Destroy(_游戏内实例);
-            _游戏内实例 = null;
+            Destroy(_inGameInstance);
+            _inGameInstance = null;
         }
 
         private void OnDestroy()

@@ -80,9 +80,9 @@ namespace GIC.Pet
 
         // 视线静默（出场/退场等仪式动作期间，2026-08-24）：头链完全交给 clip。
         // 恢复时平滑值可能已偏离——首帧先同步到当前骨骼姿态再叠加，防视线"瞬移归位"
-        private bool _静默;
-        private bool _刚恢复; // 静默→恢复的过渡帧标记：重置平滑基准（动画动过头链，旧值失义），本帧不叠加
-        private float _静默淡出权重;
+        private bool _silent;
+        private bool _justResumed; // 静默→恢复的过渡帧标记：重置平滑基准（动画动过头链，旧值失义），本帧不叠加
+        private float _silenceFadeWeight;
         // 淡出速率（指数）：7/s ≈ 0.3s 收敛到 5% 以下——与头平滑速度同量级，读作"目光自然收回"
         private const float silenceFadeRate = 7f;
         // 静默进入淡出（2026-08-27）：进入静默≠瞬停——头链正带着最多水平30°+垂直22°的视线偏转，
@@ -93,28 +93,28 @@ namespace GIC.Pet
         /// <summary>仪式动作（出场/退场/拎起）期间暂停视线跟随：头/颈/眼球全部交给动画曲线。
         /// 进入时若视线层正在写骨则先淡出（约 0.3s 指数收敛，防头部视线偏转单帧弹回）；
         /// 恢复非静默时置过渡标记——首帧用当前骨骼姿态重置平滑基准，防视线瞬移归位。</summary>
-        public void Set视线静默(bool silent)
+        public void SetSilence(bool silent)
         {
-            if (_静默 == silent) return;
-            _静默 = silent;
-            if (silent) _静默淡出权重 = _已初始化 ? 1f : 0f; // 尚未写过视线（如出场前）则无偏转可淡出
-            else _刚恢复 = true; // 解除静默：下一帧重置基准
+            if (_silent == silent) return;
+            _silent = silent;
+            if (silent) _silenceFadeWeight = _initialized ? 1f : 0f; // 尚未写过视线（如出场前）则无偏转可淡出
+            else _justResumed = true; // 解除静默：下一帧重置基准
         }
 
         // 骨引用（启动时按名查，MMD 日文名）
-        private Transform _首, _頭, _目L, _目R;
+        private Transform _neckBone, _headBone, _eyeLBone, _eyeRBone;
         // 首帧姿态快照（世界空间增量法的基准：此刻视为"沿中性视线注视"）
-        private Quaternion _参考首, _参考头, _参考目L, _参考目R;
+        private Quaternion _refNeck, _refHead, _refEyeL, _refEyeR;
         // 眼球本地基线快照：目.L/目.R 在 clip 中无曲线、动画不覆写，以此为每帧重建基准
-        private Quaternion _目本地基线L, _目本地基线R;
-        private Quaternion _平滑首, _平滑头, _平滑目L, _平滑目R;
-        private bool _已初始化;
+        private Quaternion _eyeBaselineL, _eyeBaselineR;
+        private Quaternion _smoothNeck, _smoothHead, _smoothEyeL, _smoothEyeR;
+        private bool _initialized;
 
         void Start()
         {
             if (mainCamera == null) mainCamera = Camera.main;
             CacheBoneRefs();
-            if (_頭 == null)
+            if (_headBone == null)
             {
                 Debug.LogWarning("[PetLookAt] 未找到头骨（頭），视线跟随已禁用");
                 enableLookAt = false;
@@ -134,8 +134,8 @@ namespace GIC.Pet
                 foreach (var t in all) if (t.name == n) return t;
                 return null;
             };
-            _首 = F(neckBoneName); _頭 = F(headBoneName);
-            _目L = F(leftEyeBoneName); _目R = F(rightEyeBoneName);
+            _neckBone = F(neckBoneName); _headBone = F(headBoneName);
+            _eyeLBone = F(leftEyeBoneName); _eyeRBone = F(rightEyeBoneName);
         }
 
         void LateUpdate()
@@ -146,59 +146,59 @@ namespace GIC.Pet
             // 权重 1 起步=纯平滑输出（与抓取前视线连续），权重→0=纯动画姿态；权重耗尽停写时
             // 输出已恒等于动画姿态，结构上无跳变（v1 绝对覆写平滑值：追赶滞后在停写瞬间一次性
             // 释放=目检"转身完成瞬间头角度突变"的根因，2026-08-27）
-            if (_静默)
+            if (_silent)
             {
-                if (!_已初始化 || _静默淡出权重 <= 0.01f) return; // 淡出完毕：头链完全交给 clip
-                _静默淡出权重 *= Mathf.Exp(-silenceFadeRate * Time.deltaTime);
-                float w = _静默淡出权重;
-                if (_首 != null) silenceFadeWriteBone(_首, ref _平滑首, w, headSmoothSpeed);
-                if (_頭 != null) silenceFadeWriteBone(_頭, ref _平滑头, w, headSmoothSpeed);
+                if (!_initialized || _silenceFadeWeight <= 0.01f) return; // 淡出完毕：头链完全交给 clip
+                _silenceFadeWeight *= Mathf.Exp(-silenceFadeRate * Time.deltaTime);
+                float w = _silenceFadeWeight;
+                if (_neckBone != null) silenceFadeWriteBone(_neckBone, ref _smoothNeck, w, headSmoothSpeed);
+                if (_headBone != null) silenceFadeWriteBone(_headBone, ref _smoothHead, w, headSmoothSpeed);
                 if (enableEye)
                 {
-                    if (_目L != null) silenceFadeWriteBone(_目L, ref _平滑目L, w, eyeSmoothSpeed);
-                    if (_目R != null) silenceFadeWriteBone(_目R, ref _平滑目R, w, eyeSmoothSpeed);
+                    if (_eyeLBone != null) silenceFadeWriteBone(_eyeLBone, ref _smoothEyeL, w, eyeSmoothSpeed);
+                    if (_eyeRBone != null) silenceFadeWriteBone(_eyeRBone, ref _smoothEyeR, w, eyeSmoothSpeed);
                 }
                 return;
             }
 
             // 静默恢复首帧：动画期间头链被 clip 驱动，旧平滑值失义——重置为当前姿态防瞬移，本帧不叠加
-            if (_刚恢复)
+            if (_justResumed)
             {
-                _刚恢复 = false;
-                _平滑首 = _首 != null ? _首.rotation : Quaternion.identity;
-                _平滑头 = _頭.rotation;
-                _平滑目L = _目L != null ? _目L.rotation : Quaternion.identity;
-                _平滑目R = _目R != null ? _目R.rotation : Quaternion.identity;
+                _justResumed = false;
+                _smoothNeck = _neckBone != null ? _neckBone.rotation : Quaternion.identity;
+                _smoothHead = _headBone.rotation;
+                _smoothEyeL = _eyeLBone != null ? _eyeLBone.rotation : Quaternion.identity;
+                _smoothEyeR = _eyeRBone != null ? _eyeRBone.rotation : Quaternion.identity;
                 return;
             }
 
             // 首帧：动画采样完成后快照参考姿态（增量法基准），本帧不叠加
-            if (!_已初始化)
+            if (!_initialized)
             {
-                _参考首 = _首 != null ? _首.rotation : Quaternion.identity;
-                _参考头 = _頭.rotation;
-                _参考目L = _目L != null ? _目L.rotation : Quaternion.identity;
-                _参考目R = _目R != null ? _目R.rotation : Quaternion.identity;
-                _目本地基线L = _目L != null ? _目L.localRotation : Quaternion.identity;
-                _目本地基线R = _目R != null ? _目R.localRotation : Quaternion.identity;
-                _平滑首 = _参考首; _平滑头 = _参考头; _平滑目L = _参考目L; _平滑目R = _参考目R;
-                _已初始化 = true;
+                _refNeck = _neckBone != null ? _neckBone.rotation : Quaternion.identity;
+                _refHead = _headBone.rotation;
+                _refEyeL = _eyeLBone != null ? _eyeLBone.rotation : Quaternion.identity;
+                _refEyeR = _eyeRBone != null ? _eyeRBone.rotation : Quaternion.identity;
+                _eyeBaselineL = _eyeLBone != null ? _eyeLBone.localRotation : Quaternion.identity;
+                _eyeBaselineR = _eyeRBone != null ? _eyeRBone.localRotation : Quaternion.identity;
+                _smoothNeck = _refNeck; _smoothHead = _refHead; _smoothEyeL = _refEyeL; _smoothEyeR = _refEyeR;
+                _initialized = true;
                 return;
             }
 
             // 宿主分发（IPetHost，2026-08-27 批次 B）：桌面=窗口控制器字段（PetHostBase）；游戏内=PetInGameHost 注入
             var host = winController != null ? winController : (IPetHost)PetInGameHost.HostInterface;
-            if (host == null || !host.TryGet光标Unity屏幕位置(out Vector2 sp)) return;
+            if (host == null || !host.TryGetCursorUnityScreenPos(out Vector2 sp)) return;
 
             // 归一化偏移（-1..1）基准=头骨屏幕投影（2026-08-25 修复：原以屏幕中心为基准——
             // 派蒙不在窗口中心（缩放改变屏幕占比+构图本就偏置），鼠标与眼睛水平时
             // sp.y-Screen.height*0.5≠0 → 恒定抬头/低头偏差。以头部实际屏幕位置为基准后
             // "看着眼睛"=零偏转，缩放/窗口位置无关）
-            Vector3 headScreen = mainCamera.WorldToScreenPoint(_頭.position);
-            Vector2 基准 = new Vector2(headScreen.x, headScreen.y);
+            Vector3 headScreen = mainCamera.WorldToScreenPoint(_headBone.position);
+            Vector2 refPoint = new Vector2(headScreen.x, headScreen.y);
             Vector2 offset = new Vector2(
-                Mathf.Clamp((sp.x - 基准.x) / screenMaxOffset, -1f, 1f),
-                Mathf.Clamp((sp.y - 基准.y) / screenMaxOffset, -1f, 1f));
+                Mathf.Clamp((sp.x - refPoint.x) / screenMaxOffset, -1f, 1f),
+                Mathf.Clamp((sp.y - refPoint.y) / screenMaxOffset, -1f, 1f));
 
             // 目标增量：绕世界 up(yaw)/right(pitch) 轴，与骨骼局部系无关
             // Euler 约定：+X = 向下（docs/14 §8.1），故抬头用 -pitch
@@ -210,16 +210,16 @@ namespace GIC.Pet
 
             // 先颈后头：父骨先应用，子骨后读取的世界旋转已含父级增量
             // 颈+头分担之和=1，总偏转恰为目标增量（v4 头叠加满份致 1.35× 过冲）
-            Quaternion headAnimWorld = _頭.rotation; // 应用前快照本帧动画姿态：眼球余量的测量基准
-            if (_首 != null)
-                applyBone(_首, ref _平滑首, targetDelta, neckShare, headSmoothSpeed);
-            applyBone(_頭, ref _平滑头, targetDelta, 1f - neckShare, headSmoothSpeed);
+            Quaternion headAnimWorld = _headBone.rotation; // 应用前快照本帧动画姿态：眼球余量的测量基准
+            if (_neckBone != null)
+                applyBone(_neckBone, ref _smoothNeck, targetDelta, neckShare, headSmoothSpeed);
+            applyBone(_headBone, ref _smoothHead, targetDelta, 1f - neckShare, headSmoothSpeed);
 
             // 眼球：余量 = inv(头链本帧实际叠加增量) × 目标增量——头未转满时眼球快速补足，
             // 头收敛后余量归零、眼球随动画回中（不反向顶眼白、不被待机摇晃带着自转）
             if (enableEye)
             {
-                Quaternion headTurned = _頭.rotation * Quaternion.Inverse(headAnimWorld);
+                Quaternion headTurned = _headBone.rotation * Quaternion.Inverse(headAnimWorld);
                 Quaternion eyeMargin = Quaternion.Inverse(headTurned) * targetDelta;
                 eyeMargin.ToAngleAxis(out float eyeCorner, out Vector3 eyeAxis);
                 if (eyeCorner > 180f) eyeCorner -= 360f;
@@ -228,17 +228,17 @@ namespace GIC.Pet
                 {
                     eyeAxis.Normalize();
                     Quaternion eyeDelta = Quaternion.AngleAxis(eyeCorner, eyeAxis);
-                    if (_目L != null) applyEye(_目L, _目本地基线L, ref _平滑目L, eyeDelta);
-                    if (_目R != null) applyEye(_目R, _目本地基线R, ref _平滑目R, eyeDelta);
+                    if (_eyeLBone != null) applyEye(_eyeLBone, _eyeBaselineL, ref _smoothEyeL, eyeDelta);
+                    if (_eyeRBone != null) applyEye(_eyeRBone, _eyeBaselineR, ref _smoothEyeR, eyeDelta);
                 }
             }
         }
 
         /// <summary>在动画世界旋转上叠加目标增量（share=叠加比例），指数阻尼平滑</summary>
-        void applyBone(Transform bone, ref Quaternion 平滑, Quaternion targetDelta, float share, float smoothVel)
+        void applyBone(Transform bone, ref Quaternion smooth, Quaternion targetDelta, float share, float smoothVel)
         {
             Quaternion delta = Quaternion.Slerp(Quaternion.identity, targetDelta, share);
-            applyBoneDelta(bone, ref 平滑, delta, smoothVel);
+            applyBoneDelta(bone, ref smooth, delta, smoothVel);
         }
 
         /// <summary>静默淡出写骨（2026-08-27 v2 无跳变版）：淡出终点=本帧动画姿态（含惯性化输出，
@@ -247,31 +247,31 @@ namespace GIC.Pet
         /// 姿态——停写时输出已恒等于动画姿态，追赶滞后被权重缩到 1% 以下，结构上无跳变。
         /// 眼球同路径（终点=动画曲线姿态而非启动基线——GI 模型 +EyeBone 有 clip 曲线，淡到"中性"
         /// 会在停写时跳回曲线值）。</summary>
-        void silenceFadeWriteBone(Transform bone, ref Quaternion 平滑, float w, float catchUpRate)
+        void silenceFadeWriteBone(Transform bone, ref Quaternion smooth, float w, float catchUpRate)
         {
-            Quaternion 动画姿态 = bone.rotation;
+            Quaternion animPose = bone.rotation;
             float k = 1f - Mathf.Exp(-catchUpRate * Time.deltaTime);
-            平滑 = Quaternion.Slerp(平滑, 动画姿态, k);
-            bone.rotation = Quaternion.Slerp(动画姿态, 平滑, w);
+            smooth = Quaternion.Slerp(smooth, animPose, k);
+            bone.rotation = Quaternion.Slerp(animPose, smooth, w);
         }
 
         /// <summary>在动画世界旋转上叠加增量，指数阻尼平滑</summary>
-        void applyBoneDelta(Transform bone, ref Quaternion 平滑, Quaternion delta, float smoothVel)
+        void applyBoneDelta(Transform bone, ref Quaternion smooth, Quaternion delta, float smoothVel)
         {
             Quaternion expected = delta * bone.rotation;
             float k = 1f - Mathf.Exp(-smoothVel * Time.deltaTime);
-            平滑 = Quaternion.Slerp(平滑, expected, k);
-            bone.rotation = 平滑;
+            smooth = Quaternion.Slerp(smooth, expected, k);
+            bone.rotation = smooth;
         }
 
         /// <summary>眼球：本地基线重建中性姿态（父骨当前世界旋转 × 启动时本地快照）后叠加余量并平滑。
         /// 目骨在 clip 中无曲线、动画不覆写，不能在自身当前旋转上累积（会复利式自转）。</summary>
-        void applyEye(Transform eye, Quaternion localBaseline, ref Quaternion 平滑, Quaternion margin)
+        void applyEye(Transform eye, Quaternion localBaseline, ref Quaternion smooth, Quaternion margin)
         {
             Quaternion expected = margin * (eye.parent.rotation * localBaseline);
             float k = 1f - Mathf.Exp(-eyeSmoothSpeed * Time.deltaTime);
-            平滑 = Quaternion.Slerp(平滑, expected, k);
-            eye.rotation = 平滑;
+            smooth = Quaternion.Slerp(smooth, expected, k);
+            eye.rotation = smooth;
         }
     }
 }

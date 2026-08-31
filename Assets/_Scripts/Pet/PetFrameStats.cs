@@ -40,7 +40,6 @@ namespace GIC.Pet
         private PetBehaviorController _behavior;
         private PetLookAtController _lookAt;
         private PaimonDropShadowController _dropShadow;
-        private PetFingerPoseController _finger;
         private PetBlinkController _blink;
         private PetEmotionController _emotion;
         private Animation _anim;
@@ -75,7 +74,6 @@ namespace GIC.Pet
             _behavior = GetComponent<PetBehaviorController>();
             _lookAt = GetComponent<PetLookAtController>();
             _dropShadow = GetComponent<PaimonDropShadowController>();
-            _finger = GetComponent<PetFingerPoseController>();
             _blink = GetComponent<PetBlinkController>();
             _emotion = GetComponent<PetEmotionController>();
             _anim = GetComponent<Animation>();
@@ -105,7 +103,6 @@ namespace GIC.Pet
             if (_behavior != null) _behavior.enabled = !diagOn;
             if (_lookAt != null) _lookAt.enabled = !diagOn || p == 3;
             if (_dropShadow != null) _dropShadow.enabled = !diagOn || p == 4;
-            if (_finger != null) _finger.enabled = !diagOn;
             if (_blink != null) _blink.enabled = !diagOn || p == 2;
             if (_emotion != null) _emotion.enabled = !diagOn;
             _fadeTimer = 0f;

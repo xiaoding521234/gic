@@ -6813,9 +6813,9 @@ MonoBehaviour:
   initScaleFactor: 0.7
   scaleSmoothSpeed: 12
   scaleStep: 1.05
-  "paimon\u6839": {fileID: 7945286511653141383}
+  paimonRoot: {fileID: 7945286511653141383}
   petCamera: {fileID: 8642857954912725697}
-  "rt\u500D\u7387": 1
+  rtMultiplier: 1
   maxScreenHeightRatio: 0.95
   equivCanvasH: 825
   screenRefH: 1080
@@ -6887,6 +6887,9 @@ MonoBehaviour:
   typeIntervalSec: 0.02
   noKeyPrompt: "\u8FD8\u6CA1\u8BBE\u7F6E API Key \u54E6\uFF01\u53BB \u8BBE\u7F6E\u2192\u6D3E\u8499\u2192\u5BF9\u8BDD
     API Key \u91CC\u586B\u4E00\u4E2A\u5427\u3002"
+  proactiveHoldSec: 6
+  fadeSec: 0.25
+  inputFadeSec: 0.15
 --- !u!1 &7323180549741893668
 GameObject:
   m_ObjectHideFlags: 0
@@ -8131,7 +8134,6 @@ MonoBehaviour:
   - animNameFrag: SitLoop
     emotionName: 
   emotionCtrl: {fileID: 6511879956086342942}
-  fingerPoseCtrl: {fileID: 0}
   animTransitionSec: 0.6
   inertializer: {fileID: 7479904176408885991}
   prewarmOnStart: 1
@@ -8326,10 +8328,10 @@ MonoBehaviour:
   mainCam: {fileID: 8642857954912725697}
   blurTemplate: {fileID: 2100000, guid: c293a4a8de5f5ed4b9f7185a19a87ec3, type: 2}
   compositeTemplate: {fileID: 2100000, guid: c2da19c292c4fd04d9a3e3f5cd8724c3, type: 2}
-  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.6}
-  "\u9634\u5F71\u504F\u79FB\u50CF\u7D20": {x: 0, y: -24}
-  "\u6A21\u7CCA\u534A\u5F84\u50CF\u7D20": 14
-  "\u9634\u5F71\u8D34\u56FE\u9AD8\u5EA6": 512
+  shadowColor: {r: 0, g: 0, b: 0, a: 0.6}
+  shadowOffsetPx: {x: 0, y: -24}
+  blurRadiusPx: 14
+  shadowTexHeight: 512
   enableShadow: 1
 --- !u!114 &4672168011806355971
 MonoBehaviour:
@@ -8348,7 +8350,6 @@ MonoBehaviour:
   blinkCtrl: {fileID: 4949557729116784227}
   lookAtCtrl: {fileID: 4452492985777622915}
   emotionCtrl: {fileID: 6511879956086342942}
-  edgeSitCtrl: {fileID: 0}
   liftAnimName: Ani_NPC_Kanban_Paimon_Drag01
   mainCamera: {fileID: 8642857954912725697}
   bodyRenderer: {fileID: 0}
@@ -8372,7 +8373,7 @@ MonoBehaviour:
   - Ani_NPC_Kanban_Paimon_Show_2
   - Ani_NPC_Kanban_Paimon_Show_3
   - Ani_NPC_Kanban_Paimon_Show_4
-  "\u5C0F\u52A8\u4F5C\u95F4\u9694\u79D2": {x: 15, y: 20}
+  randomAnimIntervalSec: {x: 15, y: 20}
   appearAnimName: Ani_NPC_Kanban_Paimon_Appear
   exitAnimName: Ani_NPC_Kanban_Paimon_Disappear
 --- !u!114 &7479904176408885991

@@ -11,7 +11,7 @@ namespace GIC.Pet
     /// <summary>
     /// 边缘坐控制器（2026-08-27，用户需求"派蒙坐在屏幕或窗口的横框上"；2026-08-28 补窗口下边框）：
     /// 拖拽松手时探测附近"横框"（窗口顶边=标题栏上沿 / 窗口底边=坐下沿身体在窗前腿垂窗下 /
-    /// 任务栏顶=工作区底）→ 磁吸贴合播坐姿动画
+    /// 任务栏顶=workAreaBottom）→ 磁吸贴合播坐姿动画
     /// （SitUpright 合成直坐；SitLoop 原版定性"生病坐姿"已弃用，2026-08-27）；
     /// 坐定后跟随锚定窗口移动（窗口拖走/改尺寸她贴着走）；锚定窗口最小化/关闭/隐藏 → 沿 eSheep 语义
     /// 重力掉落，途中可落在更低窗口顶边，兜底落任务栏顶，全程无缝衔接回坐姿。
@@ -22,7 +22,7 @@ namespace GIC.Pet
     ///   变化时按水平比例重定位、垂直直跟；窗口失效（GetWindowRect 失败/归零）→ 掉落。
     /// - 本实现按固定画布体制重写：移动的是窗口本身（SetWindowPos），模型在画布内照常演——与
     ///   PetWindowController"窗口唯一移动源"清单一致（本组件=第④个显式移动源：边缘坐交互，
-    ///   非动画副作用）。接触基准=骨盆投影（TryGet接触点屏幕位置，2026-08-27 目检纠正：坐姿接触线
+    ///   非动画副作用）。接触基准=骨盆投影（TryGetContactScreenPos，2026-08-27 目检纠正：坐姿接触线
     ///   是屁股不是脚），贴合目标=可见帧顶边。
     ///
     /// 设计决策（2026-08-27 V1）：
@@ -30,7 +30,7 @@ namespace GIC.Pet
     ///   "松手即停原地"（2026-08-26 拖拽终案）不能推翻：仅在松手位置落在横框附近（上 120px/下 60px，
     ///   2026-08-27 目检调大后终值）时磁吸落座，其余位置维持原地站立（既有行为零变化）。
     /// ②窗口消失的掉落是 eSheep 语义（她坐着的东西没了必然下落）：重力加速+逐帧跨越检测+途中窗口
-    ///   顶边可接住+任务栏顶兜底，永不无限下落（工作区底恒存在）。
+    ///   顶边可接住+任务栏顶兜底，永不无限下落（workAreaBottom恒存在）。
     /// ③窗口顶边取 DWM 可见帧（DWMWA_EXTENDED_FRAME_BOUNDS）而非 GetWindowRect——Win10/11 DWM 窗口
     ///   GetWindowRect 含 7px 不可见阴影边，直接贴会"悬空 7px"；DWM 帧才是肉眼可见边框（主流桌宠
     ///   Desktop Mate/VPet 同款做法）。取不到时回退 GetWindowRect。
@@ -84,7 +84,7 @@ namespace GIC.Pet
         private enum EdgeSitState { none, IsFalling, Sit, scaleAdjusting }
         private EdgeSitState state = EdgeSitState.none;
 
-        /// <summary>坐定中的锚定窗口句柄；IntPtr.Zero=屏幕锚定（任务栏顶/工作区底，永不失效）</summary>
+        /// <summary>坐定中的锚定窗口句柄；IntPtr.Zero=屏幕锚定（任务栏顶/workAreaBottom，永不失效）</summary>
         private IntPtr anchorHwnd = IntPtr.Zero;
         private bool anchoredBottom;             // true=锚定窗口底边（坐下沿：跟随/贴正取 r.Bottom）；false=顶边（取 r.Top）——2026-08-28 补
         private RECT anchorRect;              // 坐定时的锚定窗口可见帧（跟随变化检测）
@@ -92,7 +92,7 @@ namespace GIC.Pet
         private float contactX, contactY;         // 接触线屏幕坐标（物理像素，虚拟桌面系）
         private float fallSpeed;
         private float settleUntil = -10f; // 坐定后 坐定贴正秒 内逐帧贴正骨盆（站→坐姿势过渡补偿）
-        private float _上次缩放 = -1f;      // 坐定中监听的目标缩放（缩放露馅修正入口；-1=未初始化）
+        private float _lastScale = -1f;      // 坐定中监听的目标缩放（缩放露馅修正入口；-1=未初始化）
         private float _scaleStableAt = -10f;  // 缩放过渡结束后的重新落座时刻（<0=未起算）
         private float lastEnumAt = -10f;
         private float lastCloakCheckAt = -10f; // 坐定期 cloaked 低频检查节流
@@ -117,17 +117,17 @@ namespace GIC.Pet
         public bool EvaluateSnapAndSit()
         {
             if (winController == null || !winController.IsWindowRestyled) return false;
-            if (!winController.TryGet接触点屏幕位置(out Vector2 footBottom)) return false;
+            if (!winController.TryGetContactScreenPos(out Vector2 footBottom)) return false;
 
             EnumerateEdges();
-            CandidateEdge best = default; bool found = false; float 最小距 = float.MaxValue; bool best下边 = false;
+            CandidateEdge best = default; bool found = false; float minDist = float.MaxValue; bool bestBottom = false;
             // 屏幕底横框（任务栏顶）同场参评：拖到任务栏上松手=坐任务栏
-            int 工作区底 = GetWorkAreaBottomAt(footBottom.x);
-            if (InWorkAreaX(footBottom.x) && footBottom.y >= 工作区底 - snapRangeTopPx && footBottom.y <= 工作区底 + snapRangeBottomPx)
+            int workAreaBottom = GetWorkAreaBottomAt(footBottom.x);
+            if (InWorkAreaX(footBottom.x) && footBottom.y >= workAreaBottom - snapRangeTopPx && footBottom.y <= workAreaBottom + snapRangeBottomPx)
             {
-                最小距 = Mathf.Abs(footBottom.y - 工作区底);
+                minDist = Mathf.Abs(footBottom.y - workAreaBottom);
                 found = true;
-                best = new CandidateEdge { hwnd = IntPtr.Zero, rect = new RECT { Left = int.MinValue, Top = 工作区底, Right = int.MaxValue, Bottom = int.MaxValue } };
+                best = new CandidateEdge { hwnd = IntPtr.Zero, rect = new RECT { Left = int.MinValue, Top = workAreaBottom, Right = int.MaxValue, Bottom = int.MaxValue } };
             }
             // 每个候选窗口两条横框参评（2026-08-28 补下边框）：顶边（坐上沿，腿垂窗前）与底边
             // （坐下沿，身体在窗前、腿垂窗下）；磁吸窗=边线上 120px / 下 60px（终值，与 Inspector
@@ -139,20 +139,20 @@ namespace GIC.Pet
                 if (dTop >= -snapRangeTopPx && dTop <= snapRangeBottomPx)
                 {
                     float d = Mathf.Abs(dTop);
-                    if (d < 最小距) { 最小距 = d; found = true; best = c; best下边 = false; }
+                    if (d < minDist) { minDist = d; found = true; best = c; bestBottom = false; }
                 }
                 float dBottom = footBottom.y - c.rect.Bottom;
                 if (dBottom >= -snapRangeTopPx && dBottom <= snapRangeBottomPx)
                 {
                     float d = Mathf.Abs(dBottom);
-                    if (d < 最小距) { 最小距 = d; found = true; best = c; best下边 = true; }
+                    if (d < minDist) { minDist = d; found = true; best = c; bestBottom = true; }
                 }
             }
             if (!found) return false;
 
             contactX = footBottom.x;
-            contactY = best下边 ? best.rect.Bottom : best.rect.Top;
-            Sit(best.hwnd, best.rect, best下边);
+            contactY = bestBottom ? best.rect.Bottom : best.rect.Top;
+            Sit(best.hwnd, best.rect, bestBottom);
             return true;
         }
 
@@ -177,9 +177,9 @@ namespace GIC.Pet
                     // 缩放露馅修正（2026-08-27 用户拍板）：模型绕脚底长高而窗口不动，坐姿骨盆会浮离窗沿
                     // （放大上浮/缩小下沉）。坐姿下滚轮改缩放=先切回站立待机，缩放稳定后按锚点重新落座。
                     float scale = winController.TargetScaleValue;
-                    if (!Mathf.Approximately(scale, _上次缩放))
+                    if (!Mathf.Approximately(scale, _lastScale))
                     {
-                        _上次缩放 = scale;
+                        _lastScale = scale;
                         state = EdgeSitState.scaleAdjusting;
                         _scaleStableAt = -10f;
                         if (animPlayer != null && animPlayer.HasAnim(standAnimName))
@@ -193,7 +193,7 @@ namespace GIC.Pet
                 case EdgeSitState.scaleAdjusting:
                 {
                     float scale = winController.TargetScaleValue;
-                    if (!Mathf.Approximately(scale, _上次缩放)) { _上次缩放 = scale; _scaleStableAt = -10f; } // 连续滚轮：重等稳定
+                    if (!Mathf.Approximately(scale, _lastScale)) { _lastScale = scale; _scaleStableAt = -10f; } // 连续滚轮：重等稳定
                     if (winController.ScaleTransitioning) { _scaleStableAt = -10f; break; }               // 平滑过渡进行中
                     if (_scaleStableAt < 0f) { _scaleStableAt = Time.unscaledTime + 0.3f; break; } // 刚到位，宽限
                     if (Time.unscaledTime < _scaleStableAt) break;
@@ -295,11 +295,11 @@ namespace GIC.Pet
                 Sit(crossed.hwnd, crossed.rect, false); // 下落只能落在上方表面（顶边）——从上往下跨过底边前必先跨过同窗顶边
                 return;
             }
-            // 任务栏顶/屏幕底兜底：跨越或已越界都接住（后者覆盖"锚点本就在工作区底以下"的奇态）
-            int 工作区底 = GetWorkAreaBottomAt(contactX);
-            if (contactY >= 工作区底)
+            // 任务栏顶/屏幕底兜底：跨越或已越界都接住（后者覆盖"锚点本就在workAreaBottom以下"的奇态）
+            int workAreaBottom = GetWorkAreaBottomAt(contactX);
+            if (contactY >= workAreaBottom)
             {
-                contactY = 工作区底;
+                contactY = workAreaBottom;
                 Sit(IntPtr.Zero, default, false); // 屏幕锚定
                 return;
             }
@@ -319,7 +319,7 @@ namespace GIC.Pet
             winController.PauseHitBaking = false; // 解除暂停→2s 宽限后补烘坐姿碰撞体（既有一次性机制）
             winController.MarkPosDirty();
             settleUntil = Time.unscaledTime + sitSettleSec;
-            _上次缩放 = winController.TargetScaleValue; // 防陈旧值误触发缩放重坐（坐下时同步当前倍率）
+            _lastScale = winController.TargetScaleValue; // 防陈旧值误触发缩放重坐（坐下时同步当前倍率）
             if (animPlayer != null && animPlayer.HasAnim(sitAnimName))
                 animPlayer.Play(sitAnimName);
             if (printStateLog)
@@ -338,7 +338,7 @@ namespace GIC.Pet
         {
             state = EdgeSitState.IsFalling;
             fallSpeed = 0f;
-            if (!winController.TryGet接触点屏幕位置(out Vector2 footBottom)) { Release(true); return; }
+            if (!winController.TryGetContactScreenPos(out Vector2 footBottom)) { Release(true); return; }
             contactX = footBottom.x;
             contactY = footBottom.y;
             EnumerateEdges();
@@ -402,7 +402,7 @@ namespace GIC.Pet
             return GetMonitorInfoW(mon, ref mi) && x >= mi.rcWork.Left - hTolerancePx && x <= mi.rcWork.Right + hTolerancePx;
         }
 
-        /// <summary>脚底所在显示器的工作区底（=任务栏顶/屏幕底，物理像素）——掉落兜底地面。
+        /// <summary>脚底所在显示器的workAreaBottom（=任务栏顶/屏幕底，物理像素）——掉落兜底地面。
         /// 显示器取脚底当前位置最近的（脚底可能在两屏间，掉落中 X 不动所以地面恒定）。</summary>
         private int GetWorkAreaBottomAt(float x)
         {

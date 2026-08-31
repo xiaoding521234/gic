@@ -10,30 +10,19 @@ namespace GIC.Pet.Chat
 {
     /// <summary>
     /// 派蒙对话客户端（docs/19 §6.5）：OpenAI 兼容 /chat/completions 薄层——多供应商
-    /// （PetChatProviders 注册表：DeepSeek/Kimi/GLM/通义/OpenAI，端点+模型名按设置里选的供应商
-    /// 现取，2026-08-29 起不再绑死 DeepSeek）+ SSE 流式解析 + 工具调用（function calling）。
+    /// （PetChatProviders 注册表：DeepSeek/Kimi/GLM/通义/OpenAI）+ SSE 流式解析 + 工具调用。
     ///
-    /// 传输层=UnityWebRequest + DownloadHandlerScript（2026-08-29 重写，替换 HttpClient）：
-    /// HttpClient 版实测"整局卡住→一次性出完整回复"——Unity Mono 的 HttpContent.ReadAsStreamAsync
-    /// 沿 .NET Framework 血统**整体缓冲响应**（MS 文档：Task 在全部内容读完后才完成），SSE 增量
-    /// 无法逐块送达，且 StreamReader.EndOfStream 的同步读可能落在主线程上；社区通行方案即
-    /// UnityWebRequest+DownloadHandlerScript（官方文档：下载在 worker 线程，ReceiveData 回调
-    /// 在主线程逐块送达）——打字机气泡吃到的就是真正的流式增量。
-    ///
-    /// 超时=手工看门狗（UnityWebRequest.timeout 语义含糊会腰斩长流式回复，恒置 0）：
-    /// 首字节超过 超时秒 / 流中 90s 无数据 → Abort 并报错；流一旦开始则不限总时长。
-    ///
-    /// 密钥链路（2026-08-28 用户拍板：玩家自输 key，存档加密存储）：设置界面经 PetApiKeyCrypto
-    /// 加密写主存档+pet.json（WriteChatCipher 直写）；本层每次请求 PetPrefs.ReadChatCipher 直读
-    /// 磁盘解密（绕进程缓存=改 key 即生效+跨进程新鲜），兜底供应商环境变量（开发用）。
-    ///
-    /// SSE 解析规格：delta 三通道（reasoning_content 思考增量 / content 正文增量 / tool_calls 按
-    /// index 拼接：name 首块、arguments 分片累加），data: [DONE] 结束；HTTP 错误响应体（非 SSE，
-    /// 无 data: 前缀）累积在 rawBody 供完成时提取 error.message。
-    ///
-    /// 薄层回调（非 event：字段可直接赋值）。约定——任何一方只摘自己接的处理器（持引用 -=），
-    /// 勿整体置 null：UI 层的 正文增量/错误 先于会话接线，整体置 null 会抹掉它们
-    /// （2026-08-29 "发送后无回复无报错" 事故实证）。
+    /// 【传输层铁律】UnityWebRequest + DownloadHandlerScript——勿改回 HttpClient：Unity Mono 的
+    /// ReadAsStreamAsync 整体缓冲响应=SSE 假流式（用户实测"整局卡住后一次性出全文"）；
+    /// ReceiveData 在主线程逐块送达=打字机气泡吃到真流式。
+    /// 【超时】手工看门狗（UnityWebRequest.timeout 会腰斩长流式回复，恒置 0）：首字节超过
+    /// timeoutSec / 流中 90s 无数据 → Abort 报错；流一旦开始则不限总时长。
+    /// 【密钥】每请求 PetPrefs.ReadChatCipher 直读磁盘解密（绕进程缓存=改 key 即生效+跨进程新鲜），
+    /// 兜底供应商环境变量（开发用）。
+    /// 【SSE 规格】delta 三通道（reasoning_content/content/tool_calls 按 index 拼接：name 首块、
+    /// arguments 分片累加）；HTTP 错误体（无 data: 前缀）累积 rawBody 供收尾提取 error.message。
+    /// 【回调约定——防事故】onXxx 是公共 Action 字段（非 event）：任何一方只摘自己接的处理器
+    /// （持引用 -=），勿整体赋值（=）——会顶掉另一方的处理器（2026-08-29 事故实证）。
     /// </summary>
     public class PetChatClient : MonoBehaviour
     {
@@ -67,6 +56,12 @@ namespace GIC.Pet.Chat
         // 运行时请求状态（工具循环会串行重入：完成回调里会话层同步发下一轮）
         private UnityWebRequest _activeRequest;
         private bool _watchdogAbort;
+        // AbortActive 主动中止的请求（2026-08-31 修复）：按请求引用静默标记——它的收尾**不触发
+        // 任何回调**。旧实现设 _watchdogAbort=true 想静默，但新请求的 RequestStream 会立刻把它
+        // 重置 false，被中止的旧请求下一帧收尾读到 false 走 ConnectionError 分支照样触发 onError
+        // ——此时回调已被新请求方重接（对话优先），用户对话气泡会闪一条"哎呀…Request aborted"
+        // 假错误。共享布尔按请求隔离后，看门狗路径（要报错）与主动中止路径（静默）彻底分流。
+        private UnityWebRequest _silentlyAborted;
 
         /// <summary>当前供应商（存档值 → 表；非法钳 0）</summary>
         private PetChatProviders.ProviderInfo provider => PetChatProviders.Resolve(PetPrefs.ReadChatProvider());
@@ -139,12 +134,13 @@ namespace GIC.Pet.Chat
             AbortActive();
         }
 
-        /// <summary>中止在途请求（宿主退场/组件销毁时防泄漏）</summary>
+        /// <summary>中止在途请求（宿主退场/组件销毁/新请求发出前防泄漏）。**静默**：被中止请求的
+        /// 收尾不触发任何回调（见 _silentlyAborted 注释——回调可能已被新请求方重接）。</summary>
         public void AbortActive()
         {
             if (_activeRequest != null && !_activeRequest.isDone)
             {
-                _watchdogAbort = true; // 静默：销毁路径不触发 onError
+                _silentlyAborted = _activeRequest;
                 try { _activeRequest.Abort(); } catch (Exception) { }
             }
             _activeRequest = null;
@@ -215,6 +211,12 @@ namespace GIC.Pet.Chat
         {
             try
             {
+                if (req == _silentlyAborted)
+                {
+                    // 主动中止的请求静默收尾：不触发 onError/onComplete（2026-08-31 修复）
+                    _silentlyAborted = null;
+                    return;
+                }
                 if (_watchdogAbort)
                 {
                     onError?.Invoke(handler.receivedAny
