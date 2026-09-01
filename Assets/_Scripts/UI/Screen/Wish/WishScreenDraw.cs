@@ -87,6 +87,12 @@ namespace GIC.UI
 
             if (drawController != null)
             {
+                // 扣费在入口层完成（表现层不做货币写操作）；CanAfford 已查且同栈无消耗点，失败仅防御
+                if (!_wishManager.ConsumePrimogem(count))
+                {
+                    PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Wish_NoPrimogem"));
+                    return;
+                }
                 drawController.StartWish(_wishManager, _currentPool, count);
                 // 派蒙对玩家手气的反应（2026-08-31）：玩家手抽轮挂观察者——抽到好卡/连烂时
                 // 派蒙有动作+LLM 话语（与派蒙代抽严格区分，观察者内部校验 IsAutoDraw 防串场）
@@ -103,7 +109,7 @@ namespace GIC.UI
 
         /// <summary>AI 自动抽卡基础就绪：管理器已建+无角色切换进行中（Start 的默认首选完成后即满足）。
         /// 注意卡池可能仍为空——卡池界面首个角色未必绑定卡池（如 Columbina），由 EnsurePoolSelected 补选</summary>
-        public bool IsBaseReady => _wishManager != null && !isSwitching;
+        public bool IsBaseReady => _wishManager != null && !_isSwitching;
 
         /// <summary>确保选中了绑定可用卡池的角色（AI 自动抽卡用，2026-08-30）：当前卡池有效则不动；
         /// 否则选第一个绑定了卡池的角色（与手动点击角色按钮同路径——默认选中的首个角色可能无卡池，
@@ -125,7 +131,7 @@ namespace GIC.UI
 
         /// <summary>AI 自动抽卡就绪：管理器已建 + 卡池已选 + 非切换中（Start 后默认角色选中完成）。
         /// 不含 IsWishInProgress——进行中由 TryStartAutoDraw 判 Busy</summary>
-        public bool IsAutoDrawReady => _wishManager != null && _currentPool != null && !isSwitching;
+        public bool IsAutoDrawReady => _wishManager != null && _currentPool != null && !_isSwitching;
 
         /// <summary>抽卡控制器（PetWishAutoRunner 订阅 OnShotPlanned/OnWishComplete 用）</summary>
         public WishDrawController DrawController => drawController;
@@ -149,6 +155,7 @@ namespace GIC.UI
             if (_currentPool == null || _currentPool.units.Count == 0 && _currentPool.items.Count == 0)
                 return AutoDrawStartResult.PoolEmpty;
             if (!_wishManager.CanAfford(count)) return AutoDrawStartResult.NoPrimogem;
+            if (!_wishManager.ConsumePrimogem(count)) return AutoDrawStartResult.NoPrimogem; // 防御：CanAfford 后同栈无消耗点，理论不可达
 
             UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(null);
             drawController.StartWish(_wishManager, _currentPool, count, autoShoot: true);

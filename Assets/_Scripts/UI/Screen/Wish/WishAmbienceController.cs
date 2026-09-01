@@ -19,7 +19,6 @@ namespace GIC.UI
         [SerializeField] private ParticleSystem smokeParticles;
         [SerializeField] private ParticleSystem elementParticles;
 
-        private Color _currentColor = Color.white;
         private ParticleSystem.Particle[] _particleBuffer = new ParticleSystem.Particle[128];
         private Coroutine _speedBoostCoroutine;
 
@@ -114,8 +113,6 @@ namespace GIC.UI
         /// </summary>
         public void SetElementColor(Color color)
         {
-            _currentColor = color;
-
             if (elementParticles != null)
             {
                 var main = elementParticles.main;

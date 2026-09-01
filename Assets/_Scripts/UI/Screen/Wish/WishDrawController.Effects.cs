@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;
@@ -73,12 +74,17 @@ namespace GIC.UI
 
         #region fateLine
 
+        // 材质实例缓存（每次射击复用，协程中断时线体由 CleanupFateLines 兜底清理）
+        private Material _fateLineMaterial;
+        private readonly List<GameObject> _activeFateLines = new();
+
         private IEnumerator FateLineCoroutine(bool isEncounter = false)
         {
             Color lineColor = isEncounter ? encounterLineColor : fateLineColor;
             var lineObj = new GameObject(isEncounter ? "EncounterLine" : "FateLine", typeof(RectTransform), typeof(Image));
             lineObj.transform.SetParent(fateLineContainer, false);
             lineObj.layer = fateLineContainer.gameObject.layer;
+            _activeFateLines.Add(lineObj);
 
             var lineImg = lineObj.GetComponent<Image>();
             lineImg.color = lineColor;
@@ -86,8 +92,10 @@ namespace GIC.UI
 
             if (_fateLineShader == null)
                 _fateLineShader = Shader.Find("UI/FateLine");
-            if (_fateLineShader != null)
-                lineImg.material = new Material(_fateLineShader);
+            if (_fateLineMaterial == null && _fateLineShader != null)
+                _fateLineMaterial = new Material(_fateLineShader);
+            if (_fateLineMaterial != null)
+                lineImg.material = _fateLineMaterial;
 
             var lineRect = lineObj.GetComponent<RectTransform>();
 
@@ -119,8 +127,18 @@ namespace GIC.UI
                 yield return null;
             }
 
-            if (lineImg.material != null) Destroy(lineImg.material);
+            _activeFateLines.Remove(lineObj);
             Destroy(lineObj);
+        }
+
+        /// <summary>清理残留线体（协程被打断时兜底；正常结束由协程自身移除后销毁）</summary>
+        private void CleanupFateLines()
+        {
+            foreach (var line in _activeFateLines)
+            {
+                if (line != null) Destroy(line);
+            }
+            _activeFateLines.Clear();
         }
 
         #endregion

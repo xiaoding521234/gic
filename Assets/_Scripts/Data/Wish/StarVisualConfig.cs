@@ -45,10 +45,25 @@ namespace GIC.Data
         [SerializeField] private float edgeGlowBaseWidth = 0.08f;
         [SerializeField] private float edgeGlowWidthPerStar = 0.04f;
 
-        // ── 单例（由 ConfigManager.Start() 注入）──
+        // ── 单例（由 ConfigManager.Init [PostConstruct] 注入；未注入时按同路径 Resources 兜底，防异常时序/编辑器工具 NRE）──
 
         private static StarVisualConfig _instance;
-        public static StarVisualConfig Instance => _instance;
+        private static bool _instanceLoadAttempted;
+
+        public static StarVisualConfig Instance
+        {
+            get
+            {
+                if (_instance == null && !_instanceLoadAttempted)
+                {
+                    _instanceLoadAttempted = true;
+                    _instance = Resources.Load<StarVisualConfig>("Configs/StarVisualConfig");
+                    if (_instance == null)
+                        Debug.LogWarning("[StarVisualConfig] 未注入且 Resources 无此资产，星级视觉参数不可用");
+                }
+                return _instance;
+            }
+        }
 
         /// <summary>由 ConfigManager.Start() 调用注入</summary>
         public static void Initialize(StarVisualConfig config) => _instance = config;

@@ -214,8 +214,7 @@ namespace GIC.UI
 
             for (int i = 0; i < upgradeCount; i++)
             {
-                starLevel++;
-                if (starLevel > 5) starLevel = 5;
+                starLevel++; // upgradeCount 已 Min 钳到 5-baseStarLevel，不会越界
 
                 var upgraded = _wishManager.RollCardByStar(_pool, starLevel, isUnit);
                 if (upgraded.cardId.value == 0) break;
@@ -230,34 +229,18 @@ namespace GIC.UI
                     newSaveData.SaveItem(upgraded.cardId.AsItemName(), itemCount);
                 }
 
-                // 判重发星辉（5★只入账不播雨）
+                // 判重发星辉 + 升级步（5★雨延迟到视频后并入总雨量）
                 int stepSg = _wishManager.AwardDuplicateStarglitter(upgraded);
                 if (starLevel >= 5)
                     pendingRain5 += stepSg;
-                else
+                result.steps.Add(new WishRevealStep
                 {
-                    result.steps.Add(new WishRevealStep
-                    {
-                        type = WishRevealStep.StepType.EncounterUpgrade,
-                        starLevel = starLevel,
-                        starglitterAmount = stepSg,
-                        cardData = newSaveData,
-                        shakeDelay = StarVisualConfig.GetShakeDuration(starLevel - 1),
-                    });
-                }
-
-                // 5★升级步（只换卡+入账星辉，雨延迟到视频后）
-                if (starLevel >= 5)
-                {
-                    result.steps.Add(new WishRevealStep
-                    {
-                        type = WishRevealStep.StepType.EncounterUpgrade,
-                        starLevel = starLevel,
-                        starglitterAmount = 0, // 雨延迟
-                        cardData = newSaveData,
-                        shakeDelay = StarVisualConfig.GetShakeDuration(starLevel - 1),
-                    });
-                }
+                    type = WishRevealStep.StepType.EncounterUpgrade,
+                    starLevel = starLevel,
+                    starglitterAmount = starLevel >= 5 ? 0 : stepSg, // 5★雨延迟
+                    cardData = newSaveData,
+                    shakeDelay = StarVisualConfig.GetShakeDuration(starLevel - 1),
+                });
 
                 currentResult = upgraded;
             }

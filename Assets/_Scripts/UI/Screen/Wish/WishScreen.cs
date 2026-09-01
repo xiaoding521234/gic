@@ -47,15 +47,15 @@ namespace GIC.UI
         [Header("氛围特效")]
         [SerializeField] private WishAmbienceController ambience;
 
-        private int currentIndex = -1;
-        private bool isSwitching;
+        private int _currentIndex = -1;
+        private bool _isSwitching;
 
-        private Vector2? selectorOffset;
+        private Vector2? _selectorOffset;
 
         // 缓存的面板目标位置
-        private Vector2 topPanelTargetPos;
-        private Vector2 leftPanelTargetPos;
-        private Vector2 bottomPanelTargetPos;
+        private Vector2 _topPanelTargetPos;
+        private Vector2 _leftPanelTargetPos;
+        private Vector2 _bottomPanelTargetPos;
 
         protected override void Awake()
         {
@@ -64,7 +64,7 @@ namespace GIC.UI
             closeButton.onClick.AddListener(Close);
 
             if (selector != null)
-                selectorOffset = selector.anchoredPosition;
+                _selectorOffset = selector.anchoredPosition;
 
             CachePanelPositions();
             SetPanelsToStartOffset();  // Awake 就移到偏移位，避免首帧闪烁
@@ -139,15 +139,15 @@ namespace GIC.UI
         private IEnumerator ExitAnimation()
         {
             Coroutine slideOut = StartCoroutine(PlaySlideOutAnimation());
-            if (currentIndex >= 0 && characters[currentIndex].panel != null)
-                characters[currentIndex].panel.FadeOut();
+            if (_currentIndex >= 0 && characters[_currentIndex].panel != null)
+                characters[_currentIndex].panel.FadeOut();
 
             yield return slideOut;
         }
 
         public void SelectCharacter(int index)
         {
-            if (isSwitching || index == currentIndex) return;
+            if (_isSwitching || index == _currentIndex) return;
             if (index < 0 || index >= characters.Length) return;
 
             StartCoroutine(SwitchCharacterCoroutine(index));
@@ -155,13 +155,13 @@ namespace GIC.UI
 
         private IEnumerator SwitchCharacterCoroutine(int newIndex)
         {
-            isSwitching = true;
+            _isSwitching = true;
 
             // 立即触发粒子加速，不等淡出
             if (ambience != null)
                 ambience.OnPoolSwitching();
 
-            var oldEntry = currentIndex >= 0 ? characters[currentIndex] : null;
+            var oldEntry = _currentIndex >= 0 ? characters[_currentIndex] : null;
             var newEntry = characters[newIndex];
 
             // 预加载新角色立绘（利用旧面板淡出的时间并行加载 4K 纹理）
@@ -175,7 +175,7 @@ namespace GIC.UI
                 yield return Wait.Seconds(oldEntry.panel.FadeDuration);
             }
 
-            currentIndex = newIndex;
+            _currentIndex = newIndex;
 
             // selector 移动 + 面板淡入 同时进行
             MoveSelectorTo(newEntry.button);
@@ -192,15 +192,15 @@ namespace GIC.UI
             // 切换对应的祈愿卡池
             SwitchPool(newEntry.pool);
 
-            // 更新氛围特效的元素颜色
-            if (ambience != null)
+            // 更新氛围特效的元素颜色（panel 可为空——与上面 FadeIn 同守卫，防 NRE 中断协程卡死切换锁）
+            if (ambience != null && newEntry.panel != null)
             {
                 var unitData = _unitConfig?.GetUnitData(newEntry.panel.UnitName);
                 if (unitData != null)
                     ambience.SetElementColor(ElementColor.GetColor(unitData.selfElement));
             }
 
-            isSwitching = false;
+            _isSwitching = false;
         }
 
         private void RefreshButtonColors()
@@ -208,7 +208,7 @@ namespace GIC.UI
             for (int i = 0; i < characters.Length; i++)
             {
                 var entry = characters[i];
-                Color target = (i == currentIndex) ? selectedColor : unselectedColor;
+                Color target = (i == _currentIndex) ? selectedColor : unselectedColor;
                 ApplyButtonColor(entry, target);
             }
         }
@@ -219,7 +219,7 @@ namespace GIC.UI
             if (selector.parent == targetButton.transform) return;
 
             selector.SetParent(targetButton.transform, worldPositionStays: false);
-            selector.anchoredPosition = selectorOffset ?? Vector2.zero;
+            selector.anchoredPosition = _selectorOffset ?? Vector2.zero;
         }
 
         private void ApplyButtonColor(CharacterEntry entry, Color color)
@@ -240,19 +240,19 @@ namespace GIC.UI
 
         private void CachePanelPositions()
         {
-            if (topPanel != null)    topPanelTargetPos    = topPanel.anchoredPosition;
-            if (leftPanel != null)   leftPanelTargetPos   = leftPanel.anchoredPosition;
-            if (bottomPanel != null) bottomPanelTargetPos = bottomPanel.anchoredPosition;
+            if (topPanel != null)    _topPanelTargetPos    = topPanel.anchoredPosition;
+            if (leftPanel != null)   _leftPanelTargetPos   = leftPanel.anchoredPosition;
+            if (bottomPanel != null) _bottomPanelTargetPos = bottomPanel.anchoredPosition;
         }
 
         private void SetPanelsToStartOffset()
         {
             if (topPanel != null)
-                topPanel.anchoredPosition = topPanelTargetPos + Vector2.up * panelSlideDistance;
+                topPanel.anchoredPosition = _topPanelTargetPos + Vector2.up * panelSlideDistance;
             if (leftPanel != null)
-                leftPanel.anchoredPosition = leftPanelTargetPos + Vector2.left * panelSlideDistance;
+                leftPanel.anchoredPosition = _leftPanelTargetPos + Vector2.left * panelSlideDistance;
             if (bottomPanel != null)
-                bottomPanel.anchoredPosition = bottomPanelTargetPos + Vector2.down * panelSlideDistance;
+                bottomPanel.anchoredPosition = _bottomPanelTargetPos + Vector2.down * panelSlideDistance;
             if (panelCanvasGroup != null)
                 panelCanvasGroup.alpha = 0f;
         }
@@ -275,11 +275,11 @@ namespace GIC.UI
                 float t = panelSlideCurve.Evaluate(elapsed / panelSlideDuration);
 
                 if (topPanel != null)
-                    topPanel.anchoredPosition = topPanelTargetPos + Vector2.up * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
+                    topPanel.anchoredPosition = _topPanelTargetPos + Vector2.up * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
                 if (leftPanel != null)
-                    leftPanel.anchoredPosition = leftPanelTargetPos + Vector2.left * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
+                    leftPanel.anchoredPosition = _leftPanelTargetPos + Vector2.left * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
                 if (bottomPanel != null)
-                    bottomPanel.anchoredPosition = bottomPanelTargetPos + Vector2.down * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
+                    bottomPanel.anchoredPosition = _bottomPanelTargetPos + Vector2.down * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
                 if (panelCanvasGroup != null)
                     panelCanvasGroup.alpha = t;
 
@@ -307,11 +307,11 @@ namespace GIC.UI
                 float t = panelSlideCurve.Evaluate(elapsed / panelSlideDuration);
 
                 if (topPanel != null)
-                    topPanel.anchoredPosition = topPanelTargetPos + Vector2.up * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
+                    topPanel.anchoredPosition = _topPanelTargetPos + Vector2.up * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
                 if (leftPanel != null)
-                    leftPanel.anchoredPosition = leftPanelTargetPos + Vector2.left * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
+                    leftPanel.anchoredPosition = _leftPanelTargetPos + Vector2.left * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
                 if (bottomPanel != null)
-                    bottomPanel.anchoredPosition = bottomPanelTargetPos + Vector2.down * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
+                    bottomPanel.anchoredPosition = _bottomPanelTargetPos + Vector2.down * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
                 if (panelCanvasGroup != null)
                     panelCanvasGroup.alpha = Mathf.LerpUnclamped(startAlpha, 0f, t);
 
@@ -323,9 +323,9 @@ namespace GIC.UI
 
         private void SnapPanelsToTarget()
         {
-            if (topPanel != null)    topPanel.anchoredPosition    = topPanelTargetPos;
-            if (leftPanel != null)   leftPanel.anchoredPosition   = leftPanelTargetPos;
-            if (bottomPanel != null) bottomPanel.anchoredPosition = bottomPanelTargetPos;
+            if (topPanel != null)    topPanel.anchoredPosition    = _topPanelTargetPos;
+            if (leftPanel != null)   leftPanel.anchoredPosition   = _leftPanelTargetPos;
+            if (bottomPanel != null) bottomPanel.anchoredPosition = _bottomPanelTargetPos;
         }
     }
 }

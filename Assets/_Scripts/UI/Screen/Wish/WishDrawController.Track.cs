@@ -23,25 +23,6 @@ namespace GIC.UI
             }
         }
 
-        /// <summary>
-        /// 预构建星级→候选列表缓存（在 StartWish 中从 _flow 获取，此方法保留兼容）
-        /// </summary>
-        private void BuildStarLevelCache()
-        {
-            if (_flow == null) return;
-            var unitConfig = _wishManager.GetUnitConfig();
-            var itemConfig = _wishManager.GetItemConfig();
-
-            _unitsByStar = new Dictionary<int, List<UnitName>>();
-            _itemsByStar = new Dictionary<int, List<ItemName>>();
-
-            for (int star = 1; star <= 5; star++)
-            {
-                _unitsByStar[star] = _pool.GetUnitsByStar(unitConfig, star);
-                _itemsByStar[star] = _pool.GetItemsByStar(itemConfig, star);
-            }
-        }
-
         private void SpawnTrackCard(float initialProgress = 0f)
         {
             GameObject cardObj = GetPooledCard();

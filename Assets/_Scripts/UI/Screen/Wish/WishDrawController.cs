@@ -159,12 +159,17 @@ namespace GIC.UI
         private void OnDestroy()
         {
             OnDestroyStar5Video();
+            if (_fateLineMaterial != null)
+            {
+                Destroy(_fateLineMaterial);
+                _fateLineMaterial = null;
+            }
         }
 
         #region publicEntry
 
         /// <summary>
-        /// 开始祈愿流程
+        /// 开始祈愿流程（原石已由入口层 WishScreen.StartDraw/TryStartAutoDraw 扣除——表现层不做货币写操作）
         /// </summary>
         /// <param name="autoShoot">自动射击（AI 抽卡）：倒计时余 自动射击提前秒 时自动开枪，不等玩家点击</param>
         public void StartWish(WishManager manager, WishPoolConfig pool, int count, bool autoShoot = false)
@@ -176,15 +181,7 @@ namespace GIC.UI
             _flow.StartFlow(count);
             _isWishActive = true;
 
-            if (!manager.ConsumePrimogem(count))
-            {
-                PopupManager.Instance?.ShowToast("原石不足");
-                _flow.Reset();
-                _isWishActive = false;
-                return;
-            }
-
-            // 抽卡全程锁定输入 — CloseUI 等动作派发暂停（放在扣费成功之后，失败路径无锁可泄）
+            // 抽卡全程锁定输入 — CloseUI 等动作派发暂停
             InputLocks.Push(this, InputLockReason.WishInProgress);
 
             // 从 flow 获取星级缓存
@@ -506,6 +503,7 @@ namespace GIC.UI
             ClearResultCards();
             ClearStarglitterPool();
             CleanupStar5Video();
+            CleanupFateLines();
         }
 
         protected void StopHoldThenFlyCoroutines()
