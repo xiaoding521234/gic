@@ -408,6 +408,10 @@ Tuanjie 1.9.3（类 2022.3）的 ShaderLab 属性块解析器对 MaterialPropert
 **修复**：子类 `PetChatInputField` 覆写 OnDrag 为空（掐掉协程路径；代价=拖出矩形选字失效，单击定位/双击选词/Shift+方向键选区不受影响）。**勿给聊天画布配 MainCamera tag 相机**（DontDestroyOnLoad 相机抢 Camera.main 是另一坑，见 §6.4 教训）；也勿把聊天画布改 ScreenSpaceCamera（会被游戏 Overlay UI 盖住，layering 语义反了）。
 另：程序化 TMP 文本勿用"➤"等装饰符号——zh-cn SDF 无此字形（警告+显示方块），按钮文字用中文（"发送"）。
 
+### 追加根因（同批实证：输入框程序化构建赋值顺序 NRE，2026-08-29）
+
+**TMP_InputField 程序化构建赋值顺序**：TMP 3.0.9 的 fontAsset/pointSize setter（SetGlobalFontAsset/SetGlobalPointSize，源码 L4593/L4605）**无条件解引用 textComponent**（placeholder 有判空、textComponent 没有）——程序化建输入框赋值顺序必须 **textComponent → placeholder → fontAsset → pointSize**，反序必 NRE。
+
 ## 15. Unity Mono 的 HttpClient SSE 假流式（派蒙聊天整局卡住后一次性出全文，2026-08-29）
 
 ### 现象
@@ -516,6 +520,37 @@ APK 真机运行画面整体被压扁（横屏画面被纵向压平）。
 ### 修复与规范
 - 移动端（`Application.isMobilePlatform`）**一律不调 Screen.SetResolution**：启动读档（含窗口化分支）、无存档兜底、设置界面分辨率下拉回调三处全守卫——分辨率/窗口化是桌面概念，移动端画面恒原生全屏。
 - 桌面专属逻辑跨平台复用前先想"手机上这个 API 语义还成立吗"（同类前科：桌宠注册表窗口尺寸）。
+
+## 22. 设置页克隆下拉条目两坑（派蒙形态"点了没反应"，2026-08-27/28）
+
+### 现象
+设置页新增"派蒙形态"下拉：克隆现有条目后显示正常，但选择无任何反应；且首次打开显示的就是错项。语言/帧率/分辨率条目一切正常。
+
+### 根因（两个独立坑）
+1. **克隆到 inactive 面板的组件 Awake 从未执行**：SettingsScreen 各分栏面板初始未激活，Unity 规则=inactive 物体不跑 Awake——凡"Awake 缓存引用"模式（LocalizedDropdown.Awake 里 `dropdown = GetComponent`）全部静默失效：`if(x==null) return` 式守卫不报错，选项不重建/监听不挂/值不设=条目彻底假死。语言/帧率正常只因恰在初始激活的 Display 面板。
+2. **DropdownSettingItem.Setup 的 defaultValue 框架语义=Initialize() 的显示值**（非"新玩家默认"）——必须传当前存档值；传错则下拉打开即显示错项，用户点同一项时 TMP_Dropdown 值不变、不触发 onValueChanged=点了没反应。
+
+### 修复与规范
+- 克隆到分栏面板的新条目必须**真实点击验证**（显示对了≠回调通了）。
+- "Awake 缓存引用"改惰性属性：`Dd => dropdown != null ? dropdown : (dropdown = GetComponent<T>())`（已修 LocalizedDropdown，存量 bug 连原 Other 栏 petClose 一起治愈）。
+- Setup 的 defaultValue 一律传当前存档值。
+- 排查下拉问题时拿正常条目（如帧率设置）做对照组逐项 diff 很有效；Language/FrameRate/Resolution 全用 `TextEntry(null, 静态文本)` 是参考实现，PetForm 用 LocalizedString 是少数派。
+
+## 23. SaveAsPrefabAsset 往返污染场景序列化（PaimonInGameRoot.prefab 化实证，2026-08-27）
+
+### 现象
+把场景物体收进临时公共根 → `SaveAsPrefabAsset` → 还原层级后，场景 git diff 出现 327 行 RectTransform 序列化噪声（m_AnchorMin 0.5→0、SizeDelta 100→0 之类）。
+
+### 根因
+"收进临时父物体→还原"的 Parent/Reparent 往返本身会改写 RectTransform 锚点/尺寸序列化值，即使代码逻辑未动。
+
+### 修复与规范
+- 任何"临时改层级→存 prefab→还原"操作后，git diff 场景必须逐类检查：非零 diff 且全为锚点/SizeDelta 类行=直接 `git checkout` 场景 + OpenScene 强制重载（磁盘还原≠编辑器内存态，同 gic-pet skill 铁律 6）+ 抽查字段值确认无损。
+- 噪声混进提交会污染历史（值级 diff 也会淹没真正的改动）。
+
+## 24. Tuanjie SpriteAtlas API：Add/SetIncludeInBuild 是方法不是属性（2026-08-29）
+
+`atlas.Add(objs)` / `atlas.SetIncludeInBuild(true)` 是 `UnityEditor.U2D.SpriteAtlasExtensions` 扩展方法，不是可赋值属性——编辑器脚本按属性直觉写法会编译失败。Atlas 清单与入图规则见 docs/20 §1.4。
 
 
 
