@@ -69,23 +69,33 @@ namespace GIC.UI
 
         private void InitResolutionSetting()
         {
-            var resolutions = Screen.resolutions;
+            // 去重列表与 SettingsApplier.ApplyFromSave 共用（存档 resolutionIndex 两端映射同一列表，
+            // 机制见 SettingsApplier.GetUniqueResolutions 注释——不去重=每档分辨率出现两次）
+            var resolutions = SettingsApplier.GetUniqueResolutions();
             var resolutionOptions = new List<TextEntry>();
 
             resolutionOptions.Add(new TextEntry(new LocalizedString("UIText", "Fullscreen"), ""));
 
-            for (int i = 0; i < resolutions.Length; i++)
+            // 移动端只有全屏（分辨率/窗口化是桌面概念——移动端画面恒原生全屏，
+            // 压扁防护见 SettingsApplier.ApplyDefaultFullscreen 头注释）
+            if (!Application.isMobilePlatform)
             {
-                string resText = $"{resolutions[i].width}x{resolutions[i].height}";
-                resolutionOptions.Add(new TextEntry(null, resText));
+                for (int i = 0; i < resolutions.Count; i++)
+                {
+                    resolutionOptions.Add(new TextEntry(null, $"{resolutions[i].width}x{resolutions[i].height}"));
+                }
             }
 
-            int currentIndex = _saveManager.CurrentSave.resolutionIndex;
+            // clamp：存档索引可能越界（去重后列表变短/移动端列表只剩全屏），DropdownSettingItem 不做越界钳制
+            int currentIndex = Mathf.Clamp(_saveManager.CurrentSave.resolutionIndex, 0, resolutionOptions.Count - 1);
 
             resolutionSetting.Setup("Resolution", resolutionOptions, currentIndex, (index) =>
             {
                 _saveManager.CurrentSave.resolutionIndex = index;
                 _saveManager.SaveGame();
+
+                // 移动端不做运行时 SetResolution（压扁防护，机制见 SettingsApplier.ApplyDefaultFullscreen 头注释）
+                if (Application.isMobilePlatform) return;
 
                 if (index == 0)
                 {
@@ -96,7 +106,7 @@ namespace GIC.UI
                 else
                 {
                     int resIndex = index - 1;
-                    if (resIndex >= 0 && resIndex < resolutions.Length)
+                    if (resIndex >= 0 && resIndex < resolutions.Count)
                     {
                         var res = resolutions[resIndex];
                         Screen.SetResolution(res.width, res.height, FullScreenMode.Windowed);

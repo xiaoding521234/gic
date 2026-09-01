@@ -207,8 +207,17 @@ namespace GIC.Framework
 
         private static bool IsAnyKeyDown(List<KeyCode> keys)
         {
+            // 触屏时忽略鼠标键位：Unity 的触摸→鼠标模拟把第二根手指映射为右键按下（官方文档
+            // Input.simulateMouseWithTouches："a two-finger tap will be equal to a right-button
+            // mouse click"）——移动端双指捏合刚落下就会触发 CloseUI 关掉界面（2026-09-02 真机实证）。
+            // 不用 simulateMouseWithTouches=false 全局关：游戏内派蒙拖拽轮询 GetMouseButton(0)
+            // 依赖该模拟。触摸交互走 EventSystem/各控制器 HandleTouch；PC 真鼠标不受影响（touchCount 恒 0）。
+            bool touchActive = Input.touchCount > 0;
             for (int i = 0; i < keys.Count; i++)
+            {
+                if (touchActive && keys[i] >= KeyCode.Mouse0 && keys[i] <= KeyCode.Mouse6) continue;
                 if (Input.GetKeyDown(keys[i])) return true;
+            }
             return false;
         }
 

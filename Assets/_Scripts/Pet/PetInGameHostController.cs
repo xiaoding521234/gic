@@ -99,6 +99,12 @@ namespace GIC.Pet
         private float _pressDownAt = -10f;   // 单击（非拖拽）判定：按下时刻
         private Vector3 _pressDownPos;        // 按下时鼠标位（<8px 位移=没拖=单击）
 
+        // 双指捏合缩放（移动端，2026-09-01）：滚轮缩放的触屏等价。桌面形态=Win32 单光标进程
+        // 无多指输入，属形态本质差异允许单侧（双形态对齐口径见 docs/19 §6）
+        private bool _pinching;
+        private float _pinchStartDist;     // 起手两指屏距（px）——比例式缩放基准
+        private float _pinchStartScale;    // 起手目标倍率
+
         // ---- 三连击切换形态（2026-09-01，桌面版同构手势；连击状态机在 PetHostBase 共用；
         //      游戏内宿主在主进程内直调切换，无需 IPC） ----
 
@@ -315,12 +321,17 @@ namespace GIC.Pet
             ScaleSmoothFrame();
             if (!interactFrozen)
             {
-                dragPollFrame(modelHit);
-                ScrollZoomFrame(modelHit);
+                PinchZoomFrame();
+                if (!_pinching)
+                {
+                    dragPollFrame(modelHit);
+                    ScrollZoomFrame(modelHit);
+                }
             }
             else
             {
                 _pressPending = false; // 退场冻结期作废待定按下（防解冻松手误判单击）
+                if (_pinching) EndPinch();
             }
             blockerToggleFrame(modelHit);
             sitSettleFrame();
@@ -405,12 +416,12 @@ namespace GIC.Pet
             return hitMeshCollider.Raycast(ray, out _, 100f);
         }
 
-        /// <summary>挡板穿透切换（桌面版 穿透切换帧 同构）：命中模型或拖拽中=可交互挡板吃点击；
-        /// 其余区域点击穿透到主游戏 UI。</summary>
+        /// <summary>挡板穿透切换（桌面版 穿透切换帧 同构）：命中模型/拖拽中/捏合缩放中=可交互
+        /// 挡板吃点击；其余区域点击穿透到主游戏 UI。</summary>
         void blockerToggleFrame(bool modelHit)
         {
             if (_eventBlocker == null) return;
-            bool want = modelHit || dragging;
+            bool want = modelHit || dragging || _pinching;
             if (_eventBlocker.raycastTarget != want) _eventBlocker.raycastTarget = want;
         }
 
@@ -610,22 +621,66 @@ namespace GIC.Pet
             PlaceToNormalized(new Vector2(nx, ny));
         }
 
-        /// <summary>滚轮缩放（桌面版 滚轮缩放帧 同款：仅光标命中模型时响应；只改目标倍率走平滑）。
-        /// 缩放改变模型尺寸→烘焙碰撞体（按旧尺寸烘的）尺寸失配=点击范围错位（放大后点视觉边缘点不中/
-        /// 缩小后周围空气误中）——目标变化时排一次延迟补烘（2026-08-28 修复"有时候点不中"）。连续滚轮
-        /// 顺延补烘时刻，落稳后一次烘到位。</summary>
+        /// <summary>滚轮缩放（桌面版 滚轮缩放帧 同款：仅光标命中模型时响应）。倍率生成在滚轮侧，
+        /// 落地与双指捏合共用 ApplyZoom。</summary>
         void ScrollZoomFrame(bool modelHit)
         {
             float scroll = Input.mouseScrollDelta.y;
             if (!modelHit || Mathf.Abs(scroll) < 0.01f) return;
-            float newScale = Mathf.Clamp(targetScale * Mathf.Pow(scaleStep, scroll), scaleMin, effectiveMaxScale);
-            if (!Mathf.Approximately(newScale, targetScale))
+            ApplyZoom(Mathf.Clamp(targetScale * Mathf.Pow(scaleStep, scroll), scaleMin, effectiveMaxScale));
+        }
+
+        /// <summary>双指捏合缩放（移动端，2026-09-01）：滚轮缩放的触屏等价——任一指命中模型即起手
+        /// （抓着派蒙捏，两指都在身上或一指在旁边都成立），两指张合比例→目标倍率。方向与地图捏合相反：
+        /// 正交相机的 size 是"可见范围"（张大=缩小），本处的倍率是放大率（张大=放大）。
+        /// 起手接管：取消进行中的拖拽/待定按下/连击计次（两指手势取代单指手势，同地图双指取消单指拖拽）。</summary>
+        void PinchZoomFrame()
+        {
+            if (Input.touchCount != 2)
             {
-                targetScale = newScale;
-                _bakePending = true;                                    // 缩放改了模型尺寸：补烘碰撞体
-                reBakeAt = Time.unscaledTime + bakeGraceSec;    // 平滑落稳后再烘（连续滚轮顺延）
-                MarkDirty();
+                if (_pinching) EndPinch();
+                return;
             }
+            Touch t0 = Input.GetTouch(0);
+            Touch t1 = Input.GetTouch(1);
+
+            if (!_pinching)
+            {
+                if (!GetHitState(t0.position) && !GetHitState(t1.position)) return;
+                _pinchStartDist = Vector2.Distance(t0.position, t1.position);
+                if (_pinchStartDist < 1f) return; // 两指同点无比例基准，等分离后再起手
+                _pinching = true;
+                _pinchStartScale = targetScale;
+                if (dragging) { dragging = false; dragPhysics.Release(); }
+                _pressPending = false;
+                ResetClickChain(); // 捏合是明确非点击手势，打断三连击计次（同真实拖拽语义）
+                return;           // 起手帧只建基准不缩放
+            }
+
+            float dist = Vector2.Distance(t0.position, t1.position);
+            if (dist < 1f) return; // 捏死防除零抖动
+            ApplyZoom(Mathf.Clamp(_pinchStartScale * (dist / _pinchStartDist), scaleMin, effectiveMaxScale));
+        }
+
+        /// <summary>结束捏合：置 prevLmbDown 模拟"按钮早已按住"——防捏完残留的单指被 dragPollFrame
+        /// 误判为新按下（0.15s 后突然起拖）。两指同落、捏完留一指的场景必经此路径。</summary>
+        void EndPinch()
+        {
+            _pinching = false;
+            prevLmbDown = true;
+        }
+
+        /// <summary>落地缩放目标（滚轮/捏合共用）：只改目标倍率走平滑（ScaleSmoothFrame 每帧趋近）。
+        /// 缩放改变模型尺寸→烘焙碰撞体（按旧尺寸烘的）尺寸失配=点击范围错位（放大后点视觉边缘点不中/
+        /// 缩小后周围空气误中）——目标变化时排一次延迟补烘（2026-08-28 修复"有时候点不中"），连续缩放
+        /// 顺延补烘时刻，落稳后一次烘到位。坐定中缩放的重坐由 sitScaleResitFrame 监听 targetScale 自动接管。</summary>
+        void ApplyZoom(float newScale)
+        {
+            if (Mathf.Approximately(newScale, targetScale)) return;
+            targetScale = newScale;
+            _bakePending = true;                                    // 缩放改了模型尺寸：补烘碰撞体
+            reBakeAt = Time.unscaledTime + bakeGraceSec;    // 平滑落稳后再烘（连续缩放顺延）
+            MarkDirty();
         }
 
         /// <summary>四肢摆动叠加走共用基类（PetHostBase.四肢摆动应用帧，2026-08-28 合一）：

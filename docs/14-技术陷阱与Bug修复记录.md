@@ -492,6 +492,32 @@ PetChatClient 的流式回调是**公共 Action 字段**（onContentDelta/onErro
 - **回调接线三铁律**：①任何一方只 `-= 自己持引用的处理器` 后 `+=` 新的，**禁止 `=` 整体赋值/置 null**（会顶掉同链上他方处理器）；②"靠回调复位状态"的组件必须有**兜底复位通道**（本例=UI Send 发起对话前广播 `chatStreamTakingOver` 事件，反应侧收到即复位 _generating+摘自己的处理器）；③新消费者挂载前要摘链上可能存在的上一方处理器（防增量双重消费=双重打字）。
 - 次要修复同批：pet_react.jsonl 续号解析的 `break` 写在 try/catch 之外——注释宣称"坏行继续往前找"实际不执行，坏尾行时 `_seq` 归 0、重启后新事件被消费基线当旧事件跳过。**教训：声明式注释（"继续找"）必须与命令式代码（break 位置）对得上，改控制流时连注释一起核对。**
 
+## 20. 触摸→鼠标模拟把第二根手指当右键（"手机双指刚放上就关闭界面"，2026-09-02）
+
+### 现象
+真机双指捏合缩放地图，第二根手指落下的瞬间界面被关闭（表现为"刚放上就触发取消"）。
+
+### 根因
+Unity legacy Input 的**触摸→鼠标模拟**是官方行为：`Input.simulateMouseWithTouches` 文档原文 "a two-finger tap will be equal to a right-button mouse click"——第二根手指按下 = `GetKeyDown(KeyCode.Mouse1)` 为真。而 InputManager 把 `Mouse1` 绑定为 CloseUI 动作，派发循环立刻关掉顶层界面。
+
+### 修复与规范
+- InputManager.IsAnyKeyDown：`Input.touchCount > 0` 时忽略所有 `KeyCode.Mouse0~Mouse6` 绑定键——模拟出来的鼠标键不是真实按键输入，触摸交互一律走 EventSystem/各控制器 HandleTouch；PC 真鼠标 touchCount 恒 0 不受影响。
+- **勿用 `Input.simulateMouseWithTouches = false` 全局关**：游戏内派蒙拖拽轮询 `Input.GetMouseButton(0)` 依赖该模拟（移动端单指拖派蒙的输入源），全局关会断它的输入。
+- 移动端关闭界面正路=安卓返回键（ESC 映射），Mouse1 绑定保留给 PC 右键。
+
+## 21. Android 运行时 Screen.SetResolution 宽高比失配拉伸（"真机画面严重压扁"，2026-09-02）
+
+### 现象
+APK 真机运行画面整体被压扁（横屏画面被纵向压平）。
+
+### 根因
+`SettingsApplier.ApplyDefaultFullscreen` 启动时无条件 `Screen.SetResolution(native.w, native.h, FullScreenWindow)`，其中 native 取 `Screen.resolutions` 末项、**空表回退 1920×1080**。这是桌面逻辑（防桌宠子进程写坏注册表窗口尺寸）：手机面板是**竖屏原生**而游戏横屏锁定，Android 上 `Screen.resolutions` 报告的分辨率与横屏画面宽高比失配（空表/末项非本机时更甚），失配分辨率被拉伸铺满整屏 = 压扁。运行时 SetResolution 与显示器宽高比不一致时部分平台直接拉伸（Unity 不会替你保持像素纵横比）。
+
+### 修复与规范
+- 移动端（`Application.isMobilePlatform`）**一律不调 Screen.SetResolution**：启动读档（含窗口化分支）、无存档兜底、设置界面分辨率下拉回调三处全守卫——分辨率/窗口化是桌面概念，移动端画面恒原生全屏。
+- 桌面专属逻辑跨平台复用前先想"手机上这个 API 语义还成立吗"（同类前科：桌宠注册表窗口尺寸）。
+
+
 
 
 
