@@ -1,4 +1,6 @@
 using UnityEngine;
+using GIC.Framework;
+using GIC.Data.Event;
 
 namespace GIC.Pet
 {
@@ -79,6 +81,9 @@ namespace GIC.Pet
             int oldForm = CurrentForm;
             CurrentForm = form;
 
+            // 广播形态变更（Local UI 事件）：设置界面"派蒙"栏下拉据此刷新显示（见事件类注释）
+            EventBusHub.Instance.Send(new OnPetFormChangedEvent { NewForm = form });
+
             if (form == FormInGame)
             {
                 // 桌面→游戏内：写退出请求让桌宠进程播 Disappear 再退出（非硬杀）
@@ -93,6 +98,22 @@ namespace GIC.Pet
                 instance.StartCoroutine(instance.LaunchDesktopAfterInGameExit());
                 Debug.Log($"[PetInGameHost] 热切换：游戏画面内版→桌面版（旧形态={oldForm}，等退场动画）");
             }
+        }
+
+        /// <summary>三连击手势入口（2026-09-01）：持久化形态到存档 + 热切换（与设置下拉回调同路径，
+        /// 差异只在持久化也归拢于此）。桌宠三连击经 IPC→PetChatIntent.ExecutePetGoInGame 调用
+        ///（切游戏内形态）；游戏内宿主三连击直接调用（切桌面形态——游戏内宿主在主进程内，无需 IPC）。</summary>
+        public static void GestureSwitchTo(int form)
+        {
+            form = ClampForm(form);
+            var saveManager = Wargame.Instance?.Context?.Get<SaveManager>();
+            var save = saveManager?.CurrentSave;
+            if (save != null && save.petForm != form)
+            {
+                save.petForm = form;
+                saveManager.SaveGame();
+            }
+            HotSwitchForm(form);
         }
 
         /// <summary>等桌面进程退出（最多 5s 超时强杀）后创建游戏内实例</summary>

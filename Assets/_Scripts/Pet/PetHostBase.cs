@@ -294,6 +294,32 @@ namespace GIC.Pet
             paimonRoot.localScale = new Vector3(s, s, s);
         }
 
+        // ---- 点击手势共用层（2026-09-01 下沉：三连击切换形态 + 单击立即开对话——两形态同语义，
+        //      连击计次/窗口/聊天收起判定一处维护防漂移；宿主差异只剩输入源与触发动作） ----
+
+        protected const float ClickChainWindow = 0.4f; // 三连击间隔窗（秒）
+        protected int _clickCount;                    // 连击计次（窗内累计，达 3 触发形态切换）
+        protected float _lastClickAt = -10f;          // 上次命中单击时刻
+
+        /// <summary>连击计数（宿主帧在"按下且命中模型"时调用）：窗口超时重计→累计→达 3 清零并
+        /// 返回 true（触发方自行执行切换——桌面=IPC 通知主进程+退场退出；游戏内=直调切换）。</summary>
+        protected bool CountClickChain()
+        {
+            if (Time.unscaledTime - _lastClickAt >= ClickChainWindow) _clickCount = 0;
+            _clickCount++;
+            _lastClickAt = Time.unscaledTime;
+            if (_clickCount < 3) return false;
+            _clickCount = 0;
+            return true;
+        }
+
+        /// <summary>清连击计次（真实拖拽起手/发生位移的松手时调用，防误触切换）</summary>
+        protected void ResetClickChain() => _clickCount = 0;
+
+        /// <summary>聊天输入期点击是否应收起对话：点模型且连击计数≥2=三连击进行中（第 1 击已开
+        /// 输入条、第 3 击将触发切换）不收起；其余（点外部 / 超窗点模型=收起意图）收起。</summary>
+        protected bool ShouldCloseChatOnClick(bool modelHit) => !modelHit || _clickCount < 2;
+
         // ---- 对话装配（2026-08-31 批 5 下沉：两宿主 WireChat/WireReactionChannel 整段重复收拢） ----
 
         protected PetBehaviorController behaviorCtrl;                       // 行为层（聊天动作回调/反应通道用；两宿主各自在 Start/Awake 缓存）

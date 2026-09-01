@@ -38,8 +38,9 @@ namespace GIC.Pet
         [SerializeField] private float dockMargin = 24f;
         [InspectorName("启动时停靠右下角")]
         [SerializeField] private bool dockBottomRight = true;
-        [InspectorName("允许双击退出")]
-        [SerializeField] private bool allowDoubleClickExit = true; // 派蒙独立存活后的手动关闭方式（后续可换右键菜单）
+        [FormerlySerializedAs("allowDoubleClickExit")]
+        [InspectorName("允许三连击切换形态")]
+        [SerializeField] private bool allowTripleClickExit = true; // 三连击：游戏在运行→切换为游戏内形态；游戏不在运行→关闭桌宠（2026-09-01，原双击退出）
 
         [Header("性能")]
         [InspectorName("目标帧率")]
@@ -135,17 +136,16 @@ namespace GIC.Pet
         private bool passThroughOn;
         private bool prevLmbDown;
         private Vector2Int dragStartCursor; // 拖拽起点（区分单击与真实拖动）
-        private float lastClickTime = -10f; // 双击退出判定：上次有效单击时刻
+        // 连击计次/上次单击时刻已上移 PetHostBase（_clickCount/_lastClickAt，两形态共用）
         // behaviorCtrl 已上移 PetHostBase（protected；Start 里 FindObjectOfType 赋值不变）
 
         // ---- 对话（2026-08-29 桌面版补齐，复用游戏内形态三组件 docs/19 §6.5；_chatUI/behaviorCtrl 在 PetHostBase）----
         private Transform _headBone;                    // 气泡水平锚（同游戏内：包围盒顶+头骨水平位）
-        private float _pendingChatOpenAt = -1f;      // 单击→过 0.4s 双击窗口才开对话（不与双击退出互抢）
         private bool _pressPending;                 // 命中模型按下但未升级为拖拽（单击判定窗口内，2026-08-29 移植游戏内单击阈值）
         private float _pressDownAt = -10f;
         private POINT _pressDownPt;
 
-        private bool exitRequested;              // 退场动画进行中：屏蔽重复双击与新拖拽
+        private bool exitRequested;              // 退场动画进行中：屏蔽重复三连击与新拖拽
         private int baseWinW, baseWinH; // 基准客户区物理像素（=逻辑尺寸×dpi/96）
         private int fixedWinW, fixedWinH; // 实际窗口客户区物理像素（=基准×有效缩放上限，运行期恒定不随缩放变化）
         private float dpiScale = 1f;        // GetDpiForWindow/96（exe 清单 PerMonitorV2：客户区物理像素=渲染像素）
@@ -963,21 +963,25 @@ namespace GIC.Pet
             bool lmbDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
             bool lmbPressed = lmbDown && !prevLmbDown;
 
-            // 双击派蒙退出（独立存活的关闭方式）：在拖拽启动前判定，两次命中单击间隔 <0.4s
-            // 启动冷却 1s：防进程启动瞬间误吞"上一次双击退出旧进程"的残余按键状态（2026-08-23 实测）
+            // 三连击派蒙（2026-09-01，原双击退出；连击状态机在 PetHostBase.CountClickChain 共用）：
+            // 0.4s 内第 3 次命中单击触发——游戏在运行→发 IPC 让主进程切换为游戏内形态（PetInGameHost
+            // 等本进程退出后才创建实例=游戏运行时恒只有 1 个派蒙）；游戏不在运行→请求 3s 后陈旧丢弃，
+            // 本进程照常退出=关闭。
+            // 启动冷却 1s：防进程启动瞬间误吞"上一次三连击退出旧进程"的残余按键状态（2026-08-23 实测）
             if (lmbPressed && modelHit && Time.unscaledTime > 1f)
             {
-                if (allowDoubleClickExit && !exitRequested && Time.unscaledTime - lastClickTime < 0.4f)
+                dragStartCursor = new Vector2Int(pt.X, pt.Y);
+
+                if (CountClickChain() && allowTripleClickExit && !exitRequested)
                 {
-                    _pendingChatOpenAt = -1f; // 双击退出优先：取消待开的对话
-                    Debug.Log("[PetWindow] 双击退出，桌宠再见");
+                    _chatUI?.CloseChat(); // 收起输入条（第 1 击单击可能已开）再退场
+                    Debug.Log("[PetWindow] 三连击：通知主游戏接管（若在运行）后退出");
+                    Chat.PetIntentIpc.RequestFireAndForget("pet_go_ingame", "{}");
                     exitRequested = true;
                     // 退场动画（2026-08-24）：先播退场动画再真正退出；无动画可用则立即退出
                     bool exitTakeover = behaviorCtrl != null && behaviorCtrl.RequestExit(Application.Quit);
                     if (!exitTakeover) Application.Quit();
                 }
-                lastClickTime = Time.unscaledTime;
-                dragStartCursor = new Vector2Int(pt.X, pt.Y);
             }
 
             // ---- 拖拽物理（docs/19 §6.1 刚体跟随+四肢摆动）：身体 1:1 直跟光标（无任何摆动），
@@ -988,10 +992,10 @@ namespace GIC.Pet
                 {
                     if (!lmbDown)
                     {
-                        // 发生过实际位移的拖拽不算单击，清除双击计次防误触退出
+                        // 发生过实际位移的拖拽不算单击，清除连击计次防误触切换
                         if (Mathf.Abs(pt.X - dragStartCursor.x) + Mathf.Abs(pt.Y - dragStartCursor.y) > 8)
                         {
-                            lastClickTime = -10f;
+                            ResetClickChain();
                         }
                         dragging = false;
                         dragPhysics.Release(); // 松手即停：骨盆冻结原地，四肢弹簧收尾归零
@@ -1020,29 +1024,25 @@ namespace GIC.Pet
             // ---- 聊天输入期：点击对话元素（输入条/气泡）以外任何地方=关闭对话（2026-08-29 用户拍板，
             // 游戏内形态同款）；不起新拖拽/不推进待定按下。全局轮询看得见穿透到别处的点击——
             // 点其它应用同样收对话。物理收尾已在上方无条件推进（勿挪进门控内）。
+            // 三连击进行中（点模型且计数≥2）不收起——第 3 击将触发切换（PetHostBase.ShouldCloseChatOnClick）
             if (_chatUI != null && _chatUI.IsInputVisible)
             {
                 if (lmbPressed)
                 {
                     bool onChatElement = TryGetCursorUnityScreenPos(out Vector2 cursor)
                         && (_chatUI.IsPointOnInputBar(cursor) || _chatUI.IsPointOnBubble(cursor));
-                    if (!onChatElement) _chatUI.CloseChat();
+                    if (!onChatElement && ShouldCloseChatOnClick(modelHit)) _chatUI.CloseChat();
                 }
                 _pressPending = false;
                 prevLmbDown = lmbDown;
                 return;
             }
 
-            // ---- 单击待开对话：0.4s 双击窗口过后才开（窗口内来了第二次点击=退出路径已取消）
-            if (_pendingChatOpenAt > 0f && Time.unscaledTime >= _pendingChatOpenAt)
-            {
-                _pendingChatOpenAt = -1f;
-                if (!exitRequested) _chatUI?.ToggleInput();
-            }
-
             // ---- 按下待定（2026-08-29 移植游戏内单击阈值）：命中模型按下不立刻起手——按住超时
-            // （0.15s）或位移超阈值（8px）才升级为真拖拽；期间松手且几乎没动=单击（对话在双击窗口
-            // 后开，见上）。单击全程零姿势零物理（旧版按下即抓=每次单击闪拎起姿势，开对话高频后不可接受）。
+            //（0.15s）或位移超阈值（8px）才升级为真拖拽；期间松手且几乎没动=单击→**立即**开对话
+            //（2026-09-01 与游戏内形态同步，用户拍板"对话框立刻出现"；三连击兼容见聊天门控——
+            // 第 1 击开输入条后，连击的第 2 击命中模型不收起，第 3 击触发切换）。
+            // 单击全程零姿势零物理（旧版按下即抓=每次单击闪拎起姿势，开对话高频后不可接受）。
             if (_pressPending)
             {
                 if (!lmbDown)
@@ -1051,7 +1051,7 @@ namespace GIC.Pet
                     if (Time.unscaledTime - _pressDownAt <= 0.15f
                         && Mathf.Abs(pt.X - _pressDownPt.X) + Mathf.Abs(pt.Y - _pressDownPt.Y) < 8)
                     {
-                        _pendingChatOpenAt = Time.unscaledTime + 0.4f;
+                        _chatUI?.ToggleInput(); // 单击立即开（与游戏内形态同步）
                     }
                 }
                 else if (Time.unscaledTime - _pressDownAt > 0.15f

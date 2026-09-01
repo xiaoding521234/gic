@@ -82,6 +82,28 @@ namespace GIC.Pet.Chat
             return Error("主游戏没有在运行，或游戏正忙（开一下游戏再喊派蒙试试）");
         }
 
+        /// <summary>发指令不等响应（fire-and-forget，2026-09-01 桌宠三连击切形态用）：不阻塞主线程
+        /// （同步等待的 Thread.Sleep 在退出路径上会造成可感知卡顿）。主游戏在运行→250ms 内消费执行；
+        /// 不在运行→请求 3s 后陈旧丢弃（PollRequest 守卫），无副作用——发送方两种结果下行为一致
+        ///（照常退出），无需关心回执。</summary>
+        public static void RequestFireAndForget(string tool, string argsJson)
+        {
+            try
+            {
+                File.WriteAllText(ReqPath, JsonUtility.ToJson(new IntentRequest
+                {
+                    id = Guid.NewGuid().ToString("N"),
+                    t = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
+                    tool = tool,
+                    args = argsJson ?? "",
+                }));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PetIntentIpc] 请求写入失败：{e.Message}");
+            }
+        }
+
         // ==================== 主进程侧（消费方） ====================
 
         /// <summary>轮询取待执行请求（无/已消费/陈旧返回 null）。执行后调 WriteResponse 回写结果。</summary>

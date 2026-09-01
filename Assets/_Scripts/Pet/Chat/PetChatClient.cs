@@ -132,6 +132,52 @@ namespace GIC.Pet.Chat
         void OnDestroy()
         {
             AbortActive();
+            if (_warmupRequest != null)
+            {
+                try { _warmupRequest.Abort(); } catch (Exception) { }
+                _warmupRequest.Dispose();
+                _warmupRequest = null;
+            }
+        }
+
+        // ---- 连接/缓存预热（2026-09-01：缓解"首次对话明显慢于后续"） ----
+
+        private UnityWebRequest _warmupRequest;
+
+        /// <summary>预热：与真实对话同前缀的 max_tokens=1 极小请求——提前完成 DNS/TLS 建连与
+        /// 供应商前缀缓存构建（DeepSeek 上下文缓存首建后，同前缀请求首字节显著提前——首次
+        /// 对话慢的主因之一）。独立于流式状态（不碰 _activeRequest/回调链，结果不关心）；
+        /// 无 key 静默跳过；与在途真实请求并发无害。</summary>
+        public void SendWarmup(List<ChatMessage> messages)
+        {
+            string key = apiKey;
+            if (string.IsNullOrEmpty(key) || _warmupRequest != null) return;
+            StartCoroutine(warmupRoutine(messages, key));
+        }
+
+        IEnumerator warmupRoutine(List<ChatMessage> messages, string key)
+        {
+            var body = new JObject
+            {
+                ["model"] = modelName,
+                ["messages"] = SerializeMessages(messages),
+                ["stream"] = false,
+                ["max_tokens"] = 1,
+            };
+            if (provider.sendTemperature) body["temperature"] = temperature;
+            var req = new UnityWebRequest(endpoint + "/chat/completions", "POST");
+            req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body.ToString(Newtonsoft.Json.Formatting.None)))
+            {
+                contentType = "application/json",
+            };
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Authorization", "Bearer " + key);
+            req.timeout = 15; // 预热尽力而为：没建好就放弃（首对话照常工作，只是慢一点）
+            _warmupRequest = req;
+            var op = req.SendWebRequest();
+            while (!op.isDone) yield return null;
+            if (_warmupRequest == req) _warmupRequest = null;
+            req.Dispose();
         }
 
         /// <summary>中止在途请求（宿主退场/组件销毁/新请求发出前防泄漏）。**静默**：被中止请求的

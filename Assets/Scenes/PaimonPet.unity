@@ -29327,7 +29327,7 @@ MonoBehaviour:
   colorKey: {r: 1, g: 0, b: 1, a: 1}
   dockMargin: 24
   dockBottomRight: 1
-  allowDoubleClickExit: 1
+  allowTripleClickExit: 1
   targetFramerate: 165
   vSyncCount: 3
   dwmFrameAlign: 1

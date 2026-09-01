@@ -96,7 +96,9 @@ namespace GIC.Pet.Chat
         private RectTransform _starIcon;
         private readonly StringBuilder _typingBuffer = new StringBuilder();
         private Coroutine _typingCoroutine;
+        private Coroutine _thinkingCoroutine; // 思考指示动画（等待 LLM 首字节：省略号循环；首增量到达即停）
         private bool _inputVisible;
+        private bool _prewarmed; // 对话预热已发（每进程一次：首次打开输入条触发——打字期间后台建连+建供应商前缀缓存，首次对话不再明显慢于后续）
         private bool _awaitingFirstByte; // 发送后的"…"占位：首个流式增量到达时清掉再追加（防"…回复"拼接）
         private Action<string> _uiCompleteHandler; // 界面侧 完成 事件处理器（持引用可摘——会话层也接此事件，勿整体赋值）
         private Action<string> _uiDeltaHandler; // 界面侧 正文增量 处理器（持引用摘挂——2026-08-31 前 Send 用 = 整体
@@ -141,6 +143,7 @@ namespace GIC.Pet.Chat
         {
             closeInput();
             if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
+            StopThinking();
             _awaitingFirstByte = false;
             _proactiveMode = false;
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf)
@@ -160,16 +163,14 @@ namespace GIC.Pet.Chat
 
         // ---- 主动气泡流式入口（PetReactionConsumer 的 LLM 反应生成驱动，2026-08-31） ----
 
-        /// <summary>开始一条主动流式反应（清场+进入主动模式；首字节前不显示占位）</summary>
+        /// <summary>开始一条主动流式反应（清场+进入主动模式；首字节前气泡内播放思考动画）</summary>
         public void BeginProactiveStream()
         {
             if (_bubbleText == null) return;
             _proactiveMode = true;
             CancelBubbleFade();
             if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
-            _typingBuffer.Length = 0;
-            _bubbleGroup.alpha = 1f;
-            _bubbleRoot.gameObject.SetActive(true);
+            StartThinking(); // 内含清缓冲/显气泡/起省略号动画——首个正文增量到达由 typewriter 停止
         }
 
         /// <summary>主动流式增量（打字机追加——与对话流共用 typewriter；typewriter 内会取消淡出计时）</summary>
@@ -274,6 +275,12 @@ namespace GIC.Pet.Chat
         void openInput()
         {
             _inputVisible = true;
+            // 首次打开输入条=明确对话意图：后台预热（建连+供应商前缀缓存），用户打字的几秒正好用上
+            if (!_prewarmed)
+            {
+                _prewarmed = true;
+                session?.Prewarm();
+            }
             _inputBarRoot.gameObject.SetActive(true);
             FollowInputBar((_canvas.transform as RectTransform).rect); // 立即摆位，防一帧闪在旧位置
             InputLocks.Push(this, InputLockReason.InputPopupEntering); // 输入期按键不漏进游戏
@@ -533,7 +540,7 @@ namespace GIC.Pet.Chat
             _inputField.text = "";
             _inputField.ActivateInputField();
             _proactiveMode = false; // 用户发话=进入对话流：回复气泡恢复常驻规则（不自动淡出）
-            showBubble("…"); // 等待首字节
+            StartThinking(); // 等待首字节（思考动画——替代旧静态"…"占位）
             _awaitingFirstByte = true;
             if (client == null) { showBubble(GetLocalizedText("PetChatNotWired", "对话组件未接线")); return; }
 
@@ -585,6 +592,7 @@ namespace GIC.Pet.Chat
         void typewriter(string delta)
         {
             if (string.IsNullOrEmpty(delta)) return;
+            StopThinking(); // 首个正文增量到达：思考动画让位（对话/主动反应两路共用）
             if (_typingCoroutine != null) StopCoroutine(_typingCoroutine);
             CancelBubbleFade();
             if (_awaitingFirstByte) { _typingBuffer.Length = 0; _awaitingFirstByte = false; } // 清"…"占位（错误文案同理——增量代表新回复）
@@ -605,9 +613,47 @@ namespace GIC.Pet.Chat
             _typingCoroutine = null;
         }
 
+        // ---- 思考动画（等待 LLM 首字节的气泡指示，2026-09-01） ----
+
+        /// <summary>气泡内播放思考指示（省略号循环），等待 LLM 首字节——对话 Send 与主动反应流共用；
+        /// 停止点=首个正文增量（typewriter）/整段直出（showBubble）/关闭对话（CloseChat）。
+        /// 修复"反应气泡出现但空白"观感：LLM 生成（尤其思考型模型 reasoning 阶段）需要数秒，
+        /// 此前无任何占位反馈。</summary>
+        void StartThinking()
+        {
+            if (_bubbleText == null) return;
+            StopThinking();
+            _typingBuffer.Length = 0;
+            _bubbleGroup.alpha = 1f;
+            _bubbleRoot.gameObject.SetActive(true);
+            _thinkingCoroutine = StartCoroutine(thinkingRoutine());
+        }
+
+        void StopThinking()
+        {
+            if (_thinkingCoroutine == null) return;
+            StopCoroutine(_thinkingCoroutine);
+            _thinkingCoroutine = null;
+        }
+
+        IEnumerator thinkingRoutine()
+        {
+            _bubbleRoot.sizeDelta = new Vector2(bubbleMaxW, 72f); // 紧凑高度（几个点撑不满整框）
+            while (true)
+            {
+                _bubbleText.text = ".";
+                yield return Wait.Seconds(0.35f);
+                _bubbleText.text = "..";
+                yield return Wait.Seconds(0.35f);
+                _bubbleText.text = "...";
+                yield return Wait.Seconds(0.35f);
+            }
+        }
+
         /// <summary>整段显示（错误/提示/非流式完成）</summary>
         void showBubble(string msg)
         {
+            StopThinking(); // 整段内容直接顶掉思考动画（错误文案/兜底直出路径）
             if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
             CancelBubbleFade();
             _typingBuffer.Length = 0;

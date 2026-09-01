@@ -131,6 +131,12 @@ namespace GIC.Pet.Chat
         float _nextGenAt;                                // 下次允许发起生成的时刻（节流）
         bool _generating;                                // LLM 生成中（防叠请求）
         string _currentFallback;                         // 本批事件的兜底文案（失败时直出最后一条）
+        float _genStartAt;                               // 本轮生成起点（卡死看门狗基准）
+
+        // 生成卡死看门狗：客户端自身看门狗（首字节超时/流中断）会走 onError→兜底，这里只兜
+        // "请求根本没发出/回调链断裂"的静默死亡（如 inactive 物体上 StartCoroutine 失败不触发
+        // 任何回调——_generating 永久卡 true=反应文本从此全灭，气泡只剩思考省略号转个不停）
+        const float GenerationStuckSec = 120f;
 
         // 流式回调引用（2026-08-31 持引用摘挂修复）：onComplete/onError/onContentDelta 是共享
         // Action 字段（UI 层 Send 也接）——必须 += 挂/-= 摘，整体赋值（=）会顶掉另一方的处理器
@@ -210,6 +216,16 @@ namespace GIC.Pet.Chat
                 Poll();
             }
             TryGenerate();
+
+            // 生成卡死看门狗：静默死亡（请求未发出/回调链断裂）时强制复位走兜底——
+            // 否则 _generating 永久卡 true，后续所有反应只剩动作没有话语
+            if (_generating && now - _genStartAt > GenerationStuckSec)
+            {
+                Debug.LogWarning($"[PetReact] 反应生成卡死（{GenerationStuckSec:0}s 无收尾），强制复位走兜底");
+                _generating = false;
+                DetachHandlers();
+                ShowFallback();
+            }
         }
 
         void Poll()
@@ -252,7 +268,7 @@ namespace GIC.Pet.Chat
             if (_pendingDescs.Count == 0 || _generating) return;
             if (Time.unscaledTime < _nextGenAt) return;
             var client = _session != null ? _session.clientRef : null;
-            if (client == null) { FlushAsFallback(); return; }
+            if (client == null || !client.isActiveAndEnabled) { FlushAsFallback(); return; } // 未接线/inactive（StartCoroutine 会静默失败）=无生成能力
             if (_session.IsBusy) { FlushAsFallback(); return; } // 用户对话优先：错失文本（下次事件再生成）
 
             // 合并事件描述
@@ -273,6 +289,7 @@ namespace GIC.Pet.Chat
             };
 
             _generating = true;
+            _genStartAt = Time.unscaledTime;
             _nextGenAt = Time.unscaledTime + generateIntervalSec;
 
             // 摘 UI 侧流式处理器（上次对话 Send 挂的仍留在链上——不摘则反应增量同时触发
@@ -308,7 +325,12 @@ namespace GIC.Pet.Chat
 
         void ShowFallback()
         {
-            if (string.IsNullOrEmpty(_currentFallback)) return;
+            if (string.IsNullOrEmpty(_currentFallback))
+            {
+                // 无兜底文案（罕见）：别让思考省略号转个不停——直接走淡出收场
+                _chatUI?.ProactiveStreamDone();
+                return;
+            }
             _chatUI?.ShowProactive(_currentFallback);
             _currentFallback = null;
         }

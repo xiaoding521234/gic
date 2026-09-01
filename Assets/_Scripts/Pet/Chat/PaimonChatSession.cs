@@ -311,6 +311,19 @@ namespace GIC.Pet.Chat
         /// <summary>清空会话历史（长期记忆保留）</summary>
         public void ClearHistory() => _history.Clear();
 
+        /// <summary>预热（首次打开输入条时 UI 层调用一次）：用与真实对话一致的 system 前缀发
+        /// max_tokens=1 极小请求——提前建 DNS/TLS 连接与供应商前缀缓存，缓解"首次对话明显
+        /// 慢于后续"（2026-09-01 用户实测反馈）。不进历史、不触发任何回调。</summary>
+        public void Prewarm()
+        {
+            if (client == null || _busy) return;
+            client.SendWarmup(new List<PetChatClient.ChatMessage>
+            {
+                new PetChatClient.ChatMessage("system", BuildSystemPrompt()),
+                new PetChatClient.ChatMessage("user", "ping"),
+            });
+        }
+
         /// <summary>后台事件注记（AI 抽卡结果等，2026-08-30）：以 system 消息进历史——
         /// 不触发回复，但下次对话时 LLM 可引用（用户问"刚才抽得怎么样"能答上）。
         /// 五家供应商均为 OpenAI 兼容，messages 中段 system 消息合法。</summary>

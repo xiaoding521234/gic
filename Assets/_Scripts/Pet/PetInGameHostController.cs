@@ -99,6 +99,13 @@ namespace GIC.Pet
         private float _pressDownAt = -10f;   // 单击（非拖拽）判定：按下时刻
         private Vector3 _pressDownPos;        // 按下时鼠标位（<8px 位移=没拖=单击）
 
+        // ---- 三连击切换形态（2026-09-01，桌面版同构手势；连击状态机在 PetHostBase 共用；
+        //      游戏内宿主在主进程内直调切换，无需 IPC） ----
+
+        [Tooltip("三连击派蒙切换为桌面形态（0.4s 内第 3 次命中单击触发，播退场动画后拉起桌面版）")]
+        [InspectorName("允许三连击切换形态")]
+        [SerializeField] private bool allowTripleClickSwitch = true;
+
         // 对话（2026-08-28）：单击弹输入框+流式回复气泡；组件随 prefab 预挂（素材/字体接线在 prefab）
         // _chatUI 在 PetHostBase；此处仅本形态的锚点辅助引用
         private Transform _headBone;              // 气泡锚点（头骨屏幕投影）
@@ -420,6 +427,18 @@ namespace GIC.Pet
             bool lmbDown = Input.GetMouseButton(0);
             bool lmbPressed = lmbDown && !prevLmbDown;
 
+            // ⓪三连击切换形态（连击状态机在 PetHostBase.CountClickChain 共用，与桌面版同语义）：
+            // 0.4s 内第 3 次命中单击→切换为桌面形态（GestureSwitchTo 内部播退场→销毁实例→拉起桌面版
+            // 进程=交接期不并存）。置于聊天门控之前——连击期间（含输入条已开的场景）照常计数
+            if (lmbPressed && modelHit && CountClickChain() && allowTripleClickSwitch)
+            {
+                _chatUI?.CloseChat(); // 收起输入条（第 1 击单击可能已开）再退场
+                Debug.Log("[PetInGame] 三连击：切换为桌面形态");
+                prevLmbDown = lmbDown;
+                PetInGameHost.GestureSwitchTo(PetInGameHost.FormDesktop);
+                return; // 退场已起（IsExiting 冻结后续交互帧），本帧不再推进
+            }
+
             // ①物理推进（含松手与收尾）**不受聊天输入门控**（2026-08-29 修双报障：旧版输入期整体早退
             // =收尾轮询停摆，dragPhysics.IsActive 永真 → 行为层卡 dragPhysicsPhase（Drag01 循环+视线
             // 静默）=永久拎起姿势+头不再跟踪鼠标——两症状同根）。输入期不会开着 dragging（新拖拽被
@@ -456,7 +475,10 @@ namespace GIC.Pet
             if (chatInputActive)
             {
                 if (lmbPressed && !_chatUI.IsPointOnInputBar(Input.mousePosition) && !_chatUI.IsPointOnBubble(Input.mousePosition))
-                    _chatUI.CloseChat();
+                {
+                    // 三连击进行中（点模型且计数≥2）不收起——第 3 击将触发切换（PetHostBase.ShouldCloseChatOnClick）
+                    if (ShouldCloseChatOnClick(modelHit)) _chatUI.CloseChat();
+                }
                 _pressPending = false;
                 prevLmbDown = lmbDown;
                 return;
@@ -474,6 +496,8 @@ namespace GIC.Pet
                     if (Time.unscaledTime - _pressDownAt <= 0.15f
                         && (Input.mousePosition - _pressDownPos).magnitude < 8f)
                     {
+                        // 单击立即开对话（2026-09-01 用户拍板恢复"对话框立刻出现"；三连击兼容见上——
+                        // 第 1 击开输入条后，连击的第 2 击在 chatInputActive 分支不收起，第 3 击触发切换）
                         _chatUI?.ToggleInput();
                     }
                 }
@@ -498,6 +522,7 @@ namespace GIC.Pet
         void dragStart()
         {
             dragging = true;
+            ResetClickChain(); // 真实拖拽打断连击计次（防误触切换）
             _screenSeated = false; // 被拖=立即解除坐定
             _scaleAdjusting = false; // 缩放重坐流程一并取消（拖走了自然不重坐）
             dragStartPointerRT = PointerRT();

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization;
 using GIC.Framework;
+using GIC.Data.Event;
 using GIC.Tool; // TextEntry（同 Display/Account 各 partial 的 using 约定）
 
 namespace GIC.UI
@@ -12,6 +13,11 @@ namespace GIC.UI
         /// <summary>派蒙形态枚举值（与 PlayerSaveData.petForm 对应：0=桌面版，1=游戏画面内版）</summary>
         private const int PET_FORM_DESKTOP = 0;
         private const int PET_FORM_INGAME = 1;
+
+        /// <summary>派蒙形态下拉的选项索引缓存（形态变更事件刷新用——非 Windows 平台无桌面项）</summary>
+        private int _petFormDesktopIdx = -1, _petFormIngameIdx = -1;
+        /// <summary>形态变更事件处理器（持引用；ScreenBase.OnDestroy 自动 UnsubscribeOwner(this)）</summary>
+        private PetFormChangedHandler _petFormHandler;
 
         /// <summary>当前平台是否可选桌面版（Win32 专属形态；安卓等平台恒游戏内版）</summary>
         public static bool DesktopFormAvailable =>
@@ -105,6 +111,8 @@ namespace GIC.UI
             }
             ingameIdx = options.Count;
             options.Add(new TextEntry(new LocalizedString("UIText", "PetFormInGame"), ""));
+            _petFormDesktopIdx = desktopIdx;
+            _petFormIngameIdx = ingameIdx;
 
             int current = GetEffectiveForm();
             int currentIndex = current == PET_FORM_DESKTOP ? desktopIdx : ingameIdx;
@@ -117,6 +125,28 @@ namespace GIC.UI
                 GIC.Pet.PetInGameHost.HotSwitchForm(form);
             });
             petFormSetting.Initialize();
+
+            // 订阅形态变更事件（2026-09-01）：三连击手势/桌宠 IPC 接管等外部切换后刷新下拉显示——
+            // 否则显示旧值且点同项不触发 onValueChanged（点了没反应陷阱）。ScreenBase.OnDestroy 自动退订。
+            _petFormHandler = new PetFormChangedHandler(this);
+            EventBusHub.Instance.Subscribe(_petFormHandler, this);
+        }
+
+        /// <summary>外部形态切换（OnPetFormChangedEvent）刷新下拉显示。SetValue=SetValueWithoutNotify
+        /// 不回触发 onValueChanged，无回环。</summary>
+        private void RefreshPetFormDropdown()
+        {
+            int idx = GetEffectiveForm() == PET_FORM_DESKTOP ? _petFormDesktopIdx : _petFormIngameIdx;
+            if (idx >= 0) petFormSetting.SetValue(idx);
+        }
+
+        /// <summary>形态变更事件处理器（gic-eventbus 标准写法：CanHandle 判 activeInHierarchy 防已销毁回调）</summary>
+        private class PetFormChangedHandler : IEventHandler<OnPetFormChangedEvent>
+        {
+            private readonly SettingsScreen _screen;
+            public PetFormChangedHandler(SettingsScreen s) => _screen = s;
+            public bool CanHandle(OnPetFormChangedEvent evt) => _screen != null && _screen.gameObject.activeInHierarchy;
+            public void Handle(OnPetFormChangedEvent evt) => _screen.RefreshPetFormDropdown();
         }
 
         /// <summary>读档侧钳制：非 Windows 平台/非法值恒游戏内版（存 0 的老档在安卓上跑=钳 1）</summary>

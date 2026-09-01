@@ -77,5 +77,15 @@ namespace GIC.Data.Event
         public bool IsInDeck;
     }
 
+    /// <summary>
+    /// 派蒙形态变更事件（PetInGameHost.HotSwitchForm 广播——设置界面"派蒙"栏下拉订阅刷新显示：
+    /// 三连击手势/桌宠 IPC 接管等外部切换后，打开着的设置界面不会自动重读存档，下拉显示旧值
+    /// 且点同项不触发 onValueChanged=点了没反应陷阱，2026-09-01）
+    /// </summary>
+    public class OnPetFormChangedEvent : BaseEvent
+    {
+        public int NewForm;
+    }
+
 }
 

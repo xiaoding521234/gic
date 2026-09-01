@@ -122,6 +122,7 @@ namespace GIC.Pet.Chat
                     case "get_game_time": return ExecuteGetGameTime();
                     case "open_screen": return ExecuteOpenScreen(args);
                     case "auto_wish": return ExecuteAutoWish(args);
+                    case "pet_go_ingame": return ExecutePetGoInGame();
                 }
                 return Error($"未知工具: {toolName}");
             }
@@ -247,6 +248,19 @@ namespace GIC.Pet.Chat
                 return Error("派蒙已经在抽卡啦，等这轮结束再说");
 
             return Ok($"好嘞！派蒙这就去抽{count}次卡！（会自动打开祈愿界面，抽到好卡坏卡派蒙都会有反应）");
+        }
+
+        // ---- 桌宠三连击形态接管（2026-09-01，非 LLM 工具——桌宠退出手势经 IPC 触发，共用本通道） ----
+
+        /// <summary>桌宠三连击触发：主游戏在运行则把派蒙切换为游戏内形态（PetInGameHost.GestureSwitchTo
+        /// ——存档 petForm=1 + 热切换；内部写 quit_request 优雅退出桌宠、等本进程退出后才创建游戏内
+        /// 实例=游戏运行时恒有且只有 1 个派蒙）。桌宠自身照常播 Disappear 退出（发送方
+        /// fire-and-forget，本回执无人读）。已处于游戏内形态（玩家手动多开桌宠）=no-op，
+        /// 桌宠退出后仍只剩游戏内一个。</summary>
+        static string ExecutePetGoInGame()
+        {
+            GIC.Pet.PetInGameHost.GestureSwitchTo(GIC.Pet.PetInGameHost.FormInGame);
+            return Ok("已切换为游戏内形态");
         }
 
         // ---- 回执 JSON ----
