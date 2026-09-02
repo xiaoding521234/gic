@@ -55,6 +55,7 @@ SpriteAtlas:
     - 3ecffc33e9f9d70438751b6d9b2a25e3: 21300000
     - 03770f93e67b956458466325bb2a1852: 21300000
     - f0e1a7c35b3cc9748ab3ef231eead7dc: 21300000
+    - 678252940640c9344820d48f8d414a5b: 21300000
     - 95d6d5e4d2ba26e48876dff1d41db88f: 21300000
     - 86e49bf4938f29c4f9aff05e27a26b91: 21300000
     - 1a68794507287234fbccb7cfbd27914a: 21300000
@@ -68,6 +69,7 @@ SpriteAtlas:
     - 3629fe466eb896e46b2e9650983b7175: 21300000
     - 9cb38f56f285c3d439b39d0199149024: 21300000
     - 204891760de775a41b8b35e4e253cd49: 21300000
+    - 0ff05596753451a48a2ae98ee68085f1: 21300000
     - 7c4bde67528d7cc498b3a23c01ad6c44: 21300000
     - abfbccb74b0d94342b8b4bb251264704: 21300000
     - b86c50689bd9e9a408739a20a0a7dc05: 21300000
@@ -93,6 +95,7 @@ SpriteAtlas:
     - 28cca5edf8823ec46bf148ebd5ddbe33: 21300000
     - 35c06dfd0b931da48ba5d9dc66d65e30: 21300000
     - acd5701e0904f1d4b8c7efe5085d25e8: 21300000
+    - 85f9667e223247f40b79471ae6e2751c: 21300000
     - 0cc8ba8e1d3697c47a18da8056c20538: 21300000
     - 4c4c9dee5175bc045a59640fbac6b8ae: 21300000
     - a1dd7d2fd4776734d965de5d5a6cc3d6: 21300000
@@ -112,6 +115,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 3ecffc33e9f9d70438751b6d9b2a25e3, type: 3}
   - {fileID: 21300000, guid: 03770f93e67b956458466325bb2a1852, type: 3}
   - {fileID: 21300000, guid: f0e1a7c35b3cc9748ab3ef231eead7dc, type: 3}
+  - {fileID: 21300000, guid: 678252940640c9344820d48f8d414a5b, type: 3}
   - {fileID: 21300000, guid: 95d6d5e4d2ba26e48876dff1d41db88f, type: 3}
   - {fileID: 21300000, guid: 86e49bf4938f29c4f9aff05e27a26b91, type: 3}
   - {fileID: 21300000, guid: 1a68794507287234fbccb7cfbd27914a, type: 3}
@@ -125,6 +129,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 3629fe466eb896e46b2e9650983b7175, type: 3}
   - {fileID: 21300000, guid: 9cb38f56f285c3d439b39d0199149024, type: 3}
   - {fileID: 21300000, guid: 204891760de775a41b8b35e4e253cd49, type: 3}
+  - {fileID: 21300000, guid: 0ff05596753451a48a2ae98ee68085f1, type: 3}
   - {fileID: 21300000, guid: 7c4bde67528d7cc498b3a23c01ad6c44, type: 3}
   - {fileID: 21300000, guid: abfbccb74b0d94342b8b4bb251264704, type: 3}
   - {fileID: 21300000, guid: b86c50689bd9e9a408739a20a0a7dc05, type: 3}
@@ -150,6 +155,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 28cca5edf8823ec46bf148ebd5ddbe33, type: 3}
   - {fileID: 21300000, guid: 35c06dfd0b931da48ba5d9dc66d65e30, type: 3}
   - {fileID: 21300000, guid: acd5701e0904f1d4b8c7efe5085d25e8, type: 3}
+  - {fileID: 21300000, guid: 85f9667e223247f40b79471ae6e2751c, type: 3}
   - {fileID: 21300000, guid: 0cc8ba8e1d3697c47a18da8056c20538, type: 3}
   - {fileID: 21300000, guid: 4c4c9dee5175bc045a59640fbac6b8ae, type: 3}
   - {fileID: 21300000, guid: a1dd7d2fd4776734d965de5d5a6cc3d6, type: 3}
@@ -168,6 +174,7 @@ SpriteAtlas:
   - normal_button
   - bottom
   - select
+  - popup_button_confirm
   - bottom
   - pyro
   - tutorial_button
@@ -181,6 +188,7 @@ SpriteAtlas:
   - electro
   - coop_button
   - back_button
+  - medium_popup
   - hydro
   - logo_back
   - close_button
@@ -206,6 +214,7 @@ SpriteAtlas:
   - dendro
   - select
   - valuable_button
+  - popup_button_cancel
   - map_button
   - backpack_button
   - dendro

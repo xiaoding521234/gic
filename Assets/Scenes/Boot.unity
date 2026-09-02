@@ -929,7 +929,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   popupPrefab: {fileID: 7149037203528289380, guid: bda0a7dd7c2ab8a49b366d0e96f76ea9, type: 3}
-  toastPrefab: {fileID: 0}
+  toastPrefab: {fileID: 7149037203528289380, guid: aa0e99f084eec7e4faf2ed97750bb0e2, type: 3}
   toastGap: 10
   toastPosRatio: 0.05
 --- !u!1660057539 &9223372036854775807
