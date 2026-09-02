@@ -155,6 +155,14 @@ MonoBehaviour:
     m_Key: CollectStaminaGain
     m_Metadata:
       m_Items: []
+  - m_Id: 36
+    m_Key: C2EnergyLimit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37
+    m_Key: StackLimit
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

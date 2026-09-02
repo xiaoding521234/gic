@@ -27,7 +27,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus}"
+    m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus} for {Duration}
+      turns\n\xB7Stacks up to {StackLimit} times, duration also stacks"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
@@ -57,9 +58,11 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001006
-    m_Localized: "\xB7[C1] Move SPD +{C1MoveSpeed}, Vision +{C1Vision}\n\xB7[C2]
-      Move SPD +{C2MoveSpeed}. Burst can dispel fog, gain {C2FogEnergyGain} energy
-      per {C2FogEnergyThreshold} tiles dispelled\n\xB7[C3] Gain <color=#FFD700><u><link=\"Unit:Amber\">Baron
+    m_Localized: "\xB7[C1] Vision +{C1Vision}. When Amber gains energy while at full
+      capacity, it transfers to the nearest allied character with unfilled energy;
+      no effect if all are full\n\xB7[C2] Move SPD +{C2MoveSpeed}, Max Energy +{C2EnergyLimit}.
+      Burst can dispel fog, gain {C2FogEnergyGain} energy per {C2FogEnergyThreshold}
+      tiles dispelled\n\xB7[C3] Gain <color=#FFD700><u><link=\"Unit:Amber\">Baron
       Bunny</link></u></color>"
     m_Metadata:
       m_Items: []

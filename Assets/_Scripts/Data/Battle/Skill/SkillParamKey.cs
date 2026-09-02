@@ -134,6 +134,14 @@ namespace GIC.Data
 
         [InspectorName("采集体力获取")]
         CollectStaminaGain = 35,
+
+        // 安柏命座
+        [InspectorName("2命元能上限增加")]
+        C2EnergyLimit = 36,
+
+        // 通用
+        [InspectorName("叠加上限")]
+        StackLimit = 37,
     }
 
     /// <summary>

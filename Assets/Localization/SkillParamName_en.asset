@@ -158,6 +158,14 @@ MonoBehaviour:
     m_Localized: Collection Stamina Gain
     m_Metadata:
       m_Items: []
+  - m_Id: 36
+    m_Localized: C2 Energy Limit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37
+    m_Localized: Stack Limit
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

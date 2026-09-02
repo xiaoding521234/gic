@@ -27,7 +27,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7\u88AB\u5354\u8005\u63D0\u5347{ATKBonus}\u653B\u64CA"
+    m_Localized: "\xB7\u88AB\u5354\u8005\u63D0\u5347{ATKBonus}\u653B\u64CA\uFF0C\u6301\u7E8C{Duration}\u56DE\u5408\n\xB7\u53EF\u758A\u52A0{StackLimit}\u5C64\uFF0C\u6301\u7E8C\u6642\u9593\u4E5F\u758A\u52A0"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
@@ -51,7 +51,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001006
-    m_Localized: "\xB7\u30101\u547D\u3011\u79FB\u901F\u63D0\u5347{C1MoveSpeed}\uFF0C\u8996\u91CE\u63D0\u5347{C1Vision}\n\xB7\u30102\u547D\u3011\u79FB\u901F\u63D0\u5347{C2MoveSpeed}\uFF0C\u7206\u767C\u53EF\u4EE5\u7834\u9664\u8FF7\u9727\uFF0C\u6BCF\u7834\u9664{C2FogEnergyThreshold}\u683C\u8FF7\u9727\u7372\u5F97{C2FogEnergyGain}\u5143\u80FD\n\xB7\u30103\u547D\u3011\u7372\u5F97<color=#FFD700><u><link=\"Unit:Amber\">\u5154\u5154\u4F2F\u7235</link></u></color>"
+    m_Localized: "\xB7\u30101\u547D\u3011\u8996\u91CE\u63D0\u5347{C1Vision}\uFF0C\u5B89\u67CF\u7372\u5F97\u5143\u80FD\u6642\u82E5\u81EA\u8EAB\u5DF2\u6EFF\uFF0C\u5247\u5143\u80FD\u8F49\u79FB\u7D66\u8DDD\u96E2\u6700\u8FD1\u7684\u6211\u65B9\u672A\u6EFF\u5143\u80FD\u89D2\u8272\uFF0C\u5168\u6EFF\u5247\u7121\u6548\u679C\n\xB7\u30102\u547D\u3011\u79FB\u901F\u63D0\u5347{C2MoveSpeed}\uFF0C\u5143\u80FD\u4E0A\u9650\u984D\u5916\u589E\u52A0{C2EnergyLimit}\uFF0C\u7206\u767C\u53EF\u4EE5\u7834\u9664\u8FF7\u9727\uFF0C\u6BCF\u7834\u9664{C2FogEnergyThreshold}\u683C\u8FF7\u9727\u7372\u5F97{C2FogEnergyGain}\u5143\u80FD\n\xB7\u30103\u547D\u3011\u7372\u5F97<color=#FFD700><u><link=\"Unit:Amber\">\u5154\u5154\u4F2F\u7235</link></u></color>"
     m_Metadata:
       m_Items: []
   - m_Id: 26206775032754176
