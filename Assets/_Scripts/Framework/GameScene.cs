@@ -5,7 +5,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using GIC.Data.Event;
 using UnityEngine.Localization.Settings;
-using GIC.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Battle;
@@ -36,9 +35,6 @@ namespace GIC.Framework
         [Header("调试配置")]
         [SerializeField] private bool enableDebugLog = true;
         [SerializeField] private bool showMemoryUsage = false;
-
-        [Header("弹窗")]
-        [SerializeField] private PopupManager popupManager;
 
         public Texture2D cursor;
 

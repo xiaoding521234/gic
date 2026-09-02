@@ -2,11 +2,6 @@
 using UnityEngine;
 using UnityEngine.Localization;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
-using GIC.Tool;
-using UnityEngine.Serialization;
 namespace GIC.UI
 {
 
@@ -16,6 +11,7 @@ namespace GIC.UI
         /// <summary>静态访问入口（场景唯一实例，Boot 场景建立）</summary>
         public static PopupManager Instance { get; private set; }
 
+        [InspectorName("模态弹窗预制体")]
         public GameObject popupPrefab;
 
         [Header("轻提示")]
@@ -26,7 +22,6 @@ namespace GIC.UI
         [SerializeField] private float toastPosRatio = 0.05f;
 
         private readonly List<PopupDialog> _activeToasts = new();
-        private float _canvasHeight;
         private float _toastHeight;
 
         private void Awake()
@@ -35,6 +30,11 @@ namespace GIC.UI
                 Instance = this;
             else if (Instance != this)
                 Destroy(gameObject);
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         public void ShowModalPopup(string message)
@@ -95,7 +95,7 @@ namespace GIC.UI
             var dialog = CreateToast();
             if (dialog == null) return;
 
-            Vector2 pos = ComputeToastPosition(_activeToasts.Count);
+            Vector2 pos = ComputeToastPosition(_activeToasts.Count, dialog);
             dialog.InitToast(message, pos, OnToastComplete);
             _activeToasts.Add(dialog);
         }
@@ -119,68 +119,66 @@ namespace GIC.UI
             var dialog = CreateToast();
             if (dialog == null) return;
 
-            Vector2 pos = ComputeToastPosition(_activeToasts.Count);
+            Vector2 pos = ComputeToastPosition(_activeToasts.Count, dialog);
             dialog.InitToast(localizedString, pos, OnToastComplete);
             _activeToasts.Add(dialog);
         }
 
         private PopupDialog CreateToast()
         {
-            var prefab = toastPrefab != null ? toastPrefab : popupPrefab;
-            if (prefab == null)
+            // 拆分定案后 toast 专用 prefab 独立配置——缺失即配置错误，不兜底模态 prefab（会静默呈现错误外观）
+            if (toastPrefab == null)
             {
-                GICLog.Error("PopupManager: popupPrefab 未设置");
+                GICLog.Error("PopupManager: toastPrefab 未设置");
                 return null;
             }
 
-            var instance = Instantiate(prefab, transform);
+            var instance = Instantiate(toastPrefab, transform);
             var dialog = instance.GetComponent<PopupDialog>();
             if (dialog == null)
             {
-                GICLog.Error("PopupManager: 预制体上未找到 PopupDialog 组件");
+                GICLog.Error("PopupManager: toastPrefab 上未找到 PopupDialog 组件");
                 Destroy(instance);
                 return null;
             }
             return dialog;
         }
 
-        private Vector2 ComputeToastPosition(int index)
+        private Vector2 ComputeToastPosition(int index, PopupDialog dialog)
         {
-            float height = GetCanvasHeight();
+            float height = GetToastCanvasHeight(dialog);
             float toastH = GetToastHeight();
             // 子节点锚定在屏幕中心 (0.5, 0.5)，Y=0 是中心，正值向上
-            // 目标位置：距顶部 20%（从顶部向下 0.2*height）
+            // 目标位置：距顶部 toastPosRatio 比例高度（默认 5%）
             float y = height * 0.5f - height * toastPosRatio - index * (toastH + toastGap);
             return new Vector2(0f, y);
         }
 
-        private float GetCanvasHeight()
+        /// <summary>toast 坐标系 = toast 实例自带根 Canvas（与 PopupDialog.SetupToastLayout 同源，
+        /// 避免管理器父 Canvas 与 toast Canvas 双源不一致）</summary>
+        private float GetToastCanvasHeight(PopupDialog dialog)
         {
-            if (_canvasHeight <= 0f)
-            {
-                var canvas = GetComponentInParent<Canvas>();
-                _canvasHeight = canvas != null ? canvas.GetComponent<RectTransform>().rect.height : 1080f;
-            }
-            return _canvasHeight;
+            if (dialog == null) return 1080f;
+            var canvas = dialog.GetComponent<Canvas>();
+            return canvas != null ? canvas.GetComponent<RectTransform>().rect.height : 1080f;
         }
 
         private float GetToastHeight()
         {
-            if (_toastHeight <= 0f)
+            if (_toastHeight <= 0f && toastPrefab != null)
             {
-                var prefab = toastPrefab != null ? toastPrefab : popupPrefab;
                 // 根节点 rect 高度为 0，实际内容在子节点 Image 上
-                for (int i = 0; i < prefab.transform.childCount; i++)
+                for (int i = 0; i < toastPrefab.transform.childCount; i++)
                 {
-                    var childRect = prefab.transform.GetChild(i).GetComponent<RectTransform>();
+                    var childRect = toastPrefab.transform.GetChild(i).GetComponent<RectTransform>();
                     if (childRect != null && childRect.rect.height > 0f)
                     {
                         _toastHeight = childRect.rect.height;
                         break;
                     }
                 }
-                if (_toastHeight <= 0f) _toastHeight = 60f;
             }
+            if (_toastHeight <= 0f) _toastHeight = 60f;
             return _toastHeight;
         }
 
@@ -195,7 +193,7 @@ namespace GIC.UI
             for (int i = index; i < _activeToasts.Count; i++)
             {
                 if (_activeToasts[i] != null)
-                    _activeToasts[i].SetToastPosition(ComputeToastPosition(i));
+                    _activeToasts[i].SetToastPosition(ComputeToastPosition(i, _activeToasts[i]));
             }
         }
     }

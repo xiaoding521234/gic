@@ -24,7 +24,8 @@ namespace GIC.UI
             playerNameSetting.Setup("Name", playerName,
                 onClick: () =>
                 {
-                    ShowInputPanel(playerNameSetting, playerName, (newName) =>
+                    // 点击时实时读存档——闭包捕获 Init 时的局部变量会回显改名前的旧值（PetApiKey 同款）
+                    ShowInputPanel(playerNameSetting, saveManager.CurrentSave.playerName, (newName) =>
                     {
                         saveManager.CurrentSave.playerName = newName;
                         saveManager.SaveGame();

@@ -144,11 +144,11 @@ namespace GIC.UI
                     if (_usable == null || _saveData == null) return;
                     if (_usable.TryUse(_saveData, out var msg))
                     {
-                        PopupManager.Instance?.ShowToast(msg);
+                        PopupManager.Instance.ShowToast(msg);
                     }
                     else
                     {
-                        PopupManager.Instance?.ShowToast(msg);
+                        PopupManager.Instance.ShowToast(msg);
                     }
                 });
             }

@@ -2,12 +2,8 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.UI
 {
@@ -15,8 +11,11 @@ namespace GIC.UI
 
     public class PopupDialog : MonoBehaviour, IClosable
     {
+        [InspectorName("消息文本")]
         [SerializeField] private TextMeshProUGUI messageTextObj;
+        [InspectorName("模态遮罩按钮")]
         public Button backPanel;
+        [InspectorName("淡入淡出组")]
         public CanvasGroup canvasGroup;
 
         [Header("动画")]
@@ -56,9 +55,11 @@ namespace GIC.UI
         private string _toastMessage;
 
         private TextCombiner _messageText;
-        private Coroutine currentCoroutine;
+        private Coroutine _currentCoroutine;
+        private Coroutine _emphasizeCoroutine;  // 强调动画（红闪+抖动）——独立跟踪，防连点/移出时互抢位置
         private Button _toastClickBtn;   // 点击移出（2026-08-31）
         private bool _toastDismissing;   // 移出中（连点防重入 + 管理器去重跳过）
+        private bool _isClosing;         // 模态关闭防重入（ESC 与遮罩点击同帧双触发）
 
         [Autowired] private InputManager _inputManager;
 
@@ -125,19 +126,23 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 刷新已有 toast 的生命时间并播放强调动画（红色闪烁+抖动）
+        /// 刷新已有 toast：重置停留计时并播放强调动画（红色闪烁+抖动）。
+        /// 保持当前可见度原地强调，不重播入场淡入（2026-09-02 审查拍板）
         /// </summary>
         public void RefreshToast()
         {
             if (_toastDismissing) return; // 移出中不复活（管理器去重会跳过并新建）
 
-            // 重启生命协程
-            if (currentCoroutine != null) StopCoroutine(currentCoroutine);
-            currentCoroutine = StartCoroutine(ToastShowCoroutine());
+            // 重启生命协程（animateIn=false：只重置停留计时，不清 alpha）
+            if (_currentCoroutine != null) StopCoroutine(_currentCoroutine);
+            _currentCoroutine = StartCoroutine(ToastShowCoroutine(false));
 
-            // 播放强调动画
+            // 播放强调动画（连续刷新时先停旧的，防两段抖动互抢）
             if (_toastBgImage != null)
-                StartCoroutine(FlashShakeCoroutine());
+            {
+                if (_emphasizeCoroutine != null) StopCoroutine(_emphasizeCoroutine);
+                _emphasizeCoroutine = StartCoroutine(FlashShakeCoroutine());
+            }
         }
 
         /// <summary>移出中（管理器去重跳过用：移出中的实例不刷新、新建替代）</summary>
@@ -149,8 +154,13 @@ namespace GIC.UI
         {
             if (_mode != PopupMode.Toast || _toastDismissing) return;
             _toastDismissing = true;
-            if (currentCoroutine != null) StopCoroutine(currentCoroutine);
-            currentCoroutine = StartCoroutine(ToastDismissCoroutine());
+            if (_emphasizeCoroutine != null)
+            {
+                StopCoroutine(_emphasizeCoroutine); // 移出动画独占位置，先停抖动
+                _emphasizeCoroutine = null;
+            }
+            if (_currentCoroutine != null) StopCoroutine(_currentCoroutine);
+            _currentCoroutine = StartCoroutine(ToastDismissCoroutine());
         }
 
         private IEnumerator ToastDismissCoroutine()
@@ -174,7 +184,7 @@ namespace GIC.UI
             }
             if (canvasGroup != null) canvasGroup.alpha = 0f;
 
-            currentCoroutine = null;
+            _currentCoroutine = null;
             var cb = _onToastComplete;
             _onToastComplete = null;   // 先摘再调（OnDestroy 兜底不会二次触发）
             cb?.Invoke(this);
@@ -207,6 +217,7 @@ namespace GIC.UI
             _toastBgImage.color = _toastBgOriginalColor;
             if (_toastContentRect != null)
                 _toastContentRect.anchoredPosition = basePos;
+            _emphasizeCoroutine = null;
         }
 
         /// <summary>
@@ -307,9 +318,9 @@ namespace GIC.UI
             gameObject.SetActive(true);
 
             if (_mode == PopupMode.Toast)
-                currentCoroutine = StartCoroutine(ToastShowCoroutine());
+                _currentCoroutine = StartCoroutine(ToastShowCoroutine(true));
             else
-                currentCoroutine = StartCoroutine(ShowCoroutine());
+                _currentCoroutine = StartCoroutine(ShowCoroutine());
         }
 
         private IEnumerator ShowCoroutine()
@@ -341,44 +352,53 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 轻提示动画 — 从顶部滑入→停留→滑出
+        /// 轻提示动画 — 滑入→停留→滑出。
+        /// animateIn=false 为刷新路径：保持可见度原地续命，不重播入场（2026-09-02 审查 #5）
         /// </summary>
-        private IEnumerator ToastShowCoroutine()
+        private IEnumerator ToastShowCoroutine(bool animateIn)
         {
-            // 初始状态已在 SetupToastLayout 中设置（alpha=0, 内容位于 startPos）
-            Vector2 startPos = _toastContentRect != null
-                ? _toastContentRect.anchoredPosition
-                : _toastTargetPos + new Vector2(0f, slideOutDist);
+            // 屏幕外起点（滑入起点 = 滑出终点，按目标位置推算而非当前位置——刷新重启不丢滑出位移）
+            Vector2 offscreenPos = _toastTargetPos + new Vector2(0f, slideOutDist);
 
-            // 滑入 + 淡入
-            float elapsed = 0f;
-            while (elapsed < slideInDuration)
+            if (animateIn)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / slideInDuration;
-                float eased = 1f - Mathf.Pow(1f - t, 3f);
-                if (canvasGroup != null) canvasGroup.alpha = eased;
-                if (_toastContentRect != null)
-                    _toastContentRect.anchoredPosition = Vector2.Lerp(startPos, _toastTargetPos, eased);
-                yield return null;
-            }
+                // 滑入 + 淡入
+                float elapsed = 0f;
+                while (elapsed < slideInDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / slideInDuration;
+                    float eased = 1f - Mathf.Pow(1f - t, 3f);
+                    if (canvasGroup != null) canvasGroup.alpha = eased;
+                    if (_toastContentRect != null)
+                        _toastContentRect.anchoredPosition = Vector2.Lerp(offscreenPos, _toastTargetPos, eased);
+                    yield return null;
+                }
 
-            if (canvasGroup != null) canvasGroup.alpha = 1f;
-            if (_toastContentRect != null)
-                _toastContentRect.anchoredPosition = _toastTargetPos;
+                if (canvasGroup != null) canvasGroup.alpha = 1f;
+                if (_toastContentRect != null)
+                    _toastContentRect.anchoredPosition = _toastTargetPos;
+            }
+            else
+            {
+                // 刷新：确保满可见度落在目标位（中途刷新时从半路吸附，红闪抖动掩盖此跳变）
+                if (canvasGroup != null) canvasGroup.alpha = 1f;
+                if (_toastContentRect != null)
+                    _toastContentRect.anchoredPosition = _toastTargetPos;
+            }
 
             // 停留
             yield return Wait.Seconds(toastHoldDuration);
 
             // 滑出 + 淡出
-            elapsed = 0f;
-            while (elapsed < slideOutDuration)
+            float elapsedOut = 0f;
+            while (elapsedOut < slideOutDuration)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / slideOutDuration;
-                canvasGroup.alpha = 1f - t;
+                elapsedOut += Time.deltaTime;
+                float t = elapsedOut / slideOutDuration;
+                if (canvasGroup != null) canvasGroup.alpha = 1f - t;
                 if (_toastContentRect != null)
-                    _toastContentRect.anchoredPosition = Vector2.Lerp(_toastTargetPos, startPos, t);
+                    _toastContentRect.anchoredPosition = Vector2.Lerp(_toastTargetPos, offscreenPos, t);
                 yield return null;
             }
 
@@ -390,11 +410,14 @@ namespace GIC.UI
 
         private void Close()
         {
+            if (_isClosing) return; // ESC 与遮罩点击同帧双触发防重入
+            _isClosing = true;
+
             _inputManager?.UnregisterClosable(this);
 
-            if (currentCoroutine != null)
+            if (_currentCoroutine != null)
             {
-                StopCoroutine(currentCoroutine);
+                StopCoroutine(_currentCoroutine);
                 // Show 协程在淡入完成前被中断 — 释放入场锁（幂等）
                 InputLocks.Pop(this, InputLockReason.PopupEntering);
             }

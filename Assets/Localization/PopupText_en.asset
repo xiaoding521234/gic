@@ -38,6 +38,10 @@ MonoBehaviour:
     m_Localized: Wish pool not available
     m_Metadata:
       m_Items: []
+  - m_Id: 5
+    m_Localized: Host startup timed out. Check whether the port is in use
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
