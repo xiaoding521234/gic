@@ -43,7 +43,7 @@ namespace GIC.Data
             public int maxPrepareCount = 10;
 
             [Header("每份数量")]
-            [Range(1, 5)]
+            [Range(1, 10)]
             public int countPerServing = 1;
 
             [Header("战斗")]

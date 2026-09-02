@@ -115,7 +115,7 @@ namespace GIC.Data
             public int GetEffectiveAttack() => IsSpecified(baseAttack) ? baseAttack : GetAttackByWeaponType();
             public int GetEffectiveAttackSpeed() => IsSpecified(baseAttackSpeed) ? baseAttackSpeed : GetAttackSpeedByWeaponType();
             public int GetEffectiveDefense() => IsSpecified(baseDefense) ? baseDefense : 0;
-            public int GetEffectiveMoveSpeed() => IsSpecified(baseMoveSpeed) ? baseMoveSpeed : 3;
+            public int GetEffectiveMoveSpeed() => IsSpecified(baseMoveSpeed) ? baseMoveSpeed : 30;
             public int GetEffectiveLuck() => IsSpecified(baseLuck) ? baseLuck : 0;
             public int GetEffectiveTenacity() => IsSpecified(baseTenacity) ? baseTenacity : 0;
             public int GetEffectiveMastery() => IsSpecified(baseMastery) ? baseMastery : 0;
@@ -124,7 +124,7 @@ namespace GIC.Data
             public int GetEffectiveVisionRange() => IsSpecified(visionRange) ? visionRange : 1;
             public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
             public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
-            public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 10;
+            public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;
             public int GetEffectiveDeployCost() => IsSpecified(deployCost) ? deployCost : GetDeployCost();
 
             /// <summary>

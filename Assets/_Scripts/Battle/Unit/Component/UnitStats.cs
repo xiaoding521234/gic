@@ -34,7 +34,7 @@ namespace GIC.Battle
         { StatType.Attack, new RangedInt(-500, 500, 40) },
         { StatType.Defense, new RangedInt(-300, 300, 0) },
         { StatType.AttackSpeed, new RangedInt(-100, 100, 40) },
-        { StatType.MoveSpeed, new RangedInt(-10, 10, 3) },
+        { StatType.MoveSpeed, new RangedInt(-100, 100, 30) },
         { StatType.Luck, new RangedInt(-100, 100, 0) },
         { StatType.Tenacity, new RangedInt(-100, 100, 0) },
         { StatType.Mastery, new RangedInt(-300, 300, 0) },
@@ -47,7 +47,7 @@ namespace GIC.Battle
         { StatType.DamageBonus, new RangedInt(-300, 300, 0) },
         { StatType.LifeSteal, new RangedInt(0, 100, 0) },
         { StatType.HealEfficiency, new RangedInt(0, 300, 100) },
-        { StatType.Energy, new RangedInt(0, 100, 0) },
+        { StatType.Energy, new RangedInt(0, 1000, 0) },
     };
 
         // ==================== 当前属性实例 ====================

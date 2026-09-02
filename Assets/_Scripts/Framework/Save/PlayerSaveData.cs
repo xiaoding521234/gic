@@ -264,7 +264,7 @@ namespace GIC.Framework
                 {
                     ItemName.Mora => 100,
                     ItemName.IntertwinedFate => 60,
-                    ItemName.Stamina => 10,
+                    ItemName.Stamina => 100,
                     ItemName.Primogem => 16000,
                     _ => 1
                 };

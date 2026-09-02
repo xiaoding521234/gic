@@ -23,7 +23,7 @@ MonoBehaviour:
     subType: 0
     maxStack: 9999
     maxPrepareCount: 100
-    countPerServing: 5
+    countPerServing: 10
     recycleAfterBattle: 1
     recycleLossCount: 60
     customParams: []
@@ -51,7 +51,7 @@ MonoBehaviour:
     subType: 0
     maxStack: 9999
     maxPrepareCount: 10
-    countPerServing: 5
+    countPerServing: 10
     recycleAfterBattle: 1
     recycleLossCount: 60
     customParams: []
@@ -79,7 +79,7 @@ MonoBehaviour:
     subType: 0
     maxStack: 9999
     maxPrepareCount: 100
-    countPerServing: 5
+    countPerServing: 10
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []

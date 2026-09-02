@@ -334,14 +334,14 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 5
+    baseMoveSpeed: 50
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 3
+    baseEnergy: 30
     normalMoveType: 2
     blockAllies: 1
     blockEnemies: 1
@@ -381,7 +381,7 @@ MonoBehaviour:
         value: 4
         baseType: 0
       - key: 9
-        value: 3
+        value: 30
         baseType: 0
     - skillID: 3001004
       icon: {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
@@ -391,7 +391,7 @@ MonoBehaviour:
         value: 10
         baseType: 0
       - key: 9
-        value: 2
+        value: 20
         baseType: 0
     - skillID: 3001005
       icon: {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
@@ -408,19 +408,19 @@ MonoBehaviour:
       skillType: 4
       customParams:
       - key: 13
-        value: 1
+        value: 10
         baseType: 0
       - key: 14
         value: 1
         baseType: 0
       - key: 15
-        value: 2
+        value: 20
         baseType: 0
       - key: 18
-        value: 5
+        value: 50
         baseType: 0
       - key: 19
-        value: 1
+        value: 10
         baseType: 0
     voices:
       onGoWar:
@@ -518,7 +518,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 4
+    baseEnergy: 40
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -552,17 +552,17 @@ MonoBehaviour:
         value: 2
         baseType: 0
       - key: 9
-        value: 4
+        value: 40
         baseType: 0
     - skillID: 3002003
       icon: {fileID: 0}
       skillType: 6
       customParams:
       - key: 30
-        value: 1
+        value: 10
         baseType: 0
       - key: 9
-        value: 1
+        value: 10
         baseType: 0
     - skillID: 3002004
       icon: {fileID: 0}
@@ -743,7 +743,7 @@ MonoBehaviour:
         value: 40
         baseType: 2
       - key: 9
-        value: 10
+        value: 100
         baseType: 0
     - skillID: 3003002
       icon: {fileID: 0}
@@ -753,7 +753,7 @@ MonoBehaviour:
         value: 15
         baseType: 2
       - key: 9
-        value: 2
+        value: 20
         baseType: 0
     - skillID: 3003003
       icon: {fileID: 0}
@@ -767,7 +767,7 @@ MonoBehaviour:
       skillType: 4
       customParams:
       - key: 32
-        value: 1
+        value: 10
         baseType: 0
       - key: 33
         value: 1
@@ -875,7 +875,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 5
+    baseEnergy: 50
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -920,7 +920,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 5
+    baseEnergy: 50
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -1010,7 +1010,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 5
+    baseEnergy: 50
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -1056,7 +1056,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 5
+    baseEnergy: 50
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -1094,14 +1094,14 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 2
+    baseMoveSpeed: 20
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 3
+    baseEnergy: 30
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -2038,7 +2038,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 10
+    baseEnergy: 100
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -2083,7 +2083,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 10
+    baseEnergy: 100
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
