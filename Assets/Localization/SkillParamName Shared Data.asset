@@ -147,6 +147,14 @@ MonoBehaviour:
     m_Key: C2Radius
     m_Metadata:
       m_Items: []
+  - m_Id: 34
+    m_Key: CollectEnergyGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 35
+    m_Key: CollectStaminaGain
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -32,7 +32,8 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001001
     m_Localized: "\xB7Fly in one of the four cardinal directions\n\xB7Collect resources
-      along the path {CollectCount} times"
+      along the path {CollectCount} times\n\xB7Each collection grants {CollectStaminaGain}
+      Stamina and {CollectEnergyGain} Energy"
     m_Metadata:
       m_Items: []
   - m_Id: 3001002

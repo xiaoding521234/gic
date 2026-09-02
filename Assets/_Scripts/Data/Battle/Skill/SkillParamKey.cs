@@ -127,6 +127,13 @@ namespace GIC.Data
 
         [InspectorName("2命生效半径")]
         C2Radius = 33,
+
+        // 安柏采集
+        [InspectorName("采集元能获取")]
+        CollectEnergyGain = 34,
+
+        [InspectorName("采集体力获取")]
+        CollectStaminaGain = 35,
     }
 
     /// <summary>

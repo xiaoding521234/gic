@@ -360,6 +360,12 @@ MonoBehaviour:
       - key: 16
         value: 2
         baseType: 0
+      - key: 34
+        value: 5
+        baseType: 0
+      - key: 35
+        value: 5
+        baseType: 0
     - skillID: 3001002
       icon: {fileID: 21300000, guid: f96030a9a9bcc494a802b1a9c0ae67cd, type: 3}
       skillType: 2
@@ -417,10 +423,10 @@ MonoBehaviour:
         value: 20
         baseType: 0
       - key: 18
-        value: 50
+        value: 1
         baseType: 0
       - key: 19
-        value: 10
+        value: 5
         baseType: 0
     voices:
       onGoWar:
