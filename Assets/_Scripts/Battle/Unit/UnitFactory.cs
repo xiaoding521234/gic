@@ -19,7 +19,7 @@ namespace GIC.Battle
         // ==================== 预制体配置 ====================
         
         /// <summary>
-        /// 单位预制体（在 Inspector 中配置或通过代码注册）
+        /// 单位预制体（Resources/Prefabs/Units/Unit）
         /// </summary>
         private static GameObject _unitPrefab;
         private static bool _isInitialized = false;
@@ -34,10 +34,10 @@ namespace GIC.Battle
             if (_isInitialized) return;
 
             // 从 Resources 加载预制体
-            _unitPrefab = Resources.Load<GameObject>("Prefabs/Units/NormalUnit");
+            _unitPrefab = Resources.Load<GameObject>("Prefabs/Units/Unit");
             if (_unitPrefab == null)
             {
-                GICLog.Error("[UnitFactory] 未找到单位预制体 Prefabs/Units/NormalUnit，请确认 Resources 目录");
+                GICLog.Error("[UnitFactory] 未找到单位预制体 Prefabs/Units/Unit，请确认 Resources 目录");
                 return; // 不置 _isInitialized，下次调用重试加载
             }
 
