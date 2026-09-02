@@ -22,17 +22,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 4
-    deployCost: -1
+    deployCost: -64
     weaponType: 4
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -41,7 +41,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 8
-    visionRange: -1
+    visionRange: -64
     tags: a60f0000
     skills: []
     voices:
@@ -283,17 +283,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 4
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -302,7 +302,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 2
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -355,7 +355,7 @@ MonoBehaviour:
       skillType: 1
       customParams:
       - key: 5
-        value: 100
+        value: 10
         baseType: 9
       - key: 16
         value: 2
@@ -532,7 +532,7 @@ MonoBehaviour:
       skillType: 1
       customParams:
       - key: 5
-        value: 100
+        value: 10
         baseType: 9
     - skillID: 3002001
       icon: {fileID: 0}
@@ -717,7 +717,7 @@ MonoBehaviour:
       skillType: 1
       customParams:
       - key: 5
-        value: 100
+        value: 10
         baseType: 9
     - skillID: 3003004
       icon: {fileID: 0}
@@ -952,17 +952,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 5
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -971,7 +971,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 3
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -1350,17 +1350,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 2
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1369,7 +1369,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 7
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -1395,17 +1395,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1414,7 +1414,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1440,17 +1440,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1459,7 +1459,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1485,17 +1485,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1504,7 +1504,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1530,17 +1530,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 2
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1549,7 +1549,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 4
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -1575,17 +1575,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1594,7 +1594,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1620,17 +1620,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1639,7 +1639,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1665,17 +1665,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1684,7 +1684,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1710,17 +1710,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 4
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1729,7 +1729,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -1755,17 +1755,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1774,7 +1774,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1800,17 +1800,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1819,7 +1819,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1845,17 +1845,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 0
     starLevel: 3
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1864,7 +1864,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 6
-    visionRange: -1
+    visionRange: -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1890,17 +1890,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1909,7 +1909,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 2
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -1935,17 +1935,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 5
-    deployCost: -1
+    deployCost: -64
     weaponType: 0
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1954,7 +1954,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 1
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
@@ -1980,17 +1980,17 @@ MonoBehaviour:
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
     hideInBackpack: 1
     starLevel: 4
-    deployCost: -1
+    deployCost: -64
     weaponType: 1
-    baseHP: -1
-    baseAttack: -1
-    baseDefense: -1
-    baseAttackSpeed: -1
-    baseMoveSpeed: -1
-    baseLuck: -1
-    baseTenacity: -1
-    baseMastery: -1
-    baseSanity: -1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
     baseEnergy: -64
@@ -1999,7 +1999,7 @@ MonoBehaviour:
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 0
-    visionRange: -1
+    visionRange: -64
     tags: 
     skills: []
     voices:
