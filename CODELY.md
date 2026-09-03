@@ -45,7 +45,7 @@
 
 - [2026-09-02 20:59:46] [2026-09-02 20:15:30] [feedback] 【桥重放脚本必须幂等】（2026-09-02 两次实证，安柏本地化批）：unity_refresh 恢复后编辑器脚本可能被重放执行——AddKey 型脚本第二遍会新建同 key 重复条目、字符串追加型会重复 append。**How to apply**：AI 直改本地化/资产的编辑器脚本一律带幂等守卫：加键前 `Entries.Where(e=>e.Key==key)` 查重、追加文本前 `Value.Contains("{新占位符}")` 已含即跳过、全量重写型天然幂等；脚本输出逐条报 exists/already/rewritten 便于核对实际生效遍数。
 - [2026-09-02 22:31:13] [2026-09-02 22:23] [feedback] 【AI 素材 9 切片两陷阱】已沉淀为 gic-ui-9slice skill（.codely-cli/skills/gic-ui-9slice/SKILL.md，2026-09-02 弹窗素材实证）：①Sliced border 按原生像素渲染，超显示矩形用 pixelsPerUnitMultiplier；②spriteBorder ≥ 角饰（max 缩进法测量）。细节/代码模板/流程七步一律查 skill，本条只留指针。**How to apply:** AI生成UI素材→9切片落地类需求先读该 skill。
-
+- [2026-09-03 09:02:13] [feedback] 【UI 图标风格品味标准=原神级极简】（2026-09-03 背包标签图标三轮实证）：用户对 AI 生成 UI 图标的验收标准对标原神 UI。已否决两方向：①复合元素主体（法阵+星、剑盾交叉、币堆+浮雕——元素堆叠即繁复）②两色实心剪影+负空间镂空（用户自提交批次，仍评"不如原神简约"：分量重、米白暗紫对比生硬、缺线条感）。正解方向=单色细线描图标（米白/暖金、对称、大量留白、无填充）；网检佐证：站酷《浅谈〈原神〉美术风格与UI视觉包装》——原神主界面 ICON 扁平、对称式、细线元素。**Why:** 每轮方向错误浪费 5 个生成额度+等待时间，三轮才逼近目标。**How to apply:** UI 图标生成 prompt 一律按"单一简单物体+单色细线+留白"基线起步，禁用实心色块与复合元素起步；风格存疑时先出 1 张试方向再批量。
 
 ### Project
 - [2026-08-16 19:13:23] GIC"协议核心"：同时回合制卡牌战术战棋（原神IP，最多6人，LAN联机 via Mirror）。核心循环：祈愿解锁→局前选8卡→同时选1行动→攻速排序执行→摧毁核心掠夺→原石结算。7势力可混搭，命座0-3重复出战升命。**定位**：单人开发的个人 Demo/作品集，非商业上线；目标全平台互通（PC+移动+主机）。**Why:** solo dev 资源有限，scope 必须从 GDD 雄心大幅裁剪。**How to apply:** 实现战斗/势力/经济系统时参考 docs/；优先 2人1v1 而非 6 人、2-3 势力而非 7、垂直切片优先于铺量。
@@ -137,6 +137,7 @@
 - [2026-09-02 22:31:39] [2026-09-02 22:23] [project] 弹窗素材体系拆分定案（2026-09-02）：轻提示=ToastDialog.prefab（bottom.png 原横条，Boot.unity 的 PopupManager.toastPrefab 已指向）；中弹窗=PopupDialog.prefab（模态消息）+InputPopupDialog.prefab（输入框），面板/按钮素材在 Assets/Resources/UI/Popup/。**Why:** 原先模态与 toast 共用一个 prefab（toastPrefab 为空时兜底 popupPrefab），直接换中弹窗素材会连带改 toast 外观。**How to apply:** 改弹窗/轻提示外观前先分清两 prefab；弹窗类素材生成与 9 切片落地走 gic-ui-9slice skill（内含现状索引）。
 
 - [2026-09-02 22:23:37] [2026-09-02 22:25] [project] 【.codelyignore 搜索陷阱】本项目 .codelyignore 屏蔽 Assets/**/*.png、*.prefab、*.asset、*.mat、*.wav 等——search_file_content/glob 在这些路径**静默零命中**（极易误判"无引用/文件不存在"），查 guid 引用/资产内容前一律 shell `rg --no-ignore`；read_file 直接读不受影响。**How to apply:** 引用排查（素材 guid、prefab 反查）先想路径是否被 ignore，被 ignore 就走 rg。
+- [2026-09-03 00:39:06] [project] UI 素材分辨率基准（2026-09-03 普查实证，186 PNG）：全项目按钮素材 500~512px 一档（MainHall 导航钮 512×512×10、back/normal_button 500×135、弹窗钮 500×103）；Canvas 参考分辨率 2560×1440（仅 PaimonPet 960×540）；medium_popup 511×512 对显示 ~900×500 属偏低档。纹理 raw 预算大头：Art/Wish 470MB（8 张 4096px）、Art/PositionBack 172MB（3200px）、UI/Cards 107MB（30 张 800×1200）；弹窗族 4 张仅 2.1MB 占 0.2%。**How to apply:** 弹窗/按钮素材保持 500~512 一档即可，勿超标也勿低于显示尺寸；内存优化议题优先看 Wish/PositionBack/Cards，不是弹窗族。
 
 ### Reference
 - [2026-08-14 10:16:21] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Picture\gichess\my\wg-0.2.d。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 需要查旧 Java 实现时按路径阅读源码。
