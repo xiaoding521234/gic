@@ -14,6 +14,8 @@ namespace GIC.UI
     {
         public Toggle toggle;
         public Image selectIcon;
+        public Image selectDisc;   // 选中态公共圆盘层（原神式：盘+glyph 分层染色）
+        public Image selectGlyph;  // 选中态 glyph 层（与 NormalIcon 同 sprite，染深色）
         public BackpackTab tab = BackpackTab.Character;
 
         [Header("动画参数")]
@@ -32,11 +34,23 @@ namespace GIC.UI
             _syncHandler = new CategorySyncHandler(this);
             EventBusHub.Instance.Subscribe(_syncHandler, this);
 
-            if (selectIcon != null)
+            bool layered = selectDisc != null && selectGlyph != null;
+            if (!layered && selectIcon != null)
             {
+                // 兼容旧单层结构：未拆层时退化为单层动画
                 selectIcon.transform.localScale = Vector3.zero;
                 selectIcon.color = unselectedColor;
                 selectIcon.gameObject.SetActive(true);
+            }
+            if (selectDisc != null)
+            {
+                selectDisc.transform.localScale = Vector3.zero;
+                selectDisc.gameObject.SetActive(true);
+            }
+            if (selectGlyph != null)
+            {
+                selectGlyph.transform.localScale = Vector3.zero;
+                selectGlyph.gameObject.SetActive(true);
             }
         }
 
@@ -74,11 +88,65 @@ namespace GIC.UI
 
         private IEnumerator PopAnimation(bool isOn)
         {
-            if (selectIcon == null) yield break;
+            if (selectDisc != null && selectGlyph != null)
+            {
+                // 原神式两层：盘(米白) + glyph(深色) 同步 pop
+                yield return PopLayers(isOn);
+                yield break;
+            }
+            if (selectIcon != null)
+            {
+                yield return PopSingle(selectIcon, isOn);
+                yield break;
+            }
+        }
 
+        private IEnumerator PopLayers(bool isOn)
+        {
             float elapsed = 0f;
-            Vector3 startScale = selectIcon.transform.localScale;
-            Color startColor = selectIcon.color;
+            Vector3 startScaleDisc = selectDisc.transform.localScale;
+            Vector3 startScaleGlyph = selectGlyph.transform.localScale;
+
+            if (isOn)
+            {
+                while (elapsed < popDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / popDuration;
+                    float scale;
+                    if (t < 0.5f)
+                        scale = Mathf.Lerp(0f, 1.1f, t * 2f);
+                    else
+                        scale = Mathf.Lerp(1.1f, 1f, (t - 0.5f) * 2f);
+
+                    selectDisc.transform.localScale = Vector3.one * scale;
+                    selectGlyph.transform.localScale = Vector3.one * scale;
+                    yield return null;
+                }
+                selectDisc.transform.localScale = Vector3.one;
+                selectGlyph.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                while (elapsed < popDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / popDuration;
+                    float scale = Mathf.Lerp(startScaleDisc.x, 0f, t);
+                    selectDisc.transform.localScale = Vector3.one * scale;
+                    selectGlyph.transform.localScale = Vector3.one * scale;
+                    yield return null;
+                }
+                selectDisc.transform.localScale = Vector3.zero;
+                selectGlyph.transform.localScale = Vector3.zero;
+            }
+        }
+
+        private IEnumerator PopSingle(Image img, bool isOn)
+        {
+            float elapsed = 0f;
+            Vector3 startScale = img.transform.localScale;
+            Color startColor = img.color;
 
             if (isOn)
             {
@@ -93,12 +161,12 @@ namespace GIC.UI
                     else
                         scale = Mathf.Lerp(1.1f, 1f, (t - 0.5f) * 2f);
 
-                    selectIcon.transform.localScale = Vector3.one * scale;
-                    selectIcon.color = Color.Lerp(unselectedColor, selectedColor, t);
+                    img.transform.localScale = Vector3.one * scale;
+                    img.color = Color.Lerp(unselectedColor, selectedColor, t);
                     yield return null;
                 }
-                selectIcon.transform.localScale = Vector3.one;
-                selectIcon.color = selectedColor;
+                img.transform.localScale = Vector3.one;
+                img.color = selectedColor;
             }
             else
             {
@@ -106,12 +174,12 @@ namespace GIC.UI
                 {
                     elapsed += Time.deltaTime;
                     float t = elapsed / popDuration;
-                    selectIcon.transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
-                    selectIcon.color = Color.Lerp(startColor, unselectedColor, t);
+                    img.transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+                    img.color = Color.Lerp(startColor, unselectedColor, t);
                     yield return null;
                 }
-                selectIcon.transform.localScale = Vector3.zero;
-                selectIcon.color = unselectedColor;
+                img.transform.localScale = Vector3.zero;
+                img.color = unselectedColor;
             }
         }
 
@@ -129,5 +197,3 @@ namespace GIC.UI
     }
 
 }
-
-
