@@ -44,7 +44,10 @@ namespace GIC.Framework
         private const int CURRENT_SAVE_VERSION = 10;
 
         private float lastSaveTime = -999f;
+        // 落盘间隔（2026-09-05 时机优化）：SaveGame() 只标脏，变更由 Update 在距上次写盘 ≥该间隔后合并落盘。
+        // 旧语义="1 秒 CD 内连发的保存被静默丢弃"（连发修改会丢数据），新语义="延迟合并"——永不丢，只推迟 ≤1s。
         private const float SAVE_CD = 1f;
+        private bool saveDirty;
 
         public PlayerSaveData CurrentSave { get; private set; } = new PlayerSaveData();
 
@@ -118,18 +121,49 @@ namespace GIC.Framework
             }
         }
 
-        public void Update(float deltaTime) { }
+        public void Update(float deltaTime)
+        {
+            // 延迟落盘（2026-09-05）：标脏后最迟 ~SAVE_CD 秒在此写盘，连发保存自动合并（设置滑条/卡组连点/位置切换）
+            if (saveDirty && Time.time - lastSaveTime >= SAVE_CD)
+                DoSave();
+        }
 
+        /// <summary>
+        /// 请求存盘（标脏延迟合并）：变更最迟 ~SAVE_CD 秒后由 Update 落盘。高频/连发调用安全；
+        /// 关键路径（祈愿扣石、读档固化、建档、退出/后台化兜底）必须用 SaveGameNow。
+        /// </summary>
         public void SaveGame()
         {
-            if (Time.time - lastSaveTime < SAVE_CD) return;
-            lastSaveTime = Time.time;
+            saveDirty = true;
+        }
 
+        /// <summary>立即写盘（绕过延迟窗）：货币/进度关键路径与进程生命周期兜底用（GameScene.OnApplicationQuit/Pause）</summary>
+        public void SaveGameNow()
+        {
+            DoSave();
+        }
+
+        private void DoSave()
+        {
+            lastSaveTime = Time.time;
             try
             {
                 CurrentSave.saveVersion = CURRENT_SAVE_VERSION;
-                string json = JsonUtility.ToJson(CurrentSave, true);
-                File.WriteAllText(SavePath, json, System.Text.Encoding.UTF8);
+#if UNITY_EDITOR
+                string json = JsonUtility.ToJson(CurrentSave, true);   // 编辑器 pretty 便于人工排查存档内容
+#else
+                string json = JsonUtility.ToJson(CurrentSave, false);  // 构建版关 pretty：序列化更快、文件更小（存档随游戏增长的存量成本优化）
+#endif
+                // 原子写（2026-09-05）：先写 .tmp 再替换正式文件——写盘中途崩溃/断电不留半截损坏档
+                //（旧直写的后果：下次读档 catch → CreateNewSave = 全进度清零）。同卷 File.Replace 为原子替换；
+                // 首存（正式文件尚不存在）走 File.Move；残留 .tmp 无害，下次保存自然覆盖。
+                string tmpPath = SavePath + ".tmp";
+                File.WriteAllText(tmpPath, json, System.Text.Encoding.UTF8);
+                if (File.Exists(SavePath))
+                    File.Replace(tmpPath, SavePath, null);
+                else
+                    File.Move(tmpPath, SavePath);
+                saveDirty = false;   // 仅成功后清脏；失败保持脏=下个间隔自动重试
                 GICLog.Info($"存档成功: {SavePath}");
             }
             catch (Exception e)
@@ -169,8 +203,8 @@ namespace GIC.Framework
                 // 3. 版本兼容检查（高于当前版本仅警告）
                 ApplySaveCompatibility();
 
-                // 4. 保存一次，确保补充和排序的结果持久化
-                SaveGame();
+                // 4. 保存一次，确保补充和排序的结果持久化（立即写：启动路径，不走延迟窗）
+                SaveGameNow();
 
                 GICLog.Info($"读档成功，当前版本: {CurrentSave.saveVersion}");
             }
@@ -191,7 +225,7 @@ namespace GIC.Framework
             // 编辑器与构建共享 persistentDataPath+同机设备指纹=密文互通。构建产物无此代码路径。
             GIC.Pet.PetPrefs.WriteChatCipher(CurrentSave.petApiKeyCipher);
 #endif
-            SaveGame();
+            SaveGameNow();
         }
 
         /// <summary>

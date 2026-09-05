@@ -156,11 +156,11 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 统一存盘（由 WishDrawController 在整个抽卡流程结束后调用一次）
+        /// 统一存盘（由 WishDrawController 在整个抽卡流程结束后调用一次）——祈愿=货币关键路径，立即写盘不走延迟窗
         /// </summary>
         public void SaveGame()
         {
-            _saveManager.SaveGame();
+            _saveManager.SaveGameNow();
         }
 
         /// <summary>

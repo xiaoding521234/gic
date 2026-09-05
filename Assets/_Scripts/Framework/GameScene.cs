@@ -131,11 +131,24 @@ namespace GIC.Framework
 
         private void OnApplicationQuit()
         {
+            // 存档兜底（2026-09-05 时机优化）：退出前把标脏未落盘的变更立即写盘
+            _saveManager?.SaveGameNow();
+
             // 设置开启时退出游戏连带关闭派蒙（设置项 closePetOnExit，默认开；关闭则她独立存活；
             // 游戏内形态天然随进程销毁，TryKillPet 对无 pid 文件场景为 no-op——2026-08-27 起两形态共用此钩子）
             if (!PetMode.Enabled && _saveManager?.CurrentSave?.closePetOnExit == true)
             {
                 PetSingleInstance.TryKillPet();
+            }
+        }
+
+        private void OnApplicationPause(bool pause)
+        {
+            // 存档兜底（2026-09-05 时机优化）：切后台即写盘——移动端后台化后进程随时可能被系统回收，
+            // 延迟窗内的未落盘变更必须在挂起前持久化。桌宠形态本组件已自毁，此钩子不触发。
+            if (pause && !PetMode.Enabled)
+            {
+                _saveManager?.SaveGameNow();
             }
         }
 
