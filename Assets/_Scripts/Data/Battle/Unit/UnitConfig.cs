@@ -87,7 +87,7 @@ namespace GIC.Data
 
             public int GetHPByStarLevel()
             {
-                return starLevel switch { 1 => 150, 2 => 200, 3 => 200, 4 => 250, 5 => 300, _ => 200 };
+                return starLevel switch { 1 => 150, 2 => 200, 3 => 200, 4 => 300, 5 => 600, _ => 200 };
             }
 
             public int GetAttackByWeaponType()
