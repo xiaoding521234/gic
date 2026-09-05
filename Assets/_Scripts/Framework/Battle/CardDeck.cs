@@ -86,8 +86,8 @@ namespace GIC.Framework
 
             // 收集所有卡牌中属于本卡组的
             var all = new List<SaveCardData>();
-            all.AddRange(save.ownedUnits);
-            all.AddRange(save.ownedNormalItems);
+            all.AddRange(save.progress.ownedUnits);
+            all.AddRange(save.progress.ownedNormalItems);
 
             foreach (var card in all)
             {

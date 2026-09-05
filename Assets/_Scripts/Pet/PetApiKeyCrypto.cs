@@ -22,7 +22,7 @@ namespace GIC.Pet
     /// </summary>
     public static class PetApiKeyCrypto
     {
-        /// <summary>存档字段名（PlayerSaveData.petApiKeyCipher，Base64 密文；空串=未设置）</summary>
+        /// <summary>存档字段名（PlayerSaveData.pet.petApiKeyCipher，Base64 密文；空串=未设置）</summary>
         public const string saveField = "petApiKeyCipher";
 
 #if UNITY_EDITOR

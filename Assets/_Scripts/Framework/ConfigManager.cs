@@ -21,6 +21,7 @@ namespace GIC.Framework
         [Bean] public PositionConfig GetPositionConfig() => LoadConfig<PositionConfig>("Configs/PositionConfig");
         [Bean] public ElementFactionIconConfig GetElementFactionIconConfig() => LoadConfig<ElementFactionIconConfig>("Configs/ElementFactionIconConfig");
         [Bean] public StarVisualConfig GetStarVisualConfig() => LoadConfig<StarVisualConfig>("Configs/StarVisualConfig");
+        [Bean] public InitialSaveConfig GetInitialSaveConfig() => LoadConfig<InitialSaveConfig>("Configs/InitialSaveConfig");
 
         [Autowired] private UnitConfig _unitConfig;
         [Autowired] private ItemConfig _itemConfig;

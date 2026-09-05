@@ -27,8 +27,8 @@ namespace GIC.UI
             if (newDeckId < 0 || newDeckId >= cardManager.decks.Length) return;
 
             currentDeckId = newDeckId;
-            saveManager.CurrentSave.currentDeck = newDeckId;
-            saveManager.SaveGame();
+            // 统一变更入口（2026-09-05 Modify 迁移）：变更+自动标脏一步完成
+            saveManager.Modify(s => s.progress.currentDeck = newDeckId);
             RefreshCardList();
 
             if (isEditMode)
@@ -134,8 +134,7 @@ namespace GIC.UI
 
             if (isInDeck)
             {
-                cardData.RemoveFromDeck(currentDeckId);
-                saveManager.SaveGame();
+                saveManager.Modify(_ => cardData.RemoveFromDeck(currentDeckId));
                 cardManager.RebuildDeck(currentDeckId);
                 RefreshCurrentDeckCache();
                 UpdateCardDeckVisual(cardData, false);
@@ -147,8 +146,7 @@ namespace GIC.UI
             {
                 if (GetCurrentDeckCount() < MAX_DECK_SIZE)
                 {
-                    cardData.AddToDeck(currentDeckId);
-                    saveManager.SaveGame();
+                    saveManager.Modify(_ => cardData.AddToDeck(currentDeckId));
                     cardManager.RebuildDeck(currentDeckId);
                     RefreshCurrentDeckCache();
                     UpdateCardDeckVisual(cardData, true);

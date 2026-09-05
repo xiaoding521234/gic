@@ -28,7 +28,7 @@ namespace GIC.Framework
 
             // ── 阶段2：按依赖顺序注册 [Component] 类（构造器注入，依赖必须已就绪）──
             Context.Register<AssetCache>();         // 无依赖，缓存控制中枢
-            Context.Register<SaveManager>();       // deps: UnitConfig, ItemConfig
+            Context.Register<SaveManager>();       // deps: UnitConfig, ItemConfig, InitialSaveConfig
             Context.Register<CardManager>();       // deps: SaveManager, ItemConfig, UnitConfig
             Context.Register<PositionManager>();   // deps: SaveManager, PositionConfig
             Context.Register<PlayerManager>();     // 玩家名册数据层（无依赖）

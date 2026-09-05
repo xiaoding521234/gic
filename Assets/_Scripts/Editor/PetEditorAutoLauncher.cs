@@ -62,11 +62,13 @@ namespace GIC.Editor
         /// <summary>
         /// 读 closePetOnExit：优先读运行中容器（Boot 启动、设置改动即时生效）；
         /// Wargame 未起（直开非 Boot 场景 Play）时落盘读存档 JSON；均失败按默认值 true。
+        /// 2026-09-05 起直接反序列化真实 PlayerSaveData（分区重组后旧探针类会失配——
+        /// 复用真实类根治"探针与存档格式漂移"；只取 pet.closePetOnExit 一个字段，开销可忽略）。
         /// </summary>
         private static bool ReadClosePetOnExit()
         {
             var save = GIC.Framework.Wargame.Instance?.Context?.Get<GIC.Framework.SaveManager>()?.CurrentSave;
-            if (save != null) return save.closePetOnExit;
+            if (save != null) return save.pet.closePetOnExit;
 
             try
             {
@@ -75,18 +77,12 @@ namespace GIC.Editor
                 string cloneMarker = Path.Combine(Application.dataPath, "..", ".clone");
                 if (File.Exists(cloneMarker)) dir = Path.Combine(dir, "clone");
                 string json = File.ReadAllText(Path.Combine(dir, "gic_save.json"));
-                return JsonUtility.FromJson<PetSaveProbe>(json).closePetOnExit;
+                return JsonUtility.FromJson<GIC.Framework.PlayerSaveData>(json)?.pet?.closePetOnExit ?? true;
             }
             catch
             {
                 return true; // 无存档/读取失败：与 PlayerSaveData 默认值一致
             }
-        }
-
-        [System.Serializable]
-        private class PetSaveProbe
-        {
-            public bool closePetOnExit = true;
         }
 
         private static void TryLaunch()

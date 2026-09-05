@@ -168,7 +168,7 @@ namespace GIC.Battle
 
         private int GetCurrentDeckId()
         {
-            return _saveManager?.CurrentSave?.currentDeck ?? 0;
+            return _saveManager?.CurrentSave?.progress.currentDeck ?? 0;
         }
 
         public void SetCount(int count)

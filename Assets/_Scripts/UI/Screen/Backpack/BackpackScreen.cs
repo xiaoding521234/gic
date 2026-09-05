@@ -87,7 +87,7 @@ namespace GIC.UI
             PushMusicVolumeSafe();
             RegisterClosableSelf();
 
-            currentDeckId = saveManager.CurrentSave.currentDeck;
+            currentDeckId = saveManager.CurrentSave.progress.currentDeck;
 
             nextButtonLeft.onClick.AddListener(OnPreviousCategory);
             nextButtonRight.onClick.AddListener(OnNextCategory);

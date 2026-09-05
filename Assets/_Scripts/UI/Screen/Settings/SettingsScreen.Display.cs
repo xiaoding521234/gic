@@ -49,7 +49,7 @@ namespace GIC.UI
                 }
             }
 
-            int savedIndex = _saveManager.CurrentSave.languageIndex;
+            int savedIndex = _saveManager.CurrentSave.settings.languageIndex;
             if (savedIndex >= 0 && savedIndex < languageOptions.Count)
             {
                 currentIndex = savedIndex;
@@ -60,8 +60,7 @@ namespace GIC.UI
                 if (index >= 0 && index < locales.Count)
                 {
                     LocalizationSettings.SelectedLocale = locales[index];
-                    _saveManager.CurrentSave.languageIndex = index;
-                    _saveManager.SaveGame();
+                    _saveManager.Modify(s => s.settings.languageIndex = index);   // 统一变更入口（2026-09-05 Modify 迁移）
                 }
             });
             languageSetting.Initialize();
@@ -87,12 +86,11 @@ namespace GIC.UI
             }
 
             // clamp：存档索引可能越界（去重后列表变短/移动端列表只剩全屏），DropdownSettingItem 不做越界钳制
-            int currentIndex = Mathf.Clamp(_saveManager.CurrentSave.resolutionIndex, 0, resolutionOptions.Count - 1);
+            int currentIndex = Mathf.Clamp(_saveManager.CurrentSave.settings.resolutionIndex, 0, resolutionOptions.Count - 1);
 
             resolutionSetting.Setup("Resolution", resolutionOptions, currentIndex, (index) =>
             {
-                _saveManager.CurrentSave.resolutionIndex = index;
-                _saveManager.SaveGame();
+                _saveManager.Modify(s => s.settings.resolutionIndex = index);   // 统一变更入口（2026-09-05 Modify 迁移）
 
                 // 移动端不做运行时 SetResolution（压扁防护，机制见 SettingsApplier.ApplyDefaultFullscreen 头注释）
                 if (Application.isMobilePlatform) return;
@@ -133,7 +131,7 @@ namespace GIC.UI
                 }
             }
 
-            int savedIndex = _saveManager.CurrentSave.frameRate;
+            int savedIndex = _saveManager.CurrentSave.settings.frameRate;
             for (int i = 0; i < frameRates.Length; i++)
             {
                 if (frameRates[i] == savedIndex)
@@ -148,8 +146,7 @@ namespace GIC.UI
                 if (index >= 0 && index < frameRates.Length)
                 {
                     Application.targetFrameRate = frameRates[index];
-                    _saveManager.CurrentSave.frameRate = frameRates[index];
-                    _saveManager.SaveGame();
+                    _saveManager.Modify(s => s.settings.frameRate = frameRates[index]);   // 统一变更入口（2026-09-05 Modify 迁移）
                 }
             });
             frameRateSetting.Initialize();

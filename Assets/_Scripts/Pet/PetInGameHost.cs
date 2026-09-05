@@ -7,7 +7,7 @@ namespace GIC.Pet
     /// <summary>
     /// 游戏画面内版派蒙宿主（docs/19 §6.4，2026-08-27 立项）——主游戏进程内的派蒙形态，
     /// 目标安卓（Win32 不适用）与想省内存/单进程的 Windows 玩家。与桌面版（独立进程）二选一，
-    /// 由设置"派蒙"栏目切换（PlayerSaveData.petForm），**热切换即时生效**。
+    /// 由设置"派蒙"栏目切换（PlayerSaveData.pet.petForm），**热切换即时生效**。
     ///
     /// 职责：
     /// 1. 形态状态机（启动分发 + 热切换）：桌面=拉起/关闭独立进程；游戏内=创建/销毁本进程内实例
@@ -21,7 +21,7 @@ namespace GIC.Pet
     /// </summary>
     public class PetInGameHost : MonoBehaviour
     {
-        /// <summary>形态常量（与 PlayerSaveData.petForm / SettingsScreen 对应）</summary>
+        /// <summary>形态常量（与 PlayerSaveData.pet.petForm / SettingsScreen 对应）</summary>
         public const int FormDesktop = 0;
         public const int FormInGame = 1;
 
@@ -108,10 +108,9 @@ namespace GIC.Pet
             form = ClampForm(form);
             var saveManager = Wargame.Instance?.Context?.Get<SaveManager>();
             var save = saveManager?.CurrentSave;
-            if (save != null && save.petForm != form)
+            if (save != null && save.pet.petForm != form)
             {
-                save.petForm = form;
-                saveManager.SaveGame();
+                saveManager.Modify(s => s.pet.petForm = form);   // 统一变更入口（2026-09-05 Modify 迁移）
             }
             HotSwitchForm(form);
         }

@@ -5,7 +5,7 @@ namespace GIC.Pet.Chat
     /// 五家全部 OpenAI Chat Completions 兼容（同一套传输层/DTO/工具调用协议，仅 baseUrl+模型名不同），
     /// 端点与模型名均为 2026-08-29 官方文档网检确认（勿凭记忆改，改前先网检）。
     ///
-    /// **表下标=存档值（PlayerSaveData.petChatProvider / pet.json chatProvider），只增不删不重排**——
+    /// **表下标=存档值（PlayerSaveData.pet.petChatProvider / pet.json chatProvider），只增不删不重排**——
     /// 删改中段会静默错位所有玩家的供应商选择。新供应商 append 到表尾。
     /// 玩家只填 key（设置→派蒙→对话 API Key）；模型名/端点对玩家不可见，默认值在此表维护，
     /// Inspector 端点/模型覆盖字段留给开发调试。

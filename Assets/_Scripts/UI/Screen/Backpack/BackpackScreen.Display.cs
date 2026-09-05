@@ -15,7 +15,7 @@ namespace GIC.UI
     {
         private void RefreshCurrentDeckCache()
         {
-            currentDeckId = saveManager.CurrentSave.currentDeck;
+            currentDeckId = saveManager.CurrentSave.progress.currentDeck;
             currentDeckCards.Clear();
 
             if (currentDeckId >= 0 && currentDeckId < cardManager.decks.Length)

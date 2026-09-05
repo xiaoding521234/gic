@@ -129,10 +129,10 @@ namespace GIC.Framework
 
             var save = saveManager.CurrentSave;
 
-            masterVolume = save.masterVolume;
-            musicVolume = save.bgmVolume;
-            sfxVolume = save.sfxVolume;
-            voiceVolume = save.voiceVolume;
+            masterVolume = save.settings.masterVolume;
+            musicVolume = save.settings.bgmVolume;
+            sfxVolume = save.settings.sfxVolume;
+            voiceVolume = save.settings.voiceVolume;
 
             ApplyAllVolumes();
 
@@ -147,13 +147,14 @@ namespace GIC.Framework
             var saveManager = SaveManagerRef;
             if (saveManager?.CurrentSave == null) return;
 
-            var save = saveManager.CurrentSave;
-            save.masterVolume = masterVolume;
-            save.bgmVolume = musicVolume;
-            save.sfxVolume = sfxVolume;
-            save.voiceVolume = voiceVolume;
-
-            saveManager.SaveGame();
+            // 统一变更入口（2026-09-05 Modify 迁移）：四音量一次变更+自动标脏
+            saveManager.Modify(s =>
+            {
+                s.settings.masterVolume = masterVolume;
+                s.settings.bgmVolume = musicVolume;
+                s.settings.sfxVolume = sfxVolume;
+                s.settings.voiceVolume = voiceVolume;
+            });
         }
 
         private void SetMusicVolumeInternal(float targetVolume, bool immediate)

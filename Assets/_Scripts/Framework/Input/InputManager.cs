@@ -328,7 +328,7 @@ namespace GIC.Framework
         {
             _bindings.Clear();
 
-            var savedBindings = _saveManager?.CurrentSave?.keyBindings;
+            var savedBindings = _saveManager?.CurrentSave?.settings.keyBindings;
             if (savedBindings != null)
             {
                 foreach (var entry in savedBindings)
@@ -348,17 +348,19 @@ namespace GIC.Framework
         {
             if (_saveManager?.CurrentSave == null) return;
 
-            var save = _saveManager.CurrentSave;
-            save.keyBindings.Clear();
-            foreach (var kvp in _bindings)
+            // 统一变更入口（2026-09-05 Modify 迁移）：全量重写绑定+自动标脏
+            _saveManager.Modify(s =>
             {
-                save.keyBindings.Add(new KeyBindingEntry
+                s.settings.keyBindings.Clear();
+                foreach (var kvp in _bindings)
                 {
-                    action = kvp.Key,
-                    keys = new List<KeyCode>(kvp.Value)
-                });
-            }
-            _saveManager.SaveGame();
+                    s.settings.keyBindings.Add(new KeyBindingEntry
+                    {
+                        action = kvp.Key,
+                        keys = new List<KeyCode>(kvp.Value)
+                    });
+                }
+            });
         }
     }
 }

@@ -10,7 +10,7 @@ namespace GIC.UI
 {
     public partial class SettingsScreen
     {
-        /// <summary>派蒙形态枚举值（与 PlayerSaveData.petForm 对应：0=桌面版，1=游戏画面内版）</summary>
+        /// <summary>派蒙形态枚举值（与 PlayerSaveData.pet.petForm 对应：0=桌面版，1=游戏画面内版）</summary>
         private const int PET_FORM_DESKTOP = 0;
         private const int PET_FORM_INGAME = 1;
 
@@ -46,14 +46,16 @@ namespace GIC.UI
             foreach (var p in GIC.Pet.Chat.PetChatProviders.table)
                 options.Add(new TextEntry(new UnityEngine.Localization.LocalizedString("UIText", "PetProvider_" + p.id), ""));
 
-            int current = Mathf.Clamp(_saveManager.CurrentSave.petChatProvider, 0, options.Count - 1);
+            int current = Mathf.Clamp(_saveManager.CurrentSave.pet.petChatProvider, 0, options.Count - 1);
 
             petProviderSetting.Setup("PetChatProvider", options, current, (index) =>
             {
-                if (index == _saveManager.CurrentSave.petChatProvider) return; // 同项重选不触发清 key
-                _saveManager.CurrentSave.petChatProvider = index;
-                _saveManager.CurrentSave.petApiKeyCipher = ""; // 旧 key 对新供应商无效
-                _saveManager.SaveGame();
+                if (index == _saveManager.CurrentSave.pet.petChatProvider) return; // 同项重选不触发清 key
+                _saveManager.Modify(s =>
+                {
+                    s.pet.petChatProvider = index;
+                    s.pet.petApiKeyCipher = ""; // 旧 key 对新供应商无效
+                });
                 GIC.Pet.PetPrefs.WriteChatProvider(index);
                 GIC.Pet.PetPrefs.WriteChatCipher("");
                 petApiKeySetting.UpdateValue(""); // 显示回"未设置"占位，引导填新家的 key
@@ -74,13 +76,12 @@ namespace GIC.UI
                 onClick: () =>
                 {
                     // 回显当前明文（弹窗内可见全 key——本机用户自己输的，回显方便核对改错）
-                    string currentPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.petApiKeyCipher);
+                    string currentPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.pet.petApiKeyCipher);
                     ShowInputPanel(petApiKeySetting, currentPlain, (newValue) =>
                     {
                         newValue = newValue.Trim();
                         string cipher = GIC.Pet.PetApiKeyCrypto.Encrypt(newValue);
-                        _saveManager.CurrentSave.petApiKeyCipher = cipher;
-                        _saveManager.SaveGame();
+                        _saveManager.Modify(s => s.pet.petApiKeyCipher = cipher);   // 统一变更入口（2026-09-05 Modify 迁移）
                         // 同步密文到 pet.json（桌面桌宠进程永不读主存档——靠这条共享通道取 key，
                         // 密文传输安全；WriteChatCipher 磁盘读改写保留其它字段+编辑器也生效）
                         GIC.Pet.PetPrefs.WriteChatCipher(cipher);
@@ -91,7 +92,7 @@ namespace GIC.UI
                 placeholderKey: "PetApiKeyNotSet");
             petApiKeySetting.Initialize();
             // 初始显示：已设置=脱敏；未设置=占位（Initialize 走 LoadValue=defaultValue=""→占位键生效需手动刷新一次）
-            string storedPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.petApiKeyCipher);
+            string storedPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.pet.petApiKeyCipher);
             if (!string.IsNullOrEmpty(storedPlain))
                 petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(storedPlain));
         }
@@ -120,8 +121,7 @@ namespace GIC.UI
             petFormSetting.Setup("PetForm", options, currentIndex, (index) =>
             {
                 int form = index == desktopIdx ? PET_FORM_DESKTOP : PET_FORM_INGAME;
-                _saveManager.CurrentSave.petForm = form;
-                _saveManager.SaveGame();
+                _saveManager.Modify(s => s.pet.petForm = form);   // 统一变更入口（2026-09-05 Modify 迁移）
                 GIC.Pet.PetInGameHost.HotSwitchForm(form);
             });
             petFormSetting.Initialize();
@@ -152,14 +152,14 @@ namespace GIC.UI
         /// <summary>读档侧钳制：非 Windows 平台/非法值恒游戏内版（存 0 的老档在安卓上跑=钳 1）</summary>
         private int GetEffectiveForm()
         {
-            int form = _saveManager.CurrentSave.petForm;
+            int form = _saveManager.CurrentSave.pet.petForm;
             if (form != PET_FORM_DESKTOP && form != PET_FORM_INGAME) form = PET_FORM_INGAME;
             if (form == PET_FORM_DESKTOP && !DesktopFormAvailable) form = PET_FORM_INGAME;
             return form;
         }
 
         /// <summary>关闭游戏连带关闭派蒙（仅桌面形态有意义——游戏内形态天然随进程销毁）。
-        /// 选项与 PlayerSaveData.closePetOnExit 对应：0=开（随游戏退出），1=关（独立存活）。
+        /// 选项与 PlayerSaveData.pet.closePetOnExit 对应：0=开（随游戏退出），1=关（独立存活）。
         /// 2026-08-27 从"其它"栏挪入"派蒙"栏。</summary>
         private void InitPetCloseSetting()
         {
@@ -169,12 +169,11 @@ namespace GIC.UI
                 new TextEntry(new LocalizedString("UIText", "Off"), ""),
             };
 
-            int current = _saveManager.CurrentSave.closePetOnExit ? 0 : 1;
+            int current = _saveManager.CurrentSave.pet.closePetOnExit ? 0 : 1;
 
             petCloseSetting.Setup("ClosePetOnExit", options, current, (index) =>
             {
-                _saveManager.CurrentSave.closePetOnExit = index == 0;
-                _saveManager.SaveGame();
+                _saveManager.Modify(s => s.pet.closePetOnExit = index == 0);   // 统一变更入口（2026-09-05 Modify 迁移）
             });
             petCloseSetting.Initialize();
         }

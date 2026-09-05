@@ -93,10 +93,10 @@ namespace GIC.UI
         // ── 相遇之线 ──
 
         /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
-        public int GetStarglitterEarned() => _saveManager.CurrentSave.starglitterEarned;
+        public int GetStarglitterEarned() => _saveManager.CurrentSave.progress.starglitterEarned;
 
         /// <summary>待用的相遇之线次数 = 累计获取量/20 - 已用量</summary>
-        public int GetEncounterCharges() => GetStarglitterEarned() / EncounterThreshold - _saveManager.CurrentSave.encounterUsed;
+        public int GetEncounterCharges() => GetStarglitterEarned() / EncounterThreshold - _saveManager.CurrentSave.progress.encounterUsed;
 
         /// <summary>当前进度条比例 (0~1) = (累计获取量%20) / 20</summary>
         public float GetStarglitterProgress() => (GetStarglitterEarned() % EncounterThreshold) / (float)EncounterThreshold;
@@ -108,15 +108,15 @@ namespace GIC.UI
         public bool ConsumeEncounter()
         {
             if (GetEncounterCharges() <= 0) return false;
-            _saveManager.CurrentSave.encounterUsed++;
+            _saveManager.CurrentSave.progress.encounterUsed++;
             return true;
         }
 
         /// <summary>返还 1 次相遇之线（5★卡无法提升时退回）</summary>
         public void RefundEncounter()
         {
-            if (_saveManager.CurrentSave.encounterUsed > 0)
-                _saveManager.CurrentSave.encounterUsed--;
+            if (_saveManager.CurrentSave.progress.encounterUsed > 0)
+                _saveManager.CurrentSave.progress.encounterUsed--;
         }
 
         /// <summary>
@@ -200,7 +200,7 @@ namespace GIC.UI
         {
             starglitter = 0;
             var save = _saveManager.CurrentSave;
-            var list = isUnit ? save.ownedUnits : save.ownedNormalItems;
+            var list = isUnit ? save.progress.ownedUnits : save.progress.ownedNormalItems;
 
             // 物品按 countPerServing 给数量，角色固定 1 张
             int addCount = 1;
@@ -261,7 +261,7 @@ namespace GIC.UI
         /// </summary>
         private void AddStarglitter(PlayerSaveData save, int amount)
         {
-            save.starglitterEarned += amount;
+            save.progress.starglitterEarned += amount;
             save.AddItemCount(ItemName.Starglitter, amount);
         }
 
@@ -275,7 +275,7 @@ namespace GIC.UI
             if (result.cardType != CardType.Unit) return 0;
 
             var save = _saveManager.CurrentSave;
-            foreach (var card in save.ownedUnits)
+            foreach (var card in save.progress.ownedUnits)
             {
                 if (card.id == result.cardId && card.count > 0)
                 {

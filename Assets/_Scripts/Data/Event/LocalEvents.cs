@@ -87,5 +87,13 @@ namespace GIC.Data.Event
         public int NewForm;
     }
 
+    /// <summary>
+    /// 存档写盘失败事件（SaveManager.DoSave catch 分支广播——PopupManager 订阅弹轻提示，
+    /// 磁盘满/权限异常时玩家可感知而非静默丢进度。连续失败由发送侧防抖只发一次，2026-09-05）
+    /// </summary>
+    public class OnSaveFailedEvent : BaseEvent
+    {
+    }
+
 }
 

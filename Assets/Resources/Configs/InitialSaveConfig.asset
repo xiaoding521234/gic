@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bf902dc59fe7c24db408b8997fb1198, type: 3}
+  m_Name: InitialSaveConfig
+  m_EditorClassIdentifier: 
+  initialUnits:
+  - unit: 1001
+    count: 1
+    decks: 
+  - unit: 2001
+    count: 1
+    decks: 01000000
+  - unit: 2002
+    count: 1
+    decks: 01000000
+  - unit: 2003
+    count: 1
+    decks: 01000000
+  - unit: 3001
+    count: 1
+    decks: 00000000
+  - unit: 3002
+    count: 1
+    decks: 00000000
+  - unit: 3003
+    count: 1
+    decks: 00000000
+  - unit: 4001
+    count: 1
+    decks: 02000000
+  - unit: 4002
+    count: 1
+    decks: 02000000
+  - unit: 4005
+    count: 1
+    decks: 02000000
+  - unit: 5001
+    count: 1
+    decks: 03000000
+  - unit: 5002
+    count: 1
+    decks: 03000000
+  - unit: 5003
+    count: 1
+    decks: 03000000
+  initialItems:
+  - item: 1001
+    count: 100
+    decks: 
+  - item: 1002
+    count: 60
+    decks: 00000000
+  - item: 1003
+    count: 100
+    decks: 00000000
+  - item: 1005
+    count: 16000
+    decks: 
+  - item: 4001
+    count: 10
+    decks: 
+  - item: 4002
+    count: 10
+    decks: 
+  - item: 4003
+    count: 10
+    decks: 
+  - item: 4004
+    count: 10
+    decks: 
+  - item: 4005
+    count: 10
+    decks: 
+  defaultDeck: 1

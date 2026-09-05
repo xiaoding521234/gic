@@ -11,7 +11,10 @@ namespace GIC.Framework
 
 
     /// <summary>
-    /// 玩家存档数据
+    /// 玩家存档数据 — 分区结构（2026-09-05 重组，存档版本 11）：
+    /// progress=游戏进度（卡牌/卡组/位置/祈愿统计）、settings=用户设置（音量/显示/按键绑定）、
+    /// pet=桌宠设置。PlayerSaveData 保留全部便捷方法作为稳定 API 门面（外部调用不感知分区），
+    /// 分区类只承载数据。JsonUtility 铁律：全部 public 字段、引用类型必带初始化器、不支持 Dictionary/多态。
     /// </summary>
     [Serializable]
     public class PlayerSaveData
@@ -20,13 +23,13 @@ namespace GIC.Framework
         public int saveVersion = 1;  // 存档版本号
         public string playerName = "旅行者";
 
-        // 卡片相关
-        public List<SaveCardData> ownedUnits = new List<SaveCardData>();        // 已拥有的角色
-        public List<SaveCardData> ownedNormalItems = new List<SaveCardData>();  // 已拥有的物品
-        public int currentDeck = 0;
+        // ========== 分区 ==========
+        public SaveProgress progress = new SaveProgress();
+        public SaveSettings settings = new SaveSettings();
+        public SavePetSettings pet = new SavePetSettings();
 
         /// <summary>
-        /// 统一拥有卡牌列表（运行时合并 ownedUnits + ownedNormalItems）
+        /// 统一拥有卡牌列表（运行时合并 progress.ownedUnits + progress.ownedNormalItems）
         /// </summary>
         [NonSerialized] private List<SaveCardData> _ownedCards;
         public List<SaveCardData> ownedCards
@@ -36,8 +39,8 @@ namespace GIC.Framework
                 if (_ownedCards == null)
                 {
                     _ownedCards = new List<SaveCardData>();
-                    _ownedCards.AddRange(ownedUnits);
-                    _ownedCards.AddRange(ownedNormalItems);
+                    _ownedCards.AddRange(progress.ownedUnits);
+                    _ownedCards.AddRange(progress.ownedNormalItems);
                 }
                 return _ownedCards;
             }
@@ -54,14 +57,14 @@ namespace GIC.Framework
         /// <summary>添加已拥有角色 —— 外部改库存的统一入口，自动失效 ownedCards 缓存</summary>
         public void AddOwnedUnit(SaveCardData card)
         {
-            ownedUnits.Add(card);
+            progress.ownedUnits.Add(card);
             RebuildOwnedCards();
         }
 
         /// <summary>添加已拥有物品 —— 外部改库存的统一入口，自动失效 ownedCards 缓存</summary>
         public void AddOwnedItem(SaveCardData card)
         {
-            ownedNormalItems.Add(card);
+            progress.ownedNormalItems.Add(card);
             RebuildOwnedCards();
         }
 
@@ -70,7 +73,7 @@ namespace GIC.Framework
         /// <summary>查询物品持有数量（不在存档中返回 0）</summary>
         public int GetItemCount(ItemName item)
         {
-            foreach (var card in ownedNormalItems)
+            foreach (var card in progress.ownedNormalItems)
             {
                 if (card.id.AsItemName() == item)
                     return card.count;
@@ -84,7 +87,7 @@ namespace GIC.Framework
         /// </summary>
         public void AddItemCount(ItemName item, int amount)
         {
-            foreach (var card in ownedNormalItems)
+            foreach (var card in progress.ownedNormalItems)
             {
                 if (card.id.AsItemName() == item)
                 {
@@ -100,7 +103,7 @@ namespace GIC.Framework
         /// <summary>尝试消耗物品数量（数量不足返回 false 且不改动）</summary>
         public bool TryConsumeItem(ItemName item, int count)
         {
-            foreach (var card in ownedNormalItems)
+            foreach (var card in progress.ownedNormalItems)
             {
                 if (card.id.AsItemName() == item)
                 {
@@ -112,7 +115,89 @@ namespace GIC.Framework
             return false;
         }
 
+        /// <summary>
+        /// 初始化默认数据 — 分区全量重置。初始卡牌/货币不再在此硬编码：
+        /// 由 SaveManager.ApplyInitialData 从 InitialSaveConfig（SO）填充（2026-09-05 外置）。
+        /// </summary>
+        public void InitDefault()
+        {
+            playerName = "旅行者";
+            progress = new SaveProgress();
+            settings = new SaveSettings();
+            pet = new SavePetSettings();
+#if UNITY_EDITOR
+            // 开发 key 预填（2026-08-30）：编辑器新档自带对话 key（AES 加密后入档），删档测试后聊天免重输。
+            // DevKey 的 const 声明在 UNITY_EDITOR 内——构建产物无此代码路径，导出的存档初始化恒为空 key。
+            pet.petApiKeyCipher = GIC.Pet.PetApiKeyCrypto.Encrypt(GIC.Pet.PetApiKeyCrypto.DevKey);
+#endif
+        }
 
+        /// <summary>
+        /// 读档后防御性校验修复（SaveManager.TryLoadFile 调用）。
+        /// 本游戏自身产出的存档不会出现 null/负值（JsonUtility 缺字段保留初始化器、不序列化 null），
+        /// 但手改档/外部工具可能产出"合法 JSON 坏数据"——null 列表会带进 SyncMissingCards/排序
+        /// 直接 NRE，且每次启动必崩成死循环（用户无法进游戏自救）。就地修复优于崩溃：补空集合、剔 null 条目、负数量归零。
+        /// </summary>
+        public void EnsureValid()
+        {
+            playerName ??= "旅行者";
+            progress ??= new SaveProgress();
+            settings ??= new SaveSettings();
+            pet ??= new SavePetSettings();
+            settings.keyBindings ??= new List<KeyBindingEntry>();
+            pet.petApiKeyCipher ??= "";
+            progress.EnsureValid();
+        }
+    }
+
+    /// <summary>
+    /// 进度分区 — 卡牌库存/卡组/位置/祈愿统计（存档易变核心，丢失最疼的部分）
+    /// </summary>
+    [Serializable]
+    public class SaveProgress
+    {
+        public List<SaveCardData> ownedUnits = new List<SaveCardData>();        // 已拥有的角色
+        public List<SaveCardData> ownedNormalItems = new List<SaveCardData>();  // 已拥有的物品
+        public int currentDeck = 0;
+
+        // 锚点位置信息
+        public int currentPosition = (int)PositionName.SnezhnayaCastle;
+
+        // ========== 相遇之线 ==========
+        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
+        public int starglitterEarned = 0;
+        /// <summary>已使用的相遇之线次数</summary>
+        public int encounterUsed = 0;
+
+        /// <summary>分区数据修复（PlayerSaveData.EnsureValid 调用）</summary>
+        public void EnsureValid()
+        {
+            ownedUnits ??= new List<SaveCardData>();
+            ownedNormalItems ??= new List<SaveCardData>();
+
+            ownedUnits.RemoveAll(c => c == null);
+            ownedNormalItems.RemoveAll(c => c == null);
+
+            foreach (var card in ownedUnits)
+                EnsureCardValid(card);
+            foreach (var card in ownedNormalItems)
+                EnsureCardValid(card);
+        }
+
+        private static void EnsureCardValid(SaveCardData card)
+        {
+            card.inDecks ??= new List<int>();
+            if (card.count < 0)
+                card.count = 0;
+        }
+    }
+
+    /// <summary>
+    /// 用户设置分区 — 音量/显示/按键绑定（丢失不疼、变更高频）
+    /// </summary>
+    [Serializable]
+    public class SaveSettings
+    {
         // ========== 音量设置 ==========
         [Range(0f, 1f)]
         public float masterVolume = 1.0f;      // 总音量
@@ -131,7 +216,16 @@ namespace GIC.Framework
         public int resolutionIndex = 0;         // 0=全屏（当前桌面分辨率）, 1=3840x2160, 2=2560x1440, 3=1920x1080, 4=1280x720
         public int frameRate = 165;              // 帧率
 
-        // ========== 桌宠设置 ==========
+        // ========== 按键绑定 ==========
+        public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();
+    }
+
+    /// <summary>
+    /// 桌宠设置分区 — 形态/对话供应商/API Key（双通道同步主档↔pet.json，细节 docs/19）
+    /// </summary>
+    [Serializable]
+    public class SavePetSettings
+    {
         /// <summary>游戏退出时是否连带关闭派蒙（true=随游戏退出，false=独立存活；仅桌面形态有意义）</summary>
         public bool closePetOnExit = true;
 
@@ -148,156 +242,6 @@ namespace GIC.Framework
         /// JsonUtility 对缺失字段反序列化为默认值 0——老档升级语义=DeepSeek，与历史唯一供应商一致，无需迁移。
         /// 同步双通道写：本字段（主存档，设置界面回显）+ pet.json chatProvider（桌面进程读取通道）。</summary>
         public int petChatProvider = 0;
-
-        // 锚点位置信息
-        public int currentPosition = (int)PositionName.SnezhnayaCastle;
-
-        // ========== 按键绑定 ==========
-        public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();
-
-        // ========== 相遇之线 ==========
-        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
-        public int starglitterEarned = 0;
-        /// <summary>已使用的相遇之线次数</summary>
-        public int encounterUsed = 0;
-
-
-        /// <summary>
-        /// 初始化默认数据
-        /// </summary>
-        public void InitDefault()
-        {
-            playerName = "旅行者";
-
-            InitCards();
-
-            masterVolume = 1.0f;
-            bgmVolume = 0.4f;
-            sfxVolume = 0.8f;
-            voiceVolume = 0.8f;
-
-            languageIndex = 0;
-            resolutionIndex = 0;
-            frameRate = 165;
-
-            closePetOnExit = true;
-            petForm = 0;
-#if UNITY_EDITOR
-            // 开发 key 预填（2026-08-30）：编辑器新档自带对话 key（AES 加密后入档），删档测试后聊天免重输。
-            // DevKey 的 const 声明在 UNITY_EDITOR 内——构建产物无此代码路径，导出的存档初始化恒为空 key。
-            petApiKeyCipher = GIC.Pet.PetApiKeyCrypto.Encrypt(GIC.Pet.PetApiKeyCrypto.DevKey);
-#else
-            petApiKeyCipher = "";
-#endif
-            petChatProvider = 0;
-
-            currentPosition = (int)PositionName.SnezhnayaCastle;
-
-            keyBindings.Clear();
-        }
-
-        public void InitCards()
-        {
-            // ==================== 角色 ====================
-
-            // 角色（13个初始解锁）
-            List<UnitName> unitList = new List<UnitName>
-            {
-                UnitName.Paimon,      // 索引 0
-                UnitName.Zibai,       // 索引 1
-                UnitName.Linnea,      // 索引 2
-                UnitName.Illuga,      // 索引 3
-                UnitName.Amber,       // 索引 4
-                UnitName.Kaeya,       // 索引 5
-                UnitName.Barbara,     // 索引 6
-                UnitName.Xingqiu,     // 索引 7
-                UnitName.Beidou,      // 索引 8
-                UnitName.Hutao,       // 索引 9
-                UnitName.Mizuki,      // 索引 10
-                UnitName.Gorou,       // 索引 11
-                UnitName.Kirara,      // 索引 12
-            };
-
-            unitList.ForEach(unitName =>
-            {
-                SaveCardData cardData = new SaveCardData();
-                cardData.SaveUnit(unitName, 1);
-                AddOwnedUnit(cardData);
-            });
-
-            // 卡组1：前三个蒙德角色（Amber, Kaeya, Barbara）
-            ownedUnits[4].AddToDeck(0);   // Amber
-            ownedUnits[5].AddToDeck(0);   // Kaeya
-            ownedUnits[6].AddToDeck(0);   // Barbara
-
-            // 卡组2：三个挪德卡莱角色（Zibai, Linnea, Illuga）
-            ownedUnits[1].AddToDeck(1);   // Zibai
-            ownedUnits[2].AddToDeck(1);   // Linnea
-            ownedUnits[3].AddToDeck(1);   // Illuga
-
-            // 卡组3：三个璃月角色（Xingqiu, Beidou, Hutao）
-            ownedUnits[7].AddToDeck(2);   // Xingqiu
-            ownedUnits[8].AddToDeck(2);   // Beidou
-            ownedUnits[9].AddToDeck(2);   // Hutao
-
-            // 卡组4：三个稻妻角色（Kirara, Gorou, Mizuki）
-            ownedUnits[10].AddToDeck(3);  // Kirara
-            ownedUnits[11].AddToDeck(3);  // Gorou
-            ownedUnits[12].AddToDeck(3);  // Mizuki
-            // ==================== 货币/珍贵物品 ====================
-
-            List<ItemName> valuableItemList = new List<ItemName>
-            {
-                ItemName.Mora,
-                ItemName.IntertwinedFate,
-                ItemName.Stamina,
-                ItemName.Primogem
-            };
-
-            int valuableStartIndex = ownedNormalItems.Count;
-
-            valuableItemList.ForEach(itemID =>
-            {
-                SaveCardData cardData = new SaveCardData();
-                // 设置初始数量
-                int count = itemID switch
-                {
-                    ItemName.Mora => 100,
-                    ItemName.IntertwinedFate => 60,
-                    ItemName.Stamina => 100,
-                    ItemName.Primogem => 16000,
-                    _ => 1
-                };
-                cardData.SaveItem(itemID, count);
-                AddOwnedItem(cardData);
-            });
-
-            // 纠缠之缘和体力加入卡组1
-            ownedNormalItems[valuableStartIndex + 1].AddToDeck(0);  // IntertwinedFate
-            ownedNormalItems[valuableStartIndex + 2].AddToDeck(0);  // Stamina
-
-            // ==================== 普通物品 ====================
-
-            List<ItemName> itemList = new List<ItemName>
-            {
-                ItemName.Apple,
-                ItemName.RawMeat,
-                ItemName.Egg,
-                ItemName.Wheat,
-                ItemName.Radish
-            };
-
-            itemList.ForEach(itemID =>
-            {
-                SaveCardData cardData = new SaveCardData();
-                cardData.SaveItem(itemID, 10);
-                AddOwnedItem(cardData);
-            });
-
-            // ==================== 默认卡组 ====================
-            currentDeck = 1;
-        }
-
     }
 
     [Serializable]
@@ -354,7 +298,8 @@ namespace GIC.Framework
         public void RemoveFromDecks(IEnumerable<int> deckIds)
         {
             if (inDecks == null) return;
-            foreach (int d in deckIds) inDecks.RemoveAll(x => x == d);
+            foreach (int d in deckIds)
+                inDecks.RemoveAll(x => x == d);
         }
 
         public void ClearAllDecks() => inDecks?.Clear();
@@ -389,5 +334,3 @@ namespace GIC.Framework
 
 
 }
-
-

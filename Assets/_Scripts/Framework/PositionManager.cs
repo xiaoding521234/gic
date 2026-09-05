@@ -37,7 +37,7 @@ namespace GIC.Framework
         // 公共属性
         public PositionName CurrentPosition
         {
-            get => (PositionName)saveManager.CurrentSave.currentPosition;
+            get => (PositionName)saveManager.CurrentSave.progress.currentPosition;
             set
             {
                 if (CurrentPosition != value)

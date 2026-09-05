@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Localization;
 using GIC.Framework;
+using GIC.Data;
+using GIC.Data.Event;
 namespace GIC.UI
 {
 
@@ -24,6 +26,9 @@ namespace GIC.UI
         private readonly List<PopupDialog> _activeToasts = new();
         private float _toastHeight;
 
+        // 存档写盘失败 → toast（2026-09-05）：SaveManager 只发事件不依赖 UI，本管理器是 toast 设施所以订阅方落在此处
+        private SaveFailedToastHandler _saveFailedHandler;
+
         private void Awake()
         {
             if (Instance == null)
@@ -32,8 +37,16 @@ namespace GIC.UI
                 Destroy(gameObject);
         }
 
+        private void Start()
+        {
+            // Start 时机订阅（EventBusHub.Instance 已在 Awake 建立——Start 晚于同场景全部 Awake，订阅不落空）
+            _saveFailedHandler = new SaveFailedToastHandler(this);
+            EventBusHub.Instance.Subscribe(_saveFailedHandler, this);
+        }
+
         private void OnDestroy()
         {
+            EventBusHub.Instance?.UnsubscribeOwner(this);   // owner 登记式退订兜底（gic-eventbus 规范）
             if (Instance == this) Instance = null;
         }
 
@@ -195,6 +208,16 @@ namespace GIC.UI
                 if (_activeToasts[i] != null)
                     _activeToasts[i].SetToastPosition(ComputeToastPosition(i, _activeToasts[i]));
             }
+        }
+
+        /// <summary>存档写盘失败事件处理器（gic-eventbus 标准写法：CanHandle 判 activeInHierarchy 防已销毁回调）</summary>
+        private class SaveFailedToastHandler : IEventHandler<OnSaveFailedEvent>
+        {
+            private readonly PopupManager _manager;
+            public SaveFailedToastHandler(PopupManager manager) => _manager = manager;
+            public bool CanHandle(OnSaveFailedEvent evt) => _manager != null && _manager.gameObject.activeInHierarchy;
+            public void Handle(OnSaveFailedEvent evt) =>
+                _manager.ShowToast(new LocalizedString(TableName.PopupText.ToString(), "Save_WriteFailed"));
         }
     }
 

@@ -45,6 +45,10 @@ MonoBehaviour:
       \u043D\u0435 \u0437\u0430\u043D\u044F\u0442 \u043B\u0438 \u043F\u043E\u0440\u0442"
     m_Metadata:
       m_Items: []
+  - m_Id: 25807539803860992
+    m_Localized: Failed to save game data. Please check disk space.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

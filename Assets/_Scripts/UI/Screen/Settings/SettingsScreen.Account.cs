@@ -27,8 +27,7 @@ namespace GIC.UI
                     // 点击时实时读存档——闭包捕获 Init 时的局部变量会回显改名前的旧值（PetApiKey 同款）
                     ShowInputPanel(playerNameSetting, saveManager.CurrentSave.playerName, (newName) =>
                     {
-                        saveManager.CurrentSave.playerName = newName;
-                        saveManager.SaveGame();
+                        saveManager.Modify(s => s.playerName = newName);   // 统一变更入口（2026-09-05 Modify 迁移）
                         playerNameSetting.UpdateValue(newName);
                     });
                 },

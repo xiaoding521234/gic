@@ -22,19 +22,19 @@ namespace GIC.Framework
 
             // 应用语言
             var locales = LocalizationSettings.AvailableLocales.Locales;
-            if (save.languageIndex >= 0 && save.languageIndex < locales.Count)
+            if (save.settings.languageIndex >= 0 && save.settings.languageIndex < locales.Count)
             {
-                LocalizationSettings.SelectedLocale = locales[save.languageIndex];
+                LocalizationSettings.SelectedLocale = locales[save.settings.languageIndex];
             }
 
             // 应用帧率
-            Application.targetFrameRate = save.frameRate;
+            Application.targetFrameRate = save.settings.frameRate;
 
             // 应用分辨率（桌面专属）：移动端原生全屏恒定，运行时 SetResolution 会拉伸压扁——
             // 见 ApplyDefaultFullscreen 头注释
             if (!Application.isMobilePlatform)
             {
-                if (save.resolutionIndex == 0)
+                if (save.settings.resolutionIndex == 0)
                 {
                     // 全屏
                     ApplyDefaultFullscreen();
@@ -43,7 +43,7 @@ namespace GIC.Framework
                 {
                     // 窗口化指定分辨率（索引=设置下拉的序，两端必须共用同一去重列表——见 GetUniqueResolutions）
                     var resolutions = GetUniqueResolutions();
-                    int resIndex = save.resolutionIndex - 1;
+                    int resIndex = save.settings.resolutionIndex - 1;
                     if (resIndex >= 0 && resIndex < resolutions.Count)
                     {
                         var res = resolutions[resIndex];
