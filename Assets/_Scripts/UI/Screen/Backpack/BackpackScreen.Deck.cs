@@ -14,14 +14,18 @@ namespace GIC.UI
 
     public partial class BackpackScreen
     {
-        private const int MAX_DECK_SIZE = 8;
-
         // 编辑面板动画
         private RectTransform editDetailsPanelRect;
         private Vector2 editDetailsPanelTargetPos;
         private Coroutine editPanelAnimCoroutine;
+        private TextCombiner _deckBarNumberCombiner;
+        private TextCombiner _deckBarNameCombiner;
 
-        private void SwitchDeck(int newDeckId)
+        /// <summary>当前卡组 Id（卡组管理面板删除卡组后的联动判断用）</summary>
+        public int CurrentDeckId => currentDeckId;
+
+        /// <summary>切换当前卡组（卡组管理面板点击行时调用）</summary>
+        public void SwitchDeck(int newDeckId)
         {
             if (currentDeckId == newDeckId) return;
             if (newDeckId < 0 || newDeckId >= cardManager.decks.Length) return;
@@ -30,9 +34,52 @@ namespace GIC.UI
             // 统一变更入口（2026-09-05 Modify 迁移）：变更+自动标脏一步完成
             saveManager.Modify(s => s.progress.currentDeck = newDeckId);
             RefreshCardList();
+            UpdateDeckBar();
 
             if (isEditMode)
                 RefreshDeckPanel();
+        }
+
+        /// <summary>打开卡组管理面板（长条卡组按钮入口）</summary>
+        public void OpenDeckPanel()
+        {
+            if (deckSwitchPanel != null)
+                deckSwitchPanel.Open();
+        }
+
+        /// <summary>刷新长条卡组按钮的编号与名称（当前卡组变化/改名/排序后调用）</summary>
+        public void UpdateDeckBar()
+        {
+            if (deckBarNumberText == null || deckBarNameText == null) return;
+
+            var order = saveManager.CurrentSave.progress.deckOrder;
+            int pos = order.IndexOf(currentDeckId);
+            int number = (pos < 0 ? currentDeckId : pos) + 1;
+
+            _deckBarNumberCombiner ??= deckBarNumberText.GetComponent<TextCombiner>() ?? deckBarNumberText.gameObject.AddComponent<TextCombiner>();
+            _deckBarNameCombiner ??= deckBarNameText.GetComponent<TextCombiner>() ?? deckBarNameText.gameObject.AddComponent<TextCombiner>();
+
+            _deckBarNumberCombiner.SetSingleEntry(number.ToString());
+
+            string customName = cardManager.GetDeckName(currentDeckId);
+            if (!string.IsNullOrEmpty(customName))
+                _deckBarNameCombiner.SetSingleEntry(customName);
+            else
+                _deckBarNameCombiner.SetSingleEntry(DeckSwitchPanel.DefaultDeckName(number));
+        }
+
+        /// <summary>卡组内容被外部操作整体替换（面板粘贴/导入密语）后的联动刷新</summary>
+        public void OnDeckContentChanged(int deckId)
+        {
+            if (deckId == currentDeckId)
+            {
+                RefreshCurrentDeckCache();
+                UpdateDeckCountText();
+                if (isEditMode)
+                    RefreshDeckPanel();
+                RefreshCardList();
+            }
+            UpdateDeckBar();
         }
 
         private void OnToggleEditMode()
@@ -120,7 +167,7 @@ namespace GIC.UI
             if (countText != null)
             {
                 int count = GetCurrentDeckCount();
-                countText.text = $"{count}/{MAX_DECK_SIZE}";
+                countText.text = $"{count}/{CardManager.MaxDeckSize}";
             }
         }
 
@@ -144,7 +191,7 @@ namespace GIC.UI
             }
             else
             {
-                if (GetCurrentDeckCount() < MAX_DECK_SIZE)
+                if (GetCurrentDeckCount() < CardManager.MaxDeckSize)
                 {
                     saveManager.Modify(_ => cardData.AddToDeck(currentDeckId));
                     cardManager.RebuildDeck(currentDeckId);

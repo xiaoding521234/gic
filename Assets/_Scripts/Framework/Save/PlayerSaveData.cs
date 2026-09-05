@@ -125,6 +125,7 @@ namespace GIC.Framework
             progress = new SaveProgress();
             settings = new SaveSettings();
             pet = new SavePetSettings();
+            progress.EnsureDecksValid(); // 新档/重置路径：补齐 deckNames 到卡组数（改名写入依赖列表长度，CreateNewSave 不走读档 EnsureValid）
 #if UNITY_EDITOR
             // 开发 key 预填（2026-08-30）：编辑器新档自带对话 key（AES 加密后入档），删档测试后聊天免重输。
             // DevKey 的 const 声明在 UNITY_EDITOR 内——构建产物无此代码路径，导出的存档初始化恒为空 key。
@@ -160,6 +161,12 @@ namespace GIC.Framework
         public List<SaveCardData> ownedNormalItems = new List<SaveCardData>();  // 已拥有的物品
         public int currentDeck = 0;
 
+        // ========== 卡组名称与排序（2026-09-05 卡组管理面板） ==========
+        /// <summary>卡组自定义名称（下标=deckId；""=未命名，UI 显示本地化默认"卡组N"）。JsonUtility 缺字段保留初始化器，EnsureValid 补齐到 7 项</summary>
+        public List<string> deckNames = new List<string>();
+        /// <summary>卡组显示顺序（值为 deckId；显示编号=下标+1）。拖拽排序只改此表，卡牌 inDecks 引用的 deckId 恒定不变</summary>
+        public List<int> deckOrder = new List<int> { 0, 1, 2, 3, 4, 5, 6 };
+
         // 锚点位置信息
         public int currentPosition = (int)PositionName.SnezhnayaCastle;
 
@@ -182,6 +189,46 @@ namespace GIC.Framework
                 EnsureCardValid(card);
             foreach (var card in ownedNormalItems)
                 EnsureCardValid(card);
+
+            EnsureDecksValid();
+        }
+
+        /// <summary>卡组名称/排序字段修复（v2 动态卡组）：
+        /// deckNames.Count 即卡组数量的事实源（增删卡组由 CardManager 同步维护三张表）——
+        /// 空表才补 DefaultDeckCount（新档/极旧档）；超上限裁剪；排列表必须是 0..N-1 的排列；
+        /// currentDeck 越界钳回 0。public：InitDefault 新档路径直接调用。</summary>
+        public void EnsureDecksValid()
+        {
+            deckNames ??= new List<string>();
+            deckNames.RemoveAll(x => x == null);
+
+            if (deckNames.Count == 0)
+            {
+                for (int i = 0; i < CardManager.DefaultDeckCount; i++)
+                    deckNames.Add("");
+            }
+            if (deckNames.Count > CardManager.MaxDeckCount)
+                deckNames.RemoveRange(CardManager.MaxDeckCount, deckNames.Count - CardManager.MaxDeckCount);
+
+            int n = deckNames.Count;
+
+            deckOrder ??= new List<int>();
+            bool valid = deckOrder.Count == n;
+            if (valid)
+            {
+                var seen = new HashSet<int>();
+                foreach (var id in deckOrder)
+                {
+                    if (id < 0 || id >= n || !seen.Add(id)) { valid = false; break; }
+                }
+            }
+            if (!valid)
+            {
+                deckOrder.Clear();
+                for (int i = 0; i < n; i++) deckOrder.Add(i);
+            }
+
+            if (currentDeck < 0 || currentDeck >= n) currentDeck = 0;
         }
 
         private static void EnsureCardValid(SaveCardData card)

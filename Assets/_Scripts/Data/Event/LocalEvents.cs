@@ -53,22 +53,6 @@ namespace GIC.Data.Event
     }
 
     /// <summary>
-    /// 卡组切换事件（DeckChooseView → BackpackScreen）
-    /// </summary>
-    public class OnDeckChangedEvent : BaseEvent
-    {
-        public int DeckId;
-    }
-
-    /// <summary>
-    /// 请求同步卡组Toggle（BackpackScreen → DeckChooseView）
-    /// </summary>
-    public class OnBackpackDeckSyncEvent : BaseEvent
-    {
-        public int DeckId;
-    }
-
-    /// <summary>
     /// 编辑模式下卡片被点击（Card → BackpackScreen）
     /// </summary>
     public class OnCardClickedInEditModeEvent : BaseEvent

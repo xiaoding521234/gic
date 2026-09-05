@@ -75,6 +75,7 @@ SpriteAtlas:
     - 9cb38f56f285c3d439b39d0199149024: 21300000
     - 204891760de775a41b8b35e4e253cd49: 21300000
     - 0ff05596753451a48a2ae98ee68085f1: 21300000
+    - cf35a6c6d85ce844fa5ea23f08e1fd75: 21300000
     - 7c4bde67528d7cc498b3a23c01ad6c44: 21300000
     - abfbccb74b0d94342b8b4bb251264704: 21300000
     - b86c50689bd9e9a408739a20a0a7dc05: 21300000
@@ -143,6 +144,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 9cb38f56f285c3d439b39d0199149024, type: 3}
   - {fileID: 21300000, guid: 204891760de775a41b8b35e4e253cd49, type: 3}
   - {fileID: 21300000, guid: 0ff05596753451a48a2ae98ee68085f1, type: 3}
+  - {fileID: 21300000, guid: cf35a6c6d85ce844fa5ea23f08e1fd75, type: 3}
   - {fileID: 21300000, guid: 7c4bde67528d7cc498b3a23c01ad6c44, type: 3}
   - {fileID: 21300000, guid: abfbccb74b0d94342b8b4bb251264704, type: 3}
   - {fileID: 21300000, guid: b86c50689bd9e9a408739a20a0a7dc05, type: 3}
@@ -210,6 +212,7 @@ SpriteAtlas:
   - coop_button
   - back_button
   - medium_popup
+  - dropdown_triangle
   - hydro
   - logo_back
   - close_button

@@ -46,6 +46,46 @@ MonoBehaviour:
     m_Localized: Failed to save game data. Please check disk space.
     m_Metadata:
       m_Items: []
+  - m_Id: 6
+    m_Localized: Deck copied. Paste it onto another deck.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7
+    m_Localized: Deck pasted
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8
+    m_Localized: No deck copied yet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9
+    m_Localized: Deck code copied to clipboard! Share it with friends!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10
+    m_Localized: Deck code imported!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11
+    m_Localized: Invalid deck code. Try again.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12
+    m_Localized: '{0} unowned cards were skipped'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13
+    m_Localized: Deck "{0}" deleted
+    m_Metadata:
+      m_Items: []
+  - m_Id: 14
+    m_Localized: Deck limit reached ({0})
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15
+    m_Localized: Keep at least one deck
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

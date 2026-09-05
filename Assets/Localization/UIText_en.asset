@@ -716,6 +716,46 @@ MonoBehaviour:
     m_Localized: Ugh... all {0} were junk. Don't lose heart, Traveler...
     m_Metadata:
       m_Items: []
+  - m_Id: 11001
+    m_Localized: Switch Decks
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11002
+    m_Localized: Deck {0}
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11003
+    m_Localized: Rename Deck
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11004
+    m_Localized: Enter Deck Code
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11005
+    m_Localized: Copy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11006
+    m_Localized: Paste
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11007
+    m_Localized: Export
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11008
+    m_Localized: Import Code
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11009
+    m_Localized: Add Deck
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11010
+    m_Localized: Delete
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

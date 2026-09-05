@@ -39,6 +39,46 @@ MonoBehaviour:
     m_Key: Save_WriteFailed
     m_Metadata:
       m_Items: []
+  - m_Id: 6
+    m_Key: Deck_Copied
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7
+    m_Key: Deck_Pasted
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8
+    m_Key: Deck_EmptyClipboard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9
+    m_Key: Deck_ExportCopied
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10
+    m_Key: Deck_ImportSuccess
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11
+    m_Key: Deck_ImportFailed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12
+    m_Key: Deck_MissingCards
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13
+    m_Key: Deck_Deleted
+    m_Metadata:
+      m_Items: []
+  - m_Id: 14
+    m_Key: Deck_MaxReached
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15
+    m_Key: Deck_MinReached
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

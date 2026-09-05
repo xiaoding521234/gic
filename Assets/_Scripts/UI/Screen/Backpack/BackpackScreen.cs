@@ -35,6 +35,12 @@ namespace GIC.UI
         [SerializeField] private Transform deckContent; // 编辑面板内卡组内容容器
         [SerializeField] private float deckCardScale = 0.5f;
 
+        [Header("卡组切换（王者荣耀式长条按钮 + 管理面板）")]
+        public Button deckSwitchButton;// 长条卡组按钮：显示当前卡组编号+名称，点击弹出卡组管理面板
+        public TextMeshProUGUI deckBarNumberText;// 长条按钮上的编号文本
+        public TextMeshProUGUI deckBarNameText;// 长条按钮上的名称文本
+        public DeckSwitchPanel deckSwitchPanel;// 卡组管理面板（切换/改名/拖拽排序/复制粘贴/密语）
+
         [Header("详情面板")]
         public SkillDetailView skillDetailView;
         public CardDetailView cardDetailView;
@@ -74,7 +80,6 @@ namespace GIC.UI
         [Autowired] private UnitConfig unitConfig;
         [Autowired] private ItemConfig itemConfig;
         private BackpackCategoryChangedHandler _categoryChangedHandler;
-        private DeckChangedHandler _deckChangedHandler;
         private CardClickedInEditHandler _cardClickedHandler;
 
         private bool isEditMode = false;
@@ -93,17 +98,14 @@ namespace GIC.UI
             nextButtonRight.onClick.AddListener(OnNextCategory);
             editDeck.onClick.AddListener(OnToggleEditMode);
             closeButton.onClick.AddListener(OnClose);
+            if (deckSwitchButton != null)
+                deckSwitchButton.onClick.AddListener(OpenDeckPanel);
 
             _categoryChangedHandler = new BackpackCategoryChangedHandler(this);
             EventBusHub.Instance.Subscribe(_categoryChangedHandler, this);
 
-            _deckChangedHandler = new DeckChangedHandler(this);
-            EventBusHub.Instance.Subscribe(_deckChangedHandler, this);
-
             _cardClickedHandler = new CardClickedInEditHandler(this);
             EventBusHub.Instance.Subscribe(_cardClickedHandler, this);
-
-            EventBusHub.Instance.SendImmediate(new OnBackpackDeckSyncEvent { DeckId = currentDeckId });
 
             CachePanelPositions();
             CacheButtonPositions();
@@ -119,6 +121,7 @@ namespace GIC.UI
 
             SetCategory(BackpackTab.Character, isInit: true);
             RefreshCurrentDeckCache();
+            UpdateDeckBar();
 
             SetPanelsOffScreen();
             SetButtonsOffScreen();
@@ -134,6 +137,8 @@ namespace GIC.UI
             nextButtonRight.onClick.RemoveListener(OnNextCategory);
             editDeck.onClick.RemoveListener(OnToggleEditMode);
             closeButton.onClick.RemoveListener(OnClose);
+            if (deckSwitchButton != null)
+                deckSwitchButton.onClick.RemoveListener(OpenDeckPanel);
 
             _cardPool?.Clear();
             _deckCardPool?.Clear();

@@ -20,16 +20,6 @@ namespace GIC.UI
                 => _screen.SetCategory(evt.Tab, isInit: false);
         }
 
-        private class DeckChangedHandler : IEventHandler<OnDeckChangedEvent>
-        {
-            private readonly BackpackScreen _screen;
-            public DeckChangedHandler(BackpackScreen screen) => _screen = screen;
-            public bool CanHandle(OnDeckChangedEvent evt)
-                => _screen != null && _screen.gameObject.activeInHierarchy;
-            public void Handle(OnDeckChangedEvent evt)
-                => _screen.SwitchDeck(evt.DeckId);
-        }
-
         private class CardClickedInEditHandler : IEventHandler<OnCardClickedInEditModeEvent>
         {
             private readonly BackpackScreen _screen;

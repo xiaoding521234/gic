@@ -46,6 +46,46 @@ MonoBehaviour:
     m_Localized: Failed to save game data. Please check disk space.
     m_Metadata:
       m_Items: []
+  - m_Id: 6
+    m_Localized: "\u30C7\u30C3\u30AD\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\u3002\u4ED6\u306E\u30C7\u30C3\u30AD\u306B\u8CBC\u308A\u4ED8\u3051\u3089\u308C\u307E\u3059"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7
+    m_Localized: "\u8CBC\u308A\u4ED8\u3051\u307E\u3057\u305F"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8
+    m_Localized: "\u307E\u3060\u30B3\u30D4\u30FC\u3057\u3066\u3044\u307E\u305B\u3093"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9
+    m_Localized: "\u30B3\u30FC\u30C9\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\uFF01\u53CB\u9054\u306B\u5171\u6709\u3057\u3088\u3046\uFF01"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10
+    m_Localized: "\u30B3\u30FC\u30C9\u8AAD\u8FBC\u5B8C\u4E86\uFF01"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11
+    m_Localized: "\u7121\u52B9\u306A\u30B3\u30FC\u30C9\u3067\u3059"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12
+    m_Localized: "\u672A\u6240\u6301\u306E\u30AB\u30FC\u30C9{0}\u679A\u3092\u30B9\u30AD\u30C3\u30D7\u3057\u307E\u3057\u305F"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13
+    m_Localized: "\u30C7\u30C3\u30AD\u300C{0}\u300D\u3092\u524A\u9664\u3057\u307E\u3057\u305F"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 14
+    m_Localized: "\u30C7\u30C3\u30AD\u4E0A\u9650\u3067\u3059\uFF08{0}\uFF09"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15
+    m_Localized: "\u6700\u4F4E1\u3064\u306E\u30C7\u30C3\u30AD\u304C\u5FC5\u8981\u3067\u3059"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
