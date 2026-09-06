@@ -34,7 +34,8 @@ namespace GIC.UI
 
         public int ShotsCompleted => _shotsCompleted;
         public int TotalShots => _totalShots;
-        public bool IsEncounterReady => _wishManager.IsEncounterReady();
+        /// <summary>下一发将射出的线（由背包命运之缘决定：纠缠之缘优先）——射击线视觉/进度条满格共用</summary>
+        public WishLineType UpcomingLineType => _wishManager.GetUpcomingLineType();
 
         public WishFlowController(WishManager wishManager, WishPoolConfig pool)
         {
@@ -90,25 +91,24 @@ namespace GIC.UI
             _shotsCompleted++;
 
             int starLevel = trackCard.saveCardData.StarLevel;
-            bool isEncounter = _wishManager.IsEncounterReady();
-
-            if (isEncounter)
-                _wishManager.ConsumeEncounter();
+            // 命运之缘物品化（2026-09-06）：消耗 1 个命运之缘（纠缠之缘优先），射出对应升级线
+            WishLineType lineType = _wishManager.ConsumeFateForShot();
 
             WishShotResult result;
-            if (isEncounter && starLevel < 5)
+            if (lineType != WishLineType.Normal && starLevel < 5)
             {
-                result = PlanEncounterShot(trackCard, shotIndex, starLevel);
+                result = PlanEncounterShot(trackCard, shotIndex, starLevel, lineType);
             }
             else
             {
-                // encounter 且 starLevel >= 5：退回相遇之线，按普通处理
-                if (isEncounter)
-                    _wishManager.RefundEncounter();
+                // 射中 5★ 无法提升：退回本发消耗的命运之缘物品，按普通处理
+                if (lineType != WishLineType.Normal)
+                    _wishManager.RefundFate(lineType);
                 result = PlanNormalShot(trackCard, shotIndex, starLevel);
             }
 
-            result.isEncounter = isEncounter && starLevel < 5;
+            result.lineType = lineType;
+            result.isEncounter = lineType != WishLineType.Normal && starLevel < 5;
             result.shotIndex = shotIndex;
 
             // 状态保持 Revealing，等表现层调用 OnRevealComplete 后再转回
@@ -176,14 +176,14 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 相遇之线升级路径
+        /// 命运之缘升级射击路径（相遇之线/纠缠之线共用，升级权重按线型分流）
         /// </summary>
-        private WishShotResult PlanEncounterShot(Card card, int shotIndex, int baseStarLevel)
+        private WishShotResult PlanEncounterShot(Card card, int shotIndex, int baseStarLevel, WishLineType lineType)
         {
             bool isUnit = card.saveCardData.cardType == CardType.Unit;
 
-            // 1. Roll 升级次数
-            int upgradeCount = _wishManager.RollUpgradeCount(_pool);
+            // 1. Roll 升级次数（相遇之线=0-4 档权重；纠缠之线=必升 1-4 档权重）
+            int upgradeCount = _wishManager.RollUpgradeCount(_pool, lineType);
             upgradeCount = Mathf.Min(upgradeCount, 5 - baseStarLevel);
 
             var result = new WishShotResult();

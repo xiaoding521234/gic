@@ -57,8 +57,8 @@ MonoBehaviour:
     count: 100
     decks: 
   - item: 1002
-    count: 60
-    decks: 00000000
+    count: 0
+    decks: 
   - item: 1003
     count: 100
     decks: 00000000

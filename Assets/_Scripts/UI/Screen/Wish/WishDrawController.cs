@@ -62,6 +62,10 @@ namespace GIC.UI
         [Header("倒计时")]
         [SerializeField] private float clickTimeLimit = 1.5f;
 
+        [Tooltip("纠缠之线射击的时间限制——背包有纠缠之缘、下一发为纠缠之线时生效（2026-09-06 拍板 12 秒，给玩家更多瞄准时间）")]
+        [InspectorName("纠缠之线射击时限秒")]
+        [SerializeField] private float intertwinedShotTimeLimit = 12f;
+
         [Header("结果展示")]
         [SerializeField] private float resultCardSize = 80f;
         [SerializeField] private float resultCardSpacing = 10f;
@@ -85,6 +89,9 @@ namespace GIC.UI
 
         [Header("相遇之线")]
         [SerializeField] private Color encounterLineColor = new Color(1f, 0.85f, 0.3f, 1f);
+
+        [Header("纠缠之线")]
+        [SerializeField] private Color intertwinedLineColor = new Color(1f, 0.45f, 0.72f, 1f);
 
         /// <summary>抽卡流程是否进行中（供 StartDraw 防重入检查）</summary>
         public bool IsWishInProgress => _isWishActive;
@@ -213,7 +220,7 @@ namespace GIC.UI
             StartCoroutine(SpawnCardsCoroutine());
             StartCoroutine(InputCoroutine());
 
-            _currentTimer = clickTimeLimit;
+            _currentTimer = GetCurrentShotTimeLimit();
             _isInCooldown = false;
             _cooldownTimer = 0f;
             RollAutoClickDelay(); // 自动模式第一发的随机"点击"时刻
@@ -245,7 +252,7 @@ namespace GIC.UI
                         if (_cooldownTimer <= 0f)
                         {
                             _isInCooldown = false;
-                            _currentTimer = clickTimeLimit;
+                            _currentTimer = GetCurrentShotTimeLimit(); // 纠缠之线 12 秒，其余常规时限
                             RollAutoClickDelay(); // 下一发的随机"点击"时刻
                         }
                     }
@@ -253,11 +260,11 @@ namespace GIC.UI
                 else
                 {
                     _currentTimer -= Time.deltaTime;
-                    UpdateCountdownBar(_currentTimer / clickTimeLimit);
+                    UpdateCountdownBar(_currentTimer / GetCurrentShotTimeLimit());
 
                     // 自动射击：随机时刻"手点"（AI 抽卡模拟玩家节奏）；玩家点击仍可提前；倒计时归零兜底
                     if (_currentTimer <= 0f || IsConfirmPressed()
-                        || (_autoShoot && (clickTimeLimit - _currentTimer) >= _nextAutoClickElapsed))
+                        || (_autoShoot && (GetCurrentShotTimeLimit() - _currentTimer) >= _nextAutoClickElapsed))
                         Shoot();
                 }
 
@@ -277,13 +284,21 @@ namespace GIC.UI
         }
 
         /// <summary>掷本发的随机"点击"时刻（自动模式）：模拟玩家在倒计时内随机时刻手点开枪，
-        /// 每发独立重掷——节奏不机械。窗口钳在 (0, 倒计时秒) 内防越界。</summary>
+        /// 每发独立重掷——节奏不机械。窗口钳在 (0, 当前射击时限) 内防越界。</summary>
         void RollAutoClickDelay()
         {
+            float limit = GetCurrentShotTimeLimit();
             float min = Mathf.Max(0.05f, Mathf.Min(autoClickWindowSec.x, autoClickWindowSec.y));
-            float max = Mathf.Min(Mathf.Max(autoClickWindowSec.x, autoClickWindowSec.y), clickTimeLimit - 0.05f);
+            float max = Mathf.Min(Mathf.Max(autoClickWindowSec.x, autoClickWindowSec.y), limit - 0.05f);
             _nextAutoClickElapsed = max > min ? UnityEngine.Random.Range(min, max) : min;
         }
+
+        /// <summary>本发射击时限：下一发为纠缠之线（背包有纠缠之缘）时 12 秒，否则常规 1.5 秒——
+        /// 倒计时重置/进度条分母/AI 点击窗口共用。Drawing 状态下背包不变，时限在整发内恒定。</summary>
+        private float GetCurrentShotTimeLimit() =>
+            _flow != null && _flow.UpcomingLineType == WishLineType.Intertwined
+                ? intertwinedShotTimeLimit
+                : clickTimeLimit;
 
         /// <summary>
         /// 确认输入是否按下 — 鼠标左键 + Confirm 动作绑定的按键（支持重绑定）
@@ -311,7 +326,7 @@ namespace GIC.UI
             if (shootSFX != null)
                 AudioManager.Instance?.PlaySFX(shootSFX, sfxVolume);
 
-            StartCoroutine(FateLineCoroutine(_flow.IsEncounterReady));
+            StartCoroutine(FateLineCoroutine(_flow.UpcomingLineType));
 
             _isInCooldown = true;
 

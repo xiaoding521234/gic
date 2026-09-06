@@ -64,7 +64,7 @@ namespace GIC.Tool
 
             // ── 初始物品/货币 ──
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Mora,            count = 100 });
-            cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.IntertwinedFate, count = 60,  decks = new List<int> { 0 } });
+            cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.IntertwinedFate, count = 0 }); // 2026-09-06 拍板：命运之缘不随新档赠送（0/0）且不可入卡组（maxPrepareCount=0）
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Stamina,         count = 100, decks = new List<int> { 0 } });
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Primogem,        count = 16000 });
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Apple,           count = 10 });

@@ -36,7 +36,7 @@ MonoBehaviour:
       stacks: 1
     subType: 0
     maxStack: 9999
-    maxPrepareCount: 10
+    maxPrepareCount: 0
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
@@ -50,8 +50,22 @@ MonoBehaviour:
       stacks: 1
     subType: 0
     maxStack: 9999
-    maxPrepareCount: 10
-    countPerServing: 10
+    maxPrepareCount: 0
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 60
+    customParams: []
+  - itemID: 1004
+    icon:
+    - {fileID: 21300000, guid: d32f1a0fe4e84f88969dc7cccae5122e, type: 3}
+    starLevel: 4
+    elements:
+    - elementType: 5
+      stacks: 1
+    subType: 0
+    maxStack: 9999
+    maxPrepareCount: 0
+    countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 60
     customParams: []
@@ -64,7 +78,7 @@ MonoBehaviour:
       stacks: 1
     subType: 0
     maxStack: 9999
-    maxPrepareCount: 6
+    maxPrepareCount: 60
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0

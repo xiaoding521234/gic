@@ -28,3 +28,7 @@ MonoBehaviour:
   upgrade2Weight: 20
   upgrade3Weight: 7
   upgrade4Weight: 3
+  intertwinedUpgrade1Weight: 40
+  intertwinedUpgrade2Weight: 30
+  intertwinedUpgrade3Weight: 20
+  intertwinedUpgrade4Weight: 10

@@ -39,6 +39,12 @@ namespace GIC.Data
         public float upgrade3Weight = 7f;
         public float upgrade4Weight = 3f;
 
+        [Header("纠缠之线升级权重（2026-09-06 拍板：必升 1-4 次，无 0 次档）")]
+        [InspectorName("升1次权重")] public float intertwinedUpgrade1Weight = 40f;
+        [InspectorName("升2次权重")] public float intertwinedUpgrade2Weight = 30f;
+        [InspectorName("升3次权重")] public float intertwinedUpgrade3Weight = 20f;
+        [InspectorName("升4次权重")] public float intertwinedUpgrade4Weight = 10f;
+
         /// <summary>
         /// 获取指定星级的所有角色
         /// </summary>
@@ -126,6 +132,30 @@ namespace GIC.Data
             if (roll < cumulative) return 2;
 
             cumulative += upgrade3Weight;
+            if (roll < cumulative) return 3;
+
+            return 4;
+        }
+
+        /// <summary>
+        /// 按权重抽取纠缠之线升级次数 (1-4，必升——2026-09-06 拍板：无 0 次档，纠缠之缘的价值差异化)
+        /// </summary>
+        public int RollIntertwinedUpgradeCount()
+        {
+            float totalWeight = intertwinedUpgrade1Weight + intertwinedUpgrade2Weight
+                              + intertwinedUpgrade3Weight + intertwinedUpgrade4Weight;
+            if (totalWeight <= 0f) return 1;
+
+            float roll = UnityEngine.Random.Range(0f, totalWeight);
+            float cumulative = 0f;
+
+            cumulative += intertwinedUpgrade1Weight;
+            if (roll < cumulative) return 1;
+
+            cumulative += intertwinedUpgrade2Weight;
+            if (roll < cumulative) return 2;
+
+            cumulative += intertwinedUpgrade3Weight;
             if (roll < cumulative) return 3;
 
             return 4;

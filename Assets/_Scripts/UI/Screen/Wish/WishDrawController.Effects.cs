@@ -78,10 +78,22 @@ namespace GIC.UI
         private Material _fateLineMaterial;
         private readonly List<GameObject> _activeFateLines = new();
 
-        private IEnumerator FateLineCoroutine(bool isEncounter = false)
+        private IEnumerator FateLineCoroutine(WishLineType lineType = WishLineType.Normal)
         {
-            Color lineColor = isEncounter ? encounterLineColor : fateLineColor;
-            var lineObj = new GameObject(isEncounter ? "EncounterLine" : "FateLine", typeof(RectTransform), typeof(Image));
+            // 线色随本发消耗的命运之缘变化：命运之线（白）/相遇之线（金）/纠缠之线（粉）
+            Color lineColor = lineType switch
+            {
+                WishLineType.Encounter => encounterLineColor,
+                WishLineType.Intertwined => intertwinedLineColor,
+                _ => fateLineColor,
+            };
+            string lineName = lineType switch
+            {
+                WishLineType.Encounter => "EncounterLine",
+                WishLineType.Intertwined => "IntertwinedLine",
+                _ => "FateLine",
+            };
+            var lineObj = new GameObject(lineName, typeof(RectTransform), typeof(Image));
             lineObj.transform.SetParent(fateLineContainer, false);
             lineObj.layer = fateLineContainer.gameObject.layer;
             _activeFateLines.Add(lineObj);

@@ -123,6 +123,7 @@ namespace GIC.Framework
         {
             playerName = "旅行者";
             progress = new SaveProgress();
+            progress.fateItemsMigrated = true; // 新档无历史相遇余量，直接视为已迁移
             settings = new SaveSettings();
             pet = new SavePetSettings();
             progress.EnsureDecksValid(); // 新档/重置路径：补齐 deckNames 到卡组数（改名写入依赖列表长度，CreateNewSave 不走读档 EnsureValid）
@@ -148,6 +149,31 @@ namespace GIC.Framework
             settings.keyBindings ??= new List<KeyBindingEntry>();
             pet.petApiKeyCipher ??= "";
             progress.EnsureValid();
+            MigrateFateItems();
+        }
+
+        /// <summary>
+        /// 命运之缘物品化一次性迁移（2026-09-06 改版）：
+        /// v11 及更早的相遇之线是虚拟计数（可用次数 = 累计星辉/20 - 已用次数），改版后命运之缘为背包物品——
+        /// ①未用完的相遇余量 → 补偿为相遇之缘；②累计满 200 星辉的档位（旧版无此机制）→ 全量补偿为纠缠之缘。
+        /// 幂等：fateItemsMigrated 置 true 后不再执行；新档 starglitterEarned=0 时补偿为 0，自然走完置位。
+        /// 调用点：读档 EnsureValid（迁移后随读档固化写盘）。
+        /// </summary>
+        private void MigrateFateItems()
+        {
+            if (progress.fateItemsMigrated) return;
+
+            int pendingAcquaint = Mathf.Max(0,
+                progress.starglitterEarned / SaveProgress.AcquaintFateThreshold - progress.encounterUsed);
+            int retroIntertwined = Mathf.Max(0,
+                progress.starglitterEarned / SaveProgress.IntertwinedFateThreshold);
+
+            if (pendingAcquaint > 0)
+                AddItemCount(ItemName.AcquaintFate, pendingAcquaint);
+            if (retroIntertwined > 0)
+                AddItemCount(ItemName.IntertwinedFate, retroIntertwined);
+
+            progress.fateItemsMigrated = true;
         }
     }
 
@@ -170,11 +196,20 @@ namespace GIC.Framework
         // 锚点位置信息
         public int currentPosition = (int)PositionName.SnezhnayaCastle;
 
-        // ========== 相遇之线 ==========
-        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
+        // ========== 命运之缘（2026-09-06 物品化改版） ==========
+        /// <summary>每累计 N 个星辉赠送 1 个相遇之缘（祈愿发放与旧档补偿共用，规则属存档进度语义）</summary>
+        public const int AcquaintFateThreshold = 20;
+        /// <summary>每累计 N 个星辉赠送 1 个纠缠之缘</summary>
+        public const int IntertwinedFateThreshold = 200;
+
+        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）——命运之缘里程碑计数源</summary>
         public int starglitterEarned = 0;
-        /// <summary>已使用的相遇之线次数</summary>
+        /// <summary>已使用的相遇之线次数（旧版虚拟计数，2026-09-06 改版后停用——命运之缘改为背包物品消耗；
+        /// 仅供旧档一次性补偿换算用，勿再读写</summary>
         public int encounterUsed = 0;
+        /// <summary>命运之缘物品化迁移完成标记（false=v11 旧档待补偿：把累计星辉里程碑换算成相遇之缘/纠缠之缘入包；
+        /// JsonUtility 缺字段保留初始化器 false，老档加载即触发迁移，见 PlayerSaveData.MigrateFateItems）</summary>
+        public bool fateItemsMigrated = false;
 
         /// <summary>分区数据修复（PlayerSaveData.EnsureValid 调用）</summary>
         public void EnsureValid()
@@ -190,8 +225,26 @@ namespace GIC.Framework
             foreach (var card in ownedNormalItems)
                 EnsureCardValid(card);
 
+            // 货币类物品不参与卡组（2026-09-06 拍板）：清遗留 inDecks 成员资格。
+            // maxPrepareCount=0 的卡在卡组编辑模式被遮罩锁定、点击无响应无法手动移除，
+            // 遗留成员会永久占用卡组位（历史初始存货曾把纠缠之缘放进卡组0）。
+            foreach (var card in ownedNormalItems)
+            {
+                if (card.inDecks != null && card.inDecks.Count > 0
+                    && NonDeckableCurrencyItems.Contains(card.id.AsItemName()))
+                    card.inDecks.Clear();
+            }
+
             EnsureDecksValid();
         }
+
+        /// <summary>不可入卡组的货币物品（对应 ItemConfig maxPrepareCount=0）：星辉/相遇之缘/纠缠之缘</summary>
+        private static readonly HashSet<ItemName> NonDeckableCurrencyItems = new HashSet<ItemName>
+        {
+            ItemName.Starglitter,
+            ItemName.AcquaintFate,
+            ItemName.IntertwinedFate,
+        };
 
         /// <summary>卡组名称/排序字段修复（v2 动态卡组）：
         /// deckNames.Count 即卡组数量的事实源（增删卡组由 CardManager 同步维护三张表）——

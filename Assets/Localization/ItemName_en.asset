@@ -34,7 +34,7 @@ MonoBehaviour:
     m_Localized: Stamina
     m_Metadata:
       m_Items: []
-  - m_Id: 1004
+  - m_Id: 3001
     m_Localized: Magatama
     m_Metadata:
       m_Items: []
@@ -54,11 +54,11 @@ MonoBehaviour:
     m_Localized: Leather Armor
     m_Metadata:
       m_Items: []
-  - m_Id: 3001
-    m_Localized: Magatama
+  - m_Id: 5001
+    m_Localized: Dandelion Wine
     m_Metadata:
       m_Items: []
-  - m_Id: 3002
+  - m_Id: 5002
     m_Localized: Diona's Special
     m_Metadata:
       m_Items: []
@@ -82,44 +82,48 @@ MonoBehaviour:
     m_Localized: Radish
     m_Metadata:
       m_Items: []
-  - m_Id: 5001
-    m_Localized: Dandelion Wine
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5002
-    m_Localized: Diona's Special
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5003
-    m_Localized: Thunder Crystal
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5004
-    m_Localized: Wind Crystal
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5005
-    m_Localized: Ice Crystal
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5006
-    m_Localized: Rock Crystal
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5007
-    m_Localized: Grass Crystal
-    m_Metadata:
-      m_Items: []
   - m_Id: 6001
-    m_Localized: Mystery Key
+    m_Localized: Fire Crystal
     m_Metadata:
       m_Items: []
   - m_Id: 6002
+    m_Localized: Water Crystal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Localized: Thunder Crystal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Localized: Wind Crystal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6005
+    m_Localized: Ice Crystal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6006
+    m_Localized: Rock Crystal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6007
+    m_Localized: Grass Crystal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7001
+    m_Localized: Mystery Key
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7002
     m_Localized: Ancient Scroll
     m_Metadata:
       m_Items: []
   - m_Id: 1006
     m_Localized: Starglitter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Localized: Acquaint Fate
     m_Metadata:
       m_Items: []
   references:

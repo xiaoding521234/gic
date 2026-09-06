@@ -18,9 +18,9 @@ namespace GIC.UI
         {
             if (starglitterProgressFill == null || _wishManager == null) return;
 
-            // 相遇之线射击中 或 有可用相遇之线：填满 + 持续抖动+流彩
-            bool encounterActive = _flow != null && _flow.IsEncounterReady;
-            if (encounterActive)
+            // 背包有命运之缘（相遇之缘/纠缠之缘）可用：填满 + 持续抖动+流彩
+            bool fateActive = _flow != null && _flow.UpcomingLineType != WishLineType.Normal;
+            if (fateActive)
             {
                 starglitterProgressFill.localScale = new Vector3(1f, 1f, 1f);
                 if (_progressBarGlowCoroutine == null)

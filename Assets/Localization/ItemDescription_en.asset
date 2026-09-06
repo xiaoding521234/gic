@@ -37,12 +37,13 @@ MonoBehaviour:
       recovers over time.
     m_Metadata:
       m_Items: []
-  - m_Id: 1004
+  - m_Id: 3001
     m_Localized: A magatama unique to Inazuma, infused with the power of Electro.
     m_Metadata:
       m_Items: []
   - m_Id: 1005
-    m_Localized: A primordial crystalline gem beyond this world. In the dark cosmos
+    m_Localized: A primordial crystalline gem beyond this world. In the dark cosmos,
+      it shines with the light of unclaimed dreams and hopes.
     m_Metadata:
       m_Items: []
   - m_Id: 2001
@@ -58,11 +59,12 @@ MonoBehaviour:
     m_Localized: An ordinary set of leather armor, light and practical.
     m_Metadata:
       m_Items: []
-  - m_Id: 3001
-    m_Localized: A magatama unique to Inazuma
+  - m_Id: 5001
+    m_Localized: Mondstadt's signature vintage, brewed from dandelion seeds with
+      a refreshing aroma.
     m_Metadata:
       m_Items: []
-  - m_Id: 3002
+  - m_Id: 5002
     m_Localized: A special concoction by Cat's Tail Tavern's popular bartender Diona.
       Not that she'd ever admit it.
     m_Metadata:
@@ -73,11 +75,13 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 4002
-    m_Localized: A fresh chunk of beast meat. When properly cooked
+    m_Localized: A fresh chunk of beast meat. When properly cooked, it makes a hearty
+      and energizing meal.
     m_Metadata:
       m_Items: []
   - m_Id: 4003
-    m_Localized: A shelled bird egg
+    m_Localized: A shelled bird egg, rich in protein and a fundamental ingredient
+      in countless dishes.
     m_Metadata:
       m_Items: []
   - m_Id: 4004
@@ -86,51 +90,63 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 4005
-    m_Localized: A fibrous root vegetable
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5001
-    m_Localized: Mondstadt's signature vintage
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5002
-    m_Localized: A special concoction by Cat's Tail Tavern's popular bartender Diona.
-      Not that she'd ever admit it.
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5003
-    m_Localized: A crystal imbued with wild Electro energy. Small arcs spark from
-      it
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5004
-    m_Localized: A crystal imbued with gentle Anemo energy. Held to the ear
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5005
-    m_Localized: A crystal imbued with frigid Cryo energy. Ice-cold to the touch
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5006
-    m_Localized: A crystal imbued with steadfast Geo energy. Incredibly hard
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5007
-    m_Localized: A crystal imbued with thriving Dendro energy. Pulses with life
+    m_Localized: A fibrous root vegetable, easy to plant and harvest. It adds the
+      perfect finishing touch to many dishes.
     m_Metadata:
       m_Items: []
   - m_Id: 6001
+    m_Localized: A crystal imbued with blazing fire energy. Warm to the touch, it's
+      a common material among alchemists.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6002
+    m_Localized: A crystal imbued with pure Hydro energy. Cool to the touch, it can
+      cleanse impurities.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6003
+    m_Localized: A crystal imbued with wild Electro energy. Small arcs spark from
+      it, emitting a dangerous glow.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6004
+    m_Localized: A crystal imbued with gentle Anemo energy. Held to the ear, it seems
+      to whisper with the breeze.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6005
+    m_Localized: A crystal imbued with frigid Cryo energy. Ice-cold to the touch,
+      it never melts.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6006
+    m_Localized: A crystal imbued with steadfast Geo energy. Incredibly hard, it
+      symbolizes eternity and immutability.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 6007
+    m_Localized: A crystal imbued with thriving Dendro energy. Pulses with life,
+      as if it's growing in your hand.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 7001
     m_Localized: An ancient key that emits a faint glow. It seems capable of unlocking
       a long-forgotten door somewhere.
     m_Metadata:
       m_Items: []
-  - m_Id: 6002
-    m_Localized: A yellowed ancient scroll
+  - m_Id: 7002
+    m_Localized: A yellowed ancient scroll, chronicling lost civilizations and forbidden
+      knowledge.
     m_Metadata:
       m_Items: []
   - m_Id: 1006
     m_Localized: Surplus character cards convert into Starglitter, used to redeem
       rare items in the shop.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Localized: A seed that lights up the night. No matter the distance apart, guided
+      by the stone's glimmer, the fated will meet under the stars.
     m_Metadata:
       m_Items: []
   references:

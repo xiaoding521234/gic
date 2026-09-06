@@ -28,6 +28,9 @@ namespace GIC.Data
         [InspectorName("体力")]
         Stamina = 1003,
 
+        [InspectorName("相遇之缘")]
+        AcquaintFate = 1004,
+
         [InspectorName("原石")]
         Primogem = 1005,
 

@@ -20,7 +20,10 @@ namespace GIC.UI
         /// <summary>最终卡牌标识（相遇之线升级后为最终卡；AI 自动抽卡反应取卡名用）</summary>
         public CardId finalCardId;
 
-        /// <summary>是否为相遇之线射击</summary>
+        /// <summary>本发射出的线（命运之线/相遇之线/纠缠之线——由消耗的命运之缘决定；5★ 退款发同样保留实际线色）</summary>
+        public WishLineType lineType;
+
+        /// <summary>是否为命运之缘升级射击（走 PlanEncounterShot 路径；5★ 退款发为 false）</summary>
         public bool isEncounter;
 
         /// <summary>有序动画步骤 — 表现层按序播放</summary>

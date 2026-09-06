@@ -8,6 +8,19 @@ using GIC.Battle;
 namespace GIC.UI
 {
     /// <summary>
+    /// 祈愿射击线类型 — 由本发消耗的命运之缘物品决定
+    /// </summary>
+    public enum WishLineType
+    {
+        /// <summary>命运之线（白）——未消耗命运之缘的普通射击</summary>
+        Normal = 0,
+        /// <summary>相遇之线（金）——消耗 1 个相遇之缘</summary>
+        Encounter,
+        /// <summary>纠缠之线（粉）——消耗 1 个纠缠之缘（优先于相遇之缘）</summary>
+        Intertwined,
+    }
+
+    /// <summary>
     /// 祈愿单次结果
     /// </summary>
     [Serializable]
@@ -40,9 +53,6 @@ namespace GIC.UI
         private readonly SaveManager _saveManager;
         private readonly UnitConfig _unitConfig;
         private readonly ItemConfig _itemConfig;
-
-        /// <summary>每获取 N 个星辉触发 1 次相遇之线</summary>
-        public const int EncounterThreshold = 20;
 
         public WishManager(SaveManager saveManager, UnitConfig unitConfig, ItemConfig itemConfig)
         {
@@ -90,41 +100,50 @@ namespace GIC.UI
             };
         }
 
-        // ── 相遇之线 ──
+        // ── 命运之缘（2026-09-06 物品化改版：相遇之缘/纠缠之缘为背包物品，射击自动消耗） ──
 
-        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）</summary>
+        /// <summary>累计获取的星辉总量（只增不减，与可消费的星辉余额解耦）——命运之缘里程碑的计数源</summary>
         public int GetStarglitterEarned() => _saveManager.CurrentSave.progress.starglitterEarned;
 
-        /// <summary>待用的相遇之线次数 = 累计获取量/20 - 已用量</summary>
-        public int GetEncounterCharges() => GetStarglitterEarned() / EncounterThreshold - _saveManager.CurrentSave.progress.encounterUsed;
+        /// <summary>当前进度条比例 (0~1) = (累计获取量 % 20) / 20 —— 距下一个相遇之缘的进度</summary>
+        public float GetStarglitterProgress() =>
+            (GetStarglitterEarned() % SaveProgress.AcquaintFateThreshold) / (float)SaveProgress.AcquaintFateThreshold;
 
-        /// <summary>当前进度条比例 (0~1) = (累计获取量%20) / 20</summary>
-        public float GetStarglitterProgress() => (GetStarglitterEarned() % EncounterThreshold) / (float)EncounterThreshold;
-
-        /// <summary>是否有可用的相遇之线</summary>
-        public bool IsEncounterReady() => GetEncounterCharges() > 0;
-
-        /// <summary>消耗 1 次相遇之线（不扣星辉，只增加 encounterUsed）</summary>
-        public bool ConsumeEncounter()
+        /// <summary>下一发将射出的线：背包有纠缠之缘→纠缠之线（优先消耗）；否则有相遇之缘→相遇之线；都没有→命运之线</summary>
+        public WishLineType GetUpcomingLineType()
         {
-            if (GetEncounterCharges() <= 0) return false;
-            _saveManager.CurrentSave.progress.encounterUsed++;
-            return true;
+            var save = _saveManager.CurrentSave;
+            if (save.GetItemCount(ItemName.IntertwinedFate) > 0) return WishLineType.Intertwined;
+            if (save.GetItemCount(ItemName.AcquaintFate) > 0) return WishLineType.Encounter;
+            return WishLineType.Normal;
         }
 
-        /// <summary>返还 1 次相遇之线（5★卡无法提升时退回）</summary>
-        public void RefundEncounter()
+        /// <summary>消耗 1 个命运之缘物品（纠缠之缘优先于相遇之缘）；返回消耗的线类型（Normal=背包无命运之缘可耗）</summary>
+        public WishLineType ConsumeFateForShot()
         {
-            if (_saveManager.CurrentSave.progress.encounterUsed > 0)
-                _saveManager.CurrentSave.progress.encounterUsed--;
+            var save = _saveManager.CurrentSave;
+            if (save.TryConsumeItem(ItemName.IntertwinedFate, 1)) return WishLineType.Intertwined;
+            if (save.TryConsumeItem(ItemName.AcquaintFate, 1)) return WishLineType.Encounter;
+            return WishLineType.Normal;
+        }
+
+        /// <summary>返还 1 个命运之缘物品（射中 5★ 卡无法提升时，退回本发消耗的缘）</summary>
+        public void RefundFate(WishLineType type)
+        {
+            if (type == WishLineType.Intertwined)
+                _saveManager.CurrentSave.AddItemCount(ItemName.IntertwinedFate, 1);
+            else if (type == WishLineType.Encounter)
+                _saveManager.CurrentSave.AddItemCount(ItemName.AcquaintFate, 1);
         }
 
         /// <summary>
-        /// 相遇之线升级次数：使用 WishPoolConfig 的独立升级权重表
+        /// 升级次数 Roll：相遇之线用 0-4 档权重表，纠缠之线用必升 1-4 档权重表（2026-09-06 拍板差异化）
         /// </summary>
-        public int RollUpgradeCount(WishPoolConfig pool)
+        public int RollUpgradeCount(WishPoolConfig pool, WishLineType lineType)
         {
-            return pool.RollUpgradeCount();
+            return lineType == WishLineType.Intertwined
+                ? pool.RollIntertwinedUpgradeCount()
+                : pool.RollUpgradeCount();
         }
 
         /// <summary>
@@ -257,12 +276,26 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 向存档中添加星辉（同时累加 starglitterEarned 用于相遇之线计数）
+        /// 向存档中添加星辉：累加余额与累计获取量，并结算命运之缘里程碑——
+        /// 每满 20 累计星辉赠 1 个相遇之缘、每满 200 累计星辉赠 1 个纠缠之缘（2026-09-06 改版）。
+        /// starglitterEarned 只增不减，按跨越档位的差值发放即可精确记账，无需额外 granted 计数
+        /// （v11 旧档的一次性补偿见 PlayerSaveData.MigrateFateItems）。
         /// </summary>
         private void AddStarglitter(PlayerSaveData save, int amount)
         {
+            int before = save.progress.starglitterEarned;
             save.progress.starglitterEarned += amount;
             save.AddItemCount(ItemName.Starglitter, amount);
+
+            int acquaint = save.progress.starglitterEarned / SaveProgress.AcquaintFateThreshold
+                         - before / SaveProgress.AcquaintFateThreshold;
+            if (acquaint > 0)
+                save.AddItemCount(ItemName.AcquaintFate, acquaint);
+
+            int intertwined = save.progress.starglitterEarned / SaveProgress.IntertwinedFateThreshold
+                            - before / SaveProgress.IntertwinedFateThreshold;
+            if (intertwined > 0)
+                save.AddItemCount(ItemName.IntertwinedFate, intertwined);
         }
 
         /// <summary>

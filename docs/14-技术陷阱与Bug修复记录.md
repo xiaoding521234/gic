@@ -198,6 +198,31 @@ InputPopupDialog.prefab 的根节点是"**自带 Canvas（Overlay）+ scale=0 �
 
 ---
 
+## 28. 本地化表双层错位历史事故：值挪了、Shared 层没挪（物品名错挂一月未察觉，2026-09-06 修复）
+
+### 现象
+2026-09-06 给 ItemName/ItemDescription 表加 AcquaintFate 键时发现目标 Id 1004 被 Magatama 占用，顺藤摸瓜查出 **2026-07-31 提交 06b8b5e 引入的历史事故**：该提交把**语言表（locale table）的值**按枚举值挪了位（勾玉→3001、蒲公英酒→5001、迪奥娜特调→5002），但 **Shared Data 层的 Id 没有同步 Remap**（仍是 1004/3001/3002 旧布局），旧值副本也没清——从此游戏内按 Shared Id 查表全部错挂：
+- 蒲公英酒显示成"勾玉"、火晶体显示成"蒲公英酒"、水体显示成"迪奥娜特调"（zh/en/ja/zh-TW 四表同病）
+- 火晶体/水晶体的值**彻底丢失**（它们的旧槽被上位物品的值覆盖）
+- ItemDescription 的 **ru 表整表被日语文本覆盖**（另一条事故线）；ja 表也有 13 条英文残片
+- **一个月无人察觉**——因为按 Key 查表的代码能跑、游戏不报错，错的只是显示内容
+
+### 根因
+Unity Localization 是**双层结构**：Shared Data（Key↔Id 映射）+ 各语言表（Id→值）。只挪语言表值不 Remap Shared Id = 两层各说各话。**运行时按 Key→SharedData→Id→语言表 取值**，显示跟着 Shared Id 走，语言表里"看起来对齐了枚举"的值全是错挂。
+
+### 修复（2026-09-06，全量归位）
+1. **Id 归位**：`WishFateItemsSetupTool.AlignLegacyItemIds`（依赖链从深到浅 RemapId：MysteryKey 6001→7001、AncientScroll 6002→7002、七晶体 500x→600x、蒲公英酒/迪奥娜特调 300x→500x、勾玉 1004→3001、AcquaintFate →1004）+ 每步三步法搬家（RemapId → 语言表旧 id 取值/RemoveEntry → AddEntry 新 id）
+2. **值校对**：`WishFateCanonicalValues`（从 git 提交 **1129959，2026-07-29=事故前最后已知正确状态** 用脚本提取的标准值，`extract_canonical.ps1`）逐键比对，错值写回——修复 4 语言名 3 槽/表、描述表 zh-Hans 3、zh-TW 5、en 13、ja 13、ru 14（ru 全表日语→俄语复原）
+3. 修复后 Id 与 ItemName 枚举值**全量对齐**，CSV 重导出
+
+### 规范
+- **改语言表 Id 一律动 Shared 层**（RemapId+三步法，见 gic-localization skill），任何"直接改语言表 m_Localized 挂点/值"的操作都跳过了 Key↔Id 中间层=埋雷
+- **考古修复首选 git**：`git show <旧提交>:<表>.asset` 提取事故前正确值——比凭记忆重写可靠（本次火/水晶体值已从运行时任何表不可得，只有 git 里有）
+- **大数 Id/半执行状态是历史事故的显影剂**：新加键时发现目标枚举 Id 被无关键占用（如 1004 被勾玉占）≠"该键本来就在这"——很可能是**错位链的头**，应全链排查（本次从 1 个占用提示挖出 11 键错位+3 值丢失+2 表被外语覆盖）
+- 长期无人发现的显示类错值不报错：**改本地化后肉眼过一遍 CSV**（Key,Id,各语言值 横排对比）是最便宜的防线
+
+---
+
 ## B. 文本 · TMP · 本地化 · DI
 
 ## 5. Unity Localization 陷阱

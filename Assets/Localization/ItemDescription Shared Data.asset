@@ -31,7 +31,7 @@ MonoBehaviour:
     m_Key: Stamina
     m_Metadata:
       m_Items: []
-  - m_Id: 1004
+  - m_Id: 3001
     m_Key: Magatama
     m_Metadata:
       m_Items: []
@@ -51,11 +51,11 @@ MonoBehaviour:
     m_Key: LeatherArmor
     m_Metadata:
       m_Items: []
-  - m_Id: 3001
+  - m_Id: 5001
     m_Key: DandelionWine
     m_Metadata:
       m_Items: []
-  - m_Id: 3002
+  - m_Id: 5002
     m_Key: DionaSpecial
     m_Metadata:
       m_Items: []
@@ -79,44 +79,48 @@ MonoBehaviour:
     m_Key: Radish
     m_Metadata:
       m_Items: []
-  - m_Id: 5001
+  - m_Id: 6001
     m_Key: FireCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 5002
+  - m_Id: 6002
     m_Key: WaterCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 5003
+  - m_Id: 6003
     m_Key: ThunderCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 5004
+  - m_Id: 6004
     m_Key: WindCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 5005
+  - m_Id: 6005
     m_Key: IceCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 5006
+  - m_Id: 6006
     m_Key: RockCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 5007
+  - m_Id: 6007
     m_Key: GrassCrystal
     m_Metadata:
       m_Items: []
-  - m_Id: 6001
+  - m_Id: 7001
     m_Key: MysteryKey
     m_Metadata:
       m_Items: []
-  - m_Id: 6002
+  - m_Id: 7002
     m_Key: AncientScroll
     m_Metadata:
       m_Items: []
   - m_Id: 1006
     m_Key: Starglitter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1004
+    m_Key: AcquaintFate
     m_Metadata:
       m_Items: []
   m_Metadata:
