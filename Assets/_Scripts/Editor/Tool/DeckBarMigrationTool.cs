@@ -20,8 +20,7 @@ namespace GIC.Tool
     /// <summary>
     /// 卡组管理面板迁移工具（王者荣耀式，v3）：幂等，可重复执行。
     /// 1. 本地化：UIText 11000 段（Deck_* 键）+ PopupText 顺序续（提示文案）→ 三步法加键、五语言写值、CSV 重导出；
-    /// 2. 素材：rounded_chess_frame.png border=68（行选中高亮框）、Wish/UI/button.png border=37（米白胶囊底板）、
-    ///    dropdown_triangle.png（程序化生成▼，缺失时创建）；
+    /// 2. 素材：Wish/UI/button.png border=37（米白胶囊底板）、dropdown_triangle.png（程序化生成▼，缺失时创建）；
     /// 3. 场景 BackpackScreen.unity：
     ///    · DeckBar 长条按钮 = 原神"品质顺序"下拉条样式（米白胶囊 640×80 + 左侧粗深墨蓝文字 + 右侧▼）；
     ///    · Canvas 根下重建 DeckSwitchPanel：全屏遮罩 + medium_popup 面板 + 标题/关闭钮 + DragLayer（拖动行置顶层）+
@@ -39,7 +38,6 @@ namespace GIC.Tool
         private const string PillSpritePath = "Assets/Resources/UI/Wish/UI/button.png"; // 交易商城按钮底板（290×75 米白胶囊）
         private const string PanelBgSpritePath = "Assets/Resources/UI/Popup/medium_popup.png";
         private const string CloseSpritePath = "Assets/Resources/UI/Buttons/close_button.png";
-        private const string FrameSpritePath = "Assets/Resources/UI/Avatars/rounded_chess_frame.png";
         private const string RowPrefabPath = "Assets/Resources/Prefabs/Backpack/DeckRow.prefab";
         private const string InputPopupPrefabPath = "Assets/Resources/Prefabs/Popup/InputPopupDialog.prefab";
         private const string TriangleSpritePath = "Assets/Resources/UI/Backpack/dropdown_triangle.png"; // 程序化生成的▼实心三角
@@ -50,7 +48,7 @@ namespace GIC.Tool
         private static readonly Color DarkGrayText = new(0.196f, 0.196f, 0.196f, 1f); // 交易商城按钮文字色（采样自 WishScreen）
         private static readonly Color InkBlueText = new(0.236f, 0.290f, 0.361f, 1f);  // 原神下拉条文字色（#3C4A5C，采样自用户截图）
         private static readonly Color RowBgColor = new(0.10f, 0.12f, 0.18f, 0.92f);
-        private static readonly Color GoldAccent = new(1f, 0.84f, 0.43f, 0.95f);
+        private static readonly Color GoldAccent = new(0.75f, 0.62f, 0.32f, 1f); // 选中行整行金色实底（调暗版）
         private static readonly Color BackdropColor = new(0f, 0f, 0f, 0.55f);
         private static readonly Color DragOverlayColor = new(1f, 1f, 1f, 0.15f);
 
@@ -97,11 +95,12 @@ namespace GIC.Tool
             void Check()
             {
                 string flag = Path.Combine(Application.dataPath, "..", ".codely-cli", "tmp", "DeckBarMigration.run.flag");
-                if (File.Exists(flag))
-                {
-                    File.Delete(flag);
-                    RunAndReport();
-                }
+                if (!File.Exists(flag)) return;
+                // Play 模式守卫（2026-09-06 实证）：OpenScene 在 Play 中被引擎禁止——
+                // Play 期间不消费 flag，留到退场后的下一次刷新自愈（否则失败运行会吃掉 flag，永不重试）
+                if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+                File.Delete(flag);
+                RunAndReport();
             }
             EditorApplication.delayCall += Check;
             EditorApplication.projectChanged += () => EditorApplication.delayCall += Check;
@@ -279,8 +278,7 @@ namespace GIC.Tool
 
         private static void EnsureSpriteBorders(ref List<string> log)
         {
-            EnsureSpriteBorder(FrameSpritePath, new Vector4(68, 68, 68, 68), ref log);      // 行选中高亮框
-            EnsureSpriteBorder(PillSpritePath, new Vector4(37, 37, 37, 37), ref log);       // 交易商城式胶囊底板
+            EnsureSpriteBorder(PillSpritePath, new Vector4(37, 37, 37, 37), ref log);       // 米白胶囊底板（条/按钮）
         }
 
         /// <summary>长条按钮右侧的▼下拉三角（64×64 白色实心三角，颜色由 Image.color 染）；缺失时程序化生成，幂等</summary>
@@ -368,11 +366,10 @@ namespace GIC.Tool
                 var pillSprite = AssetDatabase.LoadAssetAtPath<Sprite>(PillSpritePath);
                 var panelBgSprite = AssetDatabase.LoadAssetAtPath<Sprite>(PanelBgSpritePath);
                 var closeSprite = AssetDatabase.LoadAssetAtPath<Sprite>(CloseSpritePath);
-                var frameSprite = AssetDatabase.LoadAssetAtPath<Sprite>(FrameSpritePath);
                 var inputPopupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(InputPopupPrefabPath);
-                if (font == null || pillSprite == null || panelBgSprite == null || closeSprite == null || frameSprite == null)
+                if (font == null || pillSprite == null || panelBgSprite == null || closeSprite == null)
                 {
-                    log.Add($"SCENE assets missing: font={font} pill={pillSprite} bg={panelBgSprite} close={closeSprite} frame={frameSprite}");
+                    log.Add($"SCENE assets missing: font={font} pill={pillSprite} bg={panelBgSprite} close={closeSprite}");
                     return;
                 }
 
@@ -449,6 +446,8 @@ namespace GIC.Tool
                 panelBgRt.anchorMin = panelBgRt.anchorMax = new Vector2(0.5f, 0.5f);
                 panelBgRt.sizeDelta = new Vector2(PanelW, PanelH);
                 panelBg.raycastTarget = true;
+                // 尺寸自适应组件（通用，Tool/Component/PanelFitToCanvas）：超宽屏画布垂直单位不足时收缩面板
+                panelBg.gameObject.AddComponent<GIC.Tool.PanelFitToCanvas>();
 
                 // 拖拽层：拖动中的行挂到这里（面板层级最顶 + 不受滚动遮罩影响），全屏铺开
                 var dragLayerGo = new GameObject("DragLayer", typeof(RectTransform));
@@ -485,7 +484,7 @@ namespace GIC.Tool
                 scrollRt.anchorMin = new Vector2(0, 0);
                 scrollRt.anchorMax = new Vector2(1, 1);
                 scrollRt.offsetMin = new Vector2(30, 150);   // 底部让位给[新增卡组][导入密语]
-                scrollRt.offsetMax = new Vector2(-30, -96); // 顶部让位给标题
+                scrollRt.offsetMax = new Vector2(-30, -140); // 顶部让位给标题+右上关闭按钮（按钮占 -40..-130，留 10px 缝）
                 var scrollRect = scrollGo.GetComponent<ScrollRect>();
                 scrollRect.horizontal = false;
                 scrollRect.vertical = true;
@@ -568,11 +567,12 @@ namespace GIC.Tool
                     new Vector2(260, 44), new Vector2(440, 88), 38, DarkGrayText);
 
                 // ── 3.3 行预制体（面板运行时按卡组数量实例化） ──
-                var rowPrefab = BuildRowPrefab(font, frameSprite, pillSprite, ref log);
+                var rowPrefab = BuildRowPrefab(font, pillSprite, ref log);
 
                 // ── 3.4 接线 ──
                 panelComp.screen = screen;
                 panelComp.canvasGroup = panelCanvas;
+                panelComp.panelFit = panelBg.GetComponent<GIC.Tool.PanelFitToCanvas>(); // 打开面板时 Apply() 收敛尺寸
                 panelComp.backdropButton = backdropBtn;
                 panelComp.closeButton = closeGo.GetComponent<Button>();
                 panelComp.rowsRoot = rowsRt;
@@ -608,7 +608,7 @@ namespace GIC.Tool
         // ─────────── 行预制体构建 ───────────
 
         /// <summary>构建 DeckRow.prefab（幂等：已存在则删除重建，引用在本运行内重接）</summary>
-        private static GameObject BuildRowPrefab(TMP_FontAsset font, Sprite frameSprite, Sprite pillSprite, ref List<string> log)
+        private static GameObject BuildRowPrefab(TMP_FontAsset font, Sprite pillSprite, ref List<string> log)
         {
             if (AssetDatabase.LoadAssetAtPath<GameObject>(RowPrefabPath) != null)
             {
@@ -627,10 +627,9 @@ namespace GIC.Tool
             Stretch(bg.rectTransform);
             view.rowBackground = bg;
 
-            // 当前卡组高亮框（默认隐藏，运行时 SetCurrent 切换）
-            var hi = MakeImage("CurrentHighlight", rowGo.transform, frameSprite, Image.Type.Sliced, GoldAccent, 0.32f);
+            // 当前卡组高亮（整行金色实底，默认隐藏，运行时 SetCurrent 切换；与行同界铺满）
+            var hi = MakeImage("CurrentHighlight", rowGo.transform, null, Image.Type.Simple, GoldAccent);
             Stretch(hi.rectTransform);
-            hi.rectTransform.sizeDelta = new Vector2(14, 14);
             hi.raycastTarget = false;
             hi.gameObject.SetActive(false);
             view.currentHighlight = hi;

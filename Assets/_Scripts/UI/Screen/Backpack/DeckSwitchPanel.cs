@@ -33,6 +33,7 @@ namespace GIC.UI
         [InspectorName("滚动条")] public Scrollbar scrollbar;
         [InspectorName("行预制体")] public DeckRowView rowPrefab;
         [InspectorName("拖拽层（拖动中的行挂载到这，永远显示在最顶层）")] public RectTransform dragLayer;
+        [InspectorName("面板尺寸自适应组件（挂在面板主体上）")] public PanelFitToCanvas panelFit;
         [InspectorName("新增卡组按钮")] public Button addDeckButton;
         [InspectorName("导入密语按钮")] public Button importButton;
         [InspectorName("输入弹窗预制体")] public InputPopupDialog inputPopupPrefab;
@@ -132,6 +133,7 @@ namespace GIC.UI
             _open = true;
 
             gameObject.SetActive(true);
+            panelFit?.Apply(); // 分辨率可能变化：每次打开按当前画布空间收敛尺寸
             RefreshAllRows();
             PlayRowsEntrance();
 
