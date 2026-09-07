@@ -51,8 +51,11 @@ namespace GIC.UI
                 float shake = 6f;
                 starglitterProgressFill.anchoredPosition = basePos + new Vector2(
                     Random.Range(-shake, shake), Random.Range(-shake, shake));
-                float hue = (elapsed * 2f) % 1f;
-                starglitterProgressFill.GetComponent<Image>().color = Color.HSVToRGB(hue, 0.85f, 1f);
+                // 按下一发线型取色（可预判将消耗哪种命运之缘）：纠缠粉 / 相遇金，向白色呼吸振荡
+                bool intertwined = _flow != null && _flow.UpcomingLineType == WishLineType.Intertwined;
+                Color baseColor = intertwined ? intertwinedLineColor : encounterLineColor;
+                float pulse = 0.5f + 0.5f * Mathf.Sin(elapsed * 3f);
+                starglitterProgressFill.GetComponent<Image>().color = Color.Lerp(baseColor, Color.white, pulse * 0.35f);
                 yield return null;
             }
         }

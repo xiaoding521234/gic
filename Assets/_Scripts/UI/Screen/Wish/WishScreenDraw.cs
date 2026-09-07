@@ -49,15 +49,29 @@ namespace GIC.UI
                 wish10Button.onClick.AddListener(() => StartDraw(10));
 
             if (drawController != null)
+            {
                 drawController.OnWishComplete += UpdateFateCount;
+                drawController.OnShotPlanned += OnShotPlannedForAmbience;
+            }
 
             UpdateFateCount();
+        }
+
+        /// <summary>纠缠之线射击瞬间：氛围粒子粉色脉冲（"粉色风暴"全场反馈，比相遇更强烈）</summary>
+        private void OnShotPlannedForAmbience(WishShotResult result)
+        {
+            if (result == null || result.lineType != WishLineType.Intertwined) return;
+            if (ambience != null)
+                ambience.PulseElementColor(drawController.IntertwinedLineColor, 0.9f);
         }
 
         protected override void OnDestroy()
         {
             if (drawController != null)
+            {
                 drawController.OnWishComplete -= UpdateFateCount;
+                drawController.OnShotPlanned -= OnShotPlannedForAmbience;
+            }
 
             // 基类收尾：注销可关闭 + PopAll 输入锁 + 音乐 pop 兜底（UnsubscribeOwner 此前无订阅）
             base.OnDestroy();

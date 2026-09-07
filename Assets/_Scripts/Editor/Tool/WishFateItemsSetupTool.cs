@@ -16,7 +16,7 @@ namespace GIC.Tool
     /// ① ItemConfig.asset：纠缠之缘(1002) countPerServing 10→1；新增相遇之缘(1004) 条目
     ///    （镜像纠缠之缘配置，icon=acquaint_fate.png，countPerServing=1）；
     ///    星辉/相遇之缘/纠缠之缘 maxPrepareCount=0（不可入卡组，2026-09-06 拍板）；
-    /// ② 所有 WishPoolConfig：纠缠之线升级权重落盘（必升 1-4 次 = 40/30/20/10，2026-09-06 拍板差异化）；
+    /// ② 所有 WishPoolConfig：纠缠之线升级权重落盘（必升 1-4 次 = 10/40/40/10，2026-09-07 拍板调整）；
     /// ③ ItemName/ItemDescription 本地化表补 AcquaintFate 键（Id 对齐枚举值 1004，走 AddKey→RemapId 三步绕行）；
     /// ④ 遗留 Id 错位全链归位（docs/14 §28，RemapId+语言表搬家三步法）；
     /// ⑤ 语言表标准值校对修复（WishFateCanonicalValues，源自 git 1129959）；
@@ -151,10 +151,10 @@ namespace GIC.Tool
             }
         }
 
-        // ── ② 纠缠之线升级权重落盘（2026-09-06 拍板：必升 1-4 次 = 40/30/20/10） ──
+        // ── ② 纠缠之线升级权重落盘（必升 1-4 次 = 10/40/40/10，2026-09-07 拍板） ──
 
         /// <summary>把纠缠之线升级权重显式写入所有 WishPoolConfig 资产
-        /// （新字段反序列化本就取代码默认 40/30/20/10，此步为把值固化进 YAML——Inspector 可见可改、不随代码默认漂移）</summary>
+        /// （新字段反序列化本就取代码默认 10/40/40/10，此步为把值固化进 YAML——Inspector 可见可改、不随代码默认漂移）</summary>
         private static void SetupIntertwinedWeights(StringBuilder sb)
         {
             foreach (var guid in AssetDatabase.FindAssets("t:WishPoolConfig"))
@@ -164,16 +164,16 @@ namespace GIC.Tool
                 if (pool == null) continue;
 
                 bool changed = false;
-                if (pool.intertwinedUpgrade1Weight != 40f) { pool.intertwinedUpgrade1Weight = 40f; changed = true; }
-                if (pool.intertwinedUpgrade2Weight != 30f) { pool.intertwinedUpgrade2Weight = 30f; changed = true; }
-                if (pool.intertwinedUpgrade3Weight != 20f) { pool.intertwinedUpgrade3Weight = 20f; changed = true; }
+                if (pool.intertwinedUpgrade1Weight != 10f) { pool.intertwinedUpgrade1Weight = 10f; changed = true; }
+                if (pool.intertwinedUpgrade2Weight != 40f) { pool.intertwinedUpgrade2Weight = 40f; changed = true; }
+                if (pool.intertwinedUpgrade3Weight != 40f) { pool.intertwinedUpgrade3Weight = 40f; changed = true; }
                 if (pool.intertwinedUpgrade4Weight != 10f) { pool.intertwinedUpgrade4Weight = 10f; changed = true; }
 
                 // 无论是否改值都 SetDirty：首次运行把新字段序列化进 YAML
                 EditorUtility.SetDirty(pool);
                 sb.AppendLine(changed
-                    ? $"WishPool '{pool.poolName}' ({path}): intertwined weights set 40/30/20/10"
-                    : $"WishPool '{pool.poolName}' ({path}): intertwined weights already 40/30/20/10 (serialized)");
+                    ? $"WishPool '{pool.poolName}' ({path}): intertwined weights set 10/40/40/10"
+                    : $"WishPool '{pool.poolName}' ({path}): intertwined weights already 10/40/40/10 (serialized)");
             }
         }
 

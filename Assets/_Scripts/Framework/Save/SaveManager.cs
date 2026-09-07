@@ -353,6 +353,14 @@ namespace GIC.Framework
                 save.AddOwnedItem(card);
             }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // 开发测试物资（2026-09-07）：仅编辑器/开发构建建档发放，正式版编译剔除——新档命运之缘 0/0 拍板不受影响。
+            // 必须走 AddItemCount（合并语义）：initialItems 里命运之缘已有 0 值占位条目，用 AddOwnedItem 会追加双条目
+            // 而 GetItemCount 只读首条（0），发放会被白吞。
+            foreach (var entry in initialSaveConfig.devTestItems)
+                save.AddItemCount(entry.item, entry.count);
+#endif
+
             save.progress.currentDeck = initialSaveConfig.defaultDeck;
         }
 

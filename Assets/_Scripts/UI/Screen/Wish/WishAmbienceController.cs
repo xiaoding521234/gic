@@ -22,6 +22,11 @@ namespace GIC.UI
         private ParticleSystem.Particle[] _particleBuffer = new ParticleSystem.Particle[128];
         private Coroutine _speedBoostCoroutine;
 
+        // 当前元素色缓存（SetElementColor 时记录；粉色脉冲结束/中断时还原用）
+        private Color _elementColor;
+        private bool _hasElementColor;
+        private Coroutine _colorPulseCoroutine;
+
         // 缓存原始速度（只在首次加速时记录，避免连续切换累积）
         private float _origVelXMin, _origVelXMax, _origVelYMin, _origVelYMax;
         private float _origEmissionRate;
@@ -41,6 +46,14 @@ namespace GIC.UI
         private void OnDisable()
         {
             StopAmbience();
+            // 粉色脉冲中断兜底：防止禁用后粒子色滞留为粉色
+            if (_colorPulseCoroutine != null)
+            {
+                StopCoroutine(_colorPulseCoroutine);
+                _colorPulseCoroutine = null;
+                if (_hasElementColor)
+                    ApplyElementColor(_elementColor);
+            }
         }
 
         public void StartAmbience()
@@ -113,16 +126,48 @@ namespace GIC.UI
         /// </summary>
         public void SetElementColor(Color color)
         {
-            if (elementParticles != null)
+            _elementColor = color;
+            _hasElementColor = true;
+            if (_colorPulseCoroutine != null)
             {
-                var main = elementParticles.main;
-                main.startColor = color;
-
-                int count = elementParticles.GetParticles(_particleBuffer);
-                for (int i = 0; i < count; i++)
-                    _particleBuffer[i].startColor = color;
-                elementParticles.SetParticles(_particleBuffer, count);
+                // 脉冲进行中切元素色：终止脉冲，直接采用新色（防脉冲结束时把旧色盖回来）
+                StopCoroutine(_colorPulseCoroutine);
+                _colorPulseCoroutine = null;
             }
+            ApplyElementColor(color);
+        }
+
+        /// <summary>把颜色写入粒子系统（startColor + 已存活粒子）</summary>
+        private void ApplyElementColor(Color color)
+        {
+            if (elementParticles == null) return;
+            var main = elementParticles.main;
+            main.startColor = color;
+
+            int count = elementParticles.GetParticles(_particleBuffer);
+            for (int i = 0; i < count; i++)
+                _particleBuffer[i].startColor = color;
+            elementParticles.SetParticles(_particleBuffer, count);
+        }
+
+        /// <summary>
+        /// 纠缠之线射击瞬间：元素粒子临时变粉色并加速席卷，holdSeconds 后还原为当前元素色
+        /// （祈愿"粉色风暴"氛围脉冲——比相遇之线更强烈的全场反馈）
+        /// </summary>
+        public void PulseElementColor(Color tempColor, float holdSeconds)
+        {
+            if (elementParticles == null) return;
+            BoostElementSpeed(2.5f, holdSeconds);
+            if (_colorPulseCoroutine != null) StopCoroutine(_colorPulseCoroutine);
+            _colorPulseCoroutine = StartCoroutine(ColorPulseRoutine(tempColor, holdSeconds));
+        }
+
+        private IEnumerator ColorPulseRoutine(Color tempColor, float holdSeconds)
+        {
+            ApplyElementColor(tempColor);
+            yield return Wait.Seconds(holdSeconds);
+            ApplyElementColor(_hasElementColor ? _elementColor : tempColor);
+            _colorPulseCoroutine = null;
         }
 
         /// <summary>

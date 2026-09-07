@@ -790,6 +790,16 @@ MonoBehaviour:
     m_Localized: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C"
     m_Metadata:
       m_Items: []
+  - m_Id: 9063
+    m_Localized: Paimon takes out an Intertwined Fate! Shot {0} will use the Intertwined
+      Line - it always upgrades!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9064
+    m_Localized: The Traveler takes out an Intertwined Fate! Shot {0} will use the
+      Intertwined Line - so exciting!
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -6,26 +6,30 @@ using GIC.Data;
 namespace GIC.UI
 {
     /// <summary>
-    /// 相遇之线 — 卡片抖动+发光动画（纯表现层）
+    /// 相遇之线/纠缠之线 — 卡片抖动+发光动画（纯表现层）
     /// 业务逻辑已在 WishFlowController.PlanShot 中预计算。
+    /// 2026-09-07 拍板：纠缠之线不改变相遇的抖动发光表现（同款金色+基础强度），
+    /// 差异化一律走"叠加"特效（瞄准期圆环风暴/暗幕等，见 WishDrawController.Effects.cs）。
     /// </summary>
     public partial class WishDrawController
     {
         /// <summary>
         /// 卡片抖动+越来越亮动画
-        /// 每个星级阶段有独立的正弦波，幅度和持续时间都随星级递增
+        /// 每个星级阶段独立持续时间，幅度和持续时间都随星级递增
         /// 通过预制体上的 glowImage（Additive材质）控制亮度，不修改原始 Image 颜色
         /// </summary>
-        private IEnumerator CardShakeGlowCoroutine(RectTransform rect, Image glowImage, int startStarLevel, int upgradeCount, float baseDuration)
+        private IEnumerator CardShakeGlowCoroutine(RectTransform rect, Image glowImage, int startStarLevel, int upgradeCount)
         {
             Vector2 basePos = rect.anchoredPosition;
+
+            Color glowColor = StarVisualConfig.EncounterGlowColor;
 
             float[] phaseDurations = new float[upgradeCount + 1];
             float totalDuration = 0f;
             for (int i = 0; i <= upgradeCount; i++)
             {
                 int star = Mathf.Clamp(startStarLevel + i, 1, 5);
-                phaseDurations[i] = baseDuration * (1f + (star - 1) * 0.3f);
+                phaseDurations[i] = StarVisualConfig.GetShakeDuration(star);
                 totalDuration += phaseDurations[i];
             }
 
@@ -72,7 +76,7 @@ namespace GIC.UI
                     float maxGlow = StarVisualConfig.GetMaxGlow(currentStar);
                     float glowT = t * t * (3f - 2f * t);
                     float alpha = Mathf.Clamp01(maxGlow * glowT);
-                    glowImage.color = new Color(StarVisualConfig.EncounterGlowColor.r, StarVisualConfig.EncounterGlowColor.g, StarVisualConfig.EncounterGlowColor.b, alpha);
+                    glowImage.color = new Color(glowColor.r, glowColor.g, glowColor.b, alpha);
                 }
 
                 yield return null;

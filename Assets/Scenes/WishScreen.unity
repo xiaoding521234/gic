@@ -9293,6 +9293,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cardPrefab: {fileID: 213453043530044941, guid: 4c805fb2252b3134b955390474719163, type: 3}
+  autoClickWindowSec: {x: 0.4, y: 1.35}
   drawRoot: {fileID: 1514311380}
   cardTrack: {fileID: 1439918350}
   cardSpawnPoint: {fileID: 993463185}
@@ -9310,6 +9311,7 @@ MonoBehaviour:
   fateLineThickness: 3
   fateLineColor: {r: 1, g: 1, b: 1, a: 1}
   clickTimeLimit: 1.5
+  intertwinedShotTimeLimit: 12
   resultCardSize: 80
   resultCardSpacing: 10
   holdCardSize: 280
@@ -9322,6 +9324,20 @@ MonoBehaviour:
   starglitterProgressBar: {fileID: 3313136}
   starglitterProgressFill: {fileID: 1945638560}
   encounterLineColor: {r: 1, g: 0.85, b: 0.3, a: 1}
+  intertwinedLineColor: {r: 1, g: 0.45, b: 0.72, a: 1}
+  intertwinedLineThicknessMultiplier: 2.5
+  intertwinedLineDuration: 0.3
+  intertwinedFlashAlpha: 0.3
+  ringSpawnIntervalStart: 0.55
+  ringSpawnIntervalPeak: 0.12
+  ringRampSeconds: 3
+  ringStartSize: 140
+  ringEndSize: 2200
+  ringLifetime: 1.5
+  ringPeakAlpha: 0.6
+  ringSpinSpeed: 240
+  ringTintColor: {r: 1, g: 1, b: 1, a: 1}
+  intertwinedVeilAlpha: 0.5
 --- !u!1 &1055573043
 GameObject:
   m_ObjectHideFlags: 0

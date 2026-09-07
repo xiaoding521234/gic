@@ -39,10 +39,10 @@ namespace GIC.Data
         public float upgrade3Weight = 7f;
         public float upgrade4Weight = 3f;
 
-        [Header("纠缠之线升级权重（2026-09-06 拍板：必升 1-4 次，无 0 次档）")]
-        [InspectorName("升1次权重")] public float intertwinedUpgrade1Weight = 40f;
-        [InspectorName("升2次权重")] public float intertwinedUpgrade2Weight = 30f;
-        [InspectorName("升3次权重")] public float intertwinedUpgrade3Weight = 20f;
+        [Header("纠缠之线升级权重（必升 1-4 次，无 0 次档；权重 10/40/40/10 @2026-09-07 拍板）")]
+        [InspectorName("升1次权重")] public float intertwinedUpgrade1Weight = 10f;
+        [InspectorName("升2次权重")] public float intertwinedUpgrade2Weight = 40f;
+        [InspectorName("升3次权重")] public float intertwinedUpgrade3Weight = 40f;
         [InspectorName("升4次权重")] public float intertwinedUpgrade4Weight = 10f;
 
         /// <summary>

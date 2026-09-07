@@ -42,6 +42,21 @@ namespace GIC.Data
         [InspectorName("物品条目")]
         public List<ItemEntry> initialItems = new List<ItemEntry>();
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>开发测试物资条目 — 只发数量、不入卡组（测试便利用，正式版整块编译剔除）</summary>
+        [Serializable]
+        public class DevTestItemEntry
+        {
+            public ItemName item = ItemName.Mora;
+            [Min(0)] public int count = 1;
+        }
+
+        [Header("开发测试（仅编辑器/开发构建生效）")]
+        [Tooltip("仅 UNITY_EDITOR/DEVELOPMENT_BUILD 建档时额外发放的测试物资（AddItemCount 合并语义）；正式版编译整块剔除，正式拍板（如命运之缘新档 0/0）不受影响。只发数量不入卡组。测试物资写这里，勿写进上面的正式条目。")]
+        [InspectorName("开发测试物品")]
+        public List<DevTestItemEntry> devTestItems = new List<DevTestItemEntry>();
+#endif
+
         [Header("默认卡组")]
         [InspectorName("初始选中的卡组")]
         public int defaultDeck = 1;

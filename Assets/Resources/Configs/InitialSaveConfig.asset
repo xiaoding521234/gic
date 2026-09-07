@@ -80,4 +80,9 @@ MonoBehaviour:
   - item: 4005
     count: 10
     decks: 
+  devTestItems:
+  - item: 1002
+    count: 10
+  - item: 1004
+    count: 10
   defaultDeck: 1

@@ -18,6 +18,8 @@ namespace GIC.Pet.Chat
     /// 反应规则（阈值与动作在此一处定义，两形态共享）：
     /// - 5★（金）：Clap01 拍手庆祝；4★（紫）：Show_1 得意展示
     /// - 连续 ≤2★ 烂卡达 5/9 张：ShakeHead01 失望摇头（3★ 中性重置连击）
+    /// - 纠缠之线瞄准开始：Domagic 施法动作+话语（OnIntertwinedAimStart，2026-09-07 拍板；
+    ///   与 WishDrawController 自动模式的"纠缠仪式 AI 多等 4 秒"配套——反应在瞄准前段播完再开火）
     /// - 结算：有金 Show_2 / 有紫无金 Nod01 / 全烂 Sneer01，附 LLM 注记（下次对话可引用结果）
     /// </summary>
     public class PetWishAutoRunner : MonoBehaviour
@@ -157,6 +159,7 @@ namespace GIC.Pet.Chat
             _completed = false;
             _watch.OnShotPlanned += HandleShot;
             _watch.OnWishComplete += HandleComplete;
+            _watch.OnIntertwinedAimStart += HandleIntertwinedAim;
 
             Reaction(AnimMagic, $"你刚开始帮旅行者抽卡（共{count}发）", "PetWishStart", count);
 
@@ -203,6 +206,12 @@ namespace GIC.Pet.Chat
             }
         }
 
+        /// <summary>纠缠之线瞄准开始（第 shotNo 发）：施法动作+话语——多等 4 秒的仪式前段播完再开火</summary>
+        void HandleIntertwinedAim(int shotNo)
+        {
+            Reaction(AnimMagic, $"你拿出了纠缠之缘，第{shotNo}发将用纠缠之线瞄准——这是必升1-4级的珍贵之线", "PetWishIntertwinedAim", shotNo);
+        }
+
         void HandleComplete()
         {
             _completed = true;
@@ -236,6 +245,7 @@ namespace GIC.Pet.Chat
             {
                 _watch.OnShotPlanned -= HandleShot;
                 _watch.OnWishComplete -= HandleComplete;
+                _watch.OnIntertwinedAimStart -= HandleIntertwinedAim;
                 _watch = null;
             }
         }

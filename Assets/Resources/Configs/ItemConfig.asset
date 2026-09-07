@@ -13,38 +13,24 @@ MonoBehaviour:
   m_Name: ItemConfig
   m_EditorClassIdentifier: 
   itemDataList:
-  - itemID: 1001
+  - itemID: 1005
     icon:
-    - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
-    starLevel: 2
+    - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
+    starLevel: 5
     elements:
-    - elementType: 7
+    - elementType: 8
       stacks: 1
     subType: 0
     maxStack: 9999
     maxPrepareCount: 100
     countPerServing: 10
     recycleAfterBattle: 1
-    recycleLossCount: 60
-    customParams: []
-  - itemID: 1006
-    icon:
-    - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
-    starLevel: 3
-    elements:
-    - elementType: 8
-      stacks: 1
-    subType: 0
-    maxStack: 9999
-    maxPrepareCount: 0
-    countPerServing: 1
-    recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
   - itemID: 1002
     icon:
     - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
-    starLevel: 4
+    starLevel: 5
     elements:
     - elementType: 5
       stacks: 1
@@ -53,7 +39,7 @@ MonoBehaviour:
     maxPrepareCount: 0
     countPerServing: 1
     recycleAfterBattle: 1
-    recycleLossCount: 60
+    recycleLossCount: 0
     customParams: []
   - itemID: 1004
     icon:
@@ -67,7 +53,7 @@ MonoBehaviour:
     maxPrepareCount: 0
     countPerServing: 1
     recycleAfterBattle: 1
-    recycleLossCount: 60
+    recycleLossCount: 0
     customParams: []
   - itemID: 1003
     icon:
@@ -83,19 +69,33 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
-  - itemID: 1005
+  - itemID: 1006
     icon:
-    - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
-    starLevel: 5
+    - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
+    starLevel: 3
     elements:
     - elementType: 8
+      stacks: 1
+    subType: 0
+    maxStack: 9999
+    maxPrepareCount: 0
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+  - itemID: 1001
+    icon:
+    - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
+    starLevel: 2
+    elements:
+    - elementType: 7
       stacks: 1
     subType: 0
     maxStack: 9999
     maxPrepareCount: 100
     countPerServing: 10
     recycleAfterBattle: 1
-    recycleLossCount: 0
+    recycleLossCount: 60
     customParams: []
   - itemID: 3001
     icon:

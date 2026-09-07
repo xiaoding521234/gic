@@ -25,6 +25,11 @@ namespace GIC.UI
         /// 派蒙反应监听用（AI 代抽=PetWishAutoRunner；玩家手抽=PetWishPlayerObserver）</summary>
         public event Action<WishShotResult> OnShotPlanned;
 
+        /// <summary>纠缠之线瞄准期开始回调（参数=1-based 即将射击的发数；在瞄准首帧而非 StartWish
+        /// 同步触发——订阅方 PetWishAutoRunner/PetWishPlayerObserver 都在 StartWish 返回后才挂上）——
+        /// 派蒙瞄准反应监听用（AI 代抽=多等 4 秒+动作+说话；玩家手抽=动作+说话，2026-09-07 拍板）</summary>
+        public event Action<int> OnIntertwinedAimStart;
+
         /// <summary>本轮抽卡是否 AI 自动抽卡（PetWishPlayerObserver 据此区分"玩家自己抽"与
         /// "派蒙代抽"——只对玩家手抽做反应，AI 抽的反应由 PetWishAutoRunner 负责，防串场）</summary>
         public bool IsAutoDraw => _autoShoot;
@@ -36,6 +41,10 @@ namespace GIC.UI
         [Tooltip("随机点击窗口（秒）：自动模式下每发在倒计时内随机时刻'手点'开枪（模拟玩家节奏，不卡点倒计时归零）。窗口须小于倒计时秒；超界时倒计时归零兜底")]
         [InspectorName("随机点击窗口秒")]
         [SerializeField] private Vector2 autoClickWindowSec = new Vector2(0.4f, 1.35f);
+
+        [Tooltip("纠缠之线射击时自动模式的额外等待秒（2026-09-07 拍板：AI 在 12 秒瞄准仪式上多等 4 秒——给圆环风暴与派蒙瞄准反应留时间，随机点击窗口整体后移，仍钳在射击时限内）")]
+        [InspectorName("纠缠仪式AI多等秒")]
+        [SerializeField] private float intertwinedAutoExtraWaitSec = 4f;
 
         [Header("场景 UI 引用")]
         [SerializeField] private GameObject drawRoot;
@@ -93,8 +102,64 @@ namespace GIC.UI
         [Header("纠缠之线")]
         [SerializeField] private Color intertwinedLineColor = new Color(1f, 0.45f, 0.72f, 1f);
 
+        [Tooltip("纠缠之线射击线加厚倍率（主线粗细 = 命运之线厚度 × 此值）")]
+        [InspectorName("纠缠之线加厚倍率")]
+        [SerializeField] private float intertwinedLineThicknessMultiplier = 2.5f;
+
+        [Tooltip("纠缠之线飞行时长秒（相遇/普通为 0.2s；纠缠更慢更重）")]
+        [InspectorName("纠缠之线飞行时长秒")]
+        [SerializeField] private float intertwinedLineDuration = 0.3f;
+
+        [Tooltip("纠缠开火全屏粉闪的峰值 alpha（0 = 关闭粉闪）")]
+        [InspectorName("纠缠开火粉闪峰值")]
+        [SerializeField] private float intertwinedFlashAlpha = 0.3f;
+
+        [Header("纠缠圆环风暴（瞄准仪式）")]
+        [Tooltip("圆环生成起始间隔秒（频率从起始间隔线性爬到峰值间隔）")]
+        [InspectorName("环起始生成间隔秒")]
+        [SerializeField] private float ringSpawnIntervalStart = 0.55f;
+
+        [Tooltip("圆环生成峰值间隔秒（爬升结束后保持此频率直到开火）")]
+        [InspectorName("环峰值生成间隔秒")]
+        [SerializeField] private float ringSpawnIntervalPeak = 0.12f;
+
+        [Tooltip("生成频率从起始爬到峰值所需秒数（拍板：3 秒达到最高）")]
+        [InspectorName("频率爬升秒数")]
+        [SerializeField] private float ringRampSeconds = 3f;
+
+        [Tooltip("圆环出生尺寸（px）")]
+        [InspectorName("环起始尺寸")]
+        [SerializeField] private float ringStartSize = 140f;
+
+        [Tooltip("圆环扩散到最大尺寸（px，超屏幕制造冲击感）")]
+        [InspectorName("环最终尺寸")]
+        [SerializeField] private float ringEndSize = 2200f;
+
+        [Tooltip("单个圆环从出生到消失的秒数")]
+        [InspectorName("环生命周期秒")]
+        [SerializeField] private float ringLifetime = 1.5f;
+
+        [Tooltip("圆环最高不透明度")]
+        [InspectorName("环峰值透明度")]
+        [SerializeField] private float ringPeakAlpha = 0.6f;
+
+        [Tooltip("环自旋基础速度（度/秒）；每个环随机顺/逆时针、速度 ±30%")]
+        [InspectorName("环自旋速度")]
+        [SerializeField] private float ringSpinSpeed = 240f;
+
+        [Tooltip("圆环染色（乘在素材色上；白=显示素材原色）")]
+        [InspectorName("环染色")]
+        [SerializeField] private Color ringTintColor = Color.white;
+
+        [Tooltip("纠缠瞄准期全屏暗幕 alpha：压暗背景凸显圆环（背景图偏亮，纯加色环会被洗白）；0=关闭暗幕")]
+        [InspectorName("瞄准暗幕强度")]
+        [SerializeField] private float intertwinedVeilAlpha = 0.5f;
+
         /// <summary>抽卡流程是否进行中（供 StartDraw 防重入检查）</summary>
         public bool IsWishInProgress => _isWishActive;
+
+        /// <summary>纠缠之线颜色（氛围粒子脉冲等外部表现取色用）</summary>
+        public Color IntertwinedLineColor => intertwinedLineColor;
 
         #region runtimeState
 
@@ -104,6 +169,7 @@ namespace GIC.UI
         private bool _isWishActive;
         private bool _autoShoot;       // AI 自动抽卡模式：倒计时内随机时刻自动开枪（随 StartWish 参数重置）
         private float _nextAutoClickElapsed; // 本发的随机"点击"时刻（倒计时已流逝秒数；每发重掷）
+        private bool _pendingIntertwinedAimAnnounce; // 纠缠瞄准事件待发标记（InputCoroutine 首帧/冷却次帧发出）
 
         protected List<WishTrackCard> _activeCards = new();
 
@@ -126,6 +192,10 @@ namespace GIC.UI
 
         // 屏幕边缘泛光
         protected ScreenEdgeGlow _edgeGlow;
+
+        // 倒计时条原色缓存（纠缠瞄准期染粉，恢复用）
+        protected Color _originalCountdownColor;
+        protected bool _hasOriginalCountdownColor;
 
         [Autowired] private InputManager _inputManager;
 
@@ -160,6 +230,8 @@ namespace GIC.UI
             Wargame.Instance?.Context?.Inject(this); // 容器已就绪，Awake 注入
             if (drawRoot != null) drawRoot.SetActive(false);
             CreateEdgeGlow();
+            CreateIntertwinedFlash();
+            CreateIntertwinedCeremonyOverlays();
             CreateStar5VideoOverlay();
         }
 
@@ -223,7 +295,14 @@ namespace GIC.UI
             _currentTimer = GetCurrentShotTimeLimit();
             _isInCooldown = false;
             _cooldownTimer = 0f;
+            _pendingIntertwinedAimAnnounce = false; // 上一轮中止可能残留待发标记
             RollAutoClickDelay(); // 自动模式第一发的随机"点击"时刻
+            UpdateCountdownTint();
+            if (_flow.UpcomingLineType == WishLineType.Intertwined)
+            {
+                StartIntertwinedCeremony();
+                _pendingIntertwinedAimAnnounce = true; // 由 InputCoroutine 首帧发事件（订阅方此刻未挂上）
+            }
 
             UpdateStarglitterProgressBar();
 
@@ -254,11 +333,25 @@ namespace GIC.UI
                             _isInCooldown = false;
                             _currentTimer = GetCurrentShotTimeLimit(); // 纠缠之线 12 秒，其余常规时限
                             RollAutoClickDelay(); // 下一发的随机"点击"时刻
+                            UpdateCountdownTint();
+                            if (_flow.UpcomingLineType == WishLineType.Intertwined)
+                            {
+                                StartIntertwinedCeremony();
+                                _pendingIntertwinedAimAnnounce = true; // 次发瞄准开始：下一帧发事件
+                            }
                         }
                     }
                 }
                 else
                 {
+                    // 纠缠瞄准事件：延到本协程首帧/冷却结束次帧发——订阅方（AutoRunner/PlayerObserver）
+                    // 都在 StartWish 返回后才挂订阅，StartWish 里同步发会漏掉第一发
+                    if (_pendingIntertwinedAimAnnounce)
+                    {
+                        _pendingIntertwinedAimAnnounce = false;
+                        OnIntertwinedAimStart?.Invoke(_flow.ShotsCompleted + 1);
+                    }
+
                     _currentTimer -= Time.deltaTime;
                     UpdateCountdownBar(_currentTimer / GetCurrentShotTimeLimit());
 
@@ -284,12 +377,16 @@ namespace GIC.UI
         }
 
         /// <summary>掷本发的随机"点击"时刻（自动模式）：模拟玩家在倒计时内随机时刻手点开枪，
-        /// 每发独立重掷——节奏不机械。窗口钳在 (0, 当前射击时限) 内防越界。</summary>
+        /// 每发独立重掷——节奏不机械。窗口钳在 (0, 当前射击时限) 内防越界。
+        /// 纠缠之线（12 秒仪式）：窗口整体后移"纠缠仪式AI多等秒"（2026-09-07 拍板 +4 秒）——
+        /// AI 看圆环风暴酝酿片刻再开火，也给派蒙瞄准反应留出播放时间。</summary>
         void RollAutoClickDelay()
         {
             float limit = GetCurrentShotTimeLimit();
-            float min = Mathf.Max(0.05f, Mathf.Min(autoClickWindowSec.x, autoClickWindowSec.y));
-            float max = Mathf.Min(Mathf.Max(autoClickWindowSec.x, autoClickWindowSec.y), limit - 0.05f);
+            float extra = _flow != null && _flow.UpcomingLineType == WishLineType.Intertwined
+                ? intertwinedAutoExtraWaitSec : 0f;
+            float min = Mathf.Max(0.05f, Mathf.Min(autoClickWindowSec.x, autoClickWindowSec.y)) + extra;
+            float max = Mathf.Min(Mathf.Max(autoClickWindowSec.x, autoClickWindowSec.y) + extra, limit - 0.05f);
             _nextAutoClickElapsed = max > min ? UnityEngine.Random.Range(min, max) : min;
         }
 
@@ -323,8 +420,15 @@ namespace GIC.UI
         {
             if (_isInCooldown || _flow.CurrentState != WishFlowController.State.Drawing) return;
 
+            // 纠缠瞄准仪式收尾：暗幕淡出、圆环停发（存活环自然播完淡出）
+            StopIntertwinedCeremony();
+
             if (shootSFX != null)
                 AudioManager.Instance?.PlaySFX(shootSFX, sfxVolume);
+
+            // 纠缠之线开火：全屏粉闪（比相遇更强烈的开场冲击）
+            if (_flow.UpcomingLineType == WishLineType.Intertwined)
+                PlayIntertwinedFlash();
 
             StartCoroutine(FateLineCoroutine(_flow.UpcomingLineType));
 
@@ -421,7 +525,7 @@ namespace GIC.UI
                     case WishRevealStep.StepType.EncounterShakeStart:
                         if (hasGlow) card.glowImage.gameObject.SetActive(true);
                         shakeGlow = StartCoroutine(CardShakeGlowCoroutine(
-                            rect, card.glowImage, step.baseStarLevel, step.upgradeCount, StarVisualConfig.ShakeBaseDuration));
+                            rect, card.glowImage, step.baseStarLevel, step.upgradeCount));
                         break;
 
                     case WishRevealStep.StepType.EncounterUpgrade:
@@ -432,7 +536,7 @@ namespace GIC.UI
                         if (step.cardData != null)
                             card.Init(step.cardData, null);
 
-                        // 特效
+                        // 特效（相遇/纠缠同款星级色表现——2026-09-07 拍板：纠缠差异化一律走叠加特效，不改此表现）
                         PlayCardHitEffects(step.starLevel, card);
 
                         // 星辉雨
@@ -447,7 +551,8 @@ namespace GIC.UI
                         if (shakeGlow != null) StopCoroutine(shakeGlow);
                         if (hasGlow && card.glowImage != null)
                         {
-                            card.glowImage.color = new Color(1f, 0.95f, 0.6f, 0f);
+                            var endGlowColor = StarVisualConfig.EncounterGlowColor;
+                            card.glowImage.color = new Color(endGlowColor.r, endGlowColor.g, endGlowColor.b, 0f);
                             card.glowImage.gameObject.SetActive(false);
                         }
                         // 恢复位置
@@ -519,6 +624,8 @@ namespace GIC.UI
             ClearStarglitterPool();
             CleanupStar5Video();
             CleanupFateLines();
+            CleanupIntertwinedFlash();
+            CleanupIntertwinedCeremony();
         }
 
         protected void StopHoldThenFlyCoroutines()

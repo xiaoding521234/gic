@@ -751,6 +751,14 @@ MonoBehaviour:
     m_Key: Deck_Delete
     m_Metadata:
       m_Items: []
+  - m_Id: 9063
+    m_Key: PetWishIntertwinedAim
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9064
+    m_Key: PetWishPlayerIntertwinedAim
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -61,6 +61,9 @@ namespace GIC.UI
         {
             if (!_musicPushed) return;
             _musicPushed = false;
+            // 拆除期 AudioManager（DontDestroyOnLoad）可能已被先销毁：Unity 假 null 用 == 判，
+            // 管理器已亡即无需恢复——防 OnDestroy 链路 StopCoroutine 抛 MissingReferenceException（2026-09-06，docs/14 §29）
+            if (AudioManager.Instance == null) return;
             if (_musicIsState)
                 AudioManager.Instance.PopMusicState();
             else

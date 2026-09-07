@@ -10,6 +10,8 @@ namespace GIC.Pet.Chat
     /// 的得意语气）；LLM 历史注记同步区分（之后问"我刚才手气怎么样"答得对得上）。
     /// 防串场：射击/完成事件里校验 IsAutoDraw——AI 代抽轮的反应归 PetWishAutoRunner，观察者跳过
     ///（同一控制器先玩家抽后代抽的少见序列也安全）。
+    /// 纠缠之线瞄准开始（OnIntertwinedAimStart，2026-09-07 拍板）：玩家手抽轮同样动作+话语
+    ///（描述以"旅行者拿出纠缠之缘"框架书写，与代抽的"你拿出"区分）。
     /// 挂接：WishScreen.StartDraw 玩家路径（TryStartAutoDraw 不挂——那是 AI 路径）。
     /// </summary>
     public static class PetWishPlayerObserver
@@ -29,6 +31,7 @@ namespace GIC.Pet.Chat
             _goldNames.Clear();
             controller.OnShotPlanned += HandleShot;
             controller.OnWishComplete += HandleComplete;
+            controller.OnIntertwinedAimStart += HandleIntertwinedAim;
         }
 
         static void Detach()
@@ -37,6 +40,7 @@ namespace GIC.Pet.Chat
             {
                 _watch.OnShotPlanned -= HandleShot;
                 _watch.OnWishComplete -= HandleComplete;
+                _watch.OnIntertwinedAimStart -= HandleIntertwinedAim;
                 _watch = null;
             }
         }
@@ -81,6 +85,17 @@ namespace GIC.Pet.Chat
             {
                 _badStreak = 0; // 3★ 中性：重置连击
             }
+        }
+
+        /// <summary>纠缠之线瞄准开始（第 shotNo 发）：玩家手抽轮同样动作+话语——
+        /// 描述以"旅行者拿出"框架书写（观赛语气，与代抽"你拿出"区分）</summary>
+        static void HandleIntertwinedAim(int shotNo)
+        {
+            if (_watch == null || _watch.IsAutoDraw) return; // AI 代抽轮：反应归 PetWishAutoRunner
+            PetReactionChannel.Push(
+                $"旅行者拿出了纠缠之缘，第{shotNo}发将用纠缠之线瞄准——必升1-4级的珍贵之线，气氛凝重",
+                PetWishAutoRunner.AnimMagic,
+                PetWishAutoRunner.Localize("PetWishPlayerIntertwinedAim", shotNo));
         }
 
         static void HandleComplete()

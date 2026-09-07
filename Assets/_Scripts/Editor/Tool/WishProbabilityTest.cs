@@ -295,7 +295,7 @@ namespace GIC.Editor
             }
 
             sb.AppendLine();
-            sb.AppendLine("─ 纠缠之线升级次数分布（必升 1-4 档权重表 40/30/20/10） ─");
+            sb.AppendLine("─ 纠缠之线升级次数分布（必升 1-4 档权重表 10/40/40/10） ─");
             for (int u = 4; u >= 1; u--)
             {
                 float pct = intertwinedShots > 0 ? intertwinedUpgradeDist[u] / (float)intertwinedShots * 100f : 0;

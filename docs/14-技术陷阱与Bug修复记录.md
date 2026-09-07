@@ -331,6 +331,37 @@ CSV 导入后检查 `SharedData.Entries` 中的 Id 是否与枚举值一致；�
 
 ---
 
+## 29. 拆除期 AudioManager 先亡：Screen OnDestroy 链路 Pop 音乐抛 MissingReferenceException（2026-09-06 WishScreen 实证）
+
+### 现象
+停止 Play Mode（或打包版退出应用）时恰停在祈愿界面，控制台报：
+```
+MissingReferenceException: The object of type 'AudioManager' has been destroyed ...
+  at UnityEngine.MonoBehaviour.StopCoroutine
+  at AudioManager.StopCurrentMusic() (AudioManager.Music.cs:118)
+  at AudioManager.PopMusicState() (AudioManager.MusicState.cs:144)
+  at ScreenBase.PopMusicSafe() (ScreenBase.cs:65)
+  at ScreenBase.OnDestroy() → WishScreen.OnDestroy()
+```
+**游玩全程声音正常**——纯退场拆除噪音，无功能损失。
+
+### 根因
+Unity 撤销对象的 OnDestroy 顺序**不保证**。`AudioManager` 是 DontDestroyOnLoad 场景单例，退场时它的原生对象可能先被销毁，而 WishScreen 的 OnDestroy 后跑；`ScreenBase.PopMusicSafe` 里的 `AudioManager.Instance` 是纯 C# 静态属性（Awake 注册、销毁后不清）——持有的是"Unity 假 null"包装（C# 层非 null），`Instance.Xxx()` 照常进方法体，直到 `StopCoroutine` 这类原生调用才炸。`?.` 与 `is null` 都防不住（只查 C# null，不走 Object 重载 ==）。
+
+### 修复（2026-09-06）
+`ScreenBase.PopMusicSafe` 在 `_musicPushed` 复位后加一行守卫：
+```csharp
+if (AudioManager.Instance == null) return;  // Unity 假 null 用 == 判（Object 重载）；管理器已亡即无需恢复
+```
+守卫放 Safe 层（ScreenBase）而非 AudioManager 内部：Safe 层本就是弹层 Screen 的生命周期防护收口，一处守卫覆盖全部继承 Screen（按 gic-audio 铁律禁止 Screen 直接调 Push/Pop，无第二条拆除期调用路径）。
+
+### 规范
+- **拆除期（OnDestroy）访问全局单例一律先 `Xxx.Instance == null` 守卫**（Unity 假 null 走 Object 重载 == 才判得死）；`?.` / `is null` / C# `== null` 全部无效
+- 单例被销毁后不再恢复场景（DontDestroyOnLoad 只死于应用退场），守卫处直接放弃恢复即可，无泄漏风险
+- 判"是不是 bug"先看时机：游玩中正常、仅停止/退出时炸 = 拆除顺序类噪音，修守卫而非修业务
+
+---
+
 ## D. 渲染 · Shader · 大地图图形
 
 ## 8. 3D 相机俯角陷阱（大地图 3D 化，2026-08-16）
