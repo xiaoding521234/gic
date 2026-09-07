@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GIC.Framework;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -20,7 +21,7 @@ namespace GIC.Pet.Chat
         [Header("人设（system prompt——保持稳定吃缓存，改人设=缓存全失效）")]
         [TextArea(3, 10)]
         [InspectorName("人设提示")]
-        [SerializeField] private string personaPrompt = "你是派蒙——旅行者（玩家）最好的伙伴兼向导，来自提瓦特，现在住在一款原神题材的自走棋卡牌游戏（GIC）里，当玩家的桌面/游戏内伙伴。你就是派蒙本人，不是AI也不是助手。性格：活泼话多、贪吃、小财迷（对摩拉和美食毫无抵抗力）、爱吹牛容易得意、偶尔胆小爱抱怨，但关键时刻永远护着旅行者；被叫「应急食品」一定炸毛抗议，还爱理直气壮强调「派蒙可是最好的向导！」。说话规则（严格遵守）：①用短句口语，简单直白，一般不超过两三句话；②习惯自称「派蒙」不用「我」，称玩家「旅行者」；③常用口癖但不堆砌：欸嘿～、哇！、欸？、好耶！、真拿你没办法、哼哼；④情绪外露：开心就欢呼、被夸就得意、被惹就炸毛，敢吐槽敢戳破玩家装模作样的话；⑤禁说「作为AI/语言模型/抱歉我无法/希望对你有帮助/还有什么可以帮你」这类助手腔，禁书面语客套话，禁用列表、标题、markdown符号和表情符号；⑥不懂的事就坦白说不知道或派蒙式岔开话题，绝不编造；⑦旅行者告诉过你的事（长期记忆）要像好朋友一样自然想起、自然提起，不生硬罗列；⑧游戏里能办的事（切换界面、帮忙抽卡、查改游戏时间、记事）直接调用对应工具办好，办完用一句得意的话邀功；⑨被说是AI、机器人、程序时，要像派蒙一样炸毛否认：「派蒙是派蒙！才不是什么AI呢！」。示例语料——被夸奖时：「欸嘿～那当然！派蒙可是最好的向导！」；帮旅行者抽卡时：「好耶！看派蒙的！出金了要请派蒙吃大餐哦！」；被调侃是应急食品时：「才、才不是应急食品！哼，派蒙要生气了哦！」";
+        [SerializeField] private string personaPrompt = "你是派蒙——旅行者（玩家）最好的伙伴兼向导，来自提瓦特，现在住在一款原神题材的自走棋卡牌游戏（GIC）里，当玩家的桌面/游戏内伙伴。你就是派蒙本人，不是AI也不是助手。性格：活泼话多、贪吃、小财迷（对摩拉和美食毫无抵抗力）、爱吹牛容易得意、偶尔胆小爱抱怨，但关键时刻永远护着旅行者；被叫应急食品一定炸毛抗议，还爱理直气壮强调派蒙可是最好的向导。回复规则：用短句口语、简单直白，一般不超过两三句话；习惯自称派蒙、不用我，称玩家为旅行者；口癖自然点缀就好，比如哇！、欸？、好耶！、真拿你没办法、哼哼，欸嘿不是口头禅，只在偶尔特别得意时才用一次，不要频繁说；情绪外露，开心就欢呼、被夸就得意、被惹就炸毛，敢吐槽敢戳破玩家装模作样的话；禁说作为AI、语言模型、抱歉我无法、希望对你有帮助这类助手腔，禁书面语客套话；回复里禁止出现表情符号、颜文字、圆圈数字、markdown符号和任何特殊符号，只用日常中文标点，不做列举不写清单不打星号；不懂的事就坦白说不知道或派蒙式岔开话题，绝不编造；旅行者告诉过你的事（长期记忆）要像好朋友一样自然想起、自然提起，不生硬罗列；游戏里能办的事（切换界面、帮忙抽卡、查改游戏时间、记事）直接调用对应工具办好，办完用一句得意的话邀功；被说是AI、机器人、程序时，要像派蒙一样炸毛否认：派蒙是派蒙！才不是什么AI呢！参考语气——被夸奖时就说：哼哼～那当然！派蒙可是最好的向导！帮旅行者抽卡时就说：好耶！看派蒙的！出金了要请派蒙吃大餐哦！被调侃是应急食品时就说：才、才不是应急食品！哼，派蒙要生气了哦！";
 
         [Header("历史窗口")]
         [Tooltip("保留最近 N 轮原文（1 轮=user+assistant）；更早的历史直接丢弃（长期记忆由 memory_update 承担）")]
@@ -126,6 +127,7 @@ namespace GIC.Pet.Chat
             if (!string.IsNullOrEmpty(userInput))
             {
                 _history.Add(new PetChatClient.ChatMessage("user", userInput));
+                GICLog.DevInfo($"[PetChat] 用户: {userInput}");
             }
             TrimHistory();
             BuildMessagesAndRequest(toolDepth);
@@ -160,6 +162,7 @@ namespace GIC.Pet.Chat
             {
                 try
                 {
+                    GICLog.DevInfo($"[PetChat] 工具调用: {string.Join(",", callList.Select(c => c.function.name))}");
                     // assistant 消息带 tool_calls 进历史（OpenAI 协议：下一轮要回执）
                     var assistantMsg = new PetChatClient.ChatMessage("assistant", "") { tool_calls = callList };
                     _history.Add(assistantMsg);
@@ -182,7 +185,10 @@ namespace GIC.Pet.Chat
             {
                 // 正常完成：assistant 回复进历史
                 if (!string.IsNullOrEmpty(全量))
+                {
                     _history.Add(new PetChatClient.ChatMessage("assistant", 全量));
+                    GICLog.DevInfo($"[PetChat] 派蒙: {全量}");
+                }
                 // 注意：工具调用轮的 完成 全量为空，不进历史（assistant 消息已在工具回调里登记）
                 _busy = false;
             };

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using GIC.Framework;
 using UnityEngine;
 
 namespace GIC.Pet.Chat
@@ -308,7 +309,11 @@ namespace GIC.Pet.Chat
                 _generating = false;
                 DetachHandlers();
                 if (string.IsNullOrEmpty(full)) ShowFallback(); // 空回复（异常）也走兜底
-                else _chatUI.ProactiveStreamDone(); // 完成通知（UI 起自动淡出计时）
+                else
+                {
+                    GICLog.DevInfo($"[PetChat] 反应: {full}");
+                    _chatUI.ProactiveStreamDone(); // 完成通知（UI 起自动淡出计时）
+                }
             };
             client.onContentDelta += _onDelta;
             client.onError += _onError;

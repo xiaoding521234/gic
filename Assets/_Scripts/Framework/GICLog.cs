@@ -26,6 +26,14 @@ namespace GIC.Framework
         public static void Info(object message, UnityEngine.Object context = null)
             => Debug.Log(message, context);
 
+        /// <summary>开发诊断流（对话内容类）：Editor 与 Development 构建输出，Release 编译期删除——
+        /// 与 Info 同机制但 define 换 DEVELOPMENT_BUILD（桌宠测试包是 Development 构建，日志可落 Player.log；
+        /// 正式包零输出，防对话明文进玩家的 Player.log）</summary>
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        public static void DevInfo(object message, UnityEngine.Object context = null)
+            => Debug.Log(message, context);
+
         /// <summary>警告：所有构建恒输出（不加 [Conditional]）</summary>
         public static void Warn(object message, UnityEngine.Object context = null)
             => Debug.LogWarning(message, context);
