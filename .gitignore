@@ -43,3 +43,6 @@ Mirror-*-backup-*.zip
 .gradle/
 *.keystore
 *.keystore.meta
+
+# local dev key for PetApiKeyCrypto.DevKey (never commit)
+devkey.txt

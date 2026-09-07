@@ -26,11 +26,36 @@ namespace GIC.Pet
         public const string saveField = "petApiKeyCipher";
 
 #if UNITY_EDITOR
-        /// <summary>开发用对话 API Key（2026-08-30 用户拍板）：**const 声明整体在 UNITY_EDITOR 内——
-        /// 任何构建产物（测试包/正式导出）不含此字面量**，导出后玩家存档初始化恒为空 key（玩家自输
-        /// 自己的 key，商业边界不变）。消费方=PlayerSaveData.InitDefault 预填（删档测试后聊天免重输）。
-        /// 注意：key 已进 git 历史——仓库公开/协作前先去供应商后台吊销换新。</summary>
-        public const string DevKey = "REDACTED-DEVKEY-2026-09-07";
+        /// <summary>开发用对话 API Key（2026-08-30 拍板；2026-09-07 改本地文件制）：**从本地文件读取，
+        /// 代码/构建产物/git 仓库零明文**——查找链：项目根 devkey.txt（.gitignore 已排除）→ 环境变量
+        /// GIC_DEVKEY → 空（按未设置处理；构建产物恒空 key 不变——玩家自输自己的 key，商业边界不变）。
+        /// 用法：把 key 一行写入项目根 devkey.txt（与 Assets 同级）。消费方=PlayerSaveData.InitDefault
+        /// 预填（删档测试后聊天免重输）。历史教训：曾以 const 字面量进库、2026-09-07 已清洗出 git 历史，
+        /// 勿再以任何明文形式提交。</summary>
+        public static string DevKey
+        {
+            get
+            {
+                if (_devKeyResolved) return _devKey;
+                _devKeyResolved = true;
+                try
+                {
+                    var root = Directory.GetParent(Application.dataPath)?.FullName;
+                    if (!string.IsNullOrEmpty(root))
+                    {
+                        var path = Path.Combine(root, "devkey.txt");
+                        if (File.Exists(path))
+                            _devKey = File.ReadAllText(path).Trim();
+                    }
+                }
+                catch { /* 读失败=未设置 */ }
+                if (string.IsNullOrEmpty(_devKey))
+                    _devKey = Environment.GetEnvironmentVariable("GIC_DEVKEY") ?? string.Empty;
+                return _devKey;
+            }
+        }
+        static string _devKey = string.Empty;
+        static bool _devKeyResolved;
 #endif
 
         private static byte[] _keyCache;
