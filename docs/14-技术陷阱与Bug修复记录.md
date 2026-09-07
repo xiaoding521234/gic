@@ -742,3 +742,21 @@ UnitConfig.asset 的 customParams `key: N` 用 **SkillParamKey 枚举值**（15=
 - 桌面版同坑在补聊天时一并规避（物理块上移到门控前）；今后任何"输入期冻结交互"的新分支都不得包裹物理收尾帧。
 
 ---
+
+## 30. TMP 字体"看似子集实为全库"——勿把烘焙字形表当字体文件覆盖度；图集多页开关才是 tofu 真根因（2026-09-07 实证 + 当日纠错）
+
+### 现象
+派蒙聊天回复大量"口"形 tofu（哪/儿、嗯/哈 等口语字重灾区）。初诊误判"zh-cn.ttf 按游戏文案子集化、集外字无字形"——**误诊过程本身是第一坑**。
+
+### 根因（文件级 cmap 纠错后）
+- zh-cn.ttf（SDK_SC_Web，MD5 与原神安装 MiHoYoSDKRes\...\font\zh-cn.ttf 逐字节一致）是 **11MB 大字库**，文件级 cmap 口语字（哪儿嗯哈①…）**全有**
+- 真根因：zh-cn SDF 资产 **isMultiAtlasTexturesEnabled=False** + pointSize=90 下 1569 字已把单张 4096² 图集烘焙到极限 → 运行时 Dynamic 补字必失败 → 渲染 tofu
+- **诊断铁律：TMP_FontAsset.HasCharacter 测的是烘焙字形表，Font.HasCharacter 测的才是字体文件 cmap——两层不可混淆**（此前"缺 56 字"测了前者层，错判字体死刑）
+
+### 修复与规范（2026-09-08）
+- 开 isMultiAtlasTexturesEnabled + 预烘 77 个对话高频字（字形 1646、图集 2 页）——Dynamic 补字恢复工作，tofu 根治
+- **建 Dynamic 字体资产必开多图集**（pointSize=90 的单张 4096² 约 900~1500 字即满，全量烘焙+动态补充是必炸组合）
+- 人设去特殊符号（v2.1）保留为附带防御：模型会模仿 system prompt 的符号风格，①「」 类即使能兜底显示也破坏观感，禁令依然成立
+- 项目字体全量统一 zh-cn SDF（2026-09-08 用户拍板）：InputPopupDialog/CoopScreen 原 SourceHanSans SDF 引用（m_fontAsset+m_sharedMaterial 双形态）已切至 zh-cn SDF；SourceHanSans SDF 资产留库无引用
+
+---
