@@ -30,6 +30,13 @@ namespace GIC.Battle
             targetImage.sprite = card.saveCardData.Config?.GetSprite(skinIndex);
         }
 
+        /// <summary>统一设置遮罩与获取文本的可见性（文本独立于遮罩，初始态不显示）</summary>
+        protected static void SetOverlayState(Card card, bool showMask, bool showText)
+        {
+            card.overlay.gameObject.SetActive(showMask);
+            card.obtainText.gameObject.SetActive(showText);
+        }
+
         public int GetTotalSkins(Card card) =>
             card.saveCardData.Config?.GetTotalSkins() ?? 0;
 
@@ -37,5 +44,9 @@ namespace GIC.Battle
         public abstract void EnterEditMode(Card card);
         public abstract void ApplySkin(Card card, int skinIndex);
         public abstract bool ShouldOverlayInEditMode(Card card);
+
+        /// <summary>退出编辑/池化释放时恢复初始遮罩状态 — 默认与现状一致：遮罩全关</summary>
+        public virtual void ExitEditDeck(Card card) =>
+            SetOverlayState(card, false, false);
     }
 }

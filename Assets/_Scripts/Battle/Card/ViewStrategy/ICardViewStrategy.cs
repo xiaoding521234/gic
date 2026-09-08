@@ -27,6 +27,9 @@ namespace GIC.Battle
 
         /// <summary>进入编辑时是否应被覆盖遮罩</summary>
         bool ShouldOverlayInEditMode(Card card);
+
+        /// <summary>退出编辑/池化释放时恢复初始遮罩状态</summary>
+        void ExitEditDeck(Card card);
     }
 
 }

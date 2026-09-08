@@ -64,6 +64,7 @@ MonoBehaviour:
     avatar: {fileID: 21300000, guid: df6842f9dd8615b4ab231feb770c16fa, type: 3}
     cards:
     - {fileID: 21300000, guid: ec0921993ea60b84e94ae4ad2eb8567a, type: 3}
+    - {fileID: 21300000, guid: 120d1529d2fae1f48bf3eccb7a3c827b, type: 3}
     nameCard: {fileID: 21300000, guid: 93346be2723cfe844a9f3cd0182cdfdd, type: 3}
     hideInBackpack: 0
     starLevel: 3

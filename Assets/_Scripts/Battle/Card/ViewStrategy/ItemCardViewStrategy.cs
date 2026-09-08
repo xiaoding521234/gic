@@ -26,6 +26,9 @@ namespace GIC.Battle
 
             card.unitImage.gameObject.SetActive(false);
 
+            // 初始态：物品卡不显示遮罩（池化复用自角色卡时显式清除残留）
+            SetOverlayState(card, false, false);
+
             InitCommon(card, data, detailView);
         }
 
@@ -33,7 +36,7 @@ namespace GIC.Battle
         {
             var raw = CardConfigResolver.Instance?.ItemConfig?.GetItemData(card.saveCardData.id.AsItemName());
             if (raw != null && raw.maxPrepareCount == 0)
-                card.overlay.gameObject.SetActive(true);
+                SetOverlayState(card, true, false); // 物品卡无获取描述条目，遮罩不带文本
         }
 
         public override void ApplySkin(Card card, int skinIndex) =>

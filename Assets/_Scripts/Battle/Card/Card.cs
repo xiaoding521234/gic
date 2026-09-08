@@ -129,7 +129,7 @@ namespace GIC.Battle
         public void ExitEditDeck()
         {
             isEditMode = false;
-            overlay.gameObject.SetActive(false);
+            _strategy?.ExitEditDeck(this);
         }
 
         public void OnToggleValueChanged(bool isOn)

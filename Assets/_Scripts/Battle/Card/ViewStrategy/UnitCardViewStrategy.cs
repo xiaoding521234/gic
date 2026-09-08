@@ -27,14 +27,20 @@ namespace GIC.Battle
             card.itemImage.gameObject.SetActive(false);
             card.countImage.gameObject.SetActive(false);
 
+            // 初始态：未拥有卡显示半透明遮罩（不含获取文本，仍可点击查看详情）
+            SetOverlayState(card, data.count < 1, false);
+
             InitCommon(card, data, detailView);
         }
 
         public override void EnterEditMode(Card card)
         {
             if (card.saveCardData.count < 1)
-                card.overlay.gameObject.SetActive(true);
+                SetOverlayState(card, true, true); // 编辑模式：遮罩+获取方式文本（现状语义）
         }
+
+        public override void ExitEditDeck(Card card) =>
+            SetOverlayState(card, card.saveCardData.count < 1, false); // 回初始态：未拥有仅遮罩
 
         public override void ApplySkin(Card card, int skinIndex) =>
             ApplySkinTo(card, skinIndex, card.unitImage);
