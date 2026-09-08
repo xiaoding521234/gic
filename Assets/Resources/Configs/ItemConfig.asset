@@ -58,7 +58,7 @@ MonoBehaviour:
   - itemID: 1003
     icon:
     - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
-    starLevel: 4
+    starLevel: 3
     elements:
     - elementType: 6
       stacks: 1
@@ -100,7 +100,7 @@ MonoBehaviour:
   - itemID: 3001
     icon:
     - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
-    starLevel: 4
+    starLevel: 2
     elements:
     - elementType: 4
       stacks: 1
