@@ -28,12 +28,12 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001004
     m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus} for {Duration}
-      turns\n\xB7Stacks up to {StackLimit} times, duration also stacks"
+      turns\n\xB7Stacks up to {StackLimit} times, duration extends with each stack"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
     m_Localized: "\xB7Fly in one of the four cardinal directions\n\xB7Collect resources
-      along the path {CollectCount} times\n\xB7Each collection grants {CollectStaminaGain}
+      along the path, up to {CollectCount} times\n\xB7Each collection grants {CollectStaminaGain}
       Stamina and {CollectEnergyGain} Energy"
     m_Metadata:
       m_Items: []
@@ -48,8 +48,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: "\xB7Dispel fog in a {EffectRadius}-tile radius\n\xB7Reveal enemies
-      in range for {VisionDuration} turns"
+    m_Localized: "\xB7Dispel fog within a {EffectRadius}-tile radius\n\xB7Reveal
+      enemies in range for {VisionDuration} turns"
     m_Metadata:
       m_Items: []
   - m_Id: 24651732772147200
@@ -59,54 +59,56 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001006
     m_Localized: "\xB7[C1] Vision +{C1Vision}. When Amber gains energy while at full
-      capacity, it transfers to the nearest allied character with unfilled energy;
-      no effect if all are full\n\xB7[C2] Move SPD +{C2MoveSpeed}, Max Energy +{C2EnergyLimit}.
-      Burst can dispel fog, gain {C2FogEnergyGain} energy per {C2FogEnergyThreshold}
-      tiles dispelled\n\xB7[C3] Gain <color=#FFD700><u><link=\"Unit:Amber\">Baron
+      capacity, the excess transfers to the nearest allied character with unfilled
+      energy; no effect if all are full\n\xB7[C2] Move SPD +{C2MoveSpeed}, Max Energy
+      +{C2EnergyLimit}; Burst can dispel fog, gaining {C2FogEnergyGain} energy per
+      {C2FogEnergyThreshold} tiles dispelled\n\xB7[C3] Gain <color=#FFD700><u><link=\"Concept:BaronBunny\">Baron
       Bunny</link></u></color>"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775032754176
+  - m_Id: 3002001
     m_Localized: "\xB7Thrust frost in one of the four cardinal directions\n\xB7Deal
-      {Damage} Cryo DMG to {DamageDistance} tiles ahead"
+      {Damage} Cryo DMG to enemies within {DamageDistance} tiles ahead\n\xB7Plunder
+      {MoraPlunder} Mora from each enemy hit"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775263440896
+  - m_Id: 3002002
     m_Localized: "\xB7Summon {ShardCount} <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
       Shards</link></u></color> orbiting self"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775263440897
+  - m_Id: 3002003
     m_Localized: "\xB7Increase coordinated ally's Move SPD by {MoveSpeedBonus} for
-      3 turns\n\xB7Stacks up to 5 times, duration stacks too"
+      {Duration} turns\n\xB7Stacks up to {StackLimit} times, duration extends with
+      each stack"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775267635200
+  - m_Id: 3002004
     m_Localized: "\xB7Heal self for {Heal} HP"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775267635201
+  - m_Id: 3002005
     m_Localized: "\xB7[C1] Healing efficiency +{C1HealEfficiency}, Life steal +{C1LifeSteal}\n\xB7[C2]
       <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>
-      stack limit +{C2StackLimit}, hits reduce enemy DEF by {C2DefenseReduce}\n\xB7[C3]
+      stack limit +{C2StackLimit}, hits also reduce enemy DEF by {C2DefenseReduce}\n\xB7[C3]
       <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>
       stack limit +{C3StackLimit}, radius +{C3Radius}"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775267635202
+  - m_Id: 3003001
     m_Localized: "\xB7Select an ally: if downed, revive and heal {Heal} HP; if alive,
       grant <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775267635203
+  - m_Id: 3003002
     m_Localized: "\xB7Heal coordinated ally for {Heal} HP"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775267635204
+  - m_Id: 3003003
     m_Localized: "\xB7Heal all allies for {Heal} HP"
     m_Metadata:
       m_Items: []
-  - m_Id: 26206775267635205
+  - m_Id: 3003005
     m_Localized: "\xB7[C0] Summon <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color>\n\xB7[C1] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color> grants holder {C1EnergyGain} energy each turn end\n\xB7[C2]
@@ -115,10 +117,152 @@ MonoBehaviour:
       Ring</link></u></color> stack limit +{C3StackLimit}"
     m_Metadata:
       m_Items: []
-  - m_Id: 26250548261498880
+  - m_Id: 3003004
     m_Localized: "\xB7Launch a water orb in one of the four cardinal directions,
       flying {ProjectileDistance} tiles\n\xB7Deal {Damage} Hydro DMG on hit\n\xB7Heal
-      all allies within {HealRadius} tiles for {Heal} HP"
+      all allied units within {HealRadius} tiles of self for {Heal} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001001
+    m_Localized: "\xB7Choose one cardinal direction: deal {Damage} Hydro DMG to enemies
+      in a straight line, {DamageDistance} tiles ahead\n\xB7Gain {RainSwordGain}
+      <color=#FFD700><u><link=\"Buff:\u96E8\u5E18\u5251\">Rain Sword</link></u></color>(s)"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001002
+    m_Localized: "\xB7Gain {RainSwordGain} <color=#FFD700><u><link=\"Buff:\u96E8\u5E18\u5251\">Rain
+      Sword</link></u></color>(s)\n\xB7Gain {MoraPerSword} in Mora for each Rain
+      Sword held"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001003
+    m_Localized: "\xB7While the contract lasts, the signee's Move SPD is reduced
+      by {MoveSpeedReduction}, but they gain 10/15/20 Energy at each turn end\n\xB7The
+      contract ends automatically after the signee has moved {ContractBreakMoveCount}
+      times\n\xB7Refusal: the signee loses 30/45/60 Energy; if Energy is insufficient,
+      the shortfall is converted to Mora at {PlunderRate} and plundered by the contractor\n\xB7Costs
+      {MoraCost} Mora"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001004
+    m_Localized: "\xB7[C1] Rain Sword hold limit +{C1RainSwordLimit}. Each coordinated
+      attack also grants {C1SynergyEnergyGain} Energy to both Xingqiu and the assisted
+      ally\n\xB7[C2] After any allied unit downs an enemy, Xingqiu gains {C2KillSwordGain}
+      Rain Swords; overflowing Rain Swords immediately strike the lowest-HP enemy
+      within {C2OverflowRadius} tiles\n\xB7[C3] Each coordinated attack also grants
+      {C3SynergyTenacityGain} Tenacity to both Xingqiu and the assisted ally"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3
+    m_Localized: "\xB7Amphibious move in one of the four cardinal directions"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004001
+    m_Localized: "\xB7Teleport to an empty tile within {CastRadius} tiles, striking
+      lightning at both the start and end points\n\xB7The lightning deals {Damage}
+      Electro DMG to enemies within {EffectRadius} tiles\n\xB7Enemies hit by lightning
+      at both points are Stunned for {Duration} turns"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004002
+    m_Localized: "\xB7Teleport the unit carrying <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
+      Thorn</link></u></color> to any empty tile and strike lightning\n\xB7The lightning
+      deals {Damage} Electro DMG to enemies within {EffectRadius} tiles\n\xB7If that
+      unit is Banished, Lisa takes {PenaltyDamage} True DMG and forcibly recalls
+      it"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004003
+    m_Localized: "\xB7Transfer <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
+      Thorn</link></u></color> to the coordinated ally (at most 1 may exist at a
+      time)\n\xB7Rose Thorn initially marks Lisa herself"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004004
+    m_Localized: "\xB7Stun enemies within {EffectRadius} tiles for {Duration} turns\n\xB7If
+      the <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose Thorn</link></u></color>
+      holder is a Mondstadt character (excluding Lisa), trigger their Henka; otherwise
+      grant them {EnergyGain} Energy"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3004005
+    m_Localized: "\xB7[C1] When the <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
+      Thorn</link></u></color> holder is within the strike range of Lisa's Move,
+      Burst, or the Rose Thorn lightning, the rose fires needles, dealing {C1NeedleCount}
+      hits of {C1NeedleDamage} Electro DMG to the nearest enemy within {C1NeedleRadius}
+      tiles of the holder\n\xB7[C2] Henka also grants {C2EnergyGain} Energy to allies
+      in range; the Rose Thorn lightning triggers at most {C2TriggerLimit} times
+      per turn\n\xB7[C3] Units carrying <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
+      Thorn</link></u></color> gain {C3DamageBonus} DMG Bonus"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110001
+    m_Localized: "\xB7Walk in one of the four cardinal directions\n\xB7Each tile
+      traversed leaves a Dandelion Wind behind, blowing in the direction of movement"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110002
+    m_Localized: "\xB7Release wind pressure in one of the four cardinal directions\n\xB7Enemies
+      more than {CloseRange} tiles away: pulled in front of Jean\n\xB7Enemies within
+      {CloseRange} tiles: take {Damage} Anemo DMG and are knocked back {Knockback}
+      tiles\n\xB7Max range {MaxRange} tiles"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110003
+    m_Localized: "\xB7Create a <color=#FFD700><u><link=\"Buff:\u84B2\u516C\u82F1\u9886\u57DF\">Dandelion
+      Field</link></u></color> for {Duration} turns"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110004
+    m_Localized: "\xB7Create {WindFieldRange} tiles of Dandelion Wind in each of
+      the four cardinal directions from the coordinated ally, blowing away from them"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110005
+    m_Localized: "\xB7If Jean is on a Dandelion Wind, dash along its direction\n\xB7After
+      leaving the wind, dash up to {DashRange} more tiles\n\xB7Passing other Dandelion
+      Winds while dashing: Move SPD +{MoveSpeedBonus} for {MoveSpeedDuration} turns;
+      dash direction becomes that wind's direction and dash range refreshes (each
+      wind counts once)\n\xB7When the dash is blocked by an enemy, deal {Damage}+{MoveSpeedDamage}
+      DMG to it, counted as Skill DMG\n\xB7If Jean is not on a wind, teleport to
+      the farthest Dandelion Wind within {TeleportRange} tiles; no effect if none
+      exists"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110006
+    m_Localized: "\xB7[C0] When Jean enters battle, all allied units gain a {C0Shield}
+      shield\n\xB7[C1] Gale Blade can hit allied characters (dealing no DMG), max
+      range +{C1RangeBonus}\n\xB7[C2] Dandelion Wind lasts {C2DurationBonus} more
+      turns, and each time it pulls an enemy it also deals {C2ThornDamage} Anemo
+      DMG to it\n\xB7[C3] Dandelion Winds created by Jean's movement blow opposite
+      to her movement direction"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120001
+    m_Localized: "\xB7Choose one of the four cardinal directions and enter a charging
+      state\n\xB7After charging for {ChargeTurns} turns, deal {Damage} Geo DMG to
+      all enemies in the 3\xD73 area ahead\n\xB7While charging: Move SPD -10, Skills
+      disabled, can be interrupted by hard CC"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120002
+    m_Localized: "\xB7Noelle gains a {Shield} shield"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120003
+    m_Localized: "\xB7The coordinated ally gains a {Shield} shield"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120004
+    m_Localized: "\xB7If Noelle is charging Sweeping Time, complete the charge immediately"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120005
+    m_Localized: "\xB7[C1] When Noelle loses shield, she gains Energy equal to {C1ShieldToEnergyRate}
+      of the shield lost\n\xB7[C2] When her Skill hits an enemy, it also Stuns for
+      {C2StunDuration} turns and she gains a {C2Shield} shield\n\xB7[C3] Noelle's
+      weapon takes the element of her current shield; with no elemental shield, it
+      takes Geo"
     m_Metadata:
       m_Items: []
   references:

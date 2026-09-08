@@ -24,7 +24,7 @@ namespace GIC.Battle
         /// <summary>
         /// 根据模板和参数列表构建最终描述文本
         /// </summary>
-        /// <param name="template">描述模板（来自本地化表），含 {ParamKey} 占位符</param>
+        /// <param name="template">描述模板（来自本地化表，任意语言），含 {ParamKey} 占位符</param>
         /// <param name="parameters">技能参数列表</param>
         /// <returns>替换占位符后的带颜色 TMP 富文本</returns>
         public static string Build(string template, SkillParam[] parameters)
@@ -62,7 +62,9 @@ namespace GIC.Battle
         /// <summary>
         /// 获取单个参数的带颜色展示值
         /// 固定值 → "4" → "<color=#FFD700>4</color>"
+        /// 上下文百分比 → "50%" → "<color=#FFD700>50%</color>"
         /// 非固定值 → "40%攻击力" → "<color=#FFD700>40%攻击力</color>"
+        /// 基底名从 SkillBaseType 本地化表按当前语言读取（勿硬编码中文——描述模板是五语言的）
         /// </summary>
         private static string GetColoredValue(SkillParam param)
         {
@@ -70,17 +72,34 @@ namespace GIC.Battle
             {
                 return $"<color={ValueColor}>{param.value}</color>";
             }
+            if (param.baseType == SkillBaseType.Percent)
+            {
+                // 上下文百分比：基底由技能语境提供，展示值只含数字+%，结构（"基于失去护盾的…"）在描述模板里
+                return $"<color={ValueColor}>{param.value}%</color>";
+            }
 
-            // 非固定值: "40%攻击力"
-            // 类型名通过本地化获取，但描述中用简写
-            string baseName = GetBaseTypeShortName(param.baseType);
+            // 非固定值: "40%攻击力"——基底名走本地化表（param.GetValueEntry 的 TextEntry 已按当前语言解析，
+            // 此处取其静态前缀拼 %，保持与参数列表右侧一致的展示来源）
+            string baseName = GetLocalizedBaseName(param.baseType);
             return $"<color={ValueColor}>{param.value}%{baseName}</color>";
         }
 
         /// <summary>
-        /// 获取基础类型的简写名（用于描述文本内嵌）
+        /// 获取基础类型的本地化名（跟随当前语言，用于描述文本内嵌）
+        /// 同步读 SkillBaseType 表当前语言值；表未加载/缺条目时退回简写兜底
         /// </summary>
-        private static string GetBaseTypeShortName(SkillBaseType baseType)
+        private static string GetLocalizedBaseName(SkillBaseType baseType)
+        {
+            var table = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(TableName.SkillBaseType.ToString());
+            var entry = table?.GetEntry(baseType.ToString());
+            return entry?.Value ?? GetBaseTypeShortNameFallback(baseType);
+        }
+
+        /// <summary>
+        /// 兜底简写名（本地化表缺失时使用，避免描述出现空基底）
+        /// </summary>
+        private static string GetBaseTypeShortNameFallback(SkillBaseType baseType)
         {
             return baseType switch
             {
@@ -93,11 +112,10 @@ namespace GIC.Battle
                 SkillBaseType.BasedOnTargetCurrentHealth => "目标当前生命值",
                 SkillBaseType.BasedOnTargetLostHealth => "目标已损生命值",
                 SkillBaseType.BasedOnMoveSpeed => "移速",
+                SkillBaseType.BasedOnSanity => "理智",
                 _ => "",
             };
         }
     }
 
 }
-
-

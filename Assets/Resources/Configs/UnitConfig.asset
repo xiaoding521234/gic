@@ -556,6 +556,9 @@ MonoBehaviour:
       - key: 31
         value: 2
         baseType: 0
+      - key: 75
+        value: 5
+        baseType: 0
     - skillID: 3002002
       icon: {fileID: 0}
       skillType: 3
@@ -576,6 +579,12 @@ MonoBehaviour:
       - key: 9
         value: 10
         baseType: 0
+      - key: 12
+        value: 3
+        baseType: 0
+      - key: 37
+        value: 5
+        baseType: 0
     - skillID: 3002004
       icon: {fileID: 0}
       skillType: 7
@@ -589,10 +598,10 @@ MonoBehaviour:
       customParams:
       - key: 24
         value: 50
-        baseType: 0
+        baseType: 11
       - key: 25
         value: 50
-        baseType: 0
+        baseType: 11
       - key: 26
         value: 1
         baseType: 0
@@ -895,7 +904,81 @@ MonoBehaviour:
     selfElement: 7
     visionRange: -64
     tags: 74170000a30f0000ba0b0000bf0b0000
-    skills: []
+    skills:
+    - skillID: 3004001
+      icon: {fileID: 0}
+      skillType: 1
+      customParams:
+      - key: 7
+        value: 10
+        baseType: 9
+      - key: 6
+        value: 1
+        baseType: 0
+      - key: 1
+        value: 40
+        baseType: 1
+      - key: 12
+        value: 1
+        baseType: 0
+    - skillID: 3004002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams:
+      - key: 6
+        value: 2
+        baseType: 0
+      - key: 1
+        value: 150
+        baseType: 1
+      - key: 51
+        value: 60
+        baseType: 0
+      - key: 9
+        value: 50
+        baseType: 0
+    - skillID: 3004003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams:
+      - key: 9
+        value: 30
+        baseType: 0
+    - skillID: 3004004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams:
+      - key: 6
+        value: 2
+        baseType: 0
+      - key: 12
+        value: 2
+        baseType: 0
+      - key: 50
+        value: 10
+        baseType: 0
+    - skillID: 3004005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams:
+      - key: 52
+        value: 2
+        baseType: 0
+      - key: 53
+        value: 20
+        baseType: 1
+      - key: 54
+        value: 2
+        baseType: 0
+      - key: 55
+        value: 10
+        baseType: 0
+      - key: 56
+        value: 2
+        baseType: 0
+      - key: 57
+        value: 60
+        baseType: 11
     voices:
       onGoWar:
         clips: []
@@ -1076,7 +1159,88 @@ MonoBehaviour:
     selfElement: 3
     visionRange: -64
     tags: 75170000c10b0000a30f0000bf0b0000ef030000f0030000
-    skills: []
+    skills:
+    - skillID: 30110001
+      icon: {fileID: 0}
+      skillType: 1
+      customParams:
+      - key: 5
+        value: 10
+        baseType: 9
+    - skillID: 30110002
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 1
+        value: 50
+        baseType: 1
+      - key: 58
+        value: 2
+        baseType: 0
+      - key: 59
+        value: 3
+        baseType: 0
+      - key: 60
+        value: 5
+        baseType: 0
+    - skillID: 30110003
+      icon: {fileID: 0}
+      skillType: 3
+      customParams:
+      - key: 12
+        value: 3
+        baseType: 0
+      - key: 9
+        value: 50
+        baseType: 0
+    - skillID: 30110004
+      icon: {fileID: 0}
+      skillType: 6
+      customParams:
+      - key: 61
+        value: 5
+        baseType: 0
+      - key: 9
+        value: 20
+        baseType: 0
+    - skillID: 30110005
+      icon: {fileID: 0}
+      skillType: 7
+      customParams:
+      - key: 62
+        value: 10
+        baseType: 9
+      - key: 30
+        value: 20
+        baseType: 0
+      - key: 63
+        value: 1
+        baseType: 0
+      - key: 1
+        value: 50
+        baseType: 1
+      - key: 64
+        value: 100
+        baseType: 9
+      - key: 65
+        value: 5
+        baseType: 0
+    - skillID: 30110006
+      icon: {fileID: 0}
+      skillType: 4
+      customParams:
+      - key: 66
+        value: 50
+        baseType: 0
+      - key: 67
+        value: 3
+        baseType: 0
+      - key: 68
+        value: 3
+        baseType: 0
+      - key: 69
+        value: 20
+        baseType: 1
     voices:
       onGoWar:
         clips: []
@@ -1121,7 +1285,61 @@ MonoBehaviour:
     selfElement: 6
     visionRange: -64
     tags: 73170000ef030000bd0b0000ba0b0000
-    skills: []
+    skills:
+    - skillID: 1
+      icon: {fileID: 0}
+      skillType: 1
+      customParams:
+      - key: 5
+        value: 10
+        baseType: 9
+    - skillID: 30120001
+      icon: {fileID: 0}
+      skillType: 2
+      customParams:
+      - key: 1
+        value: 200
+        baseType: 1
+      - key: 70
+        value: 2
+        baseType: 0
+    - skillID: 30120002
+      icon: {fileID: 0}
+      skillType: 3
+      customParams:
+      - key: 71
+        value: 150
+        baseType: 1
+      - key: 9
+        value: 30
+        baseType: 0
+    - skillID: 30120003
+      icon: {fileID: 0}
+      skillType: 6
+      customParams:
+      - key: 71
+        value: 40
+        baseType: 1
+      - key: 9
+        value: 10
+        baseType: 0
+    - skillID: 30120004
+      icon: {fileID: 0}
+      skillType: 7
+      customParams: []
+    - skillID: 30120005
+      icon: {fileID: 0}
+      skillType: 4
+      customParams:
+      - key: 72
+        value: 50
+        baseType: 11
+      - key: 73
+        value: 1
+        baseType: 0
+      - key: 74
+        value: 40
+        baseType: 1
     voices:
       onGoWar:
         clips: []
@@ -1158,42 +1376,89 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: -64
-    normalMoveType: 1
+    baseEnergy: 30
+    normalMoveType: 3
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -64
-    tags: c00b0000a70f0000
+    tags: 72170000c00b0000ba0b0000
     skills:
-    - skillID: 1
+    - skillID: 3
       icon: {fileID: 0}
       skillType: 1
-      customParams: []
-    - skillID: 1002001
+      customParams:
+      - key: 5
+        value: 10
+        baseType: 9
+    - skillID: 4001001
       icon: {fileID: 0}
       skillType: 2
       customParams:
-      - key: 0
-        value: 0
+      - key: 1
+        value: 100
+        baseType: 1
+      - key: 31
+        value: 2
         baseType: 0
-    - skillID: 1002002
+      - key: 38
+        value: 1
+        baseType: 0
+    - skillID: 4001002
       icon: {fileID: 0}
       skillType: 3
-      customParams: []
-    - skillID: 1002003
+      customParams:
+      - key: 38
+        value: 2
+        baseType: 0
+      - key: 39
+        value: 10
+        baseType: 10
+      - key: 9
+        value: 30
+        baseType: 0
+    - skillID: 4001003
       icon: {fileID: 0}
-      skillType: 6
-      customParams: []
-    - skillID: 1002004
-      icon: {fileID: 0}
-      skillType: 7
-      customParams: []
-    - skillID: 1002005
+      skillType: 8
+      customParams:
+      - key: 40
+        value: 50
+        baseType: 11
+      - key: 41
+        value: 10
+        baseType: 0
+      - key: 42
+        value: 30
+        baseType: 0
+      - key: 43
+        value: 50
+        baseType: 11
+      - key: 44
+        value: 2
+        baseType: 0
+      - key: 10
+        value: 20
+        baseType: 0
+    - skillID: 4001004
       icon: {fileID: 0}
       skillType: 4
-      customParams: []
+      customParams:
+      - key: 45
+        value: 3
+        baseType: 0
+      - key: 46
+        value: 10
+        baseType: 0
+      - key: 47
+        value: 6
+        baseType: 0
+      - key: 48
+        value: 5
+        baseType: 0
+      - key: 49
+        value: 2
+        baseType: 0
     voices:
       onGoWar:
         clips: []

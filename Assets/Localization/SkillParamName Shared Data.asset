@@ -15,11 +15,11 @@ MonoBehaviour:
   m_TableCollectionName: SkillParamName
   m_TableCollectionNameGuidString: e9e9b4a0fc9f94247a62bbd708b23bc9
   m_Entries:
-  - m_Id: 2190471671808
+  - m_Id: 1
     m_Key: Damage
     m_Metadata:
       m_Items: []
-  - m_Id: 1
+  - m_Id: 3
     m_Key: Heal
     m_Metadata:
       m_Items: []
@@ -27,123 +27,123 @@ MonoBehaviour:
     m_Key: SingleDamage
     m_Metadata:
       m_Items: []
-  - m_Id: 3
+  - m_Id: 12
     m_Key: Duration
     m_Metadata:
       m_Items: []
-  - m_Id: 4
+  - m_Id: 5
     m_Key: MoveDistance
     m_Metadata:
       m_Items: []
-  - m_Id: 5
+  - m_Id: 4
     m_Key: Count
     m_Metadata:
       m_Items: []
-  - m_Id: 6
+  - m_Id: 8
     m_Key: ATKBonus
     m_Metadata:
       m_Items: []
-  - m_Id: 7
+  - m_Id: 6
     m_Key: EffectRadius
     m_Metadata:
       m_Items: []
-  - m_Id: 8
+  - m_Id: 7
     m_Key: CastRadius
     m_Metadata:
       m_Items: []
-  - m_Id: 9
+  - m_Id: 10
     m_Key: MoraCost
     m_Metadata:
       m_Items: []
-  - m_Id: 10
+  - m_Id: 9
     m_Key: EnergyCost
     m_Metadata:
       m_Items: []
-  - m_Id: 11
+  - m_Id: 13
     m_Key: C1MoveSpeed
     m_Metadata:
       m_Items: []
-  - m_Id: 12
+  - m_Id: 14
     m_Key: C1Vision
     m_Metadata:
       m_Items: []
-  - m_Id: 13
+  - m_Id: 15
     m_Key: C2MoveSpeed
     m_Metadata:
       m_Items: []
-  - m_Id: 24279222071283712
+  - m_Id: 11
     m_Key: StaminaCost
     m_Metadata:
       m_Items: []
-  - m_Id: 24290055270649856
+  - m_Id: 16
     m_Key: CollectCount
     m_Metadata:
       m_Items: []
-  - m_Id: 24290055392284672
+  - m_Id: 17
     m_Key: DamageCount
     m_Metadata:
       m_Items: []
-  - m_Id: 26187074403643392
+  - m_Id: 18
     m_Key: C2FogEnergyThreshold
     m_Metadata:
       m_Items: []
-  - m_Id: 26187074487529472
+  - m_Id: 19
     m_Key: C2FogEnergyGain
     m_Metadata:
       m_Items: []
-  - m_Id: 26191813191217152
+  - m_Id: 20
     m_Key: VisionDuration
     m_Metadata:
       m_Items: []
-  - m_Id: 26201398455119872
+  - m_Id: 21
     m_Key: ShardCount
     m_Metadata:
       m_Items: []
-  - m_Id: 26211417317781504
+  - m_Id: 22
     m_Key: ProjectileDistance
     m_Metadata:
       m_Items: []
-  - m_Id: 26211417317781505
+  - m_Id: 23
     m_Key: HealRadius
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310798049280
+  - m_Id: 24
     m_Key: C1HealEfficiency
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186624
+  - m_Id: 25
     m_Key: C1LifeSteal
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186625
+  - m_Id: 26
     m_Key: C2StackLimit
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186626
+  - m_Id: 27
     m_Key: C2DefenseReduce
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186627
+  - m_Id: 28
     m_Key: C3StackLimit
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186628
+  - m_Id: 29
     m_Key: C3Radius
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186629
+  - m_Id: 30
     m_Key: MoveSpeedBonus
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186630
+  - m_Id: 31
     m_Key: DamageDistance
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186631
+  - m_Id: 32
     m_Key: C1EnergyGain
     m_Metadata:
       m_Items: []
-  - m_Id: 26341310844186632
+  - m_Id: 33
     m_Key: C2Radius
     m_Metadata:
       m_Items: []
@@ -161,6 +161,158 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 37
     m_Key: StackLimit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 38
+    m_Key: RainSwordGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39
+    m_Key: MoraPerSword
+    m_Metadata:
+      m_Items: []
+  - m_Id: 40
+    m_Key: MoveSpeedReduction
+    m_Metadata:
+      m_Items: []
+  - m_Id: 41
+    m_Key: ContractEnergyCompensation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 42
+    m_Key: ContractRefusalPenalty
+    m_Metadata:
+      m_Items: []
+  - m_Id: 43
+    m_Key: PlunderRate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 44
+    m_Key: ContractBreakMoveCount
+    m_Metadata:
+      m_Items: []
+  - m_Id: 45
+    m_Key: C1RainSwordLimit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 46
+    m_Key: C1SynergyEnergyGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 47
+    m_Key: C2KillSwordGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 48
+    m_Key: C2OverflowRadius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 49
+    m_Key: C3SynergyTenacityGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 50
+    m_Key: EnergyGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 51
+    m_Key: PenaltyDamage
+    m_Metadata:
+      m_Items: []
+  - m_Id: 52
+    m_Key: C1NeedleRadius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 53
+    m_Key: C1NeedleDamage
+    m_Metadata:
+      m_Items: []
+  - m_Id: 54
+    m_Key: C1NeedleCount
+    m_Metadata:
+      m_Items: []
+  - m_Id: 55
+    m_Key: C2EnergyGain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 56
+    m_Key: C2TriggerLimit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 57
+    m_Key: C3DamageBonus
+    m_Metadata:
+      m_Items: []
+  - m_Id: 58
+    m_Key: CloseRange
+    m_Metadata:
+      m_Items: []
+  - m_Id: 59
+    m_Key: Knockback
+    m_Metadata:
+      m_Items: []
+  - m_Id: 60
+    m_Key: MaxRange
+    m_Metadata:
+      m_Items: []
+  - m_Id: 61
+    m_Key: WindFieldRange
+    m_Metadata:
+      m_Items: []
+  - m_Id: 62
+    m_Key: DashRange
+    m_Metadata:
+      m_Items: []
+  - m_Id: 63
+    m_Key: MoveSpeedDuration
+    m_Metadata:
+      m_Items: []
+  - m_Id: 64
+    m_Key: MoveSpeedDamage
+    m_Metadata:
+      m_Items: []
+  - m_Id: 65
+    m_Key: TeleportRange
+    m_Metadata:
+      m_Items: []
+  - m_Id: 66
+    m_Key: C0Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 67
+    m_Key: C1RangeBonus
+    m_Metadata:
+      m_Items: []
+  - m_Id: 68
+    m_Key: C2DurationBonus
+    m_Metadata:
+      m_Items: []
+  - m_Id: 69
+    m_Key: C2ThornDamage
+    m_Metadata:
+      m_Items: []
+  - m_Id: 70
+    m_Key: ChargeTurns
+    m_Metadata:
+      m_Items: []
+  - m_Id: 71
+    m_Key: Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 73
+    m_Key: C2StunDuration
+    m_Metadata:
+      m_Items: []
+  - m_Id: 74
+    m_Key: C2Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 75
+    m_Key: MoraPlunder
+    m_Metadata:
+      m_Items: []
+  - m_Id: 72
+    m_Key: C1ShieldToEnergyRate
     m_Metadata:
       m_Items: []
   m_Metadata:

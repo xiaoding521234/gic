@@ -147,6 +147,7 @@ namespace GIC.Data
         /// <summary>
         /// 获取技能参数展示值（右侧）的 Entry：
         /// 固定值 → "3"
+        /// 上下文百分比 → "50%"
         /// 非固定值 → "100%攻击力"（类型名通过本地化）
         /// </summary>
         public TextEntry GetValueEntry()
@@ -156,7 +157,8 @@ namespace GIC.Data
                 return null;
             }
             string displayValue = GetDisplayValueText();
-            if (baseType == SkillBaseType.Fixed)
+            // 固定值与上下文百分比：右侧只显示数值本身（百分比自带 %，无基底名）
+            if (baseType == SkillBaseType.Fixed || baseType == SkillBaseType.Percent)
             {
                 return new TextEntry(null, displayValue);
             }
@@ -211,6 +213,12 @@ namespace GIC.Data
 
         [InspectorName("移速")]
         BasedOnMoveSpeed = 9,
+
+        [InspectorName("理智")]
+        BasedOnSanity = 10,
+
+        [InspectorName("上下文百分比")]
+        Percent = 11,
     }
 
     /// <summary>

@@ -186,8 +186,72 @@ MonoBehaviour:
     m_Localized: Amber Constellation
     m_Metadata:
       m_Items: []
-  - m_Id: 26489378201743360
+  - m_Id: 3003004
     m_Localized: Water Serenade
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3
+    m_Localized: Amphibious
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001001
+    m_Localized: Fatal Rainscreen
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001002
+    m_Localized: Feiyun Commerce
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001003
+    m_Localized: Rain-Deep Gate
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001004
+    m_Localized: Xingqiu Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110001
+    m_Localized: Leading Wind
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110002
+    m_Localized: Gale Blade
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110003
+    m_Localized: Dandelion Breeze
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110004
+    m_Localized: Follow the Wind
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110005
+    m_Localized: Tailwind
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30110006
+    m_Localized: Jean's Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120001
+    m_Localized: Sweeping Time
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120002
+    m_Localized: Spotless
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120003
+    m_Localized: Protective Heart
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120004
+    m_Localized: Clean Sweep
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30120005
+    m_Localized: Noelle's Constellation
     m_Metadata:
       m_Items: []
   references:

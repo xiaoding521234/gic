@@ -28,6 +28,38 @@ MonoBehaviour:
       Her endless energy makes her a trustworthy companion.
     m_Metadata:
       m_Items: []
+  - m_Id: 26802933513924608
+    m_Localized: Stacks up to 2. At each turn end, deals 20% ATK Cryo DMG to enemies
+      within 1 tile of the holder. When the holder's Energy exceeds 50%, each shard
+      shatters and heals the holder for 30% ATK. Persists even if the holder is downed.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802933564256256
+    m_Localized: Single stack. At each turn end, deals 10% ATK Hydro DMG to enemies
+      within 1 tile of the holder, heals allies for 10 HP and restores 1 Sanity,
+      applying Hydro. Vanishes when the holder is downed.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802933564256257
+    m_Localized: Only one may exist at a time; initially marks Lisa herself. When
+      the holder takes enemy DMG, lightning strikes the attacker's position, dealing
+      30% of the holder's ATK as Electro DMG to enemies within 1 tile, once per turn.
+      Lisa's Enso transfers it to the coordinated ally; returns to Lisa if the holder
+      vanishes.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802933564256258
+    m_Localized: At each turn end, pulls enemies within 3 tiles 1 tile toward the
+      field and deals 50% ATK Anemo DMG; grants allied characters a shield of 20%
+      ATK and 5 Tenacity. Extends Dandelion Wind duration by 1 turn. Lasts 3 turns.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802933564256259
+    m_Localized: Up to 3 swords. When an allied character deals Skill DMG, consumes
+      1 Rain Sword to deal 40% ATK Hydro DMG to the target (coordinated DMG). Cleared
+      when the holder is downed.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

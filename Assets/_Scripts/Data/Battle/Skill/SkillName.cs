@@ -23,6 +23,9 @@ namespace GIC.Data
 
         [InspectorName("飞行")]
         Common_Fly = 2,
+
+        [InspectorName("两栖")]
+        Common_Amphibious = 3,
         #endregion
 
         #region 派蒙 (1001)
@@ -140,6 +143,57 @@ namespace GIC.Data
 
         [InspectorName("温迪命座")]
         Venti_Constellation = 3008005,
+        #endregion
+
+        #region 琴 (3011)
+        [InspectorName("引领之风")]
+        Jean_LeadingWind = 30110001,
+
+        [InspectorName("风压剑")]
+        Jean_GaleBlade = 30110002,
+
+        [InspectorName("西风吹拂之时")]
+        Jean_DandelionBreeze = 30110003,
+
+        [InspectorName("听凭风引")]
+        Jean_FollowTheWind = 30110004,
+
+        [InspectorName("顺风而行")]
+        Jean_Tailwind = 30110005,
+
+        [InspectorName("琴命座")]
+        Jean_Constellation = 30110006,
+        #endregion
+
+        #region 诺艾尔 (3012)
+        [InspectorName("大扫除")]
+        Noelle_SweepingTime = 30120001,
+
+        [InspectorName("要一尘不染才行")]
+        Noelle_Spotless = 30120002,
+
+        [InspectorName("护心铠")]
+        Noelle_ProtectiveHeart = 30120003,
+
+        [InspectorName("干净利落")]
+        Noelle_CleanSweep = 30120004,
+
+        [InspectorName("诺艾尔命座")]
+        Noelle_Constellation = 30120005,
+        #endregion
+
+        #region 行秋 (4001)
+        [InspectorName("画雨笼山")]
+        Xingqiu_FatalRainscreen = 4001001,
+
+        [InspectorName("飞云商会")]
+        Xingqiu_FeiyunCommerce = 4001002,
+
+        [InspectorName("雨深闭门")]
+        Xingqiu_RaindeepGate = 4001003,
+
+        [InspectorName("行秋命座")]
+        Xingqiu_Constellation = 4001004,
         #endregion
 
         #region empty/旅行者 (11002)

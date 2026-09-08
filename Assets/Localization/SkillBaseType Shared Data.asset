@@ -55,6 +55,14 @@ MonoBehaviour:
     m_Key: BasedOnMoveSpeed
     m_Metadata:
       m_Items: []
+  - m_Id: 10
+    m_Key: BasedOnSanity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11
+    m_Key: Percent
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

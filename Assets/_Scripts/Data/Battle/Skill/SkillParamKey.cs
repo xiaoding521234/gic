@@ -142,6 +142,126 @@ namespace GIC.Data
         // 通用
         [InspectorName("叠加上限")]
         StackLimit = 37,
+
+        // 行秋
+        [InspectorName("雨帘剑获取")]
+        RainSwordGain = 38,
+
+        [InspectorName("每柄摩拉")]
+        MoraPerSword = 39,
+
+        [InspectorName("移速减少")]
+        MoveSpeedReduction = 40,
+
+        [InspectorName("契约补偿元能")]
+        ContractEnergyCompensation = 41,
+
+        [InspectorName("拒签惩罚元能")]
+        ContractRefusalPenalty = 42,
+
+        [InspectorName("掠夺折率")]
+        PlunderRate = 43,
+
+        [InspectorName("解除移动次数")]
+        ContractBreakMoveCount = 44,
+
+        [InspectorName("1命雨帘剑上限")]
+        C1RainSwordLimit = 45,
+
+        [InspectorName("1命协同元能")]
+        C1SynergyEnergyGain = 46,
+
+        [InspectorName("2命击倒获取剑数")]
+        C2KillSwordGain = 47,
+
+        [InspectorName("2命溢出攻击半径")]
+        C2OverflowRadius = 48,
+
+        [InspectorName("3命协同韧性")]
+        C3SynergyTenacityGain = 49,
+
+        // 通用
+        [InspectorName("元能增加")]
+        EnergyGain = 50,
+
+        // 丽莎
+        [InspectorName("惩罚伤害")]
+        PenaltyDamage = 51,
+
+        [InspectorName("1命飞针刺索敌半径")]
+        C1NeedleRadius = 52,
+
+        [InspectorName("1命飞针刺伤害")]
+        C1NeedleDamage = 53,
+
+        [InspectorName("1命飞针刺次数")]
+        C1NeedleCount = 54,
+
+        [InspectorName("2命元能增加")]
+        C2EnergyGain = 55,
+
+        [InspectorName("2命闪电触发上限")]
+        C2TriggerLimit = 56,
+
+        [InspectorName("3命增伤提升")]
+        C3DamageBonus = 57,
+
+        // 琴
+        [InspectorName("近战距离")]
+        CloseRange = 58,
+
+        [InspectorName("击退格数")]
+        Knockback = 59,
+
+        [InspectorName("命中距离上限")]
+        MaxRange = 60,
+
+        [InspectorName("风场格数")]
+        WindFieldRange = 61,
+
+        [InspectorName("冲刺距离")]
+        DashRange = 62,
+
+        [InspectorName("移速提升持续")]
+        MoveSpeedDuration = 63,
+
+        [InspectorName("移速伤害")]
+        MoveSpeedDamage = 64,
+
+        [InspectorName("瞬移范围")]
+        TeleportRange = 65,
+
+        [InspectorName("全队护盾")]
+        C0Shield = 66,
+
+        [InspectorName("1命命中距离提升")]
+        C1RangeBonus = 67,
+
+        [InspectorName("2命风场持续增加")]
+        C2DurationBonus = 68,
+
+        [InspectorName("2命牵引额外伤害")]
+        C2ThornDamage = 69,
+
+        // 诺艾尔
+        [InspectorName("蓄力回合")]
+        ChargeTurns = 70,
+
+        [InspectorName("护盾")]
+        Shield = 71,
+
+        [InspectorName("1命护盾转元能比例")]
+        C1ShieldToEnergyRate = 72,
+
+        [InspectorName("2命晕眩持续")]
+        C2StunDuration = 73,
+
+        [InspectorName("2命护盾")]
+        C2Shield = 74,
+
+        // 凯亚战技（文档有、早期落地遗漏）
+        [InspectorName("掠夺摩拉")]
+        MoraPlunder = 75,
     }
 
     /// <summary>

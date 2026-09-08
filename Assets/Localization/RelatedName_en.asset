@@ -26,6 +26,26 @@ MonoBehaviour:
     m_Localized: Amber
     m_Metadata:
       m_Items: []
+  - m_Id: 26802824705290240
+    m_Localized: Frost Shard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802824747233280
+    m_Localized: Song Ring
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802824747233281
+    m_Localized: Rose Thorn
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802824747233282
+    m_Localized: Dandelion Field
+    m_Metadata:
+      m_Items: []
+  - m_Id: 26802824747233283
+    m_Localized: Rain Sword
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
