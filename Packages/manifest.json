@@ -44,11 +44,10 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0",
-    "cn.tuanjie.ai.generators": "file:C:/Users/86139/.codely-cli/extensions/TJGenerators/Packages/cn.tuanjie.ai.generators",
     "cn.tuanjie.shadergraph-mcptools": "file:../.codely-cli/extensions/ShaderGraph-AI/Packages/cn.tuanjie.shadergraph-mcptools",
-    "cn.tuanjie.ai.profiler": "file:../.codely-cli/extensions/tuanjie-perf-profiler/Packages/cn.tuanjie.ai.profiler",
     "cn.tuanjie.figma2unity": "file:../.codely-cli/extensions/Figma2Unity/Packages/cn.tuanjie.figma2unity",
-    "cn.tuanjie.codely.bridge": "1.0.81"
+    "cn.tuanjie.codely.bridge": "1.0.81",
+    "cn.tuanjie.profiler.assistant": "file:../.codely-cli/extensions/profiler-assistant/Packages/cn.tuanjie.profiler.assistant"
   },
   "testables": [
     "com.besty.unity-skills"
