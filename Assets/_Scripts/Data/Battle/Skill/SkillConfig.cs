@@ -113,7 +113,7 @@ namespace GIC.Data
         /// <summary>
         /// 获取展示值文本（不含颜色）：
         /// 固定值 → "3"
-        /// 非固定值 → "100%攻击力"
+        /// 非固定值 → "100%"（基底名由 GetValueEntry 的 baseEntry 拼接）
         /// </summary>
         public string GetDisplayValueText()
         {
@@ -124,24 +124,6 @@ namespace GIC.Data
                 return value.ToString();
             }
             return value.ToString() + "%";
-        }
-
-        /// <summary>
-        /// 获取带颜色的展示值（用于动态描述注入）
-        /// </summary>
-        public string GetColoredDisplayValue()
-        {
-            string display = GetDisplayValueText();
-            if (string.IsNullOrEmpty(display)) return display;
-
-            // 固定值：数值本身着色
-            // 非固定值：数值着色 + 基础类型名着色
-            if (baseType == SkillBaseType.Fixed)
-            {
-                return $"<color=#FFD700>{display}</color>";
-            }
-            // 非固定值: "100%攻击力" → 数值和类型名一起着色
-            return $"<color=#FFD700>{display}</color>";
         }
 
         /// <summary>

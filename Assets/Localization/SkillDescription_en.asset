@@ -196,29 +196,29 @@ MonoBehaviour:
       Thorn</link></u></color> gain {C3DamageBonus} DMG Bonus"
     m_Metadata:
       m_Items: []
-  - m_Id: 30110001
+  - m_Id: 3011001
     m_Localized: "\xB7Walk in one of the four cardinal directions\n\xB7Each tile
       traversed leaves a Dandelion Wind behind, blowing in the direction of movement"
     m_Metadata:
       m_Items: []
-  - m_Id: 30110002
+  - m_Id: 3011002
     m_Localized: "\xB7Release wind pressure in one of the four cardinal directions\n\xB7Enemies
       more than {CloseRange} tiles away: pulled in front of Jean\n\xB7Enemies within
       {CloseRange} tiles: take {Damage} Anemo DMG and are knocked back {Knockback}
       tiles\n\xB7Max range {MaxRange} tiles"
     m_Metadata:
       m_Items: []
-  - m_Id: 30110003
+  - m_Id: 3011003
     m_Localized: "\xB7Create a <color=#FFD700><u><link=\"Buff:\u84B2\u516C\u82F1\u9886\u57DF\">Dandelion
       Field</link></u></color> for {Duration} turns"
     m_Metadata:
       m_Items: []
-  - m_Id: 30110004
+  - m_Id: 3011004
     m_Localized: "\xB7Create {WindFieldRange} tiles of Dandelion Wind in each of
       the four cardinal directions from the coordinated ally, blowing away from them"
     m_Metadata:
       m_Items: []
-  - m_Id: 30110005
+  - m_Id: 3011005
     m_Localized: "\xB7If Jean is on a Dandelion Wind, dash along its direction\n\xB7After
       leaving the wind, dash up to {DashRange} more tiles\n\xB7Passing other Dandelion
       Winds while dashing: Move SPD +{MoveSpeedBonus} for {MoveSpeedDuration} turns;
@@ -229,7 +229,7 @@ MonoBehaviour:
       exists"
     m_Metadata:
       m_Items: []
-  - m_Id: 30110006
+  - m_Id: 3011006
     m_Localized: "\xB7[C0] When Jean enters battle, all allied units gain a {C0Shield}
       shield\n\xB7[C1] Gale Blade can hit allied characters (dealing no DMG), max
       range +{C1RangeBonus}\n\xB7[C2] Dandelion Wind lasts {C2DurationBonus} more
@@ -238,26 +238,26 @@ MonoBehaviour:
       to her movement direction"
     m_Metadata:
       m_Items: []
-  - m_Id: 30120001
+  - m_Id: 3012001
     m_Localized: "\xB7Choose one of the four cardinal directions and enter a charging
       state\n\xB7After charging for {ChargeTurns} turns, deal {Damage} Geo DMG to
       all enemies in the 3\xD73 area ahead\n\xB7While charging: Move SPD -10, Skills
       disabled, can be interrupted by hard CC"
     m_Metadata:
       m_Items: []
-  - m_Id: 30120002
+  - m_Id: 3012002
     m_Localized: "\xB7Noelle gains a {Shield} shield"
     m_Metadata:
       m_Items: []
-  - m_Id: 30120003
+  - m_Id: 3012003
     m_Localized: "\xB7The coordinated ally gains a {Shield} shield"
     m_Metadata:
       m_Items: []
-  - m_Id: 30120004
+  - m_Id: 3012004
     m_Localized: "\xB7If Noelle is charging Sweeping Time, complete the charge immediately"
     m_Metadata:
       m_Items: []
-  - m_Id: 30120005
+  - m_Id: 3012005
     m_Localized: "\xB7[C1] When Noelle loses shield, she gains Energy equal to {C1ShieldToEnergyRate}
       of the shield lost\n\xB7[C2] When her Skill hits an enemy, it also Stuns for
       {C2StunDuration} turns and she gains a {C2Shield} shield\n\xB7[C3] Noelle's

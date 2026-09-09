@@ -203,47 +203,47 @@ MonoBehaviour:
     m_Key: Xingqiu_Constellation
     m_Metadata:
       m_Items: []
-  - m_Id: 30110001
+  - m_Id: 3011001
     m_Key: Jean_LeadingWind
     m_Metadata:
       m_Items: []
-  - m_Id: 30110002
+  - m_Id: 3011002
     m_Key: Jean_GaleBlade
     m_Metadata:
       m_Items: []
-  - m_Id: 30110003
+  - m_Id: 3011003
     m_Key: Jean_DandelionBreeze
     m_Metadata:
       m_Items: []
-  - m_Id: 30110004
+  - m_Id: 3011004
     m_Key: Jean_FollowTheWind
     m_Metadata:
       m_Items: []
-  - m_Id: 30110005
+  - m_Id: 3011005
     m_Key: Jean_Tailwind
     m_Metadata:
       m_Items: []
-  - m_Id: 30110006
+  - m_Id: 3011006
     m_Key: Jean_Constellation
     m_Metadata:
       m_Items: []
-  - m_Id: 30120001
+  - m_Id: 3012001
     m_Key: Noelle_SweepingTime
     m_Metadata:
       m_Items: []
-  - m_Id: 30120002
+  - m_Id: 3012002
     m_Key: Noelle_Spotless
     m_Metadata:
       m_Items: []
-  - m_Id: 30120003
+  - m_Id: 3012003
     m_Key: Noelle_ProtectiveHeart
     m_Metadata:
       m_Items: []
-  - m_Id: 30120004
+  - m_Id: 3012004
     m_Key: Noelle_CleanSweep
     m_Metadata:
       m_Items: []
-  - m_Id: 30120005
+  - m_Id: 3012005
     m_Key: Noelle_Constellation
     m_Metadata:
       m_Items: []
