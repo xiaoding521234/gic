@@ -401,6 +401,7 @@ MonoBehaviour:
   skillIcon: {fileID: 41932993180658910}
   skillCircle: {fileID: 8073703792750041267}
   skillSelect: {fileID: 3173257143361351232}
+  skillBadge: {fileID: 3659938512320176139}
   toggle: {fileID: 4726552218965850403}
   skillDetailView: {fileID: 0}
 --- !u!114 &4726552218965850403

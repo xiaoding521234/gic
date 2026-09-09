@@ -58,7 +58,7 @@ namespace GIC.UI
         private bool _spriteLoadDone;
 
         [Autowired] private UnitConfig _unitConfig;
-        [Autowired] private ElementFactionIconConfig _iconConfig;
+        [Autowired] private ElementFactionConfig _iconConfig;
         [Autowired] private AssetCache _assetCache;
 
         /// <summary>
@@ -114,9 +114,9 @@ namespace GIC.UI
             if (factionIcon != null && _iconConfig != null && data.factions?.Length > 0)
                 factionIcon.sprite = _iconConfig.GetFactionIcon(data.factions[0]);
 
-            // 立绘背景色 = 元素对应颜色
-            if (colorImage != null)
-                colorImage.color = ElementColor.GetColor(data.selfElement);
+            // 立绘背景色 = 元素对应颜色（配置文件）
+            if (colorImage != null && _iconConfig != null)
+                colorImage.color = _iconConfig.GetElementColor(data.selfElement);
 
             // 描述
             if (descriptionText != null)

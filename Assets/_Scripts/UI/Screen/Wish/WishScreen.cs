@@ -197,7 +197,7 @@ namespace GIC.UI
             {
                 var unitData = _unitConfig?.GetUnitData(newEntry.panel.UnitName);
                 if (unitData != null)
-                    ambience.SetElementColor(ElementColor.GetColor(unitData.selfElement));
+                    ambience.SetElementColor(ElementFactionConfig.Instance.GetElementColor(unitData.selfElement));
             }
 
             _isSwitching = false;
