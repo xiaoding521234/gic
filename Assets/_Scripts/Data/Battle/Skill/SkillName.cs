@@ -147,39 +147,39 @@ namespace GIC.Data
 
         #region 琴 (3011)
         [InspectorName("引领之风")]
-        Jean_LeadingWind = 30110001,
+        Jean_LeadingWind = 3011001,
 
         [InspectorName("风压剑")]
-        Jean_GaleBlade = 30110002,
+        Jean_GaleBlade = 3011002,
 
         [InspectorName("西风吹拂之时")]
-        Jean_DandelionBreeze = 30110003,
+        Jean_DandelionBreeze = 3011003,
 
         [InspectorName("听凭风引")]
-        Jean_FollowTheWind = 30110004,
+        Jean_FollowTheWind = 3011004,
 
         [InspectorName("顺风而行")]
-        Jean_Tailwind = 30110005,
+        Jean_Tailwind = 3011005,
 
         [InspectorName("琴命座")]
-        Jean_Constellation = 30110006,
+        Jean_Constellation = 3011006,
         #endregion
 
         #region 诺艾尔 (3012)
         [InspectorName("大扫除")]
-        Noelle_SweepingTime = 30120001,
+        Noelle_SweepingTime = 3012001,
 
         [InspectorName("要一尘不染才行")]
-        Noelle_Spotless = 30120002,
+        Noelle_Spotless = 3012002,
 
         [InspectorName("护心铠")]
-        Noelle_ProtectiveHeart = 30120003,
+        Noelle_ProtectiveHeart = 3012003,
 
         [InspectorName("干净利落")]
-        Noelle_CleanSweep = 30120004,
+        Noelle_CleanSweep = 3012004,
 
         [InspectorName("诺艾尔命座")]
-        Noelle_Constellation = 30120005,
+        Noelle_Constellation = 3012005,
         #endregion
 
         #region 行秋 (4001)
