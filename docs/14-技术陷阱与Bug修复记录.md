@@ -760,3 +760,18 @@ UnitConfig.asset 的 customParams `key: N` 用 **SkillParamKey 枚举值**（15=
 - 项目字体全量统一 zh-cn SDF（2026-09-08 用户拍板）：InputPopupDialog/CoopScreen 原 SourceHanSans SDF 引用（m_fontAsset+m_sharedMaterial 双形态）已切至 zh-cn SDF；SourceHanSans SDF 资产留库无引用
 
 ---
+
+## 31. 反射拿 Unity 字段判空必须 as 成具体类型——object 层 .NET null 比较认不出 fake null（2026-09-09 命座图标接线两次反转实证）
+
+### 现象
+编辑器脚本反射遍历 UnitConfig 技能条目给空 icon 赋值：目标条目明明是"未接线"（icon 序列化为 fileID:0），守卫 `iconF.GetValue(s) == null` 却恒为 false → 赋值分支永不执行（wired=0 静默失败）；同一批数据的另一个诊断脚本用 `GetValue(s) as Sprite; if (icon == null)` 却正确判空——两个脚本对同一字段得出相反结论。
+
+### 根因
+Unity 的 `UnityEngine.Object == null` 是**重载运算符**：missing/空引用反序列化产物（fake null，fileID:0/0 guid 引用）在 Unity 比较下等于 null。但反射 `FieldInfo.GetValue()` 返回 `object`，`object == null` 走 .NET 引用比较——fake null 是一个真实存在的伪装对象，引用非空 → 判"有值"。
+
+### 规范
+- 反射取 Unity Object 字段后**立即 `as Sprite`/`as GameObject` 等具体类型再判空**（具体类型的 == 编译绑定为 Unity 重载，fake null 正确识别）
+- 遍历判断"字段是否为空引用"的诊断脚本同理；`GetValue` 结果直接 `??`/`== null`（object 语境）判 Unity 字段 = 误判
+- 本项目 icon 空引用即 fileID:0 形态（fake null），任何"批量给空引用赋值"的桥脚本都先按本条自查守卫写法
+
+---
