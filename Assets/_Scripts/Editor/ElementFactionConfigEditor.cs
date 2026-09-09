@@ -1,5 +1,5 @@
 // ============================================
-// ElementFactionIconConfigEditor - 图标配置 Inspector
+// ElementFactionConfigEditor - 元素势力视觉配置 Inspector
 // ============================================
 // 非列表型配置：全字段默认绘制（Sprite 走预览控件）+ 底部自动加载工具。
 // 取代原独立窗口 ElementFactionIconAutoLoader（2026-08-16 迁入）。
@@ -13,8 +13,8 @@ using GIC.Data;
 
 namespace GIC.Editor
 {
-    [CustomEditor(typeof(ElementFactionIconConfig))]
-    public class ElementFactionIconConfigEditor : UnityEditor.Editor
+    [CustomEditor(typeof(ElementFactionConfig))]
+    public class ElementFactionConfigEditor : UnityEditor.Editor
     {
         private const string ElementStrokePath = "UI/Other/Element/Stroke/";
         private const string ElementDeepPath   = "UI/Other/Element/Deep/";
@@ -63,7 +63,7 @@ namespace GIC.Editor
 
         private void LoadAll()
         {
-            var config = (ElementFactionIconConfig)target;
+            var config = (ElementFactionConfig)target;
             if (config == null) return;
             Undo.RecordObject(config, "Auto-load element & faction icons");
 
@@ -105,7 +105,7 @@ namespace GIC.Editor
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
 
-            GICLog.Info("[ElementFactionIconConfig] 图标加载完成，请检查 fallback 项并手动替换缺失图标。");
+            GICLog.Info("[ElementFactionConfig] 图标加载完成，请检查 fallback 项并手动替换缺失图标。");
         }
 
         private static Sprite LoadSprite(string path)
@@ -113,7 +113,7 @@ namespace GIC.Editor
             var sprite = Resources.Load<Sprite>(path);
             if (sprite != null) return sprite;
 
-            GICLog.Warn($"[ElementFactionIconConfig] 未找到: Resources/{path}");
+            GICLog.Warn($"[ElementFactionConfig] 未找到: Resources/{path}");
             return null;
         }
     }

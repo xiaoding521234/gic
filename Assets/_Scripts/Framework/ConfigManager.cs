@@ -19,7 +19,7 @@ namespace GIC.Framework
         [Bean] public UnitConfig GetUnitConfig() => LoadConfig<UnitConfig>("Configs/UnitConfig");
         [Bean] public ItemConfig GetItemConfig() => LoadConfig<ItemConfig>("Configs/ItemConfig");
         [Bean] public PositionConfig GetPositionConfig() => LoadConfig<PositionConfig>("Configs/PositionConfig");
-        [Bean] public ElementFactionIconConfig GetElementFactionIconConfig() => LoadConfig<ElementFactionIconConfig>("Configs/ElementFactionIconConfig");
+        [Bean] public ElementFactionConfig GetElementFactionConfig() => LoadConfig<ElementFactionConfig>("Configs/ElementFactionConfig");
         [Bean] public StarVisualConfig GetStarVisualConfig() => LoadConfig<StarVisualConfig>("Configs/StarVisualConfig");
         [Bean] public InitialSaveConfig GetInitialSaveConfig() => LoadConfig<InitialSaveConfig>("Configs/InitialSaveConfig");
 
@@ -33,6 +33,8 @@ namespace GIC.Framework
         {
             // StarVisualConfig 静态访问兼容
             StarVisualConfig.Initialize(GetStarVisualConfig());
+            // ElementFactionConfig 静态访问兼容（元素颜色等，非注入上下文调用）
+            ElementFactionConfig.Initialize(GetElementFactionConfig());
             // CardConfigResolver 静态访问兼容（SaveCardData.Config / 卡牌视图策略）
             CardConfigResolver.Initialize(_cardResolver);
         }

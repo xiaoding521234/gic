@@ -14,6 +14,7 @@ namespace GIC.UI
         public Image skillIcon;
         public Image skillCircle;
         public Image skillSelect;
+        public Image skillBadge;
         public Toggle toggle;
 
         private ViewType viewType;
@@ -39,8 +40,18 @@ namespace GIC.UI
             this.unitData = unitData;
             this.skillDetailView = skillDetailView;
 
+            // 元素染色（2026-09-10 拍板：图案保持白色不染，底图染亮元素色；色值=配置文件）
+            // 底图为白基底圆板，乘色后即完整元素亮色；无 unitData 回退物理灰防白底白图
+            Color elementColor = unitData != null
+                ? ElementFactionConfig.Instance.GetElementColor(unitData.selfElement)
+                : ElementFactionConfig.Instance.GetElementColor(ElementType.Physical);
             if (skillIcon != null)
+            {
                 skillIcon.sprite = skillData.icon;
+                skillIcon.color = Color.white;
+            }
+            if (skillBadge != null)
+                skillBadge.color = elementColor;
                 
             if (skillData.skillType.IsActive())
             {
