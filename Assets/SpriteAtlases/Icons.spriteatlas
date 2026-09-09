@@ -43,11 +43,19 @@ SpriteAtlas:
     packedSpriteRenderDataKeys:
     - 9af9caa073664874787b3310147653e9: 21300000
     - 4f97dfa0394017848b683bb6d38591f9: 21300000
+    - 07511fe03878c134594a3ae79e93cce5: 21300000
     - aa067161f45acfc41bfba70b4a80b49b: 21300000
+    - f0b71a61a19af9244942d928d64fc78f: 21300000
     - 2e04ac81d073d5e4b822ec722cace92c: 21300000
+    - 077a9ba1a9d595e40951208fac980c5b: 21300000
     - 62f43eb11ab365d4f8b5dc555ee7175d: 21300000
+    - 7ffdac12af69a6f42914f3ecaf2951c9: 21300000
+    - 40f6ddd2cabef0443a063c378f5ab1ff: 21300000
     - de472ae2896b9ce4d81f66fa24f26c96: 21300000
     - b1e72193a5f02a2438f9dd084f92be9b: 21300000
+    - 90f7de93cd1e29849a9fa58c311c9456: 21300000
+    - 62a6fe0453ea4da45ac77d9d59fd5ce4: 21300000
+    - 22f63d14e3df3074382cf859230fa72c: 21300000
     - 39f9ec44617920641bbb03a2d5631fa1: 21300000
     - d72ecd35e6924114b95f51402007f837: 21300000
     - bcd88e26649e3fc4cbe3cbceac56cbb0: 21300000
@@ -55,26 +63,46 @@ SpriteAtlas:
     - bdd686e661bbce84eaf3ac90bafc5c68: 21300000
     - 904790a7b6578e443899548661a1c8e5: 21300000
     - 79595858371497641a128d88edd01616: 21300000
+    - 028585a8761cbcc47be102af0f342b88: 21300000
+    - f9bbea59072d2a841af9e60db99816c4: 21300000
+    - cc894c695492e654fa6bc8f236aefb1f: 21300000
     - 04b7668990803b74e9e59675da77d209: 21300000
     - f96030a9a9bcc494a802b1a9c0ae67cd: 21300000
     - f1c2792a0d66dd6408864beedbfd0ec1: 21300000
     - f0a43b3a6d95abb48bb0d0a80aa91f24: 21300000
+    - 8c512cea4609494478d1452a226c79bb: 21300000
+    - 202aebfa5c996d24d9ba4ca5d46fa62e: 21300000
+    - 7fc2f61c174056148b68bb76f9a3fb25: 21300000
+    - f9cdae9cfc9e3f94a933c4eddbdec802: 21300000
+    - 89e8a48dfc0374349b13c63c734a3957: 21300000
     - 5a3ca0cdd572a684885527900394f22b: 21300000
+    - 3a27c20eef178e941ab32fd1972c5006: 21300000
     - 8fd7698eeaa5ef048af18b5cb4531296: 21300000
     - c17fe7ded9f44a04bbee607a9c07ac18: 21300000
+    - 0ff24aee6ba7a3d418d51b5fbb0ffe14: 21300000
     - d32f1a0fe4e84f88969dc7cccae5122e: 21300000
     - 64afcc1f1a0efb14699b321d7585fdf8: 21300000
+    - 7554bb3fe73de1c4e9d04c0bd8f0bc6d: 21300000
     - 32d5c04fc5004494888bc64d1adceffe: 21300000
     - 4eaca57f760d8864ab50b40d6d5d65bb: 21300000
+    - c9c63ccf729974b4db4ebd54d53a87a8: 21300000
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
   - {fileID: 21300000, guid: 9af9caa073664874787b3310147653e9, type: 3}
   - {fileID: 21300000, guid: 4f97dfa0394017848b683bb6d38591f9, type: 3}
+  - {fileID: 21300000, guid: 07511fe03878c134594a3ae79e93cce5, type: 3}
   - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
+  - {fileID: 21300000, guid: f0b71a61a19af9244942d928d64fc78f, type: 3}
   - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
+  - {fileID: 21300000, guid: 077a9ba1a9d595e40951208fac980c5b, type: 3}
   - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
+  - {fileID: 21300000, guid: 7ffdac12af69a6f42914f3ecaf2951c9, type: 3}
+  - {fileID: 21300000, guid: 40f6ddd2cabef0443a063c378f5ab1ff, type: 3}
   - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
   - {fileID: 21300000, guid: b1e72193a5f02a2438f9dd084f92be9b, type: 3}
+  - {fileID: 21300000, guid: 90f7de93cd1e29849a9fa58c311c9456, type: 3}
+  - {fileID: 21300000, guid: 62a6fe0453ea4da45ac77d9d59fd5ce4, type: 3}
+  - {fileID: 21300000, guid: 22f63d14e3df3074382cf859230fa72c, type: 3}
   - {fileID: 21300000, guid: 39f9ec44617920641bbb03a2d5631fa1, type: 3}
   - {fileID: 21300000, guid: d72ecd35e6924114b95f51402007f837, type: 3}
   - {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
@@ -82,25 +110,45 @@ SpriteAtlas:
   - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
   - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
   - {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
+  - {fileID: 21300000, guid: 028585a8761cbcc47be102af0f342b88, type: 3}
+  - {fileID: 21300000, guid: f9bbea59072d2a841af9e60db99816c4, type: 3}
+  - {fileID: 21300000, guid: cc894c695492e654fa6bc8f236aefb1f, type: 3}
   - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
   - {fileID: 21300000, guid: f96030a9a9bcc494a802b1a9c0ae67cd, type: 3}
   - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
   - {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
+  - {fileID: 21300000, guid: 8c512cea4609494478d1452a226c79bb, type: 3}
+  - {fileID: 21300000, guid: 202aebfa5c996d24d9ba4ca5d46fa62e, type: 3}
+  - {fileID: 21300000, guid: 7fc2f61c174056148b68bb76f9a3fb25, type: 3}
+  - {fileID: 21300000, guid: f9cdae9cfc9e3f94a933c4eddbdec802, type: 3}
+  - {fileID: 21300000, guid: 89e8a48dfc0374349b13c63c734a3957, type: 3}
   - {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
+  - {fileID: 21300000, guid: 3a27c20eef178e941ab32fd1972c5006, type: 3}
   - {fileID: 21300000, guid: 8fd7698eeaa5ef048af18b5cb4531296, type: 3}
   - {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
+  - {fileID: 21300000, guid: 0ff24aee6ba7a3d418d51b5fbb0ffe14, type: 3}
   - {fileID: 21300000, guid: d32f1a0fe4e84f88969dc7cccae5122e, type: 3}
   - {fileID: 21300000, guid: 64afcc1f1a0efb14699b321d7585fdf8, type: 3}
+  - {fileID: 21300000, guid: 7554bb3fe73de1c4e9d04c0bd8f0bc6d, type: 3}
   - {fileID: 21300000, guid: 32d5c04fc5004494888bc64d1adceffe, type: 3}
   - {fileID: 21300000, guid: 4eaca57f760d8864ab50b40d6d5d65bb, type: 3}
+  - {fileID: 21300000, guid: c9c63ccf729974b4db4ebd54d53a87a8, type: 3}
   m_PackedSpriteNamesToIndex:
   - apple
   - egg
+  - barbara_shining_miracle
   - masterless_starglitter
+  - kaeya_frostgnaw
   - intertwined_fate
+  - amber_double_shot
   - primogem
+  - badge
+  - xingqiu_fatal_rainscreen
   - stamina
   - detail
+  - lisa_lightning_rose
+  - barbara_water_serenade
+  - kaeya_coldblooded_blade
   - bottom
   - select
   - sharpshooter
@@ -108,17 +156,29 @@ SpriteAtlas:
   - raw_meat
   - dandelion_wine
   - constellation
+  - barbara_vitality_burst
+  - noelle_clean_sweep
+  - kaeya_hidden_strength
   - mora
   - bow
   - magatama
   - reveal
+  - noelle_spotless
+  - noelle_sweeping_time
+  - lisa_violet_arc
+  - jean_gale_blade
+  - kaeya_glacial_waltz
   - walk
+  - jean_dandelion_breeze
   - fly
   - arrow_rain
+  - noelle_protective_heart
   - acquaint_fate
   - null
+  - lisa_pulsing_witch
   - radish
   - wheat
+  - jean_follow_the_wind
   m_RenderDataMap: {}
   m_Tag: Icons
   m_IsVariant: 0
