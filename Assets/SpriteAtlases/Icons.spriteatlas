@@ -58,6 +58,9 @@ SpriteAtlas:
     - 62a6fe0453ea4da45ac77d9d59fd5ce4: 21300000
     - 22f63d14e3df3074382cf859230fa72c: 21300000
     - 39f9ec44617920641bbb03a2d5631fa1: 21300000
+    - 3a8f7b54b380e224ebe5962d721b0ab8: 21300000
+    - 5ef5069407237b24ca3420f0fa7d98f7: 21300000
+    - 09f633e4fc72fcd46878a839b79ee026: 21300000
     - d72ecd35e6924114b95f51402007f837: 21300000
     - bcd88e26649e3fc4cbe3cbceac56cbb0: 21300000
     - a47534b6fe0888444b82db899e95683d: 21300000
@@ -74,10 +77,12 @@ SpriteAtlas:
     - f0a43b3a6d95abb48bb0d0a80aa91f24: 21300000
     - 8c512cea4609494478d1452a226c79bb: 21300000
     - 202aebfa5c996d24d9ba4ca5d46fa62e: 21300000
+    - 9555378b322c48d4a9648978ba3c800d: 21300000
     - 7fc2f61c174056148b68bb76f9a3fb25: 21300000
     - f9cdae9cfc9e3f94a933c4eddbdec802: 21300000
     - 8bb8d0fca7e98104fbee44166d9149d4: 21300000
     - 5cdf4b1d5dd14e1408c54c05afbe67e9: 21300000
+    - f6c5f66d7833c7e4690234420394876d: 21300000
     - 89e8a48dfc0374349b13c63c734a3957: 21300000
     - 5a3ca0cdd572a684885527900394f22b: 21300000
     - 3a27c20eef178e941ab32fd1972c5006: 21300000
@@ -111,6 +116,9 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 62a6fe0453ea4da45ac77d9d59fd5ce4, type: 3}
   - {fileID: 21300000, guid: 22f63d14e3df3074382cf859230fa72c, type: 3}
   - {fileID: 21300000, guid: 39f9ec44617920641bbb03a2d5631fa1, type: 3}
+  - {fileID: 21300000, guid: 3a8f7b54b380e224ebe5962d721b0ab8, type: 3}
+  - {fileID: 21300000, guid: 5ef5069407237b24ca3420f0fa7d98f7, type: 3}
+  - {fileID: 21300000, guid: 09f633e4fc72fcd46878a839b79ee026, type: 3}
   - {fileID: 21300000, guid: d72ecd35e6924114b95f51402007f837, type: 3}
   - {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
   - {fileID: 21300000, guid: a47534b6fe0888444b82db899e95683d, type: 3}
@@ -127,10 +135,12 @@ SpriteAtlas:
   - {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
   - {fileID: 21300000, guid: 8c512cea4609494478d1452a226c79bb, type: 3}
   - {fileID: 21300000, guid: 202aebfa5c996d24d9ba4ca5d46fa62e, type: 3}
+  - {fileID: 21300000, guid: 9555378b322c48d4a9648978ba3c800d, type: 3}
   - {fileID: 21300000, guid: 7fc2f61c174056148b68bb76f9a3fb25, type: 3}
   - {fileID: 21300000, guid: f9cdae9cfc9e3f94a933c4eddbdec802, type: 3}
   - {fileID: 21300000, guid: 8bb8d0fca7e98104fbee44166d9149d4, type: 3}
   - {fileID: 21300000, guid: 5cdf4b1d5dd14e1408c54c05afbe67e9, type: 3}
+  - {fileID: 21300000, guid: f6c5f66d7833c7e4690234420394876d, type: 3}
   - {fileID: 21300000, guid: 89e8a48dfc0374349b13c63c734a3957, type: 3}
   - {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
   - {fileID: 21300000, guid: 3a27c20eef178e941ab32fd1972c5006, type: 3}
@@ -163,6 +173,9 @@ SpriteAtlas:
   - barbara_water_serenade
   - kaeya_coldblooded_blade
   - bottom
+  - lisa_rose_mark
+  - barbara_heartfelt_devotion
+  - xingqiu_raindeep_gate
   - select
   - sharpshooter
   - teleport
@@ -179,10 +192,12 @@ SpriteAtlas:
   - reveal
   - noelle_spotless
   - noelle_sweeping_time
+  - amphibious
   - lisa_violet_arc
   - jean_gale_blade
   - catalyst_skill
   - gauntlet_skill
+  - xingqiu_feiyun_commerce
   - kaeya_glacial_waltz
   - walk
   - jean_dandelion_breeze

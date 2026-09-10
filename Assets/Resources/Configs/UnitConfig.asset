@@ -742,7 +742,7 @@ MonoBehaviour:
         value: 10
         baseType: 9
     - skillID: 3003004
-      icon: {fileID: 21300000, guid: 62a6fe0453ea4da45ac77d9d59fd5ce4, type: 3}
+      icon: {fileID: 21300000, guid: 8bb8d0fca7e98104fbee44166d9149d4, type: 3}
       skillType: 2
       customParams:
       - key: 22
@@ -768,7 +768,7 @@ MonoBehaviour:
         value: 100
         baseType: 0
     - skillID: 3003002
-      icon: {fileID: 0}
+      icon: {fileID: 21300000, guid: 5ef5069407237b24ca3420f0fa7d98f7, type: 3}
       skillType: 6
       customParams:
       - key: 3
@@ -907,7 +907,7 @@ MonoBehaviour:
     tags: 74170000a30f0000ba0b0000bf0b0000
     skills:
     - skillID: 3004001
-      icon: {fileID: 21300000, guid: 7fc2f61c174056148b68bb76f9a3fb25, type: 3}
+      icon: {fileID: 21300000, guid: a47534b6fe0888444b82db899e95683d, type: 3}
       skillType: 1
       customParams:
       - key: 7
@@ -939,7 +939,7 @@ MonoBehaviour:
         value: 50
         baseType: 0
     - skillID: 3004003
-      icon: {fileID: 0}
+      icon: {fileID: 21300000, guid: 3a8f7b54b380e224ebe5962d721b0ab8, type: 3}
       skillType: 6
       customParams:
       - key: 9
@@ -1387,7 +1387,7 @@ MonoBehaviour:
     tags: 72170000c00b0000ba0b0000
     skills:
     - skillID: 3
-      icon: {fileID: 0}
+      icon: {fileID: 21300000, guid: 9555378b322c48d4a9648978ba3c800d, type: 3}
       skillType: 1
       customParams:
       - key: 5
@@ -1407,7 +1407,7 @@ MonoBehaviour:
         value: 1
         baseType: 0
     - skillID: 4001002
-      icon: {fileID: 0}
+      icon: {fileID: 21300000, guid: f6c5f66d7833c7e4690234420394876d, type: 3}
       skillType: 3
       customParams:
       - key: 38
@@ -1420,7 +1420,7 @@ MonoBehaviour:
         value: 30
         baseType: 0
     - skillID: 4001003
-      icon: {fileID: 0}
+      icon: {fileID: 21300000, guid: 09f633e4fc72fcd46878a839b79ee026, type: 3}
       skillType: 8
       customParams:
       - key: 40
