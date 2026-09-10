@@ -40,7 +40,8 @@ namespace GIC.UI
             this.unitData = unitData;
             this.skillDetailView = skillDetailView;
 
-            // 元素染色（2026-09-10 拍板：图案保持白色不染，底图染亮元素色；色值=配置文件）
+            // 元素染色（2026-09-10 拍板：图案保持白色不染，底图染亮元素色；色值=配置文件。
+            // 2026-09-10 晚曾试"图案染提亮元素色"，用户目检后取消——勿再主动提案）
             // 底图为白基底圆板，乘色后即完整元素亮色；无 unitData 回退物理灰防白底白图
             Color elementColor = unitData != null
                 ? ElementFactionConfig.Instance.GetElementColor(unitData.selfElement)
