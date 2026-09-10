@@ -49,6 +49,7 @@ SpriteAtlas:
     - 2e04ac81d073d5e4b822ec722cace92c: 21300000
     - 077a9ba1a9d595e40951208fac980c5b: 21300000
     - 62f43eb11ab365d4f8b5dc555ee7175d: 21300000
+    - add0db023b9bec4498a4bb85db7e1aa6: 21300000
     - 7ffdac12af69a6f42914f3ecaf2951c9: 21300000
     - 40f6ddd2cabef0443a063c378f5ab1ff: 21300000
     - de472ae2896b9ce4d81f66fa24f26c96: 21300000
@@ -59,6 +60,7 @@ SpriteAtlas:
     - 39f9ec44617920641bbb03a2d5631fa1: 21300000
     - d72ecd35e6924114b95f51402007f837: 21300000
     - bcd88e26649e3fc4cbe3cbceac56cbb0: 21300000
+    - a47534b6fe0888444b82db899e95683d: 21300000
     - c54119b6fe915994d9346433dfed462b: 21300000
     - bdd686e661bbce84eaf3ac90bafc5c68: 21300000
     - 904790a7b6578e443899548661a1c8e5: 21300000
@@ -74,10 +76,14 @@ SpriteAtlas:
     - 202aebfa5c996d24d9ba4ca5d46fa62e: 21300000
     - 7fc2f61c174056148b68bb76f9a3fb25: 21300000
     - f9cdae9cfc9e3f94a933c4eddbdec802: 21300000
+    - 8bb8d0fca7e98104fbee44166d9149d4: 21300000
+    - 5cdf4b1d5dd14e1408c54c05afbe67e9: 21300000
     - 89e8a48dfc0374349b13c63c734a3957: 21300000
     - 5a3ca0cdd572a684885527900394f22b: 21300000
     - 3a27c20eef178e941ab32fd1972c5006: 21300000
+    - cc6ea64e6da673945bf000148a98f1ce: 21300000
     - 8fd7698eeaa5ef048af18b5cb4531296: 21300000
+    - 8fd8969e565d8ca4bab57875fe2453a8: 21300000
     - c17fe7ded9f44a04bbee607a9c07ac18: 21300000
     - 0ff24aee6ba7a3d418d51b5fbb0ffe14: 21300000
     - d32f1a0fe4e84f88969dc7cccae5122e: 21300000
@@ -96,6 +102,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
   - {fileID: 21300000, guid: 077a9ba1a9d595e40951208fac980c5b, type: 3}
   - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
+  - {fileID: 21300000, guid: add0db023b9bec4498a4bb85db7e1aa6, type: 3}
   - {fileID: 21300000, guid: 7ffdac12af69a6f42914f3ecaf2951c9, type: 3}
   - {fileID: 21300000, guid: 40f6ddd2cabef0443a063c378f5ab1ff, type: 3}
   - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
@@ -106,6 +113,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 39f9ec44617920641bbb03a2d5631fa1, type: 3}
   - {fileID: 21300000, guid: d72ecd35e6924114b95f51402007f837, type: 3}
   - {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
+  - {fileID: 21300000, guid: a47534b6fe0888444b82db899e95683d, type: 3}
   - {fileID: 21300000, guid: c54119b6fe915994d9346433dfed462b, type: 3}
   - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
   - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
@@ -121,10 +129,14 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 202aebfa5c996d24d9ba4ca5d46fa62e, type: 3}
   - {fileID: 21300000, guid: 7fc2f61c174056148b68bb76f9a3fb25, type: 3}
   - {fileID: 21300000, guid: f9cdae9cfc9e3f94a933c4eddbdec802, type: 3}
+  - {fileID: 21300000, guid: 8bb8d0fca7e98104fbee44166d9149d4, type: 3}
+  - {fileID: 21300000, guid: 5cdf4b1d5dd14e1408c54c05afbe67e9, type: 3}
   - {fileID: 21300000, guid: 89e8a48dfc0374349b13c63c734a3957, type: 3}
   - {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
   - {fileID: 21300000, guid: 3a27c20eef178e941ab32fd1972c5006, type: 3}
+  - {fileID: 21300000, guid: cc6ea64e6da673945bf000148a98f1ce, type: 3}
   - {fileID: 21300000, guid: 8fd7698eeaa5ef048af18b5cb4531296, type: 3}
+  - {fileID: 21300000, guid: 8fd8969e565d8ca4bab57875fe2453a8, type: 3}
   - {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
   - {fileID: 21300000, guid: 0ff24aee6ba7a3d418d51b5fbb0ffe14, type: 3}
   - {fileID: 21300000, guid: d32f1a0fe4e84f88969dc7cccae5122e, type: 3}
@@ -142,6 +154,7 @@ SpriteAtlas:
   - intertwined_fate
   - amber_double_shot
   - primogem
+  - sword_skill
   - badge
   - xingqiu_fatal_rainscreen
   - stamina
@@ -152,6 +165,7 @@ SpriteAtlas:
   - bottom
   - select
   - sharpshooter
+  - teleport
   - circle
   - raw_meat
   - dandelion_wine
@@ -167,10 +181,14 @@ SpriteAtlas:
   - noelle_sweeping_time
   - lisa_violet_arc
   - jean_gale_blade
+  - catalyst_skill
+  - gauntlet_skill
   - kaeya_glacial_waltz
   - walk
   - jean_dandelion_breeze
+  - polearm_skill
   - fly
+  - claymore_skill
   - arrow_rain
   - noelle_protective_heart
   - acquaint_fate
