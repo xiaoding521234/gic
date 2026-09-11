@@ -902,7 +902,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
-    selfElement: 7
+    selfElement: 4
     visionRange: -64
     tags: 74170000a30f0000ba0b0000bf0b0000
     skills:
@@ -1283,9 +1283,9 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
-    selfElement: 6
+    selfElement: 7
     visionRange: -64
-    tags: 73170000ef030000bd0b0000ba0b0000
+    tags: 71170000ef030000bd0b0000ba0b0000
     skills:
     - skillID: 1
       icon: {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
@@ -1384,7 +1384,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     selfElement: 2
     visionRange: -64
-    tags: 72170000c00b0000ba0b0000
+    tags: 73170000c00b0000ba0b0000
     skills:
     - skillID: 3
       icon: {fileID: 21300000, guid: 9555378b322c48d4a9648978ba3c800d, type: 3}
