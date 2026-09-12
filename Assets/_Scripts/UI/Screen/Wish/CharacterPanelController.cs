@@ -138,6 +138,18 @@ namespace GIC.UI
             SnapToTarget();
         }
 
+        /// <summary>
+        /// 池化复位（WishScreen.OnShow 每开一次遍历调用，docs/14 §39 连坐）：
+        /// FadeOut 协程被入池 SetActive(false) 打断时，尾部 SetAlpha(0)+SetActive(false) 永不执行
+        /// ——面板残留"半透明+激活"态，重开后叠在新选中面板上（双卡池叠加实证）。
+        /// </summary>
+        public void ResetHidden()
+        {
+            StopAllCoroutines(); // 杀掉残留的 FadeOut/FadeIn 协程
+            SetAlpha(0f);
+            gameObject.SetActive(false);
+        }
+
         public void FadeIn()
         {
             EnsureTargetPositions();

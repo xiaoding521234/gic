@@ -897,4 +897,6 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - **位置断言是面板冒烟的必备维度**（§37 断言盲区补充第二例）：只断言 alpha/锁/容器数量查不出"动画到不了位"——必须反射断言 `当前 anchoredPosition == 缓存目标位` + 跨开关目标位零漂移
 - 池化迁移 checklist 新增：OnShow 内每个方法调用逐个问"这个是消费缓存还是生产缓存？生产缓存的必须挪 Awake 或加守卫"
 
+**§39b 连坐第二例（同日实证，"重开叠加两个卡池"）**：FadeOut 类协程被入池 SetActive(false) 硬杀时，**尾部的收尾动作（SetAlpha(0)+SetActive(false)）永不执行**——面板残留"半透明+activeSelf=True"，重开后叠在新选中面板上（用户序列：切到 Furina→关闭→重开=双卡池叠加）。运行时取证 `[5]act=True a=0.04` 一发实锤。**规范**：所有 Fade/Switch 类"协程尾部收尾"的显示物，OnShow 必须提供强制复位（CharacterPanelController.ResetHidden=StopAllCoroutines+SetAlpha(0)+SetActive(false)，WishScreen.OnShow 遍历全量归零）——收尾语义不能只依赖协程跑完，必须可被 OnShow 幂等重建。
+
 ---
