@@ -76,7 +76,8 @@ namespace GIC.UI
         public static readonly ScreenId Map = ScreenId.Overlay("Map", SceneType.MapScreen);          // 保持场景制（3D 内容，docs/23 D1）
         // P2 已翻 PrefabHost（2026-09-12）：场景删除；MainHall/PetGameBridge 按 SceneType 地址经 _bySceneName 仍命中本条
         public static readonly ScreenId Settings = ScreenId.Prefab("Settings", "Prefabs/UIPanels/SettingsScreen");
-        public static readonly ScreenId Backpack = ScreenId.Overlay("Backpack", SceneType.BackpackScreen); // P3→Prefab
+        // P3 已翻 PrefabHost（2026-09-13，池化+双层毛玻璃+生命周期拆分配方）
+        public static readonly ScreenId Backpack = ScreenId.Prefab("Backpack", "Prefabs/UIPanels/BackpackScreen");
         public static readonly ScreenId Wish = ScreenId.Overlay("Wish", SceneType.WishScreen);        // P3→Prefab
         public static readonly ScreenId Coop = ScreenId.Overlay("Coop", SceneType.CoopScreen);        // P3→Prefab
 

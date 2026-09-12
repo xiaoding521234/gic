@@ -21,6 +21,25 @@ namespace GIC.UI
         private RectTransform leftButtonRect;
         private RectTransform rightButtonRect;
 
+        // 毛玻璃底图（BackPanel：UIBlurCapture 的 Image）——扫入扫出驱动
+        //（双层配方 docs/14 §38b：变暗层 BackDim 瞬时，模糊层才扫）
+        private UnityEngine.UI.Image _blurBackdrop;
+
+        private UnityEngine.UI.Image BlurBackdrop
+        {
+            get
+            {
+                if (_blurBackdrop == null)
+                {
+                    // BackPanel 在 Canvas 子树下、与脚本对象是兄弟——须从面板根搜（docs/14 §37 连坐）
+                    var root = transform.parent != null ? transform.parent : transform;
+                    var cap = root.GetComponentInChildren<GIC.UI.UIBlurCapture>(true);
+                    if (cap != null) _blurBackdrop = cap.GetComponent<UnityEngine.UI.Image>();
+                }
+                return _blurBackdrop;
+            }
+        }
+
         private void CachePanelPositions()
         {
             if (topPanel != null)
@@ -65,15 +84,28 @@ namespace GIC.UI
         private IEnumerator PlaySlideInAnimation()
         {
             InputLocks.Push(this, InputLockReason.Entering);
+
+            // 首帧跳过计时（docs/14 §37 纪律②）：打开帧 deltaTime 会吃到激活/加载尖峰帧时长
+            yield return null;
+
             float elapsed = 0f;
             while (elapsed < panelSlideDuration)
             {
+                // 秒开秒关守卫（docs/14 §37 纪律③）：释放 Entering 锁交由退场接管
+                if (isClosing)
+                {
+                    InputLocks.Pop(this, InputLockReason.Entering);
+                    yield break;
+                }
+
                 elapsed += Time.deltaTime;
                 float t = slideCurve.Evaluate(elapsed / panelSlideDuration);
                 AnimateSlide(t, isOut: false);
+                if (BlurBackdrop != null) BlurBackdrop.fillAmount = t; // 模糊顶→底扫入（变暗层瞬时，双层配方）
                 yield return null;
             }
             SnapToTarget();
+            if (BlurBackdrop != null) BlurBackdrop.fillAmount = 1f;
             InputLocks.Pop(this, InputLockReason.Entering);
         }
 
@@ -91,11 +123,13 @@ namespace GIC.UI
                 AnimateSlide(t, isOut: true);
                 if (centerCanvasGroup != null) centerCanvasGroup.alpha = Mathf.Lerp(centerStartAlpha, 0f, t);
                 if (cardDetailCanvasGroup != null) cardDetailCanvasGroup.alpha = Mathf.Lerp(detailStartAlpha, 0f, t);
+                if (BlurBackdrop != null) BlurBackdrop.fillAmount = 1f - t; // 模糊底→顶扫出（用户拍板"关闭同理"）
                 yield return null;
             }
 
             if (centerCanvasGroup != null) centerCanvasGroup.alpha = 0f;
             if (cardDetailCanvasGroup != null) cardDetailCanvasGroup.alpha = 0f;
+            if (BlurBackdrop != null) BlurBackdrop.fillAmount = 0f;
             // 收尾（Closing 锁 Pop + GoBack）由 ScreenBase.CloseScreen 模板统一处理
         }
 
