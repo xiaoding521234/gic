@@ -7,8 +7,11 @@ namespace GIC.Framework
     /// 双指捏合识别器（连续；MaxPointers=2）。第二指落下即宣胜起手（hub 先已按"双指取代单指"
     /// 取消同面单指识别器——Map/桌宠现有语义）；比例式回调 startDist/当前距离（消费者做
     /// pinchStartSize * ratio，Map 现公式），附双指中点屏幕位（消费者做锚定缩放）。
+    /// **纯触屏手势**（PointerKind.Touch 才追踪——原 Map/pet 语义：鼠标不参与捏合；2026-09-13
+    /// P2 回归修复：曾把鼠标追踪为第一指+晚起手用未初始化 _p1=(0,0) 算基准距离，单鼠标拖拽被
+    /// 误判为捏合缩放，docs/14 §41）。
     /// 起手门槛=两指都不在 UI 上（hub 门2 在双指 Began 时按位置式兼查既有指，Map L470 实证教训）。
-    /// 两指同点（距离 ≤1px 无比例基准）不起手，**分开后可晚起手**（Map 现行为：每帧重试起手判定）。
+    /// 两指同点（距离 ≤1px 无比例基准）不起手，**两指齐备后**分开可晚起手（Map 现行为：每帧重试起手判定）。
     /// 注意：第二指起手瞬间在 UI 上则本识别器不追踪它——比旧实现略收紧（旧=两指都离开 UI 后还能
     /// 补起手）；"手指先按在按钮上再拖出"的补起手路径视为按钮意图，目检若异议再放宽。
     /// 一指抬起 → Ended；剩余指不自动续拖（Map 现语义；消费者可自行接管，libGDX 无缝转拖见 docs/24 §8）。
@@ -32,6 +35,8 @@ namespace GIC.Framework
 
         protected override void OnPointerEvent(in PointerEvent e)
         {
+            if (e.Kind != PointerKind.Touch) return; // 纯触屏手势：非触摸指针一律不追踪（鼠标拖拽归 DragRecognizer）
+
             switch (e.Phase)
             {
                 case PointerPhase.Began:
@@ -47,7 +52,7 @@ namespace GIC.Framework
                         if (e.OverUI) return; // 一指在 UI 上不捏合（Map"捏按钮归按钮"规则；OverUI=hub 双指位置式兼查结果）
                         _id1 = e.Id;
                         _p1 = e.Position;
-                        TryBegin(); // 两指同点则不 now，等分开后晚起手
+                        TryBegin(); // 两指同点则不起手，等分开后晚起手
                     }
                     return;
 
@@ -65,9 +70,9 @@ namespace GIC.Framework
                             OnPinchRatio?.Invoke(_startDist / dist, (_p0 + _p1) * 0.5f);
                         }
                     }
-                    else if (State == GestureState.Possible)
+                    else if (State == GestureState.Possible && _id1 != int.MinValue)
                     {
-                        TryBegin(); // 晚起手：两指从同点分开（Map 现行为=起手判定每帧重试）
+                        TryBegin(); // 晚起手：两指齐备前提下，从同点分开时补起手（单指在屏期间绝不自起手——P2 回归教训）
                     }
                     return;
 
@@ -93,9 +98,10 @@ namespace GIC.Framework
             }
         }
 
-        /// <summary>起手判定：两指距离 &gt;1px 才有比例基准；起手即宣胜（hub 仲裁同面单指——CancelSingles 已先行）</summary>
+        /// <summary>起手判定：两指齐备且距离 &gt;1px 才有比例基准；起手即宣胜（hub 仲裁同面单指——CancelSingles 已先行）</summary>
         private void TryBegin()
         {
+            if (_id1 == int.MinValue) return; // 铁闸：两指未齐备绝不自起手（防默认 _p1=(0,0) 产出垃圾基准距离）
             _startDist = Vector2.Distance(_p0, _p1);
             if (_startDist <= 1f) return;
             SetBegan();
