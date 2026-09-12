@@ -253,7 +253,7 @@ CSV 导入后检查 `SharedData.Entries` 中的 Id 是否与枚举值一致；�
 
 **修复**：仅在 `textComponent.font != currentFont`（字体真正变更，如语言切换）时才同时切 font + fontMaterial；字体已一致时不动材质，保留场景变体。
 
-**规则**：需要描边/特殊配色的 TMP 文本 = 同字体 + 变体材质（放 `TextMesh Pro/Resources/Fonts & Materials/`，该目录 git 忽略，改材质不入库，重装环境需手动备份）。另注意 rg/搜索工具默认跳过 git 忽略目录，排查 TextMesh Pro/ 下资产时需加 `--no-ignore`。
+**规则**：需要描边/特殊配色的 TMP 文本 = 同字体 + 变体材质（放 `TextMesh Pro/Resources/Fonts & Materials/`，该目录 git 忽略，改材质不入库，重装环境需手动备份）。另注意 rg/搜索工具默认跳过 git 忽略目录，排查 TextMesh Pro/ 下资产时需加 `--no-ignore`；Codely 搜索工具（search_file_content/glob/list_directory）ignore 层=.codelyignore**加**.gitignore 双层（.codelyignore 另吞 Assets 的 png/prefab/asset/mat/wav 与 Mirror/kcp2k/Plugins 整目录）——被任一层命中即**静默零命中/无名**，下"查无引用/文件不存在/skill 不存在"类结论前一律先想 ignore 层，改走原生 `rg --no-ignore` 或 Get-ChildItem；analyze_multimedia 对被忽略路径同样拒读（Assets 图片先复制到 .codely-cli/tmp 再传）。
 
 ### 6.3 引用相等判断在打包后误判字体变更（真机描边二次丢失，2026-08-16）
 
@@ -671,6 +671,12 @@ Tuanjie 中 `Bind()`/`PropertyField` 的 UITK 绑定扩展在 **UnityEditor.UIEl
 - 任何"临时改层级→存 prefab→还原"操作后，git diff 场景必须逐类检查：非零 diff 且全为锚点/SizeDelta 类行=直接 `git checkout` 场景 + OpenScene 强制重载（磁盘还原≠编辑器内存态，同 gic-pet skill 铁律 6）+ 抽查字段值确认无损。
 - 噪声混进提交会污染历史（值级 diff 也会淹没真正的改动）。
 
+### 23a. 迁移防丢值三则（2026-08-29 命名迁移丢值事故，已修复）
+
+1. "改默认值+重保存"路径会顶替一切场景值≠代码默认值的字段——迁移/批量改字段后必须 diff **值**而不只看键名；排查"早期正常现在坏"回归同法（工具 `.codely-cli/tmp/value_diff.ps1` 按块比值序列）。
+2. 删除 FormerlySerializedAs 前必须按资产全量扫描旧键（Resources/ 下 prefab 不在场景重存范围，会成孤儿键丢引用）。
+3. 编辑器工具引用运行时字段必须跟字段名走（字段改名后中文 FindProperty 静默断裂）。
+
 ---
 
 ## 24. Tuanjie SpriteAtlas API：Add/SetIncludeInBuild 是方法不是属性（2026-08-29）
@@ -773,5 +779,28 @@ Unity 的 `UnityEngine.Object == null` 是**重载运算符**：missing/空引�
 - 反射取 Unity Object 字段后**立即 `as Sprite`/`as GameObject` 等具体类型再判空**（具体类型的 == 编译绑定为 Unity 重载，fake null 正确识别）
 - 遍历判断"字段是否为空引用"的诊断脚本同理；`GetValue` 结果直接 `??`/`== null`（object 语境）判 Unity 字段 = 误判
 - 本项目 icon 空引用即 fileID:0 形态（fake null），任何"批量给空引用赋值"的桥脚本都先按本条自查守卫写法
+
+---
+
+## 32. Prefab 实例引用编辑不持久化 + flag 文件自愈协议（2026-09-05 背包页签迁移两次实证）
+
+### 现象
+对场景中 prefab 实例的组件做 C# 赋值（sprite/color/GO 改名）+ SaveScene，部分修改不持久化（新增对象与字段覆写可持久化，m_Sprite/m_Color/m_Name 赋值丢失）——疑与 Additive 加载后 prefab 资产先被 SaveAsPrefabAsset 重建的同步时序有关。
+
+### 对策
+1. 实例级修引用优先**内容替换法**——不动 override，直接换被引用文件内容（guid/meta 不变，零风险）。
+2. 必须动实例 override 时走 YAML 手术：备份→删块→删 PrefabInstance 修改项→校验（scene-local 无 guid 的 fileID 引用必须可解析到块；跨文件 fileID: 21300000/11500000/100100000 等子资产引用合法，勿计为悬空）→留 flag 自愈让 Unity 序列化器最终验证。
+3. 校验 dangling 时区分场景内引用与跨文件子资产引用，否则 700+ 误报。
+
+### flag 文件+InitializeOnLoad 自愈协议（无 execute_custom_tool 时的批量场景编辑通道）
+写 `.codely-cli/tmp/<ToolName>.run.flag` → 编辑器下次刷新自动执行并写 result.txt；用户全屏应用时 SetForegroundWindow 偷不到焦点、refresh 不触发，flag 留到下次刷新自愈；**Play 期不消费 flag**（AutoRunHook 守卫，退场后下次刷新自愈）；编辑器窗口标题 "gic - 场景名" ≠ Play 状态判据；**编译失败时旧程序集钩子仍会消费 flag 跑旧版**——重跑前确认编译通过。
+
+---
+
+## 33. 祈愿事件必须延一帧发（AutoRunner/PlayerObserver 漏第一发，2026-09-07 实证）
+
+WishDrawController 祈愿期事件（如 `OnIntertwinedAimStart`）要给 AutoRunner/PlayerObserver 消费时，必须**延一帧经 InputCoroutine 发**——两者都在 StartWish 返回后才挂订阅，StartWish 内同步发会漏第一发。
+
+**规则**：事件订阅方晚于触发方挂载时（同帧构造顺序），跨对象事件一律延一帧发。派蒙祈愿反应扩展规则表见 docs/19 §6.5；机制细节见 docs/12 §6.7。
 
 ---
