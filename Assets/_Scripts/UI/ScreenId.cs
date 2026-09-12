@@ -78,7 +78,8 @@ namespace GIC.UI
         public static readonly ScreenId Settings = ScreenId.Prefab("Settings", "Prefabs/UIPanels/SettingsScreen");
         // P3 已翻 PrefabHost（2026-09-13，池化+双层毛玻璃+生命周期拆分配方）
         public static readonly ScreenId Backpack = ScreenId.Prefab("Backpack", "Prefabs/UIPanels/BackpackScreen");
-        public static readonly ScreenId Wish = ScreenId.Overlay("Wish", SceneType.WishScreen);        // P3→Prefab
+        // P3 已翻 PrefabHost（2026-09-13，三根含 UICamera；无毛玻璃——自绘背景艺术层）
+        public static readonly ScreenId Wish = ScreenId.Prefab("Wish", "Prefabs/UIPanels/WishScreen");
         public static readonly ScreenId Coop = ScreenId.Overlay("Coop", SceneType.CoopScreen);        // P3→Prefab
 
         /// <summary>全量清单（UIManager 预热泵遍历用；新增界面记得同步入列）</summary>

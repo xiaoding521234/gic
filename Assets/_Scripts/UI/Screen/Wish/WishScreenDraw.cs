@@ -29,13 +29,17 @@ namespace GIC.UI
         private WishManager _wishManager;
         private WishPoolConfig _currentPool;
 
+        // 池化防叠监听（docs/14 §38）：wiring 只做一次——InitWishDraw 每开一次重入
+        private bool _wishWiringDone = false;
+
         // 注入字段（partial 共享，主文件 Awake 注入）
         [Autowired] private SaveManager saveManager;
         [Autowired] private UnitConfig unitConfig;
         [Autowired] private ItemConfig itemConfig;
 
         /// <summary>
-        /// 祈愿部分的初始化（由 WishScreen.Start 调用）
+        /// 祈愿部分的初始化（每开一次）：管理器重建+货币数刷新。
+        /// 按钮监听与 drawController 事件订阅只做一次（池化面板不销毁，重复订阅必叠）。
         /// </summary>
         private void InitWishDraw()
         {
@@ -43,15 +47,19 @@ namespace GIC.UI
 
             _wishManager = new WishManager(saveManager, unitConfig, itemConfig);
 
-            if (wish1Button != null)
-                wish1Button.onClick.AddListener(() => StartDraw(1));
-            if (wish10Button != null)
-                wish10Button.onClick.AddListener(() => StartDraw(10));
-
-            if (drawController != null)
+            if (!_wishWiringDone)
             {
-                drawController.OnWishComplete += UpdateFateCount;
-                drawController.OnShotPlanned += OnShotPlannedForAmbience;
+                _wishWiringDone = true;
+                if (wish1Button != null)
+                    wish1Button.onClick.AddListener(() => StartDraw(1));
+                if (wish10Button != null)
+                    wish10Button.onClick.AddListener(() => StartDraw(10));
+
+                if (drawController != null)
+                {
+                    drawController.OnWishComplete += UpdateFateCount;
+                    drawController.OnShotPlanned += OnShotPlannedForAmbience;
+                }
             }
 
             UpdateFateCount();
