@@ -24,6 +24,9 @@ namespace GIC.UI
     {
         [Autowired] private SaveManager _saveManager;
 
+        // prefab 面板：静态身份（场景名寻址在面板实例化进宿主场景后失效，P2 定则）
+        protected override ScreenId Id => Screens.Settings;
+
         [Header("顶部")]
         public GameObject topPanel;
         public TextCombiner titleText;

@@ -20,15 +20,25 @@ namespace GIC.UI
     {
         public static UIManager Instance { get; private set; }
 
-        /// <summary>栈单元：Id 可为 null（未注册场景匿名入栈）；Instance 为 null 表示纯场景弹层（P2+ prefab 宿主启用）</summary>
+        [Header("UI 层级根（Boot 场景 UIRoot 容器，docs/23 §2）")]
+        [UnityEngine.InspectorName("全屏层根")] [SerializeField] private Transform layerFullscreen;
+        [UnityEngine.InspectorName("弹窗层根")] [SerializeField] private Transform layerPopup;
+        [UnityEngine.InspectorName("提示层根")] [SerializeField] private Transform layerToast;
+        [UnityEngine.InspectorName("顶层根")] [SerializeField] private Transform layerTop;
+
+        /// <summary>栈单元：Id 可为 null（未注册场景匿名入栈）</summary>
         private sealed class ScreenUnit
         {
             public ScreenId Id;
             public ScreenBase Instance;
             public string SceneName;
+            public bool IsPrefabHost => Id != null && Id.Host == ScreenHostKind.Prefab;
         }
 
         private readonly List<ScreenUnit> _stack = new();
+
+        /// <summary>Open 时暂存的面板参数（面板 OnEnable→RegisterScreen 消费后清空）</summary>
+        private object _pendingOpenArgs;
 
         private void Awake()
         {
@@ -48,17 +58,20 @@ namespace GIC.UI
         {
             if (screen == null) return;
 
-            string sceneName = screen.gameObject.scene.name;
-            var id = Screens.FromSceneName(sceneName);
+            var id = screen.GetId();
             if (id != null && id.Host == ScreenHostKind.RootScene)
                 return; // 根场景=context 不入栈（Splash/Battle；MainHall 非 ScreenBase 天然不入）
 
             if (FindEntry(screen) != null) return; // 幂等：重复 OnEnable 不重复入栈
 
+            string sceneName = id != null && id.Host == ScreenHostKind.Prefab
+                ? id.Name  // 面板无场景语义，用 ScreenId 名（事件 FromScene/宠物桥寻址用）
+                : screen.gameObject.scene.name;
+
             if (id == null)
                 GICLog.Warn($"[UIManager] 场景 '{sceneName}' 未在 Screens 注册表登记，匿名入栈（P4 清查，docs/23 D11）");
 
-            // 下方 Fullscreen 弹层被遮挡 → OnPause（P1 场景制下单弹层不叠加，此路径 P2+ 面板化后生效）
+            // 下方 Fullscreen 弹层被遮挡 → OnPause（面板化后弹层互叠生效，场景制单弹层不触发）
             var below = Top;
             if (below?.Instance != null)
                 below.Instance.RaisePause();
@@ -66,9 +79,11 @@ namespace GIC.UI
             var unit = new ScreenUnit { Id = id, Instance = screen, SceneName = sceneName };
             _stack.Add(unit);
 
-            // 生命周期：OnInit 一次性 + OnShow（args 场景制 P1 无来源，恒 null）
+            // 生命周期：OnInit 一次性 + OnShow（消费 Open 暂存参数；场景制无来源为 null）
+            var args = _pendingOpenArgs;
+            _pendingOpenArgs = null;
             screen.RaiseOnInit();
-            screen.RaiseShow(null);
+            screen.RaiseShow(args);
         }
 
         internal void UnregisterScreen(ScreenBase screen)
@@ -85,10 +100,20 @@ namespace GIC.UI
             return null;
         }
 
+        private ScreenUnit FindEntryById(ScreenId id)
+        {
+            for (int i = 0; i < _stack.Count; i++)
+                if (id != null && ReferenceEquals(_stack[i].Id, id)) return _stack[i];
+            return null;
+        }
+
         private ScreenUnit Top => _stack.Count > 0 ? _stack[_stack.Count - 1] : null;
 
         /// <summary>栈深度（结构化断言/调试用）</summary>
         public int StackCount => _stack.Count;
+
+        /// <summary>指定弹层是否在栈（面板+场景制通用；PetChatIntent 已打开判定/断言用）</summary>
+        public bool IsOpen(ScreenId id) => FindEntryById(id) != null;
 
         /// <summary>栈顶弹层名（断言用；空栈返回 null）</summary>
         public string TopSceneName => Top?.SceneName;
@@ -96,8 +121,8 @@ namespace GIC.UI
         // ==================== 打开 ====================
 
         /// <summary>
-        /// 打开弹层（docs/23 §3.4）。P1：MainHall 的预载→退场→激活编排仍走其自有路径（ExitToSceneAsync），
-        /// 本入口供后续调用点/冒烟使用。P2+ PrefabHost 在此分发实例化。
+        /// 打开弹层（docs/23 §3.4）。场景制走 GameScene 场景原语；Prefab 面板即时实例化（PanelHost）。
+        /// MainHall 的预载→退场→激活编排仍走其自有路径（ExitToSceneAsync），面板分支已在其内部接入。
         /// </summary>
         public void Open(ScreenId id, object args = null)
         {
@@ -111,10 +136,50 @@ namespace GIC.UI
                     break;
 
                 case ScreenHostKind.Prefab:
-                    GICLog.Error($"[UIManager] PrefabHost 尚未落地（P2，docs/23）：{id.Name}");
+                    OpenPanel(id, args);
                     break;
             }
         }
+
+        /// <summary>
+        /// PanelHost（docs/23 §3.5）：Resources 加载 prefab → 实例化至全屏层容器。
+        /// 注册/OnInit/OnShow 经 ScreenBase.OnEnable 自动链（args 由 _pendingOpenArgs 传递）；
+        /// 层级带内排序=100+栈深（层级权威，覆盖宿主场景 Canvas 的 sortingOrder，docs/23 §3.2）。
+        /// </summary>
+        private void OpenPanel(ScreenId id, object args)
+        {
+            if (layerFullscreen == null)
+            {
+                GICLog.Error($"[UIManager] 全屏层级根未配置（Boot UIRoot 缺失），无法打开 {id.Name}");
+                return;
+            }
+            if (FindEntryById(id) != null)
+            {
+                GICLog.Warn($"[UIManager] {id.Name} 已打开，重复 Open 忽略（幂等）");
+                return;
+            }
+
+            var prefab = Resources.Load<GameObject>(id.PrefabPath);
+            if (prefab == null)
+            {
+                GICLog.Error($"[UIManager] 面板 prefab 加载失败: Resources/{id.PrefabPath}");
+                return;
+            }
+
+            _pendingOpenArgs = args;
+            var go = Instantiate(prefab, layerFullscreen);
+            _pendingOpenArgs = null;
+            go.name = id.Name;
+
+            // 层级带内排序：面板根 Canvas 为 root canvas（宿主容器无 Canvas），强制层级带序
+            // MainHall Canvas order=0，Fullscreen 带 100+ 恒在其上（与迁移前 Settings order=100 等效）
+            var canvas = go.GetComponentInChildren<Canvas>(true);
+            if (canvas != null)
+                canvas.sortingOrder = LayerBand(UILayer.Fullscreen) + _stack.Count;
+        }
+
+        /// <summary>层级排序带：Fullscreen=100 / Popup=200 / Toast=300 / Top=400，带内用栈深递增</summary>
+        private static int LayerBand(UILayer layer) => 100 + (int)layer * 100;
 
         // ==================== 返回语义（两分，docs/23 D10） ====================
 
@@ -146,9 +211,19 @@ namespace GIC.UI
 
             var newTop = Top;
             if (wasTop && newTop?.Instance != null)
-                newTop.Instance.RaiseResume(); // 下方弹层重新成为栈顶 → OnResume（P2+ 生效）
+                newTop.Instance.RaiseResume(); // 下方弹层重新成为栈顶 → OnResume
 
             string toScene = newTop?.SceneName ?? GameScene.Instance.CurrentRootSceneName;
+
+            if (entry.IsPrefabHost)
+            {
+                // PanelHost：Destroy 实例即可（无场景卸载/无资源清理，docs/23 §3.5）；
+                // OnDisable/OnDestroy 自动出栈注销与四件套兜底。同样发返回事件保持语义统一
+                if (entry.Instance != null) Destroy(entry.Instance.gameObject);
+                EventBusHub.Instance?.Send(new OnGoBackEvent { FromScene = fromScene, ToScene = toScene });
+                return true;
+            }
+
             StartCoroutine(UnloadSceneHostSequence(fromScene, toScene, newTop?.SceneName));
             return true;
         }

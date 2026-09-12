@@ -72,9 +72,10 @@ namespace GIC.UI
         public static readonly ScreenId MainHall = ScreenId.Root("MainHall", SceneType.MainHall);
         public static readonly ScreenId Battle = ScreenId.Root("Battle", SceneType.BattleScreen);
 
-        // ── 弹层（当前场景制；注释标注翻转批次） ──
+        // ── 弹层 ──
         public static readonly ScreenId Map = ScreenId.Overlay("Map", SceneType.MapScreen);          // 保持场景制（3D 内容，docs/23 D1）
-        public static readonly ScreenId Settings = ScreenId.Overlay("Settings", SceneType.SettingsScreen); // P2→Prefab
+        // P2 已翻 PrefabHost（2026-09-12）：场景删除；MainHall/PetGameBridge 按 SceneType 地址经 _bySceneName 仍命中本条
+        public static readonly ScreenId Settings = ScreenId.Prefab("Settings", "Prefabs/UIPanels/SettingsScreen");
         public static readonly ScreenId Backpack = ScreenId.Overlay("Backpack", SceneType.BackpackScreen); // P3→Prefab
         public static readonly ScreenId Wish = ScreenId.Overlay("Wish", SceneType.WishScreen);        // P3→Prefab
         public static readonly ScreenId Coop = ScreenId.Overlay("Coop", SceneType.CoopScreen);        // P3→Prefab
@@ -91,7 +92,10 @@ namespace GIC.UI
             { SceneType.CoopScreen.SceneName, Coop },
         };
 
-        /// <summary>按场景名查身份（场景制 Screen OnEnable 注册时寻址）；未知返回 null（UIManager 匿名入栈）</summary>
+        /// <summary>
+        /// 按场景名查身份（MainHall/PetGameBridge 持 SceneType 地址解析用；场景制 Screen 注册寻址同走）。
+        /// prefab 面板的 ScreenBase.Id 直接重写静态身份，不经此表。未知返回 null（UIManager 匿名入栈）。
+        /// </summary>
         public static ScreenId FromSceneName(string sceneName)
             => sceneName != null && _bySceneName.TryGetValue(sceneName, out var id) ? id : null;
     }

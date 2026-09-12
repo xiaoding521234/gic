@@ -24,9 +24,6 @@ EditorBuildSettings:
     path: Assets/Scenes/BackpackScreen.unity
     guid: a0042b18d695be64e907d401b728e30d
   - enabled: 1
-    path: Assets/Scenes/SettingsScreen.unity
-    guid: 74de4816bfecc554182702226da459d9
-  - enabled: 1
     path: Assets/Scenes/WishScreen.unity
     guid: 46325499d59395d4a8fb93d9e8dbc820
   - enabled: 1
