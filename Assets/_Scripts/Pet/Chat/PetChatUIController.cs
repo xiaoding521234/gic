@@ -227,7 +227,13 @@ namespace GIC.Pet.Chat
             // 消失，用户被困在"打开→发送→消失"循环——多一条退出途径）。ESC=完整关闭对话（含气泡）。
             if (_inputVisible && Input.GetKeyDown(KeyCode.Escape)) { CloseChat(); return; }
             if (_canvas == null) return; // 宿主接线前的防御（WireHost 未调用时恒静默——2026-08-30 桌面版窗口句柄事故：Start 提前 return 吞掉接线=此处每帧 NRE 刷屏 9.6 万条）
-            var canvasRect = (_canvas.transform as RectTransform).rect;
+            // 边界 bounds 必须与锚点/anchoredPosition 同空间（左下锚绝对空间）。
+            // 根画布 pivot 恒居中：RectTransform.rect 是枢轴中心局部空间（xMin=-w/2）——直接拿它当
+            // bounds 钳锚点=两空间错位（2026-09-13 实证：派蒙贴屏边时输入条被钳进画布中带、气泡同理，
+            // docs/14 §42）；画布自身在锚定空间恒为 (0,0,w,h)。
+            // 桌面 visibleBoundsProvider 的入参也只取宽高、输出本按左下空间构造——源头归一后契约一致。
+            var canvasLocal = (_canvas.transform as RectTransform).rect;
+            Rect canvasRect = new Rect(0f, 0f, canvasLocal.width, canvasLocal.height);
             // 可见边界（2026-09-12 桌面边缘自适应）：宿主未注入=画布即边界（游戏内全屏画布）；
             // 桌面注入"屏幕工作区映射到画布坐标系"的矩形——贴屏边/压任务栏的画布区域不算可用区
             Rect bounds = visibleBoundsProvider != null ? visibleBoundsProvider(canvasRect) : canvasRect;
