@@ -113,6 +113,14 @@ namespace GIC.UI
 
             while (elapsed < panelSlideDuration)
             {
+                // 秒开秒关守卫（docs/14 §37 纪律③）：关闭启动即提前跳出，
+                // 释放 Entering 锁交由退场动画接管画面（残余泄漏由 OnDisable PopAll 兜底）
+                if (isClosing)
+                {
+                    InputLocks.Pop(this, InputLockReason.Entering);
+                    yield break;
+                }
+
                 elapsed += Time.deltaTime;
                 float t = slideCurve.Evaluate(elapsed / panelSlideDuration);
 
