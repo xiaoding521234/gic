@@ -80,7 +80,8 @@ namespace GIC.UI
         public static readonly ScreenId Backpack = ScreenId.Prefab("Backpack", "Prefabs/UIPanels/BackpackScreen");
         // P3 已翻 PrefabHost（2026-09-13，三根含 UICamera；无毛玻璃——自绘背景艺术层）
         public static readonly ScreenId Wish = ScreenId.Prefab("Wish", "Prefabs/UIPanels/WishScreen");
-        public static readonly ScreenId Coop = ScreenId.Overlay("Coop", SceneType.CoopScreen);        // P3→Prefab
+        // P3 已翻 PrefabHost（2026-09-13，房间状态机+可见期事件绑定；提取时清除 1 个历史缺失脚本组件）
+        public static readonly ScreenId Coop = ScreenId.Prefab("Coop", "Prefabs/UIPanels/CoopScreen");
 
         /// <summary>全量清单（UIManager 预热泵遍历用；新增界面记得同步入列）</summary>
         public static readonly ScreenId[] All =

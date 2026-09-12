@@ -110,20 +110,49 @@ namespace GIC.UI
             _leaveRoomText?.SetSingleEntry(new LocalizedString("UIText", "Back"));
         }
 
-        void Start()
+        // prefab 面板：静态身份（场景名寻址在面板实例化进宿主场景后失效，P2 定则）
+        protected override ScreenId Id => Screens.Coop;
+
+        /// <summary>
+        /// 一次性装配（池化生命周期，docs/14 §38）：按钮监听与下拉初始化只做一次——
+        /// 池化面板不销毁，AddListener/InitBoardDropdown 重复执行必叠。
+        /// C# 网络事件（玩家/房间/网络）按可见期语义放 OnShow 绑定、OnDisable 解绑。
+        /// </summary>
+        protected override void OnInit()
+        {
+            BindButtonEvents();
+            InitBoardDropdown();
+        }
+
+        /// <summary>
+        /// 每次打开（池化生命周期）：断开残留连接 + 音乐 + 房间状态机复位（旧场景制靠重载天然复位）
+        /// + 可见期事件绑定 + 发现流程启动。OnDisable 对称解绑（隐藏期不吃联机事件）。
+        /// </summary>
+        protected override void OnShow(object args)
         {
             StopCurrentConnection();
             PushMusicVolumeSafe();
-            RegisterClosableSelf();
 
-            BindButtonEvents();
+            SetRoomState(RoomState.DisconnectedClient);
+
             BindDiscoveryEvents();
             BindPlayerEvents();
             BindNetworkEvents();
-            InitBoardDropdown();
 
-            SetRoomState(RoomState.DisconnectedClient);
             Invoke(nameof(InitializeDiscovery), 0.5f);
+        }
+
+        /// <summary>
+        /// 池化可见期解绑（对称 OnShow 的绑定；预热渲染态两帧未绑定过，解绑为安全空操作）。
+        /// 隐藏期不接联机/房间事件——防不可见 UI 流（如被踢提示弹在大厅上）。
+        /// </summary>
+        protected override void OnDisable()
+        {
+            CancelInvoke();
+            UnbindDiscoveryEvents();   // 停广播+停扫描（面板关闭路径均自 DisconnectedClient 态，即空闲态）
+            UnbindPlayerEvents();
+            UnbindNetworkEvents();
+            base.OnDisable();          // 出栈注销+可关闭注销+PopAll 锁保险丝
         }
 
         void Update()

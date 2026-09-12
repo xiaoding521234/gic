@@ -45,12 +45,36 @@ namespace GIC.UI
         {
             if (Instance == null) Instance = this;
             else if (Instance != this) { Destroy(this); return; }
+
+            // 根转换自动入池（P3 联机实证必需）：面板挂在 DontDestroyOnLoad 层级根下，
+            // 根场景 Single 加载（如联机→战斗）不会销毁/隐藏它们——必须主动清栈入池，
+            // 否则联机 UI 叠在战斗画面上（docs/23 root=context 模型的补漏）
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnRootSceneLoaded;
         }
 
         private void OnDestroy()
         {
             InputLocks.PopAll(this); // 兜底：本类持有的全部输入锁
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnRootSceneLoaded;
             if (Instance == this) Instance = null;
+        }
+
+        /// <summary>根场景切换（Single 加载）→ 栈内全部面板强制入池（root context 交替，弹层不属于任何根场景）</summary>
+        private void OnRootSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            if (mode != UnityEngine.SceneManagement.LoadSceneMode.Single) return;
+
+            for (int i = _stack.Count - 1; i >= 0; i--)
+            {
+                var unit = _stack[i];
+                _stack.RemoveAt(i);
+                if (unit.PanelRoot != null)
+                {
+                    unit.PanelRoot.SetActive(false);
+                    if (!string.IsNullOrEmpty(unit.SceneName)) _panelPool[unit.SceneName] = unit.PanelRoot;
+                    GICLog.Info($"[UIManager] 根转换自动入池: {unit.SceneName}");
+                }
+            }
         }
 
         // ==================== 注册制（ScreenBase.OnEnable/OnDisable 自动调用） ====================
