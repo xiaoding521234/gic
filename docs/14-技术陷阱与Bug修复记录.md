@@ -804,3 +804,33 @@ WishDrawController 祈愿期事件（如 `OnIntertwinedAimStart`）要给 AutoRu
 **规则**：事件订阅方晚于触发方挂载时（同帧构造顺序），跨对象事件一律延一帧发。派蒙祈愿反应扩展规则表见 docs/19 §6.5；机制细节见 docs/12 §6.7。
 
 ---
+
+## 34. AI 生成分段产物（is_segmentation）URL 404 NoSuchKey——白底图+本地泛洪抠图绕过（2026-09-12 实证）
+
+generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `aigc/segmented/*.png`，直链 GET 永远 `NoSuchKey`（两次任务+间隔重试+files/ 路径探测全 404）——服务端分段上传链路坏，非本地网络问题。
+
+**绕过**：改出**纯白底**图（is_segmentation=false，提示词强调"completely pure flat white background, no shadow"），本地像素级抠图（Unity 编辑器脚本 Texture2D.GetPixels32 + 从四条边 BFS 泛洪近白连通域置 alpha 0，只清与边框连通的白色保住物体内部高光，再按内容 bbox 裁剪）。实装于战斗草簇透明图：Assets/Art/Battle/Textures/battle_grass_tuft_raw.jpg → battle_grass_tuft.png。
+
+**规则**：需要透明底的 AI 素材一律白底生成+本地泛洪抠图，不再走 is_segmentation 分段链路；抠图属像素级客观处理（非识图判定），可信。
+
+---
+
+## 35. 编辑器 Play 测试会被 Boot 启动链异步屠场——必须等链走到 MainHall 再加载被测场景（2026-09-12 实证）
+
+编辑器活动场景=Boot 时进 Play，Boot→SplashScreen→MainHall 生产启动链自动异步推进，每步 Single 加载会**销毁一切已加载场景**。桥脚本里 LoadSceneAsync(被测场景, Additive) 后若被测逻辑耗时超过启动链（约 3-5s），被测场景会被链的 Single 加载屠掉——表现为"对象已销毁但仍访问"（StartCoroutine 抛 The object has been destroyed）。
+
+**规则**：exec_runtime_script 驱动场景级测试时，先等 `MainHall` 出现在已加载场景清单（生产栈就位、链停止推进），再注入配置/加载被测场景；对已捕获引用先做 Unity 假 null 判活。战斗开局端到端测试即按此模式（BattleLaunchConfig.Prepare 注入 → Additive 加载 BattleScreen → Close 验证回 MainHall）。
+
+---
+
+## 36. 桌宠构建无 Addressables 运行数据——触 Localization 必报错链；桌宠进程换血必须验 StartTime（2026-09-12 实证）
+
+**症状**：桌宠构建产物（Builds/PetSpike）启动即报错链：`Invalid path in TextDataProvider: .../StreamingAssets/aa/settings.json` → `No Location found for Key=Locale` → `SelectedLocale is null. Could not load table.`。功能无损（全部 fallback 兜底），纯日志噪音——自 2026-08-28 聊天 UI 落地起一直存在，2026-09-12 用户拉日志才发现。
+
+**根因**：PetSpikeBuildTool 只 BuildPlayer 不做 Addressables 构建 → 产物无 aa/settings.json；PetChatUIController.GetLocalizedText（placeholder/busy/notWired 三键）在 WireChat 建 UI 时同步调 LocalizationSettings.GetStringDatabase() → 触发 Unity Localization 自动初始化 → Addressables 引导必败 → 报错链。
+
+**修复**：GetLocalizedText 首行加 `if (PetMode.Enabled) return fallback;`——桌宠进程直接走 fallback 文案不碰取表；游戏内形态（编辑器/主进程，有 Addressables 数据）照常本地化。PetWishAutoRunner.Localize/CardName 无需守卫（仅主进程执行路径）。验证=新进程 Player.log 报错链归零（error lines: 0）。
+
+**连坐陷阱——进程换血假阳性**：杀旧进程+Start-Process 后用 `(Get-Process gic) -ne $null` 判"成功"是**假验证**：Stop-Process 可能静默失败（旧进程存活），新实例被 PetSingleInstance 互斥（"桌上已有派蒙，本实例退出"）立即退出——True 来自旧进程。**规则**：换血三步=①杀后验证 `gic 进程数=0` ②启动后验证**新进程 Id/StartTime=当下** ③读日志证据时先核栈帧行号与当前代码一致（本次靠 PetChatUIController.cs:525≠新代码 529 识破日志来自旧构建）。
+
+---

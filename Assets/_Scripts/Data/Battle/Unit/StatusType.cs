@@ -29,7 +29,10 @@ namespace GIC.Data
         Frozen,
 
         [InspectorName("石化")]
-        Petrified
+        Petrified,
+
+        [InspectorName("尸体")]
+        Dead
     }
 
     // StatusType 扩展方法

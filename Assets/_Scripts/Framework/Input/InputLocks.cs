@@ -13,6 +13,7 @@ namespace GIC.Framework
         public const string PopupEntering = "PopupEntering";           // 弹窗淡入期间
         public const string InputPopupEntering = "InputPopupEntering"; // 输入弹窗淡入期间
         public const string WishInProgress = "WishInProgress";         // 祈愿抽卡进行中
+        public const string BattleExitConfirm = "BattleExitConfirm";   // 战斗退出确认弹窗期间
     }
 
     /// <summary>

@@ -41,6 +41,7 @@ namespace GIC.Battle
             { StatusType.Silenced, false },
             { StatusType.Frozen, false },
             { StatusType.Petrified, false },
+            { StatusType.Dead, false },
         };
 
         // ==================== 当前状态实例 ====================
@@ -58,14 +59,19 @@ namespace GIC.Battle
         public bool IsPetrified => GetFinalStatus(StatusType.Petrified);
 
         /// <summary>
+        /// 尸体态（docs/05 §5.4：无法行动+被动失效，属性/碰撞/体积/势力/元能/元素附着全保留）
+        /// </summary>
+        public bool IsDead => GetFinalStatus(StatusType.Dead);
+
+        /// <summary>
         /// 是否被硬控（晕眩/冰冻/石化）
         /// </summary>
         public bool IsHardControlled => IsStunned || IsFrozen || IsPetrified;
 
         /// <summary>
-        /// 是否可以行动
+        /// 是否可以行动（尸体不可行动，docs/05 §5.4）
         /// </summary>
-        public bool CanAct => !IsHardControlled;
+        public bool CanAct => !IsHardControlled && !IsDead;
 
         /// <summary>
         /// 是否可以被敌方选中

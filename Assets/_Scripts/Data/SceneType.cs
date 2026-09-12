@@ -31,7 +31,7 @@ namespace GIC.Data
         public static readonly SceneType CoopScreen = new("CoopScreen", LoadSceneMode.Additive);
         public static readonly SceneType BackpackScreen = new("BackpackScreen", LoadSceneMode.Additive);
         public static readonly SceneType SettingsScreen = new("SettingsScreen", LoadSceneMode.Additive);
-        public static readonly SceneType BattleScreen = new("BattleScreen", LoadSceneMode.Additive);
+        public static readonly SceneType BattleScreen = new("BattleScreen", LoadSceneMode.Single);
 
         // ==================== 便利方法 ====================
         

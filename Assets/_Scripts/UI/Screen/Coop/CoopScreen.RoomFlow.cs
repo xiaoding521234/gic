@@ -104,9 +104,14 @@ namespace GIC.UI
         {
             if (_currentState != RoomState.Host) return;
 
-            // TODO: 全员就绪后开始游戏（战斗场景加载），目前仅校验准备状态
+            // 就绪校验（B7 LAN：全员就绪门）
             foreach (var player in _playerManager.GetAllPlayers())
                 if (!player.IsReady) return;
+
+            // B1 单人开局：停网络、本端直开（真人 + AI 补位对手，docs/22 §5）。
+            // B7 LAN 时：改为广播开战配置 → 各端加载同一战斗场景（Host 权威，docs/18 决策一）
+            StopCurrentConnection();
+            BattleLaunchConfig.LaunchSinglePlayer(GetSelectedMapConfigName());
         }
 
         void OnLeaveRoomClick()

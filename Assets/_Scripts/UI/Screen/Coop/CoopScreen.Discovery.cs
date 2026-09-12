@@ -134,18 +134,45 @@ namespace GIC.UI
 
         #region 地图选择
 
+        private List<BattleMapConfig> _battleMaps = new List<BattleMapConfig>();
+
+        /// <summary>
+        /// 地图下拉填充为真实可用的战场清单（Resources/Configs 下的 BattleMapConfig）。
+        /// B1 仅一张地图；后续新增地图 asset 自动进下拉。
+        /// </summary>
         void InitBoardDropdown()
         {
             if (boardDropdown == null) return;
             boardDropdown.onValueChanged.AddListener(_ => UpdateRoomPanel());
             boardDropdown.ClearOptions();
-            var options = new List<string>
+
+            _battleMaps = new List<BattleMapConfig>(Resources.LoadAll<BattleMapConfig>("Configs"));
+            var options = new List<string>();
+            foreach (var map in _battleMaps)
+                options.Add(string.IsNullOrEmpty(map.mapName) ? map.name : map.mapName);
+
+            if (options.Count == 0)
             {
-                new LocalizedString("UIText", "Board1").GetLocalizedString(),
-                new LocalizedString("UIText", "Board2").GetLocalizedString(),
-                new LocalizedString("UIText", "Board3").GetLocalizedString()
-            };
+                // 兜底：无地图资产时禁用开始按钮并提示（正常不该发生）
+                options.Add("-");
+                if (startButton != null) startButton.interactable = false;
+                GICLog.Warn("[CoopScreen] 未找到任何 BattleMapConfig（Resources/Configs）");
+            }
+
             boardDropdown.AddOptions(options);
+            boardDropdown.value = 0;
+            boardDropdown.RefreshShownValue();
+        }
+
+        /// <summary>
+        /// 当前选中的地图资产名（下拉索引 ↔ _battleMaps 顺序）
+        /// </summary>
+        internal string GetSelectedMapConfigName()
+        {
+            if (_battleMaps == null || _battleMaps.Count == 0) return BattleLaunchConfig.DefaultMapName;
+            int index = boardDropdown != null ? boardDropdown.value : 0;
+            if (index < 0 || index >= _battleMaps.Count) index = 0;
+            return _battleMaps[index].name;
         }
 
         #endregion

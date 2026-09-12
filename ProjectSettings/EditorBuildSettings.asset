@@ -32,6 +32,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/PaimonPet.unity
     guid: d90bcf608e754d8499e3fce3b9b8e3a0
+  - enabled: 1
+    path: Assets/Scenes/BattleScreen.unity
+    guid: ddec04f879528ed4d9fca46053fe3b32
   m_BuildProfiles: []
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 22e5059b49680434dae0e20a9738d830, type: 2}
