@@ -35,6 +35,7 @@ namespace GIC.Framework
             Context.Register<RoomManager>();       // deps: SaveManager, PlayerManager（联机房间流程）
             Context.Register<UnitManager>();       // deps: UnitConfig
             Context.Register<InputManager>();
+            Context.Register<GestureHub>();   // 手势层（docs/24）：指针事件归一→三门→识别器，与 InputManager 同管线
             Context.Register<SkillManager>();
 
             // 注入剩余 [Autowired] 字段（ConfigManager 自身 [Bean] 产物、MonoBehaviour 层）
@@ -50,6 +51,7 @@ namespace GIC.Framework
             managers = new List<IWargameManager> {
                 configManager,
                 Context.Get<AssetCache>(), Context.Get<SaveManager>(), Context.Get<InputManager>(),
+                Context.Get<GestureHub>(),
                 Context.Get<CardManager>(), Context.Get<PositionManager>(),
                 Context.Get<SkillManager>(), Context.Get<UnitManager>()
             };
