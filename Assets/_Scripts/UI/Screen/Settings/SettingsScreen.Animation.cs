@@ -50,9 +50,13 @@ namespace GIC.UI
             animationsCached = true;
         }
 
-        private void PlayEnterAnimation()
+        /// <summary>
+        /// 入场起始态：三面板移偏移位 + 内容区透明。幂等（目标位取自缓存）。
+        /// OnShow（实例化同帧）与 PlayEnterAnimation（Start）双调用——OnShow 先行保证首帧渲染不可见
+        /// （prefab 序列化态=完成态，Start 晚于首帧渲染，只靠 Start 会闪现一帧，docs/14 §37）。
+        /// </summary>
+        private void SetEntryOffsets()
         {
-            // 设置初始位置
             if (topPanelRect != null)
                 topPanelRect.anchoredPosition = topPanelTargetPos + Vector2.up * topPanelSlideOffset;
 
@@ -64,7 +68,11 @@ namespace GIC.UI
 
             if (centerGroup != null)
                 centerGroup.alpha = 0f;
+        }
 
+        private void PlayEnterAnimation()
+        {
+            SetEntryOffsets(); // 幂等：OnShow 已设置，此处兜底（重开/时序异常时保底）
             StartCoroutine(PlayEnterAnimationCoroutine());
         }
 

@@ -33,7 +33,8 @@
 
 
 
-- [2026-09-12 14:24:31] 【桥/编辑器异常恢复】①编辑器没开/桥死心跳：拉起编辑器（D:\Tool\2022.3.62t11\Editor\Tuanjie.exe -projectpath 'D:\Tuanjie_editor\gic'）→ 等 Editor.log 出现 CompileScripts → unity_refresh 重连；心跳仍 stale 用最小化+还原焦点循环（SW_MINIMIZE=6→2s→SW_RESTORE=9+SetForegroundWindow）触发。②CLI 连不上桥第一排查=版本错位：桥包 1.0.81 心跳写 Temp/.com-unity-codely.json，CLI 读项目根同名文件→根文件冻结即永判未连接、**编辑器重启无效**（2026-09-12 复核仍错位：根文件停 9/10、Temp 每日新鲜）；排查序=netstat+对比两心跳文件时间戳→**Copy-Item Temp 版到项目根**做副本桥接（重启后 Temp 端口变即副本过期，需重新同步）→仍不行才考虑重启。③编辑器 License 过期弹窗：点 Exit 重启编辑器自动续期；重启前先确认场景 dirty=false。
+- [2026-09-12 23:21:29] 【桥/编辑器异常恢复】①编辑器没开/桥死心跳：拉起编辑器（D:\Tool\2022.3.62t11\Editor\Tuanjie.exe -projectpath 'D:\Tuanjie_editor\gic'）→ 等 Editor.log 出现 CompileScripts → unity_refresh 重连；心跳仍 stale 用最小化+还原焦点循环（SW_MINIMIZE=6→2s→SW_RESTORE=9+SetForegroundWindow）触发。②CLI 连不上桥第一排查=版本错位：桥包 1.0.81 心跳写 Temp/.com-unity-codely.json，CLI 读项目根同名文件→根文件冻结即永判未连接、**编辑器重启无效**（2026-09-12 复核仍错位：根文件停 9/10、Temp 每日新鲜）；排查序=netstat+对比两心跳文件时间戳→**Copy-Item Temp 版到项目根**做副本桥接（重启后 Temp 端口变即副本过期，需重新同步）→仍不行才考虑重启。③编辑器 License 过期弹窗：点 Exit 重启编辑器自动续期；重启前先确认场景 dirty=false。④exec_runtime_script 结束 Play 会话/域重载后，桥推送 state=stale + custom_tools_reloaded 通知属**常态**（2026-09-12 P1-P2 连续多轮实证）：unity_refresh 重连即可继续，勿当故障走排查流程。
+
 
 
 

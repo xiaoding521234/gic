@@ -835,17 +835,20 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 
 ---
 
-## 37. 面板化双陷阱：同步 Instantiate 尖峰帧吞入场动画 + 销毁必须打面板根（2026-09-12 实证，P2 回归用户目检发现）
+## 37. 面板化三连陷阱：Instantiate 尖峰帧吞入场动画 + 销毁必须打面板根 + 起始态必须 OnShow 同帧设（2026-09-12 实证，P2 回归用户目检发现 ×2）
 
-**现象**：①面板打开无入场动画（瞬间完成），关闭退场动画正常；②退场动画播完后界面仍残留在屏幕上。
+**现象**：①面板打开无入场动画（瞬间完成），关闭退场动画正常；②退场动画播完后界面仍残留在屏幕上；③（同日第二次回归）点击打开时屏幕闪现一帧完整界面，随后才从偏移位滑入。
 
-**根因①**：面板制下 `Resources.Load + Instantiate` 同步发生在打开帧（大尖峰帧）；Start 在下一帧执行，入场协程首轮 `elapsed += Time.deltaTime` 取到**尖峰帧时长**（常 >0.2s 动画时长）→ while 直接跳出=动画瞬完成。旧场景制为异步分帧加载，Start 跑在正常帧上无此问题。
+**根因①**：面板制下 `Resources.Load + Instantiate` 同步发生在打开帧（大尖峰帧）；Start 在下一帧执行，入场协程首轮 `elapsed += Time.deltaTime` 取到**尖峰帧时长**（常 >0.2s 动画时长）→ while 直接跳出=入场瞬完成。旧场景制为异步分帧加载，Start 跑在正常帧上无此问题。
 
 **根因②**：面板 prefab 结构=`面板根{Canvas, ScreenBase 脚本子物体}`，弹出分支 `Destroy(entry.Instance.gameObject)` 只销毁了脚本子物体——Canvas（UI 内容）残留在层级容器下继续渲染。组件级断言（FindObjectsByType 计数=0）全绿但视觉残骸——**断言盲区实证**。
+
+**根因③**：prefab 序列化态=完成态；Instantiate 帧 OnEnable/OnShow 同步跑、**Start 在下一帧帧首**，只把"设偏移+alpha=0"放 Start → 首帧渲染出完成态=闪现一帧。场景制 Start 先于首帧可见渲染，无此问题；WishScreen 的"Awake 设偏移"即本纪律既有先例。
 
 **规范**：
 - 面板入场动画协程**首帧 `yield return null`** 再开始计时（skill gic-new-screen 已入纪律；后续迁移屏同配方）
 - 面板销毁以 `ScreenUnit.PanelRoot`（OpenPanel 实例化时记录）为准；回退路径沿层级**上溯到层级容器为止**，禁用 `transform.root`（会走到 GameScene DontDestroyOnLoad 场景根=灾难性误删）
+- **入场起始态必须在 OnShow（实例化同帧）设置**（CacheAnimationPositions+SetEntryOffsets；PlayEnterAnimation 保留幂等兜底）
 - 面板级冒烟断言必须含"层级容器 childCount"维度（开=1/关=0）与"动画真在播"时点断言（开面板 100ms 时 Entering 锁仍持有）——组件级断言不足以证明视觉正确
 
 ---
