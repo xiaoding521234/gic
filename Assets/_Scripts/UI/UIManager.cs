@@ -59,6 +59,9 @@ namespace GIC.UI
         {
             if (screen == null) return;
 
+            // 预热守卫（docs/14 §38）：预热期实例化触发的 OnEnable 不入栈——真正的注册在首次 SetActive(true) 打开时
+            if (_prewarming) return;
+
             var id = screen.GetId();
             if (id != null && id.Host == ScreenHostKind.RootScene)
                 return; // 根场景=context 不入栈（Splash/Battle；MainHall 非 ScreenBase 天然不入）
@@ -143,9 +146,10 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// PanelHost（docs/23 §3.5）：Resources 加载 prefab → 实例化至全屏层容器。
+        /// PanelHost（docs/23 §3.5，池化版）：优先复用池中预热实例（SetActive(true) 即开——
+        /// 零 Instantiate、无尖峰帧，docs/14 §38）；池空时回退同步实例化。
         /// 注册/OnInit/OnShow 经 ScreenBase.OnEnable 自动链（args 由 _pendingOpenArgs 传递）；
-        /// 层级带内排序=100+栈深（层级权威，覆盖宿主场景 Canvas 的 sortingOrder，docs/23 §3.2）。
+        /// 层级带内排序=100+栈深（层级权威，docs/23 §3.2）。
         /// </summary>
         private void OpenPanel(ScreenId id, object args)
         {
@@ -160,25 +164,40 @@ namespace GIC.UI
                 return;
             }
 
-            var prefab = Resources.Load<GameObject>(id.PrefabPath);
-            if (prefab == null)
+            GameObject go = null;
+
+            // ① 池中预热实例复用（快路径）
+            if (_panelPool.TryGetValue(id.Name, out var pooled) && pooled != null)
             {
-                GICLog.Error($"[UIManager] 面板 prefab 加载失败: Resources/{id.PrefabPath}");
-                return;
+                _panelPool.Remove(id.Name);
+                _pendingOpenArgs = args;
+                pooled.SetActive(true); // OnEnable→RegisterScreen→OnInit/OnShow 自动链
+                _pendingOpenArgs = null;
+                go = pooled;
             }
 
-            _pendingOpenArgs = args;
-            var go = Instantiate(prefab, layerFullscreen);
-            _pendingOpenArgs = null;
-            go.name = id.Name;
+            // ② 池空回退：同步实例化（预热未完成/被赶在前面时）
+            if (go == null)
+            {
+                var prefab = Resources.Load<GameObject>(id.PrefabPath);
+                if (prefab == null)
+                {
+                    GICLog.Error($"[UIManager] 面板 prefab 加载失败: Resources/{id.PrefabPath}");
+                    return;
+                }
 
-            // 记录面板根（ScreenBase 脚本可能是面板根的子孙物体，销毁必须打 PanelRoot——P2 回归修正）
+                _pendingOpenArgs = args;
+                go = Instantiate(prefab, layerFullscreen);
+                _pendingOpenArgs = null;
+                go.name = id.Name;
+            }
+
+            // 记录面板根（ScreenBase 脚本可能是面板根的子孙物体，销毁/入池必须打 PanelRoot——P2 回归修正）
             var unit = FindEntryById(id);
             if (unit != null) unit.PanelRoot = go;
             else
             {
-                // OnEnable 注册链异常兜底（正常不会走到）：面板根自挂标记，PopToPrevious 时反查
-                GICLog.Warn($"[UIManager] {id.Name} 实例化后未自动入栈（OnEnable 注册链异常），请检查 prefab 内 ScreenBase");
+                GICLog.Warn($"[UIManager] {id.Name} 打开后未自动入栈（OnEnable 注册链异常），请检查 prefab 内 ScreenBase");
             }
 
             // 层级带内排序：面板根 Canvas 为 root canvas（宿主容器无 Canvas），强制层级带序
@@ -186,6 +205,70 @@ namespace GIC.UI
             var canvas = go.GetComponentInChildren<Canvas>(true);
             if (canvas != null)
                 canvas.sortingOrder = LayerBand(UILayer.Fullscreen) + _stack.Count;
+        }
+
+        // ==================== 面板池与预热（docs/14 §38：同步 Instantiate 尖峰帧根治） ====================
+
+        /// <summary>池中实例（按 Id.Name 键；隐藏挂层级容器下）——打开复用、关闭回池</summary>
+        private readonly Dictionary<string, GameObject> _panelPool = new();
+
+        /// <summary>预热守卫：预热期 OnEnable 注册链跳过（真正的注册发生在首次 SetActive(true) 打开时）</summary>
+        private bool _prewarming;
+
+        private void Start()
+        {
+            StartCoroutine(PrewarmLoop());
+        }
+
+        /// <summary>
+        /// 预热泵：等 MainHall 就绪（面板只从大厅打开）→ 逐屏空闲实例化（每 30 帧一个，
+        /// 把 Instantiate 成本摊进大厅空闲帧——冷打开 286ms 尖峰帧即用户可见的全屏闪烁，docs/14 §38）。
+        /// 预热实例 SetActive(false) 挂全屏层容器下，打开时 SetActive(true) 复用。
+        /// </summary>
+        private IEnumerator PrewarmLoop()
+        {
+            // 等 MainHall 根场景就绪 + 入场动画头（约 1s）后开泵
+            while (UnityEngine.SceneManagement.SceneManager.GetSceneByName("MainHall").isLoaded == false)
+                yield return null;
+            for (int i = 0; i < 60; i++)
+                yield return null;
+
+            foreach (var id in Screens.All)
+            {
+                if (id == null || id.Host != ScreenHostKind.Prefab) continue;
+
+                var prefab = Resources.Load<GameObject>(id.PrefabPath);
+                if (prefab == null)
+                {
+                    GICLog.Warn($"[UIManager] 预热失败，打开时回退同步实例化: Resources/{id.PrefabPath}");
+                    continue;
+                }
+
+                _prewarming = true;
+                var go = Instantiate(prefab, layerFullscreen);
+                go.name = id.Name;
+
+                // 渲染态预热（池化冒烟实证：只暖物体不暖渲染，首开仍有 ~157ms 尖峰帧）：
+                // alpha=0 激活两帧走完整渲染管线（Canvas 重建/TMP 网格与字形图集/贴图上传），
+                // 成本摊进大厅空闲帧；OnEnable 注册链被 _prewarming 守卫跳过
+                bool hadCg = go.TryGetComponent<CanvasGroup>(out var cg);
+                float origAlpha = hadCg ? cg.alpha : 1f;
+                if (!hadCg) cg = go.AddComponent<CanvasGroup>();
+                cg.alpha = 0f;
+                go.SetActive(true);
+                yield return null;
+                yield return null;
+                go.SetActive(false);
+                cg.alpha = origAlpha;
+                if (!hadCg) Destroy(cg);
+                _prewarming = false;
+
+                _panelPool[id.Name] = go;
+
+                GICLog.Info($"[UIManager] 面板预热完成（含渲染态）: {id.Name}");
+                for (int i = 0; i < 30; i++)
+                    yield return null; // 摊开成本：一屏一歇
+            }
         }
 
         /// <summary>层级排序带：Fullscreen=100 / Popup=200 / Toast=300 / Top=400，带内用栈深递增</summary>
@@ -227,9 +310,9 @@ namespace GIC.UI
 
             if (entry.IsPrefabHost)
             {
-                // PanelHost：Destroy 面板根（P2 回归修正：entry.Instance 可能是面板根的子孙脚本物体，
-                // 只销毁它会留下 Canvas 残骸）。回退=沿层级上溯到层级容器为止（勿用 transform.root——
-                // 它会走到 GameScene 场景根，误删不可逆）；OnDisable/OnDestroy 自动出栈注销与四件套兜底
+                // PanelHost：面板入池（SetActive(false)，docs/14 §38 池化）——下次打开零成本复用；
+                // OnDisable 自动出栈注销，可关闭注册由 ScreenBase.OnDisable 收口。
+                // 回退路径沿层级上溯至层级容器为止（禁 transform.root——会走到 GameScene 场景根）
                 UnityEngine.GameObject panelRoot = entry.PanelRoot;
                 if (panelRoot == null && entry.Instance != null)
                 {
@@ -237,7 +320,11 @@ namespace GIC.UI
                     while (t.parent != null && t.parent != layerFullscreen) t = t.parent;
                     panelRoot = t.gameObject;
                 }
-                if (panelRoot != null) Destroy(panelRoot);
+                if (panelRoot != null)
+                {
+                    panelRoot.SetActive(false);
+                    _panelPool[fromScene] = panelRoot;
+                }
                 EventBusHub.Instance?.Send(new OnGoBackEvent { FromScene = fromScene, ToScene = toScene });
                 return true;
             }

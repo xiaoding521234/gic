@@ -10,7 +10,7 @@
 
 | 分组 | 节 |
 |------|-----|
-| A · UI 与 UGUI（粒子 / 九切片 / 程序化 UI / 设置页 / 面板化） | §2 §4 §14（14.2–14.4）§22 §26 §27 §37 |
+| A · UI 与 UGUI（粒子 / 九切片 / 程序化 UI / 设置页 / 面板化） | §2 §4 §14（14.2–14.4）§22 §26 §27 §37 §38 |
 | B · 文本 · TMP · 本地化 · DI | §5 §6 §18 |
 | C · 音频 | §10 §11 |
 | D · 渲染 · Shader · 大地图图形 | §8 §13 |
@@ -850,5 +850,24 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 面板销毁以 `ScreenUnit.PanelRoot`（OpenPanel 实例化时记录）为准；回退路径沿层级**上溯到层级容器为止**，禁用 `transform.root`（会走到 GameScene DontDestroyOnLoad 场景根=灾难性误删）
 - **入场起始态必须在 OnShow（实例化同帧）设置**（CacheAnimationPositions+SetEntryOffsets；PlayEnterAnimation 保留幂等兜底）
 - 面板级冒烟断言必须含"层级容器 childCount"维度（开=1/关=0）与"动画真在播"时点断言（开面板 100ms 时 Entering 锁仍持有）——组件级断言不足以证明视觉正确
+
+---
+
+## 38. 同步 Instantiate 尖峰帧 → 全屏闪烁（间歇性）；面板池化三件套（2026-09-12 实证，冷热实测）
+
+**现象**：面板打开瞬间整个画面闪烁一下，**间歇性**（有时正常）。
+
+**实测取证**（逐帧 deltaTime 采样）：冷打开帧 **285.9ms**（基线 6-24ms）；热重开仅 38.1ms——**冷/热缓存交替=间歇性的谜底**。长帧期间背景视频/视差层跳帧=用户可见的全屏闪烁。
+
+**修复演进（三件套，全部进 UIManager PanelHost）**：
+1. **池化**：面板关闭不再 Destroy 而是 SetActive(false) 入池；打开复用池中实例（重开 11.6ms）。**池化连坐 bug：`isClosing` 防重入标志入池后未复位 → 重开面板永远关不掉**——RaiseShow 必须复位。
+2. **渲染态预热**：只暖物体（inactive Instantiate）首开仍 157.4ms——TMP 网格/字形图集/贴图上传发生在**首次可见渲染**；预热须 alpha=0 激活两帧走完整渲染管线再入池 → 首开 74.4ms。
+3. **摊开成本**：预热泵在 MainHall 就绪后逐屏实例化（每屏间隔 30 帧），尖峰摊进大厅空闲帧。
+
+**规范**：
+- 面板打开类"闪一下/卡一下"问题先做逐帧 deltaTime 取证（冷热对比），勿凭猜测修
+- 面板池化后生命周期变化：**Start 只跑一次**——每开一次的动作（音乐 push/入场动画/选中态/值刷新）必须挪 OnShow，一次性 wiring 落 OnInit；`isClosing` 由 ScreenBase.RaiseShow 统一复位
+- 可关闭注册随池化改为每开一次（ScreenBase.RaiseShow 自动 RegisterClosableSelf，幂等）+ OnDisable 注销（隐藏面板不再接走 ESC）
+- 冒烟断言同步升级：关闭断言改"活跃子物体=0"（池实例以隐藏态留在容器下，childCount 含隐藏不再归零）；二次关闭断言必须含（isClosing 复位回归）
 
 ---

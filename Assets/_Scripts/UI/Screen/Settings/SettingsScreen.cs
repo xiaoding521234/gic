@@ -27,17 +27,6 @@ namespace GIC.UI
         // prefab 面板：静态身份（场景名寻址在面板实例化进宿主场景后失效，P2 定则）
         protected override ScreenId Id => Screens.Settings;
 
-        /// <summary>
-        /// 面板制防闪屏（docs/14 §37 延伸）：prefab 序列化态=完成态，Start 晚于首帧渲染——
-        /// 必须在 OnShow（UIManager 实例化同帧调用）把面板置于入场起始态，首帧渲染即不可见。
-        /// 场景制 Start 先于首帧渲染无此问题（WishScreen 的"Awake 设偏移"即本纪律）。
-        /// </summary>
-        protected override void OnShow(object args)
-        {
-            CacheAnimationPositions();
-            SetEntryOffsets();
-        }
-
         [Header("顶部")]
         public GameObject topPanel;
         public TextCombiner titleText;
@@ -117,10 +106,13 @@ namespace GIC.UI
         private List<TextCombiner> navTexts = new List<TextCombiner>();
         private List<RectTransform> navRects = new List<RectTransform>();
 
-        void Start()
+        /// <summary>
+        /// 一次性装配（池化生命周期，docs/14 §38：面板不再销毁，旧 Start 的 wiring 落此，只跑一次）。
+        /// 值初始化（Init*Settings）一并在此——设置项仅本面板可编辑，池化重开无需重读；
+        /// 若未来出现"外部改设置值"的入口，再挪入 OnShow。
+        /// </summary>
+        protected override void OnInit()
         {
-            RegisterClosableSelf();
-
             // 收集所有设置面板（与导航按钮顺序一致：派蒙=第 5 栏，其它=第 6 栏）
             settingPanels.Add(displaySettings);
             settingPanels.Add(soundSettings);
@@ -164,7 +156,7 @@ namespace GIC.UI
             // 绑定关闭按钮
             closeButton.onClick.AddListener(Close);
 
-            // 初始化本地化文本
+            // 初始化本地化文本（TextCombiner 自带语言切换自动刷新，一次设置即可）
             InitLocalizedTexts();
 
             // 初始化各项设置
@@ -174,11 +166,19 @@ namespace GIC.UI
             InitAccountSettings();
             InitPetSettings();
             // "其它"栏 2026-08-27 起暂无条目（petClose 挪入派蒙栏）——面板保留占位
+        }
 
-            // 缓存动画位置
+        /// <summary>
+        /// 每次打开（池化生命周期）：起始态（防闪屏，docs/14 §37）+ 每开一次的动作
+        /// （音乐压低、入场动画、选中态初始化）。原 Start 的这些动作在池化下只会跑一次，必须落此。
+        /// </summary>
+        protected override void OnShow(object args)
+        {
+            // 起始态必须 OnShow（实例化/激活同帧）设置——首帧渲染不可见（docs/14 §37）
             CacheAnimationPositions();
+            SetEntryOffsets();
 
-            // 播放进入动画
+            PushMusicVolumeSafe();
             PlayEnterAnimation();
 
             // 延迟一帧初始化选中效果位置
