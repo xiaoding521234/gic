@@ -71,6 +71,12 @@ namespace GIC.UI
         private IEnumerator PlayEnterAnimationCoroutine()
         {
             InputLocks.Push(this, InputLockReason.Entering);
+
+            // 首帧跳过计时（P2 回归修正）：面板制下 Resources.Load+Instantiate 同步发生在点击帧，
+            // Start 在下一帧执行，首轮 Time.deltaTime=尖峰帧时长（常 >0.2s 动画时长）→ while 直接跳出=入场瞬完成。
+            // 旧场景制为异步分帧加载无此问题。先 yield 一帧消化尖峰帧的 deltaTime。
+            yield return null;
+
             float elapsed = 0f;
 
             while (elapsed < panelSlideDuration)
