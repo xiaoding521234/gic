@@ -5,16 +5,20 @@ namespace GIC.Framework
 {
     /// <summary>
     /// 双指捏合识别器（连续；MaxPointers=2）。第二指落下即宣胜起手（hub 先已按"双指取代单指"
-    /// 取消同面单指识别器——Map/桌宠现有语义）；比例式回调（消费者做 pinchStartSize * ratio，Map 现公式）。
+    /// 取消同面单指识别器——Map/桌宠现有语义）；比例式回调 startDist/当前距离（消费者做
+    /// pinchStartSize * ratio，Map 现公式），附双指中点屏幕位（消费者做锚定缩放）。
     /// 起手门槛=两指都不在 UI 上（hub 门2 在双指 Began 时按位置式兼查既有指，Map L470 实证教训）。
+    /// 两指同点（距离 ≤1px 无比例基准）不起手，**分开后可晚起手**（Map 现行为：每帧重试起手判定）。
+    /// 注意：第二指起手瞬间在 UI 上则本识别器不追踪它——比旧实现略收紧（旧=两指都离开 UI 后还能
+    /// 补起手）；"手指先按在按钮上再拖出"的补起手路径视为按钮意图，目检若异议再放宽。
     /// 一指抬起 → Ended；剩余指不自动续拖（Map 现语义；消费者可自行接管，libGDX 无缝转拖见 docs/24 §8）。
     /// </summary>
     public class PinchRecognizer : GestureRecognizer
     {
-        /// <summary>捏合起手（参数=起手两指距离 px）</summary>
-        public event Action<float> OnPinchBegan;
-        /// <summary>捏合逐帧（参数=startDist/当前两指距离 的比例；&gt;1 张开 &lt;1 收拢）</summary>
-        public event Action<float> OnPinchRatio;
+        /// <summary>捏合起手（参数=起手两指距离 px、双指中点屏幕位）</summary>
+        public event Action<float, Vector2> OnPinchBegan;
+        /// <summary>捏合逐帧（参数=startDist/当前两指距离 的比例、双指中点屏幕位；&gt;1 张开 &lt;1 收拢）</summary>
+        public event Action<float, Vector2> OnPinchRatio;
         /// <summary>捏合结束（一指抬起）</summary>
         public event Action OnPinchEnded;
 
@@ -43,9 +47,7 @@ namespace GIC.Framework
                         if (e.OverUI) return; // 一指在 UI 上不捏合（Map"捏按钮归按钮"规则；OverUI=hub 双指位置式兼查结果）
                         _id1 = e.Id;
                         _p1 = e.Position;
-                        _startDist = Vector2.Distance(_p0, _p1);
-                        SetBegan(); // 宣胜
-                        OnPinchBegan?.Invoke(_startDist);
+                        TryBegin(); // 两指同点则不 now，等分开后晚起手
                     }
                     return;
 
@@ -60,8 +62,12 @@ namespace GIC.Framework
                         if (dist > 1f) // 两指同点无比例基准（Map 现守卫）
                         {
                             SetChanged();
-                            OnPinchRatio?.Invoke(_startDist / dist);
+                            OnPinchRatio?.Invoke(_startDist / dist, (_p0 + _p1) * 0.5f);
                         }
+                    }
+                    else if (State == GestureState.Possible)
+                    {
+                        TryBegin(); // 晚起手：两指从同点分开（Map 现行为=起手判定每帧重试）
                     }
                     return;
 
@@ -85,6 +91,15 @@ namespace GIC.Framework
                         SetFailed(); // 第二指从未准入（如在 UI 上），第一指抬起时收尸
                     return;
             }
+        }
+
+        /// <summary>起手判定：两指距离 &gt;1px 才有比例基准；起手即宣胜（hub 仲裁同面单指——CancelSingles 已先行）</summary>
+        private void TryBegin()
+        {
+            _startDist = Vector2.Distance(_p0, _p1);
+            if (_startDist <= 1f) return;
+            SetBegan();
+            OnPinchBegan?.Invoke(_startDist, (_p0 + _p1) * 0.5f);
         }
 
         protected override void OnReset()

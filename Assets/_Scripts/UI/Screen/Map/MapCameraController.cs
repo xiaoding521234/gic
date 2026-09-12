@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using GIC.Framework;
 using UnityEngine.Serialization;
 
@@ -11,17 +10,24 @@ namespace GIC.UI
     /// <summary>
     /// 大地图相机控制器（垂直画布正交版，Unity 2D 约定）。
     /// 地图平铺在 XY 竖直平面（z=0），相机沿 -Z 看，rotation 归零：
-    /// - 拖拽平移：抓取画布点跟随（鼠标/单指）
-    /// - 缩放：滚轮/双指捏合调整正交尺寸（比例式）
+    /// - 手势输入：本类=GestureHub 的 surface（docs/24 P2）——Drag(Immediate, ShortTap 复合)+Pinch
+    ///   识别器做全部判定（起手/点击/捏合/双指防抢），本类只做相机响应（拖拽=抓取画布点跟随、
+    ///   捏合=比例式锚定中点缩放、短位移点击=射线检测 3D 锚点分发）；
+    ///   点击判定阈值=GestureMetrics 双档（鼠标 4px/触摸 24px，2026-09-13 全局统一拍板）
+    /// - 滚轮缩放：轴输入不进指针流，维持本类 Update 轮询（比例式+平滑缓动）
     /// - 惯性滑行：快速拖拽松手后按末速度继续平移，指数衰减至停（2026-09-01）
     /// - 边界：注视点按当前可见范围限制在地图矩形内（画面不露出地图外）
-    /// - 入场动画：尺寸从倍数回落（快进慢出），期间持有 MapEntering 输入锁
-    /// - 点击：按下与抬起位移小于阈值视为点击，射线检测 3D 锚点并分发
-    /// - 双指起手防抢：两指都落在 UI 上（含游戏内派蒙挡板）不缩放地图——捏派蒙归派蒙
+    /// - 入场动画：尺寸从倍数回落（快进慢出），期间持有 MapEntering 输入锁（hub 门1 冻结手势）
     /// </summary>
-    public class MapCameraController : MonoBehaviour
+    public class MapCameraController : MonoBehaviour, IGestureSurface
     {
         private const float cameraFixedDist = 100f;
+
+        // ── 手势层接线（docs/24 P2）──
+        [Autowired] private GestureHub _gestureHub;
+        private readonly DragRecognizer _dragRecognizer = new DragRecognizer(DragBeginMode.Immediate, emitShortTap: true);
+        private readonly PinchRecognizer _pinchRecognizer = new PinchRecognizer();
+        private readonly List<GestureRecognizer> _recognizers = new List<GestureRecognizer>();
 
         [Header("缩放")]
         [InspectorName("最小尺寸")]
@@ -41,9 +47,7 @@ namespace GIC.UI
         [InspectorName("入场时长")]
         [SerializeField] private float enterDuration = 0.2f;
 
-        [Header("点击判定")]
-        [InspectorName("点击位移阈值")]
-        [SerializeField] private float clickMoveThreshold = 12f;
+        [Header("锚点点击")]
         [InspectorName("锚点射线最大距离")]
         [SerializeField] private float anchorRayMaxDist = 500f;
 
@@ -72,14 +76,10 @@ namespace GIC.UI
         private Coroutine _entryCoroutine;
         private AnimationCurve _easeCurve;
 
-        // 拖拽状态（鼠标与单指共用）
-        private bool _dragging;
-        private Vector2 _pressScreenPos;
+        // 拖拽状态：_grabGround=抓取画布点（DragTo 跟随基准）；起手/点击/捏合判定全在识别器（docs/24 P2）
         private Vector2 _grabGround;
 
-        // 双指捏合状态
-        private bool _pinching;
-        private float _pinchStartDist;
+        // 捏合：起手尺寸快照（比例基准=pinchStartSize×张合比；起手距离/比例在 PinchRecognizer）
         private float _pinchStartSize;
 
         // 惯性滑行：拖拽中=实测平滑末速度，松手后=滑行速度（同字段无缝交接——松手瞬间的
@@ -87,18 +87,100 @@ namespace GIC.UI
         private Vector2 _panVelocity;
         private const float velocitySmoothSec = 0.04f; // 末速度 EMA 时间常数（≈2-3 帧：只反映松手前最近手势，先停住再松≈0 速不滑）
 
-        // 位置式 UI 命中缓存（IsScreenPointOverUI 用，避免每次分配）
-        private static readonly List<RaycastResult> _uiRaycastBuffer = new List<RaycastResult>(8);
-
         /// <summary>入场动画是否正在播放</summary>
         public bool IsAnimating => _entryCoroutine != null;
 
         private void Awake()
         {
             _camera = GetComponent<Camera>();
+            _recognizers.Add(_dragRecognizer);
+            _recognizers.Add(_pinchRecognizer);
+            WireGestureHandlers();
             ResetEaseCurve();
             ApplyCameraSetup();
             SyncZoomTargets();
+        }
+
+        private void OnEnable()
+        {
+            if (!Application.isPlaying) return;
+            Wargame.Instance?.Context?.Inject(this); // [Autowired] GestureHub（同 BattleExitConfirmDialog 的迟到注入模式）
+            if (_gestureHub == null)
+            {
+                Debug.LogWarning("[MapCamera] GestureHub 未注入——手势层不可用（Wargame 未初始化？）");
+                return;
+            }
+            _gestureHub.RegisterSurface(this);
+            _gestureHub.AnyPointerBegan += OnAnyPointerBeganForGlideStop;
+        }
+
+        private void OnDisable()
+        {
+            if (_gestureHub == null) return;
+            _gestureHub.UnregisterSurface(this);
+            _gestureHub.AnyPointerBegan -= OnAnyPointerBeganForGlideStop;
+        }
+
+        // ==================== IGestureSurface（docs/24 §4.4） ====================
+
+        /// <summary>入场动画期间不收新指针（进行中手势由 hub 门1/锁冻结取消）</summary>
+        public bool Enabled => !IsAnimating;
+
+        /// <summary>大地图面=全屏世界面：指针准入恒真（UI 命中由 hub 门2 挡，无需本面过滤）</summary>
+        public bool ShouldReceivePointer(in PointerEvent e) => true;
+
+        public IReadOnlyList<GestureRecognizer> Recognizers => _recognizers;
+
+        /// <summary>识别器回调接线（一次即可——事件订阅跨 OnEnable/OnDisable 存续，注册到 hub 才开始收事件）</summary>
+        private void WireGestureHandlers()
+        {
+            _dragRecognizer.OnDragBegan += OnDragBeganHandler;
+            _dragRecognizer.OnDragDelta += OnDragDeltaHandler;
+            _dragRecognizer.OnShortTap += OnShortTapHandler;
+            _dragRecognizer.OnDragEnded += OnDragEndedHandler;
+            _pinchRecognizer.OnPinchBegan += OnPinchBeganHandler;
+            _pinchRecognizer.OnPinchRatio += OnPinchRatioHandler;
+        }
+
+        /// <summary>任何指针按下（含 UI 上）掐断滑行——原"任何按下都掐断滑行（抓停语义，含按在 UI 上）"现语义保持</summary>
+        private void OnAnyPointerBeganForGlideStop(PointerEvent e) => _panVelocity = Vector2.zero;
+
+        private void OnDragBeganHandler(Vector2 screenPos)
+        {
+            if (TryGetGroundPoint(screenPos, out Vector2 ground))
+                _grabGround = ground; // 抓取画布点（Immediate：按下即起手，跟手零延迟）
+        }
+
+        private void OnDragDeltaHandler(Vector2 delta, Vector2 screenPos)
+        {
+            if (TryGetGroundPoint(screenPos, out Vector2 current))
+                DragTo(current); // 原公式不变：_focus += _grabGround - current（贴边 clamp+EMA 末速）
+        }
+
+        /// <summary>短位移点击（DragRecognizer.ShortTap 复合发射，先于 OnDragEnded）——射线检测 3D 锚点并分发</summary>
+        private void OnShortTapHandler(Vector2 screenPos)
+        {
+            _panVelocity = Vector2.zero; // 点击松手不滑行（快速轻点的末速可能虚高）
+            DispatchAnchorClick(screenPos);
+        }
+
+        private void OnDragEndedHandler(Vector2 screenPos)
+        {
+            if (_panVelocity.magnitude < glideMinSpeed)
+                _panVelocity = Vector2.zero; // 真实拖拽但末速不足：不滑行
+        }
+
+        private void OnPinchBeganHandler(float startDist, Vector2 midScreenPos)
+        {
+            _pinchStartSize = _size;
+            _panVelocity = Vector2.zero; // 双指取代单指：掐断滑行（原 touchCount==2 分支同语义）
+        }
+
+        private void OnPinchRatioHandler(float ratio, Vector2 midScreenPos)
+        {
+            // 比例式捏合（原公式 pinchStartSize × startDist/dist）：锚定双指中点画布点缩放
+            if (TryGetGroundPoint(midScreenPos, out Vector2 midGround))
+                SetSizeAtScreenPoint(midScreenPos, _pinchStartSize * ratio, midGround);
         }
 
         /// <summary>注视点目标同步（拖拽/滑行只直写 _focus：位置由手接管、清其缓动，
@@ -193,136 +275,23 @@ namespace GIC.UI
         {
             if (InputLocks.IsLocked)
             {
-                // 锁期间中断进行中的手势与滑行（幂等，下一帧手势重新判定）
-                _dragging = false;
-                _pinching = false;
+                // 锁期间冻结：识别器由 hub 门1 ForceCancel（Cancelled→复位），此处清速度掐断滑行
+                // 并停掉缩放平滑帧——与原实现"锁期间中断手势与滑行"同语义
                 _panVelocity = Vector2.zero;
                 return;
             }
 
-            if (Input.touchSupported && Input.touchCount > 0)
-                HandleTouch();
-            else
-                HandleMouse();
-
+            // 滚轮缩放（轴输入不进指针流，维持轮询）：以鼠标画布点为锚，乘法缩放；
+            // 只写目标值，SmoothZoomFrame 平滑逼近——2026-09-12 平滑化
+            if (Input.mouseScrollDelta.y != 0f && TryGetGroundPoint(Input.mousePosition, out Vector2 anchor))
+                SmoothZoomAtScreenPoint(_targetSize * Mathf.Pow(scrollStep, -Input.mouseScrollDelta.y), anchor);
             SmoothZoomFrame();
             GlideFrame();
         }
 
-        private void HandleMouse()
-        {
-            // 滚轮缩放（以鼠标画布点为锚；乘法缩放；只写目标值，SmoothZoomFrame 平滑逼近——2026-09-12 平滑化）
-            if (Input.mouseScrollDelta.y != 0f && TryGetGroundPoint(Input.mousePosition, out Vector2 anchor))
-                SmoothZoomAtScreenPoint(_targetSize * Mathf.Pow(scrollStep, -Input.mouseScrollDelta.y), anchor);
-
-            bool pressed = Input.GetMouseButtonDown(0);
-            if (pressed) _panVelocity = Vector2.zero; // 任何按下都掐断滑行（抓停语义，含按在 UI 上）
-
-            if (pressed && !IsPointerOverUI(-1))
-            {
-                if (TryGetGroundPoint(Input.mousePosition, out _grabGround))
-                {
-                    _dragging = true;
-                    _pressScreenPos = Input.mousePosition;
-                }
-            }
-            else if (_dragging && Input.GetMouseButton(0))
-            {
-                if (TryGetGroundPoint(Input.mousePosition, out Vector2 current))
-                    DragTo(current);
-            }
-            else if (_dragging && Input.GetMouseButtonUp(0))
-            {
-                _dragging = false;
-                // 抬起点也须不在 UI 上（按下于地图、滑到按钮上抬起的场景不分发点击）
-                bool clicked = !IsPointerOverUI(-1) &&
-                    Vector2.Distance(Input.mousePosition, _pressScreenPos) < clickMoveThreshold;
-                if (clicked)
-                {
-                    _panVelocity = Vector2.zero; // 点击松手不滑行（快速轻点的末速可能虚高）
-                    DispatchAnchorClick(Input.mousePosition);
-                }
-                else if (_panVelocity.magnitude < glideMinSpeed)
-                    _panVelocity = Vector2.zero; // 真实拖拽但末速不足：不滑行
-            }
-        }
-
-        private void HandleTouch()
-        {
-            if (Input.touchCount == 1)
-            {
-                _pinching = false;
-                Touch t = Input.GetTouch(0);
-
-                bool began = t.phase == TouchPhase.Began;
-                if (began) _panVelocity = Vector2.zero; // 任何按下都掐断滑行（抓停语义，含按在 UI 上）
-
-                if (began && !IsPointerOverUI(t.fingerId))
-                {
-                    if (TryGetGroundPoint(t.position, out _grabGround))
-                    {
-                        _dragging = true;
-                        _pressScreenPos = t.position;
-                    }
-                }
-                else if (_dragging && (t.phase == TouchPhase.Moved || t.phase == TouchPhase.Stationary))
-                {
-                    // Stationary 也走跟随：指针静止帧喂 0 位移给末速度 EMA 衰减——否则按住不动
-                    // 松手会按停住前的旧速度滑（EMA 只在被更新时衰减）
-                    if (TryGetGroundPoint(t.position, out Vector2 current))
-                        DragTo(current);
-                }
-                else if (_dragging && (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled))
-                {
-                    _dragging = false;
-                    // 抬起点也须不在 UI 上（同鼠标路径）
-                    bool clicked = !IsPointerOverUI(t.fingerId) &&
-                        Vector2.Distance(t.position, _pressScreenPos) < clickMoveThreshold;
-                    if (clicked)
-                    {
-                        _panVelocity = Vector2.zero; // 点击松手不滑行（快速轻点的末速可能虚高）
-                        DispatchAnchorClick(t.position);
-                    }
-                    else if (_panVelocity.magnitude < glideMinSpeed)
-                        _panVelocity = Vector2.zero; // 真实拖拽但末速不足：不滑行
-                }
-            }
-            else if (Input.touchCount == 2)
-            {
-                // 双指=捏合意图：取消单指拖拽与其惯性
-                _dragging = false;
-                _panVelocity = Vector2.zero;
-                Touch t0 = Input.GetTouch(0);
-                Touch t1 = Input.GetTouch(1);
-
-                if (_pinching)
-                {
-                    float dist = Vector2.Distance(t0.position, t1.position);
-                    if (dist > 1f && TryGetGroundPoint((t0.position + t1.position) * 0.5f, out Vector2 mid))
-                    {
-                        // 比例式捏合：两指张合比例直接映射为尺寸比例
-                        float newSize = _pinchStartSize * (_pinchStartDist / dist);
-                        SetSizeAtScreenPoint((t0.position + t1.position) * 0.5f, newSize, mid);
-                    }
-
-                    if (t0.phase == TouchPhase.Ended || t0.phase == TouchPhase.Canceled ||
-                        t1.phase == TouchPhase.Ended || t1.phase == TouchPhase.Canceled)
-                        _pinching = false;
-                }
-                else
-                {
-                    // 起手须两指都不在 UI 上（位置式检测，见 IsScreenPointOverUI）：捏派蒙（挡板=UI）
-                    // 归派蒙缩放、捏按钮归按钮；两指同点（无比例基准）也不起手
-                    float startDist = Vector2.Distance(t0.position, t1.position);
-                    if (startDist > 1f && !IsScreenPointOverUI(t0.position) && !IsScreenPointOverUI(t1.position))
-                    {
-                        _pinching = true;
-                        _pinchStartDist = startDist;
-                        _pinchStartSize = _size;
-                    }
-                }
-            }
-        }
+        // （HandleMouse/HandleTouch 双轨与手写判定已删——P2 迁移至手势层：鼠标/触摸归一在
+        //  PointerInputPump，起手/点击/捏合判定在 DragRecognizer/PinchRecognizer/GestureHub 门，
+        //  本类只保留上面 OnXxxHandler 的相机响应；docs/24 §5）
 
         // ==================== 惯性滑行 ====================
 
@@ -349,7 +318,9 @@ namespace GIC.UI
         /// 两轴都被边界顶死；新手势/输入锁/入场动画接管时各自清零。</summary>
         private void GlideFrame()
         {
-            if (_dragging || _pinching) return; // 手势进行中：速度字段由 DragTo 维护，不滑行
+            // 手势进行中：速度字段由 DragTo 维护，不滑行（识别器状态查行——Immediate 拖拽按下即 Began，
+            // 捏合晚起手期间=Possible 也算"手在屏上"，同样不滑）
+            if (_dragRecognizer.State != GestureState.Idle || _pinchRecognizer.State != GestureState.Idle) return;
             float sqrMin = glideMinSpeed * glideMinSpeed;
             if (_panVelocity.sqrMagnitude < sqrMin) { _panVelocity = Vector2.zero; return; }
 
@@ -459,24 +430,8 @@ namespace GIC.UI
                 anchor.HandleClick();
         }
 
-        private static bool IsPointerOverUI(int pointerId)
-        {
-            var es = EventSystem.current;
-            return es != null && es.IsPointerOverGameObject(pointerId);
-        }
-
-        /// <summary>位置式 UI 命中（手动 RaycastAll）——任意帧对任意屏幕点有效。IsPointerOverGameObject
-        /// 对非 Began 帧的触摸不可靠（Unity 已知行为），双指捏合起手时第二指往往已落下数帧，
-        /// 手势起手判定必须用位置式。双指起手用它，单击/拖拽起手仍用 pointerId 式（Began 帧可靠）。</summary>
-        private static bool IsScreenPointOverUI(Vector2 screenPos)
-        {
-            var es = EventSystem.current;
-            if (es == null) return false;
-            var pointerData = new PointerEventData(es) { position = screenPos };
-            _uiRaycastBuffer.Clear();
-            es.RaycastAll(pointerData, _uiRaycastBuffer);
-            return _uiRaycastBuffer.Count > 0;
-        }
+        // （IsPointerOverUI(id)/IsScreenPointOverUI(pos) 已删——UI 命中收编为 GestureHub 门2 唯一实现；
+        //  id 式（单指 Began 帧）+位置式（双指起手兼查既有指）两套实证教训都在 hub，docs/24 §4.4）
 
         // ==================== 入场动画 ====================
 

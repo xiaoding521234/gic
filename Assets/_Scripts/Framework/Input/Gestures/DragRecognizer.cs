@@ -100,13 +100,15 @@ namespace GIC.Framework
                     }
                     if (State == GestureState.Began || State == GestureState.Changed)
                     {
-                        OnDragEnded?.Invoke(e.Position);
+                        // ShortTap 先于 OnDragEnded 派发：消费方在 ShortTap 里清滑行速度后，
+                        // OnDragEnded 的滑行判定自然不成立（Map"点击松手不滑行"现语义，零一帧滑移）
                         if (_emitShortTap)
                         {
                             float slopEnd = GestureMetrics.SlopFor(_kind);
                             if ((e.Position - _downPos).sqrMagnitude < slopEnd * slopEnd && !e.OverUI)
                                 OnShortTap?.Invoke(e.Position); // 短位移点击伴发（Map 现语义：轻点锚点）
                         }
+                        OnDragEnded?.Invoke(e.Position);
                         SetEnded();
                     }
                     break;
