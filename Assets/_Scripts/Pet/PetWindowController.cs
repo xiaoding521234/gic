@@ -429,6 +429,51 @@ namespace GIC.Pet
             return new Vector2(sp.x, sp.y);
         }
 
+        /// <summary>桌面聊天可见边界（2026-09-12 桌面边缘自适应）：把屏幕工作区（任务栏感知，
+        /// SPI_GETWORKAREA——输入条要可点，底线=任务栏顶）映射进画布坐标系并取与画布的交集。
+        /// 画布=Overlay 恒铺客户区、ConstantPixelSize（画布像素=客户区物理像素）；画布 y 向上、
+        /// 屏幕 y 向下：画布 y = 客户区底的屏幕 Y - 点的屏幕 Y；画布 x = 点的屏幕 X - 客户区左的屏幕 X。
+        /// 派蒙贴屏边/压任务栏时，窗口（跟派蒙移动）出屏的部分在此表现为画布外负区——共享层的
+        /// 钳制与"脚底放不下翻转"判定据此感知真实屏幕边缘（修复：派蒙拖到屏幕底，输入条画在
+        /// 脚底方向出屏外看不见点不到）。</summary>
+        protected override Rect ChatVisibleBounds(Rect canvasRect)
+        {
+            if (hwnd == IntPtr.Zero) return canvasRect;
+            try
+            {
+                SystemParametersInfo(SPI_GETWORKAREA, 0, out RECT work, 0);
+                POINT origin = GetClientOriginScreen(); // 客户区 (0,0) 的屏幕坐标（物理像素系）
+
+                // 工作区四边 → 画布坐标系（画布 y 向上自窗口底起：canvasY = 窗口底屏幕Y - sy；
+                // 窗口底屏幕Y = origin.Y + 客户区高 = origin.Y + canvasRect.height——Overlay 恒铺客户区）
+                float clientBottomY = origin.Y + canvasRect.height;
+                float xMin = work.Left - origin.X;
+                float xMax = work.Right - origin.X;
+                float yMax = clientBottomY - work.Top;      // 工作区顶在画布的高 y
+                float yMin = clientBottomY - work.Bottom;   // 工作区底（任务栏顶）在画布的低 y
+
+                // 与画布（0..width/height）取交集；倒挂（窗口完全出工作区）退回画布自身防 NaN
+                float x0 = Mathf.Max(0f, xMin), y0 = Mathf.Max(0f, yMin);
+                float x1 = Mathf.Min(canvasRect.width, xMax), y1 = Mathf.Min(canvasRect.height, yMax);
+                if (x1 <= x0 || y1 <= y0) return canvasRect;
+
+                // 诊断日志（2026-09-12 边缘自适应排查）：首次调用记录 Win32 原始值与映射结果
+                if (!_visibleBoundsLogged)
+                {
+                    _visibleBoundsLogged = true;
+                    GIC.Framework.GICLog.DevInfo($"[PetChat] 可见边界首调: petMode={PetMode.Enabled} hwnd=0x{hwnd.ToInt64():X} " +
+                                   $"origin=({origin.X},{origin.Y}) work=({work.Left},{work.Top})-({work.Right},{work.Bottom}) " +
+                                   $"canvas={canvasRect.width:F0}x{canvasRect.height:F0} -> bounds=({x0:F0},{y0:F0})-({x1:F0},{y1:F0})");
+                }
+                return Rect.MinMaxRect(x0, y0, x1, y1);
+            }
+            catch
+            {
+                return canvasRect; // Win32 异常兜底：退画布自身（不挡聊天）
+            }
+        }
+        private static bool _visibleBoundsLogged;
+
         /// <summary>Intent 工具执行分发（桌面差异）：独立进程无主进程引用——经 PetIntentIpc 文件通道
         /// 转发主游戏进程执行（主进程 PetIntentIpcHost 消费）；主游戏未运行时通道超时报错（LLM 自行解释）。</summary>
         protected override string ExecuteChatTool(string toolName, string toolArgsJson)

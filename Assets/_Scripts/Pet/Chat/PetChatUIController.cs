@@ -117,6 +117,16 @@ namespace GIC.Pet.Chat
         /// 输入条挂在模型下方；null=输入条退回屏底居中兜底）</summary>
         [HideInInspector] public System.Func<Vector2> footAnchorProvider;
 
+        /// <summary>可见边界提供器（宿主注入；2026-09-12 桌面边缘自适应）：返回"屏幕上真正可用的
+        /// 矩形"映射到画布坐标系（左下锚+anchoredPosition 同空间）。null=画布即边界（游戏内形态
+        /// 全屏画布天然正确）；桌面形态画布=贴身小窗跟派蒙移动，派蒙贴屏边时窗口坐标系感知不到
+        /// 屏幕边缘——输入条"脚底放不下翻转"等判定必须以屏幕工作区为准，否则派蒙拖到屏幕底时
+        /// 输入条画在脚底方向出屏外，看不见也点不到（2026-09-12 用户实测报告）。</summary>
+        [HideInInspector] public System.Func<Rect, Rect> visibleBoundsProvider;
+
+        /// <summary>翻转判定诊断序列（-1=未记；0=不翻/1=翻——变化才记防刷屏）</summary>
+        private int _flipLogSeq = -1;
+
         /// <summary>输入框当前打开（宿主据此冻结拖拽误判；未接线=恒 false 不挡交互）</summary>
         public bool IsInputVisible => _inputVisible && _inputBarRoot != null;
 
@@ -218,46 +228,60 @@ namespace GIC.Pet.Chat
             if (_inputVisible && Input.GetKeyDown(KeyCode.Escape)) { CloseChat(); return; }
             if (_canvas == null) return; // 宿主接线前的防御（WireHost 未调用时恒静默——2026-08-30 桌面版窗口句柄事故：Start 提前 return 吞掉接线=此处每帧 NRE 刷屏 9.6 万条）
             var canvasRect = (_canvas.transform as RectTransform).rect;
-            // 回复气泡跟随头部锚点（拖拽/移动/动画头部都在动——每帧跟；按半宽钳回屏内防贴边裁切）
+            // 可见边界（2026-09-12 桌面边缘自适应）：宿主未注入=画布即边界（游戏内全屏画布）；
+            // 桌面注入"屏幕工作区映射到画布坐标系"的矩形——贴屏边/压任务栏的画布区域不算可用区
+            Rect bounds = visibleBoundsProvider != null ? visibleBoundsProvider(canvasRect) : canvasRect;
+            // 回复气泡跟随头部锚点（拖拽/移动/动画头部都在动——每帧跟；按半宽钳回可见区内防贴边裁切）
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf && headAnchorProvider != null)
             {
                 Vector2 p = headAnchorProvider();
                 float bubbleHalfWidth = _bubbleRoot.sizeDelta.x * 0.5f;
                 p.x = Mathf.Clamp(p.x + bubbleOffset.x,
-                    Mathf.Min(screenMargin + bubbleHalfWidth, canvasRect.width * 0.5f),
-                    Mathf.Max(canvasRect.width - screenMargin - bubbleHalfWidth, canvasRect.width * 0.5f));
-                p.y = Mathf.Clamp(p.y + bubbleOffset.y, screenMargin, canvasRect.height - screenMargin);
+                    Mathf.Min(bounds.xMin + screenMargin + bubbleHalfWidth, bounds.center.x),
+                    Mathf.Max(bounds.xMax - screenMargin - bubbleHalfWidth, bounds.center.x));
+                p.y = Mathf.Clamp(p.y + bubbleOffset.y, bounds.yMin + screenMargin, bounds.yMax - screenMargin);
                 _bubbleRoot.anchoredPosition = p;
             }
             // 输入条跟随模型（开着才需要；翻转判定依赖气泡当前高度，故在气泡跟随之后算）
-            if (_inputVisible && _inputBarRoot != null) FollowInputBar(canvasRect);
+            if (_inputVisible && _inputBarRoot != null) FollowInputBar(bounds);
         }
 
         /// <summary>输入条跟随模型（每帧，输入开着时）：默认挂模型脚底下方（底部锚点=模型包围盒底
         /// 中心）；脚底放不下（贴屏底/坐任务栏腿垂出屏）时翻转到气泡上方——输入条与气泡都不遮模型。
-        /// 宿主未注入 底部锚点提供器 时退回屏底居中（理论兜底——现行宿主都会注入）。</summary>
-        void FollowInputBar(Rect canvasRect)
+        /// 边缘判定以 可见边界（屏幕工作区）为准，不以画布为准（2026-09-12：桌面画布=贴身小窗，
+        /// 派蒙拖到屏幕底时窗口坐标感知不到屏边，输入条画在屏外点不到）。
+        /// 宿主未注入 底部锚点提供器 时退回可见区底居中（理论兜底——现行宿主都会注入）。</summary>
+        void FollowInputBar(Rect bounds)
         {
             if (footAnchorProvider == null)
             {
-                // 顶中心 pivot：y=条底距屏底+条高，使条底贴 输入条距modelBottom
-                _inputBarRoot.anchoredPosition = new Vector2(canvasRect.width * 0.5f, inputBarToModelBottom + inputBarH);
+                // 顶中心 pivot：y=条底距可见区底+条高，使条底贴 输入条距modelBottom
+                _inputBarRoot.anchoredPosition = new Vector2(bounds.center.x, bounds.yMin + inputBarToModelBottom + inputBarH);
                 return;
             }
             Vector2 modelBottom = footAnchorProvider();
             float halfWidth = _inputBarRoot.sizeDelta.x * 0.5f;
             float x = Mathf.Clamp(modelBottom.x,
-                Mathf.Min(screenMargin + halfWidth, canvasRect.width * 0.5f),
-                Mathf.Max(canvasRect.width - screenMargin - halfWidth, canvasRect.width * 0.5f));
+                Mathf.Min(bounds.xMin + screenMargin + halfWidth, bounds.center.x),
+                Mathf.Max(bounds.xMax - screenMargin - halfWidth, bounds.center.x));
             // 默认：输入条顶边贴模型脚底下方（pivot=顶中心）
             float y = modelBottom.y - inputBarToModelBottom;
-            if (y - inputBarH < screenMargin)
+            bool flip = y - inputBarH < bounds.yMin + screenMargin;
+            // 诊断日志（2026-09-12 桌面边缘自适应排查）：翻转判定变化或首次才记，防每帧刷屏
+            int seq = flip ? 1 : 0;
+            if (seq != _flipLogSeq)
             {
-                // 脚底放不下：翻转到气泡上方（气泡隐藏时按头锚点+偏移估气泡底）
+                _flipLogSeq = seq;
+                GICLog.DevInfo($"[PetChat] 边缘判定: flip={flip} modelBottom=({modelBottom.x:F0},{modelBottom.y:F0}) " +
+                               $"bounds=({bounds.xMin:F0},{bounds.yMin:F0})-({bounds.xMax:F0},{bounds.yMax:F0}) y={y:F0}");
+            }
+            if (flip)
+            {
+                // 脚底放不下（出可见区/压任务栏）：翻转到气泡上方（气泡隐藏时按头锚点+偏移估气泡底）
                 float bubbleTop = _bubbleRoot != null && _bubbleRoot.gameObject.activeSelf
                     ? _bubbleRoot.anchoredPosition.y + _bubbleRoot.sizeDelta.y
                     : (headAnchorProvider != null ? headAnchorProvider().y + bubbleOffset.y : modelBottom.y + 240f);
-                y = Mathf.Min(bubbleTop + inputBarToModelBottom + inputBarH, canvasRect.height - screenMargin);
+                y = Mathf.Min(bubbleTop + inputBarToModelBottom + inputBarH, bounds.yMax - screenMargin);
             }
             _inputBarRoot.anchoredPosition = new Vector2(x, y);
         }
@@ -282,7 +306,10 @@ namespace GIC.Pet.Chat
                 session?.Prewarm();
             }
             _inputBarRoot.gameObject.SetActive(true);
-            FollowInputBar((_canvas.transform as RectTransform).rect); // 立即摆位，防一帧闪在旧位置
+            var canvasRect0 = (_canvas.transform as RectTransform).rect;
+            // 立即摆位防一帧闪旧位置——与 Update 同源走可见边界（2026-09-12：首摆曾直传画布矩形，
+            // 桌面贴屏边时首帧会画在屏外）
+            FollowInputBar(visibleBoundsProvider != null ? visibleBoundsProvider(canvasRect0) : canvasRect0);
             InputLocks.Push(this, InputLockReason.InputPopupEntering); // 输入期按键不漏进游戏
             AnimateInputBar(1f); // 淡入（2026-08-31）
             _inputField.text = "";
@@ -519,9 +546,13 @@ namespace GIC.Pet.Chat
         }
 
         /// <summary>运行时取 UIText 本地化文本（语言切换不自动刷新——仅用于 placeholder/动态气泡
-        /// 文案等 TextCombiner 不适用的位置；静态标签一律挂 TextCombiner）</summary>
+        /// 文案等 TextCombiner 不适用的位置；静态标签一律挂 TextCombiner）。
+        /// 桌宠进程守卫（2026-09-12）：桌宠构建产物不含 Addressables 运行数据（aa/settings.json），
+        /// 触发 Localization 初始化必报 Invalid path 错链——桌宠直接走 fallback 文案，不碰取表；
+        /// 游戏内形态（编辑器/主进程）照常本地化。</summary>
         static string GetLocalizedText(string key, string fallback)
         {
+            if (PetMode.Enabled) return fallback;
             var table = UnityEngine.Localization.Settings.LocalizationSettings.Instance.GetStringDatabase()
                 .GetTable("UIText") as UnityEngine.Localization.Tables.StringTable;
             return table?.GetEntry(key)?.GetLocalizedString() ?? fallback;
