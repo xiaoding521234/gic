@@ -91,6 +91,11 @@ namespace GIC.Editor
                     return;
                 }
 
+                // 知识库保鲜（2026-09-12）：构建前自动重烘焙 pet_knowledge.json（幂等全量重写）。
+                // 失败不阻断构建——桌宠只是知识可能过期，聊天其余功能不受影响（文档化降级）。
+                try { PetKnowledgeBaker.Bake(); }
+                catch (System.Exception ex) { Debug.LogWarning($"[PetSpikeBuild] 知识库烘焙失败（构建继续）: {ex.Message}"); }
+
                 string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
                 var options = new BuildPlayerOptions
                 {
