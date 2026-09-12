@@ -900,3 +900,16 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **§39b 连坐第二例（同日实证，"重开叠加两个卡池"）**：FadeOut 类协程被入池 SetActive(false) 硬杀时，**尾部的收尾动作（SetAlpha(0)+SetActive(false)）永不执行**——面板残留"半透明+activeSelf=True"，重开后叠在新选中面板上（用户序列：切到 Furina→关闭→重开=双卡池叠加）。运行时取证 `[5]act=True a=0.04` 一发实锤。**规范**：所有 Fade/Switch 类"协程尾部收尾"的显示物，OnShow 必须提供强制复位（CharacterPanelController.ResetHidden=StopAllCoroutines+SetAlpha(0)+SetActive(false)，WishScreen.OnShow 遍历全量归零）——收尾语义不能只依赖协程跑完，必须可被 OnShow 幂等重建。
 
 ---
+
+## 40. "全局扫描断链图片并替换"方案不可行——序列化 null 即 fake-null（2026-09-13 缺失图兜底实证）
+
+**现象**：为做"缺失图片兜底"设计全局守卫：面板打开时扫描子树，检测"断链 sprite"（fake null：`!ReferenceEquals(s,null) && s==null`）并替换为兜底图。一跑冒烟，设置面板 **11 处合法纯色块 Image 被误伤**（Dropdown 模板 Item Background×4、Slider Handle×4、BackDim 遮暗层）——全部被换成人脸兜底图。
+
+**根因**：**prefab 序列化保存的 sprite=null 字段，加载后就是 fake-null 对象**（§31 fake-null 判定法反面印证：空引用反序列化产物="真实存在的伪装对象"）——与真正的断链引用（fileID 指向丢失资产）在运行时**完全不可区分**。本项目大量 UI 形态就是"故意无图纯色块"（靠 color 显色），全局扫描无差别替换必炸。
+
+**规范**：
+- 缺失图兜底只能**调用点显式接入**（MissingImageGuard.Assign/Ensure）：在"应当有图"的赋值处（立绘/名片/图标加载回调）显式调用——为空即兜底+拉伸填满（preserveAspect=false）；"故意无图"的纯色块不经过守卫，天然免疫
+- **禁止**再做任何形式的"扫描-替换断链图"全局方案（含编辑器批量工具）；审计类需求只能做"报告不改动"
+- 兜底资产放 Resources（同步加载保障）：`Resources/UI/missing_image`（548x533，用户指定的醒目图）
+
+---

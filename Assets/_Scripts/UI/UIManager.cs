@@ -112,6 +112,8 @@ namespace GIC.UI
             _pendingOpenArgs = null;
             screen.RaiseOnInit();
             screen.RaiseShow(args);
+            // 缺失图片兜底已改调用点显式接入（MissingImageGuard.Ensure）：全局自动扫描方案实证不可行
+            // ——prefab 序列化 null 加载后即 fake-null，与真断链运行时不可区分，扫描必误伤纯色块
         }
 
         internal void UnregisterScreen(ScreenBase screen)

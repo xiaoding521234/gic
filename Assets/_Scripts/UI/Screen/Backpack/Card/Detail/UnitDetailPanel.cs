@@ -69,7 +69,7 @@ namespace GIC.UI
         {
             _top.color = StarVisualConfig.GetStarColor(raw.starLevel);
             _bottomImage.color = StarVisualConfig.GetStarColor(raw.starLevel);
-            nameCard.sprite = raw.nameCard;
+            MissingImageGuard.Assign(nameCard, raw.nameCard); // 名片缺失兜底（调用点显式）
 
             // 星级
             RefreshStars(raw.starLevel);
