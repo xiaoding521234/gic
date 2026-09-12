@@ -101,8 +101,9 @@ namespace GIC.UI
                 PushMusicStateSafe(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
             }
 
-            // 起始态（幂等——Awake 已设，重开兜底）
-            CachePanelPositions();
+            // 起始态：只设偏移，【勿】再 CachePanelPositions——Awake 已缓存目标位；
+            // OnShow 时面板处于偏移位，重复缓存会把偏移位覆写成目标位=三面板永远滑不回屏幕
+            // （用户目检实证：抽卡/关闭/切换按钮消失，立绘可见——目标位被 ±200 污染）
             SetPanelsToStartOffset();
 
             // 池化状态复位：选中态回未选、切换锁复位（旧场景制靠重载天然复位）
@@ -252,11 +253,18 @@ namespace GIC.UI
 
         // ==================== 面板入场/退场动画 ====================
 
+        // 动画目标位缓存幂等守卫：池化生命周期里 Awake（预热实例化）是唯一合法缓存点
+        // ——面板此后常驻偏移位/动画位，任何二次缓存都会把非目标位污染成目标位（P3 实证）
+        private bool _positionsCached = false;
+
         private void CachePanelPositions()
         {
+            if (_positionsCached) return;
+
             if (topPanel != null)    _topPanelTargetPos    = topPanel.anchoredPosition;
             if (leftPanel != null)   _leftPanelTargetPos   = leftPanel.anchoredPosition;
             if (bottomPanel != null) _bottomPanelTargetPos = bottomPanel.anchoredPosition;
+            _positionsCached = true;
         }
 
         private void SetPanelsToStartOffset()
