@@ -340,6 +340,7 @@ namespace GIC.Pet
                 _chatUI.WireHost(canvas);
                 _chatUI.headAnchorProvider = ChatHeadAnchor;
                 _chatUI.footAnchorProvider = ChatFootAnchor;
+                _chatUI.visibleBoundsProvider = ChatVisibleBounds; // 桌面边缘自适应（2026-09-12）：默认画布即边界；桌面重写为屏幕工作区映射
             }
             catch (System.Exception e)
             {
@@ -359,11 +360,16 @@ namespace GIC.Pet
         protected abstract Vector2 ChatHeadAnchor();
         /// <summary>脚锚点（输入条挂模型脚底下方用，宿主差异同上）</summary>
         protected abstract Vector2 ChatFootAnchor();
+        /// <summary>聊天可见边界（宿主差异，2026-09-12 桌面边缘自适应）：返回"屏幕真正可用矩形"映射到
+        /// 画布坐标系（与锚点/anchoredPosition 同空间）。默认=画布自身（游戏内全屏画布天然正确）；
+        /// 桌面画布=贴身小窗跟派蒙移动，须用 Win32 把屏幕工作区映射进画布坐标——派蒙贴屏边时
+        /// 输入条/气泡的避让判定才感知得到屏幕边缘。</summary>
+        protected virtual Rect ChatVisibleBounds(Rect canvasRect) => canvasRect;
         /// <summary>Intent 工具执行分发（宿主差异）：桌面=PetIntentIpc 文件通道转发主进程；游戏内=主进程内直调。
         /// 本地工具（memory_update/do_action）由会话层拦截不经此分发（模型在宠物进程，转发主进程是错的）</summary>
         protected abstract string ExecuteChatTool(string toolName, string toolArgsJson);
 
-        /// <summary>Intent 工具表注册（两形态同表：记忆/情绪动作/游戏时间×2/界面导航/自动抽卡）。
+        /// <summary>Intent 工具表注册（两形态同表：记忆/情绪动作/知识检索/游戏时间×2/界面导航/自动抽卡）。
         /// 注册失败只少工具不影响聊天（防泄漏结构同上）。</summary>
         void RegisterChatTools()
         {
@@ -375,6 +381,7 @@ namespace GIC.Pet
                 {
                     Chat.PaimonChatSession.MemoryToolDefinition(),
                     Chat.PaimonChatSession.DoActionTool(), // 情绪动作（LLM 对话自主选，会话层本地拦截不经 IPC）
+                    Chat.PaimonChatSession.SearchKnowledgeTool(), // 知识库检索（会话层本地拦截不经 IPC，docs/19 §6.5.9）
                     Chat.PetChatIntent.SetGameTimeTool(),
                     Chat.PetChatIntent.GetGameTimeTool(),
                     Chat.PetChatIntent.OpenScreenTool(),
@@ -384,7 +391,7 @@ namespace GIC.Pet
                 // do_action 动作回调（会话层本地消化后回调）：行为层播单次动作
                 //（拖拽物理中/退场中 PlayReaction 内部静默跳过——反应错失可接受）
                 session.onPlayAction = anim => behaviorCtrl?.PlayReaction(anim);
-                Debug.Log($"{logTag} 对话指令工具已注册（游戏时间/界面/自动抽卡/情绪动作）");
+                Debug.Log($"{logTag} 对话指令工具已注册（游戏时间/界面/自动抽卡/情绪动作/知识检索）");
             }
             catch (System.Exception e)
             {
