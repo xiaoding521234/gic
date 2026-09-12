@@ -929,3 +929,16 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **修复**（`PinchRecognizer.cs`）：`e.Kind != Touch` 一律不追踪 + 晚起手分支加 `_id1 != int.MinValue` 前置 + `TryBegin` 就绪铁闸；负路径断言 R1（单指移动不自起手）/R2（鼠标零追踪）入回归集。
 
 ---
+
+## 42. RectTransform.rect 与 anchoredPosition 空间错位——贴屏边时桌宠输入条/气泡被钳进画布中带（2026-09-13 P4 目检实证，§39 活体诊断法）
+
+**现象**：游戏内派蒙拖到画面边缘后单击，输入框出现在屏幕中部（x≈1297）而非模型脚底；派蒙在屏幕中部时输入条也偏左 ~290px（轻微未被察觉）。
+
+**诊断**（exec_runtime_script 反射取证，游戏运行中）：锚点链全部正确（ChatFootAnchor=(2796,443) 跟随模型，输入条 y 精确=foot.y-20 ✓），但输入条 x=1297——**现场复算 Clamp(foot.x=2796, min, max)=1297 逐位复现 bug 本体**：min/max 来自 `(_canvas.transform as RectTransform).rect`——根画布 pivot 恒居中，rect 是**枢轴中心局部空间**（xMin=-1587, xMax=+1587, center=0）；而锚点/anchoredPosition 是**左下锚绝对空间**（0..3174）。中心空间钳左下空间锚点：屏中(1587)→钳到 1297 偏左 290px；贴右缘(2796)→钳到 1297=屏幕正中。气泡钳制同病。**为 2026-09-12 桌面边缘自适应引入的预存 bug**（非 P4 回归——in-game 路径当年"假设天然正确"未测贴边）。
+
+**规范**：
+- 避让/钳制 bounds 必须与被钳对象**同空间**：uGUI 里 anchoredPosition 是锚定空间，画布自身在锚空间恒为 `Rect(0,0,w,h)`；`RectTransform.rect` 只在"看局部尺寸"时安全（width/height 恒对），**取 xMin/xMax/center 参与跨对象运算前先想清楚空间**
+- 探针复算是实锤利器：现场复现 Clamp 公式→与实际值逐位吻合→根因自证（§39 方法论第二次胜利）
+- 修复在源头归一（PetChatUIController.Update 产 canvasRect 处），不在各钳制点打补丁；桌面 override 契约本就是左下空间（入参只取宽高），源头归一后两形态一致
+
+---
