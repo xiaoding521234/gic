@@ -91,6 +91,9 @@ namespace GIC.UI
             // 池化关闭（SetActive false）即注销可关闭——防隐藏面板接走 ESC；
             // 场景销毁路径 OnDestroy 再注销一次，幂等安全
             _inputManager?.UnregisterClosable(this);
+            // 音乐幂等 pop（根转换自动入池路径补漏，P3 联机实证：不走 CloseScreen 模板时
+            // OnDestroy 不触发，压低音量若不在此恢复会泄漏到新根场景；正常关闭已 pop 则空操作）
+            PopMusicSafe();
             // 池化保险丝下移：入池隐藏会打断动画协程（秒开秒关时入场动画持有的 Entering 锁
             // 随之悬空）——原 OnDestroy 四件套的 PopAll 对永不销毁的池化面板不再触发，
             // 兜底移到 OnDisable（场景销毁路径双触发，幂等）
