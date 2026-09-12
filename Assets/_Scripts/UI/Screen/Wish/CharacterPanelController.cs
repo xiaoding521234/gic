@@ -188,8 +188,9 @@ namespace GIC.UI
 
             AssetCacheRef?.LoadAsync<Sprite>(_currentAddress, sprite =>
             {
-                if (this != null && characterImage != null && sprite != null)
-                    characterImage.sprite = sprite;
+                // 立绘缺失兜底（调用点显式）：加载失败/空时用醒目兜底图拉伸填满
+                if (this != null && characterImage != null)
+                    MissingImageGuard.Assign(characterImage, sprite);
                 _spriteLoadDone = true;
             }, LoadPriority.High);
         }
@@ -231,8 +232,9 @@ namespace GIC.UI
 
                 AssetCacheRef?.LoadAsync<Sprite>(_currentAddress, sprite =>
                 {
-                    if (this != null && characterImage != null && sprite != null)
-                        characterImage.sprite = sprite;
+                    // 立绘缺失兜底（调用点显式）：加载失败/空时用醒目兜底图拉伸填满
+                    if (this != null && characterImage != null)
+                        MissingImageGuard.Assign(characterImage, sprite);
                     _spriteLoadDone = true;
                 }, LoadPriority.High);
             }

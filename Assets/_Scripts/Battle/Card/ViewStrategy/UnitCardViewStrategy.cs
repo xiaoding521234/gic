@@ -20,7 +20,7 @@ namespace GIC.Battle
             {
                 card.cardBack.color = StarVisualConfig.GetStarColor(raw.starLevel);
                 card.unitImage.gameObject.SetActive(true);
-                card.unitImage.sprite = raw.GetCard(data.skin);
+                MissingImageGuard.Assign(card.unitImage, raw.GetCard(data.skin)); // 立绘缺失兜底（docs：调用点显式）
                 card.obtainText.SetSingleEntry(raw.GetObtainDescriptionEntry());
             }
 
