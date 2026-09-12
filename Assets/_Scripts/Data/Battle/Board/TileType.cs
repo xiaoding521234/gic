@@ -60,6 +60,10 @@ namespace GIC.Data
         [InspectorName("冰面")]
         [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
         Ice = 5,
+
+        [InspectorName("石路")]
+        [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
+        StonePath = 6,
         #endregion
 
         #region waterTerrain (100-199)

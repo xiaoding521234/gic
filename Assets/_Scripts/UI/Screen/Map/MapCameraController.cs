@@ -31,6 +31,9 @@ namespace GIC.UI
         [Tooltip("每滚轮一格的缩放比例（0.85 = 每格缩小 15%）。乘法缩放保证任意级别下视觉变化一致，到上下限有明确停顿感")]
         [InspectorName("滚轮缩放步进")]
         [SerializeField, Range(0.5f, 0.99f)] private float scrollStep = 0.85f;
+        [Tooltip("滚轮缩放平滑时间常数（秒）：实际尺寸/注视点向目标指数逼近，越小跟得越紧（0=瞬移）。2026-09-12 反哺自战斗相机，消除滚轮瞬跳")]
+        [InspectorName("缩放平滑时间常数")]
+        [SerializeField, Range(0f, 0.3f)] private float zoomSmoothTau = 0.06f;
 
         [Header("区域聚焦")]
         [InspectorName("默认视野尺寸")]
@@ -61,6 +64,11 @@ namespace GIC.UI
         private Vector2 _focus;
         private float _size = 8f;
 
+        // 滚轮平滑缩放目标值（滚轮只写目标，实际值由 SmoothZoomFrame 逐帧逼近；
+        // 拖拽/捏合/入场动画/惯性滑行直写实际值并同步目标，互不干扰）
+        private float _targetSize = 8f;
+        private Vector2 _targetFocus;
+
         private Coroutine _entryCoroutine;
         private AnimationCurve _easeCurve;
 
@@ -90,6 +98,21 @@ namespace GIC.UI
             _camera = GetComponent<Camera>();
             ResetEaseCurve();
             ApplyCameraSetup();
+            SyncZoomTargets();
+        }
+
+        /// <summary>注视点目标同步（拖拽/滑行只直写 _focus：位置由手接管、清其缓动，
+        /// 但**保留尺寸目标**——滑行中滚轮缩放正常生效（2026-09-12 修复：曾把 _targetSize 一并回写，滚轮目标被逐帧抹掉=滑行期缩放灵敏度极低）</summary>
+        private void SyncFocusTarget()
+        {
+            _targetFocus = _focus;
+        }
+
+        /// <summary>全量目标同步（直控尺寸的路径用：捏合/入场动画收尾/Awake 初始化）</summary>
+        private void SyncZoomTargets()
+        {
+            _targetSize = _size;
+            _targetFocus = _focus;
         }
 
         private void Reset()
@@ -182,14 +205,15 @@ namespace GIC.UI
             else
                 HandleMouse();
 
+            SmoothZoomFrame();
             GlideFrame();
         }
 
         private void HandleMouse()
         {
-            // 滚轮缩放（以鼠标画布点为锚；乘法缩放）
+            // 滚轮缩放（以鼠标画布点为锚；乘法缩放；只写目标值，SmoothZoomFrame 平滑逼近——2026-09-12 平滑化）
             if (Input.mouseScrollDelta.y != 0f && TryGetGroundPoint(Input.mousePosition, out Vector2 anchor))
-                SetSizeAtScreenPoint(Input.mousePosition, _size * Mathf.Pow(scrollStep, -Input.mouseScrollDelta.y), anchor);
+                SmoothZoomAtScreenPoint(_targetSize * Mathf.Pow(scrollStep, -Input.mouseScrollDelta.y), anchor);
 
             bool pressed = Input.GetMouseButtonDown(0);
             if (pressed) _panVelocity = Vector2.zero; // 任何按下都掐断滑行（抓停语义，含按在 UI 上）
@@ -310,6 +334,7 @@ namespace GIC.UI
             Vector2 next = ClampFocus(_focus + (_grabGround - currentGround), _size);
             Vector2 moved = next - _focus;
             _focus = next;
+            SyncFocusTarget(); // 拖拽直写注视点：位置目标跟随手，保留滚轮尺寸目标
             ApplyCameraSetup();
 
             float dt = Time.unscaledDeltaTime;
@@ -332,6 +357,7 @@ namespace GIC.UI
             Vector2 next = ClampFocus(_focus + _panVelocity * dt, _size);
             if ((next - _focus).sqrMagnitude < 1e-10f) { _panVelocity = Vector2.zero; return; } // 边界顶死
             _focus = next;
+            SyncFocusTarget(); // 滑行只接管注视点：保留滚轮尺寸目标（2026-09-12 修复滑行期缩放失灵）
             _panVelocity *= Mathf.Exp(-glideDamping * dt);
             if (_panVelocity.sqrMagnitude < sqrMin) _panVelocity = Vector2.zero;
             ApplyCameraSetup();
@@ -355,6 +381,7 @@ namespace GIC.UI
         /// <summary>
         /// 缩放到新尺寸，并保持锚定画布点仍位于指定屏幕点下方。
         /// 正交相机下屏幕偏移与尺寸成线性关系，可直接按比例换算注视点。
+        /// 直接落位路径（捏合/外部调用）；滚轮走 SmoothZoomAtScreenPoint 平滑路径。
         /// </summary>
         private void SetSizeAtScreenPoint(Vector3 screenPos, float newSize, Vector2 anchorXY)
         {
@@ -364,6 +391,45 @@ namespace GIC.UI
             float ratio = newSize / _size;
             _focus = ClampFocus(anchorXY - (anchorXY - _focus) * ratio, newSize);
             _size = newSize;
+            SyncZoomTargets();
+            ApplyCameraSetup();
+        }
+
+        /// <summary>
+        /// 滚轮平滑缩放：只写目标尺寸与注视点（锚定鼠标画布点），实际值由 SmoothZoomFrame 逐帧逼近——
+        /// 消除滚轮瞬跳（2026-09-12，反哺自战斗相机方案）。多格连滚基于目标值累积，不漂移。
+        /// </summary>
+        private void SmoothZoomAtScreenPoint(float newSize, Vector2 anchorXY)
+        {
+            newSize = Mathf.Clamp(newSize, minSize, maxSize);
+            if (Mathf.Approximately(newSize, _targetSize)) return;
+
+            float ratio = newSize / _targetSize;
+            _targetFocus = ClampFocus(anchorXY - (anchorXY - _targetFocus) * ratio, newSize);
+            _targetSize = newSize;
+        }
+
+        /// <summary>滚轮平滑逼近帧：入场动画期间由动画独占（其直写实际值）；拖拽/捏合/滑行每帧同步目标，无残留在缓</summary>
+        private void SmoothZoomFrame()
+        {
+            if (IsAnimating) return;
+            bool sizePending = !Mathf.Approximately(_size, _targetSize);
+            bool focusPending = (_focus - _targetFocus).sqrMagnitude > 1e-8f;
+            if (!sizePending && !focusPending) return;
+
+            if (zoomSmoothTau <= 0f)
+            {
+                _size = _targetSize;
+                _focus = _targetFocus;
+            }
+            else
+            {
+                float t = 1f - Mathf.Exp(-Time.unscaledDeltaTime / zoomSmoothTau);
+                _size = Mathf.Lerp(_size, _targetSize, t);
+                _focus = Vector2.Lerp(_focus, _targetFocus, t);
+                if (Mathf.Abs(_size - _targetSize) < 0.0005f) _size = _targetSize;
+                if ((_focus - _targetFocus).sqrMagnitude < 1e-8f) _focus = _targetFocus;
+            }
             ApplyCameraSetup();
         }
 
@@ -454,6 +520,7 @@ namespace GIC.UI
 
             _size = targetSize;
             _focus = targetFocus;
+            SyncZoomTargets(); // 动画直写实际值：结束同步目标（清掉期间可能残留的滚轮目标）
             ApplyCameraSetup();
 
             _entryCoroutine = null;

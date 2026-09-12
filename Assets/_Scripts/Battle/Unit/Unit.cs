@@ -18,6 +18,12 @@ namespace GIC.Battle
         public List<BaseSkill> Skills = new();
         public List<BaseBuff> Buffs = new();
 
+        /// <summary>
+        /// 单位体积（docs/05 §5.3：角色/造物 = 1，建筑 = 2；格子体积容量 3。
+        /// 体积判定在阻挡规则之上，无视阻挡能力也不可绕过）
+        /// </summary>
+        public int Volume => RawData != null && RawData.unitType == UnitType.Building ? 2 : 1;
+
 
         private void Awake()
         {
