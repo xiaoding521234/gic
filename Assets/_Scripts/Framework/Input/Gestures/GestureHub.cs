@@ -32,6 +32,13 @@ namespace GIC.Framework
         // 位置式 UI 命中的静态缓存（移植自 MapCameraController._uiRaycastBuffer——避免每次分配）
         private static readonly List<RaycastResult> _uiRaycastBuffer = new List<RaycastResult>(8);
 
+        /// <summary>
+        /// 任意指针按下（门2 UI 门**之前**触发——含按在 UI 上的按下）。
+        /// 消费方"抓停"类语义用（Map：任何按下都掐断惯性滑行，含按在按钮上）；
+        /// 也是 WaitForAnyTap（docs/24 P3）的指针侧入口。
+        /// </summary>
+        public event System.Action<PointerEvent> AnyPointerBegan;
+
         /// <summary>注册手势面（消费方 Start 调用；识别器集合此后固定——hub 据此挂仲裁钩子）</summary>
         public void RegisterSurface(IGestureSurface surface)
         {
@@ -104,6 +111,8 @@ namespace GIC.Framework
         {
             if (e.Phase == PointerPhase.Began)
             {
+                AnyPointerBegan?.Invoke(e); // 抓停/任意点击类语义入口（在 UI 门之前）
+
                 bool secondTouch = e.Kind == PointerKind.Touch && HasOtherTouchBinding(e.Id);
 
                 // 门2 UI 命中：UI 指针不进世界面（按住按钮不拖地图/不点锚点）
