@@ -87,15 +87,29 @@ namespace GIC.UI
             }
         }
 
-        private void Start()
-        {
-            RegisterClosableSelf();
+        // prefab 面板：静态身份（场景名寻址在面板实例化进宿主场景后失效，P2 定则）
+        protected override ScreenId Id => Screens.Wish;
 
+        /// <summary>
+        /// 每次打开（池化生命周期，docs/14 §38）：音乐状态切换 + 池化状态复位 + 抽卡部分重初始化 + 入场动画。
+        /// 起始态已在 Awake 设过（幂等再设，docs/14 §37 纪律①）。
+        /// </summary>
+        protected override void OnShow(object args)
+        {
             if (wishClip != null)
             {
                 PushMusicStateSafe(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
             }
 
+            // 起始态（幂等——Awake 已设，重开兜底）
+            CachePanelPositions();
+            SetPanelsToStartOffset();
+
+            // 池化状态复位：选中态回未选、切换锁复位（旧场景制靠重载天然复位）
+            _currentIndex = -1;
+            _isSwitching = false;
+
+            // 抽卡部分：管理器重建+货币数刷新（按钮/事件订阅已拆入 OnInit，一次 wiring 防池化叠监听）
             InitWishDraw();
 
             // 确保所有 Layout Group 计算完成，并等渲染管线跑完一帧
@@ -266,6 +280,13 @@ namespace GIC.UI
 
             while (true)
             {
+                // 秒开秒关守卫（docs/14 §37 纪律③）：释放 Entering 锁交由退场接管
+                if (isClosing)
+                {
+                    InputLocks.Pop(this, InputLockReason.Entering);
+                    yield break;
+                }
+
                 float elapsed = Time.realtimeSinceStartup - startTime;
                 elapsed = Mathf.Min(elapsed, panelSlideDuration);
 
