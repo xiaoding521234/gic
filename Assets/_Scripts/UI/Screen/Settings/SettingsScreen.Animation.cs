@@ -22,6 +22,26 @@ namespace GIC.UI
         private Vector2 centerPanelTargetPos;
         private bool animationsCached = false;
 
+        // 毛玻璃底图（BackPanel：UIBlurCapture 的 Image）——扫入扫出动画驱动
+        // （2026-09-12 用户拍板：毛玻璃不再瞬间铺满全屏=观感闪烁源，改为顶→底扫入，时长与淡入一致）
+        private UnityEngine.UI.Image _blurBackdrop;
+
+        private UnityEngine.UI.Image BlurBackdrop
+        {
+            get
+            {
+                if (_blurBackdrop == null)
+                {
+                    // BackPanel 在 Canvas 子树下、与 SettingsScreen 脚本对象是兄弟——须从面板根搜
+                    //（GetComponentInChildren 只搜自身后代，从脚本对象起搜必空——冒烟实证 fill 全程=0）
+                    var root = transform.parent != null ? transform.parent : transform;
+                    var cap = root.GetComponentInChildren<GIC.UI.UIBlurCapture>(true);
+                    if (cap != null) _blurBackdrop = cap.GetComponent<UnityEngine.UI.Image>();
+                }
+                return _blurBackdrop;
+            }
+        }
+
         private void CacheAnimationPositions()
         {
             if (animationsCached) return;
@@ -68,6 +88,10 @@ namespace GIC.UI
 
             if (centerGroup != null)
                 centerGroup.alpha = 0f;
+
+            // 毛玻璃起始态：fill=0（顶→底扫入的起点；prefab 已预置 Filled/Vertical/Top）
+            var blur = BlurBackdrop;
+            if (blur != null) blur.fillAmount = 0f;
         }
 
         private void PlayEnterAnimation()
@@ -124,6 +148,10 @@ namespace GIC.UI
                     centerGroup.alpha = Mathf.Lerp(0f, 1f, t);
                 }
 
+                // 毛玻璃顶→底扫入（时长=淡入动画，用户拍板 2026-09-12）
+                if (BlurBackdrop != null)
+                    BlurBackdrop.fillAmount = t;
+
                 yield return null;
             }
 
@@ -136,6 +164,8 @@ namespace GIC.UI
                 centerPanelRect.anchoredPosition = centerPanelTargetPos;
             if (centerGroup != null)
                 centerGroup.alpha = 1f;
+            if (BlurBackdrop != null)
+                BlurBackdrop.fillAmount = 1f;
 
             InputLocks.Pop(this, InputLockReason.Entering);
         }
@@ -184,11 +214,17 @@ namespace GIC.UI
                     centerGroup.alpha = Mathf.Lerp(startCenterAlpha, 0f, t);
                 }
 
+                // 毛玻璃底部→顶部扫出（与入场镜像，用户拍板"关闭时同理"）
+                if (BlurBackdrop != null)
+                    BlurBackdrop.fillAmount = 1f - t;
+
                 yield return null;
             }
 
             if (centerGroup != null)
                 centerGroup.alpha = 0f;
+            if (BlurBackdrop != null)
+                BlurBackdrop.fillAmount = 0f;
             // 收尾（Closing 锁 Pop + GoBack）由 ScreenBase.CloseScreen 模板统一处理
         }
     }

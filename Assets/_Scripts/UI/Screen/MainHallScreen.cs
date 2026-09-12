@@ -236,16 +236,15 @@ namespace GIC.UI
         {
             if (isExiting) return;
 
-            // P2 面板分支（docs/23 §3.5）：prefab 面板即时实例化，按钮退场交错动画并行播放
-            //（无需预载/激活场景）；面板关闭后经 OnGoBackEvent→OnReturnedFromScene 复位按钮
+            // P2 面板分支（docs/23 §3.5）：先播完按钮退场动画，再开面板——
+            // 与场景制（背包/地图）节奏一致（2026-09-12 用户拍板：勿瞬间开门）
             var id = Screens.FromSceneName(scene.SceneName);
             if (id != null && id.Host == ScreenHostKind.Prefab)
             {
                 isExiting = true;
                 _buttonsOut = true;
                 SetButtonsInteractable(false);
-                UIManager.Instance.Open(id);
-                StartCoroutine(ExitButtonsOnlyCoroutine());
+                StartCoroutine(ExitThenOpenPanelCoroutine(id));
                 return;
             }
 
@@ -284,8 +283,9 @@ namespace GIC.UI
             isExiting = false;
         }
 
-        /// <summary>P2 面板分支的按钮退场：同款交错动画但不激活场景；复位由 OnGoBackEvent 钩子负责</summary>
-        private IEnumerator ExitButtonsOnlyCoroutine()
+        /// <summary>P2 面板分支：先播完按钮退场交错动画，再 Open 面板（场景制同节奏，用户拍板）；
+        /// 面板关闭后按钮复位由 OnGoBackEvent 钩子负责</summary>
+        private IEnumerator ExitThenOpenPanelCoroutine(ScreenId id)
         {
             List<Coroutine> exitCoroutines = new List<Coroutine>();
             CollectExitCoroutines(exitCoroutines);
@@ -295,7 +295,8 @@ namespace GIC.UI
                 yield return coroutine;
             }
 
-            isExiting = false; // 按钮退完即可再次接受跳转（面板已开，无需守场景激活）
+            UIManager.Instance.Open(id);
+            isExiting = false; // 面板已开；按钮复位由 OnGoBackEvent 钩子负责
         }
 
         /// <summary>收集左右按钮的退场动画协程（reverseStaggerOnExit 逆序交错）</summary>
