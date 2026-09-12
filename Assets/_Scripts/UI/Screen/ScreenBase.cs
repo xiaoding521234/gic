@@ -56,7 +56,15 @@ namespace GIC.UI
             OnInit();
         }
 
-        internal void RaiseShow(object args) => OnShow(args);
+        /// <summary>每次打开：复位关闭防重入标志（池化后同一实例会重开，上次关闭置位的
+        /// isClosing 若不复位，重开后将永远关不掉——池化冒烟实证）+ 自动注册可关闭（幂等）；
+        /// 注销由 OnDisable 收口。子类无需再手动调 RegisterClosableSelf（保留兼容旧写法）</summary>
+        internal void RaiseShow(object args)
+        {
+            isClosing = false;
+            RegisterClosableSelf();
+            OnShow(args);
+        }
         internal void RaisePause() => OnPause();
         internal void RaiseResume() => OnResume();
 
@@ -80,6 +88,9 @@ namespace GIC.UI
         protected virtual void OnDisable()
         {
             UIManager.Instance?.UnregisterScreen(this);
+            // 池化关闭（SetActive false）即注销可关闭——防隐藏面板接走 ESC；
+            // 场景销毁路径 OnDestroy 再注销一次，幂等安全
+            _inputManager?.UnregisterClosable(this);
         }
 
         /// <summary>注册 ESC/右键关闭（注入完成后在 Start 开头调用）</summary>
