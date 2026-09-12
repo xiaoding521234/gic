@@ -27,6 +27,17 @@ namespace GIC.UI
         // prefab 面板：静态身份（场景名寻址在面板实例化进宿主场景后失效，P2 定则）
         protected override ScreenId Id => Screens.Settings;
 
+        /// <summary>
+        /// 面板制防闪屏（docs/14 §37 延伸）：prefab 序列化态=完成态，Start 晚于首帧渲染——
+        /// 必须在 OnShow（UIManager 实例化同帧调用）把面板置于入场起始态，首帧渲染即不可见。
+        /// 场景制 Start 先于首帧渲染无此问题（WishScreen 的"Awake 设偏移"即本纪律）。
+        /// </summary>
+        protected override void OnShow(object args)
+        {
+            CacheAnimationPositions();
+            SetEntryOffsets();
+        }
+
         [Header("顶部")]
         public GameObject topPanel;
         public TextCombiner titleText;
