@@ -64,6 +64,14 @@ namespace GIC.UI
         // OnEnable/OnDisable 自动入出栈；根场景 Screen（Splash/Battle）由注册表守卫跳过；
         // 未知场景匿名入栈+Warn（零回归，P4 清查）。子类重写时必须调用 base。
 
+        /// <summary>
+        /// Screen 身份（UIManager 注册/栈管理用）。场景制默认按场景名解析；
+        /// prefab 面板必须重写为静态身份——实例化进宿主场景后 scene.name 寻址失效（P2 定则）。
+        /// </summary>
+        protected virtual ScreenId Id => Screens.FromSceneName(gameObject.scene.name);
+
+        internal ScreenId GetId() => Id;
+
         protected virtual void OnEnable()
         {
             UIManager.Instance?.RegisterScreen(this);

@@ -195,8 +195,10 @@ namespace GIC.Pet.Chat
                 return Ok("正在回大厅");
             }
 
-            // 目标已打开：无事可做
-            if (gs.CurrentScene != null && gs.CurrentScene.SceneName == entry.scene.SceneName)
+            // 目标已打开：场景制看 CurrentScene，面板制看 UIManager 栈（P2 起两类并存）
+            bool alreadyOpen = (gs.CurrentScene != null && gs.CurrentScene.SceneName == entry.scene.SceneName)
+                            || (UIManager.Instance != null && UIManager.Instance.IsOpen(Screens.FromSceneName(entry.scene.SceneName)));
+            if (alreadyOpen)
                 return Ok($"{entry.cnName}界面已经打开了");
 
             PetGameBridge.Run(PetGameBridge.NavigateToScreen(entry.scene));

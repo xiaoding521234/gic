@@ -51,6 +51,9 @@ namespace GIC.UI
         private Coroutine exitAnimationCoroutine;
         private bool isExiting = false;
 
+        /// <summary>P2 面板分支标记：按钮已滑出待复位（面板关→OnGoBackEvent 复位；场景路径 OnSceneActivated 复位，标志互斥防双动画）</summary>
+        private bool _buttonsOut = false;
+
         private Wargame wargame;
         [Autowired] private PositionManager _positionManager;
         [Autowired] private AssetCache _assetCache;
@@ -195,14 +198,21 @@ namespace GIC.UI
 
         private void OnSceneActivated()
         {
-            // 场景被激活时重置并播放入场动画
+            // 场景被激活时重置并播放入场动画（场景路径的按钮复位入口）
+            _buttonsOut = false;
             ResetAndPlayEnterAnimation();
         }
 
         private void OnReturnedFromScene(string fromScene)
         {
             GICLog.Info($"从 {fromScene} 返回到大厅");
-            // 可以在这里添加返回时的特殊处理
+            // P2 面板分支：面板关闭不切换场景（OnSceneActivated 不触发），
+            // 按钮复位由本钩子驱动；_buttonsOut 标志与场景路径互斥（防双动画）
+            if (_buttonsOut)
+            {
+                _buttonsOut = false;
+                ResetAndPlayEnterAnimation();
+            }
         }
 
         #endregion
@@ -225,6 +235,19 @@ namespace GIC.UI
         public void ExitToSceneAsync(SceneType scene)
         {
             if (isExiting) return;
+
+            // P2 面板分支（docs/23 §3.5）：prefab 面板即时实例化，按钮退场交错动画并行播放
+            //（无需预载/激活场景）；面板关闭后经 OnGoBackEvent→OnReturnedFromScene 复位按钮
+            var id = Screens.FromSceneName(scene.SceneName);
+            if (id != null && id.Host == ScreenHostKind.Prefab)
+            {
+                isExiting = true;
+                _buttonsOut = true;
+                SetButtonsInteractable(false);
+                UIManager.Instance.Open(id);
+                StartCoroutine(ExitButtonsOnlyCoroutine());
+                return;
+            }
 
             SetButtonsInteractable(false);
             StartCoroutine(ExitWithPreloadCoroutine(scene));
@@ -249,7 +272,35 @@ namespace GIC.UI
 
             // 播放退出动画
             List<Coroutine> exitCoroutines = new List<Coroutine>();
+            CollectExitCoroutines(exitCoroutines);
 
+            foreach (var coroutine in exitCoroutines)
+            {
+                yield return coroutine;
+            }
+
+            yield return GameScene.Instance.ActivatePreloadedScene(asyncLoad, scene);
+
+            isExiting = false;
+        }
+
+        /// <summary>P2 面板分支的按钮退场：同款交错动画但不激活场景；复位由 OnGoBackEvent 钩子负责</summary>
+        private IEnumerator ExitButtonsOnlyCoroutine()
+        {
+            List<Coroutine> exitCoroutines = new List<Coroutine>();
+            CollectExitCoroutines(exitCoroutines);
+
+            foreach (var coroutine in exitCoroutines)
+            {
+                yield return coroutine;
+            }
+
+            isExiting = false; // 按钮退完即可再次接受跳转（面板已开，无需守场景激活）
+        }
+
+        /// <summary>收集左右按钮的退场动画协程（reverseStaggerOnExit 逆序交错）</summary>
+        private void CollectExitCoroutines(List<Coroutine> exitCoroutines)
+        {
             for (int i = 0; i < leftButtons.Count; i++)
             {
                 var btn = leftButtons[i];
@@ -275,15 +326,6 @@ namespace GIC.UI
                     exitCoroutines.Add(StartCoroutine(AnimateButtonExit(btn, rightStartX, delay)));
                 }
             }
-
-            foreach (var coroutine in exitCoroutines)
-            {
-                yield return coroutine;
-            }
-
-            yield return GameScene.Instance.ActivatePreloadedScene(asyncLoad, scene);
-
-            isExiting = false;
         }
 
         // ==================== 按钮回调 ====================
