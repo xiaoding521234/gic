@@ -94,6 +94,12 @@ namespace GIC.Battle
 
         public IReadOnlyList<GestureRecognizer> Recognizers => _recognizers;
 
+        /// <summary>世界面：尊重 UI 命中门</summary>
+        public bool BypassUIGate => false;
+
+        /// <summary>游戏面：输入锁生效时冻结手势</summary>
+        public bool IgnoresInputLocks => false;
+
         private void OnDragBeganHandler(Vector2 screenPos)
         {
             if (TryGetBoardPoint(screenPos, out Vector3 grab))

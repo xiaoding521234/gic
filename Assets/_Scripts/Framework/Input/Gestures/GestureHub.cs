@@ -100,17 +100,24 @@ namespace GIC.Framework
                     break;
                 }
 
-            // 门1 输入锁：锁生效 → 新事件不分发 + 活跃手势取消（与今日 Map/Battle"锁期间中断手势"同语义）
+            // 门1 输入锁：锁生效 → 游戏面取消手势+解绑（忽略锁的面——桌宠类元游戏陪伴体——照常收事件，
+            // 旧全轮询实现从不理 InputLocks，一刀切冻结属行为回归，docs/24 §7.11）
             if (InputLocks.IsLocked)
             {
                 for (int i = 0; i < _surfaces.Count; i++)
                 {
+                    if (_surfaces[i].IgnoresInputLocks) continue;
                     var list = _surfaces[i].Recognizers;
                     for (int r = 0; r < list.Count; r++)
                         list[r].ForceCancel();
                 }
-                _bindings.Clear();
-                return;
+                _removeBuffer.Clear();
+                foreach (var kv in _bindings)
+                    if (!kv.Value.Surface.IgnoresInputLocks)
+                        _removeBuffer.Add(kv.Key);
+                for (int i = 0; i < _removeBuffer.Count; i++)
+                    _bindings.Remove(_removeBuffer[i]);
+                // 不 return：忽略锁的面继续正常派发
             }
 
             for (int i = 0; i < _events.Count; i++)
@@ -131,18 +138,20 @@ namespace GIC.Framework
         {
             if (e.Phase == PointerPhase.Began)
             {
-                AnyPointerBegan?.Invoke(e); // 抓停/任意点击类语义入口（在 UI 门之前）
+                AnyPointerBegan?.Invoke(e); // 抓停/任意点击/桌宠按下链等语义入口（在所有门之前）
 
                 bool secondTouch = e.Kind == PointerKind.Touch && HasOtherTouchBinding(e.Id);
+                bool overUI = IsPointerOverUI(e, secondTouch);
+                bool locked = InputLocks.IsLocked;
 
-                // 门2 UI 命中：UI 指针不进世界面（按住按钮不拖地图/不点锚点）
-                if (IsPointerOverUI(e, secondTouch)) return;
-
-                // 门3 surface 准入：第一个收留的面得绑定（注册序；现实中一屏一面）
+                // 门3 surface 准入：第一个收留的面得绑定（注册序；现实中一屏一面）。
+                // 门2 UI 命中/门1 锁按面豁免（BypassUIGate/IgnoresInputLocks——覆盖型 overlay 面专用，docs/24 §7.11）
                 for (int i = 0; i < _surfaces.Count; i++)
                 {
                     IGestureSurface surface = _surfaces[i];
                     if (!surface.Enabled || !surface.ShouldReceivePointer(e)) continue;
+                    if (overUI && !surface.BypassUIGate) continue;
+                    if (locked && !surface.IgnoresInputLocks) continue;
                     _bindings[e.Id] = new PointerBinding { Surface = surface, Kind = e.Kind, LastPos = e.Position };
                     if (secondTouch)
                         CancelSinglePointerGestures(surface); // 双指起手取代单指（先于识别器收事件——Map L292/桌宠 L636 现语义）

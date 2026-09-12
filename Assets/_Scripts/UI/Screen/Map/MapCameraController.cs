@@ -131,6 +131,12 @@ namespace GIC.UI
 
         public IReadOnlyList<GestureRecognizer> Recognizers => _recognizers;
 
+        /// <summary>世界面：尊重 UI 命中门（按住按钮不拖地图）</summary>
+        public bool BypassUIGate => false;
+
+        /// <summary>游戏面：输入锁生效时冻结手势（原"锁期间中断手势与滑行"语义）</summary>
+        public bool IgnoresInputLocks => false;
+
         /// <summary>识别器回调接线（一次即可——事件订阅跨 OnEnable/OnDisable 存续，注册到 hub 才开始收事件）</summary>
         private void WireGestureHandlers()
         {

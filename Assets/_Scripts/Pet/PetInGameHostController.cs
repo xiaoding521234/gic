@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
+using GIC.Framework;
 
 namespace GIC.Pet
 {
@@ -30,7 +32,7 @@ namespace GIC.Pet
     /// 对齐桌面版"工作区 95% 预算"语义——放大到最大恰好占满屏不截断）。
     /// 持久化：PetPrefs 游戏内字段（骨盆归一化屏幕位+缩放，分辨率无关）。
     /// </summary>
-    public class PetInGameHostController : PetHostBase
+    public class PetInGameHostController : PetHostBase, IGestureSurface
     {
         [Header("引用（空=自动找）")]
         [InspectorName("派蒙相机")]
@@ -90,14 +92,17 @@ namespace GIC.Pet
         private Vector2Int _lastScreenSize;
         // behaviorCtrl/_chatUI 已上移 PetHostBase（批 5 下沉；本类 Awake 里 GetComponentInChildren 赋值）
 
-        // 拖拽状态（对齐桌面版 PetWindowController 字段语义）
+        // 拖拽状态（docs/24 P4：起手/升级/单击判定移交 DragRecognizer(OnSlopOrHold)——
+        // 按住 150ms 升级=GestureMetrics.HoldToDragTimeout（原拍板值），位移阈值=双档 slop；本类只留响应）
         private bool dragging;
-        private bool prevLmbDown;
-        private bool _pressPending;           // 命中模型已按下但未升级为拖拽（单击判定窗口内）
-        private Vector2 dragStartPointerRT;      // RT 像素系（鼠标×RT/屏比）
+        private Vector2 dragStartPointerRT;      // RT 像素系（屏幕点×RT/屏比）
         private Vector2 dragStartPelvisRT;     // 起手骨盆屏幕投影（RT 像素系）——骨盆钉位基准
-        private float _pressDownAt = -10f;   // 单击（非拖拽）判定：按下时刻
-        private Vector3 _pressDownPos;        // 按下时鼠标位（<8px 位移=没拖=单击）
+
+        // ── 手势层接线（docs/24 P4）──
+        [Autowired] private GestureHub _gestureHub;
+        private readonly DragRecognizer _dragRecognizer = new DragRecognizer(DragBeginMode.OnSlopOrHold);
+        private readonly List<GestureRecognizer> _recognizers = new List<GestureRecognizer>();
+        private bool _chatClosedByThisPress; // 本次按下已承载"关对话"：不得再起拖/判单击（旧分支② return 语义）
 
         // 双指捏合缩放（移动端，2026-09-01）：滚轮缩放的触屏等价。桌面形态=Win32 单光标进程
         // 无多指输入，属形态本质差异允许单侧（双形态对齐口径见 docs/19 §6）
@@ -168,6 +173,8 @@ namespace GIC.Pet
             }
 
             WireDragBones();
+            _recognizers.Add(_dragRecognizer);
+            WireGestureHandlers();
             // 头骨锚点取 GI 本体（Bip001 系——视线层同款配置）。勿用日文名"頭"：那是 MMD 兜底模型
             // （Paimon_arm，禁用留存）的骨名，找本体骨 只过滤影子壳不过滤它——命中后气泡锚在
             // 不动的 MMD 头上（2026-08-29 首测气泡错位根因之一）
@@ -177,6 +184,152 @@ namespace GIC.Pet
             calcBaseAndLimit();
             restorePrefs();
             WireChat();
+        }
+
+        private void OnEnable()
+        {
+            if (!Application.isPlaying) return;
+            Wargame.Instance?.Context?.Inject(this); // [Autowired] GestureHub（同 BattleExitConfirmDialog 迟到注入模式）
+            if (_gestureHub == null)
+            {
+                Debug.LogWarning("[PetInGame] GestureHub 未注入——拖拽/单击手势不可用（Wargame 未初始化？捏合/滚轮不受影响）");
+                return;
+            }
+            _gestureHub.RegisterSurface(this);
+            _gestureHub.AnyPointerBegan += OnPetPointerBegan;
+        }
+
+        private void OnDisable()
+        {
+            if (_gestureHub == null) return;
+            _gestureHub.UnregisterSurface(this);
+            _gestureHub.AnyPointerBegan -= OnPetPointerBegan;
+        }
+
+        // ==================== IGestureSurface（docs/24 §4.4，P4） ====================
+
+        /// <summary>退场中（Disappear 播放期+播完冻结期）不收新指针（旧 interactFrozen 守卫）</summary>
+        public bool Enabled => behaviorCtrl == null || !behaviorCtrl.IsExiting;
+
+        /// <summary>桌宠挡板/输入条自身即 UI（raycastTarget 动态开关），不豁免则永远收不到自己的指针</summary>
+        public bool BypassUIGate => true;
+
+        /// <summary>元游戏陪伴体：旧全轮询实现从不理 InputLocks，游戏弹窗/转场锁不冻结它</summary>
+        public bool IgnoresInputLocks => true;
+
+        /// <summary>
+        /// 指针准入=命中烘焙蒙皮碰撞体（像素级，桌面版同配方）+ 聊天输入期不起新手势。
+        /// 聊天开着时：本次按下只承载"关对话"（OnPetPointerBegan 内判定），不进手势——输入条/气泡上
+        /// 的按下归 EventSystem/气泡自身，命中模型（元素以外）的按下=收起意图，均不绑面（旧分支② return 语义）。
+        /// </summary>
+        public bool ShouldReceivePointer(in PointerEvent e)
+        {
+            if (_chatClosedByThisPress) return false;
+            if (!GetHitState(e.Position)) return false;
+            if (_chatUI != null && _chatUI.IsInputVisible) return false;
+            return true;
+        }
+
+        public IReadOnlyList<GestureRecognizer> Recognizers => _recognizers;
+
+        /// <summary>识别器回调接线（一次即可——事件订阅跨 OnEnable/OnDisable 存续，注册到 hub 才开始收事件）</summary>
+        private void WireGestureHandlers()
+        {
+            _dragRecognizer.OnDragBegan += OnDragBeganHandler;
+            _dragRecognizer.OnDragDelta += OnDragDeltaHandler;
+            _dragRecognizer.OnTapCandidate += OnTapCandidateHandler;
+            _dragRecognizer.OnDragEnded += pos => EndDrag();
+            _dragRecognizer.StateChanged += (oldState, newState) =>
+            {
+                // 双指起手取代单指（hub CancelSingles）或输入锁外的强制取消：拖拽物理收尾走同一路径
+                if (newState == GestureState.Cancelled) EndDrag();
+            };
+        }
+
+        /// <summary>
+        /// 任意指针按下（hub AnyPointerBegan，全部门之前）：承载旧 dragPollFrame 的**按下瞬间**逻辑——
+        /// ⓪三连击切换形态（连击状态机 PetHostBase.CountClickChain 与桌面版共用：按下计数、
+        /// 第 3 击按下瞬间触发，2026-09-01 拍板保持）②聊天输入期点"对话元素以外"关对话。
+        /// 拖拽升级/单击判定不在此处（识别器承担），故无 _pressPending。
+        /// </summary>
+        private void OnPetPointerBegan(PointerEvent e)
+        {
+            _chatClosedByThisPress = false;
+            if (behaviorCtrl != null && behaviorCtrl.IsExiting) return;
+            if (_pinching) return; // 捏合中不计链不关对话（旧：整段 dragPollFrame 被 _pinching 跳过）
+
+            bool modelHit = GetHitState(e.Position);
+
+            // ⓪三连击切换形态：0.4s 窗口内第 3 次命中单击→切桌面形态（置于聊天门控之前——连击期间
+            //   含输入条已开的场景照常计数）
+            if (modelHit && CountClickChain() && allowTripleClickSwitch)
+            {
+                _chatUI?.CloseChat(); // 收起输入条（第 1 击单击可能已开）再退场
+                Debug.Log("[PetInGame] 三连击：切换为桌面形态");
+                PetInGameHost.GestureSwitchTo(PetInGameHost.FormDesktop);
+                return; // 退场已起（IsExiting→Enabled=false 冻结后续），本帧不再推进
+            }
+
+            // ②聊天输入期：点击"对话元素（输入条/气泡）以外"任何地方=关闭对话（2026-08-29 用户拍板：
+            //   点派蒙=原有 Toggle 收起，点游戏其它区域同样收——含气泡判定，回看气泡时不误关）。
+            //   三连击进行中（点模型且计数≥2）不收起——第 3 击将触发切换
+            if (_chatUI != null && _chatUI.IsInputVisible
+                && !_chatUI.IsPointOnInputBar(e.Position) && !_chatUI.IsPointOnBubble(e.Position))
+            {
+                if (ShouldCloseChatOnClick(modelHit))
+                {
+                    _chatUI.CloseChat();
+                    _chatClosedByThisPress = true; // 本按下只关对话：不起拖/不判单击（旧分支② return 语义）
+                }
+            }
+        }
+
+        // ---- 拖拽/单击响应（判定在 DragRecognizer(OnSlopOrHold)，docs/24 P4）----
+
+        /// <summary>鼠标/指针屏幕坐标 → RT 像素系（rtMultiplier&gt;1 时放大）</summary>
+        Vector2 ScreenToRT(Vector2 screenPos) => new Vector2(
+            screenPos.x * _rt.width / Mathf.Max(1f, Screen.width),
+            screenPos.y * _rt.height / Mathf.Max(1f, Screen.height));
+
+        /// <summary>拖拽起手（识别器宣胜：按住 150ms 或位移过 slop）：快照指针/骨盆 RT 位+根旋转基准
+        /// （收尾中被再抓不重取基准，防旋转叠加——桌面版语义）。物理组件喂 RT 像素系。</summary>
+        void OnDragBeganHandler(Vector2 screenPos)
+        {
+            if (dragPhysics == null || _pelvis == null || petCamera == null) return;
+            dragging = true;
+            ResetClickChain(); // 真实拖拽打断连击计次（防误触切换）
+            _screenSeated = false; // 被拖=立即解除坐定
+            _scaleAdjusting = false; // 缩放重坐流程一并取消（拖走了自然不重坐）
+            dragStartPointerRT = ScreenToRT(screenPos);
+            SnapshotDragBaseline(false); // 根旋转基准（模型位置=拖拽结果，不快照还原基准）
+            dragStartPelvisRT = petCamera.WorldToScreenPoint(_pelvis.position);
+            dragPhysics.BeginDrag(dragStartPointerRT, dragStartPelvisRT);
+        }
+
+        void OnDragDeltaHandler(Vector2 delta, Vector2 screenPos)
+        {
+            if (dragPhysics == null || !dragPhysics.IsActive) return;
+            dragPhysics.DragFrame(ScreenToRT(screenPos), Time.unscaledDeltaTime);
+            LiftPoseAngleFrame(true);   // 姿势旋转（基类：角平滑+挣扎+绕骨盆枢轴补偿）
+            PelvisPinToTarget();         // 骨盆钉位（刚体 1:1 直跟）
+        }
+
+        /// <summary>拖拽收口（正常抬起/取消同路）：松手即停——骨盆冻结原地，四肢弹簧收尾归零。
+        /// 收尾帧（SettleFrame→PhysicsSettle）在 Update 推进。</summary>
+        void EndDrag()
+        {
+            if (!dragging) return;
+            dragging = false;
+            dragPhysics?.Release();
+        }
+
+        /// <summary>单击（早退点击候选：未过 150s 也未过 slop 即抬起）——立即开对话
+        /// （2026-09-01 用户拍板"对话框立刻出现"；三连击兼容：第 1 击开输入条后，第 2 击在
+        /// OnPetPointerBegan 的关对话判定中被计数≥2 豁免，第 3 击触发切换）</summary>
+        void OnTapCandidateHandler(Vector2 screenPos)
+        {
+            if (_chatClosedByThisPress) return; // 本次按下已关对话：不再 Toggle（旧一按只收起语义）
+            _chatUI?.ToggleInput();
         }
 
         // ---- 对话装配差异钩子（共用主体在 PetHostBase.WireChat，2026-08-31 批 5 下沉） ----
@@ -313,8 +466,9 @@ namespace GIC.Pet
         void Update()
         {
             resolutionChangedFrame();
-            // 退场中（热切换/退场的 Disappear 播放期+播完冻结期）交互全冻结——拖拽会抓住正在退场的
-            // 模型（桌面版 PetWindowController.已请求退出 同款守卫，2026-08-28 用户要求"播完就杀"配套）
+            // 退场中（热切换/退场的 Disappear 播放期+播完冻结期）交互全冻结——Enabled=false 让 hub
+            // 不派发新手势；在途识别器逐帧强制取消（防退场起手瞬间按住升级成拖拽"抓住正在退场的模型"，
+            // 2026-08-28 用户要求"播完就杀"配套）
             bool interactFrozen = behaviorCtrl != null && behaviorCtrl.IsExiting;
             bool modelHit = !interactFrozen && GetHitState(Input.mousePosition);
             RebakeHitMeshFrame();
@@ -323,15 +477,20 @@ namespace GIC.Pet
             {
                 PinchZoomFrame();
                 if (!_pinching)
-                {
-                    dragPollFrame(modelHit);
                     ScrollZoomFrame(modelHit);
-                }
             }
             else
             {
-                _pressPending = false; // 退场冻结期作废待定按下（防解冻松手误判单击）
+                _dragRecognizer.ForceCancel(); // 退场冻结期作废在途按下/拖拽（旧 _pressPending=false 同语义）
                 if (_pinching) EndPinch();
+            }
+            // 拖拽物理收尾帧（拖拽中的 DragFrame 已移入 OnDragDeltaHandler；本处只管松手后的
+            // SettleFrame 收尾——旧 dragPollFrame ①段收尾分支：捏合中/退场中不推进，行为保持）
+            if (!interactFrozen && !_pinching && dragPhysics != null && dragPhysics.IsActive && !dragging)
+            {
+                bool settleDone = !dragPhysics.SettleFrame(Time.unscaledDeltaTime);
+                LiftPoseAngleFrame(false); // 收尾期角度平滑归零
+                if (!dragPhysics.IsActive || settleDone) PhysicsSettle();
             }
             blockerToggleFrame(modelHit);
             sitSettleFrame();
@@ -425,122 +584,11 @@ namespace GIC.Pet
             if (_eventBlocker.raycastTarget != want) _eventBlocker.raycastTarget = want;
         }
 
-        // ---- 拖拽轮询（桌面版 拖拽与双击帧 的 Unity 轮询等价；双击退出在游戏内形态无意义）----
-
-        /// <summary>鼠标屏幕坐标 → RT 像素系（rtMultiplier>1 时放大）</summary>
-        Vector2 PointerRT() => new Vector2(
-            Input.mousePosition.x * _rt.width / Screen.width,
-            Input.mousePosition.y * _rt.height / Screen.height);
-
-        void dragPollFrame(bool modelHit)
-        {
-            if (dragPhysics == null || _pelvis == null || petCamera == null) return;
-            bool lmbDown = Input.GetMouseButton(0);
-            bool lmbPressed = lmbDown && !prevLmbDown;
-
-            // ⓪三连击切换形态（连击状态机在 PetHostBase.CountClickChain 共用，与桌面版同语义）：
-            // 0.4s 内第 3 次命中单击→切换为桌面形态（GestureSwitchTo 内部播退场→销毁实例→拉起桌面版
-            // 进程=交接期不并存）。置于聊天门控之前——连击期间（含输入条已开的场景）照常计数
-            if (lmbPressed && modelHit && CountClickChain() && allowTripleClickSwitch)
-            {
-                _chatUI?.CloseChat(); // 收起输入条（第 1 击单击可能已开）再退场
-                Debug.Log("[PetInGame] 三连击：切换为桌面形态");
-                prevLmbDown = lmbDown;
-                PetInGameHost.GestureSwitchTo(PetInGameHost.FormDesktop);
-                return; // 退场已起（IsExiting 冻结后续交互帧），本帧不再推进
-            }
-
-            // ①物理推进（含松手与收尾）**不受聊天输入门控**（2026-08-29 修双报障：旧版输入期整体早退
-            // =收尾轮询停摆，dragPhysics.IsActive 永真 → 行为层卡 dragPhysicsPhase（Drag01 循环+视线
-            // 静默）=永久拎起姿势+头不再跟踪鼠标——两症状同根）。输入期不会开着 dragging（新拖拽被
-            // ③拦截），此处恒走收尾分支。
-            if (dragPhysics.IsActive)
-            {
-                if (dragging)
-                {
-                    if (!lmbDown)
-                    {
-                        dragging = false;
-                        dragPhysics.Release(); // 松手即停：骨盆冻结原地，四肢弹簧收尾归零
-                    }
-                    else
-                    {
-                        dragPhysics.DragFrame(PointerRT(), Time.unscaledDeltaTime);
-                        LiftPoseAngleFrame(true);   // ①姿势旋转（基类：角平滑+挣扎+绕骨盆枢轴补偿）
-                        PelvisPinToTarget(); // ②骨盆钉位（刚体 1:1 直跟）
-                    }
-                }
-                else
-                {
-                    bool settleDone = !dragPhysics.SettleFrame(Time.unscaledDeltaTime);
-                    LiftPoseAngleFrame(false); // 收尾期角度平滑归零
-                    if (!dragPhysics.IsActive || settleDone) PhysicsSettle();
-                }
-            }
-
-            // ②聊天输入期：不起新拖拽；点击"对话元素（输入条/气泡）以外"任何地方=关闭对话
-            //（2026-08-29 用户拍板：点派蒙=原有 Toggle 收起，点游戏其它区域同样收——含气泡判定，
-            // 回看气泡时不误关）。点输入条本身=正常 UI 交互（EventSystem 吃掉，这里仍会看到一次
-            // 按下——靠 IsPointOnInputBar 排除）。
-            bool chatInputActive = _chatUI != null && _chatUI.IsInputVisible;
-            if (chatInputActive)
-            {
-                if (lmbPressed && !_chatUI.IsPointOnInputBar(Input.mousePosition) && !_chatUI.IsPointOnBubble(Input.mousePosition))
-                {
-                    // 三连击进行中（点模型且计数≥2）不收起——第 3 击将触发切换（PetHostBase.ShouldCloseChatOnClick）
-                    if (ShouldCloseChatOnClick(modelHit)) _chatUI.CloseChat();
-                }
-                _pressPending = false;
-                prevLmbDown = lmbDown;
-                return;
-            }
-
-            // ③正常交互：按下待定（2026-08-29 修"单击也立刻摆出拖拽姿势"）：命中模型按下**不立刻起手**
-            // ——按住超时（0.15s，用户拍板的单击阈值）或位移超阈值（8px）才升级为真拖拽（此刻才起手
-            // +拎起姿势+物理）；期间松手且几乎没动=单击→切对话输入框。单击全程零姿势零物理。升级不看
-            // 当前命中（按下起点在模型上，快速甩出模型的拖拽也要能抓——桌面版"按下即抓"的同构语义）。
-            if (_pressPending)
-            {
-                if (!lmbDown)
-                {
-                    _pressPending = false;
-                    if (Time.unscaledTime - _pressDownAt <= 0.15f
-                        && (Input.mousePosition - _pressDownPos).magnitude < 8f)
-                    {
-                        // 单击立即开对话（2026-09-01 用户拍板恢复"对话框立刻出现"；三连击兼容见上——
-                        // 第 1 击开输入条后，连击的第 2 击在 chatInputActive 分支不收起，第 3 击触发切换）
-                        _chatUI?.ToggleInput();
-                    }
-                }
-                else if (Time.unscaledTime - _pressDownAt > 0.15f
-                         || (Input.mousePosition - _pressDownPos).magnitude >= 8f)
-                {
-                    _pressPending = false;
-                    dragStart();
-                }
-            }
-            else if (!dragging && modelHit && lmbPressed)
-            {
-                _pressPending = true;
-                _pressDownAt = Time.unscaledTime;
-                _pressDownPos = Input.mousePosition;
-            }
-            prevLmbDown = lmbDown;
-        }
-
-        /// <summary>拖拽起手：快照指针/骨盆 RT 位+根旋转基准（收尾中被再抓不重取基准，防旋转叠加——桌面版语义）。
-        /// 物理组件喂 RT 像素系（指针与骨盆同系即可，组件内部只做差分）。</summary>
-        void dragStart()
-        {
-            dragging = true;
-            ResetClickChain(); // 真实拖拽打断连击计次（防误触切换）
-            _screenSeated = false; // 被拖=立即解除坐定
-            _scaleAdjusting = false; // 缩放重坐流程一并取消（拖走了自然不重坐）
-            dragStartPointerRT = PointerRT();
-            SnapshotDragBaseline(false); // 根旋转基准（模型位置=拖拽结果，不快照还原基准）
-            dragStartPelvisRT = petCamera.WorldToScreenPoint(_pelvis.position);
-            dragPhysics.BeginDrag(dragStartPointerRT, dragStartPelvisRT);
-        }
+        // ---- 拖拽/单击（docs/24 P4 迁移至手势层）----
+        // （dragPollFrame/PointerRT/dragStart/_pressPending/prevLmbDown 已删——起手升级（150ms 按住
+        //  或双档 slop 位移）/单击早退判定在 DragRecognizer(OnSlopOrHold)，按下瞬间逻辑（三连击链/
+        //  聊天关对话）在 OnPetPointerBegan（hub AnyPointerBegan），拖拽物理响应在 OnDragBegan/
+        //  OnDragDelta/EndDrag，收尾帧在 Update。阈值=GestureMetrics 全局统一拍板。）
 
         /// <summary>骨盆钉位（桌面版 按骨盆目标定位窗口 的游戏内等价）：目标=起手骨盆+光标位移（刚体 1:1
         /// 直跟），根平移使骨盆投影钉到目标——Drag01 动画微动/旋转残余位移全部被吸收（桌面版靠移窗吸收，
@@ -651,8 +699,8 @@ namespace GIC.Pet
                 if (_pinchStartDist < 1f) return; // 两指同点无比例基准，等分离后再起手
                 _pinching = true;
                 _pinchStartScale = targetScale;
-                if (dragging) { dragging = false; dragPhysics.Release(); }
-                _pressPending = false;
+                _dragRecognizer.ForceCancel(); // 双指取代单指：取消在途拖拽识别器（Cancelled→EndDrag 释放物理；
+                                               // 手指2未命中模型未绑本面时 hub 的 CancelSingles 不会代劳，这里手动）
                 ResetClickChain(); // 捏合是明确非点击手势，打断三连击计次（同真实拖拽语义）
                 return;           // 起手帧只建基准不缩放
             }
@@ -662,12 +710,12 @@ namespace GIC.Pet
             ApplyZoom(Mathf.Clamp(_pinchStartScale * (dist / _pinchStartDist), scaleMin, effectiveMaxScale));
         }
 
-        /// <summary>结束捏合：置 prevLmbDown 模拟"按钮早已按住"——防捏完残留的单指被 dragPollFrame
-        /// 误判为新按下（0.15s 后突然起拖）。两指同落、捏完留一指的场景必经此路径。</summary>
+        /// <summary>结束捏合。（prevLmbDown"按钮早已按住"hack 已废：PointerInputPump 触摸期间完全抑制
+        /// 鼠标流——捏合残留单指只产触摸事件，Drag 识别器 Idle 态不接序列中途的 Moved；两指松尽后
+        /// 鼠标流按真实按键状态恢复，不再有幻影按下。）</summary>
         void EndPinch()
         {
             _pinching = false;
-            prevLmbDown = true;
         }
 
         /// <summary>落地缩放目标（滚轮/捏合共用）：只改目标倍率走平滑（ScaleSmoothFrame 每帧趋近）。
