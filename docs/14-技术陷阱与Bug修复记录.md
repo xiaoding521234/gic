@@ -882,3 +882,19 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **规范**：双层顺序=**BackPanel（模糊，先渲染）→ BackDim（变暗，后叠上）→ 内容面板**；"blur×50%+黑50%（shader 内 lerp）≡ blur 全亮+黑 50% 叠加"的恒等式**只有遮暗层在上时成立**。skill 毛玻璃双层配方已写死顺序不可反。
 
 ---
+
+## 39. 池化生命周期陷阱：动画目标位缓存必须幂等（P3 祈愿实证，按钮全消失）
+
+**现象**：祈愿面板化后打开，大立绘/势力图标/介绍可见，但**抽卡按钮、关闭按钮、左侧切换卡池按钮全部消失**。
+
+**根因**：池化时序下 `CachePanelPositions()` 被二次执行——Awake（预热实例化）缓存正确目标位并把面板移到偏移位；首次打开的 OnShow 里又调了一次缓存，此时面板在偏移位 → **偏移位（±panelSlideDistance）被覆写成"目标位"** → 入场动画 lerp 到"目标位"=三滑动面板永远停在屏幕外。立绘等独立 Fade 物体不属滑动面板故不受影响——症状分界线即根因指纹。
+
+**取证方法**：用户报障后直接用 exec_runtime_script 反射读取当前 anchoredPosition 与缓存目标位——三个"目标"恰好是序列化位 ±200（=滑入距离），一键实锤。
+
+**规范**：
+- 动画目标位缓存的**唯一合法执行点是 Awake（预热实例化）**，OnShow 只做 SetPanelsToStartOffset（消费缓存），**严禁再缓存**
+- 所有 CacheXxxPositions 类方法必须带 `_xxxCached` 幂等守卫（Settings 的 animationsCached 是正例；Wish 缺守卫 + OnShow 重复调用 = 双错齐踩）
+- **位置断言是面板冒烟的必备维度**（§37 断言盲区补充第二例）：只断言 alpha/锁/容器数量查不出"动画到不了位"——必须反射断言 `当前 anchoredPosition == 缓存目标位` + 跨开关目标位零漂移
+- 池化迁移 checklist 新增：OnShow 内每个方法调用逐个问"这个是消费缓存还是生产缓存？生产缓存的必须挪 Awake 或加守卫"
+
+---
