@@ -48,13 +48,13 @@ namespace GIC.Pet.Chat
             var gs = GameScene.Instance;
             if (gs == null) yield break;
 
-            // 1. 弹层界面逐层标准关闭回大厅（历史栈清空=回到根场景）
+            // 1. 弹层界面逐层标准关闭回大厅（UIManager 栈清空=回到根场景，docs/23 D12）
             int safety = 0;
-            while (gs.CurrentScene != null && gs.HasPreviousScene() && safety++ < 4)
+            while (UIManager.Instance != null && UIManager.Instance.StackCount > 0 && safety++ < 4)
             {
-                CloseCurrentScreen(gs.CurrentScene.SceneName);
+                CloseCurrentScreen(UIManager.Instance.TopSceneName);
                 float deadline = Time.unscaledTime + 3f;
-                while (gs.HasPreviousScene() && Time.unscaledTime < deadline) yield return null;
+                while (UIManager.Instance != null && UIManager.Instance.StackCount > 0 && Time.unscaledTime < deadline) yield return null;
             }
 
             if (target == null) yield break; // hall：关闭流程已回大厅
@@ -98,7 +98,8 @@ namespace GIC.Pet.Chat
                     }
                 }
             }
-            GameScene.Instance.GoBack();
+            // 场景内未找到 ScreenBase 的兜底：弹栈顶（弹出原语，原 GameScene.GoBack 职责，docs/23 D10）
+            UIManager.Instance.PopToPrevious(null);
         }
 
         /// <summary>协程宿主标记（空组件）</summary>

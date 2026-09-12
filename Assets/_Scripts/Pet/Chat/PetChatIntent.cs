@@ -5,6 +5,7 @@ using UnityEngine.SceneManagement;
 using GIC.Framework;
 using GIC.Tool;
 using GIC.Data;
+using GIC.UI;
 
 namespace GIC.Pet.Chat
 {
@@ -182,7 +183,9 @@ namespace GIC.Pet.Chat
             string busy = BlockedSceneCheck();
             if (busy != null) return Error(busy);
 
-            bool inPopup = gs.CurrentScene != null && gs.CurrentScene.LoadMode == LoadSceneMode.Additive && gs.HasPreviousScene();
+            // 在弹层界面=UIManager 栈上有弹层（root=context 不入栈，docs/23 D12）
+            var ui = UIManager.Instance;
+            bool inPopup = ui != null && ui.StackCount > 0;
 
             // hall=回大厅：已在大厅无事可做；在弹层界面=标准关闭它（不新开）
             if (entry.scene == null)

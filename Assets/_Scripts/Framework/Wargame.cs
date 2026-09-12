@@ -35,7 +35,6 @@ namespace GIC.Framework
             Context.Register<RoomManager>();       // deps: SaveManager, PlayerManager（联机房间流程）
             Context.Register<UnitManager>();       // deps: UnitConfig
             Context.Register<InputManager>();
-            Context.Register<UIManager>();
             Context.Register<SkillManager>();
 
             // 注入剩余 [Autowired] 字段（ConfigManager 自身 [Bean] 产物、MonoBehaviour 层）
@@ -45,11 +44,13 @@ namespace GIC.Framework
             Context.Validate();
 
             // 构建 managers 列表（用于 Update 循环）
+            // （2026-09-12 UI 重构 P1：空壳 Framework.UIManager 已删——UI 栈管理器为 Boot 常驻
+            //  MonoBehaviour（GIC.UI.UIManager，带 prefab 引用须场景挂载，docs/23 §3.4），不入 DI）
             var configManager = Context.Get<ConfigManager>();
             managers = new List<IWargameManager> {
                 configManager,
                 Context.Get<AssetCache>(), Context.Get<SaveManager>(), Context.Get<InputManager>(),
-                Context.Get<UIManager>(), Context.Get<CardManager>(), Context.Get<PositionManager>(),
+                Context.Get<CardManager>(), Context.Get<PositionManager>(),
                 Context.Get<SkillManager>(), Context.Get<UnitManager>()
             };
 

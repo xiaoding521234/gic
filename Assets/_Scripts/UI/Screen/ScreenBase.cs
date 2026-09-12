@@ -23,6 +23,7 @@ namespace GIC.UI
 
         private bool _musicPushed = false;
         private bool _musicIsState = false;
+        private bool _lifeInited = false;
 
         /// <summary>
         /// 注入 [Autowired] 字段（含基类与子类字段）。
@@ -32,6 +33,45 @@ namespace GIC.UI
         protected virtual void Awake()
         {
             Wargame.Instance?.Context?.Inject(this);
+        }
+
+        // ==================== 生命周期（UIManager 调度，docs/23 §3.3） ====================
+
+        /// <summary>一次性初始化（场景加载/prefab 实例化后；幂等由基类保证）</summary>
+        protected virtual void OnInit() { }
+
+        /// <summary>每次打开（入栈）；args 携带打开参数（场景制 P1 无来源恒 null）</summary>
+        protected virtual void OnShow(object args) { }
+
+        /// <summary>被更高 Fullscreen 弹层遮挡（仅钩子；不自动变暗/停用，重内容屏自行降载）</summary>
+        protected virtual void OnPause() { }
+
+        /// <summary>遮挡它的弹层关闭，重新成为栈顶</summary>
+        protected virtual void OnResume() { }
+
+        internal void RaiseOnInit()
+        {
+            if (_lifeInited) return;
+            _lifeInited = true;
+            OnInit();
+        }
+
+        internal void RaiseShow(object args) => OnShow(args);
+        internal void RaisePause() => OnPause();
+        internal void RaiseResume() => OnResume();
+
+        // ==================== 注册制入栈（docs/23 §3.6） ====================
+        // OnEnable/OnDisable 自动入出栈；根场景 Screen（Splash/Battle）由注册表守卫跳过；
+        // 未知场景匿名入栈+Warn（零回归，P4 清查）。子类重写时必须调用 base。
+
+        protected virtual void OnEnable()
+        {
+            UIManager.Instance?.RegisterScreen(this);
+        }
+
+        protected virtual void OnDisable()
+        {
+            UIManager.Instance?.UnregisterScreen(this);
         }
 
         /// <summary>注册 ESC/右键关闭（注入完成后在 Start 开头调用）</summary>
@@ -73,9 +113,10 @@ namespace GIC.UI
         // ==================== 标准关闭流程 ====================
 
         /// <summary>
-        /// 标准关闭模板：防重入 + Closing 输入锁 + 恢复音乐 + 可选退场动画 + GoBack。
-        /// exitAnimation 只做动画本身（不要再 Pop/GoBack，模板统一收尾）；
-        /// 为 null 时立即返回（转场期间输入由 GoBack 的 SceneTransition 锁封锁）。
+        /// 标准关闭模板：防重入 + Closing 输入锁 + 恢复音乐 + 可选退场动画 + 弹出。
+        /// exitAnimation 只做动画本身（不要再 Pop/返回，模板统一收尾）；
+        /// 为 null 时立即返回（转场期间输入由 PopToPrevious 的 SceneTransition 锁封锁）。
+        /// 收尾走 UIManager.PopToPrevious 弹出原语（原 GameScene.GoBack 职责，docs/23 D10）。
         /// </summary>
         protected void CloseScreen(Func<IEnumerator> exitAnimation)
         {
@@ -91,7 +132,7 @@ namespace GIC.UI
             if (exitAnimation != null)
                 yield return StartCoroutine(exitAnimation);
             InputLocks.Pop(this, InputLockReason.Closing);
-            GameScene.Instance.GoBack();
+            UIManager.Instance.PopToPrevious(this);
         }
 
         // ==================== IClosable / 统一销毁 ====================
