@@ -868,6 +868,17 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 面板打开类"闪一下/卡一下"问题先做逐帧 deltaTime 取证（冷热对比），勿凭猜测修
 - 面板池化后生命周期变化：**Start 只跑一次**——每开一次的动作（音乐 push/入场动画/选中态/值刷新）必须挪 OnShow，一次性 wiring 落 OnInit；`isClosing` 由 ScreenBase.RaiseShow 统一复位
 - 可关闭注册随池化改为每开一次（ScreenBase.RaiseShow 自动 RegisterClosableSelf，幂等）+ OnDisable 注销（隐藏面板不再接走 ESC）
-- 冒烟断言同步升级：关闭断言改"活跃子物体=0"（池实例以隐藏态留在容器下，childCount 含隐藏不再归零）；二次关闭断言必须含（isClosing 复位回归）
+- **池化锁保险丝必须下移 OnDisable**（秒关锁泄漏实证）：入池 SetActive(false) 会打断动画协程，入场动画持有的 Entering 锁随协程死亡而悬空——原 OnDestroy 四件套的 PopAll 对永不销毁的池化面板不再触发；ScreenBase.OnDisable 统一 PopAll（场景销毁路径双触发，幂等），各屏入场协程同时补 isClosing 提前跳出（纪律③落地）
+- 冒烟断言同步升级：关闭断言改"活跃子物体=0"（池实例以隐藏态留在容器下，childCount 含隐藏不再归零）；二次关闭断言必须含（isClosing 复位回归）；**秒开秒关×3 轮锁零泄漏**（快关打断入场动画的回归模式）
+
+---
+
+## 38b. UIBlur 毛玻璃双层的渲染顺序陷阱（2026-09-12 实证，"画面反而更亮了"）
+
+**现象**：毛玻璃拆双层（变暗层+纯模糊层）后，界面比拆层前**更亮**——变暗层失效。
+
+**根因**：UIBlur shader 片元输出 `col.a = 1.0`（Alpha 混合下=**完全替换**其下画面）。遮暗层 BackDim 若排在模糊层 BackPanel **之下**，模糊层渲染时会把遮暗成果整个替换成"纯模糊无变暗"——等效于把 tint 丢了。
+
+**规范**：双层顺序=**BackPanel（模糊，先渲染）→ BackDim（变暗，后叠上）→ 内容面板**；"blur×50%+黑50%（shader 内 lerp）≡ blur 全亮+黑 50% 叠加"的恒等式**只有遮暗层在上时成立**。skill 毛玻璃双层配方已写死顺序不可反。
 
 ---

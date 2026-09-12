@@ -91,6 +91,10 @@ namespace GIC.UI
             // 池化关闭（SetActive false）即注销可关闭——防隐藏面板接走 ESC；
             // 场景销毁路径 OnDestroy 再注销一次，幂等安全
             _inputManager?.UnregisterClosable(this);
+            // 池化保险丝下移：入池隐藏会打断动画协程（秒开秒关时入场动画持有的 Entering 锁
+            // 随之悬空）——原 OnDestroy 四件套的 PopAll 对永不销毁的池化面板不再触发，
+            // 兜底移到 OnDisable（场景销毁路径双触发，幂等）
+            InputLocks.PopAll(this);
         }
 
         /// <summary>注册 ESC/右键关闭（注入完成后在 Start 开头调用）</summary>
