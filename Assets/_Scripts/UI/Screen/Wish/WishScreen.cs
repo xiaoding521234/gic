@@ -110,6 +110,14 @@ namespace GIC.UI
             _currentIndex = -1;
             _isSwitching = false;
 
+            // 池化连坐复位（docs/14 §39）：全部角色面板强制隐藏——上次会话的 FadeOut 被
+            // 入池打断时卡在"半透明+激活"（重开双卡池叠加实证）；首个面板由首选角色协程 FadeIn 拉起
+            foreach (var entry in characters)
+            {
+                if (entry != null && entry.panel != null)
+                    entry.panel.ResetHidden();
+            }
+
             // 抽卡部分：管理器重建+货币数刷新（按钮/事件订阅已拆入 OnInit，一次 wiring 防池化叠监听）
             InitWishDraw();
 
