@@ -20,5 +20,18 @@ namespace GIC.Framework
 
         /// <summary>本面的识别器集合（注册后固定）</summary>
         IReadOnlyList<GestureRecognizer> Recognizers { get; }
+
+        /// <summary>
+        /// 绕过 hub 门2（UI 命中门）——**覆盖型 overlay 面专用**（游戏内桌宠：其挡板/输入条自身即 UI，
+        /// raycastTarget 动态开关会把命中区域报告为"UI"，若不豁免则永远收不到自己的指针；面内自行
+        /// 排除对话元素）。默认 false 的世界面照旧尊重 UI 命中（按住按钮不拖地图）。
+        /// </summary>
+        bool BypassUIGate { get; }
+
+        /// <summary>
+        /// 忽略门1 输入锁——**元游戏陪伴体专用**（游戏内桌宠：旧全轮询实现从不理 InputLocks，
+        /// 游戏弹窗/转场动画锁冻结它属行为回归）。默认 false：锁生效时手势冻结。
+        /// </summary>
+        bool IgnoresInputLocks { get; }
     }
 }

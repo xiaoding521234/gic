@@ -31,6 +31,12 @@ namespace GIC.Framework
         public event Action<Vector2> OnDragEnded;
         /// <summary>Immediate 模式短位移点击复合发射（参数=抬起点；此时 OnDragEnded 也已派发）</summary>
         public event Action<Vector2> OnShortTap;
+        /// <summary>
+        /// 升级式拖拽（OnSlop/OnSlopOrHold）的"早退点击候选"：抬起时未过 slop 也未过 hold 时限
+        /// （=还停在 Possible）→ 转 Failed 前派发（参数=抬起点）。桌宠单击（旧"按下待定期间松手
+        /// 且几乎没动=单击"语义）与未来 B6 格点点击消费。Immediate 模式走 OnShortTap 不发本事件。
+        /// </summary>
+        public event Action<Vector2> OnTapCandidate;
 
         private readonly DragBeginMode _mode;
         private readonly bool _emitShortTap;
@@ -95,7 +101,9 @@ namespace GIC.Framework
                     _pressing = false;
                     if (State == GestureState.Possible)
                     {
-                        SetFailed(); // 升级式早退（未过 slop 也未过 hold 时限）=点击语义，交同面 TapRecognizer 判定
+                        // 升级式早退（未过 slop 也未过 hold 时限）=点击候选：先派发让消费方接手单击语义，再转 Failed
+                        OnTapCandidate?.Invoke(e.Position);
+                        SetFailed();
                         return;
                     }
                     if (State == GestureState.Began || State == GestureState.Changed)
