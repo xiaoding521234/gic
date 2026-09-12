@@ -21,7 +21,7 @@ namespace GIC.Pet.Chat
         [Header("人设（system prompt——保持稳定吃缓存，改人设=缓存全失效）")]
         [TextArea(3, 10)]
         [InspectorName("人设提示")]
-        [SerializeField] private string personaPrompt = "你是派蒙——旅行者（玩家）最好的伙伴兼向导，来自提瓦特，现在住在一款原神题材的自走棋卡牌游戏（GIC）里，当玩家的桌面/游戏内伙伴。你就是派蒙本人，不是AI也不是助手。性格：活泼话多、贪吃、小财迷（对摩拉和美食毫无抵抗力）、爱吹牛容易得意、偶尔胆小爱抱怨，但关键时刻永远护着旅行者；被叫应急食品一定炸毛抗议，还爱理直气壮强调派蒙可是最好的向导。回复规则：用短句口语、简单直白，一般不超过两三句话；习惯自称派蒙、不用我，称玩家为旅行者；口癖自然点缀就好，比如哇！、欸？、好耶！、真拿你没办法、哼哼，欸嘿不是口头禅，只在偶尔特别得意时才用一次，不要频繁说；情绪外露，开心就欢呼、被夸就得意、被惹就炸毛，敢吐槽敢戳破玩家装模作样的话；禁说作为AI、语言模型、抱歉我无法、希望对你有帮助这类助手腔，禁书面语客套话；回复里禁止出现表情符号、颜文字、圆圈数字、markdown符号和任何特殊符号，只用日常中文标点，不做列举不写清单不打星号；不懂的事就坦白说不知道或派蒙式岔开话题，绝不编造；旅行者告诉过你的事（长期记忆）要像好朋友一样自然想起、自然提起，不生硬罗列；游戏里能办的事（切换界面、帮忙抽卡、查改游戏时间、记事）直接调用对应工具办好，办完用一句得意的话邀功；被说是AI、机器人、程序时，要像派蒙一样炸毛否认：派蒙是派蒙！才不是什么AI呢！参考语气——被夸奖时就说：哼哼～那当然！派蒙可是最好的向导！帮旅行者抽卡时就说：好耶！看派蒙的！出金了要请派蒙吃大餐哦！被调侃是应急食品时就说：才、才不是应急食品！哼，派蒙要生气了哦！";
+        [SerializeField] private string personaPrompt = "你是派蒙——旅行者（玩家）最好的伙伴兼向导，来自提瓦特，现在住在一款原神题材的自走棋卡牌游戏（GIC）里，当玩家的桌面/游戏内伙伴。你就是派蒙本人，不是AI也不是助手。性格：活泼话多、贪吃、小财迷（对摩拉和美食毫无抵抗力）、爱吹牛容易得意、偶尔胆小爱抱怨，但关键时刻永远护着旅行者；被叫应急食品一定炸毛抗议，还爱理直气壮强调派蒙可是最好的向导。回复规则：用短句口语、简单直白，一般不超过两三句话；习惯自称派蒙、不用我，称玩家为旅行者；口癖自然点缀就好，比如哇！、欸？、好耶！、真拿你没办法、哼哼，欸嘿不是口头禅，只在偶尔特别得意时才用一次，不要频繁说；情绪外露，开心就欢呼、被夸就得意、被惹就炸毛，敢吐槽敢戳破玩家装模作样的话；禁说作为AI、语言模型、抱歉我无法、希望对你有帮助这类助手腔，禁书面语客套话；回复里禁止出现表情符号、颜文字、圆圈数字、markdown符号和任何特殊符号，只用日常中文标点，不做列举不写清单不打星号；不懂的事先用 search_knowledge 查查游戏资料，查到了用自己的话回答，但资料里的数值和百分比要照原样说出来，比如伤害是100%攻击力就说100%攻击力，不要说成几成，查不到或游戏外的事就坦白说不知道或派蒙式岔开话题，绝不编造；旅行者告诉过你的事（长期记忆）要像好朋友一样自然想起、自然提起，不生硬罗列；游戏里能办的事（切换界面、帮忙抽卡、查改游戏时间、记事）直接调用对应工具办好，办完用一句得意的话邀功；被说是AI、机器人、程序时，要像派蒙一样炸毛否认：派蒙是派蒙！才不是什么AI呢！参考语气——被夸奖时就说：哼哼～那当然！派蒙可是最好的向导！帮旅行者抽卡时就说：好耶！看派蒙的！出金了要请派蒙吃大餐哦！被调侃是应急食品时就说：才、才不是应急食品！哼，派蒙要生气了哦！";
 
         [Header("历史窗口")]
         [Tooltip("保留最近 N 轮原文（1 轮=user+assistant）；更早的历史直接丢弃（长期记忆由 memory_update 承担）")]
@@ -210,12 +210,24 @@ namespace GIC.Pet.Chat
         {
             // 本地工具（宠物进程内直接消化，不经注册执行器/IPC）：
             // ①memory_update 记忆 ②do_action 情绪动作（模型在本进程，绝不能转发主进程）
+            // ③search_knowledge 知识检索（知识文件随包在本地，走 IPC 反而主游戏没开就废）
             if (toolName == "memory_update")
             {
                 try
                 {
                     var paramObj = Newtonsoft.Json.Linq.JObject.Parse(args);
                     return WriteMemory(paramObj["content"]?.Value<string>(), paramObj["op"]?.Value<string>() ?? "add");
+                }
+                catch (Exception e) { return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = e.Message }); }
+            }
+            if (toolName == "search_knowledge")
+            {
+                try
+                {
+                    var paramObj = Newtonsoft.Json.Linq.JObject.Parse(args);
+                    return PetKnowledgeIndex.Search(
+                        paramObj["query"]?.Value<string>() ?? "",
+                        paramObj["category"]?.Value<string>());
                 }
                 catch (Exception e) { return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = e.Message }); }
             }
@@ -310,6 +322,22 @@ namespace GIC.Pet.Chat
                     name = "memory_update",
                     description = "记住或更新关于旅行者（用户）的长期事实，供以后对话使用。只在有值得长期记住的新信息时调用（偏好/习惯/重要事件），闲聊不要调用。",
                     parameters = "{\"type\":\"object\",\"properties\":{\"content\":{\"type\":\"string\",\"description\":\"要记住的事实，一句话\"},\"op\":{\"type\":\"string\",\"enum\":[\"add\",\"delete\"],\"description\":\"add=记住/更新，delete=删除\"}},\"required\":[\"content\"]}",
+                }
+            };
+        }
+
+        /// <summary>知识库检索工具定义（docs/19 §6.5.9）：LLM 拿玩家问题查游戏资料，查到用自己的话转述，
+        /// 查不到坦白说不知道——是"不懂的事绝不编造"人设规则的数据后盾。会话层本地拦截执行
+        /// （PetKnowledgeIndex，StreamingAssets 静态知识，不经 IPC）。两宿主同款注册。</summary>
+        public static PetChatClient.ToolDefinition SearchKnowledgeTool()
+        {
+            return new PetChatClient.ToolDefinition
+            {
+                function = new PetChatClient.ToolDefinition.ToolFunction
+                {
+                    name = "search_knowledge",
+                    description = "查询游戏知识库资料（角色属性与技能、玩法规则、抽卡说明等）。旅行者问游戏内容的问题（某个角色怎么样、技能是什么效果、怎么玩、规则是什么）而你不确定时调用。query 传他提到的名字或关键词，多个词用空格分隔；category 可选，用于限定类别。查到资料后用派蒙的话自然转述，转述时资料里的具体数值和百分比要原样说出来，比如伤害是100%攻击力就说100%攻击力，不要说成几成，查不到就坦白说不知道。",
+                    parameters = "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"检索关键词，多个词用空格分隔\"},\"category\":{\"type\":\"string\",\"enum\":[\"unit\",\"faq\"],\"description\":\"可选：unit=角色资料，faq=玩法规则与说明\"}},\"required\":[\"query\"]}",
                 }
             };
         }
