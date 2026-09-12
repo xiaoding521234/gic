@@ -123,8 +123,9 @@ namespace GIC.UI
                 case RoomState.DisconnectedClient:
                     isClosing = true;
                     PopMusicSafe();
-                    // 无退场动画 — 转场期间输入由 GoBackCoroutine 的 SceneTransition 锁封锁
-                    GameScene.Instance.GoBack();
+                    // 无退场动画 — 直连弹出原语（不经 Close 二跳防递归，docs/23 D10）；
+                    // 转场期间输入由 PopToPrevious 序列的 SceneTransition 锁封锁
+                    UIManager.Instance.PopToPrevious(this);
                     break;
                 case RoomState.Host:
                     _network.LeaveRoom();

@@ -42,8 +42,7 @@ namespace GIC.Framework
 
         #region privateField
 
-        // 场景历史记录栈
-        private Stack<SceneType> sceneHistory = new Stack<SceneType>();
+        // （2026-09-12 UI 重构 P1：场景历史栈与 GoBack 移交 UIManager，docs/23 §3.5——本类只留场景原语与 root 跟踪）
 
         // 当前活动的场景类型
         private SceneType currentScene;
@@ -63,6 +62,9 @@ namespace GIC.Framework
 
         public bool IsTransitioning
             => InputLocks.HasLock(InputLockReason.SceneTransition);
+
+        /// <summary>当前根场景名（context；UIManager 弹出序列恢复激活/事件 ToScene 用）</summary>
+        public string CurrentRootSceneName => currentRootScene?.SceneName;
 
         #endregion
 
@@ -362,18 +364,20 @@ namespace GIC.Framework
             }
         }
 
-        /// <summary>
-        /// 返回上一个场景
-        /// </summary>
-        public bool GoBack()
+        /// <summary>按场景名恢复激活场景（UIManager 弹出序列调用，docs/23 §3.5）；未加载时 LogError 不中断</summary>
+        public void SetActiveSceneByName(string sceneName)
         {
-            if (!CanGoBack())
-            {
-                return false;
-            }
+            if (string.IsNullOrEmpty(sceneName)) return;
 
-            StartCoroutine(GoBackCoroutine());
-            return true;
+            Scene scene = SceneManager.GetSceneByName(sceneName);
+            if (scene.isLoaded)
+            {
+                SceneManager.SetActiveScene(scene);
+            }
+            else
+            {
+                GICLog.Error($"无法设置活动场景: {sceneName} 未加载");
+            }
         }
 
         #endregion
@@ -384,10 +388,7 @@ namespace GIC.Framework
         {
             InputLocks.Push(this, InputLockReason.SceneTransition);
 
-            // 记录历史
-            RecordSceneHistory(scene);
-
-            // 加载场景
+            // 加载场景（历史记录已移交 UIManager 注册制，docs/23 §3.6）
             yield return LoadSceneAsync(scene);
 
             // 设置为活动场景
@@ -427,6 +428,13 @@ namespace GIC.Framework
             }
 
             CurrentScene = scene;
+
+            // Single 加载=根场景切换（context 更新；历史记录已移交 UIManager 注册制，docs/23 §3.6）。
+            // 预载路径（ActivatePreloadedScene→ValidateSceneActivation）另有同款更新，两条路径都要覆盖。
+            if (scene.LoadMode == LoadSceneMode.Single)
+            {
+                currentRootScene = scene;
+            }
         }
 
         private IEnumerator SetActiveSceneAfterLoad(SceneType scene)
@@ -445,41 +453,11 @@ namespace GIC.Framework
             }
         }
 
-        private IEnumerator GoBackCoroutine()
-        {
-            InputLocks.Push(this, InputLockReason.SceneTransition);
-
-            SceneType previousScene = sceneHistory.Pop();
-            SceneType sceneToUnload = CurrentScene;
-
-            string fromSceneName = sceneToUnload?.SceneName ?? "Unknown";
-            string toSceneName = previousScene.SceneName;
-
-            // 1. 卸载当前场景
-            if (ShouldUnloadScene(sceneToUnload))
-            {
-                yield return UnloadSceneInternal(sceneToUnload.SceneName);
-            }
-
-            // 2. 更新当前场景
-            CurrentScene = previousScene;
-
-            // 3. 激活上一个场景
-            yield return ActivatePreviousScene(previousScene);
-
-            // 4. 清理资源
-            if (autoCleanupResources)
-            {
-                yield return CleanupUnusedResources();
-            }
-
-            // 5. 发送事件
-            SendGoBackEvent(fromSceneName, toSceneName);
-
-            InputLocks.Pop(this, InputLockReason.SceneTransition);
-        }
-
-        private IEnumerator UnloadSceneInternal(string sceneName)
+        /// <summary>
+        /// 卸载 Additive 弹层场景（公开原语：UIManager.PopToPrevious 序列调用，docs/23 §3.5）。
+        /// 原返回流程（历史弹栈→卸载→恢复激活→清理→事件）整体移交 UIManager。
+        /// </summary>
+        public IEnumerator UnloadAdditiveScene(string sceneName)
         {
             AsyncOperation asyncUnload = SceneManager.UnloadSceneAsync(sceneName);
 
@@ -504,8 +482,15 @@ namespace GIC.Framework
 
         #region resCleanup
 
-        private IEnumerator CleanupUnusedResources()
+        /// <summary>
+        /// 资源清理原语（公开：UIManager 弹出序列调用）。autoCleanupResources 关闭时为空操作。
+        /// 2026-09-12 去 GC.Collect（docs/23 D7）：主线程同步 GC 是每次返回的卡顿尖峰来源，
+        /// 托管内存交运行时 GC 自行回收；UnloadUnusedAssets 保留（Map 瓦片类原生内存回收）。
+        /// </summary>
+        public IEnumerator CleanupUnusedResources()
         {
+            if (!autoCleanupResources) yield break;
+
             // 等待一帧确保所有对象都被销毁
             yield return null;
 
@@ -515,9 +500,6 @@ namespace GIC.Framework
             {
                 yield return null;
             }
-
-            // 触发垃圾回收
-            GC.Collect();
 
             if (enableDebugLog)
             {
@@ -529,79 +511,14 @@ namespace GIC.Framework
 
         #region helperMethod
 
-        private void RecordSceneHistory(SceneType scene)
-        {
-            // 只将 Additive 场景加入历史记录
-            if (scene.LoadMode == LoadSceneMode.Additive && CurrentScene != null)
-            {
-                if (CurrentScene.LoadMode == LoadSceneMode.Single ||
-                    CurrentScene.LoadMode == LoadSceneMode.Additive)
-                {
-                    sceneHistory.Push(CurrentScene);
-                }
-            }
-
-            // 如果是 Single 模式，更新根场景并清空历史
-            if (scene.LoadMode == LoadSceneMode.Single)
-            {
-                currentRootScene = scene;
-                sceneHistory.Clear();
-            }
-        }
-
         private bool ValidateSceneActivation(SceneType scene)
         {
-            RecordSceneHistory(scene);
-
             if (scene.LoadMode == LoadSceneMode.Single)
             {
                 currentRootScene = scene;
-                sceneHistory.Clear();
             }
 
             CurrentScene = scene;
-            return true;
-        }
-
-        private bool ShouldUnloadScene(SceneType scene)
-        {
-            return scene != null && scene.LoadMode == LoadSceneMode.Additive;
-        }
-
-        private IEnumerator ActivatePreviousScene(SceneType scene)
-        {
-            Scene loadedScene = SceneManager.GetSceneByName(scene.SceneName);
-
-            if (loadedScene.isLoaded)
-            {
-                SceneManager.SetActiveScene(loadedScene);
-            }
-            else if (scene.LoadMode == LoadSceneMode.Single)
-            {
-                yield return LoadSceneAsync(scene);
-            }
-            else
-            {
-                GICLog.Error($"上一个场景未加载且无法重新加载: {scene.SceneName}");
-            }
-        }
-
-        private void SendGoBackEvent(string fromScene, string toScene)
-        {
-            EventBusHub.Instance?.Send(new OnGoBackEvent
-            {
-                FromScene = fromScene,
-                ToScene = toScene
-            });
-        }
-
-        private bool CanGoBack()
-        {
-            if (sceneHistory.Count == 0)
-            {
-                return false;
-            }
-
             return true;
         }
 
@@ -615,20 +532,7 @@ namespace GIC.Framework
 
         #region 弹窗/toast
         // 弹窗与轻提示已收敛到 PopupManager（静态 Instance 直连），GameScene 不再转发
-        #endregion
-
-        #region publicQueryMethod
-
-        public bool HasPreviousScene()
-        {
-            return sceneHistory.Count > 0;
-        }
-
-        public void ClearHistory()
-        {
-            sceneHistory.Clear();
-        }
-
+        // （P4 将折叠进 UIManager 弹窗层，docs/23 §3.6）
         #endregion
     }
 }
