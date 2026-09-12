@@ -10,7 +10,7 @@
 
 | 分组 | 节 |
 |------|-----|
-| A · UI 与 UGUI（粒子 / 九切片 / 程序化 UI / 设置页） | §2 §4 §14（14.2–14.4）§22 §26 §27 |
+| A · UI 与 UGUI（粒子 / 九切片 / 程序化 UI / 设置页 / 面板化） | §2 §4 §14（14.2–14.4）§22 §26 §27 §37 |
 | B · 文本 · TMP · 本地化 · DI | §5 §6 §18 |
 | C · 音频 | §10 §11 |
 | D · 渲染 · Shader · 大地图图形 | §8 §13 |
@@ -832,5 +832,20 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **修复**：GetLocalizedText 首行加 `if (PetMode.Enabled) return fallback;`——桌宠进程直接走 fallback 文案不碰取表；游戏内形态（编辑器/主进程，有 Addressables 数据）照常本地化。PetWishAutoRunner.Localize/CardName 无需守卫（仅主进程执行路径）。验证=新进程 Player.log 报错链归零（error lines: 0）。
 
 **连坐陷阱——进程换血假阳性**：杀旧进程+Start-Process 后用 `(Get-Process gic) -ne $null` 判"成功"是**假验证**：Stop-Process 可能静默失败（旧进程存活），新实例被 PetSingleInstance 互斥（"桌上已有派蒙，本实例退出"）立即退出——True 来自旧进程。**规则**：换血三步=①杀后验证 `gic 进程数=0` ②启动后验证**新进程 Id/StartTime=当下** ③读日志证据时先核栈帧行号与当前代码一致（本次靠 PetChatUIController.cs:525≠新代码 529 识破日志来自旧构建）。
+
+---
+
+## 37. 面板化双陷阱：同步 Instantiate 尖峰帧吞入场动画 + 销毁必须打面板根（2026-09-12 实证，P2 回归用户目检发现）
+
+**现象**：①面板打开无入场动画（瞬间完成），关闭退场动画正常；②退场动画播完后界面仍残留在屏幕上。
+
+**根因①**：面板制下 `Resources.Load + Instantiate` 同步发生在打开帧（大尖峰帧）；Start 在下一帧执行，入场协程首轮 `elapsed += Time.deltaTime` 取到**尖峰帧时长**（常 >0.2s 动画时长）→ while 直接跳出=动画瞬完成。旧场景制为异步分帧加载，Start 跑在正常帧上无此问题。
+
+**根因②**：面板 prefab 结构=`面板根{Canvas, ScreenBase 脚本子物体}`，弹出分支 `Destroy(entry.Instance.gameObject)` 只销毁了脚本子物体——Canvas（UI 内容）残留在层级容器下继续渲染。组件级断言（FindObjectsByType 计数=0）全绿但视觉残骸——**断言盲区实证**。
+
+**规范**：
+- 面板入场动画协程**首帧 `yield return null`** 再开始计时（skill gic-new-screen 已入纪律；后续迁移屏同配方）
+- 面板销毁以 `ScreenUnit.PanelRoot`（OpenPanel 实例化时记录）为准；回退路径沿层级**上溯到层级容器为止**，禁用 `transform.root`（会走到 GameScene DontDestroyOnLoad 场景根=灾难性误删）
+- 面板级冒烟断言必须含"层级容器 childCount"维度（开=1/关=0）与"动画真在播"时点断言（开面板 100ms 时 Entering 锁仍持有）——组件级断言不足以证明视觉正确
 
 ---

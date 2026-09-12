@@ -26,12 +26,13 @@ namespace GIC.UI
         [UnityEngine.InspectorName("提示层根")] [SerializeField] private Transform layerToast;
         [UnityEngine.InspectorName("顶层根")] [SerializeField] private Transform layerTop;
 
-        /// <summary>栈单元：Id 可为 null（未注册场景匿名入栈）</summary>
+        /// <summary>栈单元：Id 可为 null（未注册场景匿名入栈）；PanelRoot=面板根物体（P2 回归修正：销毁必须打面板根而非脚本子物体）</summary>
         private sealed class ScreenUnit
         {
             public ScreenId Id;
             public ScreenBase Instance;
             public string SceneName;
+            public UnityEngine.GameObject PanelRoot;
             public bool IsPrefabHost => Id != null && Id.Host == ScreenHostKind.Prefab;
         }
 
@@ -171,6 +172,15 @@ namespace GIC.UI
             _pendingOpenArgs = null;
             go.name = id.Name;
 
+            // 记录面板根（ScreenBase 脚本可能是面板根的子孙物体，销毁必须打 PanelRoot——P2 回归修正）
+            var unit = FindEntryById(id);
+            if (unit != null) unit.PanelRoot = go;
+            else
+            {
+                // OnEnable 注册链异常兜底（正常不会走到）：面板根自挂标记，PopToPrevious 时反查
+                GICLog.Warn($"[UIManager] {id.Name} 实例化后未自动入栈（OnEnable 注册链异常），请检查 prefab 内 ScreenBase");
+            }
+
             // 层级带内排序：面板根 Canvas 为 root canvas（宿主容器无 Canvas），强制层级带序
             // MainHall Canvas order=0，Fullscreen 带 100+ 恒在其上（与迁移前 Settings order=100 等效）
             var canvas = go.GetComponentInChildren<Canvas>(true);
@@ -217,9 +227,17 @@ namespace GIC.UI
 
             if (entry.IsPrefabHost)
             {
-                // PanelHost：Destroy 实例即可（无场景卸载/无资源清理，docs/23 §3.5）；
-                // OnDisable/OnDestroy 自动出栈注销与四件套兜底。同样发返回事件保持语义统一
-                if (entry.Instance != null) Destroy(entry.Instance.gameObject);
+                // PanelHost：Destroy 面板根（P2 回归修正：entry.Instance 可能是面板根的子孙脚本物体，
+                // 只销毁它会留下 Canvas 残骸）。回退=沿层级上溯到层级容器为止（勿用 transform.root——
+                // 它会走到 GameScene 场景根，误删不可逆）；OnDisable/OnDestroy 自动出栈注销与四件套兜底
+                UnityEngine.GameObject panelRoot = entry.PanelRoot;
+                if (panelRoot == null && entry.Instance != null)
+                {
+                    var t = entry.Instance.transform;
+                    while (t.parent != null && t.parent != layerFullscreen) t = t.parent;
+                    panelRoot = t.gameObject;
+                }
+                if (panelRoot != null) Destroy(panelRoot);
                 EventBusHub.Instance?.Send(new OnGoBackEvent { FromScene = fromScene, ToScene = toScene });
                 return true;
             }
