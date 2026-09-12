@@ -175,7 +175,8 @@
 - [2026-09-05 20:04:54] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Tuanjie_editor\gic\.codely-cli\webrefs\genshin-unpack\gichess\my\wg-0.2.d（2026-09-05 随 gichess 77.78GB GI 解包归档整体迁入 webrefs/genshin-unpack/，原 D:\Picture\gichess）。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 需要查旧 Java 实现时按路径阅读源码。
 
 - [2026-08-10 09:28:39] 技术陷阱与 Bug 修复记录：详见 docs/14-技术陷阱与Bug修复记录.md。
-- [2026-09-12 22:57:23] GIC 文档体系：**docs/17-代码架构指南.md 是新会话入口文档**（目录结构/核心系统速查表/场景清单/配置资产/常用工作流速查/战斗规划/环境备忘），开工先读它再按需深入；docs/00-12 玩法设计、13 大地图、14 技术陷阱、15 输入系统、16 优化史、18 战斗决策、19 AI派蒙、20 项目规范（规范权威）、21 商业化与发布边界、23 UI架构重构技术设计（2026-09-12 起 P1-P4 重构进行中）。**How to apply:** 新系统落地/结构性变化后更新 docs/17 对应小节保持时效。
+- [2026-09-13 00:42:25] GIC 文档体系：**docs/17-代码架构指南.md 是新会话入口文档**（目录结构/核心系统速查表/场景清单/配置资产/常用工作流速查/战斗规划/环境备忘），开工先读它再按需深入；docs/00-12 玩法设计、13 大地图、14 技术陷阱、15 输入系统、16 优化史、18 战斗决策、19 AI派蒙、20 项目规范（规范权威）、21 商业化与发布边界、23 UI架构重构技术设计。**How to apply:** 新系统落地/结构性变化后更新 docs/17 对应小节保持时效。**2026-09-13 更新：UI 重构 P1-P4 已全量收官**（15 提交：UIManager 统一栈+池化面板，四屏 prefab 化，场景只剩 Boot/Splash/MainHall/Battle/Map+PaimonPet；面板制纪律全部沉淀 docs/14 §37-39b 与 gic-new-screen skill）。**两条已否决的"故意不做"勿再提**：PopupManager 折叠进 UIManager（专科管理器职责分离+回归风险不成比）、god-class Presenter 级拆分（partial 已按职责分文件，逻辑久经考验，拆分回归风险＞组织收益）——依据见 docs/23 §6 P4 行。
+
 
 
 
