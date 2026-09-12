@@ -29,6 +29,12 @@ namespace GIC.Framework
         private readonly Dictionary<int, PointerBinding> _bindings = new Dictionary<int, PointerBinding>();
         private readonly List<int> _removeBuffer = new List<int>(8); // 注销面时解绑用（迭代中不可直接改字典）
 
+        /// <summary>[Component] DI 构造入口——顺带绑定 WaitForAnyTap 静态门面（InputLocks 同款模式）</summary>
+        public GestureHub()
+        {
+            WaitForAnyTap.Bind(this);
+        }
+
         // 位置式 UI 命中的静态缓存（移植自 MapCameraController._uiRaycastBuffer——避免每次分配）
         private static readonly List<RaycastResult> _uiRaycastBuffer = new List<RaycastResult>(8);
 
@@ -70,6 +76,12 @@ namespace GIC.Framework
             return true;
         }
 
+        /// <summary>
+        /// 本帧是否发生过任意指针按下（任意 id/任意位置，含 UI 上）——WaitForAnyTap 的指针侧数据源。
+        /// **锁门之前计算**（输入锁期间也新鲜）：锁只冻结手势分发，"点击任意处继续"类 UI 语义不受影响。
+        /// </summary>
+        public bool AnyPointerBeganThisFrame { get; private set; }
+
         // ── IWargameManager（GameScene.Update → Wargame.Update 管线驱动）──
 
         public void Start() { }
@@ -79,6 +91,14 @@ namespace GIC.Framework
             double now = Time.unscaledTimeAsDouble;
             _events.Clear();
             _pump.Poll(now, _events);
+
+            AnyPointerBeganThisFrame = false;
+            for (int i = 0; i < _events.Count; i++)
+                if (_events[i].Phase == PointerPhase.Began)
+                {
+                    AnyPointerBeganThisFrame = true;
+                    break;
+                }
 
             // 门1 输入锁：锁生效 → 新事件不分发 + 活跃手势取消（与今日 Map/Battle"锁期间中断手势"同语义）
             if (InputLocks.IsLocked)

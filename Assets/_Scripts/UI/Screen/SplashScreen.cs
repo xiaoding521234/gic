@@ -82,7 +82,7 @@ namespace GIC.UI
             // InputLock 期间 SplashScreen 自己也不跳过
             if (InputLocks.IsLocked) return;
 
-            if (Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
+            if (WaitForAnyTap.Any())
             {
                 SkipAnimation();
             }
