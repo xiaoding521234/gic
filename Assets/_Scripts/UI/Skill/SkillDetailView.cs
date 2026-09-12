@@ -100,7 +100,7 @@ namespace GIC.UI
                     }
                 }
 
-                bool isClickOnSourceIcon = IsPointerOverUI(sourceSkillIconView != null ? sourceSkillIconView.gameObject : null);
+                bool isClickOnSourceIcon = IsPointerOverRect(sourceSkillIconView != null ? sourceSkillIconView.gameObject : null);
 
                 if (isClickOnSourceIcon)
                 {
@@ -109,7 +109,7 @@ namespace GIC.UI
                     return;
                 }
 
-                if (!IsPointerOverUI(skillDetailPanel) && !IsPointerOverUI(relatedPanel))
+                if (!IsPointerOverRect(skillDetailPanel) && !IsPointerOverRect(relatedPanel))
                 {
                     ClosePanel();
                     sourceSkillIconView.SetSelected(false);
@@ -196,7 +196,9 @@ namespace GIC.UI
 
         #endregion
 
-        bool IsPointerOverUI(GameObject target)
+        /// <summary>本帧指针是否落在指定 RectTransform 上（2026-09-13 P3 改名：原 IsPointerOverUI 撞名 GestureHub 的
+        /// "任意 UI"命中门——本方法实为"指定矩形内"判定，语义纠偏，docs/24 §5）</summary>
+        bool IsPointerOverRect(GameObject target)
         {
             if (target == null || !target.activeInHierarchy) return false;
             RectTransform rectTransform = target.GetComponent<RectTransform>();

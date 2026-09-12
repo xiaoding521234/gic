@@ -80,7 +80,7 @@ namespace GIC.UI
             }
             finalDisplayCanvasGroup.alpha = 1f;
 
-            yield return new WaitUntil(() => Input.anyKeyDown || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2));
+            yield return new WaitUntil(WaitForAnyTap.Any);
 
             fadeElapsed = 0f;
             while (fadeElapsed < fadeDuration)
