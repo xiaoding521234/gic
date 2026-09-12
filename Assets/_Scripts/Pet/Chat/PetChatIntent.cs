@@ -208,7 +208,9 @@ namespace GIC.Pet.Chat
         /// <summary>联机/战斗界面互斥检查（两者有进行中的状态机，AI 强切会打断流程）</summary>
         static string BlockedSceneCheck()
         {
-            if (SceneManager.GetSceneByName("CoopScreen").isLoaded)
+            // P4 修正：联机已面板化（场景已删，按场景判据恒 false=拦截失效）——改查 UIManager 栈
+            var ui = UIManager.Instance;
+            if (ui != null && ui.IsOpen(Screens.Coop))
                 return "联机界面打开中，请先手动退出联机界面再让派蒙操作";
             if (SceneManager.GetSceneByName("BattleScreen").isLoaded)
                 return "战斗进行中，请先手动结束战斗再让派蒙操作";
@@ -234,7 +236,8 @@ namespace GIC.Pet.Chat
                 return Error("派蒙已经在抽卡啦，等这轮结束再说");
 
             // 祈愿界面已开且抽卡进行中（含最终展示期）→ 拒绝
-            if (SceneManager.GetSceneByName("WishScreen").isLoaded)
+            // （P4 修正：祈愿已面板化，场景判据失效——改查 UIManager 栈）
+            if (UIManager.Instance != null && UIManager.Instance.IsOpen(Screens.Wish))
             {
                 var wish = UnityEngine.Object.FindFirstObjectByType<GIC.UI.WishScreen>(FindObjectsInactive.Exclude);
                 if (wish != null && wish.IsWishInProgress)

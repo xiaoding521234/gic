@@ -82,9 +82,18 @@ namespace GIC.Pet.Chat
         }
 
         /// <summary>标准关闭当前弹层界面：场景内找 ScreenBase 走 Close()（与用户按 ESC 同路径：
-        /// 退场动画+音乐恢复+GoBack）；找不到（异常态）兜底直接 GoBack。</summary>
+        /// 退场动画+音乐恢复+GoBack）；找不到（异常态）兜底直接弹出原语。</summary>
         static void CloseCurrentScreen(string sceneName)
         {
+            // 栈顶匹配（面板/场景制统一）：标准 Close——含退场动画与模板四件套
+            // （P4 修正：此前面板走场景查找失败→兜底 PopToPrevious(null) 绕过退场动画）
+            var ui = UIManager.Instance;
+            if (ui != null && ui.TopSceneName == sceneName)
+            {
+                ui.GoBack();
+                return;
+            }
+
             var scene = SceneManager.GetSceneByName(sceneName);
             if (scene.isLoaded)
             {
