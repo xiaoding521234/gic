@@ -22,8 +22,8 @@ namespace GIC.Pet
     /// </summary>
     public static class PetApiKeyCrypto
     {
-        /// <summary>存档字段名（PlayerSaveData.pet.petApiKeyCipher，Base64 密文；空串=未设置）</summary>
-        public const string saveField = "petApiKeyCipher";
+        /// <summary>存档字段名（PlayerSaveData.pet.petApiKeyCiphers[petChatProvider] 分槽密文，Base64；空串=未设置）</summary>
+        public const string saveField = "petApiKeyCiphers";
 
 #if UNITY_EDITOR
         /// <summary>开发用对话 API Key（2026-08-30 拍板；2026-09-07 改本地文件制）：**从本地文件读取，
