@@ -1775,12 +1775,13 @@ MonoBehaviour:
   deckSwitchPanel: {fileID: 6515858004646967858}
   skillDetailView: {fileID: 626753586075323035}
   cardDetailView: {fileID: 7634230562826976572}
-  topPanel: {fileID: 4892924532145067296}
-  bottomPanel: {fileID: 3063709067509890698}
-  centerCanvasGroup: {fileID: 5325224357011905305}
-  cardDetailCanvasGroup: {fileID: 7402623095309268952}
-  panelSlideDuration: 0.2
-  slideCurve:
+  "\u6BDB\u73BB\u7483\u52A8\u753B\u5668": {fileID: 1224415482540866689}
+  tabContainer: {fileID: 6258897394701036385}
+  sharedSelectLine: {fileID: 8026842726851115669}
+  lineSlideDuration: 0.2
+  "\u7F16\u8F91\u9762\u677F\u6ED1\u5165\u504F\u79FB": 100
+  "\u7F16\u8F91\u9762\u677F\u6ED1\u52A8\u65F6\u957F": 0.2
+  "\u7F16\u8F91\u9762\u677F\u6ED1\u52A8\u66F2\u7EBF":
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
@@ -1804,11 +1805,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  panelSlideOffset: 100
-  buttonSlideOffset: 80
-  tabContainer: {fileID: 6258897394701036385}
-  sharedSelectLine: {fileID: 8026842726851115669}
-  lineSlideDuration: 0.2
 --- !u!1 &1198873029827854929
 GameObject:
   m_ObjectHideFlags: 0
@@ -4731,6 +4727,7 @@ GameObject:
   serializedVersion: 7
   m_Component:
   - component: {fileID: 3909336051874279184}
+  - component: {fileID: 1224415482540866689}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: BackpackScreen
@@ -4756,6 +4753,65 @@ Transform:
   - {fileID: 1482368852976614707}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1224415482540866689
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3611315329202400078}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dd92ebd336040744a2484808e33bbda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u6A21\u7CCA\u5C42": {fileID: 2081129787874361291}
+  "\u5185\u5BB9\u5143\u7D20":
+  - "\u5143\u7D20": {fileID: 9186513712890614778}
+    "\u65B9\u5411": 1
+    "\u504F\u79FB": 100
+  - "\u5143\u7D20": {fileID: 6155675030374803809}
+    "\u65B9\u5411": 2
+    "\u504F\u79FB": 100
+  - "\u5143\u7D20": {fileID: 5630525773470297769}
+    "\u65B9\u5411": 3
+    "\u504F\u79FB": 80
+  - "\u5143\u7D20": {fileID: 6627322964934344994}
+    "\u65B9\u5411": 4
+    "\u504F\u79FB": 80
+  "\u81EA\u52A8\u6536\u96C6\u5185\u5BB9": 0
+  "\u5185\u5BB9\u5BB9\u5668": {fileID: 0}
+  "\u989D\u5916\u5143\u7D20": []
+  "\u5185\u5BB9\u6DE1\u5165\u7EC4":
+  - {fileID: 5325224357011905305}
+  - {fileID: 7402623095309268952}
+  "\u6DE1\u5165\u7EC4\u5165\u573A\u6DE1\u5165": 0
+  "\u6ED1\u52A8\u65F6\u957F": 0.2
+  "\u6ED1\u52A8\u66F2\u7EBF":
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  "\u9ED8\u8BA4\u5185\u5BB9\u504F\u79FB": 60
 --- !u!1 &3764063677580362319
 GameObject:
   m_ObjectHideFlags: 0

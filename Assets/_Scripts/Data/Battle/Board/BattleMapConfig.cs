@@ -33,6 +33,11 @@ namespace GIC.Data
         [Header("地图名")]
         public string mapName = "未命名战场";
 
+        [Header("所属势力")]
+        [Tooltip("地图所属势力：开局加载页按此显示对应势力徽标")]
+        [InspectorName("所属势力")]
+        public FactionType faction = FactionType.Mondstadt;
+
         [Header("尺寸")]
         public int width = 20;
         public int height = 20;

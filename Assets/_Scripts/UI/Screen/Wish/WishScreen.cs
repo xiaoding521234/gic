@@ -29,13 +29,8 @@ namespace GIC.UI
         public RectTransform selector;
 
         [Header("面板动画")]
-        public RectTransform topPanel;
-        public RectTransform leftPanel;
-        public RectTransform bottomPanel;
-        public CanvasGroup panelCanvasGroup;
-        [SerializeField] private float panelSlideDuration = 0.2f;
-        [SerializeField] private float panelSlideDistance = 200f;
-        [SerializeField] private AnimationCurve panelSlideCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+        [Tooltip("毛玻璃动画公共组件（挂面板根；祈愿=无模糊层纯滑动+整组淡入）")]
+        [SerializeField] private GlassPanelAnimator 毛玻璃动画器;
 
         [Header("角色列表")]
         [SerializeField] private CharacterEntry[] characters;
@@ -52,11 +47,6 @@ namespace GIC.UI
 
         private Vector2? _selectorOffset;
 
-        // 缓存的面板目标位置
-        private Vector2 _topPanelTargetPos;
-        private Vector2 _leftPanelTargetPos;
-        private Vector2 _bottomPanelTargetPos;
-
         protected override void Awake()
         {
             base.Awake(); // 注入（Boot 链路容器已就绪）
@@ -66,8 +56,7 @@ namespace GIC.UI
             if (selector != null)
                 _selectorOffset = selector.anchoredPosition;
 
-            CachePanelPositions();
-            SetPanelsToStartOffset();  // Awake 就移到偏移位，避免首帧闪烁
+            // 目标位缓存由公共组件 GlassPanelAnimator 在自身 Awake 自动完成（§39）
 
             // 尽早预加载所有角色立绘（4K 纹理提前加载，首次选中即可丝滑淡入）
             foreach (var entry in characters)
@@ -101,10 +90,9 @@ namespace GIC.UI
                 PushMusicStateSafe(wishClip, MusicType.Relaxed, loop: true, fadeInTime: 1f);
             }
 
-            // 起始态：只设偏移，【勿】再 CachePanelPositions——Awake 已缓存目标位；
-            // OnShow 时面板处于偏移位，重复缓存会把偏移位覆写成目标位=三面板永远滑不回屏幕
-            // （用户目检实证：抽卡/关闭/切换按钮消失，立绘可见——目标位被 ±200 污染）
-            SetPanelsToStartOffset();
+            // 起始态：只设偏移（目标位缓存由公共组件 Awake 自动完成，勿重复缓存——
+            // 重复缓存会把偏移位覆写成目标位=面板永远滑不回屏幕，docs/14 §39 用户目检实证）
+            if (毛玻璃动画器 != null) 毛玻璃动画器.SetEntryOffsets();
 
             // 池化状态复位：选中态回未选、切换锁复位（旧场景制靠重载天然复位）
             _currentIndex = -1;
@@ -130,15 +118,10 @@ namespace GIC.UI
         {
             yield return new WaitForEndOfFrame();
 
+            // 入场走公共组件+基类包装（Entering 锁+isClosing 守卫，2026-09-13 统一——原实现无锁）
+            StartCoroutine(PlayGlassEnter(毛玻璃动画器));
             if (characters.Length > 0)
-            {
-                StartCoroutine(PlaySlideInAnimation());
                 StartCoroutine(SelectFirstCharacterDelayed());
-            }
-            else
-            {
-                StartCoroutine(PlaySlideInAnimation());
-            }
         }
 
         /// <summary>
@@ -158,14 +141,16 @@ namespace GIC.UI
 
         [Autowired] private UnitConfig _unitConfig;
 
-        /// <summary>退场动画：三面板滑出 + 当前角色面板淡出（收尾由模板统一处理）</summary>
+        /// <summary>退场动画：三面板滑出+整组淡出走公共组件（系数 1=保持原 0.2s 等时长退场）；
+        /// 当前角色面板淡出为祈愿特有表现，保留在编排层（收尾由模板统一处理）</summary>
         private IEnumerator ExitAnimation()
         {
-            Coroutine slideOut = StartCoroutine(PlaySlideOutAnimation());
-            if (_currentIndex >= 0 && characters[_currentIndex].panel != null)
+            if (characters != null && _currentIndex >= 0 && _currentIndex < characters.Length
+                && characters[_currentIndex].panel != null)
                 characters[_currentIndex].panel.FadeOut();
 
-            yield return slideOut;
+            if (毛玻璃动画器 != null)
+                yield return 毛玻璃动画器.ExitRoutine(1f);
         }
 
         public void SelectCharacter(int index)
@@ -259,111 +244,8 @@ namespace GIC.UI
             }
         }
 
-        // ==================== 面板入场/退场动画 ====================
-
-        // 动画目标位缓存幂等守卫：池化生命周期里 Awake（预热实例化）是唯一合法缓存点
-        // ——面板此后常驻偏移位/动画位，任何二次缓存都会把非目标位污染成目标位（P3 实证）
-        private bool _positionsCached = false;
-
-        private void CachePanelPositions()
-        {
-            if (_positionsCached) return;
-
-            if (topPanel != null)    _topPanelTargetPos    = topPanel.anchoredPosition;
-            if (leftPanel != null)   _leftPanelTargetPos   = leftPanel.anchoredPosition;
-            if (bottomPanel != null) _bottomPanelTargetPos = bottomPanel.anchoredPosition;
-            _positionsCached = true;
-        }
-
-        private void SetPanelsToStartOffset()
-        {
-            if (topPanel != null)
-                topPanel.anchoredPosition = _topPanelTargetPos + Vector2.up * panelSlideDistance;
-            if (leftPanel != null)
-                leftPanel.anchoredPosition = _leftPanelTargetPos + Vector2.left * panelSlideDistance;
-            if (bottomPanel != null)
-                bottomPanel.anchoredPosition = _bottomPanelTargetPos + Vector2.down * panelSlideDistance;
-            if (panelCanvasGroup != null)
-                panelCanvasGroup.alpha = 0f;
-        }
-
-        private IEnumerator PlaySlideInAnimation()
-        {
-            InputLocks.Push(this, InputLockReason.Entering);
-            // Awake 已设置偏移位，这里只做动画
-
-            float startTime = Time.realtimeSinceStartup;
-
-            while (true)
-            {
-                // 秒开秒关守卫（docs/14 §37 纪律③）：释放 Entering 锁交由退场接管
-                if (isClosing)
-                {
-                    InputLocks.Pop(this, InputLockReason.Entering);
-                    yield break;
-                }
-
-                float elapsed = Time.realtimeSinceStartup - startTime;
-                elapsed = Mathf.Min(elapsed, panelSlideDuration);
-
-                if (elapsed >= panelSlideDuration)
-                    break;
-
-                float t = panelSlideCurve.Evaluate(elapsed / panelSlideDuration);
-
-                if (topPanel != null)
-                    topPanel.anchoredPosition = _topPanelTargetPos + Vector2.up * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
-                if (leftPanel != null)
-                    leftPanel.anchoredPosition = _leftPanelTargetPos + Vector2.left * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
-                if (bottomPanel != null)
-                    bottomPanel.anchoredPosition = _bottomPanelTargetPos + Vector2.down * Mathf.LerpUnclamped(panelSlideDistance, 0f, t);
-                if (panelCanvasGroup != null)
-                    panelCanvasGroup.alpha = t;
-
-                yield return null;
-            }
-
-            SnapPanelsToTarget();
-            if (panelCanvasGroup != null) panelCanvasGroup.alpha = 1f;
-            InputLocks.Pop(this, InputLockReason.Entering);
-        }
-
-        private IEnumerator PlaySlideOutAnimation()
-        {
-            float startAlpha = panelCanvasGroup != null ? panelCanvasGroup.alpha : 1f;
-            float startTime = Time.realtimeSinceStartup;
-
-            while (true)
-            {
-                float elapsed = Time.realtimeSinceStartup - startTime;
-                elapsed = Mathf.Min(elapsed, panelSlideDuration);
-
-                if (elapsed >= panelSlideDuration)
-                    break;
-
-                float t = panelSlideCurve.Evaluate(elapsed / panelSlideDuration);
-
-                if (topPanel != null)
-                    topPanel.anchoredPosition = _topPanelTargetPos + Vector2.up * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
-                if (leftPanel != null)
-                    leftPanel.anchoredPosition = _leftPanelTargetPos + Vector2.left * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
-                if (bottomPanel != null)
-                    bottomPanel.anchoredPosition = _bottomPanelTargetPos + Vector2.down * Mathf.LerpUnclamped(0f, panelSlideDistance, t);
-                if (panelCanvasGroup != null)
-                    panelCanvasGroup.alpha = Mathf.LerpUnclamped(startAlpha, 0f, t);
-
-                yield return null;
-            }
-
-            if (panelCanvasGroup != null) panelCanvasGroup.alpha = 0f;
-        }
-
-        private void SnapPanelsToTarget()
-        {
-            if (topPanel != null)    topPanel.anchoredPosition    = _topPanelTargetPos;
-            if (leftPanel != null)   leftPanel.anchoredPosition   = _leftPanelTargetPos;
-            if (bottomPanel != null) bottomPanel.anchoredPosition = _bottomPanelTargetPos;
-        }
+        // 面板入场/退场动画：已由公共组件 GlassPanelAnimator 承载（三面板滑动+整组淡入，
+        // 无模糊层），本类仅保留 OnShow 起始态与退场编排（角色面板 FadeOut）
     }
 }
 

@@ -759,6 +759,70 @@ MonoBehaviour:
     m_Key: PetWishPlayerIntertwinedAim
     m_Metadata:
       m_Items: []
+  - m_Id: 9065
+    m_Key: CreatingRoom
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9066
+    m_Key: LoadingTip_Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9067
+    m_Key: LoadingTip_Line1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9068
+    m_Key: LoadingTip_Line2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9069
+    m_Key: LoadingTip_02_Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9070
+    m_Key: LoadingTip_02_Line1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9071
+    m_Key: LoadingTip_02_Line2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9072
+    m_Key: LoadingTip_03_Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9073
+    m_Key: LoadingTip_03_Line1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9074
+    m_Key: LoadingTip_03_Line2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9075
+    m_Key: LoadingTip_04_Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9076
+    m_Key: LoadingTip_04_Line1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9077
+    m_Key: LoadingTip_04_Line2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9078
+    m_Key: LoadingTip_05_Title
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9079
+    m_Key: LoadingTip_05_Line1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9080
+    m_Key: LoadingTip_05_Line2
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

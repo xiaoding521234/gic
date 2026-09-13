@@ -339,11 +339,15 @@ namespace GIC.Tool
                 var screen = UnityEngine.Object.FindObjectsByType<BackpackScreen>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault();
                 if (screen == null) { log.Add("SCENE BackpackScreen component NOT FOUND"); return; }
 
-                if (screen.bottomPanel == null) { log.Add("SCENE screen.bottomPanel NOT wired"); return; }
-                Transform canvasRoot = screen.bottomPanel.transform.parent;
+                // bottomPanel 字段已随毛玻璃动画公共化移除（2026-09-13）——按面板根路径定位（场景制时代结构：root/Canvas/BottomPanel）
+                var bottomPanelTf = screen.transform.parent != null
+                    ? screen.transform.parent.Find("Canvas/BottomPanel")
+                    : null;
+                if (bottomPanelTf == null) { log.Add("SCENE Canvas/BottomPanel NOT FOUND"); return; }
+                Transform canvasRoot = bottomPanelTf.parent;
                 if (canvasRoot == null) { log.Add("SCENE bottomPanel has no parent (canvas root?)"); return; }
 
-                var buttonsTf = screen.bottomPanel.transform.Find("Buttons");
+                var buttonsTf = bottomPanelTf.Find("Buttons");
                 if (buttonsTf == null) { log.Add("SCENE Buttons container NOT FOUND"); return; }
 
                 // v1 遗留清理：DeckChoose 实例（v1 已删，重跑防御）与旧面板（重建保持幂等）

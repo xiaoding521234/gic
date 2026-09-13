@@ -21,7 +21,7 @@ MonoBehaviour:
     - elementType: 8
       stacks: 1
     subType: 0
-    maxStack: 9999
+    maxStack: 99999
     maxPrepareCount: 100
     countPerServing: 10
     recycleAfterBattle: 1
@@ -91,7 +91,7 @@ MonoBehaviour:
     - elementType: 7
       stacks: 1
     subType: 0
-    maxStack: 9999
+    maxStack: 99999
     maxPrepareCount: 100
     countPerServing: 10
     recycleAfterBattle: 1

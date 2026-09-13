@@ -942,3 +942,50 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 修复在源头归一（PetChatUIController.Update 产 canvasRect 处），不在各钳制点打补丁；桌面 override 契约本就是左下空间（入参只取宽高），源头归一后两形态一致
 
 ---
+
+## 43. 预热守卫横跨两帧窗口：用户 Open 的面板被连带跳过注册 + 冒烟工作流两条（2026-09-13 联机动画冒烟实证）
+
+**现象**：MainHall 就绪后 ~1.5s 打开联机面板，Console 报 `[UIManager] Coop 打开后未自动入栈（OnEnable 注册链异常）`——面板开了但 `IsOpen=false`：ESC/GoBack 对它失效整个会话、Single 加载自动入池也漏掉它（僵尸面板悬浮在战场之上）。冒烟的连带 FAIL 全部源于此。
+
+**根因**：`UIManager._prewarming` 是**全局布尔**，旧写法从 Instantiate 一直持到渲染态预热结束（含两个 `yield return null`）——泵实例的 OnEnable 只发生在 **Instantiate 同步瞬间**（prefab 根默认 active，之后的 `SetActive(true)` 是 no-op），而两帧 yield 窗口期间**用户代码照常运行**：用户 `Open` 走"池空回退同步实例化"→ 新面板的 OnEnable 撞上仍为 true 的全局标志 → 注册被连带跳过；且此刻泵还没把自建实例放进 `_panelPool` → 产生双实例（用户的一份未注册成僵尸，泵的一份闲置在池里）。
+
+**规范**：
+- **注册跳过守卫只覆盖 Instantiate 原子窗口**（set 后、首个 yield 前清）：同步调用期间用户代码不可能穿插，守卫精确命中泵实例唯一的 OnEnable；两帧渲染态预热窗口必须放开（泵实例此后无新 OnEnable，用户 Open 照常注册）。
+- "预热期跳过注册链"类全局标志，写之前先问：**这个窗口里还会发生谁的 OnEnable/OnDisable？** 含 yield 的窗口 ≠ 原子窗口。
+- 面板冒烟必含 `IsOpen(面板)` 断言——"实例激活"≠"已入栈"，未入栈的面板一切栈语义（ESC/GoBack/自动入池）都静默失效。
+
+**冒烟工作流两条（同日实证）**：
+- **exec_runtime_script 完成后编辑器留在 Play 模式**——连续两个 runtime 脚本会在**同一 Play 会话**里跑（面板栈/网络连接/场景全部残留：第二个脚本的"等 MainHall"瞬过、`Open` 报"已打开，重复忽略"）。需要干净会话时先 `unity_editor stop` 再跑下一个。
+- 锁类断言若 FAIL，**先反射倾倒 InputManager._inputLocks（Owner+Reason）再推理**——本日 3 个假 FAIL 靠锁清单直接排除了"代码泄漏"假设，实际是断言时机（锁在动画完成帧稍后弹出，`fill>=1` 即断言太早）；AnimationCurve 尾段缓出时"断言间隔帧数跳变"是曲线特性不是卡顿。
+
+---
+
+## 44. 切换动画进行中的同态直刷竞态——离房无退场+列表闪现重扫（2026-09-13 用户目检实证）
+
+**现象**：联机界面退出房间时房间页**瞬间消失无退场动画**；切到列表页时列表**整屏闪现后被拉回起始态重扫一遍**（用户报"抖动"）。
+
+**根因**：离房路径对 `ReturnToDiscovery` **双触达**——`OnLeaveRoomClick` 里 `_network.LeaveRoom()`（StopHost 同步触发 `OnClientDisconnected` 回调→`ReturnToDiscovery` ①）之后紧接直调 `ReturnToDiscovery()` ②。①启动切换动画（旧面板扫出→刷新→新面板扫入），②以**同态**再次进入 `SetRoomState`——同态走"即时 RefreshUI"分支，在动画进行中 `SetActive` 切换 + `SnapAllPanelsToRest` 复位半途动画：房间页被瞬间隐藏（退场腰斩）、列表页先被复位成完成态整屏可见（闪现）、约 0.125s 后又被动画的 `SetEntryOffsets` 拉回起始态重新扫入。旧场景制时代无动画，同态双刷无害；引入切换动画后即刻可见。
+
+**修复**（CoopScreen.RoomFlow.SetRoomState + Animation.SwitchPanelRoutine）：
+- `SetRoomState` 首行吞掉"**同态且切换动画进行中**"的刷新（`oldState == newState && _switchRoutine != null → return`）——运行中动画的 applyState 会在正确时序收口本次状态（SetActive/内容/按钮文案一个不漏）；无动画进行时同态照常即时刷新
+- `SwitchPanelRoutine` 的 `finally` 里 `_switchRoutine = null`——句柄即"进行中"标志，完成/被中断都归位
+
+**规范**：
+- 状态机带切换动画后，**同态重复刷新必须与动画互斥**：要么吞掉（由动画收口），要么让动画响应——绝不能让第二条路径直刷 SetActive/复位
+- "双触达"型状态入口（网络回调+直调并行）是竞态重灾区——给状态机引入动画前先枚举全部触达路径
+- 冒烟断言要判**病灶帧**（如"两面板同时激活且新面板满 fill"——修复前必现、修复后不可能），而非笼统的 fill 峰值（入场正常完成态/曲线尾段 ≥0.999 会造成假阳性，本日两轮假 FAIL 实证）；逐帧时序断言（激活时刻先后、首帧 fill 值）比瞬时值断言可靠
+
+---
+
+## 45. 全屏 UI prefab 根 RectTransform 零尺寸——子节点"屏幕中心原点"坐标全体错位（2026-09-13 联机加载页布局实证）
+
+**现象**：原神式加载页（LoadingOverlay.prefab）词条文案与七元素图标全部挤在画面顶部/顶边之外，徽标却在中下——与设计（徽标中央、词条其下、元素行底部横贯线）完全不符。
+
+**根因**：prefab 根节点的 RectTransform 为**零尺寸**（anchorMin=anchorMax=(0,0)、sizeDelta=(0,0)、pivot=(0,0)，锚在父画布左下角一点）——程序化摆子节点时按"屏幕中心为原点"给的 anchoredPosition（TipTitle y=468、元素行 y=634 等）全部相对这个 0×0 参照系定位，整体错位。`Instantiate(prefab, uiRoot.transform, false)` **不会自动纠正根 RectTransform 的锚点/尺寸**——prefab 里是什么就是什么。
+
+**规范**：
+- 新建全屏覆盖类 UI prefab（加载页/结算页/过场黑幕等），**根 RectTransform 必须显式设全屏 stretch**：anchorMin=(0,0)、anchorMax=(1,1)、sizeDelta=(0,0)、anchoredPosition=(0,0)——脚本创建同理（`GameObject.AddComponent<RectTransform>()` 的默认值就是零尺寸锚点）
+- 诊断"子节点群体错位"先读根节点 RectTransform（anchor/size/pivot），不要先怀疑子节点坐标值本身
+- 交付 UI 布局类改动时，读回断言应包含根节点锚点（本次靠 dump 全树 RectTransform 一次定位）
+
+---

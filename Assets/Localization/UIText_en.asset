@@ -766,6 +766,80 @@ MonoBehaviour:
       Intertwined Line - so exciting!
     m_Metadata:
       m_Items: []
+  - m_Id: 9065
+    m_Localized: "Creating room\u2026"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9066
+    m_Localized: Elemental Reactions
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9067
+    m_Localized: When two elements come into contact, a reaction occurs, dealing
+      bonus damage or effects.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9068
+    m_Localized: For example, Pyro and Hydro trigger "Vaporize", while Cryo and Electro
+      trigger "Superconduct".
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9069
+    m_Localized: The Seven Elements
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9070
+    m_Localized: 'Everything in Teyvat is composed of seven elements: Anemo, Geo,
+      Electro, Dendro, Hydro, Pyro, and Cryo.'
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9071
+    m_Localized: The resonance and repulsion between elements nurture the endless
+      cycle of all things.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9072
+    m_Localized: Mondstadt, the Wind Kingdom
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9073
+    m_Localized: Mondstadt is the free city blessed by the Anemo Archon Barbatos,
+      where poems and pastoral songs drift on the wind.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9074
+    m_Localized: Where a thousand breezes converge, may the city of freedom forever
+      bathe in the wind.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9075
+    m_Localized: Starfell Lake
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9076
+    m_Localized: Legend has it that stars of old fell beside Windrise, gathering
+      into this lake, clear as a mirror.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9077
+    m_Localized: On the isle at its heart, dandelions sway gently in the morning
+      light.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9078
+    m_Localized: Battlefield Terrain
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9079
+    m_Localized: The battlefield is woven from grasslands, waters, and stone paths,
+      scattered across the board.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9080
+    m_Localized: Know every inch of the land, and you will command the board with
+      ease.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

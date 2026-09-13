@@ -83,7 +83,8 @@ namespace GIC.UI
         {
             if (screen == null) return;
 
-            // 预热守卫（docs/14 §38）：预热期实例化触发的 OnEnable 不入栈——真正的注册在首次 SetActive(true) 打开时
+            // 预热守卫（docs/14 §38）：泵自建实例在 Instantiate 同步瞬间触发的 OnEnable 不入栈——
+            // 真正的注册在首次 SetActive(true) 打开时。守卫只覆盖 Instantiate 原子窗口（见字段注释）
             if (_prewarming) return;
 
             var id = screen.GetId();
@@ -238,7 +239,13 @@ namespace GIC.UI
         /// <summary>池中实例（按 Id.Name 键；隐藏挂层级容器下）——打开复用、关闭回池</summary>
         private readonly Dictionary<string, GameObject> _panelPool = new();
 
-        /// <summary>预热守卫：预热期 OnEnable 注册链跳过（真正的注册发生在首次 SetActive(true) 打开时）</summary>
+        /// <summary>
+        /// 预热守卫：泵自建实例在 Instantiate 同步瞬间触发的 OnEnable 不入栈（真正的注册
+        /// 在首次 SetActive(true) 打开时）。守卫只覆盖 Instantiate 原子窗口（无 yield、用户代码
+        /// 不可能穿插）——渲染态预热两帧窗口放开：泵实例此后无新 OnEnable，用户 Open 的面板
+        /// 照常注册（2026-09-13 冒烟实证：旧写法横跨两帧窗口，用户 Open 撞上即被连带跳过注册
+        /// →"打开后未自动入栈"→ESC/GoBack 对该面板失效整个会话）。
+        /// </summary>
         private bool _prewarming;
 
         private void Start()
@@ -270,24 +277,26 @@ namespace GIC.UI
                     continue;
                 }
 
-                _prewarming = true;
+                _prewarming = true; // 守卫只覆盖 Instantiate 原子窗口（无 yield，用户代码不可能穿插）
                 var go = Instantiate(prefab, layerFullscreen);
                 go.name = id.Name;
 
                 // 渲染态预热（池化冒烟实证：只暖物体不暖渲染，首开仍有 ~157ms 尖峰帧）：
                 // alpha=0 激活两帧走完整渲染管线（Canvas 重建/TMP 网格与字形图集/贴图上传），
-                // 成本摊进大厅空闲帧；OnEnable 注册链被 _prewarming 守卫跳过
+                // 成本摊进大厅空闲帧。本实例 OnEnable 仅发生在 Instantiate 同步瞬间（已被上方
+                // 守卫跳过）；两帧窗口不持守卫——用户 Open 的面板须照常注册（守卫横跨窗口会把
+                // 撞期的用户面板连带跳过注册=打开后不入栈，2026-09-13 冒烟实证，见字段注释）
                 bool hadCg = go.TryGetComponent<CanvasGroup>(out var cg);
                 float origAlpha = hadCg ? cg.alpha : 1f;
                 if (!hadCg) cg = go.AddComponent<CanvasGroup>();
                 cg.alpha = 0f;
                 go.SetActive(true);
+                _prewarming = false; // 首个 yield 前清——原子窗口结束
                 yield return null;
                 yield return null;
                 go.SetActive(false);
                 cg.alpha = origAlpha;
                 if (!hadCg) Destroy(cg);
-                _prewarming = false;
 
                 _panelPool[id.Name] = go;
 

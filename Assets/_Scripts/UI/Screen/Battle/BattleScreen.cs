@@ -37,11 +37,20 @@ namespace GIC.UI
         {
             base.Awake();
         }
-
         private void Start()
         {
             RegisterClosableSelf();
+            StartCoroutine(AssembleRoutine());
+        }
 
+        /// <summary>
+        /// 装配协程（2026-09-13 分帧化，用户拍板"加载不阻塞"）：
+        /// 建盘/立牌/面板等同步装配原为一帧 1.1s+ 尖峰（实测），加载页动画整帧冻结——
+        /// 重活之间插帧，把单帧尖峰摊薄到多帧；Reveal 收尾不变（装配完毕才揭幕）。
+        /// 中途异常协程中断 → SceneFadeOverlay 15s 安全兜底自动揭幕，不会卡死加载页。
+        /// </summary>
+        private IEnumerator AssembleRoutine()
+        {
             // 消费开局配置（consume-once）：null = 调试直开（双端手动）
             var launchConfig = BattleLaunchConfig.Take();
             var playerSetups = launchConfig?.Players;
@@ -66,15 +75,17 @@ namespace GIC.UI
             {
                 GICLog.Error("[BattleScreen] 未找到战斗地图配置，无法开战");
                 DoClose();
-                return;
+                yield break;
             }
             var map = mapConfig.BuildData();
             if (map == null)
             {
                 GICLog.Error("[BattleScreen] 战场地图配置非法，无法开战");
                 DoClose();
-                return;
+                yield break;
             }
+
+            yield return null; // ── 分帧：地图数据就绪/会话创建是重活起点 ──
 
             // 组件兜底（场景装配缺失时补挂，便于直接打开场景调试）
             if (_player == null) _player = gameObject.AddComponent<BattlePlayer>();
@@ -86,7 +97,7 @@ namespace GIC.UI
                 {
                     GICLog.Error("[BattleScreen] 场景缺少 BattleBoard，无法建盘");
                     DoClose();
-                    return;
+                    yield break;
                 }
             }
             if (_debugPanel == null)
@@ -104,6 +115,8 @@ namespace GIC.UI
             if (cameraGo != null && cameraGo.GetComponent<BattleCameraController>() == null)
                 cameraGo.AddComponent<BattleCameraController>();
 
+            yield return null; // ── 分帧：兜底/建会话分开（单帧 304ms 实测拆半，2026-09-13） ──
+
             // 逻辑单位隐藏根（Host 侧逻辑对象；表现层为 UnitView）
             var logicGo = new GameObject("LogicUnits");
             logicGo.transform.SetParent(transform, false);
@@ -112,30 +125,41 @@ namespace GIC.UI
             foreach (var setup in playerSetups)
                 _session.RegisterDebugPlayer(setup.PlayerId);
 
-            SpawnDebugUnits(mapConfig, playerSetups);
+            yield return null; // ── 分帧：会话就绪/立牌是重活起点 ──
+
+            // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
+            yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
 
             // AI 玩家大脑（B1 固定脚本占位：攻击最近敌人；B6 换启发式）
             foreach (var setup in playerSetups)
             {
                 if (!setup.IsAI) continue;
+
                 var brainGo = new GameObject($"AIBrain_{setup.PlayerId}");
                 brainGo.transform.SetParent(transform, false);
                 brainGo.AddComponent<AIDebugBrain>().Bind(_session, setup.PlayerId);
                 GICLog.Info($"[BattleScreen] AI 玩家就位：{setup.PlayerId}（{setup.DisplayName}）");
             }
 
+            yield return null; // ── 分帧：面板绑定/开局前让渲染喘一口气 ──
+
             // 调试面板只给真人玩家建操作块
             var manualIds = playerSetups.Where(p => !p.IsAI).Select(p => p.PlayerId).ToList();
             _debugPanel.Bind(_session, Close, manualIds);
 
             _session.StartBattle();
+
+            // 联机入口开局经加载页转场而来（SceneFadeOverlay.Cover）：装配尖峰已分帧摊薄，
+            // 装配完毕揭幕；调试直开无黑场时为纯 no-op
+            SceneFadeOverlay.Reveal(0.2f);
         }
 
         /// <summary>
         /// B1 固定测试军：先手方 安柏+凯亚 / 后手方 丽莎+芭芭拉（全蒙德，决策五）。
         /// 出生点来自地图配置的玩家出生区；正式出战队列 B6 落地。
+        /// 分帧协程：逐单位 yield（单帧 1.1s 立牌尖峰摊薄，2026-09-13）。
         /// </summary>
-        private void SpawnDebugUnits(BattleMapConfig mapConfig, List<BattlePlayerSetup> playerSetups)
+        private IEnumerator SpawnDebugUnitsRoutine(BattleMapConfig mapConfig, List<BattlePlayerSetup> playerSetups)
         {
             var first = playerSetups[0];
             var second = playerSetups[1];
@@ -144,8 +168,11 @@ namespace GIC.UI
             var secondCenter = FindSpawnCenter(mapConfig, second.PlayerId, new BattleCell(16, 16));
 
             _session.SpawnDebugUnit(UnitName.Amber, first.PlayerId, TeamType.A, firstCenter);
+            yield return null;
             _session.SpawnDebugUnit(UnitName.Kaeya, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 0));
+            yield return null;
             _session.SpawnDebugUnit(UnitName.Lisa, second.PlayerId, TeamType.B, secondCenter);
+            yield return null;
             _session.SpawnDebugUnit(UnitName.Barbara, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 0));
         }
 
@@ -179,6 +206,7 @@ namespace GIC.UI
             if (isClosing) return;
             isClosing = true;
             InputLocks.Push(this, InputLockReason.Closing);
+            SceneFadeOverlay.Reveal(0.2f); // 地图配置失败直退路径：揭幕加载页（正常退出无黑场=no-op）
             _session?.StopBattle();
             StartCoroutine(CloseToMainHall());
         }
