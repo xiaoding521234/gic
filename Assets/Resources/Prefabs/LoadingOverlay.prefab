@@ -1031,7 +1031,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   "\u5FBD\u6807\u65CB\u8F6C\u901F\u5EA6": 40
-  "\u586B\u5145\u65F6\u957F": 1
+  "\u586B\u5145\u65F6\u957F": 1.55
+  "\u5361\u70B9\u8FDB\u5EA6": 0.85
+  "\u626B\u5C3E\u65F6\u957F": 0.3
+  "\u8FDB\u5EA6\u65CB\u5F8B\u8868":
+  - "\u52BF\u529B": 3001
+    "\u97F3\u7B26\u5E8F\u5217":
+    - "\u97F3\u7B26": {fileID: 8300000, guid: 353ab5852cadb3c4d869f3c6e3f96ed6, type: 3}
+      "\u89E6\u53D1\u8FDB\u5EA6": 0
+      "\u97F3\u91CF\u500D\u7387": 1
+  "\u65CB\u5F8B\u97F3\u91CF": 0.8
   "\u9875\u9762\u7EC4": {fileID: 2278204251198353516}
   "\u5FBD\u6807": {fileID: 4030939692587101871}
   "\u5E95\u90E8\u884C": {fileID: 6995306364087072480}
