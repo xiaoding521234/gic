@@ -224,6 +224,18 @@ namespace GIC.Framework
 
         private void StartMusicPlayback(MusicTrack track)
         {
+            // 残留淡出协程先行终止：新曲起播后它仍会按自己的时长把音量拖到 0 并在结束时
+            // Stop+清 clip，误杀刚起播的新曲（2026-09-14 战斗无声实锤：开局 StopMusic(0.5f)
+            // 淡出未走完时战斗曲已开播——PreWarm 后转场<0.5s 竞态；完成回调协程见 clip 不
+            // 匹配静默退场，轮换链无声死亡）。StartFadeInMusic 已有同款终止，此处补齐非淡入
+            // 路径；音量归位（非淡入态源音量恒 1）
+            if (musicFadeCoroutine != null)
+            {
+                StopCoroutine(musicFadeCoroutine);
+                musicFadeCoroutine = null;
+                if (musicSource != null) musicSource.volume = 1f;
+            }
+
             if (track.fadeInTime > 0)
             {
                 StartFadeInMusic(track);
@@ -343,6 +355,7 @@ namespace GIC.Framework
                 yield return null;
             }
             musicSource.volume = 1f;
+            musicFadeCoroutine = null; // 自然结束清引用（同 FadeOutMusicCoroutine）
         }
 
         private void StartFadeOutMusic(float duration)
@@ -367,6 +380,7 @@ namespace GIC.Framework
             musicSource.Stop();
             musicSource.clip = null;
             musicSource.volume = startVolume;
+            musicFadeCoroutine = null; // 自然结束清引用：防字段持已完成协程的假引用误导现场取证
         }
 
         #endregion

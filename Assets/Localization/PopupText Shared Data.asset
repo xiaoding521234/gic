@@ -79,6 +79,22 @@ MonoBehaviour:
     m_Key: Deck_MinReached
     m_Metadata:
       m_Items: []
+  - m_Id: 16
+    m_Key: Coop_PlayerLimitExceeded
+    m_Metadata:
+      m_Items: []
+  - m_Id: 17
+    m_Key: Coop_SpawnConflict
+    m_Metadata:
+      m_Items: []
+  - m_Id: 18
+    m_Key: Coop_ColorConflict
+    m_Metadata:
+      m_Items: []
+  - m_Id: 19
+    m_Key: Coop_NotAllReady
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

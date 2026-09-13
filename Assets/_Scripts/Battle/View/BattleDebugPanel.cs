@@ -91,16 +91,11 @@ namespace GIC.Battle
             scaler.referenceResolution = new Vector2(2560f, 1440f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            // 全屏输入拦截层（完全透明只吃射线）：防止点击穿透到底层界面（如 MainHall 按钮）
-            var blockerGo = new GameObject("InputBlocker");
-            var blockerRect = blockerGo.AddComponent<RectTransform>();
-            blockerRect.SetParent(canvasGo.transform, false);
-            blockerRect.anchorMin = Vector2.zero;
-            blockerRect.anchorMax = Vector2.one;
-            blockerRect.offsetMin = blockerRect.offsetMax = Vector2.zero;
-            var blocker = blockerGo.AddComponent<Image>();
-            blocker.color = new Color(0f, 0f, 0f, 0f);
-            blocker.raycastTarget = true;
+            // （全屏 InputBlocker 已删，2026-09-14：独立根场景无底层界面共存，它防的"点击穿透到
+            // MainHall 按钮"不存在；且战斗为独立根场景后无 ES 时代它是死代码——§54 补挂 EventSystem
+            // 后它活了，全屏吃射线把 GestureHub 门2 全量判"按在 UI 上"，拖拽平移整面瘫痪
+            // （滚轮走 Update 直读 Input 不进手势系统故幸存）。点击穿透防御已是 GestureHub 门2 职责，
+            // 面板本体区域照常吃射线=按在面板上不拖棋盘的正确行为）
 
             var panelGo = new GameObject("DebugPanel");
             var panelRect = panelGo.AddComponent<RectTransform>();

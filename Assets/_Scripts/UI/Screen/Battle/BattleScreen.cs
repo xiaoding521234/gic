@@ -30,6 +30,9 @@ namespace GIC.UI
         private BattleSession _session;
         private BattleExitConfirmDialog _exitDialog;
 
+        // 战斗地图音乐：按绑定位置取 PositionConfig 昼夜曲池（2026-09-14）
+        [Autowired] private PositionManager _positionManager;
+
         /// <summary>当前对局（调试/测试访问口）</summary>
         public BattleSession Session => _session;
 
@@ -115,6 +118,17 @@ namespace GIC.UI
             if (cameraGo != null && cameraGo.GetComponent<BattleCameraController>() == null)
                 cameraGo.AddComponent<BattleCameraController>();
 
+            // EventSystem 兜底（2026-09-14 退出弹窗按钮全死实锤）：EventSystem 活在大厅场景，
+            // 随旧根卸载/Single 加载清场消失——战斗场景缺它时全部 UI 按钮点击无法投递
+            // （棋盘/相机走 3D 物理射线不受影响，弹窗与调试面板 UI 全瘫）。幂等补挂；
+            // 不 DontDestroyOnLoad——退出回大厅随场景卸载消亡，由大厅场景自己的 ES 接管
+            if (UnityEngine.EventSystems.EventSystem.current == null)
+            {
+                var esGo = new GameObject("EventSystem");
+                esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+                esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            }
+
             yield return null; // ── 分帧：兜底/建会话分开（单帧 304ms 实测拆半，2026-09-13） ──
 
             // 逻辑单位隐藏根（Host 侧逻辑对象；表现层为 UnitView）
@@ -149,9 +163,101 @@ namespace GIC.UI
 
             _session.StartBattle();
 
+            // 正式进入战斗地图：启动音乐轮换链（2026-09-14 用户拍板，揭幕同时起曲）
+            StartBattleMusic(mapConfig);
+
             // 联机入口开局经加载页转场而来（SceneFadeOverlay.Cover）：装配尖峰已分帧摊薄，
             // 装配完毕揭幕；调试直开无黑场时为纯 no-op
             SceneFadeOverlay.Reveal(0.2f);
+        }
+
+        // ==================== 战斗地图音乐（轮换链，参考大厅位置曲模式） ====================
+
+        // 轮换间隔取大厅位置曲同款节奏（PositionManager.MUSIC_INTERVAL=10s；战斗侧独立常量，
+        // 不与大厅耦合，2026-09-14 用户拍板"播完轮换参考当前大厅背景音乐"）
+        private const float BattleMusicIntervalSeconds = 10f;
+
+        // 链路生死标志：轮换链的 onComplete 闭包与协程都跑在 AudioManager 上，退出战斗后须防续播
+        private bool _battleMusicActive;
+        private Action<BattlePhase, int> _onPhaseChangedForMusic;
+
+        /// <summary>
+        /// 启动战斗地图音乐轮换链：按 BattleMapConfig.position → PositionConfig 昼夜曲池取曲，
+        /// 选池用**战斗独立时钟时段**（TurnFlowController.BattleTimePeriod，全局 TimeUtility 仅
+        /// 未就绪兜底）。链式 PlayMusicWithInterval：播完 → 间隔 10s → 按当前战斗时段重选池 →
+        /// 随机下一首（时段随回合推进自然切换，不打断在播曲目）。另订阅回合状态机阶段变化做
+        /// 自愈重试：链曾因池空静默死亡时，新回合开始且真静默则重新起链。曲池为空仅警告不阻断。
+        /// </summary>
+        private void StartBattleMusic(BattleMapConfig mapConfig)
+        {
+            _battleMusicActive = true;
+            if (_flow != null)
+            {
+                _onPhaseChangedForMusic = (phase, _) =>
+                {
+                    if (!_battleMusicActive || phase != BattlePhase.Selecting) return;
+                    var audio = AudioManager.Instance;
+                    if (audio == null) return;
+                    // 真静默才重试：在播/间隔冷却中（clip 仍挂 source）链是活的，不插手
+                    if (audio.IsMusicPlaying() || audio.GetCurrentMusicClip() != null) return;
+                    PlayNextBattleTrack(mapConfig);
+                };
+                _flow.OnPhaseChanged += _onPhaseChangedForMusic;
+            }
+            PlayNextBattleTrack(mapConfig);
+        }
+
+        private void PlayNextBattleTrack(BattleMapConfig mapConfig)
+        {
+            var positionData = _positionManager?.GetPositionData(mapConfig.position);
+            if (positionData == null)
+            {
+                GICLog.Warn($"[BattleScreen] 战斗地图 {mapConfig.mapName} 绑定位置 {mapConfig.position} 未配置 PositionData，战斗无音乐");
+                return;
+            }
+
+            var period = _flow != null ? _flow.BattleTimePeriod : TimeUtility.GetCurrentTimePeriod();
+            var clip = (period == TimePeriod.Daytime ? positionData.dayAudios : positionData.nightAudios)
+                ?.GetRandomClip();
+            if (clip == null)
+            {
+                GICLog.Warn($"[BattleScreen] 战斗地图 {mapConfig.mapName} 绑定位置 {mapConfig.position} 无 {period} 时段音乐，等待下回合自愈重试");
+                return;
+            }
+
+            AudioManager.Instance.PlayMusicWithInterval(
+                clip, MusicType.Battle,
+                intervalAfter: BattleMusicIntervalSeconds,
+                loop: false,
+                onComplete: () =>
+                {
+                    if (!_battleMusicActive) return; // 退出已停链：不再续播
+                    PlayNextBattleTrack(mapConfig);
+                });
+        }
+
+        /// <summary>
+        /// 停止轮换链（退出战斗全路径 + OnDestroy 兜底）。
+        /// 硬切不淡出：战斗退出无加载页遮盖；且 FadeOutMusicCoroutine 不可重入——若淡出中途
+        /// 新曲起播（回大厅复活链 fadeIn=0），残留淡出协程会在结束时 Stop+清 clip 误杀新曲。
+        /// 回大厅后位置曲由 PositionManager 的 MainHall 激活钩子复活。
+        /// </summary>
+        private void StopBattleMusic()
+        {
+            _battleMusicActive = false;
+            if (_flow != null && _onPhaseChangedForMusic != null)
+            {
+                _flow.OnPhaseChanged -= _onPhaseChangedForMusic;
+                _onPhaseChangedForMusic = null;
+            }
+            if (AudioManager.Instance == null) return; // 拆除期 AudioManager 可能已亡（docs/14 §29）
+            AudioManager.Instance.StopMusic();
+        }
+
+        protected override void OnDestroy()
+        {
+            StopBattleMusic();
+            base.OnDestroy();
         }
 
         /// <summary>
@@ -207,6 +313,7 @@ namespace GIC.UI
             isClosing = true;
             InputLocks.Push(this, InputLockReason.Closing);
             SceneFadeOverlay.Reveal(0.2f); // 地图配置失败直退路径：揭幕加载页（正常退出无黑场=no-op）
+            StopBattleMusic(); // 轮换链停播（回大厅后位置曲由 MainHall 激活钩子复活）
             _session?.StopBattle();
             StartCoroutine(CloseToMainHall());
         }

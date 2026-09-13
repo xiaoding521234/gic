@@ -1,7 +1,10 @@
 // ==================== CoopScreen.RoomFlow.cs（房间状态机 + 建房/离房流程 + 网络回调） ====================
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Localization;
+using UnityEngine.UI;
 using Mirror;
 using GIC.Framework;
 using GIC.Battle;
@@ -17,7 +20,7 @@ namespace GIC.UI
         internal enum RoomState { DisconnectedClient, Host, ConnectedClient }
         internal RoomState _currentState = RoomState.DisconnectedClient;
 
-        // 建房中标志（防重复点击；池化复位在 OnShow）
+        // 建房中标志（防重复点击+锁退出；唯一写点=SetCreatingUI，池化复位在 OnShow）
         private bool _startingHost;
 
         #region connManage
@@ -84,9 +87,6 @@ namespace GIC.UI
                     : new LocalizedString("UIText", "OpponentRoom"));
             }
 
-            if (emptyRoomHintObj)
-                emptyRoomHintObj.gameObject.SetActive(isDisconnected);
-
             if (!isDisconnected)
             {
                 UpdateRoomPanel();
@@ -105,13 +105,13 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 建房流程（带加载反馈）：按钮转「创建中」并禁点 → 先让反馈渲染一帧 →
-        /// 再吃 StartHost 的同步尖峰（端口探测循环）→ 0.5s 轮询等主机就绪 → 成功即切换动画进房间页。
+        /// 建房流程（带中央反馈）：列表页转等待态（隐藏房间列表+中央显示「正在创建房间…」+锁退出）→
+        /// 先让反馈渲染一帧 → 再吃 StartHost 的同步尖峰（端口探测循环）→ 0.5s 轮询等主机就绪 →
+        /// 成功即切换动画进房间页；超时复位列表页并弹 Coop_HostStartTimeout。
         /// </summary>
         private IEnumerator CreateRoomWithFeedback()
         {
-            _startingHost = true;
-            SetCreateRoomBusy(true);
+            SetCreatingUI(true);
             yield return null;
 
             _network.StartHost();
@@ -119,15 +119,39 @@ namespace GIC.UI
             Invoke(nameof(WaitForHostStart), 0.5f);
         }
 
-        /// <summary>建房按钮 busy 态：禁点 + 文案 CreateRoom ↔ CreatingRoom（UIText 9065）</summary>
-        private void SetCreateRoomBusy(bool busy)
+        /// <summary>
+        /// 建房等待态 UI（2026-09-13 用户拍板：反馈文字上列表页中央、不上按钮；建房中不可退出界面）：
+        /// 隐藏房间列表 + 中央文字（EmptyRoomHint）切 CreatingRoom ↔ SearchingServers +
+        /// 返回/创建按钮禁点。OnLeaveRoomClick 以 _startingHost 拦截（覆盖 ESC/返回全路径），
+        /// 本方法同时是 _startingHost 的唯一写点。
+        /// </summary>
+        private void SetCreatingUI(bool creating)
         {
-            if (createRoomButton == null) return;
-            createRoomButton.interactable = !busy;
-            _createRoomText?.SetSingleEntry(busy
-                ? new LocalizedString("UIText", "CreatingRoom")
-                : new LocalizedString("UIText", "CreateRoom"));
+            _startingHost = creating;
+            var scroll = ServerListScrollView;
+            if (scroll != null) scroll.SetActive(!creating);
+            if (leaveRoomButton != null) leaveRoomButton.interactable = !creating;
+            if (createRoomButton != null) createRoomButton.interactable = !creating;
+
+            if (emptyRoomHintObj == null || _emptyRoomHint == null) return;
+            emptyRoomHintObj.gameObject.SetActive(true);
+            _emptyRoomHint.SetSingleEntry(new LocalizedString("UIText",
+                creating ? "CreatingRoom" : "SearchingServers"));
         }
+
+        /// <summary>房间列表滚动视图（ServerListScroll）：从 serverListContent 向上解析所属 ScrollRect——
+        /// CoopScreen 未对其建序列化字段（prefab 结构自明的内部层级，勿为它加 prefab 接线）</summary>
+        private GameObject ServerListScrollView
+        {
+            get
+            {
+                if (_serverListScroll != null) return _serverListScroll;
+                if (serverListContent != null)
+                    _serverListScroll = serverListContent.GetComponentInParent<ScrollRect>()?.gameObject;
+                return _serverListScroll;
+            }
+        }
+        private GameObject _serverListScroll;
 
         private int _hostStartRetries;
         private const int MAX_HOST_START_RETRIES = 10;
@@ -136,8 +160,7 @@ namespace GIC.UI
         {
             if (NetworkServer.active)
             {
-                _startingHost = false;
-                SetCreateRoomBusy(false); // 复位按钮（随后列表页被切换动画送走）
+                SetCreatingUI(false); // 复位列表页（随后被切换动画送走）
                 SetRoomState(RoomState.Host); // → 列表↔房间切换动画
                 _network.StartBroadcast();
 
@@ -152,8 +175,7 @@ namespace GIC.UI
             }
             else
             {
-                _startingHost = false;
-                SetCreateRoomBusy(false);
+                SetCreatingUI(false);
                 GICLog.Error("[CoopScreen] 主机启动超时，请检查端口是否被占用");
                 PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText.ToString(), "Coop_HostStartTimeout"));
             }
@@ -164,12 +186,52 @@ namespace GIC.UI
             if (_currentState != RoomState.Host) return;
             if (isClosing) return; // 已在开局转场/关闭中
 
-            // 就绪校验（B7 LAN：全员就绪门）
-            foreach (var player in _playerManager.GetAllPlayers())
-                if (!player.IsReady) return;
+            if (!ValidateStartConditions()) return; // 未通过：轻提示已弹原因
 
             StartCoroutine(StartGameTransition());
         }
+
+        /// <summary>
+        /// 开局就绪校验（B7 LAN 全员就绪门扩展，2026-09-13 用户拍板加轻提示）：
+        /// 人数超地图出生区上限 / 出生点冲突（Random 不参与，运行期落位不算冲突） /
+        /// 颜色冲突 / 有玩家未准备——任一未过弹 PopupText 轻提示说明原因。
+        /// 校验序=结构性问题（容量→出生点→颜色）先于状态问题（准备）。
+        /// </summary>
+        private bool ValidateStartConditions()
+        {
+            var players = new List<PlayerInfo>(_playerManager.GetAllPlayers());
+
+            var map = GetSelectedMapConfig();
+            if (map != null && players.Count > map.spawnZones.Count)
+            {
+                ShowStartBlockedToast("Coop_PlayerLimitExceeded");
+                return false;
+            }
+
+            if (players.Where(p => p.SpawnPosition != SpawnPositionType.Random)
+                       .GroupBy(p => p.SpawnPosition).Any(g => g.Count() > 1))
+            {
+                ShowStartBlockedToast("Coop_SpawnConflict");
+                return false;
+            }
+
+            if (players.GroupBy(p => p.Color).Any(g => g.Count() > 1))
+            {
+                ShowStartBlockedToast("Coop_ColorConflict");
+                return false;
+            }
+
+            if (players.Any(p => !p.IsReady))
+            {
+                ShowStartBlockedToast("Coop_NotAllReady");
+                return false;
+            }
+
+            return true;
+        }
+
+        private void ShowStartBlockedToast(string key)
+            => PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText.ToString(), key));
 
         /// <summary>
         /// 开局转场（B1 单人开局：真人 + AI 补位对手，docs/22 §5；B7 LAN 时改为广播开战配置，
@@ -187,6 +249,10 @@ namespace GIC.UI
         {
             isClosing = true;
             InputLocks.Push(this, InputLockReason.Closing);
+            // 开局即淡出当前音乐（2026-09-14 用户拍板）：转场加载页只留进度旋律，位置曲链随停；
+            // 回大厅由 PositionManager 的 MainHall 激活钩子复活位置曲。StopMusic 不动音量/状态栈
+            // ——本屏 PushMusicVolume 的配对 pop 随根切换 OnDisable 自洽
+            AudioManager.Instance.StopMusic(0.5f);
             SceneFadeOverlay.Cover(GetSelectedMapConfig(), 0.2f);
             yield return new WaitForSeconds(0.2f); // 等加载页铺满再拆网络
 
@@ -206,6 +272,7 @@ namespace GIC.UI
         void OnLeaveRoomClick()
         {
             if (isClosing) return;
+            if (_startingHost) return; // 建房中不可退出界面（2026-09-13 用户拍板；ESC/返回全经此路径）
 
             switch (_currentState)
             {

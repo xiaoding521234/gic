@@ -133,10 +133,9 @@ namespace GIC.UI
         {
             // 池化复位先行：状态直置必须早于 StopCurrentConnection——
             // 停服的断连回调据此判定为空闲态，不误触列表↔房间的切换动画（屏级入场动画才是本帧主角）；
-            // 建房中标志/按钮复位兜上次会话 CancelInvoke 中断流程的残留
+            // 建房等待态复位（标志+列表可见+按钮+中央文字）兜上次会话 CancelInvoke 中断流程的残留
             _currentState = RoomState.DisconnectedClient;
-            _startingHost = false;
-            SetCreateRoomBusy(false);
+            SetCreatingUI(false);
 
             StopCurrentConnection();
             PushMusicVolumeSafe();

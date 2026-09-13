@@ -38,6 +38,11 @@ namespace GIC.Data
         [InspectorName("所属势力")]
         public FactionType faction = FactionType.Mondstadt;
 
+        [Header("绑定大地图位置")]
+        [Tooltip("战斗地图对应的大地图锚点/位置：正式进入战斗地图后播放该位置配置的音乐（PositionConfig 昼夜曲池，按当前游戏内时段选池）")]
+        [InspectorName("绑定位置")]
+        public PositionName position = PositionName.StarfellLake;
+
         [Header("尺寸")]
         public int width = 20;
         public int height = 20;

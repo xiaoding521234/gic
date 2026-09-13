@@ -29,6 +29,7 @@ namespace GIC.Data
         [InspectorName("雷波岛")] LempoIsle = 1,
         [InspectorName("那夏镇")] NashaTown = 2,
         [InspectorName("至冬堡")] SnezhnayaCastle = 3,
+        [InspectorName("蒙德野外")] MondstadtWilds = 4,
     }
 
     /// <summary>

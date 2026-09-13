@@ -174,11 +174,41 @@ MonoBehaviour:
   - position: 2006
     region: 2
     taskNames: []
-    audioTheme: 0
+    audioTheme: 4
     dayAudios:
-      clips: []
+      clips:
+      - clip: {fileID: 8300000, guid: e17c39321b582984dad67e9af3ca060c, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 801cb0121d1fcee4abc6231f16fb2a8d, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: bdef657b0d45e544cb40ceb4a097f0de, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 9dc53a4fa1e9df34f86d6ef6518c9758, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 740b73683f898c449909ce6be94563db, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: d478f3255ffbddb4582ee21c0d95b3ed, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: c4fd57b49ddbe1746a7079baea466a53, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: fff1dc8f39d0ba14b8de70958e23b4ed, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 88503c627e196624f83284b99ec0a191, type: 3}
+        weight: 1
     nightAudios:
-      clips: []
+      clips:
+      - clip: {fileID: 8300000, guid: 21fdecc00d4af62488a6020b1a70adc6, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: da6bbabe9600f194e8c47c93792616c8, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 501b7fc12e1449c44bab6ca27987a659, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 2c1ad20d1b0bb7c419b4dd70bb59c7b4, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 74c5ea59c1606d9489174d6d442a4784, type: 3}
+        weight: 1
+      - clip: {fileID: 8300000, guid: 0fe44300bb700cd41a22b34938d55ece, type: 3}
+        weight: 1
     isUnlocked: 0
     dayMedia:
       mediaType: 0

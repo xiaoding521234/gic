@@ -1081,3 +1081,31 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **规范**：
 - **改过 .cs（或调过 ImportAsset）后再 ScheduleBuild：先确认编译/域重载已落地**（桥推 custom_tools_reloaded/stale 通知=刚重载过）再调度；**调度后 ~30s 内 Editor.log 必须出现 `[PetSpikeBuild] START`**——不出=已蒸发，直接重调（守卫位随域重载归零，无需手动清）。
 - 判据链分层：RESULT 行=建成判据（铁律 1 不变）；**START 计数=调度是否真开跑的第一信号**，排队后先看 START 再去等 RESULT。
+
+---
+
+## 53. 残留的 FadeOutMusicCoroutine 在到期时"Stop+清 clip"误杀刚起播的新曲——开局淡出与 PreWarm 转场 <0.5s 竞态致战斗无声（2026-09-14 战斗音乐轮换链实证，§39 活体诊断）
+
+**现象**：联机开局进战斗图无音乐；Console 零异常零警告（链路各守卫都不触发），`curType=Battle` 证明战斗曲确实起播过、`musicSource.clip=null`+音量已复位=1 证明被淡出协程到期收尾杀掉；轮换链的 `MusicCompletionCoroutine` 见 `clip != track.clip` 静默 yield break——**无声死亡无任何日志**。
+
+**根因**：`StopMusic(0.5f)` 淡出协程只被 `StartFadeInMusic`（fadeIn>0 路径）终止，`StartMusicPlayback` 的**非淡入路径（fadeIn=0）不杀它**——淡出继续按自己时长跑，到期执行 `Stop()+clip=null+音量复位`，把期间起播的新曲当"自己人"收尾。旧版战斗曲带 fadeIn 0.5s 恰好顺手取消了残废淡出所以从未暴露；轮换链改 fadeIn=0（对齐大厅位置曲语义）后，PreWarm 把开局转场压到 <0.5s，残废淡出反杀战斗曲——竞态窗口从"不可能"变"必现"。`MusicCompletionCoroutine` 的 clip 一致性检查是守卫不是杀手：被外协程 Stop 后它只退场不续链，无声即"链死"。
+
+**规范**：
+- **`StartMusicPlayback` 已补齐"起播先杀残留淡出协程+音量归位"堵点**（2026-09-14）：任何新曲起播（PlayMusic 全家族）都会终止 musicFadeCoroutine——这是系统性修复，同族保护 PositionManager 回大厅复活链等一切"淡出后新曲可能提前起播"的路径。
+- 淡入/淡出协程自然结束时 `musicFadeCoroutine = null`（防字段持已完成协程的假引用误导活体取证——本例诊断时该字段非空但协程早已结束）。
+- **排障判据**：新配音乐链"零日志但无声"→ 反射读 `currentMusicType`（证明 PlayMusic 跑过）+ `musicSource.clip`（null=被外部 Stop）+ 音量（1=淡出收尾已执行）；三者组合即本陷阱指纹。
+- 勿给链式轮换曲加 fadeIn 来"绕过"——fadeIn 只是碰巧取消残废协程的副作用，堵点修复才是根治。
+
+---
+
+## 54. 战斗场景缺 EventSystem——UI 按钮全瘫但 3D 交互正常（2026-09-14 退出弹窗按钮"点了没反应"实证，§39 活体取证第二例）
+
+**现象**：打完对局点退出→确认弹窗正常弹出（全屏遮罩+面板都在、IsOpen=true），点「确定退出/继续战斗」无任何反应；isClosing=False 证明确认回调从未执行。局内棋盘/相机交互一直正常（掩盖了问题——用户全程没用过 UI 按钮）。
+
+**根因**：EventSystem 活在大厅场景里；Additive 根切换（SwitchRootScene 卸载旧根）或 Single 加载清场后战斗场景**没有自己的 EventSystem**——uGUI 的 Button.onClick 靠 EventSystem 投递，缺它则**一切 UI 按钮点击蒸发**（GraphicRaycaster 挂了也没用）；棋盘交互走 BattleCameraController 的 3D 物理射线，不依赖 EventSystem，故对局玩得起来。ESC/右键走 InputManager 轮询+closable 栈也不受影响（弹窗能被 ESC 打开正因此）。
+
+**规范**：
+- **BattleScreen.AssembleRoutine 已幂等补挂**（`EventSystem.current == null` 时 new GameObject + EventSystem + StandaloneInputModule；项目 activeInputHandler=0 纯旧版 Input Manager）；**不 DontDestroyOnLoad**——回大厅随场景卸载消亡，大厅场景自己的 ES 接管，防双 ES。
+- **排障指纹**：UI 按钮"点了没反应"+ 3D 点击正常 + 弹窗渲染完好 → 先查 `EventSystem.current == null`。
+- **新根场景/独立场景清单须核 EventSystem**：凡从"带 ES 的场景"切到"无 ES 的场景"（根切换/Single 加载/直接打开调试），UI 即全瘫——独立场景要么场景内自备 ES，要么装配期兜底（本例模式）。
+- **§54b 连锁案（同日实锤）**：补挂 ES 后**拖拽平移随之瘫痪**——BattleDebugPanel 的全屏透明 InputBlocker（防穿透挡板）在无 ES 时代是死代码，ES 一活它全屏吃射线，GestureHub 门2 把每次按下都判"按在 UI 上"（`BypassUIGate=false` 面整面收不到指针），拖拽识别器饿死；滚轮缩放走 Update 直读 Input 不进手势系统故幸存。**修复=删 InputBlocker**（独立根场景无底层界面共存，穿透防御已是 GestureHub 门2 职责；面板本体区域照常吃射线）。**教训：给场景补 ES 属"激活一切隐性 UI 死代码"的操作，须连带审计既有全屏 raycast 挡板**——探针法（EventSystem.RaycastAll 三点位）可实证。

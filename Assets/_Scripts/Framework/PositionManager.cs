@@ -33,6 +33,7 @@ namespace GIC.Framework
         // 当前曲目按哪个时段选的（游戏内时间变更事件判定用——同时段调时间不打断当前曲）
         private TimePeriod? _currentMusicPeriod;
         private GameTimeChangedHandler _gameTimeHandler;
+        private MainHallActivatedHandler _mainHallHandler;
 
         // 公共属性
         public PositionName CurrentPosition
@@ -62,6 +63,11 @@ namespace GIC.Framework
             _gameTimeHandler = new GameTimeChangedHandler(this);
             EventBusHub.Instance.Subscribe(_gameTimeHandler, this);
 
+            // 大厅激活复活位置曲（2026-09-14 战斗音乐链路：开局淡出把位置曲链停掉后，
+            // 退出战斗回大厅时据此复活；常驻订阅同上）
+            _mainHallHandler = new MainHallActivatedHandler(this);
+            EventBusHub.Instance.Subscribe(_mainHallHandler, this);
+
             // 初始播放当前位置的音乐
             PlayCurrentPositionMusic();
 
@@ -87,6 +93,38 @@ namespace GIC.Framework
             public void Handle(OnGameTimeChangedEvent evt)
             {
                 if (_manager._currentMusicPeriod == evt.NewPeriod) return;
+                _manager.PlayCurrentPositionMusic();
+            }
+        }
+
+        /// <summary>
+        /// 大厅激活处理器（2026-09-14 战斗音乐链路）：位置曲链可能已随战斗开局被停——
+        /// 联机开局 StopMusic 淡出直接停链，退出战斗 pop 恢复的也只是当时快照（静默）。
+        /// 回大厅激活时处于真静默（无曲在播且 musicSource 上无曲目）则复活当前位置曲链；
+        /// 间隔冷却中 clip 仍挂在 source 上不算静默，不重启（防冷却期重入重选曲）。
+        /// 正常路径（位置曲一直在播/冷却中）与启动期（Init 已起曲）天然空操作。
+        /// </summary>
+        private class MainHallActivatedHandler : IEventHandler<OnSceneActivatedEvent>
+        {
+            private readonly PositionManager _manager;
+
+            public MainHallActivatedHandler(PositionManager manager)
+            {
+                _manager = manager;
+            }
+
+            public bool CanHandle(OnSceneActivatedEvent evt)
+            {
+                return _manager != null && evt.SceneName == SceneType.MainHall.SceneName;
+            }
+
+            public void Handle(OnSceneActivatedEvent evt)
+            {
+                var audio = _manager.audioManager;
+                if (audio == null) return;
+                if (audio.IsMusicPlaying() || audio.GetCurrentMusicClip() != null) return;
+
+                GICLog.Info("回到大厅且音乐已停，复活当前位置曲");
                 _manager.PlayCurrentPositionMusic();
             }
         }
