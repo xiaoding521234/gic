@@ -1014,3 +1014,45 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 审查清单：协程内调用任何 SetActive(false)/入池/切场景的代码路径时，检查本协程宿主是否在受害名单里
 
 ---
+
+## 48. C# 插值字符串孔内三元条件的冒号被当格式说明符——整程序集编译炸（2026-09-13 指令系统实证，并行会话协同修复）
+
+**现象**：`GICLog.Info($"... {result.ok ? "✓" : "✗"} ...")` 直接编译失败，且报错形态是连续多条 CS1003 `',' expected` 指向后续行——极具误导性（看似换行/引号问题，实为前一行的孔内冒号）。当时堵死整个程序集，并行的另一 AI 会话做了最小语法修复（括号包裹）后才恢复。
+
+**根因**：插值字符串的孔 `{表达式}` 内，**顶层的 `:` 分隔段被解析为格式说明符起点**（`{值:格式}` 语法）——三元条件表达式的冒号恰在孔顶层，编译器把 `✗` 当格式串吃掉后孔结构错乱。属语言解析规则而非风格问题；含内嵌字符串字面量的三元尤其易踩（孔内引号本身合法，掩盖了真凶位置）。
+
+**规范**：
+- 插值孔内写含冒号的表达式（三元 `?:`、字典索引、具名参数等）一律**括号包裹**：`{(result.ok ? "✓" : "✗")}`——括号使冒号退出孔顶层
+- 疑似无关的连续 CS1003 串报错，先查同文件插值字符串的孔内是否有裸冒号
+- 多会话并行时，他方对冲突文件做过的最小语法修复勿"顺手撤回"——修复本身就是对方在协调板上留的标记（语义零变化时保留）
+
+---
+
+## 49. 新增 MonoBehaviour 类经编辑器脚本写入 prefab——m_Script 被静默序列化为 {fileID: 0}，运行时 missing script 连刷（2026-09-13 指令补全实弹目检实证）
+
+**现象**：编辑器脚本（`LoadPrefabContents` + `AddComponent<新类>` + `SaveAsPrefabAsset`）给 InputPopupDialog.prefab 写入建议行模板，创建与保存时**零告警**；运行时每次 `Instantiate` 报 "The referenced script on this Behaviour (Game Object 'SuggestRowTemplate') is missing!" 逐行连刷，`GetComponent<类型>()` 返回 null → 行构建/关闭两路 NRE。
+
+**根因**：prefab 里该组件 `m_Script: {fileID: 0}`——**当轮新编译的类型**在 prefab contents 序列化时 FileID 解析不出（TypeCache/脚本注册未稳），保存器静默写 0。连锁三坑：①带 missing script 的 prefab 被 `SaveAsPrefabAsset` 拒存（报错不落盘，修复动作全白做）；②`SerializedProperty.DeleteArrayElementAtIndex` 删 m_Component 元素被拒（"It is not allowed to modify the data property"）；③Tuanjie 分支**没有**标准 Unity 2020+ 的 `GameObjectUtility.RemoveMonoBehavioursWithMissingScripts`（CS0117）。
+
+**规范**：
+- 判定：`rg --no-ignore -n "m_Script: \{fileID: 0\}" <prefab>` 一发实锤（prefab 被 .gitignore 吞，rg 须 --no-ignore；注意排除 m_CorrespondingSourceObject 等合法 0 值字段，专搜 m_Script）
+- **要被 prefab/场景序列化引用的新建 MonoBehaviour 一律类名=文件名独立成文件**（主类 FileID=11500000 恒可解析；共享 .cs 的次要类走类名哈希 FileID，新类型+当轮写入易踩 0）——新建后不要当轮就跑写入脚本，先 refresh 让类型注册稳
+- 修复 missing script：删不掉单个坏组件时**销毁整个 GameObject 重建**（missing script 随 GO 消失，绕过拒存），重建后重接 InputPopupDialog 等外部引用
+- **保存后必须回读验证**：`SaveAsPrefabAsset` 返回 void 不报写入结果——`LoadPrefabContents` 重开 + `GetComponent<类型>` 非 null 才算落盘成功
+- 纯静态断言测不到 Instantiate 路径：本例 44 条 Suggest/指令断言全绿，仍漏此雷——**带 prefab 实例化的真实弹窗测试是 UI 类功能的必要验收环**
+
+---
+
+## 50. 池化面板内的弹窗协程被入池腰斩——重激活带回"半透明幽灵"（2026-09-13 指令跳祈愿后回设置实证，§39b 第三例；活体诊断=暂停现场反射读 alpha）
+
+**现象**：设置页指令弹窗输 `wish` 回车 → 派蒙自动抽卡导航**关闭设置面板（池化 SetActive(false)）**→ 弹窗 HideCoroutine（0.2s 淡出）被硬杀，alpha 冻结 0.292+_isClosing=true+active；抽完卡回设置（面板池化取出 SetActive(true)）→ 半透明弹窗残骸随面板复活。
+
+**根因**：§39b 同族——Fade 类协程尾部收尾（alpha=0+SetActive(false)）被宿主池化硬杀永不执行；**弹窗作为池化面板的运行时子物体，协程宿主=面板的激活状态**（§46），面板入池=全体子物体协程腰斩。取证=§39 活体诊断法：用户暂停现场，resume 后反射读 canvasGroup.alpha/activeSelf/_isClosing 一发实锤（暂停态 exec_runtime_script 握手超时，须先 resume）。
+
+**规范**：
+- **池化宿主内的 Fade/开关类弹窗必须 OnEnable 自愈复位**（§39b "OnShow 强制复位"纪律的子物体版）：`if (_isClosing || _shown) ForceClosedState()`（alpha 归零+SetActive(false)+PopAll(owner)+UnregisterClosable，全幂等）——收尾语义不得依赖协程跑完。自愈覆盖三场景：淡出中途被池化（半透明残骸）、**全开态被池化**（派蒙导航强切、更糟：全透明+可交互挡输入）、淡入中途被池化（entering 锁泄漏，靠 PopAll 兜底释放）
+- **自愈判据标记必须 Show 末尾置位**：`_shown=true` 若在 Show 开头置，`Show` 内的 `SetActive(true)` 会触发 OnEnable → 自愈把刚开的弹窗当场自毁（释放刚 Push 的 entering 锁、协程在 inactive 上启动报错——本例修复中实证）；**判据用运行时标记而非序列化属性**（新实例首次 OnEnable 恒 false 无动作）
+- 协程完成即置空引用：ShowCoroutine 末尾 `_currentCoroutine=null`——防"完成后引用残留"被 Hide 误判为淡入中被中断而**重复 Pop entering 锁**（弹掉别人的锁）
+- 弹窗宿主在池化面板内时（SettingsScreen.InputPopup/DeckSwitchPanel 同类风险），此类自愈比"宿主 OnShow 逐个复位子弹窗"更内聚：弹窗自己管自己的收尾幂等
+
+---

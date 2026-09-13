@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -104,6 +105,18 @@ namespace GIC.Pet.Chat
         private Action<string> _uiDeltaHandler; // 界面侧 正文增量 处理器（持引用摘挂——2026-08-31 前 Send 用 = 整体
                                                 // 覆盖，会把 PetReactionConsumer 挂的反应处理器一起顶掉）
         private Action<string> _uiErrorHandler; // 界面侧 错误 处理器（持引用摘挂，同上）
+
+        // ---- "/" 本地指令模式（2026-09-13，docs/25 §8）：同设置页指令行——补全/Tab/↑↓/点击/Enter 执行，
+        // 回执直出气泡（不经 LLM、不进对话历史）。执行路由与 LLM 工具同路（session.RunCommandDirect：
+        // 游戏内=主进程直调；桌面=IPC 转发）——两形态零分叉。 ----
+        private RectTransform _slashPanel;   // 建议列表（挂输入条顶边向上生长，随输入条 CanvasGroup 淡入淡出）
+        private readonly List<(RectTransform rt, TextMeshProUGUI main, TextMeshProUGUI hint, Image bg, Button btn)> _slashRows
+            = new List<(RectTransform, TextMeshProUGUI, TextMeshProUGUI, Image, Button)>();
+        private readonly List<CommandSuggestion> _slashSuggestions = new List<CommandSuggestion>();
+        private int _slashSelected = -1;
+        private const int SlashMaxRows = 6;   // 聊天窗窄：少于设置页的 8
+        private const float SlashRowH = 40f;
+        private const float SlashPad = 4f;
 
         /// <summary>对话流接管通知（Send 重接流式回调前触发，2026-08-31）：PetReactionConsumer 订阅——
         /// 在途的反应流将被新请求 AbortActive **静默**中止（onComplete/onError 均不触发），
@@ -226,6 +239,24 @@ namespace GIC.Pet.Chat
             // ESC 收起输入条（2026-08-29：旧版输入期宿主交互全冻结+无 ESC=输入条打开后只能靠发送
             // 消失，用户被困在"打开→发送→消失"循环——多一条退出途径）。ESC=完整关闭对话（含气泡）。
             if (_inputVisible && Input.GetKeyDown(KeyCode.Escape)) { CloseChat(); return; }
+            // "/" 指令模式键盘（docs/25 §8）：Tab 补词（选中优先）/ ↑↓ 切换（焦点保持）——
+            // Enter 由既有 onEndEdit→Send 路径统一进入 RunSlashCommand；输入期持有 InputLocks 无他处抢键
+            if (_inputVisible && _slashSuggestions.Count > 0)
+            {
+                if (Input.GetKeyDown(KeyCode.Tab)) ApplySlashSuggestion(_slashSelected >= 0 ? _slashSelected : 0);
+                else if (Input.GetKeyDown(KeyCode.DownArrow))
+                {
+                    _slashSelected = (_slashSelected + 1) % _slashSuggestions.Count;
+                    RefreshSlashSelection();
+                    _inputField.ActivateInputField();   // 焦点保持：防 EventSystem 方向导航把焦点带走
+                }
+                else if (Input.GetKeyDown(KeyCode.UpArrow))
+                {
+                    _slashSelected = _slashSelected <= 0 ? _slashSuggestions.Count - 1 : _slashSelected - 1;
+                    RefreshSlashSelection();
+                    _inputField.ActivateInputField();
+                }
+            }
             if (_canvas == null) return; // 宿主接线前的防御（WireHost 未调用时恒静默——2026-08-30 桌面版窗口句柄事故：Start 提前 return 吞掉接线=此处每帧 NRE 刷屏 9.6 万条）
             // 边界 bounds 必须与锚点/anchoredPosition 同空间（左下锚绝对空间）。
             // 根画布 pivot 恒居中：RectTransform.rect 是枢轴中心局部空间（xMin=-w/2）——直接拿它当
@@ -327,6 +358,7 @@ namespace GIC.Pet.Chat
         {
             if (!_inputVisible) return;
             _inputVisible = false;
+            HideSlashSuggestions();   // 建议列表随输入条收起（docs/25 §8）
             InputLocks.Pop(this, InputLockReason.InputPopupEntering);
             AnimateInputBar(0f); // 淡出后自动隐藏（2026-08-31）
         }
@@ -440,6 +472,7 @@ namespace GIC.Pet.Chat
             _inputField.fontAsset = font != null ? font : TMP_Settings.defaultFontAsset;
             _inputField.pointSize = 26;
             _inputField.onEndEdit.AddListener(v => { if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) Send(); });
+            _inputField.onValueChanged.AddListener(OnChatInputChanged);   // "/" 指令模式实时补全（docs/25 §8）
             // 占位与正文同矩形（同 insets）——两者矩形不一致会显成"打字时文字跳位"
             ((RectTransform)_inputField.textComponent.transform).offsetMin = new Vector2(4f, 0f);
             ((RectTransform)_inputField.textComponent.transform).offsetMax = new Vector2(-4f, 0f);
@@ -572,6 +605,8 @@ namespace GIC.Pet.Chat
             if (string.IsNullOrEmpty(text)) return;
             // 流式进行中再发送=会话层静默丢弃（_请求中 直接 return）——给出可见反馈并保留输入
             if (session != null && session.IsBusy) { showBubble(GetLocalizedText("PetChatBusy", "等派蒙说完这句嘛！")); return; }
+            // "/" 开头=本地指令模式（docs/25 §8）：不经 LLM——回执直出气泡
+            if (text.StartsWith("/")) { RunSlashCommand(text); return; }
             // 发送后输入框保留（2026-08-29 用户实测反馈"点击发送后输入框按钮直接消失了"——聊天软件式
             // 连续对话：只清文本保持焦点，回复气泡照常显示；收起走 单击派蒙/ESC）
             _inputField.text = "";
@@ -622,6 +657,164 @@ namespace GIC.Pet.Chat
             if (_uiDeltaHandler != null) { c.onContentDelta -= _uiDeltaHandler; _uiDeltaHandler = null; }
             if (_uiErrorHandler != null) { c.onError -= _uiErrorHandler; _uiErrorHandler = null; }
             if (_uiCompleteHandler != null) { c.onComplete -= _uiCompleteHandler; _uiCompleteHandler = null; }
+        }
+
+        // ---- "/" 本地指令模式（docs/25 §8）----
+
+        /// <summary>执行 "/" 指令并回执直出气泡（不经 LLM、不进对话历史、开发者格式原文）。
+        /// 执行路由=会话层 _toolExecutor（游戏内直调主进程 / 桌面 IPC 转发），与 LLM 工具同路。
+        /// 回执按主动消息语义：停留 proactiveHoldSec 后自动淡出。</summary>
+        void RunSlashCommand(string text)
+        {
+            _inputField.text = "";               // 同聊天发送惯例：清文本保焦点
+            _inputField.ActivateInputField();
+            HideSlashSuggestions();
+            string resultJson = session != null
+                ? session.RunCommandDirect(text.Trim().TrimStart('/'))
+                : "{\"error\":\"会话未接线\"}";
+            _proactiveMode = true;                // 主动消息语义（下一条对话 Send 自动切回常驻）
+            showBubble(PetChatIntent.ResultMessageOf(resultJson));
+            StartBubbleFade(proactiveHoldSec);
+        }
+
+        /// <summary>输入变化回调（BuildUI 挂 onValueChanged）：/ 开头=实时补全建议，否则收起</summary>
+        void OnChatInputChanged(string text)
+        {
+            if (!_inputVisible || _inputField == null) return;
+            if (text.StartsWith("/"))
+            {
+                EnsureSlashPanel();
+                _slashSuggestions.Clear();
+                var list = CommandSystem.Suggest(text);   // Tokenize 自剥 / 前缀——斜杠无需预剥
+                if (list != null) _slashSuggestions.AddRange(list);
+                _slashSelected = _slashSuggestions.Count > 0 ? 0 : -1;
+                RebuildSlashRows();
+            }
+            else if (_slashPanel != null && _slashPanel.gameObject.activeSelf)
+                HideSlashSuggestions();
+        }
+
+        /// <summary>建议列表面板（懒建；挂输入条顶边随其淡入淡出——父有 CanvasGroup 自动继承）</summary>
+        void EnsureSlashPanel()
+        {
+            if (_slashPanel != null) return;
+            var go = new GameObject("SlashSuggest", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(_inputBarRoot, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 0f);    // 底边贴输入条顶边、向上生长
+            rt.anchoredPosition = new Vector2(0f, 6f);
+            rt.sizeDelta = new Vector2(_inputBarRoot.sizeDelta.x, 0f);
+            var img = go.GetComponent<Image>();
+            img.sprite = null;
+            img.color = new Color(0.08f, 0.12f, 0.16f, 0.95f);
+            go.SetActive(false);
+            _slashPanel = rt;
+        }
+
+        /// <summary>行数对齐建议数（≤SlashMaxRows，复用行实例）；行结构=程序化（本 UI 全程序化惯例），
+        /// 主词左+对照提示右、NoWrap 单行（docs/25 §4 行宽预算同约束）</summary>
+        void RebuildSlashRows()
+        {
+            if (_slashPanel == null) return;
+            int showCount = Mathf.Min(_slashSuggestions.Count, SlashMaxRows);
+            while (_slashRows.Count < showCount)
+            {
+                var rowGo = new GameObject("Row", typeof(RectTransform), typeof(Image), typeof(Button));
+                rowGo.transform.SetParent(_slashPanel, false);
+                var bg = rowGo.GetComponent<Image>();
+                bg.sprite = null;
+                bg.color = new Color(1f, 1f, 1f, 0f);   // 常态透明（选中态换色）
+                var btn = rowGo.GetComponent<Button>();
+                btn.targetGraphic = null;
+
+                var main = BuildText(rowGo.transform, font, 24, TextAlignmentOptions.MidlineLeft);
+                main.color = Color.white;
+                main.enableWordWrapping = false;
+                var mainRt = (RectTransform)main.transform;
+                mainRt.anchorMin = new Vector2(0f, 0f); mainRt.anchorMax = new Vector2(0.5f, 1f);
+                mainRt.offsetMin = new Vector2(10f, 0f); mainRt.offsetMax = Vector2.zero;
+
+                var hint = BuildText(rowGo.transform, font, 20, TextAlignmentOptions.MidlineRight);
+                hint.color = new Color(0.55f, 0.62f, 0.72f, 1f);
+                hint.enableWordWrapping = false;
+                var hintRt = (RectTransform)hint.transform;
+                hintRt.anchorMin = new Vector2(0.5f, 0f); hintRt.anchorMax = new Vector2(1f, 1f);
+                hintRt.offsetMin = Vector2.zero; hintRt.offsetMax = new Vector2(-10f, 0f);
+
+                _slashRows.Add(((RectTransform)rowGo.transform, main, hint, bg, btn));
+            }
+            while (_slashRows.Count > showCount)
+            {
+                Destroy(_slashRows[_slashRows.Count - 1].rt.gameObject);
+                _slashRows.RemoveAt(_slashRows.Count - 1);
+            }
+
+            for (int i = 0; i < _slashRows.Count; i++)
+            {
+                int index = i;   // 闭包捕获
+                var row = _slashRows[i];
+                row.main.text = _slashSuggestions[i].main;
+                row.hint.text = _slashSuggestions[i].hint ?? "";
+                row.btn.onClick.RemoveAllListeners();
+                row.btn.onClick.AddListener(() => ApplySlashSuggestion(index));
+                row.rt.anchorMin = new Vector2(0f, 1f);
+                row.rt.anchorMax = new Vector2(1f, 1f);
+                row.rt.pivot = new Vector2(0.5f, 1f);
+                row.rt.anchoredPosition = new Vector2(0f, -(SlashPad + i * SlashRowH));
+                row.rt.sizeDelta = new Vector2(-SlashPad * 2f, SlashRowH);
+            }
+            RefreshSlashSelection();
+
+            bool visible = _slashRows.Count > 0;
+            if (_slashPanel.gameObject.activeSelf != visible) _slashPanel.gameObject.SetActive(visible);
+            if (visible)
+                _slashPanel.sizeDelta = new Vector2(_slashPanel.sizeDelta.x, SlashPad * 2f + _slashRows.Count * SlashRowH);
+        }
+
+        void RefreshSlashSelection()
+        {
+            for (int i = 0; i < _slashRows.Count; i++)
+                _slashRows[i].bg.color = i == _slashSelected ? new Color(0.16f, 0.22f, 0.30f, 1f) : new Color(1f, 1f, 1f, 0f);
+        }
+
+        /// <summary>应用补全（IDE "补一个词"，同 InputPopupDialog 语义）：替换正在输入的词；尾随空格=
+        /// 追加；命令词阶段（无空格）前缀保 "/" 维持指令模式。补全后立即刷新建议。</summary>
+        void ApplySlashSuggestion(int index)
+        {
+            if (index < 0 || index >= _slashSuggestions.Count) return;
+            var s = _slashSuggestions[index];
+
+            string text = _inputField.text.Replace((char)0x3000, ' ');
+            string prefix;
+            if (text.EndsWith(" "))
+                prefix = text;                       // 尾随空格=正在输入的词为空→追加
+            else
+            {
+                text = text.TrimEnd();
+                int lastSpace = text.LastIndexOf(' ');
+                prefix = lastSpace >= 0 ? text.Substring(0, lastSpace + 1) : "/";   // 命令词阶段保斜杠
+            }
+
+            string completed = prefix + s.main + (s.trailingSpace ? " " : "");
+            _inputField.SetTextWithoutNotify(completed);
+            _inputField.stringPosition = completed.Length;
+            _inputField.ActivateInputField();
+
+            _slashSuggestions.Clear();
+            var list = CommandSystem.Suggest(completed);
+            if (list != null) _slashSuggestions.AddRange(list);
+            _slashSelected = _slashSuggestions.Count > 0 ? 0 : -1;
+            RebuildSlashRows();
+        }
+
+        /// <summary>收起建议列表（行实例保留复用；清建议状态防 Update 键盘处理残留）</summary>
+        void HideSlashSuggestions()
+        {
+            _slashSuggestions.Clear();
+            _slashSelected = -1;
+            if (_slashPanel != null && _slashPanel.gameObject.activeSelf)
+                _slashPanel.gameObject.SetActive(false);
         }
 
         /// <summary>打字机追加（流式增量逐段追加；间隔=0 直出）——新内容到达自动取消未完成的

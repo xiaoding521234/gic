@@ -74,6 +74,24 @@ namespace GIC.Pet.Chat
             _toolExecutor = executor;
         }
 
+        /// <summary>本地直调工具执行器（聊天框 "/" 指令模式，2026-09-13，docs/25 §8）：与 LLM 工具
+        /// 循环同一执行路由（游戏内=主进程直调；桌面=IPC 转发主进程）——不经 LLM 请求、不进对话历史。
+        /// 返回 Ok/Error JSON 原文（PetChatIntent 产出格式）。</summary>
+        public string ExecuteToolDirect(string toolName, string argsJson)
+        {
+            if (_toolExecutor == null) return "{\"error\":\"工具执行器未注册\"}";
+            try { return _toolExecutor(toolName, argsJson); }
+            catch (System.Exception e) { return Newtonsoft.Json.JsonConvert.SerializeObject(new { error = e.Message }); }
+        }
+
+        /// <summary>执行一条指令（聊天框 "/" 指令模式入口）：run_command 直通，命令文本经 JSON 编码。
+        /// 未注册工具（宿主未接线）返回错误回执。</summary>
+        public string RunCommandDirect(string commandLine)
+        {
+            return ExecuteToolDirect("run_command",
+                "{\"command\":" + Newtonsoft.Json.JsonConvert.SerializeObject(commandLine ?? "") + "}");
+        }
+
         /// <summary>动作播放回调（宿主接线：LLM 对话自主选动作 2026-08-31）。参数=完整 clip 名；
         /// 宿主接 PlayReaction（拖拽/退场中静默跳过）。null=未接线，do_action 回执错误。</summary>
         [HideInInspector] public Action<string> onPlayAction;
