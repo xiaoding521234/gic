@@ -42,7 +42,8 @@ namespace GIC.Framework
 
         // 存档版本策略：低于该版本的旧档不做迁移，直接删旧档创建新档（开发期无真实玩家，语义变更即升版重置）
         // v11（2026-09-05）：PlayerSaveData 分区重组（progress/settings/pet 嵌套结构），旧格式字段不可直接映射
-        private const int CURRENT_SAVE_VERSION = 11;
+        // v12（2026-09-13）：无 schema 变化——零迁移政策落定（docs/20 §1.6）后的开发期重置重启，旧档清零重建
+        private const int CURRENT_SAVE_VERSION = 12;
 
         private float lastSaveTime = -999f;
         // 落盘间隔（2026-09-05 时机优化）：SaveGame() 只标脏，变更由 Update 在距上次写盘 ≥该间隔后合并落盘。
