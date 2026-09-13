@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -9,8 +10,9 @@ using GIC.Tool;
 namespace GIC.Framework
 {
     /// <summary>
-    /// 核心指令集（GIC.Framework 层，只依赖 Framework/Data）：help / give / card / time。
-    /// 界面导航 open 与自动抽卡 wish 是 Pet 域指令，在 GameCommands.Pet.cs（依赖方向：Pet→Framework/Data/UI）。
+    /// 核心指令集（GIC.Framework 层，只依赖 Framework/Data）：help / give / card / time / quit。
+    /// 界面导航 open、自动抽卡 wish、快捷消息 qm、启动游戏 start_game 是 Pet 域指令，
+    /// 在 GameCommands.Pet.cs（依赖方向：Pet→Framework/Data/UI）。
     /// 存档变更一律走 SaveManager.ModifyNow（货币/进度=丢了会疼的数据，立即落盘）。
     /// 文案基调=开发者向（2026-09-13 用户拍板）：短、干、事实化——派蒙的口吻由 LLM 层转述时自加，回执只给原始事实。
     /// </summary>
@@ -181,6 +183,39 @@ namespace GIC.Framework
                         list.Add(new CommandSuggestion { main = t, hint = "HH:mm", trailingSpace = false });
             }
             return list;
+        }
+
+        // ==================== quit（退出游戏，2026-09-13 快捷消息"关闭游戏"预设） ====================
+
+        [GameCommand("quit", "关闭游戏", "quit", "退出游戏（自动存档）", null)]
+        private static CommandResult Quit(CommandArgs args)
+        {
+            QuitDelayer.Request();
+            return CommandResult.Ok("正在退出");
+        }
+    }
+
+    /// <summary>延迟退出宿主（quit 指令专用）：回执/IPC 响应先落盘、气泡先显示，0.3s 后再真正退出——
+    /// 同帧立即 Application.Quit 会吞掉桌宠 IPC 的响应回写（PetIntentIpcHost 在 Execute 返回后才
+    /// WriteResponse，进程当帧即停=桌宠侧必超时报"游戏没在运行"）。真正的清理（标脏存档兜底落盘+
+    /// closePetOnExit 连带关派蒙）全在 GameScene.OnApplicationQuit，本类零退出逻辑。</summary>
+    internal class QuitDelayer : MonoBehaviour
+    {
+        static QuitDelayer _pending;
+
+        public static void Request()
+        {
+            if (_pending != null) return; // 已在退出流程：幂等
+            var go = new GameObject("[QuitDelayer]");
+            UnityEngine.Object.DontDestroyOnLoad(go);
+            _pending = go.AddComponent<QuitDelayer>();
+            _pending.StartCoroutine(DoQuit());
+        }
+
+        static IEnumerator DoQuit()
+        {
+            yield return new WaitForSecondsRealtime(0.3f);
+            Application.Quit();
         }
     }
 

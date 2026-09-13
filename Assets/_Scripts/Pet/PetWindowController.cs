@@ -144,6 +144,11 @@ namespace GIC.Pet
         private bool _pressPending;                 // 命中模型按下但未升级为拖拽（单击判定窗口内，2026-08-29 移植游戏内单击阈值）
         private float _pressDownAt = -10f;
         private POINT _pressDownPt;
+        // 对话开着按在派蒙身上的待定按下（2026-09-13 快捷消息）：拖/按住升级=快捷气泡、
+        // 原地快速松手=单击收起——与 _pressPending 同阈值不同升级去向
+        private bool _quickPressPending;
+        private float _quickPressDownAt = -10f;
+        private POINT _quickPressDownPt;
 
         private bool exitRequested;              // 退场动画进行中：屏蔽重复三连击与新拖拽
         private int baseWinW, baseWinH; // 基准客户区物理像素（=逻辑尺寸×dpi/96）
@@ -475,9 +480,13 @@ namespace GIC.Pet
         private static bool _visibleBoundsLogged;
 
         /// <summary>Intent 工具执行分发（桌面差异）：独立进程无主进程引用——经 PetIntentIpc 文件通道
-        /// 转发主游戏进程执行（主进程 PetIntentIpcHost 消费）；主游戏未运行时通道超时报错（LLM 自行解释）。</summary>
+        /// 转发主游戏进程执行（主进程 PetIntentIpcHost 消费）；主游戏未运行时通道超时报错（LLM 自行解释）。
+        /// 例外（2026-09-13 快捷消息）：start_game/qm 是桌宠本地指令（主游戏没开时 IPC 无消费者，
+        /// start_game 恰恰要在没开时才用得上）——PetLocalCommands 本地拦截，其余照旧 IPC。</summary>
         protected override string ExecuteChatTool(string toolName, string toolArgsJson)
         {
+            string local = PetLocalCommands.TryExecuteJson(toolName, toolArgsJson);
+            if (local != null) return local;
             return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgsJson);
         }
 
@@ -909,13 +918,16 @@ namespace GIC.Pet
             SaveDebounceFrame();
         }
 
-        /// <summary>光标是否在聊天对话元素（输入条/气泡）上（2026-08-29 桌面对话补齐）：输入期这些
-        /// 区域必须非穿透（uGUI 要吃到点击/聚焦输入框）；未开输入条时恒 false（气泡只读不挡桌面）。</summary>
+        /// <summary>光标是否在聊天对话元素（输入条/气泡/快捷气泡）上（2026-08-29 桌面对话补齐；
+        /// 2026-09-13 快捷气泡加入）：这些区域必须非穿透（uGUI 要吃到点击/聚焦输入框；快捷气泡
+        /// 拖拽持有期窗口保持实体，免得下层应用抢走光标交互）；输入条未开且无快捷气泡时恒 false。</summary>
         private bool ChatUiHitFrame()
         {
-            if (_chatUI == null || !_chatUI.IsInputVisible) return false;
+            if (_chatUI == null) return false;
+            if (!_chatUI.IsInputVisible && !_chatUI.QuickBubblesActive) return false;
             if (!TryGetCursorUnityScreenPos(out Vector2 cursor)) return false;
-            return _chatUI.IsPointOnInputBar(cursor) || _chatUI.IsPointOnBubble(cursor);
+            return _chatUI.IsPointOnInputBar(cursor) || _chatUI.IsPointOnBubble(cursor)
+                || (_chatUI.QuickBubblesActive && _chatUI.IsPointOnQuickBubble(cursor));
         }
 
         /// <summary>置顶守卫（2026-08-28）：点击任务栏/开始菜单等 shell 激活时，Windows 会把任务栏
@@ -1066,17 +1078,66 @@ namespace GIC.Pet
                 else PhysicsSettle();
             }
 
-            // ---- 聊天输入期：点击对话元素（输入条/气泡）以外任何地方=关闭对话（2026-08-29 用户拍板，
-            // 游戏内形态同款）；不起新拖拽/不推进待定按下。全局轮询看得见穿透到别处的点击——
-            // 点其它应用同样收对话。物理收尾已在上方无条件推进（勿挪进门控内）。
-            // 三连击进行中（点模型且计数≥2）不收起——第 3 击将触发切换（PetHostBase.ShouldCloseChatOnClick）
+            // ---- 聊天输入期（2026-08-29 用户拍板"点对话元素以外=关闭对话"；2026-09-13 快捷消息改造）：
+            // 点"对话元素（输入条/气泡）以外"且不在派蒙身上=立即关闭；按在派蒙身上=延后——
+            // 过阈值（位移 8px/按住 0.15s）升级为快捷消息气泡、原地快速松手=单击收起（三连击
+            // 计数≥2 的第 3 击豁免收起）。快捷气泡进行中：悬停喂数+松手提交，不再判新按下/收起。
+            // 全局轮询看得见穿透到别处的点击——点其它应用同样收对话（原语义保持）。
+            // 物理收尾已在上方无条件推进（勿挪进门控内）。
             if (_chatUI != null && _chatUI.IsInputVisible)
             {
+                // 快捷气泡进行中（拖拽持有期）：派蒙不动，光标驱动悬停，松手=按悬停提交
+                if (_chatUI.QuickBubblesActive)
+                {
+                    if (TryGetCursorUnityScreenPos(out Vector2 quickCursor))
+                        _chatUI.QuickBubbleHover(quickCursor);   // 松手帧也先刷新（最后位移别漏判）
+                    if (!lmbDown)
+                        _chatUI.EndQuickBubbles(true);            // 悬停中=发送，气泡外=收回不发
+                    _quickPressPending = false;
+                    prevLmbDown = lmbDown;
+                    return;
+                }
+
                 if (lmbPressed)
                 {
                     bool onChatElement = TryGetCursorUnityScreenPos(out Vector2 cursor)
                         && (_chatUI.IsPointOnInputBar(cursor) || _chatUI.IsPointOnBubble(cursor));
-                    if (!onChatElement && ShouldCloseChatOnClick(modelHit)) _chatUI.CloseChat();
+                    if (onChatElement)
+                    {
+                        // 对话元素上的按下=正常 UI 交互（聚焦输入条等），不关不拖
+                    }
+                    else if (modelHit)
+                    {
+                        // 按在派蒙身上：延后判定（拖=快捷气泡/快速松手=收起）
+                        _quickPressPending = true;
+                        _quickPressDownAt = Time.unscaledTime;
+                        _quickPressDownPt = pt;
+                    }
+                    else if (ShouldCloseChatOnClick(modelHit))
+                    {
+                        _chatUI.CloseChat(); // 元素以外+非模型=立即收起
+                    }
+                }
+
+                if (_quickPressPending)
+                {
+                    if (!lmbDown)
+                    {
+                        _quickPressPending = false;
+                        if (Time.unscaledTime - _quickPressDownAt <= 0.15f
+                            && Mathf.Abs(pt.X - _quickPressDownPt.X) + Mathf.Abs(pt.Y - _quickPressDownPt.Y) < 8
+                            && ShouldCloseChatOnClick(true))
+                        {
+                            _chatUI.CloseChat(); // 原地快速松手=单击收起（连击计数≥2 豁免——第 3 击将切换）
+                        }
+                    }
+                    else if (Time.unscaledTime - _quickPressDownAt > 0.15f
+                             || Mathf.Abs(pt.X - _quickPressDownPt.X) + Mathf.Abs(pt.Y - _quickPressDownPt.Y) >= 8)
+                    {
+                        _quickPressPending = false;
+                        ResetClickChain();              // 真实拖拽手势打断连击计次（防误触三连击切换）
+                        _chatUI.BeginQuickBubbles();    // 无快捷消息=false：拖拽无动作（对话开着本不允许普通拖拽）
+                    }
                 }
                 _pressPending = false;
                 prevLmbDown = lmbDown;

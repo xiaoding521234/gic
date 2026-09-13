@@ -1056,3 +1056,28 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 弹窗宿主在池化面板内时（SettingsScreen.InputPopup/DeckSwitchPanel 同类风险），此类自愈比"宿主 OnShow 逐个复位子弹窗"更内聚：弹窗自己管自己的收尾幂等
 
 ---
+
+## 51. `#if !UNITY_EDITOR` 块内"匿名委托捕获 out 参数"——编辑器编译恒绿、桌宠构建才炸 CS1628；伴随 Bee 玩家编译首轮陈旧文件清单的 CS0103 串扰（2026-09-13 快捷消息 GameWindowState 实证）
+
+**现象**：编辑器 refresh 编译 0 错，ScheduleBuild 桌宠构建 `RESULT FAIL errors=2`。Editor.log 错误两组混排：`GameWindowState.cs(144,17): error CS1628: Cannot use ref, out, or in parameter 'hwnd' inside an anonymous method...`（真实错误），以及大量 `error CS0103: The name 'PetQuickMessages'/'PetLocalCommands'/'GameWindowState' does not exist`（引用三个**新建 .cs** 类型的文件全体报"类型不存在"）。
+
+**根因**：
+- **CS1628**：`TryGetOwnWindow(out IntPtr hwnd)` 内 `EnumWindows(delegate ... { hwnd = h; })`——匿名委托捕获 out 参数是 C# 硬错误；该段在 `#if UNITY_STANDALONE_WIN && !UNITY_EDITOR` 内，**编辑器永远不编译这段**（铁律 7 应验：#if 块编辑器零验证，构建期才暴露）。
+- **CS0103 串扰**：BuildPlayer 的 Bee 玩家编译**首轮使用了陈旧的 PlayerDataCache 文件清单**（不含当轮新建的 .cs）→ 引用新类型的存量文件全体 CS0103；重导入后文件清单自愈，后续编译轮次才编译到新文件（真实错误 CS1628 在更晚的日志行）。日志按行号交错混排极易误判成"新文件丢了"。
+
+**规范**：
+- **`#if !UNITY_EDITOR` 块内禁止匿名委托/lambda 捕获方法签名里的 out/ref/in 参数**——经局部变量带出再赋值（`IntPtr found=Zero; lambda 内 found=h; 方法尾 hwnd=found`）；写 Win32 块时按"编辑器不编译"自检一遍闭包捕获。
+- **构建失败先按"错误组"分层归因再动手**：CS0103 批量指向**本批新建类型的引用方**=PlayerDataCache 文件清单陈旧的串扰（自愈型，勿追"文件不存在"）；同日志里的 CS1628/CS0xxx 语法级错误才是真凶。修复真错误后对新建 .cs 逐个 `AssetDatabase.ImportAsset(ForceUpdate)` + 重跑 ScheduleBuild（其 isCompiling 守卫自然衔接）即可，无需重建整个导入链。
+- 判据口径不变：建成与否只认 `[PetSpikeBuild] RESULT` 行（本例 `RESULT FAIL errors=2` 即真失败，与"RESULT FAIL errors=0"的编译竞态假失败区分开）。
+
+---
+
+## 52. ScheduleBuild 排队的构建被"编译引发的域重载"静默吃掉——无 START 无 RESULT 直接蒸发（2026-09-13 快捷消息重建实证）
+
+**现象**：`ScheduleBuild()` 正常返回，但 Editor.log 永不出新的 `[PetSpikeBuild] START`/`RESULT`（START 计数不涨），8 分钟轮询空等。前情：调度前刚对改动 .cs 做过 `ImportAsset(ForceUpdate)`（修 §51 后的重建）。
+
+**根因**：ImportAsset 触发**异步脚本编译** → ScheduleBuild 已把 `EnqueueBuild` 挂上 `EditorApplication.update` 且 `_已排队=true` → 编译完成的**域重载把静态状态与旧域 update 回调一并清掉**（`_已排队` 归零、委托蒸发）→ EnqueueBuild 永不执行。`BuildInternal` 的 isCompiling 守卫防的是"构建先跑、编译没落地"，防不了"回调本身被重载消灭"——调度发生在编译落点之前就必中招。
+
+**规范**：
+- **改过 .cs（或调过 ImportAsset）后再 ScheduleBuild：先确认编译/域重载已落地**（桥推 custom_tools_reloaded/stale 通知=刚重载过）再调度；**调度后 ~30s 内 Editor.log 必须出现 `[PetSpikeBuild] START`**——不出=已蒸发，直接重调（守卫位随域重载归零，无需手动清）。
+- 判据链分层：RESULT 行=建成判据（铁律 1 不变）；**START 计数=调度是否真开跑的第一信号**，排队后先看 START 再去等 RESULT。

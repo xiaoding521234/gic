@@ -103,6 +103,7 @@ namespace GIC.Pet
         private readonly DragRecognizer _dragRecognizer = new DragRecognizer(DragBeginMode.OnSlopOrHold);
         private readonly List<GestureRecognizer> _recognizers = new List<GestureRecognizer>();
         private bool _chatClosedByThisPress; // 本次按下已承载"关对话"：不得再起拖/判单击（旧分支② return 语义）
+        private bool _quickBubbleDrag;      // 快捷消息气泡拖拽进行中（2026-09-13）：光标驱动悬停，不进拖拽物理
 
         // 双指捏合缩放（移动端，2026-09-01）：滚轮缩放的触屏等价。桌面形态=Win32 单光标进程
         // 无多指输入，属形态本质差异允许单侧（双形态对齐口径见 docs/19 §6）
@@ -201,6 +202,12 @@ namespace GIC.Pet
 
         private void OnDisable()
         {
+            // 快捷气泡拖拽中宿主失能（热切换/销毁）=收回不发送（2026-09-13）
+            if (_quickBubbleDrag)
+            {
+                _quickBubbleDrag = false;
+                _chatUI?.EndQuickBubbles(false);
+            }
             if (_gestureHub == null) return;
             _gestureHub.UnregisterSurface(this);
             _gestureHub.AnyPointerBegan -= OnPetPointerBegan;
@@ -218,15 +225,15 @@ namespace GIC.Pet
         public bool IgnoresInputLocks => true;
 
         /// <summary>
-        /// 指针准入=命中烘焙蒙皮碰撞体（像素级，桌面版同配方）+ 聊天输入期不起新手势。
-        /// 聊天开着时：本次按下只承载"关对话"（OnPetPointerBegan 内判定），不进手势——输入条/气泡上
-        /// 的按下归 EventSystem/气泡自身，命中模型（元素以外）的按下=收起意图，均不绑面（旧分支② return 语义）。
+        /// 指针准入=命中烘焙蒙皮碰撞体（像素级，桌面版同配方）。聊天开着时（2026-09-13 快捷消息改造）：
+        /// 按在派蒙身上=放行给手势层（承载快捷气泡拖拽/单击收起两语义）；按在对话元素以外其它区域
+        /// =OnPetPointerBegan 已关对话（_chatClosedByThisPress 拦本指针）；按在输入条/气泡上
+        /// =归 EventSystem 自身，命中模型之外恒 false 不绑面。
         /// </summary>
         public bool ShouldReceivePointer(in PointerEvent e)
         {
             if (_chatClosedByThisPress) return false;
             if (!GetHitState(e.Position)) return false;
-            if (_chatUI != null && _chatUI.IsInputVisible) return false;
             return true;
         }
 
@@ -238,11 +245,31 @@ namespace GIC.Pet
             _dragRecognizer.OnDragBegan += OnDragBeganHandler;
             _dragRecognizer.OnDragDelta += OnDragDeltaHandler;
             _dragRecognizer.OnTapCandidate += OnTapCandidateHandler;
-            _dragRecognizer.OnDragEnded += pos => EndDrag();
+            _dragRecognizer.OnDragEnded += pos =>
+            {
+                if (_quickBubbleDrag)
+                {
+                    _quickBubbleDrag = false;
+                    _chatUI?.QuickBubbleHover(pos);   // 松手帧先刷新悬停（最后位移别漏判）再提交
+                    _chatUI?.EndQuickBubbles(true);   // 悬停中=发送，气泡外=收回不发
+                    return;
+                }
+                EndDrag();
+            };
             _dragRecognizer.StateChanged += (oldState, newState) =>
             {
-                // 双指起手取代单指（hub CancelSingles）或输入锁外的强制取消：拖拽物理收尾走同一路径
-                if (newState == GestureState.Cancelled) EndDrag();
+                // 双指起手取代单指（hub CancelSingles）或输入锁外的强制取消：拖拽物理收尾走同一路径；
+                // 快捷气泡拖拽被取消=收回不发送（2026-09-13）
+                if (newState == GestureState.Cancelled)
+                {
+                    if (_quickBubbleDrag)
+                    {
+                        _quickBubbleDrag = false;
+                        _chatUI?.EndQuickBubbles(false);
+                        return;
+                    }
+                    EndDrag();
+                }
             };
         }
 
@@ -272,11 +299,13 @@ namespace GIC.Pet
 
             // ②聊天输入期：点击"对话元素（输入条/气泡）以外"任何地方=关闭对话（2026-08-29 用户拍板：
             //   点派蒙=原有 Toggle 收起，点游戏其它区域同样收——含气泡判定，回看气泡时不误关）。
-            //   三连击进行中（点模型且计数≥2）不收起——第 3 击将触发切换
-            if (_chatUI != null && _chatUI.IsInputVisible
+            //   例外（2026-09-13 快捷消息）：按在派蒙身上不立即收——延后到抬起（原地快速松手=收起，
+            //   OnTapCandidateHandler 判）或拖拽升级（快捷气泡，OnDragBeganHandler 起）；
+            //   三连击进行中（计数≥2）照旧豁免（第 3 击将触发切换）
+            if (_chatUI != null && _chatUI.IsInputVisible && !_chatUI.QuickBubblesActive
                 && !_chatUI.IsPointOnInputBar(e.Position) && !_chatUI.IsPointOnBubble(e.Position))
             {
-                if (ShouldCloseChatOnClick(modelHit))
+                if (!modelHit && ShouldCloseChatOnClick(modelHit))
                 {
                     _chatUI.CloseChat();
                     _chatClosedByThisPress = true; // 本按下只关对话：不起拖/不判单击（旧分支② return 语义）
@@ -291,10 +320,18 @@ namespace GIC.Pet
             screenPos.x * _rt.width / Mathf.Max(1f, Screen.width),
             screenPos.y * _rt.height / Mathf.Max(1f, Screen.height));
 
-        /// <summary>拖拽起手（识别器宣胜：按住 150ms 或位移过 slop）：快照指针/骨盆 RT 位+根旋转基准
-        /// （收尾中被再抓不重取基准，防旋转叠加——桌面版语义）。物理组件喂 RT 像素系。</summary>
+        /// <summary>拖拽起手（识别器宣胜：按住 150ms 或位移过 slop）：对话开着=快捷消息气泡
+        /// （2026-09-13，派蒙不动，光标驱动悬停；无快捷消息=false=拖拽无动作——对话开着本就不
+        /// 允许普通拖拽）；对话关着=快照指针/骨盆 RT 位+根旋转基准（收尾中被再抓不重取基准，防
+        /// 旋转叠加——桌面版语义）。物理组件喂 RT 像素系。</summary>
         void OnDragBeganHandler(Vector2 screenPos)
         {
+            if (_chatUI != null && _chatUI.IsInputVisible)
+            {
+                _quickBubbleDrag = _chatUI.BeginQuickBubbles();
+                if (_quickBubbleDrag) ResetClickChain(); // 真实拖拽手势打断连击计次（防误触切换）
+                return;
+            }
             if (dragPhysics == null || _pelvis == null || petCamera == null) return;
             dragging = true;
             ResetClickChain(); // 真实拖拽打断连击计次（防误触切换）
@@ -308,6 +345,11 @@ namespace GIC.Pet
 
         void OnDragDeltaHandler(Vector2 delta, Vector2 screenPos)
         {
+            if (_quickBubbleDrag)
+            {
+                _chatUI?.QuickBubbleHover(screenPos); // 气泡拖拽：只喂悬停，不起物理
+                return;
+            }
             if (dragPhysics == null || !dragPhysics.IsActive) return;
             dragPhysics.DragFrame(ScreenToRT(screenPos), Time.unscaledDeltaTime);
             LiftPoseAngleFrame(true);   // 姿势旋转（基类：角平滑+挣扎+绕骨盆枢轴补偿）
@@ -323,12 +365,18 @@ namespace GIC.Pet
             dragPhysics?.Release();
         }
 
-        /// <summary>单击（早退点击候选：未过 150s 也未过 slop 即抬起）——立即开对话
+        /// <summary>单击（早退点击候选：未过 150s 也未过 slop 即抬起）——对话关着=立即开对话
         /// （2026-09-01 用户拍板"对话框立刻出现"；三连击兼容：第 1 击开输入条后，第 2 击在
-        /// OnPetPointerBegan 的关对话判定中被计数≥2 豁免，第 3 击触发切换）</summary>
+        /// OnPetPointerBegan 的关对话判定中被计数≥2 豁免，第 3 击触发切换）；
+        /// 对话开着=收起（2026-09-13 快捷消息改造：原"按下即收"延后到抬起，连击计数≥2 豁免）</summary>
         void OnTapCandidateHandler(Vector2 screenPos)
         {
             if (_chatClosedByThisPress) return; // 本次按下已关对话：不再 Toggle（旧一按只收起语义）
+            if (_chatUI != null && _chatUI.IsInputVisible)
+            {
+                if (ShouldCloseChatOnClick(true)) _chatUI.CloseChat();
+                return;
+            }
             _chatUI?.ToggleInput();
         }
 
@@ -575,12 +623,14 @@ namespace GIC.Pet
             return hitMeshCollider.Raycast(ray, out _, 100f);
         }
 
-        /// <summary>挡板穿透切换（桌面版 穿透切换帧 同构）：命中模型/拖拽中/捏合缩放中=可交互
+        /// <summary>挡板穿透切换（桌面版 穿透切换帧 同构）：命中模型/拖拽中/捏合缩放中/快捷气泡
+        /// 拖拽中（2026-09-13：光标在气泡上时也吃点击——免得主游戏 UI 抢走拖拽期光标）=可交互
         /// 挡板吃点击；其余区域点击穿透到主游戏 UI。</summary>
         void blockerToggleFrame(bool modelHit)
         {
             if (_eventBlocker == null) return;
-            bool want = modelHit || dragging || _pinching;
+            bool want = modelHit || dragging || _pinching
+                        || (_quickBubbleDrag && _chatUI != null && _chatUI.QuickBubblesActive);
             if (_eventBlocker.raycastTarget != want) _eventBlocker.raycastTarget = want;
         }
 

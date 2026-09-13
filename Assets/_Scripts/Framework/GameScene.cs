@@ -118,6 +118,9 @@ namespace GIC.Framework
             DeltaTime = Time.deltaTime;
             Wargame.Instance?.Update(DeltaTime);
 
+            // 主游戏窗口状态心跳（2026-09-13 快捷消息"启动游戏"：桌宠读它判活+启动后恢复窗口位）
+            GameWindowState.HeartbeatFrame();
+
             if (showMemoryUsage)
             {
                 LogMemoryUsage();
@@ -134,6 +137,9 @@ namespace GIC.Framework
 
         private void OnApplicationQuit()
         {
+            // 窗口状态终写（2026-09-13：退出瞬间的窗口位=下次启动恢复的"最后一次位置"）
+            GameWindowState.WriteNow();
+
             // 存档兜底（2026-09-05 时机优化）：退出前把标脏未落盘的变更立即写盘
             _saveManager?.SaveGameNow();
 
@@ -171,6 +177,17 @@ namespace GIC.Framework
 
             // 应用存档中的显示设置（语言/帧率/分辨率）
             SettingsApplier.ApplyFromSave(_saveManager?.CurrentSave);
+
+            // 窗口位置恢复（2026-09-13 快捷消息"启动游戏"）：记录的窗口化矩形摆回原位。
+            // 延迟一拍等 SetResolution 落地（Awake 期直接 SetWindowPos 可能被分辨率切换覆盖）
+            StartCoroutine(RestoreGameWindowDelayed());
+        }
+
+        /// <summary>窗口位置恢复延迟协程（0.2s 后单次执行，见 GameWindowState.RestoreWindowPosition）</summary>
+        private IEnumerator RestoreGameWindowDelayed()
+        {
+            yield return new WaitForSecondsRealtime(0.2f);
+            GameWindowState.RestoreWindowPosition();
         }
 
         private void InitializeSingleton()

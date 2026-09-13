@@ -129,12 +129,30 @@ namespace GIC.Pet
 
         // ==================== wish（派蒙自动抽卡） ====================
 
-        [GameCommand("wish", "抽卡", "wish <次数>", "自动抽卡（160 原石/次）", null)]
+        [GameCommand("wish", "抽卡", "wish <次数> [角色名]", "自动抽卡（160 原石/次，可选卡池）", nameof(WishSuggest))]
         private static CommandResult Wish(CommandArgs args)
         {
+            // 自适应解析（give 同款）：数字=次数、非数字=卡池角色名，两参顺序随意
             int count = 1;
-            if (args.Count > 0 && (!int.TryParse(args.Get(0), out count) || count < 1 || count > 10))
-                return CommandResult.Error("次数须为 1-10");
+            string poolToken = null;
+            foreach (var t in args.tokens)
+            {
+                if (int.TryParse(t, out int n))
+                {
+                    if (n < 1 || n > 10) return CommandResult.Error("次数须为 1-10");
+                    count = n;
+                }
+                else poolToken ??= t;
+            }
+
+            // 可选卡池（2026-09-13 快捷消息"抽温迪卡池10次"）：按角色名指定抽谁的池；
+            // 指定角色无卡池时由 PetWishAutoRunner 经反应通道报错，不偷偷换池
+            UnitName? poolUnit = null;
+            if (poolToken != null)
+            {
+                poolUnit = EnumNameResolver.ResolveUnit(poolToken);
+                if (poolUnit == null) return CommandResult.Error($"未知角色: {poolToken}");
+            }
 
             var gs = GameScene.Instance;
             if (gs == null) return CommandResult.Error("场景管理器未就绪");
@@ -162,10 +180,52 @@ namespace GIC.Pet
             if (have < cost)
                 return CommandResult.Error($"原石不足: 需 {cost}，持有 {have}");
 
-            if (!PetWishAutoRunner.Begin(count))
+            if (!PetWishAutoRunner.Begin(count, poolUnit))
                 return CommandResult.Error("抽卡进行中");
 
-            return CommandResult.Ok($"开始自动抽卡 ×{count}");
+            string pool = poolUnit != null ? $"（{EnumNameResolver.UnitDisplayName(poolUnit.Value)}池）" : "";
+            return CommandResult.Ok($"开始自动抽卡 ×{count}{pool}");
+        }
+
+        /// <summary>wish 参数补全：第 0 参=常用次数；第 1 参=角色名（按角色名指定卡池）</summary>
+        private static List<CommandSuggestion> WishSuggest(int argIndex, string partial)
+        {
+            var list = new List<CommandSuggestion>();
+            if (argIndex == 0)
+            {
+                foreach (var n in new[] { "1", "5", "10" })
+                    if (n.StartsWith(partial, StringComparison.OrdinalIgnoreCase))
+                        list.Add(new CommandSuggestion { main = n, hint = "次数", trailingSpace = true });
+            }
+            else if (argIndex == 1)
+            {
+                list.AddRange(EnumNameResolver.SuggestUnitNames(partial, 5));
+            }
+            return list;
+        }
+
+        // ==================== qm / start_game（2026-09-13 快捷消息） ====================
+
+        [GameCommand("qm", "快捷消息", "qm [add <消息> | set <序号> <消息> | del <序号> | clear]（无参=列表）", "快捷消息编辑（拖拽派蒙弹的气泡）", nameof(QmSuggest))]
+        private static CommandResult QuickMsg(CommandArgs args) => PetQuickMessages.Execute(args);
+
+        /// <summary>qm 参数补全：第 0 参=add/set/del/clear（消息原文是自由文本，第 1 参起不给补全）</summary>
+        private static List<CommandSuggestion> QmSuggest(int argIndex, string partial)
+        {
+            var list = new List<CommandSuggestion>();
+            if (argIndex != 0) return list;
+            foreach (var (op, hint) in new[] { ("add", "追加一条"), ("set", "按序号替换"), ("del", "按序号删除"), ("clear", "清空") })
+                if (op.StartsWith(partial, StringComparison.OrdinalIgnoreCase))
+                    list.Add(new CommandSuggestion { main = op, hint = hint, trailingSpace = true });
+            return list;
+        }
+
+        [GameCommand("start_game", "启动游戏", "start_game", "启动主游戏（桌宠侧有效）", null)]
+        private static CommandResult StartGame(CommandArgs args)
+        {
+            // 桌宠进程内由 PetLocalCommands 本地拦截执行（主游戏没开时 IPC 无消费者，到不了这里）；
+            // 走到这里=在游戏内/设置页执行——游戏显然已在运行
+            return CommandResult.Error("游戏已在运行");
         }
     }
 }

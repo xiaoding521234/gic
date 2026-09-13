@@ -83,6 +83,29 @@ namespace GIC.Pet.Chat
         [InspectorName("AnimateInputBar秒")]
         [SerializeField] private float inputFadeSec = 0.15f;
 
+        [Header("快捷消息气泡（对话开着时拖拽派蒙弹出，2026-09-13）")]
+        [Tooltip("气泡从身体中心飞出的时长（秒）")]
+        [InspectorName("飞出秒")]
+        [SerializeField] private float quickFlySec = 0.16f;
+        [Tooltip("多个气泡依次飞出的错峰间隔（秒）")]
+        [InspectorName("飞出间隔秒")]
+        [SerializeField] private float quickStaggerSec = 0.035f;
+        [Tooltip("气泡与派蒙身体边缘的水平间距（画布像素）")]
+        [InspectorName("气泡侧距")]
+        [SerializeField] private float quickSideGap = 26f;
+        [Tooltip("同列相邻气泡的垂直间距（画布像素）")]
+        [InspectorName("气泡行距")]
+        [SerializeField] private float quickRowGap = 16f;
+        [Tooltip("单个气泡高度（画布像素）")]
+        [InspectorName("气泡高")]
+        [SerializeField] private float quickChipH = 58f;
+        [Tooltip("气泡最大宽度（按文字自适应，超出省略号截断）")]
+        [InspectorName("气泡最大宽")]
+        [SerializeField] private float quickMaxW = 230f;
+        [Tooltip("气泡最小宽度")]
+        [InspectorName("气泡最小宽")]
+        [SerializeField] private float quickMinW = 96f;
+
         // ---- 运行时 ----
         private Canvas _canvas;
         private RectTransform _inputBarRoot;
@@ -164,6 +187,7 @@ namespace GIC.Pet.Chat
         /// 2026-08-31 改为淡出（输入条与气泡都有过渡动画）。</summary>
         public void CloseChat()
         {
+            EndQuickBubbles(false); // 快捷气泡随对话关闭收回（未在弹出中=无害 no-op）
             closeInput();
             if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
             StopThinking();
@@ -258,16 +282,7 @@ namespace GIC.Pet.Chat
                 }
             }
             if (_canvas == null) return; // 宿主接线前的防御（WireHost 未调用时恒静默——2026-08-30 桌面版窗口句柄事故：Start 提前 return 吞掉接线=此处每帧 NRE 刷屏 9.6 万条）
-            // 边界 bounds 必须与锚点/anchoredPosition 同空间（左下锚绝对空间）。
-            // 根画布 pivot 恒居中：RectTransform.rect 是枢轴中心局部空间（xMin=-w/2）——直接拿它当
-            // bounds 钳锚点=两空间错位（2026-09-13 实证：派蒙贴屏边时输入条被钳进画布中带、气泡同理，
-            // docs/14 §42）；画布自身在锚定空间恒为 (0,0,w,h)。
-            // 桌面 visibleBoundsProvider 的入参也只取宽高、输出本按左下空间构造——源头归一后契约一致。
-            var canvasLocal = (_canvas.transform as RectTransform).rect;
-            Rect canvasRect = new Rect(0f, 0f, canvasLocal.width, canvasLocal.height);
-            // 可见边界（2026-09-12 桌面边缘自适应）：宿主未注入=画布即边界（游戏内全屏画布）；
-            // 桌面注入"屏幕工作区映射到画布坐标系"的矩形——贴屏边/压任务栏的画布区域不算可用区
-            Rect bounds = visibleBoundsProvider != null ? visibleBoundsProvider(canvasRect) : canvasRect;
+            Rect bounds = CurrentBounds();
             // 回复气泡跟随头部锚点（拖拽/移动/动画头部都在动——每帧跟；按半宽钳回可见区内防贴边裁切）
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf && headAnchorProvider != null)
             {
@@ -281,6 +296,18 @@ namespace GIC.Pet.Chat
             }
             // 输入条跟随模型（开着才需要；翻转判定依赖气泡当前高度，故在气泡跟随之后算）
             if (_inputVisible && _inputBarRoot != null) FollowInputBar(bounds);
+        }
+
+        /// <summary>当前可见边界（气泡跟随/输入条跟随/快捷气泡布局共用）：画布矩形经宿主
+        /// visibleBoundsProvider 映射（桌面=屏幕工作区映射进画布系；游戏内未注入=画布即边界）。
+        /// **根画布 pivot 恒居中：RectTransform.rect 是枢轴中心局部空间（xMin=-w/2）——直接拿它当
+        /// bounds 钳锚点=两空间错位（2026-09-13 实证：派蒙贴屏边时输入条被钳进画布中带、气泡同理，
+        /// docs/14 §42）；画布自身在锚定空间恒为 (0,0,w,h)。**</summary>
+        Rect CurrentBounds()
+        {
+            var canvasLocal = (_canvas.transform as RectTransform).rect;
+            Rect canvasRect = new Rect(0f, 0f, canvasLocal.width, canvasLocal.height);
+            return visibleBoundsProvider != null ? visibleBoundsProvider(canvasRect) : canvasRect;
         }
 
         /// <summary>输入条跟随模型（每帧，输入开着时）：默认挂模型脚底下方（底部锚点=模型包围盒底
@@ -343,10 +370,9 @@ namespace GIC.Pet.Chat
                 session?.Prewarm();
             }
             _inputBarRoot.gameObject.SetActive(true);
-            var canvasRect0 = (_canvas.transform as RectTransform).rect;
             // 立即摆位防一帧闪旧位置——与 Update 同源走可见边界（2026-09-12：首摆曾直传画布矩形，
             // 桌面贴屏边时首帧会画在屏外）
-            FollowInputBar(visibleBoundsProvider != null ? visibleBoundsProvider(canvasRect0) : canvasRect0);
+            FollowInputBar(CurrentBounds());
             InputLocks.Push(this, InputLockReason.InputPopupEntering); // 输入期按键不漏进游戏
             AnimateInputBar(1f); // 淡入（2026-08-31）
             _inputField.text = "";
@@ -815,6 +841,271 @@ namespace GIC.Pet.Chat
             _slashSelected = -1;
             if (_slashPanel != null && _slashPanel.gameObject.activeSelf)
                 _slashPanel.gameObject.SetActive(false);
+        }
+
+        // ---- 快捷消息气泡（2026-09-13）：对话开着时在派蒙身上拖拽弹出（≤5），从身体中心
+        //      飞出到身旁左右两列；宿主喂数光标→悬停高亮；松手在气泡上=以输入条文本走既有
+        //      Send 全链路（/开头=指令回执直出、否则发 LLM），松手在气泡外=收回不发。
+        //      交互帧序（升格判定/松手提交）在两宿主，UI 与数据在此——铁律 13 共用层分工。 ----
+
+        private class QuickChip
+        {
+            public RectTransform rt;
+            public CanvasGroup cg;
+            public Image img;
+            public Vector2 center;   // 飞出原点（=身体中心，收回也回这里）
+            public Vector2 target;   // 展开目标位
+            public bool arrived;     // 飞出完成（之后悬停高亮才接管外观）
+        }
+
+        private readonly List<QuickChip> _quickChips = new List<QuickChip>();
+        private readonly List<string> _quickMessages = new List<string>();
+        private int _quickHover = -1;
+        private Coroutine _quickAnim;   // 飞出/收回动画（End 时停飞出起收回，互斥）
+
+        /// <summary>快捷气泡进行中（宿主据此接管交互帧：悬停喂数/松手提交，冻结拖拽判定）</summary>
+        public bool QuickBubblesActive { get; private set; }
+
+        /// <summary>弹出快捷气泡（宿主在"对话开着+在派蒙身上拖拽升级"时调）。
+        /// 无快捷消息/未接线/已在弹出中=false（宿主视为无动作——对话开着本就不允许普通拖拽）。
+        /// 每次弹出重读 pet.json（另一进程 qm 指令刚改完立即可见，PetPrefs 直读通道）。</summary>
+        public bool BeginQuickBubbles()
+        {
+            if (QuickBubblesActive || _canvas == null || _bubbleText == null) return false;
+            _quickMessages.Clear();
+            _quickMessages.AddRange(PetQuickMessages.ReadAll());
+            if (_quickMessages.Count == 0) return false;
+
+            if (_quickAnim != null) { StopCoroutine(_quickAnim); _quickAnim = null; }
+            ClearQuickChips();
+            QuickBubblesActive = true;
+            _quickHover = -1;
+
+            // 展开基准：身体中心=头/脚锚点中点；身体半宽按模型高估算（Q 版近方，0.30 偏保守）。
+            // 锚点未注入的异常态退回可见区中心（气泡照常弹出，位置略糙但不至于炸）
+            Rect bounds = CurrentBounds();
+            Vector2 center; float bodyHalfW;
+            if (headAnchorProvider != null && footAnchorProvider != null)
+            {
+                Vector2 head = headAnchorProvider();
+                Vector2 foot = footAnchorProvider();
+                center = new Vector2((head.x + foot.x) * 0.5f, (head.y + foot.y) * 0.5f);
+                bodyHalfW = Mathf.Max(60f, (head.y - foot.y) * 0.30f);
+            }
+            else
+            {
+                center = bounds.center;
+                bodyHalfW = Mathf.Max(60f, bounds.height * 0.10f);
+            }
+
+            // 左右两列均衡分布（右列先填：ceil(n/2)，多数人右手惯用），列内绕身体中心垂直居中
+            int n = _quickMessages.Count;
+            int rightCount = (n + 1) / 2;
+            float rowSpacing = quickChipH + quickRowGap;
+            for (int i = 0; i < n; i++)
+            {
+                bool right = i < rightCount;
+                int row = right ? i : i - rightCount;
+                int colCount = right ? rightCount : n - rightCount;
+                float yOff = (row - (colCount - 1) * 0.5f) * rowSpacing;
+
+                var chip = BuildQuickChip(i);
+                float dx = bodyHalfW + chip.rt.sizeDelta.x * 0.5f + quickSideGap;
+                Vector2 target = new Vector2(center.x + (right ? dx : -dx), center.y + yOff);
+                // 钳入可见边界（派蒙贴屏边时列位可能出界——宁可叠回身上不可不见）
+                target.x = Mathf.Clamp(target.x, bounds.xMin + chip.rt.sizeDelta.x * 0.5f + screenMargin,
+                                       bounds.xMax - chip.rt.sizeDelta.x * 0.5f - screenMargin);
+                target.y = Mathf.Clamp(target.y, bounds.yMin + quickChipH * 0.5f + screenMargin,
+                                       bounds.yMax - quickChipH * 0.5f - screenMargin);
+                chip.center = center;
+                chip.target = target;
+                chip.rt.anchoredPosition = center;   // 从身体中心起飞
+                chip.cg.alpha = 0f;
+                _quickChips.Add(chip);
+            }
+
+            _quickAnim = StartCoroutine(quickFlyOutRoutine());
+            return true;
+        }
+
+        /// <summary>悬停帧（宿主每帧喂数光标屏幕位）：命中已到位的气泡=高亮（金色调+微放大）。
+        /// 未到位的 chip 不参与（飞出途中光标多半还在身上，含入判定=误选）。</summary>
+        public void QuickBubbleHover(Vector2 screenPoint)
+        {
+            if (!QuickBubblesActive || _canvas == null) return;
+            int hit = -1;
+            for (int i = 0; i < _quickChips.Count; i++)
+            {
+                var c = _quickChips[i];
+                if (!c.arrived) continue;
+                if (RectTransformUtility.RectangleContainsScreenPoint(c.rt, screenPoint, _canvas.worldCamera))
+                {
+                    hit = i;
+                    break;
+                }
+            }
+            if (hit == _quickHover) return;
+            _quickHover = hit;
+            RefreshQuickHover();
+        }
+
+        /// <summary>结束快捷气泡（宿主松手调）：commit 且悬停在气泡上=把它当输入条文本走既有
+        /// Send 全链路（/开头=RunSlashCommand 回执直出，否则发 LLM——与手打完全同路零分叉）；
+        /// 其余（松手在气泡外/取消）=只收回。收回动画与回执/对话气泡并行，互不等待。</summary>
+        public void EndQuickBubbles(bool commit)
+        {
+            if (!QuickBubblesActive) return;
+            QuickBubblesActive = false;
+            string send = null;
+            if (commit && _quickHover >= 0 && _quickHover < _quickMessages.Count)
+                send = _quickMessages[_quickHover];
+            _quickHover = -1;
+
+            if (_quickAnim != null) { StopCoroutine(_quickAnim); _quickAnim = null; }
+            _quickAnim = StartCoroutine(quickRetractRoutine());
+
+            if (!string.IsNullOrEmpty(send))
+            {
+                _inputField.text = send;   // 走 Send 全链路（含忙碌守卫/斜杠分发/清文本保焦点）
+                Send();
+            }
+        }
+
+        /// <summary>屏幕点是否落在任一快捷气泡上（桌面版穿透判定用：气泡区窗口不穿透）</summary>
+        public bool IsPointOnQuickBubble(Vector2 screenPoint)
+        {
+            if (!QuickBubblesActive || _canvas == null) return false;
+            for (int i = 0; i < _quickChips.Count; i++)
+                if (RectTransformUtility.RectangleContainsScreenPoint(_quickChips[i].rt, screenPoint, _canvas.worldCamera))
+                    return true;
+            return false;
+        }
+
+        /// <summary>建一个快捷气泡 chip：九切片暖白底+深棕单行文字（超宽省略号截断）；
+        /// raycastTarget 全 false——悬停由宿主喂数光标判定，不占 EventSystem（与聊天气泡同纪律）</summary>
+        QuickChip BuildQuickChip(int index)
+        {
+            var go = new GameObject($"QuickChip{index}", typeof(RectTransform));
+            go.transform.SetParent(_canvas.transform, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = Vector2.zero;   // 左下锚：anchoredPosition 即画布绝对坐标（与气泡/输入条同约定）
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            var img = go.AddComponent<Image>();
+            img.sprite = bubbleSprite;
+            img.type = Image.Type.Sliced;
+            img.color = new Color(1f, 1f, 1f, 0.96f);
+            img.raycastTarget = false;
+            var cg = go.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+
+            var textObj = new GameObject("Text", typeof(RectTransform));
+            textObj.transform.SetParent(go.transform, false);
+            var textRect = textObj.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(14f, 0f);
+            textRect.offsetMax = new Vector2(-14f, 0f);
+            var tmp = textObj.AddComponent<TextMeshProUGUI>();
+            tmp.font = _inputField.fontAsset != null ? _inputField.fontAsset : TMP_Settings.defaultFontAsset;
+            tmp.fontSize = 22;
+            tmp.color = new Color(0.24f, 0.18f, 0.10f);   // 深棕文字（与聊天气泡同配色）
+            tmp.alignment = TextAlignmentOptions.Midline;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Ellipsis;
+            tmp.raycastTarget = false;
+            tmp.text = _quickMessages[index];   // 原样显示（含 / 前缀——斜杠可见，一眼区分指令行与普通文本消息）
+            tmp.ForceMeshUpdate();
+            float w = Mathf.Clamp(tmp.preferredWidth + 44f, quickMinW, quickMaxW);
+            rt.sizeDelta = new Vector2(w, quickChipH);
+            return new QuickChip { rt = rt, cg = cg, img = img };
+        }
+
+        /// <summary>悬停高亮刷新（金色调+微放大；-1=全部回常态色）</summary>
+        void RefreshQuickHover()
+        {
+            for (int i = 0; i < _quickChips.Count; i++)
+            {
+                bool hover = i == _quickHover;
+                _quickChips[i].img.color = hover
+                    ? new Color(1f, 0.92f, 0.66f, 0.98f)
+                    : new Color(1f, 1f, 1f, 0.96f);
+                if (_quickChips[i].arrived)
+                {
+                    float s = hover ? 1.07f : 1f;
+                    _quickChips[i].rt.localScale = new Vector3(s, s, 1f);
+                }
+            }
+        }
+
+        /// <summary>飞出动画：各 chip 依次（错峰 飞出间隔秒）从中心飞向目标位——位置 EaseOutCubic、
+        /// 缩放 0.5→1 带轻微过冲、alpha 0→1。到位后不再驱动（悬停高亮接管外观）。</summary>
+        IEnumerator quickFlyOutRoutine()
+        {
+            float t0 = Time.unscaledTime;
+            while (true)
+            {
+                bool anyFlying = false;
+                for (int i = 0; i < _quickChips.Count; i++)
+                {
+                    var c = _quickChips[i];
+                    if (c.arrived) continue;
+                    float k = Mathf.Clamp01((Time.unscaledTime - t0 - i * quickStaggerSec) / Mathf.Max(0.01f, quickFlySec));
+                    if (k < 1f) anyFlying = true;
+                    float e = 1f - Mathf.Pow(1f - k, 3f);   // EaseOutCubic
+                    c.rt.anchoredPosition = Vector2.Lerp(c.center, c.target, e);
+                    // 缩放过冲：0→1.12→1（k=1 精确收在 1）
+                    float pop = 1f + 0.12f * Mathf.Sin(Mathf.Clamp01(k * 1.25f) * Mathf.PI);
+                    float s = Mathf.Lerp(0.5f, 1f, e) * pop;
+                    c.rt.localScale = new Vector3(s, s, 1f);
+                    c.cg.alpha = k;
+                    if (k >= 1f)
+                    {
+                        c.arrived = true;
+                        c.rt.anchoredPosition = c.target;
+                        c.rt.localScale = Vector3.one;
+                        c.cg.alpha = 1f;
+                    }
+                }
+                if (!anyFlying) break;
+                yield return null;
+            }
+            _quickAnim = null;
+        }
+
+        /// <summary>收回动画：全部飞回身体中心+淡出后销毁。提交发送已在 EndQuickBubbles 同步完成，
+        /// 本动画纯视觉收尾——开始时 QuickBubblesActive 已置 false，宿主可正常交互。</summary>
+        IEnumerator quickRetractRoutine()
+        {
+            float el = 0f;
+            var starts = new List<Vector2>(_quickChips.Count);
+            for (int i = 0; i < _quickChips.Count; i++) starts.Add(_quickChips[i].rt.anchoredPosition);
+            while (el < fadeSec)
+            {
+                el += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(el / Mathf.Max(0.01f, fadeSec));
+                for (int i = 0; i < _quickChips.Count; i++)
+                {
+                    var c = _quickChips[i];
+                    c.rt.anchoredPosition = Vector2.Lerp(starts[i], c.center, k);
+                    c.rt.localScale = Vector3.one * Mathf.Lerp(1f, 0.6f, k);
+                    c.cg.alpha = 1f - k;
+                }
+                yield return null;
+            }
+            ClearQuickChips();
+            _quickAnim = null;
+        }
+
+        /// <summary>清全部 chip（编辑模式兜底 DestroyImmediate——程序化 UI 编辑器自检可安全收尾）</summary>
+        void ClearQuickChips()
+        {
+            for (int i = 0; i < _quickChips.Count; i++)
+                if (_quickChips[i].rt != null)
+                {
+                    if (Application.isPlaying) Destroy(_quickChips[i].rt.gameObject);
+                    else DestroyImmediate(_quickChips[i].rt.gameObject);
+                }
+            _quickChips.Clear();
         }
 
         /// <summary>打字机追加（流式增量逐段追加；间隔=0 直出）——新内容到达自动取消未完成的
