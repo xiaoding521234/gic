@@ -192,6 +192,11 @@ namespace GIC.Framework
 
         // ==================== 解析 ====================
 
+        /// <summary>归一化切分：去首尾空白、去可选 / 前缀、全角空格归一、按空白切分。
+        /// 公开版（TokenizeLine，2026-09-13）：宿主本地拦截（PetLocalCommands）等复用同一
+        /// 切分语义，勿另写一份导致本地表与注册表解析不一致。</summary>
+        public static string[] TokenizeLine(string input) => Tokenize(input);
+
         /// <summary>归一化切分：去首尾空白、去可选 / 前缀、全角空格归一、按空白切分</summary>
         private static string[] Tokenize(string input)
         {

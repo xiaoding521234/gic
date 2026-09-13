@@ -22,6 +22,14 @@ namespace GIC.Pet
     /// 读时内存迁移（下次落盘自动固化英文键），玩家存档零丢失。
     /// v6（2026-09-13）：对话密文按供应商分槽（chatCiphers，下标=PetChatProviders 表）——
     /// 切供应商各家 key 各自持久保留；旧单槽 chatCipher 读时迁移进当时供应商的槽位。
+    /// v7（2026-09-13 快捷消息气泡）：+quickMessages（拖拽派蒙弹出的快捷消息，≤5 条）+quickSeeded
+    /// （首次种子标记——区分"从未初始化"与"用户清空"，清空后不再回灌预设）。设置类字段同密文：
+    /// 走 ReadQuickMessages/WriteQuickMessages 磁盘读改写，Save() 落盘以磁盘现值为准。
+    /// v8（2026-09-13）：快捷消息预设追加"你好"（纯文本消息示例）——已种子化的 v7 老档由
+    /// PetQuickMessages.ReadAll 按 version&lt;8 一次性补齐，用户此后删除不回灌（预设内容属
+    /// PetQuickMessages 管，本类只负责 version 推进与直读）。
+    /// v9（2026-09-13 零迁移政策，docs/20 §1.6 拍板）：版本低于 9 的旧档不再迁移——直接按
+    /// 无存档重建默认档；旧键/分槽迁移链自此不可达，保留为死代码（剥离待拍板）。
     /// "单一派蒙不变量"（用户拍板：任何时刻只存在一个派蒙）：Mutex 保证桌面侧唯一，
     /// petForm 状态机保证桌面/游戏内互斥——文件无并发写者（游戏内+手动桌面同活的极罕见场景
     /// 靠防抖重写自愈，Demo 可接受）。
@@ -31,7 +39,7 @@ namespace GIC.Pet
         [Serializable]
         public class PetSave
         {
-            public int version = 6;
+            public int version = 9;  // v9=零迁移政策基线（2026-09-13，docs/20 §1.6）：当前版本；低于此=旧档重建
             // 桌面版（物理像素，虚拟桌面系）
             public float desktopScale = -1f;        // <0 = 无记录
             public int desktopClientX, desktopClientY;
@@ -51,6 +59,12 @@ namespace GIC.Pet
             public string chatCipher = "";      // 旧单槽（v3~v5）——只读迁移源，搬进分槽后不再有任何写入方
             public int chatProvider = 0;
             public List<string> chatCiphers = new List<string>();  // v6 分槽密文（下标=供应商表，空串=未设置）
+            // v7（2026-09-13 快捷消息气泡）：拖拽派蒙弹出的快捷消息（原文可含空格，/ 开头=指令行）。
+            // 编辑方=qm 指令（游戏内=主进程 CommandSystem，桌面=PetLocalCommands 本地拦截）——两进程
+            // 都经 WriteQuickMessages 磁盘读改写；读取方=气泡 UI（ReadQuickMessages 绕缓存=另一进程
+            // 刚改完立即可见）。quickSeeded 区分"从未初始化"（回灌预设）与"用户清空"（不再回灌）。
+            public List<string> quickMessages = new List<string>();
+            public bool quickSeeded = false;
         }
 
         /// <summary>v1-v4 旧档的中文/旧名 JSON 键镜像（**只读迁移用**——字段名必须与旧档 JSON 键
@@ -95,8 +109,8 @@ namespace GIC.Pet
         }
 
         /// <summary>落盘（易变状态路径：缩放/位置）。编辑器恒跳过（桌宠状态不入编辑器会话）。
-        /// 设置类字段（chatCipher/chatProvider）以磁盘现值为准（见 PetSave 字段注释）——
-        /// 本进程缓存可能是另一进程写入前的旧值。</summary>
+        /// 设置类字段（chatCipher/chatProvider/quickMessages——本进程缓存可能是另一进程写入前的旧值）
+        /// 以磁盘现值为准（见 PetSave 字段注释；quickMessages 同款跨进程陈旧覆写防护，2026-09-13）。</summary>
         public static void Save()
         {
 #if !UNITY_EDITOR
@@ -107,6 +121,8 @@ namespace GIC.Pet
                 data.chatCipher = disk.chatCipher;
                 data.chatProvider = disk.chatProvider;
                 data.chatCiphers = disk.chatCiphers;
+                data.quickMessages = disk.quickMessages;
+                data.quickSeeded = disk.quickSeeded;
                 WriteAtomic(JsonUtility.ToJson(data, true));
             }
             catch (Exception e)
@@ -176,6 +192,9 @@ namespace GIC.Pet
             }
             catch { /* 旧键段异常：按已解析的新键值继续 */ }
             MigrateChatCipherSlot(d);
+            // v9 零迁移版本门（2026-09-13 拍板，docs/20 §1.6）：版本低于 9=旧档，不迁移——
+            // 直接按无存档重建默认档（上方旧键/分槽迁移链自此不可达，保留为死代码、剥离待拍板）。
+            if (d.version < 9) return new PetSave();
             return d;
         }
 
@@ -259,6 +278,51 @@ namespace GIC.Pet
             catch (Exception e)
             {
                 Debug.LogWarning($"[PetPrefs] 供应商写入失败：{e.Message}");
+            }
+        }
+
+        // ---- 快捷消息直读直写通道（v7，2026-09-13；跨进程新鲜度同密文通道：绕缓存每次碰磁盘） ----
+
+        /// <summary>直读快捷消息（气泡 UI 每次展开时调用——另一进程 qm 指令刚改完立即可见）。
+        /// 文件缺失/损坏返回 null（调用方自决兜底）。</summary>
+        public static List<string> ReadQuickMessages()
+        {
+            var d = ReadDiskSave();
+            return d.quickMessages;
+        }
+
+        /// <summary>直读快捷消息种子标记（false=从未初始化，首次读取方负责回灌预设）</summary>
+        public static bool ReadQuickSeeded()
+        {
+            return ReadDiskSave().quickSeeded;
+        }
+
+        /// <summary>直读存档 schema 版本（PetQuickMessages 的预设升级迁移判据，v8=含"你好"预设）</summary>
+        public static int ReadVersion()
+        {
+            return ReadDiskSave().version;
+        }
+
+        /// <summary>写快捷消息（磁盘读改写：保留其它字段含另一进程刚落的缩放/位置/密文+同步进程缓存）。
+        /// **编辑器也生效**（同 WriteChatCipher：编辑器 qm 指令测试写的就是真实 pet.json，
+        /// 桌面桌宠与构建版立刻可见）。</summary>
+        public static void WriteQuickMessages(List<string> messages, bool seeded)
+        {
+            try
+            {
+                var d = ReadDiskSave();
+                d.quickMessages = messages ?? new List<string>();
+                d.quickSeeded = seeded;
+                WriteAtomic(JsonUtility.ToJson(d, true));
+                if (_cache != null)
+                {
+                    _cache.quickMessages = d.quickMessages;
+                    _cache.quickSeeded = d.quickSeeded;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PetPrefs] 快捷消息写入失败：{e.Message}");
             }
         }
     }

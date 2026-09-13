@@ -133,23 +133,44 @@ namespace GIC.UI
         /// 注意卡池可能仍为空——卡池界面首个角色未必绑定卡池（如 Columbina），由 EnsurePoolSelected 补选</summary>
         public bool IsBaseReady => _wishManager != null && !_isSwitching;
 
-        /// <summary>确保选中了绑定可用卡池的角色（AI 自动抽卡用，2026-08-30）：当前卡池有效则不动；
-        /// 否则选第一个绑定了卡池的角色（与手动点击角色按钮同路径——默认选中的首个角色可能无卡池，
-        /// 直接开抽会被卡池空守卫拒绝）。返回 false=没有任何角色绑定卡池。
-        /// 切换是异步协程（含面板淡出淡入）——调用后等 IsAutoDrawReady 变 true 再开抽。</summary>
-        public bool EnsurePoolSelected()
+        /// <summary>自动抽卡卡池选择结果（EnsurePoolSelected）</summary>
+        public enum PoolSelectResult
         {
-            if (_currentPool != null) return true;
+            Ready,          // 当前池可用或已切换到目标池
+            NoPoolAnywhere, // 没有任何角色绑定卡池
+            UnitHasNoPool,  // 指定角色未绑定卡池（有其它池也不偷换——用户点名要TA的池）
+        }
+
+        /// <summary>确保选中了绑定可用卡池的角色（AI 自动抽卡用）：当前池有效且（未指定角色或含指定角色）
+        /// 则不动；否则优先选含 preferUnit 的卡池角色，未指定时选第一个绑定了卡池的角色（与手动点击
+        /// 角色按钮同路径——默认选中的首个角色可能无卡池，直接开抽会被卡池空守卫拒绝）。
+        /// preferUnit 指定但全项目无该角色卡池=UnitHasNoPool（调用方报错，不偷换池，2026-09-13）。
+        /// 切换是异步协程（含面板淡出淡入）——调用后等 IsAutoDrawReady 变 true 再开抽。</summary>
+        public PoolSelectResult EnsurePoolSelected(UnitName? preferUnit = null)
+        {
+            if (_currentPool != null && (preferUnit == null || PoolContains(_currentPool, preferUnit.Value)))
+                return PoolSelectResult.Ready;
+            int fallback = -1;
             for (int i = 0; i < characters.Length; i++)
             {
-                if (characters[i] != null && characters[i].pool != null)
+                var c = characters[i];
+                if (c == null || c.pool == null) continue;
+                if (preferUnit != null && PoolContains(c.pool, preferUnit.Value))
                 {
                     SelectCharacter(i);
-                    return true;
+                    return PoolSelectResult.Ready;
                 }
+                if (fallback < 0) fallback = i;
             }
-            return false;
+            if (fallback < 0) return PoolSelectResult.NoPoolAnywhere;
+            if (preferUnit != null) return PoolSelectResult.UnitHasNoPool;
+            SelectCharacter(fallback);
+            return PoolSelectResult.Ready;
         }
+
+        /// <summary>卡池是否包含指定角色（角色名指定卡池的匹配判据）</summary>
+        static bool PoolContains(WishPoolConfig pool, UnitName unit) =>
+            pool != null && pool.units != null && pool.units.Contains(unit);
 
         /// <summary>AI 自动抽卡就绪：管理器已建 + 卡池已选 + 非切换中（Start 后默认角色选中完成）。
         /// 不含 IsWishInProgress——进行中由 TryStartAutoDraw 判 Busy</summary>

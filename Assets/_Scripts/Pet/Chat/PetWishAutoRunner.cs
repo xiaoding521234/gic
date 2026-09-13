@@ -68,17 +68,18 @@ namespace GIC.Pet.Chat
             if (_instance == this) _instance = null;
         }
 
-        /// <summary>开始一次自动抽卡（返回 false=已有执行中）</summary>
-        public static bool Begin(int count)
+        /// <summary>开始一次自动抽卡（返回 false=已有执行中）。preferUnit=按角色名指定卡池
+        /// （2026-09-13 快捷消息"抽温迪卡池10次"）；null=沿用当前/第一个可用卡池。</summary>
+        public static bool Begin(int count, UnitName? preferUnit = null)
         {
             var runner = Ensure();
             if (runner._running) return false;
             runner._running = true;
-            runner.StartCoroutine(runner.RunRoutine(count));
+            runner.StartCoroutine(runner.RunRoutine(count, preferUnit));
             return true;
         }
 
-        IEnumerator RunRoutine(int count)
+        IEnumerator RunRoutine(int count, UnitName? preferUnit)
         {
             var gs = GameScene.Instance;
 
@@ -109,12 +110,24 @@ namespace GIC.Pet.Chat
                 yield break;
             }
 
-            // 3. 当前卡池为空 → 自动选第一个绑定卡池的角色（与手动点击角色按钮同路径），
-            //    等切换协程完成（含面板淡出淡入）后卡池就位
-            if (!wish.EnsurePoolSelected())
+            // 3. 卡池就位：当前卡池为空/不含指定角色 → 切到目标角色的卡池（与手动点击角色按钮同路径），
+            //    等切换协程完成（含面板淡出淡入）后卡池就位。指定角色没有卡池=报错不偷换池（2026-09-13）
+            var poolResult = wish.EnsurePoolSelected(preferUnit);
+            if (poolResult != WishScreen.PoolSelectResult.Ready)
             {
-                Debug.LogWarning("[PetWish] 无可用卡池（所有角色均未绑定卡池）");
-                Reaction(AnimError, "你想帮旅行者抽卡，但现在的卡池都还没开放", "PetWishPoolEmpty");
+                if (poolResult == WishScreen.PoolSelectResult.UnitHasNoPool)
+                {
+                    string name = EnumNameResolver.UnitDisplayName(preferUnit.Value);
+                    Debug.LogWarning($"[PetWish] {name} 未绑定卡池");
+                    // fallback 键未进本地化表——desc 自身即兜底文案（Localize 查无回退原键）
+                    Reaction(AnimError, $"你想帮旅行者抽{name}的卡池，但TA的卡池都还没开放",
+                        $"你想帮旅行者抽{name}的卡池，但TA的卡池都还没开放");
+                }
+                else
+                {
+                    Debug.LogWarning("[PetWish] 无可用卡池（所有角色均未绑定卡池）");
+                    Reaction(AnimError, "你想帮旅行者抽卡，但现在的卡池都还没开放", "PetWishPoolEmpty");
+                }
                 _running = false;
                 yield break;
             }
