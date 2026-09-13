@@ -63,7 +63,17 @@ namespace GIC.UI
         private void OnRootSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
         {
             if (mode != UnityEngine.SceneManagement.LoadSceneMode.Single) return;
+            PoolAllForRootSwitch();
+        }
 
+        /// <summary>
+        /// 根切换强制清栈入池（2026-09-13 提取公共：Single 自动路径与 Additive 根切换路径共用）。
+        /// Additive 根切换（GameScene.SwitchRootScene）不触发 sceneLoaded 的 Single 分支，需显式调用。
+        /// 注意：本调用会 SetActive(false) 栈内面板——面板宿主上的协程随之停止，
+        /// 调用方不得在被清面板上持有待续协程（挂在 GameScene 上的嵌套协程不受影响）。
+        /// </summary>
+        internal void PoolAllForRootSwitch()
+        {
             for (int i = _stack.Count - 1; i >= 0; i--)
             {
                 var unit = _stack[i];

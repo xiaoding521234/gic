@@ -989,3 +989,28 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 交付 UI 布局类改动时，读回断言应包含根节点锚点（本次靠 dump 全树 RectTransform 一次定位）
 
 ---
+
+## 46. 程序化重组 UI 层级的三条 UGUI 陷阱（2026-09-13 加载页逐像素填充实证）
+
+**①子节点 SetParent 进新容器时 anchor 参照系不迁移**：原相对画布的锚（如 y=0.06="从底 6%"）移进 56px 高的 BottomBar 层后变成"距层底 3.4px"——整行图标被挤出层底边缘。**迁移层级必须逐节点重设层内锚**（y=0.5 居中等）。
+
+**②单边锚点节点的 pivot 必须与锚边一致**：动态宽度节点锚父左缘（anchorMin.x=anchorMax.x=0）时 pivot 默认 (0.5,0.5) 会让宽度增长以**中心**为轴对称外扩——RectMask2D 裁剪窗口（LitClip）一半跑到界外（实测 rect[-332,+332]）。**左缘锚定取 pivot=(0,0.5)**。
+
+**③inactive 对象不能 StartCoroutine**：`d.StartCoroutine(...)` 在 `d.gameObject.SetActive(false)` 状态下直接报 Error（Coroutine couldn't be started）——预热协程（激活两帧再隐藏）必须先 SetActive(true) 再 StartCoroutine。
+
+**规范**：程序化 prefab 重构脚本默认带"迁移后逐节点重锚+pivot 复核"读回断言；预热型协程先激活后启动。
+
+---
+
+## 47. 协程嵌套宿主被清栈禁用腰斩——根切换转场的锁泄漏（2026-09-13 Additive 卸载拆分实证）
+
+**现象**：开局转场 `yield return StartCoroutine(GameScene.SwitchRootScene(...))` 写在 CoopScreen 协程里，而 SwitchRootScene 中途 `PoolAllForRootSwitch` 会 `SetActive(false)` 清栈面板——**宿主面板一被禁用，挂它上面的整个协程链（含 StartCoroutine 嵌套的 SwitchRootScene）当场腰斩**：旧根 UnloadAsync 永不执行（场景残留）+ SceneTransition 锁永不释放（后续退战被"场景正在切换中"拦截）。
+
+**根因**：Unity 协程的生命周期=宿主 MonoBehaviour 的 active 状态；`StartCoroutine` 嵌套不改变宿主归属（谁 StartCoroutine 挂谁身上）。注释里写"嵌套协程宿主=GameScene 不受影响"是**意图**而非**事实**——实现必须显式 `GameScene.Instance.StartCoroutine(...)` 才真正挂到 GameScene。
+
+**规范**：
+- 转场/流程类协程**宿主选择是架构决策**：凡是会"干掉某些对象"的流程（清栈/入池/切场景），协程必须挂在流程中不会被禁用的宿主（GameScene/UIManager 等持久对象）上——`target.StartCoroutine` 显式指定
+- 嵌套 `yield return StartCoroutine(other)` 只表达"等它跑完"，**不转移宿主**；宿主死则全链死
+- 审查清单：协程内调用任何 SetActive(false)/入池/切场景的代码路径时，检查本协程宿主是否在受害名单里
+
+---
