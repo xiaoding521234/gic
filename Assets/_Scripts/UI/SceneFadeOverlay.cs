@@ -3,6 +3,8 @@
 // 加载页里，新场景就绪后由调用方 Reveal 揭幕。
 // 原神式加载页 prefab（用户拍板参考原神截图）——白底+势力徽标缓转（Cover 按所选地图
 // 换标）+词条文案（多条随机，点击换条）+元素图标点亮，布局见 Resources/Prefabs/LoadingOverlay.prefab。
+// 填充三段制（2026-09-13）：正常段 0→85% 卡点承载旋律 → 加载未完卡住（Reveal=真实加载完成
+// 放行）→ 扫尾 100% → 揭幕；保底≈旋律时长 ≤3s。
 // 淡入淡出时长统一 0.2s（2026-09-13 用户拍板）。
 using System.Collections;
 using UnityEngine;
@@ -62,11 +64,15 @@ namespace GIC.UI
             StartSafety(d);
         }
 
-        /// <summary>揭幕（新场景就绪时调用）。从未覆盖时纯 no-op（调试直开零副作用）。</summary>
+        /// <summary>
+        /// 揭幕（新场景就绪时调用）= 真实加载完成信号：放行加载条 85% 卡点 → 扫尾 → 淡出。
+        /// 从未覆盖时纯 no-op（调试直开零副作用——标志由下次 Cover 复位）。
+        /// </summary>
         public static void Reveal(float duration = 0.2f)
         {
             if (_driver == null) return; // 未 Cover 过 → 不创建不留痕
             StopSafety();
+            _driver.MarkLoadDone(); // 85% 卡点放行（若加载快于填充则无感直通扫尾）
             _driver.Reveal(duration);
         }
 
