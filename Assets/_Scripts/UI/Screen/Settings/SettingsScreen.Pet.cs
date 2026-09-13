@@ -37,9 +37,10 @@ namespace GIC.UI
 
         /// <summary>对话模型供应商（2026-08-29 多供应商支持，Spring AI 式"选供应商+填自己的 key"）：
         /// PetChatProviders 注册表（DeepSeek/Kimi/GLM/通义/OpenAI，全部 OpenAI 兼容）——玩家选一家、
-        /// 填该家的 key 即可对话，模型名/端点对玩家不可见。切换供应商=旧 key 对新家无效，清空密文
-        /// 引导重填（防静默 401——聊天报错文案比"看似已设置实则错 key"更可诊断）。注意 Setup 的
-        /// defaultValue 框架语义=Initialize() 的显示值——必须传当前存档值（2026-08-27 首测踩坑）。</summary>
+        /// 填该家的 key 即可对话，模型名/端点对玩家不可见。
+        /// 2026-09-13 分槽（用户拍板"每个 LLM 对应一个 key，持久保存"）：key 按供应商分槽持久，
+        /// 切换**不清 key**——显示直接切到该家自己的 key（已填=脱敏回显，未填=占位引导）。
+        /// 注意 Setup 的 defaultValue 框架语义=Initialize() 的显示值——必须传当前存档值（2026-08-27 首测踩坑）。</summary>
         private void InitPetProviderSetting()
         {
             var options = new List<TextEntry>();
@@ -50,51 +51,61 @@ namespace GIC.UI
 
             petProviderSetting.Setup("PetChatProvider", options, current, (index) =>
             {
-                if (index == _saveManager.CurrentSave.pet.petChatProvider) return; // 同项重选不触发清 key
-                _saveManager.Modify(s =>
-                {
-                    s.pet.petChatProvider = index;
-                    s.pet.petApiKeyCipher = ""; // 旧 key 对新供应商无效
-                });
+                if (index == _saveManager.CurrentSave.pet.petChatProvider) return; // 同项重选不触发刷新
+                _saveManager.Modify(s => s.pet.petChatProvider = index);
                 GIC.Pet.PetPrefs.WriteChatProvider(index);
-                GIC.Pet.PetPrefs.WriteChatCipher("");
-                petApiKeySetting.UpdateValue(""); // 显示回"未设置"占位，引导填新家的 key
+                RefreshPetApiKeyDisplay(); // 显示切到该家自己的 key（已填=脱敏；未填=占位引导）
             });
             petProviderSetting.Initialize();
         }
 
         /// <summary>对话 API Key（2026-08-28 用户拍板：玩家自输自己的 key，不花开发者钱）：
-        /// 按钮→输入弹窗回显脱敏 key→确认后 AES 加密存 petApiKeyCipher（明文永不落盘，PetApiKeyCrypto）。
+        /// 按钮→输入弹窗回显脱敏 key→确认后 AES 加密存**当前供应商槽位**（明文永不落盘，PetApiKeyCrypto）。
         /// 显示=脱敏（前6+****+后4）；空=占位"未设置"。输入弹窗空值不触发回调（OnConfirm 拒空）——
         /// 清除 key 走删除存档或后续右键菜单，一期不做。
         /// 2026-08-29：落盘改走 PetPrefs.WriteChatCipher（磁盘读改写+编辑器也生效——旧走
         /// PetPrefs.Save() 在编辑器恒跳过=密文从未落盘，且跨进程陈旧缓存整体覆写会抹密文，
-        /// "重启后设置里有 key 但对话报未设置"两根因）；上限 64→200（OpenAI key 可超百字符）。</summary>
+        /// "重启后设置里有 key 但对话报未设置"两根因）；上限 64→200（OpenAI key 可超百字符）。
+        /// 2026-09-13：key 按供应商分槽（切供应商各家 key 各自持久，不再清空重输）。</summary>
         private void InitPetApiKeySetting()
         {
             petApiKeySetting.Setup("PetApiKey", "",
                 onClick: () =>
                 {
                     // 回显当前明文（弹窗内可见全 key——本机用户自己输的，回显方便核对改错）
-                    string currentPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.pet.petApiKeyCipher);
-                    ShowInputPanel(petApiKeySetting, currentPlain, (newValue) =>
+                    ShowInputPanel(petApiKeySetting, CurrentPetApiKeyPlain(), (newValue) =>
                     {
                         newValue = newValue.Trim();
                         string cipher = GIC.Pet.PetApiKeyCrypto.Encrypt(newValue);
-                        _saveManager.Modify(s => s.pet.petApiKeyCipher = cipher);   // 统一变更入口（2026-09-05 Modify 迁移）
-                        // 同步密文到 pet.json（桌面桌宠进程永不读主存档——靠这条共享通道取 key，
+                        _saveManager.Modify(s => s.pet.SetChatCipher(s.pet.petChatProvider, cipher));   // 统一变更入口（2026-09-05 Modify 迁移）：写当前供应商槽
+                        // 同步密文到 pet.json 同一供应商槽位（桌面桌宠进程永不读主存档——靠这条共享通道取 key，
                         // 密文传输安全；WriteChatCipher 磁盘读改写保留其它字段+编辑器也生效）
-                        GIC.Pet.PetPrefs.WriteChatCipher(cipher);
+                        GIC.Pet.PetPrefs.WriteChatCipher(_saveManager.CurrentSave.pet.petChatProvider, cipher);
                         petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(newValue));
                     }, "PetApiKeyInput", 200); // 上限 200：DeepSeek sk-35 字符，OpenAI sk-proj- 可超百字符（旧 64 会截断）
                 },
                 onValueConfirmed: null,
                 placeholderKey: "PetApiKeyNotSet");
             petApiKeySetting.Initialize();
-            // 初始显示：已设置=脱敏；未设置=占位（Initialize 走 LoadValue=defaultValue=""→占位键生效需手动刷新一次）
-            string storedPlain = GIC.Pet.PetApiKeyCrypto.Decrypt(_saveManager.CurrentSave.pet.petApiKeyCipher);
-            if (!string.IsNullOrEmpty(storedPlain))
-                petApiKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(storedPlain));
+            // 初始显示：当前供应商槽的 key（已设置=脱敏；未设置=占位）
+            RefreshPetApiKeyDisplay();
+        }
+
+        /// <summary>当前供应商槽位的明文 key（解密；未设置=空串）</summary>
+        private string CurrentPetApiKeyPlain()
+        {
+            var petData = _saveManager.CurrentSave.pet;
+            return GIC.Pet.PetApiKeyCrypto.Decrypt(petData.GetChatCipher(petData.petChatProvider));
+        }
+
+        /// <summary>刷新 API Key 行显示=当前供应商槽位的 key（已设置=脱敏回显；未设置=占位引导）。
+        /// 初始进界面与供应商切换两处共用。</summary>
+        private void RefreshPetApiKeyDisplay()
+        {
+            string plain = CurrentPetApiKeyPlain();
+            petApiKeySetting.UpdateValue(string.IsNullOrEmpty(plain)
+                ? ""
+                : GIC.Pet.PetApiKeyCrypto.MaskKey(plain));
         }
 
         /// <summary>派蒙形态：桌面版（仅 Windows）/ 游戏画面内版。切换即时生效（PetInGameHost 热切换；

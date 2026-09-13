@@ -142,7 +142,8 @@ namespace GIC.Framework
 #if UNITY_EDITOR
             // 开发 key 预填（2026-08-30）：编辑器新档自带对话 key（AES 加密后入档），删档测试后聊天免重输。
             // DevKey 的 const 声明在 UNITY_EDITOR 内——构建产物无此代码路径，导出的存档初始化恒为空 key。
-            pet.petApiKeyCipher = GIC.Pet.PetApiKeyCrypto.Encrypt(GIC.Pet.PetApiKeyCrypto.DevKey);
+            // 分槽（2026-09-13）：新档供应商恒 0=DeepSeek，DevKey 预填进 0 号槽。
+            pet.SetChatCipher(pet.petChatProvider, GIC.Pet.PetApiKeyCrypto.Encrypt(GIC.Pet.PetApiKeyCrypto.DevKey));
 #endif
         }
 
@@ -160,6 +161,11 @@ namespace GIC.Framework
             pet ??= new SavePetSettings();
             settings.keyBindings ??= new List<KeyBindingEntry>();
             pet.petApiKeyCipher ??= "";
+            // 单槽→分槽迁移（2026-09-13）：老档 key 搬进当时供应商的槽位，切供应商各家 key 各自保留。
+            // 幂等：分槽该槽已非空（搬过/玩家已设）则不动；旧单槽字段此后再无写入方。
+            if (!string.IsNullOrEmpty(pet.petApiKeyCipher)
+                && string.IsNullOrEmpty(pet.GetChatCipher(pet.petChatProvider)))
+                pet.SetChatCipher(pet.petChatProvider, pet.petApiKeyCipher);
             progress.EnsureValid();
             MigrateFateItems();
         }
@@ -345,10 +351,36 @@ namespace GIC.Framework
         /// ——老档升级语义=桌面版，恰与"桌面版一直是唯一形态"的历史一致，无需版本迁移。安卓上 0 由读取侧钳为 1（Win32 不适用）。</summary>
         public int petForm = 0;
 
-        /// <summary>派蒙对话 API Key 密文（AES-128-CBC+设备指纹派生密钥，Base64(iv+ct)；空串=未设置。
-        /// 2026-08-28 用户拍板：玩家自输自己的 key，存档加密存储——明文永不落盘。
-        /// 加解密/脱敏一律走 PetApiKeyCrypto，勿直接读此字段。</summary>
+        /// <summary>派蒙对话 API Key 密文·按供应商分槽（2026-09-13 取代单槽：切供应商各家 key 各自
+        /// 持久保留，不再清空重输）。下标=PetChatProviders 表（只增不删不重排，表尾追加新供应商），
+        /// 空串=未设置。加解密/脱敏一律走 PetApiKeyCrypto，勿绕过 helpers 直读写列表。
+        /// 双通道同步：本列表（主存档，设置界面回显）+ pet.json chatCiphers（桌面进程读取通道）。</summary>
+        public List<string> petApiKeyCiphers = new List<string>();
+
+        /// <summary>旧单槽密文（2026-08-28~2026-09-13）——只读迁移源：EnsureValid 搬进分槽列表后
+        /// 不再有任何写入方。保留字段防老档解析丢 key（JsonUtility 缺字段保留初始化器）。</summary>
         public string petApiKeyCipher = "";
+
+        /// <summary>取指定供应商的密文（越界钳 0=DeepSeek；列表懒补齐到该槽）</summary>
+        public string GetChatCipher(int provider)
+        {
+            int slot = ClampCipherSlot(provider);
+            var list = petApiKeyCiphers ??= new List<string>();
+            while (list.Count <= slot) list.Add("");
+            return list[slot] ?? "";
+        }
+
+        /// <summary>写指定供应商的密文（越界钳 0=DeepSeek；列表懒补齐到该槽）</summary>
+        public void SetChatCipher(int provider, string cipher)
+        {
+            int slot = ClampCipherSlot(provider);
+            var list = petApiKeyCiphers ??= new List<string>();
+            while (list.Count <= slot) list.Add("");
+            list[slot] = cipher ?? "";
+        }
+
+        private static int ClampCipherSlot(int provider) =>
+            provider >= 0 && provider < GIC.Pet.Chat.PetChatProviders.table.Length ? provider : 0;
 
         /// <summary>派蒙对话供应商（PetChatProviders 表下标，0=DeepSeek；2026-08-29 多供应商支持）。
         /// JsonUtility 对缺失字段反序列化为默认值 0——老档升级语义=DeepSeek，与历史唯一供应商一致，无需迁移。

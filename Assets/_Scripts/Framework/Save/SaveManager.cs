@@ -319,7 +319,9 @@ namespace GIC.Framework
             // 开发 key 同步落 pet.json（2026-08-30）：聊天客户端每请求 PetPrefs.ReadChatCipher 直读
             // pet.json 密文——只写主存档不写 pet.json 的话编辑器/桌宠构建版聊天仍报未设置 key。
             // 编辑器与构建共享 persistentDataPath+同机设备指纹=密文互通。构建产物无此代码路径。
-            GIC.Pet.PetPrefs.WriteChatCipher(CurrentSave.pet.petApiKeyCipher);
+            // 分槽（2026-09-13）：DevKey 预填在新档供应商槽位（新档恒 0=DeepSeek），pet.json 同槽。
+            GIC.Pet.PetPrefs.WriteChatCipher(CurrentSave.pet.petChatProvider,
+                CurrentSave.pet.GetChatCipher(CurrentSave.pet.petChatProvider));
 #endif
             SaveGameNow();
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -19,6 +20,8 @@ namespace GIC.Pet
     /// v3（2026-08-28）：+对话密文；v4（2026-08-29）：+对话供应商（多供应商支持）。
     /// v5（2026-08-31 命名规范）：JSON 键全量英文化——v1-v4 中文键旧档经 ParseAndMigrate
     /// 读时内存迁移（下次落盘自动固化英文键），玩家存档零丢失。
+    /// v6（2026-09-13）：对话密文按供应商分槽（chatCiphers，下标=PetChatProviders 表）——
+    /// 切供应商各家 key 各自持久保留；旧单槽 chatCipher 读时迁移进当时供应商的槽位。
     /// "单一派蒙不变量"（用户拍板：任何时刻只存在一个派蒙）：Mutex 保证桌面侧唯一，
     /// petForm 状态机保证桌面/游戏内互斥——文件无并发写者（游戏内+手动桌面同活的极罕见场景
     /// 靠防抖重写自愈，Demo 可接受）。
@@ -28,7 +31,7 @@ namespace GIC.Pet
         [Serializable]
         public class PetSave
         {
-            public int version = 5;
+            public int version = 6;
             // 桌面版（物理像素，虚拟桌面系）
             public float desktopScale = -1f;        // <0 = 无记录
             public int desktopClientX, desktopClientY;
@@ -36,16 +39,18 @@ namespace GIC.Pet
             // 游戏画面内版（UI 归一化坐标 0..1，分辨率无关）
             public float ingameScale = -1f;      // <0 = 无记录
             public float ingamePosX = -1f, ingamePosY = -1f; // <0 = 无记录
-            // v3（2026-08-28 对话功能）+ v4（2026-08-29 多供应商）：
-            // 对话 API Key 密文（PetApiKeyCrypto AES+设备指纹）与供应商索引（PetChatProviders 表下标）。
-            // 写入方=设置界面（主进程，同步写主存档与 pet.json）；读取方=两形态的聊天客户端——
-            // 桌面进程永不读主存档（双进程铁律），靠 pet.json 这条既有共享通道拿密文（加密态传输安全）。
-            // **这两个是"设置类"字段（非易变状态）：只经 WriteChatCipher/WriteChatProvider 磁盘读改写，
+            // v3（2026-08-28 对话功能）+ v4（2026-08-29 多供应商）+ v6（2026-09-13 分槽）：
+            // 对话 API Key 密文按供应商分槽（PetApiKeyCrypto AES+设备指纹；下标=PetChatProviders 表），
+            // 供应商索引=chatProvider。写入方=设置界面（主进程，同步写主存档与 pet.json）；读取方=两形态的
+            // 聊天客户端——桌面进程永不读主存档（双进程铁律），靠 pet.json 这条既有共享通道拿密文
+            //（加密态传输安全）。
+            // **这些是"设置类"字段（非易变状态）：只经 WriteChatCipher/WriteChatProvider 磁盘读改写，
             // Save()（易变状态路径）落盘前一律以磁盘现值为准**——防跨进程陈旧缓存整体覆写抹掉密文
             //（2026-08-29 实证：桌面进程先启动缓存了无密文档，用户在主进程设 key 后桌面进程一次
             // 滚轮缩放落盘=密文被抹，重启后"设置里有 key 但对话报未设置"）。
-            public string chatCipher = "";
+            public string chatCipher = "";      // 旧单槽（v3~v5）——只读迁移源，搬进分槽后不再有任何写入方
             public int chatProvider = 0;
+            public List<string> chatCiphers = new List<string>();  // v6 分槽密文（下标=供应商表，空串=未设置）
         }
 
         /// <summary>v1-v4 旧档的中文/旧名 JSON 键镜像（**只读迁移用**——字段名必须与旧档 JSON 键
@@ -101,6 +106,7 @@ namespace GIC.Pet
                 var disk = ReadDiskSave();
                 data.chatCipher = disk.chatCipher;
                 data.chatProvider = disk.chatProvider;
+                data.chatCiphers = disk.chatCiphers;
                 WriteAtomic(JsonUtility.ToJson(data, true));
             }
             catch (Exception e)
@@ -169,12 +175,42 @@ namespace GIC.Pet
                 }
             }
             catch { /* 旧键段异常：按已解析的新键值继续 */ }
+            MigrateChatCipherSlot(d);
             return d;
         }
 
-        /// <summary>直读对话密文（聊天客户端每次请求调用——低频操作，小文件读+AES 解密开销可忽略；
-        /// 绕缓存=另一进程刚写入的 key 立即可见，且天然"改 key 即生效"）</summary>
-        public static string ReadChatCipher() => ReadDiskSave().chatCipher;
+        /// <summary>单槽→分槽迁移（v6）：旧 chatCipher 搬进当时供应商（chatProvider）的槽位。
+        /// 幂等：该槽已非空（搬过/玩家已设）则不动；此后旧字段不再被写入。
+        /// 槽位懒补齐——供应商表只增不删，新供应商表尾追加时旧档自然扩容。</summary>
+        static void MigrateChatCipherSlot(PetSave d)
+        {
+            if (string.IsNullOrEmpty(d.chatCipher)) return;
+            int slot = ClampProviderSlot(d.chatProvider);
+            var list = d.chatCiphers ??= new List<string>();
+            while (list.Count <= slot) list.Add("");
+            if (string.IsNullOrEmpty(list[slot])) list[slot] = d.chatCipher;
+        }
+
+        /// <summary>供应商索引→分槽下标（越界/负值钳 0=DeepSeek，与 PetChatProviders.Resolve 一致）</summary>
+        static int ClampProviderSlot(int provider) =>
+            provider >= 0 && provider < Chat.PetChatProviders.table.Length ? provider : 0;
+
+        /// <summary>取存档中指定供应商槽位的密文（列表懒补齐）</summary>
+        static string CipherOfSlot(PetSave d, int provider)
+        {
+            int slot = ClampProviderSlot(provider);
+            var list = d.chatCiphers ??= new List<string>();
+            while (list.Count <= slot) list.Add("");
+            return list[slot] ?? "";
+        }
+
+        /// <summary>直读**当前供应商（chatProvider）槽位**的对话密文（聊天客户端每次请求调用——低频操作，
+        /// 小文件读+AES 解密开销可忽略；绕缓存=另一进程刚写入的 key 立即可见，且天然"改 key 即生效"）</summary>
+        public static string ReadChatCipher()
+        {
+            var d = ReadDiskSave();
+            return CipherOfSlot(d, d.chatProvider);
+        }
 
         /// <summary>直读对话供应商索引（PetChatProviders 表下标；非法值钳 0）</summary>
         public static int ReadChatProvider()
@@ -183,18 +219,26 @@ namespace GIC.Pet
             return d.chatProvider >= 0 ? d.chatProvider : 0;
         }
 
-        /// <summary>写对话密文：磁盘读改写（保留其它字段——含另一进程刚落的缩放/位置）+ 同步进程缓存。
+        /// <summary>写对话密文（分槽，2026-09-13）：写进指定供应商槽位，其它供应商的 key 不受影响——
+        /// 磁盘读改写（保留其它字段——含另一进程刚落的缩放/位置）+ 同步进程缓存。
         /// **编辑器也生效**（无 #if 门）——key 是玩家设置不是易变桌宠状态，且编辑器与构建共享
         /// persistentDataPath：编辑器会话里设的 key 必须落盘，构建版才拿得到（2026-08-29 实证：
         /// 旧代码走 Save() 在编辑器恒跳过=密文从未落盘，导出后"设置里有 key 对话报未设置"）。</summary>
-        public static void WriteChatCipher(string cipher)
+        public static void WriteChatCipher(int provider, string cipher)
         {
             try
             {
                 var d = ReadDiskSave();
-                d.chatCipher = cipher ?? "";
+                int slot = ClampProviderSlot(provider);
+                var list = d.chatCiphers ??= new List<string>();
+                while (list.Count <= slot) list.Add("");
+                list[slot] = cipher ?? "";
                 WriteAtomic(JsonUtility.ToJson(d, true));
-                if (_cache != null) _cache.chatCipher = d.chatCipher;
+                if (_cache != null)
+                {
+                    _cache.chatCiphers = d.chatCiphers;
+                    _cache.chatCipher = d.chatCipher;
+                }
             }
             catch (Exception e)
             {
