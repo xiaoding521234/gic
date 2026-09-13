@@ -14,6 +14,15 @@ namespace GIC.UI
 
     public partial class BackpackScreen
     {
+        [Header("编辑面板动画")]
+        [SerializeField] private float 编辑面板滑入偏移 = 100f;
+        [SerializeField] private float 编辑面板滑动时长 = 0.2f;
+        [SerializeField]
+        private AnimationCurve 编辑面板滑动曲线 = new AnimationCurve(
+            new Keyframe(0, 0, 2f, 2f),
+            new Keyframe(1, 1, 0f, 0f)
+        );
+
         // 编辑面板动画
         private RectTransform editDetailsPanelRect;
         private Vector2 editDetailsPanelTargetPos;
@@ -102,7 +111,7 @@ namespace GIC.UI
             if (editDetailsPanel != null)
             {
                 editDetailsPanel.SetActive(true);
-                editDetailsPanelRect.anchoredPosition = editDetailsPanelTargetPos + Vector2.down * panelSlideOffset;
+                editDetailsPanelRect.anchoredPosition = editDetailsPanelTargetPos + Vector2.down * 编辑面板滑入偏移;
                 if (editPanelAnimCoroutine != null) StopCoroutine(editPanelAnimCoroutine);
                 editPanelAnimCoroutine = StartCoroutine(SlideEditPanel(true));
             }
@@ -142,16 +151,16 @@ namespace GIC.UI
 
             float elapsed = 0f;
             Vector2 startPos = slideIn
-                ? editDetailsPanelTargetPos + Vector2.down * panelSlideOffset
+                ? editDetailsPanelTargetPos + Vector2.down * 编辑面板滑入偏移
                 : editDetailsPanelTargetPos;
             Vector2 endPos = slideIn
                 ? editDetailsPanelTargetPos
-                : editDetailsPanelTargetPos + Vector2.down * panelSlideOffset;
+                : editDetailsPanelTargetPos + Vector2.down * 编辑面板滑入偏移;
 
-            while (elapsed < panelSlideDuration)
+            while (elapsed < 编辑面板滑动时长)
             {
                 elapsed += Time.deltaTime;
-                float t = slideCurve.Evaluate(elapsed / panelSlideDuration);
+                float t = 编辑面板滑动曲线.Evaluate(elapsed / 编辑面板滑动时长);
                 editDetailsPanelRect.anchoredPosition = Vector2.Lerp(startPos, endPos, t);
                 yield return null;
             }

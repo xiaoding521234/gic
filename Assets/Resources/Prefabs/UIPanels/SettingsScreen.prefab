@@ -1011,6 +1011,7 @@ GameObject:
   serializedVersion: 7
   m_Component:
   - component: {fileID: 4152721347873460490}
+  - component: {fileID: 4590045790880970092}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: SettingsScreen
@@ -1036,6 +1037,61 @@ Transform:
   - {fileID: 5322410395496686297}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4590045790880970092
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 618119818221288652}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dd92ebd336040744a2484808e33bbda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u6A21\u7CCA\u5C42": {fileID: 5465651776661885017}
+  "\u5185\u5BB9\u5143\u7D20":
+  - "\u5143\u7D20": {fileID: 4719653862068018727}
+    "\u65B9\u5411": 1
+    "\u504F\u79FB": 80
+  - "\u5143\u7D20": {fileID: 9137703513551653675}
+    "\u65B9\u5411": 3
+    "\u504F\u79FB": 100
+  - "\u5143\u7D20": {fileID: 2596555238407912561}
+    "\u65B9\u5411": 2
+    "\u504F\u79FB": 50
+  "\u81EA\u52A8\u6536\u96C6\u5185\u5BB9": 0
+  "\u5185\u5BB9\u5BB9\u5668": {fileID: 0}
+  "\u989D\u5916\u5143\u7D20": []
+  "\u5185\u5BB9\u6DE1\u5165\u7EC4":
+  - {fileID: 1464652495369683808}
+  "\u6DE1\u5165\u7EC4\u5165\u573A\u6DE1\u5165": 1
+  "\u6ED1\u52A8\u65F6\u957F": 0.2
+  "\u6ED1\u52A8\u66F2\u7EBF":
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 2
+      outSlope: 2
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  "\u9ED8\u8BA4\u5185\u5BB9\u504F\u79FB": 60
 --- !u!1 &701946486823877401
 GameObject:
   m_ObjectHideFlags: 0
@@ -1228,10 +1284,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a313a825c08cd747b92a6965235e204, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  topPanel: {fileID: 7143717132696430599}
   titleText: {fileID: 2442353238779049936}
   closeButton: {fileID: 2884607766049464540}
-  leftPanel: {fileID: 3840689410808298129}
   select: {fileID: 2488208785437548116}
   displayButton: {fileID: 7690972426410688717}
   displayButtonText: {fileID: 6210102337099509199}
@@ -1245,8 +1299,6 @@ MonoBehaviour:
   petButtonText: {fileID: 2217042211044485405}
   otherButton: {fileID: 51552527713632615}
   otherButtonText: {fileID: 4333099734270880869}
-  centerPanel: {fileID: 2986038813878723967}
-  centerGroup: {fileID: 1464652495369683808}
   displaySettings: {fileID: 5402719626991861959}
   languageSetting: {fileID: 9015064165356547470}
   resolutionSetting: {fileID: 1863751651141141355}
@@ -1270,34 +1322,7 @@ MonoBehaviour:
   petCloseSetting: {fileID: 3446581448641765084}
   petApiKeySetting: {fileID: 4984628737142772107}
   otherSettings: {fileID: 1113080382195505011}
-  panelSlideDuration: 0.2
-  slideCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 2
-      outSlope: 2
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  topPanelSlideOffset: 80
-  leftPanelSlideOffset: 100
-  centerFadeOffset: 50
+  "\u6BDB\u73BB\u7483\u52A8\u753B\u5668": {fileID: 4590045790880970092}
   inputPopupPrefab: {fileID: 5786617238283984623, guid: f8a2592b6eb832e419fbee6d0c66dc11, type: 3}
 --- !u!1 &1000279707449292921
 GameObject:

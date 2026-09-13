@@ -108,6 +108,7 @@ namespace GIC.UI
             _createRoomText?.SetSingleEntry(new LocalizedString("UIText", "CreateRoom"));
             _startGameText?.SetSingleEntry(new LocalizedString("UIText", "StartGame"));
             _leaveRoomText?.SetSingleEntry(new LocalizedString("UIText", "Back"));
+            // 动画目标位缓存由面板上的 GlassPanelAnimator 在自身 Awake 自动完成（§39）
         }
 
         // prefab 面板：静态身份（场景名寻址在面板实例化进宿主场景后失效，P2 定则）
@@ -126,20 +127,30 @@ namespace GIC.UI
 
         /// <summary>
         /// 每次打开（池化生命周期）：断开残留连接 + 音乐 + 房间状态机复位（旧场景制靠重载天然复位）
-        /// + 可见期事件绑定 + 发现流程启动。OnDisable 对称解绑（隐藏期不吃联机事件）。
+        /// + 可见期事件绑定 + 发现流程启动 + 入场动画。OnDisable 对称解绑（隐藏期不吃联机事件）。
         /// </summary>
         protected override void OnShow(object args)
         {
+            // 池化复位先行：状态直置必须早于 StopCurrentConnection——
+            // 停服的断连回调据此判定为空闲态，不误触列表↔房间的切换动画（屏级入场动画才是本帧主角）；
+            // 建房中标志/按钮复位兜上次会话 CancelInvoke 中断流程的残留
+            _currentState = RoomState.DisconnectedClient;
+            _startingHost = false;
+            SetCreateRoomBusy(false);
+
             StopCurrentConnection();
             PushMusicVolumeSafe();
 
-            SetRoomState(RoomState.DisconnectedClient);
+            SetRoomState(RoomState.DisconnectedClient); // 同态 → RefreshUI 即时刷新，无切换动画
 
             BindDiscoveryEvents();
             BindPlayerEvents();
             BindNetworkEvents();
 
             Invoke(nameof(InitializeDiscovery), 0.5f);
+
+            // 入场动画（docs/14 §37 ①）：起始态同帧设置防首帧闪现——公共组件驱动（锁/守卫在基类包装）
+            PlayEnterAnimation();
         }
 
         /// <summary>

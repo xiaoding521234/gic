@@ -1353,7 +1353,7 @@ MonoBehaviour:
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
-  m_sharedMaterial: {fileID: 0}
+  m_sharedMaterial: {fileID: -4192194038158232135, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
   m_fontSharedMaterials:
   - {fileID: 0}
   m_fontMaterial: {fileID: 0}
@@ -3203,6 +3203,7 @@ GameObject:
   serializedVersion: 7
   m_Component:
   - component: {fileID: 8286367060866080172}
+  - component: {fileID: 2834359973795614614}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: WishScreen
@@ -3229,6 +3230,61 @@ Transform:
   - {fileID: 1764043297210364462}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2834359973795614614
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5295381622657101297}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dd92ebd336040744a2484808e33bbda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u6A21\u7CCA\u5C42": {fileID: 0}
+  "\u5185\u5BB9\u5143\u7D20":
+  - "\u5143\u7D20": {fileID: 2613363782280190946}
+    "\u65B9\u5411": 1
+    "\u504F\u79FB": 200
+  - "\u5143\u7D20": {fileID: 5557745041659707879}
+    "\u65B9\u5411": 3
+    "\u504F\u79FB": 200
+  - "\u5143\u7D20": {fileID: 3512895037616931702}
+    "\u65B9\u5411": 2
+    "\u504F\u79FB": 200
+  "\u81EA\u52A8\u6536\u96C6\u5185\u5BB9": 0
+  "\u5185\u5BB9\u5BB9\u5668": {fileID: 0}
+  "\u989D\u5916\u5143\u7D20": []
+  "\u5185\u5BB9\u6DE1\u5165\u7EC4":
+  - {fileID: 2903555316681336503}
+  "\u6DE1\u5165\u7EC4\u5165\u573A\u6DE1\u5165": 1
+  "\u6ED1\u52A8\u65F6\u957F": 0.2
+  "\u6ED1\u52A8\u66F2\u7EBF":
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  "\u9ED8\u8BA4\u5185\u5BB9\u504F\u79FB": 60
 --- !u!1 &5393521758495007855
 GameObject:
   m_ObjectHideFlags: 0
@@ -3474,7 +3530,7 @@ MonoBehaviour:
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
-  m_sharedMaterial: {fileID: 0}
+  m_sharedMaterial: {fileID: -4192194038158232135, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
   m_fontSharedMaterials:
   - {fileID: 0}
   m_fontMaterial: {fileID: 0}
@@ -10012,36 +10068,7 @@ MonoBehaviour:
   wishClip: {fileID: 8300000, guid: 5cc0c0d29d4017e419045ace9043f0e3, type: 3}
   closeButton: {fileID: 205794515514924995}
   selector: {fileID: 5749747174804178243}
-  topPanel: {fileID: 2613363782280190946}
-  leftPanel: {fileID: 5557745041659707879}
-  bottomPanel: {fileID: 3512895037616931702}
-  panelCanvasGroup: {fileID: 2903555316681336503}
-  panelSlideDuration: 0.2
-  panelSlideDistance: 200
-  panelSlideCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 2
-      outSlope: 2
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  "\u6BDB\u73BB\u7483\u52A8\u753B\u5668": {fileID: 2834359973795614614}
   characters:
   - button: {fileID: 2761154764590417997}
     panel: {fileID: 5194581642181889793}

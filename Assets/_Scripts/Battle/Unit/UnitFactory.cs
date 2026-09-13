@@ -46,6 +46,20 @@ namespace GIC.Battle
         }
 
 
+        /// <summary>
+        /// 预热：实例化一枚单位立牌后即刻销毁——把 prefab 依赖的模型/材质/贴图等资产
+        /// 首次加载反序列化的同步成本（实测首枚 ~0.37s，2026-09-13 帧取证）吃进无感时机
+        /// （建房等待期），开局装配帧不再付。幂等：未初始化先 Initialize。
+        /// </summary>
+        public static void PreWarm()
+        {
+            Initialize();
+            if (_unitPrefab == null) return;
+            var probe = UnityEngine.Object.Instantiate(_unitPrefab);
+            UnityEngine.Object.Destroy(probe); // 依赖资产已进缓存，下次实例化仅克隆开销
+        }
+
+
         // ==================== 创建方法 ====================
 
         /// <summary>

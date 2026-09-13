@@ -165,14 +165,23 @@ namespace GIC.UI
         }
 
         /// <summary>
+        /// 当前选中的地图配置（下拉索引 ↔ _battleMaps 顺序）；空表返回 null
+        /// </summary>
+        internal BattleMapConfig GetSelectedMapConfig()
+        {
+            if (_battleMaps == null || _battleMaps.Count == 0) return null;
+            int index = boardDropdown != null ? boardDropdown.value : 0;
+            if (index < 0 || index >= _battleMaps.Count) index = 0;
+            return _battleMaps[index];
+        }
+
+        /// <summary>
         /// 当前选中的地图资产名（下拉索引 ↔ _battleMaps 顺序）
         /// </summary>
         internal string GetSelectedMapConfigName()
         {
-            if (_battleMaps == null || _battleMaps.Count == 0) return BattleLaunchConfig.DefaultMapName;
-            int index = boardDropdown != null ? boardDropdown.value : 0;
-            if (index < 0 || index >= _battleMaps.Count) index = 0;
-            return _battleMaps[index].name;
+            var map = GetSelectedMapConfig();
+            return map != null ? map.name : BattleLaunchConfig.DefaultMapName;
         }
 
         #endregion

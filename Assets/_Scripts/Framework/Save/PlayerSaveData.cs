@@ -61,9 +61,11 @@ namespace GIC.Framework
             RebuildOwnedCards();
         }
 
-        /// <summary>添加已拥有物品 —— 外部改库存的统一入口，自动失效 ownedCards 缓存</summary>
+        /// <summary>添加已拥有物品 —— 外部改库存的统一入口，自动失效 ownedCards 缓存；
+        /// 追加条目按 ItemConfig.maxStack 钳制（2026-09-13 持有上限启用）</summary>
         public void AddOwnedItem(SaveCardData card)
         {
+            card.count = Mathf.Min(card.count, GetItemMaxStack(card.id.AsItemName()));
             progress.ownedNormalItems.Add(card);
             RebuildOwnedCards();
         }
@@ -84,6 +86,8 @@ namespace GIC.Framework
         /// <summary>
         /// 增加物品数量（不存在则新建卡片），自动失效 ownedCards 缓存。
         /// 原石/星辉等货币变动的统一入口。
+        /// 持有钳制（2026-09-13 启用）：合并结果不超 ItemConfig.maxStack，已到顶再加静默封顶；
+        /// 新条目路径的钳制在 AddOwnedItem 内。
         /// </summary>
         public void AddItemCount(ItemName item, int amount)
         {
@@ -91,7 +95,7 @@ namespace GIC.Framework
             {
                 if (card.id.AsItemName() == item)
                 {
-                    card.count += amount;
+                    card.count = Mathf.Min(card.count + amount, GetItemMaxStack(item));
                     return;
                 }
             }
@@ -113,6 +117,14 @@ namespace GIC.Framework
                 }
             }
             return false;
+        }
+
+        /// <summary>ItemConfig.maxStack 持有上限查询（配置未注册/条目缺失时 int.MaxValue=不钳制）。
+        /// 存档数据对象无法走注入，静态入口同 SaveCardData.Config 先例（CardConfigResolver.Instance）。</summary>
+        private static int GetItemMaxStack(ItemName item)
+        {
+            var data = CardConfigResolver.Instance?.ItemConfig?.GetItemData(item);
+            return data != null ? data.maxStack : int.MaxValue;
         }
 
         /// <summary>

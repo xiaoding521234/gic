@@ -45,19 +45,9 @@ namespace GIC.UI
         public SkillDetailView skillDetailView;
         public CardDetailView cardDetailView;
 
-        [Header("动画")]
-        public GameObject topPanel;
-        public GameObject bottomPanel;
-        public CanvasGroup centerCanvasGroup;
-        public CanvasGroup cardDetailCanvasGroup;
-        [SerializeField] private float panelSlideDuration = 0.2f;
-        [SerializeField]
-        private AnimationCurve slideCurve = new AnimationCurve(
-            new Keyframe(0, 0, 2f, 2f),
-            new Keyframe(1, 1, 0f, 0f)
-        );
-        [SerializeField] private float panelSlideOffset = 100f;
-        [SerializeField] private float buttonSlideOffset = 80f;
+        [Header("面板动画")]
+        [Tooltip("毛玻璃动画公共组件（挂面板根，配方唯一实现）")]
+        [SerializeField] private GlassPanelAnimator 毛玻璃动画器;
 
         [Header("标签指示线")]
         [SerializeField] private Transform tabContainer;
@@ -108,8 +98,7 @@ namespace GIC.UI
             _cardClickedHandler = new CardClickedInEditHandler(this);
             EventBusHub.Instance.Subscribe(_cardClickedHandler, this);
 
-            CachePanelPositions();
-            CacheButtonPositions();
+            // 目标位缓存由公共组件 GlassPanelAnimator 在自身 Awake 自动完成（§39）
             CacheTabViews();
 
             for (int i = 0; i < cardContent.transform.childCount; i++)
@@ -131,12 +120,9 @@ namespace GIC.UI
         {
             PushMusicVolumeSafe();
 
-            // 起始态（docs/14 §37）：面板/按钮离屏 + 毛玻璃 fill=0 + CanvasGroup 复位
-            SetPanelsOffScreen();
-            SetButtonsOffScreen();
-            if (BlurBackdrop != null) BlurBackdrop.fillAmount = 0f;
-            if (centerCanvasGroup != null) centerCanvasGroup.alpha = 1f;
-            if (cardDetailCanvasGroup != null) cardDetailCanvasGroup.alpha = 1f;
+            // 起始态（docs/14 §37）：面板/按钮离屏 + 毛玻璃 fill=0 + 卡区不透明复位
+            // （淡入组入场淡入=False，入场保持不透明、仅退场淡出——公共组件承载）
+            if (毛玻璃动画器 != null) 毛玻璃动画器.SetEntryOffsets();
 
             // 池化状态复位（旧场景制靠场景重载天然复位，池化须手动）：
             // 分类回角色页、标签线贴位、编辑面板隐藏、卡组管理面板与技能详情面板关闭
@@ -150,7 +136,7 @@ namespace GIC.UI
             RefreshCardList();
             UpdateDeckBar();
 
-            StartCoroutine(PlaySlideInAnimation());
+            if (毛玻璃动画器 != null) StartCoroutine(PlayGlassEnter(毛玻璃动画器));
         }
 
         protected override void OnDestroy()

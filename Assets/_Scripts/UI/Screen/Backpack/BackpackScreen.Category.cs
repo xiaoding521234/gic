@@ -134,8 +134,8 @@ namespace GIC.UI
             {
                 ExitEditMode();
             }
-            // 标准关闭模板：防重入 + Closing 锁 + 音乐恢复 + 动画 + GoBack
-            CloseScreen(CloseWithAnimation);
+            // 标准关闭模板：防重入 + Closing 锁 + 音乐恢复 + 公共组件退场动画 + GoBack
+            CloseScreen(() => 毛玻璃动画器.ExitRoutine());
         }
     }
 

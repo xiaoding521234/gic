@@ -254,7 +254,8 @@ namespace GIC.UI
                     }
                     else
                     {
-                        card.count += addCount;
+                        // 统一入口：内部按 ItemConfig.maxStack 钳制持有上限（2026-09-13 启用）
+                        save.AddItemCount(cardId.AsItemName(), addCount);
                     }
                     save.RebuildOwnedCards();
                     return;

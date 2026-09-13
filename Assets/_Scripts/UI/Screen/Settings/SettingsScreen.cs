@@ -28,12 +28,10 @@ namespace GIC.UI
         protected override ScreenId Id => Screens.Settings;
 
         [Header("顶部")]
-        public GameObject topPanel;
         public TextCombiner titleText;
         public Button closeButton;
 
         [Header("左侧导航")]
-        public GameObject leftPanel;
         public RectTransform select;
         public Button displayButton;
         public TextCombiner displayButtonText;
@@ -47,10 +45,6 @@ namespace GIC.UI
         public TextCombiner petButtonText;
         public Button otherButton;
         public TextCombiner otherButtonText;
-
-        [Header("中央内容区")]
-        public GameObject centerPanel;
-        public CanvasGroup centerGroup;
 
         [Header("显示设置")]
         public GameObject displaySettings;
@@ -87,15 +81,9 @@ namespace GIC.UI
         [Header("其它设置")]
         public GameObject otherSettings;
 
-        [Header("动画")]
-        [SerializeField] private float panelSlideDuration = 0.2f;
-        [SerializeField] private AnimationCurve slideCurve = new AnimationCurve(
-            new Keyframe(0, 0, 2f, 2f),
-            new Keyframe(1, 1, 0f, 0f)
-        );
-        [SerializeField] private float topPanelSlideOffset = 80f;
-        [SerializeField] private float leftPanelSlideOffset = 100f;
-        [SerializeField] private float centerFadeOffset = 50f;
+        [Header("面板动画")]
+        [Tooltip("毛玻璃动画公共组件（挂面板根，配方唯一实现）")]
+        [SerializeField] private GlassPanelAnimator 毛玻璃动画器;
 
         [Header("输入弹窗")]
         [SerializeField] private InputPopupDialog inputPopupPrefab;
@@ -174,12 +162,12 @@ namespace GIC.UI
         /// </summary>
         protected override void OnShow(object args)
         {
-            // 起始态必须 OnShow（实例化/激活同帧）设置——首帧渲染不可见（docs/14 §37）
-            CacheAnimationPositions();
-            SetEntryOffsets();
+            // 起始态必须 OnShow（实例化/激活同帧）设置——首帧渲染不可见（docs/14 §37）；
+            // 目标位缓存/首帧跳过计时/锁与守卫全部由公共组件与基类包装承载
+            if (毛玻璃动画器 != null) 毛玻璃动画器.SetEntryOffsets();
 
             PushMusicVolumeSafe();
-            PlayEnterAnimation();
+            if (毛玻璃动画器 != null) StartCoroutine(PlayGlassEnter(毛玻璃动画器));
 
             // 延迟一帧初始化选中效果位置
             StartCoroutine(InitSelectPosition());
@@ -196,10 +184,10 @@ namespace GIC.UI
             otherButtonText.SetSingleEntry(new LocalizedString("UIText", "Other"));
         }
 
-        // ── IClosable 实现（标准关闭模板 + 退场动画） ──
+        // ── IClosable 实现（标准关闭模板 + 公共组件退场动画） ──
         public override void Close()
         {
-            CloseScreen(PlayExitAnimationCoroutine);
+            CloseScreen(() => 毛玻璃动画器.ExitRoutine());
         }
     }
 }

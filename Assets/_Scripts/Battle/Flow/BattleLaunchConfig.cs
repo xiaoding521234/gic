@@ -62,11 +62,12 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 单人开局：真人 + AI 补位对手（当前即可开一把；B7 换真人入座）
+        /// 单人开局配置（真人 + AI 补位对手；当前即可开一把；B7 换真人入座）。
+        /// 只构造不触发加载——预载路径（CoopScreen 预载+激活）用 Prepare 写入后再激活场景。
         /// </summary>
-        public static void LaunchSinglePlayer(string mapConfigName)
+        public static BattleLaunchConfig BuildSinglePlayer(string mapConfigName)
         {
-            Launch(new BattleLaunchConfig
+            return new BattleLaunchConfig
             {
                 MapConfigName = string.IsNullOrEmpty(mapConfigName) ? DefaultMapName : mapConfigName,
                 Players = new List<BattlePlayerSetup>
@@ -84,7 +85,13 @@ namespace GIC.Battle
                         IsAI = true,
                     },
                 },
-            });
+            };
+        }
+
+        /// <summary>以指定配置开战（同步启动加载协程）</summary>
+        public static void LaunchSinglePlayer(string mapConfigName)
+        {
+            Launch(BuildSinglePlayer(mapConfigName));
         }
     }
 }

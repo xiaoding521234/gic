@@ -139,6 +139,28 @@ namespace GIC.UI
         // ==================== 标准关闭流程 ====================
 
         /// <summary>
+        /// 毛玻璃入场动画统一包装（公共组件 GlassPanelAnimator 配套）：Entering 锁 +
+        /// isClosing 每帧守卫（秒开秒关即中止并释放锁，交由退场接管）+ 驱动组件入场协程。
+        /// 退场无需包装（Closing 锁由 CloseScreen 模板持有）：CloseScreen(() => animator.ExitRoutine())。
+        /// </summary>
+        protected IEnumerator PlayGlassEnter(GlassPanelAnimator animator)
+        {
+            if (animator == null) yield break;
+            InputLocks.Push(this, InputLockReason.Entering);
+            var routine = animator.EnterRoutine();
+            while (routine.MoveNext())
+            {
+                if (isClosing)
+                {
+                    InputLocks.Pop(this, InputLockReason.Entering);
+                    yield break;
+                }
+                yield return routine.Current;
+            }
+            InputLocks.Pop(this, InputLockReason.Entering);
+        }
+
+        /// <summary>
         /// 标准关闭模板：防重入 + Closing 输入锁 + 恢复音乐 + 可选退场动画 + 弹出。
         /// exitAnimation 只做动画本身（不要再 Pop/返回，模板统一收尾）；
         /// 为 null 时立即返回（转场期间输入由 PopToPrevious 的 SceneTransition 锁封锁）。
