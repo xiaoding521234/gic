@@ -175,11 +175,13 @@ namespace GIC.UI
         /// 开局转场（B1 单人开局：真人 + AI 补位对手，docs/22 §5；B7 LAN 时改为广播开战配置，
         /// 各端加载同一战斗场景，Host 权威，docs/18 决策一）：
         /// 加载页盖住 StopHost 拆除尖峰（0.2s 淡入，按所选地图换势力徽标+随机词条）→
-        /// **预载战斗场景**（LoadSceneAsync 分帧加载，加载页动画全程流畅不冻结——2026-09-13
-        /// 用户拍板"加载不阻塞"，模式照 MainHallScreen.ExitWithPreloadCoroutine 先例）→ 激活 →
-        /// BattleScreen.Start 装配完毕 Reveal 揭幕。
+        /// **Additive 根切换**（GameScene.SwitchRootScene：新根 Additive 加载+旧根 UnloadAsync 分帧
+        /// 卸载，2026-09-13 用户拍板"Additive 卸载拆分"——激活帧卸载风暴根治，加载页动画全程流畅）→
+        /// BattleScreen.Start 装配协程完毕 Reveal 揭幕。
         /// isClosing 同时拦下 StopHost 断连回调触发的切换动画（转场无需面板动画）。
-        /// 锁与标志随 Single 加载自动入池的 OnDisable PopAll / 下次 RaiseShow 自清。
+        /// 锁与标志随根切换清栈入池的 OnDisable PopAll / 下次 RaiseShow 自清；
+        /// 本协程宿主（本面板）会在清栈时被禁用——末行之后不得再有依赖代码
+        /// （yield return 的嵌套协程宿主=GameScene，不受本面板禁用影响）。
         /// </summary>
         private IEnumerator StartGameTransition()
         {
@@ -192,22 +194,13 @@ namespace GIC.UI
             // 只写开局配置（不触发加载）；BattleScreen.Start 激活后 Take() 消费
             BattleLaunchConfig.Prepare(BattleLaunchConfig.BuildSinglePlayer(GetSelectedMapConfigName()));
 
-            // 预载战斗场景：后台分帧加载场景资产，期间加载页动画（徽标缓转/填充扫描）持续渲染
-            AsyncOperation asyncLoad = null;
-            yield return StartCoroutine(GameScene.Instance.PreloadScene(SceneType.BattleScreen, op => asyncLoad = op));
-            if (asyncLoad == null)
-            {
-                InputLocks.Pop(this, InputLockReason.Closing);
-                isClosing = false;
-                GICLog.Error("[CoopScreen] 战斗场景预载失败");
-                SceneFadeOverlay.Reveal(0.2f);
-                yield break;
-            }
-
             // 主动释放 Closing 防 OnDisable 保险丝走"泄漏锁警告"噪音路径；
-            // ActivatePreloadedScene 首行同步压入 SceneTransition 锁（本行同帧执行）→ 无缝接管
+            // SwitchRootScene 首行同步压入 SceneTransition 锁（本行同帧执行）→ 无缝接管。
+            // 协程宿主必须是 GameScene：SwitchRootScene 中途 PoolAllForRootSwitch 会 SetActive(false)
+            // 本面板——挂本面板的协程（含 StartCoroutine 嵌套）会被腰斩，旧根卸载+放锁永不执行
             InputLocks.Pop(this, InputLockReason.Closing);
-            yield return GameScene.Instance.ActivatePreloadedScene(asyncLoad, SceneType.BattleScreen);
+            yield return GameScene.Instance.StartCoroutine(GameScene.Instance.SwitchRootScene(SceneType.BattleScreen));
+            // 本行仅供断言续行性（正常路径 GameScene 宿主协程自洽完成，本面板协程可能已随禁用终止）
         }
 
         void OnLeaveRoomClick()

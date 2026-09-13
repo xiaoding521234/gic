@@ -10,6 +10,7 @@ using GIC.Data;
 using GIC.Battle;
 using GIC.Tool;
 using GIC.Pet;
+using GIC.UI;
 namespace GIC.Framework
 {
 
@@ -378,6 +379,64 @@ namespace GIC.Framework
             {
                 GICLog.Error($"无法设置活动场景: {sceneName} 未加载");
             }
+        }
+
+        /// <summary>
+        /// 根场景 Additive 切换（2026-09-13 用户拍板"Additive 卸载拆分"）：
+        /// 新根 Additive 加载（旧根保留——新根 Awake 尖峰不再叠加旧根卸载风暴）→
+        /// 激活（状态更新+SetActiveScene+面板清栈）→ 旧根 UnloadAsync **分帧卸载**（每帧销毁一批，
+        /// 转场动画不冻结）。与 Single 路径的差异：激活帧只剩新根 Awake，实测卸载风暴占激活帧大头。
+        /// 前提约束：调用期间画面须已被加载页盖住（两根短暂并存会同渲）；
+        /// 面板清栈会停掉栈内面板宿主上的协程——调用方不得依赖被清面板上的后续协程（嵌套在本
+        /// 协程宿主 GameScene 上的不受影响）。Splash→MainHall、战斗退出回大厅暂保持 Single 路径
+        /// （无加载页盖场，Additive 同渲会穿帮——接 Additive 需先补遮盖方案，后续拍板）。
+        /// </summary>
+        public IEnumerator SwitchRootScene(SceneType newRoot)
+        {
+            if (InputLocks.HasLock(InputLockReason.SceneTransition))
+            {
+                GICLog.Warn("场景正在切换中，请稍后再试");
+                yield break;
+            }
+
+            InputLocks.Push(this, InputLockReason.SceneTransition);
+            string oldRootName = currentRootScene?.SceneName;
+
+            // 1. Additive 加载新根（旧根保留；分帧 IO/Awake）
+            AsyncOperation load = SceneManager.LoadSceneAsync(newRoot.SceneName, LoadSceneMode.Additive);
+            if (load == null)
+            {
+                GICLog.Error($"无法加载场景: {newRoot.SceneName}");
+                InputLocks.Pop(this, InputLockReason.SceneTransition);
+                yield break;
+            }
+            while (!load.isDone) yield return null;
+
+            // 2. 激活：状态更新（与 LoadSceneAsync/ValidateSceneActivation 同款）+ SetActiveScene + 面板清栈
+            CurrentScene = newRoot;
+            currentRootScene = newRoot;
+            Scene loadedScene = SceneManager.GetSceneByName(newRoot.SceneName);
+            if (loadedScene.isLoaded)
+                SceneManager.SetActiveScene(loadedScene);
+            else
+                GICLog.Error($"[SwitchRootScene] 新根未加载成功: {newRoot.SceneName}");
+            UIManager.Instance.PoolAllForRootSwitch();
+
+            // 3. 旧根分帧卸载（编辑器直开新根调试时旧根可能未加载——防御跳过）
+            if (!string.IsNullOrEmpty(oldRootName))
+            {
+                Scene oldScene = SceneManager.GetSceneByName(oldRootName);
+                if (oldScene.IsValid() && oldScene.isLoaded && oldRootName != newRoot.SceneName)
+                {
+                    AsyncOperation unload = SceneManager.UnloadSceneAsync(oldScene);
+                    if (unload != null)
+                        while (!unload.isDone) yield return null;
+                }
+            }
+
+            // 4. 缓冲一帧：让新根 Start()（装配协程等）跑起来再放锁（与 Single 路径节奏对齐）
+            yield return null;
+            InputLocks.Pop(this, InputLockReason.SceneTransition);
         }
 
         #endregion
