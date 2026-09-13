@@ -369,8 +369,8 @@ namespace GIC.Pet
         /// 本地工具（memory_update/do_action）由会话层拦截不经此分发（模型在宠物进程，转发主进程是错的）</summary>
         protected abstract string ExecuteChatTool(string toolName, string toolArgsJson);
 
-        /// <summary>Intent 工具表注册（两形态同表：记忆/情绪动作/知识检索/游戏时间×2/界面导航/自动抽卡）。
-        /// 注册失败只少工具不影响聊天（防泄漏结构同上）。</summary>
+        /// <summary>Intent 工具表注册（两形态同表：记忆/情绪动作/知识检索 + run_command 游戏指令统一入口——
+        /// 2026-09-13 四个游戏态工具合并为 CommandSystem 指令，docs/19 §6.5.4）。注册失败只少工具不影响聊天（防泄漏结构同上）。</summary>
         void RegisterChatTools()
         {
             try
@@ -382,16 +382,13 @@ namespace GIC.Pet
                     Chat.PaimonChatSession.MemoryToolDefinition(),
                     Chat.PaimonChatSession.DoActionTool(), // 情绪动作（LLM 对话自主选，会话层本地拦截不经 IPC）
                     Chat.PaimonChatSession.SearchKnowledgeTool(), // 知识库检索（会话层本地拦截不经 IPC，docs/19 §6.5.9）
-                    Chat.PetChatIntent.SetGameTimeTool(),
-                    Chat.PetChatIntent.GetGameTimeTool(),
-                    Chat.PetChatIntent.OpenScreenTool(),
-                    Chat.PetChatIntent.AutoWishTool(),
+                    Chat.PetChatIntent.RunCommandTool(), // 游戏指令统一入口（give/card/time/open/wish/help，目录自动生成）
                 };
                 session.RegisterTools(tools, (toolName, toolArgs) => ExecuteChatTool(toolName, toolArgs));
                 // do_action 动作回调（会话层本地消化后回调）：行为层播单次动作
                 //（拖拽物理中/退场中 PlayReaction 内部静默跳过——反应错失可接受）
                 session.onPlayAction = anim => behaviorCtrl?.PlayReaction(anim);
-                Debug.Log($"{logTag} 对话指令工具已注册（游戏时间/界面/自动抽卡/情绪动作/知识检索）");
+                Debug.Log($"{logTag} 对话指令工具已注册（游戏指令统一入口/情绪动作/知识检索）");
             }
             catch (System.Exception e)
             {
