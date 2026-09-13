@@ -117,11 +117,13 @@ namespace GIC.UI
         void UpdateEmptyRoomHint()
         {
             if (!emptyRoomHintObj || _currentState != RoomState.DisconnectedClient) return;
+            if (_startingHost) return; // 建房中：中央文字归 SetCreatingUI 持有（「正在创建房间…」），自动刷新勿覆盖
 
-            if (!_network.FoundServers.Any())
-            {
+            // 居中提示仅空列表时显示（有房间时隐藏，2026-09-13 与建房中央反馈一并收口）
+            bool listEmpty = !_network.FoundServers.Any();
+            emptyRoomHintObj.gameObject.SetActive(listEmpty);
+            if (listEmpty)
                 _emptyRoomHint?.SetSingleEntry(new LocalizedString("UIText", "NoServersFound"));
-            }
         }
 
         void ClearServerList()

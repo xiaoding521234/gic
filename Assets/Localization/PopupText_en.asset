@@ -86,6 +86,22 @@ MonoBehaviour:
     m_Localized: Keep at least one deck
     m_Metadata:
       m_Items: []
+  - m_Id: 16
+    m_Localized: Player count exceeds the map's spawn limit!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 17
+    m_Localized: Spawn point conflict!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 18
+    m_Localized: Color conflict!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 19
+    m_Localized: Not all players are ready!
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

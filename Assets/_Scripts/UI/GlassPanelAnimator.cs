@@ -19,7 +19,8 @@ namespace GIC.UI
     /// · 通用模式（Backpack/Settings）：挂面板根，模糊层引用指向 Canvas 下的 BackPanel Image，
     ///   内容元素用显式条目（自动收集关闭）；
     /// · 面板自身即模糊层模式（Coop 多视图）：挂各视图面板自身，模糊层可空（自动取自身
-    ///   UIBlurCapture），开自动收集（容器直接子节点，排除 BackDim）+ 额外元素（如面板外共享按钮）。
+    ///   UIBlurCapture），开自动收集（容器直接子节点，排除 BackDim/Background 等结构层）
+    ///   + 额外元素（如面板外共享按钮）。
     /// </summary>
     [DisallowMultipleComponent]
     public class GlassPanelAnimator : MonoBehaviour
@@ -44,7 +45,7 @@ namespace GIC.UI
         [Header("内容元素")]
         [Tooltip("显式元素条目（通用模式）；空列表配合自动收集使用")]
         public List<内容元素条目> 内容元素 = new();
-        [Tooltip("自动收集内容容器的直接子节点（排除 BackDim）——面板自身即模糊层的多视图模式用")]
+        [Tooltip("自动收集内容容器的直接子节点（排除 BackDim/Background 结构层）——面板自身即模糊层的多视图模式用")]
         public bool 自动收集内容 = false;
         [Tooltip("自动收集的容器；空=自身")]
         public RectTransform 内容容器;
@@ -100,6 +101,7 @@ namespace GIC.UI
                 {
                     if (child is not RectTransform rt) continue;
                     if (rt.name == "BackDim") continue; // 变暗层瞬时起落不滑动（§38b）
+                    if (rt.name == "Background") continue; // 背景板静态起落不滑动（Coop 列表页视差背板，2026-09-13 拍板）
                     AddElem(new 内容元素条目 { 元素 = rt }); // 方向=按位置自动，偏移=默认
                 }
             }

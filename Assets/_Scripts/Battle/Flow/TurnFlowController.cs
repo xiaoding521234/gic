@@ -32,6 +32,35 @@ namespace GIC.Battle
         public BattlePhase Phase { get; private set; } = BattlePhase.Idle;
         public int TurnNumber { get; private set; } = 0;
 
+        // ==================== 战斗独立时间系统（2026-09-14 用户拍板） ====================
+        // 战斗地图不与全局游戏时间共用：独立时钟初始 6:00 整，每个回合结束 +20 分钟。
+        // 时段边界沿用 TimeUtility.DayStartHour/DayEndHour（8:00-20:00 白天，与全局 TimePeriod
+        // 语义一致），驱动战斗地图音乐昼夜选池等表现。
+
+        public const int BattleClockStartMinutes = 6 * 60;
+        public const int BattleClockMinutesPerTurn = 20;
+
+        /// <summary>战斗内时间（当天分钟数，0-1439）</summary>
+        public int BattleTimeMinutes { get; private set; } = BattleClockStartMinutes;
+
+        /// <summary>战斗时段（独立时钟推导；TurnFlow 未就绪方回退全局时段）</summary>
+        public TimePeriod BattleTimePeriod
+        {
+            get
+            {
+                int hour = BattleTimeMinutes / 60 % 24;
+                return hour >= TimeUtility.DayStartHour && hour < TimeUtility.DayEndHour
+                    ? TimePeriod.Daytime
+                    : TimePeriod.Night;
+            }
+        }
+
+        /// <summary>回合结束推进独立时钟（片循环演算完毕、进入下一回合选择阶段前调用）</summary>
+        private void AdvanceBattleClock()
+        {
+            BattleTimeMinutes = (BattleTimeMinutes + BattleClockMinutesPerTurn) % (24 * 60);
+        }
+
         /// <summary>阶段变化通知（调试 UI 刷新用；战斗内不走 EventBus）</summary>
         public event Action<BattlePhase, int> OnPhaseChanged;
 
@@ -61,6 +90,7 @@ namespace GIC.Battle
         public void StartBattle()
         {
             TurnNumber = 1;
+            BattleTimeMinutes = BattleClockStartMinutes; // 独立时钟复位（06:00 起）
             BeginSelectPhase();
         }
 
@@ -137,6 +167,7 @@ namespace GIC.Battle
             yield return _resolver.ResolveTurnCoroutine(TurnNumber, actions);
 
             _resolveCoroutine = null;
+            AdvanceBattleClock(); // 回合结束：独立时间 +20 分钟（2026-09-14 用户拍板）
             TurnNumber++;
             BeginSelectPhase();
         }

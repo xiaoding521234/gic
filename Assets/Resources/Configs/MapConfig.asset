@@ -44,6 +44,8 @@ MonoBehaviour:
       world: {x: 62.361603, y: 23.956993}
     - positionName: 2004
       world: {x: 59.523064, y: 24.952322}
+    - positionName: 2006
+      world: {x: 70, y: 28}
   - region: 3
     viewCenterWorld: {x: 45.71186, y: 3.021074}
     viewHeight: 0

@@ -3,7 +3,8 @@
 //（强度 1 / 平滑 0.15 / 边界钳制；鼠标右移→背景左移）。
 // 前提：图必须大于根画布（maxOffset=半差值），否则行程为零=组件安全空转。
 // 双层纪律：本组件每帧写 anchoredPosition——若宿主图同时在 GlassPanelAnimator 的滑动组里，
-// 两个写入者会互写打架；正确结构=外层 wrapper（动画器滑动）包本图（视差），参考 Coop 列表页 Background。
+// 两个写入者会互写打架；正确结构=外层 wrapper（动画器滑动）包本图（视差）。
+// （Coop 列表页 Background 背景板 2026-09-13 起按名排除滑动组=静态，wrapper 仅作分层容器保留。）
 using UnityEngine;
 using GIC.Framework;
 using GIC.Battle;

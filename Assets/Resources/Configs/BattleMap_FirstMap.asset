@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mapName: "\u661F\u843D\u6E56"
   faction: 3001
+  position: 2006
   width: 20
   height: 20
   rows:
