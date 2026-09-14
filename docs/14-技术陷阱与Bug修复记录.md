@@ -1109,3 +1109,18 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - **排障指纹**：UI 按钮"点了没反应"+ 3D 点击正常 + 弹窗渲染完好 → 先查 `EventSystem.current == null`。
 - **新根场景/独立场景清单须核 EventSystem**：凡从"带 ES 的场景"切到"无 ES 的场景"（根切换/Single 加载/直接打开调试），UI 即全瘫——独立场景要么场景内自备 ES，要么装配期兜底（本例模式）。
 - **§54b 连锁案（同日实锤）**：补挂 ES 后**拖拽平移随之瘫痪**——BattleDebugPanel 的全屏透明 InputBlocker（防穿透挡板）在无 ES 时代是死代码，ES 一活它全屏吃射线，GestureHub 门2 把每次按下都判"按在 UI 上"（`BypassUIGate=false` 面整面收不到指针），拖拽识别器饿死；滚轮缩放走 Update 直读 Input 不进手势系统故幸存。**修复=删 InputBlocker**（独立根场景无底层界面共存，穿透防御已是 GestureHub 门2 职责；面板本体区域照常吃射线）。**教训：给场景补 ES 属"激活一切隐性 UI 死代码"的操作，须连带审计既有全屏 raycast 挡板**——探针法（EventSystem.RaycastAll 三点位）可实证。
+
+## 55. GI 角色完整模型提取五坑：Animator→FBX 永远纯骨架、骨名哈希=CRC32(路径)、FBX 骨位置塌缩、bindpose 跨网格空间不一致、压缩哈希路径曲线不可读（2026-09-14 安柏全模型重建实证）
+
+**现象**：想从本地原神 blocks 提取角色完整蒙皮模型（像 gpt astra 演示那样），Animator 导出的 12 个 FBX 全是纯骨架无网格；Mesh OBJ 导出丢权重；骨架挂骨盲配全错。
+
+**根因与解法**（全部实测）：
+1. **Animator→FBX 永远拿不到网格**：GI 角色 prefab 不含 SkinnedMeshRenderer（运行时装配），网格在独立 mesh bundle 里（Container 区分），`--containers` 参数会因无 container 资产 ArgumentNullException 崩——**唯一出路 `--export_type JSON` 导 Mesh**（m_Skin/m_BindPose/m_BoneNameHashes/m_SubMeshes 全在，OBJ 只给几何）。
+2. **m_BoneNameHashes = CRC32(骨骼完整路径)**（从 Bip001 起的 `Bip001/Bip001 Pelvis/...`，与 .anim path 同构）——fnv/murmur/djb2 全不是；裸名也不对，必须路径。**同一哈希空间的另一证据：.anim 里的数字路径（path: 1117758078）就是同一 CRC32**。
+3. **骨架 FBX 骨骼局部位置全部塌缩同一点**（HANDOFF-派蒙动画重定向早有记载）——真实绑定姿势**藏在 mesh 的 m_BindPose 里**（`bp⁻¹`=骨骼矩阵），骨架绑定姿势要靠 bindpose 逆推重建；Bip001 自身无绑定矩阵，直接子骨须按"父骨当前矩阵"逐层下推（Bip001 归零处理）。
+4. **各网格 bindpose 空间不一致**：`bp = M⁻¹·S_m`（S_m=该网格 SMR 节点矩阵），同一骨骼在不同网格的 bindpose 差一个常量变换——**共享骨对比可解出 X=S_ref⁻¹·S_m，全部 `bp·X⁻¹` 归一到同一空间**（实测 spread=0 验证一致后冲突归零）。**必须按变体（本体/皮肤）分别归一**，跨变体混合必炸。
+5. **FBX 缺物理骨链**（裙摆/头发等，hashMap 62/246 命中即可见）：动画曲线里它们是**压缩哈希路径**，Unity 导入后 GetCurveBindings 拿不到（派蒙重定向管线当年判"死路弃用"同类）——静态兜底骨（平铺挂 modelRoot、local=bindpose）保蒙皮精确（实测全部件 skinErr=0.00000），代价是这些链不参与动画。
+
+**验收**：蒙皮正确性可纯数学终验——逐顶点 `Σw·(boneWorld·bp)·v ≈ v`，安柏 21 个部件全部 0.00000。视觉仍交用户目检。
+
+**资产**：`Assets/Art/AmberExtract/`（README 里有全链路）；提取脚本 `.codely-cli/tmp/ambor/`；操作流程已入 `gic-gi-extract` skill「完整角色模型+动画提取」节。
