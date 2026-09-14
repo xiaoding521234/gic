@@ -25,7 +25,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// 回合状态机（最小版：选择阶段收齐行动 → 执行阶段片循环 → 回合结束循环；
-    /// 五阶段完整版 AI 决策→玩家选择→玩家执行→AI 执行→回合结束 B6 落地，docs/22 §5）
+    /// 五阶段完整版 AI 决策→玩家选择→玩家执行→AI 执行→回合结束 B6 落地，docs/active/22 §5）
     /// </summary>
     public class TurnFlowController : MonoBehaviour
     {

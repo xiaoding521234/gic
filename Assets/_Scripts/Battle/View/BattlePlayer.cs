@@ -14,7 +14,7 @@ namespace GIC.Battle
     /// <summary>
     /// 最小战斗播放器（客户端侧；Host 显示侧同构复用）。
     /// Snapshot 建场 → Segment 驱动动画 → 片播放完成回 ack。
-    /// 片开始时刻 =（全场最高攻速 − 本片攻速）÷ 10 秒（docs/22 §1）；
+    /// 片开始时刻 =（全场最高攻速 − 本片攻速）÷ 10 秒（docs/active/22 §1）；
     /// 表现层时序与逻辑层解耦：逻辑即时结算，本类只管"何时播"。
     /// </summary>
     public class BattlePlayer : MonoBehaviour
