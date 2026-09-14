@@ -12,7 +12,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// B1 AI 决策占位：恒定攻击最近敌人（docs/22 §5；B6 换启发式）。
+    /// B1 AI 决策占位：恒定攻击最近敌人（docs/active/22 §5；B6 换启发式）。
     /// AI 决策由 Host 生成（docs/18 决策一）——直接读 BattleSimState，不走传输通道。
     /// 选择阶段开始后延迟提交（给玩家看清回合切换），每回合一个行动。
     /// </summary>

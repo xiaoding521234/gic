@@ -12,7 +12,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// Host 侧战场状态访问门面（快照生成 / 效应应用 / unitId 注册 / 地形查询）。
-    /// 逻辑 Unit = 现有 MonoBehaviour 组件容器（Host 场景实例化，docs/22 §4）。
+    /// 逻辑 Unit = 现有 MonoBehaviour 组件容器（Host 场景实例化，docs/active/22 §4）。
     /// </summary>
     public class BattleSimState
     {
