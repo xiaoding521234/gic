@@ -234,7 +234,7 @@ namespace GIC.UI
             => PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText.ToString(), key));
 
         /// <summary>
-        /// 开局转场（B1 单人开局：真人 + AI 补位对手，docs/22 §5；B7 LAN 时改为广播开战配置，
+        /// 开局转场（B1 单人开局：真人 + AI 补位对手，docs/active/22 §5；B7 LAN 时改为广播开战配置，
         /// 各端加载同一战斗场景，Host 权威，docs/18 决策一）：
         /// 加载页盖住 StopHost 拆除尖峰（0.2s 淡入，按所选地图换势力徽标+随机词条）→
         /// **Additive 根切换**（GameScene.SwitchRootScene：新根 Additive 加载+旧根 UnloadAsync 分帧
