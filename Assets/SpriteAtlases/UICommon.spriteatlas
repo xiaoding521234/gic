@@ -97,6 +97,7 @@ SpriteAtlas:
     - c3ee8cfbd8b09f442a655105d134ef43: 21300000
     - aad3120c824af4b47b58e812becb33e4: 21300000
     - afc86f0c190da0b4895407310cc2dfed: 21300000
+    - 99c48b5cc9dbb1747bbbfd1a626cc69e: 21300000
     - 66cf8d3dfa50b9a4bb4028d528e73cfd: 21300000
     - aeebf75d9f118e04b9d1d38cf6d15941: 21300000
     - a49cbd7d02c6a3349832397a1549ccfb: 21300000
@@ -108,6 +109,7 @@ SpriteAtlas:
     - 0cc8ba8e1d3697c47a18da8056c20538: 21300000
     - 4c4c9dee5175bc045a59640fbac6b8ae: 21300000
     - a1dd7d2fd4776734d965de5d5a6cc3d6: 21300000
+    - 01dde03f74f9a2d4f98d3b4dc7a1a76f: 21300000
     - 322f6e3fa3f675144b3834b6c90f2a7d: 21300000
     - 5f44224fdfd13bd4e9392555332f03f4: 21300000
     - 0ba5ed4fd15b83e49a74538afc037366: 21300000
@@ -166,6 +168,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: c3ee8cfbd8b09f442a655105d134ef43, type: 3}
   - {fileID: 21300000, guid: aad3120c824af4b47b58e812becb33e4, type: 3}
   - {fileID: 21300000, guid: afc86f0c190da0b4895407310cc2dfed, type: 3}
+  - {fileID: 21300000, guid: 99c48b5cc9dbb1747bbbfd1a626cc69e, type: 3}
   - {fileID: 21300000, guid: 66cf8d3dfa50b9a4bb4028d528e73cfd, type: 3}
   - {fileID: 21300000, guid: aeebf75d9f118e04b9d1d38cf6d15941, type: 3}
   - {fileID: 21300000, guid: a49cbd7d02c6a3349832397a1549ccfb, type: 3}
@@ -177,6 +180,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 0cc8ba8e1d3697c47a18da8056c20538, type: 3}
   - {fileID: 21300000, guid: 4c4c9dee5175bc045a59640fbac6b8ae, type: 3}
   - {fileID: 21300000, guid: a1dd7d2fd4776734d965de5d5a6cc3d6, type: 3}
+  - {fileID: 21300000, guid: 01dde03f74f9a2d4f98d3b4dc7a1a76f, type: 3}
   - {fileID: 21300000, guid: 322f6e3fa3f675144b3834b6c90f2a7d, type: 3}
   - {fileID: 21300000, guid: 5f44224fdfd13bd4e9392555332f03f4, type: 3}
   - {fileID: 21300000, guid: 0ba5ed4fd15b83e49a74538afc037366, type: 3}
@@ -234,6 +238,7 @@ SpriteAtlas:
   - card_overlay_2
   - normal_button_select
   - next
+  - mondstadt_frame
   - achievement_button
   - electro
   - cryo
@@ -245,6 +250,7 @@ SpriteAtlas:
   - map_button
   - backpack_button
   - dendro
+  - mondstadt_windmill
   - hydro
   - inazuma
   - star

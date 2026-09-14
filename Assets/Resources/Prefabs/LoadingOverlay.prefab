@@ -879,7 +879,8 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 8091456005690150547}
   m_Father: {fileID: 4832500442122179100}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.544}
@@ -915,7 +916,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: eaef217502ec92741964b8726d73dbd3, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 99c48b5cc9dbb1747bbbfd1a626cc69e, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1032,6 +1033,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   "\u5FBD\u6807\u65CB\u8F6C\u901F\u5EA6": 40
   "\u586B\u5145\u65F6\u957F": 1.55
+  "\u5FBD\u6807\u5E27\u52A8\u753B\u8868": []
+  "\u5FBD\u6807\u5206\u5C42\u8868":
+  - "\u52BF\u529B": 3001
+    "\u5E95\u56FE": {fileID: 21300000, guid: 99c48b5cc9dbb1747bbbfd1a626cc69e, type: 3}
+    "\u52A8\u5C42": {fileID: 21300000, guid: 01dde03f74f9a2d4f98d3b4dc7a1a76f, type: 3}
+    "\u52A8\u5C42\u8F6C\u901F": -80
   "\u5361\u70B9\u8FDB\u5EA6": 0.85
   "\u626B\u5C3E\u65F6\u957F": 0.3
   "\u8FDB\u5EA6\u65CB\u5F8B\u8868":
@@ -1043,6 +1050,7 @@ MonoBehaviour:
   "\u65CB\u5F8B\u97F3\u91CF": 0.8
   "\u9875\u9762\u7EC4": {fileID: 2278204251198353516}
   "\u5FBD\u6807": {fileID: 4030939692587101871}
+  "\u52A8\u5C42\u8282\u70B9": {fileID: 8091456005690150547}
   "\u5E95\u90E8\u884C": {fileID: 6995306364087072480}
   "\u586B\u5145\u88C1\u526A": {fileID: 7832843794770163263}
   "\u6807\u9898\u6587\u672C": {fileID: 8056288908809599716}
@@ -2013,6 +2021,82 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_Sprite: {fileID: 21300000, guid: 322f6e3fa3f675144b3834b6c90f2a7d, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!1 &8330765671989191424
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 7
+  m_Component:
+  - component: {fileID: 8091456005690150547}
+  - component: {fileID: 8344304029425935892}
+  - component: {fileID: 2784955717051669609}
+  m_Layer: 0
+  m_HasEditorInfo: 1
+  m_Name: Windmill
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &8091456005690150547
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8330765671989191424}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4030939692587101871}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -0.1171875, y: 8.810148}
+  m_SizeDelta: {x: 240, y: 240}
+  m_Pivot: {x: 0.49951172, y: 0.53670895}
+--- !u!222 &8344304029425935892
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8330765671989191424}
+  m_CullTransparentMesh: 1
+--- !u!114 &2784955717051669609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8330765671989191424}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.47843137, g: 0.54509807, b: 0.6, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 01dde03f74f9a2d4f98d3b4dc7a1a76f, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
