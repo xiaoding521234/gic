@@ -1,5 +1,6 @@
 // ==================== LoadingOverlayDriver.cs（原神式加载页驱动——开局转场加载界面） ====================
-// 布局复刻原神加载页：纯白底 + 中央势力徽标缓转（按所选地图势力换标）+ 灰蓝词条文案
+// 布局复刻原神加载页：纯白底 + 中央势力徽标（按所选地图势力换标：配分层表的势力=官方原图
+// 无损拆层的底图静止+动层旋转如蒙德风车持续旋转，未配的势力整标缓转）+ 灰蓝词条文案
 // （多条随机，点击页面任意处换一条）+ 底部元素行**逐像素填充扫描**（Dim/Lit 双层 + RectMask2D
 // 裁剪矩形从左往右展宽=进度条式点亮，扫过处线与图标整列变深，与原神一致）+ 右下版本号。
 // 进度旋律（2026-09-13）：填充扫描每越过一个触发点播一个单音符，加载顺畅时整句连听
@@ -43,14 +44,46 @@ namespace GIC.UI
         public LoadingMelodyNote[] 音符序列;
     }
 
+    /// <summary>一个势力的徽标分层动画（官方原图无损拆层：静止外框+旋转动层，如蒙德风车）</summary>
+    [System.Serializable]
+    public class FactionEmblemLayer
+    {
+        public FactionType 势力;
+        [Tooltip("静止层 sprite（外框/垂饰/毂环——替换整标底图）")]
+        public Sprite 底图;
+        [Tooltip("旋转层 sprite（风车等活动主体）；与底图同画布，旋转轴心由动层节点偏移对准")]
+        public Sprite 动层;
+        [Tooltip("动层每秒旋转角速度（度）；负=顺时针")]
+        public float 动层转速 = -80f;
+    }
+
+    /// <summary>一个势力的徽标帧动画（AI 生成循环序列帧：每帧=完整徽标图，运动已含在帧内）</summary>
+    [System.Serializable]
+    public class FactionEmblemAnim
+    {
+        public FactionType 势力;
+        [Tooltip("循环序列帧（每帧=完整徽标图，逐帧换图）")]
+        public Sprite[] 帧;
+        [Tooltip("播放帧率（帧/秒）：16 帧 360° 循环@2fps≈45°/s；按序列帧实际单圈角度配")]
+        public float 帧率 = 2f;
+    }
+
 
     public class LoadingOverlayDriver : MonoBehaviour, IPointerClickHandler
     {
         [Header("动效参数")]
-        [Tooltip("徽标每秒旋转角速度（度）")]
+        [Tooltip("徽标每秒旋转角速度（度）——仅对未配分层表的势力生效（整标缓转兜底）")]
         [SerializeField] private float 徽标旋转速度 = 40f;
         [Tooltip("正常填充段时长（秒）：进度 0→卡点，承载整段旋律；≈旋律时长，取旋律时选好 ≤3s（2026-09-13 拍板保底不过 3s）。进度旋律随此节奏联动：值越小旋律越快")]
         [SerializeField] private float 填充时长 = 1.7f;
+
+        [Header("徽标帧动画（按势力，AI 生成序列帧——优先级最高）")]
+        [Tooltip("各势力徽标循环序列帧（AI 一次生成：每帧=完整徽标，逐帧换图）；有条目=帧动画播放")]
+        [SerializeField] private FactionEmblemAnim[] 徽标帧动画表;
+
+        [Header("徽标分层旋转（按势力）")]
+        [Tooltip("各势力分层徽标（官方原图无损拆层）：有帧动画表的势力优先帧动画；其次本表=底图静止、动层旋转，均无=整标缓转")]
+        [SerializeField] private FactionEmblemLayer[] 徽标分层表;
 
         [Header("真实加载联动（85% 卡点规则）")]
         [Tooltip("正常填充的卡点进度：到达时若真实加载（Reveal）未完成则停在此处等，加载完成才扫尾揭幕——进度条不空转满格")]
@@ -67,6 +100,8 @@ namespace GIC.UI
         [Header("节点引用（prefab 接线）")]
         [SerializeField] private CanvasGroup 页面组;
         [SerializeField] private RectTransform 徽标;
+        [Tooltip("徽标下挂的动层节点（旋转层，如蒙德风车）；分层轴心偏移在 prefab 里对准")]
+        [SerializeField] private RectTransform 动层节点;
         [SerializeField] private RectTransform 底部行;
         [Tooltip("Lit 层裁剪节点：rect 宽度=填充进度×行宽，子层恒全宽被裁（扫过边缘=像素级硬边）")]
         [SerializeField] private RectMask2D 填充裁剪;
@@ -92,6 +127,12 @@ namespace GIC.UI
         private int _melodyIndex = -1;            // 已触发到的音符下标（-1=未开始；Cover 复位）
         private bool _loadDone;                   // 真实加载完成（SceneFadeOverlay.Reveal 到达时置位；Cover 复位）
         private float _sweepElapsed;               // 卡点→100% 扫尾已计时长（帧时长钳制累计）
+        private Image _emblemImage;                  // 徽标 Image（SetFaction 缓存）
+        private Image _动层Image;                    // 动层 Image（SetFaction 懒缓存）
+        private FactionEmblemLayer _emblemLayer;     // 当前势力分层条目（null=未配）
+        private FactionEmblemAnim _emblemFrames;     // 当前势力帧动画条目（优先于分层；null=未配）
+        private int _frameIndex;                     // 帧动画当前帧下标（Cover 复位）
+        private float _frameTimer;                   // 帧动画换帧累计计时
 
         /// <summary>正常填充段总时长（0→卡点，承载旋律）</summary>
         private float FillDuration => Mathf.Max(0.01f, 填充时长);
@@ -146,12 +187,61 @@ namespace GIC.UI
                 }
             }
 
+            // 徽标帧动画条目（AI 序列帧，优先于分层）
+            _emblemFrames = null;
+            if (徽标帧动画表 != null)
+            {
+                foreach (var anim in 徽标帧动画表)
+                {
+                    if (anim != null && anim.势力 == faction && anim.帧 != null && anim.帧.Length > 0)
+                    {
+                        _emblemFrames = anim;
+                        break;
+                    }
+                }
+            }
+
+            // 徽标分层条目（有=底图静止+动层旋转：风车等主体动画）
+            _emblemLayer = null;
+            if (徽标分层表 != null)
+            {
+                foreach (var entry in 徽标分层表)
+                {
+                    if (entry != null && entry.势力 == faction && entry.底图 != null && entry.动层 != null)
+                    {
+                        _emblemLayer = entry;
+                        break;
+                    }
+                }
+            }
+
             if (徽标 == null) return;
-            var img = 徽标.GetComponent<Image>();
-            if (img == null) return;
+            _emblemImage = 徽标.GetComponent<Image>();
+            if (_emblemImage == null) return;
+            bool frameMode = _emblemFrames != null;
+            if (动层节点 != null)
+            {
+                if (_动层Image == null) _动层Image = 动层节点.GetComponent<Image>();
+                动层节点.gameObject.SetActive(_emblemLayer != null && !frameMode);
+                if (_emblemLayer != null && !frameMode && _动层Image != null)
+                    _动层Image.sprite = _emblemLayer.动层;
+            }
+            if (frameMode)
+            {
+                _frameIndex = 0;
+                _frameTimer = 0f;
+                var first = _emblemFrames.帧[0];
+                if (first != null) _emblemImage.sprite = first;
+                return;
+            }
             var config = ElementFactionConfig.Instance;
-            var icon = config != null ? config.GetFactionIcon(faction) : null;
-            if (icon != null) img.sprite = icon;
+            if (_emblemLayer != null)
+                _emblemImage.sprite = _emblemLayer.底图; // 分层模式：底图=静止层
+            else
+            {
+                var icon = config != null ? config.GetFactionIcon(faction) : null;
+                if (icon != null) _emblemImage.sprite = icon;
+            }
         }
 
         // ── 词条文案（多条随机 + 点击换条） ──
@@ -184,9 +274,29 @@ namespace GIC.UI
         {
             if (页面组.alpha <= 0f) return; // 整页隐藏时不空转
 
-            // 徽标缓转（unscaled：转场期间 timeScale 不可控）
-            if (徽标 != null)
+            // 徽标动效（unscaled：转场期间 timeScale 不可控）——帧动画模式=逐帧换图
+            // （AI 生成的完整徽标序列帧）；其次分层模式=底图静止、动层旋转；
+            // 都未配的势力维持整标缓转
+            if (_emblemFrames != null && _emblemImage != null)
+            {
+                float interval = 1f / Mathf.Max(0.1f, _emblemFrames.帧率);
+                _frameTimer += Time.unscaledDeltaTime;
+                while (_frameTimer >= interval)
+                {
+                    _frameTimer -= interval;
+                    _frameIndex = (_frameIndex + 1) % _emblemFrames.帧.Length;
+                    var frame = _emblemFrames.帧[_frameIndex];
+                    if (frame != null) _emblemImage.sprite = frame;
+                }
+            }
+            else if (_emblemLayer != null && 动层节点 != null)
+            {
+                动层节点.Rotate(0f, 0f, _emblemLayer.动层转速 * Time.unscaledDeltaTime);
+            }
+            else if (徽标 != null)
+            {
                 徽标.Rotate(0f, 0f, -徽标旋转速度 * Time.unscaledDeltaTime);
+            }
 
             // 底部元素行填充三段制：正常段(0→卡点)→未加载完卡点→加载完成扫尾(卡点→100%)。
             // 各段帧时长钳制 0.05s——场景加载的单帧尖峰不吞进度，恢复渲染后不跳变
@@ -261,6 +371,14 @@ namespace GIC.UI
             _sweepElapsed = 0f;
             _loadDone = false;
             _melodyIndex = -1;
+            if (_emblemFrames != null && _emblemImage != null)
+            {
+                _frameIndex = 0;      // 帧动画从头起（SetFaction 已先选定条目）
+                _frameTimer = 0f;
+                if (_emblemFrames.帧[0] != null) _emblemImage.sprite = _emblemFrames.帧[0];
+            }
+            if (_emblemLayer != null && _emblemFrames == null && 动层节点 != null)
+                动层节点.localRotation = Quaternion.identity; // 动层从 0° 起（每次加载一致）
             ApplyFillProgress(0f); // 清上一轮残留
             ApplyTip(RandomTipIndex());
             if (_fadeRoutine != null) StopCoroutine(_fadeRoutine);
