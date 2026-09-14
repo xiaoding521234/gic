@@ -11,7 +11,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// 战斗传输通道接口（B1-B6 本地直通；B7 换 Mirror 实现上层零改动）
-    /// 铁律：战斗逻辑不走 EventBusHub，全部消息经本通道（docs/22 §4）
+    /// 铁律：战斗逻辑不走 EventBusHub，全部消息经本通道（docs/active/22 §4）
     /// </summary>
     public interface IBattleTransport
     {
