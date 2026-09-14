@@ -209,7 +209,9 @@ MonoBehaviour:
         weight: 1
       - clip: {fileID: 8300000, guid: 0fe44300bb700cd41a22b34938d55ece, type: 3}
         weight: 1
-    isUnlocked: 0
+      - clip: {fileID: 8300000, guid: 84409e7ddf17e8c4b86deb122432e009, type: 3}
+        weight: 1
+    isUnlocked: 1
     dayMedia:
       mediaType: 0
     nightMedia:
