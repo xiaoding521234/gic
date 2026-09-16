@@ -65,6 +65,17 @@ namespace GIC.Pet
             // 刚改完立即可见）。quickSeeded 区分"从未初始化"（回灌预设）与"用户清空"（不再回灌）。
             public List<string> quickMessages = new List<string>();
             public bool quickSeeded = false;
+            // v9+（2026-09-16 派蒙语音，docs/19 §6.5.11）：语音三模式（0=关闭，1=本地侧车，2=云端TTS+克隆）。
+            // **只存 pet.json 不进主存档**（学 quickMessages 先例——单一事实源，避免双写同步坑）；
+            // 侧车参考音频路径/文本是侧车部署侧的事（玩家自建侧车时自己改），不进设置 UI 一期。
+            public int voiceMode = 0;
+            public string voiceSidecarUrl = "http://127.0.0.1:9880";
+            public string voiceSidecarPath = "";            // 空=不自动拉起（填侧车启动 bat/exe 路径）
+            public string voiceSidecarRefPath = "D:/Tool/GPT-SoVITS/paimon/ref_pm.wav";      // 侧车参考音频（服务器侧文件路径）
+            public string voiceSidecarRefText = "聊到炼金和研究的话题,砂糖就完全不怯场了,这就是研究者的气质吗?";  // 参考文本（须与参考音频内容一致）
+            public string voiceCloudKeyCipher = "";        // 云端 TTS key 密文（PetApiKeyCrypto；明文永不落盘）
+            public string voiceCloudVoiceId = "";          // 云端音色 ID（空=供应商默认女声）
+            public float voiceVolume = 0.8f;               // 播放音量 0..1
         }
 
         /// <summary>v1-v4 旧档的中文/旧名 JSON 键镜像（**只读迁移用**——字段名必须与旧档 JSON 键
@@ -123,6 +134,15 @@ namespace GIC.Pet
                 data.chatCiphers = disk.chatCiphers;
                 data.quickMessages = disk.quickMessages;
                 data.quickSeeded = disk.quickSeeded;
+                // 语音设置（2026-09-16）：同款设置类字段——本进程缓存可能是另一进程写入前的旧值，落盘以磁盘现值为准
+                data.voiceMode = disk.voiceMode;
+                data.voiceSidecarUrl = disk.voiceSidecarUrl;
+                data.voiceSidecarPath = disk.voiceSidecarPath;
+                data.voiceSidecarRefPath = disk.voiceSidecarRefPath;
+                data.voiceSidecarRefText = disk.voiceSidecarRefText;
+                data.voiceCloudKeyCipher = disk.voiceCloudKeyCipher;
+                data.voiceCloudVoiceId = disk.voiceCloudVoiceId;
+                data.voiceVolume = disk.voiceVolume;
                 WriteAtomic(JsonUtility.ToJson(data, true));
             }
             catch (Exception e)
@@ -324,6 +344,79 @@ namespace GIC.Pet
             {
                 Debug.LogWarning($"[PetPrefs] 快捷消息写入失败：{e.Message}");
             }
+        }
+
+        // ---- 派蒙语音设置直读直写通道（2026-09-16，docs/19 §6.5.11；同密文/快捷消息模式：绕缓存每次碰磁盘） ----
+
+        /// <summary>语音设置写通道共用的磁盘读改写（保留其它字段含另一进程刚落的缩放/位置；同款变更同步进程缓存）。
+        /// 编辑器也生效（同 WriteChatCipher：设置类字段无 #if 门）。</summary>
+        static void WriteVoiceDisk(System.Action<PetSave> mutate)
+        {
+            try
+            {
+                var d = ReadDiskSave();
+                mutate(d);
+                WriteAtomic(JsonUtility.ToJson(d, true));
+                if (_cache != null) mutate(_cache);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PetPrefs] 语音设置写入失败：{e.Message}");
+            }
+        }
+
+        /// <summary>直读语音模式（0=关闭，1=本地侧车，2=云端TTS+克隆；越界/负值钳 0）</summary>
+        public static int ReadVoiceMode()
+        {
+            int m = ReadDiskSave().voiceMode;
+            return m >= 0 && m <= 2 ? m : 0;
+        }
+
+        /// <summary>直读侧车地址（默认 http://127.0.0.1:9880；空串回默认——TTS 客户端兜底）</summary>
+        public static string ReadVoiceSidecarUrl()
+        {
+            string url = ReadDiskSave().voiceSidecarUrl;
+            return string.IsNullOrEmpty(url) ? "http://127.0.0.1:9880" : url;
+        }
+
+        /// <summary>直读侧车程序路径（空=不自动拉起）</summary>
+        public static string ReadVoiceSidecarPath() => ReadDiskSave().voiceSidecarPath ?? "";
+
+        /// <summary>直读侧车参考音频路径（GPT-SoVITS 每请求必填 ref_audio_path——服务器侧文件路径）</summary>
+        public static string ReadVoiceSidecarRefPath() => ReadDiskSave().voiceSidecarRefPath ?? "";
+
+        /// <summary>直读侧车参考文本（须与参考音频内容一致——GPT-SoVITS 音质对参考文本极敏感）</summary>
+        public static string ReadVoiceSidecarRefText() => ReadDiskSave().voiceSidecarRefText ?? "";
+
+        /// <summary>直读云端 TTS key 密文（空=未设置）</summary>
+        public static string ReadVoiceCloudKeyCipher() => ReadDiskSave().voiceCloudKeyCipher ?? "";
+
+        /// <summary>直读云端音色 ID（空=供应商默认音色）</summary>
+        public static string ReadVoiceCloudVoiceId() => ReadDiskSave().voiceCloudVoiceId ?? "";
+
+        /// <summary>直读播放音量（0..1）</summary>
+        public static float ReadVoiceVolume()
+        {
+            float v = ReadDiskSave().voiceVolume;
+            return v < 0f ? 0f : (v > 1f ? 1f : v);
+        }
+
+        /// <summary>写语音模式</summary>
+        public static void WriteVoiceMode(int mode) => WriteVoiceDisk(d => d.voiceMode = mode);
+
+        /// <summary>写侧车地址+程序路径（一次写两项——设置 UI 同弹窗确认）</summary>
+        public static void WriteVoiceSidecar(string url, string path) =>
+            WriteVoiceDisk(d => { d.voiceSidecarUrl = url ?? ""; d.voiceSidecarPath = path ?? ""; });
+
+        /// <summary>写云端 TTS key 密文+音色 ID（一次写两项——设置 UI 同组）</summary>
+        public static void WriteVoiceCloud(string keyCipher, string voiceId) =>
+            WriteVoiceDisk(d => { d.voiceCloudKeyCipher = keyCipher ?? ""; d.voiceCloudVoiceId = voiceId ?? ""; });
+
+        /// <summary>写播放音量（钳 0..1）</summary>
+        public static void WriteVoiceVolume(float volume)
+        {
+            float v = volume < 0f ? 0f : (volume > 1f ? 1f : volume);
+            WriteVoiceDisk(d => d.voiceVolume = v);
         }
     }
 }

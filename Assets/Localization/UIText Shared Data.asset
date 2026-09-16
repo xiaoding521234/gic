@@ -823,6 +823,66 @@ MonoBehaviour:
     m_Key: LoadingTip_05_Line2
     m_Metadata:
       m_Items: []
+  - m_Id: 9081
+    m_Key: PetVoiceMode
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9082
+    m_Key: PetVoiceModeOff
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9083
+    m_Key: PetVoiceModeSidecar
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9084
+    m_Key: PetVoiceModeCloud
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9085
+    m_Key: PetVoiceSidecarUrl
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9086
+    m_Key: PetVoiceSidecarUrlInput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9087
+    m_Key: PetVoiceSidecarPath
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9088
+    m_Key: PetVoiceSidecarPathInput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9089
+    m_Key: PetVoiceSidecarPathNotSet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9090
+    m_Key: PetVoiceCloudKey
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9091
+    m_Key: PetVoiceCloudKeyInput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9092
+    m_Key: PetVoiceCloudVoiceId
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9093
+    m_Key: PetVoiceCloudVoiceIdInput
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9094
+    m_Key: PetVoiceCloudVoiceIdNotSet
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9095
+    m_Key: PetVoiceVolume
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

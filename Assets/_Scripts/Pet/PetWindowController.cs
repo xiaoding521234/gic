@@ -490,6 +490,17 @@ namespace GIC.Pet
             return GIC.Pet.Chat.PetIntentIpc.RequestWithWait(toolName, toolArgsJson);
         }
 
+        /// <summary>AudioListener 兜底（2026-09-16 语音说话层）：PaimonPet.unity 场景无任何音频设施
+        ///（2026-09-16 实证：全场景零 Listener/AudioSource，整个桌宠进程哑）——缺则挂相机上；
+        /// 已有（未来场景改动）不重复挂（双 Listener 会炸音频）。</summary>
+        protected override void EnsureAudioListener()
+        {
+            var existing = FindObjectsByType<AudioListener>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (existing != null && existing.Length > 0) return;
+            var cam = GetComponentInChildren<Camera>(true);
+            (cam != null ? cam.gameObject : gameObject).AddComponent<AudioListener>();
+        }
+
         /// <summary>去掉标题栏边框，透明化（DWM 或色键），置顶并停靠。</summary>
         private void RestyleWindow()
         {

@@ -328,6 +328,10 @@ namespace GIC.Pet.Chat
             ShowFallback();
         }
 
+        /// <summary>兜底文案直出回调（宿主接语音说话层——兜底也念，2026-09-16 docs/19 §6.5.11；
+        /// 只在真展示兜底时触发——对话进行中错失不展示也不念）</summary>
+        public System.Action<string> onFallbackShown;
+
         void ShowFallback()
         {
             if (string.IsNullOrEmpty(_currentFallback))
@@ -337,6 +341,7 @@ namespace GIC.Pet.Chat
                 return;
             }
             _chatUI?.ShowProactive(_currentFallback);
+            onFallbackShown?.Invoke(_currentFallback); // 语音说话层同句朗读（说话层自判模式开关）
             _currentFallback = null;
         }
     }

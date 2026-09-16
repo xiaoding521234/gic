@@ -33,6 +33,143 @@ namespace GIC.UI
             InitPetCloseSetting();
             InitPetProviderSetting();
             InitPetApiKeySetting();
+            InitPetVoiceSettings();
+        }
+
+        // ---- 派蒙语音（2026-09-16，docs/19 §6.5.11）：三模式=关闭/本地侧车/云端TTS+克隆 ----
+        // 设置只存 pet.json（学 quickMessages 先例——单一事实源零双写；桌面进程双进程铁律下天然可达）；
+        // 读取全走 PetPrefs 直读通道（另一进程改动立即可见），不进主存档。
+
+        /// <summary>语音区五件套聚合（模式/侧车地址/侧车程序路径/云端key/音色ID/音量）</summary>
+        private void InitPetVoiceSettings()
+        {
+            InitVoiceModeSetting();
+            InitVoiceSidecarUrlSetting();
+            InitVoiceSidecarPathSetting();
+            InitVoiceCloudKeySetting();
+            InitVoiceCloudVoiceIdSetting();
+            InitVoiceVolumeSetting();
+        }
+
+        /// <summary>语音模式三选：0=关闭，1=本地侧车（玩家自建 GPT-SoVITS），2=云端 TTS+克隆（玩家自填 key）。
+        /// 默认关闭——零进包设计下语音完全是玩家自配的进阶功能（游戏构建不含任何 TTS 引擎/模型）。</summary>
+        private void InitVoiceModeSetting()
+        {
+            var options = new List<TextEntry>
+            {
+                new TextEntry(new LocalizedString("UIText", "PetVoiceModeOff"), ""),
+                new TextEntry(new LocalizedString("UIText", "PetVoiceModeSidecar"), ""),
+                new TextEntry(new LocalizedString("UIText", "PetVoiceModeCloud"), ""),
+            };
+            int current = GIC.Pet.PetPrefs.ReadVoiceMode();
+            voiceModeSetting.Setup("PetVoiceMode", options, current, (index) =>
+            {
+                GIC.Pet.PetPrefs.WriteVoiceMode(index);
+            });
+            voiceModeSetting.Initialize();
+        }
+
+        /// <summary>侧车地址（ButtonSettingItem+输入弹窗=项目文本值既有模式）：默认 http://127.0.0.1:9880
+        ///（GPT-SoVITS api_v2 默认端口）——玩家自建侧车改这个。显示原值（非机密）。</summary>
+        private void InitVoiceSidecarUrlSetting()
+        {
+            voiceSidecarUrlSetting.Setup("PetVoiceSidecarUrl", "",
+                onClick: () =>
+                {
+                    ShowInputPanel(voiceSidecarUrlSetting, GIC.Pet.PetPrefs.ReadVoiceSidecarUrl(), (v) =>
+                    {
+                        v = v.Trim();
+                        GIC.Pet.PetPrefs.WriteVoiceSidecar(v, GIC.Pet.PetPrefs.ReadVoiceSidecarPath());
+                        voiceSidecarUrlSetting.UpdateValue(v);
+                    }, "PetVoiceSidecarUrlInput", 200);
+                },
+                onValueConfirmed: null,
+                placeholderKey: null);
+            voiceSidecarUrlSetting.Initialize();
+            voiceSidecarUrlSetting.UpdateValue(GIC.Pet.PetPrefs.ReadVoiceSidecarUrl());
+        }
+
+        /// <summary>侧车程序路径（可选）：填了=游戏检测侧车未运行时自动拉起一次（bat/exe/lnk 均可）；
+        /// 空=不拉起（玩家自己开）。占位引导文案走 PetVoiceSidecarPathNotSet。</summary>
+        private void InitVoiceSidecarPathSetting()
+        {
+            voiceSidecarPathSetting.Setup("PetVoiceSidecarPath", "",
+                onClick: () =>
+                {
+                    ShowInputPanel(voiceSidecarPathSetting, GIC.Pet.PetPrefs.ReadVoiceSidecarPath(), (v) =>
+                    {
+                        v = v.Trim();
+                        GIC.Pet.PetPrefs.WriteVoiceSidecar(GIC.Pet.PetPrefs.ReadVoiceSidecarUrl(), v);
+                        voiceSidecarPathSetting.UpdateValue(v);
+                    }, "PetVoiceSidecarPathInput", 400);
+                },
+                onValueConfirmed: null,
+                placeholderKey: "PetVoiceSidecarPathNotSet");
+            voiceSidecarPathSetting.Initialize();
+        }
+
+        /// <summary>云端 TTS Key（同对话 API Key 全套：输入弹窗回显明文→AES 加密存 pet.json
+        /// voiceCloudKeyCipher→显示脱敏。MiniMax JWT——客户端自动从中解 GroupId，玩家只填这一个）。</summary>
+        private void InitVoiceCloudKeySetting()
+        {
+            voiceCloudKeySetting.Setup("PetVoiceCloudKey", "",
+                onClick: () =>
+                {
+                    ShowInputPanel(voiceCloudKeySetting, CurrentVoiceKeyPlain(), (v) =>
+                    {
+                        v = v.Trim();
+                        string cipher = GIC.Pet.PetApiKeyCrypto.Encrypt(v);
+                        GIC.Pet.PetPrefs.WriteVoiceCloud(cipher, GIC.Pet.PetPrefs.ReadVoiceCloudVoiceId());
+                        voiceCloudKeySetting.UpdateValue(GIC.Pet.PetApiKeyCrypto.MaskKey(v));
+                    }, "PetVoiceCloudKeyInput", 400);
+                },
+                onValueConfirmed: null,
+                placeholderKey: "PetApiKeyNotSet");
+            voiceCloudKeySetting.Initialize();
+            RefreshVoiceKeyDisplay();
+        }
+
+        /// <summary>当前云端 key 明文（解密；未设置=空串）</summary>
+        private string CurrentVoiceKeyPlain()
+        {
+            string cipher = GIC.Pet.PetPrefs.ReadVoiceCloudKeyCipher();
+            return string.IsNullOrEmpty(cipher) ? "" : GIC.Pet.PetApiKeyCrypto.Decrypt(cipher);
+        }
+
+        /// <summary>刷新云端 key 行显示（已设置=脱敏；未设置=占位）</summary>
+        private void RefreshVoiceKeyDisplay()
+        {
+            string plain = CurrentVoiceKeyPlain();
+            voiceCloudKeySetting.UpdateValue(string.IsNullOrEmpty(plain)
+                ? ""
+                : GIC.Pet.PetApiKeyCrypto.MaskKey(plain));
+        }
+
+        /// <summary>云端音色 ID：填玩家在供应商侧克隆的音色 ID（如 MiniMax 声音复刻）；
+        /// 空=供应商默认预置少女声。显示原值（非机密）。</summary>
+        private void InitVoiceCloudVoiceIdSetting()
+        {
+            voiceCloudVoiceIdSetting.Setup("PetVoiceCloudVoiceId", "",
+                onClick: () =>
+                {
+                    ShowInputPanel(voiceCloudVoiceIdSetting, GIC.Pet.PetPrefs.ReadVoiceCloudVoiceId(), (v) =>
+                    {
+                        v = v.Trim();
+                        GIC.Pet.PetPrefs.WriteVoiceCloud(GIC.Pet.PetPrefs.ReadVoiceCloudKeyCipher(), v);
+                        voiceCloudVoiceIdSetting.UpdateValue(v);
+                    }, "PetVoiceCloudVoiceIdInput", 200);
+                },
+                onValueConfirmed: null,
+                placeholderKey: "PetVoiceCloudVoiceIdNotSet");
+            voiceCloudVoiceIdSetting.Initialize();
+        }
+
+        /// <summary>语音音量（0..1 步进 10%）：起播时直读——设置改动下一句生效。</summary>
+        private void InitVoiceVolumeSetting()
+        {
+            petVoiceVolumeSetting.Setup("PetVoiceVolume", 0f, 1f, GIC.Pet.PetPrefs.ReadVoiceVolume(),
+                v => GIC.Pet.PetPrefs.WriteVoiceVolume(v), true, 0.1f);
+            petVoiceVolumeSetting.Initialize();
         }
 
         /// <summary>对话模型供应商（2026-08-29 多供应商支持，Spring AI 式"选供应商+填自己的 key"）：

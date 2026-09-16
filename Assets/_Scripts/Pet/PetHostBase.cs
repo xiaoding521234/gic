@@ -351,6 +351,7 @@ namespace GIC.Pet
             }
             RegisterChatTools();
             WireReactionChannel();
+            WireVoice(); // 语音说话层（2026-09-16）：流式增量→逐句 TTS→播放；模式默认关闭
             Debug.Log($"{logTag} 对话已接线（单击派蒙开输入条）");
         }
 
@@ -423,5 +424,36 @@ namespace GIC.Pet
             var urp = target.GetUniversalAdditionalCameraData();
             if (urp != null) urp.renderPostProcessing = false;
         }
+
+        // ---- 语音说话层装配（2026-09-16，docs/19 §6.5.11） ----
+
+        /// <summary>语音装配：说话层组件运行时挂本物体（零 prefab 依赖）→ 订阅聊天流式增量 +
+        /// 反应兜底钩子（兜底文案也念）→ 宿主差异的 AudioListener 兜底。独立 try-catch 防泄漏
+        ///（语音缺席不影响任何既有功能——模式默认关闭，玩家在 设置→派蒙→语音 开启）。</summary>
+        void WireVoice()
+        {
+            try
+            {
+                var session = _chatUI != null ? _chatUI.sessionRef : null;
+                if (session == null) return;
+                var speaker = GetComponent<Chat.PetVoiceSpeaker>();
+                if (speaker == null) speaker = gameObject.AddComponent<Chat.PetVoiceSpeaker>();
+                speaker.Wire(_chatUI, session.clientRef);
+                // 反应兜底文案也念（单漏斗口：PetReactionConsumer.ShowFallback）
+                var consumer = GetComponent<Chat.PetReactionConsumer>();
+                if (consumer != null) consumer.onFallbackShown += speaker.SpeakText;
+                EnsureAudioListener();
+                Debug.Log($"{logTag} 语音说话层已接线（设置→派蒙→语音 开启生效）");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"{logTag} 语音说话层接线失败（其余功能不受影响）：{e.Message}");
+            }
+        }
+
+        /// <summary>AudioListener 兜底（宿主差异）：默认空操作——游戏内形态主场景恒有 Listener；
+        /// 桌面形态场景无任何音频设施（2026-09-16 实证：PaimonPet.unity 无 Listener，整个进程哑），
+        /// 覆写为缺则补挂相机上。</summary>
+        protected virtual void EnsureAudioListener() { }
     }
 }
