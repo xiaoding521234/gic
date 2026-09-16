@@ -1124,3 +1124,89 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **验收**：蒙皮正确性可纯数学终验——逐顶点 `Σw·(boneWorld·bp)·v ≈ v`，安柏 21 个部件全部 0.00000。视觉仍交用户目检。
 
 **资产**：`Assets/Art/AmberExtract/`（README 里有全链路）；提取脚本 `.codely-cli/tmp/ambor/`；操作流程已入 `gic-gi-extract` skill「完整角色模型+动画提取」节。
+
+## 56. GI Avatar 动画=Humanoid 肌肉压缩格式：AnimeStudio .anim 导出丢主体动画 + 厘米/米制位置失配=「严重拉伸变形」（2026-09-15 安柏 TMR 实证）
+
+**现象**：安柏 154 条官方动画在 AmberTMR 上播放严重拉伸变形；同链路派蒙 199 条 NPC 动画正常。用户怀疑「提取出的动作不是安柏的」。
+
+**结论**：动作确属安柏本人（154 条全名 `Ani_Avatar_Girl_Bow_Ambor_*`，源 blk 04161624）；问题在**存储格式与单位**，不在归属。
+
+**勘误**（推翻 §55 坑 5 与 skill 旧记载的「物理骨=压缩哈希不可读」——归因记反了）：
+- 物理骨（+HairB/+EarS/+Breast/+LegBagS/+PelvisTwist/手指/Weapon 挂点）曲线=**可读 TRS**，是 clip 里的「通用附加绑定」，Attack_05 中 80 条真动画全在此；
+- **主体骨骼（Biped 核心）才是压缩部分**：GI Avatar 动画=标准 Unity **Humanoid 肌肉 clip**（m_Compressed=true、m_MuscleClip、密集数据流式存 blk 同包 .resS；`--export_type JSON` dump 可见 m_DenseClip 空 + `archive:/...resS`）；**NPC 动画=普通 TRS**——这就是「派蒙正常 / 安柏残废」的分水岭。
+
+**根因链（全实证）**：
+1. AnimeStudio Convert 导出 .anim：肌肉绑定只写出**常量值**（Attack_05 265 曲线 185 条常量，含全部 ~40 肌肉 + RootT/Q + 手脚 IK 曲线），密集身体动画未解码导出 → 主体全程单一姿态（人偶）；肌肉 float 曲线属性名（Left Arm Down-Up 等）legacy Animation 也播不动。
+2. 物理/手指 TRS 曲线在 TMR 骨架上照常播放（骨骼同源、旋转量级一致）——配上静止主体=配件乱甩。
+3. **位置曲线单位失配（拉伸主因）**：clip 位置值=GI 厘米制（+HairB L B01 常量 -0.126），TMR 骨架=米制（同骨 rest -0.0013），×100 失配 → 播放时物理骨被甩到约百倍远处，蒙皮随骨拉出=严重拉伸变形。
+4. 次要：WeaponL/R、AO_、HitObject 路径 TMR 无对应节点不绑定（无害）；`path_3559852561` 等 3 个字面量路径不在 132 骨路径表内（binding 表 43/47 命中，哈希空间=CRC32 无误）。
+
+**验证工具**（`.codely-cli/tmp/ambor/`）：`curve_stats.cjs` 曲线方差统计（区分真动画/常量）、`reverse_hash.cjs` CRC32 反查；源头结构用 CLI `--export_type JSON` dump AnimationClip。
+
+**修复方向（2026-09-15 待拍板）**：A=止血（位置曲线 ×0.01 或剥离，主体保持常量姿态）；B=网检社区 GI 动画解码器（AssetRipper streamed clip 支持 / GIMI-Blender 导入器）后离线烘 TRS；C=自研解码 resS 肌肉数据+复刻 Unity 肌肉求值；D=重建真 humanoid clip + Animator 重定向。**通则：AnimeStudio 导出的 Ani_Avatar_* clip 一律不得当完整动画使用；Ani_NPC_* 可直读。**（落地定案见 §57）
+
+## 57. 方案B 首次 Play 验证「头发炸帆」：legacy 通道位置曲线从未做单位换算，被双通道机制每帧覆盖到正确值上（2026-09-16 实证，§56 位置失配的最终闭环）
+
+**现象**：方案B（解码 ACL→可编辑肌肉 clip）双通道首验：Play 后**身体/腿/手臂/躯干完好未破坏**（骨架比例正常——单帧截图只能证明主体没炸，肌肉是否真正驱动身体运动需目检确认），但头发从颈部锚点炸成巨大帆状面片、棕色长条拉出画面外——只炸物理骨区域，主体完好。
+
+**架构背景**（AmberTestPanel 双通道）：Animator+PlayableGraph 放新肌肉 clip（MuscleClips/，153 条），Animation 组件放 legacy clip（Clips/，154 条，物理骨 TRS 完整变化动画）。两通道**同时驱动同一批 42 根物理骨**。
+
+**根因**：build_editable.cjs 建新肌肉 clip 时已正确把位置 ÷100（与 TMR 骨架本征单位吻合），**但 legacy clip 的位置曲线从未换算**（保留 AnimeStudio 导出的 GI 原始量级，×100）。Play 时 legacy Animation 求值在 Animator 之后，每帧用 ×100 位置**覆盖**掉 Animator 写入的正确值 → 物理骨甩百倍远。下半身正常=legacy POS 曲线只含头发/耳/胸/腿袋/裙摆骨，不含腿骨。
+
+**定案证据（三源收敛）**：TMR prefab 骨架 rest（+HairB L B01 = -0.00126）≈ 新肌肉 clip POS（-0.00126）= legacy POS ÷100（-0.126→-0.00126）；且 Attack_05 legacy 全局 POS max=1.15 与新 clip max=0.0115 严格 ÷100 对应（两套独立来源交叉验证）。单位本质：TMR FBX 骨骼局部偏移 = GI 动画值的 ×0.01。
+
+**修复**：`fix_legacy_pos.cjs`（`.codely-cli/tmp/ambor/`）批量把 154 个 legacy clip 的 m_PositionCurves 值与斜率 ×0.01（带 maxAbs<0.05 幂等跳过守卫防二次缩放；只动 Position 段，Rotation/Scale/Float 不碰）——150 文件修复，4 个 StandbyIK/WeaponStandbyIK clip 无位置曲线天然免修；git diff 逐行核验+编辑器 AnimationUtility 回读 firstKey 确认生效。
+
+**遗留（已知未修）**：legacy clip 内仍混 ~150 条肌肉 FLT 曲线（classID 95 在 legacy Animation 通道不绑定、播放无害），内含解码垃圾值（RightFootQ.y=-5.15、LeftHand.Ring.1 Stretched=±1e+37）——新肌肉 clip 的肌肉段大概率同污（同一解码流），Unity 肌肉钳制兜底，目检时关注左手无名指即可。若后续把物理骨完整 TRS 烘进新肌肉 clip（当前只有首帧常量快照），legacy 通道可整体退役。
+
+**通则**：双通道驱动同一批骨骼时，求值顺序=覆盖关系（legacy Animation 后于 Animator），两通道数据单位必须各自对齐目标骨架；GI 角色管线换算因子=位置 ÷100（斜率同缩），旋转/缩放不动。
+
+## 58. Animator 组件 disabled 时自建 PlayableGraph 照常播放、人形肌肉求值静默不写骨骼——「图在播但身体零驱动」先查 enabled 位（2026-09-16 安柏肌肉通道取证定案）
+
+**现象**：AmberTestPanel 双通道播放，头发/配饰（legacy Animation 通道）正常动，身体（Animator+肌肉 clip 通道）完全静止，连点 13 条动作全部如此、零报错。
+
+**取证**（§39 活体诊断）：自建 PlayableGraph `IsValid=True IsPlaying=True outs=1`、clip `isHumanMotion=True`、`avatar=AmberAvatar` `ctrl=AmberTestController` 全在——一切看似正常，唯独 **`Animator.enabled=False`**；0.7s 采样：arm/spine 旋转增量 0.00°、hair 4.82°。prefab 序列化位 `m_Enabled: 0`。
+
+**根因**：AnimationPlayableOutput 目标 Animator 处于 disabled 时，图照常评估但人形肌肉写回被静默跳过，无任何报错。2026-09-16 早前「编辑器 PlayableGraph Evaluate 肌肉写回不稳定（测试骨架可、安柏无效）」的真身即此——测试骨架的 Animator 开着、安柏 prefab 的关着，与编辑器域无关。
+
+**修复**：prefab Animator `m_Enabled: 0→1` + 面板 Awake 自愈守卫（`!animator.enabled` 则置真）。
+
+**通则**：Playable 驱动人形角色「图在播、骨骼零写回」时，先查 **Animator.enabled / cullingMode / avatar** 三件，再怀疑数据格式；`IsPlaying()==true` 不代表输出在生效。
+
+## 59. 「身体零驱动」终极定案（三因叠加）：运行时肌肉求值只认 m_MuscleClip 密集流 + 导入器 autoGenerate 对非标准 T-pose 写出理想化废参照位姿——isValid/isHuman 全绿照样零输出（2026-09-16 安柏三连环收官实证）
+
+**现象接 §58**：Animator.enabled 修好后身体依然零驱动。隔离实验（停面板+禁 legacy Animation+自建图单播）无效，armΔ 恒 0.00°。
+
+**2×2 差分定案**（clip 形态 × rig，运行时采样）：手写 **m_MuscleClip（v11）版 Attack_05 → TestRig armΔ=48.99°（在动！）→ Amber armΔ=0.00°**；真 Unity 生成的 **ExtractedTestAction（m_FloatCurves 可编辑形态）→ TestRig armΔ=0.41°（近零）**——连亲儿子 rig 都不动，铁证：**运行时肌肉求值只读 m_MuscleClip 密集流，m_FloatCurves classID95 仅为编辑器可编辑视图**。09-16 早前「手写 m_MuscleClip 被无视」是被 disabled Animator 污染的误判——v11 形态才是运行时正解。
+
+**Amber 接收侧根因（对照取证）**：AmberAvatar=FBX 导入器 autoGenerate 产物（meta `human:[]`+`skeleton:[]`+`autoGenerateAvatarMappingIfUnspecified:1`），ForceUpdate 重导入复现同结果——**GI 骨架的自然站立 rest 不被识别为标准 T-pose，自动装配把 desc.skeleton 写成理想化双足位姿（76/93 骨与 FBX 真实 rest 不符，UpperArm 实际 -23° 被写成恒等）**；TestRig（mixamo 标准 T-pose）捕获正确（21/21 全匹配）。**Avatar.isValid=true、isHuman=true、52 映射正确、limit 全 useDefaultValues——一切体检全绿，唯独参照位姿是废的，运行时静默零输出**。层级 ×100 缩放、双通道干扰、limit 退化三个假设全部被判别实验排除。
+
+**一发实锤**：运行时用 FBX 真实 rest 重建 Avatar（AvatarBuilder.BuildHumanAvatar+52 映射原样拷贝+实时层级抓 SkeletonBone）挂上 Animator → **同一 v11 clip armΔ=63.30°**。
+
+**落地修复**：①`AmberAvatarReal.asset`（BuildHumanAvatar 产物）接入 prefab Animator；②153 个 MuscleClips 同名覆盖为 v11 m_MuscleClip 形态（GUID 不动、控制器引用不断）；③双通道保留（legacy 提供物理骨完整动画）。
+
+**通则**：①手搓人形肌肉 clip 必须写成 m_MuscleClip 密集流形态（v11），m_FloatCurves 形态编辑器看得见、运行时不动；②「导入器 autoGenerate 的 Avatar + 非标准 T-pose 骨架」= 废参照位姿陷阱——肌肉管线对不上时用「desc.skeleton vs FBX 资产 rest 逐骨比对」体检（healthy capture 应全匹配）；③判别套路=2×2 差分（换 clip 形态 × 换 rig）+运行时重建 Avatar 实验，比理论推演快十倍；④Unity 系体检（isValid/isHuman）查不出参照位姿废——API 的绿≠数据绿。
+
+## 60. 肌肉 clip 运行时求值的真正门闩=m_ClipBindingConstant 私有哈希格式（Tuanjie 特有）——手写 YAML 与编辑器 API 双双无法构造，五路全灭（2026-09-16 安柏身体动画最终卡点定案）
+
+**§59 勘误**：「运行时不读 m_FloatCurves」结论**半错**——NativeRef（Tuanjie 导入器生成的原生肌肉 clip 经 Instantiate 拷贝为独立 .anim=m_FloatCurves 形态）在 Amber 官方 Avatar 上 in-play armΔ=26.43°（复测稳定）→ **m_FloatCurves 形态运行时可以被求值**，前提是 clip 携带正确的绑定结构。当时 ExtractedTestAction 的 0.41° 实为该动画末段的小幅运动+姿势切换跳变（改进采样法「播放中连续变化」后区分出真驱动）。
+
+**真门闩（SerializedObject 取证）**：①原生 clip 的 `m_ClipBindingConstant.genericBindings`=130 条、path 字段=**Integer 哈希**（非字符串路径）、attribute=负数哈希枚举（-993..-864）、customType=8——**Tuanjie 私有序列化格式**；②手写 v11 的 binding 段（标准 Unity 格式 path 字符串+attribute 1/2/4）**反序列化读出 n=0**——整段被静默丢弃 → 任何曲线（骨 TRS+肌肉）都无绑定 → 求值零输出。物理骨动画看似在播实为 legacy 通道的功劳。③`AnimationUtility.SetEditorCurve` API 重建（547 条曲线写入成功、引擎自建 253 条 binding）——**肌肉仍不求值**：SetEditorCurve 过程会清掉 m_MuscleClip 段（嫁接模板实验证实 muscleClipSize 消失）→ 丢失肌肉求值上下文。④AnimationMode.SampleAnimationClip 编辑器采样同样不求值手写肌肉曲线（编辑器/运行时同源）。⑤root 元数据（m_StartX/m_MotionStartX/m_StopX/m_AverageSpeed+dense 流 Motion/Root 列 410-423）走 m_MuscleClip 元数据通道**可以被读**（实测 head.y 随其值变化：-3.56 未修时下沉 3.3m）——单位=GI 引擎厘米，置零/÷100 修正后 head.y=1.208~1.93 正常。
+
+**五路全灭清单**：手写 v11 m_MuscleClip（binding 读不进）→手写 m_FloatCurves（同因）→SetEditorCurve 重建（清 m_MuscleClip）→嫁接模板+API 覆写（同因）→AnimationMode 离线烘焙（编辑器也不求值手写曲线）。**唯一被求值的形态=ModelImporter 从 FBX 导入生成**（原生结构）——肌肉→TRS 的求值数学在引擎 native 侧，无法离线复刻，鸡生蛋死结。
+
+**当前可用成果**：Amber 官方参照 Avatar（AmberAvatarReal，官方 T-pose 旋转+官方位置÷100）下，模型姿势正常（不再拧碎）、高度正常（不下沉不飞天）、legacy 通道头发/配饰动画完整——身体肌肉动画待后续路线。
+
+**后续路线选项**：A=网检社区 GI 动画烘焙工具（Genshin Blender 插件系生态已逆向肌肉→TRS 数学，烘成 FBX 后走 ModelImporter 导入）；B=自研肌肉→TRS 数学（AnimationJob 每帧按 Avatar muscle limits 计算，52 骨×3 肌肉轴约定需逆向）；C=Bug Hunter 提交（Tuanjie 手写肌肉 clip 的私有 binding 格式无文档+SetEditorCurve 破坏 m_MuscleClip，能力失效级素材）。
+
+**通则**：①Tuanjie 序列化格式≠标准 Unity YAML——手写资产先过「SerializedObject 读回验证」关（读出 n=0=格式被静默丢）；②「armDelta 类单点测量」必须用「播放中连续变化」采样法，姿势切换跳变会伪装成驱动；③引擎求值链=数据段×绑定段×求值上下文三件套，缺一静默零输出。
+
+## 61. 路线A网检+「嫁接求值」终局：社区无轮子、嫁接目检失败——手搓肌肉管线正式放弃（2026-09-16 用户拍板）
+
+**路线A网检结论**（详见 webrefs/genshin-anim-bake/ 登记）：①MonkeyAss-byte/AnimeStudio-ACL-Fix=哈希路径还原+完整 ACL 解码，肌肉值只输出 Floats 曲线、**无肌肉→TRS 求值**；②UniVRM/UniGLFT 对肌肉绑定 NotImplemented 跳过；③上游 issue #85「ZZZ FBX 导出完美」真相=ZZZ 数据本体是 TRS 轨（qvvf），GI 主体=肌肉标量不可类比；④AssetRipper 无 glTF 动画导出；⑤GI 官方 dump 的 m_Human.m_Handles 为空（无肌肉轴捷径）。**社区无现成轮子成立**。
+
+**嫁接求值实验**（不装标准 Unity 的最后尝试）：Tuanjie 亲生成的原生 clip（TestRig|TestAction）Instantiate 拷贝=可独立播放的肌肉 clip（在 Amber 官方 Avatar 上驱动 26~62°）→ **用它当结构容器，逐条 SetEditorCurve 替换肌肉曲线值为我们解码的数据** → 运行时实证 armΔ=22°/spineΔ=7°（求值链通）——但用户目检**姿势非常糟糕**（官方参照位姿与 GI 官方肌肉空间的差异、52 映射肌肉范围用 Unity 默认值而非 GI 原生范围、以及 TestAction 容器的 root 语义残留），**放弃**。
+
+**终局状态（可交付）**：①安柏=正常姿势站立（AmberAvatarReal 官方参照 Avatar）+头发/配饰 legacy 动画完整；②153 条解码肌肉数据（JSON）+全套陷阱知识（§56-60）留档，未来任何方案（官方工具/更强逆向）的输入；③探针实验资产已清理（MuscleClipProbe 仅留 TestRig.fbx 对照）。
+
+**通则**：①「能驱动」≠「驱动正确」——肌肉空间的参照位姿/范围/轴向三者必须与数据原生语义对齐，错位输出的是乱舞而非报错；②视觉验收失败时，姿势级偏差与数据级错误要先分离（本例=官方 T-pose 参照 vs GI 肌肉空间的系统性错位，非数据错误）；③重度逆向任务（引擎私有格式+官方肌肉空间数学）的投入应在早期用「最小目检样张」验证可行性，而非在数据链上层层推进后再交视觉验收——本例的教训是样张出得太晚（嫁接样张早出可省 3 轮格式战争）。

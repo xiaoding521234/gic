@@ -568,6 +568,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7837022057273125960}
   - component: {fileID: 2327739097735292693}
+  - component: {fileID: 1287554409128433960}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: Avatar_Girl_Bow_Ambor
@@ -761,6 +762,41 @@ Animation:
   m_PlayAutomatically: 1
   m_AnimatePhysics: 0
   m_CullingType: 0
+--- !u!95 &1287554409128433960
+Animator:
+  serializedVersion: 6
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2011693059432241686}
+  m_Enabled: 1
+  m_Avatar: {fileID: 9000000, guid: 93233497c29424c479ae1885a141715e, type: 2}
+  m_Controller: {fileID: 9100000, guid: e6ac67197510a724d8e5d8c1b0970560, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_UpdateFrequencyMode: 0
+  m_UpdateFrequency: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
+    are already bound by a Humanoid avatar. These transforms can only be changed
+    by Humanoid clips.\n\tTransform 'Bip001 R Finger0'\n\tTransform 'Bip001 L Finger0'\n\tTransform
+    'Bip001 R Finger02'\n\tTransform 'Bip001 L Finger02'\n\tTransform 'Bip001 R Finger01'\n\tTransform
+    'Bip001 L Finger01'\n\tTransform 'Bip001 R Finger0'\n\tTransform 'Bip001 L Finger0'\n\tTransform
+    'Bip001 R Finger02'\n\tTransform 'Bip001 L Finger02'\n\tand more ...\n\tFrom
+    animation clip 'Ani_Avatar_Girl_Bow_Ambor_Attack_05'\n\tFrom animation clip 'Ani_Avatar_Girl_Bow_Ambor_ElementalArt_Long_01'\n\tFrom
+    animation clip 'Ani_Avatar_Girl_Bow_Ambor_ElementalArt_Middle_01'\n\tFrom animation
+    clip 'Ani_Avatar_Girl_Bow_Ambor_ElementalArt_Middle_02'\n\tFrom animation clip
+    'Ani_Avatar_Girl_Bow_Ambor_ElementalArt_Short'\n\tFrom animation clip 'Ani_Avatar_Girl_Bow_Ambor_ElementalArt_Short_AS'\n\tFrom
+    animation clip 'Ani_Avatar_Girl_Bow_Ambor_FallingAttack_BS_01'\n\tFrom animation
+    clip 'Ani_Avatar_Girl_Bow_Ambor_FallingAttack_BS_02'\n\tFrom animation clip 'Ani_Avatar_Girl_Bow_Ambor_Show_01'\n\tFrom
+    animation clip 'Ani_Avatar_Girl_Bow_Ambor_Show_02'\n\tand more ..."
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &2090111131166437961
 GameObject:
   m_ObjectHideFlags: 0
