@@ -2609,87 +2609,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.053774565, y: 0.048309136, z: -0.0328296}
+        value: {x: -0.00053774565, y: 0.00048309136, z: -0.000328296}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -2701,87 +2701,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.033212375, y: 0.000116424555, z: -0.00068643567}
+        value: {x: -0.00033212375, y: 0.00000116424555, z: -0.0000068643567}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -2793,87 +2793,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.053774565, y: 0.048308715, z: 0.03282791}
+        value: {x: -0.00053774565, y: 0.00048308715, z: 0.0003282791}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -2885,87 +2885,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.033216722, y: 0.00011657715, z: 0.0006886291}
+        value: {x: -0.00033216722, y: 0.0000011657715, z: 0.000006886291}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -2977,87 +2977,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12597808, y: -0.07089973, z: 0.025929557}
+        value: {x: -0.0012597808, y: -0.0007089973, z: 0.00025929557}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3069,87 +3069,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.17541558, y: -1.2207031E-06, z: 4.863739E-07}
+        value: {x: -0.0017541558, y: -1.2207031e-8, z: 4.863739e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3161,87 +3161,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12436485, y: 7.629394E-07, z: 9.441375E-07}
+        value: {x: -0.0012436485, y: 7.629394e-9, z: 9.441375e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3253,87 +3253,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.121495284, y: -5.340576E-07, z: -6.4849854E-07}
+        value: {x: -0.00121495284, y: -5.340576e-9, z: -6.4849854e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3345,87 +3345,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12598236, y: -0.070899926, z: -0.02593405}
+        value: {x: -0.0012598236, y: -0.00070899926, z: -0.0002593405}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3437,87 +3437,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.17541206, y: 1.14440915E-07, z: -2.8610228E-07}
+        value: {x: -0.0017541206, y: 1.14440915e-9, z: -2.8610228e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3529,87 +3529,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12436897, y: 1.7547607E-06, z: -6.1035155E-07}
+        value: {x: -0.0012436897, y: 1.7547607e-8, z: -6.1035155e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3621,87 +3621,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12149383, y: -1.4495849E-06, z: 1.3160706E-06}
+        value: {x: -0.0012149383, y: -1.4495849e-8, z: 1.3160706e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3713,87 +3713,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.22555359, y: 0.035433672, z: -0.004230361}
+        value: {x: -0.0022555359, y: 0.00035433672, z: -0.00004230361}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3805,87 +3805,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.09712883, y: 1.9073485E-07, z: -7.629394E-07}
+        value: {x: -0.0009712883, y: 1.9073485e-9, z: -7.629394e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3897,87 +3897,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.22555205, y: 0.03543396, z: 0.0042252997}
+        value: {x: -0.0022555205, y: 0.0003543396, z: 0.000042252997}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -3989,87 +3989,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.09713173, y: -2.4414062E-06, z: -1.5258788E-06}
+        value: {x: -0.0009713173, y: -2.4414062e-8, z: -1.5258788e-8}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4081,87 +4081,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.09440658, y: 0.0018345261, z: 0.10066865}
+        value: {x: -0.0009440658, y: 0.000018345261, z: 0.0010066865}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4173,87 +4173,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.09440872, y: 0.001831398, z: -0.10066766}
+        value: {x: -0.0009440872, y: 0.00001831398, z: -0.0010066766}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4265,87 +4265,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: 0.00027770994, y: 0.08819145, z: 3.1024217E-07}
+        value: {x: 0.0000027770994, y: 0.0008819145, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4357,87 +4357,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.0057774354, y: 0.088211, z: 3.1024217E-07}
+        value: {x: -0.000057774354, y: 0.00088211, z: 3.1024217e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4449,87 +4449,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.04380371, y: 0.04044416, z: -0.049510114}
+        value: {x: -0.0004380371, y: 0.0004044416, z: -0.00049510114}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4541,87 +4541,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.043803785, y: 0.04044424, z: 0.049505215}
+        value: {x: -0.00043803785, y: 0.0004044424, z: 0.00049505215}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4633,87 +4633,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.0015413666, y: 0.010466842, z: 0.04338781}
+        value: {x: -0.000015413666, y: 0.00010466842, z: 0.0004338781}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4725,87 +4725,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.085274965, y: 3.0517576E-06, z: -7.6293944E-08}
+        value: {x: -0.00085274965, y: 3.0517576e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4817,87 +4817,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.025867233, y: 0.045212783, z: -0.16516317}
+        value: {x: -0.00025867233, y: 0.00045212783, z: -0.0016516317}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -4909,87 +4909,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.113092035, y: 1.5258788E-06, z: -1.5258789E-07}
+        value: {x: -0.00113092035, y: 1.5258788e-8, z: -1.5258789e-9}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -5001,87 +5001,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12495574, y: 6.1035155E-07, z: 7.6293944E-08}
+        value: {x: -0.0012495574, y: 6.1035155e-9, z: 7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -5093,87 +5093,87 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.016666668
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.033333335
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.050000004
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.06666667
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.083333336
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.10000001
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.116666675
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.13333334
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.15
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.16666667
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.18333334
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.20000002
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.21666668
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.23333335
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.25
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.26666668
-        value: {x: -0.12668465, y: -1.0299682E-06, z: -7.6293944E-08}
+        value: {x: -0.0012668465, y: -1.0299682e-8, z: -7.6293944e-10}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
@@ -5185,12 +5185,12 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 2
         time: 0
-        value: {x: -0.0003053665, y: 0.0009642982, z: -0.00045791626}
+        value: {x: -0.000003053665, y: 0.000009642982, z: -0.0000045791626}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       - serializedVersion: 2
         time: 0.28333333
-        value: {x: -0.0003053665, y: 0.0009642982, z: -0.00045791626}
+        value: {x: -0.000003053665, y: 0.000009642982, z: -0.0000045791626}
         inSlope: {x: 0, y: 0, z: 0}
         outSlope: {x: 0, y: 0, z: 0}
       m_PreInfinity: 2
