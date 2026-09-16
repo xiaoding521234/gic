@@ -840,6 +840,66 @@ MonoBehaviour:
       ease.
     m_Metadata:
       m_Items: []
+  - m_Id: 9081
+    m_Localized: Voice
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9082
+    m_Localized: Off
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9083
+    m_Localized: Local TTS Server
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9084
+    m_Localized: Cloud TTS
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9085
+    m_Localized: TTS Server Address
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9086
+    m_Localized: Enter TTS server address
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9087
+    m_Localized: TTS Launcher Program
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9088
+    m_Localized: Enter launcher path
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9089
+    m_Localized: Not set (no auto-start)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9090
+    m_Localized: TTS API Key
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9091
+    m_Localized: Enter TTS API key
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9092
+    m_Localized: Voice ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9093
+    m_Localized: Enter voice ID
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9094
+    m_Localized: Not set (default voice)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9095
+    m_Localized: Voice Volume
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

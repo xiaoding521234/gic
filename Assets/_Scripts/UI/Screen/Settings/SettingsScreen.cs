@@ -78,6 +78,14 @@ namespace GIC.UI
         public DropdownSettingItem petCloseSetting; // 2026-08-27 从"其它"栏挪入"派蒙"栏
         public ButtonSettingItem petApiKeySetting;  // 2026-08-28 对话 API Key（玩家自输，加密存储）
 
+        [Header("派蒙语音（2026-09-16，docs/19 §6.5.11：三模式=关闭/本地侧车/云端TTS+克隆；零进包）")]
+        public DropdownSettingItem voiceModeSetting;        // 语音模式三选
+        public ButtonSettingItem voiceSidecarUrlSetting;   // 侧车地址（默认 127.0.0.1:9880）
+        public ButtonSettingItem voiceSidecarPathSetting;   // 侧车程序路径（可选自动拉起）
+        public ButtonSettingItem voiceCloudKeySetting;     // 云端 key（加密存 pet.json，脱敏显示）
+        public ButtonSettingItem voiceCloudVoiceIdSetting; // 云端音色 ID（空=默认预置）
+        public SliderSettingItem petVoiceVolumeSetting;     // 语音音量（起播直读，下一句生效；命名避让声音区 voiceVolumeSetting）
+
         [Header("其它设置")]
         public GameObject otherSettings;
 

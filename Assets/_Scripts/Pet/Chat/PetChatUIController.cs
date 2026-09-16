@@ -143,8 +143,18 @@ namespace GIC.Pet.Chat
 
         /// <summary>对话流接管通知（Send 重接流式回调前触发，2026-08-31）：PetReactionConsumer 订阅——
         /// 在途的反应流将被新请求 AbortActive **静默**中止（onComplete/onError 均不触发），
-        /// 其 _generating 状态靠本通知复位并摘除自己的处理器（对话优先，本批反应错失不弹 fallback）。</summary>
+        /// 其 _generating 状态靠本通知复位并摘除自己的处理器（对话优先，本批反应错失不弹 fallback）。
+        /// 语音说话层（PetVoiceSpeaker）同订：新对话=清语音队列停播（2026-09-16，docs/19 §6.5.11）。</summary>
         public event Action chatStreamTakingOver;
+
+        /// <summary>对话关闭通知（CloseChat 收尾触发，2026-09-16）：语音说话层订阅——
+        /// ESC/外点关闭后停播清队列（语音不念给已关闭的气泡）。</summary>
+        public event Action chatClosed;
+
+        /// <summary>新气泡开始通知（showBubble/BeginProactiveStream 两个气泡入口触发，2026-09-16 用户拍板
+        /// 「下一个气泡出来时，之前的停止」——反应通道高频时旧语音必须被打断不能叠播）：语音说话层订阅
+        /// →清队列停播+废弃在途合成。对话流首增量走 typewriter 不触发本事件（不会自己打断自己）。/summary>
+        public event Action bubbleStarted;
 
         /// <summary>头部锚点提供器（宿主注入：返回派蒙头顶的 Canvas 屏幕坐标；null=气泡藏屏顶中央）</summary>
         [HideInInspector] public System.Func<Vector2> headAnchorProvider;
@@ -195,6 +205,7 @@ namespace GIC.Pet.Chat
             _proactiveMode = false;
             if (_bubbleRoot != null && _bubbleRoot.gameObject.activeSelf)
                 StartBubbleFade(0f); // 立即淡出（无停留）
+            chatClosed?.Invoke(); // 语音说话层停播清队列（2026-09-16，docs/19 §6.5.11）
         }
 
         /// <summary>主动气泡（LLM 失败兜底直出——AI 抽卡反应等）：整段显示，
@@ -214,6 +225,7 @@ namespace GIC.Pet.Chat
         public void BeginProactiveStream()
         {
             if (_bubbleText == null) return;
+            bubbleStarted?.Invoke(); // 新气泡开始=打断旧语音（说话层清队列+废弃在途，2026-09-16 拍板）
             _proactiveMode = true;
             CancelBubbleFade();
             if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
@@ -1174,6 +1186,7 @@ namespace GIC.Pet.Chat
         /// <summary>整段显示（错误/提示/非流式完成）</summary>
         void showBubble(string msg)
         {
+            bubbleStarted?.Invoke(); // 新气泡开始=打断旧语音（兜底直出/错误文案路径；随后新文本按需入队，2026-09-16 拍板）
             StopThinking(); // 整段内容直接顶掉思考动画（错误文案/兜底直出路径）
             if (_typingCoroutine != null) { StopCoroutine(_typingCoroutine); _typingCoroutine = null; }
             CancelBubbleFade();
