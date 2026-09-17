@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
+using GIC.UI;
 
 namespace GIC.Battle
 {
@@ -71,8 +72,18 @@ namespace GIC.Battle
         private RectTransform _skillZone;
         private RectTransform _handZone;
         private RectTransform _cancelButton;
-        private RectTransform _skillPopup;
-        private TextMeshProUGUI _popupText;
+
+        // 技能详情（现有体系复用：Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab）
+        private SkillDetailView _skillDetailView;
+
+        // 技能盘按钮（图标+名称运行时按选中单位填：UnitData.skills → SkillData）
+        private Image _skillIcon;
+        private Image _burstIcon;
+        private Image _ensoIcon;
+        private Button _ensoButton;
+        private TextCombiner _skillNameText;
+        private TextCombiner _burstNameText;
+        private TextCombiner _ensoNameText;
 
         // 高亮（世界层）
         private Transform _highlightRoot;
@@ -84,9 +95,13 @@ namespace GIC.Battle
         private HudState _state = HudState.Idle;
         private AimMode _aimMode;
         private string _selectedUnitId;
-        private readonly HashSet<BattleCell> _aimCells = new HashSet<BattleCell>();
-        private bool _popupOpen;
         private string _popupButtonKey;
+        private string _aimButtonKey;
+        private readonly HashSet<BattleCell> _aimCells = new HashSet<BattleCell>();
+
+        /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——其自带 Update 也关面板，勿另存布尔失同步）</summary>
+        private bool PopupOpen => _skillDetailView != null && _skillDetailView.skillDetailPanel != null
+            && _skillDetailView.skillDetailPanel.activeSelf;
 
         // ==================== 绑定 ====================
 
@@ -201,7 +216,7 @@ namespace GIC.Battle
                     return;
 
                 case HudState.UnitSelected:
-                    if (_popupOpen) { ClosePopup(); return; }        // 情况②：面板开着点外部=收面板（选中保持）
+                    if (PopupOpen) { ClosePopup(); return; }          // 情况②：面板开着点外部=收面板（选中保持）
                     if (myUnit != null) { SelectUnit(myUnit.unitId); return; } // 换选中
                     if (enemyUnit != null) return;                    // 点敌方：无操作
                     DeselectUnit();                                   // 点空白=取消选中
@@ -237,7 +252,7 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             var unit = snapshot?.units.FirstOrDefault(u => u.unitId == unitId);
             if (unit != null)
-                RefreshSkillIcons(unit.unitName);
+                RefreshSkillButtons(unit.unitName);
             _handZone.gameObject.SetActive(false);
             _moveButton.gameObject.SetActive(true);
             _skillZone.gameObject.SetActive(true);
@@ -258,6 +273,7 @@ namespace GIC.Battle
         private void EnterAiming(AimMode mode, string skillButtonKey)
         {
             _aimMode = mode;
+            _aimButtonKey = skillButtonKey;
             _state = HudState.Aiming;
             ClosePopup();
             ComputeAimCells();
@@ -322,7 +338,7 @@ namespace GIC.Battle
                 playerId = _myPlayerId,
                 unitId = _selectedUnitId,
                 actionType = _aimMode == AimMode.Move ? ActionType.Move : ActionType.Skill,
-                skillIndex = 0,
+                skillIndex = _aimMode == AimMode.Move ? 0 : GetSelectedSkillIndex(_aimButtonKey),
                 targetUnitId = enemyAtCell != null ? enemyAtCell.unitId : "",
                 moveMagnitude = 1,
                 direction = Direction2D.Up,
@@ -370,7 +386,7 @@ namespace GIC.Battle
         private void OnSkillButtonClicked(string buttonKey)
         {
             if (_state != HudState.UnitSelected) return;
-            if (_popupOpen)
+            if (PopupOpen)
             {
                 if (_popupButtonKey == buttonKey)
                     EnterAiming(AimMode.Skill, buttonKey);
@@ -387,24 +403,22 @@ namespace GIC.Battle
         private void ShowSkillPopup(string buttonKey)
         {
             _popupButtonKey = buttonKey;
-            bool burst = buttonKey == "burst";
-            var name = burst ? "元素爆发" : "元素战技";
-            _popupText.text =
-                $"<size=40>{name}</size>\n" +
-                "<size=28>伤害 —（技能数据 B4 接入）</size>\n" +
-                "<size=28>目标：单个敌方单位</size>\n" +
-                "<size=28>消耗：体力 10</size>\n\n" +
-                "<size=26>再点本按钮 → 进入瞄准 · 点棋盘空白 → 收起</size>";
-            _skillPopup.gameObject.SetActive(true);
-            _popupOpen = true;
+            if (_skillDetailView == null) return;
+
+            // 走现有技能详情体系：UnitData.skills 的 SkillData → SkillDetailView（图标/类型/名称/描述/参数全本地化）
+            var skillData = GetSelectedSkillData(buttonKey);
+            var unitData = GetSelectedUnitData();
+            if (skillData == null || unitData == null) return;
+
+            _skillDetailView.skillDetailPanel.SetActive(true);
+            _skillDetailView.InitWithData(skillData, unitData, null);
+            _skillDetailView.OpenPanel();
         }
 
         private void ClosePopup()
         {
-            if (!_popupOpen) return;
-            _popupOpen = false;
-            if (_skillPopup != null)
-                _skillPopup.gameObject.SetActive(false);
+            if (_skillDetailView != null)
+                _skillDetailView.ClosePanel();
         }
 
         private void OnCancelButtonClicked()
@@ -533,22 +547,28 @@ namespace GIC.Battle
             // 爆发圆心 in-zone 坐标（zone 右下角为原点，pivot 右下）
             var burstCenter = new Vector2(爆发圆心距右, 爆发圆心距底);
 
-            // 爆发（盘心，×1.2）
+            // 爆发（盘心，×1.2）——图标/名称由 RefreshSkillButtons 按选中单位填（UnitData.skills 数据链）
             var burst = MakeActionButton("BurstButton", null, "爆发", 技能按钮直径 * 爆发倍率);
             PlaceInZone(burst, _skillZone, burstCenter);
             burst.GetComponent<Button>().onClick.AddListener(() => OnSkillButtonClicked("burst"));
-            _burstIcon = burst.GetComponent<Image>();
+            _burstIcon = burst.Find("Icon").GetComponent<Image>();
+            _burstNameText = burst.GetComponentInChildren<TextCombiner>();
 
             // 战技（左弧位）
             var skill = MakeActionButton("SkillButton", null, "战技", 技能按钮直径);
             PlaceInZone(skill, _skillZone, burstCenter + new Vector2(-围绕圆心距, 0f));
             skill.GetComponent<Button>().onClick.AddListener(() => OnSkillButtonClicked("skill"));
-            _skillIcon = skill.GetComponent<Image>();
+            _skillIcon = skill.Find("Icon").GetComponent<Image>();
+            _skillNameText = skill.GetComponentInChildren<TextCombiner>();
 
-            // 延奏（上弧位；B4 接入前禁用）
-            var encore = MakeActionButton("EncoreButton", "UI/Other/Faction/mondstadt_windmill", "延奏", 技能按钮直径);
+            // 延奏（上弧位）——配置有 Enso 技能才可交互（RefreshSkillButtons 时定）
+            var encore = MakeActionButton("EncoreButton", null, "延奏", 技能按钮直径);
             PlaceInZone(encore, _skillZone, burstCenter + new Vector2(0f, 围绕圆心距));
-            encore.GetComponent<Button>().interactable = false;
+            _ensoButton = encore.GetComponent<Button>();
+            _ensoButton.onClick.AddListener(() => OnSkillButtonClicked("enso"));
+            _ensoIcon = encore.Find("Icon").GetComponent<Image>();
+            _ensoNameText = encore.GetComponentInChildren<TextCombiner>();
+            _ensoButton.interactable = false;
         }
 
         private static void PlaceInZone(RectTransform rect, Transform zone, Vector2 inZonePos)
@@ -558,9 +578,6 @@ namespace GIC.Battle
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = inZonePos;
         }
-
-        private Image _burstIcon;
-        private Image _skillIcon;
 
         private void BuildHandZone()
         {
@@ -612,20 +629,43 @@ namespace GIC.Battle
 
         private void BuildSkillPopup()
         {
-            _skillPopup = MakeRect("SkillPopup", _canvas.transform);
-            _skillPopup.anchorMin = _skillPopup.anchorMax = new Vector2(1f, 0f);
-            _skillPopup.pivot = new Vector2(1f, 0.5f);
-            _skillPopup.anchoredPosition = new Vector2(-70f, 640f);
-            _skillPopup.sizeDelta = new Vector2(430f, 360f);
+            // 复用现有技能详情面板（Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab——背包/卡牌详情同款，
+            // 图标/类型/名称/描述/参数行全本地化，自带滑入动画与点外关闭）
+            var prefab = Resources.Load<GameObject>("Prefabs/UI/Skill/SkillDetailPanel");
+            if (prefab == null)
+            {
+                GICLog.Warn("[BattleHud] SkillDetailPanel.prefab 未找到，技能详情不可用");
+                return;
+            }
+            var popup = Instantiate(prefab, _canvas.transform, false);
+            popup.name = "BattleSkillDetail";
+            _skillDetailView = popup.GetComponent<SkillDetailView>();
+            if (_skillDetailView == null)
+            {
+                GICLog.Warn("[BattleHud] SkillDetailPanel.prefab 根缺 SkillDetailView 组件");
+                return;
+            }
 
-            var bg = _skillPopup.gameObject.AddComponent<Image>();
-            bg.color = 玻璃底;
+            // 面板初始隐藏，摆到技能盘左侧（prefab 原位是背包场景接线值，须重摆）
+            _skillDetailView.skillDetailPanel.SetActive(false);
+            if (_skillDetailView.relatedPanel != null)
+                _skillDetailView.relatedPanel.SetActive(false);
+            var rect = _skillDetailView.skillDetailPanel.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            var pos = new Vector2(-爆发圆心距右 - 400f, 0f);
+            rect.anchoredPosition = pos;
+            _skillDetailView.RepositionPanel(pos);
 
-            _popupText = MakeText("PopupText", _skillPopup, 顶栏字号 * 0.5f, 文字米白);
-            SetRect(_popupText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 0f), new Vector2(24f, -20f), new Vector2(-48f, 40f));
-            _popupText.alignment = TextAlignmentOptions.TopLeft;
-
-            _skillPopup.gameObject.SetActive(false);
+            if (_skillDetailView.relatedPanel != null)
+            {
+                var relatedRect = _skillDetailView.relatedPanel.GetComponent<RectTransform>();
+                if (relatedRect != null)
+                {
+                    relatedRect.anchorMin = relatedRect.anchorMax = new Vector2(1f, 0.5f);
+                    relatedRect.pivot = new Vector2(1f, 0.5f);
+                }
+            }
         }
 
         // ==================== UI 基础件 ====================
@@ -680,7 +720,7 @@ namespace GIC.Battle
             colors.pressedColor = new Color(0.85f, 0.83f, 0.75f);
             button.colors = colors;
 
-            if (iconPath != null)
+            // 图标位（iconPath null 时也建空位——RefreshSkillButtons 按选中单位的 SkillData.icon 填）
             {
                 var iconGo = new GameObject("Icon");
                 var iconRect = iconGo.AddComponent<RectTransform>();
@@ -689,7 +729,7 @@ namespace GIC.Battle
                 iconRect.anchoredPosition = Vector2.zero;
                 iconRect.sizeDelta = new Vector2(diameter * 0.56f, diameter * 0.56f);
                 var icon = iconGo.AddComponent<Image>();
-                icon.sprite = Resources.Load<Sprite>(iconPath);
+                if (iconPath != null) icon.sprite = Resources.Load<Sprite>(iconPath);
                 icon.raycastTarget = false;
             }
 
@@ -705,6 +745,7 @@ namespace GIC.Battle
             labelText.color = 文字米白;
             labelText.alignment = TextAlignmentOptions.Center;
             labelText.raycastTarget = false;
+            labelGo.AddComponent<TextCombiner>(); // 名称在 RefreshSkillButtons 换为技能名本地化条目
 
             return rect;
         }
@@ -720,27 +761,91 @@ namespace GIC.Battle
             return button;
         }
 
-        // ==================== 技能图标（4 角色临时硬表；B4 SkillConfig 落地后换数据驱动） ====================
+        // ==================== 技能数据链（现有体系：UnitConfig.skills → SkillData；2026-09-18 复用拍板） ====================
 
-        private static readonly Dictionary<UnitName, (string skill, string burst)> SkillIconTable =
-            new Dictionary<UnitName, (string skill, string burst)>
-            {
-                { UnitName.Amber, ("UI/Skills/amber_double_shot", "UI/Skills/arrow_rain") },
-                { UnitName.Kaeya, ("UI/Skills/kaeya_frostgnaw", "UI/Skills/kaeya_glacial_waltz") },
-                { UnitName.Lisa, ("UI/Skills/lisa_violet_arc", "UI/Skills/lisa_lightning_rose") },
-                { UnitName.Barbara, ("UI/Skills/barbara_water_serenade", "UI/Skills/barbara_shining_miracle") },
-            };
+        private UnitConfig _unitConfig;
 
-        private static readonly (string skill, string burst) FallbackIcons = ("UI/Skills/sword_skill", "UI/Skills/badge");
-
-        /// <summary>选中单位时刷新技能盘图标</summary>
-        private void RefreshSkillIcons(string unitName)
+        /// <summary>选中角色的配置数据（头像/技能表/元素全在；BattlePlayer 同款加载）</summary>
+        private UnitConfig.UnitData GetSelectedUnitData()
         {
-            var icons = FallbackIcons;
-            if (Enum.TryParse(unitName, out UnitName name) && SkillIconTable.TryGetValue(name, out var mapped))
-                icons = mapped;
-            _skillIcon.sprite = Resources.Load<Sprite>(icons.skill);
-            _burstIcon.sprite = Resources.Load<Sprite>(icons.burst);
+            if (_unitConfig == null)
+                _unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
+            var snapshot = _session.Player.LatestSnapshot;
+            var unit = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (unit == null) return null;
+            return Enum.TryParse(unit.unitName, out UnitName name) && _unitConfig != null && _unitConfig.TryGetUnitData(name, out var data)
+                ? data : null;
+        }
+
+        /// <summary>按钮键 → 该技能在 UnitData.skills 数组的索引（ActionData.skillIndex 的 Host 侧语义）</summary>
+        private int GetSelectedSkillIndex(string buttonKey)
+        {
+            var unitData = GetSelectedUnitData();
+            if (unitData?.skills == null) return 0;
+            SkillType want = buttonKey switch
+            {
+                "burst" => SkillType.Burst,
+                "enso" => SkillType.Enso,
+                _ => SkillType.Normal,
+            };
+            for (int i = 0; i < unitData.skills.Length; i++)
+                if (unitData.skills[i].skillType == want) return i;
+            return 0;
+        }
+
+        /// <summary>按钮键（skill/burst/enso）→ 该角色的 SkillData（UnitData.skills 按 SkillType 分拣）</summary>
+        private SkillConfig.SkillData GetSelectedSkillData(string buttonKey)
+        {
+            var unitData = GetSelectedUnitData();
+            if (unitData?.skills == null) return null;
+            SkillType want = buttonKey switch
+            {
+                "burst" => SkillType.Burst,
+                "enso" => SkillType.Enso,
+                _ => SkillType.Normal,
+            };
+            return unitData.skills.FirstOrDefault(s => s.skillType == want) ?? unitData.skills.FirstOrDefault();
+        }
+
+        /// <summary>选中单位时刷新技能盘：图标 = SkillData.icon（配置资产 Sprite 引用）；技能名走本地化</summary>
+        private void RefreshSkillButtons(string unitName)
+        {
+            var unitData = GetSelectedUnitData();
+            if (unitData == null) return;
+
+            // 元素色环（现有 ElementFactionConfig 配色链路，同 SkillIconView 底图染色规则）
+            Color elementColor = ElementFactionConfig.Instance != null
+                ? ElementFactionConfig.Instance.GetElementColor(unitData.selfElement)
+                : 文字米白;
+
+            var normal = GetSelectedSkillData("skill");
+            var burst = GetSelectedSkillData("burst");
+            var enso = GetSelectedSkillData("enso");
+
+            ApplySkillButton(_skillIcon, normal, _skillNameText, elementColor);
+            ApplySkillButton(_burstIcon, burst, _burstNameText, elementColor);
+            ApplySkillButton(_ensoIcon, enso, _ensoNameText, elementColor);
+            if (_ensoButton != null)
+                _ensoButton.interactable = enso != null; // 无延奏配置的角色置灰（图标同步隐藏）
+        }
+
+        private void ApplySkillButton(Image iconImage, SkillConfig.SkillData data, TextCombiner label, Color elementColor)
+        {
+            if (iconImage != null)
+            {
+                iconImage.sprite = data != null ? data.icon : null;
+                iconImage.color = Color.white;
+                iconImage.gameObject.SetActive(data != null);
+            }
+            if (label != null)
+            {
+                if (data != null)
+                {
+                    label.ClearAllEntries();
+                    label.AddEntry(data.skillID.GetEntry());
+                }
+                label.gameObject.SetActive(data != null);
+            }
         }
     }
 }
