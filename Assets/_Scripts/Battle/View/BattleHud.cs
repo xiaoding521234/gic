@@ -592,19 +592,18 @@ namespace GIC.Battle
             return rect;
         }
 
-        /// <summary>接线：SkillIconView 视觉填充（InitWithData 现有链）+ Button 驱动点击式状态机 + 底部名称</summary>
+        /// <summary>接线：SkillIconView 视觉填充（InitWithData 现有链）+ 点击转发 + 底部名称。
+        /// 注意：Toggle 与 Button 同为 Selectable 不能共存（UGUI 单 Selectable 限制，2026-09-18 NRE 实锤）——
+        /// 点击事件走非 Selectable 的 IPointerClickHandler 转发件；Toggle 自身 isOn 随点击翻转无副作用
+        /// （ViewType.OnlyDisplay 拦截其跳转/选中环逻辑），瞄准反馈由 SetAimSelectRing 管。</summary>
         private void WireSkillIconButton(RectTransform buttonRect, string buttonKey,
             ref SkillIconView viewRef, ref TextCombiner nameRef)
         {
             var view = buttonRect.GetComponent<SkillIconView>();
             viewRef = view;
 
-            // Toggle 自身交互停用（ViewType.OnlyDisplay 也屏蔽其详情跳转）——改由 Button 驱动本 HUD 状态机；
-            // 选中环 skillSelect 由瞄准态显隐管理（瞄准中亮环=视觉反馈）
-            view.toggle.enabled = false;
-            var button = buttonRect.gameObject.AddComponent<Button>();
-            button.transition = Selectable.Transition.ColorTint;
-            button.onClick.AddListener(() => OnSkillButtonClicked(buttonKey));
+            var forwarder = buttonRect.gameObject.AddComponent<SkillClickForwarder>();
+            forwarder.onClick = () => OnSkillButtonClicked(buttonKey);
 
             // 底部名称（prefab 无名字文本；技能名本地化条目由 RefreshSkillButtons 填）
             var labelGo = new GameObject("Name");
@@ -621,6 +620,13 @@ namespace GIC.Battle
             labelText.alignment = TextAlignmentOptions.Center;
             labelText.raycastTarget = false;
             nameRef = labelGo.AddComponent<TextCombiner>();
+        }
+
+        /// <summary>技能按钮点击转发（非 Selectable，可与 Toggle 共存——Toggle/Button 单 Selectable 限制绕行）</summary>
+        private class SkillClickForwarder : MonoBehaviour, UnityEngine.EventSystems.IPointerClickHandler
+        {
+            public Action onClick;
+            public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData) => onClick?.Invoke();
         }
 
         private static void PlaceInZone(RectTransform rect, Transform zone, Vector2 inZonePos)
@@ -873,7 +879,7 @@ namespace GIC.Battle
             ApplySkillButton(_burstView, burst, _burstNameText, unitData);
             ApplySkillButton(_ensoView, enso, _ensoNameText, unitData);
             if (_ensoRect != null)
-                _ensoRect.GetComponent<Button>().interactable = enso != null; // 无延奏配置的角色置灰
+                _ensoRect.GetComponent<Toggle>().interactable = enso != null; // 无延奏配置的角色置灰（Toggle.interactable）
         }
 
         private void ApplySkillButton(SkillIconView view, SkillConfig.SkillData data, TextCombiner label, UnitConfig.UnitData unitData)
