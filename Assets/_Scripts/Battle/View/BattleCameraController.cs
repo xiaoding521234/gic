@@ -57,13 +57,25 @@ namespace GIC.Battle
         /// <summary>当前视轴距离（探针/未来 UI 缩放按钮用）</summary>
         public float CurrentDistance => _distance;
 
+        /// <summary>
+        /// 板面短位移点击（docs/24 §7.10 tap+pan 同体：Immediate 拖拽面的点击由 DragRecognizer
+        /// 的 ShortTap 复合发射；B6 正式 HUD 的立牌选中/瞄准拾取入口）。参数=屏幕坐标。
+        /// </summary>
+        public event Action<Vector2> OnBoardTap;
+
         private void Awake()
         {
             _camera = GetComponent<Camera>();
             _recognizers.Add(_dragRecognizer);
             _dragRecognizer.OnDragBegan += OnDragBeganHandler;
             _dragRecognizer.OnDragDelta += OnDragDeltaHandler;
+            _dragRecognizer.OnShortTap += OnShortTapHandler;
             InitFromTransform();
+        }
+
+        private void OnShortTapHandler(Vector2 screenPos)
+        {
+            OnBoardTap?.Invoke(screenPos);
         }
 
         private void OnEnable()
@@ -219,8 +231,8 @@ namespace GIC.Battle
             return focus;
         }
 
-        /// <summary>屏幕点射线与棋盘平面（y=0，地块底面）的交点</summary>
-        private bool TryGetBoardPoint(Vector3 screenPos, out Vector3 point)
+        /// <summary>屏幕点射线与棋盘平面（y=0，地块底面）的交点（HUD 拾取共用，B6）</summary>
+        public bool TryGetBoardPoint(Vector3 screenPos, out Vector3 point)
         {
             point = default;
             if (_camera == null) return false;
