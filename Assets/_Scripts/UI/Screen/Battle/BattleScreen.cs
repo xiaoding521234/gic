@@ -26,6 +26,7 @@ namespace GIC.UI
         [SerializeField] private BattlePlayer _player;
         [SerializeField] private TurnFlowController _flow;
         [SerializeField] private BattleDebugPanel _debugPanel;
+        [SerializeField] private BattleHud _hud;
 
         private BattleSession _session;
         private BattleExitConfirmDialog _exitDialog;
@@ -160,6 +161,16 @@ namespace GIC.UI
             // 调试面板只给真人玩家建操作块
             var manualIds = playerSetups.Where(p => !p.IsAI).Select(p => p.PlayerId).ToList();
             _debugPanel.Bind(_session, Close, manualIds);
+
+            // 正式战斗 HUD（B6 提前启动，docs/18 决策六；与灰盒调试面板并行共存——目检后拍板灰盒去留）
+            if (_hud == null)
+            {
+                var hudGo = new GameObject("BattleHud");
+                hudGo.transform.SetParent(transform, false);
+                _hud = hudGo.AddComponent<BattleHud>();
+            }
+            var cameraCtrl = GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>();
+            _hud.Bind(_session, _board, cameraCtrl, Close);
 
             _session.StartBattle();
 

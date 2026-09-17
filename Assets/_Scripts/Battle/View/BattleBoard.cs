@@ -112,6 +112,18 @@ namespace GIC.Battle
         }
 
         /// <summary>
+        /// 世界坐标反算格坐标（CellToWorld 的逆运算；HUD 点击拾取用，B6）
+        /// </summary>
+        public BattleCell WorldToCell(Vector3 worldPos)
+        {
+            float halfW = Map != null ? Map.width / 2f : 0f;
+            float halfH = Map != null ? Map.height / 2f : 0f;
+            int x = Mathf.FloorToInt(worldPos.x + halfW);
+            int y = Mathf.FloorToInt(worldPos.z + halfH);
+            return new BattleCell(x, y);
+        }
+
+        /// <summary>
         /// 地块预制体摆放位置（预制体轴心在底面中心）
         /// </summary>
         private Vector3 TileBottomPosition(int x, int y)
