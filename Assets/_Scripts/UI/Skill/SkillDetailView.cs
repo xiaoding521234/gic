@@ -235,6 +235,19 @@ namespace GIC.UI
             slideCoroutine = StartCoroutine(SlideInAnimation(panelRect, panelTargetPosition));
         }
 
+        /// <summary>
+        /// 重摆面板位置（跨场景复用时用：Awake 记录的 panelTargetPosition 是原场景接线值，
+        /// 实例化到别的 Canvas 后须以新位置重定——如战斗 HUD，2026-09-18）
+        /// </summary>
+        public void RepositionPanel(Vector2 anchoredPosition)
+        {
+            if (panelRect != null)
+            {
+                panelRect.anchoredPosition = anchoredPosition;
+                panelTargetPosition = anchoredPosition;
+            }
+        }
+
         private void ShowRelatedPanel()
         {
             relatedPanel.SetActive(true);
