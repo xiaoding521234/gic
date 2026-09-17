@@ -32,9 +32,10 @@ namespace GIC.Battle
         /// <summary>
         /// 创建立牌（头像 SpriteRenderer + 阵营色底座）
         /// </summary>
-        /// <param name="tiltDegrees">立牌后倾角（饥荒式"斜插卡片"：相机固定俯角 55°，垂直立牌被俯视压扁；
-        /// 绕底边后倾后立牌面正对相机视线。35°=90°−55° 恰好正对，2026-09-18 用户目检拍板）</param>
-        public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor, Quaternion billboardRotation, float tiltDegrees = 35f)
+        /// <param name="tiltDegrees">立牌后仰角（饥荒式"斜插卡片"：相机固定俯角 55°，立牌向后仰倾角=俯角时
+        /// 立牌面恰好正对视线（完全消俯视压扁），与地面夹角=90°−倾角；2026-09-18 两轮目检修正：方向=顶部
+        /// 远离相机后仰，正对值=55°）</param>
+        public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor, Quaternion billboardRotation, float tiltDegrees = 55f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -46,11 +47,11 @@ namespace GIC.Battle
 
             // 头像立牌（SpriteRenderer 自动处理图集 UV）：
             // 外层 AvatarTilt 原点=格面底边（旋转轴=底边），内层挂 sprite 居于半高处——
-            // 倾斜时立牌绕底边倒（底边保持贴地），非绕中心转（那会让底边翘起/插地）
+            // 后仰时立牌绕底边倒（底边保持贴地），非绕中心转（那会让底边翘起/插地）
             var avatarGo = new GameObject("AvatarTilt");
             avatarGo.transform.SetParent(root.transform, false);
             avatarGo.transform.localPosition = Vector3.zero;
-            avatarGo.transform.localRotation = Quaternion.Euler(-tiltDegrees, 0f, 0f);
+            avatarGo.transform.localRotation = Quaternion.Euler(tiltDegrees, 0f, 0f);
 
             var spriteGo = new GameObject("Avatar");
             spriteGo.transform.SetParent(avatarGo.transform, false);

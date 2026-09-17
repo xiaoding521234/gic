@@ -31,8 +31,8 @@ namespace GIC.Battle
         [Header("立牌视觉")]
         [SerializeField] private Color _teamAColor = new Color(0.25f, 0.55f, 1f, 1f);
         [SerializeField] private Color _teamBColor = new Color(1f, 0.35f, 0.3f, 1f);
-        [Tooltip("立牌后倾角（饥荒式斜插卡片：55° 俯角相机下 35° 恰好正对视线；0=完全垂直；2026-09-18 目检拍板）")]
-        [SerializeField, Range(0f, 60f)] private float 立牌后倾角 = 35f;
+        [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
+        [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
 
         /// <summary>最新快照（调试面板刷新用；客户端不持逻辑状态）</summary>
         public BattleSnapshot LatestSnapshot { get; private set; }
