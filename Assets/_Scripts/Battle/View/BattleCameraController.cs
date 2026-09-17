@@ -51,7 +51,9 @@ namespace GIC.Battle
 
         // ── 手势层接线（docs/24 P3）──
         [Autowired] private GestureHub _gestureHub;
-        private readonly DragRecognizer _dragRecognizer = new DragRecognizer(DragBeginMode.Immediate);
+        // emitShortTap=true：短位移点击复合发射（2026-09-18 报障修复：漏传该参导致 HUD OnBoardTap 全链不触发，
+        // 点立牌无反应；Map 同款写法。tap+pan 同体=docs/24 §7.10）
+        private readonly DragRecognizer _dragRecognizer = new DragRecognizer(DragBeginMode.Immediate, emitShortTap: true);
         private readonly List<GestureRecognizer> _recognizers = new List<GestureRecognizer>();
 
         /// <summary>当前视轴距离（探针/未来 UI 缩放按钮用）</summary>
