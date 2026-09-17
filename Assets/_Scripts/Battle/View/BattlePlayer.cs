@@ -31,6 +31,8 @@ namespace GIC.Battle
         [Header("立牌视觉")]
         [SerializeField] private Color _teamAColor = new Color(0.25f, 0.55f, 1f, 1f);
         [SerializeField] private Color _teamBColor = new Color(1f, 0.35f, 0.3f, 1f);
+        [Tooltip("立牌后倾角（饥荒式斜插卡片：55° 俯角相机下 35° 恰好正对视线；0=完全垂直；2026-09-18 目检拍板）")]
+        [SerializeField, Range(0f, 60f)] private float 立牌后倾角 = 35f;
 
         /// <summary>最新快照（调试面板刷新用；客户端不持逻辑状态）</summary>
         public BattleSnapshot LatestSnapshot { get; private set; }
@@ -280,7 +282,7 @@ namespace GIC.Battle
             }
 
             var teamColor = (TeamType)state.team == TeamType.B ? _teamBColor : _teamAColor;
-            var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor, _billboardRotation);
+            var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor, _billboardRotation, 立牌后倾角);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.ApplyPosition(_board.CellToWorld(state.position));
