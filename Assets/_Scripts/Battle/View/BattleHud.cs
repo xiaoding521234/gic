@@ -76,11 +76,10 @@ namespace GIC.Battle
         // 技能详情（现有体系复用：Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab）
         private SkillDetailView _skillDetailView;
 
-        // 技能盘按钮（图标+名称运行时按选中单位填：UnitData.skills → SkillData）
-        private Image _skillIcon;
-        private Image _burstIcon;
-        private Image _ensoIcon;
-        private Button _ensoButton;
+        // 技能盘按钮（现成 Skill.prefab/SkillIconView；视觉填充走 InitWithData 现有链）
+        private SkillIconView _skillView;
+        private SkillIconView _burstView;
+        private SkillIconView _ensoView;
         private TextCombiner _skillNameText;
         private TextCombiner _burstNameText;
         private TextCombiner _ensoNameText;
@@ -275,6 +274,7 @@ namespace GIC.Battle
             _aimMode = mode;
             _aimButtonKey = skillButtonKey;
             _state = HudState.Aiming;
+            SetAimSelectRing(skillButtonKey, true);
             ClosePopup();
             ComputeAimCells();
             ShowAimHighlights();
@@ -288,10 +288,21 @@ namespace GIC.Battle
         {
             if (_state != HudState.Aiming) return;
             _state = HudState.UnitSelected;
+            SetAimSelectRing(_aimButtonKey, false);
             _aimCells.Clear();
             ClearHighlights();
             _cancelButton.gameObject.SetActive(false);
             _tipText.text = "已选中单位 —— 选择行动（移动 / 技能）";
+        }
+
+        /// <summary>瞄准态视觉反馈：亮/灭对应技能按钮的选中环（prefab 自带 skillSelect）</summary>
+        private void SetAimSelectRing(string buttonKey, bool on)
+        {
+            var view = buttonKey == "burst" ? _burstView
+                : buttonKey == "enso" ? _ensoView
+                : _skillView;
+            if (view != null && view.skillSelect != null)
+                view.skillSelect.gameObject.SetActive(on);
         }
 
         /// <summary>瞄准可选格：移动 = 8 方向直线 1..3 步（有地块格）；战技 = 敌方存活单位所在格</summary>
@@ -547,28 +558,69 @@ namespace GIC.Battle
             // 爆发圆心 in-zone 坐标（zone 右下角为原点，pivot 右下）
             var burstCenter = new Vector2(爆发圆心距右, 爆发圆心距底);
 
-            // 爆发（盘心，×1.2）——图标/名称由 RefreshSkillButtons 按选中单位填（UnitData.skills 数据链）
-            var burst = MakeActionButton("BurstButton", null, "爆发", 技能按钮直径 * 爆发倍率);
+            // 技能位全用现成 Skill.prefab（SkillIconView：图标+元素色环+选中环+Toggle；子件锚点全拉伸，
+            // sizeDelta 直接等比缩放整件；2026-09-18 用户拍板"skill 也有现成预制体"）
+            var burst = MakeSkillIconButton("BurstSkillIcon", 技能按钮直径 * 爆发倍率);
             PlaceInZone(burst, _skillZone, burstCenter);
-            burst.GetComponent<Button>().onClick.AddListener(() => OnSkillButtonClicked("burst"));
-            _burstIcon = burst.Find("Icon").GetComponent<Image>();
-            _burstNameText = burst.GetComponentInChildren<TextCombiner>();
+            WireSkillIconButton(burst, "burst", ref _burstView, ref _burstNameText);
 
-            // 战技（左弧位）
-            var skill = MakeActionButton("SkillButton", null, "战技", 技能按钮直径);
+            var skill = MakeSkillIconButton("NormalSkillIcon", 技能按钮直径);
             PlaceInZone(skill, _skillZone, burstCenter + new Vector2(-围绕圆心距, 0f));
-            skill.GetComponent<Button>().onClick.AddListener(() => OnSkillButtonClicked("skill"));
-            _skillIcon = skill.Find("Icon").GetComponent<Image>();
-            _skillNameText = skill.GetComponentInChildren<TextCombiner>();
+            WireSkillIconButton(skill, "skill", ref _skillView, ref _skillNameText);
 
-            // 延奏（上弧位）——配置有 Enso 技能才可交互（RefreshSkillButtons 时定）
-            var encore = MakeActionButton("EncoreButton", null, "延奏", 技能按钮直径);
+            var encore = MakeSkillIconButton("EnsoSkillIcon", 技能按钮直径);
             PlaceInZone(encore, _skillZone, burstCenter + new Vector2(0f, 围绕圆心距));
-            _ensoButton = encore.GetComponent<Button>();
-            _ensoButton.onClick.AddListener(() => OnSkillButtonClicked("enso"));
-            _ensoIcon = encore.Find("Icon").GetComponent<Image>();
-            _ensoNameText = encore.GetComponentInChildren<TextCombiner>();
-            _ensoButton.interactable = false;
+            WireSkillIconButton(encore, "enso", ref _ensoView, ref _ensoNameText);
+            _ensoRect = encore;
+        }
+
+        private RectTransform _ensoRect;
+
+        /// <summary>实例化现成 Skill.prefab（根 100×100）并等比缩放到目标直径（子件锚点全拉伸随动）</summary>
+        private RectTransform MakeSkillIconButton(string name, float diameter)
+        {
+            var prefab = Resources.Load<GameObject>("Prefabs/UI/Skill/Skill");
+            if (prefab == null)
+            {
+                GICLog.Error("[BattleHud] Skill.prefab 未找到，技能盘不可用");
+                return null;
+            }
+            var instance = Instantiate(prefab, _canvas.transform, false);
+            instance.name = name;
+            var rect = instance.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(diameter, diameter);
+            return rect;
+        }
+
+        /// <summary>接线：SkillIconView 视觉填充（InitWithData 现有链）+ Button 驱动点击式状态机 + 底部名称</summary>
+        private void WireSkillIconButton(RectTransform buttonRect, string buttonKey,
+            ref SkillIconView viewRef, ref TextCombiner nameRef)
+        {
+            var view = buttonRect.GetComponent<SkillIconView>();
+            viewRef = view;
+
+            // Toggle 自身交互停用（ViewType.OnlyDisplay 也屏蔽其详情跳转）——改由 Button 驱动本 HUD 状态机；
+            // 选中环 skillSelect 由瞄准态显隐管理（瞄准中亮环=视觉反馈）
+            view.toggle.enabled = false;
+            var button = buttonRect.gameObject.AddComponent<Button>();
+            button.transition = Selectable.Transition.ColorTint;
+            button.onClick.AddListener(() => OnSkillButtonClicked(buttonKey));
+
+            // 底部名称（prefab 无名字文本；技能名本地化条目由 RefreshSkillButtons 填）
+            var labelGo = new GameObject("Name");
+            var labelRect = labelGo.AddComponent<RectTransform>();
+            labelRect.SetParent(buttonRect, false);
+            labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0f);
+            labelRect.pivot = new Vector2(0.5f, 1f);
+            labelRect.anchoredPosition = new Vector2(0f, -8f);
+            labelRect.sizeDelta = new Vector2(260f, 按钮名字号 + 8f);
+            var labelText = labelGo.AddComponent<TextMeshProUGUI>();
+            labelText.text = buttonKey == "burst" ? "爆发" : buttonKey == "enso" ? "延奏" : "战技";
+            labelText.fontSize = 按钮名字号;
+            labelText.color = 文字米白;
+            labelText.alignment = TextAlignmentOptions.Center;
+            labelText.raycastTarget = false;
+            nameRef = labelGo.AddComponent<TextCombiner>();
         }
 
         private static void PlaceInZone(RectTransform rect, Transform zone, Vector2 inZonePos)
@@ -807,44 +859,36 @@ namespace GIC.Battle
             return unitData.skills.FirstOrDefault(s => s.skillType == want) ?? unitData.skills.FirstOrDefault();
         }
 
-        /// <summary>选中单位时刷新技能盘：图标 = SkillData.icon（配置资产 Sprite 引用）；技能名走本地化</summary>
+        /// <summary>选中单位时刷新技能盘：图标/元素色环/主动被动色全走 SkillIconView.InitWithData 现有链</summary>
         private void RefreshSkillButtons(string unitName)
         {
             var unitData = GetSelectedUnitData();
             if (unitData == null) return;
 
-            // 元素色环（现有 ElementFactionConfig 配色链路，同 SkillIconView 底图染色规则）
-            Color elementColor = ElementFactionConfig.Instance != null
-                ? ElementFactionConfig.Instance.GetElementColor(unitData.selfElement)
-                : 文字米白;
-
             var normal = GetSelectedSkillData("skill");
             var burst = GetSelectedSkillData("burst");
             var enso = GetSelectedSkillData("enso");
 
-            ApplySkillButton(_skillIcon, normal, _skillNameText, elementColor);
-            ApplySkillButton(_burstIcon, burst, _burstNameText, elementColor);
-            ApplySkillButton(_ensoIcon, enso, _ensoNameText, elementColor);
-            if (_ensoButton != null)
-                _ensoButton.interactable = enso != null; // 无延奏配置的角色置灰（图标同步隐藏）
+            ApplySkillButton(_skillView, normal, _skillNameText, unitData);
+            ApplySkillButton(_burstView, burst, _burstNameText, unitData);
+            ApplySkillButton(_ensoView, enso, _ensoNameText, unitData);
+            if (_ensoRect != null)
+                _ensoRect.GetComponent<Button>().interactable = enso != null; // 无延奏配置的角色置灰
         }
 
-        private void ApplySkillButton(Image iconImage, SkillConfig.SkillData data, TextCombiner label, Color elementColor)
+        private void ApplySkillButton(SkillIconView view, SkillConfig.SkillData data, TextCombiner label, UnitConfig.UnitData unitData)
         {
-            if (iconImage != null)
-            {
-                iconImage.sprite = data != null ? data.icon : null;
-                iconImage.color = Color.white;
-                iconImage.gameObject.SetActive(data != null);
-            }
+            if (view == null) return;
+            view.gameObject.SetActive(data != null);
+            if (data == null) return;
+
+            // 现有链：图标白底不染 + 底图染亮元素色 + 主动/被动色环（2026-09-10 拍板规则全在 SkillIconView 内）
+            view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
+
             if (label != null)
             {
-                if (data != null)
-                {
-                    label.ClearAllEntries();
-                    label.AddEntry(data.skillID.GetEntry());
-                }
-                label.gameObject.SetActive(data != null);
+                label.ClearAllEntries();
+                label.AddEntry(data.skillID.GetEntry());
             }
         }
     }

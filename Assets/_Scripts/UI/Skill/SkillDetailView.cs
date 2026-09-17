@@ -112,7 +112,8 @@ namespace GIC.UI
                 if (!IsPointerOverRect(skillDetailPanel) && !IsPointerOverRect(relatedPanel))
                 {
                     ClosePanel();
-                    sourceSkillIconView.SetSelected(false);
+                    // 源图标可空（战斗 HUD 从 MOBA 技能按钮打开，非 SkillIconView；2026-09-18 NRE 修复）
+                    sourceSkillIconView?.SetSelected(false);
                 }
             }
         }
