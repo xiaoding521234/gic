@@ -105,7 +105,7 @@ body{background:#0E0C09;color:var(--paper);font-family:var(--sans);padding:40px 
 .hcard .cost{position:absolute;left:10px;top:8px;width:30px;height:30px;border-radius:50%;background:rgba(199,91,80,.9);display:flex;align-items:center;justify-content:center;font-family:var(--num);font-size:15px;font-weight:700;color:#fff}
 .hcard:hover{transform:translateY(-10px)}
 /* ===================== 左下：移动 ===================== */
-.movepad{position:absolute;left:64px;bottom:64px;z-index:20}
+.movepad{position:absolute;left:64px;bottom:190px;z-index:20}
 /* ===================== 右下：技能盘 ===================== */
 .skillzone{position:absolute;right:64px;bottom:64px;width:640px;height:740px;z-index:20}
 .sbtn{position:absolute;border-radius:50%;cursor:pointer;transition:transform .12s}
@@ -289,7 +289,7 @@ table.spec td{color:#C9BD9F}
   <h2>布局规格（Unity 落地用 · 2560×1440 基准 · 比例锚点）</h2>
   <table class="spec">
     <tr><th>区域</th><th>锚点</th><th>规格</th><th>备注</th></tr>
-    <tr><td><b>移动技能</b></td><td>左下（摇杆位）</td><td>Ø220 · 距左 64 / 距底 64</td><td>walk 图标 · 体力徽章 10 · 常驻</td></tr>
+    <tr><td><b>移动技能</b></td><td>左下（摇杆位）</td><td>Ø220 · 距左 64 / 距底 190</td><td>圆心距底 300 与爆发盘心同高（左右对称）· walk 图标 · 体力徽章 10 · 常驻</td></tr>
     <tr><td><b>爆发技能</b></td><td>右下盘心</td><td>Ø<b>264（=220×1.2）</b> · 距右 300 / 距底 300</td><td>技能盘视觉锚点 · 金色高亮环</td></tr>
     <tr><td><b>战技</b></td><td>围绕爆发 · 左弧位</td><td>Ø220 · 与爆发圆心距 300</td><td>元素色环（pyro）· 体力徽章 10</td></tr>
     <tr><td><b>延奏</b></td><td>围绕爆发 · 上弧位</td><td>Ø220 · 与爆发圆心距 300</td><td>图标待定（风车占位）· 后续契约同圈层加位</td></tr>
