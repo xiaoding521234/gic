@@ -61,6 +61,55 @@ namespace GIC.Battle
             BattleTimeMinutes = (BattleTimeMinutes + BattleClockMinutesPerTurn) % (24 * 60);
         }
 
+        // ==================== 选择时限（docs/04 §4.2，B6 落地） ====================
+        // 第 1 回合 25 秒；2~6 回合 16 秒；第 7 回合起每回合 -0.5 秒，下限 8 秒（第 22 回合触底）。
+        // 超时行为 docs 未明确定义，按"未交玩家自动上交 Pass（空过）"实现——待用户拍板确认。
+
+        public const float FirstTurnSelectSeconds = 25f;
+        public const float BaseSelectSeconds = 16f;
+        public const float SelectShrinkPerTurn = 0.5f;
+        public const float MinSelectSeconds = 8f;
+
+        /// <summary>第 N 回合选择阶段时限（秒），公式 docs/04 §4.2</summary>
+        public static float GetSelectLimitSeconds(int turn)
+        {
+            if (turn <= 1) return FirstTurnSelectSeconds;
+            if (turn <= 6) return BaseSelectSeconds;
+            return Mathf.Max(MinSelectSeconds, BaseSelectSeconds - (turn - 6) * SelectShrinkPerTurn);
+        }
+
+        /// <summary>选择阶段剩余秒数（供 HUD 轮询；-1 = 非选择阶段）</summary>
+        public float SelectRemainingSeconds { get; private set; } = -1f;
+
+        private Coroutine _selectTimerCoroutine;
+
+        /// <summary>选择阶段倒计时：到时未交玩家自动空过（Pass）并进入执行阶段</summary>
+        private IEnumerator SelectTimerRoutine(int turn)
+        {
+            while (SelectRemainingSeconds > 0f)
+            {
+                yield return null;
+                // 阶段已推进（收齐提前开演 / 战斗停止）→ 计时作废
+                if (Phase != BattlePhase.Selecting || TurnNumber != turn) yield break;
+                SelectRemainingSeconds -= Time.deltaTime;
+            }
+
+            if (Phase != BattlePhase.Selecting || TurnNumber != turn) yield break;
+            SelectRemainingSeconds = 0f;
+            GICLog.Warn($"[TurnFlow] 回合 {turn} 选择阶段超时，未交玩家自动空过");
+            foreach (var pid in _sim.PlayerIds)
+            {
+                if (_pendingActions.ContainsKey(pid)) continue;
+                _pendingActions[pid] = new ActionData
+                {
+                    playerId = pid,
+                    actionType = ActionType.Pass,
+                    turnNumber = turn,
+                };
+            }
+            TryBeginResolve();
+        }
+
         /// <summary>阶段变化通知（调试 UI 刷新用；战斗内不走 EventBus）</summary>
         public event Action<BattlePhase, int> OnPhaseChanged;
 
@@ -103,6 +152,12 @@ namespace GIC.Battle
             {
                 snapshot = _sim.TakeSnapshot(TurnNumber),
             });
+
+            // 选择时限计时（收齐提前开演时由阶段推进作废；docs/04 §4.2）
+            SelectRemainingSeconds = GetSelectLimitSeconds(TurnNumber);
+            if (_selectTimerCoroutine != null) StopCoroutine(_selectTimerCoroutine);
+            _selectTimerCoroutine = StartCoroutine(SelectTimerRoutine(TurnNumber));
+
             OnPhaseChanged?.Invoke(Phase, TurnNumber);
         }
 
@@ -125,6 +180,21 @@ namespace GIC.Battle
                 return;
             }
 
+            // B1 只支持 Move/Skill/Pass
+            if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill && action.actionType != ActionType.Pass)
+            {
+                GICLog.Warn($"[TurnFlow] B1 不支持行动类型 {action.actionType}，忽略");
+                return;
+            }
+
+            // 空过不指向单位（超时自动 Pass / AI 无可用单位 Pass 同走此路），豁免单位校验
+            if (action.actionType == ActionType.Pass)
+            {
+                _pendingActions[action.playerId] = action;
+                TryBeginResolve();
+                return;
+            }
+
             var unit = _sim.GetUnit(action.unitId);
             if (unit == null)
             {
@@ -140,28 +210,28 @@ namespace GIC.Battle
                 return;
             }
 
-            // B1 只支持 Move/Skill/Pass
-            if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill && action.actionType != ActionType.Pass)
-            {
-                GICLog.Warn($"[TurnFlow] B1 不支持行动类型 {action.actionType}，忽略");
-                return;
-            }
-
             // 每玩家每回合 1 个行动：后交覆盖先交
             _pendingActions[action.playerId] = action;
 
             // 收齐全部玩家行动 → 进入执行阶段
-            if (_pendingActions.Count >= _sim.PlayerIds.Count)
-            {
-                var actions = new List<ActionData>(_pendingActions.Values);
-                if (_resolveCoroutine != null) StopCoroutine(_resolveCoroutine);
-                _resolveCoroutine = StartCoroutine(ResolveTurnRoutine(actions));
-            }
+            TryBeginResolve();
+        }
+
+        /// <summary>收齐全部玩家行动则进入执行阶段（提交/超时自动 Pass 共用入口）</summary>
+        private void TryBeginResolve()
+        {
+            if (Phase != BattlePhase.Selecting) return;
+            if (_pendingActions.Count < _sim.PlayerIds.Count) return;
+
+            var actions = new List<ActionData>(_pendingActions.Values);
+            if (_resolveCoroutine != null) StopCoroutine(_resolveCoroutine);
+            _resolveCoroutine = StartCoroutine(ResolveTurnRoutine(actions));
         }
 
         private IEnumerator ResolveTurnRoutine(List<ActionData> actions)
         {
             Phase = BattlePhase.Resolving;
+            SelectRemainingSeconds = -1f; // 计时终止（HUD 不再显示倒计时）
             OnPhaseChanged?.Invoke(Phase, TurnNumber);
 
             yield return _resolver.ResolveTurnCoroutine(TurnNumber, actions);
@@ -182,6 +252,12 @@ namespace GIC.Battle
                 StopCoroutine(_resolveCoroutine);
                 _resolveCoroutine = null;
             }
+            if (_selectTimerCoroutine != null)
+            {
+                StopCoroutine(_selectTimerCoroutine);
+                _selectTimerCoroutine = null;
+            }
+            SelectRemainingSeconds = -1f;
             Phase = BattlePhase.Finished;
             OnPhaseChanged?.Invoke(Phase, TurnNumber);
         }

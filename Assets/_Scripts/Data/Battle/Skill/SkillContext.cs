@@ -17,8 +17,8 @@ namespace GIC.Data
         public Vector2Int? TargetPosition;
         public Direction2D Direction;
         public Tile TargetTile;
+
+        /// <summary>技能元素（解析自技能配置/施展者元素；产物效应携带，B4）</summary>
+        public ElementType Element;
     }
 }
-
-
-

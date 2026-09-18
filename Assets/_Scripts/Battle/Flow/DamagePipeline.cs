@@ -20,6 +20,9 @@ namespace GIC.Battle
         public int AttackPercent = 100;
         public int FlatDamage;
         public int Element;
+
+        /// <summary>易伤乘区增量（元素反应提供：如 1 级融化 +0.5；同乘区加法并入，docs/18 决策五）</summary>
+        public float VulnerabilityBonus;
     }
 
     /// <summary>
@@ -94,11 +97,12 @@ namespace GIC.Battle
             float bonusZone = 1f + (attackerStats.DamageBonus - targetStats.DamageReduction) / 100f;
             if (bonusZone < 0f) bonusZone = 0f;
 
-            // 易伤乘区：正防御除法减伤递减，负防御线性增伤（每点 1%）
+            // 易伤乘区：正防御除法减伤递减，负防御线性增伤（每点 1%）；
+            // 反应易伤（VulnerabilityBonus）同乘区加法并入（docs/18 决策五）
             int defense = targetStats.Defense;
-            float vulnerability = defense >= 0
+            float vulnerability = (defense >= 0
                 ? 100f / (100f + defense)
-                : 1f - defense / 100f;
+                : 1f - defense / 100f) + request.VulnerabilityBonus;
 
             result.FinalDamage = Mathf.Max(0, Mathf.RoundToInt(baseZone * bonusZone * vulnerability));
 

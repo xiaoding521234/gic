@@ -25,7 +25,6 @@ namespace GIC.UI
         [SerializeField] private BattleBoard _board;
         [SerializeField] private BattlePlayer _player;
         [SerializeField] private TurnFlowController _flow;
-        [SerializeField] private BattleDebugPanel _debugPanel;
         [SerializeField] private BattleHud _hud;
 
         private BattleSession _session;
@@ -104,15 +103,6 @@ namespace GIC.UI
                     yield break;
                 }
             }
-            if (_debugPanel == null)
-                _debugPanel = GetComponentInChildren<BattleDebugPanel>();
-            if (_debugPanel == null)
-            {
-                // 程序化 UI 无 prefab 可改，运行时自建为唯一路径（调试工具不入包）
-                var panelGo = new GameObject("BattleDebugPanel");
-                panelGo.transform.SetParent(transform, false);
-                _debugPanel = panelGo.AddComponent<BattleDebugPanel>();
-            }
 
             // RTS 相机控制器（滚轮缩放/WASD/中键拖拽，2026-09-12 用户拍板；幂等补挂）
             var cameraGo = GameObject.Find("BattleCamera");
@@ -121,7 +111,7 @@ namespace GIC.UI
 
             // EventSystem 兜底（2026-09-14 退出弹窗按钮全死实锤）：EventSystem 活在大厅场景，
             // 随旧根卸载/Single 加载清场消失——战斗场景缺它时全部 UI 按钮点击无法投递
-            // （棋盘/相机走 3D 物理射线不受影响，弹窗与调试面板 UI 全瘫）。幂等补挂；
+            // （棋盘/相机走 3D 物理射线不受影响，弹窗与 HUD 按钮全瘫）。幂等补挂；
             // 不 DontDestroyOnLoad——退出回大厅随场景卸载消亡，由大厅场景自己的 ES 接管
             if (UnityEngine.EventSystems.EventSystem.current == null)
             {
@@ -156,13 +146,9 @@ namespace GIC.UI
                 GICLog.Info($"[BattleScreen] AI 玩家就位：{setup.PlayerId}（{setup.DisplayName}）");
             }
 
-            yield return null; // ── 分帧：面板绑定/开局前让渲染喘一口气 ──
+            yield return null; // ── 分帧：HUD 绑定/开局前让渲染喘一口气 ──
 
-            // 调试面板只给真人玩家建操作块
-            var manualIds = playerSetups.Where(p => !p.IsAI).Select(p => p.PlayerId).ToList();
-            _debugPanel.Bind(_session, Close, manualIds);
-
-            // 正式战斗 HUD（B6 提前启动，docs/18 决策六；与灰盒调试面板并行共存——目检后拍板灰盒去留）
+            // 正式战斗 HUD（B6 提前启动，docs/18 决策六；灰盒调试面板 2026-09-18 用户拍板撤除）
             if (_hud == null)
             {
                 var hudGo = new GameObject("BattleHud");

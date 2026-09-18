@@ -83,6 +83,11 @@ namespace GIC.Data
         public BattleCell cell;
         public List<BattleCell> path = new List<BattleCell>();
 
+        [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
+        public int buffType;
+        public int buffLevel;
+        public int buffTurns;
+
         public static BattleCommand Move(string unitId, int sliceIndex, int indexInSlice, List<BattleCell> path)
         {
             return new BattleCommand
@@ -96,7 +101,10 @@ namespace GIC.Data
             };
         }
 
-        public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice, int amount, int metadata)
+        /// <summary>Damage 命令工厂。metadata=元素；direction=投放形态（0=瞬发直击/1=直线投射物，复用字段）；
+        /// cell=投射物发射格（Delivery≠0 时有效，命中点=目标位置）——docs/18 决策二"Damage 命令带 delivery 元数据"</summary>
+        public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
+            int amount, int metadata, int delivery = 0, BattleCell fromCell = default)
         {
             return new BattleCommand
             {
@@ -107,6 +115,8 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 value = amount,
                 metadata = metadata,
+                direction = delivery,
+                cell = fromCell,
             };
         }
 
@@ -132,6 +142,35 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 value = amount,
+            };
+        }
+
+        public static BattleCommand ApplyBuff(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
+            int buffType, int buffLevel, int buffTurns)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.ApplyBuff,
+                actorUnitId = actorUnitId,
+                targetUnitId = targetUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                buffType = buffType,
+                buffLevel = buffLevel,
+                buffTurns = buffTurns,
+            };
+        }
+
+        public static BattleCommand RemoveBuff(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice, int buffType)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.RemoveBuff,
+                actorUnitId = actorUnitId,
+                targetUnitId = targetUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                buffType = buffType,
             };
         }
     }

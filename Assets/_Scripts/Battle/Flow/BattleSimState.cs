@@ -30,6 +30,12 @@ namespace GIC.Battle
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
 
+        /// <summary>Buff 注册表（全局注册序：回合结束效果按注册序结算，docs/active/22 §2）</summary>
+        private readonly List<BaseBuff> _activeBuffs = new List<BaseBuff>();
+        private int _buffSequence;
+
+        public IReadOnlyList<BaseBuff> ActiveBuffs => _activeBuffs;
+
         public IReadOnlyDictionary<string, Unit> Units => _units;
         public IReadOnlyList<ActionData> InstantActionQueue => _instantActionQueue;
 
@@ -188,6 +194,53 @@ namespace GIC.Battle
             return dead;
         }
 
+        // ==================== Buff（B2） ====================
+
+        /// <summary>
+        /// 施加 Buff：同类已存在 → 合并（默认时长累加+级别取大，docs/06 燃烧延长同构）；
+        /// 新施加 → 记入全局注册表（回合结束效果按注册序，docs/active/22 §2）→ OnApplied 生命周期回调
+        /// </summary>
+        public void ApplyBuff(Unit target, BaseBuff buff, Unit source = null)
+        {
+            if (target == null || buff == null) return;
+            buff.source = source;
+
+            var existing = target.Buffs.Find(b => b.Type == buff.Type);
+            if (existing != null)
+            {
+                existing.Merge(buff);
+                return;
+            }
+
+            buff.ApplicationIndex = _buffSequence++;
+            target.AddBuff(buff); // Unit.AddBuff 置 owner
+            _activeBuffs.Add(buff);
+            buff.OnApplied(); // 如冻结写入 UnitStatus（B4）
+        }
+
+        /// <summary>移除 Buff（到期/驱散）：OnRemoved 生命周期回调 + 同步清注册表</summary>
+        public void RemoveBuff(Unit target, BaseBuff buff)
+        {
+            buff.OnRemoved(); // 如冻结解除 UnitStatus（幂等：重复移除无害）
+            target?.RemoveBuff(buff);
+            _activeBuffs.Remove(buff);
+        }
+
+        /// <summary>元素附着（效应应用阶段执行；覆盖=消耗被反应附着，docs/06）</summary>
+        public void AttachElement(Unit target, ElementType element)
+        {
+            target?.GetUnitComponent<UnitElement>()?.Dye(element);
+        }
+
+        /// <summary>按注册序结算后的到期收集（RemainingTurns≤0）</summary>
+        public List<BaseBuff> CollectExpiredBuffs()
+        {
+            var expired = new List<BaseBuff>();
+            foreach (var buff in _activeBuffs)
+                if (buff.RemainingTurns <= 0) expired.Add(buff);
+            return expired;
+        }
+
         // ==================== 即时行动队列 ====================
 
         public void EnqueueInstantAction(ActionData action)
@@ -232,10 +285,16 @@ namespace GIC.Battle
                     attackSpeed = stats?.AttackSpeed ?? 0,
                     dyedElement = (int)(element?.DyedElement ?? ElementType.Physical),
                     isCorpse = status != null && status.IsDead ? 1 : 0,
+                    isFrozen = status != null && status.IsFrozen ? 1 : 0,
                     volume = unit.Volume,
                 };
                 foreach (var buff in buffs)
-                    state.buffs.Add(buff.GetType().Name);
+                    state.buffs.Add(new BuffState
+                    {
+                        type = (int)buff.Type,
+                        level = buff.Level,
+                        remainingTurns = buff.RemainingTurns,
+                    });
                 snapshot.units.Add(state);
             }
 

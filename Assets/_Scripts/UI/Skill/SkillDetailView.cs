@@ -54,6 +54,9 @@ namespace GIC.UI
 
         private Camera uiCamera;
 
+        [Tooltip("面板外按下自动关闭（默认开）。跨场景复用方（如战斗 HUD）应关闭：点外关闭与按钮点击同帧竞态——按下帧关面板会抢跑抬起帧才派发的 PointerClick，让「再点同键进瞄准」永远走重开分支（docs/14 §64b）；战斗的点外收面板由 BattleHud.OnBoardTap 承接")]
+        public bool 点外关闭 = true;
+
         private void Awake()
         {
             if (skillDetailPanel != null)
@@ -109,7 +112,7 @@ namespace GIC.UI
                     return;
                 }
 
-                if (!IsPointerOverRect(skillDetailPanel) && !IsPointerOverRect(relatedPanel))
+                if (点外关闭 && !IsPointerOverRect(skillDetailPanel) && !IsPointerOverRect(relatedPanel))
                 {
                     ClosePanel();
                     // 源图标可空（战斗 HUD 从 MOBA 技能按钮打开，非 SkillIconView；2026-09-18 NRE 修复）
@@ -246,6 +249,17 @@ namespace GIC.UI
             {
                 panelRect.anchoredPosition = anchoredPosition;
                 panelTargetPosition = anchoredPosition;
+            }
+        }
+
+        /// <summary>重摆关联面板位置（跨场景复用，如战斗 HUD；与 RepositionPanel 同款——
+        /// 不重定则滑入动画仍滑向 prefab 原场景接线值）</summary>
+        public void RepositionRelatedPanel(Vector2 anchoredPosition)
+        {
+            if (relatedPanelRect != null)
+            {
+                relatedPanelRect.anchoredPosition = anchoredPosition;
+                relatedPanelTargetPosition = anchoredPosition;
             }
         }
 

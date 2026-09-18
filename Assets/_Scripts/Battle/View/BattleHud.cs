@@ -4,6 +4,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Localization;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
@@ -13,23 +14,26 @@ namespace GIC.Battle
 {
     /// <summary>
     /// 正式战斗 HUD（B6 提前启动；docs/18 决策六 + docs/active/22 §13 + docs/designs/battle-hud-v1.html）。
+    /// partial 分件（2026-09-18 B 案）：本文件=字段/数据回调/状态机/瞄准/技能按钮交互/数据链/高亮；
+    /// BattleHud.TopBar.cs=顶栏（回合中枢/倒计时/时钟/攻速队列条/双方信息块）构建与刷新；
+    /// BattleHud.Build.cs=程序化 UI 构建（Build/Make 基础件/技能盘按钮注册）。
+    /// 技能盘四键表驱动（SkillButtonDef，2026-09-18 A 案）：加技能键=BuildSkillButtons 里
+    /// RegisterSkillButton 加一行，勿再散写 buttonKey switch（原 string 映射散落 5 处、加键改 8 处的债已清）。
     /// 布局 = MOBA 范式：移动左下（圆心距底 500）、爆发右下盘心 ×1.2、战技/延奏围绕；
     /// 单位选择交互（2026-09-18 拍板）：点立牌选中 → 技能盘现+手牌藏（选中态/手牌态互斥），
-    /// 点空白取消选中；技能瞄准 = 可选格高亮 + 右上取消按钮。
+    /// 点空白取消选中；技能瞄准 = 可选格高亮 + 右上取消按钮 + 选中单位脚下金色标记。
     /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）。
     /// 输入 = BattleCameraController.OnBoardTap（Drag 短点击复合发射，docs/24 §7.10 tap+pan 同体）。
-    /// 拖动式瞄准/手牌卡列表/协议核心血条 = B4/B8 接线；技能图标为 4 角色临时硬表，B4 SkillConfig 落地后换数据驱动。
+    /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产
+    /// （2026-09-18 拍板"素材复用优先"）。拖动式瞄准/手牌卡列表/协议核心血条 = B4/B8 接线。
     /// </summary>
-    public class BattleHud : MonoBehaviour
+    public partial class BattleHud : MonoBehaviour
     {
         // ==================== 可调参数（编辑器直改） ====================
 
-        [Header("配色")]
-        [SerializeField] private Color 文字米白 = new Color(0.93f, 0.89f, 0.82f);
-        [SerializeField] private Color 暖金 = new Color(0.83f, 0.74f, 0.56f);
-        [SerializeField] private Color 玻璃底 = new Color(0.086f, 0.075f, 0.059f, 0.78f);
-        [SerializeField] private Color 敌红 = new Color(0.78f, 0.36f, 0.31f);
-        [SerializeField] private Color 高亮金 = new Color(0.83f, 0.74f, 0.56f, 0.55f);
+        // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；本组件运行时 AddComponent 生成，
+        // 原色值 SerializeField 从未被场景持久化调参，迁移零损失；玻璃底死字段一并移除）
+        private static BattlePalette Palette => BattlePalette.Instance;
 
         [Header("技能盘尺寸（2560×1440 基准）")]
         [SerializeField] private float 技能按钮直径 = 220f;
@@ -41,6 +45,19 @@ namespace GIC.Battle
         [SerializeField] private float 顶栏字号 = 34f;
         [SerializeField] private float 按钮名字号 = 30f;
 
+        [Header("技能详情面板（2560×1440 基准）")]
+        [Tooltip("详情/关联面板高度（点锚化后须显式落高；prefab 原为 y 拉伸设计，点锚下高度=0）")]
+        [SerializeField] private float 详情面板高度 = 900f;
+        [SerializeField] private float 详情面板间距 = 40f;
+
+        [Header("顶栏（2560×1440 基准）")]
+        [SerializeField] private float 信息块距左 = 64f;
+        [SerializeField] private float 信息块距右 = 160f;   // 让位右上设置按钮（56+84）
+        [SerializeField] private float 徽标尺寸 = 86f;
+        [SerializeField] private float 队列槽边长 = 64f;
+        [SerializeField] private float 队列槽间距 = 14f;
+        [SerializeField] private int 队列槽位数 = 6;
+
         // 布局常量（设计稿 v1 定稿；结构调整改代码，参数微调走 Inspector）
         private const float 移动按钮距左 = 64f;
         private const float 移动按钮圆心距底 = 500f;
@@ -49,6 +66,7 @@ namespace GIC.Battle
         private const float 取消按钮距右 = 56f;
         private const float 取消按钮距顶 = 212f;
         private const int 移动最大步数 = 3;
+        private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
 
         // ==================== 运行引用 ====================
 
@@ -60,45 +78,55 @@ namespace GIC.Battle
 
         private Canvas _canvas;
 
-        // 顶栏
-        private TextMeshProUGUI _turnText;
-        private TextMeshProUGUI _clockText;
-        private TextMeshProUGUI _queueText;
-        private TextMeshProUGUI _tipText;
-        private TextMeshProUGUI _resourceText;
-
-        // 行动区
-        private RectTransform _moveButton;
-        private RectTransform _skillZone;
-        private RectTransform _handZone;
-        private RectTransform _cancelButton;
+        // 提示条
+        private TMP_Text _tipText;
+        private TextCombiner _tipCombiner;
 
         // 技能详情（现有体系复用：Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab）
         private SkillDetailView _skillDetailView;
 
-        // 技能盘按钮（现成 Skill.prefab/SkillIconView；视觉填充走 InitWithData 现有链）
-        private SkillIconView _skillView;
-        private SkillIconView _burstView;
-        private SkillIconView _ensoView;
-        private TextCombiner _skillNameText;
-        private TextCombiner _burstNameText;
-        private TextCombiner _ensoNameText;
+        // 行动区（移动按钮的显隐走 _moveDef.rect）
+        private RectTransform _skillZone;
+        private RectTransform _handZone;
+        private RectTransform _cancelButton;
+        private TextCombiner _handTextCombiner;
 
-        // 高亮（世界层）
+        // 技能盘按钮（表驱动四键；现成 Skill.prefab/SkillIconView 视觉填充走 InitWithData 现有链。
+        // 移动=特殊技能同款建法+同款交互（2026-09-18 拍板"技能按钮统一，移动是特殊的技能"）：
+        // 专位左下，点击式三情况与其余三键全同）
+        private readonly List<SkillButtonDef> _skillButtons = new List<SkillButtonDef>();
+        private SkillButtonDef _moveDef; // 移动键（SelectUnit/DeselectUnit 的专位显示控制）
+
+        /// <summary>技能盘按钮定义（表驱动，2026-09-18 统一化 A 案）：key=日志标识，type=数据分拣
+        /// （UnitConfig.skills 按 SkillType）+ 瞄准语义（IsMove=移动瞄准，其余按 SkillData 分档）</summary>
+        private class SkillButtonDef
+        {
+            public string key;
+            public SkillType type;
+            public RectTransform rect;
+            public SkillIconView view;
+            public TextCombiner nameText;
+            public bool IsMove => type == SkillType.Move;
+        }
+
+        // 高亮（世界层）+ 选中标记
         private Transform _highlightRoot;
+        private GameObject _selectMarker;
         private readonly List<GameObject> _highlightQuads = new List<GameObject>();
+        // 世界层运行时材质（单实例缓存，OnDestroy 释放——Destroy 物体不销材质，逐次 new 会累积泄漏）
+        private Material _aimHighlightMaterial;
+        private Material _selectMarkerMaterial;
 
-        // 状态机
+        // 状态机（AimMode 枚举已并表——瞄准语义由 _aimDef.type 承载，2026-09-18 A 案）
         private enum HudState { Idle, UnitSelected, Aiming }
-        private enum AimMode { Move, Skill }
         private HudState _state = HudState.Idle;
-        private AimMode _aimMode;
         private string _selectedUnitId;
-        private string _popupButtonKey;
-        private string _aimButtonKey;
+        private SkillButtonDef _popupDef;  // 详情面板当前展示的键
+        private SkillButtonDef _aimDef;    // 瞄准中的键
         private readonly HashSet<BattleCell> _aimCells = new HashSet<BattleCell>();
 
-        /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——其自带 Update 也关面板，勿另存布尔失同步）</summary>
+        /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——关闭只走 BattleHud 显式路径，
+        /// 自带点外关闭已在 BuildSkillPopup 关闭，docs/14 §64b）</summary>
         private bool PopupOpen => _skillDetailView != null && _skillDetailView.skillDetailPanel != null
             && _skillDetailView.skillDetailPanel.activeSelf;
 
@@ -115,6 +143,7 @@ namespace GIC.Battle
             BuildUi();
 
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
+            _session.Player.OnSegmentPlaying += OnSegmentPlayingHandler;
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
@@ -126,11 +155,19 @@ namespace GIC.Battle
         {
             if (_session != null)
             {
-                if (_session.Player != null) _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
+                if (_session.Player != null)
+                {
+                    _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
+                    _session.Player.OnSegmentPlaying -= OnSegmentPlayingHandler;
+                }
                 if (_session.Flow != null) _session.Flow.OnPhaseChanged -= OnPhaseChanged;
             }
             if (_camera != null)
                 _camera.OnBoardTap -= OnBoardTap;
+
+            // 世界层运行时材质释放（Destroy 物体不销材质，不释放则跨战斗累积）
+            if (_aimHighlightMaterial != null) Destroy(_aimHighlightMaterial);
+            if (_selectMarkerMaterial != null) Destroy(_selectMarkerMaterial);
         }
 
         // ==================== 数据回调 ====================
@@ -141,42 +178,79 @@ namespace GIC.Battle
         {
             if (phase != BattlePhase.Selecting)
             {
-                // 执行阶段：清瞄准/清选中回手牌态（执行阶段 HUD 变化 B6 表现侧再拍）
+                // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
+                SetTip("Battle_TipResolving");
+            }
+            else
+            {
+                SetTip("Battle_TipSelect");
             }
             RefreshFromSnapshot(_session.Player.LatestSnapshot);
         }
 
+        /// <summary>执行阶段：高亮当前攻速片的行动者（其余降透明）</summary>
+        private void OnSegmentPlayingHandler(int sliceAttackSpeed)
+        {
+            foreach (var slot in _queueSlots)
+            {
+                bool active = slot.attackSpeed == sliceAttackSpeed;
+                var baseColor = slot.baseColor;
+                slot.frame.color = active
+                    ? Palette.高亮金
+                    : new Color(baseColor.r, baseColor.g, baseColor.b, 0.30f);
+            }
+        }
+
+        private void Update()
+        {
+            // 选择倒计时（docs/04 §4.2；每秒级刷新，静态数字条目）
+            if (_session == null || _session.Flow == null || _countdownText == null) return;
+            var flow = _session.Flow;
+            bool selecting = flow.Phase == BattlePhase.Selecting;
+            bool show = selecting && flow.SelectRemainingSeconds >= 0f;
+            if (_countdownText.gameObject.activeSelf != show)
+                _countdownText.gameObject.SetActive(show);
+            if (!show) return;
+
+            string seconds = Mathf.CeilToInt(Mathf.Max(0f, flow.SelectRemainingSeconds)).ToString();
+            if (_countdownCombiner.GetCombinedText() != seconds)
+                _countdownCombiner.SetSingleEntry(seconds);
+        }
+
         private void RefreshFromSnapshot(BattleSnapshot snapshot)
         {
-            if (snapshot == null || _turnText == null) return;
+            if (snapshot == null || _turnPhaseText == null) return;
 
-            // 顶栏：回合 + 阶段
-            string phaseLabel = _session.Flow.Phase switch
-            {
-                BattlePhase.Selecting => "选择阶段",
-                BattlePhase.Resolving => "执行阶段",
-                BattlePhase.Finished => "战斗结束",
-                _ => "待机",
-            };
-            _turnText.text = $"回合 {snapshot.turnNumber} · {phaseLabel}";
+            // 回合中枢：回合 label + 数字 + 阶段徽章（动态数字 = 静态条目拼接，语言切换随下次刷新）
+            _turnPhaseCombiner.ClearAllEntries();
+            _turnPhaseCombiner.AddEntry(new LocalizedString("UIText", "Battle_Turn"));
+            _turnPhaseCombiner.AddStaticEntry(" " + snapshot.turnNumber + " · ");
+            string phaseKey = PhaseKey(_session.Flow.Phase);
+            if (phaseKey != null)
+                _turnPhaseCombiner.AddEntry(new LocalizedString("UIText", phaseKey));
 
             // 战斗时钟（独立时钟，TurnFlowController）
             int minutes = _session.Flow.BattleTimeMinutes;
-            _clockText.text = $"{minutes / 60:D2}:{minutes % 60:D2}";
+            _clockCombiner.SetSingleEntry($"{minutes / 60:D2}:{minutes % 60:D2}");
 
-            // 我方资源
-            var res = snapshot.resources.FirstOrDefault(r => r.playerId == _myPlayerId);
-            if (res != null)
-                _resourceText.text = $"体力 {res.stamina}    摩拉 {res.mora}    手牌 {res.handCardCount}";
+            // 双方资源 chips
+            UpdatePlayerBlock(_myBlock, snapshot, _myPlayerId);
+            var enemyId = snapshot.resources.Where(r => r.playerId != _myPlayerId)
+                .Select(r => r.playerId).FirstOrDefault();
+            UpdatePlayerBlock(_enemyBlock, snapshot, enemyId);
 
-            // 执行预览（全部存活单位按攻速降序；含双方——攻速时间窗跨单位一致生效）
-            var order = snapshot.units
-                .Where(u => u.isCorpse == 0)
-                .OrderByDescending(u => u.attackSpeed)
-                .Take(6);
-            _queueText.text = "执行预览  " + string.Join("  →  ", order.Select(u => $"{u.unitName} {u.attackSpeed}"));
+            // 攻速队列条
+            RebuildQueue(snapshot);
+            UpdateQueueLabel();
+
+            // 手牌（数量；卡列表 B8 接入）
+            var myRes = snapshot.resources.FirstOrDefault(r => r.playerId == _myPlayerId);
+            _handTextCombiner.ClearAllEntries();
+            _handTextCombiner.AddEntry(new LocalizedString("UIText", "Battle_Hand"));
+            if (myRes != null)
+                _handTextCombiner.AddStaticEntry(" ×" + myRes.handCardCount);
 
             // 选中单位若已死亡（对局中不可能复苏），清选中
             if (!string.IsNullOrEmpty(_selectedUnitId))
@@ -187,6 +261,17 @@ namespace GIC.Battle
                     ExitAiming();
                     DeselectUnit();
                 }
+            }
+        }
+
+        private static string PhaseKey(BattlePhase phase)
+        {
+            switch (phase)
+            {
+                case BattlePhase.Selecting: return "Battle_SelectingPhase";
+                case BattlePhase.Resolving: return "Battle_ResolvingPhase";
+                case BattlePhase.Finished: return "Battle_Finished";
+                default: return null; // Idle：HUD 未开战不显示
             }
         }
 
@@ -248,14 +333,12 @@ namespace GIC.Battle
             ExitAiming();
             _selectedUnitId = unitId;
             _state = HudState.UnitSelected;
-            var snapshot = _session.Player.LatestSnapshot;
-            var unit = snapshot?.units.FirstOrDefault(u => u.unitId == unitId);
-            if (unit != null)
-                RefreshSkillButtons(unit.unitName);
+            RefreshSkillButtons();
             _handZone.gameObject.SetActive(false);
-            _moveButton.gameObject.SetActive(true);
+            if (_moveDef != null) _moveDef.rect.gameObject.SetActive(true);
             _skillZone.gameObject.SetActive(true);
-            _tipText.text = "已选中单位 —— 选择行动（移动 / 技能）";
+            ShowSelectMarker(unitId);
+            SetTip("Battle_TipUnitSelected");
         }
 
         private void DeselectUnit()
@@ -263,49 +346,59 @@ namespace GIC.Battle
             _selectedUnitId = null;
             _state = HudState.Idle;
             ClosePopup();
-            _moveButton.gameObject.SetActive(false);
+            HideSelectMarker();
+            if (_moveDef != null) _moveDef.rect.gameObject.SetActive(false);
             _skillZone.gameObject.SetActive(false);
             _handZone.gameObject.SetActive(true);
-            _tipText.text = "点击我方立牌选中单位";
+            SetTip("Battle_TipSelect");
         }
 
-        private void EnterAiming(AimMode mode, string skillButtonKey)
+        private void EnterAiming(SkillButtonDef def)
         {
-            _aimMode = mode;
-            _aimButtonKey = skillButtonKey;
+            if (def == null) return;
+            _aimDef = def;
             _state = HudState.Aiming;
-            SetAimSelectRing(skillButtonKey, true);
+            SetAimSelectRing(def, true);
             ClosePopup();
             ComputeAimCells();
             ShowAimHighlights();
             _cancelButton.gameObject.SetActive(true);
-            _tipText.text = _aimMode == AimMode.Move
-                ? "选择目标格（8 方向直线，至多 3 步）——点右上取消"
-                : "选择目标单位所在格——点右上取消";
+            SetTip(def.IsMove
+                ? "Battle_TipAimMove"
+                : IsLineSkill(def) ? "Battle_TipAimDirection" : "Battle_TipAimSkill");
+        }
+
+        /// <summary>该按钮技能是否直线型（战技/爆发=十字方向瞄准；延奏/契约=单位指向）</summary>
+        private bool IsLineSkill(SkillButtonDef def)
+        {
+            var data = GetSelectedSkillData(def);
+            return data != null
+                && data.skillType != SkillType.Enso
+                && data.skillType != SkillType.Contract
+                && data.skillType != SkillType.Interact;
         }
 
         private void ExitAiming()
         {
             if (_state != HudState.Aiming) return;
             _state = HudState.UnitSelected;
-            SetAimSelectRing(_aimButtonKey, false);
+            SetAimSelectRing(_aimDef, false);
+            _aimDef = null;
             _aimCells.Clear();
             ClearHighlights();
             _cancelButton.gameObject.SetActive(false);
-            _tipText.text = "已选中单位 —— 选择行动（移动 / 技能）";
+            SetTip("Battle_TipUnitSelected");
         }
 
         /// <summary>瞄准态视觉反馈：亮/灭对应技能按钮的选中环（prefab 自带 skillSelect）</summary>
-        private void SetAimSelectRing(string buttonKey, bool on)
+        private static void SetAimSelectRing(SkillButtonDef def, bool on)
         {
-            var view = buttonKey == "burst" ? _burstView
-                : buttonKey == "enso" ? _ensoView
-                : _skillView;
-            if (view != null && view.skillSelect != null)
-                view.skillSelect.gameObject.SetActive(on);
+            if (def?.view?.skillSelect != null)
+                def.view.skillSelect.gameObject.SetActive(on);
         }
 
-        /// <summary>瞄准可选格：移动 = 8 方向直线 1..3 步（有地块格）；战技 = 敌方存活单位所在格</summary>
+        /// <summary>瞄准可选格：移动 = 8 方向直线 1..3 步；战技/爆发（直线型）= 十字方向瞄准；
+        /// 延奏/契约（单位指向型）= 敌方存活单位所在格（B4：投放形态由技能类型分档，docs/18 决策二）</summary>
         private void ComputeAimCells()
         {
             _aimCells.Clear();
@@ -313,7 +406,28 @@ namespace GIC.Battle
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
 
-            if (_aimMode == AimMode.Skill)
+            if (_aimDef.IsMove)
+            {
+                // 移动：8 方向 × 1..3 步（客户端只做地块粗筛；体积/阻挡由 Host 结算兜底）
+                for (int dx = -1; dx <= 1; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    for (int step = 1; step <= 移动最大步数; step++)
+                    {
+                        var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
+                        if (!_board.Map.HasTile(c.x, c.y)) break;
+                        _aimCells.Add(c);
+                    }
+                }
+                return;
+            }
+
+            var skillData = GetSelectedSkillData(_aimDef);
+            if (skillData == null) return;
+
+            // 单位指向型（延奏/契约）：敌方存活单位所在格（目标判定不经格子，docs/05 §5.3）
+            if (skillData.skillType == SkillType.Enso || skillData.skillType == SkillType.Contract)
             {
                 foreach (var u in snapshot.units)
                 {
@@ -324,12 +438,12 @@ namespace GIC.Battle
                 return;
             }
 
-            // 移动：8 方向 × 1..3 步（客户端只做地块粗筛；体积/阻挡由 Host 结算兜底）
-            for (int dx = -1; dx <= 1; dx++)
-            for (int dy = -1; dy <= 1; dy++)
+            // 直线型（战技/爆发）：十字 4 方向瞄准格（点方向格提交 direction；投射物路径 Host 即定）
+            for (int dir = 0; dir < 4; dir++)
             {
-                if (dx == 0 && dy == 0) continue;
-                for (int step = 1; step <= 移动最大步数; step++)
+                int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
+                int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                for (int step = 1; step <= 方向瞄准显示距离; step++)
                 {
                     var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
                     if (!_board.Map.HasTile(c.x, c.y)) break;
@@ -343,33 +457,58 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
+            bool isMove = _aimDef.IsMove;
 
             var action = new ActionData
             {
                 playerId = _myPlayerId,
                 unitId = _selectedUnitId,
-                actionType = _aimMode == AimMode.Move ? ActionType.Move : ActionType.Skill,
-                skillIndex = _aimMode == AimMode.Move ? 0 : GetSelectedSkillIndex(_aimButtonKey),
-                targetUnitId = enemyAtCell != null ? enemyAtCell.unitId : "",
+                actionType = isMove ? ActionType.Move : ActionType.Skill,
+                skillIndex = isMove ? 0 : GetSelectedSkillIndex(_aimDef.type),
+                targetUnitId = "",
                 moveMagnitude = 1,
                 direction = Direction2D.Up,
             };
 
-            if (_aimMode == AimMode.Move)
+            if (isMove)
             {
                 int dx = cell.x - sel.position.x;
                 int dy = cell.y - sel.position.y;
                 action.direction = DeltaToDirection(dx, dy);
                 action.moveMagnitude = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy));
             }
+            else if (IsLineSkill(_aimDef))
+            {
+                // 直线型：点方向格 → 归一十字方向（目标由 Host 投射物扫描即定，无需指定单位）
+                int dx = cell.x - sel.position.x;
+                int dy = cell.y - sel.position.y;
+                action.direction = SnapToCardinal(dx, dy);
+            }
+            else
+            {
+                // 单位指向型（延奏/契约）：目标=点中格上的敌方单位
+                action.targetUnitId = enemyAtCell != null ? enemyAtCell.unitId : "";
+            }
 
             _session.SubmitAction(action);
             GICLog.Info($"[BattleHud] {_myPlayerId} 上交：{action.actionType} by {sel.unitName}" +
-                        (_aimMode == AimMode.Skill ? $" → {action.targetUnitId}" : $" {action.direction} ×{action.moveMagnitude}"));
+                        (isMove
+                            ? $" {action.direction} ×{action.moveMagnitude}"
+                            : (string.IsNullOrEmpty(action.targetUnitId)
+                                ? $" → 方向 {action.direction}"
+                                : $" → {action.targetUnitId}")));
 
             ExitAiming();
             DeselectUnit();
-            _tipText.text = "已上交行动 —— 等待执行";
+            SetTip("Battle_TipSubmitted");
+        }
+
+        /// <summary>格差归一到十字方向（|dx|≥|dy| 取横轴，否则取纵轴；0,0 防御回 Right）</summary>
+        private static Direction2D SnapToCardinal(int dx, int dy)
+        {
+            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+                return dx >= 0 ? Direction2D.Right : Direction2D.Left;
+            return dy >= 0 ? Direction2D.Up : Direction2D.Down;
         }
 
         private static Direction2D DeltaToDirection(int dx, int dy)
@@ -384,40 +523,39 @@ namespace GIC.Battle
             return Direction2D.DownLeft;
         }
 
-        // ==================== 技能按钮（点击式） ====================
+        // ==================== 技能按钮（点击式三情况） ====================
 
-        private void OnMoveButtonClicked()
+        /// <summary>点击式三情况（四键全统一，含移动——2026-09-18 拍板）：①面板开着再点同键=隐藏面板进入瞄准
+        /// ②面板没开第一次点=开面板 ③换点其它技能=切内容。移动与其余三键唯一差异=瞄准语义（def.IsMove）；
+        /// 拖动式=B4 接线；瞄准态点按钮=无操作（退出走取消按钮/点非可选格）。</summary>
+        private void OnSkillButtonClicked(SkillButtonDef def)
         {
-            if (_state == HudState.Aiming && _aimMode == AimMode.Move) { ExitAiming(); return; }
-            if (_state != HudState.UnitSelected) return;
-            EnterAiming(AimMode.Move, null);
-        }
-
-        /// <summary>点击式三情况：①面板开着再点=进瞄准 ②面板没开第一次点=开面板 ③拖动=B4 接线</summary>
-        private void OnSkillButtonClicked(string buttonKey)
-        {
-            if (_state != HudState.UnitSelected) return;
+            if (def == null || _state != HudState.UnitSelected) return;
+            // 置灰防线收口在处理端：SkillClickForwarder=IPointerClickHandler 不受 Toggle.interactable 拦截
+            //（UGUI 对同物体全部兼容 handler 执行，interactable 只拦 Selectable 自身，docs/14 §63）
+            var toggle = def.view != null ? def.view.GetComponent<Toggle>() : null;
+            if (toggle != null && !toggle.interactable) return;
             if (PopupOpen)
             {
-                if (_popupButtonKey == buttonKey)
-                    EnterAiming(AimMode.Skill, buttonKey);
+                if (_popupDef == def)
+                    EnterAiming(def);
                 else
                 {
                     ClosePopup();
-                    ShowSkillPopup(buttonKey);
+                    ShowSkillPopup(def);
                 }
                 return;
             }
-            ShowSkillPopup(buttonKey);
+            ShowSkillPopup(def);
         }
 
-        private void ShowSkillPopup(string buttonKey)
+        private void ShowSkillPopup(SkillButtonDef def)
         {
-            _popupButtonKey = buttonKey;
+            _popupDef = def;
             if (_skillDetailView == null) return;
 
             // 走现有技能详情体系：UnitData.skills 的 SkillData → SkillDetailView（图标/类型/名称/描述/参数全本地化）
-            var skillData = GetSelectedSkillData(buttonKey);
+            var skillData = GetSelectedSkillData(def);
             var unitData = GetSelectedUnitData();
             if (skillData == null || unitData == null) return;
 
@@ -437,33 +575,35 @@ namespace GIC.Battle
             if (_state == HudState.Aiming) ExitAiming();
         }
 
-        // ==================== 可选格高亮（世界层） ====================
+        // ==================== 可选格高亮 + 选中标记（世界层） ====================
 
         private void ShowAimHighlights()
         {
             ClearHighlights();
             if (_highlightRoot == null) return;
-            var shader = Shader.Find("Universal Render Pipeline/Unlit");
-            if (shader == null) shader = Shader.Find("Unlit/Color");
 
             foreach (var cell in _aimCells)
             {
-                var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                quad.name = $"AimHighlight_{cell.x}_{cell.y}";
-                UnityEngine.Object.Destroy(quad.GetComponent<Collider>());
-                quad.transform.SetParent(_highlightRoot, false);
+                var quad = BattleViewFactory.CreateQuad(_highlightRoot,
+                    $"AimHighlight_{cell.x}_{cell.y}", GetAimHighlightMaterial());
                 quad.transform.position = new Vector3(
                     _board.CellToWorld(cell).x,
                     _board.GetSurfaceHeight(cell) + 0.03f,
                     _board.CellToWorld(cell).z);
                 quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
                 quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
-                var renderer = quad.GetComponent<MeshRenderer>();
-                var material = new Material(shader);
-                material.color = 高亮金;
-                renderer.sharedMaterial = material;
                 _highlightQuads.Add(quad);
             }
+        }
+
+        /// <summary>瞄准高亮共享材质（懒建单实例复用——曾每格 new Material 且清理只销 quad 不销材质，
+        /// 反复进出瞄准态无限累积已修，docs/14 §63；高亮色走 palette 可调，每次进瞄准态刷新）</summary>
+        private Material GetAimHighlightMaterial()
+        {
+            if (_aimHighlightMaterial == null)
+                _aimHighlightMaterial = BattleViewFactory.CreateUnlitMaterial(Palette.高亮金);
+            _aimHighlightMaterial.color = Palette.高亮金;
+            return _aimHighlightMaterial;
         }
 
         private void ClearHighlights()
@@ -473,350 +613,23 @@ namespace GIC.Battle
             _highlightQuads.Clear();
         }
 
-        // ==================== UI 构建 ====================
-
-        private void BuildUi()
+        /// <summary>选中单位脚下金色圆盘标记（选中无棋盘反馈的补全；选中态/瞄准态常显）</summary>
+        private void ShowSelectMarker(string unitId)
         {
-            var canvasGo = new GameObject("BattleHudCanvas");
-            canvasGo.transform.SetParent(transform, false);
-            _canvas = canvasGo.AddComponent<Canvas>();
-            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 40;
-            canvasGo.AddComponent<GraphicRaycaster>();
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(2560f, 1440f);
-            scaler.matchWidthOrHeight = 0.5f;
+            if (_selectMarker == null) return;
+            var snapshot = _session.Player.LatestSnapshot;
+            var unit = snapshot?.units.FirstOrDefault(u => u.unitId == unitId);
+            if (unit == null) { HideSelectMarker(); return; }
 
-            // 高亮根（世界层，非 Canvas 子级）
-            var highlightGo = new GameObject("AimHighlightRoot");
-            highlightGo.transform.SetParent(transform, false);
-            _highlightRoot = highlightGo.transform;
-
-            BuildTopBar();
-            BuildMoveButton();
-            BuildSkillZone();
-            BuildHandZone();
-            BuildTipBar();
-            BuildCancelButton();
-            BuildSkillPopup();
-
-            // 初始 = 手牌态
-            _moveButton.gameObject.SetActive(false);
-            _skillZone.gameObject.SetActive(false);
-            _cancelButton.gameObject.SetActive(false);
-            _tipText.text = "点击我方立牌选中单位";
+            var cellWorld = _board.CellToWorld(unit.position);
+            _selectMarker.transform.position = new Vector3(
+                cellWorld.x, _board.GetSurfaceHeight(unit.position) + 0.024f, cellWorld.z);
+            _selectMarker.SetActive(true);
         }
 
-        private void BuildTopBar()
+        private void HideSelectMarker()
         {
-            var bar = MakeRect("TopBar", _canvas.transform);
-            bar.anchorMin = bar.anchorMax = new Vector2(0.5f, 1f);
-            bar.pivot = new Vector2(0.5f, 1f);
-            bar.anchoredPosition = Vector2.zero;
-            bar.sizeDelta = new Vector2(1600f, 240f);
-
-            _turnText = MakeText("TurnText", bar, 顶栏字号, 文字米白);
-            SetRect(_turnText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(900f, 60f));
-
-            _clockText = MakeText("ClockText", bar, 顶栏字号 * 0.6f, 暖金);
-            SetRect(_clockText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -84f), new Vector2(900f, 46f));
-
-            _queueText = MakeText("QueueText", bar, 顶栏字号 * 0.5f, 文字米白);
-            SetRect(_queueText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -136f), new Vector2(1400f, 42f));
-
-            _resourceText = MakeText("ResourceText", bar, 顶栏字号 * 0.55f, 文字米白);
-            SetRect(_resourceText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(64f, -30f), new Vector2(600f, 50f));
-            _resourceText.alignment = TextAlignmentOptions.Left;
-
-            // 设置/退出（右上角，走 BattleExitConfirmDialog 确认）
-            var settings = MakeIconButton("SettingsButton", bar, "UI/Other/Faction/mondstadt_frame",
-                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-56f, -56f), new Vector2(84f, 84f));
-            settings.onClick.AddListener(() => _onCloseBattle?.Invoke());
-        }
-
-        private void BuildMoveButton()
-        {
-            float d = 技能按钮直径;
-            _moveButton = MakeActionButton("MoveButton", "UI/Skills/walk", "移动", d);
-            // 底部锚：距左 64，圆心距底 500（设计稿 v1 定稿）
-            _moveButton.anchorMin = _moveButton.anchorMax = new Vector2(0f, 0f);
-            _moveButton.pivot = new Vector2(0.5f, 0.5f);
-            _moveButton.anchoredPosition = new Vector2(移动按钮距左 + d * 0.5f, 移动按钮圆心距底);
-            _moveButton.GetComponent<Button>().onClick.AddListener(OnMoveButtonClicked);
-        }
-
-        private void BuildSkillZone()
-        {
-            // 盘心（爆发圆心）屏幕坐标：距右 300 / 距底 300
-            _skillZone = MakeRect("SkillZone", _canvas.transform);
-            _skillZone.anchorMin = _skillZone.anchorMax = new Vector2(1f, 0f);
-            _skillZone.pivot = new Vector2(1f, 0f);
-            _skillZone.anchoredPosition = Vector2.zero;
-            _skillZone.sizeDelta = new Vector2(爆发圆心距右 + 400f, 900f);
-
-            // 爆发圆心 in-zone 坐标（zone 右下角为原点，pivot 右下）
-            var burstCenter = new Vector2(爆发圆心距右, 爆发圆心距底);
-
-            // 技能位全用现成 Skill.prefab（SkillIconView：图标+元素色环+选中环+Toggle；子件锚点全拉伸，
-            // sizeDelta 直接等比缩放整件；2026-09-18 用户拍板"skill 也有现成预制体"）
-            var burst = MakeSkillIconButton("BurstSkillIcon", 技能按钮直径 * 爆发倍率);
-            PlaceInZone(burst, _skillZone, burstCenter);
-            WireSkillIconButton(burst, "burst", ref _burstView, ref _burstNameText);
-
-            var skill = MakeSkillIconButton("NormalSkillIcon", 技能按钮直径);
-            PlaceInZone(skill, _skillZone, burstCenter + new Vector2(-围绕圆心距, 0f));
-            WireSkillIconButton(skill, "skill", ref _skillView, ref _skillNameText);
-
-            var encore = MakeSkillIconButton("EnsoSkillIcon", 技能按钮直径);
-            PlaceInZone(encore, _skillZone, burstCenter + new Vector2(0f, 围绕圆心距));
-            WireSkillIconButton(encore, "enso", ref _ensoView, ref _ensoNameText);
-            _ensoRect = encore;
-        }
-
-        private RectTransform _ensoRect;
-
-        /// <summary>实例化现成 Skill.prefab（根 100×100）并等比缩放到目标直径（子件锚点全拉伸随动）</summary>
-        private RectTransform MakeSkillIconButton(string name, float diameter)
-        {
-            var prefab = Resources.Load<GameObject>("Prefabs/UI/Skill/Skill");
-            if (prefab == null)
-            {
-                GICLog.Error("[BattleHud] Skill.prefab 未找到，技能盘不可用");
-                return null;
-            }
-            var instance = Instantiate(prefab, _canvas.transform, false);
-            instance.name = name;
-            var rect = instance.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(diameter, diameter);
-            return rect;
-        }
-
-        /// <summary>接线：SkillIconView 视觉填充（InitWithData 现有链）+ 点击转发 + 底部名称。
-        /// 注意：Toggle 与 Button 同为 Selectable 不能共存（UGUI 单 Selectable 限制，2026-09-18 NRE 实锤）——
-        /// 点击事件走非 Selectable 的 IPointerClickHandler 转发件；Toggle 自身 isOn 随点击翻转无副作用
-        /// （ViewType.OnlyDisplay 拦截其跳转/选中环逻辑），瞄准反馈由 SetAimSelectRing 管。</summary>
-        private void WireSkillIconButton(RectTransform buttonRect, string buttonKey,
-            ref SkillIconView viewRef, ref TextCombiner nameRef)
-        {
-            var view = buttonRect.GetComponent<SkillIconView>();
-            viewRef = view;
-
-            var forwarder = buttonRect.gameObject.AddComponent<SkillClickForwarder>();
-            forwarder.onClick = () => OnSkillButtonClicked(buttonKey);
-
-            // 底部名称（prefab 无名字文本；技能名本地化条目由 RefreshSkillButtons 填）
-            var labelGo = new GameObject("Name");
-            var labelRect = labelGo.AddComponent<RectTransform>();
-            labelRect.SetParent(buttonRect, false);
-            labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0f);
-            labelRect.pivot = new Vector2(0.5f, 1f);
-            labelRect.anchoredPosition = new Vector2(0f, -8f);
-            labelRect.sizeDelta = new Vector2(260f, 按钮名字号 + 8f);
-            var labelText = labelGo.AddComponent<TextMeshProUGUI>();
-            labelText.text = buttonKey == "burst" ? "爆发" : buttonKey == "enso" ? "延奏" : "战技";
-            labelText.fontSize = 按钮名字号;
-            labelText.color = 文字米白;
-            labelText.alignment = TextAlignmentOptions.Center;
-            labelText.raycastTarget = false;
-            nameRef = labelGo.AddComponent<TextCombiner>();
-        }
-
-        /// <summary>技能按钮点击转发（非 Selectable，可与 Toggle 共存——Toggle/Button 单 Selectable 限制绕行）</summary>
-        private class SkillClickForwarder : MonoBehaviour, UnityEngine.EventSystems.IPointerClickHandler
-        {
-            public Action onClick;
-            public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData) => onClick?.Invoke();
-        }
-
-        private static void PlaceInZone(RectTransform rect, Transform zone, Vector2 inZonePos)
-        {
-            rect.SetParent(zone, false);
-            rect.anchorMin = rect.anchorMax = Vector2.zero;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = inZonePos;
-        }
-
-        private void BuildHandZone()
-        {
-            _handZone = MakeRect("HandZone", _canvas.transform);
-            _handZone.anchorMin = _handZone.anchorMax = new Vector2(0.5f, 0f);
-            _handZone.pivot = new Vector2(0.5f, 0f);
-            _handZone.anchoredPosition = new Vector2(0f, 30f);
-            _handZone.sizeDelta = new Vector2(900f, 120f);
-
-            var handText = MakeText("HandText", _handZone, 顶栏字号 * 0.45f, 文字米白);
-            SetRect(handText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(880f, 44f));
-            handText.text = "手牌（卡列表 B8 接入 · 数量见左上资源区）";
-        }
-
-        /// <summary>全局提示条（独立于手牌区——选中态手牌隐藏时提示仍可见）</summary>
-        private void BuildTipBar()
-        {
-            var rect = MakeRect("TipBar", _canvas.transform);
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, 168f);
-            rect.sizeDelta = new Vector2(1000f, 52f);
-
-            _tipText = MakeText("TipText", rect, 顶栏字号 * 0.5f, 暖金);
-            SetRect(_tipText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        }
-
-        private void BuildCancelButton()
-        {
-            float d = 取消按钮直径;
-            var cancel = MakeRect("CancelButton", _canvas.transform);
-            cancel.anchorMin = cancel.anchorMax = new Vector2(1f, 1f);
-            cancel.pivot = new Vector2(0.5f, 0.5f);
-            cancel.anchoredPosition = new Vector2(-取消按钮距右 - d * 0.5f, -取消按钮距顶 - d * 0.5f);
-            cancel.sizeDelta = new Vector2(d, d);
-
-            var image = cancel.gameObject.AddComponent<Image>();
-            image.sprite = Resources.Load<Sprite>("UI/Skills/circle");
-            image.color = new Color(敌红.r, 敌红.g, 敌红.b, 0.35f);
-
-            var label = MakeText("CancelText", cancel, 取消按钮直径 * 0.16f, 文字米白);
-            SetRect(label.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            label.text = "取消";
-
-            var button = cancel.gameObject.AddComponent<Button>();
-            button.onClick.AddListener(OnCancelButtonClicked);
-            _cancelButton = cancel;
-        }
-
-        private void BuildSkillPopup()
-        {
-            // 复用现有技能详情面板（Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab——背包/卡牌详情同款，
-            // 图标/类型/名称/描述/参数行全本地化，自带滑入动画与点外关闭）
-            var prefab = Resources.Load<GameObject>("Prefabs/UI/Skill/SkillDetailPanel");
-            if (prefab == null)
-            {
-                GICLog.Warn("[BattleHud] SkillDetailPanel.prefab 未找到，技能详情不可用");
-                return;
-            }
-            var popup = Instantiate(prefab, _canvas.transform, false);
-            popup.name = "BattleSkillDetail";
-            _skillDetailView = popup.GetComponent<SkillDetailView>();
-            if (_skillDetailView == null)
-            {
-                GICLog.Warn("[BattleHud] SkillDetailPanel.prefab 根缺 SkillDetailView 组件");
-                return;
-            }
-
-            // 面板初始隐藏，摆到技能盘左侧（prefab 原位是背包场景接线值，须重摆）
-            _skillDetailView.skillDetailPanel.SetActive(false);
-            if (_skillDetailView.relatedPanel != null)
-                _skillDetailView.relatedPanel.SetActive(false);
-            var rect = _skillDetailView.skillDetailPanel.GetComponent<RectTransform>();
-            rect.anchorMin = rect.anchorMax = new Vector2(1f, 0.5f);
-            rect.pivot = new Vector2(1f, 0.5f);
-            var pos = new Vector2(-爆发圆心距右 - 400f, 0f);
-            rect.anchoredPosition = pos;
-            _skillDetailView.RepositionPanel(pos);
-
-            if (_skillDetailView.relatedPanel != null)
-            {
-                var relatedRect = _skillDetailView.relatedPanel.GetComponent<RectTransform>();
-                if (relatedRect != null)
-                {
-                    relatedRect.anchorMin = relatedRect.anchorMax = new Vector2(1f, 0.5f);
-                    relatedRect.pivot = new Vector2(1f, 0.5f);
-                }
-            }
-        }
-
-        // ==================== UI 基础件 ====================
-
-        private static RectTransform MakeRect(string name, Transform parent)
-        {
-            var go = new GameObject(name);
-            var rect = go.AddComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            return rect;
-        }
-
-        private static void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 position, Vector2 size)
-        {
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = size;
-        }
-
-        private TextMeshProUGUI MakeText(string name, Transform parent, float fontSize, Color color)
-        {
-            var go = new GameObject(name);
-            var rect = go.AddComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            var text = go.AddComponent<TextMeshProUGUI>();
-            text.fontSize = fontSize;
-            text.color = color;
-            text.alignment = TextAlignmentOptions.Center;
-            text.raycastTarget = false;
-            return text;
-        }
-
-        /// <summary>圆形行动按钮（底盘 circle + 图标 + 底部名称）</summary>
-        private RectTransform MakeActionButton(string name, string iconPath, string label, float diameter)
-        {
-            var rect = MakeRect(name, _canvas.transform);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(diameter, diameter);
-
-            var image = rect.gameObject.AddComponent<Image>();
-            var circle = Resources.Load<Sprite>("UI/Skills/circle");
-            image.sprite = circle;
-            image.color = new Color(0.10f, 0.09f, 0.07f, 0.92f);
-            image.raycastTarget = true;
-
-            var button = rect.gameObject.AddComponent<Button>();
-            var colors = button.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1.06f, 1.03f, 0.92f);
-            colors.pressedColor = new Color(0.85f, 0.83f, 0.75f);
-            button.colors = colors;
-
-            // 图标位（iconPath null 时也建空位——RefreshSkillButtons 按选中单位的 SkillData.icon 填）
-            {
-                var iconGo = new GameObject("Icon");
-                var iconRect = iconGo.AddComponent<RectTransform>();
-                iconRect.SetParent(rect, false);
-                iconRect.anchorMin = iconRect.anchorMax = new Vector2(0.5f, 0.5f);
-                iconRect.anchoredPosition = Vector2.zero;
-                iconRect.sizeDelta = new Vector2(diameter * 0.56f, diameter * 0.56f);
-                var icon = iconGo.AddComponent<Image>();
-                if (iconPath != null) icon.sprite = Resources.Load<Sprite>(iconPath);
-                icon.raycastTarget = false;
-            }
-
-            var labelGo = new GameObject("Label");
-            var labelRect = labelGo.AddComponent<RectTransform>();
-            labelRect.SetParent(rect, false);
-            labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0f);
-            labelRect.anchoredPosition = new Vector2(0f, -10f);
-            labelRect.sizeDelta = new Vector2(240f, 按钮名字号 + 8f);
-            var labelText = labelGo.AddComponent<TextMeshProUGUI>();
-            labelText.text = label;
-            labelText.fontSize = 按钮名字号;
-            labelText.color = 文字米白;
-            labelText.alignment = TextAlignmentOptions.Center;
-            labelText.raycastTarget = false;
-            labelGo.AddComponent<TextCombiner>(); // 名称在 RefreshSkillButtons 换为技能名本地化条目
-
-            return rect;
-        }
-
-        private Button MakeIconButton(string name, Transform parent, string iconPath,
-            Vector2 anchorMin, Vector2 anchorMax, Vector2 position, Vector2 size)
-        {
-            var rect = MakeRect(name, parent);
-            SetRect(rect, anchorMin, anchorMax, position, size);
-            var image = rect.gameObject.AddComponent<Image>();
-            image.sprite = Resources.Load<Sprite>(iconPath);
-            var button = rect.gameObject.AddComponent<Button>();
-            return button;
+            if (_selectMarker != null) _selectMarker.SetActive(false);
         }
 
         // ==================== 技能数据链（现有体系：UnitConfig.skills → SkillData；2026-09-18 复用拍板） ====================
@@ -835,67 +648,104 @@ namespace GIC.Battle
                 ? data : null;
         }
 
-        /// <summary>按钮键 → 该技能在 UnitData.skills 数组的索引（ActionData.skillIndex 的 Host 侧语义）</summary>
-        private int GetSelectedSkillIndex(string buttonKey)
+        /// <summary>该技能类型在 UnitData.skills 数组的索引（ActionData.skillIndex 的 Host 侧语义）</summary>
+        private int GetSelectedSkillIndex(SkillType want)
         {
             var unitData = GetSelectedUnitData();
             if (unitData?.skills == null) return 0;
-            SkillType want = buttonKey switch
-            {
-                "burst" => SkillType.Burst,
-                "enso" => SkillType.Enso,
-                _ => SkillType.Normal,
-            };
             for (int i = 0; i < unitData.skills.Length; i++)
                 if (unitData.skills[i].skillType == want) return i;
             return 0;
         }
 
-        /// <summary>按钮键（skill/burst/enso）→ 该角色的 SkillData（UnitData.skills 按 SkillType 分拣）</summary>
-        private SkillConfig.SkillData GetSelectedSkillData(string buttonKey)
+        /// <summary>按钮 def → 该角色的 SkillData（UnitData.skills 按 def.type 分拣）；
+        /// fallback 到首技能是预期语义——3004 号角色设计即无战技、主要靠移动，勿当 bug 修（docs/14 §63④）</summary>
+        private SkillConfig.SkillData GetSelectedSkillData(SkillButtonDef def)
         {
+            if (def == null) return null;
             var unitData = GetSelectedUnitData();
             if (unitData?.skills == null) return null;
-            SkillType want = buttonKey switch
-            {
-                "burst" => SkillType.Burst,
-                "enso" => SkillType.Enso,
-                _ => SkillType.Normal,
-            };
-            return unitData.skills.FirstOrDefault(s => s.skillType == want) ?? unitData.skills.FirstOrDefault();
+            return unitData.skills.FirstOrDefault(s => s.skillType == def.type)
+                ?? unitData.skills.FirstOrDefault();
         }
 
-        /// <summary>选中单位时刷新技能盘：图标/元素色环/主动被动色全走 SkillIconView.InitWithData 现有链</summary>
-        private void RefreshSkillButtons(string unitName)
+        /// <summary>选中单位时刷新技能盘：表驱动全键统一（移动走 ApplyMoveButton，其余走 ApplySkillButton）；
+        /// 图标/元素色环/主动被动色全走 SkillIconView.InitWithData 现有链</summary>
+        private void RefreshSkillButtons()
         {
             var unitData = GetSelectedUnitData();
             if (unitData == null) return;
 
-            var normal = GetSelectedSkillData("skill");
-            var burst = GetSelectedSkillData("burst");
-            var enso = GetSelectedSkillData("enso");
-
-            ApplySkillButton(_skillView, normal, _skillNameText, unitData);
-            ApplySkillButton(_burstView, burst, _burstNameText, unitData);
-            ApplySkillButton(_ensoView, enso, _ensoNameText, unitData);
-            if (_ensoRect != null)
-                _ensoRect.GetComponent<Toggle>().interactable = enso != null; // 无延奏配置的角色置灰（Toggle.interactable）
+            foreach (var def in _skillButtons)
+            {
+                if (def.IsMove) ApplyMoveButton(def, unitData);
+                else ApplySkillButton(def, unitData);
+            }
         }
 
-        private void ApplySkillButton(SkillIconView view, SkillConfig.SkillData data, TextCombiner label, UnitConfig.UnitData unitData)
+        /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
+        /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）</summary>
+        private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
-            if (view == null) return;
-            view.gameObject.SetActive(data != null);
+            if (def?.view == null) return;
+            var data = GetSelectedSkillData(def);
+            def.view.gameObject.SetActive(data != null);
+            var toggle = def.view.GetComponent<Toggle>();
+            if (toggle != null) toggle.interactable = data != null;
             if (data == null) return;
 
-            // 现有链：图标白底不染 + 底图染亮元素色 + 主动/被动色环（2026-09-10 拍板规则全在 SkillIconView 内）
-            view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
+            def.view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
 
-            if (label != null)
+            if (def.nameText != null)
             {
-                label.ClearAllEntries();
-                label.AddEntry(data.skillID.GetEntry());
+                def.nameText.ClearAllEntries();
+                def.nameText.AddEntry(data.skillID.GetEntry());
             }
+        }
+
+        /// <summary>移动按钮刷新（特殊技能）：数据链走 skills[Move]（InitWithData 染角色元素色底+主动环；
+        /// 无 Move 条目单位不隐藏——移动人人可用，仅跳过染色）。图标+名称随单位常态切换
+        /// （walk/fly/amphibious → 步行/飞行/两栖，docs/18 决策六"随单位切换与否"待拍板项的数据驱动落地）</summary>
+        private void ApplyMoveButton(SkillButtonDef def, UnitConfig.UnitData unitData)
+        {
+            if (def?.view == null || unitData == null) return;
+
+            var move = unitData.skills?.FirstOrDefault(s => s.skillType == SkillType.Move);
+            if (move != null)
+                def.view.InitWithData(move, unitData, ViewType.OnlyDisplay, null);
+
+            // 图标+名称随常态切换（InitWithData 已填配置的 walk.png，飞行/两栖覆盖为对应图）
+            SkillName nameId = SkillName.Common_Walk;
+            string iconPath = "UI/Skills/walk";
+            if (unitData.normalMoveType == ForceType.Fly)
+            {
+                nameId = SkillName.Common_Fly;
+                iconPath = "UI/Skills/fly";
+            }
+            else if (unitData.normalMoveType == ForceType.Amphibious)
+            {
+                nameId = SkillName.Common_Amphibious;
+                iconPath = "UI/Skills/amphibious";
+            }
+            if (def.view.skillIcon != null)
+                def.view.skillIcon.sprite = Resources.Load<Sprite>(iconPath);
+            if (def.nameText != null)
+            {
+                def.nameText.ClearAllEntries();
+                def.nameText.AddEntry(nameId.GetEntry());
+            }
+        }
+
+        /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>
+        private void SetTip(string key)
+        {
+            if (_tipCombiner == null) return;
+            if (string.IsNullOrEmpty(key))
+            {
+                _tipCombiner.SetSingleEntry(string.Empty);
+                return;
+            }
+            _tipCombiner.SetSingleEntry(new LocalizedString("UIText", key));
         }
     }
 }

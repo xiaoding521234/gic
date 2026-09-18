@@ -24,6 +24,9 @@ namespace GIC.Data
         /// <summary>玩家出生区（3x3 石路中心格）</summary>
         public List<BattleCell> spawnCenters = new List<BattleCell>();
 
+        /// <summary>地图所属势力（FactionType 的 int 值）：HUD 徽标等表现层取用（B7 客户端无 mapConfig 资产）</summary>
+        public int faction;
+
         public bool InBounds(int x, int y) => x >= 0 && x < width && y >= 0 && y < height;
 
         /// <summary>

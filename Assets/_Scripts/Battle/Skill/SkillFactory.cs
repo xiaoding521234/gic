@@ -51,21 +51,23 @@ namespace GIC.Battle
         }
         
         /// <summary>
-        /// 创建技能实例
+        /// 创建技能实例。未注册类 → 返回占位技能（保 unit.Skills 与 UnitConfig.skills
+        /// **索引严格对齐**——ActionData.skillIndex 双端同源映射，占位不可施放）而非 null
+        /// （null 会令 InitSkills 跳过 → 后续技能索引整体前移错位，2026-09-18 B4 实证防）。
         /// </summary>
         private static BaseSkill CreateWithID(SkillName skillID)
         {
             if (!_isInitialized) Initialize();
-            
+
             if (skillID == SkillName.None) return null;
-            
+
             if (_creators.TryGetValue(skillID, out var creator))
             {
                 return creator();
             }
-            
-            GICLog.Warn($"[SkillFactory] 未注册的技能: {skillID}");
-            return null;
+
+            GICLog.Warn($"[SkillFactory] 未注册的技能: {skillID} → 占位（不可施放）");
+            return new UnimplementedSkill();
         }
 
         public static BaseSkill CreateWithData(SkillConfig.SkillData data)

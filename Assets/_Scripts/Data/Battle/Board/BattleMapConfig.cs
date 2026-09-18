@@ -85,6 +85,8 @@ namespace GIC.Data
             foreach (var zone in spawnZones)
                 data.spawnCenters.Add(zone.center);
 
+            data.faction = (int)faction; // 协议携带势力：客户端 HUD 徽标等表现层取用（B7 客户端无 mapConfig 资产）
+
             return data;
         }
 

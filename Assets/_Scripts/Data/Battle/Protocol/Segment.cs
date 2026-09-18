@@ -29,13 +29,17 @@ namespace GIC.Data
         /// <summary>是否为片边界插入的即时行动块（0/1）</summary>
         public int insertedInstantAction;
 
+        /// <summary>是否为回合结束效果块（0/1；B2：Buff 计时与回合结束效果——播放侧短节拍、不驱动攻速排程/执行高亮）</summary>
+        public int turnEnd;
+
         [Header("命令流")]
         public List<BattleCommand> commands = new List<BattleCommand>();
 
         public override string ToString()
         {
             return $"[Segment turn={turnNumber} slice={sliceIndex} speed={sliceAttackSpeed} cmds={commands.Count}" +
-                   (insertedInstantAction != 0 ? " INSTANT" : "") + "]";
+                   (insertedInstantAction != 0 ? " INSTANT" : "") +
+                   (turnEnd != 0 ? " TURN-END" : "") + "]";
         }
     }
 }
