@@ -168,11 +168,52 @@ namespace GIC.Pet.Chat
             if (_tts == null || _tts.IsBusy || _textQueue.Count == 0) return;
             int mode = PetPrefs.ReadVoiceMode();
             if (mode == 0) { _textQueue.Clear(); return; }
-            string sentence = _textQueue.Dequeue();
+            string sentence = SanitizeForSpeech(_textQueue.Dequeue());
+            if (sentence.Length == 0) { PumpText(); return; } // 清洗后为空（纯 emoji/符号句）→ 直接下一句
             GICLog.DevInfo($"[PetVoice] 合成: {sentence}");
             _pumpGen = _gen; // 在途合成的世代标签（回调时比对）
             if (mode == 1) _tts.SynthesizeSidecar(sentence);
             else _tts.SynthesizeCloud(sentence);
+        }
+
+        /// <summary>语音文本清洗（2026-09-17，docs/27 A5）：白名单保留可念字符——字母数字（含 CJK）、
+        /// CJK 标点、全角标点、弯引号、省略号/破折号/间隔号、ASCII 常用标点；其余（emoji 代理对、
+        /// markdown 记号 *#`_~、控制符、生僻符号）剔除，空白折叠。人设本禁 markdown/emoji，此为最后
+        /// 一道防线——GPT-SoVITS 对不可念符号敏感。</summary>
+        static string SanitizeForSpeech(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(s.Length);
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (char.IsSurrogate(c)) { i++; continue; } // 代理对整体丢弃（emoji 全在此区间）
+                if (char.IsWhiteSpace(c)) { sb.Append(' '); continue; }
+                if (IsSpeakable(c)) sb.Append(c);
+            }
+            var sb2 = new StringBuilder(sb.Length);
+            bool lastSpace = true; // 首部空格直接吃掉
+            for (int i = 0; i < sb.Length; i++)
+            {
+                if (sb[i] == ' ')
+                {
+                    if (!lastSpace) { sb2.Append(' '); lastSpace = true; }
+                }
+                else { sb2.Append(sb[i]); lastSpace = false; }
+            }
+            if (sb2.Length > 0 && sb2[sb2.Length - 1] == ' ') sb2.Length--;
+            return sb2.ToString();
+        }
+
+        /// <summary>可念字符白名单判定（SanitizeForSpeech 用）</summary>
+        static bool IsSpeakable(char c)
+        {
+            if (char.IsLetterOrDigit(c)) return true;
+            if (c >= 0x3000 && c <= 0x303F) return true; // CJK 标点（。、「」《》）
+            if (c >= 0xFF00 && c <= 0xFF5E) return true;  // 全角标点（！？，：；（））
+            if (c >= 0x2018 && c <= 0x201D) return true;  // 弯引号 ‘’“”
+            if (c == '…' || c == '—' || c == '·' || c == '・') return true;
+            return ",.!?:;'\"()%&+-/".IndexOf(c) >= 0;
         }
 
         void OnSynthReady(AudioClip clip)
