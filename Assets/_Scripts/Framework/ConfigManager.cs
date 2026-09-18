@@ -21,6 +21,7 @@ namespace GIC.Framework
         [Bean] public PositionConfig GetPositionConfig() => LoadConfig<PositionConfig>("Configs/PositionConfig");
         [Bean] public ElementFactionConfig GetElementFactionConfig() => LoadConfig<ElementFactionConfig>("Configs/ElementFactionConfig");
         [Bean] public StarVisualConfig GetStarVisualConfig() => LoadConfig<StarVisualConfig>("Configs/StarVisualConfig");
+        [Bean] public BattlePalette GetBattlePalette() => LoadConfig<BattlePalette>("Configs/BattlePalette");
         [Bean] public InitialSaveConfig GetInitialSaveConfig() => LoadConfig<InitialSaveConfig>("Configs/InitialSaveConfig");
 
         [Autowired] private UnitConfig _unitConfig;
@@ -35,6 +36,8 @@ namespace GIC.Framework
             StarVisualConfig.Initialize(GetStarVisualConfig());
             // ElementFactionConfig 静态访问兼容（元素颜色等，非注入上下文调用）
             ElementFactionConfig.Initialize(GetElementFactionConfig());
+            // BattlePalette 静态访问兼容（战斗视图层配色，2026-09-18 统一化批次）
+            BattlePalette.Initialize(GetBattlePalette());
             // CardConfigResolver 静态访问兼容（SaveCardData.Config / 卡牌视图策略）
             CardConfigResolver.Initialize(_cardResolver);
         }

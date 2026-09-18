@@ -1210,3 +1210,53 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 **终局状态（可交付）**：①安柏=正常姿势站立（AmberAvatarReal 官方参照 Avatar）+头发/配饰 legacy 动画完整；②153 条解码肌肉数据（JSON）+全套陷阱知识（§56-60）留档，未来任何方案（官方工具/更强逆向）的输入；③探针实验资产已清理（MuscleClipProbe 仅留 TestRig.fbx 对照）。
 
 **通则**：①「能驱动」≠「驱动正确」——肌肉空间的参照位姿/范围/轴向三者必须与数据原生语义对齐，错位输出的是乱舞而非报错；②视觉验收失败时，姿势级偏差与数据级错误要先分离（本例=官方 T-pose 参照 vs GI 肌肉空间的系统性错位，非数据错误）；③重度逆向任务（引擎私有格式+官方肌肉空间数学）的投入应在早期用「最小目检样张」验证可行性，而非在数据链上层层推进后再交视觉验收——本例的教训是样张出得太晚（嫁接样张早出可省 3 轮格式战争）。
+
+## 62. 战斗世界层程序化视觉三件套：Resources.Load 路径相对最内层 Resources 根 + Quad/TMP 法线全 -Z + TMP 默认字体链（2026-09-18 HUD 补全实证）
+
+**①Resources.Load 路径陷阱**：`Assets/TextMesh Pro/Resources/Fonts & Materials/zh-cn SDF.asset` 的 Resources 路径 = `Fonts & Materials/zh-cn SDF`——相对**最内层 Resources 文件夹**，不带外层目录前缀；写全 `TextMesh Pro/Fonts & Materials/...` 静默 null（Resources.Load 失败不报错）。判定：Resources.Load 返回 null 先查路径层级。
+
+**②世界层朝向速查（billboard 场景）**：Unity **Quad 基元法线 = (0,0,-1)**（非 +Z）；TMP 3D 网格法线亦 -Z；billboard root 用 `LookRotation(camera.forward)` 时其 +Z 指向**远离相机**——故「root 子物体 identity 摆放即正对相机」（Quad/MeshRenderer/TMP 全适用，UnitView 血条/单位名实证）；平铺地面 = `Euler(90,0,0)`（法线 +Y，底座/高亮/选中标记既有模式）。编辑模式探法线：`mesh.normals` 取均值即可，勿凭记忆赌朝向。
+
+**③程序化 TMP 中文字体链**：TMP Settings 的 defaultFontAsset = zh-cn SDF（TMPChineseFont skill 已配）——程序化 `TextMeshProUGUI`/世界空间 `TextMeshPro` 默认即中文安全；显式 `Resources.Load<TMP_FontAsset>("Fonts & Materials/zh-cn SDF")` 更稳（世界空间 TMP 无 UGUI 字体链兜底的场合）。程序化 UGUI TMP 与 TextCombiner 同物体 = 规范路径（docs/20 §2）。
+
+## 63. 战斗世界层材质生命周期 + Toggle.interactable 拦不住 IPointerClickHandler（2026-09-18 代码审查实证，BattleHud）
+
+**①运行时 new Material 泄漏（sharedMaterial 模式）**：`Destroy(GameObject)` **不销毁**运行时 `new Material(...)` 的材质（材质是独立资产，随 renderer 销毁只解除引用不释放）——曾 `ShowAimHighlights` 每格 new 一个材质、`ClearHighlights` 只销 quad，反复进出瞄准态每局累积 ~24 材质/次。修法：**同类同色件用单实例懒建缓存共享**（`GetAimHighlightMaterial()`），组件 `OnDestroy` 里 `Destroy(_xxMaterial)` 释放（BattleHud 瞄准高亮+选中盘已修）。同族提醒：UnitView 每单位 3 材质（底座/血条bg/fill）有界暂容忍——B5 表现批次建世界层 quad 工厂时一并收口（一次建、一次释放）。
+
+**②IPointerClickHandler 不受 Toggle.interactable 拦截**：UGUI 事件执行对同物体**全部兼容 handler** 生效，`interactable=false` 只拦 Selectable 自身的内部响应——为绕"Toggle/Button 单 Selectable 限制"挂的 `SkillClickForwarder`（IPointerClickHandler）**照常收点击**，置灰防线被穿透（与 §2.2"interactable≠禁用"同族）。修法：**防线收口在处理端**——`OnSkillButtonClicked` 入口显式查 `Toggle.interactable` 不通过即 return，勿依赖 UGUI 拦截。
+
+**③审查核验免修项（勿再误报）**：`Shader.Find("Universal Render Pipeline/Unlit")`（GUID `650dd9526735d5b46b79224bc6e94025`）**已在** GraphicsSettings→Always Included Shaders 清单内，构建剥离风险不成立（§3/§53 类问题的反例——报前先核清单）。
+
+**④设计拍板（勿当 bug 修）**：`GetSelectedSkillData` 尾部 `?? skills.FirstOrDefault()` fallback 语义**保留**——3004 号角色设计即无战技、主要靠移动（2026-09-18 用户拍板），无对应类型技能时技能盘按钮显示首个技能是**预期行为**，勿"修复"成隐藏/置灰。
+
+**⑤统一化批次落地（2026-09-18 同日晚，审查债务 #3-#8 一次收口）**：战斗表现层统一件三件套——**BattlePalette**（`Data/Battle/BattlePalette.cs`+`Resources/Configs/BattlePalette.asset`，ConfigManager [Bean]+PostConstruct 注入，ElementFactionConfig.Instance 同款；配色字面量 BattleHud/BattlePlayer/UnitView 三文件收口，队伍色=底座/队列框/accent 同源）；**BattleViewFactory**（`Battle/View/`，世界 quad+Unlit 材质+世界 TMP 字体的唯一出口——材质生命周期归调用方持有+OnDestroy 释放；Shader.Find 收口一处）；**BattleViewTween**（elapsed-while 手写循环收口，末帧保证 t=1）。按钮建法 4→3（取消钮并入 MakeActionButton，labelCentered 参数；统一按压反馈补到设置/取消钮；Skill.prefab+SkillClickForwarder 保留=Toggle/Button 单 Selectable 限制的必要绕行）。**TextMesh 全数退役**（伤害数字/Buff 回合角标→世界 TMP；换算 `世界高≈fontSize×scale×0.1`，scale=原 characterSize 保等高）。可见变化三处：队列框/accent/取消钮敌红 (0.78,0.36,0.31)→(1,0.35,0.3) 对齐底座队伍色；数字字形 Arial→zh-cn SDF；设置/取消钮有 hover/press 反馈。**追加（同日用户拍板"技能按钮应当统一，包括移动——移动是特殊的技能"）**：移动按钮并入 Skill.prefab 建法（四键全同构，事件通道统一走 SkillClickForwarder）；数据链 skills[Move]（UnitConfig 各角色 Move 条目 skillID=Common_Walk/icon=walk.png 均已配，无技能角色跳过染色不隐藏）；图标+名称随 normalMoveType 数据驱动（walk/fly/amphibious→Common_Walk/Fly/Amphibious 的 SkillName 表现成键，图标=InitWithData 后覆盖为对应现成图）；移动瞄准选中环接入 SetAimSelectRing（EnterAiming(Move,"move")）。可见变化：移动钮从暗底盘变角色元素色底+主动橙环（与技能盘同款），名称从恒「移动」变随单位「步行/飞行/两栖」。
+
+## 64. 战技/爆发/延奏点击「无反应」=详情面板开而不渲染——跨场景复用拉伸锚 prefab 的点锚化陷阱三连（2026-09-18 活体实证）
+
+**症状**：战技/爆发/延奏点击无反应（移动正常——移动不走详情面板）；反射直调 OnSkillButtonClicked 全通、真点击链（RaycastAll+ExecuteHierarchy）也全通、面板 activeSelf=True——**一切逻辑正常但视觉零反馈**。
+
+**根因三层（BattleHud.BuildSkillPopup 自 HUD v1 起潜伏）**：
+①**skillDetailPanel 字段引用的就是 prefab 根本身**（非子物体），其原锚=全拉伸 (0,0)-(1,1)+负 sizeDelta 边距 (-1807.67,0)（背包左侧全高栏设计）——只点锚化 (1,0.5) 不落尺寸 → **负宽零高**（活体实测 rect=(-1807.67,0)），面板 SetActive(true)/滑入动画照跑但 CanvasRenderer 不出 mesh=「开而不渲染」。
+②**RelatedPanel 是面板本体的子物体**（锚参照=面板 rect 非画布——由活体落点反推实锤），同病：y 拉伸负边距点锚化后高 -337、位超画布右缘。
+③**设计宽实时捕获竞态**：BuildUi 时 CanvasScaler 尚未应用，canvasRect.rect.width=裸屏宽（实测 3174）→ designWidth=1366 超设计值；修法=以 `scaler.referenceResolution.x`（2560）为捕获基准（拉伸语义宽=参考宽+sizeDelta.x≈752）。
+
+**修法**（BuildSkillPopup 重写）：点锚化前按拉伸语义捕获设计宽→显式落 `sizeDelta=(designWidth, 详情面板高度[新 SerializeField=900])`；关联面板挂**面板左缘锚** (0,0.5)+pivot(1,0.5) 向左展开（勿按画布参照系摆位）；滑入目标经新 API `SkillDetailView.RepositionRelatedPanel` 重定（否则滑向 prefab 原场景接线值）。
+
+**取证三教训**：
+a) **ScreenSpaceOverlay 画布的世界坐标=屏幕像素**，画布局部=(世界−画布中心)/scaleFactor——直接除 scale 会把正确的 (608,0) 误算成「落点超画布」；
+b) **活体取证防选择阶段 25s 超时污染**——超时自动 Pass→DeselectUnit 隐藏技能盘→射线「零命中」/activeInHierarchy=False 全是污染样本（§39 排障时序：SelectUnit 后**立刻**取证，勿跨多轮工具往返）；
+c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开而不渲染」：dump RectTransform（负宽/零高=锚点体系错配的指纹）。
+
+## 64b. 「面板开着再点同键」永远进不了瞄准——SkillDetailView 点外关闭与 UGUI 点击派发的同帧竞态（2026-09-18 活体实锤）
+
+**症状**：面板开着再点同一技能按钮，面板闪一下又开着（永远走"重开"分支，进不了瞄准）；点面板外的棋盘空白也会先被抢关（OnBoardTap 读到 PopupOpen=false，误走"取消选中"分支）。
+
+**根因**：SkillDetailView.Update 的点外关闭用 `Input.GetMouseButtonDown(0)` 在**按下帧**判定"指针在面板外"立即 `ClosePanel()`——而 UGUI 的 PointerClick 在**抬起帧**才派发给点击目标（按钮转发件）。时序：按下帧关面板 → 抬起帧 OnSkillButtonClicked 读到 PopupOpen=false → 永远走 ShowSkillPopup 重开。背包场景同款竞态一直存在（点源图标=面板闪一下重开），从未被注意。
+
+**曾试方案（勿再走）**：pendingOutsideClose 延迟一帧关闭——抬起帧若 SkillDetailView.Update 先于 EventSystem 执行，仍会在按钮点击派发前关面板，**竞态只是换了个位置**，依赖脚本执行顺序（未设 Script Execution Order）不可靠。
+
+**终案（零竞态）**：SkillDetailView 加 `public bool 点外关闭 = true`（默认开保背包原行为），战斗 HUD 实例化时设 **false**——按钮点击与面板自动关闭彻底解耦；战斗的"点外收面板"由 BattleHud.OnBoardTap 已有分支承接（点棋盘=收面板保持选中）。**判定原则：同一交互目标（按钮）同时被两个系统响应（自动关闭+按钮点击）时，必须一方显式让位，勿依赖帧内执行顺序。**
+
+**顺带统一（2026-09-18 用户拍板"移动按钮也不应当直接瞄准"）**：OnMoveButtonClicked 删除，四键（移动/战技/爆发/延奏）全走 OnSkillButtonClicked 点击式三情况（①开面板②再点同键进瞄准③换点切内容），移动唯一差异=AimMode（瞄准按移动语义结算）；GetSelectedSkillData 补 move 分拣（否则移动面板会显示战技数据）；瞄准态点任何按钮=无操作（退出走取消钮/点非可选格）。
+
+**结构收敛 A+B（2026-09-18 深夜，质量评估后拍板）**：①**表驱动四键（A）**——`SkillButtonDef{key,type,rect,view,nameText}`+`RegisterSkillButton` 注册（`BuildSkillButtons` 里加键=加一行），全类 buttonKey 字符串 switch 清零、转发闭包直捕 def 零查找、**AimMode 枚举删除**（瞄准语义由 `def.type==Move` 承载）、置灰语义泛化全键（原延奏特例）；加键成本从"改 8 处"降为"加 1 行"。②**partial 拆分（B）**——BattleHud.cs 主（状态机/技能按钮交互/数据链/高亮）+ BattleHud.TopBar.cs（顶栏/队列/信息块）+ BattleHud.Build.cs（程序化构建/按钮注册/面板接线），修改热区按职责归位。受控复现基线逐项一致（战技 22 格/移动 24 格/面板开合/瞄准链/取消钮全同）。

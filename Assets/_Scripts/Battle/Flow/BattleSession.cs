@@ -73,6 +73,7 @@ namespace GIC.Battle
             transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
 
             player.Bind(transport, sim.Map);
+            player.BindFlow(flow); // 两态模型：立牌布局随回合阶段切换（散开/收拢，docs/active/22 §11）
             return session;
         }
 
@@ -143,7 +144,8 @@ namespace GIC.Battle
         // ==================== 调试单位生成 ====================
 
         /// <summary>
-        /// 生成调试单位（复用 UnitFactory + UnitConfig 真实数据 + DebugAttackSkill；
+        /// 生成调试单位（复用 UnitFactory + UnitConfig 真实数据；技能由 InitSkills 按
+        /// UnitConfig.skills 顺序自动创建（B4 正式技能链），DebugAttackSkill 已退役；
         /// 逻辑单位挂入隐藏 LogicRoot——仅 Host 侧持有逻辑，表现层走 UnitView）
         /// </summary>
         public string SpawnDebugUnit(UnitName unitName, string playerId, TeamType team, BattleCell cell)
@@ -166,7 +168,6 @@ namespace GIC.Battle
             var unit = UnitFactory.CreateUnitWithData(data);
             if (unit == null) return null;
 
-            unit.AddSkill(new DebugAttackSkill());
             if (_logicRoot != null)
                 unit.transform.SetParent(_logicRoot, false);
 

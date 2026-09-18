@@ -33,7 +33,8 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 技能行动执行器（B1 = DebugAttackSkill 固定伤害，走 DamagePipeline）。
+    /// 技能行动执行器（B4：正式技能链——ActionData.skillIndex 索引 unit.Skills（=UnitConfig.skills
+    /// 顺序创建），BaseSkill.ResolveEffects 纯结算产出效应；DebugAttackSkill 已退役）。
     /// 单位指向型技能只对目标单位生效（不适用格子判定，docs/05 §5.3）；允许鞭尸。
     /// 目标校验读片前快照（瞬发效应按片初状态结算）。
     /// </summary>
@@ -47,52 +48,28 @@ namespace GIC.Battle
             if (attacker == null) return effects;
             if (BattleSimState.IsDead(attacker) || !BattleSimState.CanAct(attacker)) return effects;
 
-            // 目标必须存在于片前快照（尸体可被打）
-            var targetState = FindUnitState(sliceSnapshot, action.targetUnitId);
-            if (targetState == null)
+            var skill = GetSkill(attacker, action.skillIndex);
+            if (skill == null)
             {
-                GICLog.Warn($"[SkillExecutor] 快照中找不到目标单位 {action.targetUnitId}，行动落空");
+                GICLog.Warn($"[SkillExecutor] 单位 {action.unitId} 无技能索引 {action.skillIndex}，行动落空");
                 return effects;
             }
 
-            var target = sim.GetUnit(action.targetUnitId);
-            if (target == null) return effects;
-
-            // B1：取 DebugAttackSkill（正式技能 B4 换 BaseSkill 子类 + SkillConfig.asset）
-            var debugSkill = FindDebugSkill(attacker);
-            if (debugSkill == null)
+            if (!skill.CanCast(attacker))
             {
-                GICLog.Warn($"[SkillExecutor] 单位 {action.unitId} 无可用调试技能，行动落空");
+                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 不可施放，行动落空");
                 return effects;
             }
 
-            var request = new DamageRequest
-            {
-                Attacker = attacker,
-                Target = target,
-                AttackPercent = 100,
-                FlatDamage = DebugAttackSkill.FixedDamage,
-            };
-            var result = DamagePipeline.Calculate(request);
-            if (!result.Cancelled && result.FinalDamage > 0)
-                effects.Add(new DamageEffect(action.unitId, action.targetUnitId, result.FinalDamage));
-
+            effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
             return effects;
         }
 
-        private static UnitState FindUnitState(BattleSnapshot snapshot, string unitId)
+        /// <summary>skillIndex = unit.Skills 数组索引（InitSkills 按 UnitConfig.skills 顺序创建，HUD 同源映射）</summary>
+        private static BaseSkill GetSkill(Unit unit, int skillIndex)
         {
-            if (snapshot == null || unitId == null) return null;
-            foreach (var state in snapshot.units)
-                if (state.unitId == unitId) return state;
-            return null;
-        }
-
-        private static DebugAttackSkill FindDebugSkill(Unit unit)
-        {
-            foreach (var skill in unit.Skills)
-                if (skill is DebugAttackSkill debug) return debug;
-            return null;
+            if (unit == null || skillIndex < 0 || skillIndex >= unit.Skills.Count) return null;
+            return unit.Skills[skillIndex];
         }
     }
 

@@ -883,6 +883,62 @@ MonoBehaviour:
     m_Key: PetVoiceVolume
     m_Metadata:
       m_Items: []
+  - m_Id: 12001
+    m_Key: Battle_SelectingPhase
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12002
+    m_Key: Battle_ResolvingPhase
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12003
+    m_Key: Battle_Finished
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12004
+    m_Key: Battle_Turn
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12005
+    m_Key: Battle_QueuePreview
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12006
+    m_Key: Battle_Executing
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12007
+    m_Key: Battle_Hand
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12008
+    m_Key: Battle_TipSelect
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12009
+    m_Key: Battle_TipUnitSelected
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12010
+    m_Key: Battle_TipAimMove
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12011
+    m_Key: Battle_TipAimSkill
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12012
+    m_Key: Battle_TipSubmitted
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12013
+    m_Key: Battle_TipResolving
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12014
+    m_Key: Battle_TipAimDirection
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

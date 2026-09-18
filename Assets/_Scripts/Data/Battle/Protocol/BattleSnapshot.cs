@@ -27,8 +27,9 @@ namespace GIC.Data
         public int attackSpeed;
         public int dyedElement;
         public int isCorpse;
+        public int isFrozen;
         public int volume;
-        public List<string> buffs = new List<string>();
+        public List<BuffState> buffs = new List<BuffState>();
     }
 
     /// <summary>

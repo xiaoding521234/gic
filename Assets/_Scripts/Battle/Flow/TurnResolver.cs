@@ -66,7 +66,15 @@ namespace GIC.Battle
                 }
             }
 
-            // 回合结束效果按注册序（B1 无注册）→ WaitConditions 扫描（B1 无）
+            // 回合结束效果按注册序（B2 = Buff 回合制计时 + DoT；产出独立 turnEnd 段）
+            var turnEndSegment = ResolveTurnEnd(turnNumber, sliceIndex, maxSpeed);
+            if (turnEndSegment != null)
+            {
+                yield return PushSegmentAndWaitAck(turnEndSegment);
+                sliceIndex++;
+            }
+
+            // WaitConditions 扫描（B1 无）
             _transport.HostSend(BattleMessageType.TurnEnd, new TurnEndMessage { turnNumber = turnNumber });
         }
 
@@ -128,8 +136,8 @@ namespace GIC.Battle
             // 移动同步逐步结算（动态展开；与快照结算并存）
             MovementResolver.Resolve(_sim, movers);
 
-            // 效应统一应用（伤害/治疗合并 HP 天然成立）
-            ApplyEffects(effects);
+            // 效应统一应用（伤害/治疗合并 HP 天然成立；Buff 施加记入注册表）
+            var appliedBuffs = ApplyEffects(effects);
 
             // 死亡判定（效应应用后统一判；同片互杀 = 同归于尽）
             var damagedUnits = CollectDamagedTargets(effects);
@@ -145,12 +153,81 @@ namespace GIC.Battle
             }
             foreach (var effect in MergeDamageEffects(effects))
             {
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element));
+                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
+            }
+            foreach (var applied in MergeAppliedBuffs(appliedBuffs))
+            {
+                segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
+                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
             }
             foreach (var dead in newlyDead)
             {
                 if (_sim.TryGetUnitId(dead, out var deadId))
                     segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
+            }
+
+            GICLog.Info($"[TurnResolver] {segment}");
+            return segment;
+        }
+
+        /// <summary>
+        /// 回合结束段（B2）：Buff 回合结束效果按注册序结算（docs/active/22 §2）→
+        /// 计时减一（上 buff 当回合结束即减，docs/04 §4.4）→ 到期移除 → 产出 turnEnd 段。
+        /// 无 Buff 无效果时返回 null（不推送空段）。
+        /// </summary>
+        private Segment ResolveTurnEnd(int turnNumber, int sliceIndex, int maxSpeed)
+        {
+            var segment = new Segment
+            {
+                turnNumber = turnNumber,
+                sliceIndex = sliceIndex,
+                sliceAttackSpeed = maxSpeed,
+                turnMaxAttackSpeed = maxSpeed,
+                insertedInstantAction = 0,
+                turnEnd = 1,
+            };
+
+            var effects = new List<BattleEffect>();
+
+            // 按注册序结算回合结束效果，随后计时减一（到期收集）
+            foreach (var buff in _sim.ActiveBuffs)
+            {
+                effects.AddRange(buff.OnTurnEnd());
+                buff.RemainingTurns--;
+            }
+            var expired = _sim.CollectExpiredBuffs();
+
+            if (effects.Count == 0 && expired.Count == 0)
+                return null; // 本回合无任何回合结束内容：不推送空段
+
+            ApplyEffects(effects);
+            var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
+
+            int indexInSlice = 0;
+            foreach (var effect in MergeDamageEffects(effects))
+            {
+                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
+            }
+            foreach (var effect in effects)
+            {
+                if (effect is HealEffect heal)
+                    segment.commands.Add(BattleCommand.Heal(heal.SourceUnitId, heal.TargetUnitId, sliceIndex, indexInSlice++, heal.Amount));
+            }
+            foreach (var dead in newlyDead)
+            {
+                if (_sim.TryGetUnitId(dead, out var deadId))
+                    segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
+            }
+            foreach (var buff in expired)
+            {
+                if (_sim.TryGetUnitId(buff.owner, out var targetId))
+                {
+                    string sourceId = targetId;
+                    if (buff.source != null && _sim.TryGetUnitId(buff.source, out var sid))
+                        sourceId = sid;
+                    segment.commands.Add(BattleCommand.RemoveBuff(sourceId, targetId, sliceIndex, indexInSlice++, (int)buff.Type));
+                }
+                _sim.RemoveBuff(buff.owner, buff);
             }
 
             GICLog.Info($"[TurnResolver] {segment}");
@@ -193,7 +270,7 @@ namespace GIC.Battle
                     return null;
             }
 
-            ApplyEffects(effects);
+            var appliedBuffs = ApplyEffects(effects);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
             var segment = new Segment
@@ -209,7 +286,10 @@ namespace GIC.Battle
             if (mover != null && mover.Path.Count > 1)
                 segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path)));
             foreach (var effect in MergeDamageEffects(effects))
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element));
+                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
+            foreach (var applied in MergeAppliedBuffs(appliedBuffs))
+                segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
+                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
             foreach (var dead in newlyDead)
             {
                 if (_sim.TryGetUnitId(dead, out var deadId))
@@ -253,8 +333,12 @@ namespace GIC.Battle
             return buckets;
         }
 
-        private void ApplyEffects(List<BattleEffect> effects)
+        /// <summary>
+        /// 效应统一应用（伤害/治疗/Buff 施加）；返回已施 Buff 列表（含合并后的级别与剩余回合，供命令产出）
+        /// </summary>
+        private List<ApplyBuffEffect> ApplyEffects(List<BattleEffect> effects)
         {
+            var appliedBuffs = new List<ApplyBuffEffect>();
             foreach (var effect in effects)
             {
                 var target = _sim.GetUnit(effect.TargetUnitId);
@@ -269,7 +353,46 @@ namespace GIC.Battle
                 {
                     _sim.ApplyHeal(target, heal.Amount);
                 }
+                else if (effect is ApplyBuffEffect applyBuff)
+                {
+                    var buff = BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level, _sim.GetUnit(applyBuff.SourceUnitId));
+                    if (buff == null) continue;
+                    _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
+
+                    // 回填合并后的真实状态（同类叠加时 Level/Turns 以注册表为准）
+                    var state = target.Buffs.Find(b => b.Type == (BuffType)applyBuff.BuffType);
+                    applyBuff.Level = state != null ? state.Level : applyBuff.Level;
+                    applyBuff.Turns = state != null ? state.RemainingTurns : 0;
+                    appliedBuffs.Add(applyBuff);
+                }
+                else if (effect is AttachElementEffect attach)
+                {
+                    _sim.AttachElement(target, (ElementType)attach.Element); // 覆盖=消耗被反应附着（docs/06）
+                }
             }
+            return appliedBuffs;
+        }
+
+        /// <summary>同片同 (目标,类型) 的多次施加合并为一条命令（回合数以最终合并态为准）</summary>
+        private static List<ApplyBuffEffect> MergeAppliedBuffs(List<ApplyBuffEffect> applied)
+        {
+            var merged = new Dictionary<string, ApplyBuffEffect>();
+            var result = new List<ApplyBuffEffect>();
+            foreach (var buff in applied)
+            {
+                string key = $"{buff.TargetUnitId}:{buff.BuffType}";
+                if (!merged.ContainsKey(key))
+                {
+                    merged[key] = buff;
+                    result.Add(buff);
+                }
+                else
+                {
+                    merged[key].Level = Mathf.Max(merged[key].Level, buff.Level);
+                    merged[key].Turns = buff.Turns; // 后施合并态覆盖
+                }
+            }
+            return result;
         }
 
         private List<Unit> CollectDamagedTargets(List<BattleEffect> effects)
@@ -305,7 +428,8 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount, damage.Element);
+                    var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
+                        damage.Element, damage.Delivery, damage.FromCell);
                     merged[key] = copy;
                     result.Add(copy);
                 }
