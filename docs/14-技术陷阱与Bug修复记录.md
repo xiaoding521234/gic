@@ -1123,7 +1123,9 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 
 **验收**：蒙皮正确性可纯数学终验——逐顶点 `Σw·(boneWorld·bp)·v ≈ v`，安柏 21 个部件全部 0.00000。视觉仍交用户目检。
 
-**资产**：`Assets/Art/AmberExtract/`（README 里有全链路）；提取脚本 `.codely-cli/tmp/ambor/`；操作流程已入 `gic-gi-extract` skill「完整角色模型+动画提取」节。
+**坑 6 · 导入 URP Lit 后模型整体纯黑三因（2026-09-14~15 安柏实证，2026-09-19 自项目记忆补录）**：①`_BaseColor` 未显式设白（URP Lit 默认非白）——必须显式 `(1,1,1,1)`；②SMR culling bounds 错——`updateWhenOffscreen=true`；③方向光从背面打——光转正面；兜底=ambient Flat 白、仍暗加 `_EMISSION` 35% 补光。另：GI 贴图 alpha≠真透明（Body_Diffuse alpha 99.7%=0 但 RGB 有数据）、UV 与网格不直接映射（GI shader 内变换）→ naive UV 评分法失效。gic-gi-extract skill「TMR 提取包导入路线」所指「§55 纯黑坑」即本条。
+
+**资产**：自提版 `Assets/Art/AmberExtract/` 已于 2026-09-15 按用户拍板删除，现行=**`Assets/Art/AmberTMR/`**（TMR 直提包，154 Clips 在 `AmberTMR/Clips` GUID 不变）；提取脚本 `.codely-cli/tmp/ambor/`；操作流程已入 `gic-gi-extract` skill「完整角色模型+动画提取」节。
 
 ## 56. GI Avatar 动画=Humanoid 肌肉压缩格式：AnimeStudio .anim 导出丢主体动画 + 厘米/米制位置失配=「严重拉伸变形」（2026-09-15 安柏 TMR 实证）
 
@@ -1260,3 +1262,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **顺带统一（2026-09-18 用户拍板"移动按钮也不应当直接瞄准"）**：OnMoveButtonClicked 删除，四键（移动/战技/爆发/延奏）全走 OnSkillButtonClicked 点击式三情况（①开面板②再点同键进瞄准③换点切内容），移动唯一差异=AimMode（瞄准按移动语义结算）；GetSelectedSkillData 补 move 分拣（否则移动面板会显示战技数据）；瞄准态点任何按钮=无操作（退出走取消钮/点非可选格）。
 
 **结构收敛 A+B（2026-09-18 深夜，质量评估后拍板）**：①**表驱动四键（A）**——`SkillButtonDef{key,type,rect,view,nameText}`+`RegisterSkillButton` 注册（`BuildSkillButtons` 里加键=加一行），全类 buttonKey 字符串 switch 清零、转发闭包直捕 def 零查找、**AimMode 枚举删除**（瞄准语义由 `def.type==Move` 承载）、置灰语义泛化全键（原延奏特例）；加键成本从"改 8 处"降为"加 1 行"。②**partial 拆分（B）**——BattleHud.cs 主（状态机/技能按钮交互/数据链/高亮）+ BattleHud.TopBar.cs（顶栏/队列/信息块）+ BattleHud.Build.cs（程序化构建/按钮注册/面板接线），修改热区按职责归位。受控复现基线逐项一致（战技 22 格/移动 24 格/面板开合/瞄准链/取消钮全同）。
+
+## 65. 手势面要点击必须显式传 `emitShortTap: true`——DragRecognizer 短点击发射是构造参、默认 false（2026-09-18 战斗 HUD 点立牌无反应实证，2026-09-19 补录）
+
+**现象**：Battle 面接入手势层后点立牌无反应（HUD OnBoardTap 点击链全不触发）；同构的 Map 面正常。
+
+**根因**：`public DragRecognizer(DragBeginMode mode, bool emitShortTap = false)`——「抬起时总位移 < slop 伴发点击」（libGDX/Android tap+pan 同体模式）是**可选构造参，默认关闭**；Immediate 拖拽面不显式传 `emitShortTap: true` 就永远不发短点击，无报错无日志。
+
+**规范**：任何手势面需要"点一下"语义（格点点击/单位选择/点击继续），构造识别器时必须显式传 `emitShortTap: true`（`BattleCameraController`/`MapCameraController` 均已带且留有注释指针，新增面照传）。短点击两通道分工：Immediate 面走 `OnShortTap`、升级式早退走 `OnTapCandidate`（docs/24 §7.11 勘定）。与 §63② 同族教训：能力位默认静默关闭，症状=整条点击链零触发。
