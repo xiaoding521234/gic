@@ -1,4 +1,5 @@
-﻿namespace GIC.Battle
+﻿using GIC.Data;
+namespace GIC.Battle
 {
 
     /// <summary>

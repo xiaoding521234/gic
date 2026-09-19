@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using GIC.Battle;
 namespace GIC.Data
 {
 

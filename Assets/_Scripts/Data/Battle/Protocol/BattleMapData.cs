@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using GIC.Battle;
 namespace GIC.Data
 {
 

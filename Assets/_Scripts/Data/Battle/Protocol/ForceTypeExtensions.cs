@@ -1,9 +1,8 @@
 ﻿using System.Reflection;
 using UnityEngine;
 using UnityEngine.Localization;
-using GIC.Data;
 using GIC.Tool;
-namespace GIC.Battle
+namespace GIC.Data
 {
 
 

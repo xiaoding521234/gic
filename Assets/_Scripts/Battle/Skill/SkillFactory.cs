@@ -55,7 +55,7 @@ namespace GIC.Battle
         {
             if (!_isInitialized) Initialize();
 
-            if (skillID == SkillName.None) return null;
+            if (skillID == SkillName.None) return new UnimplementedSkill(); // None 配置条目=空槽，占位保索引对齐（与未注册同哲学、不告警）
 
             if (_creators.TryGetValue(skillID, out var creator))
             {

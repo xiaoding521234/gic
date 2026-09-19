@@ -1,6 +1,5 @@
 ﻿// PlayerNetworkEvents.cs - 玩家网络相关事件
 using GIC.Framework;
-using GIC.Battle;
 namespace GIC.Data
 {
 

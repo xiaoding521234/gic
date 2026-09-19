@@ -1,5 +1,5 @@
 ﻿using UnityEngine;
-namespace GIC.Battle
+namespace GIC.Data
 {
 
 
