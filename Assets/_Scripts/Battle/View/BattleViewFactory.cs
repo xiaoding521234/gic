@@ -51,5 +51,38 @@ namespace GIC.Battle
             quad.GetComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
             return quad;
         }
+
+        /// <summary>世界层纯色圆面片（程序化扇面 mesh：中心顶点+24 段圆周，直径 1、法线 -Z 与 Quad 同向；
+        /// 单位受击圆柱的底座圆盘可视化——视觉即判定，直径=BattleMetrics.UnitCylinderDiameter，docs/18 决策二。
+        /// localScale x/y 语义与 Quad 一致（旋转 90° 平铺后=地面直径），支持非均匀缩放出椭圆（尸体压扁）</summary>
+        public static GameObject CreateDisc(Transform parent, string name, Material sharedMaterial, int segments = 24)
+        {
+            var vertices = new Vector3[segments + 1];
+            var triangles = new int[segments * 3];
+            vertices[0] = Vector3.zero;
+            for (int i = 0; i < segments; i++)
+            {
+                float angle = 2f * Mathf.PI * i / segments;
+                vertices[i + 1] = new Vector3(Mathf.Cos(angle) * 0.5f, Mathf.Sin(angle) * 0.5f, 0f);
+                int next = i + 1 == segments ? 1 : i + 2;
+                triangles[i * 3] = 0;
+                triangles[i * 3 + 1] = next;
+                triangles[i * 3 + 2] = i + 1;
+            }
+
+            var mesh = new Mesh
+            {
+                vertices = vertices,
+                triangles = triangles,
+            };
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
+            return go;
+        }
     }
 }

@@ -133,6 +133,11 @@ namespace GIC.Battle
             // 移动同步逐步结算（动态展开；与快照结算并存）
             MovementResolver.Resolve(_sim, movers);
 
+            // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整路径，
+            // docs/active/22 §11——命中点/消散点随命令千分定点下发）
+            var vanishes = new List<BattleCommand>();
+            ProjectileResolver.Resolve(_sim, snapshot, effects, movers, vanishes);
+
             // 效应统一应用（伤害/治疗合并 HP 天然成立；Buff 施加记入注册表）
             var appliedBuffs = ApplyEffects(effects);
 
@@ -150,7 +155,14 @@ namespace GIC.Battle
             }
             foreach (var effect in MergeDamageEffects(effects))
             {
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
+                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
+                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f)));
+            }
+            foreach (var vanish in vanishes)
+            {
+                vanish.sliceIndex = sliceIndex;
+                vanish.indexInSlice = indexInSlice++;
+                segment.commands.Add(vanish);
             }
             foreach (var effect in MergeHealEffects(effects))
             {
@@ -249,7 +261,7 @@ namespace GIC.Battle
 
             var snapshot = _sim.TakeSnapshot(turnNumber);
             var effects = new List<BattleEffect>();
-            MoveActionState mover = null;
+            var moverList = new List<MoveActionState>();
 
             switch (action.actionType)
             {
@@ -257,11 +269,11 @@ namespace GIC.Battle
                     effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot));
                     break;
                 case ActionType.Move:
-                    mover = MoveExecutor.BuildMover(_sim, action);
+                    var mover = MoveExecutor.BuildMover(_sim, action);
                     if (mover != null)
                     {
-                        var movers = new List<MoveActionState> { mover };
-                        MovementResolver.Resolve(_sim, movers);
+                        moverList.Add(mover);
+                        MovementResolver.Resolve(_sim, moverList);
                     }
                     break;
                 case ActionType.Pass:
@@ -270,6 +282,10 @@ namespace GIC.Battle
                     GICLog.Warn($"[TurnResolver] 即时行动类型 {action.actionType} B1 不支持");
                     return null;
             }
+
+            // 投射物连续命中判定（即时行动段无并发移动者，连续判定退化为静止接触）
+            var vanishes = new List<BattleCommand>();
+            ProjectileResolver.Resolve(_sim, snapshot, effects, moverList, vanishes);
 
             var appliedBuffs = ApplyEffects(effects);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
@@ -284,10 +300,17 @@ namespace GIC.Battle
             };
 
             int indexInSlice = 0;
-            if (mover != null && mover.Path.Count > 1)
-                segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path)));
+            if (moverList.Count > 0 && moverList[0].Path.Count > 1)
+                segment.commands.Add(BattleCommand.Move(moverList[0].UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(moverList[0].Path)));
             foreach (var effect in MergeDamageEffects(effects))
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
+                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
+                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f)));
+            foreach (var vanish in vanishes)
+            {
+                vanish.sliceIndex = sliceIndex;
+                vanish.indexInSlice = indexInSlice++;
+                segment.commands.Add(vanish);
+            }
             foreach (var effect in MergeHealEffects(effects))
                 segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
@@ -431,8 +454,9 @@ namespace GIC.Battle
                 }
                 else
                 {
+                    // 命中点取首条（同片同 (攻击者,目标) 合并时=最早一次接触的位置）
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
-                        damage.Element, damage.Delivery, damage.FromCell);
+                        damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY);
                     merged[key] = copy;
                     result.Add(copy);
                 }

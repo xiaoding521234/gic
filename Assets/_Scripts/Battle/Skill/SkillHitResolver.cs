@@ -18,8 +18,11 @@ namespace GIC.Battle
         /// <param name="attackPercent">攻击百分比（多段伤害已在此合并）</param>
         /// <param name="delivery">投放形态（0=直击 / 1=直线投射物）</param>
         /// <param name="fromCell">投射物发射格</param>
+        /// <param name="hitPointX">命中点连续格心坐标（投射物有效；Host 接触判定得出）</param>
+        /// <param name="hitPointY">命中点连续格心坐标 Y</param>
         public static List<BattleEffect> Hit(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot,
-            string targetUnitId, int attackPercent, int delivery, BattleCell fromCell)
+            string targetUnitId, int attackPercent, int delivery, BattleCell fromCell,
+            float hitPointX = 0f, float hitPointY = 0f)
         {
             var effects = new List<BattleEffect>();
             var attacker = sim.GetUnit(action.unitId);
@@ -46,7 +49,7 @@ namespace GIC.Battle
             if (!result.Cancelled && result.FinalDamage > 0)
             {
                 effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage,
-                    (int)element, delivery, fromCell));
+                    (int)element, delivery, fromCell, hitPointX, hitPointY));
             }
 
             if (outcome.HasReaction && outcome.BuffType >= 0)
