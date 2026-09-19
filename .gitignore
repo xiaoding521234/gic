@@ -46,3 +46,6 @@ Mirror-*-backup-*.zip
 
 # local dev key for PetApiKeyCrypto.DevKey (never commit)
 devkey.txt
+
+# Chat session exports (local only)
+/chat-export-*
