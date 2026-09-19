@@ -1,7 +1,6 @@
 ﻿// PlayerInfo.cs - 玩家信息数据结构
 using System;
 using Mirror;
-using GIC.Battle;
 namespace GIC.Data
 {
 

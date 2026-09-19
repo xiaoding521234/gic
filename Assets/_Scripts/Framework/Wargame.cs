@@ -32,7 +32,6 @@ namespace GIC.Framework
             Context.Register<UnitManager>();       // deps: UnitConfig
             Context.Register<InputManager>();
             Context.Register<GestureHub>();   // 手势层（docs/24）：指针事件归一→三门→识别器，与 InputManager 同管线
-            Context.Register<SkillManager>();
 
             // 注入剩余 [Autowired] 字段（ConfigManager 自身 [Bean] 产物、MonoBehaviour 层）
             Context.InjectAll();
@@ -49,7 +48,7 @@ namespace GIC.Framework
                 Context.Get<AssetCache>(), Context.Get<SaveManager>(), Context.Get<InputManager>(),
                 Context.Get<GestureHub>(),
                 Context.Get<CardManager>(), Context.Get<PositionManager>(),
-                Context.Get<SkillManager>(), Context.Get<UnitManager>()
+                Context.Get<UnitManager>()
             };
 
             GICLog.Info("Wargame初始化完成");
