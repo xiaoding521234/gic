@@ -1,12 +1,7 @@
 // ==================== SettingsScreen.Control.cs（操作设置：按键绑定） ====================
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
-using GIC.Tool;
 namespace GIC.UI
 {
 

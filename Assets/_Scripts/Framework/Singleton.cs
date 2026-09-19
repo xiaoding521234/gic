@@ -1,12 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using System;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Battle;
-using GIC.Tool;
+﻿using System;
 namespace GIC.Framework
 {
 

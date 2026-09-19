@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 using GIC.Framework;
 

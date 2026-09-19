@@ -1,13 +1,6 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using UnityEngine;
-using GIC.UI;
-using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
-using GIC.Tool;
 namespace GIC.Editor
 {
 

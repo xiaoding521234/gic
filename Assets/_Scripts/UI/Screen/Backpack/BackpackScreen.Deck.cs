@@ -1,7 +1,6 @@
 ﻿// ==================== BackpackScreen.Deck.cs ====================
 using System.Collections;
 using System.Collections.Generic;
-using GIC.Data.Event;
 using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;

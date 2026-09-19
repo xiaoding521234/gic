@@ -1,8 +1,4 @@
-﻿using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Tool;
+﻿using GIC.Data;
 namespace GIC.Battle
 {
 

@@ -2,14 +2,11 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Localization;
 using UnityEngine.Localization.Settings;
 using System.Collections;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.UI
 {

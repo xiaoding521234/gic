@@ -1270,3 +1270,16 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：`public DragRecognizer(DragBeginMode mode, bool emitShortTap = false)`——「抬起时总位移 < slop 伴发点击」（libGDX/Android tap+pan 同体模式）是**可选构造参，默认关闭**；Immediate 拖拽面不显式传 `emitShortTap: true` 就永远不发短点击，无报错无日志。
 
 **规范**：任何手势面需要"点一下"语义（格点点击/单位选择/点击继续），构造识别器时必须显式传 `emitShortTap: true`（`BattleCameraController`/`MapCameraController` 均已带且留有注释指针，新增面照传）。短点击两通道分工：Immediate 面走 `OnShortTap`、升级式早退走 `OnTapCandidate`（docs/24 §7.11 勘定）。与 §63② 同族教训：能力位默认静默关闭，症状=整条点击链零触发。
+
+## 66. 编辑器脚本 Roslyn 批量语义分析四坑 + 模板 using 全量清理成果（2026-09-19 战斗审查修复批次实证）
+
+**场景**：用 exec_editor_script 挂 Roslyn 做全项目"未用 using"清理（_Scripts 361 文件三轮共删 291 文件 867 条，逐轮 refresh 编译 0 错）。桥脚本宿主的 Roslyn 有四坑：
+
+1. **命名空间是桥内部化前缀**：脚本里 `using Microsoft.CodeAnalysis.*` 必全 CS0246——桥包把 Roslyn/Newtonsoft 内部化为 `Codely.Microsoft.CodeAnalysis.*`（栈帧里 ScriptOptions 类型名即证）。写 `Codely.Microsoft.CodeAnalysis.CSharp` 等前缀版本即可用全套 API。
+2. **API 表面差异**：内部化 `CSharpCompilationOptions` 无 `allowUnsafeEnabled` 命名参（构造只收 OutputKind）；`Compilation.GetDiagnostics(tree)` 不可用（重载只收 CancellationToken）——逐树诊断用 `compilation.GetSemanticModel(tree).GetDiagnostics()`。
+3. **手解码假门**：`new UTF8Encoding(false).GetString(bytes)` 自解全部文件时，逐树诊断报出 241 文件假编译错（同源码改用 `File.ReadAllText` 全量解析=0 错、五文件抽检全 0 错）；根因未完全实锤但差异仅在解码路径。规范：编辑器脚本批量语义分析**一律 File.ReadAllText**（自动编码检测）+ `\0`/`\uFFFD` 双门跳过异常文件。
+4. **写回保真**：删除行前 BOM 字节嗅探（EF BB BF）决定 `UTF8Encoding(bom)` 与否；按文件实测保 LF/CRLF（混合换行整只跳过）；git autocrlf 对 LF 工作副本告警"LF will be replaced by CRLF"属常态无害。
+
+**清理安全网**（可复用套路）：①语义分析只删"行文本 Trim 后完全等于 using 指令"的行；②诊断门=逐树 0 错才动文件（CS0433/CS0104 Newtonsoft 歧义族豁免，歧义符号走 CandidateSymbols 双命名空间保守标记）；③含玩家侧 `#if`（!UNITY_EDITOR/UNITY_STANDALONE_WIN/DEVELOPMENT_BUILD）与混合换行文件整只豁免；④每轮后 refresh 编译验证（Unity 真编译器是最终裁判）。
+
+**成果**：`using GIC.X` 逐文件 grep **恢复可用作依赖方向审计**——Battle 层 using GIC.UI 58→7（全真实：Card 显示策略族 5 + BattleHud 复用 SkillDetailView 族 2）；Data 层 using GIC.Battle 41→5；Framework 33→3；Tool 9→0。**17 个豁免文件仍带模板头**（玩家侧 #if×16 + CardGlowOverlay.cs 混合换行），审计到它们仍须核类型实际使用。**顺带实锤 Data→Battle 真反向边**（比人工审查更准）：`Direction2D`（ActionData）/`ForceType`（BattleMapData/UnitConfig）/`TeamType`（PlayerInfo/PlayerNetworkEvents）三个值类型放错层（住 Battle/Unit/Component 但属协议词汇）——B3 归位材料（挪 Data/Battle+改命名空间，Battle 引用方为合法方向）。

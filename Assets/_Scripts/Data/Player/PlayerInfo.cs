@@ -1,12 +1,7 @@
 ﻿// PlayerInfo.cs - 玩家信息数据结构
 using System;
-using UnityEngine;
 using Mirror;
 using GIC.Battle;
-using GIC.Framework;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Tool;
 namespace GIC.Data
 {
 

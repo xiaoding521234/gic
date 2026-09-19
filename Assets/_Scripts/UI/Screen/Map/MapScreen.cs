@@ -7,7 +7,6 @@ using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
-using UnityEngine.Serialization;
 namespace GIC.UI
 {
 

@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using UnityEngine;
-using GIC.Battle;
-using GIC.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Data.Event;

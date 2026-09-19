@@ -1,12 +1,6 @@
-﻿using TMPro;
-using UnityEngine;
-using UnityEngine.Localization;
-using UnityEngine.UI;
-using GIC.UI;
+﻿using UnityEngine;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.Editor
 {

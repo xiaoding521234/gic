@@ -11,7 +11,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
 using GIC.Tool;
 using GIC.Pet.Chat;
 using Newtonsoft.Json;

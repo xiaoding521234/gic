@@ -7,10 +7,6 @@ using Mirror;
 using Mirror.Discovery;
 using System.Collections.Generic;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Battle;
-using GIC.Tool;
 using GIC.Pet;
 namespace GIC.Framework
 {

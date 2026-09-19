@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.Localization;
 using GIC.Framework;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.Data
 {

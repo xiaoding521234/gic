@@ -6,11 +6,7 @@
 // 两个写入者会互写打架；正确结构=外层 wrapper（动画器滑动）包本图（视差）。
 // （Coop 列表页 Background 背景板 2026-09-13 起按名排除滑动组=静态，wrapper 仅作分层容器保留。）
 using UnityEngine;
-using GIC.Framework;
-using GIC.Battle;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.Tool;
 namespace GIC.UI
 {
 

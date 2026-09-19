@@ -9,7 +9,6 @@ using Mirror;
 using GIC.Framework;
 using GIC.Battle;
 using GIC.Data;
-using GIC.Data.Event;
 using GIC.Tool;
 namespace GIC.UI
 {

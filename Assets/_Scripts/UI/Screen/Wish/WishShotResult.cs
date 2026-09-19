@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using GIC.Framework;
-using GIC.Battle;
 using GIC.Data;
 
 namespace GIC.UI

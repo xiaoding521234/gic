@@ -5,7 +5,6 @@ using UnityEngine;
 using Mirror;
 using GIC.Battle;
 using GIC.Data;
-using GIC.Tool;
 namespace GIC.Framework
 {
 

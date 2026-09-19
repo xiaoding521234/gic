@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
 using static GIC.Pet.PetWin32; // Win32 声明集中在 PetWin32（2026-08-27 抽取去重），调用点免限定
-using UnityEngine.Serialization;
 
 namespace GIC.Pet
 {

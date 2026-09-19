@@ -1,9 +1,7 @@
 ﻿// ==================== BackpackScreen.Events.cs ====================
 using GIC.Data.Event;
-using GIC.Battle;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Tool;
 namespace GIC.UI
 {
 

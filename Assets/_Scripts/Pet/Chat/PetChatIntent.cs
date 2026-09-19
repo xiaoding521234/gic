@@ -1,11 +1,7 @@
 using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using UnityEngine.SceneManagement;
 using GIC.Framework;
-using GIC.Tool;
-using GIC.Data;
-using GIC.UI;
 
 namespace GIC.Pet.Chat
 {

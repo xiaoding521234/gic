@@ -6,7 +6,6 @@ using GIC.Data.Event;
 using UnityEngine;
 using UnityEngine.Localization;
 using GIC.Framework;
-using GIC.Battle;
 using GIC.Data;
 using GIC.Tool;
 namespace GIC.UI

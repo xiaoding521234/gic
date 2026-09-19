@@ -7,7 +7,6 @@ using UnityEngine.UI;
 using UnityEngine.Localization;
 using GIC.Data;
 using GIC.Tool;
-using GIC.UI;
 
 namespace GIC.Battle
 {

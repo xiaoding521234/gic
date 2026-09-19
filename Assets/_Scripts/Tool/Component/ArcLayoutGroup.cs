@@ -1,11 +1,6 @@
 ﻿using UnityEngine;
-using UnityEngine.UI;
 using System.Collections.Generic;
-using GIC.UI;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
 namespace GIC.Tool
 {
 

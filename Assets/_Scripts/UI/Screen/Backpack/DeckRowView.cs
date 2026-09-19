@@ -1,13 +1,9 @@
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.Localization;
 using UnityEngine.UI;
-using GIC.Framework;
-using GIC.Battle;
-using GIC.Data;
 using GIC.Tool;
 
 namespace GIC.UI
