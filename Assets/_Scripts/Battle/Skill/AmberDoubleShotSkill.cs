@@ -1,10 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Tool;
 namespace GIC.Battle
 {
 
@@ -22,8 +18,6 @@ namespace GIC.Battle
     public class AmberDoubleShotSkill : BaseSkill
     {
         public override bool CanCast(Unit caster) => true;
-
-        public override void Execute(Unit caster, SkillContext context) { /* 结算走 ResolveEffects */ }
 
         public override List<BattleEffect> ResolveEffects(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot)
         {
