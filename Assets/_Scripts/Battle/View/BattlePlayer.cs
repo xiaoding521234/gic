@@ -57,7 +57,7 @@ namespace GIC.Battle
         /// <summary>当前立牌布局态：true=散开（选择阶段展开布局）/ false=收拢（执行阶段重叠格心）——两态模型（docs/active/22 §11）</summary>
         private bool _spreadFormations;
 
-        private const float MoveStepSeconds = 0.18f;
+        private const float MoveStepSeconds = BattleMetrics.MoveStepSeconds;
         private const float CommandStaggerSeconds = 0.12f;
         private const float TurnEndDelaySeconds = 0.25f; // 回合结束段固定节拍（不按攻速排程）
 
@@ -165,8 +165,65 @@ namespace GIC.Battle
 
         // ==================== 片播放 ====================
 
-        /// <summary>投射物飞行速度（世界单位/秒；1 格=1 世界单位）</summary>
-        private const float ProjectileSpeed = 8f;
+        // 投射物/移动速度常量统一走 BattleMetrics（B5 连续判定：Host 判定与客户端播放同源，
+        // "所见即所得"=双方按同一速度常量推进时间轴）
+        private const float ProjectileSpeed = BattleMetrics.ProjectileSpeed;
+
+        /// <summary>
+        /// 直线投射物：箭矢从发射格飞至**命中点**（Host 接触判定千分定点下发，docs/active/22 §11——
+        /// 移动中目标命中点=中途接触位置，所见即所得），到达后接伤害表现。
+        /// B4 的"飞向目标当前位置"近似已废弃；无命中点数据时兜底旧行为。
+        /// </summary>
+        private IEnumerator PlayProjectileThenDamageCoroutine(UnitView target, BattleCommand command, float stagger)
+        {
+            if (stagger > 0f)
+                yield return new WaitForSeconds(stagger);
+
+            Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
+            Vector3 to = command.hitX != 0 || command.hitY != 0
+                ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
+                : target.transform.position + new Vector3(0f, 0.45f, 0f); // 兜底：无定点数据时飞向目标
+
+            var arrowGo = CreateProjectileVisual(from);
+
+            float distance = Vector3.Distance(from, to);
+            float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
+            yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
+
+            Destroy(arrowGo);
+            yield return PlayDamageCoroutine(target, -command.value, 0f, false);
+        }
+
+        /// <summary>
+        /// 投射物消散（Effect 命令·EffectKindProjectileVanish）：无接触命中（虚空截断或 24 格上限，
+        /// docs/05 §5.3）——从发射格飞至消散点（千分定点）后消失；无定点时按方向飞 value 格兜底
+        /// </summary>
+        private IEnumerator PlayProjectileVanishCoroutine(BattleCommand command, float stagger)
+        {
+            if (stagger > 0f)
+                yield return new WaitForSeconds(stagger);
+
+            Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
+            Vector3 to;
+            if (command.hitX != 0 || command.hitY != 0)
+            {
+                to = _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f);
+            }
+            else
+            {
+                var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
+                to = _board.CellToWorld(new BattleCell(command.cell.x + delta.x * command.value,
+                    command.cell.y + delta.y * command.value)) + new Vector3(0f, 0.45f, 0f);
+            }
+
+            var arrowGo = CreateProjectileVisual(from);
+
+            float distance = Vector3.Distance(from, to);
+            float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
+            yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
+
+            Destroy(arrowGo);
+        }
 
         /// <summary>投射物光条 sprite（程序化 1×1 白图缓存；B5 表现批次换正式箭矢素材）</summary>
         private static Sprite _projectileSprite;
@@ -183,18 +240,9 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>
-        /// 直线投射物：箭矢（billboard 白色光条）从发射格飞至目标位置，到达后接伤害表现
-        /// （docs/18 决策二：投射物真实飞行、命中=接触立牌圆柱之时——B4 格级近似，B5 表现批次美化与连续化）
-        /// </summary>
-        private IEnumerator PlayProjectileThenDamageCoroutine(UnitView target, BattleCommand command, float stagger)
+        /// <summary>箭矢视觉（billboard 白色光条；B5 换正式素材——创建即就位，飞行由调用方 tween）</summary>
+        private GameObject CreateProjectileVisual(Vector3 from)
         {
-            if (stagger > 0f)
-                yield return new WaitForSeconds(stagger);
-
-            Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
-            Vector3 to = target.transform.position + new Vector3(0f, 0.45f, 0f);
-
             var arrowGo = new GameObject("Projectile");
             arrowGo.transform.SetParent(_viewRoot, false);
             arrowGo.transform.position = from;
@@ -204,13 +252,7 @@ namespace GIC.Battle
             renderer.sprite = ProjectileSprite;
             renderer.color = new Color(0.98f, 0.93f, 0.80f);
             renderer.sortingOrder = 12;
-
-            float distance = Vector3.Distance(from, to);
-            float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
-            yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
-
-            Destroy(arrowGo);
-            yield return PlayDamageCoroutine(target, -command.value, 0f, false);
+            return arrowGo;
         }
 
         private IEnumerator PlaySegmentCoroutine(Segment segment)
@@ -247,8 +289,10 @@ namespace GIC.Battle
                     case BattleCommandType.Damage:
                         if (_views.TryGetValue(command.targetUnitId, out var target))
                         {
-                            if (command.direction == 1) // 直线投射物（B4）：先飞后中（delivery 元数据）
-                                playbacks.Add(StartCoroutine(PlayProjectileThenDamageCoroutine(target, command, stagger)));
+                            if (command.direction == 1)
+                                // 直线投射物（B5）：与移动同 t=0 起跑（时间轴对齐——命中时刻=接触时刻），
+                                // 不吃命令 stagger；命中点由命令定点下发
+                                playbacks.Add(StartCoroutine(PlayProjectileThenDamageCoroutine(target, command, 0f)));
                             else
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, stagger, false)));
                         }
@@ -272,6 +316,12 @@ namespace GIC.Battle
                     case BattleCommandType.RemoveBuff:
                         if (_views.TryGetValue(command.targetUnitId, out var unbuffed))
                             unbuffed.RemoveBuffBadge(command.buffType);
+                        break;
+
+                    case BattleCommandType.Effect:
+                        // 特效命令（B5 首个接线=投射物消散，与投射物/移动同 t=0 起跑）
+                        if (command.metadata == BattleCommand.EffectKindProjectileVanish)
+                            playbacks.Add(StartCoroutine(PlayProjectileVanishCoroutine(command, 0f)));
                         break;
 
                     default:

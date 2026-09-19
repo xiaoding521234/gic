@@ -122,12 +122,13 @@ namespace GIC.Battle
                 spriteGo.transform.localPosition = new Vector3(0f, AvatarHeight * 0.5f, 0f);
             }
 
-            // 阵营色底座（平铺地面的圆盘替代：薄方块投影感）
+            // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=BattleMetrics.UnitCylinderDiameter，
+            // 视觉即判定，docs/18 决策二）
             view._baseDiscMaterial = BattleViewFactory.CreateUnlitMaterial(teamColor);
-            var baseGo = BattleViewFactory.CreateQuad(root.transform, "BaseDisc", view._baseDiscMaterial);
+            var baseGo = BattleViewFactory.CreateDisc(root.transform, "BaseDisc", view._baseDiscMaterial);
             baseGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             baseGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            baseGo.transform.localScale = new Vector3(0.42f, 0.42f, 1f);
+            baseGo.transform.localScale = new Vector3(BattleMetrics.UnitCylinderDiameter, BattleMetrics.UnitCylinderDiameter, 1f);
             view._baseDisc = baseGo.transform;
             view._baseColor = teamColor;
 
@@ -198,8 +199,8 @@ namespace GIC.Battle
             RefreshTint();
             if (_baseDisc != null)
                 _baseDisc.localScale = corpse
-                    ? new Vector3(0.42f, 0.28f, 1f) // 尸体底座压扁
-                    : new Vector3(0.42f, 0.42f, 1f);
+                    ? new Vector3(BattleMetrics.UnitCylinderDiameter, 0.28f, 1f) // 尸体底座压扁（压扁值沿用旧观感）
+                    : new Vector3(BattleMetrics.UnitCylinderDiameter, BattleMetrics.UnitCylinderDiameter, 1f);
         }
 
         /// <summary>冻结态（B4：水+冰反应）：立牌冰色 tint + 底座冰色（快照权威同步）</summary>

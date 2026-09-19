@@ -78,10 +78,17 @@ namespace GIC.Data
         public BattleCell cell;
         public List<BattleCell> path = new List<BattleCell>();
 
+        [Header("命中点（Damage 投射物有效；千分定点连续格心坐标×1000，docs/active/22 §11）")]
+        public int hitX;
+        public int hitY;
+
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
         public int buffLevel;
         public int buffTurns;
+
+        [Header("特效子类型（Effect 命令 metadata；随用随加）")]
+        public const int EffectKindProjectileVanish = 1;
 
         public static BattleCommand Move(string unitId, int sliceIndex, int indexInSlice, List<BattleCell> path)
         {
@@ -97,9 +104,10 @@ namespace GIC.Data
         }
 
         /// <summary>Damage 命令工厂。metadata=元素；direction=投放形态（0=瞬发直击/1=直线投射物，复用字段）；
-        /// cell=投射物发射格（Delivery≠0 时有效，命中点=目标位置）——docs/18 决策二"Damage 命令带 delivery 元数据"</summary>
+        /// cell=投射物发射格（Delivery≠0 时有效）；hitX/hitY=命中点千分定点连续格心坐标
+        /// （Delivery=1 有效——Host 接触判定得出，客户端按此播放弹着点，勿自行推算）</summary>
         public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
-            int amount, int metadata, int delivery = 0, BattleCell fromCell = default)
+            int amount, int metadata, int delivery = 0, BattleCell fromCell = default, int hitX = 0, int hitY = 0)
         {
             return new BattleCommand
             {
@@ -112,6 +120,26 @@ namespace GIC.Data
                 metadata = metadata,
                 direction = delivery,
                 cell = fromCell,
+                hitX = hitX,
+                hitY = hitY,
+            };
+        }
+
+        /// <summary>特效命令工厂（Effect）。metadata=特效子类型（EffectKindProjectileVanish=投射物消散：
+        /// cell=发射格、direction=飞行方向 Direction2D、value=最大飞行格数——客户端播放飞至尽头消散）</summary>
+        public static BattleCommand Effect(string actorUnitId, int sliceIndex, int indexInSlice,
+            int effectKind, int direction, BattleCell fromCell, int intValue)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.Effect,
+                actorUnitId = actorUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = effectKind,
+                direction = direction,
+                cell = fromCell,
+                value = intValue,
             };
         }
 

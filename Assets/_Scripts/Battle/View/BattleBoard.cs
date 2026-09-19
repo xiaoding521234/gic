@@ -93,6 +93,18 @@ namespace GIC.Battle
         }
 
         /// <summary>
+        /// 连续格心坐标 → 世界坐标（CellToWorld 的连续版；B5 连续判定——投射物命中点/消散点由 Host
+        /// 千分定点下发，格 c 的心=c+0.5，与 CellToWorld 同系数）。表面高度取归属格（floor）
+        /// </summary>
+        public Vector3 ContinuousCellToWorld(float gx, float gy)
+        {
+            float x = gx - Map.width / 2f;
+            float z = gy - Map.height / 2f;
+            float y = GetSurfaceHeight(new BattleCell(Mathf.FloorToInt(gx), Mathf.FloorToInt(gy)));
+            return new Vector3(x, y, z);
+        }
+
+        /// <summary>
         /// 该格表面高度（单位站立面）
         /// </summary>
         public float GetSurfaceHeight(BattleCell cell)
