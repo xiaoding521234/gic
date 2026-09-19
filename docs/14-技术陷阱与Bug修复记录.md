@@ -1283,3 +1283,18 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **清理安全网**（可复用套路）：①语义分析只删"行文本 Trim 后完全等于 using 指令"的行；②诊断门=逐树 0 错才动文件（CS0433/CS0104 Newtonsoft 歧义族豁免，歧义符号走 CandidateSymbols 双命名空间保守标记）；③含玩家侧 `#if`（!UNITY_EDITOR/UNITY_STANDALONE_WIN/DEVELOPMENT_BUILD）与混合换行文件整只豁免；④每轮后 refresh 编译验证（Unity 真编译器是最终裁判）。
 
 **成果**：`using GIC.X` 逐文件 grep **恢复可用作依赖方向审计**——Battle 层 using GIC.UI 58→7（全真实：Card 显示策略族 5 + BattleHud 复用 SkillDetailView 族 2）；Data 层 using GIC.Battle 41→5；Framework 33→3；Tool 9→0。**17 个豁免文件仍带模板头**（玩家侧 #if×16 + CardGlowOverlay.cs 混合换行），审计到它们仍须核类型实际使用。**顺带实锤 Data→Battle 真反向边**（比人工审查更准）：`Direction2D`（ActionData）/`ForceType`（BattleMapData/UnitConfig）/`TeamType`（PlayerInfo/PlayerNetworkEvents）三个值类型放错层（住 Battle/Unit/Component 但属协议词汇）——B3 归位材料（挪 Data/Battle+改命名空间，Battle 引用方为合法方向）。
+
+## 67. GI 动画目检场景黑屏三因 + 编辑器 SMR bounds 塌缩误判误删 + TMR 嫁接单位失配柱子（2026-09-19 安柏动画验证批次实证）
+
+**场景**：AnimLookTest 目检场景验收 harness 导出的 GI 动画 FBX（安柏 1.0 老角色 vs Odette 6.x 新角色，白模+Animation 自动循环播放）。
+
+1. **黑屏三因**（一次排障逐个撞上）：
+   - `EditorSceneManager.NewScene(DefaultGameObjects)` 创建的场景 **lights=0**（URP 下无灯+无环境光=纯黑）——新场景一律显式补 Directional Light；
+   - SMR 未开 `updateWhenOffscreen` → 蒙皮网格被视锥剔除误杀（§55 纯黑坑同族）；
+   - 外部 FBX 实例的材质若是 Built-in shader → URP 下渲染异常——一律换 URP Lit 白模材质。
+
+2. **编辑器非 Play 状态 `smr.bounds`/骨骼 transform 塌缩 ≠ 模型坏**（误判误删实证）：SMR 蒙皮网格由 bindpose 烘焙渲染，编辑器下读 `smr.localBounds`/`bones[i].position` 得到接近零的塌缩值（worldBounds size 0.02 级），但**渲染人形完全正确**（用户选中轮廓确认）——按编辑器读数判"骨架塌缩"并删实例是**误判**，Play 后一切正常。规范：模型好坏以渲染/用户目检为准，编辑器 bounds 读数只作参考。
+
+3. **TMR 模型 + harness clip 嫁接 = 柱子**：harness 导出的 clip 位置曲线是 GI 骨架**厘米制**、TMR 骨架**米制**（§56 已知坑），跨源嫁接播放时物理骨被甩约百倍远、蒙皮拉成柱状。规范：**harness/AnimeStudio 产出的动画只能在同源 FBX 白模上目检**（FBX 内网格+骨架+动画单位自洽）。
+
+**成果定案**：安柏（1.0 代）=物理骨（头发/裙摆/腿带）摆动正常 + 主体（躯干/手臂/重心）完全静止——老角色 muscle binding 丢弃的目检级实锤；Odette（6.x 代）=衣服等摆动正常、人形正确——新角色全链路可用实锤。代差与管线细节=.codely-cli/webrefs/gi-animation-extraction/README.md。
