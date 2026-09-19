@@ -1,6 +1,5 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
-using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.Localization.Tables;
@@ -11,9 +10,6 @@ using System.Text;
 using System.Collections.Generic;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.Editor
 {

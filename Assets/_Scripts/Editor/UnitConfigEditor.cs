@@ -11,14 +11,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
 using GIC.Tool;
 
 namespace GIC.Editor

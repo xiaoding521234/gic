@@ -11,8 +11,6 @@ using UnityEngine.Localization;
 using UnityEngine.Localization.Tables;
 using UnityEngine.UI;
 using TMPro;
-using GIC.Data;
-using GIC.Framework;
 using GIC.UI;
 
 namespace GIC.Tool

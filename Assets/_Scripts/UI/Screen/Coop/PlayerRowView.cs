@@ -1,14 +1,11 @@
 ﻿// PlayerRowUI.cs - 玩家行 UI
 using UnityEngine;
-using TMPro;
 using UnityEngine.UI;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine.Localization;
 using GIC.Framework;
 using GIC.Battle;
 using GIC.Data;
-using GIC.Data.Event;
 using GIC.Tool;
 namespace GIC.UI
 {

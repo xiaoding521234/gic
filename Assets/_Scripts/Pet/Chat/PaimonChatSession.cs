@@ -4,7 +4,6 @@ using System.Linq;
 using GIC.Framework;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace GIC.Pet.Chat
 {

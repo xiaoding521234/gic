@@ -5,7 +5,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
-using UnityEngine;
 using GIC.Framework;
 
 namespace GIC.Editor

@@ -1,14 +1,8 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using UnityEngine.SceneManagement;
-using System.Collections.Generic;
 using UnityEditor.SceneManagement;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Battle;
-using GIC.Tool;
 namespace GIC.Editor
 {
 

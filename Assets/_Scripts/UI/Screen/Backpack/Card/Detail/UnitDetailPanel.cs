@@ -1,10 +1,8 @@
-﻿using TMPro;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Battle;
 using GIC.Data;
-using GIC.Data.Event;
 using GIC.Tool;
 namespace GIC.UI
 {

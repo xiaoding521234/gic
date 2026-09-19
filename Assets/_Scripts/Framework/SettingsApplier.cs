@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization.Settings;
-using GIC.Data;
 
 namespace GIC.Framework
 {

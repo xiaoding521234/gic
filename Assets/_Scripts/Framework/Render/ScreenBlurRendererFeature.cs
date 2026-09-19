@@ -1,11 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Battle;
-using GIC.Tool;
 namespace GIC.Framework
 {
 

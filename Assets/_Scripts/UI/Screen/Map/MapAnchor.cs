@@ -3,7 +3,6 @@ using UnityEngine;
 using static GIC.Data.PositionConfig;
 using GIC.Framework;
 using GIC.Data;
-using UnityEngine.Serialization;
 namespace GIC.UI
 {
 

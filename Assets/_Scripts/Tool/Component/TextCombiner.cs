@@ -4,11 +4,7 @@ using TMPro;
 using System.Collections.Generic;
 using System.Text;
 using System;
-using GIC.UI;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
 namespace GIC.Tool
 {
 

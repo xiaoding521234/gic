@@ -244,6 +244,9 @@
 - [2026-09-19 01:58:22] [project] SkillDetailView 点外关闭竞态已修（战斗实例设 `点外关闭=false`，点外收面板由 OnBoardTap 承接；教训=同一交互目标被两个系统响应必须一方显式让位，勿依赖帧内执行顺序——全案 docs/14 §64b）。**背包场景同款竞态（点源图标面板闪动重开）仍存在未修——用户未报障勿主动动。**
 
 - [2026-09-19 01:58:22] [project] BattleHud 结构已收敛：表驱动四键（SkillButtonDef+RegisterSkillButton 加键=加一行；AimMode 枚举已删）+partial 三分件（主/TopBar/Build）——**文件地图/加键 checklist/勿当 bug 修清单/活体取证时序全在 gic-battle-hud skill，战斗 HUD 话题先读它**；受控复现基线逐项一致（战技 22 格/移动 24 格/面板开合/取消钮）。
+- [2026-09-19 12:48:41] 【搜索铁律补遗③：glob 静默零命中（仍有效）+ 模板 using 已清理】search_file_content 的多段/花括号 glob 过滤实证**静默零命中**（glob=UI/**/*.cs 搜 "using GIC.Battle" 报 0 而 BattleScreen.cs 明含；path 参数直搜正常）。**How to apply:** 目录范围一律用 path 参数逐目录搜、不用 glob 过滤；glob 报零命中先换 path 复核再下结论。~~全项目 .cs 文件头批量模板 using 使 grep 依赖审计失效~~ → **已修复（2026-09-19 13:0x）**：三轮语义分析清理 291 文件 867 条，Unity 编译逐轮 0 错——`using GIC.X` 逐文件检索恢复可用作依赖方向审计依据（清理后实证：Battle→UI 仅 Card 策略族 5+BattleHud 复用族 2 全真实、Tool→Battle 清零、Framework→Battle 仅 3 处网络/池真实引用）；**例外=17 个豁免文件**（玩家侧 #if×16+CardGlowOverlay 混合换行）仍带模板头，审计到它们仍须核类型实际使用。清理工具链四坑+安全网套路=docs/14 §66。
+
+- [2026-09-19 12:49:07] 【战斗系统全量架构审查+修复（2026-09-19 报告交付、用户拍板「开始」六项全执行；View 层 11 文件深检补遗已交付：表现件纪律全绿、BattlePlayer 播放链=祈愿标杆达标样本）】总评：主干健康——Host 权威+片级命令流+三层时间模型与 docs/active/22 逐条一致，B7 换 Mirror 路径可信；系统性风险=效应→命令缺对账机制。**已修（逐轮 Unity 编译 0 错）**：①片内 Heal 命令漏发（TurnResolver ResolveSlice/ResolveInstantAction 补发+MergeHealEffects 按来源目标合并，BattlePlayer 客户端 handler 原已在位）；②SkillContext+死 API BaseSkill.Execute 全量删除（6 处空实现，引用清零实证）。**模板 using 全量清理**：三轮 291 文件 867 条（工具链四坑+安全网=docs/14 §66），grep 依赖审计恢复可用。**审查更正**：Data→Battle 真实反向边不止 SkillContext——语义清理实锤 Direction2D（ActionData）/ForceType（BattleMapData/UnitConfig）/TeamType（PlayerInfo/PlayerNetworkEvents）三值类型放错层，B3 归位材料。**仍登记未修**：docs/11 新 5 项（效应→命令对账机制 B6 前/ElementAttach 接线/B7 同构债三处/组合根域内化/ExitDialog B6）+ 🟡 存量（SkillFactory None→null 索引穴、DamagePipeline 静态 hooks 无生命周期、快照纪律靠约定、MergeDamageEffects 合并口径、UI→Battle 未入 docs/17 §2 表、Framework/Battle 四文件 B3、SkillManager 空壳）。全部改动未提交，交用户决定。
 
 
 

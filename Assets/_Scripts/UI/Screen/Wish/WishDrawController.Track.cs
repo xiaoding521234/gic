@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Battle;

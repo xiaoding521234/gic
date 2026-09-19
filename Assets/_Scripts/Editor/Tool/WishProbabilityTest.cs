@@ -5,7 +5,6 @@ using UnityEditor;
 using UnityEngine;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
 
 namespace GIC.Editor
 {

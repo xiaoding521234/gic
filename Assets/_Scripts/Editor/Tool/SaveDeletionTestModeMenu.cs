@@ -1,5 +1,4 @@
 using UnityEditor;
-using UnityEngine;
 using GIC.Framework;
 
 namespace GIC.Editor

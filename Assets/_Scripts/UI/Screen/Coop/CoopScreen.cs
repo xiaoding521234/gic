@@ -1,6 +1,5 @@
 ﻿// CoopScreen.cs - 联机界面（字段声明 + 生命周期 + 事件绑定）
 // partial 拆分：主文件（本文件）/ RoomFlow（状态机+房间流程）/ PlayerList（玩家行刷新）/ Discovery（房间发现）
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization;
 using UnityEngine.Serialization;
@@ -9,9 +8,7 @@ using TMPro;
 using Mirror;
 using Mirror.Discovery;
 using GIC.Framework;
-using GIC.Battle;
 using GIC.Data;
-using GIC.Data.Event;
 using GIC.Tool;
 namespace GIC.UI
 {

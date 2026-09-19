@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using GIC.Framework;
-using UnityEngine.Serialization;
 
 namespace GIC.UI
 {

@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using GIC.Data.Event;
-using UnityEngine.Localization.Settings;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
-using GIC.Tool;
 using GIC.Pet;
 using GIC.UI;
 namespace GIC.Framework

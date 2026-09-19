@@ -3,10 +3,6 @@ using Mirror;
 using Mirror.Discovery;
 using UnityEngine;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Battle;
-using GIC.Tool;
 namespace GIC.UI
 {
 

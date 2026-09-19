@@ -3,9 +3,6 @@ using UnityEngine;
 using GIC.Battle;
 using GIC.UI;
 using GIC.Framework;
-using GIC.Data;
-using GIC.Data.Event;
-using GIC.Tool;
 namespace GIC.Framework
 {
 

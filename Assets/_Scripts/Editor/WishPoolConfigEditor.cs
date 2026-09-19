@@ -7,7 +7,6 @@ using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
-using GIC.Framework;
 using GIC.Data;
 
 namespace GIC.Editor

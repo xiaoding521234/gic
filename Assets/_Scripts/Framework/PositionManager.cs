@@ -5,10 +5,8 @@ using GIC.Data.Event;
 using UnityEngine;
 
 using static GIC.Data.PositionConfig;
-using GIC.UI;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
 using GIC.Tool;
 namespace GIC.Framework
 {

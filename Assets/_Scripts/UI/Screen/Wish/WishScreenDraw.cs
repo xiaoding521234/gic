@@ -4,8 +4,6 @@ using UnityEngine.UI;
 using TMPro;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Battle;
-using GIC.Tool;
 
 namespace GIC.UI
 {

@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 
 using GIC.Framework;
-using UnityEngine.Serialization;
 namespace GIC.Battle
 {
     /// <summary>
