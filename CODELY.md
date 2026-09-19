@@ -222,7 +222,10 @@
 - [2026-09-19 01:57:27] [project] 【AI 生成 sprite-sheet 实证结论】generate_sprite_animation 两次生成均未过像素验收（循环接缝 IoU 仅 0.603、静止区 7% 像素逐帧抖动、叶片形变）——**扩散模型无法同时满足「外框像素级静止+部件精确旋转+无缝循环」三条件**。**How to apply:** 「部件动而外框静」类动画需求直接走拆层/合成路线（见徽标分层条目），勿再尝试 AI 逐帧生成；AI 生成适用于无静止参照的全新动效。
 
 
-- [2026-09-19 01:58:22] 【安柏管线定案：正常姿势+头发/配饰动画交付，身体动画封存】模型=Assets/Art/AmberTMR/（TMR asset/328738 直提包；原始 zip 存 D:\Tool\AmberModel\TMR\）。**铁律：AnimeStudio 导出的 Ani_Avatar_* 不得当完整动画用（Avatar 动画=肌肉压缩格式，导出只剩常量值）；Ani_NPC_* 可直读**（原理=docs/14 §56+gic-gi-extract skill）。身体动画=手搓肌肉管线已正式放弃（五路全灭+嫁接目检失败，全案 docs/14 §56-61）：m_MuscleClip 手写被 Tuanjie 私有 binding 哈希格式静默丢弃、唯一被求值形态=ModelImporter 从 FBX 导入——重启需新信源（官方 muscle clip 格式文档/社区成熟方案/自研肌肉数学），勿再盲试。保留：legacy POS ÷100（炸帆修复）、AmberAvatarReal=GI 官方 ModelAvatar dump 重建（Lumine 法：m_TOS=CRC32 骨路径表+m_AvatarSkeletonPose 官方 TRS、t÷100）——**后续 GI 角色参照位姿一律用此法，勿信 FBX 导入器 autoGenerate**；场景实例 Avatar 断链需补链；153 条解码肌肉 JSON+工具链（.codely-cli/tmp/ambor）+TestRig.fbx。通用教训=重度逆向任务先出「最小目检样张」再投入数据链工程。
+- [2026-09-19 22:02:43] 【安柏管线定案：正常姿势+头发/配饰动画交付，身体动画封存】模型=Assets/Art/AmberTMR/（TMR asset/328738 直提包；原始 zip 存 D:\Tool\AmberModel\TMR\）。**铁律：AnimeStudio 导出的 Ani_Avatar_* 不得当完整动画用（Avatar 动画=肌肉压缩格式，导出只剩常量值）；Ani_NPC_* 可直读**（原理=docs/14 §56+gic-gi-extract skill）。身体动画=手搓肌肉管线已正式放弃（五路全灭+嫁接目检失败，全案 docs/14 §56-61）：m_MuscleClip 手写被 Tuanjie 私有 binding 哈希格式静默丢弃、唯一被求值形态=ModelImporter 从 FBX 导入——重启需新信源——**新信源已全链实操+目检终验（2026-09-19 晚定案；信源+复现命令=.codely-cli/webrefs/gi-animation-extraction/README.md，harness 工程=.codely-cli/tmp/AnimHarnessProj/，目检场景=Assets/Scenes/AnimLookTest.unity）**：AnimeStudio（02994d5c）+自建反射 harness（LoadFiles 双 blk→ModelConverter(go,options,clips[])→Fbx.Exporter）管线全通，**代差勘定**——新角色（6.x 代）ACL 直存骨 TRS 全解全出（Odette 目检衣服摆动正常✓）；**老角色（1.0 代主切片全员）muscle binding 在 ModelConverter.ReadCurveData else 行级丢弃，只出物理骨 88 条（安柏目检：头发裙摆摆动✓躯干静止✓）**——修复路径=上游提 issue（首选）或自研 muscle 烘焙（可抄 Perfare humanoid 实现）；CLI 三种直导姿势全判死（Convert .anim=物理骨+常量；Animator/GameObject FBX=无动画）；harness FBX 白模自洽可目检（勿嫁接 TMR=厘米/米失配柱子 §56、勿按编辑器 bounds 塌缩误判删白模 §67）。保留：legacy POS ÷100（炸帆修复）、AmberAvatarReal=GI 官方 ModelAvatar dump 重建（Lumine 法：m_TOS=CRC32 骨路径表+m_AvatarSkeletonPose 官方 TRS、t÷100）——**后续 GI 角色参照位姿一律用此法，勿信 FBX 导入器 autoGenerate**；场景实例 Avatar 断链需补链；153 条解码肌肉 JSON+工具链（.codely-cli/tmp/ambor）+TestRig.fbx。通用教训=重度逆向任务先出「最小目检样张」再投入数据链工程。
+
+
+
 
 
 
