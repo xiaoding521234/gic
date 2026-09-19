@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using GIC.Framework;
 using GIC.Data;
-using GIC.Data.Event;
-using GIC.UI;
-using GIC.Tool;
 namespace GIC.Battle
 {
 
@@ -155,6 +152,10 @@ namespace GIC.Battle
             {
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
             }
+            foreach (var effect in MergeHealEffects(effects))
+            {
+                segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
+            }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
@@ -287,6 +288,8 @@ namespace GIC.Battle
                 segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path)));
             foreach (var effect in MergeDamageEffects(effects))
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
+            foreach (var effect in MergeHealEffects(effects))
+                segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
                     sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
@@ -430,6 +433,32 @@ namespace GIC.Battle
                 {
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
                         damage.Element, damage.Delivery, damage.FromCell);
+                    merged[key] = copy;
+                    result.Add(copy);
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 同片同 (来源,目标) 的多次治疗合并为一条命令（docs/active/22 §7.4：同片多伤害/治疗数值合并；
+        /// 片内/即时段治疗命令发射——此前仅回合结束段发射，片内治疗对客户端不可见致双端血量背离）
+        /// </summary>
+        private static List<HealEffect> MergeHealEffects(List<BattleEffect> effects)
+        {
+            var merged = new Dictionary<string, HealEffect>();
+            var result = new List<HealEffect>();
+            foreach (var effect in effects)
+            {
+                if (!(effect is HealEffect heal)) continue;
+                string key = $"{heal.SourceUnitId}->{heal.TargetUnitId}";
+                if (merged.TryGetValue(key, out var existing))
+                {
+                    existing.Amount += heal.Amount;
+                }
+                else
+                {
+                    var copy = new HealEffect(heal.SourceUnitId, heal.TargetUnitId, heal.Amount);
                     merged[key] = copy;
                     result.Add(copy);
                 }
