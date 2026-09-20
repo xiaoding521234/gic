@@ -20,6 +20,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 995ea11a87b311d489b7e407157c2ab7, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 4
     deployCost: -64
@@ -66,6 +67,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: ec0921993ea60b84e94ae4ad2eb8567a, type: 3}
     - {fileID: 21300000, guid: 120d1529d2fae1f48bf3eccb7a3c827b, type: 3}
     nameCard: {fileID: 21300000, guid: 93346be2723cfe844a9f3cd0182cdfdd, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -138,6 +140,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: e90113174efafab48860363d682a8b38, type: 3}
     nameCard: {fileID: 21300000, guid: 619ff4e09a0e13c4b886b92aa5c1b95f, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -210,6 +213,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 8d0c6211b53ac214f9a24dea04bf5a99, type: 3}
     nameCard: {fileID: 21300000, guid: 12688bd232e44aa4c934108bac26ceaf, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -282,6 +286,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -327,6 +332,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 77ae75539af390344a1169e1639e645c, type: 3}
     nameCard: {fileID: 21300000, guid: 61c683655e18f9e4995cfdc5ec9e8d42, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 21300000, guid: 8361bb751fcfded408707eea5b061d07, type: 3}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -516,6 +522,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 07a454e67a67d8a48aa2ca98cc2dbd0d, type: 3}
     nameCard: {fileID: 21300000, guid: 6c409b229a14b5e46b479d2d5d19528f, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -710,6 +717,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 83919bccf87fcc9449de328b28ce6b4a, type: 3}
     nameCard: {fileID: 21300000, guid: 2ce814b262046f442bbd3617f98ccc87, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -882,6 +890,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1001,6 +1010,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 75991f4edf18234498bcc0ff582d830b, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1046,6 +1056,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 7a26e7a3f5cef664cba0cf41b0bf089b, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 5
     deployCost: -64
@@ -1091,6 +1102,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: f63984f02313c0344b3e1ed413efaee5, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1137,6 +1149,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: e00ded7615f110a46a612faf9913f667, type: 3}
     - {fileID: 21300000, guid: 15cbd6174824663468968c43d67e02f3, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 4
     deployCost: -64
@@ -1263,6 +1276,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1362,6 +1376,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 5e3c038ef269fb94eb9b95cbe8fe3476, type: 3}
     nameCard: {fileID: 21300000, guid: 3051a0793bbd690438aa785d709fcc3d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1482,6 +1497,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 947b0f3600c155f4b8f3c8d891c73f7e, type: 3}
     - {fileID: 21300000, guid: 947b0f3600c155f4b8f3c8d891c73f7e, type: 3}
     nameCard: {fileID: 21300000, guid: 720e71ce5f98591458599dde23f3a019, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1554,6 +1570,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 59bb0d008ccdb964baca1e8706b8ab67, type: 3}
     nameCard: {fileID: 21300000, guid: 09451ce4ccda3d247afae06d01963071, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1626,6 +1643,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1671,6 +1689,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1716,6 +1735,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 1e26834a813b504408971a8d83af014b, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1761,6 +1781,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 74bad361f4b306c41a8501d56aa40873, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1806,6 +1827,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1851,6 +1873,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 45fcf702057746341bd1292cb6836e02, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1896,6 +1919,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 63da76fd8df9c974eb4040b6d38c3391, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1941,6 +1965,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 479d545aca45a834eb2fd16bfdd635a5, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1986,6 +2011,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -2031,6 +2057,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b7caeddbccc20fa4299ed59fa5bc33ae, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -2076,6 +2103,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: fe941b2ba1cbf0b46811c39e972b6006, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -2121,6 +2149,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 007a7e6be6f279a4ba73687516798556, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -2166,6 +2195,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -2211,6 +2241,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -2256,6 +2287,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: b6846c989fd6e6a4caece145d6e57099, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 1
     starLevel: 4
     deployCost: -64
@@ -2301,6 +2333,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 09bb399298eb16d4bb1e165f0f011a83, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 2
     deployCost: -64
@@ -2346,6 +2379,7 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 4d271a8961861a1408948bf8a1436719, type: 3}
     nameCard: {fileID: 21300000, guid: 3996419b0441a314c8f9b6e53a4fb21d, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
     hideInBackpack: 0
     starLevel: 1
     deployCost: -64

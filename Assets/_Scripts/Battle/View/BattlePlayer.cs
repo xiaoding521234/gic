@@ -31,6 +31,9 @@ namespace GIC.Battle
         [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
         [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
 
+        [Tooltip("全身立牌（UnitData.立牌图）放大倍数：全身立绘人物在图中占比小，放大对齐头像版人物观感（2026-09-21 先试 2.5）；血条/名字/Buff 行尺寸不变、随立牌顶抬高；头像版（无立牌图回落 avatar）恒为原尺寸")]
+        [SerializeField, Min(0.1f)] private float 全身立牌放大倍数 = 2.5f;
+
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 _teamAColor/_teamBColor 场景序列化值
         // 与代码默认一致，迁移零损失——队伍色与 HUD 队列框/accent 同源对齐）
         private static BattlePalette Palette => BattlePalette.Instance;
@@ -434,12 +437,15 @@ namespace GIC.Battle
                 _unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
 
             Sprite avatar = null;
+            bool useFullBody = false;
             string displayName = state.unitId;
             TextEntry nameEntry = null;
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
                 _unitConfig.TryGetUnitData(unitName, out var unitData))
             {
-                avatar = unitData.avatar;
+                // 全身立牌（立牌图）人物占比小，按 Inspector 倍数整体放大；缺立牌图的单位回落头像原尺寸
+                useFullBody = unitData.立牌图 != null;
+                avatar = useFullBody ? unitData.立牌图 : unitData.avatar;
                 displayName = unitName.ToString();
                 nameEntry = unitName.GetEntry(); // 单位名本地化条目（UnitName 表）
             }
@@ -449,7 +455,8 @@ namespace GIC.Battle
             // 血条敌我染色：本地 1v1 惯例 A=先手（真人）→ 绿；B7 联机时应按 viewer 归属重定
             bool allyHpBar = team != TeamType.B;
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
-                _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp, allyHpBar);
+                _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp, allyHpBar,
+                useFullBody ? 全身立牌放大倍数 : 1f);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);

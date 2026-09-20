@@ -46,9 +46,13 @@ namespace GIC.Battle
         /// <summary>立牌后倾角缓存</summary>
         private float _tiltDegrees = 55f;
 
+        /// <summary>立牌面内显示高度（Create 按 avatarScale 算出；头顶行 Y 以立牌顶为基准 + 原间隙，行尺寸不变）</summary>
+        private float _avatarDisplayHeight = AvatarHeight;
+
         private const float AvatarHeight = 0.55f;
 
-        // 血条/名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~0.55）
+        // 血条/名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
+        // 全身放大时行 Y 随立牌顶同步抬高、行自身尺寸不变）
         private const float HpBarWidth = 0.52f;
         private const float HpBarHeight = 0.055f;
         private const float HpBarY = 0.66f;
@@ -58,6 +62,9 @@ namespace GIC.Battle
         private const float BuffBadgeGap = 0.28f;
         private const float NameFontSize = 36f;   // 世界高度 ≈ 3.43 × scale
         private const float NameScale = 0.038f;   // → 约 0.13 世界高
+
+        /// <summary>头顶行面内 Y：立牌顶 + 与原 0.55 高版本相同的间隙（全身放大仅抬高位置）</summary>
+        private float OverheadRowY(float baseY) => _avatarDisplayHeight + (baseY - AvatarHeight);
 
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 static 字面量收口，同语义不同值已对齐）
         private static BattlePalette Palette => BattlePalette.Instance;
@@ -84,8 +91,12 @@ namespace GIC.Battle
         /// <param name="hp">初始血量</param>
         /// <param name="maxHp">最大血量</param>
         /// <param name="allyHpBar">血条敌我染色：true=我方绿 / false=敌方红（B7 联机时按 viewer 归属重定）</param>
+        /// <param name="avatarScale">立牌整体放大倍数（1=头像版原尺寸）：全身立绘人物在图中占比小，放大对齐
+        /// 头像版人物观感——底边原点贴地不漂移；血条/名字/Buff 行尺寸不变、随立牌顶同步抬高；
+        /// B5 判定圆柱与底座不受视觉放大影响</param>
         public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
-            Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0, bool allyHpBar = true)
+            Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0, bool allyHpBar = true,
+            float avatarScale = 1f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -115,11 +126,13 @@ namespace GIC.Battle
 
             if (avatar != null)
             {
+                float displayHeight = AvatarHeight * avatarScale;
                 float worldHeight = avatar.bounds.size.y;
-                float scale = worldHeight > 0f ? AvatarHeight / worldHeight : 1f;
+                float scale = worldHeight > 0f ? displayHeight / worldHeight : 1f;
                 spriteGo.transform.localScale = Vector3.one * scale;
                 // sprite 中心置于半高处（外层原点=底边 → 底边贴地、立牌居中于半高）
-                spriteGo.transform.localPosition = new Vector3(0f, AvatarHeight * 0.5f, 0f);
+                spriteGo.transform.localPosition = new Vector3(0f, displayHeight * 0.5f, 0f);
+                view._avatarDisplayHeight = displayHeight;
             }
 
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=BattleMetrics.UnitCylinderDiameter，
@@ -146,7 +159,7 @@ namespace GIC.Battle
         {
             _hpBarBgMaterial = BattleViewFactory.CreateUnlitMaterial(Palette.血条底);
             var bgGo = BattleViewFactory.CreateQuad(_tiltGroup, "HpBarBg", _hpBarBgMaterial);
-            bgGo.transform.localPosition = new Vector3(0f, HpBarY, 0f);
+            bgGo.transform.localPosition = new Vector3(0f, OverheadRowY(HpBarY), 0f);
             bgGo.transform.localScale = new Vector3(HpBarWidth, HpBarHeight, 1f);
             _hpBarBg = bgGo.transform;
 
@@ -163,7 +176,7 @@ namespace GIC.Battle
         {
             var nameGo = new GameObject("NameText");
             nameGo.transform.SetParent(_tiltGroup, false);
-            nameGo.transform.localPosition = new Vector3(0f, NameY, 0f);
+            nameGo.transform.localPosition = new Vector3(0f, OverheadRowY(NameY), 0f);
             nameGo.transform.localScale = Vector3.one * NameScale;
 
             _nameText = nameGo.AddComponent<TextMeshPro>();
@@ -278,7 +291,7 @@ namespace GIC.Battle
         {
             var rowGo = new GameObject("BuffRow");
             rowGo.transform.SetParent(_tiltGroup, false);
-            rowGo.transform.localPosition = new Vector3(0f, BuffRowY, 0f);
+            rowGo.transform.localPosition = new Vector3(0f, OverheadRowY(BuffRowY), 0f);
             _buffRow = rowGo.transform;
         }
 
