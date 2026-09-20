@@ -94,9 +94,7 @@
 
 
 - [2026-09-15 01:17:42] [feedback]【依据 docs 答来源/现状类问题必须整节通读，禁 offset 截窗起读】（2026-09-15 派蒙来源连环误答两轮实证）：用户问「派蒙模型来源于哪个网站」，我 read_file docs/19 时 offset=35 恰好切掉 L34 头行「当前生效：GI 官方模型（2026-08-24 落地，来自 models-resource 完整 rip，asset 328738）」，误锚到下文资产表的「模之屋原始 PMX 包」兜底行→首答错称模之屋；用户纠正「TMR 正是我当初下载派蒙的网站」后，我又拿「项目 PMX 包与 TMR 条目格式对不上」顶回去一轮；用户再纠「当前项目在用的不是MMD模型」才定位——答案在文档里 8-24 就写对了。**Why**：截窗漏读一行小节标题→整条证据链锚错；且与用户记忆冲突时未先回读全文就质疑用户。**How to apply**：①答「X 来源于哪/现状是什么/在哪」前，从节标题起完整读 docs 相关小节，勿用 offset 从中段起读；②用户纠正我的事实性答案且与文档记载冲突时，先重读文档原文核对，再决定是否质疑用户记忆。
-
-
-
+- [2026-09-20 00:16:57] 【四元数/骨架空间约定问题直接移植现成工具，勿手搓试错】（2026-09-20 用户叫停原话「这样修改会不断有新问题出现，找找有没有现成的工具」）：GI muscle→hips 旋转我手搓公式连错两版（倾斜→平躺），每次只修一个症状。**Why:** 骨骼旋转的空间约定（质心系 vs 节点系、Z-up vs Y-up bindpose、RootQ vs 本地Q）是多层嵌套的隐式约定，靠目检反馈逐个试错每轮只暴露下一层错误；成熟工具实现是自洽约定系，移植后问题收敛为「一个已定位的差异点」。**How to apply:** ①涉及骨骼旋转/坐标系的转换，先搜现成实现（Ruri.RipperHook 的 HumanoidToGeneric 模块=Unity muscle clip→generic 全流程，BA 的 HumanoidAnimationBaker 也是完整参照），核心求值逻辑整段移植、只剥离宿主依赖（AssetRipper 类型等），勿重写数学；②移植后若仍有输出差异，定位为「一个约定差异点」用数据诊断（FK 算理论值对比）一次修正，勿连环改公式；③搜现成工具的手法：GitHub code search 用 distinctive symbol 名（HumanoidAnimationBaker/AvatarMuscleReferential/HumanoidClipGenericizer 这类自造词一搜一个准），泛关键词（genshin animation blender）反而全是噪声。
 
 ### Project
 
@@ -212,7 +210,13 @@
 
 - [2026-09-19 01:57:27] [project] UnityInsight 索引系统档案（活锁 bug 已提交 Bug Hunter，证据包=.codely\有效bug活动\已提交\index-build-failure）：架构=CLI 侧 node 守护进程（unity-insight-cli.js serve --daemon）持有全部索引，**被动模式**——杀掉不自动重生、重生后须 Cowork GUI 发构建指令（编辑器 AI/ 菜单只有 Check Connections/Force Reload）；数据目录=<项目>\.codely-cli\UnityInsight\（构建中=index.db.tmp+WAL，ready 后写 index.current 指针）。活锁特征：first_build 磁盘写入 ~6 分钟后冻结、进程 4~5 核满负荷+RSS 狂涨至 7.5GB+零 I/O、index_building=true 永不翻转、GUI 无进度无报错；~\.codely-cli\crash-logs\exit-*.json（uptime<1s）=单实例锁握手记录属常态勿误判崩溃。处置=Stop-Process 杀 daemon+清 tmp 三件套。
 
-- [2026-09-19 01:57:27] [project] Bug Hunter 证据包与提交状态（快照）：权威位置=.codely\有效bug活动\（旧 .codely\bughunter-* 勿再引用）。已提交\=index-build-failure、activity-page-log-path、cron-oneshot-no-fire；待提交=jobject-assembly-conflict、plan-path-error（曾遇 503 待重试）、runtime-script-playmode-remains、playmode-real-save-suggestion；另有提交接口 503 bug（PUT publish 返 503、页面无提示仅控制台可见）。**已复验判死勿再打包**：高成本确认门解析失败、poll Try 保留字、AfterAgent 空注入误触发（均已被 9/14 CLI 更新修复）、暂停态握手超时（不可复现）。活动规则与四件套流程=全局 skill codely-bughunter。
+- [2026-09-20 20:13:55] [project] Bug Hunter 证据包与提交状态（快照；**权威状态板=.codely\有效bug活动\00-新会话交接总览.md，新会话先读它，本条只当指针**）：2026-09-20 20:15 快照——本周（一9/14~日9/20）累计提交 **11 件**（9/14 七件 + 9/20 四件），名义 33,000 超 2 万周上限、超出部分结算以周二公布为准；**不正确\ 撤案 2 件**：core日志跨日不滚动（翻案=core 按 UTC 日滚动，本地 08:00 切文件，教训=判日志机制先看行内时间戳时区+找边界对）+ 增值包速率上限口径未写明（用户判定不交）。**已立包待交 3 件（9/20 晚）**：popup-pipe-chars（OS 通知弹窗内容渲染为竖线串"|||..."，日志侧内容正常、7 次发送时刻与报障吻合，差弹窗截图）+ image-link-cdn-not-local（AI 生成图给 CDN 链接不给本地 file:/// 链接，体验缺陷，无需截图可交）+ credit-false-insufficient（同批并行两张生成一过一拒，报"需 165 积分"但用户实测 5h 剩~7000/周剩~2 万；积分拒绝日志零留痕，差余额页截图）。周二（9/22）结算后提醒用户查邮箱、兑换码一周内核销。活动规则与四件套流程=全局 skill codely-bughunter。
+
+
+
+
+
+
 
 
 
@@ -222,7 +226,12 @@
 - [2026-09-19 01:57:27] [project] 【AI 生成 sprite-sheet 实证结论】generate_sprite_animation 两次生成均未过像素验收（循环接缝 IoU 仅 0.603、静止区 7% 像素逐帧抖动、叶片形变）——**扩散模型无法同时满足「外框像素级静止+部件精确旋转+无缝循环」三条件**。**How to apply:** 「部件动而外框静」类动画需求直接走拆层/合成路线（见徽标分层条目），勿再尝试 AI 逐帧生成；AI 生成适用于无静止参照的全新动效。
 
 
-- [2026-09-19 22:02:43] 【安柏管线定案：正常姿势+头发/配饰动画交付，身体动画封存】模型=Assets/Art/AmberTMR/（TMR asset/328738 直提包；原始 zip 存 D:\Tool\AmberModel\TMR\）。**铁律：AnimeStudio 导出的 Ani_Avatar_* 不得当完整动画用（Avatar 动画=肌肉压缩格式，导出只剩常量值）；Ani_NPC_* 可直读**（原理=docs/14 §56+gic-gi-extract skill）。身体动画=手搓肌肉管线已正式放弃（五路全灭+嫁接目检失败，全案 docs/14 §56-61）：m_MuscleClip 手写被 Tuanjie 私有 binding 哈希格式静默丢弃、唯一被求值形态=ModelImporter 从 FBX 导入——重启需新信源——**新信源已全链实操+目检终验（2026-09-19 晚定案；信源+复现命令=.codely-cli/webrefs/gi-animation-extraction/README.md，harness 工程=.codely-cli/tmp/AnimHarnessProj/，目检场景=Assets/Scenes/AnimLookTest.unity）**：AnimeStudio（02994d5c）+自建反射 harness（LoadFiles 双 blk→ModelConverter(go,options,clips[])→Fbx.Exporter）管线全通，**代差勘定**——新角色（6.x 代）ACL 直存骨 TRS 全解全出（Odette 目检衣服摆动正常✓）；**老角色（1.0 代主切片全员）muscle binding 在 ModelConverter.ReadCurveData else 行级丢弃，只出物理骨 88 条（安柏目检：头发裙摆摆动✓躯干静止✓）**——修复路径=上游提 issue（首选）或自研 muscle 烘焙（可抄 Perfare humanoid 实现）；CLI 三种直导姿势全判死（Convert .anim=物理骨+常量；Animator/GameObject FBX=无动画）；harness FBX 白模自洽可目检（勿嫁接 TMR=厘米/米失配柱子 §56、勿按编辑器 bounds 塌缩误判删白模 §67）。保留：legacy POS ÷100（炸帆修复）、AmberAvatarReal=GI 官方 ModelAvatar dump 重建（Lumine 法：m_TOS=CRC32 骨路径表+m_AvatarSkeletonPose 官方 TRS、t÷100）——**后续 GI 角色参照位姿一律用此法，勿信 FBX 导入器 autoGenerate**；场景实例 Avatar 断链需补链；153 条解码肌肉 JSON+工具链（.codely-cli/tmp/ambor）+TestRig.fbx。通用教训=重度逆向任务先出「最小目检样张」再投入数据链工程。
+- [2026-09-20 01:27:48] 【GI 动画提取：全世代身体骨均无法通过 AnimeStudio 直接导出（2026-09-20 终局修正）】**重大修正**：之前「新角色 ACL 直存 TRS 全解全出」结论错误——Odette FBX 的 138 paths 全部是物理/装饰骨（Breast/Hair/EyeBone/Bone_Sleeves 等），身体骨（Spine1/UpperArm/Thigh）无 m_LocalRotation 绑定。之前 bodyPaths=54 的统计误将「路径包含 Spine 关键词」当作「身体骨自身有动画」（实际是子孙物理骨的祖先路径含关键词）。**所有世代角色的身体骨都由 humanoid muscle 系统驱动，AnimeStudio ReadCurveData 的 else 分支全部丢弃**——不是代差，是同一种限制。新角色只是物理骨更多（138 vs 29）让人误以为更多数据被导出。**muscle 求值路线（Ruri 工具链）已走通但产出幅度不够**（呼吸级 ±1-2°）。**战斗表现需换方向**：Mixamo 重定向/纸片人/其他方案。技术成果保留=AnimHarness bake 模式+Ruri 工具链移植+DBACL 修复，见 webrefs/gi-animation-extraction/README + docs/14 §68。
+
+
+
+
+
 
 
 
@@ -247,10 +256,16 @@
 - [2026-09-19 01:58:22] [project] SkillDetailView 点外关闭竞态已修（战斗实例设 `点外关闭=false`，点外收面板由 OnBoardTap 承接；教训=同一交互目标被两个系统响应必须一方显式让位，勿依赖帧内执行顺序——全案 docs/14 §64b）。**背包场景同款竞态（点源图标面板闪动重开）仍存在未修——用户未报障勿主动动。**
 
 - [2026-09-19 01:58:22] [project] BattleHud 结构已收敛：表驱动四键（SkillButtonDef+RegisterSkillButton 加键=加一行；AimMode 枚举已删）+partial 三分件（主/TopBar/Build）——**文件地图/加键 checklist/勿当 bug 修清单/活体取证时序全在 gic-battle-hud skill，战斗 HUD 话题先读它**；受控复现基线逐项一致（战技 22 格/移动 24 格/面板开合/取消钮）。
-- [2026-09-19 12:48:41] 【搜索铁律补遗③：glob 静默零命中（仍有效）+ 模板 using 已清理】search_file_content 的多段/花括号 glob 过滤实证**静默零命中**（glob=UI/**/*.cs 搜 "using GIC.Battle" 报 0 而 BattleScreen.cs 明含；path 参数直搜正常）。**How to apply:** 目录范围一律用 path 参数逐目录搜、不用 glob 过滤；glob 报零命中先换 path 复核再下结论。~~全项目 .cs 文件头批量模板 using 使 grep 依赖审计失效~~ → **已修复（2026-09-19 13:0x）**：三轮语义分析清理 291 文件 867 条，Unity 编译逐轮 0 错——`using GIC.X` 逐文件检索恢复可用作依赖方向审计依据（清理后实证：Battle→UI 仅 Card 策略族 5+BattleHud 复用族 2 全真实、Tool→Battle 清零、Framework→Battle 仅 3 处网络/池真实引用）；**例外=17 个豁免文件**（玩家侧 #if×16+CardGlowOverlay 混合换行）仍带模板头，审计到它们仍须核类型实际使用。清理工具链四坑+安全网套路=docs/14 §66。
+- [2026-09-20 02:43:41] 【搜索铁律补遗③（2026-09-20 复验修正）+ 模板 using 已清理】search_file_content 的 glob=锚定于搜索根的 gitignore 式语义：含 / 的模式须从搜索根写起（从工作区根搜 Assets 下 UI 目录须 **/UI/**/*.cs）——9/19 所记「UI/**/*.cs 静默零命中」实为锚定语义误解非工具 bug，**已判死勿再当 bug-hunter 候选提交**（9/20 复验：**/*.cs、**/*.{cs}、*.cs 全正常命中）。**How to apply:** 目录范围仍优先 path 参数逐目录搜；glob 零命中先加 **/ 前缀或换 path 复核再下结论。~~全项目 .cs 文件头批量模板 using 使 grep 依赖审计失效~~ → **已修复（2026-09-19 13:0x）**：三轮语义分析清理 291 文件 867 条，Unity 编译逐轮 0 错——`using GIC.X` 逐文件检索恢复可用作依赖方向审计依据（清理后实证：Battle→UI 仅 Card 策略族 5+BattleHud 复用族 2 全真实、Tool→Battle 清零、Framework→Battle 仅 3 处网络/池真实引用）；**例外=17 个豁免文件**（玩家侧 #if×16+CardGlowOverlay 混合换行）仍带模板头，审计到它们仍须核类型实际使用。清理工具链四坑+安全网套路=docs/14 §66。
+
 
 - [2026-09-19 18:50:54] 【战斗系统全量架构审查+修复+B3 归位（2026-09-19；View 层深检补遗已交付：表现件纪律全绿、BattlePlayer 播放链=祈愿标杆达标样本）】总评：主干健康——Host 权威+片级命令流+三层时间模型与 docs/active/22 逐条一致，B7 换 Mirror 路径可信；系统性风险=效应→命令缺对账机制。**审查批已修并提交推送（用户验证通过）**：7b8ea20（片内 Heal 命令补发+MergeHealEffects；删 SkillContext/死 API Execute）、9482251（模板 using 语义清理 867 条，grep 依赖审计恢复可用；工具链四坑=docs/14 §66）。**B3 归位批已提交（2026-09-19：3953fd9 归位+a7cf05c .gitignore）**：①CardManager/CardDeck/DeckCodeCodec/UnitManager 迁 Framework/Collection（.meta 成对保 GUID、命名空间不变）+SkillManager 空壳删（Wargame 双处摘除）——Framework/Battle 目录消亡；②Direction2D/ForceType(+Extensions) 迁 Data/Battle/Protocol、TeamType 从 UnitIdentity 抽出迁 Data/Battle/Unit（命名空间全改 GIC.Data）——**Data→Battle 反向依赖清零（rg 实证）**；③SkillFactory None→占位（索引对齐）；④docs/17 §2 依赖方向表补记 UI→Battle、docs/11 登记同片合并口径；.gitignore 加 /chat-export-*。**仍登记未修**：docs/11 项（效应→命令对账机制 B6 前/ElementAttach 接线/同片合并口径拍板/B7 同构债三处/组合根域内化/ExitDialog B6）+ DamagePipeline 静态 hooks 生命周期（B2/B4 接线时）、快照纪律靠约定（hooks 接线批次一并处理）。
 - [2026-09-19 18:50:57] 【战斗 B5 连续判定核心已落地（2026-09-19 晚，编译 0 错，未提交未目检）】投射物命中=接触立牌圆柱之时+读命中时刻连续插值位置（移动中可中途射中）：ProjectileResolver 时间轴分段求交（Host 在同片移动展开后判定；平局 unitID 升序；虚空截断/24 格消散产 Effect 命令）；命中点/消散点=千分定点 hitX/hitY 随命令下发（客户端零推算）；BattleMetrics 常量收口（投射物 8 格/秒/移动 0.18s/格/圆柱直径 0.42，Host 与播放同源）；底座 Quad→圆盘=判定可视化。**行为变化**：贴脸同格敌 t=0 即命中（旧不打同格）；投射物播放与移动同 t=0 起跑；箭雨/霜袭仍纯瞬发按片初快照（不变）。**Why**: docs/active/22 §11 基线+docs/18 决策二 2026-09-17 拍板的实现落地。**How to apply**: 后续战斗表现/判定话题先读 docs/17 §7 B5 增量行+active/22 §11 实现要点；圆柱直径调=改 BattleMetrics.UnitCylinderDiameter 一处；B5 剩余=箭矢素材/天降视觉/震屏闪白/池化/立牌美术升级（待拍板）。
+- [2026-09-20 02:26:11] 【战斗表现纸片人方案与素材路线定案】（2026-09-20 用户拍板）GI 动画提取判死后战斗表现=纸片人方案；**GI 七圣卡面 Spine 素材路线被否决**——用户发现卡面人物只有半身/坐姿场景图不完整（"角色只有半身，因此我们仍然需要自己用ai生成"），纸片人素材改 AI 生成（安柏先行目检，正在生成正常比例+Q版三头身两张风格候选）。Spine 技术管线已验证保留：skel 4.0 解析器（spine-csharp 4.0.64 移植，573191/573191 EXACT，关键坑=大端 float/bezier 曲线每通道 4 float/strings 表+ReadStringRef/deform 帧 time2 先于 curve byte）、AtlasDump harness（MonoBehaviour 原始字节 dump，PPtr 布局=4B fileID+align4+8B pathID，atlas 数据=纯文本内嵌）——工具链存 .codely-cli/tmp/paperdoll_amber_gcg/ + webrefs/spine-paperdoll/，将来做 GI 素材骨骼动画可复用。**How to apply:** 战斗单位表现素材走 AI 生成立绘；GI 提取素材只做图标/头像/卡面类完整资源。
+- [2026-09-21 00:29:53] 【AI 出图模型规则两条（安柏纸片人实证 2026-09-20~21）】①Seedream 5.0 Pro（260628）出高还原 IP 角色必被输出侧版权审查拦截（OutputImageSensitiveContentDetected，与 prompt 措辞无关，两次实证，失败不扣积分）——GI 角色素材用标准 seedream 或 frontier_sunburst，勿选 Pro。②日辉原生透明底=fal 后端须传 **is_segmentation:true**（服务端映射 background:transparent+nativeSegmentation:true）；传自定义 background:"transparent" 无效（键不出现，出白底）。透明底固有 alpha 画像=背景约 60% alpha=0、主体 129-254 桶无 255 全实像素（中心约 253），v2 即如此非缺陷；seedream 的透明底是另一路径（segmented/ 后处理抠图 URL）。**How to apply:** 后续角色素材（凯亚/芭芭拉等）原生透明底一律 is_segmentation:true；查生成用模型/底色=chats/<会话>.jsonl 任务 JSON type 字段+下载后读 PixelFormat。
+
+
+
 
 ### Reference
 - [2026-09-16 20:01:18] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Tuanjie_editor\gic\.codely-cli\webrefs\genshin-unpack\gichess\my\wg-0.2.d（2026-09-05 随 gichess 77.78GB GI 解包归档整体迁入 webrefs/genshin-unpack/，原 D:\Picture\gichess）。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 仅作战斗系统架构参考；**旧 mod 资产一律不再用（2026-09-16 用户拍板「旧 gichess mod 不要再用」：播报员/派蒙语音 wav、模型、贴图等一切提取物都不再作为 GIC 素材来源，含 TTS 音色克隆样本；2026-09-14 已拍音频/曲目不翻旧 mod，音乐素材由用户自行网找）**。需要查旧 Java 实现时按路径阅读源码。
