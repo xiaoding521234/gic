@@ -1297,4 +1297,26 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 3. **TMR 模型 + harness clip 嫁接 = 柱子**：harness 导出的 clip 位置曲线是 GI 骨架**厘米制**、TMR 骨架**米制**（§56 已知坑），跨源嫁接播放时物理骨被甩约百倍远、蒙皮拉成柱状。规范：**harness/AnimeStudio 产出的动画只能在同源 FBX 白模上目检**（FBX 内网格+骨架+动画单位自洽）。
 
-**成果定案**：安柏（1.0 代）=物理骨（头发/裙摆/腿带）摆动正常 + 主体（躯干/手臂/重心）完全静止——老角色 muscle binding 丢弃的目检级实锤；Odette（6.x 代）=衣服等摆动正常、人形正确——新角色全链路可用实锤。代差与管线细节=.codely-cli/webrefs/gi-animation-extraction/README.md。
+**成果定案**：安柏（1.0 代）=物理骨（头发/裙摆/腿带）摆动正常 + 主体（躯干/手臂/重心）完全静止——老角色 muscle binding 丢弃的目检级实锤；Odette（6.x 代）=衣服等摆动正常、人形正确——新角色全链路可用实锤。代差与管线细节=.codely-cli/webrefs/gi-animation-extraction/README.md。**（2026-09-19 深夜修正：本行"muscle binding 丢弃"系误诊——身体动画根本不在该 clip（在共享基础 clip），且当时看到的"只有物理骨"部分受 §68 的 DBACL streamer 缺陷影响；真相与全链路见 §68。）**
+
+## 68. GI 老角色身体动画「三重误诊」终局：身体动画在共享基础 clip（不在角色 clip）+ AnimeStudio DBACL `streamer=NULL` 丢 database 精修（真根因）+ m_IndexArray 通道映射其实全对——muscle 烘焙全链路打通（2026-09-19 深夜实证）
+
+**背景**：§56-61 五路全灭后重启信源（§67），交接蓝图 Job16 自研 muscle 烘焙。本轮三个关键事实逐一实证，全部推翻此前假设：
+
+1. **身体动画不在角色专属 clip**——`Ani_Avatar_Girl_Bow_Ambor_Standby` 的 ACL=28 物理骨×(Q4+T3+S3)+7 个空 Motion 槽（m_IndexArray 前 7 指 280..286，其余 193 全 -1），**压根没有 muscle 数据**。身体动画在**共享基础 clip** `Ani_Avatar_Girl_Standby`（全员女孩共用）：200 通道布局（Motion7+Root7+Limbs28+Muscles55+Fingers40+TDoF63），ia[0..136]→ACL 170..306 全有真数据，TDOF 仅 LeftHand.z/RightHand.z（307/308）。游戏按「共享身体层 + 角色物理层」分 clip 合成。**给老角色找身体动画先找 `Ani_Avatar_<BodyType>_*` 共享 clip，别在角色 clip 里挖。**
+
+2. **AnimeStudio DBACL 的 database 分流从未生效（真根因）**——C# 包装 `DBACL.DecompressTracks(data, db, out, out)` 内部 `streamer = IntPtr.Zero`（源码注释自认 *"m_databaseData doesn't seem to be used. For now"*）。C++ 端 `debug_database_streamer::is_initialized() = (size==0 || ptr!=nullptr)`——低档 bulk 7106 字节 + NULL 指针 → database_context 初始化失败 → 静默退化为 tier-0 粗解压：**Root/Motion 曲线读成全零**（精修样本全在 DB bulk）、**muscle 值呈 2-3bit 量化混沌抖动**（帧间 ±0.3 跳变，曾被误读为"布局错乱"）。修复=harness 直接 P/Invoke，`streamer = dbAligned + bulkOffset`；bulk 偏移=DB 头布局推算：`raw(8)+dbheader(56)+chunkdesc(8×(nChunks0+nChunks1))+clipmeta(8×numClips)`。修复后 RootT.y 动画 0.571→0.945 与 CrouchToStandby 的 vad 起止值**逐位精确互证**。GI 的 DB=tag `0xAC11DB01`、bulk inline、`bulk_data_offset=-1`（mihoyo 不用它，须按布局推算）。
+
+3. **m_IndexArray 通道映射从头到尾是对的**——`ia[ch]=ACL 标量轨道索引`、`-1=无数据`；binding 表 Animator 条目的 `attribute` 即通道号。此前"数值跨通道复现/混沌"全是缺陷 2 的伪影。`m_ValueArrayDelta[0..13]=[片头值,片尾值]`（Motion+Root 通道），是天然的逐 clip 对账锚点。
+
+**muscle 求值数学**（axes 在 `Human.m_Skeleton` 的 AxesArray——**GI 的 AvatarSkeleton.m_AxesArray 是空的（axesCount=0），必须去 Human 骨架取**，48 节点 46 组 preQ/postQ/sgn/min/max，min/max 为弧度）：
+- `angle_d = sgn_d × m_d × (m_d≥0 ? max_d : -min_d)`，`q = preQ ⊗ SwingTwist ⊗ conj(postQ)`；
+- `SwingTwist(ax,ay,az) = normalize(tx, ty+tx·tz, tz-tx·ty, 1)`，`t?=tan(angle?/2)`（Unity 半角正切合成）；
+- 通道→(骨,axis) 表=Ruri.RipperHook MuscleDofTable 同构（FrontBack→axis2 等，勿按通道序硬排）；手指经 `Human.m_LeftHand/m_RightHand.m_HandBoneIndex`（15/手，近/中/远三连）。
+- FK 验证链：参照根位+肌肉求值 → 头 1.36m、手垂身侧（y≈0.87）、双脚落地、逐帧微摆 ✓。
+
+**一手信源**（网检铁律产物）：`ZM-Kimu/Blue-Archive-Asset-Downloader` 的 `HumanoidAnimationBaker.cs`（求值数学+twist 分配）、`FractalTools/Ruri.RipperHook` 的 `AvatarMuscleReferential.cs/MuscleBone.cs`（同数学+Root 质心补偿）、AnimeStudio 自带 `MuscleHelper.cs`（200 通道布局权威表）、DBACL 源码 `AnimeStudio.ACL/AnimeStudio.ACL.DB/dllmain.cpp`。
+
+**烘焙产物与验证**：AnimHarness `bake` 模式 → 单 FBX 双 clip（body：17 TRS 轨+45 muscle 轨=59 骨骼路径 278 绑定；phys：28 物理骨 TRS）→ Tuanjie 导入 **body-bone 路径 0→58**（此前旧 FBX=0）→ AnimLookTest 场景 x=0 新实例（Animation 自动循环 body，phys 挂 layer1）。同骨冲突时 TRS 区优先于 muscle 求值（手指/扭转骨走 TRS）。
+
+**遗留**：①twist 重分配未做（armTwist=1/foreArmTwist=0.35——BA 与 Ruri 对"=1"的语义相反，idle 的 twist 值小，待目检判定是否需要）；②Root/Motion→hips 质心补偿（Ruri BodyTransform）未做——idle 用参照根位足够，locomotion clip 需补；③上游 issue #124 的前提（"binding 丢弃"）已被本轮证伪，追评/关闭待拍板。
