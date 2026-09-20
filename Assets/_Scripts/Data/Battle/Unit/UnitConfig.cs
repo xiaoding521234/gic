@@ -25,6 +25,10 @@ namespace GIC.Data
             public Sprite avatar;
             public List<Sprite> cards;
             public Sprite nameCard;
+
+            /// <summary>战斗立牌图（纸片人全身立绘，gic-paperdoll 产物）；null 时立牌回落 avatar 头像</summary>
+            public Sprite 立牌图;
+
             public bool hideInBackpack = false;
 
             [Header("稀有度")]
