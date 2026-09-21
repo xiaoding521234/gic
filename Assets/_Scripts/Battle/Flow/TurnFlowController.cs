@@ -79,6 +79,9 @@ namespace GIC.Battle
         /// <summary>选择阶段剩余秒数（供 HUD 轮询；-1 = 非选择阶段）</summary>
         public float SelectRemainingSeconds { get; private set; } = -1f;
 
+        /// <summary>选择倒计时暂停门（2026-09-21：HUD 布局编辑期冻结；true=计时挂起不递减。B7 联机时编辑模式禁用另议 docs/11）</summary>
+        public bool SelectTimerPaused { get; set; }
+
         private Coroutine _selectTimerCoroutine;
 
         /// <summary>选择阶段倒计时：到时未交玩家自动空过（Pass）并进入执行阶段</summary>
@@ -89,6 +92,7 @@ namespace GIC.Battle
                 yield return null;
                 // 阶段已推进（收齐提前开演 / 战斗停止）→ 计时作废
                 if (Phase != BattlePhase.Selecting || TurnNumber != turn) yield break;
+                if (SelectTimerPaused) continue; // HUD 布局编辑期冻结（不减不超时）
                 SelectRemainingSeconds -= Time.deltaTime;
             }
 

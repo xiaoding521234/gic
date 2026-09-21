@@ -121,7 +121,11 @@ namespace GIC.Battle
             return positions;
         }
 
-        private static BattleCell StepVector(Direction2D direction)
+        /// <summary>
+        /// 方向 → 每步步进格增量（8 向全支持）。2026-09-21 转 public：View 撞墙弹回方向与 Host 步进同源；
+        /// 勿复用 SkillHitResolver.DirectionToDelta——那是直线投射物的十字归一映射，斜向会被归一到主轴
+        /// </summary>
+        public static BattleCell StepVector(Direction2D direction)
         {
             switch (direction)
             {

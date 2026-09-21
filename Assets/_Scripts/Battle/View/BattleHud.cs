@@ -14,57 +14,36 @@ namespace GIC.Battle
 {
     /// <summary>
     /// 正式战斗 HUD（B6 提前启动；docs/18 决策六 + docs/active/22 §13 + docs/designs/battle-hud-v1.html）。
-    /// partial 分件（2026-09-18 B 案）：本文件=字段/数据回调/状态机/瞄准/技能按钮交互/数据链/高亮；
-    /// BattleHud.TopBar.cs=顶栏（回合中枢/倒计时/时钟/攻速队列条/双方信息块）构建与刷新；
-    /// BattleHud.Build.cs=程序化 UI 构建（Build/Make 基础件/技能盘按钮注册）。
-    /// 技能盘四键表驱动（SkillButtonDef，2026-09-18 A 案）：加技能键=BuildSkillButtons 里
-    /// RegisterSkillButton 加一行，勿再散写 buttonKey switch（原 string 映射散落 5 处、加键改 8 处的债已清）。
-    /// 布局 = MOBA 范式：移动左下（圆心距底 500）、爆发右下盘心 ×1.2、战技/延奏围绕；
+    /// 2026-09-22 全项目统一批次：结构装配=Resources/Prefabs/Battle/BattleHud.prefab（编辑器维护，
+    /// 一次性迁移工具 BattleHudPrefabMigration 从旧程序化构建烘焙）；运行时按契约名寻址+接线+Palette 活色。
+    /// partial 分件：本文件=字段/数据回调/状态机/瞄准/技能按钮交互/数据链/高亮；
+    /// BattleHud.TopBar.cs=顶栏寻址+刷新；BattleHud.Build.cs=寻址接线总装；BattleHud.Layout.cs=布局系统。
+    /// 技能盘四键表驱动（SkillButtonDef，2026-09-18 A 案不变）：加技能键=prefab 加槽节点+Build 分件表加一行。
+    /// 布局 = MOBA 范式（移动左下、爆发右下盘心、战技/延奏围绕——默认位即 prefab 摆放，编辑器所见即所得）；
+    /// 2026-09-21 自定义布局系统：HUD 控件全量可拖可缩（LayoutSlot 归一锚点），方案存主存档 settings 分区。
     /// 单位选择交互（2026-09-18 拍板）：点立牌选中 → 技能盘现+手牌藏（选中态/手牌态互斥），
     /// 点空白取消选中；技能瞄准 = 可选格高亮 + 右上取消按钮 + 选中单位脚下金色标记。
-    /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）。
+    /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）+ LayoutEditing（编辑态门控）。
     /// 输入 = BattleCameraController.OnBoardTap（Drag 短点击复合发射，docs/24 §7.10 tap+pan 同体）。
-    /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产
-    /// （2026-09-18 拍板"素材复用优先"）。拖动式瞄准/手牌卡列表/协议核心血条 = B4/B8 接线。
+    /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产。
+    /// 拖动式瞄准/手牌卡列表/协议核心血条 = B4/B8 接线。
     /// </summary>
     public partial class BattleHud : MonoBehaviour
     {
-        // ==================== 可调参数（编辑器直改） ====================
+        // ==================== 可调参数（编辑器直改；位置/尺寸类随 2026-09-22 prefab 化退役进 prefab） ====================
 
-        // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；本组件运行时 AddComponent 生成，
-        // 原色值 SerializeField 从未被场景持久化调参，迁移零损失；玻璃底死字段一并移除）
+        // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；接线时活色覆盖烘焙兜底色）
         private static BattlePalette Palette => BattlePalette.Instance;
 
-        [Header("技能盘尺寸（2560×1440 基准）")]
-        [SerializeField] private float 技能按钮直径 = 220f;
-        [SerializeField] private float 爆发倍率 = 1.2f;
-        [SerializeField] private float 围绕圆心距 = 300f;
-        [SerializeField] private float 取消按钮直径 = 196f;
-
-        [Header("文字")]
+        [Header("文字（运行时动态件用）")]
         [SerializeField] private float 顶栏字号 = 34f;
-        [SerializeField] private float 按钮名字号 = 30f;
 
-        [Header("技能详情面板（2560×1440 基准）")]
-        [Tooltip("详情/关联面板高度（点锚化后须显式落高；prefab 原为 y 拉伸设计，点锚下高度=0）")]
-        [SerializeField] private float 详情面板高度 = 900f;
-        [SerializeField] private float 详情面板间距 = 40f;
-
-        [Header("顶栏（2560×1440 基准）")]
-        [SerializeField] private float 信息块距左 = 64f;
-        [SerializeField] private float 信息块距右 = 160f;   // 让位右上设置按钮（56+84）
-        [SerializeField] private float 徽标尺寸 = 86f;
+        [Header("攻速队列条（运行时重建）")]
         [SerializeField] private float 队列槽边长 = 64f;
         [SerializeField] private float 队列槽间距 = 14f;
         [SerializeField] private int 队列槽位数 = 6;
 
-        // 布局常量（设计稿 v1 定稿；结构调整改代码，参数微调走 Inspector）
-        private const float 移动按钮距左 = 64f;
-        private const float 移动按钮圆心距底 = 500f;
-        private const float 爆发圆心距右 = 300f;
-        private const float 爆发圆心距底 = 300f;
-        private const float 取消按钮距右 = 56f;
-        private const float 取消按钮距顶 = 212f;
+        // 瞄准常量（运行时计算用）
         private const int 移动最大步数 = 3;
         private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
 
@@ -85,8 +64,7 @@ namespace GIC.Battle
         // 技能详情（现有体系复用：Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab）
         private SkillDetailView _skillDetailView;
 
-        // 行动区（移动按钮的显隐走 _moveDef.rect）
-        private RectTransform _skillZone;
+        // 行动区（技能盘三键/移动/手牌/取消均为布局件——显隐走 ApplyStateVisibility，_skillZone 容器 2026-09-21 退役）
         private RectTransform _handZone;
         private RectTransform _cancelButton;
         private TextCombiner _handTextCombiner;
@@ -140,7 +118,12 @@ namespace GIC.Battle
             _onCloseBattle = onCloseBattle;
             _myPlayerId = BattleDebugPlayerIds.P1; // 本地双开：真人 P1（B7 联机换本机玩家 id）
 
-            BuildUi();
+            ResolveHudReferences(); // prefab 寻址接线（结构=BattleHud.prefab，2026-09-22 prefab 化）
+
+            // 布局系统（2026-09-21）：运行时 AddComponent 不走场景注入扫描——手动注入取 SaveManager；
+            // 建盘完成后按存档激活方案应用布局（-1/空槽=默认）
+            Wargame.Instance.Context.Inject(this);
+            ApplySavedLayoutOnStart();
 
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnSegmentPlaying += OnSegmentPlayingHandler;
@@ -181,9 +164,9 @@ namespace GIC.Battle
                 // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
-                SetTip("Battle_TipResolving");
+                if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
             }
-            else
+            else if (!_layoutEditing)
             {
                 SetTip("Battle_TipSelect");
             }
@@ -210,9 +193,8 @@ namespace GIC.Battle
             var flow = _session.Flow;
             bool selecting = flow.Phase == BattlePhase.Selecting;
             bool show = selecting && flow.SelectRemainingSeconds >= 0f;
-            if (_countdownText.gameObject.activeSelf != show)
-                _countdownText.gameObject.SetActive(show);
-            if (!show) return;
+            SetLayoutWidgetActive("countdown", show); // 编辑态强制可见由统一口处理（数字冻结展示）
+            if (!show && !_layoutEditing) return;
 
             string seconds = Mathf.CeilToInt(Mathf.Max(0f, flow.SelectRemainingSeconds)).ToString();
             if (_countdownCombiner.GetCombinedText() != seconds)
@@ -279,6 +261,7 @@ namespace GIC.Battle
 
         private void OnBoardTap(Vector2 screenPos)
         {
+            if (_layoutEditing) return; // 布局编辑期棋盘交互全静默
             if (_session == null || _session.Flow.Phase != BattlePhase.Selecting) return;
             if (_camera == null || _board == null || _board.Map == null) return;
             if (!_camera.TryGetBoardPoint(screenPos, out Vector3 world)) return;
@@ -333,10 +316,8 @@ namespace GIC.Battle
             ExitAiming();
             _selectedUnitId = unitId;
             _state = HudState.UnitSelected;
+            ApplyStateVisibility(); // 先态显隐、后数据刷新——无数据技能键的隐藏由 RefreshSkillButtons 终态定
             RefreshSkillButtons();
-            _handZone.gameObject.SetActive(false);
-            if (_moveDef != null) _moveDef.rect.gameObject.SetActive(true);
-            _skillZone.gameObject.SetActive(true);
             ShowSelectMarker(unitId);
             SetTip("Battle_TipUnitSelected");
         }
@@ -347,9 +328,7 @@ namespace GIC.Battle
             _state = HudState.Idle;
             ClosePopup();
             HideSelectMarker();
-            if (_moveDef != null) _moveDef.rect.gameObject.SetActive(false);
-            _skillZone.gameObject.SetActive(false);
-            _handZone.gameObject.SetActive(true);
+            ApplyStateVisibility();
             SetTip("Battle_TipSelect");
         }
 
@@ -362,7 +341,7 @@ namespace GIC.Battle
             ClosePopup();
             ComputeAimCells();
             ShowAimHighlights();
-            _cancelButton.gameObject.SetActive(true);
+            ApplyStateVisibility(); // Aiming 态：技能盘+移动+取消可见、手牌藏
             SetTip(def.IsMove
                 ? "Battle_TipAimMove"
                 : IsLineSkill(def) ? "Battle_TipAimDirection" : "Battle_TipAimSkill");
@@ -386,7 +365,7 @@ namespace GIC.Battle
             _aimDef = null;
             _aimCells.Clear();
             ClearHighlights();
-            _cancelButton.gameObject.SetActive(false);
+            ApplyStateVisibility();
             SetTip("Battle_TipUnitSelected");
         }
 
@@ -531,6 +510,7 @@ namespace GIC.Battle
         private void OnSkillButtonClicked(SkillButtonDef def)
         {
             if (def == null || _state != HudState.UnitSelected) return;
+            if (_layoutEditing) return; // 编辑期点击让位给拖拽/选框（拖拽板在控件之上）
             // 置灰防线收口在处理端：SkillClickForwarder=IPointerClickHandler 不受 Toggle.interactable 拦截
             //（UGUI 对同物体全部兼容 handler 执行，interactable 只拦 Selectable 自身，docs/14 §63）
             var toggle = def.view != null ? def.view.GetComponent<Toggle>() : null;
@@ -572,6 +552,7 @@ namespace GIC.Battle
 
         private void OnCancelButtonClicked()
         {
+            if (_layoutEditing) return;
             if (_state == HudState.Aiming) ExitAiming();
         }
 

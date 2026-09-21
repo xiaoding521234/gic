@@ -147,12 +147,19 @@ namespace GIC.UI
 
             yield return null; // ── 分帧：HUD 绑定/开局前让渲染喘一口气 ──
 
-            // 正式战斗 HUD（B6 提前启动，docs/18 决策六；灰盒调试面板 2026-09-18 用户拍板撤除）
+            // 正式战斗 HUD（B6 提前启动，docs/18 决策六；2026-09-22 prefab 化——结构=BattleHud.prefab 编辑器维护）
             if (_hud == null)
             {
-                var hudGo = new GameObject("BattleHud");
-                hudGo.transform.SetParent(transform, false);
-                _hud = hudGo.AddComponent<BattleHud>();
+                var hudPrefab = Resources.Load<GameObject>("Prefabs/Battle/BattleHud");
+                if (hudPrefab == null)
+                {
+                    GICLog.Error("[BattleScreen] BattleHud.prefab 未找到，HUD 不可用");
+                    DoClose();
+                    yield break;
+                }
+                var hudGo = Instantiate(hudPrefab, transform, false);
+                hudGo.name = "BattleHud";
+                _hud = hudGo.GetComponent<BattleHud>();
             }
             var cameraCtrl = GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>();
             _hud.Bind(_session, _board, cameraCtrl, Close);
@@ -297,7 +304,7 @@ namespace GIC.UI
         {
             if (isClosing) return;
             if (_exitDialog != null && _exitDialog.IsOpen) return; // 已在确认中（防御）
-            _exitDialog = BattleExitConfirmDialog.Show(transform, "确定退出战斗？当前对局将结束并回到大厅。", DoClose);
+            _exitDialog = BattleExitConfirmDialog.Show(transform, DoClose); // 文案=弹窗内部本地化键（2026-09-22 转正）
         }
 
         /// <summary>

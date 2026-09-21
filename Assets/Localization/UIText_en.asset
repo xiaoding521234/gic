@@ -957,6 +957,58 @@ MonoBehaviour:
     m_Localized: "Pick a direction tile (4-way) \u2014 cancel at top right"
     m_Metadata:
       m_Items: []
+  - m_Id: 12015
+    m_Localized: Layout
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12016
+    m_Localized: Reset Default
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12017
+    m_Localized: Save
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12018
+    m_Localized: Apply
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12019
+    m_Localized: Done
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12020
+    m_Localized: Scale
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12021
+    m_Localized: Scheme 1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12022
+    m_Localized: Scheme 2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12023
+    m_Localized: Scheme 3
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12024
+    m_Localized: Drag widgets to reposition; select one to scale below
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12025
+    m_Localized: Quit battle? The current match will end and return to the main hall.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12026
+    m_Localized: Quit Battle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12027
+    m_Localized: Keep Fighting
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

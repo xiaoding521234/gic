@@ -1322,3 +1322,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **烘焙产物与验证**：AnimHarness `bake` 模式 → 单 FBX 双 clip（body：17 TRS 轨+45 muscle 轨=59 骨骼路径 278 绑定；phys：28 物理骨 TRS）→ Tuanjie 导入 **body-bone 路径 0→58**（此前旧 FBX=0）→ AnimLookTest 场景 x=0 新实例（Animation 自动循环 body，phys 挂 layer1）。同骨冲突时 TRS 区优先于 muscle 求值（手指/扭转骨走 TRS）。
 
 **遗留**：①twist 重分配未做（armTwist=1/foreArmTwist=0.35——BA 与 Ruri 对"=1"的语义相反，idle 的 twist 值小，待目检判定是否需要）；②Root/Motion→hips 质心补偿（Ruri BodyTransform）未做——idle 用参照根位足够，locomotion clip 需补；③上游 issue #124 的前提（"binding 丢弃"）已被本轮证伪，追评/关闭待拍板。
+
+## 69. 复用十字归一映射当 8 向用——SkillHitResolver.DirectionToDelta 斜向被归一到主轴（2026-09-21 撞墙弹回方向变十字实证）
+
+**症状**：斜向移动被挡的撞墙弹回，探出/弹回方向却是十字正交方向（凯亚斜走水面，用户目检报障）。
+
+**根因**：`SkillHitResolver.DirectionToDelta` 注释明写「十字方向→格增量（斜向输入归一到主轴；投射物=十字方向其一）」——Right/UpRight/DownRight 共用返回 (1,0)、Left/UpLeft/DownLeft 共用 (-1,0)，是直线投射物技能的专用归一映射。撞墙弹回首版误复用它换算 Direction2D（8 向），斜向全被吞成主轴。
+
+**修法**：`MovementResolver.StepVector`（8 向步进权威映射，Host 移动结算同一份）转 public，View 播放同源复用——「Host 判定与播放同源」与 BattleMetrics 同哲学；弹回幅度=未归一步向量×比例（斜向朝下一格格心等比例 45%，与移动插值一步一整格口径一致）。
+
+**How to apply**：Direction2D→格增量换算按场景选映射——8 向移动/步进语义一律 `MovementResolver.StepVector`；只有直线投射物（HUD 提交前已 SnapToCardinal 十字归一）才用 `DirectionToDelta`；新增换算点先读目标函数注释语义，勿按方法名就近取用。
