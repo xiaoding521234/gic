@@ -871,6 +871,8 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - **池化锁保险丝必须下移 OnDisable**（秒关锁泄漏实证）：入池 SetActive(false) 会打断动画协程，入场动画持有的 Entering 锁随协程死亡而悬空——原 OnDestroy 四件套的 PopAll 对永不销毁的池化面板不再触发；ScreenBase.OnDisable 统一 PopAll（场景销毁路径双触发，幂等），各屏入场协程同时补 isClosing 提前跳出（纪律③落地）
 - 冒烟断言同步升级：关闭断言改"活跃子物体=0"（池实例以隐藏态留在容器下，childCount 含隐藏不再归零）；二次关闭断言必须含（isClosing 复位回归）；**秒开秒关×3 轮锁零泄漏**（快关打断入场动画的回归模式）
 
+**2026-09-21 泵时序重排（方案 B）**：开泵条件自"MainHall 就绪+60 帧"改为"Splash 就绪+30 帧"——Instantiate 摊进启动动画期，进大厅即全暖（进厅 3 秒内开面板不再吃冷开尖峰）；泵未完遇根转场挂起（SceneTransition 锁检测，Single 加载/预载激活/Additive 根切换全路径覆盖、失败路径不漏 Pop），转场毕再顺延 60 帧避开大厅入场动画头；渲染态两帧窗补 blocksRaycasts=false（CanvasGroup alpha=0 **仍拦截射线**——UGUI 陷阱，隐形面板可能吃掉 Splash 的跳过点击）；桌宠形态直载 PaimonPet 等不到 Splash=泵挂起，与旧版等 MainHall 同款安全。
+
 ---
 
 ## 38b. UIBlur 毛玻璃双层的渲染顺序陷阱（2026-09-12 实证，"画面反而更亮了"）
