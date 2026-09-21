@@ -266,9 +266,7 @@
 
 
 - [2026-09-21 00:29:53] 【AI 出图模型规则两条（安柏纸片人实证 2026-09-20~21）】①Seedream 5.0 Pro（260628）出高还原 IP 角色必被输出侧版权审查拦截（OutputImageSensitiveContentDetected，与 prompt 措辞无关，两次实证，失败不扣积分）——GI 角色素材用标准 seedream 或 frontier_sunburst，勿选 Pro。②日辉原生透明底=fal 后端须传 **is_segmentation:true**（服务端映射 background:transparent+nativeSegmentation:true）；传自定义 background:"transparent" 无效（键不出现，出白底）。透明底固有 alpha 画像=背景约 60% alpha=0、主体 129-254 桶无 255 全实像素（中心约 253），v2 即如此非缺陷；seedream 的透明底是另一路径（segmented/ 后处理抠图 URL）。**How to apply:** 后续角色素材（凯亚/芭芭拉等）原生透明底一律 is_segmentation:true；查生成用模型/底色=chats/<会话>.jsonl 任务 JSON type 字段+下载后读 PixelFormat。
-
-
-
+- [2026-09-21 01:34:10] 【面板预热泵方案 B 已落地待验收】（2026-09-21 用户「开始」拍板实施）：UIManager.PrewarmLoop 改=等 Splash 就绪+30 帧开泵（原 MainHall 就绪+60 帧）+根转场 SceneTransition 锁在途挂起/转场毕+60 帧再续+渲染态两帧窗 blocksRaycasts=false；连带 WishScreen.Awake 的 4K 立绘 Preload 提前至 Splash 期。未提交，运行时目检待用户（6 项清单已交）。**Why**: 进厅 3 秒内开面板吃 285.9ms 冷开尖峰帧（docs/14 §38）。**How to apply**: 用户报「启动动画卡顿/进厅首开异常/跳过 Splash 失灵」类症状先查本次重排（docs/17 §5b 泵行+协调板会话 K）；验收通过后随 docs 改动一并提交。另：PreloadRegistry 统一注册表候选仍**未拍板**（同轮提出，用户「先做1」只批了 docs/17 §5b 预加载地图落档，未登记 docs/11）——后续时序重排/B6 时再提请拍板。
 
 ### Reference
 - [2026-09-16 20:01:18] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Tuanjie_editor\gic\.codely-cli\webrefs\genshin-unpack\gichess\my\wg-0.2.d（2026-09-05 随 gichess 77.78GB GI 解包归档整体迁入 webrefs/genshin-unpack/，原 D:\Picture\gichess）。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 仅作战斗系统架构参考；**旧 mod 资产一律不再用（2026-09-16 用户拍板「旧 gichess mod 不要再用」：播报员/派蒙语音 wav、模型、贴图等一切提取物都不再作为 GIC 素材来源，含 TTS 音色克隆样本；2026-09-14 已拍音频/曲目不翻旧 mod，音乐素材由用户自行网找）**。需要查旧 Java 实现时按路径阅读源码。

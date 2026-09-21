@@ -264,21 +264,34 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 预热泵：等 MainHall 就绪（面板只从大厅打开）→ 逐屏空闲实例化（每 30 帧一个，
-        /// 把 Instantiate 成本摊进大厅空闲帧——冷打开 286ms 尖峰帧即用户可见的全屏闪烁，docs/14 §38）。
-        /// 预热实例 SetActive(false) 挂全屏层容器下，打开时 SetActive(true) 复用。
+        /// 预热泵（2026-09-21 方案 B 重排）：等 Splash 根场景就绪即开泵——启动动画期间就把
+        /// Instantiate 成本摊掉，进大厅时 4 面板大概率已全暖（冷打开 285.9ms 尖峰帧即用户可见的
+        /// 全屏闪烁，docs/14 §38）；泵未完部分遇根转场自动挂起，转场毕再顺延 60 帧避开大厅
+        /// 入场动画头。预热实例 SetActive(false) 挂全屏层容器下，打开时 SetActive(true) 复用。
+        /// 桌宠形态直载 PaimonPet 永远等不到 Splash → 泵天然挂起，与旧"等 MainHall"版同款安全。
         /// </summary>
         private IEnumerator PrewarmLoop()
         {
-            // 等 MainHall 根场景就绪 + 入场动画头（约 1s）后开泵
-            while (UnityEngine.SceneManagement.SceneManager.GetSceneByName("MainHall").isLoaded == false)
+            // 等 Splash 根场景就绪（Boot→Splash 必经）+ 起跑缓冲（Logo 动画与 Splash 自身预载先起稳）
+            while (UnityEngine.SceneManagement.SceneManager.GetSceneByName("SplashScreen").isLoaded == false)
                 yield return null;
-            for (int i = 0; i < 60; i++)
+            for (int i = 0; i < 30; i++)
                 yield return null;
 
             foreach (var id in Screens.All)
             {
                 if (id == null || id.Host != ScreenHostKind.Prefab) continue;
+
+                // 根转场在途则挂起（SceneTransition 锁覆盖 Single 加载/预载激活/Additive 根切换
+                // 全路径，且失败路径不漏 Pop）：用户跳过 Splash 或泵没跑完时，剩余面板不在转场帧
+                // 与大厅入场动画头（约 1s）里做同步 Instantiate——顺延到转场毕 +60 帧的大厅空闲帧
+                if (InputLocks.HasLock(InputLockReason.SceneTransition))
+                {
+                    while (InputLocks.HasLock(InputLockReason.SceneTransition))
+                        yield return null;
+                    for (int i = 0; i < 60; i++)
+                        yield return null; // 入场动画头
+                }
 
                 var prefab = Resources.Load<GameObject>(id.PrefabPath);
                 if (prefab == null)
@@ -292,20 +305,24 @@ namespace GIC.UI
                 go.name = id.Name;
 
                 // 渲染态预热（池化冒烟实证：只暖物体不暖渲染，首开仍有 ~157ms 尖峰帧）：
-                // alpha=0 激活两帧走完整渲染管线（Canvas 重建/TMP 网格与字形图集/贴图上传），
-                // 成本摊进大厅空闲帧。本实例 OnEnable 仅发生在 Instantiate 同步瞬间（已被上方
-                // 守卫跳过）；两帧窗口不持守卫——用户 Open 的面板须照常注册（守卫横跨窗口会把
-                // 撞期的用户面板连带跳过注册=打开后不入栈，2026-09-13 冒烟实证，见字段注释）
+                // alpha=0 激活两帧走完整渲染管线（Canvas 重建/TMP 网格与字形图集/贴图上传）。
+                // 本实例 OnEnable 仅发生在 Instantiate 同步瞬间（已被上方守卫跳过）；两帧窗口
+                // 不持守卫——用户 Open 的面板须照常注册（守卫横跨窗口会把撞期的用户面板连带
+                // 跳过注册=打开后不入栈，2026-09-13 冒烟实证，见字段注释）。
+                // blocksRaycasts=false：两帧窗口内隐形面板不得吃掉 Splash 的跳过点击
                 bool hadCg = go.TryGetComponent<CanvasGroup>(out var cg);
                 float origAlpha = hadCg ? cg.alpha : 1f;
+                bool origBlocks = hadCg ? cg.blocksRaycasts : true;
                 if (!hadCg) cg = go.AddComponent<CanvasGroup>();
                 cg.alpha = 0f;
+                cg.blocksRaycasts = false;
                 go.SetActive(true);
                 _prewarming = false; // 首个 yield 前清——原子窗口结束
                 yield return null;
                 yield return null;
                 go.SetActive(false);
                 cg.alpha = origAlpha;
+                cg.blocksRaycasts = origBlocks;
                 if (!hadCg) Destroy(cg);
 
                 _panelPool[id.Name] = go;
