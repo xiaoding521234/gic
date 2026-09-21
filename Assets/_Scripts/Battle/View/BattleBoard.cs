@@ -55,8 +55,7 @@ namespace GIC.Battle
                     var tile = Instantiate(prefab, _tilesRoot);
                     tile.name = $"Tile_{x}_{y}";
                     tile.transform.localPosition = TileBottomPosition(x, y);
-                    // 随机 90° 旋转打散贴图重复感（顶面无缝纹理，旋转不破 UV）
-                    tile.transform.localRotation = Quaternion.Euler(0f, 90f * UnityEngine.Random.Range(0, 4), 0f);
+                    // 朝向默认统一（2026-09-21 用户拍板：随机 90° 旋转观感乱，全盘同向）
                 }
             }
         }
