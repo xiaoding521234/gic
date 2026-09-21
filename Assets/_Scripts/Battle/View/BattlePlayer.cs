@@ -374,14 +374,15 @@ namespace GIC.Battle
 
         /// <summary>
         /// 被挡撞墙弹回（2026-09-21）：向被挡方向探出后弹回原位——纯表现层反馈，逻辑位置不变。
-        /// 探出缓出挤向被挡格、弹回快出缓停，时长跟随步进节奏（0.18s/格）
+        /// 探出缓出挤向被挡格、弹回快出缓停，时长跟随步进节奏（0.18s/格）；
+        /// 方向换算用 MovementResolver.StepVector（8 向与 Host 步进同源，斜向=朝下一格格心等比例 45%）
         /// </summary>
         private IEnumerator PlayBlockedBumpCoroutine(UnitView view, BattleCell homeCell, int blockedDirection, float stepSeconds)
         {
-            var delta = SkillHitResolver.DirectionToDelta((Direction2D)blockedDirection);
-            var dir = new Vector3(delta.x, 0f, delta.y);
+            // 勿用 SkillHitResolver.DirectionToDelta——十字归一映射会把斜向弹回归一到主轴（首版教训）
+            var step = MovementResolver.StepVector((Direction2D)blockedDirection);
+            var dir = new Vector3(step.x, 0f, step.y);
             if (dir.sqrMagnitude < 0.001f) yield break;
-            dir.Normalize();
 
             Vector3 home = _board.CellToWorld(homeCell);
             Vector3 peak = home + dir * 被挡撞墙探出幅度;

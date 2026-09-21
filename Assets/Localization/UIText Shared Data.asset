@@ -939,6 +939,58 @@ MonoBehaviour:
     m_Key: Battle_TipAimDirection
     m_Metadata:
       m_Items: []
+  - m_Id: 12015
+    m_Key: Battle_LayoutEdit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12016
+    m_Key: Battle_LayoutReset
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12017
+    m_Key: Battle_LayoutSave
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12018
+    m_Key: Battle_LayoutApply
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12019
+    m_Key: Battle_LayoutDone
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12020
+    m_Key: Battle_LayoutScale
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12021
+    m_Key: Battle_LayoutSlot1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12022
+    m_Key: Battle_LayoutSlot2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12023
+    m_Key: Battle_LayoutSlot3
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12024
+    m_Key: Battle_LayoutHint
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12025
+    m_Key: Battle_ExitConfirmMsg
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12026
+    m_Key: Battle_ExitConfirm
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12027
+    m_Key: Battle_ExitContinue
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

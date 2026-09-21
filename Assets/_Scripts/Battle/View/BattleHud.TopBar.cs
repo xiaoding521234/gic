@@ -5,14 +5,16 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Localization;
+using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
 
 namespace GIC.Battle
 {
     /// <summary>
-    /// BattleHud 顶栏分件：回合中枢（回合数+阶段徽章）/选择倒计时/战斗时钟/攻速队列条/双方信息块的
-    /// 字段、构建与刷新（2026-09-18 B 案 partial 拆分，纯搬运零逻辑变化）。
+    /// BattleHud 顶栏分件（2026-09-22 prefab 化：构建退役为寻址接线；结构改在 prefab 编辑器里做）：
+    /// 回合中枢/选择倒计时/战斗时钟/攻速队列条/双方信息块/设置钮 的引用解析 + 运行时刷新
+    /// （刷新逻辑纯搬运零变化）。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
     /// </summary>
     public partial class BattleHud
     {
@@ -48,131 +50,91 @@ namespace GIC.Battle
             public TextCombiner mora;
         }
 
-        private void BuildTopBar()
+        private void ResolveTopBar()
         {
-            var bar = MakeRect("TopBar", _canvas.transform);
-            bar.anchorMin = bar.anchorMax = new Vector2(0.5f, 1f);
-            bar.pivot = new Vector2(0.5f, 1f);
-            bar.anchoredPosition = Vector2.zero;
-            bar.sizeDelta = new Vector2(2200f, 260f);
-
             // 回合中枢（顶部中央）：回合数 + 阶段徽章
-            _turnPhaseText = MakeText("TurnPhaseText", bar, 顶栏字号, Palette.文字米白);
-            SetRect(_turnPhaseText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -14f), new Vector2(1100f, 56f));
-            _turnPhaseCombiner = AttachCombiner(_turnPhaseText);
+            _turnPhaseText = FindSlotText("turn", "TurnPhaseText");
+            _turnPhaseCombiner = FindSlotCombiner("turn", "TurnPhaseText");
+            RecolorText(_turnPhaseCombiner, Palette.文字米白);
 
             // 选择倒计时（选择阶段常显；数字条目）
-            _countdownText = MakeText("CountdownText", bar, 顶栏字号 * 0.6f, Palette.暖金);
-            SetRect(_countdownText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -76f), new Vector2(300f, 44f));
-            _countdownCombiner = AttachCombiner(_countdownText);
-            _countdownText.gameObject.SetActive(false);
+            _countdownText = FindSlotText("countdown", "CountdownText");
+            _countdownCombiner = FindSlotCombiner("countdown", "CountdownText");
+            RecolorText(_countdownCombiner, Palette.暖金);
 
             // 战斗时钟（独立时钟 6:00 起 +20/回合）
-            _clockText = MakeText("ClockText", bar, 顶栏字号 * 0.55f, Palette.文字米白);
-            SetRect(_clockText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -126f), new Vector2(300f, 40f));
-            _clockCombiner = AttachCombiner(_clockText);
+            _clockText = FindSlotText("clock", "ClockText");
+            _clockCombiner = FindSlotCombiner("clock", "ClockText");
+            RecolorText(_clockCombiner, Palette.文字米白);
 
-            // 攻速队列条（顶栏下缘）：label + 槽位
-            _queueBar = MakeRect("QueueBar", bar);
-            _queueBar.anchorMin = _queueBar.anchorMax = new Vector2(0.5f, 1f);
-            _queueBar.pivot = new Vector2(0.5f, 1f);
-            _queueBar.anchoredPosition = new Vector2(0f, -170f);
-            _queueBar.sizeDelta = new Vector2(800f, 84f);
-
-            _queueLabelText = MakeText("QueueLabel", _queueBar, 顶栏字号 * 0.45f, Palette.暖金);
-            SetRect(_queueLabelText.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                Vector2.zero, new Vector2(150f, 44f));
-            _queueLabelText.alignment = TextAlignmentOptions.Left;
-            _queueLabelCombiner = AttachCombiner(_queueLabelText);
+            // 攻速队列条：槽内容=QueueBar 容器，内含 QueueLabel
+            if (_layoutByKey.TryGetValue("queue", out var queue))
+            {
+                _queueBar = queue.content;
+                _queueLabelText = _queueBar.Find("QueueLabel")?.GetComponent<TMP_Text>();
+                _queueLabelCombiner = _queueLabelText != null ? _queueLabelText.GetComponent<TextCombiner>() : null;
+                RecolorText(_queueLabelCombiner, Palette.暖金);
+            }
+            else GICLog.Warn("[BattleHud] 布局槽缺失：queue");
 
             // 双方信息块（左右镜像；协议核心血条 B8 接入）
-            _myBlock = BuildPlayerBlock("MyInfoBlock", left: true, Palette.我方主色);
-            _enemyBlock = BuildPlayerBlock("EnemyInfoBlock", left: false, Palette.敌方主色);
+            _myBlock = ResolvePlayerBlock("myinfo", Palette.我方主色);
+            _enemyBlock = ResolvePlayerBlock("enemyinfo", Palette.敌方主色);
 
-            // 设置/退出（右上角，走 BattleExitConfirmDialog 确认；图标=项目现成 settings_button）
-            var settings = MakeIconButton("SettingsButton", bar, "UI/Buttons/settings_button",
-                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-56f, -56f), new Vector2(84f, 84f));
-            settings.onClick.AddListener(() => _onCloseBattle?.Invoke());
+            // 设置/退出（走 BattleExitConfirmDialog 确认；布局编辑期点击让位——入口钮接管编辑开关）
+            if (_layoutByKey.TryGetValue("settings", out var settings))
+            {
+                var button = settings.content.GetComponent<Button>();
+                if (button != null)
+                    button.onClick.AddListener(() => { if (!_layoutEditing) _onCloseBattle?.Invoke(); });
+            }
+            else GICLog.Warn("[BattleHud] 布局槽缺失：settings");
         }
 
-        /// <summary>玩家信息块：势力徽标（地图势力，ElementFactionConfig 现成链）+ 队营色 accent + 体力/摩拉 chip（现成物品图标）</summary>
-        private PlayerBlock BuildPlayerBlock(string name, bool left, Color accent)
+        private TMP_Text FindSlotText(string key, string contentName)
         {
-            var root = MakeRect(name, _canvas.transform);
-            root.anchorMin = root.anchorMax = left ? new Vector2(0f, 1f) : new Vector2(1f, 1f);
-            root.pivot = left ? new Vector2(0f, 1f) : new Vector2(1f, 1f);
-            root.anchoredPosition = left ? new Vector2(信息块距左, -26f) : new Vector2(-信息块距右, -26f);
-            root.sizeDelta = new Vector2(430f, 100f);
+            return _layoutByKey.TryGetValue(key, out var def)
+                ? def.content.Find(contentName)?.GetComponent<TMP_Text>()
+                : null;
+        }
 
-            float dir = left ? 1f : -1f; // 镜像：右侧块向左排布
-            Vector2 EdgeAnchor(float along) => left
-                ? new Vector2(along, 0.5f)
-                : new Vector2(1f - along, 0.5f);
+        private TextCombiner FindSlotCombiner(string key, string contentName)
+        {
+            return _layoutByKey.TryGetValue(key, out var def)
+                ? def.content.Find(contentName)?.GetComponent<TextCombiner>()
+                : null;
+        }
+
+        /// <summary>玩家信息块解析：势力徽标（地图势力，ElementFactionConfig 现成链）+ 队营色 accent + 体力/摩拉 chip 数字</summary>
+        private PlayerBlock ResolvePlayerBlock(string key, Color accent)
+        {
+            var block = new PlayerBlock();
+            if (!_layoutByKey.TryGetValue(key, out var def))
+            {
+                GICLog.Warn($"[BattleHud] 布局槽缺失：{key}");
+                return block;
+            }
+            var root = def.content;
 
             // 徽标（地图所属势力；正式化后按玩家势力）
-            var emblemGo = new GameObject("Emblem");
-            var emblemRect = emblemGo.AddComponent<RectTransform>();
-            emblemRect.SetParent(root, false);
-            emblemRect.anchorMin = emblemRect.anchorMax = EdgeAnchor(0f);
-            emblemRect.pivot = new Vector2(left ? 0f : 1f, 0.5f);
-            emblemRect.anchoredPosition = Vector2.zero;
-            emblemRect.sizeDelta = new Vector2(徽标尺寸, 徽标尺寸);
-            var emblem = emblemGo.AddComponent<Image>();
-            emblem.sprite = ElementFactionConfig.Instance != null
-                ? ElementFactionConfig.Instance.GetFactionIcon((FactionType)(_session.Sim.Map.faction))
-                : null;
-            emblem.preserveAspect = true;
+            var emblem = root.Find("Emblem")?.GetComponent<Image>();
+            if (emblem != null)
+            {
+                emblem.sprite = _session != null && _session.Sim != null && _session.Sim.Map != null
+                    && ElementFactionConfig.Instance != null
+                    ? ElementFactionConfig.Instance.GetFactionIcon((FactionType)(_session.Sim.Map.faction))
+                    : null;
+            }
 
-            // 队营色 accent 下划线
-            var accentGo = new GameObject("Accent");
-            var accentRect = accentGo.AddComponent<RectTransform>();
-            accentRect.SetParent(root, false);
-            accentRect.anchorMin = accentRect.anchorMax = EdgeAnchor(0f);
-            accentRect.pivot = new Vector2(left ? 0f : 1f, 0.5f);
-            accentRect.anchoredPosition = new Vector2(0f, -徽标尺寸 * 0.5f - 5f);
-            accentRect.sizeDelta = new Vector2(徽标尺寸, 6f);
-            var accentImage = accentGo.AddComponent<Image>();
-            accentImage.color = accent;
+            // 队营色 accent 下划线（Palette 活色）
+            var accentImage = root.Find("Accent")?.GetComponent<Image>();
+            if (accentImage != null) accentImage.color = accent;
 
-            // 体力/摩拉 chip（图标=ItemConfig 同源现成图）
-            var block = new PlayerBlock();
-            block.stamina = BuildChip(root, "StaminaChip", "UI/Items/stamina", EdgeAnchor, dir, 108f);
-            block.mora = BuildChip(root, "MoraChip", "UI/Items/mora", EdgeAnchor, dir, 224f);
+            block.stamina = root.Find("StaminaChipNum")?.GetComponent<TextCombiner>();
+            block.mora = root.Find("MoraChipNum")?.GetComponent<TextCombiner>();
+            RecolorText(block.stamina, Palette.文字米白);
+            RecolorText(block.mora, Palette.文字米白);
             return block;
-        }
-
-        /// <summary>资源 chip：图标 + 数字（TextCombiner 静态条目）；along = 距块内侧缘的偏移</summary>
-        private TextCombiner BuildChip(RectTransform root, string name, string iconPath,
-            Func<float, Vector2> edgeAnchor, float dir, float along)
-        {
-            bool left = dir > 0f;
-            var iconGo = new GameObject(name + "Icon");
-            var iconRect = iconGo.AddComponent<RectTransform>();
-            iconRect.SetParent(root, false);
-            iconRect.anchorMin = iconRect.anchorMax = edgeAnchor(0f);
-            iconRect.pivot = new Vector2(left ? 0f : 1f, 0.5f);
-            iconRect.anchoredPosition = new Vector2(dir * along, 6f);
-            iconRect.sizeDelta = new Vector2(36f, 36f);
-            var icon = iconGo.AddComponent<Image>();
-            icon.sprite = Resources.Load<Sprite>(iconPath);
-            icon.preserveAspect = true;
-
-            var numGo = new GameObject(name + "Num");
-            var numRect = numGo.AddComponent<RectTransform>();
-            numRect.SetParent(root, false);
-            numRect.anchorMin = numRect.anchorMax = edgeAnchor(0f);
-            numRect.pivot = new Vector2(left ? 0f : 1f, 0.5f);
-            numRect.anchoredPosition = new Vector2(dir * (along + 44f), 2f);
-            numRect.sizeDelta = new Vector2(72f, 44f);
-            var numText = numGo.AddComponent<TextMeshProUGUI>();
-            numText.fontSize = 顶栏字号 * 0.55f;
-            numText.color = Palette.文字米白;
-            numText.alignment = left ? TextAlignmentOptions.Left : TextAlignmentOptions.Right;
-            numText.raycastTarget = false;
-            return AttachCombiner(numText);
         }
 
         private void UpdatePlayerBlock(PlayerBlock block, BattleSnapshot snapshot, string playerId)

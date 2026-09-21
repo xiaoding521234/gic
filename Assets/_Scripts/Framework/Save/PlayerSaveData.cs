@@ -156,6 +156,17 @@ namespace GIC.Framework
             settings ??= new SaveSettings();
             pet ??= new SavePetSettings();
             settings.keyBindings ??= new List<KeyBindingEntry>();
+            // HUD 布局方案（2026-09-21 新增分区数据）：null 列表/条目剔除 + 激活索引夹取
+            settings.hudLayoutPresets ??= new List<HudLayoutPreset>();
+            settings.hudLayoutPresets.RemoveAll(p => p == null);
+            foreach (var preset in settings.hudLayoutPresets)
+            {
+                preset.name ??= "";
+                preset.entries ??= new List<HudLayoutEntry>();
+                preset.entries.RemoveAll(e => e == null);
+            }
+            if (settings.activeHudLayout < -1 || settings.activeHudLayout > 2)
+                settings.activeHudLayout = -1;
             pet.petApiKeyCipher ??= "";
             // 单槽→分槽迁移（2026-09-13）：老档 key 搬进当时供应商的槽位，切供应商各家 key 各自保留。
             // 幂等：分槽该槽已非空（搬过/玩家已设）则不动；旧单槽字段此后再无写入方。
@@ -332,6 +343,12 @@ namespace GIC.Framework
 
         // ========== 按键绑定 ==========
         public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();
+
+        // ========== 战斗 HUD 布局（2026-09-21 自定义布局系统；纯新增字段不升版，skill checklist ④） ==========
+        /// <summary>布局方案槽（下标 0..2=方案一..三；条目缺省=空槽，UI 显示仍三槽固定）</summary>
+        public List<HudLayoutPreset> hudLayoutPresets = new List<HudLayoutPreset>();
+        /// <summary>当前激活方案（-1=默认布局；0..2=方案一..三；保存/应用时写入）</summary>
+        public int activeHudLayout = -1;
     }
 
     /// <summary>
@@ -470,6 +487,30 @@ namespace GIC.Framework
                 inDecks = this.inDecks != null ? new List<int>(this.inDecks) : null,
             };
         }
+    }
+
+    /// <summary>
+    /// 战斗 HUD 布局方案（王者荣耀式自定义布局，2026-09-21；槽位 0..2=方案一..三，SaveSettings.hudLayoutPresets 承载）
+    /// </summary>
+    [Serializable]
+    public class HudLayoutPreset
+    {
+        public string name = "";
+        /// <summary>各控件条目（缺 key=该件保持默认）</summary>
+        public List<HudLayoutEntry> entries = new List<HudLayoutEntry>();
+    }
+
+    /// <summary>
+    /// 单件布局条目：key=布局注册键（burst/skill/enso/move/cancel/settings/turn/countdown/clock/queue/myinfo/enemyinfo/hand/tip），
+    /// u/v=画布归一锚点（0..1）、scale=统一缩放（0.6..1.6）——归一锚点跨视口比例不漂（比例锚点方案，docs/17 §7）
+    /// </summary>
+    [Serializable]
+    public class HudLayoutEntry
+    {
+        public string key = "";
+        public float u = 0.5f;
+        public float v = 0.5f;
+        public float scale = 1f;
     }
 
 
