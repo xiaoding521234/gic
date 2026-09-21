@@ -27,6 +27,9 @@ namespace GIC.Battle
         [Tooltip("播放速率倍率（1=按公式实时；压缩片间等待用）")]
         [SerializeField] private float _playbackSpeed = 1f;
 
+        [Tooltip("被挡撞墙探出幅度（格距比例；移动被挡=向被挡方向探出再弹回，逻辑位置不变，2026-09-21）")]
+        [SerializeField, Range(0.05f, 0.9f)] private float 被挡撞墙探出幅度 = 0.45f;
+
         [Header("立牌视觉")]
         [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
         [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
@@ -63,6 +66,8 @@ namespace GIC.Battle
         private const float MoveStepSeconds = BattleMetrics.MoveStepSeconds;
         private const float CommandStaggerSeconds = 0.12f;
         private const float TurnEndDelaySeconds = 0.25f; // 回合结束段固定节拍（不按攻速排程）
+        private const float BlockedBumpOutSecondsFactor = 0.75f;  // 撞墙探出时长 = 步进节奏 × 0.75（缓出）
+        private const float BlockedBumpBackSecondsFactor = 0.55f; // 撞墙弹回时长 = 步进节奏 × 0.55（快出缓停）
 
         public void Bind(IBattleTransport transport, BattleMapData map)
         {
@@ -285,7 +290,7 @@ namespace GIC.Battle
                         if (_views.TryGetValue(command.actorUnitId, out var mover))
                         {
                             mover.Cell = command.path.Count > 0 ? command.path[command.path.Count - 1] : mover.Cell;
-                            playbacks.Add(StartCoroutine(PlayMoveCoroutine(mover, command.path)));
+                            playbacks.Add(StartCoroutine(PlayMoveCoroutine(mover, command)));
                         }
                         break;
 
@@ -348,8 +353,9 @@ namespace GIC.Battle
             });
         }
 
-        private IEnumerator PlayMoveCoroutine(UnitView view, List<BattleCell> path)
+        private IEnumerator PlayMoveCoroutine(UnitView view, BattleCommand command)
         {
+            var path = command.path;
             float stepSeconds = MoveStepSeconds / _playbackSpeed;
             for (int i = 1; i < path.Count; i++)
             {
@@ -359,6 +365,32 @@ namespace GIC.Battle
             }
             if (path.Count > 0)
                 view.ApplyPosition(_board.CellToWorld(path[path.Count - 1]));
+
+            // 被挡撞墙弹回：Host 已停在被挡格前（全挡=原格 / 部分挡=被挡格前一格），表现层探出再弹回
+            if (command.metadata == BattleCommand.MoveBlocked)
+                yield return PlayBlockedBumpCoroutine(view, path.Count > 0 ? path[path.Count - 1] : view.Cell,
+                    command.direction, stepSeconds);
+        }
+
+        /// <summary>
+        /// 被挡撞墙弹回（2026-09-21）：向被挡方向探出后弹回原位——纯表现层反馈，逻辑位置不变。
+        /// 探出缓出挤向被挡格、弹回快出缓停，时长跟随步进节奏（0.18s/格）
+        /// </summary>
+        private IEnumerator PlayBlockedBumpCoroutine(UnitView view, BattleCell homeCell, int blockedDirection, float stepSeconds)
+        {
+            var delta = SkillHitResolver.DirectionToDelta((Direction2D)blockedDirection);
+            var dir = new Vector3(delta.x, 0f, delta.y);
+            if (dir.sqrMagnitude < 0.001f) yield break;
+            dir.Normalize();
+
+            Vector3 home = _board.CellToWorld(homeCell);
+            Vector3 peak = home + dir * 被挡撞墙探出幅度;
+            // 探出：缓出减速（挤向被挡格的"尝试"感）
+            yield return BattleViewTween.Over(stepSeconds * BlockedBumpOutSecondsFactor, t =>
+                view.ApplyPosition(Vector3.Lerp(home, peak, 1f - (1f - t) * (1f - t))));
+            // 弹回：快速离开、临原位缓停（末帧保证 t=1 精确归位）
+            yield return BattleViewTween.Over(stepSeconds * BlockedBumpBackSecondsFactor, t =>
+                view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t))));
         }
 
         private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal)

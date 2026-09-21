@@ -211,7 +211,8 @@
 
 - [2026-09-19 01:57:27] [project] UnityInsight 索引系统档案（活锁 bug 已提交 Bug Hunter，证据包=.codely\有效bug活动\已提交\index-build-failure）：架构=CLI 侧 node 守护进程（unity-insight-cli.js serve --daemon）持有全部索引，**被动模式**——杀掉不自动重生、重生后须 Cowork GUI 发构建指令（编辑器 AI/ 菜单只有 Check Connections/Force Reload）；数据目录=<项目>\.codely-cli\UnityInsight\（构建中=index.db.tmp+WAL，ready 后写 index.current 指针）。活锁特征：first_build 磁盘写入 ~6 分钟后冻结、进程 4~5 核满负荷+RSS 狂涨至 7.5GB+零 I/O、index_building=true 永不翻转、GUI 无进度无报错；~\.codely-cli\crash-logs\exit-*.json（uptime<1s）=单实例锁握手记录属常态勿误判崩溃。处置=Stop-Process 杀 daemon+清 tmp 三件套。
 
-- [2026-09-20 20:13:55] [project] Bug Hunter 证据包与提交状态（快照；**权威状态板=.codely\有效bug活动\00-新会话交接总览.md，新会话先读它，本条只当指针**）：2026-09-20 20:15 快照——本周（一9/14~日9/20）累计提交 **11 件**（9/14 七件 + 9/20 四件），名义 33,000 超 2 万周上限、超出部分结算以周二公布为准；**不正确\ 撤案 2 件**：core日志跨日不滚动（翻案=core 按 UTC 日滚动，本地 08:00 切文件，教训=判日志机制先看行内时间戳时区+找边界对）+ 增值包速率上限口径未写明（用户判定不交）。**已立包待交 3 件（9/20 晚）**：popup-pipe-chars（OS 通知弹窗内容渲染为竖线串"|||..."，日志侧内容正常、7 次发送时刻与报障吻合，差弹窗截图）+ image-link-cdn-not-local（AI 生成图给 CDN 链接不给本地 file:/// 链接，体验缺陷，无需截图可交）+ credit-false-insufficient（同批并行两张生成一过一拒，报"需 165 积分"但用户实测 5h 剩~7000/周剩~2 万；积分拒绝日志零留痕，差余额页截图）。周二（9/22）结算后提醒用户查邮箱、兑换码一周内核销。活动规则与四件套流程=全局 skill codely-bughunter。
+- [2026-09-21 22:47:14] [project] Bug Hunter 证据包与提交状态（快照；**权威状态板=.codely\有效bug活动\00-新会话交接总览.md，新会话先读它，本条只当指针**）：2026-09-20 20:15 快照——上周（一9/14~日9/20）累计提交 **11 件**（9/14 七件 + 9/20 四件），名义 33,000 超 2 万周上限；**不正确\ 撤案 2 件**：core日志跨日不滚动（翻案=core 按 UTC 日滚动，本地 08:00 切文件，教训=判日志机制先看行内时间戳时区+找边界对）+ 增值包速率上限口径未写明（用户判定不交）。**已立包待交 3 件（9/20 晚）**：popup-pipe-chars（OS 通知弹窗内容渲染为竖线串"|||..."，日志侧内容正常、7 次发送时刻与报障吻合，差弹窗截图）+ image-link-cdn-not-local（AI 生成图给 CDN 链接不给本地 file:/// 链接，体验缺陷，无需截图可交）+ credit-false-insufficient（同批并行两张生成一过一拒，报"需 165 积分"但用户实测 5h 剩~7000/周剩~2 万；积分拒绝日志零留痕，差余额页截图）——3 件下场以权威状态板为准。**结算积分已到账（2026-09-21 用户确认，早于周二公布时点）——本轮结算闭环，无需再提醒查邮箱/核销**。活动规则与四件套流程=全局 skill codely-bughunter。
+
 
 
 
@@ -266,7 +267,9 @@
 
 
 - [2026-09-21 00:29:53] 【AI 出图模型规则两条（安柏纸片人实证 2026-09-20~21）】①Seedream 5.0 Pro（260628）出高还原 IP 角色必被输出侧版权审查拦截（OutputImageSensitiveContentDetected，与 prompt 措辞无关，两次实证，失败不扣积分）——GI 角色素材用标准 seedream 或 frontier_sunburst，勿选 Pro。②日辉原生透明底=fal 后端须传 **is_segmentation:true**（服务端映射 background:transparent+nativeSegmentation:true）；传自定义 background:"transparent" 无效（键不出现，出白底）。透明底固有 alpha 画像=背景约 60% alpha=0、主体 129-254 桶无 255 全实像素（中心约 253），v2 即如此非缺陷；seedream 的透明底是另一路径（segmented/ 后处理抠图 URL）。**How to apply:** 后续角色素材（凯亚/芭芭拉等）原生透明底一律 is_segmentation:true；查生成用模型/底色=chats/<会话>.jsonl 任务 JSON type 字段+下载后读 PixelFormat。
-- [2026-09-21 01:34:10] 【面板预热泵方案 B 已落地待验收】（2026-09-21 用户「开始」拍板实施）：UIManager.PrewarmLoop 改=等 Splash 就绪+30 帧开泵（原 MainHall 就绪+60 帧）+根转场 SceneTransition 锁在途挂起/转场毕+60 帧再续+渲染态两帧窗 blocksRaycasts=false；连带 WishScreen.Awake 的 4K 立绘 Preload 提前至 Splash 期。未提交，运行时目检待用户（6 项清单已交）。**Why**: 进厅 3 秒内开面板吃 285.9ms 冷开尖峰帧（docs/14 §38）。**How to apply**: 用户报「启动动画卡顿/进厅首开异常/跳过 Splash 失灵」类症状先查本次重排（docs/17 §5b 泵行+协调板会话 K）；验收通过后随 docs 改动一并提交。另：PreloadRegistry 统一注册表候选仍**未拍板**（同轮提出，用户「先做1」只批了 docs/17 §5b 预加载地图落档，未登记 docs/11）——后续时序重排/B6 时再提请拍板。
+- [2026-09-21 22:46:48] 【面板预热泵方案 B 已提交推送 7902e0f，用户验证通过】（2026-09-21 收官）：UIManager.PrewarmLoop 改=等 Splash 就绪+30 帧开泵（原 MainHall 就绪+60 帧）+根转场 SceneTransition 锁在途挂起/转场毕+60 帧再续+渲染态两帧窗 blocksRaycasts=false；连带 WishScreen.Awake 的 4K 立绘 Preload 提前至 Splash 期。**Why**: 进厅 3 秒内开面板吃 285.9ms 冷开尖峰帧（docs/14 §38）。**How to apply**: 用户报「启动动画卡顿/进厅首开异常/跳过 Splash 失灵」类症状先查本次重排（docs/17 §5b 泵行+协调板会话 K）。另：PreloadRegistry 统一注册表候选仍**未拍板**（同轮提出，用户「先做1」只批了 docs/17 §5b 预加载地图落档，未登记 docs/11）——后续时序重排/B6 时再提请拍板。
+
+
 
 ### Reference
 - [2026-09-16 20:01:18] MC mod gichess（旧项目，Java/NeoForge）：源码 D:\Game\mod\wg-template-1.21.4\src\main\java\com\wg\gichess\（308文件），jar D:\Tuanjie_editor\gic\.codely-cli\webrefs\genshin-unpack\gichess\my\wg-0.2.d（2026-09-05 随 gichess 77.78GB GI 解包归档整体迁入 webrefs/genshin-unpack/，原 D:\Picture\gichess）。~20+角色，7元素18反应，蒙德延奏/纳塔夜魂已实现。**Why:** GIC 战斗系统 Unity 移植的架构参考。**How to apply:** 仅作战斗系统架构参考；**旧 mod 资产一律不再用（2026-09-16 用户拍板「旧 gichess mod 不要再用」：播报员/派蒙语音 wav、模型、贴图等一切提取物都不再作为 GIC 素材来源，含 TTS 音色克隆样本；2026-09-14 已拍音频/曲目不翻旧 mod，音乐素材由用户自行网找）**。需要查旧 Java 实现时按路径阅读源码。

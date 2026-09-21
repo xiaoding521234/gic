@@ -90,7 +90,13 @@ namespace GIC.Data
         [Header("特效子类型（Effect 命令 metadata；随用随加）")]
         public const int EffectKindProjectileVanish = 1;
 
-        public static BattleCommand Move(string unitId, int sliceIndex, int indexInSlice, List<BattleCell> path)
+        [Header("移动载荷（Move 命令 metadata；2026-09-21）")]
+        /// <summary>被挡标记：移动尝试进入 direction 方向的下一格失败（逻辑已停在被挡格前），
+        /// 客户端播"撞墙弹回"表现——探出后弹回，逻辑位置不变</summary>
+        public const int MoveBlocked = 1;
+
+        public static BattleCommand Move(string unitId, int sliceIndex, int indexInSlice, List<BattleCell> path,
+            int blocked = 0, int blockedDirection = 0)
         {
             return new BattleCommand
             {
@@ -100,6 +106,8 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 path = path,
                 cell = path.Count > 0 ? path[path.Count - 1] : BattleCell.zero,
+                metadata = blocked,
+                direction = blockedDirection,
             };
         }
 

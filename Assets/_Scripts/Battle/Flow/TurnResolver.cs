@@ -146,12 +146,14 @@ namespace GIC.Battle
             var newlyDead = _sim.ResolveDeaths(damagedUnits);
             deadTargets.AddRange(newlyDead);
 
-            // 产出片命令块（枚举序）
+            // 产出片命令块（枚举序）；被挡也发命令（全挡 path=[原格] / 部分挡 path=已走段），
+            // 携带 MoveBlocked 标记+方向供客户端播"撞墙弹回"表现
             int indexInSlice = 0;
             foreach (var mover in movers)
             {
-                if (mover.Path.Count > 1)
-                    segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path)));
+                if (mover.Path.Count > 1 || mover.Blocked)
+                    segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path),
+                        mover.Blocked ? BattleCommand.MoveBlocked : 0, mover.Blocked ? (int)mover.Direction : 0));
             }
             foreach (var effect in MergeDamageEffects(effects))
             {
@@ -300,8 +302,9 @@ namespace GIC.Battle
             };
 
             int indexInSlice = 0;
-            if (moverList.Count > 0 && moverList[0].Path.Count > 1)
-                segment.commands.Add(BattleCommand.Move(moverList[0].UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(moverList[0].Path)));
+            if (moverList.Count > 0 && (moverList[0].Path.Count > 1 || moverList[0].Blocked))
+                segment.commands.Add(BattleCommand.Move(moverList[0].UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(moverList[0].Path),
+                    moverList[0].Blocked ? BattleCommand.MoveBlocked : 0, moverList[0].Blocked ? (int)moverList[0].Direction : 0));
             foreach (var effect in MergeDamageEffects(effects))
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
                     Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f)));
