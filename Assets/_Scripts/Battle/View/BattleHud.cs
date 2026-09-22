@@ -98,6 +98,19 @@ namespace GIC.Battle
         // 状态机（AimMode 枚举已并表——瞄准语义由 _aimDef.type 承载，2026-09-18 A 案）
         private enum HudState { Idle, UnitSelected, Aiming }
         private HudState _state = HudState.Idle;
+
+        // ==================== 手牌（B6c：初始=玩家当前卡组投影；点卡→部署瞄准→点格出战） ====================
+
+        /// <summary>部署瞄准中的角色（UnitName 枚举值；0=非部署瞄准态）</summary>
+        private int _deployAimUnit;
+
+        /// <summary>手牌卡按钮容器（hand 布局件内动态构建；RebuildHandCards 重建）</summary>
+        private RectTransform _handCardRoot;
+        private readonly List<UnityEngine.UI.Button> _handCardButtons = new List<UnityEngine.UI.Button>();
+
+        /// <summary>手牌卡 prefab（项目唯一卡牌形态 Card.prefab=Resources/Prefabs/Backpack/；懒加载）</summary>
+        private GameObject _handCardPrefab;
+
         private string _selectedUnitId;
         private SkillButtonDef _popupDef;  // 详情面板当前展示的键
         private SkillButtonDef _aimDef;    // 瞄准中的键
@@ -228,11 +241,13 @@ namespace GIC.Battle
             UpdateQueueLabel();
 
             // 手牌（数量；卡列表 B8 接入）
+            // 手牌（B6c：卡列表=当前卡组投影；数量文本与卡列表并存——文本做标签）
             var myRes = snapshot.resources.FirstOrDefault(r => r.playerId == _myPlayerId);
             _handTextCombiner.ClearAllEntries();
             _handTextCombiner.AddEntry(new LocalizedString("UIText", "Battle_Hand"));
             if (myRes != null)
                 _handTextCombiner.AddStaticEntry(" ×" + myRes.handCardCount);
+            RebuildHandCards(myRes);
 
             // 选中单位若已死亡（对局中不可能复苏），清选中
             if (!string.IsNullOrEmpty(_selectedUnitId))
@@ -260,6 +275,137 @@ namespace GIC.Battle
                 case BattlePhase.Finished: return "Battle_Finished";
                 default: return null; // Idle：HUD 未开战不显示
             }
+        }
+
+        // ==================== 手牌与部署瞄准（B6c） ====================
+
+        /// <summary>重建手牌卡（B6c：复用项目唯一卡牌形态 Card.prefab——策略链渲染卡面/名/星；
+        /// 外层 wrapper 承点击（卡内 raycast 全关防拦截），费用角标为手牌语义叠加层。
+        /// 每选择阶段头随快照重建（Card 淡入被 OnlyDisplay 跳过，无闪烁）</summary>
+        private void RebuildHandCards(PlayerResourceState myRes)
+        {
+            if (_handCardRoot == null)
+            {
+                var handDef = _layoutByKey != null && _layoutByKey.TryGetValue("hand", out var def) ? def : null;
+                if (handDef?.content == null) return;
+                var rootGo = new GameObject("HandCards");
+                rootGo.transform.SetParent(handDef.content, false);
+                var rt = rootGo.AddComponent<RectTransform>();
+                // pivot=底边中点：anchoredPosition 的 y 语义=「底边距 HandZone 底边」——
+                // 勿用默认中心 pivot（单点锚下它=rect 中心到锚点距离，卡排会整体沉到屏幕下方，2026-09-22 实证）
+                rt.pivot = new Vector2(0.5f, 0f);
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = new Vector2(1400f, 250f);
+                _handCardRoot = rt;
+            }
+
+            foreach (var btn in _handCardButtons)
+                if (btn != null) Destroy(btn.gameObject);
+            _handCardButtons.Clear();
+            if (myRes == null || myRes.handUnits.Count == 0) return;
+
+            if (_handCardPrefab == null)
+                _handCardPrefab = Resources.Load<GameObject>("Prefabs/Backpack/Card");
+            if (_handCardPrefab == null)
+            {
+                GICLog.Warn("[BattleHud] Card.prefab 未找到（Resources/Prefabs/Backpack/Card），手牌不显示");
+                return;
+            }
+
+            var unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
+            // 手牌规格=Card.prefab 原生 160×240（保持收藏卡原比例，与背包同款）
+            float cardWidth = 160f, gap = 18f;
+            int count = myRes.handUnits.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var unitName = (UnitName)myRes.handUnits[i];
+                var unitData = unitConfig?.GetUnitData(unitName);
+                if (unitData == null) continue;
+
+                // 外层 wrapper=点击接收层（Button）；pivot=底边中点与 root 同语义
+                var wrapperGo = new GameObject($"Hand_{unitName}");
+                wrapperGo.transform.SetParent(_handCardRoot, false);
+                var wrapperRt = wrapperGo.AddComponent<RectTransform>();
+                wrapperRt.pivot = new Vector2(0.5f, 0f);
+                wrapperRt.anchorMin = wrapperRt.anchorMax = new Vector2(0.5f, 0f);
+                wrapperRt.anchoredPosition = new Vector2((i - (count - 1) * 0.5f) * (cardWidth + gap), 0f);
+                wrapperRt.sizeDelta = new Vector2(cardWidth, 240f);
+
+                // 卡牌本体（唯一形态复用；保持 prefab 原生 160×240 居中——勿 stretch 压扁，2026-09-22 目检实证）
+                var cardGo = Instantiate(_handCardPrefab, wrapperGo.transform, false);
+                var cardRt = cardGo.GetComponent<RectTransform>();
+                cardRt.anchorMin = cardRt.anchorMax = new Vector2(0.5f, 0.5f);
+                cardRt.anchoredPosition = Vector2.zero;
+                cardRt.sizeDelta = new Vector2(160f, 240f);
+
+                // 卡内全部 Graphic 关 raycast——防拦截 wrapper 点击；OnlyDisplay 关 toggle 与淡入
+                foreach (var graphic in cardGo.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+                    graphic.raycastTarget = false;
+                var card = cardGo.GetComponent<Card>();
+                if (card != null)
+                {
+                    var saveData = new GIC.Framework.SaveCardData();
+                    saveData.SaveUnit(unitName, 1);
+                    card.SetViewType(ViewType.OnlyDisplay);
+                    card.Init(saveData, null); // 手牌不挂详情面板（点卡=进部署瞄准）
+                }
+
+                // 费用角标（手牌语义叠加层，右下）
+                var costGo = new GameObject("DeployCost");
+                costGo.transform.SetParent(wrapperGo.transform, false);
+                var costRt = costGo.AddComponent<RectTransform>();
+                costRt.anchorMin = costRt.anchorMax = new Vector2(1f, 0f);
+                costRt.anchoredPosition = new Vector2(-16f, 16f);
+                costRt.sizeDelta = new Vector2(56f, 26f);
+                var costText = costGo.AddComponent<TextMeshProUGUI>();
+                costText.font = BattleViewFactory.WorldTextFont;
+                costText.fontSize = 22;
+                costText.alignment = TextAlignmentOptions.Center;
+                costText.color = Palette.高亮金;
+                costText.text = unitData.GetEffectiveDeployCost().ToString();
+
+                var btn = wrapperGo.AddComponent<UnityEngine.UI.Button>();
+                int captured = myRes.handUnits[i];
+                btn.onClick.AddListener(() => EnterDeployAim(captured));
+                _handCardButtons.Add(btn);
+            }
+        }
+
+        /// <summary>进入部署瞄准（点手牌卡）：可选格=核心半径 2（客户端粗筛，Host IsDeployCellValid 兜底）</summary>
+        private void EnterDeployAim(int unitNameValue)
+        {
+            if (_state != HudState.Idle) return; // 仅手牌态可起（选中单位时手牌已隐藏）
+            _deployAimUnit = unitNameValue;
+            _state = HudState.Aiming;
+            _aimDef = null;
+            ClosePopup();
+
+            _aimCells.Clear();
+            var snapshot = _session.Player.LatestSnapshot;
+            var core = FindMyCorePosition(snapshot);
+            for (int dx = -DeployUnitExecutor.DeployRadiusFromCore; dx <= DeployUnitExecutor.DeployRadiusFromCore; dx++)
+            for (int dy = -DeployUnitExecutor.DeployRadiusFromCore; dy <= DeployUnitExecutor.DeployRadiusFromCore; dy++)
+            {
+                var c = new BattleCell(core.x + dx, core.y + dy);
+                if (_board.Map.HasTile(c.x, c.y))
+                    _aimCells.Add(c);
+            }
+            ShowAimHighlights();
+            ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
+            SetTip("Battle_TipAimDirection"); // v1 复用方向瞄准提示；专属提示键随 B6c-2 卡面 polish
+        }
+
+        /// <summary>我方核心位置（部署半径圆心；v1=出生区中心=spawnCenters 第一个——双端 PlayerIds 同序）</summary>
+        private BattleCell FindMyCorePosition(BattleSnapshot snapshot)
+        {
+            var centers = _board.Map.spawnCenters;
+            if (centers != null && centers.Count > 0)
+            {
+                // 我方=P1（本地 1v1 惯例，BattleScreen 装配 i==0→TeamType.A 同序）
+                return centers[0];
+            }
+            return snapshot?.units.FirstOrDefault(u => u.playerId == _myPlayerId)?.position ?? BattleCell.zero;
         }
 
         // ==================== 棋盘点击（拾取/瞄准） ====================
@@ -365,6 +511,19 @@ namespace GIC.Battle
         private void ExitAiming()
         {
             if (_state != HudState.Aiming) return;
+            // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
+            bool wasDeployAim = _deployAimUnit != 0;
+            _deployAimUnit = 0;
+            if (wasDeployAim)
+            {
+                _state = HudState.Idle;
+                _aimDef = null;
+                _aimCells.Clear();
+                ClearHighlights();
+                ApplyStateVisibility();
+                SetTip("Battle_TipSelect");
+                return;
+            }
             _state = HudState.UnitSelected;
             SetAimSelectRing(_aimDef, false);
             _aimDef = null;
@@ -438,6 +597,22 @@ namespace GIC.Battle
 
         private void SubmitAim(BattleCell cell, UnitState enemyAtCell)
         {
+            // 部署瞄准分支（B6c）：点可选格=出战上交（玩家级行动，占本回合行动配额）
+            if (_deployAimUnit != 0)
+            {
+                var deployAction = new ActionData
+                {
+                    playerId = _myPlayerId,
+                    actionType = ActionType.DeployUnit,
+                    deployUnitName = _deployAimUnit,
+                    deployCell = cell,
+                };
+                _session.SubmitAction(deployAction);
+                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：出战 {(UnitName)_deployAimUnit} @ {cell}");
+                ExitAiming();
+                return;
+            }
+
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
