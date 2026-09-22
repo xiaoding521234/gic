@@ -22,8 +22,9 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 回合状态机（最小版：选择阶段收齐行动 → 执行阶段片循环 → 回合结束循环；
-    /// 五阶段完整版 AI 决策→玩家选择→玩家执行→AI 执行→回合结束 B6 落地，docs/active/22 §5）
+    /// 回合状态机（B6b 四阶段：低级单位决策→玩家选择→统一执行→回合结束，docs/04 §4.1；
+    /// 阶段一/三/四已实装，低级决策与玩家选择同处 Selecting 推流——低级行动由 Host 在
+    /// 快照广播时即生成（决策先于玩家选择完成、不依赖玩家本回合选择），执行阶段统一攻速排序结算）
     /// </summary>
     public class TurnFlowController : MonoBehaviour
     {
@@ -120,6 +121,11 @@ namespace GIC.Battle
         private TurnResolver _resolver;
 
         private readonly Dictionary<string, ActionData> _pendingActions = new Dictionary<string, ActionData>();
+
+        /// <summary>低级单位（1~2星）本回合自主行动（B6b：Host 在选择阶段头生成——
+        /// docs/04 §4.1 低级单位决策先于玩家选择完成；不占玩家行动配额）</summary>
+        private List<ActionData> _minorUnitActions = new List<ActionData>();
+
         private Coroutine _resolveCoroutine;
 
         // ack 门控状态（Host 永不跑在客户端前面）
@@ -150,6 +156,11 @@ namespace GIC.Battle
             Phase = BattlePhase.Selecting;
             _pendingActions.Clear();
             _ackedKeys.Clear();
+
+            // 阶段一：低级单位决策（先于玩家选择完成、只决策不结算——快照广播时即定，
+            // 玩家选择期间看不见其行动内容，docs/04 §4.1）
+            _minorUnitActions = LowUnitBrain.DecideAll(_sim, TurnNumber);
+
             _transport.HostSend(BattleMessageType.Snapshot, new SnapshotMessage
             {
                 snapshot = _sim.TakeSnapshot(TurnNumber),
@@ -225,7 +236,9 @@ namespace GIC.Battle
             if (Phase != BattlePhase.Selecting) return;
             if (_pendingActions.Count < _sim.PlayerIds.Count) return;
 
+            // 统一执行阶段：玩家行动 + 低级单位自主行动合并（全部按行动者攻速排序结算，docs/04 §4.1）
             var actions = new List<ActionData>(_pendingActions.Values);
+            actions.AddRange(_minorUnitActions);
             if (_resolveCoroutine != null) StopCoroutine(_resolveCoroutine);
             _resolveCoroutine = StartCoroutine(ResolveTurnRoutine(actions));
         }

@@ -298,8 +298,9 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// B1 固定测试军：先手方 安柏+凯亚 / 后手方 丽莎+芭芭拉（全蒙德，决策五）。
-        /// 出生点来自地图配置的玩家出生区；正式出战队列 B6 落地。
+        /// B1 固定测试军：先手方 安柏+凯亚 / 后手方 丽莎+芭芭拉（全蒙德，决策五）；
+        /// B6b 追加双方各一个 1 星丘丘人（低级单位自主决策实测对象，docs/04 §4.1）。
+        /// 出生点来自地图配置的玩家出生区；正式出战队列 B6c 落地。
         /// 分帧协程：逐单位 yield（单帧 1.1s 立牌尖峰摊薄，2026-09-13）。
         /// </summary>
         private IEnumerator SpawnDebugUnitsRoutine(BattleMapConfig mapConfig, List<BattlePlayerSetup> playerSetups)
@@ -317,6 +318,10 @@ namespace GIC.UI
             _session.SpawnDebugUnit(UnitName.Lisa, second.PlayerId, TeamType.B, secondCenter);
             yield return null;
             _session.SpawnDebugUnit(UnitName.Barbara, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 0));
+            yield return null;
+            _session.SpawnDebugUnit(UnitName.Hilichurl, first.PlayerId, TeamType.A, firstCenter + new BattleCell(0, 1));
+            yield return null;
+            _session.SpawnDebugUnit(UnitName.Hilichurl, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, -1));
         }
 
         private static BattleCell FindSpawnCenter(BattleMapConfig config, string playerId, BattleCell fallback)
