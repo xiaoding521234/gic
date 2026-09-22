@@ -8,9 +8,10 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// B1 AI 决策占位：恒定攻击最近敌人（docs/active/22 §5；B6 换启发式）。
-    /// AI 决策由 Host 生成（docs/18 决策一）——直接读 BattleSimState，不走传输通道。
-    /// 选择阶段开始后延迟提交（给玩家看清回合切换），每回合一个行动。
+    /// AI 玩家脑（B6b 重构）：操控己方**高级单位**（3~5 星，docs/04 §4.1）——低级单位已改由
+    /// LowUnitBrain 自主决策（不再混管）。AI 决策由 Host 生成（docs/18 决策一）——直接读
+    /// BattleSimState，不走传输通道；选择阶段开始后延迟提交（给玩家看清回合切换）。
+    /// v1 启发式（拍板）：战技可命中→战技 → 元能满→爆发 → 否则朝最近敌移动 → 无可动→Pass。
     /// </summary>
     public class AIDebugBrain : MonoBehaviour
     {
@@ -55,62 +56,92 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 固定脚本：第一个存活单位战技攻击最近的存活敌人；无可用目标则空过
+        /// v1 启发式（拍板优先级）：遍历己方存活高级单位（unitId 升序稳定）——
+        /// ① 战技方向可命中 → 该单位战技朝敌；② 元能够放爆发 → 该单位爆发朝最近敌方向；
+        /// 都不满足 → 第一个存活单位朝最近敌移动（切比雪夫全距离，战棋行动）；
+        /// 无可用单位 → Pass（超时通道同款，不指向单位）
         /// </summary>
         private ActionData Decide(int turn)
         {
             var sim = _session.Sim;
-            var identity = default(UnitIdentity);
-
-            // 找己方第一个存活单位
-            Unit ownUnit = null;
+            var majors = new List<(string unitId, Unit unit)>();
             foreach (var kv in sim.Units)
             {
-                var unit = kv.Value;
-                var id = unit.GetUnitComponent<UnitIdentity>();
+                if (!BattleHeuristics.IsMajorUnit(kv.Value)) continue;
+                if (BattleSimState.IsDead(kv.Value) || !BattleSimState.CanAct(kv.Value)) continue;
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.OwnerPlayerID != _playerId) continue;
-                if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue;
-                if (ownUnit == null)
-                {
-                    ownUnit = unit;
-                    identity = id;
-                }
+                majors.Add((kv.Key, kv.Value));
             }
+            // unitId 升序（枚举序铁律，决策确定性）
+            majors.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
 
-            if (ownUnit == null || identity == null)
+            if (majors.Count == 0)
                 return Pass(turn);
 
-            // 最近存活敌人（曼哈顿距离）
-            Unit target = null;
-            int bestDistance = int.MaxValue;
-            foreach (var kv in sim.Units)
+            foreach (var (unitId, unit) in majors)
             {
-                var unit = kv.Value;
-                var id = unit.GetUnitComponent<UnitIdentity>();
-                if (id == null || id.OwnerPlayerID == _playerId) continue;
-                if (BattleSimState.IsDead(unit)) continue;
-
-                var posA = sim.GetPosition(unit);
-                var posB = sim.GetPosition(ownUnit);
-                int distance = Math.Abs(posA.x - posB.x) + Math.Abs(posA.y - posB.y);
-                if (distance < bestDistance)
+                // ① 战技可命中（直线方向有敌格）
+                int skillIndex = BattleHeuristics.FindSkillIndex(unit, SkillType.Normal);
+                if (skillIndex >= 0)
                 {
-                    bestDistance = distance;
-                    target = unit;
+                    var direction = BattleHeuristics.FindLineSkillDirection(sim, unit, skillIndex);
+                    if (direction != 0)
+                        return Skill(unit, skillIndex, direction, turn);
+                }
+
+                // ② 元能够放爆发（门槛=技能 EnergyCost，B6a；朝最近敌所在方向放）
+                int burstIndex = BattleHeuristics.FindSkillIndex(unit, SkillType.Burst);
+                if (burstIndex >= 0)
+                {
+                    int cost = BattleSimState.GetEnergyCost(unit.RawData.skills[burstIndex]);
+                    if (BattleSimState.HasEnoughEnergy(unit, cost))
+                    {
+                        var enemy = BattleHeuristics.FindNearestEnemy(sim, unit);
+                        if (enemy != null)
+                        {
+                            var selfPos = sim.GetPosition(unit);
+                            var enemyPos = sim.GetPosition(enemy);
+                            return Skill(unit, burstIndex,
+                                BattleHeuristics.DeltaToDirection(enemyPos.x - selfPos.x, enemyPos.y - selfPos.y),
+                                turn);
+                        }
+                    }
                 }
             }
 
-            if (target == null)
+            // ③ 第一个存活单位朝最近敌移动（切比雪夫全距离）
+            var first = majors[0];
+            var enemyFirst = BattleHeuristics.FindNearestEnemy(sim, first.unit);
+            if (enemyFirst == null)
                 return Pass(turn);
-
+            var selfPosition = sim.GetPosition(first.unit);
+            var enemyPosition = sim.GetPosition(enemyFirst);
+            int dx = enemyPosition.x - selfPosition.x;
+            int dy = enemyPosition.y - selfPosition.y;
+            if (dx == 0 && dy == 0)
+                return Pass(turn); // 与敌人同格（叠加）：无移动意义，空过
             return new ActionData
             {
                 playerId = _playerId,
-                unitId = identity.UnitID,
-                actionType = ActionType.Skill,
+                unitId = first.unitId,
+                actionType = ActionType.Move,
+                direction = BattleHeuristics.DeltaToDirection(dx, dy),
+                moveMagnitude = Math.Max(Math.Abs(dx), Math.Abs(dy)),
                 turnNumber = turn,
-                targetUnitId = target.GetUnitComponent<UnitIdentity>()?.UnitID,
-                skillIndex = 0,
+            };
+        }
+
+        private ActionData Skill(Unit unit, int skillIndex, Direction2D direction, int turn)
+        {
+            return new ActionData
+            {
+                playerId = _playerId,
+                unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                actionType = ActionType.Skill,
+                skillIndex = skillIndex,
+                direction = direction,
+                turnNumber = turn,
             };
         }
 
