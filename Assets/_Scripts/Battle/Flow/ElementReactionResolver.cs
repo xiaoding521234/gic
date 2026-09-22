@@ -10,8 +10,16 @@ namespace GIC.Battle
     {
         public bool HasReaction;
 
+        /// <summary>反应类型（BattleCommand.ReactionKindMelt / ReactionKindFreeze / ReactionKindVaporize；0=无）——
+        /// ReactionEffect/Reaction 命令/Damage 命令反应标记的载体（2026-09-22 接线：反应发生对客户端可见）</summary>
+        public int ReactionType;
+
         /// <summary>反应提供的易伤增量（并入本次伤害易伤乘区，docs/18 决策五：同乘区加法并入）</summary>
         public float VulnerabilityBonus;
+
+        /// <summary>反应提供的增伤增量（并入本次伤害增伤乘区——蒸发=增伤 50%×级别，与融化的易伤分区，
+        /// docs/06 §反应表；同乘区加法并入）</summary>
+        public float DamageBonusDelta;
 
         /// <summary>反应施加的 Buff 类型（-1=无；冻结=水+冰）</summary>
         public int BuffType = -1;
@@ -21,9 +29,10 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 元素反应判定器（B4：融化 + 冻结两例，docs/18 决策三）。
-    /// 纯判定（读目标附着 + 来袭元素 → 产出易伤增量/控制效果），状态修改全部走 BattleEffect：
-    /// - 融化（火+冰 / 冰+火）：易伤 +50%（×级别）并入本次伤害；消耗被反应附着
+    /// 元素反应判定器（B4 融化+冻结两例，2026-09-22 补蒸发三例，docs/18 决策三）。
+    /// 纯判定（读目标附着 + 来袭元素 → 产出易伤/增伤增量/控制效果），状态修改全部走 BattleEffect：
+    /// - 融化（火+冰 / 冰+火）：易伤 +50%×级别 并入本次伤害；消耗被反应附着
+    /// - 蒸发（火+水 / 水+火）：增伤 +50%×级别 并入本次伤害；消耗被反应附着
     /// - 冻结（水+冰 / 冰+水）：冰冻 2 回合（ApplyBuffEffect 产出）；消耗被反应附着
     /// - 其它组合：无反应（同元素=刷新附着，由 AttachElementEffect 覆盖）
     /// 命中后的新附着统一由 AttachElementEffect 承载（覆盖=消耗被反应附着）。
@@ -32,6 +41,7 @@ namespace GIC.Battle
     public static class ElementReactionResolver
     {
         public const float MeltVulnerabilityBonus = 0.5f; // docs/06：融化 易伤 50% × 级别
+        public const float VaporizeDamageBonus = 0.5f;   // docs/06：蒸发 增伤 50% × 级别
 
         public static ReactionOutcome Preview(ElementType dyed, ElementType incoming)
         {
@@ -45,7 +55,17 @@ namespace GIC.Battle
             if (IsPair(dyed, incoming, ElementType.Pyro, ElementType.Cryo))
             {
                 outcome.HasReaction = true;
+                outcome.ReactionType = BattleCommand.ReactionKindMelt;
                 outcome.VulnerabilityBonus = MeltVulnerabilityBonus;
+                return outcome;
+            }
+
+            // 蒸发：火 + 水（docs/06）——增伤并入增伤乘区（与融化的易伤分属两区，伤害公式独立）
+            if (IsPair(dyed, incoming, ElementType.Pyro, ElementType.Hydro))
+            {
+                outcome.HasReaction = true;
+                outcome.ReactionType = BattleCommand.ReactionKindVaporize;
+                outcome.DamageBonusDelta = VaporizeDamageBonus;
                 return outcome;
             }
 
@@ -53,6 +73,7 @@ namespace GIC.Battle
             if (IsPair(dyed, incoming, ElementType.Hydro, ElementType.Cryo))
             {
                 outcome.HasReaction = true;
+                outcome.ReactionType = BattleCommand.ReactionKindFreeze;
                 outcome.BuffType = (int)BuffType.Freeze;
                 return outcome;
             }

@@ -19,6 +19,9 @@ namespace GIC.Battle
 
         /// <summary>易伤乘区增量（元素反应提供：如 1 级融化 +0.5；同乘区加法并入，docs/18 决策五）</summary>
         public float VulnerabilityBonus;
+
+        /// <summary>增伤乘区增量（元素反应提供：如 1 级蒸发 +0.5——与易伤分属两区，docs/06 §反应表）</summary>
+        public float DamageBonusDelta;
     }
 
     /// <summary>
@@ -89,8 +92,9 @@ namespace GIC.Battle
             // 基础乘区：攻击力 × 攻击百分比 + 额外伤害
             float baseZone = attackerStats.Attack * (request.AttackPercent / 100f) + request.FlatDamage;
 
-            // 增伤免伤乘区：(增伤 − 免伤)，百分比叠加
-            float bonusZone = 1f + (attackerStats.DamageBonus - targetStats.DamageReduction) / 100f;
+            // 增伤免伤乘区：(增伤 − 免伤)，百分比叠加；反应增伤（DamageBonusDelta，如蒸发）同乘区加法并入
+            float bonusZone = 1f + (attackerStats.DamageBonus - targetStats.DamageReduction) / 100f
+                + request.DamageBonusDelta;
             if (bonusZone < 0f) bonusZone = 0f;
 
             // 易伤乘区：正防御除法减伤递减，负防御线性增伤（每点 1%）；

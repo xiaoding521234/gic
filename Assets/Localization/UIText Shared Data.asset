@@ -991,6 +991,14 @@ MonoBehaviour:
     m_Key: Battle_ExitContinue
     m_Metadata:
       m_Items: []
+  - m_Id: 12028
+    m_Key: Battle_ReactionMelt
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12029
+    m_Key: Battle_ReactionVaporize
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

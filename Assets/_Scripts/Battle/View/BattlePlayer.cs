@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Localization;
 using TMPro;
 using GIC.Framework;
 using GIC.Data;
@@ -153,6 +154,7 @@ namespace GIC.Battle
                 {
                     view.SetCorpseVisual(state.isCorpse != 0);
                     view.SetFrozenVisual(state.isFrozen != 0);
+                    view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（权威态）
                     view.SetHp(state.hp, state.maxHp);
                     view.SetBuffs(state.buffs); // 头顶 Buff 行（权威态）
                 }
@@ -199,7 +201,7 @@ namespace GIC.Battle
             yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
 
             Destroy(arrowGo);
-            yield return PlayDamageCoroutine(target, -command.value, 0f, false);
+            yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind);
         }
 
         /// <summary>
@@ -302,7 +304,8 @@ namespace GIC.Battle
                                 // 不吃命令 stagger；命中点由命令定点下发
                                 playbacks.Add(StartCoroutine(PlayProjectileThenDamageCoroutine(target, command, 0f)));
                             else
-                                playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, stagger, false)));
+                                playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, stagger, false,
+                                    command.reactionKind)));
                         }
                         break;
 
@@ -323,7 +326,28 @@ namespace GIC.Battle
 
                     case BattleCommandType.RemoveBuff:
                         if (_views.TryGetValue(command.targetUnitId, out var unbuffed))
+                        {
                             unbuffed.RemoveBuffBadge(command.buffType);
+                            // 冻结到期即时退冰色（与 Reaction(Freeze) 即时上色对称；其它视觉仍随快照）
+                            if (command.buffType == (int)BuffType.Freeze)
+                                unbuffed.SetFrozenVisual(false);
+                        }
+                        break;
+
+                    case BattleCommandType.ElementAttach:
+                        // 附着即时刷新（2026-09-22 接线：此前靠下回合快照自愈，反应当片不可见）
+                        if (_views.TryGetValue(command.targetUnitId, out var attached))
+                            attached.SetAttachedElement((ElementType)command.metadata);
+                        break;
+
+                    case BattleCommandType.Reaction:
+                        // 反应发生事件：冻结=立牌冰色即时同步（此前冰色只随快照来，反应当回合不显）；
+                        // 融化=反应爆发特效属 B5/B6 画面批次，此处仅留挂点
+                        if (_views.TryGetValue(command.targetUnitId, out var reacted))
+                        {
+                            if (command.metadata == BattleCommand.ReactionKindFreeze)
+                                reacted.SetFrozenVisual(true);
+                        }
                         break;
 
                     case BattleCommandType.Effect:
@@ -394,7 +418,19 @@ namespace GIC.Battle
                 view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t))));
         }
 
-        private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal)
+        /// <summary>反应子类型 → 本地化反应名（短命数字对象直接求值当前语言，不挂 TextCombiner）。
+        /// 仅增伤反应（融化/蒸发）有名——冻结是控制反应、无伤害加成，数字不带名</summary>
+        private static string ReactionNameOf(int reactionKind)
+        {
+            string key = null;
+            if (reactionKind == BattleCommand.ReactionKindMelt) key = "Battle_ReactionMelt";
+            else if (reactionKind == BattleCommand.ReactionKindVaporize) key = "Battle_ReactionVaporize";
+            if (key == null) return null;
+            return new LocalizedString("UIText", key).GetLocalizedString();
+        }
+
+        private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal,
+            int reactionKind = 0)
         {
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
@@ -419,7 +455,12 @@ namespace GIC.Battle
             text.alignment = TextAlignmentOptions.Center;
             text.enableWordWrapping = false;
             ((RectTransform)numberGo.transform).sizeDelta = new Vector2(40f, 14f);
-            text.text = displayValue > 0 ? $"+{displayValue}" : displayValue.ToString();
+            // 反应名前缀（2026-09-22：Damage 命令带反应标记——增伤反应伤害数字带反应名，如"蒸发 -40"；
+            // 数字格式维持既有约定（伤害带负号/治疗带 +），冻结=控制反应无伤害加成、数字不带名）
+            var reactionName = !isHeal ? ReactionNameOf(reactionKind) : null;
+            text.text = displayValue > 0
+                ? $"+{displayValue}"
+                : reactionName != null ? $"{reactionName} {displayValue}" : displayValue.ToString();
             var baseColor = isHeal ? Palette.治疗绿 : Palette.伤害红;
             text.color = baseColor;
 
@@ -493,6 +534,7 @@ namespace GIC.Battle
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);
+            view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（建场权威态）
             view.SetBuffs(state.buffs);
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;

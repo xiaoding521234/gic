@@ -32,8 +32,13 @@ namespace GIC.Battle
         public float HitPointX;
         public float HitPointY;
 
+        /// <summary>本次命中触发的元素反应子类型（0=无；2026-09-22——Damage 命令带反应标记，
+        /// 客户端伤害数字带反应名，如"蒸发 40"）</summary>
+        public int ReactionType;
+
         public DamageEffect(string attackerUnitId, string targetUnitId, int amount, int element = 0,
-            int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f)
+            int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f,
+            int reactionType = 0)
         {
             AttackerUnitId = attackerUnitId;
             TargetUnitId = targetUnitId;
@@ -43,6 +48,7 @@ namespace GIC.Battle
             FromCell = fromCell;
             HitPointX = hitPointX;
             HitPointY = hitPointY;
+            ReactionType = reactionType;
         }
     }
 
@@ -136,6 +142,29 @@ namespace GIC.Battle
             SourceUnitId = sourceUnitId;
             TargetUnitId = targetUnitId;
             Element = element;
+        }
+    }
+
+    /// <summary>
+    /// 元素反应效应（2026-09-22 接线）：反应发生的事实载体——融化此前只有"更大的伤害数字"无事件、
+    /// 冻结只有 ApplyBuff 无反应语义，客户端无从表现反应。产出 Reaction 命令（快照自愈外的即时通道）
+    /// </summary>
+    public class ReactionEffect : BattleEffect
+    {
+        public string SourceUnitId;
+
+        /// <summary>反应类型（BattleCommand.ReactionKindMelt / ReactionKindFreeze）</summary>
+        public int ReactionType;
+
+        /// <summary>反应级别（B4 层数简化恒 1）</summary>
+        public int Level;
+
+        public ReactionEffect(string sourceUnitId, string targetUnitId, int reactionType, int level)
+        {
+            SourceUnitId = sourceUnitId;
+            TargetUnitId = targetUnitId;
+            ReactionType = reactionType;
+            Level = level;
         }
     }
 }

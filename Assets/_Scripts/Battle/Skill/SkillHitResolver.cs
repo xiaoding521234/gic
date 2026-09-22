@@ -34,7 +34,7 @@ namespace GIC.Battle
 
             var element = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
 
-            // 元素反应预判（融化=易伤并入本次伤害 / 冻结=施加控制；docs/06）
+            // 元素反应预判（融化=易伤 / 蒸发=增伤 / 冻结=施加控制，docs/06）
             var outcome = ElementReactionResolver.Preview((ElementType)targetState.dyedElement, element);
 
             var request = new DamageRequest
@@ -44,17 +44,23 @@ namespace GIC.Battle
                 AttackPercent = attackPercent,
                 Element = (int)element,
                 VulnerabilityBonus = outcome.VulnerabilityBonus,
+                DamageBonusDelta = outcome.DamageBonusDelta,
             };
             var result = DamagePipeline.Calculate(request);
             if (!result.Cancelled && result.FinalDamage > 0)
             {
                 effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage,
-                    (int)element, delivery, fromCell, hitPointX, hitPointY));
+                    (int)element, delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType));
             }
 
-            if (outcome.HasReaction && outcome.BuffType >= 0)
+            if (outcome.HasReaction)
             {
-                effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, outcome.BuffType, outcome.Level));
+                // 反应发生事件（2026-09-22 接线）：融化的伤害并入已由 DamageEffect 承载，
+                // 此处补"反应发生"事实载体——客户端即时表现（冻结立牌冰色等）
+                effects.Add(new ReactionEffect(action.unitId, targetUnitId, outcome.ReactionType, outcome.Level));
+
+                if (outcome.BuffType >= 0)
+                    effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, outcome.BuffType, outcome.Level));
             }
 
             // 命中后附着来袭元素（覆盖旧附着=消耗被反应附着；物理不附着）
