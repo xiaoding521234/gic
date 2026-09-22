@@ -91,11 +91,20 @@ namespace GIC.Tool
         }
 
         /// <summary>
+        /// 获取时间段枚举（无日志版：昼夜跨界轮询等高频调用用——逐调用日志会刷屏）
+        /// </summary>
+        public static TimePeriod GetCurrentTimePeriodQuiet()
+        {
+            int hour = Now.Hour;
+            return hour >= DayStartHour && hour < DayEndHour ? TimePeriod.Daytime : TimePeriod.Night;
+        }
+
+        /// <summary>
         /// 获取时间段枚举
         /// </summary>
         public static TimePeriod GetCurrentTimePeriod()
         {
-            TimePeriod result = GetCurrentTimePeriod(DayStartHour, DayEndHour);
+            TimePeriod result = GetCurrentTimePeriodQuiet();
             GICLog.Info($"[TimeUtility] GetCurrentTimePeriod() 返回: {result} (游戏内时间: {Now:HH:mm})");
             return result;
         }

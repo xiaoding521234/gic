@@ -80,6 +80,62 @@ namespace GIC.Framework
         }
 
         /// <summary>
+        /// 淡出当前曲目后起播新曲目（昼夜时段跨界立即切换用，2026-09-22）：旧曲按 fadeOutTime 淡出，
+        /// 完毕后新曲按 track.fadeInTime 淡入（单音乐源顺序淡变，无交叉重叠）。
+        /// 无在播曲目（间隔冷却中/静默）时跳过淡出直接起播（等价 PlayMusic）。
+        /// 优先级/同曲跳过语义与 PlayMusic 一致。
+        /// </summary>
+        public void SwitchMusicWithFade(MusicTrack track, float fadeOutTime)
+        {
+            if (track.clip == null || musicSource == null) return;
+
+            // 优先级：如果新音乐优先级低于当前音乐，丢弃
+            if (track.musicType < currentMusicType)
+            {
+                GICLog.Info($"音乐被丢弃：{track.clip.name}（优先级{track.musicType} < 当前{currentMusicType}）");
+                return;
+            }
+
+            // 如果优先级相同且正在播放同一首，跳过
+            if (track.musicType == currentMusicType &&
+                musicSource.isPlaying &&
+                musicSource.clip == track.clip)
+            {
+                GICLog.Info($"同一首音乐已在播放：{track.clip.name}");
+                return;
+            }
+
+            bool wasPlaying = musicSource.isPlaying;
+            StopCurrentMusic();
+
+            // 残留淡变协程（上一轮淡入/跨界淡出）先行终止并音量归位——本请求接管音频
+            if (musicFadeCoroutine != null)
+            {
+                StopCoroutine(musicFadeCoroutine);
+                musicFadeCoroutine = null;
+                musicSource.volume = 1f;
+            }
+
+            // 更新当前音乐信息（淡出期间元数据已属新曲——期间若被 Push/Pop，快照/恢复以新曲为准）
+            currentMusicType = track.musicType;
+            currentOnCompleteCallback = track.loop ? null : track.onComplete;
+            currentMusicTrack = track;
+
+            if (wasPlaying && fadeOutTime > 0f)
+            {
+                musicFadeCoroutine = StartCoroutine(FadeOutThenPlayCoroutine(track, fadeOutTime));
+            }
+            else if (track.intervalBefore > 0f)
+            {
+                StartDelayedMusic(track);
+            }
+            else
+            {
+                StartMusicPlayback(track);
+            }
+        }
+
+        /// <summary>
         /// 停止音乐（带淡出）
         /// </summary>
         public void StopMusic(float fadeOutTime = 0f)
@@ -108,6 +164,8 @@ namespace GIC.Framework
         /// </summary>
         private void StopCurrentMusic()
         {
+            playbackEpoch++; // 播放权换代：跨界淡出协程据此在起播前放弃（见字段注释）
+
             if (musicLoopCoroutine != null)
             {
                 StopCoroutine(musicLoopCoroutine);
@@ -201,6 +259,12 @@ namespace GIC.Framework
         #region internalPlayLogic
 
         private Coroutine musicCompletionCoroutine;
+
+        // 播放权世代（2026-09-22 跨界淡切）：StopCurrentMusic 每次递增。FadeOutThenPlayCoroutine
+        // 淡出结束起播前校验——期间被任何接管（StopMusic 硬停/PlayMusic/Push/Pop）则放弃起播。
+        // 必要性：既有 FadeOutMusicCoroutine 结束只 Stop 不播天然安全；跨界协程结束会起播新曲，
+        // 不校验则"淡出期间退出战斗 StopMusic(0)"后残留曲会在退出后冒出来（且带活 onComplete 链）。
+        private int playbackEpoch;
 
         private void StartDelayedMusic(MusicTrack track)
         {
@@ -376,6 +440,51 @@ namespace GIC.Framework
             musicSource.clip = null;
             musicSource.volume = startVolume;
             musicFadeCoroutine = null; // 自然结束清引用：防字段持已完成协程的假引用误导现场取证
+        }
+
+        /// <summary>
+        /// 跨界淡出→起播（SwitchMusicWithFade 的协程体，2026-09-22）：旧曲淡出到 0 → 起播新曲
+        /// （fadeInTime>0 时经 StartMusicPlayback 自带淡入）。世代校验双保险：淡出途中被接管
+        /// （唯一不杀本协程的路径=StopMusic(0) 硬停）→ 立即放弃，音量按「非淡入态源音量恒 1」
+        /// 不变量归位，接管方/下一次起播拿到正确音量。
+        /// </summary>
+        private IEnumerator FadeOutThenPlayCoroutine(MusicTrack track, float fadeOutTime)
+        {
+            int epoch = playbackEpoch;
+            float startVolume = musicSource.volume;
+            float timer = 0f;
+            while (timer < fadeOutTime)
+            {
+                if (musicSource == null) yield break;
+                if (playbackEpoch != epoch)
+                {
+                    musicSource.volume = 1f;
+                    musicFadeCoroutine = null;
+                    yield break;
+                }
+                timer += Time.deltaTime;
+                musicSource.volume = Mathf.Lerp(startVolume, 0f, timer / fadeOutTime);
+                yield return null;
+            }
+            if (musicSource == null) yield break;
+            if (playbackEpoch != epoch)
+            {
+                musicSource.volume = 1f;
+                musicFadeCoroutine = null;
+                yield break;
+            }
+            musicSource.Stop();
+            musicSource.clip = null;
+            musicSource.volume = 1f;
+            musicFadeCoroutine = null;
+            if (track.intervalBefore > 0f)
+            {
+                StartDelayedMusic(track);
+            }
+            else
+            {
+                StartMusicPlayback(track);
+            }
         }
 
         #endregion

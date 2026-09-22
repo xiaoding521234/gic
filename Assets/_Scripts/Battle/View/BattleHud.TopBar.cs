@@ -91,18 +91,30 @@ namespace GIC.Battle
             else GICLog.Warn("[BattleHud] 布局槽缺失：settings");
         }
 
+        // 纯文本件（turn/countdown/clock 槽内容=文本本体）与容器件（槽内容包子级文本）两种结构并存，
+        // 寻址先自检内容本体名、再下探子级——曾按容器件一刀切致三文本件寻空静默失显（2026-09-22）
         private TMP_Text FindSlotText(string key, string contentName)
         {
-            return _layoutByKey.TryGetValue(key, out var def)
-                ? def.content.Find(contentName)?.GetComponent<TMP_Text>()
-                : null;
+            if (!_layoutByKey.TryGetValue(key, out var def) || def.content == null) return null;
+            return (def.content.name == contentName
+                ? def.content.GetComponent<TMP_Text>()
+                : def.content.Find(contentName)?.GetComponent<TMP_Text>())
+                ?? WarnIfNull<TMP_Text>(key, contentName);
         }
 
         private TextCombiner FindSlotCombiner(string key, string contentName)
         {
-            return _layoutByKey.TryGetValue(key, out var def)
-                ? def.content.Find(contentName)?.GetComponent<TextCombiner>()
-                : null;
+            if (!_layoutByKey.TryGetValue(key, out var def) || def.content == null) return null;
+            return (def.content.name == contentName
+                ? def.content.GetComponent<TextCombiner>()
+                : def.content.Find(contentName)?.GetComponent<TextCombiner>())
+                ?? WarnIfNull<TextCombiner>(key, contentName);
+        }
+
+        private static T WarnIfNull<T>(string key, string contentName) where T : Component
+        {
+            GICLog.Warn($"[BattleHud] 槽 {key} 寻不到控件 {contentName}（<{typeof(T).Name}>），对应显隐将失效");
+            return null;
         }
 
         /// <summary>玩家信息块解析：势力徽标（地图势力，ElementFactionConfig 现成链）+ 队营色 accent + 体力/摩拉 chip 数字</summary>

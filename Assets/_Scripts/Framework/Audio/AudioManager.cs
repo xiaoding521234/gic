@@ -33,6 +33,17 @@ namespace GIC.Framework
         [Header("Music Reduction Settings")]
         private float reducedMusicVolumeScale = 0.5f;
 
+        [Header("时段切换淡变")]
+        [Tooltip("昼夜时段跨界切换音乐：旧曲淡出时长（秒）；大厅位置曲与战斗曲链共用")]
+        [SerializeField, Min(0f)] private float 时段切换淡出时长 = 1f;
+        [Tooltip("昼夜时段跨界切换音乐：新曲淡入时长（秒）；大厅位置曲与战斗曲链共用")]
+        [SerializeField, Min(0f)] private float 时段切换淡入时长 = 1f;
+
+        /// <summary>昼夜时段跨界切换：旧曲淡出时长（秒）——SwitchMusicWithFade 消费</summary>
+        public float PeriodSwitchFadeOutSeconds => 时段切换淡出时长;
+        /// <summary>昼夜时段跨界切换：新曲淡入时长（秒）——SwitchMusicWithFade 消费</summary>
+        public float PeriodSwitchFadeInSeconds => 时段切换淡入时长;
+
         // Mixer参数名
         private const string MASTER_VOLUME_PARAM = "MasterVolume";
         private const string MUSIC_VOLUME_PARAM = "MusicVolume";

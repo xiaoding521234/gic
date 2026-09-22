@@ -91,7 +91,8 @@ namespace GIC.Framework
             public void Handle(OnGameTimeChangedEvent evt)
             {
                 if (_manager._currentMusicPeriod == evt.NewPeriod) return;
-                _manager.PlayCurrentPositionMusic();
+                // 时段跨界立即换曲：淡出旧曲+淡入新池曲（2026-09-22；自然跨界轮询与 set_game_time 两来源共用）
+                _manager.PlayCurrentPositionMusic(fadeSwitch: true);
             }
         }
 
@@ -129,8 +130,28 @@ namespace GIC.Framework
 
         public void Start() { }
 
+        // 昼夜自然跨界轮询（2026-09-22）：真实时钟跨过 DayStartHour/DayEndHour 时没有任何事件可依
+        // （OnGameTimeChangedEvent 只在显式 set_game_time 时广播）——低频轮询时段，跨界即按
+        // set_game_time 同语义广播事件：位置曲链淡切新池曲（GameTimeChangedHandler）、大厅背景
+        // 刷新昼夜表现（MainHallScreen 订阅方）。用无日志版推导防轮询刷屏。战斗中广播无害：
+        // 位置曲 Relaxed 被 Battle 优先级丢弃（仅一条日志），战斗链跨界由 BattleScreen 自行处理。
+        private float _periodPollTimer;
+        private const float PeriodPollIntervalSeconds = 2f;
+
         public void Update(float deltaTime)
         {
+            _periodPollTimer += deltaTime;
+            if (_periodPollTimer < PeriodPollIntervalSeconds) return;
+            _periodPollTimer = 0f;
+
+            var period = TimeUtility.GetCurrentTimePeriodQuiet();
+            if (_currentMusicPeriod == period) return;
+
+            GICLog.Info($"[PositionManager] 昼夜自然跨界: {_currentMusicPeriod} → {period}，广播时间变更");
+            EventBusHub.Instance.SendImmediate(new OnGameTimeChangedEvent
+            {
+                NewPeriod = period
+            });
         }
 
         private void OnPositionChanged()
@@ -147,9 +168,11 @@ namespace GIC.Framework
         }
 
         /// <summary>
-        /// 播放当前位置的音乐（根据白天/黑夜自动选择，播放完毕后间隔5秒播放下一首）
+        /// 播放当前位置的音乐（根据白天/黑夜自动选择，播放完毕后间隔 MUSIC_INTERVAL 秒播放下一首）。
+        /// fadeSwitch=true 为昼夜跨界立即切换：旧曲淡出→新池曲淡入（2026-09-22）；冷却中/静默时
+        /// 等价直接起播。传送/初始化/复活等常规入口不受影响（硬切语义不变）。
         /// </summary>
-        public void PlayCurrentPositionMusic()
+        public void PlayCurrentPositionMusic(bool fadeSwitch = false)
         {
             if (audioManager == null) return;
 
@@ -172,13 +195,25 @@ namespace GIC.Framework
 
             if (clip != null)
             {
-                audioManager.PlayMusicWithInterval(
-                    clip,
-                    MusicType.Relaxed,
-                    intervalAfter: MUSIC_INTERVAL,
-                    loop: false,
-                    onComplete: OnCurrentPositionMusicComplete
-                );
+                if (fadeSwitch)
+                {
+                    audioManager.SwitchMusicWithFade(
+                        new AudioManager.MusicTrack(clip, MusicType.Relaxed,
+                            intervalAfter: MUSIC_INTERVAL, loop: false,
+                            fadeInTime: audioManager.PeriodSwitchFadeInSeconds,
+                            onComplete: OnCurrentPositionMusicComplete),
+                        audioManager.PeriodSwitchFadeOutSeconds);
+                }
+                else
+                {
+                    audioManager.PlayMusicWithInterval(
+                        clip,
+                        MusicType.Relaxed,
+                        intervalAfter: MUSIC_INTERVAL,
+                        loop: false,
+                        onComplete: OnCurrentPositionMusicComplete
+                    );
+                }
             }
             else
             {

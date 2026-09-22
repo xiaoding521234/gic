@@ -24,8 +24,8 @@ namespace GIC.Battle
         [SerializeField] private float _pitchDegrees = 55f;
 
         [Header("缩放")]
-        [Tooltip("最近视轴距离")]
-        [SerializeField] private float _minDistance = 12f;
+        [Tooltip("最近视轴距离（2026-09-22 拉近 12→4：全身立牌 2.5× 后允许贴近查看单位）")]
+        [SerializeField] private float _minDistance = 4f;
         [Tooltip("最远视轴距离")]
         [SerializeField] private float _maxDistance = 60f;
         [Tooltip("每滚轮一格的缩放比例（0.925 = 每格拉近 7.5%；乘法缩放各级别手感一致。2026-09-12 用户反馈 0.85 太灵敏，减半）")]
