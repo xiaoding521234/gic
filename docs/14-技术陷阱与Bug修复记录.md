@@ -1332,3 +1332,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：`MovementResolver.StepVector`（8 向步进权威映射，Host 移动结算同一份）转 public，View 播放同源复用——「Host 判定与播放同源」与 BattleMetrics 同哲学；弹回幅度=未归一步向量×比例（斜向朝下一格格心等比例 45%，与移动插值一步一整格口径一致）。
 
 **How to apply**：Direction2D→格增量换算按场景选映射——8 向移动/步进语义一律 `MovementResolver.StepVector`；只有直线投射物（HUD 提交前已 SnapToCardinal 十字归一）才用 `DirectionToDelta`；新增换算点先读目标函数注释语义，勿按方法名就近取用。
+
+## 70. 程序化 UGUI 三连坑：单点锚+默认中心 pivot 的 anchoredPosition 语义、纯 Button 无 Graphic 点击不可达、复用现成卡 prefab 勿 stretch 变形（2026-09-22 B6c 手牌四轮目检实证）
+
+**症状**（手牌区程序化构建，同批连续四报）：①卡排只露一点、大半沉到屏幕下方；②卡被纵向压扁；③无法左右滑动（含"1 张卡也要能滑"的产品要求）；④卡排不居中贴视口左侧。另有隐藏 bug：wrapper 纯 Button 无 Graphic，点击实际不可达（用户目检停在外观阶段未暴露）。
+
+**根因**：①单点锚 (0.5,0) 配**默认中心 pivot** 时，`anchoredPosition.y` 语义=rect **中心**到锚点距离，而非直觉的"底边到锚点"——212 高的卡中心被压在锚点上，大半沉出屏（活体取证 GetWorldCorners 实锤卡 minY=-188）；②卡被 stretch 到 158×212 而 Card.prefab 原生 160×240（2:3），比例变形；③ScrollRect 用 Clamped 且 content 宽在"不溢出"分支被夹成=视口宽→**零滚程、拖不动**；且产品语义要"任何卡数可拖"=必须 Elastic 弹性回弹+content 恒=行宽+边距（窄于视口也有拖程）；④content anchor=(0,1) 左上→窄于视口时整体贴左。隐藏 bug：UGUI 点击需 raycast 目标——"卡内 raycast 全关防拦截"后 wrapper 自身无任何 Graphic=按不到。
+
+**修法**：①wrapper/container 一律显式设 pivot（底/顶边中点），y 偏移语义对齐；②复用现成卡 prefab 保持原生 rect（居中锚+原生 sizeDelta），布局容器包原生尺寸；③ScrollRect.movementType=Elastic + content 宽恒=行宽+左右边距（勿夹视口宽）+ content anchor/pivot=中上（窄于视口初始居中、Elastic 回弹归位居中；宽于视口滚动/clamp 基于 bounds 与锚点无关照常滚）；④wrapper 加 alpha=0 的 Image（raycastTarget=true）+ Button.targetGraphic 指向它。
+
+**取证教训**：UI 排位类报障先跑 exec_runtime_script 拿 RectTransform 链的 GetWorldCorners 世界坐标算占屏比（本批两次立功：沉屏与后续验证），勿对着代码空推锚点数学；"点击全死"类问题查 raycast 靶链（无任何 Graphic 的容器=黑洞）。
+
+**How to apply**：程序化建 UGUI 容器必带三件套自查——pivot 与语义对齐、复用 prefab 不变形、ScrollRect 要可拖（Elastic+content 恒不等视口宽）；命中层=透明 Image 显式挂。

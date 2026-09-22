@@ -43,8 +43,9 @@ namespace GIC.Data
         public int handCardCount;
         public int deckCardCount;
 
-        /// <summary>手牌角色列表（UnitName 枚举值；B6c——卡不消耗留手牌，可重复出战）</summary>
-        public List<int> handUnits = new List<int>();
+        /// <summary>手牌卡列表（2026-09-22 拍板：初始手牌=完整当前卡组投影，含物品卡；
+        /// 卡不消耗留手牌，可重复出战。物品卡使用/装备链后续批次，本字段仅展示）</summary>
+        public List<CardId> handCards = new List<CardId>();
     }
 
     /// <summary>

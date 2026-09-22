@@ -1017,6 +1017,10 @@ MonoBehaviour:
     m_Localized: Vaporize
     m_Metadata:
       m_Items: []
+  - m_Id: 12030
+    m_Localized: Item card use will be added in a later update
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
