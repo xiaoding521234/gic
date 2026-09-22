@@ -62,19 +62,19 @@ namespace GIC.Battle
 
         public IReadOnlyCollection<string> PlayerIds => _playerIds;
 
-        // ==================== 局内手牌与资源（B6c：手牌=玩家当前卡组投影，卡不消耗可重复出战） ====================
+        // ==================== 局内手牌与资源（B6c：手牌=玩家当前卡组完整投影，卡不消耗可重复出战） ====================
 
-        private readonly Dictionary<string, List<int>> _hands = new Dictionary<string, List<int>>();
+        private readonly Dictionary<string, List<CardId>> _hands = new Dictionary<string, List<CardId>>();
 
-        /// <summary>注册玩家手牌（开局从存档当前卡组构建；UnitName 枚举值列表）</summary>
-        public void RegisterHand(string playerId, List<int> handUnitNames)
+        /// <summary>注册玩家手牌（开局从存档当前卡组构建；2026-09-22 拍板：完整卡组含物品卡）</summary>
+        public void RegisterHand(string playerId, List<CardId> handCards)
         {
-            _hands[playerId] = handUnitNames ?? new List<int>();
+            _hands[playerId] = handCards ?? new List<CardId>();
             if (_resources.TryGetValue(playerId, out var res))
                 res.handCardCount = _hands[playerId].Count;
         }
 
-        public IReadOnlyList<int> GetHand(string playerId)
+        public IReadOnlyList<CardId> GetHand(string playerId)
         {
             return _hands.TryGetValue(playerId, out var hand) ? hand : null;
         }
@@ -397,7 +397,7 @@ namespace GIC.Battle
                     deckCardCount = res.deckCardCount,
                 };
                 if (_hands.TryGetValue(kv.Key, out var hand))
-                    snapshotRes.handUnits = new List<int>(hand);
+                    snapshotRes.handCards = new List<CardId>(hand);
                 snapshot.resources.Add(snapshotRes);
             }
 

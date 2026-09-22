@@ -999,6 +999,10 @@ MonoBehaviour:
     m_Key: Battle_ReactionVaporize
     m_Metadata:
       m_Items: []
+  - m_Id: 12030
+    m_Key: Battle_TipItemCardPending
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

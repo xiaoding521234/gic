@@ -34,6 +34,7 @@ namespace GIC.UI
 
         // 局内手牌构建（B6c）：读玩家存档当前卡组
         [Autowired] private GIC.Framework.SaveManager _saveManager;
+        [Autowired] private GIC.Framework.CardManager _cardManager;
 
         /// <summary>当前对局（调试/测试访问口）</summary>
         public BattleSession Session => _session;
@@ -349,27 +350,29 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 从玩家存档当前卡组构建局内手牌（B6c：初始手牌=当前卡组投影，docs/18 决策七）——
-        /// 只取角色卡（物品卡 UseItem/EquipItem 后续批次）；卡不消耗留手牌。
-        /// 卡组为空时回退丘丘人×2（保证部署链路可目检）。
+        /// 从玩家存档当前卡组构建局内手牌（B6c：初始手牌=当前卡组，docs/18 决策七）——
+        /// 2026-09-22 拍板：完整卡组投影（角色卡+物品卡全进手牌，物品使用/装备链后续批次）；
+        /// 走 CardManager 卡组视图=与收藏卡组界面同源同排序（角色前物品后、SortOrder、星级）。
+        /// 卡不消耗留手牌。卡组为空时回退丘丘人×2（保证部署链路可目检）。
         /// </summary>
-        private List<int> BuildHandFromCurrentDeck()
+        private List<CardId> BuildHandFromCurrentDeck()
         {
-            var result = new List<int>();
+            var result = new List<CardId>();
             var save = _saveManager?.CurrentSave;
             if (save != null)
             {
                 int currentDeck = save.progress.currentDeck;
-                foreach (var card in save.ownedCards)
+                var decks = _cardManager?.decks;
+                if (decks != null && currentDeck >= 0 && currentDeck < decks.Length)
                 {
-                    if (card.cardType == GIC.Data.CardType.Unit && card.HasInDeck(currentDeck))
-                        result.Add((int)card.id.AsUnitName());
+                    foreach (var card in decks[currentDeck].Cards)
+                        result.Add(card.id);
                 }
             }
             if (result.Count == 0)
             {
-                result.Add((int)GIC.Data.UnitName.Hilichurl);
-                result.Add((int)GIC.Data.UnitName.Hilichurl);
+                result.Add(new CardId(UnitName.Hilichurl));
+                result.Add(new CardId(UnitName.Hilichurl));
             }
             return result;
         }

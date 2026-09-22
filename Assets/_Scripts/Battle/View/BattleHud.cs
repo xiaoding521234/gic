@@ -108,8 +108,15 @@ namespace GIC.Battle
         private RectTransform _handCardRoot;
         private readonly List<UnityEngine.UI.Button> _handCardButtons = new List<UnityEngine.UI.Button>();
 
+        /// <summary>手牌滚动（B6c-2：卡多时横向滑动，同背包滚动视图结构——ScrollRect+Viewport 裁剪+Content）</summary>
+        private UnityEngine.UI.ScrollRect _handScroll;
+        private RectTransform _handContent;
+
         /// <summary>手牌卡 prefab（项目唯一卡牌形态 Card.prefab=Resources/Prefabs/Backpack/；懒加载）</summary>
         private GameObject _handCardPrefab;
+
+        /// <summary>手牌签名（卡列表恒定时跳过重建——手牌不消耗，回合间签名不变，免每回合 Instantiate GC）</summary>
+        private string _handSignature;
 
         private string _selectedUnitId;
         private SkillButtonDef _popupDef;  // 详情面板当前展示的键
@@ -241,7 +248,7 @@ namespace GIC.Battle
             UpdateQueueLabel();
 
             // 手牌（数量；卡列表 B8 接入）
-            // 手牌（B6c：卡列表=当前卡组投影；数量文本与卡列表并存——文本做标签）
+            // 手牌（B6c：卡列表=当前卡组完整投影，含物品卡；数量文本与卡列表并存——文本做标签）
             var myRes = snapshot.resources.FirstOrDefault(r => r.playerId == _myPlayerId);
             _handTextCombiner.ClearAllEntries();
             _handTextCombiner.AddEntry(new LocalizedString("UIText", "Battle_Hand"));
@@ -288,6 +295,9 @@ namespace GIC.Battle
             {
                 var handDef = _layoutByKey != null && _layoutByKey.TryGetValue("hand", out var def) ? def : null;
                 if (handDef?.content == null) return;
+
+                // 结构（同背包滚动视图）：HandCards（外框）→ HandScroll（ScrollRect+透明命中层）
+                // → HandViewport（RectMask2D 裁剪）→ HandContent（卡排容器=ScrollRect.content）
                 var rootGo = new GameObject("HandCards");
                 rootGo.transform.SetParent(handDef.content, false);
                 var rt = rootGo.AddComponent<RectTransform>();
@@ -298,12 +308,57 @@ namespace GIC.Battle
                 rt.anchoredPosition = Vector2.zero;
                 rt.sizeDelta = new Vector2(1400f, 250f);
                 _handCardRoot = rt;
+
+                var scrollGo = new GameObject("HandScroll");
+                scrollGo.transform.SetParent(rt, false);
+                var scrollRt = scrollGo.AddComponent<RectTransform>();
+                scrollRt.anchorMin = Vector2.zero;
+                scrollRt.anchorMax = Vector2.one;
+                scrollRt.offsetMin = scrollRt.offsetMax = Vector2.zero;
+                // 透明命中层：ScrollRect 拖动与 wrapper 点击都依赖此处有 raycast 目标
+                var hitImage = scrollGo.AddComponent<UnityEngine.UI.Image>();
+                hitImage.color = Color.clear;
+                hitImage.raycastTarget = true;
+                var scroll = scrollGo.AddComponent<UnityEngine.UI.ScrollRect>();
+                scroll.horizontal = true;
+                scroll.vertical = false;
+                // Elastic 弹性回弹：卡少（content 窄于视口）时也可拖出回弹——"即便 1 张卡也能滑动"
+                // （Clamped 在 content≤viewport 时零滚程、完全拖不动，2026-09-22 实证）
+                scroll.movementType = UnityEngine.UI.ScrollRect.MovementType.Elastic;
+                scroll.scrollSensitivity = 30f;
+                _handScroll = scroll;
+
+                var viewportGo = new GameObject("HandViewport");
+                viewportGo.transform.SetParent(scrollGo.transform, false);
+                var viewportRt = viewportGo.AddComponent<RectTransform>();
+                viewportRt.anchorMin = Vector2.zero;
+                viewportRt.anchorMax = Vector2.one;
+                viewportRt.offsetMin = viewportRt.offsetMax = Vector2.zero;
+                viewportGo.AddComponent<RectMask2D>();
+                scroll.viewport = viewportRt;
+
+                var contentGo = new GameObject("HandContent");
+                contentGo.transform.SetParent(viewportGo.transform, false);
+                var contentRt = contentGo.AddComponent<RectTransform>();
+                // pivot/anchor=中上：content 窄于视口时初始即居中、Elastic 回弹也归位居中
+                // （宽于视口时 ScrollRect 滚动/clamp 基于 bounds 与锚点无关，照常滚动）——"卡牌应当居中"
+                contentRt.pivot = new Vector2(0.5f, 1f);
+                contentRt.anchorMin = contentRt.anchorMax = new Vector2(0.5f, 1f);
+                contentRt.anchoredPosition = Vector2.zero;
+                scroll.content = contentRt;
+                _handContent = contentRt;
             }
+
+            // 卡列表签名比对：手牌不消耗（回合间恒定），签名未变只重置滚动位置不重建（免每回合 Instantiate/Destroy GC 尖峰）
+            var signature = myRes == null ? "" : string.Join(",", myRes.handCards);
+            if (signature == _handSignature) return;
+            _handSignature = signature;
 
             foreach (var btn in _handCardButtons)
                 if (btn != null) Destroy(btn.gameObject);
             _handCardButtons.Clear();
-            if (myRes == null || myRes.handUnits.Count == 0) return;
+            if (_handScroll != null) _handScroll.normalizedPosition = Vector2.zero;
+            if (myRes == null || myRes.handCards.Count == 0) return;
 
             if (_handCardPrefab == null)
                 _handCardPrefab = Resources.Load<GameObject>("Prefabs/Backpack/Card");
@@ -316,21 +371,52 @@ namespace GIC.Battle
             var unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
             // 手牌规格=Card.prefab 原生 160×240（保持收藏卡原比例，与背包同款）
             float cardWidth = 160f, gap = 18f;
-            int count = myRes.handUnits.Count;
+            int count = myRes.handCards.Count;
+            float rowWidth = count * cardWidth + (count - 1) * gap;
+            // content 宽恒=行宽+左右边距 60（**勿夹到视口宽**——窄于视口才有 Elastic 拖程，
+            // "1 张卡也能滑动"；宽于视口=正常滚动），卡排相对 content 中心对称排
+            _handContent.sizeDelta = new Vector2(rowWidth + 120f, 260f);
             for (int i = 0; i < count; i++)
             {
-                var unitName = (UnitName)myRes.handUnits[i];
-                var unitData = unitConfig?.GetUnitData(unitName);
-                if (unitData == null) continue;
+                var cardId = myRes.handCards[i];
+                bool isUnit = cardId.cardType == CardType.Unit;
+                // 配置校验：角色查 UnitConfig、物品查 ItemConfig——卡组条目无配置跳过并告警；
+                // 物品备战数=min(存档持有, maxPrepareCount 备战上限)——带入战斗的量
+                // （2026-09-22 拍板：如背包含 100 体力、备战上限 60 → 手牌显示 60；maxPrepareCount=0 的货币卡不可入组）
+                int prepareCount = 0;
+                if (isUnit)
+                {
+                    if (unitConfig?.GetUnitData(cardId.AsUnitName()) == null)
+                    {
+                        GICLog.Warn($"[BattleHud] 手牌卡 {cardId} 无 UnitConfig 配置，跳过");
+                        continue;
+                    }
+                }
+                else
+                {
+                    var itemData = CardConfigResolver.Instance?.ItemConfig?.GetItemData(cardId.AsItemName());
+                    if (itemData == null)
+                    {
+                        GICLog.Warn($"[BattleHud] 手牌卡 {cardId} 无 ItemConfig 配置，跳过");
+                        continue;
+                    }
+                    prepareCount = Mathf.Min(
+                        _saveManager?.CurrentSave?.GetItemCount(cardId.AsItemName()) ?? 0,
+                        itemData.maxPrepareCount);
+                }
 
-                // 外层 wrapper=点击接收层（Button）；pivot=底边中点与 root 同语义
-                var wrapperGo = new GameObject($"Hand_{unitName}");
-                wrapperGo.transform.SetParent(_handCardRoot, false);
+                // 外层 wrapper=点击接收层（Button）；pivot=顶边中点，卡排相对 content 中心对称
+                var wrapperGo = new GameObject($"Hand_{cardId}");
+                wrapperGo.transform.SetParent(_handContent, false);
                 var wrapperRt = wrapperGo.AddComponent<RectTransform>();
-                wrapperRt.pivot = new Vector2(0.5f, 0f);
-                wrapperRt.anchorMin = wrapperRt.anchorMax = new Vector2(0.5f, 0f);
-                wrapperRt.anchoredPosition = new Vector2((i - (count - 1) * 0.5f) * (cardWidth + gap), 0f);
+                wrapperRt.pivot = new Vector2(0.5f, 1f);
+                wrapperRt.anchorMin = wrapperRt.anchorMax = new Vector2(0.5f, 1f);
+                wrapperRt.anchoredPosition = new Vector2((i - (count - 1) * 0.5f) * (cardWidth + gap), -10f);
                 wrapperRt.sizeDelta = new Vector2(cardWidth, 240f);
+                // 命中层（透明 Image）：wrapper 需 raycast 目标才可点击/拖动（卡内 raycast 已全关防拦截）
+                var hit = wrapperGo.AddComponent<UnityEngine.UI.Image>();
+                hit.color = Color.clear;
+                hit.raycastTarget = true;
 
                 // 卡牌本体（唯一形态复用；保持 prefab 原生 160×240 居中——勿 stretch 压扁，2026-09-22 目检实证）
                 var cardGo = Instantiate(_handCardPrefab, wrapperGo.transform, false);
@@ -346,28 +432,37 @@ namespace GIC.Battle
                 if (card != null)
                 {
                     var saveData = new GIC.Framework.SaveCardData();
-                    saveData.SaveUnit(unitName, 1);
+                    if (isUnit) saveData.SaveUnit(cardId.AsUnitName(), 1);
+                    else saveData.SaveItem(cardId.AsItemName(), prepareCount);
                     card.SetViewType(ViewType.OnlyDisplay);
-                    card.Init(saveData, null); // 手牌不挂详情面板（点卡=进部署瞄准）
+                    card.Init(saveData, null); // 手牌不挂详情面板（点卡=角色进部署瞄准/物品提示）
                 }
 
-                // 费用角标（手牌语义叠加层，右下）
-                var costGo = new GameObject("DeployCost");
-                costGo.transform.SetParent(wrapperGo.transform, false);
-                var costRt = costGo.AddComponent<RectTransform>();
-                costRt.anchorMin = costRt.anchorMax = new Vector2(1f, 0f);
-                costRt.anchoredPosition = new Vector2(-16f, 16f);
-                costRt.sizeDelta = new Vector2(56f, 26f);
-                var costText = costGo.AddComponent<TextMeshProUGUI>();
-                costText.font = BattleViewFactory.WorldTextFont;
-                costText.fontSize = 22;
-                costText.alignment = TextAlignmentOptions.Center;
-                costText.color = Palette.高亮金;
-                costText.text = unitData.GetEffectiveDeployCost().ToString();
+                // 部署费角标（手牌语义叠加层，右下；仅角色卡——物品卡无部署费，使用链后续批次）
+                if (isUnit)
+                {
+                    var costGo = new GameObject("DeployCost");
+                    costGo.transform.SetParent(wrapperGo.transform, false);
+                    var costRt = costGo.AddComponent<RectTransform>();
+                    costRt.anchorMin = costRt.anchorMax = new Vector2(1f, 0f);
+                    costRt.anchoredPosition = new Vector2(-16f, 16f);
+                    costRt.sizeDelta = new Vector2(56f, 26f);
+                    var costText = costGo.AddComponent<TextMeshProUGUI>();
+                    costText.font = BattleViewFactory.WorldTextFont;
+                    costText.fontSize = 22;
+                    costText.alignment = TextAlignmentOptions.Center;
+                    costText.color = Palette.高亮金;
+                    costText.text = unitConfig.GetUnitData(cardId.AsUnitName()).GetEffectiveDeployCost().ToString();
+                }
 
                 var btn = wrapperGo.AddComponent<UnityEngine.UI.Button>();
-                int captured = myRes.handUnits[i];
-                btn.onClick.AddListener(() => EnterDeployAim(captured));
+                btn.targetGraphic = hit;
+                var captured = cardId;
+                btn.onClick.AddListener(() =>
+                {
+                    if (captured.cardType == CardType.Unit) EnterDeployAim(captured.value);
+                    else SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入，不进部署链
+                });
                 _handCardButtons.Add(btn);
             }
         }
