@@ -82,6 +82,9 @@ namespace GIC.Data
         public int hitX;
         public int hitY;
 
+        [Header("反应标记（Damage 命令有效；0=无反应——本次命中触发的元素反应子类型，供客户端伤害数字带反应名）")]
+        public int reactionKind;
+
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
         public int buffLevel;
@@ -89,6 +92,11 @@ namespace GIC.Data
 
         [Header("特效子类型（Effect 命令 metadata；随用随加）")]
         public const int EffectKindProjectileVanish = 1;
+
+        [Header("反应子类型（Reaction 命令 metadata；docs/06 元素反应）")]
+        public const int ReactionKindMelt = 1;      // 融化（火+冰）
+        public const int ReactionKindFreeze = 2;     // 冻结（水+冰）
+        public const int ReactionKindVaporize = 3;  // 蒸发（火+水；2026-09-22 补全，docs/06 §反应表）
 
         [Header("移动载荷（Move 命令 metadata；2026-09-21）")]
         /// <summary>被挡标记：移动尝试进入 direction 方向的下一格失败（逻辑已停在被挡格前），
@@ -113,9 +121,11 @@ namespace GIC.Data
 
         /// <summary>Damage 命令工厂。metadata=元素；direction=投放形态（0=瞬发直击/1=直线投射物，复用字段）；
         /// cell=投射物发射格（Delivery≠0 时有效）；hitX/hitY=命中点千分定点连续格心坐标
-        /// （Delivery=1 有效——Host 接触判定得出，客户端按此播放弹着点，勿自行推算）</summary>
+        /// （Delivery=1 有效——Host 接触判定得出，客户端按此播放弹着点，勿自行推算）；
+        /// reactionKind=本次命中触发的元素反应（0=无；增伤反应时伤害数字带反应名）</summary>
         public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
-            int amount, int metadata, int delivery = 0, BattleCell fromCell = default, int hitX = 0, int hitY = 0)
+            int amount, int metadata, int delivery = 0, BattleCell fromCell = default, int hitX = 0, int hitY = 0,
+            int reactionKind = 0)
         {
             return new BattleCommand
             {
@@ -130,6 +140,7 @@ namespace GIC.Data
                 cell = fromCell,
                 hitX = hitX,
                 hitY = hitY,
+                reactionKind = reactionKind,
             };
         }
 
@@ -202,6 +213,40 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 buffType = buffType,
+            };
+        }
+
+        /// <summary>元素附着命令工厂。metadata=附着元素（覆盖语义=消耗被反应附着，docs/06）；
+        /// 客户端即时刷新目标附着显示（此前靠下回合快照自愈）</summary>
+        public static BattleCommand ElementAttach(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
+            int element)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.ElementAttach,
+                actorUnitId = actorUnitId,
+                targetUnitId = targetUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = element,
+            };
+        }
+
+        /// <summary>元素反应命令工厂。metadata=反应子类型（ReactionKindMelt/Freeze）；value=反应级别。
+        /// 融化的伤害并入已由 Damage 命令承载，本命令只播"反应发生"事件；冻结时客户端即时同步立牌冰色
+        /// （此前冰色靠下回合快照，反应当回合不可见）</summary>
+        public static BattleCommand Reaction(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
+            int reactionType, int level)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.Reaction,
+                actorUnitId = actorUnitId,
+                targetUnitId = targetUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = reactionType,
+                value = level,
             };
         }
     }

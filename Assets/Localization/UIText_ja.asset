@@ -998,6 +998,14 @@ MonoBehaviour:
     m_Localized: "\u6226\u95D8\u3092\u7D9A\u3051\u308B"
     m_Metadata:
       m_Items: []
+  - m_Id: 12028
+    m_Localized: "\u6EB6\u878D"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12029
+    m_Localized: "\u84B8\u767A"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

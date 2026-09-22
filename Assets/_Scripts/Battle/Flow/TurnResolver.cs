@@ -158,13 +158,23 @@ namespace GIC.Battle
             foreach (var effect in MergeDamageEffects(effects))
             {
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
-                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f)));
+                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType));
             }
             foreach (var vanish in vanishes)
             {
                 vanish.sliceIndex = sliceIndex;
                 vanish.indexInSlice = indexInSlice++;
                 segment.commands.Add(vanish);
+            }
+            foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
+            {
+                segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.Element));
+            }
+            foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
+            {
+                segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
             }
             foreach (var effect in MergeHealEffects(effects))
             {
@@ -180,6 +190,8 @@ namespace GIC.Battle
                 if (_sim.TryGetUnitId(dead, out var deadId))
                     segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
             }
+
+            BattleEffectCommandAudit.Assert($"回合{turnNumber}片{sliceIndex}", effects, appliedBuffs, segment.commands);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -215,7 +227,7 @@ namespace GIC.Battle
             if (effects.Count == 0 && expired.Count == 0)
                 return null; // 本回合无任何回合结束内容：不推送空段
 
-            ApplyEffects(effects);
+            var appliedBuffs = ApplyEffects(effects);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
             int indexInSlice = 0;
@@ -227,6 +239,23 @@ namespace GIC.Battle
             {
                 if (effect is HealEffect heal)
                     segment.commands.Add(BattleCommand.Heal(heal.SourceUnitId, heal.TargetUnitId, sliceIndex, indexInSlice++, heal.Amount));
+            }
+            // 回合结束段同构产出（2026-09-22 接线；当前 Buff.OnTurnEnd 只产伤害，防御性补齐——
+            // 未来"回合结束获得 Buff/附着"类效应不漏发命令，对账机制统一覆盖三段）
+            foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
+            {
+                segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.Element));
+            }
+            foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
+            {
+                segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
+            }
+            foreach (var applied in MergeAppliedBuffs(appliedBuffs))
+            {
+                segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
+                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
             }
             foreach (var dead in newlyDead)
             {
@@ -244,6 +273,8 @@ namespace GIC.Battle
                 }
                 _sim.RemoveBuff(buff.owner, buff);
             }
+
+            BattleEffectCommandAudit.Assert($"回合{turnNumber}结束段", effects, appliedBuffs, segment.commands);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -307,13 +338,19 @@ namespace GIC.Battle
                     moverList[0].Blocked ? BattleCommand.MoveBlocked : 0, moverList[0].Blocked ? (int)moverList[0].Direction : 0));
             foreach (var effect in MergeDamageEffects(effects))
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
-                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f)));
+                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType));
             foreach (var vanish in vanishes)
             {
                 vanish.sliceIndex = sliceIndex;
                 vanish.indexInSlice = indexInSlice++;
                 segment.commands.Add(vanish);
             }
+            foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
+                segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.Element));
+            foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
+                segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
             foreach (var effect in MergeHealEffects(effects))
                 segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
@@ -324,6 +361,8 @@ namespace GIC.Battle
                 if (_sim.TryGetUnitId(dead, out var deadId))
                     segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
             }
+
+            BattleEffectCommandAudit.Assert($"回合{turnNumber}即时段", effects, appliedBuffs, segment.commands);
 
             GICLog.Info($"[TurnResolver] 即时行动 {segment}");
             return segment;
@@ -457,9 +496,10 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    // 命中点取首条（同片同 (攻击者,目标) 合并时=最早一次接触的位置）
+                    // 命中点与反应标记取首条（同片同 (攻击者,目标) 合并时=最早一次接触的位置与反应）
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
-                        damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY);
+                        damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY,
+                        damage.ReactionType);
                     merged[key] = copy;
                     result.Add(copy);
                 }
@@ -491,6 +531,14 @@ namespace GIC.Battle
                 }
             }
             return result;
+        }
+
+        /// <summary>按类型枚举效应（附着/反应一一对应产出命令，覆盖语义后到者胜——与合并策略不同属预期）</summary>
+        private static IEnumerable<T> EnumerateEffects<T>(List<BattleEffect> effects) where T : BattleEffect
+        {
+            foreach (var effect in effects)
+                if (effect is T typed)
+                    yield return typed;
         }
 
         // ==================== 推送与 ack ====================

@@ -39,6 +39,14 @@ namespace GIC.Battle
         private readonly List<BuffState> _buffs = new List<BuffState>();
         private Transform _buffRow;
 
+        // 元素附着小图标（血条左侧；快照权威 + ElementAttach 命令增量，2026-09-22 接线——
+        // 此前 DyedElement 仅存在于快照、View 侧无视觉载体，附着对玩家不可见）
+        private SpriteRenderer _attachIcon;
+
+        /// <summary>附着图标尺寸（世界高；与 Buff 徽章同量级）与血条左缘间隙</summary>
+        private const float AttachIconSize = 0.18f;
+        private const float AttachIconGap = 0.10f;
+
         /// <summary>立牌倾斜组（AvatarTilt：原点=格面底边，绕底边后仰）——血条/名字/Buff 行全部挂入，
         /// 与立牌同一平面同一旋转轴（2026-09-18 用户拍板：头顶信息一律随立牌倾斜）</summary>
         private Transform _tiltGroup;
@@ -148,6 +156,7 @@ namespace GIC.Battle
             view.BuildHpBar();
             view.BuildName(nameEntry);
             view.BuildBuffRow();
+            view.BuildAttachIcon();
             view.SetHp(hp, maxHp);
 
             return view;
@@ -168,6 +177,42 @@ namespace GIC.Battle
             fillGo.transform.localPosition = new Vector3(0f, 0f, -0.02f);
             fillGo.transform.localScale = new Vector3(1f, 1f, 1f);
             _hpBarFill = fillGo.transform;
+        }
+
+        /// <summary>元素附着小图标（血条左缘外侧、同平面倾斜）：当前 DyedElement 可视化——
+        /// Physical=无附着不显示。图标=元素 Stroke 现成图（与 Buff 徽章同资产链）</summary>
+        private void BuildAttachIcon()
+        {
+            var iconGo = new GameObject("AttachIcon");
+            iconGo.transform.SetParent(_tiltGroup, false);
+            iconGo.transform.localPosition = new Vector3(-(HpBarWidth * 0.5f + AttachIconGap + AttachIconSize * 0.5f),
+                OverheadRowY(HpBarY), 0f);
+            _attachIcon = iconGo.AddComponent<SpriteRenderer>();
+            _attachIcon.sortingOrder = 11;
+            _attachIcon.gameObject.SetActive(false);
+        }
+
+        /// <summary>附着元素同步（快照权威 + ElementAttach 命令增量；覆盖语义后到者胜）</summary>
+        public void SetAttachedElement(ElementType element)
+        {
+            if (_attachIcon == null) return;
+            if (element == ElementType.Physical)
+            {
+                _attachIcon.gameObject.SetActive(false);
+                return;
+            }
+            var config = ElementFactionConfig.Instance;
+            var icon = config != null ? config.GetElementIconStroke(element) : null;
+            if (icon == null)
+            {
+                _attachIcon.gameObject.SetActive(false);
+                return;
+            }
+            _attachIcon.sprite = icon;
+            float worldHeight = icon.bounds.size.y;
+            if (worldHeight > 0f)
+                _attachIcon.transform.localScale = Vector3.one * (AttachIconSize / worldHeight);
+            _attachIcon.gameObject.SetActive(true);
         }
 
         /// <summary>单位名：世界空间 TextMeshPro + TextCombiner 同物体（语言切换自动刷新）。
