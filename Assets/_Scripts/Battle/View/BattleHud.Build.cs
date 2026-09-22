@@ -91,6 +91,22 @@ namespace GIC.Battle
                 _handZone = hand.content;
                 _handTextCombiner = _handZone.Find("HandText")?.GetComponent<TextCombiner>();
                 RecolorText(_handTextCombiner, Palette.文字米白);
+
+                // 手牌滚动壳寻址（2026-09-23 审查 R1：HandCards→HandScroll→HandViewport→HandContent 四层
+                // 结构真源=BattleHud.prefab 的 hand 槽内——pivot/锚点/Elastic/敏感度 30 全在编辑器调，
+                // 代码只寻址+建卡条目，勿再程序化建壳）
+                var shell = _handZone.Find("HandCards");
+                if (shell == null)
+                {
+                    GICLog.Warn("[BattleHud] prefab 缺手牌滚动壳（Slots/hand 内 HandCards），手牌不显示");
+                }
+                else
+                {
+                    _handScroll = shell.Find("HandScroll")?.GetComponent<UnityEngine.UI.ScrollRect>();
+                    _handContent = shell.Find("HandScroll/HandViewport/HandContent") as RectTransform;
+                    if (_handScroll == null || _handContent == null)
+                        GICLog.Warn("[BattleHud] 手牌滚动壳不完整（需 HandScroll(ScrollRect)/HandViewport(RectMask2D)/HandContent）");
+                }
             }
             else GICLog.Warn("[BattleHud] 布局槽缺失：hand");
 

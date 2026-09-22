@@ -104,8 +104,8 @@ namespace GIC.Battle
         /// <summary>部署瞄准中的角色（UnitName 枚举值；0=非部署瞄准态）</summary>
         private int _deployAimUnit;
 
-        /// <summary>手牌卡按钮容器（hand 布局件内动态构建；RebuildHandCards 重建）</summary>
-        private RectTransform _handCardRoot;
+        /// <summary>手牌卡按钮容器（hand 布局件内；RebuildHandCards 重建。
+        /// 2026-09-23 审查 R1：滚动壳四层结构上移 prefab hand 槽，代码只寻址 _handScroll/_handContent+建卡条目）</summary>
         private readonly List<UnityEngine.UI.Button> _handCardButtons = new List<UnityEngine.UI.Button>();
 
         /// <summary>手牌滚动（B6c-2：卡多时横向滑动，同背包滚动视图结构——ScrollRect+Viewport 裁剪+Content）</summary>
@@ -288,66 +288,12 @@ namespace GIC.Battle
 
         /// <summary>重建手牌卡（B6c：复用项目唯一卡牌形态 Card.prefab——策略链渲染卡面/名/星；
         /// 外层 wrapper 承点击（卡内 raycast 全关防拦截），费用角标为手牌语义叠加层。
-        /// 每选择阶段头随快照重建（Card 淡入被 OnlyDisplay 跳过，无闪烁）</summary>
+        /// 每选择阶段头随快照重建（Card 淡入被 OnlyDisplay 跳过，无闪烁）。
+        /// 2026-09-23 审查 R1：滚动壳（HandCards→HandScroll→HandViewport→HandContent 四层）上移
+        /// BattleHud.prefab 的 hand 槽内——本方法只建卡条目；壳寻址=ResolveMiscWidgets，缺失已 Warn</summary>
         private void RebuildHandCards(PlayerResourceState myRes)
         {
-            if (_handCardRoot == null)
-            {
-                var handDef = _layoutByKey != null && _layoutByKey.TryGetValue("hand", out var def) ? def : null;
-                if (handDef?.content == null) return;
-
-                // 结构（同背包滚动视图）：HandCards（外框）→ HandScroll（ScrollRect+透明命中层）
-                // → HandViewport（RectMask2D 裁剪）→ HandContent（卡排容器=ScrollRect.content）
-                var rootGo = new GameObject("HandCards");
-                rootGo.transform.SetParent(handDef.content, false);
-                var rt = rootGo.AddComponent<RectTransform>();
-                // pivot=底边中点：anchoredPosition 的 y 语义=「底边距 HandZone 底边」——
-                // 勿用默认中心 pivot（单点锚下它=rect 中心到锚点距离，卡排会整体沉到屏幕下方，2026-09-22 实证）
-                rt.pivot = new Vector2(0.5f, 0f);
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0f);
-                rt.anchoredPosition = Vector2.zero;
-                rt.sizeDelta = new Vector2(1400f, 250f);
-                _handCardRoot = rt;
-
-                var scrollGo = new GameObject("HandScroll");
-                scrollGo.transform.SetParent(rt, false);
-                var scrollRt = scrollGo.AddComponent<RectTransform>();
-                scrollRt.anchorMin = Vector2.zero;
-                scrollRt.anchorMax = Vector2.one;
-                scrollRt.offsetMin = scrollRt.offsetMax = Vector2.zero;
-                // 透明命中层：ScrollRect 拖动与 wrapper 点击都依赖此处有 raycast 目标
-                var hitImage = scrollGo.AddComponent<UnityEngine.UI.Image>();
-                hitImage.color = Color.clear;
-                hitImage.raycastTarget = true;
-                var scroll = scrollGo.AddComponent<UnityEngine.UI.ScrollRect>();
-                scroll.horizontal = true;
-                scroll.vertical = false;
-                // Elastic 弹性回弹：卡少（content 窄于视口）时也可拖出回弹——"即便 1 张卡也能滑动"
-                // （Clamped 在 content≤viewport 时零滚程、完全拖不动，2026-09-22 实证）
-                scroll.movementType = UnityEngine.UI.ScrollRect.MovementType.Elastic;
-                scroll.scrollSensitivity = 30f;
-                _handScroll = scroll;
-
-                var viewportGo = new GameObject("HandViewport");
-                viewportGo.transform.SetParent(scrollGo.transform, false);
-                var viewportRt = viewportGo.AddComponent<RectTransform>();
-                viewportRt.anchorMin = Vector2.zero;
-                viewportRt.anchorMax = Vector2.one;
-                viewportRt.offsetMin = viewportRt.offsetMax = Vector2.zero;
-                viewportGo.AddComponent<RectMask2D>();
-                scroll.viewport = viewportRt;
-
-                var contentGo = new GameObject("HandContent");
-                contentGo.transform.SetParent(viewportGo.transform, false);
-                var contentRt = contentGo.AddComponent<RectTransform>();
-                // pivot/anchor=中上：content 窄于视口时初始即居中、Elastic 回弹也归位居中
-                // （宽于视口时 ScrollRect 滚动/clamp 基于 bounds 与锚点无关，照常滚动）——"卡牌应当居中"
-                contentRt.pivot = new Vector2(0.5f, 1f);
-                contentRt.anchorMin = contentRt.anchorMax = new Vector2(0.5f, 1f);
-                contentRt.anchoredPosition = Vector2.zero;
-                scroll.content = contentRt;
-                _handContent = contentRt;
-            }
+            if (_handContent == null) return; // 壳未寻到（prefab 缺 HandCards），手牌不显示
 
             // 卡列表签名比对：手牌不消耗（回合间恒定），签名未变只重置滚动位置不重建（免每回合 Instantiate/Destroy GC 尖峰）
             var signature = myRes == null ? "" : string.Join(",", myRes.handCards);
@@ -368,7 +314,7 @@ namespace GIC.Battle
                 return;
             }
 
-            var unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
+            // 单位配置=[Autowired] 注入（Y10），不再 Resources.Load
             // 手牌规格=Card.prefab 原生 160×240（保持收藏卡原比例，与背包同款）
             float cardWidth = 160f, gap = 18f;
             int count = myRes.handCards.Count;
@@ -386,7 +332,7 @@ namespace GIC.Battle
                 int prepareCount = 0;
                 if (isUnit)
                 {
-                    if (unitConfig?.GetUnitData(cardId.AsUnitName()) == null)
+                    if (_unitConfig?.GetUnitData(cardId.AsUnitName()) == null)
                     {
                         GICLog.Warn($"[BattleHud] 手牌卡 {cardId} 无 UnitConfig 配置，跳过");
                         continue;
@@ -452,7 +398,7 @@ namespace GIC.Battle
                     costText.fontSize = 22;
                     costText.alignment = TextAlignmentOptions.Center;
                     costText.color = Palette.高亮金;
-                    costText.text = unitConfig.GetUnitData(cardId.AsUnitName()).GetEffectiveDeployCost().ToString();
+                    costText.text = _unitConfig.GetUnitData(cardId.AsUnitName()).GetEffectiveDeployCost().ToString();
                 }
 
                 var btn = wrapperGo.AddComponent<UnityEngine.UI.Button>();
@@ -890,13 +836,13 @@ namespace GIC.Battle
 
         // ==================== 技能数据链（现有体系：UnitConfig.skills → SkillData；2026-09-18 复用拍板） ====================
 
-        private UnitConfig _unitConfig;
+        /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；Bind 时 Inject 注入。
+        /// 2026-09-23 审查 Y10 收口：全 HUD 分件共用此字段，勿再 Resources.Load 旁路）</summary>
+        [Autowired] private UnitConfig _unitConfig;
 
-        /// <summary>选中角色的配置数据（头像/技能表/元素全在；BattlePlayer 同款加载）</summary>
+        /// <summary>选中角色的配置数据（头像/技能表/元素全在；BattlePlayer 同款注入）</summary>
         private UnitConfig.UnitData GetSelectedUnitData()
         {
-            if (_unitConfig == null)
-                _unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
             var snapshot = _session.Player.LatestSnapshot;
             var unit = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (unit == null) return null;

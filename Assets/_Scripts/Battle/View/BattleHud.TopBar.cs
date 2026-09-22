@@ -235,8 +235,7 @@ namespace GIC.Battle
 
         private Sprite GetAvatarSprite(string unitName)
         {
-            if (_unitConfig == null)
-                _unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
+            // _unitConfig=[Autowired] 注入（主分件声明；Y10），不再懒加载
             return _unitConfig != null && Enum.TryParse<UnitName>(unitName, out var name)
                 && _unitConfig.TryGetUnitData(name, out var data)
                 ? data.avatar : null;

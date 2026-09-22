@@ -13,8 +13,9 @@ namespace GIC.Battle
     {
         public BattleMapData Map { get; }
 
-        /// <summary>已注册玩家ID（回合提交完成度判定）</summary>
-        private readonly HashSet<string> _playerIds = new HashSet<string>();
+        /// <summary>已注册玩家ID（**注册序保序**——部署核心位置代理按注册序映射 spawnCenters、回合提交完成度判定用。
+        /// 2026-09-23 审查 Y5：原 HashSet 迭代序 .NET 无保证，B7 换注册实现会静默错位部署基准）</summary>
+        private readonly List<string> _playerIds = new List<string>();
 
         /// <summary>玩家资源（B1 只携带初始值）</summary>
         private readonly Dictionary<string, PlayerResourceState> _resources = new Dictionary<string, PlayerResourceState>();
@@ -46,7 +47,8 @@ namespace GIC.Battle
 
         public void RegisterPlayer(string playerId, int initialMora = 200, int initialStamina = 60)
         {
-            _playerIds.Add(playerId);
+            if (!_playerIds.Contains(playerId))
+                _playerIds.Add(playerId); // 注册序即 spawnCenters 映射序（List 保序）
             if (!_resources.ContainsKey(playerId))
             {
                 _resources[playerId] = new PlayerResourceState
@@ -60,7 +62,7 @@ namespace GIC.Battle
             }
         }
 
-        public IReadOnlyCollection<string> PlayerIds => _playerIds;
+        public IReadOnlyList<string> PlayerIds => _playerIds;
 
         // ==================== 局内手牌与资源（B6c：手牌=玩家当前卡组完整投影，卡不消耗可重复出战） ====================
 
@@ -94,16 +96,11 @@ namespace GIC.Battle
         }
 
         /// <summary>玩家核心位置代理（B6c 部署落点判定基准；协议核心 B8 Unit 化后换真核心——
-        /// 数据源收口此处一处：v1=出生区中心，spawnCenters 与 PlayerIds 同序）</summary>
+        /// 数据源收口此处一处：v1=出生区中心，spawnCenters 与 PlayerIds 注册序同序）</summary>
         public BattleCell GetCorePosition(string playerId)
         {
-            int index = 0;
-            foreach (var id in _playerIds)
-            {
-                if (id == playerId) break;
-                index++;
-            }
-            if (index < _playerIds.Count && Map.spawnCenters != null && index < Map.spawnCenters.Count)
+            int index = _playerIds.IndexOf(playerId);
+            if (index >= 0 && Map.spawnCenters != null && index < Map.spawnCenters.Count)
                 return Map.spawnCenters[index];
             return BattleCell.zero;
         }
@@ -343,47 +340,50 @@ namespace GIC.Battle
 
         // ==================== 快照 ====================
 
+        /// <summary>UnitState 单一构造出口（2026-09-23 审查 Y3：快照与 Summon 命令共用——
+        /// 此前 DeployUnitExecutor 手写 9 字段的部分状态，登场回合附着图标/元能/防御等客户端显示偏差，下回合快照才自愈）</summary>
+        public UnitState BuildUnitState(string unitId, Unit unit)
+        {
+            var identity = unit.GetUnitComponent<UnitIdentity>();
+            var stats = unit.GetUnitComponent<UnitStats>();
+            var element = unit.GetUnitComponent<UnitElement>();
+            var status = unit.GetUnitComponent<UnitStatus>();
+
+            var state = new UnitState
+            {
+                unitId = unitId,
+                unitName = identity?.UnitName.ToString() ?? "",
+                playerId = identity?.OwnerPlayerID ?? "",
+                team = (int)(identity?.Team ?? TeamType.A),
+                position = GetPosition(unit),
+                hp = stats?.HP ?? 0,
+                maxHp = stats?.GetStatStruct(StatType.HP).Max ?? 0,
+                attack = stats?.Attack ?? 0,
+                defense = stats?.Defense ?? 0,
+                attackSpeed = stats?.AttackSpeed ?? 0,
+                dyedElement = (int)(element?.DyedElement ?? ElementType.Physical),
+                isCorpse = status != null && status.IsDead ? 1 : 0,
+                isFrozen = status != null && status.IsFrozen ? 1 : 0,
+                volume = unit.Volume,
+                energy = stats?.Energy ?? 0,
+                maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
+            };
+            foreach (var buff in unit.Buffs)
+                state.buffs.Add(new BuffState
+                {
+                    type = (int)buff.Type,
+                    level = buff.Level,
+                    remainingTurns = buff.RemainingTurns,
+                });
+            return state;
+        }
+
         public BattleSnapshot TakeSnapshot(int turnNumber)
         {
             var snapshot = new BattleSnapshot { turnNumber = turnNumber };
 
             foreach (var kv in _units)
-            {
-                var unit = kv.Value;
-                var identity = unit.GetUnitComponent<UnitIdentity>();
-                var stats = unit.GetUnitComponent<UnitStats>();
-                var element = unit.GetUnitComponent<UnitElement>();
-                var status = unit.GetUnitComponent<UnitStatus>();
-                var buffs = unit.Buffs;
-
-                var state = new UnitState
-                {
-                    unitId = kv.Key,
-                    unitName = identity?.UnitName.ToString() ?? "",
-                    playerId = identity?.OwnerPlayerID ?? "",
-                    team = (int)(identity?.Team ?? TeamType.A),
-                    position = GetPosition(unit),
-                    hp = stats?.HP ?? 0,
-                    maxHp = stats?.GetStatStruct(StatType.HP).Max ?? 0,
-                    attack = stats?.Attack ?? 0,
-                    defense = stats?.Defense ?? 0,
-                    attackSpeed = stats?.AttackSpeed ?? 0,
-                    dyedElement = (int)(element?.DyedElement ?? ElementType.Physical),
-                    isCorpse = status != null && status.IsDead ? 1 : 0,
-                    isFrozen = status != null && status.IsFrozen ? 1 : 0,
-                    volume = unit.Volume,
-                    energy = stats?.Energy ?? 0,
-                    maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
-                };
-                foreach (var buff in buffs)
-                    state.buffs.Add(new BuffState
-                    {
-                        type = (int)buff.Type,
-                        level = buff.Level,
-                        remainingTurns = buff.RemainingTurns,
-                    });
-                snapshot.units.Add(state);
-            }
+                snapshot.units.Add(BuildUnitState(kv.Key, kv.Value));
 
             foreach (var kv in _resources)
             {

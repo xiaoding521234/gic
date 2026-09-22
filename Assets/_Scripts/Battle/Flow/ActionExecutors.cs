@@ -118,6 +118,7 @@ namespace GIC.Battle
 
         /// <summary>
         /// 执行部署：校验+扣费+生成单位。成功=true 且返回两条命令（Summon+StatChange 摩拉变化）。
+        /// 校验链=配置存在 → 手牌成员（Host 权威）→ 落点合法 → 摩拉够。
         /// </summary>
         public static bool TryResolve(BattleSimState sim, ActionData action, out BattleCommand summonCommand,
             out BattleCommand moraCommand)
@@ -125,12 +126,33 @@ namespace GIC.Battle
             summonCommand = null;
             moraCommand = null;
 
-            var config = UnityEngine.Resources.Load<UnitConfig>("Configs/UnitConfig");
+            var config = Wargame.Instance?.Context?.Get<UnitConfig>();
             var unitName = (UnitName)action.deployUnitName;
             var data = config?.GetUnitData(unitName);
             if (data == null)
             {
                 GICLog.Warn($"[DeployUnit] UnitConfig 无 {unitName}，部署落空");
+                return false;
+            }
+
+            // 手牌成员校验（2026-09-23 审查 Y2）：部署角色必须在玩家手牌内——本地 UI 只给手牌卡入口
+            // 不可见，但 Host 权威体系下客户端可凭空上交任意角色名（B7 LAN 前必须收口）
+            var hand = sim.GetHand(action.playerId);
+            bool inHand = false;
+            if (hand != null)
+            {
+                foreach (var card in hand)
+                {
+                    if (card.cardType == CardType.Unit && card.value == action.deployUnitName)
+                    {
+                        inHand = true;
+                        break;
+                    }
+                }
+            }
+            if (!inHand)
+            {
+                GICLog.Warn($"[DeployUnit] {action.playerId} 手牌无 {unitName}，部署拒绝");
                 return false;
             }
 
@@ -154,22 +176,14 @@ namespace GIC.Battle
                 unit.transform.SetParent(sim.LogicRoot, false);
             var unitId = sim.RegisterUnit(unit, action.playerId, sim.GetTeamOf(action.playerId), action.deployCell);
 
-            var identity = unit.GetUnitComponent<UnitIdentity>();
-            var stats = unit.GetUnitComponent<UnitStats>();
-            var state = new UnitState
-            {
-                unitId = unitId,
-                unitName = identity?.UnitName.ToString() ?? "",
-                playerId = action.playerId,
-                team = (int)sim.GetTeamOf(action.playerId),
-                position = action.deployCell,
-                hp = stats?.HP ?? 0,
-                maxHp = stats?.GetStatStruct(StatType.HP).Max ?? 0,
-                attackSpeed = stats?.AttackSpeed ?? 0,
-            };
+            // 全量 UnitState 单一出口（2026-09-23 审查 Y3：与快照同构——登场回合附着/元能/防御
+            // 等字段不缺，客户端建 view 与下回合快照零偏差）
+            var state = sim.BuildUnitState(unitId, unit);
 
-            summonCommand = BattleCommand.Summon(action.playerId, action.turnNumber, 0, state);
-            moraCommand = BattleCommand.StatChange(action.playerId, action.turnNumber, 1,
+            // sliceIndex/indexInSlice 传 0 占位——ResolveDeploySegment 产出时统一回填真实值（2026-09-23：
+            // 旧代码误传 turnNumber 进 sliceIndex 参数，语义误导）
+            summonCommand = BattleCommand.Summon(action.playerId, 0, 0, state);
+            moraCommand = BattleCommand.StatChange(action.playerId, 0, 0,
                 BattleCommand.StatKindMora, -cost);
             GICLog.Info($"[DeployUnit] {action.playerId} 出战 {unitName} @ {action.deployCell}（摩拉 {cost}）");
             return true;

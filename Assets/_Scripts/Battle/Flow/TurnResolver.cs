@@ -106,7 +106,6 @@ namespace GIC.Battle
 
             var effects = new List<BattleEffect>();
             var movers = new List<MoveActionState>();
-            var deadTargets = new List<Unit>();
 
             // 枚举序：unitId 升序（命令排列与写-写冲突合并依据；不影响结算结果）
             actions.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
@@ -158,59 +157,10 @@ namespace GIC.Battle
             // 死亡判定（效应应用后统一判；同片互杀 = 同归于尽）
             var damagedUnits = CollectDamagedTargets(effects);
             var newlyDead = _sim.ResolveDeaths(damagedUnits);
-            deadTargets.AddRange(newlyDead);
 
-            // 产出片命令块（枚举序）；被挡也发命令（全挡 path=[原格] / 部分挡 path=已走段），
-            // 携带 MoveBlocked 标记+方向供客户端播"撞墙弹回"表现
-            int indexInSlice = 0;
-            foreach (var mover in movers)
-            {
-                if (mover.Path.Count > 1 || mover.Blocked)
-                    segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path),
-                        mover.Blocked ? BattleCommand.MoveBlocked : 0, mover.Blocked ? (int)mover.Direction : 0));
-            }
-            foreach (var effect in MergeDamageEffects(effects))
-            {
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
-                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType));
-            }
-            foreach (var vanish in vanishes)
-            {
-                vanish.sliceIndex = sliceIndex;
-                vanish.indexInSlice = indexInSlice++;
-                segment.commands.Add(vanish);
-            }
-            foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
-            {
-                segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
-                    sliceIndex, indexInSlice++, effect.Element));
-            }
-            foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
-            {
-                segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
-                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
-            }
-            foreach (var effect in MergeEnergyEffects(effects))
-            {
-                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
-                    BattleCommand.StatKindEnergy, effect.Delta));
-            }
-            foreach (var effect in MergeHealEffects(effects))
-            {
-                segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
-            }
-            foreach (var applied in MergeAppliedBuffs(appliedBuffs))
-            {
-                segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
-                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
-            }
-            foreach (var dead in newlyDead)
-            {
-                if (_sim.TryGetUnitId(dead, out var deadId))
-                    segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
-            }
-
-            BattleEffectCommandAudit.Assert($"回合{turnNumber}片{sliceIndex}", effects, appliedBuffs, segment.commands);
+            // 产出片命令块（三段唯一出口 EmitSliceCommands——命令发射序与对账见其内注释）
+            EmitSliceCommands($"回合{turnNumber}片{sliceIndex}", segment, sliceIndex,
+                effects, appliedBuffs, movers, vanishes, newlyDead);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -288,56 +238,9 @@ namespace GIC.Battle
             var appliedBuffs = ApplyEffects(effects);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
-            int indexInSlice = 0;
-            foreach (var effect in MergeDamageEffects(effects))
-            {
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell));
-            }
-            foreach (var effect in effects)
-            {
-                if (effect is HealEffect heal)
-                    segment.commands.Add(BattleCommand.Heal(heal.SourceUnitId, heal.TargetUnitId, sliceIndex, indexInSlice++, heal.Amount));
-            }
-            // 回合结束段同构产出（2026-09-22 接线；当前 Buff.OnTurnEnd 只产伤害，防御性补齐——
-            // 未来"回合结束获得 Buff/附着"类效应不漏发命令，对账机制统一覆盖三段）
-            foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
-            {
-                segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
-                    sliceIndex, indexInSlice++, effect.Element));
-            }
-            foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
-            {
-                segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
-                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
-            }
-            foreach (var effect in MergeEnergyEffects(effects))
-            {
-                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
-                    BattleCommand.StatKindEnergy, effect.Delta));
-            }
-            foreach (var applied in MergeAppliedBuffs(appliedBuffs))
-            {
-                segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
-                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
-            }
-            foreach (var dead in newlyDead)
-            {
-                if (_sim.TryGetUnitId(dead, out var deadId))
-                    segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
-            }
-            foreach (var buff in expired)
-            {
-                if (_sim.TryGetUnitId(buff.owner, out var targetId))
-                {
-                    string sourceId = targetId;
-                    if (buff.source != null && _sim.TryGetUnitId(buff.source, out var sid))
-                        sourceId = sid;
-                    segment.commands.Add(BattleCommand.RemoveBuff(sourceId, targetId, sliceIndex, indexInSlice++, (int)buff.Type));
-                }
-                _sim.RemoveBuff(buff.owner, buff);
-            }
-
-            BattleEffectCommandAudit.Assert($"回合{turnNumber}结束段", effects, appliedBuffs, segment.commands);
+            // 产出回合结束段命令（三段唯一出口；到期 Buff 的 RemoveBuff 发射+注册表注销在出口尾部）
+            EmitSliceCommands($"回合{turnNumber}结束段", segment, sliceIndex,
+                effects, appliedBuffs, null, null, newlyDead, expired);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -398,43 +301,105 @@ namespace GIC.Battle
                 insertedInstantAction = 1,
             };
 
+            // 产出即时段命令（三段唯一出口；单 mover 复用同一 Move 发射循环）
+            EmitSliceCommands($"回合{turnNumber}即时段", segment, sliceIndex,
+                effects, appliedBuffs, moverList, vanishes, newlyDead);
+
+            GICLog.Info($"[TurnResolver] 即时行动 {segment}");
+            return segment;
+        }
+
+        // ==================== 段命令发射（三段唯一出口，2026-09-23 审查 Y1 收口） ====================
+
+        /// <summary>
+        /// 段命令统一发射：片/即时段/回合结束段三处原为复制粘贴（曾致 turnEnd 段 Damage 漏带命中点/
+        /// 反应标记的漂移）——收口后新效应→命令映射只加一处，BattleEffectCommandAudit 对账随发射统一覆盖三段。
+        /// 发射序：Move → Damage → 消散Effect → 附着 → 反应 → 元能 → 治疗 → 施加Buff → 死亡 → 到期移除Buff。
+        /// 与旧回合结束段序的差异：治疗从 Damage 后移至元能后（客户端 stagger 约 +0.36s，纯视觉节拍）。
+        /// </summary>
+        private void EmitSliceCommands(string context, Segment segment, int sliceIndex,
+            List<BattleEffect> effects, List<ApplyBuffEffect> appliedBuffs,
+            List<MoveActionState> movers, List<BattleCommand> vanishes, List<Unit> newlyDead,
+            List<BaseBuff> expired = null)
+        {
             int indexInSlice = 0;
-            if (moverList.Count > 0 && (moverList[0].Path.Count > 1 || moverList[0].Blocked))
-                segment.commands.Add(BattleCommand.Move(moverList[0].UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(moverList[0].Path),
-                    moverList[0].Blocked ? BattleCommand.MoveBlocked : 0, moverList[0].Blocked ? (int)moverList[0].Direction : 0));
-            foreach (var effect in MergeDamageEffects(effects))
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount, effect.Element, effect.Delivery, effect.FromCell,
-                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType));
-            foreach (var vanish in vanishes)
+
+            // Move：被挡也发命令（全挡 path=[原格] / 部分挡 path=已走段），携带 MoveBlocked 标记+方向
+            // 供客户端播"撞墙弹回"表现（2026-09-21）
+            if (movers != null)
             {
-                vanish.sliceIndex = sliceIndex;
-                vanish.indexInSlice = indexInSlice++;
-                segment.commands.Add(vanish);
+                foreach (var mover in movers)
+                {
+                    if (mover.Path.Count > 1 || mover.Blocked)
+                        segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path),
+                            mover.Blocked ? BattleCommand.MoveBlocked : 0, mover.Blocked ? (int)mover.Direction : 0));
+                }
             }
+
+            foreach (var effect in MergeDamageEffects(effects))
+            {
+                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount,
+                    effect.Element, effect.Delivery, effect.FromCell,
+                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType));
+            }
+
+            if (vanishes != null)
+            {
+                foreach (var vanish in vanishes)
+                {
+                    vanish.sliceIndex = sliceIndex;
+                    vanish.indexInSlice = indexInSlice++;
+                    segment.commands.Add(vanish);
+                }
+            }
+
             foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
+            {
                 segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.Element));
+            }
             foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
+            {
                 segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
+            }
             foreach (var effect in MergeEnergyEffects(effects))
+            {
                 segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindEnergy, effect.Delta));
+            }
             foreach (var effect in MergeHealEffects(effects))
+            {
                 segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
+            }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
+            {
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
                     sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
+            }
             foreach (var dead in newlyDead)
             {
                 if (_sim.TryGetUnitId(dead, out var deadId))
                     segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
             }
 
-            BattleEffectCommandAudit.Assert($"回合{turnNumber}即时段", effects, appliedBuffs, segment.commands);
+            // 到期 Buff：发射 RemoveBuff 后注销注册表（仅回合结束段传入）
+            if (expired != null)
+            {
+                foreach (var buff in expired)
+                {
+                    if (_sim.TryGetUnitId(buff.owner, out var targetId))
+                    {
+                        string sourceId = targetId;
+                        if (buff.source != null && _sim.TryGetUnitId(buff.source, out var sid))
+                            sourceId = sid;
+                        segment.commands.Add(BattleCommand.RemoveBuff(sourceId, targetId, sliceIndex, indexInSlice++, (int)buff.Type));
+                    }
+                    _sim.RemoveBuff(buff.owner, buff);
+                }
+            }
 
-            GICLog.Info($"[TurnResolver] 即时行动 {segment}");
-            return segment;
+            BattleEffectCommandAudit.Assert(context, effects, appliedBuffs, segment.commands);
         }
 
         // ==================== 分桶与应用 ====================

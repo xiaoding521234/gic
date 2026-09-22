@@ -58,7 +58,9 @@ namespace GIC.Battle
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
         private readonly Dictionary<UnitView, Vector3> _formationOffsets = new Dictionary<UnitView, Vector3>();
-        private UnitConfig _unitConfig;
+
+        /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
+        [Autowired] private UnitConfig _unitConfig;
         private TurnFlowController _flow;
 
         /// <summary>当前立牌布局态：true=散开（选择阶段展开布局）/ false=收拢（执行阶段重叠格心）——两态模型（docs/active/22 §11）</summary>
@@ -72,6 +74,7 @@ namespace GIC.Battle
 
         public void Bind(IBattleTransport transport, BattleMapData map)
         {
+            Wargame.Instance?.Context?.Inject(this); // [Autowired] UnitConfig（Y10）
             _transport = transport;
             if (_viewRoot == null)
             {
@@ -251,7 +254,8 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>箭矢视觉（billboard 白色光条；B5 换正式素材——创建即就位，飞行由调用方 tween）</summary>
+        /// <summary>箭矢视觉（billboard 白色光条；B5 换正式素材——创建即就位，飞行由调用方 tween。
+        /// 配色=BattlePalette「箭矢占位色」活色（2026-09-23 审查 Y9 收口，勿写字面量）</summary>
         private GameObject CreateProjectileVisual(Vector3 from)
         {
             var arrowGo = new GameObject("Projectile");
@@ -261,7 +265,7 @@ namespace GIC.Battle
             arrowGo.transform.localScale = new Vector3(0.05f, 0.30f, 1f);
             var renderer = arrowGo.AddComponent<SpriteRenderer>();
             renderer.sprite = ProjectileSprite;
-            renderer.color = new Color(0.98f, 0.93f, 0.80f);
+            renderer.color = Palette.箭矢占位色;
             renderer.sortingOrder = 12;
             return arrowGo;
         }
@@ -528,9 +532,7 @@ namespace GIC.Battle
         {
             if (_views.ContainsKey(state.unitId)) return;
 
-            // 客户端只依快照与共享配置建场（不触 Host 逻辑对象）
-            if (_unitConfig == null)
-                _unitConfig = Resources.Load<UnitConfig>("Configs/UnitConfig");
+            // 客户端只依快照与共享配置建场（不触 Host 逻辑对象）；配置经 [Autowired] 注入（Y10）
 
             Sprite avatar = null;
             bool useFullBody = false;
