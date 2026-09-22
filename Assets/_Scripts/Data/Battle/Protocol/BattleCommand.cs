@@ -98,6 +98,9 @@ namespace GIC.Data
         public const int ReactionKindFreeze = 2;     // 冻结（水+冰）
         public const int ReactionKindVaporize = 3;  // 蒸发（火+水；2026-09-22 补全，docs/06 §反应表）
 
+        [Header("属性子类型（StatChange 命令 metadata）")]
+        public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；B6a）
+
         [Header("移动载荷（Move 命令 metadata；2026-09-21）")]
         /// <summary>被挡标记：移动尝试进入 direction 方向的下一格失败（逻辑已停在被挡格前），
         /// 客户端播"撞墙弹回"表现——探出后弹回，逻辑位置不变</summary>
@@ -247,6 +250,23 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 metadata = reactionType,
                 value = level,
+            };
+        }
+
+        /// <summary>属性变化命令工厂。metadata=属性子类型（StatKindEnergy）；value=变化量
+        /// （正=获取/负=消耗；客户端即时刷新，快照权威自愈）</summary>
+        public static BattleCommand StatChange(string unitId, int sliceIndex, int indexInSlice,
+            int statKind, int delta)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.StatChange,
+                actorUnitId = unitId,
+                targetUnitId = unitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = statKind,
+                value = delta,
             };
         }
     }

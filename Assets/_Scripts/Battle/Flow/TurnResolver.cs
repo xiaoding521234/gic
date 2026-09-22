@@ -133,6 +133,10 @@ namespace GIC.Battle
             // 移动同步逐步结算（动态展开；与快照结算并存）
             MovementResolver.Resolve(_sim, movers);
 
+            // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算——移动行动已使用）
+            foreach (var mover in movers)
+                effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove));
+
             // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整路径，
             // docs/active/22 §11——命中点/消散点随命令千分定点下发）
             var vanishes = new List<BattleCommand>();
@@ -175,6 +179,11 @@ namespace GIC.Battle
             {
                 segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
+            }
+            foreach (var effect in MergeEnergyEffects(effects))
+            {
+                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindEnergy, effect.Delta));
             }
             foreach (var effect in MergeHealEffects(effects))
             {
@@ -252,6 +261,11 @@ namespace GIC.Battle
                 segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
             }
+            foreach (var effect in MergeEnergyEffects(effects))
+            {
+                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindEnergy, effect.Delta));
+            }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
@@ -307,6 +321,9 @@ namespace GIC.Battle
                     {
                         moverList.Add(mover);
                         MovementResolver.Resolve(_sim, moverList);
+
+                        // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算）
+                        effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove));
                     }
                     break;
                 case ActionType.Pass:
@@ -351,6 +368,9 @@ namespace GIC.Battle
             foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
                 segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
+            foreach (var effect in MergeEnergyEffects(effects))
+                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindEnergy, effect.Delta));
             foreach (var effect in MergeHealEffects(effects))
                 segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
@@ -420,6 +440,10 @@ namespace GIC.Battle
                 else if (effect is HealEffect heal)
                 {
                     _sim.ApplyHeal(target, heal.Amount);
+                }
+                else if (effect is EnergyEffect energy)
+                {
+                    _sim.ApplyEnergy(target, energy.Delta);
                 }
                 else if (effect is ApplyBuffEffect applyBuff)
                 {
@@ -539,6 +563,22 @@ namespace GIC.Battle
             foreach (var effect in effects)
                 if (effect is T typed)
                     yield return typed;
+        }
+
+        /// <summary>同片同目标的多次元能变化合并为一条（取首条）——B6a 拍板"战技多次命中不再获得元能"：
+        /// Hit 对每个命中目标各产一条 +10，合并去重后只算一次；消耗（负值）每行动一次不会重复。
+        /// 未来附加获能参数（EnergyGain）需与基础获能相加时，改此合并键区分来源类别</summary>
+        private static List<EnergyEffect> MergeEnergyEffects(List<BattleEffect> effects)
+        {
+            var seen = new HashSet<string>();
+            var result = new List<EnergyEffect>();
+            foreach (var effect in effects)
+            {
+                if (!(effect is EnergyEffect energy)) continue;
+                if (!seen.Add(energy.TargetUnitId)) continue;
+                result.Add(energy);
+            }
+            return result;
         }
 
         // ==================== 推送与 ack ====================

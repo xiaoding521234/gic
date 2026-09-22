@@ -19,5 +19,14 @@ namespace GIC.Battle
         /// <summary>单位受击圆柱直径（世界单位；底座圆盘可视化同源，视觉即判定——docs/18 决策二）。
         /// 容错目检后可调（基线起点 0.42）</summary>
         public const float UnitCylinderDiameter = 0.42f;
+
+        // ==================== 元能（B6a；获取端拍板 2026-09-22） ====================
+
+        /// <summary>移动使用即获得的元能（被挡也算——移动行动已使用）</summary>
+        public const int EnergyGainPerMove = 10;
+
+        /// <summary>战技至少 1 次命中获得的元能（多次命中不叠加——同片按行动者合并去重；
+        /// 爆发/延奏命中不获能）</summary>
+        public const int EnergyGainPerSkillHit = 10;
     }
 }

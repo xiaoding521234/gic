@@ -33,6 +33,7 @@ namespace GIC.Battle
             var applyBuffKeys = new HashSet<string>();
             var attachKeys = new HashSet<string>();
             var reactionKeys = new HashSet<string>();
+            var energyKeys = new HashSet<string>();
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -51,6 +52,10 @@ namespace GIC.Battle
                         break;
                     case BattleCommandType.Reaction:
                         reactionKeys.Add(command.targetUnitId);
+                        break;
+                    case BattleCommandType.StatChange:
+                        if (command.metadata == BattleCommand.StatKindEnergy)
+                            energyKeys.Add(command.targetUnitId);
                         break;
                 }
             }
@@ -79,6 +84,12 @@ namespace GIC.Battle
                 {
                     if (!reactionKeys.Contains(reaction.TargetUnitId))
                         Report(context, effect, BattleCommandType.Reaction);
+                }
+                else if (effect is EnergyEffect energy)
+                {
+                    // B6a 元能：效应→StatChange 命令（注意合并语义=同片同目标多条只发一条，此处查存在性）
+                    if (!energyKeys.Contains(energy.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
                 }
                 else if (effect is ApplyBuffEffect)
                 {

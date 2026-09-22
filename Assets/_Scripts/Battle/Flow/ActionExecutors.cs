@@ -51,6 +51,17 @@ namespace GIC.Battle
                 return effects;
             }
 
+            // 元能门槛（B6a）：消耗值=技能条目 EnergyCost（0=无消耗——战技/移动不耗能；
+            // 爆发 30/40/100、延奏 20，攒够才可放；不足→行动落空）
+            int energyCost = BattleSimState.GetEnergyCost(skill.RawData);
+            if (energyCost > 0 && !BattleSimState.HasEnoughEnergy(attacker, energyCost))
+            {
+                var stats = attacker.GetUnitComponent<UnitStats>();
+                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 元能不足" +
+                            $"（{stats?.Energy ?? 0}/{energyCost}），行动落空");
+                return effects;
+            }
+
             if (!skill.CanCast(attacker))
             {
                 GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 不可施放，行动落空");
@@ -58,6 +69,11 @@ namespace GIC.Battle
             }
 
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
+
+            // 元能消耗随效应产出（负值，随片统一应用；获取端=战技命中，在 SkillHitResolver）
+            if (energyCost > 0)
+                effects.Add(new EnergyEffect(action.unitId, -energyCost));
+
             return effects;
         }
 

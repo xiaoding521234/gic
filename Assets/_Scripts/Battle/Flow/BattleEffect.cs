@@ -129,6 +129,21 @@ namespace GIC.Battle
     }
 
     /// <summary>
+    /// 元能变化效应（B6a：正=获取——移动使用+10 / 战技至少1次命中+10（多次命中不叠加，
+    /// 同片按行动者合并实现）；负=爆发消耗。TargetUnitId=受益行动者自身）
+    /// </summary>
+    public class EnergyEffect : BattleEffect
+    {
+        public int Delta;
+
+        public EnergyEffect(string targetUnitId, int delta)
+        {
+            TargetUnitId = targetUnitId;
+            Delta = delta;
+        }
+    }
+
+    /// <summary>
     /// 元素附着效应（B4）：反应消耗语义已由 ElementReactionResolver 在结算时定夺，
     /// 本效应=效应应用阶段直接 Dye 目标为 incoming 元素（覆盖旧附着=消耗）
     /// </summary>

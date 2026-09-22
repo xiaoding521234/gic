@@ -243,6 +243,11 @@ namespace GIC.Battle
                     ExitAiming();
                     DeselectUnit();
                 }
+                else
+                {
+                    // 存续：重刷技能盘置灰态（B6a 爆发/延奏键的元能门槛随快照刷新——上回合攒满本回合即亮起）
+                    RefreshSkillButtons();
+                }
             }
         }
 
@@ -665,14 +670,16 @@ namespace GIC.Battle
         }
 
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
-        /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）</summary>
+        /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）；
+        /// 元能不足=置灰（B6a：爆发/延奏等 EnergyCost>0 的技能，门槛=技能消耗值，门槛随快照刷新）</summary>
         private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null) return;
             var data = GetSelectedSkillData(def);
             def.view.gameObject.SetActive(data != null);
             var toggle = def.view.GetComponent<Toggle>();
-            if (toggle != null) toggle.interactable = data != null;
+            if (toggle != null)
+                toggle.interactable = data != null && HasEnergyForSkill(data);
             if (data == null) return;
 
             def.view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
@@ -682,6 +689,17 @@ namespace GIC.Battle
                 def.nameText.ClearAllEntries();
                 def.nameText.AddEntry(data.skillID.GetEntry());
             }
+        }
+
+        /// <summary>选中单位的元能是否够放此技能（EnergyCost=0 恒可；读快照运行态，选择阶段头权威刷新）</summary>
+        private bool HasEnergyForSkill(SkillConfig.SkillData skillData)
+        {
+            int cost = BattleSimState.GetEnergyCost(skillData);
+            if (cost <= 0) return true;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot == null || string.IsNullOrEmpty(_selectedUnitId)) return false;
+            var sel = snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            return sel != null && sel.energy >= cost;
         }
 
         /// <summary>移动按钮刷新（特殊技能）：数据链走 skills[Move]（InitWithData 染角色元素色底+主动环；
