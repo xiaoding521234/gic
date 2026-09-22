@@ -73,6 +73,21 @@ namespace GIC.UI
                 GICLog.Warn("[BattleScreen] B1 只支持 2 方对局，多余玩家忽略");
                 playerSetups = playerSetups.Take(2).ToList();
             }
+            if (playerSetups.Count < 2)
+            {
+                // 单玩家配置守卫（2026-09-23 审查 Y11）：装配链按双玩家假定（队伍对位 A/B、
+                // SpawnDebugUnitsRoutine 双方各一），不足即 AI 补位——同 LaunchSinglePlayer 语义。
+                // B7 LAN 网络下发配置可能只带 1 人，届时此守卫兜底。
+                GICLog.Warn("[BattleScreen] 玩家数 <2，AI 补位");
+                playerSetups.Add(new BattlePlayerSetup
+                {
+                    PlayerId = playerSetups.Count > 0 && playerSetups[0].PlayerId == BattleDebugPlayerIds.P2
+                        ? BattleDebugPlayerIds.P1
+                        : BattleDebugPlayerIds.P2,
+                    DisplayName = "AI 玩家",
+                    IsAI = true,
+                });
+            }
 
             // 地图：联机入口按配置名加载；调试直开用默认地图
             var mapConfig = Resources.Load<BattleMapConfig>("Configs/" +

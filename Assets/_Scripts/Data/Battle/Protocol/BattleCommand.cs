@@ -99,8 +99,9 @@ namespace GIC.Data
         public const int ReactionKindVaporize = 3;  // 蒸发（火+水；2026-09-22 补全，docs/06 §反应表）
 
         [Header("属性子类型（StatChange 命令 metadata）")]
-        public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；B6a）
-        public const int StatKindMora = 2;   // 摩拉（value=变化量；B6c 部署扣费即时反馈，快照权威）
+        public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；客户端 UnitView 缓存即时增量，B6a）
+        public const int StatKindMora = 2;   // 摩拉（value=变化量；B6c 部署扣费。客户端暂不消费——HUD 摩拉 chip 随下回合快照刷新，
+                                            // 经济批次 B6d/B7 落地时一并决定消费端）
 
         [Header("召唤载荷（Summon 命令有效；B6c 部署）")]
         /// <summary>新登场的单位全量状态（客户端建 view 用；与快照 UnitState 同构）</summary>
@@ -259,7 +260,7 @@ namespace GIC.Data
         }
 
         /// <summary>属性变化命令工厂。metadata=属性子类型（StatKindEnergy/StatKindMora）；value=变化量
-        /// （正=获取/负=消耗；客户端即时刷新，快照权威自愈）</summary>
+        /// （正=获取/负=消耗；元能走客户端 UnitView 缓存增量，摩拉暂快照权威自愈——见 StatKindMora 注释）</summary>
         public static BattleCommand StatChange(string unitId, int sliceIndex, int indexInSlice,
             int statKind, int delta)
         {

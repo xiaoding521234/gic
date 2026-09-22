@@ -1344,3 +1344,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **取证教训**：UI 排位类报障先跑 exec_runtime_script 拿 RectTransform 链的 GetWorldCorners 世界坐标算占屏比（本批两次立功：沉屏与后续验证），勿对着代码空推锚点数学；"点击全死"类问题查 raycast 靶链（无任何 Graphic 的容器=黑洞）。
 
 **How to apply**：程序化建 UGUI 容器必带三件套自查——pivot 与语义对齐、复用 prefab 不变形、ScrollRect 要可拖（Elastic+content 恒不等视口宽）；命中层=透明 Image 显式挂。
+
+## 71. 私有嵌套类 MonoBehaviour 烘焙进 prefab = 域重载后 missing script（静默潜伏且阻断后续 prefab 保存，2026-09-23 实证）
+
+**症状**：`PrefabUtility.SaveAsPrefabAsset`（LoadPrefabContents 路线）保存 BattleHud.prefab 被拒——"You are trying to save a Prefab with a missing script…GameObject 'burst_SkillIcon'（×4 技能图标节点）"。但运行时 HUD 完全正常（图标/按钮全在），且资产此前可正常保存过。
+
+**根因**：`SkillClickForwarder` 定义为 BattleHud 的**私有嵌套类** MonoBehaviour（`private class SkillClickForwarder : MonoBehaviour`），2026-09-22 迁移工具从运行时实例烘焙 prefab 时把它一并烤了进去（工具只剥了 LayoutDragHandler，漏剥这件）。嵌套类 MonoBehaviour 的 m_Script fileID 非 11500000 而是 hash 计算值——**同会话内可能解析、跨域重载后断链成 missing script**。运行时零症状是因为 `ResolveSkillButtons` 每实例 `GetComponent==null → AddComponent` 重挂（设计本意=运行时件，委托不序列化），断链件变成死槽；但 Unity 在下次 SaveAsPrefabAsset 时校验拒绝。
+
+**修法**：`GameObjectUtility.RemoveMonoBehavioursWithMissingScript(go)` 官方 API 剥除缺失槽（配 `GetMonoBehavioursWithMissingScriptCount` 复查=0 再存）；剥后保存校验全过（2026-09-23：剥 4 槽+烘手牌壳一次通过）。
+
+**教训**：①**私有嵌套类 MonoBehaviour 一律不得烘焙进 prefab**——要么顶层类，要么迁移工具确保剥除全部运行时 AddComponent 件（校验清单别只列已知场景引用件，按"运行时 AddComponent 的全部类型"核对）；②诊断 missing script 勿信运行时正常就跳过——`GetMonoBehavioursWithMissingScriptCount` 在资产层与 LoadPrefabContents 层各扫一遍，prefab 保存被拒时先查这个；③需要转发件/桥接件时优先顶层类文件（Unity fileID 稳定），嵌套写法只在纯运行时场景安全。

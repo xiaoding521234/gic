@@ -146,10 +146,11 @@ namespace GIC.Battle
         /// </summary>
         public string SpawnDebugUnit(UnitName unitName, string playerId, TeamType team, BattleCell cell)
         {
-            var config = Resources.Load<UnitConfig>("Configs/UnitConfig");
+            // 配置统一走 DI 容器 [Bean] 缓存（ConfigManager 产出；2026-09-23 审查 Y10 收口，勿 Resources.Load 旁路）
+            var config = Wargame.Instance?.Context?.Get<UnitConfig>();
             if (config == null)
             {
-                GICLog.Error("[BattleSession] 未找到 Resources/Configs/UnitConfig");
+                GICLog.Error("[BattleSession] 容器无 UnitConfig（ConfigManager 未构建？），无法生成调试单位");
                 return null;
             }
 

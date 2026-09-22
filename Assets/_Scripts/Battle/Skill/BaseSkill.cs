@@ -17,10 +17,8 @@ namespace GIC.Battle
 
         private SkillType skillType = SkillType.Normal;
 
-        public int energyCost = 0;
-        public int moraCost = 0;
-        public int staminaCost = 0;
-
+        // 消耗类数值不走独立字段——一律经 SkillParamKey（EnergyCost 等）customParams：
+        // 取值入口=BattleSimState.GetEnergyCost(skill.RawData)，勿在此另设字段防双源（2026-09-23 审查 Y7 清理）
         public Sprite icon;
         
         public List<SkillParam> SkillParams { get; private set; }
@@ -41,10 +39,6 @@ namespace GIC.Battle
 
 
             skillType = rawData.skillType;
-
-            /* energyCost = rawData.energyCost;
-            moraCost = rawData.moraCost;
-            staminaCost = rawData.staminaCost; */
 
             if(rawData.icon != null)
             {

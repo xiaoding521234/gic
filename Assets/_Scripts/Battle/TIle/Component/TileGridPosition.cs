@@ -36,24 +36,9 @@ namespace GIC.Battle
         
         // ==================== 便利方法 ====================
         public bool IsInBoard(BoardType boardType) => _boardType == boardType;
-        
-        public bool IsInSameBoard(TileGridPosition other)
-        {
-            if (other == null) return false;
-            return _boardType == other._boardType;
-        }
-        
-        public int GetManhattanDistance(TileGridPosition other)
-        {
-            if (!IsInSameBoard(other)) return int.MaxValue;
-            return Mathf.Abs(_gridPosition.x - other._gridPosition.x) + 
-                   Mathf.Abs(_gridPosition.y - other._gridPosition.y);
-        }
-        
-        public bool IsAdjacent(TileGridPosition other)
-        {
-            return GetManhattanDistance(other) == 1;
-        }
+
+        // 2026-09-23 审查 Y6：已删除 GetManhattanDistance/IsAdjacent/IsInSameBoard 死助手——
+        // 零调用且度量与项目切比雪夫拍板冲突（docs/03 §3.3）；距离计算一律走切比雪夫（参照 BattleHeuristics）
     }
 }
 

@@ -24,6 +24,9 @@ namespace GIC.Data
         public Color 伤害红 = new Color(1f, 0.3f, 0.25f);
         public Color 治疗绿 = new Color(0.3f, 0.95f, 0.45f);
 
+        [Header("投射物（B5 表现批次换正式箭矢素材前的白色光条占位）")]
+        public Color 箭矢占位色 = new Color(0.98f, 0.93f, 0.80f, 1f);
+
         [Header("HUD 基调")]
         public Color 文字米白 = new Color(0.93f, 0.89f, 0.82f);
         public Color 暖金 = new Color(0.83f, 0.74f, 0.56f);
