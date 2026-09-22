@@ -69,11 +69,19 @@ namespace GIC.Data
         public string targetUnitId;
         public BattleCell targetCell;
 
+        [Header("部署参数（B6c：DeployUnit 有效）")]
+        /// <summary>出战角色（UnitName 枚举值）</summary>
+        public int deployUnitName;
+
+        /// <summary>部署落点</summary>
+        public BattleCell deployCell;
+
         public override string ToString()
         {
             return $"[ActionData {playerId}/{unitId} {actionType} turn={turnNumber}" +
                    (actionType == ActionType.Move ? $" dir={direction} mag={moveMagnitude}" : "") +
-                   (actionType == ActionType.Skill ? $" skill={skillIndex} target={targetUnitId}" : "") + "]";
+                   (actionType == ActionType.Skill ? $" skill={skillIndex} target={targetUnitId}" : "") +
+                   (actionType == ActionType.DeployUnit ? $" unit={(UnitName)deployUnitName} at={deployCell}" : "") + "]";
         }
     }
 }

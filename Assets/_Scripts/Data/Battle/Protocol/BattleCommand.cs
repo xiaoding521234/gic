@@ -100,6 +100,11 @@ namespace GIC.Data
 
         [Header("属性子类型（StatChange 命令 metadata）")]
         public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；B6a）
+        public const int StatKindMora = 2;   // 摩拉（value=变化量；B6c 部署扣费即时反馈，快照权威）
+
+        [Header("召唤载荷（Summon 命令有效；B6c 部署）")]
+        /// <summary>新登场的单位全量状态（客户端建 view 用；与快照 UnitState 同构）</summary>
+        public UnitState summonUnit;
 
         [Header("移动载荷（Move 命令 metadata；2026-09-21）")]
         /// <summary>被挡标记：移动尝试进入 direction 方向的下一格失败（逻辑已停在被挡格前），
@@ -253,7 +258,7 @@ namespace GIC.Data
             };
         }
 
-        /// <summary>属性变化命令工厂。metadata=属性子类型（StatKindEnergy）；value=变化量
+        /// <summary>属性变化命令工厂。metadata=属性子类型（StatKindEnergy/StatKindMora）；value=变化量
         /// （正=获取/负=消耗；客户端即时刷新，快照权威自愈）</summary>
         public static BattleCommand StatChange(string unitId, int sliceIndex, int indexInSlice,
             int statKind, int delta)
@@ -267,6 +272,22 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 metadata = statKind,
                 value = delta,
+            };
+        }
+
+        /// <summary>召唤命令工厂（B6c 部署）：summonUnit=新登场单位全量状态（客户端建 view）；
+        /// actorUnitId=部署玩家（摩拉归属方）。部署成功时与 StatChange(Mora) 成对出现</summary>
+        public static BattleCommand Summon(string deployPlayerId, int sliceIndex, int indexInSlice,
+            UnitState summonedUnit)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.Summon,
+                actorUnitId = deployPlayerId,
+                targetUnitId = summonedUnit.unitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                summonUnit = summonedUnit,
             };
         }
     }

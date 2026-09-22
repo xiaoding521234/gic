@@ -32,6 +32,9 @@ namespace GIC.UI
         // 战斗地图音乐：按绑定位置取 PositionConfig 昼夜曲池（2026-09-14）
         [Autowired] private PositionManager _positionManager;
 
+        // 局内手牌构建（B6c）：读玩家存档当前卡组
+        [Autowired] private GIC.Framework.SaveManager _saveManager;
+
         /// <summary>当前对局（调试/测试访问口）</summary>
         public BattleSession Session => _session;
 
@@ -126,13 +129,24 @@ namespace GIC.UI
             logicGo.transform.SetParent(transform, false);
 
             _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform);
-            foreach (var setup in playerSetups)
+            _session.Sim.LogicRoot = logicGo.transform; // 部署等运行时生成单位挂同根（B6c）
+            for (int i = 0; i < playerSetups.Count; i++)
+            {
+                var setup = playerSetups[i];
                 _session.RegisterDebugPlayer(setup.PlayerId);
+                // 队伍：双端对位 A/B（B6c 部署阵营判定用；B7 联机按房主分配重定）
+                _session.Sim.SetPlayerTeam(setup.PlayerId, i == 0 ? TeamType.A : TeamType.B);
+            }
 
             yield return null; // ── 分帧：会话就绪/立牌是重活起点 ──
 
             // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
             yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
+
+            // 局内手牌（B6c 拍板：初始手牌=玩家当前卡组投影，卡不消耗可重复出战）——
+            // 双方同用玩家存档当前卡组（对称测试；AI 出战决策 B6d 后续接 AI 脑）
+            foreach (var setup in playerSetups)
+                _session.Sim.RegisterHand(setup.PlayerId, BuildHandFromCurrentDeck());
 
             // AI 玩家大脑（B1 固定脚本占位：攻击最近敌人；B6 换启发式）
             foreach (var setup in playerSetups)
@@ -332,6 +346,32 @@ namespace GIC.UI
                     if (zone.playerId == playerId) return zone.center;
             }
             return fallback;
+        }
+
+        /// <summary>
+        /// 从玩家存档当前卡组构建局内手牌（B6c：初始手牌=当前卡组投影，docs/18 决策七）——
+        /// 只取角色卡（物品卡 UseItem/EquipItem 后续批次）；卡不消耗留手牌。
+        /// 卡组为空时回退丘丘人×2（保证部署链路可目检）。
+        /// </summary>
+        private List<int> BuildHandFromCurrentDeck()
+        {
+            var result = new List<int>();
+            var save = _saveManager?.CurrentSave;
+            if (save != null)
+            {
+                int currentDeck = save.progress.currentDeck;
+                foreach (var card in save.ownedCards)
+                {
+                    if (card.cardType == GIC.Data.CardType.Unit && card.HasInDeck(currentDeck))
+                        result.Add((int)card.id.AsUnitName());
+                }
+            }
+            if (result.Count == 0)
+            {
+                result.Add((int)GIC.Data.UnitName.Hilichurl);
+                result.Add((int)GIC.Data.UnitName.Hilichurl);
+            }
+            return result;
         }
 
         /// <summary>

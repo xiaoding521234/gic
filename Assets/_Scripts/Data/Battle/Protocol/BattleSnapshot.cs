@@ -42,6 +42,9 @@ namespace GIC.Data
         public int stamina;
         public int handCardCount;
         public int deckCardCount;
+
+        /// <summary>手牌角色列表（UnitName 枚举值；B6c——卡不消耗留手牌，可重复出战）</summary>
+        public List<int> handUnits = new List<int>();
     }
 
     /// <summary>

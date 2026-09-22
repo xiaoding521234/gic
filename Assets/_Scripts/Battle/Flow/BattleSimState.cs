@@ -39,6 +39,9 @@ namespace GIC.Battle
             Map = map;
         }
 
+        /// <summary>逻辑单位隐藏根（装配时设置；部署等运行时生成单位挂此——纯逻辑容器勿落场景根，BattleSession._logicRoot 同源）</summary>
+        public UnityEngine.Transform LogicRoot { get; set; }
+
         // ==================== 玩家注册 ====================
 
         public void RegisterPlayer(string playerId, int initialMora = 200, int initialStamina = 60)
@@ -58,6 +61,65 @@ namespace GIC.Battle
         }
 
         public IReadOnlyCollection<string> PlayerIds => _playerIds;
+
+        // ==================== 局内手牌与资源（B6c：手牌=玩家当前卡组投影，卡不消耗可重复出战） ====================
+
+        private readonly Dictionary<string, List<int>> _hands = new Dictionary<string, List<int>>();
+
+        /// <summary>注册玩家手牌（开局从存档当前卡组构建；UnitName 枚举值列表）</summary>
+        public void RegisterHand(string playerId, List<int> handUnitNames)
+        {
+            _hands[playerId] = handUnitNames ?? new List<int>();
+            if (_resources.TryGetValue(playerId, out var res))
+                res.handCardCount = _hands[playerId].Count;
+        }
+
+        public IReadOnlyList<int> GetHand(string playerId)
+        {
+            return _hands.TryGetValue(playerId, out var hand) ? hand : null;
+        }
+
+        /// <summary>摩拉查询（无注册返回 0）</summary>
+        public int GetMora(string playerId)
+        {
+            return _resources.TryGetValue(playerId, out var res) ? res.mora : 0;
+        }
+
+        /// <summary>摩拉消耗（不足返回 false 且不改动；B6c 部署扣费）</summary>
+        public bool TrySpendMora(string playerId, int cost)
+        {
+            if (!_resources.TryGetValue(playerId, out var res) || res.mora < cost) return false;
+            res.mora -= cost;
+            return true;
+        }
+
+        /// <summary>玩家核心位置代理（B6c 部署落点判定基准；协议核心 B8 Unit 化后换真核心——
+        /// 数据源收口此处一处：v1=出生区中心，spawnCenters 与 PlayerIds 同序）</summary>
+        public BattleCell GetCorePosition(string playerId)
+        {
+            int index = 0;
+            foreach (var id in _playerIds)
+            {
+                if (id == playerId) break;
+                index++;
+            }
+            if (index < _playerIds.Count && Map.spawnCenters != null && index < Map.spawnCenters.Count)
+                return Map.spawnCenters[index];
+            return BattleCell.zero;
+        }
+
+        /// <summary>玩家队伍（部署新单位的阵营；装配时注册，P1=A/P2=B）</summary>
+        private readonly Dictionary<string, TeamType> _playerTeams = new Dictionary<string, TeamType>();
+
+        public void SetPlayerTeam(string playerId, TeamType team)
+        {
+            _playerTeams[playerId] = team;
+        }
+
+        public TeamType GetTeamOf(string playerId)
+        {
+            return _playerTeams.TryGetValue(playerId, out var team) ? team : TeamType.A;
+        }
 
         // ==================== 单位注册 ====================
 
@@ -326,14 +388,17 @@ namespace GIC.Battle
             foreach (var kv in _resources)
             {
                 var res = kv.Value;
-                snapshot.resources.Add(new PlayerResourceState
+                var snapshotRes = new PlayerResourceState
                 {
                     playerId = res.playerId,
                     mora = res.mora,
                     stamina = res.stamina,
                     handCardCount = res.handCardCount,
                     deckCardCount = res.deckCardCount,
-                });
+                };
+                if (_hands.TryGetValue(kv.Key, out var hand))
+                    snapshotRes.handUnits = new List<int>(hand);
+                snapshot.resources.Add(snapshotRes);
             }
 
             return snapshot;

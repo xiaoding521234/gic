@@ -269,19 +269,19 @@ namespace GIC.Battle
         private IEnumerator PlaySegmentCoroutine(Segment segment)
         {
             // 片开始时刻 =（全场最高攻速 − 自身攻速）÷ 10 秒（连续换算）；
-            // 即时行动块 = 短节拍；回合结束段 = 固定节拍（不按攻速排程）
+            // 即时行动块/部署段 = 短节拍；回合结束段 = 固定节拍（不按攻速排程）
             float delay;
             if (segment.turnEnd != 0)
                 delay = TurnEndDelaySeconds;
-            else if (segment.insertedInstantAction != 0)
+            else if (segment.insertedInstantAction != 0 || segment.deploy != 0)
                 delay = 0.15f;
             else
                 delay = Mathf.Max(0f, (segment.turnMaxAttackSpeed - segment.sliceAttackSpeed) / 10f);
             if (delay > 0f)
                 yield return new WaitForSeconds(delay / _playbackSpeed);
 
-            if (segment.turnEnd == 0)
-                OnSegmentPlaying?.Invoke(segment.sliceAttackSpeed); // 回合结束段无"当前执行者"，不高亮
+            if (segment.turnEnd == 0 && segment.deploy == 0)
+                OnSegmentPlaying?.Invoke(segment.sliceAttackSpeed); // 回合结束/部署段无"当前执行者"，不高亮
 
             var playbacks = new List<Coroutine>();
             float stagger = 0f;
@@ -357,6 +357,18 @@ namespace GIC.Battle
                         {
                             if (command.metadata == BattleCommand.StatKindEnergy)
                                 statChanged.ApplyEnergyDelta(command.value);
+                        }
+                        break;
+
+                    case BattleCommandType.Summon:
+                        // 部署登场（B6c）：按命令携带的全量状态即时建 view（快照权威自愈兜底）
+                        if (command.summonUnit != null && !_views.ContainsKey(command.summonUnit.unitId))
+                        {
+                            CreateView(command.summonUnit);
+                            // 新登场立即按当前布局态入位（两态模型：执行阶段=收拢重叠格心）
+                            if (_views.TryGetValue(command.summonUnit.unitId, out var summoned))
+                                summoned.ApplyPosition(_board.CellToWorld(command.summonUnit.position));
+                            RefreshAllFormations(_spreadFormations);
                         }
                         break;
 

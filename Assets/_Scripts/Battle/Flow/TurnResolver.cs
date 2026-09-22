@@ -35,13 +35,23 @@ namespace GIC.Battle
 
         public IEnumerator ResolveTurnCoroutine(int turnNumber, List<ActionData> actions)
         {
+            // 部署段（B6c）：出战行动先于全部攻速片结算（新单位当回合即被后续行动波及；
+            // 占玩家行动配额由上交通道保证——DeployUnit 同走 SubmitAction 一玩家一行动，docs/18 决策七）
+            var deploys = actions.FindAll(a => a.actionType == ActionType.DeployUnit);
+            bool hasDeploySegment = deploys.Count > 0;
+            if (hasDeploySegment)
+            {
+                actions.RemoveAll(a => a.actionType == ActionType.DeployUnit);
+                yield return PushSegmentAndWaitAck(ResolveDeploySegment(turnNumber, 0, deploys));
+            }
+
             // 攻速分桶：攻速值完全相同才同片；片按攻速降序（先结算高攻速）
             var buckets = BucketByAttackSpeed(actions);
             int maxSpeed = 0;
             if (buckets.Count > 0)
                 maxSpeed = buckets[0].speed;
 
-            int sliceIndex = 0;
+            int sliceIndex = hasDeploySegment ? 1 : 0; // 部署段占 0 号（ack 键 turn:slice 唯一性）
             foreach (var bucket in buckets)
             {
                 var segment = ResolveSlice(turnNumber, sliceIndex, bucket.speed, maxSpeed, bucket.actions);
@@ -203,6 +213,45 @@ namespace GIC.Battle
             BattleEffectCommandAudit.Assert($"回合{turnNumber}片{sliceIndex}", effects, appliedBuffs, segment.commands);
 
             GICLog.Info($"[TurnResolver] {segment}");
+            return segment;
+        }
+
+        /// <summary>
+        /// 部署段（B6c）：回合开始先于攻速分桶结算全部出战行动（每玩家每回合最多 1 条，配额已保证）。
+        /// 直产命令（Summon+StatChange），无效应链、无死亡判定；播放侧短节拍（deploy 标记段）。
+        /// </summary>
+        private Segment ResolveDeploySegment(int turnNumber, int sliceIndex, List<ActionData> deploys)
+        {
+            var segment = new Segment
+            {
+                turnNumber = turnNumber,
+                sliceIndex = sliceIndex,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
+                deploy = 1,
+            };
+
+            int indexInSlice = 0;
+            foreach (var action in deploys)
+            {
+                if (DeployUnitExecutor.TryResolve(_sim, action, out var summon, out var moraChange))
+                {
+                    if (summon != null)
+                    {
+                        summon.sliceIndex = sliceIndex;
+                        summon.indexInSlice = indexInSlice++;
+                        segment.commands.Add(summon);
+                    }
+                    if (moraChange != null)
+                    {
+                        moraChange.sliceIndex = sliceIndex;
+                        moraChange.indexInSlice = indexInSlice++;
+                        segment.commands.Add(moraChange);
+                    }
+                }
+            }
+
+            GICLog.Info($"[TurnResolver] 部署段 {segment}");
             return segment;
         }
 

@@ -193,15 +193,16 @@ namespace GIC.Battle
                 return;
             }
 
-            // B1 只支持 Move/Skill/Pass
-            if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill && action.actionType != ActionType.Pass)
+            // B1 只支持 Move/Skill/Pass；B6c 加 DeployUnit（出战占玩家行动配额，docs/18 决策七）
+            if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill
+                && action.actionType != ActionType.Pass && action.actionType != ActionType.DeployUnit)
             {
-                GICLog.Warn($"[TurnFlow] B1 不支持行动类型 {action.actionType}，忽略");
+                GICLog.Warn($"[TurnFlow] 不支持行动类型 {action.actionType}，忽略");
                 return;
             }
 
-            // 空过不指向单位（超时自动 Pass / AI 无可用单位 Pass 同走此路），豁免单位校验
-            if (action.actionType == ActionType.Pass)
+            // 空过/出战不指向行动单位（玩家级行动：超时自动 Pass / AI 无可用单位 Pass / 手牌出战同走此路），豁免单位校验
+            if (action.actionType == ActionType.Pass || action.actionType == ActionType.DeployUnit)
             {
                 _pendingActions[action.playerId] = action;
                 TryBeginResolve();
