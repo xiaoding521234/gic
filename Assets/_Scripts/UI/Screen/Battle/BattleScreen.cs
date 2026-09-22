@@ -184,6 +184,10 @@ namespace GIC.UI
         private bool _battleMusicActive;
         private Action<BattlePhase, int> _onPhaseChangedForMusic;
 
+        // 当前在播/待播战斗曲的选池时段（跨界判定用：与 BattleTimePeriod 不符且在播→立即淡切，
+        // 2026-09-22）。间隔冷却中不插手——下一次选曲自然换池（≤10s）
+        private TimePeriod? _currentTrackPeriod;
+
         /// <summary>
         /// 启动战斗地图音乐轮换链：按 BattleMapConfig.position → PositionConfig 昼夜曲池取曲，
         /// 选池用**战斗独立时钟时段**（TurnFlowController.BattleTimePeriod，全局 TimeUtility 仅
@@ -201,6 +205,17 @@ namespace GIC.UI
                     if (!_battleMusicActive || phase != BattlePhase.Selecting) return;
                     var audio = AudioManager.Instance;
                     if (audio == null) return;
+                    // 时段跨界立即淡切（2026-09-22）：独立时钟在回合结束 +20 分钟，跨界瞬间=片循环
+                    // 完毕进选择阶段——在播曲目若还是旧时段选的，淡出换新池曲（冷却中未在播则留给
+                    // 下一次选曲自然换池）
+                    var battlePeriod = _flow.BattleTimePeriod;
+                    if (audio.IsMusicPlaying() &&
+                        _currentTrackPeriod.HasValue && _currentTrackPeriod.Value != battlePeriod)
+                    {
+                        GICLog.Info($"[BattleScreen] 战斗时段跨界: {_currentTrackPeriod} → {battlePeriod}，淡切战斗曲");
+                        PlayNextBattleTrack(mapConfig, periodSwitch: true);
+                        return;
+                    }
                     // 真静默才重试：在播/间隔冷却中（clip 仍挂 source）链是活的，不插手
                     if (audio.IsMusicPlaying() || audio.GetCurrentMusicClip() != null) return;
                     PlayNextBattleTrack(mapConfig);
@@ -210,7 +225,9 @@ namespace GIC.UI
             PlayNextBattleTrack(mapConfig);
         }
 
-        private void PlayNextBattleTrack(BattleMapConfig mapConfig)
+        /// <param name="periodSwitch">true=昼夜跨界立即淡切（旧曲淡出→新池曲淡入，2026-09-22）；
+        /// 默认 false=常规选曲（硬切起播，链式轮换语义不变）</param>
+        private void PlayNextBattleTrack(BattleMapConfig mapConfig, bool periodSwitch = false)
         {
             var positionData = _positionManager?.GetPositionData(mapConfig.position);
             if (positionData == null)
@@ -228,15 +245,31 @@ namespace GIC.UI
                 return;
             }
 
-            AudioManager.Instance.PlayMusicWithInterval(
-                clip, MusicType.Battle,
-                intervalAfter: BattleMusicIntervalSeconds,
-                loop: false,
-                onComplete: () =>
-                {
-                    if (!_battleMusicActive) return; // 退出已停链：不再续播
-                    PlayNextBattleTrack(mapConfig);
-                });
+            _currentTrackPeriod = period;
+            var onComplete = new Action(() =>
+            {
+                if (!_battleMusicActive) return; // 退出已停链：不再续播
+                PlayNextBattleTrack(mapConfig);
+            });
+
+            if (periodSwitch)
+            {
+                var audio = AudioManager.Instance;
+                audio.SwitchMusicWithFade(
+                    new AudioManager.MusicTrack(clip, MusicType.Battle,
+                        intervalAfter: BattleMusicIntervalSeconds, loop: false,
+                        fadeInTime: audio.PeriodSwitchFadeInSeconds,
+                        onComplete: onComplete),
+                    audio.PeriodSwitchFadeOutSeconds);
+            }
+            else
+            {
+                AudioManager.Instance.PlayMusicWithInterval(
+                    clip, MusicType.Battle,
+                    intervalAfter: BattleMusicIntervalSeconds,
+                    loop: false,
+                    onComplete: onComplete);
+            }
         }
 
         /// <summary>
@@ -248,6 +281,7 @@ namespace GIC.UI
         private void StopBattleMusic()
         {
             _battleMusicActive = false;
+            _currentTrackPeriod = null;
             if (_flow != null && _onPhaseChangedForMusic != null)
             {
                 _flow.OnPhaseChanged -= _onPhaseChangedForMusic;
