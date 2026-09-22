@@ -1354,3 +1354,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：`GameObjectUtility.RemoveMonoBehavioursWithMissingScript(go)` 官方 API 剥除缺失槽（配 `GetMonoBehavioursWithMissingScriptCount` 复查=0 再存）；剥后保存校验全过（2026-09-23：剥 4 槽+烘手牌壳一次通过）。
 
 **教训**：①**私有嵌套类 MonoBehaviour 一律不得烘焙进 prefab**——要么顶层类，要么迁移工具确保剥除全部运行时 AddComponent 件（校验清单别只列已知场景引用件，按"运行时 AddComponent 的全部类型"核对）；②诊断 missing script 勿信运行时正常就跳过——`GetMonoBehavioursWithMissingScriptCount` 在资产层与 LoadPrefabContents 层各扫一遍，prefab 保存被拒时先查这个；③需要转发件/桥接件时优先顶层类文件（Unity fileID 稳定），嵌套写法只在纯运行时场景安全。
+
+## 72. Localization 表集合主资产 {表名}.asset 误判"空壳表"险遭删除——容器无条目、条目在 Shared Data（2026-09-23 两轮审查连环误判实证）
+
+**症状**：全量审查与复审两轮把 `Assets/Localization/UIText.asset`（943 字节）定性为"0 条目空壳表，建议删除"（复审时用户追问"是什么/能否安全删除"才逼出完整核验，撤回前差一步执行删除）。
+
+**根因**：Unity Localization 的 StringTableCollection 主资产（`m_Group: String Table`）**天然是小容器**——本体只持 `m_SharedTableData` + `m_Tables`（各语言表）两组引用，条目不存在它身上，943 字节是正常体积。条目真落点=`{表名} Shared Data.asset`（键注册表，UIText 实存 247 键：通用 1000 段+战斗 12000 段）与 `{表名}_{locale}.asset` 语言表（战斗键 12028 在 UIText_zh-Hans L1000 实存）。只看主资产体积/内容判"空壳"→ 若照做=全项目 UI 文本五语言全灭（TextCombiner 全部取键失败）。且 gic-localization skill 陷阱节第 3 条早记载"{表名}.asset=表清单序列化落点"，审查结论与 skill 既有知识矛盾却未交叉验证。
+
+**验证法**：判一张 Localization 表是否为空，必须：①数 Shared Data 条目——`rg -c --no-ignore -F 'm_Id:' 'Assets/Localization/{表名} Shared Data.asset'`（零才是空）；②抽一个已知键验语言表实存（如 `rg -n -F '12028' 'UIText_zh-Hans.asset'`）；③删除类建议加 GUID 反查双验（collection 主资产按表名经 LocalizationSettings/Addressables 寻址，GUID 零外部引用≠无用，勿以引用计数判活）。
+
+**教训**：①collection 主资产、场景、prefab 的"体积小/内容少"都不是判废依据——先搞清该资产类型在引擎里的结构性职责再下结论；②删除资产类建议在提出前必须完成条目计数+消费方核验，缺证即不得写"建议删除"；③审查/分析结论与项目 skill 记载冲突时先读 skill 再落笔（skill 是踩坑沉淀，比单次审查快扫可靠）。
