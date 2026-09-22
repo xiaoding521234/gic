@@ -328,6 +328,24 @@ namespace GIC.Battle
             _hpBarFill.localPosition = new Vector3(-(1f - ratio) * 0.5f, 0f, -0.02f);
         }
 
+        // ==================== 元能（B6a：快照权威 + StatChange 命令增量；数值缓存，能量环视觉 B6d） ====================
+
+        public int EnergyCurrent { get; private set; }
+        public int EnergyMax { get; private set; }
+
+        /// <summary>快照权威同步元能（选择阶段头/开局；HUD 爆发键门控读此缓存）</summary>
+        public void SetEnergy(int current, int max)
+        {
+            EnergyCurrent = current;
+            EnergyMax = max;
+        }
+
+        /// <summary>命令流增量元能（StatChange·StatKindEnergy；下个快照自然校正）</summary>
+        public void ApplyEnergyDelta(int delta)
+        {
+            EnergyCurrent = Mathf.Clamp(EnergyCurrent + delta, 0, Mathf.Max(0, EnergyMax));
+        }
+
         // ==================== 头顶 Buff 徽章（B2；快照权威 + 命令流增量） ====================
 
         /// <summary>Buff 徽章行容器：挂立牌倾斜组，与立牌同平面同一旋转轴（2026-09-18 用户目检：

@@ -23,6 +23,10 @@ namespace GIC.Data
         public int dyedElement;
         public int isCorpse;
         public int isFrozen;
+
+        /// <summary>元能当前值/上限（B6a；上限=UnitConfig baseEnergy，爆发门槛=技能条目 EnergyCost）</summary>
+        public int energy;
+        public int maxEnergy;
         public int volume;
         public List<BuffState> buffs = new List<BuffState>();
     }

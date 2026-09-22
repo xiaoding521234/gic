@@ -67,7 +67,19 @@ namespace GIC.Battle
             if (element != ElementType.Physical)
                 effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element));
 
+            // 战技命中获能（B6a 拍板：至少 1 次命中 +10，多次命中不叠加——同片合并按行动者去重实现；
+            // 爆发/延奏命中不获能，按行动技能类型分档）
+            if (IsNormalSkillOfAction(attacker, action))
+                effects.Add(new EnergyEffect(action.unitId, BattleMetrics.EnergyGainPerSkillHit));
+
             return effects;
+        }
+
+        /// <summary>行动选中的技能是否战技（SkillType.Normal）——元能获取/未来战技类规则分档依据</summary>
+        private static bool IsNormalSkillOfAction(Unit attacker, ActionData action)
+        {
+            if (action.skillIndex < 0 || action.skillIndex >= attacker.Skills.Count) return false;
+            return attacker.Skills[action.skillIndex]?.RawData?.skillType == SkillType.Normal;
         }
 
         /// <summary>片前快照中找单位状态（瞬发结算唯一状态源）</summary>

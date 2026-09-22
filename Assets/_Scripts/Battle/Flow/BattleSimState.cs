@@ -171,6 +171,34 @@ namespace GIC.Battle
         }
 
         /// <summary>
+        /// 应用元能变化（B6a：正=获取——移动+10/战技至少1次命中+10；负=技能消耗。
+        /// 上限=UnitConfig baseEnergy（GetEffectiveEnergy）；消耗值=技能条目 EnergyCost
+        /// （三角色爆发 30/40/100 恰与上限相等=攒满才放；安柏延奏 20<上限 30=不必攒满，两者独立）
+        /// </summary>
+        public void ApplyEnergy(Unit target, int delta)
+        {
+            var stats = target.GetUnitComponent<UnitStats>();
+            if (stats == null) return;
+            var energy = stats.GetStatStruct(StatType.Energy);
+            energy.Add(delta);
+            stats.SetStatStruct(StatType.Energy, energy);
+        }
+
+        /// <summary>技能的元能消耗（技能条目 EnergyCost 参数；0=无消耗——战技/移动不耗能）</summary>
+        public static int GetEnergyCost(SkillConfig.SkillData skillData)
+        {
+            return skillData?.GetInt(SkillParamKey.EnergyCost, 0) ?? 0;
+        }
+
+        /// <summary>元能是否够施放（门槛=技能消耗值而非上限——延奏类不满即可放）</summary>
+        public static bool HasEnoughEnergy(Unit unit, int energyCost)
+        {
+            if (energyCost <= 0) return true;
+            var stats = unit?.GetUnitComponent<UnitStats>();
+            return stats != null && stats.Energy >= energyCost;
+        }
+
+        /// <summary>
         /// 死亡判定并转尸体态（HP≤0 → Dead；属性/碰撞/体积/势力全保留，docs/05 §5.4）
         /// </summary>
         public List<Unit> ResolveDeaths(IEnumerable<Unit> candidates)
@@ -282,6 +310,8 @@ namespace GIC.Battle
                     isCorpse = status != null && status.IsDead ? 1 : 0,
                     isFrozen = status != null && status.IsFrozen ? 1 : 0,
                     volume = unit.Volume,
+                    energy = stats?.Energy ?? 0,
+                    maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
                 };
                 foreach (var buff in buffs)
                     state.buffs.Add(new BuffState

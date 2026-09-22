@@ -156,6 +156,7 @@ namespace GIC.Battle
                     view.SetFrozenVisual(state.isFrozen != 0);
                     view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（权威态）
                     view.SetHp(state.hp, state.maxHp);
+                    view.SetEnergy(state.energy, state.maxEnergy); // 元能（权威态；B6a）
                     view.SetBuffs(state.buffs); // 头顶 Buff 行（权威态）
                 }
             }
@@ -350,6 +351,15 @@ namespace GIC.Battle
                         }
                         break;
 
+                    case BattleCommandType.StatChange:
+                        // 属性变化增量（B6a 首个=元能；能量环视觉=B6d 画面批次，此处只更新缓存）
+                        if (_views.TryGetValue(command.targetUnitId, out var statChanged))
+                        {
+                            if (command.metadata == BattleCommand.StatKindEnergy)
+                                statChanged.ApplyEnergyDelta(command.value);
+                        }
+                        break;
+
                     case BattleCommandType.Effect:
                         // 特效命令（B5 首个接线=投射物消散，与投射物/移动同 t=0 起跑）
                         if (command.metadata == BattleCommand.EffectKindProjectileVanish)
@@ -535,6 +545,7 @@ namespace GIC.Battle
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);
             view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（建场权威态）
+            view.SetEnergy(state.energy, state.maxEnergy); // 元能（建场权威态；B6a）
             view.SetBuffs(state.buffs);
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;
