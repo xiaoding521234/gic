@@ -53,6 +53,44 @@ namespace GIC.Battle
                 casterState.position, delta.x, delta.y));
             return effects;
         }
+
+        /// <summary>方向推荐预判（投射物截停形态）：镜像 ProjectileResolver 圆柱接触判定的静态版——
+        /// 敌方恒=快照格心（移动中途中命中不可预知，属提示非校验）；规格=时轮 LineProjectile clip
+        /// （0=BattleMetrics/ProjectileRule 默认），弹道距离上限=min(射程+0.5, 首个虚空格近边界 k−0.5)
+        /// ——距离空间版的 Host maxT/VoidBoundaryTime 同口径</summary>
+        public override bool WouldHitEnemyInDirection(BattleMapData map, BattleSnapshot snapshot,
+            string casterPlayerId, BattleCell from, Direction2D direction)
+        {
+            var delta = SkillHitResolver.DirectionToDelta(direction);
+            var clips = SkillTimelineQuery.JudgmentClips(Timeline, SkillJudgmentKind.LineProjectile);
+            var clip = clips.Count > 0 ? clips[0] : null;
+            float radius = clip != null && clip.hitDiameter > 0f ? clip.hitDiameter : BattleMetrics.UnitCylinderDiameter;
+            radius *= 0.5f;
+            int maxRange = clip != null && clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
+
+            float maxDist = maxRange + 0.5f;
+            for (int k = 1; k <= maxRange; k++)
+            {
+                if (map.HasTile(from.x + delta.x * k, from.y + delta.y * k)) continue;
+                maxDist = k - 0.5f; // 首个虚空格近边界=弹道截断
+                break;
+            }
+
+            var dir = new Vector2(delta.x, delta.y).normalized;
+            var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
+            foreach (var enemy in snapshot.units)
+            {
+                if (enemy.playerId == casterPlayerId) continue; // 含尸体——尸体完全算判定
+                var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
+                if (rel.sqrMagnitude <= radius * radius) return true; // 发射即贴脸（同格堆叠）
+                float along = Vector2.Dot(rel, dir);
+                float perpSq = rel.sqrMagnitude - along * along;
+                if (perpSq > radius * radius) continue; // 弹道不穿该圆柱
+                float entry = along - Mathf.Sqrt(radius * radius - perpSq);
+                if (entry >= 0f && entry <= maxDist) return true;
+            }
+            return false;
+        }
     }
 
     /// <summary>

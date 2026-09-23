@@ -41,6 +41,68 @@ namespace GIC.Battle
             return material;
         }
 
+        /// <summary>新建 Unlit 半透明材质（URP Unlit 透明态全套写入——等价编辑器 Surface=Transparent 的
+        /// ShaderGUI 落值；不设 _Surface 时 OutputAlpha 把 alpha 强制成 1，半透明失效。
+        /// 首个消费者=瞄准高亮推荐/不推荐分色，2026-09-23。调用方负责持有与 OnDestroy 释放）</summary>
+        public static Material CreateTransparentUnlitMaterial(Color color)
+        {
+            var material = new Material(UnlitShader);
+            material.color = color;
+            material.SetFloat("_Surface", 1f);     // 透明面（IsSurfaceTypeTransparent→alpha 输出有效）
+            material.SetFloat("_Blend", 0f);
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0f);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); // 透明面跳过 SSAO 洗色（UnlitForwardPass 同名分支）
+            material.SetOverrideTag("RenderType", "Transparent");
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            return material;
+        }
+
+        // 瞄准格底图（白芯+内嵌黑边环；运行时生成免资产文件）
+        private static Texture2D _aimCellTexture;
+
+        /// <summary>瞄准格底图（128×128，白芯+向内黑边环 12px，Clamp+Bilinear）：黑边 rgb=0 乘任意
+        /// tint 恒黑——推荐/不推荐两色共享同一张；填充区 rgb=1×tint=色块本色；全图 alpha=1
+        /// （透明度由材质 _BaseColor.a 承载）。2026-09-24 拍板：色块带内嵌黑边更明显。</summary>
+        public static Texture2D AimCellTexture
+        {
+            get
+            {
+                if (_aimCellTexture != null) return _aimCellTexture;
+                const int size = 128, border = 12;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                {
+                    name = "BattleAimCellTexture",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                var pixels = new Color32[size * size];
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        bool rim = x < border || y < border || x >= size - border || y >= size - border;
+                        byte v = rim ? (byte)0 : (byte)255;
+                        pixels[y * size + x] = new Color32(v, v, v, 255);
+                    }
+                }
+                tex.SetPixels32(pixels);
+                tex.Apply(false, true);
+                _aimCellTexture = tex;
+                return tex;
+            }
+        }
+
+        /// <summary>新建瞄准格材质（白芯黑边底图 × tint 纯色，透明配方复用 CreateTransparentUnlitMaterial。
+        /// 调用方负责持有与 OnDestroy 释放）</summary>
+        public static Material CreateAimCellMaterial(Color color)
+        {
+            var material = CreateTransparentUnlitMaterial(color);
+            material.mainTexture = AimCellTexture;
+            return material;
+        }
+
         /// <summary>世界层纯色 Quad（基元 + 去 Collider + 挂材质；姿态/缩放由调用方补——既有调用点世界系/本地系两种用法）</summary>
         public static GameObject CreateQuad(Transform parent, string name, Material sharedMaterial)
         {
