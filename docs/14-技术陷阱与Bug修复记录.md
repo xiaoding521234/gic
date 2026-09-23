@@ -1364,3 +1364,23 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **验证法**：判一张 Localization 表是否为空，必须：①数 Shared Data 条目——`rg -c --no-ignore -F 'm_Id:' 'Assets/Localization/{表名} Shared Data.asset'`（零才是空）；②抽一个已知键验语言表实存（如 `rg -n -F '12028' 'UIText_zh-Hans.asset'`）；③删除类建议加 GUID 反查双验（collection 主资产按表名经 LocalizationSettings/Addressables 寻址，GUID 零外部引用≠无用，勿以引用计数判活）。
 
 **教训**：①collection 主资产、场景、prefab 的"体积小/内容少"都不是判废依据——先搞清该资产类型在引擎里的结构性职责再下结论；②删除资产类建议在提出前必须完成条目计数+消费方核验，缺证即不得写"建议删除"；③审查/分析结论与项目 skill 记载冲突时先读 skill 再落笔（skill 是踩坑沉淀，比单次审查快扫可靠）。
+
+## 73. Legacy Animation 的 state 级设置（wrapMode/layer/weight）是纯运行时属性、不随场景序列化——循环必须落在导入器 loopTime 或组件序列化层（2026-09-23 AnimLookTest「全员静止」报障实证）
+
+**症状**：AnimLookTest 四个 Animation 实例（含 09-19 已目检过的两个旧实例）进 Play 后用户报「所有角色都静止」；活体取证：timeScale=1、帧正常推进、四组件 enabled=true，但 **isPlaying 全部 False、stateTime 全部 0**。
+
+**根因**：编辑态对 `AnimationState` 赋的 `wrapMode=Loop`（以及 layer=1/weight）是**纯运行时属性，场景保存时不序列化**——保存重载后全部蒸发，state 回落 clip 导入默认（Once）→ Play 后首轮 0.7~2s 播完即停、之后永远静止；09-19 的目检恰好发生在首轮内，掩盖了缺口。叠加既有事实：Legacy Animation 的 playAutomatically 只自动播**默认 clip**（其余 state 无脚本永不自动播）。
+
+**修法（持久层）**：①循环落 FBX 导入器——`ModelImporter.clipAnimations`（为空则从子资产 clip 手工建表：name/takeName/firstFrame=0/lastFrame=clip.length×frameRate）逐条设 `loopTime=true + wrapMode=Loop` 后 `SaveAndReimport`；②双保险落组件序列化字段：`Animation.wrapMode=Loop + playAutomatically=true + cullingType=AlwaysAnimate`（这三样会存盘）；③reimport 后复查 state/默认 clip 接线（clip 引用 fileID 稳定，不丢）。
+
+**How to apply**：给场景接 Legacy Animation 目检载体，循环一律走导入器/组件序列化层，**勿在编辑态对 AnimationState 赋值当持久配置（白做）**；「播一遍就停」「layer1 不动」先查序列化层；多 clip 同播（body+phys 双层合成）必须脚本驱动，Animation 组件无脚本做不到。
+
+## 74. 新增序列化字段的脚本默认值改动，对运行中编辑器里已加载资产实例**无效**——资产文件未变则跨域重载保留内存实例（2026-09-23/24 瞄准分色三轮调色实证）
+
+**症状**：BattlePalette 新增瞄准分色两字段后连续三次改脚本默认值（白 0.45 → 白 0.8 → 金 (1,0.8,0.35,0.8)），每次 refresh 编译 0 错，用户目检始终看到首版白 0.45；用户怀疑"被序列化了"，但 rg 资产文件零命中（文件里确实没有这两个字段）——活体取证 `BattlePalette.Instance` 读出 (1,1,1,0.45)，而 `ScriptableObject.CreateInstance` 的脚本默认值已是金色，**两者分叉**。
+
+**根因**：Unity 对**文件未变更**的已加载资产，域重载时保留内存实例（serialized-data 缓存往返），**不重跑字段初始化器**。新字段首次域重载时被物化成当时的默认值（白 0.45），此后脚本默认值再怎么改，内存实例都冻结在首版值——「资产重存前走脚本默认值」（§Y9 战斗审查条目）只对**重启编辑器/强制重导入**成立，对长跑编辑器会话不成立。且危险潜伏：任何 `AssetDatabase.SaveAssets`（编辑器保存、某工具顺手保存）都会把冻结值烘进文件，把脏值变成"真源"。
+
+**修法**：把拍板值显式写入资产并保存（`EditorUtility.SetDirty` + `SaveAssets` + `ImportAsset` 回读验证）——资产文件成为真源，编辑器内调色从此走文件。**勿只改脚本默认值指望已加载资产跟上**。
+
+**How to apply**：给运行中项目的既有资 serialized 资产加新字段后需要调值时，一律「脚本默认值+资产值」两处同步（或直接写资产）；症状指纹=改默认值编译通过但运行值不变、资产文件缺字段而 Instance 值≠脚本默认；排查用活体对比三读：磁盘资产值 / `Instance` 值 / `CreateInstance` 临时实例值（=脚本默认值），三者分叉即中此坑。

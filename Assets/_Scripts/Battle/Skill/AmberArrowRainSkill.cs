@@ -105,5 +105,21 @@ namespace GIC.Battle
             }
             return effects;
         }
+
+        /// <summary>方向推荐预判（近战距离段形态）：前方 DamageDistance 格内有敌=推荐（虚空截断；
+        /// 与 ResolveEffects 同参数同扫描口径）</summary>
+        public override bool WouldHitEnemyInDirection(BattleMapData map, BattleSnapshot snapshot,
+            string casterPlayerId, BattleCell from, Direction2D direction)
+        {
+            var delta = SkillHitResolver.DirectionToDelta(direction);
+            int distance = GetParamValue(SkillParamKey.DamageDistance, 2);
+            for (int step = 1; step <= distance; step++)
+            {
+                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
+                if (!map.HasTile(cell.x, cell.y)) break;
+                if (SkillHitResolver.FindEnemiesAt(snapshot, casterPlayerId, cell).Count > 0) return true;
+            }
+            return false;
+        }
     }
 }

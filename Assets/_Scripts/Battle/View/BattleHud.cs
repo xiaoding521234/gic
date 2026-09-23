@@ -22,7 +22,9 @@ namespace GIC.Battle
     /// 布局 = MOBA 范式（移动左下、爆发右下盘心、战技/延奏围绕——默认位即 prefab 摆放，编辑器所见即所得）；
     /// 2026-09-21 自定义布局系统：HUD 控件全量可拖可缩（LayoutSlot 归一锚点），方案存主存档 settings 分区。
     /// 单位选择交互（2026-09-18 拍板）：点立牌选中 → 技能盘现+手牌藏（选中态/手牌态互斥），
-    /// 点空白取消选中；技能瞄准 = 可选格高亮 + 右上取消按钮 + 选中单位脚下金色标记。
+    /// 点空白取消选中；技能瞄准 = 可选格推荐分色高亮（推荐/不推荐=BattlePalette 瞄准推荐色/瞄准
+    /// 不推荐色，色相勿写死在此处——2026-09-23 拍板分色、09-24 白改金；推荐=该方向能命中敌人/
+    /// 该格实际能走到；不可选=无提示）+ 右上取消按钮 + 选中单位脚下金色标记。
     /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）+ LayoutEditing（编辑态门控）。
     /// 输入 = BattleCameraController.OnBoardTap（Drag 短点击复合发射，docs/24 §7.10 tap+pan 同体）。
     /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产。
@@ -104,7 +106,8 @@ namespace GIC.Battle
         private GameObject _selectMarker;
         private readonly List<GameObject> _highlightQuads = new List<GameObject>();
         // 世界层运行时材质（单实例缓存，OnDestroy 释放——Destroy 物体不销材质，逐次 new 会累积泄漏）
-        private Material _aimHighlightMaterial;
+        private Material _aimRecommendedMaterial;    // 可选且推荐（色=BattlePalette.瞄准推荐色）
+        private Material _aimNotRecommendedMaterial; // 可选但不推荐（色=BattlePalette.瞄准不推荐色）
         private Material _selectMarkerMaterial;
 
         // 状态机（AimMode 枚举已并表——瞄准语义由 _aimDef.type 承载，2026-09-18 A 案）
@@ -134,6 +137,11 @@ namespace GIC.Battle
         private SkillButtonDef _popupDef;  // 详情面板当前展示的键
         private SkillButtonDef _aimDef;    // 瞄准中的键
         private readonly HashSet<BattleCell> _aimCells = new HashSet<BattleCell>();
+
+        /// <summary>可选且推荐的格（_aimCells 差集=可选但不推荐；2026-09-23 拍板瞄准分色数据源：
+        /// 推荐与否见 BattlePalette 瞄准推荐色/瞄准不推荐色，不可选=无提示。推荐口径=直线技能该方向
+        /// 能命中敌人 / 移动该格实际能走到，单位指向与部署 v1 全推荐）</summary>
+        private readonly HashSet<BattleCell> _aimRecommendedCells = new HashSet<BattleCell>();
 
         /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——关闭只走 BattleHud 显式路径，
         /// 自带点外关闭已在 BuildSkillPopup 关闭，docs/14 §64b）</summary>
@@ -181,7 +189,8 @@ namespace GIC.Battle
                 _camera.OnBoardTap -= OnBoardTap;
 
             // 世界层运行时材质释放（Destroy 物体不销材质，不释放则跨战斗累积）
-            if (_aimHighlightMaterial != null) Destroy(_aimHighlightMaterial);
+            if (_aimRecommendedMaterial != null) Destroy(_aimRecommendedMaterial);
+            if (_aimNotRecommendedMaterial != null) Destroy(_aimNotRecommendedMaterial);
             if (_selectMarkerMaterial != null) Destroy(_selectMarkerMaterial);
         }
 
@@ -435,6 +444,7 @@ namespace GIC.Battle
             ClosePopup();
 
             _aimCells.Clear();
+            _aimRecommendedCells.Clear();
             var snapshot = _session.Player.LatestSnapshot;
             var core = FindMyCorePosition(snapshot);
             for (int dx = -DeployUnitExecutor.DeployRadiusFromCore; dx <= DeployUnitExecutor.DeployRadiusFromCore; dx++)
@@ -442,7 +452,10 @@ namespace GIC.Battle
             {
                 var c = new BattleCell(core.x + dx, core.y + dy);
                 if (_board.Map.HasTile(c.x, c.y))
+                {
                     _aimCells.Add(c);
+                    _aimRecommendedCells.Add(c); // 部署 v1 全推荐（落点无优劣数据，Host 校验同构）
+                }
             }
             ShowAimHighlights();
             ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
@@ -572,6 +585,7 @@ namespace GIC.Battle
                 _state = HudState.Idle;
                 _aimDef = null;
                 _aimCells.Clear();
+                _aimRecommendedCells.Clear();
                 ClearHighlights();
                 ApplyStateVisibility();
                 SetTip("Battle_TipSelect");
@@ -581,6 +595,7 @@ namespace GIC.Battle
             SetAimSelectRing(_aimDef, false);
             _aimDef = null;
             _aimCells.Clear();
+            _aimRecommendedCells.Clear();
             ClearHighlights();
             ApplyStateVisibility();
             SetTip("Battle_TipUnitSelected");
@@ -593,11 +608,16 @@ namespace GIC.Battle
                 def.view.skillSelect.gameObject.SetActive(on);
         }
 
-        /// <summary>瞄准可选格：移动 = 8 方向直线 1..3 步；战技/爆发（直线型）= 十字方向瞄准；
-        /// 延奏/契约（单位指向型）= 敌方存活单位所在格（B4：投放形态由技能类型分档，docs/18 决策二）</summary>
+        /// <summary>瞄准可选格：移动 = 十字四向 1..N 步；战技/爆发（直线型）= 十字方向瞄准；
+        /// 延奏/契约（单位指向型）= 存活单位所在格（B4：投放形态由技能类型分档，docs/18 决策二）。
+        /// 同步填 _aimRecommendedCells（推荐分色，2026-09-23 拍板）：直线技能=该方向能命中敌人
+        /// （技能实例 WouldHitEnemyInDirection 静态预判，与 Host 判定形态同语义）；移动=该格实际
+        /// 能走到（CanMoveEnterPreview 步进预判，被挡后该向余下格全不推荐——移动停在格前）；
+        /// 单位指向/部署 v1 全推荐</summary>
         private void ComputeAimCells()
         {
             _aimCells.Clear();
+            _aimRecommendedCells.Clear();
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
@@ -607,16 +627,23 @@ namespace GIC.Battle
                 // 移动：十字四向 × 1..N 步（全员移动技能描述=「选择十字方向其一」，2026-09-23 修正——
                 // 首版误做成米字 8 向；上限=移动技能 MoveDistance 参数——移动是特殊技能、距离数据驱动，
                 // B-S1b；客户端只做地块粗筛，体积/阻挡由 Host 结算兜底）
+                // 推荐=步进可达（如凯亚步行不可入水——水面及其后全不推荐，Host 同款停在格前）
                 int maxSteps = 移动技能步数上限();
+                var selfData = GetSelectedUnitData();
                 for (int dir = 0; dir < 4; dir++)
                 {
                     int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
                     int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                    bool reachable = true; // 步进可达链（被挡即断，该向余下格全不推荐）
                     for (int step = 1; step <= maxSteps; step++)
                     {
                         var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
-                        if (!_board.Map.HasTile(c.x, c.y)) break;
+                        if (!_board.Map.HasTile(c.x, c.y)) break; // 虚空=可选区截止（不可选无提示）
                         _aimCells.Add(c);
+                        if (reachable && CanMoveEnterPreview(c, sel, selfData, snapshot))
+                            _aimRecommendedCells.Add(c);
+                        else
+                            reachable = false;
                     }
                 }
                 return;
@@ -626,14 +653,19 @@ namespace GIC.Battle
             if (skillData == null) return;
 
             // 单位指向型：延奏=全图我方存活角色（含施法者自身——协奏语义，docs/07 蒙德；B-S1b 修正，
-            // 此前误按敌方指向）；契约=敌方存活单位（docs/05 §5.3 目标判定不经格子）
+            // 此前误按敌方指向）；契约=敌方存活单位（docs/05 §5.3 目标判定不经格子）。
+            // 推荐分色 v1：单位指向全推荐（目标格即语义本身，无优劣数据可分）
             if (skillData.skillType == SkillType.Enso)
             {
                 foreach (var u in snapshot.units)
                 {
                     if (u.isCorpse != 0 || u.playerId != _myPlayerId) continue;
                     if (_board.Map.HasTile(u.position.x, u.position.y))
-                        _aimCells.Add(new BattleCell(u.position.x, u.position.y));
+                    {
+                        var c = new BattleCell(u.position.x, u.position.y);
+                        _aimCells.Add(c);
+                        _aimRecommendedCells.Add(c);
+                    }
                 }
                 return;
             }
@@ -643,23 +675,73 @@ namespace GIC.Battle
                 {
                     if (u.isCorpse != 0 || u.playerId == _myPlayerId) continue;
                     if (_board.Map.HasTile(u.position.x, u.position.y))
-                        _aimCells.Add(new BattleCell(u.position.x, u.position.y));
+                    {
+                        var c = new BattleCell(u.position.x, u.position.y);
+                        _aimCells.Add(c);
+                        _aimRecommendedCells.Add(c);
+                    }
                 }
                 return;
             }
 
-            // 直线型（战技/爆发）：十字 4 方向瞄准格（点方向格提交 direction；投射物路径 Host 即定）
+            // 直线型（战技/爆发）：十字 4 方向瞄准格（点方向格提交 direction；投射物路径 Host 即定）。
+            // 推荐=该方向能命中敌人（含尸体，Host 同语义）：预判走技能实例 WouldHitEnemyInDirection
+            // （SkillFactory 按 skillID 建实例，判定形态与各技能 Host 结算同源）
+            var previewSkill = SkillFactory.CreateWithData(skillData);
             for (int dir = 0; dir < 4; dir++)
             {
                 int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
                 int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                var direction = dir == 0 ? Direction2D.Right : dir == 1 ? Direction2D.Left
+                    : dir == 2 ? Direction2D.Up : Direction2D.Down;
+                bool recommended = previewSkill.WouldHitEnemyInDirection(
+                    _board.Map, snapshot, sel.playerId, sel.position, direction);
                 for (int step = 1; step <= 方向瞄准显示距离; step++)
                 {
                     var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
                     if (!_board.Map.HasTile(c.x, c.y)) break;
                     _aimCells.Add(c);
+                    if (recommended) _aimRecommendedCells.Add(c);
                 }
             }
+        }
+
+        /// <summary>单位名 → UnitData（快照 unitName 为枚举名字符串；查不到返回 null——
+        /// 单位名缺配置时预判按"无碰撞规则"处理，Host 结算仍是权威）</summary>
+        private UnitConfig.UnitData TryGetUnitData(string unitName)
+        {
+            return Enum.TryParse(unitName, out UnitName name) && _unitConfig != null
+                ? _unitConfig.GetUnitData(name)
+                : null;
+        }
+
+        /// <summary>移动推荐预判的单格进入判定（镜像 MovementResolver.CanEnter 判定链的客户端静态版）：
+        /// 地形层（IsPassable 按 ForceType——步行不可入水/沼泽）→ 体积绝对层（格内体积+自身体积≤3）
+        /// → 阻挡规则层（blockAllies/blockEnemies/blockedByEnemies 配置值——运行时 Buff 修改不可见）。
+        /// 尸体保留碰撞（Host 同语义）；属提示非校验——Host 结算兜底不变。</summary>
+        private bool CanMoveEnterPreview(BattleCell cell, UnitState self, UnitConfig.UnitData selfData,
+            BattleSnapshot snapshot)
+        {
+            var forceType = selfData != null ? selfData.normalMoveType : ForceType.Walk;
+            if (!_board.Map.IsPassable(cell.x, cell.y, forceType)) return false;
+
+            int selfVolume = self.volume > 0 ? self.volume : 1;
+            int existingVolume = 0;
+            foreach (var u in snapshot.units)
+            {
+                if (u.unitId == self.unitId) continue;
+                if (u.position.x != cell.x || u.position.y != cell.y) continue; // 含尸体——尸体保留碰撞
+                existingVolume += u.volume > 0 ? u.volume : 1;
+                if (existingVolume + selfVolume > 3) return false; // 体积绝对层（无视阻挡能力不可绕过）
+
+                var occupantData = TryGetUnitData(u.unitName);
+                if (occupantData == null) continue;
+                bool sameTeam = u.playerId == self.playerId; // 1v1：playerId 同即同队（B7 多队换 team 字段）
+                if (sameTeam && occupantData.blockAllies) return false;
+                if (!sameTeam && occupantData.blockEnemies && selfData != null && selfData.blockedByEnemies)
+                    return false;
+            }
+            return true;
         }
 
         private void SubmitAim(BattleCell cell, UnitState enemyAtCell)
@@ -816,8 +898,12 @@ namespace GIC.Battle
 
             foreach (var cell in _aimCells)
             {
+                // 分色（2026-09-23 拍板）：推荐/不推荐（推荐集差集；色值=BattlePalette 两字段）
+                var material = _aimRecommendedCells.Contains(cell)
+                    ? GetAimRecommendedMaterial()
+                    : GetAimNotRecommendedMaterial();
                 var quad = BattleViewFactory.CreateQuad(_highlightRoot,
-                    $"AimHighlight_{cell.x}_{cell.y}", GetAimHighlightMaterial());
+                    $"AimHighlight_{cell.x}_{cell.y}", material);
                 quad.transform.position = new Vector3(
                     _board.CellToWorld(cell).x,
                     _board.GetSurfaceHeight(cell) + 0.03f,
@@ -828,14 +914,24 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>瞄准高亮共享材质（懒建单实例复用——曾每格 new Material 且清理只销 quad 不销材质，
-        /// 反复进出瞄准态无限累积已修，docs/14 §63；高亮色走 palette 可调，每次进瞄准态刷新）</summary>
-        private Material GetAimHighlightMaterial()
+        /// <summary>瞄准高亮材质（推荐/不推荐双色；底图=BattleViewFactory.AimCellTexture 白芯+内嵌
+        /// 黑边——2026-09-24 拍板加黑边；色值走 palette 可调（2026-09-23 拍板分色），
+        /// 每次进瞄准态刷新。懒建单实例复用——曾每格 new Material 且清理只销 quad 不销材质，
+        /// 反复进出瞄准态无限累积已修，docs/14 §63）</summary>
+        private Material GetAimRecommendedMaterial()
         {
-            if (_aimHighlightMaterial == null)
-                _aimHighlightMaterial = BattleViewFactory.CreateUnlitMaterial(Palette.高亮金);
-            _aimHighlightMaterial.color = Palette.高亮金;
-            return _aimHighlightMaterial;
+            if (_aimRecommendedMaterial == null)
+                _aimRecommendedMaterial = BattleViewFactory.CreateAimCellMaterial(Palette.瞄准推荐色);
+            _aimRecommendedMaterial.color = Palette.瞄准推荐色;
+            return _aimRecommendedMaterial;
+        }
+
+        private Material GetAimNotRecommendedMaterial()
+        {
+            if (_aimNotRecommendedMaterial == null)
+                _aimNotRecommendedMaterial = BattleViewFactory.CreateAimCellMaterial(Palette.瞄准不推荐色);
+            _aimNotRecommendedMaterial.color = Palette.瞄准不推荐色;
+            return _aimNotRecommendedMaterial;
         }
 
         private void ClearHighlights()
@@ -875,9 +971,7 @@ namespace GIC.Battle
         {
             var snapshot = _session.Player.LatestSnapshot;
             var unit = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-            if (unit == null) return null;
-            return Enum.TryParse(unit.unitName, out UnitName name) && _unitConfig != null && _unitConfig.TryGetUnitData(name, out var data)
-                ? data : null;
+            return unit != null ? TryGetUnitData(unit.unitName) : null;
         }
 
         /// <summary>该技能类型在 UnitData.skills 数组的索引（ActionData.skillIndex 的 Host 侧语义；

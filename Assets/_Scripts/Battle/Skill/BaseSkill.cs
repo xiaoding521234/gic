@@ -89,6 +89,27 @@ namespace GIC.Battle
             var p = GetParam(key);
             return p != null ? p.value : fallback;
         }
+
+        /// <summary>
+        /// 方向推荐预判（2026-09-23 拍板：瞄准高亮分色——可选且推荐=半透明白/可选但不推荐=半透明红）：
+        /// 从 from 沿 direction（十字归一）直线施放能否命中至少一个敌方单位（含尸体——Host 判定同语义）。
+        /// 客户端 HUD 进瞄准态时逐方向调用——静态快照格位预判（同片敌方移动不可知，属提示非校验；
+        /// Host 结算仍是权威）。默认=整线逐格扫描（虚空截断、ProjectileRule.MaxRange 上限），
+        /// 与整线迸发类（箭雨）判定同语义；投射物接触截停（安柏战技）/近战距离段（凯亚霜袭）等
+        /// 特殊判定形态由子类覆写——覆写须与本技能 ResolveEffects 的判定形态保持同语义，防预判与结算漂移。
+        /// </summary>
+        public virtual bool WouldHitEnemyInDirection(BattleMapData map, BattleSnapshot snapshot,
+            string casterPlayerId, BattleCell from, Direction2D direction)
+        {
+            var delta = SkillHitResolver.DirectionToDelta(direction);
+            for (int step = 1; step <= ProjectileRule.MaxRange; step++)
+            {
+                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
+                if (!map.HasTile(cell.x, cell.y)) break; // 虚空截断
+                if (SkillHitResolver.FindEnemiesAt(snapshot, casterPlayerId, cell).Count > 0) return true;
+            }
+            return false;
+        }
     }
 }
 
