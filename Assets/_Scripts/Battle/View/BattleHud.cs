@@ -880,13 +880,14 @@ namespace GIC.Battle
                 ? data : null;
         }
 
-        /// <summary>该技能类型在 UnitData.skills 数组的索引（ActionData.skillIndex 的 Host 侧语义）</summary>
+        /// <summary>该技能类型在 UnitData.skills 数组的索引（ActionData.skillIndex 的 Host 侧语义；
+        /// 技能独立化后 skills=SkillConfig 引用列表，分拣读 .data）</summary>
         private int GetSelectedSkillIndex(SkillType want)
         {
             var unitData = GetSelectedUnitData();
             if (unitData?.skills == null) return 0;
-            for (int i = 0; i < unitData.skills.Length; i++)
-                if (unitData.skills[i].skillType == want) return i;
+            for (int i = 0; i < unitData.skills.Count; i++)
+                if (unitData.skills[i]?.data.skillType == want) return i;
             return 0;
         }
 
@@ -897,8 +898,8 @@ namespace GIC.Battle
             if (def == null) return null;
             var unitData = GetSelectedUnitData();
             if (unitData?.skills == null) return null;
-            return unitData.skills.FirstOrDefault(s => s.skillType == def.type)
-                ?? unitData.skills.FirstOrDefault();
+            return unitData.skills.FirstOrDefault(s => s != null && s.data.skillType == def.type)?.data
+                ?? unitData.skills.FirstOrDefault(s => s != null)?.data;
         }
 
         /// <summary>选中单位时刷新技能盘：表驱动全键统一（移动走 ApplyMoveButton，其余走 ApplySkillButton）；
@@ -955,7 +956,7 @@ namespace GIC.Battle
         {
             if (def?.view == null || unitData == null) return;
 
-            var move = unitData.skills?.FirstOrDefault(s => s.skillType == SkillType.Move);
+            var move = unitData.skills?.FirstOrDefault(s => s != null && s.data.skillType == SkillType.Move)?.data;
             if (move != null)
                 def.view.InitWithData(move, unitData, ViewType.OnlyDisplay, null);
 

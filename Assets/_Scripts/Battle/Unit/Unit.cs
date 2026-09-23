@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using GIC.Data;
+using GIC.Framework;
 namespace GIC.Battle
 {
 
@@ -42,10 +43,18 @@ namespace GIC.Battle
 
         private void InitSkills(UnitConfig.UnitData data)
         {
-            SkillConfig.SkillData[] skills = data.skills;
-            foreach (var skillData in skills)
+            var skills = data.skills;
+            if (skills == null) return;
+            for (int i = 0; i < skills.Count; i++)
             {
-                var skill = SkillFactory.CreateWithData(skillData);
+                var sd = skills[i]?.data;
+                if (sd == null)
+                {
+                    // 空引用槽会破坏 skillIndex 对齐（skills 列表序=skillIndex 语义）——数据错误态，告警暴露
+                    GICLog.Warn($"[Unit] {data.unitName} 技能引用列表第 {i} 位为空槽——skillIndex 对齐被破坏，请修 UnitConfig");
+                    continue;
+                }
+                var skill = SkillFactory.CreateWithData(sd);
                 if (skill != null)
                 {
                     AddSkill(skill);

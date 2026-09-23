@@ -94,7 +94,7 @@ namespace GIC.Battle
                 int burstIndex = BattleHeuristics.FindSkillIndex(unit, SkillType.Burst);
                 if (burstIndex >= 0)
                 {
-                    int cost = BattleSimState.GetEnergyCost(unit.RawData.skills[burstIndex]);
+                    int cost = BattleSimState.GetEnergyCost(unit.RawData.skills[burstIndex]?.data);
                     if (BattleSimState.HasEnoughEnergy(unit, cost))
                     {
                         var enemy = BattleHeuristics.FindNearestEnemy(sim, unit);
