@@ -41,10 +41,12 @@ namespace GIC.Battle
 
     /// <summary>
     /// Buff 工厂（B2 最小：switch 分发；B4 反应批次扩为注册表）
+    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（如 AttackUp 的每层 ATKBonus），
+    /// 与技能参数表同源、勿在各 Buff 内硬编码默认值以外的取值来源。
     /// </summary>
     public static class BuffFactory
     {
-        public static BaseBuff Create(BuffType type, int level, Unit source = null)
+        public static BaseBuff Create(BuffType type, int level, Unit source = null, int value = 0)
         {
             switch (type)
             {
@@ -56,6 +58,14 @@ namespace GIC.Battle
                     GICLog.Warn($"[BuffFactory] 未实现的 Buff 类型 {type}");
                     return null;
             }
+        }
+
+        /// <summary>带参构造（延奏等技能参数驱动 Buff：value=每层加成、stackLimit=叠层上限、turns=持续回合）</summary>
+        public static BaseBuff Create(BuffType type, int level, Unit source, int value, int stackLimit, int turns)
+        {
+            if (type == BuffType.AttackUp)
+                return new AttackUpBuff(level, value, stackLimit, turns) { source = source };
+            return Create(type, level, source, value);
         }
     }
 }

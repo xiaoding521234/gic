@@ -44,8 +44,20 @@ namespace GIC.Battle
         [SerializeField] private int 队列槽位数 = 6;
 
         // 瞄准常量（运行时计算用）
-        private const int 移动最大步数 = 3;
         private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
+        // 移动步数上限不再用常量——数据驱动=移动技能 MoveDistance 参数（B-S1b），缺参数回落 3
+
+        /// <summary>移动瞄准步数上限=移动技能 MoveDistance 按基准换算（「拼接后为10%移速」2026-09-23
+        /// 用户拍板：BasedOnMoveSpeed=10%×移速——安柏 50→5 格、凯亚 30→3 格；读快照 moveSpeed 与 Host 同源）；
+        /// 无数据回落按 10% 移速</summary>
+        private int 移动技能步数上限()
+        {
+            var moveData = GetSelectedSkillData(_aimDef); // IsMove 键 def.type=Move → 按 skillType 分拣命中
+            var snapshot = _session?.Player?.LatestSnapshot;
+            var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            int moveSpeed = sel != null ? sel.moveSpeed : 30;
+            return moveData != null ? moveData.ResolveMoveDistance(moveSpeed) : moveSpeed * 10 / 100;
+        }
 
         // ==================== 运行引用 ====================
 
@@ -592,12 +604,15 @@ namespace GIC.Battle
 
             if (_aimDef.IsMove)
             {
-                // 移动：8 方向 × 1..3 步（客户端只做地块粗筛；体积/阻挡由 Host 结算兜底）
-                for (int dx = -1; dx <= 1; dx++)
-                for (int dy = -1; dy <= 1; dy++)
+                // 移动：十字四向 × 1..N 步（全员移动技能描述=「选择十字方向其一」，2026-09-23 修正——
+                // 首版误做成米字 8 向；上限=移动技能 MoveDistance 参数——移动是特殊技能、距离数据驱动，
+                // B-S1b；客户端只做地块粗筛，体积/阻挡由 Host 结算兜底）
+                int maxSteps = 移动技能步数上限();
+                for (int dir = 0; dir < 4; dir++)
                 {
-                    if (dx == 0 && dy == 0) continue;
-                    for (int step = 1; step <= 移动最大步数; step++)
+                    int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
+                    int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                    for (int step = 1; step <= maxSteps; step++)
                     {
                         var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
                         if (!_board.Map.HasTile(c.x, c.y)) break;
@@ -610,8 +625,19 @@ namespace GIC.Battle
             var skillData = GetSelectedSkillData(_aimDef);
             if (skillData == null) return;
 
-            // 单位指向型（延奏/契约）：敌方存活单位所在格（目标判定不经格子，docs/05 §5.3）
-            if (skillData.skillType == SkillType.Enso || skillData.skillType == SkillType.Contract)
+            // 单位指向型：延奏=全图我方存活角色（含施法者自身——协奏语义，docs/07 蒙德；B-S1b 修正，
+            // 此前误按敌方指向）；契约=敌方存活单位（docs/05 §5.3 目标判定不经格子）
+            if (skillData.skillType == SkillType.Enso)
+            {
+                foreach (var u in snapshot.units)
+                {
+                    if (u.isCorpse != 0 || u.playerId != _myPlayerId) continue;
+                    if (_board.Map.HasTile(u.position.x, u.position.y))
+                        _aimCells.Add(new BattleCell(u.position.x, u.position.y));
+                }
+                return;
+            }
+            if (skillData.skillType == SkillType.Contract)
             {
                 foreach (var u in snapshot.units)
                 {
@@ -686,8 +712,12 @@ namespace GIC.Battle
             }
             else
             {
-                // 单位指向型（延奏/契约）：目标=点中格上的敌方单位
-                action.targetUnitId = enemyAtCell != null ? enemyAtCell.unitId : "";
+                // 单位指向型：延奏=点中格上的我方角色（协奏，docs/07 蒙德；B-S1b 修正）；
+                // 契约=点中格上的敌方单位（docs/05 §5.3）
+                var skillData = GetSelectedSkillData(_aimDef);
+                bool allyTargeting = skillData != null && skillData.skillType == SkillType.Enso;
+                var unitAtCell = allyTargeting ? FindUnitAt(snapshot, cell) : enemyAtCell;
+                action.targetUnitId = unitAtCell != null ? unitAtCell.unitId : "";
             }
 
             _session.SubmitAction(action);

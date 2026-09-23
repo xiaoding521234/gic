@@ -96,6 +96,7 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
       skillType: 1
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002001
       icon: {fileID: 0}
       skillType: 2
@@ -103,22 +104,27 @@ MonoBehaviour:
       - key: 0
         value: 0
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 1002002
       icon: {fileID: 0}
       skillType: 3
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002003
       icon: {fileID: 0}
       skillType: 6
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002004
       icon: {fileID: 0}
       skillType: 7
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002005
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -169,6 +175,7 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
       skillType: 1
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002001
       icon: {fileID: 0}
       skillType: 2
@@ -176,22 +183,27 @@ MonoBehaviour:
       - key: 0
         value: 0
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 1002002
       icon: {fileID: 0}
       skillType: 3
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002003
       icon: {fileID: 0}
       skillType: 6
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002004
       icon: {fileID: 0}
       skillType: 7
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002005
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -242,6 +254,7 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
       skillType: 1
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002001
       icon: {fileID: 0}
       skillType: 2
@@ -249,22 +262,27 @@ MonoBehaviour:
       - key: 0
         value: 0
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 1002002
       icon: {fileID: 0}
       skillType: 3
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002003
       icon: {fileID: 0}
       skillType: 6
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002004
       icon: {fileID: 0}
       skillType: 7
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002005
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -373,6 +391,7 @@ MonoBehaviour:
       - key: 35
         value: 5
         baseType: 0
+      timeline: {fileID: 11400000, guid: 2be8c522766a7e449bd6c4f9ccd394d5, type: 2}
     - skillID: 3001002
       icon: {fileID: 21300000, guid: 077a9ba1a9d595e40951208fac980c5b, type: 3}
       skillType: 2
@@ -383,6 +402,7 @@ MonoBehaviour:
       - key: 17
         value: 2
         baseType: 0
+      timeline: {fileID: 11400000, guid: ec9aa34604b44244abe5726fc44f37dd, type: 2}
     - skillID: 3001003
       icon: {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
       skillType: 3
@@ -396,6 +416,7 @@ MonoBehaviour:
       - key: 9
         value: 30
         baseType: 0
+      timeline: {fileID: 11400000, guid: a5e89d01e9b99c24883eff8ce08afc29, type: 2}
     - skillID: 3001004
       icon: {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
       skillType: 6
@@ -412,6 +433,7 @@ MonoBehaviour:
       - key: 37
         value: 5
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3001005
       icon: {fileID: 21300000, guid: f0a43b3a6d95abb48bb0d0a80aa91f24, type: 3}
       skillType: 7
@@ -422,6 +444,7 @@ MonoBehaviour:
       - key: 20
         value: 6
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3001006
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -441,6 +464,7 @@ MonoBehaviour:
       - key: 36
         value: 30
         baseType: 0
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips:
@@ -554,6 +578,7 @@ MonoBehaviour:
       - key: 5
         value: 10
         baseType: 9
+      timeline: {fileID: 0}
     - skillID: 3002001
       icon: {fileID: 21300000, guid: f0b71a61a19af9244942d928d64fc78f, type: 3}
       skillType: 2
@@ -567,6 +592,7 @@ MonoBehaviour:
       - key: 75
         value: 5
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3002002
       icon: {fileID: 21300000, guid: 89e8a48dfc0374349b13c63c734a3957, type: 3}
       skillType: 3
@@ -577,6 +603,7 @@ MonoBehaviour:
       - key: 9
         value: 40
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3002003
       icon: {fileID: 21300000, guid: cc894c695492e654fa6bc8f236aefb1f, type: 3}
       skillType: 6
@@ -593,6 +620,7 @@ MonoBehaviour:
       - key: 37
         value: 5
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3002004
       icon: {fileID: 21300000, guid: 22f63d14e3df3074382cf859230fa72c, type: 3}
       skillType: 7
@@ -600,6 +628,7 @@ MonoBehaviour:
       - key: 3
         value: 50
         baseType: 1
+      timeline: {fileID: 0}
     - skillID: 3002005
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -622,6 +651,7 @@ MonoBehaviour:
       - key: 29
         value: 1
         baseType: 0
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips:
@@ -749,6 +779,7 @@ MonoBehaviour:
       - key: 5
         value: 10
         baseType: 9
+      timeline: {fileID: 0}
     - skillID: 3003004
       icon: {fileID: 21300000, guid: 8bb8d0fca7e98104fbee44166d9149d4, type: 3}
       skillType: 2
@@ -765,6 +796,7 @@ MonoBehaviour:
       - key: 3
         value: 15
         baseType: 2
+      timeline: {fileID: 0}
     - skillID: 3003001
       icon: {fileID: 21300000, guid: 07511fe03878c134594a3ae79e93cce5, type: 3}
       skillType: 3
@@ -775,6 +807,7 @@ MonoBehaviour:
       - key: 9
         value: 100
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3003002
       icon: {fileID: 21300000, guid: 5ef5069407237b24ca3420f0fa7d98f7, type: 3}
       skillType: 6
@@ -785,6 +818,7 @@ MonoBehaviour:
       - key: 9
         value: 20
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3003003
       icon: {fileID: 21300000, guid: 028585a8761cbcc47be102af0f342b88, type: 3}
       skillType: 7
@@ -792,6 +826,7 @@ MonoBehaviour:
       - key: 3
         value: 8
         baseType: 2
+      timeline: {fileID: 0}
     - skillID: 3003005
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -805,6 +840,7 @@ MonoBehaviour:
       - key: 28
         value: 1
         baseType: 0
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips:
@@ -931,6 +967,7 @@ MonoBehaviour:
       - key: 12
         value: 1
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3004002
       icon: {fileID: 21300000, guid: 90f7de93cd1e29849a9fa58c311c9456, type: 3}
       skillType: 3
@@ -947,6 +984,7 @@ MonoBehaviour:
       - key: 9
         value: 50
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3004003
       icon: {fileID: 21300000, guid: 3a8f7b54b380e224ebe5962d721b0ab8, type: 3}
       skillType: 6
@@ -954,6 +992,7 @@ MonoBehaviour:
       - key: 9
         value: 30
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3004004
       icon: {fileID: 21300000, guid: 7554bb3fe73de1c4e9d04c0bd8f0bc6d, type: 3}
       skillType: 7
@@ -967,6 +1006,7 @@ MonoBehaviour:
       - key: 50
         value: 10
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3004005
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -989,6 +1029,7 @@ MonoBehaviour:
       - key: 57
         value: 60
         baseType: 11
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -1181,6 +1222,7 @@ MonoBehaviour:
       - key: 5
         value: 10
         baseType: 9
+      timeline: {fileID: 0}
     - skillID: 3011002
       icon: {fileID: 21300000, guid: f9cdae9cfc9e3f94a933c4eddbdec802, type: 3}
       skillType: 2
@@ -1197,6 +1239,7 @@ MonoBehaviour:
       - key: 60
         value: 5
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3011003
       icon: {fileID: 21300000, guid: 3a27c20eef178e941ab32fd1972c5006, type: 3}
       skillType: 3
@@ -1207,6 +1250,7 @@ MonoBehaviour:
       - key: 9
         value: 50
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3011004
       icon: {fileID: 21300000, guid: c9c63ccf729974b4db4ebd54d53a87a8, type: 3}
       skillType: 6
@@ -1217,6 +1261,7 @@ MonoBehaviour:
       - key: 9
         value: 20
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3011005
       icon: {fileID: 0}
       skillType: 7
@@ -1239,6 +1284,7 @@ MonoBehaviour:
       - key: 65
         value: 5
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3011006
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -1255,6 +1301,7 @@ MonoBehaviour:
       - key: 69
         value: 20
         baseType: 1
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -1308,6 +1355,7 @@ MonoBehaviour:
       - key: 5
         value: 10
         baseType: 9
+      timeline: {fileID: 0}
     - skillID: 3012001
       icon: {fileID: 21300000, guid: 202aebfa5c996d24d9ba4ca5d46fa62e, type: 3}
       skillType: 2
@@ -1318,6 +1366,7 @@ MonoBehaviour:
       - key: 70
         value: 2
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3012002
       icon: {fileID: 21300000, guid: 8c512cea4609494478d1452a226c79bb, type: 3}
       skillType: 3
@@ -1328,6 +1377,7 @@ MonoBehaviour:
       - key: 9
         value: 30
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3012003
       icon: {fileID: 21300000, guid: 0ff24aee6ba7a3d418d51b5fbb0ffe14, type: 3}
       skillType: 6
@@ -1338,10 +1388,12 @@ MonoBehaviour:
       - key: 9
         value: 10
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 3012004
       icon: {fileID: 21300000, guid: f9bbea59072d2a841af9e60db99816c4, type: 3}
       skillType: 7
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 3012005
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -1355,6 +1407,7 @@ MonoBehaviour:
       - key: 74
         value: 40
         baseType: 1
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -1408,6 +1461,7 @@ MonoBehaviour:
       - key: 5
         value: 10
         baseType: 9
+      timeline: {fileID: 0}
     - skillID: 4001001
       icon: {fileID: 21300000, guid: 40f6ddd2cabef0443a063c378f5ab1ff, type: 3}
       skillType: 2
@@ -1421,6 +1475,7 @@ MonoBehaviour:
       - key: 38
         value: 1
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 4001002
       icon: {fileID: 21300000, guid: f6c5f66d7833c7e4690234420394876d, type: 3}
       skillType: 3
@@ -1434,6 +1489,7 @@ MonoBehaviour:
       - key: 9
         value: 30
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 4001003
       icon: {fileID: 21300000, guid: 09f633e4fc72fcd46878a839b79ee026, type: 3}
       skillType: 8
@@ -1456,6 +1512,7 @@ MonoBehaviour:
       - key: 10
         value: 20
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 4001004
       icon: {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
       skillType: 4
@@ -1475,6 +1532,7 @@ MonoBehaviour:
       - key: 49
         value: 2
         baseType: 0
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -1526,6 +1584,7 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
       skillType: 1
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002001
       icon: {fileID: 0}
       skillType: 2
@@ -1533,22 +1592,27 @@ MonoBehaviour:
       - key: 0
         value: 0
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 1002002
       icon: {fileID: 0}
       skillType: 3
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002003
       icon: {fileID: 0}
       skillType: 6
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002004
       icon: {fileID: 0}
       skillType: 7
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002005
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []
@@ -1599,6 +1663,7 @@ MonoBehaviour:
       icon: {fileID: 21300000, guid: 5a3ca0cdd572a684885527900394f22b, type: 3}
       skillType: 1
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002001
       icon: {fileID: 0}
       skillType: 2
@@ -1606,22 +1671,27 @@ MonoBehaviour:
       - key: 0
         value: 0
         baseType: 0
+      timeline: {fileID: 0}
     - skillID: 1002002
       icon: {fileID: 0}
       skillType: 3
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002003
       icon: {fileID: 0}
       skillType: 6
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002004
       icon: {fileID: 0}
       skillType: 7
       customParams: []
+      timeline: {fileID: 0}
     - skillID: 1002005
       icon: {fileID: 0}
       skillType: 4
       customParams: []
+      timeline: {fileID: 0}
     voices:
       onGoWar:
         clips: []

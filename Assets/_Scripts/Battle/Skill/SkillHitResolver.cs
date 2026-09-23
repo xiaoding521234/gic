@@ -15,14 +15,15 @@ namespace GIC.Battle
         /// <summary>
         /// 产出命中目标的全套效应（伤害含反应易伤并入；命中后附着来袭元素）
         /// </summary>
-        /// <param name="attackPercent">攻击百分比（多段伤害已在此合并）</param>
+        /// <param name="attackPercent">攻击百分比（时轮逐发=每发各自的值；无时轮兜底=已合并值）</param>
         /// <param name="delivery">投放形态（0=直击 / 1=直线投射物）</param>
         /// <param name="fromCell">投射物发射格</param>
         /// <param name="hitPointX">命中点连续格心坐标（投射物有效；Host 接触判定得出）</param>
         /// <param name="hitPointY">命中点连续格心坐标 Y</param>
+        /// <param name="launchSeconds">发射时刻（秒；时轮 B-S1——Damage 命令带 launchMs 供客户端节拍）</param>
         public static List<BattleEffect> Hit(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot,
             string targetUnitId, int attackPercent, int delivery, BattleCell fromCell,
-            float hitPointX = 0f, float hitPointY = 0f)
+            float hitPointX = 0f, float hitPointY = 0f, float launchSeconds = 0f)
         {
             var effects = new List<BattleEffect>();
             var attacker = sim.GetUnit(action.unitId);
@@ -50,7 +51,8 @@ namespace GIC.Battle
             if (!result.Cancelled && result.FinalDamage > 0)
             {
                 effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage,
-                    (int)element, delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType));
+                    (int)element, delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType,
+                    Mathf.RoundToInt(launchSeconds * 1000f)));
             }
 
             if (outcome.HasReaction)

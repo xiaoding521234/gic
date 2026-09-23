@@ -28,6 +28,29 @@ namespace GIC.Data
             [Header("自定义参数")]
             [SerializeField] public SkillParam[] customParams;
 
+            [Header("时轮时间轴（B-S1；null=无时轮兜底=旧即时行为）")]
+            public SkillTimelineAsset timeline;
+
+            /// <summary>
+            /// 移动距离换算（2026-09-23 用户拍板：「配置文件里的10，还要看基于类型。拼接后为10%移速」）——
+            /// MoveDistance 参数按 baseType 解释：BasedOnMoveSpeed=百分比×移速（10%×50=5 格）、
+            /// Fixed=直读格数；缺参数默认按 10%移速换算（与全员配置一致）。
+            /// 消费端：Host=MoveExecutor.MaxMoveDistance（结算权威）、HUD=移动瞄准步数上限（显示同源）。
+            /// </summary>
+            public int ResolveMoveDistance(int moveSpeed)
+            {
+                if (customParams != null)
+                {
+                    foreach (var p in customParams)
+                    {
+                        if (p.key != SkillParamKey.MoveDistance) continue;
+                        if (p.baseType == SkillBaseType.Fixed) return p.value;
+                        return moveSpeed * p.value / 100; // BasedOnMoveSpeed 等百分比型基准
+                    }
+                }
+                return moveSpeed * 10 / 100; // 缺参数=默认 10% 移速（30 移速=3 格，与旧回落一致）
+            }
+
             public int GetInt(SkillParamKey key, int defaultValue = 0)
             {
                 if (customParams != null)

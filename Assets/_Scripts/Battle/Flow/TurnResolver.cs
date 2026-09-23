@@ -106,6 +106,7 @@ namespace GIC.Battle
 
             var effects = new List<BattleEffect>();
             var movers = new List<MoveActionState>();
+            var casts = new List<BattleCommand>(); // 时轮施放事件（B-S1）
 
             // 枚举序：unitId 升序（命令排列与写-写冲突合并依据；不影响结算结果）
             actions.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
@@ -122,11 +123,15 @@ namespace GIC.Battle
                 {
                     case ActionType.Move:
                         var mover = MoveExecutor.BuildMover(_sim, action);
-                        if (mover != null) movers.Add(mover);
+                        if (mover != null)
+                        {
+                            movers.Add(mover);
+                            AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
+                        }
                         break;
 
                     case ActionType.Skill:
-                        effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot));
+                        effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot, casts));
                         break;
 
                     case ActionType.Pass:
@@ -160,7 +165,7 @@ namespace GIC.Battle
 
             // 产出片命令块（三段唯一出口 EmitSliceCommands——命令发射序与对账见其内注释）
             EmitSliceCommands($"回合{turnNumber}片{sliceIndex}", segment, sliceIndex,
-                effects, appliedBuffs, movers, vanishes, newlyDead);
+                effects, appliedBuffs, movers, vanishes, newlyDead, expired: null, skillCasts: casts);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -261,11 +266,12 @@ namespace GIC.Battle
             var snapshot = _sim.TakeSnapshot(turnNumber);
             var effects = new List<BattleEffect>();
             var moverList = new List<MoveActionState>();
+            var casts = new List<BattleCommand>(); // 时轮施放事件（B-S1）
 
             switch (action.actionType)
             {
                 case ActionType.Skill:
-                    effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot));
+                    effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot, casts));
                     break;
                 case ActionType.Move:
                     var mover = MoveExecutor.BuildMover(_sim, action);
@@ -276,6 +282,8 @@ namespace GIC.Battle
 
                         // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算）
                         effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove));
+
+                        AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
                     }
                     break;
                 case ActionType.Pass:
@@ -303,7 +311,7 @@ namespace GIC.Battle
 
             // 产出即时段命令（三段唯一出口；单 mover 复用同一 Move 发射循环）
             EmitSliceCommands($"回合{turnNumber}即时段", segment, sliceIndex,
-                effects, appliedBuffs, moverList, vanishes, newlyDead);
+                effects, appliedBuffs, moverList, vanishes, newlyDead, expired: null, skillCasts: casts);
 
             GICLog.Info($"[TurnResolver] 即时行动 {segment}");
             return segment;
@@ -314,15 +322,27 @@ namespace GIC.Battle
         /// <summary>
         /// 段命令统一发射：片/即时段/回合结束段三处原为复制粘贴（曾致 turnEnd 段 Damage 漏带命中点/
         /// 反应标记的漂移）——收口后新效应→命令映射只加一处，BattleEffectCommandAudit 对账随发射统一覆盖三段。
-        /// 发射序：Move → Damage → 消散Effect → 附着 → 反应 → 元能 → 治疗 → 施加Buff → 死亡 → 到期移除Buff。
+        /// 发射序：SkillCast（时轮 B-S1）→ Move → Damage → 消散Effect → 附着 → 反应 → 元能 → 治疗
+        /// → 施加Buff → 死亡 → 到期移除Buff。
         /// 与旧回合结束段序的差异：治疗从 Damage 后移至元能后（客户端 stagger 约 +0.36s，纯视觉节拍）。
         /// </summary>
         private void EmitSliceCommands(string context, Segment segment, int sliceIndex,
             List<BattleEffect> effects, List<ApplyBuffEffect> appliedBuffs,
             List<MoveActionState> movers, List<BattleCommand> vanishes, List<Unit> newlyDead,
-            List<BaseBuff> expired = null)
+            List<BaseBuff> expired = null, List<BattleCommand> skillCasts = null)
         {
             int indexInSlice = 0;
+
+            // 时轮施放事件（B-S1）：段内最前——客户端时轮演出起点（片播放起点=各 clip 的 t=0）
+            if (skillCasts != null)
+            {
+                foreach (var cast in skillCasts)
+                {
+                    cast.sliceIndex = sliceIndex;
+                    cast.indexInSlice = indexInSlice++;
+                    segment.commands.Add(cast);
+                }
+            }
 
             // Move：被挡也发命令（全挡 path=[原格] / 部分挡 path=已走段），携带 MoveBlocked 标记+方向
             // 供客户端播"撞墙弹回"表现（2026-09-21）
@@ -340,7 +360,8 @@ namespace GIC.Battle
             {
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount,
                     effect.Element, effect.Delivery, effect.FromCell,
-                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType));
+                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType,
+                    effect.LaunchMs));
             }
 
             if (vanishes != null)
@@ -405,6 +426,25 @@ namespace GIC.Battle
         // ==================== 分桶与应用 ====================
 
         /// <summary>
+        /// 移动行动的时轮施放事件（B-S1b：「移动是特殊的技能」——与技能行动同产 SkillCast；
+        /// skillId=移动技能条目（skills[0]·Move 型）的枚举值，客户端表现轨同链）
+        /// </summary>
+        private static void AddMoveCast(List<BattleCommand> casts, Unit unit, ActionData action, BattleSnapshot snapshot)
+        {
+            var skills = unit?.Skills;
+            if (skills == null) return;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                if (skills[i]?.RawData?.skillType != SkillType.Move) continue;
+                var casterState = SkillHitResolver.FindUnitState(snapshot, action.unitId);
+                casts.Add(BattleCommand.SkillCast(action.unitId, 0, 0,
+                    (int)skills[i].RawData.skillID, (int)action.direction,
+                    casterState != null ? casterState.position : BattleCell.zero));
+                return;
+            }
+        }
+
+        /// <summary>
         /// 按行动单位攻速分桶（攻速完全相同才同片），桶按攻速降序
         /// </summary>
         private List<(int speed, List<ActionData> actions)> BucketByAttackSpeed(List<ActionData> actions)
@@ -461,7 +501,13 @@ namespace GIC.Battle
                 }
                 else if (effect is ApplyBuffEffect applyBuff)
                 {
-                    var buff = BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level, _sim.GetUnit(applyBuff.SourceUnitId));
+                    // 带参数通道的 Buff（B-S1b：AttackUp 等——value/stackLimit/turns 全由技能参数单源注入）
+                    BaseBuff buff = applyBuff.DurationTurns > 0
+                        ? BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
+                            _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue, applyBuff.StackLimit,
+                            applyBuff.DurationTurns)
+                        : BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
+                            _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue);
                     if (buff == null) continue;
                     _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
 
@@ -518,7 +564,9 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 同片多伤害按 (攻击者,目标) 合并（命令粒度 = 一次原子视觉事件）
+        /// 同片多伤害按 (攻击者,目标,发射时刻) 合并（命令粒度 = 一次原子视觉事件）。
+        /// 时轮 B-S1：合并键含 LaunchMs——逐发（发射时刻不同）不并，各产独立 Damage 命令
+        /// （两发箭矢=两个伤害数字分时弹出）；同发内同目标多来源仍合并。
         /// </summary>
         private static List<DamageEffect> MergeDamageEffects(List<BattleEffect> effects)
         {
@@ -527,17 +575,17 @@ namespace GIC.Battle
             foreach (var effect in effects)
             {
                 if (!(effect is DamageEffect damage)) continue;
-                string key = $"{damage.AttackerUnitId}->{damage.TargetUnitId}";
+                string key = $"{damage.AttackerUnitId}->{damage.TargetUnitId}:{damage.LaunchMs}";
                 if (merged.TryGetValue(key, out var existing))
                 {
                     existing.Amount += damage.Amount;
                 }
                 else
                 {
-                    // 命中点与反应标记取首条（同片同 (攻击者,目标) 合并时=最早一次接触的位置与反应）
+                    // 命中点与反应标记取首条（同合并键合并时=最早一次接触的位置与反应）
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
                         damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY,
-                        damage.ReactionType);
+                        damage.ReactionType, damage.LaunchMs);
                     merged[key] = copy;
                     result.Add(copy);
                 }

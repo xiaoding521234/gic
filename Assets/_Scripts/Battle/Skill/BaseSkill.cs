@@ -20,13 +20,18 @@ namespace GIC.Battle
         // 消耗类数值不走独立字段——一律经 SkillParamKey（EnergyCost 等）customParams：
         // 取值入口=BattleSimState.GetEnergyCost(skill.RawData)，勿在此另设字段防双源（2026-09-23 审查 Y7 清理）
         public Sprite icon;
-        
+
+        /// <summary>时轮时间轴（B-S1；null=无时轮——技能走旧即时行为兜底）</summary>
+        public SkillTimelineAsset Timeline { get; private set; }
+
         public List<SkillParam> SkillParams { get; private set; }
 
         public virtual void Init(SkillConfig.SkillData rawData)
         {
             RawData = rawData;
-            
+
+            Timeline = rawData.timeline; // 时轮（B-S1）：发射时刻/逐发间隔/投射物规格单一真源
+
             // 深拷贝参数数据
             SkillParams = new List<SkillParam>();
             if (rawData.customParams != null)

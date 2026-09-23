@@ -7,7 +7,9 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 移动行动执行器：构建移动者状态，实际结算由 MovementResolver 同片同步逐步展开
+    /// 移动行动执行器：构建移动者状态，实际结算由 MovementResolver 同片同步逐步展开。
+    /// 移动是特殊的技能（2026-09-23 B-S1b 拍板）：步数上限=移动技能条目 MoveDistance 参数
+    /// （skills[0]·Move 型，数据驱动与 HUD 瞄准同源）；无移动技能/无参数回落 3（旧默认）。
     /// </summary>
     public static class MoveExecutor
     {
@@ -22,9 +24,28 @@ namespace GIC.Battle
                 UnitId = action.unitId,
                 Unit = unit,
                 Direction = action.direction,
-                RemainingSteps = Math.Max(0, action.moveMagnitude),
+                RemainingSteps = Math.Min(Math.Max(0, action.moveMagnitude), MaxMoveDistance(unit)),
             };
             return mover;
+        }
+
+        /// <summary>
+        /// 移动步数上限（Host 权威收口）：移动技能 MoveDistance 按基准换算（2026-09-23 用户拍板
+        /// 「拼接后为10%移速」——BasedOnMoveSpeed=百分比×当前移速，SkillData.ResolveMoveDistance；
+        /// 安柏 50 移速→5 格、凯亚 30→3 格）；移速读 UnitStats 当前值（含 Buff——减速缩短移动距离）。
+        /// </summary>
+        public static int MaxMoveDistance(Unit unit)
+        {
+            if (unit?.Skills != null)
+            {
+                foreach (var skill in unit.Skills)
+                {
+                    if (skill?.RawData?.skillType != SkillType.Move) continue;
+                    int moveSpeed = unit.GetUnitComponent<UnitStats>()?.MoveSpeed ?? 30;
+                    return skill.RawData.ResolveMoveDistance(moveSpeed);
+                }
+            }
+            return 3; // 无移动技能条目=旧默认回落
         }
     }
 
@@ -33,10 +54,13 @@ namespace GIC.Battle
     /// 顺序创建），BaseSkill.ResolveEffects 纯结算产出效应；DebugAttackSkill 已退役）。
     /// 单位指向型技能只对目标单位生效（不适用格子判定，docs/05 §5.3）；允许鞭尸。
     /// 目标校验读片前快照（瞬发效应按片初状态结算）。
+    /// 时轮（B-S1）：通过全部门槛的施放各产一条 SkillCast 命令（castsOut，段内最前发射——
+    /// 客户端时轮演出起点；元能不足/不可施放=行动落空，不产施放事件）。
     /// </summary>
     public static class SkillExecutor
     {
-        public static List<BattleEffect> Resolve(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot)
+        public static List<BattleEffect> Resolve(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot,
+            List<BattleCommand> castsOut = null)
         {
             var effects = new List<BattleEffect>();
 
@@ -69,6 +93,15 @@ namespace GIC.Battle
             }
 
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
+
+            // 时轮施放事件（B-S1）：施放者片初位置=发射格/朝向参考（sliceIndex/indexInSlice 由发射出口回填）
+            if (castsOut != null)
+            {
+                var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
+                castsOut.Add(BattleCommand.SkillCast(action.unitId, 0, 0,
+                    (int)skill.RawData.skillID, (int)action.direction,
+                    casterState != null ? casterState.position : BattleCell.zero));
+            }
 
             // 元能消耗随效应产出（负值，随片统一应用；获取端=战技命中，在 SkillHitResolver）
             if (energyCost > 0)

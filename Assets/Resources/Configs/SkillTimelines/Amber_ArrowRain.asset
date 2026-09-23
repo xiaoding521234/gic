@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c6533f0ad4c87bb418d72e2737dbec72, type: 3}
+  m_Name: Amber_ArrowRain
+  m_EditorClassIdentifier: 
+  totalTime: 1.25
+  aimMode: 0
+  clips:
+  - trackType: 1
+    startTime: 0
+    endTime: 0.3
+    kind: 0
+    hitInterval: 0
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    cueName: draw_bow
+  - trackType: 2
+    startTime: 0.3
+    endTime: 0.3
+    kind: 2
+    hitInterval: 0.15
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    cueName: 
+  - trackType: 4
+    startTime: 0.3
+    endTime: 0.3
+    kind: 0
+    hitInterval: 0
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    cueName: arrow_rain_release
+  - trackType: 1
+    startTime: 0.75
+    endTime: 1.25
+    kind: 0
+    hitInterval: 0
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    cueName: recover

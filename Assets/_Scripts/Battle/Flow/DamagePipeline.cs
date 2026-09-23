@@ -13,7 +13,13 @@ namespace GIC.Battle
     {
         public Unit Attacker;
         public Unit Target;
+
+        /// <summary>攻击百分比（技能参数 Damage 标注基准 BasedOnAttack 时的换算载体——40 即 40%×攻击力；
+        /// 技能类读参后直传即可。**若技能把伤害配成 Fixed 基准（固定点数），勿走本字段**——换算成
+        /// 等效百分比或走 FlatDamage，否则固定伤害会被误当百分比（参数基准结算纪律，docs/20）</summary>
         public int AttackPercent = 100;
+
+        /// <summary>额外固定伤害（加法区；Fixed 基准伤害/附加伤害走此）</summary>
         public int FlatDamage;
         public int Element;
 

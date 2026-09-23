@@ -361,6 +361,7 @@ namespace GIC.Battle
                 attack = stats?.Attack ?? 0,
                 defense = stats?.Defense ?? 0,
                 attackSpeed = stats?.AttackSpeed ?? 0,
+                moveSpeed = stats?.MoveSpeed ?? 0,
                 dyedElement = (int)(element?.DyedElement ?? ElementType.Physical),
                 isCorpse = status != null && status.IsDead ? 1 : 0,
                 isFrozen = status != null && status.IsFrozen ? 1 : 0,

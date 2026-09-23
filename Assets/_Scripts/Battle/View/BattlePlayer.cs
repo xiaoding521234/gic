@@ -193,6 +193,10 @@ namespace GIC.Battle
             if (stagger > 0f)
                 yield return new WaitForSeconds(stagger);
 
+            // 时轮（B-S1）：发射时刻延迟（Host 时轮资产下发，勿推算——前摇=箭矢延迟起飞）
+            if (command.launchMs > 0)
+                yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+
             Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
             Vector3 to = command.hitX != 0 || command.hitY != 0
                 ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
@@ -216,6 +220,10 @@ namespace GIC.Battle
         {
             if (stagger > 0f)
                 yield return new WaitForSeconds(stagger);
+
+            // 时轮（B-S1）：发射时刻延迟（与命中侧投射物同源对齐）
+            if (command.launchMs > 0)
+                yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
 
             Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
             Vector3 to;
@@ -374,6 +382,14 @@ namespace GIC.Battle
                                 summoned.ApplyPosition(_board.CellToWorld(command.summonUnit.position));
                             RefreshAllFormations(_spreadFormations);
                         }
+                        break;
+
+                    case BattleCommandType.SkillCast:
+                        // 时轮演出起点事件（B-S1 协议占位）：按 skillID 加载时轮资产播动作/音效/特效轨
+                        // =B-S3 素材落地后接线；当前无表现资产，前摇期视觉由投射物命令的 launchMs
+                        // 延迟起飞承载（施放者动作/音效待素材批次）
+                        GICLog.Info($"[BattlePlayer] 技能施放：{command.actorUnitId} → {(SkillName)command.value}" +
+                                    $" 方向 {(Direction2D)command.direction}");
                         break;
 
                     case BattleCommandType.Effect:

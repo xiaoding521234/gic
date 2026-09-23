@@ -36,9 +36,13 @@ namespace GIC.Battle
         /// 客户端伤害数字带反应名，如"蒸发 40"）</summary>
         public int ReactionType;
 
+        /// <summary>发射时刻（毫秒，相对片播放起点；时轮 B-S1——投射物前摇/瞬发段时刻，
+        /// 客户端据此延迟箭矢起飞与伤害数字节拍；命令合并键含此值=逐发不并）</summary>
+        public int LaunchMs;
+
         public DamageEffect(string attackerUnitId, string targetUnitId, int amount, int element = 0,
             int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f,
-            int reactionType = 0)
+            int reactionType = 0, int launchMs = 0)
         {
             AttackerUnitId = attackerUnitId;
             TargetUnitId = targetUnitId;
@@ -49,6 +53,7 @@ namespace GIC.Battle
             HitPointX = hitPointX;
             HitPointY = hitPointY;
             ReactionType = reactionType;
+            LaunchMs = launchMs;
         }
     }
 
@@ -74,11 +79,24 @@ namespace GIC.Battle
         public int DeltaX;
         public int DeltaY;
 
-        /// <summary>合并后攻击百分比（多段伤害合并，B4 简化①延续）</summary>
+        /// <summary>每发攻击百分比（时轮 B-S1 起逐发独立判定——多段不再合并；无时轮兜底=旧合并值）</summary>
         public int AttackPercent;
 
+        /// <summary>发射时刻（秒，相对片播放起点；时轮 B-S1——前摇即此偏移；0=立即发射）</summary>
+        public float LaunchSeconds;
+
+        /// <summary>飞行速度（格/s；0=BattleMetrics.ProjectileSpeed 默认——per-skill 规格时轮化）</summary>
+        public float Speed;
+
+        /// <summary>判定圆柱直径（0=BattleMetrics.UnitCylinderDiameter 默认）</summary>
+        public float Diameter;
+
+        /// <summary>射程上限（格；0=ProjectileRule.MaxRange 默认）</summary>
+        public int Range;
+
         public ProjectileEffect(string attackerUnitId, ActionData action, int attackPercent,
-            BattleCell fromCell, int deltaX, int deltaY)
+            BattleCell fromCell, int deltaX, int deltaY,
+            float launchSeconds = 0f, float speed = 0f, float diameter = 0f, int range = 0)
         {
             AttackerUnitId = attackerUnitId;
             TargetUnitId = null; // 命中前未定
@@ -88,6 +106,10 @@ namespace GIC.Battle
             DeltaX = deltaX;
             DeltaY = deltaY;
             AttackPercent = attackPercent;
+            LaunchSeconds = launchSeconds;
+            Speed = speed;
+            Diameter = diameter;
+            Range = range;
         }
     }
 
@@ -119,12 +141,26 @@ namespace GIC.Battle
         /// <summary>应用/合并后的剩余回合数（命令流用；由 Host 在应用后回填）</summary>
         public int Turns;
 
-        public ApplyBuffEffect(string sourceUnitId, string targetUnitId, int buffType, int level)
+        /// <summary>技能参数通道（B-S1b：如 AttackUp 每层加成=ATKBonus——数值单源=技能参数表，
+        /// 工厂按 Buff 类型解释；协议命令不携带）</summary>
+        public int BuffValue;
+
+        /// <summary>叠层上限通道（AttackUp 用=StackLimit 参数；协议命令不携带）</summary>
+        public int StackLimit;
+
+        /// <summary>持续回合通道（AttackUp 用=Duration 参数——工厂按此构造初始计时）</summary>
+        public int DurationTurns;
+
+        public ApplyBuffEffect(string sourceUnitId, string targetUnitId, int buffType, int level,
+            int buffValue = 0, int stackLimit = 0, int durationTurns = 0)
         {
             SourceUnitId = sourceUnitId;
             TargetUnitId = targetUnitId;
             BuffType = buffType;
             Level = level;
+            BuffValue = buffValue;
+            StackLimit = stackLimit;
+            DurationTurns = durationTurns;
         }
     }
 
