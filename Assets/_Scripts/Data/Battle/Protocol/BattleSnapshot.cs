@@ -20,6 +20,9 @@ namespace GIC.Data
         public int attack;
         public int defense;
         public int attackSpeed;
+
+        /// <summary>移速（2026-09-23：移动距离=10%×移速换算的基准值——HUD 瞄准与 Host 同源）</summary>
+        public int moveSpeed;
         public int dyedElement;
         public int isCorpse;
         public int isFrozen;

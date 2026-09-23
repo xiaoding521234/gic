@@ -51,6 +51,9 @@ namespace GIC.Data
 
         [InspectorName("恢复")]
         Resume = 13,
+
+        [InspectorName("技能施放")]
+        SkillCast = 14,
     }
 
     /// <summary>
@@ -81,6 +84,9 @@ namespace GIC.Data
         [Header("命中点（Damage 投射物有效；千分定点连续格心坐标×1000，docs/active/22 §11）")]
         public int hitX;
         public int hitY;
+
+        [Header("发射时刻（Damage 投射物/Effect 消散有效；毫秒，相对片播放起点——时轮 B-S1 前摇偏移）")]
+        public int launchMs;
 
         [Header("反应标记（Damage 命令有效；0=无反应——本次命中触发的元素反应子类型，供客户端伤害数字带反应名）")]
         public int reactionKind;
@@ -131,10 +137,11 @@ namespace GIC.Data
         /// <summary>Damage 命令工厂。metadata=元素；direction=投放形态（0=瞬发直击/1=直线投射物，复用字段）；
         /// cell=投射物发射格（Delivery≠0 时有效）；hitX/hitY=命中点千分定点连续格心坐标
         /// （Delivery=1 有效——Host 接触判定得出，客户端按此播放弹着点，勿自行推算）；
-        /// reactionKind=本次命中触发的元素反应（0=无；增伤反应时伤害数字带反应名）</summary>
+        /// reactionKind=本次命中触发的元素反应（0=无；增伤反应时伤害数字带反应名）；
+        /// launchMs=发射时刻毫秒（时轮 B-S1——客户端投射物延迟起飞/瞬发段伤害数字节拍；合并键含此值=逐发不并）</summary>
         public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
             int amount, int metadata, int delivery = 0, BattleCell fromCell = default, int hitX = 0, int hitY = 0,
-            int reactionKind = 0)
+            int reactionKind = 0, int launchMs = 0)
         {
             return new BattleCommand
             {
@@ -150,13 +157,15 @@ namespace GIC.Data
                 hitX = hitX,
                 hitY = hitY,
                 reactionKind = reactionKind,
+                launchMs = launchMs,
             };
         }
 
         /// <summary>特效命令工厂（Effect）。metadata=特效子类型（EffectKindProjectileVanish=投射物消散：
-        /// cell=发射格、direction=飞行方向 Direction2D、value=最大飞行格数——客户端播放飞至尽头消散）</summary>
+        /// cell=发射格、direction=飞行方向 Direction2D、value=最大飞行格数——客户端播放飞至尽头消散）；
+        /// launchMs=发射时刻毫秒（时轮 B-S1）</summary>
         public static BattleCommand Effect(string actorUnitId, int sliceIndex, int indexInSlice,
-            int effectKind, int direction, BattleCell fromCell, int intValue)
+            int effectKind, int direction, BattleCell fromCell, int intValue, int launchMs = 0)
         {
             return new BattleCommand
             {
@@ -168,6 +177,27 @@ namespace GIC.Data
                 direction = direction,
                 cell = fromCell,
                 value = intValue,
+                launchMs = launchMs,
+            };
+        }
+
+        /// <summary>技能施放命令工厂（时轮 B-S1）：片内每个通过门槛的技能行动各产一条、
+        /// 段内最前发射——客户端的时轮演出起点事件（按 skillID 加载 SkillTimelineAsset 播
+        /// 动作/音效/特效轨；素材接线=B-S3）。value=skillID（SkillName 枚举值）、
+        /// direction=瞄准方向、cell=施放者片初位置（朝向参考）。无表现素材时不产出视觉，
+        /// 投射物延迟起飞由 Damage/Effect 命令的 launchMs 承载。</summary>
+        public static BattleCommand SkillCast(string unitId, int sliceIndex, int indexInSlice,
+            int skillId, int direction, BattleCell fromCell)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.SkillCast,
+                actorUnitId = unitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                value = skillId,
+                direction = direction,
+                cell = fromCell,
             };
         }
 

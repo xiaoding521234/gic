@@ -8,8 +8,10 @@ namespace GIC.Battle
     /// <summary>
     /// 安柏·箭雨（爆发，docs/units/蒙德/安柏.md）：选择十字方向其一射出大量箭矢，
     /// 对直线上的**所有**敌人造成 4 次 40% 火伤（整线 AoE，无截停——投放形态=整线天降斜落）。
-    /// B4 简化：①伤害按 Damage×DamageCount 合并单次（反应一次）；②天降视觉 B5 表现批次
-    /// （暂按直击表现）；③元能消耗检查待元能系统（B6）落地；④命中按片初快照格位置。
+    /// 时轮（B-S1，2026-09-23 逐发化拍板）：LineBurst clip 前摇 0.30s + 连段间隔逐段独立判定
+    /// （每段独立时刻/独立 Damage 命令——天降连射节拍；推翻 B4 简化①"合并单次"）。
+    /// 命中按片初快照格位置（瞬发结算）；天降视觉 B5 表现遗留（暂按直击表现）。
+    /// 无时轮兜底=旧合并单次行为（timeline 为 null 时）。
     /// </summary>
     [SkillAttribute(SkillName.Amber_ArrowRain)]
     public class AmberArrowRainSkill : BaseSkill
@@ -29,7 +31,33 @@ namespace GIC.Battle
             var delta = SkillHitResolver.DirectionToDelta(action.direction);
             var from = casterState.position;
 
-            // 整线全目标（无截停；虚空=线终止）
+            // 时轮判定轨（LineBurst clip）：逐段整线 AoE——每段发射时刻=前摇+间隔×序号，
+            // 各段独立结算/附着/反应（同片快照语义：各段读同一片初附着）
+            var clips = SkillTimelineQuery.JudgmentClips(Timeline, SkillJudgmentKind.LineBurst);
+            if (clips.Count > 0)
+            {
+                foreach (var clip in clips)
+                {
+                    for (int i = 0; i < damageCount; i++)
+                    {
+                        float launch = clip.startTime + clip.hitInterval * i;
+                        effects.AddRange(ResolveLineBurst(sim, action, sliceSnapshot, from, delta,
+                            damagePercent, launch));
+                    }
+                }
+                return effects;
+            }
+
+            // 无时轮兜底（旧行为：合并单次整线）
+            effects.AddRange(ResolveLineBurst(sim, action, sliceSnapshot, from, delta, totalPercent, 0f));
+            return effects;
+        }
+
+        /// <summary>整线全目标 AoE（无截停；虚空=线终止）——attackPercent=本段伤害百分比，launchSeconds=本段时刻</summary>
+        private static List<BattleEffect> ResolveLineBurst(BattleSimState sim, ActionData action,
+            BattleSnapshot sliceSnapshot, BattleCell from, Vector2Int delta, int attackPercent, float launchSeconds)
+        {
+            var effects = new List<BattleEffect>();
             for (int step = 1; step <= ProjectileRule.MaxRange; step++)
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
@@ -37,7 +65,7 @@ namespace GIC.Battle
 
                 foreach (var enemy in SkillHitResolver.FindEnemiesAt(sliceSnapshot, action.playerId, cell))
                     effects.AddRange(SkillHitResolver.Hit(sim, action, sliceSnapshot, enemy.unitId,
-                        totalPercent, 0, from));
+                        attackPercent, 0, from, 0f, 0f, launchSeconds));
             }
             return effects;
         }

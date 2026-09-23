@@ -16,6 +16,9 @@ namespace GIC.Data
 
         [InspectorName("冻结")]
         Freeze = 2,
+
+        [InspectorName("攻击提升")]
+        AttackUp = 3,
     }
 
     /// <summary>
