@@ -72,8 +72,8 @@ namespace GIC.Data
             [Header("标签")]
             public UnitTag[] tags;
 
-            [Header("技能")]
-            public SkillConfig.SkillData[] skills;
+            [Header("技能（2026-09-23 独立化：SkillConfig 资产引用列表；顺序=skillIndex 语义勿重排；通用技能共享资产）")]
+            public List<SkillConfig> skills = new List<SkillConfig>();
 
             [Header("语音")]
             public UnitVoiceData voices;

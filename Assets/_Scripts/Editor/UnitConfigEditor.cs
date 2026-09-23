@@ -596,9 +596,9 @@ namespace GIC.Editor
 
             skillsList = ConfigEditorUITK.CreateList(serializedObj, SkillsPath, new ConfigEditorUITK.ListConfig
             {
-                HeaderTitle = "技能列表",
-                NameProvider = skillElement => ((SkillName)skillElement.FindPropertyRelative("skillID").intValue).GetInspectorName(),
-                BadgeProvider = skillElement => ((SkillType)skillElement.FindPropertyRelative("skillType").intValue).GetInspectorName(),
+                HeaderTitle = "技能列表（SkillConfig 资产引用；顺序=skillIndex 勿重排）",
+                NameProvider = skillElement => (skillElement.objectReferenceValue as SkillConfig)?.data.skillID.GetInspectorName() ?? "（空引用）",
+                BadgeProvider = skillElement => (skillElement.objectReferenceValue as SkillConfig)?.data.skillType.GetInspectorName(),
                 OnSelectionChanged = SelectSkill,
             });
             skillsPane.Add(skillsList);
@@ -683,16 +683,34 @@ namespace GIC.Editor
 
             skillEditorScroll.Clear();
             var skillProp = skillsProp.GetArrayElementAtIndex(index);
+            var sc = skillProp.objectReferenceValue as SkillConfig;
+            if (sc == null)
+            {
+                ShowSkillHint("空引用槽——请绑定 SkillConfig 资产（Resources/Configs/Skills/）");
+                return;
+            }
 
-            var it = skillProp.Copy();
-            var end = skillProp.GetEndProperty();
+            // 技能独立化（2026-09-23）：编辑对象=SkillConfig 资产本体（独立 SerializedObject，
+            // 修改直写资产；通用技能共享资产——改一处全角色生效）
+            var scSo = new SerializedObject(sc);
+            var dataProp = scSo.FindProperty("data");
+            var it = dataProp.Copy();
+            var end = dataProp.GetEndProperty();
             bool enterChildren = true;
             while (it.NextVisible(enterChildren) && !SerializedProperty.EqualContents(it, end))
             {
                 enterChildren = false;
-                skillEditorScroll.Add(ConfigEditorUITK.CreateField(serializedObj, it.Copy()));
+                skillEditorScroll.Add(ConfigEditorUITK.CreateField(scSo, it.Copy()));
             }
-            skillEditorScroll.Bind(serializedObj);
+            skillEditorScroll.Bind(scSo);
+
+            var pingBtn = new Button(() =>
+            {
+                EditorGUIUtility.PingObject(sc);
+                Selection.activeObject = sc;
+            }) { text = "在 Project 中定位资产" };
+            pingBtn.style.marginTop = 8;
+            skillEditorScroll.Add(pingBtn);
         }
 
         #endregion

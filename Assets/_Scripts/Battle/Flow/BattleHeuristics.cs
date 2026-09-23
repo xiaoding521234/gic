@@ -93,14 +93,14 @@ namespace GIC.Battle
         }
 
         /// <summary>单位技能列表中首个指定类型技能的索引（-1=无；skillIndex 与 RawData.skills
-        /// 数组同源——HUD/执行器同规约）</summary>
+        /// 引用列表同源——HUD/执行器同规约，分拣读 .data）</summary>
         public static int FindSkillIndex(Unit unit, SkillType skillType)
         {
             var rawData = unit.RawData;
             if (rawData?.skills == null) return -1;
-            for (int i = 0; i < rawData.skills.Length; i++)
+            for (int i = 0; i < rawData.skills.Count; i++)
             {
-                if (rawData.skills[i].skillType == skillType) return i;
+                if (rawData.skills[i]?.data.skillType == skillType) return i;
             }
             return -1;
         }
@@ -113,7 +113,7 @@ namespace GIC.Battle
         public static Direction2D FindLineSkillDirection(BattleSimState sim, Unit self, int skillIndex)
         {
             var rawData = self.RawData;
-            if (rawData?.skills == null || skillIndex < 0 || skillIndex >= rawData.skills.Length)
+            if (rawData?.skills == null || skillIndex < 0 || skillIndex >= rawData.skills.Count)
                 return 0;
             var selfId = self.GetUnitComponent<UnitIdentity>();
             if (selfId == null) return 0;

@@ -157,11 +157,11 @@ namespace GIC.UI
             for (int i = 0; i < skillsPanel.transform.childCount; i++)
                 Destroy(skillsPanel.transform.GetChild(i).gameObject);
 
-            if (unitData.skills == null || unitData.skills.Length == 0) return;
+            if (unitData.skills == null || unitData.skills.Count == 0) return;
 
-            for (int i = 0; i < unitData.skills.Length; i++)
+            for (int i = 0; i < unitData.skills.Count; i++)
             {
-                SkillConfig.SkillData skillData = unitData.skills[i];
+                SkillConfig.SkillData skillData = unitData.skills[i]?.data;
                 if (skillData == null) continue;
 
                 GameObject skillViewObj = Instantiate(skillViewPrefab, skillsPanel.transform);

@@ -7,11 +7,18 @@ namespace GIC.Data
 
 
     /// <summary>
-    /// 技能配置 - 支持多个技能数据
+    /// 技能配置资产（2026-09-23 起独立化：每技能一个 SO，不再内嵌 UnitConfig）。
+    /// 资产路径约定：Assets/Resources/Configs/Skills/{SkillName 枚举名}.asset；
+    /// UnitConfig.unitDataList[].skills = List&lt;SkillConfig&gt; 引用列表（顺序=skillIndex 语义，勿重排）；
+    /// 通用技能（Common_Walk 等）多角色共享同一资产——一处改全处生效。
+    /// 技能本体字段在 data（SkillData）；时轮时间轴=data.timeline（SkillTimelineAsset，可空）。
     /// </summary>
     [CreateAssetMenu(fileName = "SkillConfig", menuName = "Game/SkillConfig")]
     public class SkillConfig : ScriptableObject
     {
+        [Header("技能数据（旧内嵌结构原样迁移；时轮编辑器/UnitData 编辑窗按此编辑）")]
+        public SkillData data = new SkillData();
+
         [Serializable]
         public class SkillData
         {

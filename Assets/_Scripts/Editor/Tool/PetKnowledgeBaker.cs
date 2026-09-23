@@ -105,19 +105,20 @@ namespace GIC.Editor
                     .Append("，视野").Append(u.GetEffectiveVisionRange())
                     .Append("。");
 
-                if (u.skills != null && u.skills.Length > 0)
+                if (u.skills != null && u.skills.Count > 0)
                 {
                     body.Append("\n技能：");
                     foreach (var s in u.skills)
                     {
-                        if (s == null) continue;
-                        string skillName = Zh(TableName.SkillName.ToString(), s.skillID.ToString()) ?? s.skillID.ToString();
-                        string skillTypeZh = Zh(TableName.SkillType.ToString(), s.skillType.ToString())
-                                            ?? s.skillType.GetInspectorName();
+                        if (s?.data == null) continue;
+                        var d = s.data;
+                        string skillName = Zh(TableName.SkillName.ToString(), d.skillID.ToString()) ?? d.skillID.ToString();
+                        string skillTypeZh = Zh(TableName.SkillType.ToString(), d.skillType.ToString())
+                                            ?? d.skillType.GetInspectorName();
                         string desc = ResolveTemplate(
-                            Zh(TableName.SkillDescription.ToString(), s.skillID.ToString()), s.customParams);
+                            Zh(TableName.SkillDescription.ToString(), d.skillID.ToString()), d.customParams);
                         keywords.Add(skillName);
-                        keywords.Add(s.skillID.ToString());
+                        keywords.Add(d.skillID.ToString());
                         body.Append("\n").Append(skillName).Append("（").Append(skillTypeZh).Append("）：")
                             .Append(desc.Replace("\n", "；"));
                     }
