@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization;
-using TMPro;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
@@ -55,6 +54,7 @@ namespace GIC.Battle
 
         private IBattleTransport _transport;
         private Transform _viewRoot;
+        private BattleDamageNumbers _damageNumbers;
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
         private readonly Dictionary<UnitView, Vector3> _formationOffsets = new Dictionary<UnitView, Vector3>();
@@ -480,50 +480,37 @@ namespace GIC.Battle
             view.FlashHit();
             view.ApplyHpDelta(displayValue); // 头顶血条即时反馈（快照权威，下个选择阶段头校正）
 
-            // 伤害/治疗数字（B5 正式化：随机偏移防同点多数字重叠 + 起手弹跳放大；
-            // 2026-09-18 统一化：TextMesh→世界 TMP，fontSize 64×scale 0.06 ≈0.384 世界高与原 characterSize 等高）
-            var numberGo = new GameObject("DamageNumber");
-            numberGo.transform.SetParent(_viewRoot, false);
-            var randomOffset = new Vector3(
-                UnityEngine.Random.Range(-0.18f, 0.18f), 0.35f, UnityEngine.Random.Range(-0.04f, 0.04f));
-            Vector3 start = view.transform.position + randomOffset;
-            numberGo.transform.position = start;
-            numberGo.transform.rotation = _billboardRotation;
-            numberGo.transform.localScale = Vector3.one * 0.06f;
-
-            var text = numberGo.AddComponent<TextMeshPro>();
-            text.font = BattleViewFactory.WorldTextFont;
-            text.fontSize = 64;
-            text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = false;
-            ((RectTransform)numberGo.transform).sizeDelta = new Vector2(40f, 14f);
-            // 反应名前缀（2026-09-22：Damage 命令带反应标记——增伤反应伤害数字带反应名，如"蒸发 -40"；
-            // 数字格式维持既有约定（伤害带负号/治疗带 +），冻结=控制反应无伤害加成、数字不带名）
+            // 伤害/治疗数字=原神式屏幕空间层（2026-09-24 拍板「按照原神的做法」：Overlay 画布永不遮挡、
+            // 首帧爆裂收缩、尺寸随伤害对数放大；反应名前缀为 GIC 特色保留、伤害不带负号、治疗带 +；
+            // 随机偏移防同点多数字重叠）
             var reactionName = !isHeal ? ReactionNameOf(reactionKind) : null;
-            text.text = displayValue > 0
-                ? $"+{displayValue}"
-                : reactionName != null ? $"{reactionName} {displayValue}" : displayValue.ToString();
-            var baseColor = isHeal ? Palette.治疗绿 : Palette.伤害红;
-            text.color = baseColor;
+            int value = Mathf.Abs(displayValue);
+            string text = isHeal
+                ? $"+{value}"
+                : reactionName != null ? $"{reactionName} {value}" : value.ToString();
+            // 随机偏移防同点多数字重叠（2026-09-24 目检后用户拍板加大散布：XZ 加宽、高度带随机）
+            var randomOffset = new Vector3(
+                UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
+                UnityEngine.Random.Range(-0.15f, 0.15f));
+            EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
+                isHeal ? Palette.治疗绿 : Palette.伤害红, value, _playbackSpeed);
 
-            Vector3 end = start + new Vector3(0f, 0.55f, 0f);
-            float duration = 0.8f / _playbackSpeed;
-            float popDuration = 0.15f / _playbackSpeed;
-            Vector3 baseScale = numberGo.transform.localScale;
-            yield return BattleViewTween.Over(duration, t =>
-            {
-                numberGo.transform.position = Vector3.Lerp(start, end, t);
-                text.color = new Color(baseColor.r, baseColor.g, baseColor.b, 1f - t);
-                // 弹跳：前 15% 从 0.6 放大到 1.15，回落到 1.0 后保持
-                float elapsed = t * duration;
-                float pop = elapsed < popDuration
-                    ? Mathf.Lerp(0.6f, 1.15f, elapsed / popDuration)
-                    : Mathf.Lerp(1.15f, 1f, Mathf.Clamp01((elapsed - popDuration) / (popDuration * 2f)));
-                numberGo.transform.localScale = baseScale * pop;
-            });
-
+            // 受击闪色维持原数字存活节律再恢复（观感与旧实现一致）
+            yield return new WaitForSeconds(0.8f / _playbackSpeed);
             view.RestoreColor();
-            UnityEngine.Object.Destroy(numberGo);
+        }
+
+        /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>
+        private BattleDamageNumbers EnsureDamageNumbers()
+        {
+            if (_damageNumbers == null)
+            {
+                var go = new GameObject("DamageNumbers");
+                go.transform.SetParent(transform, false);
+                _damageNumbers = go.AddComponent<BattleDamageNumbers>();
+                _damageNumbers.Init(_viewCamera != null ? _viewCamera : Camera.main);
+            }
+            return _damageNumbers;
         }
 
         private IEnumerator PlayDeathCoroutine(UnitView view, float delay)
