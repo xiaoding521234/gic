@@ -23,6 +23,8 @@ namespace GIC.Data
         [Header("反馈数字")]
         public Color 伤害红 = new Color(1f, 0.3f, 0.25f);
         public Color 治疗绿 = new Color(0.3f, 0.95f, 0.45f);
+        [Tooltip("原神式伤害数字（BattleDamageNumbers）的黑描边色")]
+        public Color 伤害数字描边色 = new Color(0.04f, 0.03f, 0.03f, 0.85f);
 
         [Header("投射物（B5 表现批次换正式箭矢素材前的白色光条占位）")]
         public Color 箭矢占位色 = new Color(0.98f, 0.93f, 0.80f, 1f);
