@@ -47,33 +47,35 @@ namespace GIC.Battle
         }
         
         /// <summary>
-        /// 创建技能实例。未注册类 → 返回占位技能（保 unit.Skills 与 UnitConfig.skills
+        /// 创建技能实例。三层分流（2026-09-25 B-1，docs/18 决策九 D5）：
+        /// ① 注册专属类优先（渐进双轨——旧技能类兜底）；
+        /// ② 无注册类且 effects 非空 → ConfiguredSkill 数据驱动通用类（效果原子管线）；
+        /// ③ 无注册类且 effects 空 → UnimplementedSkill 占位（保 unit.Skills 与 UnitConfig.skills
         /// **索引严格对齐**——ActionData.skillIndex 双端同源映射，占位不可施放）而非 null
         /// （null 会令 InitSkills 跳过 → 后续技能索引整体前移错位，2026-09-18 B4 实证防）。
         /// </summary>
-        private static BaseSkill CreateWithID(SkillName skillID)
-        {
-            if (!_isInitialized) Initialize();
-
-            if (skillID == SkillName.None) return new UnimplementedSkill(); // None 配置条目=空槽，占位保索引对齐（与未注册同哲学、不告警）
-
-            if (_creators.TryGetValue(skillID, out var creator))
-            {
-                return creator();
-            }
-
-            GICLog.Warn($"[SkillFactory] 未注册的技能: {skillID} → 占位（不可施放）");
-            return new UnimplementedSkill();
-        }
-
         public static BaseSkill CreateWithData(SkillConfig.SkillData data)
         {
             if (!_isInitialized) Initialize();
-            
-            BaseSkill skill = CreateWithID(data.skillID);
+            if (data == null) return null;
+
+            BaseSkill skill;
+            if (data.skillID != SkillName.None && _creators.TryGetValue(data.skillID, out var creator))
+            {
+                skill = creator();
+            }
+            else if (data.skillID != SkillName.None && data.HasEffects)
+            {
+                skill = new ConfiguredSkill(); // 数据驱动通用类（加技能=配 effects 零代码）
+            }
+            else
+            {
+                if (data.skillID != SkillName.None)
+                    GICLog.Warn($"[SkillFactory] 未注册且无效果原子: {data.skillID} → 占位（不可施放）");
+                skill = new UnimplementedSkill(); // None 配置条目=空槽，占位保索引对齐（不告警）
+            }
 
             skill?.Init(data);
-            
             return skill;
         }
         

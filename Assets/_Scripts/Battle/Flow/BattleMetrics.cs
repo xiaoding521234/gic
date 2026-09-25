@@ -29,4 +29,17 @@ namespace GIC.Battle
         /// 爆发/延奏命中不获能）</summary>
         public const int EnergyGainPerSkillHit = 10;
     }
+
+    /// <summary>
+    /// 投射物规则常量（docs/05 §5.3 统一拍板 + docs/18 决策二"投放形态由技能数据驱动"；
+    /// 原寄居 AmberDoubleShotSkill.cs，B-1 技能类退役迁入常量收口处）
+    /// </summary>
+    public static class ProjectileRule
+    {
+        /// <summary>直线型弹射物飞行上限（统一 24 格）</summary>
+        public const int MaxRange = 24;
+
+        /// <summary>投放形态：直线飞行投射物（客户端播箭矢）</summary>
+        public const int LineDelivery = 1;
+    }
 }

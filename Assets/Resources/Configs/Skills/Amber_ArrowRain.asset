@@ -27,3 +27,24 @@ MonoBehaviour:
       value: 30
       baseType: 0
     timeline: {fileID: 11400000, guid: a5e89d01e9b99c24883eff8ce08afc29, type: 2}
+    effects:
+    - trigger: 1
+      kind: 1
+      targetFilter: 0
+      paramKey: 1
+      paramKey2: 0
+      paramKey3: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7
+    - trigger: 1
+      kind: 4
+      targetFilter: 0
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
+      value: 0
+      element: 1
+      buffType: 1
+      targetSkillType: 7
