@@ -1021,6 +1021,14 @@ MonoBehaviour:
     m_Localized: Item card use will be added in a later update
     m_Metadata:
       m_Items: []
+  - m_Id: 12031
+    m_Localized: Victory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12032
+    m_Localized: Defeat
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

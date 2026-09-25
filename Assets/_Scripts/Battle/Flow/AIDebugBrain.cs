@@ -26,6 +26,11 @@ namespace GIC.Battle
         private string _playerId;
         private int _lastSubmittedTurn = -1;
 
+        /// <summary>AI 玩家队伍（2026-09-25 三轮审查 C2：敌我/我军判定=TeamType 口径；操控权归属=playerId 保留）</summary>
+        private TeamType MyTeam => _session != null && _session.Sim != null
+            ? _session.Sim.GetTeamOf(_playerId)
+            : TeamType.A;
+
         /// <summary>AI 提交延迟（秒）——模拟"思考"，同时让回合切换肉眼可辨</summary>
         private const float SubmitDelaySeconds = 0.8f;
 
@@ -166,9 +171,9 @@ namespace GIC.Battle
 
                 foreach (var direction in BattleHeuristics.CrossDirections)
                 {
-                    if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, _playerId, from, direction))
+                    if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, MyTeam, from, direction))
                         continue;
-                    var targets = BattleHeuristics.PreviewLineTargets(sim, snapshot, _playerId, from, data, direction);
+                    var targets = BattleHeuristics.PreviewLineTargets(sim, snapshot, MyTeam, from, data, direction);
                     if (targets.Count == 0) continue; // 纯尸体线：不浪费行动
 
                     int score = 0;
@@ -203,13 +208,14 @@ namespace GIC.Battle
                 if (!skill.CanCast(unit)) continue;
                 if (!BattleSimState.HasEnoughEnergy(unit, BattleSimState.GetEnergyCost(data))) continue;
 
-                // 候选目标：己方存活单位（含自身）unitId 升序
+                // 候选目标：我军存活单位（含自身）unitId 升序——延奏目标域=阵营口径
+                // （2026-09-25 三轮审查 C2：2v2 可协奏队友单位）；行动者归属=playerId 保留
                 var allies = new List<(string unitId, Unit unit)>();
                 foreach (var kv in sim.Units)
                 {
                     if (BattleSimState.IsDead(kv.Value)) continue;
                     var id = kv.Value.GetUnitComponent<UnitIdentity>();
-                    if (id == null || id.OwnerPlayerID != _playerId) continue;
+                    if (id == null || id.Team != MyTeam) continue;
                     allies.Add((kv.Key, kv.Value));
                 }
                 allies.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
@@ -378,8 +384,8 @@ namespace GIC.Battle
 
                 foreach (var direction in BattleHeuristics.CrossDirections)
                 {
-                    if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, _playerId, cell, direction)) continue;
-                    if (BattleHeuristics.PreviewLineTargets(sim, snapshot, _playerId, cell, data, direction).Count > 0)
+                    if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, MyTeam, cell, direction)) continue;
+                    if (BattleHeuristics.PreviewLineTargets(sim, snapshot, MyTeam, cell, data, direction).Count > 0)
                         return true;
                 }
             }

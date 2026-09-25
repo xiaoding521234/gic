@@ -19,6 +19,13 @@ namespace GIC.Battle
     /// </summary>
     public static class EffectCompiler
     {
+        /// <summary>TriggerSkill 链最大深度（2026-09-25 三轮审查 S2 防环：延奏→变奏正常链深 1~2，
+        /// 超限=循环触发配置失误，Warn 截断保 Host 不栈溢出）</summary>
+        private const int MaxTriggerChainDepth = 3;
+
+        /// <summary>链深度计数（战斗单线程；TriggerSkill 分支 ++/-- 包 try-finally，异常也归零）</summary>
+        private static int _triggerDepth;
+
         // ==================== 技能级编译入口（ConfiguredSkill.ResolveEffects） ====================
 
         /// <summary>技能全编译：按技能类型分流判定轨/单位指向，产出全部 BattleEffect（不含 SkillCast/元能消耗——SkillExecutor 职责）</summary>
@@ -31,13 +38,15 @@ namespace GIC.Battle
             var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
             if (casterState == null) return effects;
 
-            // 单位指向型（延奏/契约）：目标校验（Host 权威）+ OnCast 效果——不经格子判定
+            // 单位指向型（延奏/契约）：目标校验（Host 权威）+ OnCast 效果——不经格子判定。
+            // 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2：延奏=同队合法目标含 2v2 队友、契约=异队）
             if (skillData.skillType == SkillType.Enso || skillData.skillType == SkillType.Contract)
             {
                 var target = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
                 bool allySide = skillData.skillType == SkillType.Enso;
+                var casterTeam = sim.GetTeamOf(action.playerId);
                 bool valid = target != null && target.isCorpse == 0
-                    && (allySide ? target.playerId == action.playerId : target.playerId != action.playerId);
+                    && (allySide ? (TeamType)target.team == casterTeam : (TeamType)target.team != casterTeam);
                 if (!valid)
                 {
                     GICLog.Info($"[EffectCompiler] {action.unitId} {skillData.skillID} 目标无效（{action.targetUnitId}），行动落空");
@@ -116,7 +125,7 @@ namespace GIC.Battle
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!sim.Map.HasTile(cell.x, cell.y)) break;
 
-                foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, action.playerId, cell))
+                foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, sim.GetTeamOf(action.playerId), cell))
                     effects.AddRange(CompileOnHit(sim, action, snapshot, skillData, enemy.unitId,
                         attackPercent, 0, from, 0f, 0f, launchSeconds, launchSeconds)); // 整线迸发：段时刻即命中时刻（瞬发无飞行段）
             }
@@ -146,17 +155,18 @@ namespace GIC.Battle
                     yield return casterState;
                     break;
                 case SkillEffectTargetFilter.AllAllies:
-                    // 我方全体存活（元气迸发——群体治疗各按目标自身 maxHp 换算）
+                    // 我方全体存活（元气迸发——群体治疗各按目标自身 maxHp 换算）；
+                    // 我军=TeamType 口径（2026-09-25 三轮审查 C2：2v2 含队友单位）
                     foreach (var u in snapshot.units)
-                        if (u.playerId == action.playerId && u.isCorpse == 0)
+                        if ((TeamType)u.team == sim.GetTeamOf(action.playerId) && u.isCorpse == 0)
                             yield return u;
                     break;
                 case SkillEffectTargetFilter.MondstadtOrSelf:
-                    if (directTarget != null && (directTarget.unitId == action.unitId || IsMondstadtUnit(sim, directTarget.unitName)))
+                    if (directTarget != null && (directTarget.unitId == action.unitId || BattleHeuristics.IsMondstadtUnitName(directTarget.unitName)))
                         yield return directTarget;
                     break;
                 case SkillEffectTargetFilter.NotMondstadt:
-                    if (directTarget != null && !IsMondstadtUnit(sim, directTarget.unitName))
+                    if (directTarget != null && !BattleHeuristics.IsMondstadtUnitName(directTarget.unitName))
                         yield return directTarget;
                     break;
                 default:
@@ -189,7 +199,7 @@ namespace GIC.Battle
                     if (radius <= 0) continue;
                     foreach (var ally in sliceSnapshot.units)
                     {
-                        if (ally.playerId != action.playerId || ally.isCorpse != 0) continue; // 尸体不治疗
+                        if ((TeamType)ally.team != sim.GetTeamOf(action.playerId) || ally.isCorpse != 0) continue; // 尸体不治疗；我军=TeamType 口径（C2）
                         int dist = Math.Max(Math.Abs(ally.position.x - casterState.position.x),
                             Math.Abs(ally.position.y - casterState.position.y));
                         if (dist > radius) continue;
@@ -338,7 +348,14 @@ namespace GIC.Battle
                 case SkillEffectKind.TriggerSkill:
                 {
                     // 技能链（块内因果序——延奏→变奏串行展开，docs/active/22 §1）：目标该型技能的
-                    // 结算产出并入本行动块；变奏未实装=ConfiguredSkill 空产出/UnimplementedSkill 空产出
+                    // 结算产出并入本行动块；变奏未实装=ConfiguredSkill 空产出/UnimplementedSkill 空产出。
+                    // 防环守卫（2026-09-25 三轮审查 S2）：TriggerSkill 数据驱动可递归再入 CompileSkill——
+                    // 配置失误形成 A→B→A 循环会栈溢出炸 Host，深度超限 Warn 截断（数据错误须炸得优雅）
+                    if (_triggerDepth >= MaxTriggerChainDepth)
+                    {
+                        GICLog.Warn($"[EffectCompiler] TriggerSkill 链深度超限（{MaxTriggerChainDepth}）——疑似循环触发配置（{action.unitId} {skillData.skillID}），截断");
+                        break;
+                    }
                     var owner = target;
                     if (owner.Skills == null) break;
                     for (int i = 0; i < owner.Skills.Count; i++)
@@ -353,7 +370,15 @@ namespace GIC.Battle
                             skillIndex = i,
                             targetUnitId = "",
                         };
-                        effects.AddRange(skill.ResolveEffects(sim, chained, snapshot));
+                        _triggerDepth++;
+                        try
+                        {
+                            effects.AddRange(skill.ResolveEffects(sim, chained, snapshot));
+                        }
+                        finally
+                        {
+                            _triggerDepth--; // 异常路径也归零，防静态计数器跨行动/跨对局残留
+                        }
                         break; // 每单位一个该型技能（变奏）
                     }
                     break;
@@ -402,37 +427,27 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>目标是否蒙德角色（UnitConfig.factions 单源——蒙德协奏规则 docs/07；快照不携带势力）</summary>
-        private static bool IsMondstadtUnit(BattleSimState sim, string unitName)
-        {
-            var config = Wargame.Instance?.Context?.Get<UnitConfig>();
-            if (config == null || !Enum.TryParse<UnitName>(unitName, out var name)) return false;
-            if (!config.TryGetUnitData(name, out var data) || data.factions == null) return false;
-            foreach (var faction in data.factions)
-                if (faction == FactionType.Mondstadt) return true;
-            return false;
-        }
-
         // ==================== 预判工厂（决策九 D5：预判/结算同形由 kind 强制） ====================
 
         /// <summary>方向命中预判按判定 kind 派发：LineProjectile=投射物圆柱接触静态形态、
-        /// LineBurst/无轨=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）</summary>
+        /// LineBurst/无轨=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）。
+        /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2：casterTeam=施法者队伍，2v2 不再误伤判定队友）</summary>
         public static bool WouldHitEnemyInDirection(SkillTimelineAsset timeline, BattleMapData map,
-            BattleSnapshot snapshot, string casterPlayerId, BattleCell from, Direction2D direction)
+            BattleSnapshot snapshot, TeamType casterTeam, BattleCell from, Direction2D direction)
         {
             var projClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile);
             if (projClips.Count > 0)
-                return WouldHitProjectile(map, snapshot, casterPlayerId, from, direction, projClips[0]);
+                return WouldHitProjectile(map, snapshot, casterTeam, from, direction, projClips[0]);
 
             var burstClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst);
             int maxRange = burstClips.Count > 0 && burstClips[0].maxRange > 0
                 ? burstClips[0].maxRange : ProjectileRule.MaxRange;
-            return WouldHitLineSegments(map, snapshot, casterPlayerId, from, direction, maxRange);
+            return WouldHitLineSegments(map, snapshot, casterTeam, from, direction, maxRange);
         }
 
         /// <summary>投射物圆柱接触预判（原安柏战技覆写泛化）：距离空间版 Host maxT/VoidBoundary 同口径；
         /// 敌方恒=快照格心（移动中命中不可预知，属提示非校验）</summary>
-        private static bool WouldHitProjectile(BattleMapData map, BattleSnapshot snapshot, string casterPlayerId,
+        private static bool WouldHitProjectile(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
             BattleCell from, Direction2D direction, SkillTimelineClip clip)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
@@ -452,7 +467,7 @@ namespace GIC.Battle
             var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
             foreach (var enemy in snapshot.units)
             {
-                if (enemy.playerId == casterPlayerId) continue; // 含尸体——尸体完全算判定
+                if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
                 var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
                 if (rel.sqrMagnitude <= radius * radius) return true; // 发射即贴脸（同格堆叠）
                 float along = Vector2.Dot(rel, dir);
@@ -465,7 +480,7 @@ namespace GIC.Battle
         }
 
         /// <summary>整线/距离段预判（原凯亚霜袭覆写泛化）：前方 maxRange 格内有敌=推荐（虚空截断）</summary>
-        private static bool WouldHitLineSegments(BattleMapData map, BattleSnapshot snapshot, string casterPlayerId,
+        private static bool WouldHitLineSegments(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
             BattleCell from, Direction2D direction, int maxRange)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
@@ -473,7 +488,7 @@ namespace GIC.Battle
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!map.HasTile(cell.x, cell.y)) break;
-                if (SkillHitResolver.FindEnemiesAt(snapshot, casterPlayerId, cell).Count > 0) return true;
+                if (SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell).Count > 0) return true;
             }
             return false;
         }

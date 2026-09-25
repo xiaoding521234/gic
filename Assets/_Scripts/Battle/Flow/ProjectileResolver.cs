@@ -61,10 +61,12 @@ namespace GIC.Battle
                 var dir = new Vector2(projectile.DeltaX, projectile.DeltaY).normalized;
                 float voidT = VoidBoundaryTime(sim, projectile, maxT, speed, maxRange, launch);
 
-                // 敌方按 unitId 升序（含尸体——尸体完全算判定，docs/05 §5.4；先到先得取最早接触）
+                // 敌方按 unitId 升序（含尸体——尸体完全算判定，docs/05 §5.4；先到先得取最早接触）。
+                // 敌我=TeamType 口径（2026-09-25 三轮审查 C2：2v2 下不再把队友单位算进命中筛选）
+                var casterTeam = sim.GetTeamOf(projectile.PlayerId);
                 var enemies = new List<UnitState>();
                 foreach (var state in sliceSnapshot.units)
-                    if (state.playerId != projectile.PlayerId)
+                    if ((TeamType)state.team != casterTeam)
                         enemies.Add(state);
                 enemies.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
 

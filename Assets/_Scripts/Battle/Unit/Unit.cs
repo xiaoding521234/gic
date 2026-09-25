@@ -50,8 +50,12 @@ namespace GIC.Battle
                 var sd = skills[i]?.data;
                 if (sd == null)
                 {
-                    // 空引用槽会破坏 skillIndex 对齐（skills 列表序=skillIndex 语义）——数据错误态，告警暴露
-                    GICLog.Warn($"[Unit] {data.unitName} 技能引用列表第 {i} 位为空槽——skillIndex 对齐被破坏，请修 UnitConfig");
+                    // 空引用槽占位（2026-09-25 三轮审查 S6）：HUD 上交的 skillIndex 用 UnitConfig.skills
+                    // 配置序、Host 消费用 unit.Skills 实例序——跳过会让后续技能索引整体前移、两序错位
+                    // （点 A 技能放 B 技能且无告警）。占位件与 SkillFactory 的 UnimplementedSkill 哲学同款
+                    // （不可施放、零产出），配置序=实例序恒成立；数据错误仍 Warn 暴露，请修 UnitConfig
+                    GICLog.Warn($"[Unit] {data.unitName} 技能引用列表第 {i} 位为空槽——占位保 skillIndex 对齐，请修 UnitConfig");
+                    AddSkill(new UnimplementedSkill());
                     continue;
                 }
                 var skill = SkillFactory.CreateWithData(sd);

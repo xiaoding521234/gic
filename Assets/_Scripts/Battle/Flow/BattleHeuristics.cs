@@ -57,7 +57,7 @@ namespace GIC.Battle
             {
                 var unit = kv.Value;
                 var id = unit.GetUnitComponent<UnitIdentity>();
-                if (id == null || id.OwnerPlayerID == selfId.OwnerPlayerID) continue;
+                if (id == null || id.Team == selfId.Team) continue; // 敌我=TeamType 口径（2026-09-25 三轮审查 C2：2v2 不把队友当敌人）
                 if (BattleSimState.IsDead(unit)) continue;
 
                 var pos = sim.GetPosition(unit);
@@ -114,9 +114,9 @@ namespace GIC.Battle
             var from = sim.GetPosition(self);
             foreach (var direction in CrossDirections)
             {
-                if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, identity.OwnerPlayerID, from, direction))
+                if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, identity.Team, from, direction))
                     continue;
-                if (PreviewLineTargets(sim, snapshot, identity.OwnerPlayerID, from, skill.RawData, direction).Count == 0)
+                if (PreviewLineTargets(sim, snapshot, identity.Team, from, skill.RawData, direction).Count == 0)
                     continue;
                 return direction;
             }
@@ -130,7 +130,7 @@ namespace GIC.Battle
         /// （伤害打尸体=浪费，评分口径按存活目标计）
         /// </summary>
         public static List<UnitState> PreviewLineTargets(BattleSimState sim, BattleSnapshot snapshot,
-            string playerId, BattleCell from, SkillConfig.SkillData skillData, Direction2D direction)
+            TeamType casterTeam, BattleCell from, SkillConfig.SkillData skillData, Direction2D direction)
         {
             var result = new List<UnitState>();
             var delta = SkillHitResolver.DirectionToDelta(direction);
@@ -144,7 +144,7 @@ namespace GIC.Battle
                 {
                     var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                     if (!sim.Map.HasTile(cell.x, cell.y)) break; // 虚空截断
-                    var enemies = SkillHitResolver.FindEnemiesAt(snapshot, playerId, cell);
+                    var enemies = SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell);
                     if (enemies.Count == 0) continue;
                     foreach (var enemy in enemies)
                         if (enemy.isCorpse == 0) result.Add(enemy);
@@ -161,7 +161,7 @@ namespace GIC.Battle
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!sim.Map.HasTile(cell.x, cell.y)) break;
-                foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, playerId, cell))
+                foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell))
                     if (enemy.isCorpse == 0) result.Add(enemy);
             }
             return result;
@@ -195,9 +195,18 @@ namespace GIC.Battle
         {
             if (self == null || ally == null) return false;
             if (ally == self) return true;
-            var factions = ally.RawData?.factions;
-            if (factions == null) return false;
-            foreach (var faction in factions)
+            var id = ally.GetUnitComponent<UnitIdentity>();
+            return IsMondstadtUnitName(id != null ? id.UnitName.ToString() : "");
+        }
+
+        /// <summary>单位名是否蒙德角色（2026-09-25 三轮审查 S8 单出口：蒙德判定全项目唯一实现——
+        /// 数据源=UnitConfig.factions（与 RawData 同源）；消费方=AI 估值+EffectCompiler 协奏筛选）</summary>
+        public static bool IsMondstadtUnitName(string unitName)
+        {
+            var config = GIC.Framework.Wargame.Instance?.Context?.Get<UnitConfig>();
+            if (config == null || !Enum.TryParse<UnitName>(unitName, out var name)) return false;
+            if (!config.TryGetUnitData(name, out var data) || data.factions == null) return false;
+            foreach (var faction in data.factions)
                 if (faction == FactionType.Mondstadt) return true;
             return false;
         }

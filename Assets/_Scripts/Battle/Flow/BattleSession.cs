@@ -66,6 +66,8 @@ namespace GIC.Battle
                 msg => player.OnSegment(msg));
             session._clientRouter.Register<TurnEndMessage>(BattleMessageType.TurnEnd,
                 msg => player.OnTurnEnd(msg));
+            session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver,
+                msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播（订阅方=HUD 胜负提示）
             transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
 
             player.Bind(transport, sim.Map);
@@ -124,6 +126,20 @@ namespace GIC.Battle
             if (unit == null || BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit))
             {
                 GICLog.Warn($"[BattleSession] 即时行动单位 {action?.unitId} 不可用，丢弃");
+                return;
+            }
+
+            // 归属校验（2026-09-25 三轮审查 S3：上交通道有、此处漏——B7 LAN 下客户端可上交
+            // 他人单位的即时行动=作弊口）+ 低级单位防线（C1 同款：自主决策不走即时通道）
+            var identity = unit.GetUnitComponent<UnitIdentity>();
+            if (identity == null || identity.OwnerPlayerID != action.playerId)
+            {
+                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 不属于 {action?.playerId}，丢弃");
+                return;
+            }
+            if (!BattleHeuristics.IsMajorUnit(unit))
+            {
+                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为低级单位（LowUnitBrain 自主决策），丢弃");
                 return;
             }
 

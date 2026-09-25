@@ -31,7 +31,9 @@ namespace GIC.Battle
         {
             _owner = owner;
             _selfElement = owner.RawData.selfElement;
-            _dyedElement = _selfElement;
+            // 登场无附着（2026-09-25 拍板 4A：对齐原神+docs/06——附着只来自元素伤害命中；
+            // 首版 Dyed=SelfElement 会让元素角色登场常驻附着、第一击即触发反应）
+            _dyedElement = ElementType.Physical;
         }
 
         // ==================== 最终值计算 ====================

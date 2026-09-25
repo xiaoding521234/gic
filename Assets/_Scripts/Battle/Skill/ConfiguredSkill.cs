@@ -18,7 +18,7 @@ namespace GIC.Battle
             => EffectCompiler.CompileSkill(sim, action, sliceSnapshot, RawData);
 
         public override bool WouldHitEnemyInDirection(BattleMapData map, BattleSnapshot snapshot,
-            string casterPlayerId, BattleCell from, Direction2D direction)
-            => EffectCompiler.WouldHitEnemyInDirection(Timeline, map, snapshot, casterPlayerId, from, direction);
+            TeamType casterTeam, BattleCell from, Direction2D direction)
+            => EffectCompiler.WouldHitEnemyInDirection(Timeline, map, snapshot, casterTeam, from, direction);
     }
 }
