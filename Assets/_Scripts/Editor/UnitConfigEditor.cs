@@ -700,8 +700,11 @@ namespace GIC.Editor
             while (it.NextVisible(enterChildren) && !SerializedProperty.EqualContents(it, end))
             {
                 enterChildren = false;
+                if (it.name == "effects") continue; // 效果原子走专用按 kind 显字段编辑（B-2）
                 skillEditorScroll.Add(ConfigEditorUITK.CreateField(scSo, it.Copy()));
             }
+
+            BuildEffectsEditor(scSo, sc);
             skillEditorScroll.Bind(scSo);
 
             var pingBtn = new Button(() =>
@@ -711,6 +714,166 @@ namespace GIC.Editor
             }) { text = "在 Project 中定位资产" };
             pingBtn.style.marginTop = 8;
             skillEditorScroll.Add(pingBtn);
+        }
+
+        // ==================== 效果原子编辑（B-2，docs/active/29 §5） ====================
+
+        private ListView effectsList;
+        private VisualElement effectAtomCard;
+        private SerializedObject effectsSo;
+        private int selectedEffectIndex = -1;
+
+        /// <summary>效果原子列表 + 选中编辑卡 + 校验行（union 按行展示，选中后按 kind 显字段）</summary>
+        private void BuildEffectsEditor(SerializedObject scSo, SkillConfig sc)
+        {
+            effectsSo = scSo;
+            selectedEffectIndex = -1;
+
+            skillEditorScroll.Add(ConfigEditorUITK.CreateSectionHeader(
+                "效果原子（B-1 数据驱动——加/改效果零代码；底部 +/右键 增删）"));
+
+            effectsList = ConfigEditorUITK.CreateList(scSo, "data.effects", new ConfigEditorUITK.ListConfig
+            {
+                HeaderTitle = "效果原子列表",
+                NameProvider = DescribeEffectAtom,
+                BadgeProvider = el =>
+                {
+                    var trigger = (SkillEffectTrigger)el.FindPropertyRelative("trigger").intValue;
+                    return trigger switch
+                    {
+                        SkillEffectTrigger.OnCast => "施放",
+                        SkillEffectTrigger.OnHit => "命中",
+                        _ => "消散", // OnVanish（B-3 预留）
+                    };
+                },
+                OnSelectionChanged = idx =>
+                {
+                    selectedEffectIndex = idx;
+                    RebuildEffectAtomCard();
+                },
+            });
+            effectsList.style.maxHeight = 170;
+            skillEditorScroll.Add(effectsList);
+
+            effectAtomCard = new VisualElement();
+            effectAtomCard.style.marginTop = 6;
+            skillEditorScroll.Add(effectAtomCard);
+
+            skillEditorScroll.Add(BuildEffectsValidation(sc));
+        }
+
+        /// <summary>列表行文本：kind 中文名 + 关键载荷摘要（Damage→参数键 / ApplyBuff→Buff 名 / EnergyGain→值…）</summary>
+        private static string DescribeEffectAtom(SerializedProperty el)
+        {
+            var kind = (SkillEffectKind)el.FindPropertyRelative("kind").intValue;
+            string summary = kind switch
+            {
+                SkillEffectKind.Damage or SkillEffectKind.Heal or SkillEffectKind.EnergyGain =>
+                    $"参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}" +
+                    (kind == SkillEffectKind.EnergyGain || kind == SkillEffectKind.Heal
+                        ? $"（缺省值 {el.FindPropertyRelative("value").intValue}）" : ""),
+                SkillEffectKind.ApplyBuff =>
+                    $"Buff: {((BuffType)el.FindPropertyRelative("buffType").intValue)}",
+                SkillEffectKind.TriggerSkill =>
+                    $"触发: {((SkillType)el.FindPropertyRelative("targetSkillType").intValue)}",
+                _ => "",
+            };
+            return $"{kind.GetInspectorName()}{(summary.Length > 0 ? " · " + summary : "")}";
+        }
+
+        /// <summary>选中效果的按 kind 显字段编辑卡（字段全建+显隐切换——kind 变化不丢绑定）</summary>
+        private void RebuildEffectAtomCard()
+        {
+            if (effectAtomCard == null || effectsSo == null) return;
+            effectAtomCard.Clear();
+
+            var effectsProp = effectsSo.FindProperty("data.effects");
+            if (effectsProp == null || selectedEffectIndex < 0 || selectedEffectIndex >= effectsProp.arraySize)
+            {
+                effectAtomCard.Add(new HelpBox("选中上方列表行编辑效果（右键/底部 + 新增）", HelpBoxMessageType.Info));
+                return;
+            }
+
+            var el = effectsProp.GetArrayElementAtIndex(selectedEffectIndex);
+
+            // 公共字段：触发时机 / 类型 / 目标筛选（OnCast 语义）
+            var triggerField = new PropertyField(el.FindPropertyRelative("trigger"), "触发时机");
+            var kindField = new PropertyField(el.FindPropertyRelative("kind"), "效果类型");
+            var filterField = new PropertyField(el.FindPropertyRelative("targetFilter"), "目标筛选(施放时)");
+            effectAtomCard.Add(triggerField);
+            effectAtomCard.Add(kindField);
+            effectAtomCard.Add(filterField);
+
+            // 载荷字段（按 kind 部分有效——全建后显隐切换，kind 值变化时同步）
+            var paramKeyField = new PropertyField(el.FindPropertyRelative("paramKey"), "主参数键");
+            var paramKey2Field = new PropertyField(el.FindPropertyRelative("paramKey2"), "第二参数键(叠层上限)");
+            var paramKey3Field = new PropertyField(el.FindPropertyRelative("paramKey3"), "第三参数键(持续回合)");
+            var valueField = new PropertyField(el.FindPropertyRelative("value"), "直读值(机制常量)");
+            var elementField = new PropertyField(el.FindPropertyRelative("element"), "元素(物理=施法者元素)");
+            var buffTypeField = new PropertyField(el.FindPropertyRelative("buffType"), "Buff 类型");
+            var targetSkillTypeField = new PropertyField(el.FindPropertyRelative("targetSkillType"), "触发技能类型");
+            foreach (var f in new[] { paramKeyField, paramKey2Field, paramKey3Field, valueField, elementField, buffTypeField, targetSkillTypeField })
+                effectAtomCard.Add(f);
+
+            void ApplyVisibility()
+            {
+                var kind = (SkillEffectKind)el.FindPropertyRelative("kind").intValue;
+                bool isCast = (SkillEffectTrigger)el.FindPropertyRelative("trigger").intValue == SkillEffectTrigger.OnCast;
+                filterField.style.display = isCast ? DisplayStyle.Flex : DisplayStyle.None;
+
+                paramKeyField.style.display = kind switch
+                {
+                    SkillEffectKind.Damage or SkillEffectKind.Heal or SkillEffectKind.ApplyBuff or SkillEffectKind.EnergyGain
+                        => DisplayStyle.Flex, _ => DisplayStyle.None };
+                paramKey2Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
+                paramKey3Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
+                valueField.style.display = kind switch
+                {
+                    SkillEffectKind.Heal or SkillEffectKind.EnergyGain or SkillEffectKind.ApplyBuff
+                        => DisplayStyle.Flex, _ => DisplayStyle.None };
+                elementField.style.display = kind is SkillEffectKind.Damage or SkillEffectKind.AttachElement
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+                buffTypeField.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
+                targetSkillTypeField.style.display = kind == SkillEffectKind.TriggerSkill ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            ApplyVisibility();
+            // kind/trigger 值变化 → 显隐即时同步（绑定写回后回调）
+            kindField.RegisterValueChangeCallback(_ => ApplyVisibility());
+            triggerField.RegisterValueChangeCallback(_ => ApplyVisibility());
+        }
+
+        /// <summary>技能级效果校验行：effects 空=占位提示；判定轨有产出但无 OnHit 效果=空打警告</summary>
+        private static VisualElement BuildEffectsValidation(SkillConfig sc)
+        {
+            var data = sc.data;
+            var issues = new List<string>();
+
+            if (data == null || !data.HasEffects)
+                issues.Add("无效果原子——未注册专属类时运行时=UnimplementedSkill 占位（不可施放）");
+
+            if (data != null && (data.skillType == SkillType.Normal || data.skillType == SkillType.Burst))
+            {
+                var timeline = data.timeline;
+                var judgmentClips = timeline != null
+                    ? SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile)
+                        .Count + SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst).Count
+                    : 0;
+                bool hasOnHit = data.effects != null && data.effects.Exists(e => e.trigger == SkillEffectTrigger.OnHit);
+
+                if (judgmentClips > 0 && !hasOnHit)
+                    issues.Add("判定轨有 clip 但无 OnHit 效果——命中将无任何产出（空打）");
+                if (judgmentClips == 0 && hasOnHit)
+                    issues.Add("OnHit 效果但判定轨无 clip——走无时轮合并兜底（单发/单段）");
+            }
+
+            if (issues.Count == 0)
+                return new HelpBox("✓ 效果配置校验通过", HelpBoxMessageType.None);
+
+            var box = new HelpBox("⚠ " + string.Join("；", issues), HelpBoxMessageType.Warning);
+            box.style.whiteSpace = WhiteSpace.Normal;
+            box.style.marginTop = 6;
+            return box;
         }
 
         #endregion
