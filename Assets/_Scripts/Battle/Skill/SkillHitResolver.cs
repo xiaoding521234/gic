@@ -22,9 +22,11 @@ namespace GIC.Battle
         /// <param name="hitPointX">命中点连续格心坐标（投射物有效；Host 接触判定得出）</param>
         /// <param name="hitPointY">命中点连续格心坐标 Y</param>
         /// <param name="launchSeconds">发射时刻（秒；时轮 B-S1——Damage 命令带 launchMs 供客户端节拍）</param>
+        /// <param name="hitSeconds">命中时刻（秒，相对片播放起点，ProjectileResolver 接触判定得出；0=立即。
+        /// 战技获能/命中治疗到点应用——客户端元能/治疗数字随命中时刻跳变，非施放即跳（2026-09-25 拍板「命中时才给」）</param>
         public static List<BattleEffect> Hit(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot,
             string targetUnitId, int attackPercent, int delivery, BattleCell fromCell,
-            float hitPointX = 0f, float hitPointY = 0f, float launchSeconds = 0f)
+            float hitPointX = 0f, float hitPointY = 0f, float launchSeconds = 0f, float hitSeconds = 0f)
         {
             var attacker = sim.GetUnit(action.unitId);
             if (attacker == null) return new List<BattleEffect>();
@@ -35,7 +37,7 @@ namespace GIC.Battle
             if (skillData != null && skillData.HasEffects)
             {
                 return EffectCompiler.CompileOnHit(sim, action, sliceSnapshot, skillData, targetUnitId,
-                    attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds);
+                    attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds);
             }
 
             // 旧技能类兜底（effects 空）：内置三件套以隐式默认原子等价编译——
@@ -50,11 +52,13 @@ namespace GIC.Battle
                 {
                     trigger = SkillEffectTrigger.OnHit,
                     kind = SkillEffectKind.EnergyGain,
+                    // 受益者=施法者/行动者（B6a：命中敌不充能——targetFilter 误配 Target 会把 +10 发给被命中的敌人，2026-09-25 实证）
+                    targetFilter = SkillEffectTargetFilter.Caster,
                     value = BattleMetrics.EnergyGainPerSkillHit,
                 });
             var fallbackData = new SkillConfig.SkillData { effects = implicitEffects };
             return EffectCompiler.CompileOnHit(sim, action, sliceSnapshot, fallbackData, targetUnitId,
-                attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds);
+                attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds);
         }
 
         /// <summary>行动选中技能的配置数据（attacker.Skills[skillIndex].RawData；越界/空返回 null）</summary>

@@ -330,7 +330,14 @@ namespace GIC.Battle
 
                     case BattleCommandType.Heal:
                         if (_views.TryGetValue(command.targetUnitId, out var healed))
-                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(healed, command.value, stagger, true)));
+                        {
+                            // 命中时刻（2026-09-25「命中时才给」）：OnHit 治疗（水之浅唱）到命中毫秒再弹 +N
+                            //（与投射物落地同时刻）；0=立即（OnCast 治疗/回合结束段，保持命令 stagger 节拍）
+                            float healDelay = command.launchMs > 0
+                                ? command.launchMs / 1000f / _playbackSpeed
+                                : stagger;
+                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(healed, command.value, healDelay, true)));
+                        }
                         break;
 
                     case BattleCommandType.Death:
@@ -381,7 +388,14 @@ namespace GIC.Battle
                         if (_views.TryGetValue(command.targetUnitId, out var statChanged))
                         {
                             if (command.metadata == BattleCommand.StatKindEnergy)
-                                statChanged.ApplyEnergyDelta(command.value);
+                            {
+                                // 命中时刻（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
+                                // 到点再跳元能（与投射物命中表现同时刻）；0=立即（移动获能/协奏/消耗/回合发放）
+                                if (command.launchMs > 0)
+                                    playbacks.Add(StartCoroutine(PlayEnergyDeltaCoroutine(statChanged, command)));
+                                else
+                                    statChanged.ApplyEnergyDelta(command.value);
+                            }
                         }
                         break;
 
@@ -511,6 +525,14 @@ namespace GIC.Battle
             // 受击闪色维持原数字存活节律再恢复（观感与旧实现一致）
             yield return new WaitForSeconds(0.8f / _playbackSpeed);
             view.RestoreColor();
+        }
+
+        /// <summary>元能命中时刻应用（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
+        /// 到点再跳元能（与投射物命中表现同时刻）；0=立即不走本协程</summary>
+        private IEnumerator PlayEnergyDeltaCoroutine(UnitView view, BattleCommand command)
+        {
+            yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+            view.ApplyEnergyDelta(command.value);
         }
 
         /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>

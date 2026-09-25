@@ -85,7 +85,7 @@ namespace GIC.Data
         public int hitX;
         public int hitY;
 
-        [Header("发射时刻（Damage 投射物/Effect 消散有效；毫秒，相对片播放起点——时轮 B-S1 前摇偏移）")]
+        [Header("发射时刻（Damage 投射物/Effect 消散=发射延迟；StatChange(元能)·Heal=应用时刻——命中时才给，2026-09-25；毫秒，相对片播放起点；0=立即）")]
         public int launchMs;
 
         [Header("反应标记（Damage 命令有效；0=无反应——本次命中触发的元素反应子类型，供客户端伤害数字带反应名）")]

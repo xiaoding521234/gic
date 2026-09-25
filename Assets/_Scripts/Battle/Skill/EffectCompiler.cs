@@ -116,7 +116,7 @@ namespace GIC.Battle
 
                 foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, action.playerId, cell))
                     effects.AddRange(CompileOnHit(sim, action, snapshot, skillData, enemy.unitId,
-                        attackPercent, 0, from, 0f, 0f, launchSeconds));
+                        attackPercent, 0, from, 0f, 0f, launchSeconds, launchSeconds)); // 整线迸发：段时刻即命中时刻（瞬发无飞行段）
             }
         }
 
@@ -130,7 +130,7 @@ namespace GIC.Battle
                 if (atom.trigger != SkillEffectTrigger.OnCast) continue;
                 foreach (var target in ResolveCastTargets(atom, action, snapshot, sim, casterState, directTarget))
                     CompileAtom(sim, action, snapshot, skillData, atom, target.unitId, casterState,
-                        0, 0, BattleCell.zero, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
+                        0, 0, BattleCell.zero, 0f, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
             }
         }
 
@@ -166,10 +166,11 @@ namespace GIC.Battle
         // ==================== OnHit 编译（命中时效果——原 Hit 内置产出的数据驱动化） ====================
 
         /// <summary>命中效果编译：遍历 OnHit 原子逐个展开。Damage 原子内建元素反应预览链
-        /// （易伤/增伤并入乘区+反应命令+冻结 Buff——docs/06）；附着/获能等为其余独立原子。</summary>
+        /// （易伤/增伤并入乘区+反应命令+冻结 Buff——docs/06）；附着/获能等为其余独立原子。
+        /// hitSeconds=命中时刻（2026-09-25 拍板「命中时才给」：获能/治疗效应携带，客户端到点应用；0=立即）</summary>
         public static List<BattleEffect> CompileOnHit(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot,
             SkillConfig.SkillData skillData, string targetUnitId, int attackPercent, int delivery, BattleCell fromCell,
-            float hitPointX, float hitPointY, float launchSeconds)
+            float hitPointX, float hitPointY, float launchSeconds, float hitSeconds = 0f)
         {
             var effects = new List<BattleEffect>();
             var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
@@ -191,15 +192,26 @@ namespace GIC.Battle
                             Math.Abs(ally.position.y - casterState.position.y));
                         if (dist > radius) continue;
                         CompileAtom(sim, action, sliceSnapshot, skillData, atom, ally.unitId, casterState,
-                            attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, effects,
-                            EnergyEffect.CategorySkillHitGain);
+                            attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
+                            effects, EnergyEffect.CategorySkillHitGain);
                     }
                     continue;
                 }
 
+                // 行动者语义（战技获能 B6a，docs/18 决策七）：targetFilter=Caster → 受益者=施法者
+                // （行动者）——命中敌不充能、多次命中只获一次（同片应用层按 目标+类别 去重，TurnResolver）。
+                // 2026-09-25 修复：此前三战技获能原子 targetFilter 误配 Target，+10 元能发给了被命中的敌人
+                if (atom.targetFilter == SkillEffectTargetFilter.Caster)
+                {
+                    CompileAtom(sim, action, sliceSnapshot, skillData, atom, action.unitId, casterState,
+                        attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
+                        effects, EnergyEffect.CategorySkillHitGain);
+                    continue;
+                }
+
                 CompileAtom(sim, action, sliceSnapshot, skillData, atom, targetUnitId, casterState,
-                    attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, effects,
-                    EnergyEffect.CategorySkillHitGain);
+                    attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
+                    effects, EnergyEffect.CategorySkillHitGain);
             }
             return effects;
         }
@@ -209,7 +221,7 @@ namespace GIC.Battle
         private static void CompileAtom(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
             SkillConfig.SkillData skillData, SkillEffectConfig atom, string targetUnitId, UnitState casterState,
             int attackPercent, int delivery, BattleCell fromCell, float hitPointX, float hitPointY,
-            float launchSeconds, List<BattleEffect> effects, int energyCategory)
+            float launchSeconds, float hitSeconds, List<BattleEffect> effects, int energyCategory)
         {
             var attacker = sim.GetUnit(action.unitId);
             var target = sim.GetUnit(targetUnitId);
@@ -267,10 +279,11 @@ namespace GIC.Battle
                 case SkillEffectKind.Heal:
                 {
                     // 治疗换算出口（docs/11 裸 int 坑）：编译时按 baseType 换算后传值——Fixed=直读、
-                    // BasedOnMaxHealth=百分比×目标最大生命、BasedOnAttack=百分比×施法者攻击
+                    // BasedOnMaxHealth=百分比×目标最大生命、BasedOnAttack=百分比×施法者攻击。
+                    // HitSeconds=命中时刻（OnHit 治疗如水之浅唱随投射物落地弹数字；OnCast 治疗恒 0=立即）
                     int amount = ResolveHealAmount(skillData, atom.paramKey, atom.value, attacker, target);
                     if (amount > 0)
-                        effects.Add(new HealEffect(action.unitId, targetUnitId, amount));
+                        effects.Add(new HealEffect(action.unitId, targetUnitId, amount) { HitSeconds = hitSeconds });
                     break;
                 }
 
@@ -296,7 +309,9 @@ namespace GIC.Battle
                 case SkillEffectKind.EnergyGain:
                 {
                     int delta = atom.paramKey != SkillParamKey.None ? skillData.GetInt(atom.paramKey) : atom.value;
-                    effects.Add(new EnergyEffect(targetUnitId, delta, energyCategory));
+                    // HitSeconds=命中时刻（战技获能「命中时才给」——客户端元能到点跳变，2026-09-25 拍板；
+                    // OnCast 协奏元能恒 0=立即）
+                    effects.Add(new EnergyEffect(targetUnitId, delta, energyCategory) { HitSeconds = hitSeconds });
                     break;
                 }
 

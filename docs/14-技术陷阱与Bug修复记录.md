@@ -1424,3 +1424,26 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：依赖注入字段的初始化挪到 Inject 之后（`InitMyResourceChipIcons()` 在 `Context.Inject(this)` 后调用）；加注入失败防御 Warn（null 时显式报"ItemConfig 未注入"而非静默半渲染）。
 
 **How to apply**：任何 `[Autowired]` 字段的消费点（初始化/寻址回调）逐个核对调用时序——**"寻址（Resolve）与注入（Inject）分离"的 UI 装配模式**下，寻址阶段只存引用、不做依赖消费；初始化动作集中放注入后。症状指纹=组件部分功能缺失且无报错（null 防御路径静默吞掉）；SetIcon 类方法对 null 入参 SetActive(false) 属"防御性隐藏"——消费方应在调用前判空并 Log，勿让初始化时序错误伪装成资产缺失。
+
+## 79. 效果原子的 targetFilter 是"谁受益"的声明位——OnHit 分支漏实现 Caster + 迁移脚本误配 Target，战技获能 +10 发给了被命中的敌人（2026-09-25 用户报障实证）
+
+**症状**：安柏战技命中敌方凯亚，安柏元能不涨（B6a 拍板「战技命中 +10 元能」完全不生效）；实际 +10 被加在敌方凯亚头上（打谁谁充能）。
+
+**根因**（两层叠加+一个隐藏坑）：
+① `SkillEffectConfig.targetFilter` 是效果原子"谁受益"的声明位，但 `EffectCompiler.CompileOnHit` 只实现了「命中目标（默认）」与「CasterRadiusAllies 群体」两分支——**targetFilter=Caster 在 OnHit 路径从未被消费**，恒走命中目标；
+② B-1 迁移脚本把三战技获能原子（安柏双矢/凯亚霜袭）targetFilter 配成 0=Target——语义=受益者是被命中的敌人；芭芭拉水之浅唱则**整个获能原子漏配**（effects 只有伤害/附着/治疗）；
+③ 同链路隐藏坑：`TurnResolver.ApplyEffects` 对元能效应**逐条累加**（两发箭矢=两条 +10 → 状态 +20），而命令层 `MergeEnergyEffects` 按 (目标,类别) 去重只发 +10——**状态与命令口径不同步**，修好①②后此坑立即显形（客户端显示 +10、Host 状态 +20，下回合快照才自愈）。
+
+**修法**：`EffectCompiler.CompileOnHit` 补 targetFilter=Caster 分支（受益者=施法者/行动者）；三战技资产获能原子 targetFilter 0→1 + 水之浅唱补配 OnHit[EnergyGain Caster value 10]；`SkillHitResolver` 旧技能兜底的隐式获能原子同步 Caster；`ApplyEffects` 元能两段应用按 **(目标,类别) 去重**——与 MergeEnergyEffects 命令合并口径恒等（B6a「多次命中只获一次」由此在状态层真正成立）。
+
+**How to apply**：①新效果原子落地时先核 targetFilter 全部分支是否被编译器消费——枚举里存在≠管线里生效（本次 Caster 枚举值在 OnCast 有分支、OnHit 没有，静默回落默认分支）；②迁移脚本批量生成原子时逐原子核对"谁受益"语义（B6a 口径文档写的是**行动者**，脚本按默认值 Target 落盘=受益者漂移）；③凡命令层有"去重/合并"口径，状态应用层必须同口径——否则状态与显示背离、快照自愈掩盖累积误差（症状指纹=命令显示量 ≠ 下回合快照量）。
+
+## 80. 命中类效果的命令必须携带命中时刻——只有 Damage 带 launchMs，其余命中产物（元能/治疗）片头即跳（2026-09-25 用户报障「使用了战技立刻获得元能」）
+
+**症状**：安柏战技命中敌方凯亚——箭矢延迟起飞、飞行、落地弹伤害数字全按时序走，但施法者元能在**片播放起点**就 +10（前摇都还没播完）。
+
+**根因**：B-S1 时轮只给 Damage/消散命令带了 launchMs（发射时刻），命中链产出的其余效应命令（StatChange 元能/Heal）**没有任何时序元数据**——客户端在命令枚举处理时同步应用（`ApplyEnergyDelta` 立即执行）；而 Host 侧其实已算出精确命中时刻（ProjectileResolver 接触判定 hitT），只是没往下传。
+
+**修法**：命中时刻全链透传——ProjectileResolver 把接触时刻 hitT 作 hitSeconds 传入 Hit()/CompileOnHit()/CompileAtom；EnergyEffect/HealEffect 加 HitSeconds；EmitSliceCommands 发元能/治疗命令时命令 launchMs 字段填命中毫秒（union 载荷复用为"应用时刻"，0=立即）；客户端 StatChange(元能)/Heal 分支 launchMs>0 → 协程到点再应用（与箭矢落地同步）。
+
+**How to apply**：①命中类效果（获能/治疗/未来 OnVanish 等）新增命令映射时**必须**携带命中时刻——Host 已算出的时序数据（hitT）勿半路丢弃，只给 Damage 独享时序=B-S1 的半截工程；②union 命令字段跨类型复用时同步改 Header 注释明确各类型语义（launchMs=发射延迟 vs 应用时刻）；③客户端同步应用的命令处理器（非协程）加新字段时先问"这条命令有没有时序语义"——症状指纹=某数值在片头瞬跳而对应视觉事件（箭矢/移动）还没发生。

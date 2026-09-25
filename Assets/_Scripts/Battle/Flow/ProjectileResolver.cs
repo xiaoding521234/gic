@@ -107,9 +107,10 @@ namespace GIC.Battle
                 foreach (var enemy in enemies)
                 {
                     if (!CellOf(PositionAt(enemy, moverPaths, hitT)).Equals(hitCell)) continue;
+                    // hitT=接触时刻随效应下发（「命中时才给」2026-09-25：战技获能/命中治疗到点应用）
                     effects.AddRange(SkillHitResolver.Hit(sim, projectile.Action, sliceSnapshot, enemy.unitId,
                         projectile.AttackPercent, ProjectileRule.LineDelivery, projectile.FromCell,
-                        hitPoint.x, hitPoint.y, launch));
+                        hitPoint.x, hitPoint.y, launch, hitT));
                 }
             }
         }
