@@ -55,6 +55,7 @@ namespace GIC.Battle
         private IBattleTransport _transport;
         private Transform _viewRoot;
         private BattleDamageNumbers _damageNumbers;
+        private BattleOverheadBars _overheadBars;
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
         private readonly Dictionary<UnitView, Vector3> _formationOffsets = new Dictionary<UnitView, Vector3>();
@@ -513,6 +514,19 @@ namespace GIC.Battle
             return _damageNumbers;
         }
 
+        /// <summary>原神式头顶条层懒建（血条+元能条，2026-09-24；随 BattleScreen 场景卸载消亡）</summary>
+        private BattleOverheadBars EnsureOverheadBars()
+        {
+            if (_overheadBars == null)
+            {
+                var go = new GameObject("OverheadBars");
+                go.transform.SetParent(transform, false);
+                _overheadBars = go.AddComponent<BattleOverheadBars>();
+                _overheadBars.Init(_viewCamera != null ? _viewCamera : Camera.main);
+            }
+            return _overheadBars;
+        }
+
         private IEnumerator PlayDeathCoroutine(UnitView view, float delay)
         {
             if (delay > 0f)
@@ -529,6 +543,7 @@ namespace GIC.Battle
                     Destroy(kv.Value.gameObject);
             _views.Clear();
             _formationOffsets.Clear();
+            _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
         }
 
         private void CreateView(UnitState state)
@@ -566,6 +581,7 @@ namespace GIC.Battle
             view.SetBuffs(state.buffs);
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;
+            EnsureOverheadBars().Register(view); // 原神式头顶条（血条+元能条+附着图标，2026-09-24）
         }
 
         /// <summary>
