@@ -6,9 +6,10 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 技能命中结算工具（B4）：单目标"伤害 + 元素反应 + 附着"效应产物。
-    /// 反应判定读片前快照的 DyedElement（快照一致性）；状态修改全部以效应形态产出
-    /// （伤害走 DamagePipeline、冻结走 ApplyBuffEffect、附着走 AttachElementEffect）。
+    /// 技能命中结算入口（B4 起；B-1 起为效果原子编译派发器，docs/active/29）：
+    /// 技能 effects 非空 → EffectCompiler.CompileOnHit 数据驱动产出；空 → 内置三件套
+    /// （伤害+附着+战技获能，B6a 硬编码分档）以隐式默认原子等价编译（未迁移旧技能类兜底，决策九 D5）。
+    /// 反应判定读片前快照的 DyedElement（快照一致性）；状态修改全部以效应形态产出。
     /// </summary>
     public static class SkillHitResolver
     {
@@ -25,57 +26,42 @@ namespace GIC.Battle
             string targetUnitId, int attackPercent, int delivery, BattleCell fromCell,
             float hitPointX = 0f, float hitPointY = 0f, float launchSeconds = 0f)
         {
-            var effects = new List<BattleEffect>();
             var attacker = sim.GetUnit(action.unitId);
-            var target = sim.GetUnit(targetUnitId);
-            if (attacker == null || target == null) return effects;
+            if (attacker == null) return new List<BattleEffect>();
 
-            var targetState = FindUnitState(sliceSnapshot, targetUnitId);
-            if (targetState == null) return effects; // 快照中不存在（瞬发读片初状态）
+            var skillData = GetActionSkillData(attacker, action);
 
-            var element = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
-
-            // 元素反应预判（融化=易伤 / 蒸发=增伤 / 冻结=施加控制，docs/06）
-            var outcome = ElementReactionResolver.Preview((ElementType)targetState.dyedElement, element);
-
-            var request = new DamageRequest
+            // 数据驱动管线：技能 effects 非空 → 效果原子编译（docs/18 决策九）
+            if (skillData != null && skillData.HasEffects)
             {
-                Attacker = attacker,
-                Target = target,
-                AttackPercent = attackPercent,
-                Element = (int)element,
-                VulnerabilityBonus = outcome.VulnerabilityBonus,
-                DamageBonusDelta = outcome.DamageBonusDelta,
+                return EffectCompiler.CompileOnHit(sim, action, sliceSnapshot, skillData, targetUnitId,
+                    attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds);
+            }
+
+            // 旧技能类兜底（effects 空）：内置三件套以隐式默认原子等价编译——
+            // 伤害（施法者元素）+附着+战技获能（B6a 硬编码分档），零代码重复
+            var implicitEffects = new List<SkillEffectConfig>
+            {
+                new SkillEffectConfig { trigger = SkillEffectTrigger.OnHit, kind = SkillEffectKind.Damage },
+                new SkillEffectConfig { trigger = SkillEffectTrigger.OnHit, kind = SkillEffectKind.AttachElement },
             };
-            var result = DamagePipeline.Calculate(request);
-            if (!result.Cancelled && result.FinalDamage > 0)
-            {
-                effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage,
-                    (int)element, delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType,
-                    Mathf.RoundToInt(launchSeconds * 1000f)));
-            }
-
-            if (outcome.HasReaction)
-            {
-                // 反应发生事件（2026-09-22 接线）：融化的伤害并入已由 DamageEffect 承载，
-                // 此处补"反应发生"事实载体——客户端即时表现（冻结立牌冰色等）
-                effects.Add(new ReactionEffect(action.unitId, targetUnitId, outcome.ReactionType, outcome.Level));
-
-                if (outcome.BuffType >= 0)
-                    effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, outcome.BuffType, outcome.Level));
-            }
-
-            // 命中后附着来袭元素（覆盖旧附着=消耗被反应附着；物理不附着）
-            if (element != ElementType.Physical)
-                effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element));
-
-            // 战技命中获能（B6a 拍板：至少 1 次命中 +10，多次命中不叠加——同片合并按行动者去重实现；
-            // 爆发/延奏命中不获能，按行动技能类型分档）
             if (IsNormalSkillOfAction(attacker, action))
-                effects.Add(new EnergyEffect(action.unitId, BattleMetrics.EnergyGainPerSkillHit,
-                    EnergyEffect.CategorySkillHitGain));
+                implicitEffects.Add(new SkillEffectConfig
+                {
+                    trigger = SkillEffectTrigger.OnHit,
+                    kind = SkillEffectKind.EnergyGain,
+                    value = BattleMetrics.EnergyGainPerSkillHit,
+                });
+            var fallbackData = new SkillConfig.SkillData { effects = implicitEffects };
+            return EffectCompiler.CompileOnHit(sim, action, sliceSnapshot, fallbackData, targetUnitId,
+                attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds);
+        }
 
-            return effects;
+        /// <summary>行动选中技能的配置数据（attacker.Skills[skillIndex].RawData；越界/空返回 null）</summary>
+        private static SkillConfig.SkillData GetActionSkillData(Unit attacker, ActionData action)
+        {
+            if (action.skillIndex < 0 || action.skillIndex >= attacker.Skills.Count) return null;
+            return attacker.Skills[action.skillIndex]?.RawData;
         }
 
         /// <summary>行动选中的技能是否战技（SkillType.Normal）——元能获取/未来战技类规则分档依据</summary>

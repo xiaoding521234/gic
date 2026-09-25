@@ -38,6 +38,13 @@ namespace GIC.Data
             [Header("时轮时间轴（B-S1；null=无时轮兜底=旧即时行为）")]
             public SkillTimelineAsset timeline;
 
+            [Header("效果原子列表（B-1，docs/active/29：空=走旧技能类兜底；非空=数据驱动管线——")]
+            [Header("加/改效果=编辑此列表零代码；无注册类且非空→ConfiguredSkill 通用类，docs/18 决策九 D5）")]
+            public System.Collections.Generic.List<SkillEffectConfig> effects;
+
+            /// <summary>是否有数据驱动效果（非空=走 EffectCompiler 新管线）</summary>
+            public bool HasEffects => effects != null && effects.Count > 0;
+
             /// <summary>
             /// 移动距离换算（2026-09-23 用户拍板：「配置文件里的10，还要看基于类型。拼接后为10%移速」）——
             /// MoveDistance 参数按 baseType 解释：BasedOnMoveSpeed=百分比×移速（10%×50=5 格）、
