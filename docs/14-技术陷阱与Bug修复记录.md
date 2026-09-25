@@ -1384,3 +1384,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：把拍板值显式写入资产并保存（`EditorUtility.SetDirty` + `SaveAssets` + `ImportAsset` 回读验证）——资产文件成为真源，编辑器内调色从此走文件。**勿只改脚本默认值指望已加载资产跟上**。
 
 **How to apply**：给运行中项目的既有资 serialized 资产加新字段后需要调值时，一律「脚本默认值+资产值」两处同步（或直接写资产）；症状指纹=改默认值编译通过但运行值不变、资产文件缺字段而 Instance 值≠脚本默认；排查用活体对比三读：磁盘资产值 / `Instance` 值 / `CreateInstance` 临时实例值（=脚本默认值），三者分叉即中此坑。
+
+## 75. UGUI Image 空 sprite + Type=Filled 时 fillAmount 被忽略、条恒满——Filled 必须赋 sprite（2026-09-25 头顶条目检实锤）
+
+**症状**：程序化头顶血条/元能条 `Image.type = Filled` + `fillAmount = 血量比` 每帧写入，运行表现=血条受伤不减、元能条初始恒满；代码逻辑、数据源（UnitView.Hp）全对，fillAmount 也写进去了。
+
+**根因**：UGUI `Image` 不带 sprite 时走「简单矩形 Graphic」渲染路径，`Filled` 裁切只作用于 sprite UV——空 sprite 时 `fillAmount` 被静默忽略，永远渲染整条。
+
+**修法**：赋一个运行时程序化生成的纯白 sprite（本案=BattleViewFactory 的 BarBgSprite/BarFillSprite，圆角+黑边框烘进贴图），fillAmount 立刻生效。连锁收益：圆角+黑边也顺手解决（撤四角偏移重投的 Outline 组件——细边在条形上糊，烘边框才 crisply）。
+
+**How to apply**：程序化 UGUI 进度条/血条一律「白 sprite + Filled」，勿裸 Image；症状指纹=fillAmount 正确写入但条恒满。同批还有一条链式引用坑：显隐容器用 `transform.parent.parent.gameObject` 错链到条目根（差点把整条头顶条都关掉）——容器引用用字段显式存。

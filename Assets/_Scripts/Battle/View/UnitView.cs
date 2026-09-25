@@ -13,7 +13,9 @@ namespace GIC.Battle
     /// 风格参考饥荒：2D 立牌 + 底座投影；格子表现尺寸明显大于单位立牌。
     /// 立牌朝向 = 饥荒式"斜插卡片"：yaw 跟随相机（root，billboard），绕底边固定后倾（2026-09-18 拍板，
     /// 35°=90°−55°俯角，立牌面正对相机视线——完全垂直会被俯角透视压扁，与饥荒观感差异大的根因）。
-    /// 头顶常驻血条（我方绿/敌方红）+ 单位名（世界空间 TMP + TextCombiner 本地化条目，docs/active/22 §13）。
+    /// 头顶血条/元能条=屏幕空间层 BattleOverheadBars 显示（2026-09-24 拍板，原神式：不受遮挡+原神分隔线），
+    /// 本组件只持数据（Hp/MaxHp/Energy/AttachedElement/OverheadBarAnchor）；
+    /// 名字/Buff 徽章仍挂立牌倾斜组（世界空间 TMP + TextCombiner 本地化条目，docs/active/22 §13）。
     /// </summary>
     public class UnitView : MonoBehaviour
     {
@@ -26,26 +28,37 @@ namespace GIC.Battle
         private Transform _baseDisc;
         private Color _baseColor = Color.white;
 
-        // 头顶血条 + 单位名 + Buff 徽章行
-        private Transform _hpBarBg;
-        private Transform _hpBarFill;
+        // 名字 + Buff 徽章行（血条/元能条视觉归 BattleOverheadBars 屏幕空间层，此处只存数据）
         private TextMeshPro _nameText;
         private TextCombiner _nameCombiner;
         private int _hp;
         private int _maxHp;
         private bool _allyHpBar;
 
+        /// <summary>血条/元能层层读敌我染色（我方绿/敌方红）</summary>
+        public bool AllyHpBar => _allyHpBar;
+
+        /// <summary>队伍色（底座圆盘同源；2026-09-25 目检拍板：血条填充=玩家所选队伍色）</summary>
+        public Color TeamColor => _baseColor;
+
+        /// <summary>当前血量/上限（BattleOverheadBars 每帧拉取）</summary>
+        public int Hp => _hp;
+        public int MaxHp => _maxHp;
+
+        /// <summary>头顶条锚点（世界坐标，含 55° 后仰偏移——与名字/Buff 徽章同一平面高度）</summary>
+        public Vector3 OverheadBarAnchor =>
+            _tiltGroup != null ? _tiltGroup.TransformPoint(new Vector3(0f, OverheadRowY(HpBarY), 0f)) : transform.position;
+
         // Buff 徽章（快照权威 + ApplyBuff/RemoveBuff 命令增量；图标=元素 Stroke 现成图）
         private readonly List<BuffState> _buffs = new List<BuffState>();
         private Transform _buffRow;
 
-        // 元素附着小图标（血条左侧；快照权威 + ElementAttach 命令增量，2026-09-22 接线——
-        // 此前 DyedElement 仅存在于快照、View 侧无视觉载体，附着对玩家不可见）
-        private SpriteRenderer _attachIcon;
+        // 元素附着（快照权威 + ElementAttach 命令增量，2026-09-22 接线）；视觉归 BattleOverheadBars（血条左缘，
+        // 2026-09-24 随血条同改屏幕空间），此处只存状态
+        private ElementType _attachedElement = ElementType.Physical;
 
-        /// <summary>附着图标尺寸（世界高；与 Buff 徽章同量级）与血条左缘间隙</summary>
-        private const float AttachIconSize = 0.18f;
-        private const float AttachIconGap = 0.10f;
+        /// <summary>当前附着元素（Physical=无附着；BattleOverheadBars 每帧拉取）</summary>
+        public ElementType AttachedElement => _attachedElement;
 
         /// <summary>立牌倾斜组（AvatarTilt：原点=格面底边，绕底边后仰）——血条/名字/Buff 行全部挂入，
         /// 与立牌同一平面同一旋转轴（2026-09-18 用户拍板：头顶信息一律随立牌倾斜）</summary>
@@ -59,10 +72,8 @@ namespace GIC.Battle
 
         private const float AvatarHeight = 0.55f;
 
-        // 血条/名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
-        // 全身放大时行 Y 随立牌顶同步抬高、行自身尺寸不变）
-        private const float HpBarWidth = 0.52f;
-        private const float HpBarHeight = 0.055f;
+        // 名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
+        // 全身放大时行 Y 随立牌顶同步抬高、行自身尺寸不变；HpBarY 仅存为头顶条锚点高度——条状视觉已上移屏幕空间层）
         private const float HpBarY = 0.66f;
         private const float NameY = 0.84f;
         private const float BuffRowY = 1.08f;
@@ -79,14 +90,10 @@ namespace GIC.Battle
 
         // 世界层运行时材质（工厂出品由本组件持有，OnDestroy 释放——Destroy 物体不销材质，docs/14 §63①）
         private Material _baseDiscMaterial;
-        private Material _hpBarBgMaterial;
-        private Material _hpBarFillMaterial;
 
         private void OnDestroy()
         {
             if (_baseDiscMaterial != null) Destroy(_baseDiscMaterial);
-            if (_hpBarBgMaterial != null) Destroy(_hpBarBgMaterial);
-            if (_hpBarFillMaterial != null) Destroy(_hpBarFillMaterial);
         }
 
         /// <summary>
@@ -153,66 +160,18 @@ namespace GIC.Battle
             view._baseDisc = baseGo.transform;
             view._baseColor = teamColor;
 
-            view.BuildHpBar();
             view.BuildName(nameEntry);
             view.BuildBuffRow();
-            view.BuildAttachIcon();
             view.SetHp(hp, maxHp);
 
             return view;
         }
 
-        /// <summary>头顶血条：背景暗条 + 前景填充（localScale.x 缩放，先例=祈愿星辉进度条）。
-        /// 与立牌同平面倾斜（2026-09-18 用户拍板：头顶信息一律随立牌后仰，勿正对相机）</summary>
-        private void BuildHpBar()
-        {
-            _hpBarBgMaterial = BattleViewFactory.CreateUnlitMaterial(Palette.血条底);
-            var bgGo = BattleViewFactory.CreateQuad(_tiltGroup, "HpBarBg", _hpBarBgMaterial);
-            bgGo.transform.localPosition = new Vector3(0f, OverheadRowY(HpBarY), 0f);
-            bgGo.transform.localScale = new Vector3(HpBarWidth, HpBarHeight, 1f);
-            _hpBarBg = bgGo.transform;
-
-            _hpBarFillMaterial = BattleViewFactory.CreateUnlitMaterial(_allyHpBar ? Palette.血条我方绿 : Palette.血条敌方红);
-            var fillGo = BattleViewFactory.CreateQuad(_hpBarBg, "HpBarFill", _hpBarFillMaterial);
-            fillGo.transform.localPosition = new Vector3(0f, 0f, -0.02f);
-            fillGo.transform.localScale = new Vector3(1f, 1f, 1f);
-            _hpBarFill = fillGo.transform;
-        }
-
-        /// <summary>元素附着小图标（血条左缘外侧、同平面倾斜）：当前 DyedElement 可视化——
-        /// Physical=无附着不显示。图标=元素 Stroke 现成图（与 Buff 徽章同资产链）</summary>
-        private void BuildAttachIcon()
-        {
-            var iconGo = new GameObject("AttachIcon");
-            iconGo.transform.SetParent(_tiltGroup, false);
-            iconGo.transform.localPosition = new Vector3(-(HpBarWidth * 0.5f + AttachIconGap + AttachIconSize * 0.5f),
-                OverheadRowY(HpBarY), 0f);
-            _attachIcon = iconGo.AddComponent<SpriteRenderer>();
-            _attachIcon.sortingOrder = 11;
-            _attachIcon.gameObject.SetActive(false);
-        }
-
-        /// <summary>附着元素同步（快照权威 + ElementAttach 命令增量；覆盖语义后到者胜）</summary>
+        /// <summary>附着元素同步（快照权威 + ElementAttach 命令增量；覆盖语义后到者胜）。
+        /// 视觉归 BattleOverheadBars（血条左缘图标，2026-09-24 随血条同改屏幕空间），此处只存状态</summary>
         public void SetAttachedElement(ElementType element)
         {
-            if (_attachIcon == null) return;
-            if (element == ElementType.Physical)
-            {
-                _attachIcon.gameObject.SetActive(false);
-                return;
-            }
-            var config = ElementFactionConfig.Instance;
-            var icon = config != null ? config.GetElementIconStroke(element) : null;
-            if (icon == null)
-            {
-                _attachIcon.gameObject.SetActive(false);
-                return;
-            }
-            _attachIcon.sprite = icon;
-            float worldHeight = icon.bounds.size.y;
-            if (worldHeight > 0f)
-                _attachIcon.transform.localScale = Vector3.one * (AttachIconSize / worldHeight);
-            _attachIcon.gameObject.SetActive(true);
+            _attachedElement = element;
         }
 
         /// <summary>单位名：世界空间 TextMeshPro + TextCombiner 同物体（语言切换自动刷新）。
@@ -304,31 +263,20 @@ namespace GIC.Battle
 
         // ==================== 头顶血量（快照权威 + 伤害/治疗命令增量驱动） ====================
 
-        /// <summary>快照同步血量（权威值，选择阶段头/开局调用）</summary>
+        /// <summary>快照同步血量（权威值，选择阶段头/开局调用；视觉=BattleOverheadBars 每帧拉取 Hp/MaxHp）</summary>
         public void SetHp(int hp, int maxHp)
         {
             _hp = hp;
             _maxHp = maxHp;
-            RefreshHpBar();
         }
 
         /// <summary>命令流增量血量（Damage/Heal 播放期间即时反馈；下个快照自然校正）</summary>
         public void ApplyHpDelta(int delta)
         {
             _hp = Mathf.Clamp(_hp + delta, 0, Mathf.Max(1, _maxHp));
-            RefreshHpBar();
         }
 
-        private void RefreshHpBar()
-        {
-            if (_hpBarFill == null) return;
-            float ratio = _maxHp > 0 ? Mathf.Clamp01((float)_hp / _maxHp) : 0f;
-            // 左对齐填充：宽度=ratio，位置随宽度右移（bg 本地半宽 0.5）
-            _hpBarFill.localScale = new Vector3(ratio, 1f, 1f);
-            _hpBarFill.localPosition = new Vector3(-(1f - ratio) * 0.5f, 0f, -0.02f);
-        }
-
-        // ==================== 元能（B6a：快照权威 + StatChange 命令增量；数值缓存，能量环视觉 B6d） ====================
+        // ==================== 元能（B6a：快照权威 + StatChange 命令增量；视觉=BattleOverheadBars 元能条，2026-09-24） ====================
 
         public int EnergyCurrent { get; private set; }
         public int EnergyMax { get; private set; }
