@@ -776,6 +776,8 @@ namespace GIC.Editor
                     $"Buff: {((BuffType)el.FindPropertyRelative("buffType").intValue)}",
                 SkillEffectKind.TriggerSkill =>
                     $"触发: {((SkillType)el.FindPropertyRelative("targetSkillType").intValue)}",
+                SkillEffectKind.MoraPlunder =>
+                    $"参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}",
                 _ => "",
             };
             return $"{kind.GetInspectorName()}{(summary.Length > 0 ? " · " + summary : "")}";
@@ -823,7 +825,8 @@ namespace GIC.Editor
 
                 paramKeyField.style.display = kind switch
                 {
-                    SkillEffectKind.Damage or SkillEffectKind.Heal or SkillEffectKind.ApplyBuff or SkillEffectKind.EnergyGain
+                    SkillEffectKind.Damage or SkillEffectKind.Heal or SkillEffectKind.ApplyBuff
+                        or SkillEffectKind.EnergyGain or SkillEffectKind.MoraPlunder
                         => DisplayStyle.Flex, _ => DisplayStyle.None };
                 paramKey2Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
                 paramKey3Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;

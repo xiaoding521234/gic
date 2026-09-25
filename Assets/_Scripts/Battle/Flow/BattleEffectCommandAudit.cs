@@ -35,6 +35,7 @@ namespace GIC.Battle
             var reactionKeys = new HashSet<string>();
             var energyKeys = new HashSet<string>();
             var staminaKeys = new HashSet<string>();
+            var moraKeys = new HashSet<string>();
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -59,6 +60,8 @@ namespace GIC.Battle
                             energyKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindStamina)
                             staminaKeys.Add(command.targetUnitId);
+                        else if (command.metadata == BattleCommand.StatKindMora)
+                            moraKeys.Add(command.targetUnitId);
                         break;
                 }
             }
@@ -99,6 +102,14 @@ namespace GIC.Battle
                 {
                     // B6d 体力：TargetUnitId=玩家 ID；效应→StatChange(StatKindStamina) 命令
                     if (!staminaKeys.Contains(stamina.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is MoraPlunderEffect plunder)
+                {
+                    // B-3 摩拉掠夺：池空零动作（AppliedGain=0）无命令=非漏发；有产出=被掠夺方/掠夺方
+                    // 双 StatChange(StatKindMora) 命令（按应用后实际量发）
+                    if (plunder.AppliedGain > 0
+                        && !(moraKeys.Contains(plunder.TargetUnitId) && moraKeys.Contains(plunder.ToPlayerId)))
                         Report(context, effect, BattleCommandType.StatChange);
                 }
                 else if (effect is ApplyBuffEffect)
