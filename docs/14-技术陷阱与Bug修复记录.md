@@ -1447,3 +1447,33 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：命中时刻全链透传——ProjectileResolver 把接触时刻 hitT 作 hitSeconds 传入 Hit()/CompileOnHit()/CompileAtom；EnergyEffect/HealEffect 加 HitSeconds；EmitSliceCommands 发元能/治疗命令时命令 launchMs 字段填命中毫秒（union 载荷复用为"应用时刻"，0=立即）；客户端 StatChange(元能)/Heal 分支 launchMs>0 → 协程到点再应用（与箭矢落地同步）。
 
 **How to apply**：①命中类效果（获能/治疗/未来 OnVanish 等）新增命令映射时**必须**携带命中时刻——Host 已算出的时序数据（hitT）勿半路丢弃，只给 Damage 独享时序=B-S1 的半截工程；②union 命令字段跨类型复用时同步改 Header 注释明确各类型语义（launchMs=发射延迟 vs 应用时刻）；③客户端同步应用的命令处理器（非协程）加新字段时先问"这条命令有没有时序语义"——症状指纹=某数值在片头瞬跳而对应视觉事件（箭矢/移动）还没发生。
+
+## 81. 敌我判定 playerId 口径在 1v1 下恒等价 team，9 处混用带病存活到 2v2 必炸（2026-09-25 三轮审查 C2）
+
+**症状**：无（潜伏）——1v1 对局 playerId≠恒等价 TeamType≠，任何敌方筛选/我方目标域/投射物命中集合都"看起来对"；一旦 2v2（P1+P3 vs P2+P4），队友会被当敌人打进命中集合、协奏 Buff 发不到队友、延奏目标域漏队友单位。
+
+**根因**：两种语义混用同一比较——**操控权/资源归属**（谁的单位、谁的手牌）与**阵营判定**（敌方/我军）在 1v1 下恰好同构，写的时候无感知。9 处混用：ProjectileResolver 敌方筛选、EffectCompiler（Contract 校验+AllAllies+CasterRadiusAllies+WouldHitProjectile）、SkillHitResolver.FindEnemiesAt、BattleHeuristics.FindNearestEnemy、AIDebugBrain 两处、BattleHud（瞄准/预览/队列色）。多处注释已自我承认"1v1 暂代，B7 换 team 字段"——正确原语 UnitIdentity.IsSameTeam 一直存在但消费方没用。
+
+**修法**：口径原则单源化——**阵营判定=TeamType、操控权/资源归属=playerId，勿混用**；预判链签名统一 casterPlayerId→casterTeam（FindEnemiesAt/BaseSkill.WouldHitEnemyInDirection/EffectCompiler.WouldHit*/BattleHeuristics.PreviewLineTargets 等）；HUD 单位查找拆 UnitSide.Mine（操控权）/MyTeam/Enemy（阵营）三向。BattleHud.CreateView 队伍色绝对映射（A=我方色）保留=B7 分端 viewer 重定议题（已有登记）。
+
+**How to apply**：新增敌方筛选/我军目标域代码一律 TeamType 比较（快照 UnitState.team 字段已带，sim.GetTeamOf(playerId) 查队伍）；自查指纹=`playerId !=`/`OwnerPlayerID !=` 出现在"敌人/我方"语义处（合法保留处=操控权与资源归属：上交归属校验/CollectMajurs/chip 刷新/手牌归属）。
+
+## 82. 「轻提示」通道选错——提示条 SetTip 文字切换太隐晦，用户实测看不见（2026-09-26 报障返修）
+
+**症状**：用户选敌方单位→移动瞄准→点可选格提交，预期弹「这不是你的角色」轻提示——实际"未看见弹窗"。Console 无错误、逻辑拦截本身生效（Host 校验链正常）。
+
+**根因**：通道选错——首版用 HUD 提示条 SetTip（Battle_Tip* 键，与「选择移动方向」同一根文字条）：纯文字原地切换无入场动画无弹窗感，玩家注意力在棋盘上根本不会注意到条上文字变了。项目轻弹窗正主=**PopupManager.ShowToast（顶部滑入、可堆叠去重、Wish_NoPrimogem/Deck_Full 同款）**，且 toast 文案表=**PopupText**（非 UIText 战斗段）——首版连表也写错了。
+
+**修法**：提交拦截改 ShowBattleToast→PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText, key))；键迁移 Battle_NotYourUnit/Battle_MinorUnit 落 PopupText 表（UIText 旧键 12033/12034 删净）；PopupManager 常驻根断链降级 Warn。
+
+**How to apply**：**需要玩家"看见并理解"的即时反馈（拦截/失败/不可用）一律 PopupManager.ShowToast**；提示条（Battle_Tip*）只承载"当前该做什么"的持续引导文案；toast 文案键落 PopupText 表、提示条文案键落 UIText 战斗段——通道与表一一对应勿混。
+
+## 83. 本地化桥脚本：StringTableCollection 类型不可达+StringTable 无 SetValue——本地化写入必须走 SharedTableData+语言表资产直连（2026-09-26 实证）
+
+**症状**：exec_editor_script 写本地化表——`using UnityEngine.Localization.Tables` 后用 `StringTableCollection` 类型报 CS0246（类型不存在）；改 `StringTable.SetValue(id, value)` 报 CS1061（成员不存在）。
+
+**根因**：桥脚本 Roslyn 环境引用集不含 StringTableCollection 所在定义（编译不可达）；Tuanjie 的 Localization 版本 StringTable 无 SetValue 方法——表内条目写值 API=AddEntry(id, value)（新条目）或 TableEntry.Value 直赋（已有条目）；另 LocaleIdentifier 是非可空值类型（`!= null` 直接 CS0037）。
+
+**修法**（本地化写入标准姿势）：①FindAssets("t:SharedTableData") 按资产名（"UIText Shared Data.asset"/"PopupText Shared Data.asset"）加载共享数据；②FindAssets("t:StringTable") 按表名前缀（UIText_/PopupText_）加载各语言表；③加键=shared.GetEntry(key) 查重→shared.AddKey(key, id)（指定 id 重载）；④写值=table.GetEntry(id)==null ? table.AddEntry(id, value) : entry.Value = value；⑤SetDirty(shared+各表)+SaveAssets+回读核验。
+
+**How to apply**：见 gic-localization skill 陷阱节（同日补录）；各表 id 体系独立——UIText 用手编 12000 分段，PopupText 走 Unity 自动全局大 id（取表内最大+1 续排，勿照搬 12000 段）。

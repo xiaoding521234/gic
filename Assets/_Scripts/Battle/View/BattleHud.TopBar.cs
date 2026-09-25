@@ -228,10 +228,10 @@ namespace GIC.Battle
                 rect.anchoredPosition = new Vector2(160f + index * (slotSize + 队列槽间距) + slotSize * 0.5f, 0f);
                 rect.sizeDelta = new Vector2(slotSize, slotSize);
 
-                // 队营色底盘框（circle 现成底盘图）
+                // 队营色底盘框（circle 现成底盘图）；队营色=TeamType 口径（2026-09-25 三轮审查 C2：2v2 队友=我方色）
                 var frame = slotGo.AddComponent<Image>();
                 frame.sprite = Resources.Load<Sprite>("UI/Skills/circle");
-                Color baseColor = u.playerId == _myPlayerId ? Palette.我方主色 : Palette.敌方主色;
+                Color baseColor = (TeamType)u.team == MyTeam ? Palette.我方主色 : Palette.敌方主色;
                 frame.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.55f);
 
                 // 头像（UnitConfig 数据链）

@@ -99,14 +99,14 @@ namespace GIC.Battle
         /// 特殊判定形态由子类覆写——覆写须与本技能 ResolveEffects 的判定形态保持同语义，防预判与结算漂移。
         /// </summary>
         public virtual bool WouldHitEnemyInDirection(BattleMapData map, BattleSnapshot snapshot,
-            string casterPlayerId, BattleCell from, Direction2D direction)
+            TeamType casterTeam, BattleCell from, Direction2D direction)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
             for (int step = 1; step <= ProjectileRule.MaxRange; step++)
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!map.HasTile(cell.x, cell.y)) break; // 虚空截断
-                if (SkillHitResolver.FindEnemiesAt(snapshot, casterPlayerId, cell).Count > 0) return true;
+                if (SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell).Count > 0) return true;
             }
             return false;
         }

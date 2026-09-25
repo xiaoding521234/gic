@@ -224,6 +224,16 @@ namespace GIC.Battle
                 return;
             }
 
+            // 低级单位防线（2026-09-25 三轮审查 C1）：1~2 星单位行动由 LowUnitBrain 自主决策
+            // （不占玩家配额、不走玩家上交通道）——玩家上交低级单位为行动者会与 _minorUnitActions
+            // 同单位双行动（双 mover 并发推进=移动翻倍/写回互踩/双 Move 命令）。UI 侧已同步过滤
+            // （BattleHud 不可选中低级单位），此处 Host 权威兜底（B7 LAN 客户端可凭空上交，双保险）
+            if (!BattleHeuristics.IsMajorUnit(unit))
+            {
+                GICLog.Warn($"[TurnFlow] 低级单位 {action.unitId} 不接受玩家上交行动（LowUnitBrain 自主决策），忽略");
+                return;
+            }
+
             // 每玩家每回合 1 个行动：后交覆盖先交
             _pendingActions[action.playerId] = action;
 
@@ -253,9 +263,43 @@ namespace GIC.Battle
             yield return _resolver.ResolveTurnCoroutine(TurnNumber, actions);
 
             _resolveCoroutine = null;
+
+            // 全灭软停（2026-09-25 三轮审查 S10 轻量版；胜负判定/结算画面=B8）：恰好一队全灭→
+            // 停回合循环+广播胜负（避免全灭后回合空转继续发资源、AI 继续空过）。
+            // 双方同回合互灭不下发（结算语义 B8 定义）。
+            // 顺序：先阶段事件（HUD 会设 Tip=执行中）再发 BattleOver（客户端覆盖 Tip=胜负），勿颠倒
+            var overWinner = CheckBattleOver();
+            if (overWinner.HasValue)
+            {
+                Phase = BattlePhase.Finished;
+                SelectRemainingSeconds = -1f;
+                OnPhaseChanged?.Invoke(Phase, TurnNumber);
+                _transport.HostSend(BattleMessageType.BattleOver, new BattleOverMessage
+                {
+                    winnerTeam = (int)overWinner.Value,
+                });
+                yield break; // 不再进入下一回合选择阶段
+            }
+
             AdvanceBattleClock(); // 回合结束：独立时间 +20 分钟（2026-09-14 用户拍板）
             TurnNumber++;
             BeginSelectPhase();
+        }
+
+        /// <summary>全灭检测：恰好一队存活时返回该队（=胜方）；双方仍活/双方互灭返回 null。
+        /// 多人局同队玩家去重判定（2v2 一队两玩家）</summary>
+        private TeamType? CheckBattleOver()
+        {
+            TeamType? aliveTeam = null;
+            foreach (var pid in _sim.PlayerIds)
+            {
+                var team = _sim.GetTeamOf(pid);
+                if (aliveTeam == team) continue; // 同队已查过（2v2）
+                if (!_sim.HasLivingUnits(team)) continue;
+                if (aliveTeam.HasValue) return null; // 两队都存活：战斗继续
+                aliveTeam = team;
+            }
+            return aliveTeam; // 恰好一队存活=胜方；双方全灭=null
         }
 
         /// <summary>

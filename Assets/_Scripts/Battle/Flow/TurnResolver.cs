@@ -698,8 +698,11 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 同片同 (来源,目标) 的多次治疗合并为一条命令（docs/active/22 §7.4：同片多伤害/治疗数值合并；
-        /// 片内/即时段治疗命令发射——此前仅回合结束段发射，片内治疗对客户端不可见致双端血量背离）
+        /// 同片同 (来源,目标,命中时刻) 的多次治疗合并为一条命令（docs/active/22 §7.4：同片多伤害/治疗数值合并；
+        /// 片内/即时段治疗命令发射——此前仅回合结束段发射，片内治疗对客户端不可见致双端血量背离）。
+        /// 合并键含命中毫秒（2026-09-25 三轮审查 S4，对齐 MergeDamageEffects 键含 LaunchMs）：
+        /// 同施法者同片同目标 OnCast(0=立即)+OnHit(延迟) 双治疗不再并成一条——并条时刻取首条会让
+        /// 投射物落地治疗在片头瞬跳。当前角色池一单位一行动不会出现同刻双源，属前瞻护栏。
         /// </summary>
         private static List<HealEffect> MergeHealEffects(List<BattleEffect> effects)
         {
@@ -708,14 +711,14 @@ namespace GIC.Battle
             foreach (var effect in effects)
             {
                 if (!(effect is HealEffect heal)) continue;
-                string key = $"{heal.SourceUnitId}->{heal.TargetUnitId}";
+                string key = $"{heal.SourceUnitId}->{heal.TargetUnitId}:{Mathf.RoundToInt(heal.HitSeconds * 1000f)}";
                 if (merged.TryGetValue(key, out var existing))
                 {
                     existing.Amount += heal.Amount;
                 }
                 else
                 {
-                    // 命中时刻随合并副本保留（首条命中时刻=最早命中，2026-09-25「命中时才给」）
+                    // 命中时刻随合并副本保留（同合并键内取首条=最早一次命中的时刻）
                     var copy = new HealEffect(heal.SourceUnitId, heal.TargetUnitId, heal.Amount)
                     {
                         HitSeconds = heal.HitSeconds,

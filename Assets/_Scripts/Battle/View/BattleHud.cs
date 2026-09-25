@@ -69,6 +69,12 @@ namespace GIC.Battle
         private Action _onCloseBattle;
         private string _myPlayerId;
 
+        /// <summary>本端玩家队伍（2026-09-25 三轮审查 C2：敌我判定统一 TeamType 口径——
+        /// 操控权/资源归属=playerId，阵营判定=TeamType，两个语义勿再混用）</summary>
+        private TeamType MyTeam => _session != null && _session.Sim != null
+            ? _session.Sim.GetTeamOf(_myPlayerId)
+            : TeamType.A;
+
         private Canvas _canvas;
 
         // 提示条
@@ -174,6 +180,7 @@ namespace GIC.Battle
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnSegmentPlaying += OnSegmentPlayingHandler;
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
+            _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
@@ -190,6 +197,7 @@ namespace GIC.Battle
                     _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
                     _session.Player.OnSegmentPlaying -= OnSegmentPlayingHandler;
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
+                    _session.Player.BattleOver -= OnBattleOverHandler;
                 }
                 if (_session.Flow != null) _session.Flow.OnPhaseChanged -= OnPhaseChanged;
             }
@@ -212,6 +220,15 @@ namespace GIC.Battle
         {
             if (playerId != _myPlayerId) return;
             ApplyMyResourceDelta(statKind, delta);
+        }
+
+        /// <summary>战斗结束（S10 轻量全灭软停）：胜负 Tip 常驻，退出走既有设置钮确认流程；
+        /// 正式胜负演出/结算画面=B8（协议 BattleOverMessage.winnerTeam 已按队伍下发，B7 多人分端复用）</summary>
+        private void OnBattleOverHandler(BattleOverMessage message)
+        {
+            if (_layoutEditing) return; // 编辑期提示条保持编辑提示不抢写
+            bool victory = (TeamType)message.winnerTeam == MyTeam;
+            SetTip(victory ? "Battle_Victory" : "Battle_Defeat");
         }
 
         private void OnPhaseChanged(BattlePhase phase, int turn)
@@ -535,8 +552,12 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             if (snapshot == null) return;
 
-            var myUnit = FindUnitAt(snapshot, cell);
-            var enemyUnit = FindUnitAt(snapshot, cell, enemiesOnly: true);
+            // 选中开放任意单位（2026-09-26 拍板改版：含敌人/低级单位——可看技能盘/进瞄准查攻击范围；
+            // 行动拦截移到提交时轻提示，SubmitAim 处把关；Host 侧 OnSubmitAction 权威校验不变）。
+            // 同格多单位优先选中己方（自己的单位先被点中，敌方需点到无己方的格）
+            var myUnit = FindUnitAt(snapshot, cell, UnitSide.Mine);
+            var anyUnit = myUnit != null ? myUnit : FindUnitAt(snapshot, cell, UnitSide.Enemy);
+            var enemyUnit = FindUnitAt(snapshot, cell, UnitSide.Enemy);
 
             switch (_state)
             {
@@ -548,26 +569,31 @@ namespace GIC.Battle
 
                 case HudState.UnitSelected:
                     if (PopupOpen) { ClosePopup(); return; }          // 情况②：面板开着点外部=收面板（选中保持）
-                    if (myUnit != null) { SelectUnit(myUnit.unitId); return; } // 换选中
-                    if (enemyUnit != null) return;                    // 点敌方：无操作
+                    if (anyUnit != null) { SelectUnit(anyUnit.unitId); return; } // 换选中（任意单位，己方优先）
                     DeselectUnit();                                   // 点空白=取消选中
                     return;
 
                 case HudState.Idle:
-                    if (myUnit != null) SelectUnit(myUnit.unitId);
+                    if (anyUnit != null) SelectUnit(anyUnit.unitId);
                     return;
             }
         }
 
-        private UnitState FindUnitAt(BattleSnapshot snapshot, BattleCell cell, bool enemiesOnly = false)
+        /// <summary>单位侧向（2026-09-25 三轮审查 C2）：Mine=操控权归属（playerId）、
+        /// MyTeam/Enemy=阵营判定（TeamType）——三个语义勿再用 playerId 比较敌我</summary>
+        private enum UnitSide { Mine, MyTeam, Enemy }
+
+        private UnitState FindUnitAt(BattleSnapshot snapshot, BattleCell cell, UnitSide side)
         {
             foreach (var u in snapshot.units)
             {
                 if (u.isCorpse != 0) continue;
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
-                bool mine = u.playerId == _myPlayerId;
-                if (enemiesOnly && mine) continue;
-                if (!enemiesOnly && !mine) continue;
+                bool pick;
+                if (side == UnitSide.Mine) pick = u.playerId == _myPlayerId;          // 操控权（B7 分端=本机玩家）
+                else if (side == UnitSide.MyTeam) pick = (TeamType)u.team == MyTeam;  // 我军（2v2 含队友单位）
+                else pick = (TeamType)u.team != MyTeam;                               // 敌军
+                if (!pick) continue;
                 return u;
             }
             return null;
@@ -701,12 +727,14 @@ namespace GIC.Battle
 
             // 单位指向型：延奏=全图我方存活角色（含施法者自身——协奏语义，docs/07 蒙德；B-S1b 修正，
             // 此前误按敌方指向）；契约=敌方存活单位（docs/05 §5.3 目标判定不经格子）。
-            // 推荐分色 v1：单位指向全推荐（目标格即语义本身，无优劣数据可分）
+            // 推荐分色 v1：单位指向全推荐（目标格即语义本身，无优劣数据可分）。
+            // 队伍口径=**选中单位**的队伍（2026-09-26 选中开放任意单位：查看敌方延奏/契约时
+            // 目标域随施法者视角——敌方延奏高亮敌方全体、契约高亮我方全体）
             if (skillData.skillType == SkillType.Enso)
             {
                 foreach (var u in snapshot.units)
                 {
-                    if (u.isCorpse != 0 || u.playerId != _myPlayerId) continue;
+                    if (u.isCorpse != 0 || (TeamType)u.team != (TeamType)sel.team) continue;
                     if (_board.Map.HasTile(u.position.x, u.position.y))
                     {
                         var c = new BattleCell(u.position.x, u.position.y);
@@ -720,7 +748,7 @@ namespace GIC.Battle
             {
                 foreach (var u in snapshot.units)
                 {
-                    if (u.isCorpse != 0 || u.playerId == _myPlayerId) continue;
+                    if (u.isCorpse != 0 || (TeamType)u.team == (TeamType)sel.team) continue;
                     if (_board.Map.HasTile(u.position.x, u.position.y))
                     {
                         var c = new BattleCell(u.position.x, u.position.y);
@@ -742,7 +770,7 @@ namespace GIC.Battle
                 var direction = dir == 0 ? Direction2D.Right : dir == 1 ? Direction2D.Left
                     : dir == 2 ? Direction2D.Up : Direction2D.Down;
                 bool recommended = previewSkill.WouldHitEnemyInDirection(
-                    _board.Map, snapshot, sel.playerId, sel.position, direction);
+                    _board.Map, snapshot, (TeamType)sel.team, sel.position, direction);
                 for (int step = 1; step <= 方向瞄准显示距离; step++)
                 {
                     var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
@@ -783,7 +811,7 @@ namespace GIC.Battle
 
                 var occupantData = TryGetUnitData(u.unitName);
                 if (occupantData == null) continue;
-                bool sameTeam = u.playerId == self.playerId; // 1v1：playerId 同即同队（B7 多队换 team 字段）
+                bool sameTeam = (TeamType)u.team == (TeamType)self.team; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
                 if (sameTeam && occupantData.blockAllies) return false;
                 if (!sameTeam && occupantData.blockEnemies && selfData != null && selfData.blockedByEnemies)
                     return false;
@@ -810,7 +838,7 @@ namespace GIC.Battle
 
                 var occupantData = TryGetUnitData(u.unitName);
                 if (occupantData == null) continue;
-                bool sameTeam = u.playerId == _myPlayerId; // 1v1：playerId 同即同队（B7 多队换 team 字段）
+                bool sameTeam = (TeamType)u.team == MyTeam; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
                 if (sameTeam && occupantData.blockAllies) return false;
                 if (!sameTeam && occupantData.blockEnemies && deployData != null && deployData.blockedByEnemies)
                     return false;
@@ -840,6 +868,25 @@ namespace GIC.Battle
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
             bool isMove = _aimDef.IsMove;
+
+            // 提交时行动防线（2026-09-26 拍板改版：选中/瞄准开放任意单位供查看技能盘与攻击范围，
+            // 行动只能由**自己的高级单位**执行——非己方/低级单位在此弹 toast 轻提示、保持瞄准态继续查看。
+            // 轻提示走 PopupManager.ShowToast（2026-09-26 报障修正：首版用提示条 SetTip 文字切换太隐晦
+            // 玩家看不见——顶部滑入 toast 才是项目轻弹窗正主，Wish_NoPrimogem/Deck_Full 同款）；
+            // Host 侧 OnSubmitAction 权威校验仍为双保险，B7 LAN 客户端绕 UI 也进不来）
+            if (sel.playerId != _myPlayerId)
+            {
+                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 不是玩家 {_myPlayerId} 的角色");
+                ShowBattleToast("Battle_NotYourUnit");
+                return;
+            }
+            var selData = TryGetUnitData(sel.unitName);
+            if (selData == null || selData.starLevel < 3)
+            {
+                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为低级单位（自主行动）");
+                ShowBattleToast("Battle_MinorUnit");
+                return;
+            }
 
             var action = new ActionData
             {
@@ -872,7 +919,7 @@ namespace GIC.Battle
                 // 契约=点中格上的敌方单位（docs/05 §5.3）
                 var skillData = GetSelectedSkillData(_aimDef);
                 bool allyTargeting = skillData != null && skillData.skillType == SkillType.Enso;
-                var unitAtCell = allyTargeting ? FindUnitAt(snapshot, cell) : enemyAtCell;
+                var unitAtCell = allyTargeting ? FindUnitAt(snapshot, cell, UnitSide.MyTeam) : enemyAtCell;
                 action.targetUnitId = unitAtCell != null ? unitAtCell.unitId : "";
             }
 
@@ -1091,7 +1138,9 @@ namespace GIC.Battle
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
         /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）；
         /// 元能不足=置灰（B6a：爆发/延奏等 EnergyCost>0 的技能，门槛=技能消耗值，门槛随快照刷新）；
-        /// 体力不足=置灰（B6d：战技/爆发消耗 10 体力，docs/05 §5.1——门槛随快照刷新）</summary>
+        /// 体力不足=置灰（B6d：战技/爆发消耗 10 体力，docs/05 §5.1——门槛随快照刷新）。
+        /// 查看态恒可点（2026-09-26 选中开放任意单位：敌人/低级单位无操控权即无消耗语义，
+        /// 元能/体力置灰只约束己方可操控单位——勿把"查看敌人技能盘"也灰掉）</summary>
         private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null) return;
@@ -1099,7 +1148,11 @@ namespace GIC.Battle
             def.view.gameObject.SetActive(data != null);
             var toggle = def.view.GetComponent<Toggle>();
             if (toggle != null)
-                toggle.interactable = data != null && HasEnergyForSkill(data) && HasStaminaForSkill(data);
+            {
+                bool controllable = IsSelectedControllable();
+                toggle.interactable = data != null
+                    && (!controllable || (HasEnergyForSkill(data) && HasStaminaForSkill(data)));
+            }
             if (data == null) return;
 
             def.view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
@@ -1109,6 +1162,17 @@ namespace GIC.Battle
                 def.nameText.ClearAllEntries();
                 def.nameText.AddEntry(data.skillID.GetEntry());
             }
+        }
+
+        /// <summary>选中单位是否可操控=己方高级单位（行动提交门槛，SubmitAim 同口径）；
+        /// false=查看态（敌人/低级/无配置）——技能盘与瞄准开放，仅提交被轻提示拦截</summary>
+        private bool IsSelectedControllable()
+        {
+            var snapshot = _session?.Player?.LatestSnapshot;
+            var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel == null || sel.playerId != _myPlayerId) return false;
+            var data = TryGetUnitData(sel.unitName);
+            return data != null && data.starLevel >= 3;
         }
 
         /// <summary>选中单位的元能是否够放此技能（EnergyCost=0 恒可；读快照运行态，选择阶段头权威刷新）</summary>
@@ -1154,9 +1218,11 @@ namespace GIC.Battle
                 def.nameText.AddEntry(nameId.GetEntry());
             }
 
-            // 体力置灰（B6d）：移动=配额行动消耗 10 体力（低级单位不可选中不涉此判定），不足置灰
+            // 体力置灰（B6d）：移动=配额行动消耗 10 体力，不足置灰——仅约束己方可操控单位
+            // （2026-09-26 查看态恒可点，同 ApplySkillButton 口径）
             if (def.view.toggle != null)
-                def.view.toggle.interactable = _myStamina >= BattleMetrics.StaminaCostPerAction;
+                def.view.toggle.interactable = !IsSelectedControllable()
+                    || _myStamina >= BattleMetrics.StaminaCostPerAction;
         }
 
         /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>
@@ -1169,6 +1235,19 @@ namespace GIC.Battle
                 return;
             }
             _tipCombiner.SetSingleEntry(new LocalizedString("UIText", key));
+        }
+
+        /// <summary>战斗轻弹窗（2026-09-26 报障修正：提交拦截等反馈走 PopupManager toast——
+        /// 顶部滑入、可堆叠去重，与 Wish_NoPrimogem/Deck_Full 同款；PopupManager=Boot 建立常驻设施，
+        /// 战斗根场景可用。键在 PopupText 表非 UIText，勿写错表）</summary>
+        private static void ShowBattleToast(string popupKey)
+        {
+            if (PopupManager.Instance == null)
+            {
+                GICLog.Warn("[BattleHud] PopupManager 不在（常驻根未建立？）——轻提示降级不显示");
+                return;
+            }
+            PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText.ToString(), popupKey));
         }
     }
 }

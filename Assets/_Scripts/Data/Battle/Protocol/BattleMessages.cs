@@ -17,6 +17,7 @@ namespace GIC.Data
         TurnEnd = 6,           // Host→Client：回合结束
         Pause = 7,             // Host↔Client：硬停交互点（B1 占位）
         Resume = 8,            // Host↔Client：硬停恢复（B1 占位）
+        BattleOver = 9,        // Host→Client：战斗结束（2026-09-25 三轮审查 S10 轻量全灭软停；结算画面=B8）
     }
 
     /// <summary>
@@ -83,5 +84,13 @@ namespace GIC.Data
     public class ResumeMessage
     {
         public string reason;
+    }
+
+    /// <summary>战斗结束消息（S10 轻量软停）：winnerTeam=存活方队伍（TeamType 枚举值）——
+    /// 恰好一队全灭时下发；双方同回合互灭不下发（结算语义 B8 定义）</summary>
+    [Serializable]
+    public class BattleOverMessage
+    {
+        public int winnerTeam;
     }
 }

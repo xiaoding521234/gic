@@ -106,14 +106,16 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>片前快照中该格的敌方存活+尸体单位（含尸体——尸体完全算判定，docs/05 §5.4）</summary>
-        public static List<UnitState> FindEnemiesAt(BattleSnapshot snapshot, string playerId, BattleCell cell)
+        /// <summary>片前快照中该格的敌方存活+尸体单位（含尸体——尸体完全算判定，docs/05 §5.4）。
+        /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2 收口：casterTeam 为施法者**队伍**，
+        /// 2v2 下不再把队友当敌人）</summary>
+        public static List<UnitState> FindEnemiesAt(BattleSnapshot snapshot, TeamType casterTeam, BattleCell cell)
         {
             var result = new List<UnitState>();
             if (snapshot == null) return result;
             foreach (var state in snapshot.units)
             {
-                if (state.playerId == playerId) continue;
+                if ((TeamType)state.team == casterTeam) continue;
                 if (state.position.x != cell.x || state.position.y != cell.y) continue;
                 result.Add(state);
             }

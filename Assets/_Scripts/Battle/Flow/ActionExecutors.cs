@@ -103,6 +103,14 @@ namespace GIC.Battle
                 return effects;
             }
 
+            // 可施放检查前置（2026-09-25 三轮审查 S6 正序）：占位/不可施放技能先拦，再查元能/体力
+            // ——原顺序会让不可施放的占位技能白扣 10 体力后才落空（UI 置灰防了常规路径，异常上交仍会撞）
+            if (!skill.CanCast(attacker))
+            {
+                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 不可施放，行动落空");
+                return effects;
+            }
+
             // 元能门槛（B6a）：消耗值=技能条目 EnergyCost（0=无消耗——战技/移动不耗能；
             // 爆发 30/40/100、延奏 20，攒够才可放；不足→行动落空）
             int energyCost = BattleSimState.GetEnergyCost(skill.RawData);
@@ -119,12 +127,6 @@ namespace GIC.Battle
             if (!StaminaGate.TryCharge(sim, attacker, action.playerId, BattleSimState.GetStaminaCost(skill.RawData),
                 $"技能 {skill.RawData?.skillID}", effects))
                 return effects;
-
-            if (!skill.CanCast(attacker))
-            {
-                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 不可施放，行动落空");
-                return effects;
-            }
 
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
 

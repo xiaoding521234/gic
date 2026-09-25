@@ -310,6 +310,19 @@ namespace GIC.Battle
             return status != null && status.CanAct;
         }
 
+        /// <summary>该队伍是否还有存活单位（2026-09-25 三轮审查 S10 全灭软停检测；
+        /// 敌我=TeamType 口径与全项目一致）</summary>
+        public bool HasLivingUnits(TeamType team)
+        {
+            foreach (var kv in _units)
+            {
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id != null && id.Team == team && !IsDead(kv.Value))
+                    return true;
+            }
+            return false;
+        }
+
         // ==================== 位置查询 ====================
 
         public BattleCell GetPosition(Unit unit)

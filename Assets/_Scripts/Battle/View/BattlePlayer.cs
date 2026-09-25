@@ -57,6 +57,10 @@ namespace GIC.Battle
         /// 快照权威兜底）</summary>
         public event Action<string, int, int> OnResourceDelta;
 
+        /// <summary>战斗结束事件（2026-09-25 三轮审查 S10 轻量全灭软停；订阅方=HUD 胜负提示，
+        /// 结算画面=B8）</summary>
+        public event Action<BattleOverMessage> BattleOver;
+
         private IBattleTransport _transport;
         private Transform _viewRoot;
         private BattleDamageNumbers _damageNumbers;
@@ -181,6 +185,13 @@ namespace GIC.Battle
         public void OnTurnEnd(TurnEndMessage message)
         {
             GICLog.Info($"[BattlePlayer] 回合 {message.turnNumber} 结束");
+        }
+
+        /// <summary>战斗结束（S10 轻量全灭软停）：一方全灭——HUD 胜负提示消费；结算画面=B8</summary>
+        public void OnBattleOver(BattleOverMessage message)
+        {
+            GICLog.Info($"[BattlePlayer] 战斗结束：胜方队伍 {(TeamType)message.winnerTeam}");
+            BattleOver?.Invoke(message);
         }
 
         // ==================== 片播放 ====================
@@ -508,7 +519,14 @@ namespace GIC.Battle
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
 
-            view.FlashHit();
+            // 治疗不闪受击红（2026-09-25 三轮审查 S5 批修正：原实现无条件 FlashHit，
+            // 治疗 +N 跳血时立牌闪红观感错误）；受击闪色维持原数字存活节律再恢复——
+            // 拆独立协程不 gate ack（S5：纯装饰尾巴曾挂在 playbacks 里把每片拉长 0.8s）
+            if (!isHeal)
+            {
+                view.FlashHit();
+                StartCoroutine(RestoreColorAfterFlashRoutine(view));
+            }
             view.ApplyHpDelta(displayValue); // 头顶血条即时反馈（快照权威，下个选择阶段头校正）
 
             // 伤害/治疗数字=原神式屏幕空间层（2026-09-24 拍板「按照原神的做法」：Overlay 画布永不遮挡、
@@ -525,10 +543,13 @@ namespace GIC.Battle
                 UnityEngine.Random.Range(-0.15f, 0.15f));
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
                 isHeal ? Palette.治疗绿 : Palette.伤害红, value, _playbackSpeed);
+        }
 
-            // 受击闪色维持原数字存活节律再恢复（观感与旧实现一致）
+        /// <summary>受击闪色恢复尾巴（S5：不进 playbacks=不 gate ack——Host 片节拍只等位移/伤害主体）</summary>
+        private IEnumerator RestoreColorAfterFlashRoutine(UnitView view)
+        {
             yield return new WaitForSeconds(0.8f / _playbackSpeed);
-            view.RestoreColor();
+            if (view != null) view.RestoreColor();
         }
 
         /// <summary>元能命中时刻应用（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
