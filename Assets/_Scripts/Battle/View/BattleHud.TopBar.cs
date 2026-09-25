@@ -25,6 +25,12 @@ namespace GIC.Battle
         private TextCombiner _turnPhaseCombiner;
         private TMP_Text _countdownText;
         private TextCombiner _countdownCombiner;
+        /// <summary>倒计时基准字号（2026-09-26 拍板 3 倍烘焙=61.2；告急脉动以它为基线，解析时捕获）</summary>
+        private float _countdownBaseFontSize = 61.2f;
+        /// <summary>倒计时 SDF 描边材质实例（2026-09-26 报障返修：UGUI Outline 固定像素描边在缩放视口下
+        /// ~1.5 屏幕像素不可见+大字对角断缝——改 SDF 着色器原生 _OutlineWidth（相对字形、随缩放恒定）。
+        /// 独立实例勿污染共享字体材质；主分件 OnDestroy 释放（docs/14 §63 生命周期纪律）</summary>
+        private Material _countdownOutlineMat;
         private TMP_Text _clockText;
         private TextCombiner _clockCombiner;
 
@@ -58,10 +64,24 @@ namespace GIC.Battle
             _turnPhaseCombiner = FindSlotCombiner("turn", "TurnPhaseText");
             RecolorText(_turnPhaseCombiner, Palette.文字米白);
 
-            // 选择倒计时（选择阶段常显；数字条目）
+            // 选择倒计时（选择阶段常显；数字条目。2026-09-26 拍板：3 倍字号+黑描边+<5 秒红色脉动——
+            // 字号烘 prefab，描边=SDF 原生（运行时独立材质实例），告急脉动/变色在主分件 UpdateCountdownUrgency）
             _countdownText = FindSlotText("countdown", "CountdownText");
             _countdownCombiner = FindSlotCombiner("countdown", "CountdownText");
             RecolorText(_countdownCombiner, Palette.暖金);
+            if (_countdownText != null)
+            {
+                _countdownBaseFontSize = _countdownText.fontSize;
+                var sharedMat = _countdownText.fontSharedMaterial;
+                if (sharedMat != null && sharedMat.HasProperty("_OutlineWidth"))
+                {
+                    _countdownOutlineMat = new Material(sharedMat);
+                    _countdownOutlineMat.SetColor("_OutlineColor", Palette.伤害数字描边色); // 黑描边与伤害数字同源
+                    _countdownOutlineMat.SetFloat("_OutlineWidth", 倒计时描边宽度);
+                    _countdownText.fontMaterial = _countdownOutlineMat;
+                }
+                else GICLog.Warn("[BattleHud] 倒计时字体材质不支持 SDF 描边（_OutlineWidth），描边不生效");
+            }
 
             // 战斗时钟（独立时钟 6:00 起 +20/回合）
             _clockText = FindSlotText("clock", "ClockText");

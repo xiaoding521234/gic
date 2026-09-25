@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Localization;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
@@ -104,6 +105,7 @@ namespace GIC.Battle
                 {
                     _handScroll = shell.Find("HandScroll")?.GetComponent<UnityEngine.UI.ScrollRect>();
                     _handContent = shell.Find("HandScroll/HandViewport/HandContent") as RectTransform;
+                    _handCardsRect = shell as RectTransform; // 手牌下沉热区的被移动体（2026-09-26）
                     if (_handScroll == null || _handContent == null)
                         GICLog.Warn("[BattleHud] 手牌滚动壳不完整（需 HandScroll(ScrollRect)/HandViewport(RectMask2D)/HandContent）");
                 }
@@ -128,6 +130,24 @@ namespace GIC.Battle
                 if (button != null) button.onClick.AddListener(OnCancelButtonClicked);
             }
             else GICLog.Warn("[BattleHud] 布局槽缺失：cancel");
+
+            // 完成选择按钮（2026-09-26：顶部阶段级按钮，prefab 烘焙=祈愿 Marketplace 同款样式；
+            // 标签本地化=运行时 AddEntry（同技能 Name 标签模式），prefab 烘焙文本仅兜底预览）
+            if (_layoutByKey.TryGetValue("confirm", out var confirm))
+            {
+                _confirmButton = confirm.content.GetComponent<Button>();
+                if (_confirmButton != null)
+                    _confirmButton.onClick.AddListener(OnConfirmButtonClicked);
+                else GICLog.Warn("[BattleHud] confirm 槽控件缺 Button，完成选择不可用");
+                var label = confirm.content.Find("Text (TMP)")?.GetComponent<TextCombiner>();
+                if (label != null)
+                {
+                    label.ClearAllEntries();
+                    label.AddEntry(new LocalizedString("UIText", "Battle_ConfirmSelect"));
+                }
+                else GICLog.Warn("[BattleHud] confirm 槽缺 Text (TMP) 标签（TextCombiner）");
+            }
+            else GICLog.Warn("[BattleHud] 布局槽缺失：confirm");
 
             ResolveLayoutEntryButton(); // Layout 分件
             ResolveLayoutToolbar();     // Layout 分件

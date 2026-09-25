@@ -40,6 +40,8 @@ namespace GIC.Data
         [Header("瞄准高亮（青芯+内嵌黑边色块：可选且推荐=原神 Hydro 系青蓝 / 可选但不推荐=红；不可选=无提示。2026-09-23 分色拍板；09-24 视觉定稿=青蓝（白/金两试色已废）+每格向内黑边")]
         public Color 瞄准推荐色 = new Color(0.30f, 0.76f, 0.95f, 0.8f);
         public Color 瞄准不推荐色 = new Color(1f, 0.3f, 0.25f, 0.8f);
+        [Tooltip("瞄准待定金格（2026-09-26 拍板：点可选格不立即提交——变金待定、完成选择按钮确认；原神风格金色）")]
+        public Color 瞄准已选色 = new Color(0.96f, 0.79f, 0.27f, 0.85f);
 
         [Header("立牌状态")]
         public Color 冻结冰色 = new Color(0.62f, 0.83f, 0.96f);

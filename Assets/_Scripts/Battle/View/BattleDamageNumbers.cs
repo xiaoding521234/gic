@@ -50,6 +50,10 @@ namespace GIC.Battle
         [Tooltip("尺寸映射上限（防大数字占屏）")]
         [SerializeField] private float 尺寸上限 = 1.65f;
 
+        [Header("描边（2026-09-26 返修：UGUI Outline 固定像素式缩放视口下不可见——改 SDF 原生，docs/14 §84）")]
+        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放/数字缩放恒定可见；与倒计时同口径，迭代链 0.22→0.15）")]
+        [SerializeField] private float 描边宽度 = 0.15f;
+
         private Camera _camera;
         private Canvas _canvas;
         private static BattlePalette Palette => BattlePalette.Instance;
@@ -60,10 +64,13 @@ namespace GIC.Battle
             public RectTransform Rect;
             public TextMeshProUGUI Text;
             public CanvasGroup Group;
+            public Material OutlineMat; // SDF 描边材质实例（池条目持有；OnDestroy 统一释放）
             public Coroutine Co;
         }
 
         private readonly Queue<Entry> _pool = new Queue<Entry>();
+        /// <summary>全部池条目（含已回收的——释放时统一销材质）</summary>
+        private readonly List<Entry> _allEntries = new List<Entry>();
 
         /// <summary>初始化（确保画布+相机；幂等——重复调用不重建）</summary>
         public void Init(Camera cam)
@@ -148,12 +155,35 @@ namespace GIC.Battle
             text.overflowMode = TextOverflowModes.Overflow; // 长前缀（"蒸发 99999"）不裁切
             text.raycastTarget = false;
 
-            var outline = go.AddComponent<Outline>();
-            outline.effectColor = Palette != null ? Palette.伤害数字描边色 : new Color(0.04f, 0.03f, 0.03f, 0.85f);
-            outline.effectDistance = new Vector2(2.2f, -2.2f);
+            // SDF 原生描边（2026-09-26 返修：旧 UGUI Outline 固定像素 2.2px 在缩放视口下 ~1 屏幕像素
+            // 不可见；SDF 宽度相对字形、随数字缩放（RectTransform localScale）恒定等比，docs/14 §84）。
+            // 独立材质实例勿改共享字体材质；条目池化常驻 → OnDestroy 统一释放
+            Material outlineMat = null;
+            var sharedMat = text.fontSharedMaterial;
+            if (sharedMat != null && sharedMat.HasProperty("_OutlineWidth"))
+            {
+                outlineMat = new Material(sharedMat);
+                outlineMat.SetColor("_OutlineColor",
+                    Palette != null ? Palette.伤害数字描边色 : new Color(0.04f, 0.03f, 0.03f, 0.85f));
+                outlineMat.SetFloat("_OutlineWidth", 描边宽度);
+                text.fontMaterial = outlineMat;
+            }
 
             var group = go.AddComponent<CanvasGroup>();
-            return new Entry { Go = go, Rect = rect, Text = text, Group = group };
+            var entry = new Entry { Go = go, Rect = rect, Text = text, Group = group, OutlineMat = outlineMat };
+            _allEntries.Add(entry);
+            return entry;
+        }
+
+        /// <summary>层销毁：池条目 SDF 描边材质实例统一释放（TMP 不自销；不释放则跨战斗累积，
+        /// docs/14 §63 生命周期纪律）</summary>
+        private void OnDestroy()
+        {
+            foreach (var entry in _allEntries)
+                if (entry != null && entry.OutlineMat != null)
+                    Destroy(entry.OutlineMat);
+            _allEntries.Clear();
+            _pool.Clear();
         }
     }
 }

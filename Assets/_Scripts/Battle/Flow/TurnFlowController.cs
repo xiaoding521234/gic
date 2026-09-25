@@ -85,7 +85,8 @@ namespace GIC.Battle
 
         private Coroutine _selectTimerCoroutine;
 
-        /// <summary>选择阶段倒计时：到时未交玩家自动空过（Pass）并进入执行阶段</summary>
+        /// <summary>选择阶段倒计时：到时=自动完成选择——先给 HUD 一次待定确认窗口（OnSelectTimerExpired，
+        /// 同按钮链路），未交玩家再自动空过（Pass）进入执行阶段</summary>
         private IEnumerator SelectTimerRoutine(int turn)
         {
             while (SelectRemainingSeconds > 0f)
@@ -99,7 +100,11 @@ namespace GIC.Battle
 
             if (Phase != BattlePhase.Selecting || TurnNumber != turn) yield break;
             SelectRemainingSeconds = 0f;
-            GICLog.Warn($"[TurnFlow] 回合 {turn} 选择阶段超时，未交玩家自动空过");
+            GICLog.Warn($"[TurnFlow] 回合 {turn} 选择阶段超时——自动完成选择，未交玩家空过");
+            // 倒计时归零=自动按下「完成选择」（2026-09-26 拍板「统一复用链路」）：Pass 兜底填充前
+            // 先给订阅方一次同步上交窗口——HUD 的瞄准待定金格随超时自动确认（复用按钮链路）；
+            // 本地同进程同步回调保序（事件内提交可能已触发提前开演，则下方填充空转+TryBeginResolve 守卫兜底）
+            OnSelectTimerExpired?.Invoke(turn);
             foreach (var pid in _sim.PlayerIds)
             {
                 if (_pendingActions.ContainsKey(pid)) continue;
@@ -115,6 +120,12 @@ namespace GIC.Battle
 
         /// <summary>阶段变化通知（调试 UI 刷新用；战斗内不走 EventBus）</summary>
         public event Action<BattlePhase, int> OnPhaseChanged;
+
+        /// <summary>选择阶段倒计时归零事件（参数=回合数；触发点=超时 Pass 兜底填充**之前**——
+        /// 订阅方可同步上交待定行动：HUD 瞄准待定金格=自动按下完成选择（2026-09-26 拍板
+        /// 「倒计时结束时应当相当于按下了完成选择按钮，统一复用链路」）。本地同进程同步回调保序；
+        /// B7 LAN 分端时 Host 超时兜底语义不变，客户端迟到上交按超时丢弃）</summary>
+        public event Action<int> OnSelectTimerExpired;
 
         private BattleSimState _sim;
         private IBattleTransport _transport;
@@ -193,6 +204,15 @@ namespace GIC.Battle
                 return;
             }
 
+            // 完成选择定死（2026-09-26 拍板「当先点完成选择确认行动后，就应当定死了」）：每玩家
+            // 每回合首份上交即定稿，重复上交一律忽略（旧「后交覆盖先交」语义废除——HUD 侧按钮
+            // 置灰单提交为第一道，此处 Host 权威双保险，B7 LAN 客户端重复上交也进不来）
+            if (_pendingActions.ContainsKey(action.playerId))
+            {
+                GICLog.Warn($"[TurnFlow] 玩家 {action.playerId} 本回合行动已定稿，忽略重复上交 {action.actionType}");
+                return;
+            }
+
             // B1 只支持 Move/Skill/Pass；B6c 加 DeployUnit（出战占玩家行动配额，docs/18 决策七）
             if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill
                 && action.actionType != ActionType.Pass && action.actionType != ActionType.DeployUnit)
@@ -234,7 +254,7 @@ namespace GIC.Battle
                 return;
             }
 
-            // 每玩家每回合 1 个行动：后交覆盖先交
+            // 每玩家每回合 1 个行动：首份定稿（重复上交已在入口忽略——完成选择定死拍板）
             _pendingActions[action.playerId] = action;
 
             // 收齐全部玩家行动 → 进入执行阶段
