@@ -50,7 +50,7 @@ MonoBehaviour:
       targetSkillType: 7
     - trigger: 1
       kind: 5
-      targetFilter: 0
+      targetFilter: 1
       paramKey: 0
       paramKey2: 0
       paramKey3: 0

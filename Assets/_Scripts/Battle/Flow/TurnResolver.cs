@@ -404,8 +404,13 @@ namespace GIC.Battle
             }
             foreach (var effect in MergeEnergyEffects(effects))
             {
-                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
-                    BattleCommand.StatKindEnergy, effect.Delta));
+                var energyCommand = BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindEnergy, effect.Delta);
+                // 命中时刻（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒，客户端到点跳元能；
+                // launchMs 字段复用为"应用时刻"（union 载荷；0=立即——移动获能/协奏/消耗/回合发放无命中时刻）
+                if (effect.HitSeconds > 0f)
+                    energyCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                segment.commands.Add(energyCommand);
             }
             // 体力变化（B6d）：TargetUnitId=玩家 ID；同片同玩家防御性去重（配额行动唯一，
             // 理论只一条——低级单位豁免、延奏契约 0 消耗，正常流不会同玩家多条）
@@ -419,7 +424,12 @@ namespace GIC.Battle
             }
             foreach (var effect in MergeHealEffects(effects))
             {
-                segment.commands.Add(BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount));
+                var healCommand = BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount);
+                // 命中时刻（同元能「命中时才给」）：OnHit 治疗（水之浅唱）随投射物落地弹 +N；
+                // 0=立即——OnCast 治疗（延奏/变奏）无飞行段
+                if (effect.HitSeconds > 0f)
+                    healCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                segment.commands.Add(healCommand);
             }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
@@ -562,13 +572,26 @@ namespace GIC.Battle
                 }
             }
 
-            // 元能第二阶段：先扣除后获取（与命令发射序 MergeEnergyEffects 同语义——客户端增量顺序与 Host 状态一致）
-            if (energyCosts != null)
-                foreach (var cost in energyCosts)
-                    _sim.ApplyEnergy(_sim.GetUnit(cost.TargetUnitId), cost.Delta);
-            if (energyGains != null)
-                foreach (var gain in energyGains)
-                    _sim.ApplyEnergy(_sim.GetUnit(gain.TargetUnitId), gain.Delta);
+            // 元能第二阶段：先扣除后获取（与命令发射序 MergeEnergyEffects 同语义，2026-09-25 用户拍板「先扣除，再加」
+            // ——获取先到会被 baseEnergy 上限钳位吞掉：30+10 钳 30 再 −20=10 ≠ 期望 20）。
+            // (目标,类别) 去重=与 MergeEnergyEffects 命令合并口径恒等（2026-09-25 修复：逐条累加致状态背离命令——
+            // 两发箭矢两条 +10 战技获能曾会状态 +20/命令 +10，B6a「多次命中只获一次」由此在状态层真正成立）
+            if (energyCosts != null || energyGains != null)
+            {
+                var appliedEnergy = new HashSet<string>();
+                if (energyCosts != null)
+                    foreach (var cost in energyCosts)
+                    {
+                        if (!appliedEnergy.Add($"{cost.TargetUnitId}:{cost.Category}")) continue;
+                        _sim.ApplyEnergy(_sim.GetUnit(cost.TargetUnitId), cost.Delta);
+                    }
+                if (energyGains != null)
+                    foreach (var gain in energyGains)
+                    {
+                        if (!appliedEnergy.Add($"{gain.TargetUnitId}:{gain.Category}")) continue;
+                        _sim.ApplyEnergy(_sim.GetUnit(gain.TargetUnitId), gain.Delta);
+                    }
+            }
             return appliedBuffs;
         }
 
@@ -658,7 +681,11 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    var copy = new HealEffect(heal.SourceUnitId, heal.TargetUnitId, heal.Amount);
+                    // 命中时刻随合并副本保留（首条命中时刻=最早命中，2026-09-25「命中时才给」）
+                    var copy = new HealEffect(heal.SourceUnitId, heal.TargetUnitId, heal.Amount)
+                    {
+                        HitSeconds = heal.HitSeconds,
+                    };
                     merged[key] = copy;
                     result.Add(copy);
                 }

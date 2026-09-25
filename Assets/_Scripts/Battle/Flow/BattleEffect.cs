@@ -114,12 +114,17 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 治疗效应
+    /// 治疗效应（HitSeconds=命中时刻（秒，相对片播放起点，ProjectileResolver 接触判定得出；
+    /// 0=立即——延奏/变奏 OnCast 治疗无飞行段）。客户端治疗数字/血条到点应用（2026-09-25
+    /// 拍板「命中时才给」——水之浅唱半径治疗随水球落地弹 +N，非施放即跳）
     /// </summary>
     public class HealEffect : BattleEffect
     {
         public string SourceUnitId;
         public int Amount;
+
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即）</summary>
+        public float HitSeconds;
 
         public HealEffect(string sourceUnitId, string targetUnitId, int amount)
         {
@@ -189,6 +194,11 @@ namespace GIC.Battle
 
         /// <summary>来源类别（命令合并键成员；CategoryDefault=兜底）</summary>
         public int Category;
+
+        /// <summary>命中时刻（秒，相对片播放起点，ProjectileResolver 接触判定得出；0=立即——
+        /// 移动获能/协奏/消耗/回合发放无命中时刻语义）。战技命中获能到点应用（2026-09-25 拍板
+        /// 「命中时才给」：客户端元能随命中时刻跳变，非施放即跳；同片多命中去重取首条=最早命中）</summary>
+        public float HitSeconds;
 
         public EnergyEffect(string targetUnitId, int delta, int category = CategoryDefault)
         {

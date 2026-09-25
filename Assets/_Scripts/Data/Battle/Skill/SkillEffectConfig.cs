@@ -31,7 +31,8 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// 作用目标筛选（OnCast=指向/施法者/势力语义；OnHit 恒=命中目标，除 CasterRadiusAllies 群体语义）
+    /// 作用目标筛选（OnCast=指向/施法者/势力语义；OnHit 默认=命中目标——Caster=施法者/行动者：
+    /// 战技获能 B6a 受益者=施法者非命中敌（2026-09-25 修复实证）、CasterRadiusAllies=施法者半径群体）
     /// </summary>
     public enum SkillEffectTargetFilter
     {
