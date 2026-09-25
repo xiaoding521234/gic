@@ -28,6 +28,24 @@ namespace GIC.Battle
         /// <summary>战技至少 1 次命中获得的元能（多次命中不叠加——同片按行动者合并去重；
         /// 爆发/延奏命中不获能）</summary>
         public const int EnergyGainPerSkillHit = 10;
+
+        // ==================== 体力/摩拉局内经济（B6d；数值定义 docs/04 §4.3 / docs/05 §5.1） ====================
+
+        /// <summary>开局摩拉（=玩家摩拉物品牌的初始持有数，docs/03 §3.2）</summary>
+        public const int InitialMora = 200;
+
+        /// <summary>开局体力（=玩家体力物品牌「原粹树脂」的初始持有数）</summary>
+        public const int InitialStamina = 60;
+
+        /// <summary>每回合结束发放摩拉（docs/04 §4.3：与体力统一时机）</summary>
+        public const int MoraGainPerTurn = 5;
+
+        /// <summary>每回合结束发放体力</summary>
+        public const int StaminaGainPerTurn = 5;
+
+        /// <summary>配额行动消耗体力（docs/05 §5.1：移动/战技/爆发各 10；
+        /// 低级单位 1~2 星自主行动豁免，延奏/契约等特殊技能 0）</summary>
+        public const int StaminaCostPerAction = 10;
     }
 
     /// <summary>

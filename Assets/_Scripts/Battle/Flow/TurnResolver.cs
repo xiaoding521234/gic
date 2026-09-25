@@ -127,11 +127,13 @@ namespace GIC.Battle
                 {
                     case ActionType.Move:
                         var mover = MoveExecutor.BuildMover(_sim, action);
-                        if (mover != null)
-                        {
-                            movers.Add(mover);
-                            AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
-                        }
+                        if (mover == null) break;
+                        // 体力门槛（B6d）：移动=配额行动消耗 10 体力（低级单位豁免）；不足→移动落空
+                        if (!StaminaGate.TryCharge(_sim, unit, action.playerId,
+                            BattleMetrics.StaminaCostPerAction, "移动", effects))
+                            break;
+                        movers.Add(mover);
+                        AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
                         break;
 
                     case ActionType.Skill:
@@ -215,9 +217,10 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 回合结束段（B2）：Buff 回合结束效果按注册序结算（docs/active/22 §2）→
-        /// 计时减一（上 buff 当回合结束即减，docs/04 §4.4）→ 到期移除 → 产出 turnEnd 段。
-        /// 无 Buff 无效果时返回 null（不推送空段）。
+        /// 回合结束段（B2 + B6d 经济闭环）：①每玩家发放 5摩拉+5体力（docs/04 §4.3——发放直产命令
+        /// 不走效应链，资源变更非单位效应，同部署扣费先例；发放恒有内容，段必推送）→
+        /// ②Buff 回合结束效果按注册序结算（docs/active/22 §2）→ ③计时减一（上 buff 当回合结束即减，
+        /// docs/04 §4.4）→ 到期移除 → 产出 turnEnd 段。
         /// </summary>
         private Segment ResolveTurnEnd(int turnNumber, int sliceIndex, int maxSpeed)
         {
@@ -231,6 +234,18 @@ namespace GIC.Battle
                 turnEnd = 1,
             };
 
+            // B6d 经济闭环：回合结束发放（段首；indexInSlice 自此起算——EmitSliceCommands 接续 segment.commands.Count）
+            int grantIndex = 0;
+            foreach (var pid in _sim.PlayerIds)
+            {
+                _sim.ApplyMoraDelta(pid, BattleMetrics.MoraGainPerTurn);
+                segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
+                    BattleCommand.StatKindMora, BattleMetrics.MoraGainPerTurn));
+                _sim.ApplyStaminaDelta(pid, BattleMetrics.StaminaGainPerTurn);
+                segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
+                    BattleCommand.StatKindStamina, BattleMetrics.StaminaGainPerTurn));
+            }
+
             var effects = new List<BattleEffect>();
 
             // 按注册序结算回合结束效果，随后计时减一（到期收集）
@@ -240,9 +255,6 @@ namespace GIC.Battle
                 buff.RemainingTurns--;
             }
             var expired = _sim.CollectExpiredBuffs();
-
-            if (effects.Count == 0 && expired.Count == 0)
-                return null; // 本回合无任何回合结束内容：不推送空段
 
             var appliedBuffs = ApplyEffects(effects);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
@@ -279,16 +291,18 @@ namespace GIC.Battle
                     break;
                 case ActionType.Move:
                     var mover = MoveExecutor.BuildMover(_sim, action);
-                    if (mover != null)
-                    {
-                        moverList.Add(mover);
-                        MovementResolver.Resolve(_sim, moverList);
+                    if (mover == null) break;
+                    // 体力门槛（B6d）：移动=配额行动消耗 10 体力（低级单位豁免）；不足→移动落空
+                    if (!StaminaGate.TryCharge(_sim, unit, action.playerId,
+                        BattleMetrics.StaminaCostPerAction, "移动", effects))
+                        break;
+                    moverList.Add(mover);
+                    MovementResolver.Resolve(_sim, moverList);
 
-                        // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算）
-                        effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
+                    // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算）
+                    effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
 
-                        AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
-                    }
+                    AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
                     break;
                 case ActionType.Pass:
                     break;
@@ -326,8 +340,8 @@ namespace GIC.Battle
         /// <summary>
         /// 段命令统一发射：片/即时段/回合结束段三处原为复制粘贴（曾致 turnEnd 段 Damage 漏带命中点/
         /// 反应标记的漂移）——收口后新效应→命令映射只加一处，BattleEffectCommandAudit 对账随发射统一覆盖三段。
-        /// 发射序：SkillCast（时轮 B-S1）→ Move → Damage → 消散Effect → 附着 → 反应 → 元能 → 治疗
-        /// → 施加Buff → 死亡 → 到期移除Buff。
+        /// 发射序：SkillCast（时轮 B-S1）→ Move → Damage → 消散Effect → 附着 → 反应 → 元能 → 体力（B6d）
+        /// → 治疗 → 施加Buff → 死亡 → 到期移除Buff。段首已有直产命令（回合结束段发放）时 indexInSlice 接续。
         /// 与旧回合结束段序的差异：治疗从 Damage 后移至元能后（客户端 stagger 约 +0.36s，纯视觉节拍）。
         /// </summary>
         private void EmitSliceCommands(string context, Segment segment, int sliceIndex,
@@ -335,7 +349,7 @@ namespace GIC.Battle
             List<MoveActionState> movers, List<BattleCommand> vanishes, List<Unit> newlyDead,
             List<BaseBuff> expired = null, List<BattleCommand> skillCasts = null)
         {
-            int indexInSlice = 0;
+            int indexInSlice = segment.commands.Count;
 
             // 时轮施放事件（B-S1）：段内最前——客户端时轮演出起点（片播放起点=各 clip 的 t=0）
             if (skillCasts != null)
@@ -392,6 +406,16 @@ namespace GIC.Battle
             {
                 segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindEnergy, effect.Delta));
+            }
+            // 体力变化（B6d）：TargetUnitId=玩家 ID；同片同玩家防御性去重（配额行动唯一，
+            // 理论只一条——低级单位豁免、延奏契约 0 消耗，正常流不会同玩家多条）
+            var staminaSeen = new HashSet<string>();
+            foreach (var effect in effects)
+            {
+                if (!(effect is StaminaEffect stamina)) continue;
+                if (!staminaSeen.Add(stamina.TargetUnitId)) continue;
+                segment.commands.Add(BattleCommand.StatChange(stamina.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindStamina, stamina.Delta));
             }
             foreach (var effect in MergeHealEffects(effects))
             {
@@ -490,6 +514,13 @@ namespace GIC.Battle
             List<EnergyEffect> energyCosts = null, energyGains = null;
             foreach (var effect in effects)
             {
+                // 体力效应（B6d）：TargetUnitId=玩家 ID 非 Unit——先于单位解析处理（GetUnit(玩家ID)=null 会被跳过）
+                if (effect is StaminaEffect stamina)
+                {
+                    _sim.ApplyStaminaDelta(stamina.TargetUnitId, stamina.Delta);
+                    continue;
+                }
+
                 var target = _sim.GetUnit(effect.TargetUnitId);
                 if (target == null) continue;
 

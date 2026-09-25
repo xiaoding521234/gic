@@ -865,6 +865,7 @@ GameObject:
   - component: {fileID: 8204078116422862004}
   - component: {fileID: 7421962404673445530}
   - component: {fileID: 9137643424859734081}
+  - component: {fileID: 2205847747082955040}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: PrimogemDisplay
@@ -972,6 +973,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 2
   m_VerticalFit: 0
+--- !u!114 &2205847747082955040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1807666388960330292}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1f03b1a3fb5c2a4abadff333ddf58e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  icon: {fileID: 154313661878611643}
+  countText: {fileID: 8304298427659143992}
 --- !u!1 &2018312486083787160
 GameObject:
   m_ObjectHideFlags: 0
@@ -2322,6 +2337,7 @@ GameObject:
   - component: {fileID: 2519259289130487436}
   - component: {fileID: 7444504267074910988}
   - component: {fileID: 4369498744550455107}
+  - component: {fileID: 7391187601812780337}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: StarglitterDisplay
@@ -2429,6 +2445,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 2
   m_VerticalFit: 0
+--- !u!114 &7391187601812780337
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4011418992291830136}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1f03b1a3fb5c2a4abadff333ddf58e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  icon: {fileID: 2164354108397130292}
+  countText: {fileID: 5774785960785917929}
 --- !u!1 &4074643131847318706
 GameObject:
   m_ObjectHideFlags: 0
@@ -10104,9 +10134,9 @@ MonoBehaviour:
   drawController: {fileID: 4722976791905659086}
   wish1Button: {fileID: 7227096904301604051}
   wish10Button: {fileID: 7696828212486123977}
-  fateCountText: {fileID: 8304298427659143992}
+  primogemCounter: {fileID: 2205847747082955040}
   primogemDisplay: {fileID: 4495479147793193673}
-  starglitterCountText: {fileID: 5774785960785917929}
+  starglitterCounter: {fileID: 7391187601812780337}
 --- !u!1 &8200731835778949898
 GameObject:
   m_ObjectHideFlags: 0

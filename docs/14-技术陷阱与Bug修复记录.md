@@ -1414,3 +1414,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：元能两段应用——ApplyEffects 把 EnergyEffect 按正负分桶、**先全部消耗后全部获取**（跨行动同段同目标也覆盖：A 爆发 −30 与 B 协奏 A +10 同片时不再依赖行动枚举序）；命令发射序（MergeEnergyEffects 输出）同步先扣后加，客户端增量顺序与 Host 状态一致。拍板=docs/18 决策七"结算序"条（用户原话「应当先扣除，再加」）。
 
 **How to apply**：任何带钳位的资源增量（元能/HP/体力）同段正负并存时，先问应用顺序——消耗先行是安全序（获取后置可吃到钳位余量）；症状指纹=期望 `x−c+g` 实得 `x−c`（获取整个被吞）。同族未决：HP 的伤害/治疗同段顺序未拍板（当前按效应列表序），治疗技能落地时一并定。
+
+## 78. [Autowired] 依赖字段的初始化必须放在 Context.Inject 之后——"寻址阶段"拿到的注入字段是 null（2026-09-25 左上角只有数字无图标实证）
+
+**症状**：战斗 HUD 左上角摩拉/体力计数条只显示数字、图标不渲染（数字走另条刷新链不受影响——症状=组件一半工作一半不工作）。
+
+**根因**：`BattleHud.Bind` 顺序=`ResolveHudReferences()`（寻址+初始化）在前、`Wargame.Instance.Context.Inject(this)` 在后——寻址阶段顺手调 `InitItem(_itemConfig, ...)`，此时 `[Autowired] ItemConfig _itemConfig` **尚未注入=null**；`ItemCounterChip.InitItem` 对 null 配置走 `SetIcon(null)`，而 `SetIcon` 内 `icon.gameObject.SetActive(sprite != null)` **把图标节点主动隐藏**（后续注入完成也不会再亮——SetActive(false) 是持久状态非缺图）。
+
+**修法**：依赖注入字段的初始化挪到 Inject 之后（`InitMyResourceChipIcons()` 在 `Context.Inject(this)` 后调用）；加注入失败防御 Warn（null 时显式报"ItemConfig 未注入"而非静默半渲染）。
+
+**How to apply**：任何 `[Autowired]` 字段的消费点（初始化/寻址回调）逐个核对调用时序——**"寻址（Resolve）与注入（Inject）分离"的 UI 装配模式**下，寻址阶段只存引用、不做依赖消费；初始化动作集中放注入后。症状指纹=组件部分功能缺失且无报错（null 防御路径静默吞掉）；SetIcon 类方法对 null 入参 SetActive(false) 属"防御性隐藏"——消费方应在调用前判空并 Log，勿让初始化时序错误伪装成资产缺失。

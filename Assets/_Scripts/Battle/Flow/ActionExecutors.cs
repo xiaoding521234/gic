@@ -7,6 +7,34 @@ namespace GIC.Battle
 
 
     /// <summary>
+    /// 体力门槛（B6d 经济闭环，docs/05 §5.1）：配额行动（移动/战技/爆发）消耗玩家 10 体力。
+    /// 豁免口径：①低级单位（1~2 星）自主行动不占玩家配额故不消耗（按行动者星级判定，
+    /// docs/04 §4.1）②延奏/契约/天赋等特殊技能 0 消耗（docs/05 §5.2"视技能而定"未定，暂 0）。
+    /// 体力不足→行动落空（同元能语义，B6a 先例）+Log；通过→随行动产出 StaminaEffect
+    /// （效应链统一应用→StatChange 命令→对账登记）。
+    /// </summary>
+    public static class StaminaGate
+    {
+        /// <summary>
+        /// 体力门槛检查+消耗登记：0 消耗/低级单位直接过；高级单位配额行动消耗量不足则落空。
+        /// 通过时向 effects 追加 StaminaEffect（负值）。技能消耗口径单源=BattleSimState.GetStaminaCost。
+        /// </summary>
+        /// <param name="actionDesc">落空日志用行动描述（如"移动"/"技能 XXX"）</param>
+        public static bool TryCharge(BattleSimState sim, Unit actor, string playerId, int cost,
+            string actionDesc, List<BattleEffect> effects)
+        {
+            if (cost <= 0 || !BattleHeuristics.IsMajorUnit(actor)) return true;
+            if (sim.HasEnoughStamina(playerId, cost))
+            {
+                effects.Add(new StaminaEffect(playerId, -cost));
+                return true;
+            }
+            GICLog.Info($"[StaminaGate] 玩家 {playerId} 体力不足（{sim.GetStamina(playerId)}/{cost}），{actionDesc}落空");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 移动行动执行器：构建移动者状态，实际结算由 MovementResolver 同片同步逐步展开。
     /// 移动是特殊的技能（2026-09-23 B-S1b 拍板）：步数上限=移动技能条目 MoveDistance 参数
     /// （skills[0]·Move 型，数据驱动与 HUD 瞄准同源）；无移动技能/无参数回落 3（旧默认）。
@@ -85,6 +113,12 @@ namespace GIC.Battle
                             $"（{stats?.Energy ?? 0}/{energyCost}），行动落空");
                 return effects;
             }
+
+            // 体力门槛（B6d，docs/05 §5.1）：战技/爆发消耗玩家 10 体力——低级单位/延奏契约豁免；
+            // 不足→行动落空（同元能语义，不产生任何效应）
+            if (!StaminaGate.TryCharge(sim, attacker, action.playerId, BattleSimState.GetStaminaCost(skill.RawData),
+                $"技能 {skill.RawData?.skillID}", effects))
+                return effects;
 
             if (!skill.CanCast(attacker))
             {
@@ -210,7 +244,7 @@ namespace GIC.Battle
             {
                 foreach (var card in hand)
                 {
-                    if (card.cardType == CardType.Unit && card.value == action.deployUnitName)
+                    if (card.IsUnit && card.value == action.deployUnitName)
                     {
                         inHand = true;
                         break;

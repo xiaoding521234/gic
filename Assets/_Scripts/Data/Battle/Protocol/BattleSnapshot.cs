@@ -46,9 +46,43 @@ namespace GIC.Data
         public int handCardCount;
         public int deckCardCount;
 
-        /// <summary>手牌卡列表（2026-09-22 拍板：初始手牌=完整当前卡组投影，含物品卡；
-        /// 卡不消耗留手牌，可重复出战。物品卡使用/装备链后续批次，本字段仅展示）</summary>
-        public List<CardId> handCards = new List<CardId>();
+        /// <summary>手牌条目（卡+持有数量；2026-09-25 拍板：初始手牌=初始卡组按顺序获得+开局送
+        /// 200 摩拉+60 体力，编没编货币卡都送。物品/角色条目 count=局内真源；
+        /// 货币条目 count=资源池镜像（快照序列化时映射））</summary>
+        public List<HandCard> handCards = new List<HandCard>();
+    }
+
+    /// <summary>
+    /// 手牌条目（2026-09-25 拍板「获得卡片=手牌构建唯一入口」：卡=条目+持有数量一等属性——
+    /// 获得=有则加数量/无则加卡；失去=减数量/减至零移除卡，对称）。
+    /// 角色卡恒 1（卡不消耗，docs/01）；普通物品卡=备战数起（使用/装备后消耗）；
+    /// 货币物品牌（摩拉/体力）持有数量=玩家资源池（PlayerResourceState.mora/stamina 即该牌堆张数，
+    /// 资源池是牌堆的视图非独立系统）。
+    /// </summary>
+    [Serializable]
+    public class HandCard
+    {
+        public int cardType;
+        public int value;
+        public int count;
+
+        public HandCard() { }
+
+        public HandCard(CardId id, int count)
+        {
+            cardType = (int)id.cardType;
+            value = id.value;
+            this.count = count;
+        }
+
+        public CardId AsCardId() => new CardId((CardType)cardType, value);
+        public ItemName AsItemName() => (ItemName)value;
+        public UnitName AsUnitName() => (UnitName)value;
+        public bool IsUnit => (CardType)cardType == CardType.Unit;
+
+        /// <summary>货币物品牌（摩拉/体力——数量走资源池的牌堆）</summary>
+        public bool IsCurrency => (CardType)cardType == CardType.Item
+            && (value == (int)ItemName.Mora || value == (int)ItemName.Stamina);
     }
 
     /// <summary>

@@ -52,6 +52,11 @@ namespace GIC.Battle
         /// <summary>片开始播放（参数=本片攻速；HUD 高亮当前执行者用）</summary>
         public event Action<int> OnSegmentPlaying;
 
+        /// <summary>玩家资源增量（B6d 经济闭环：摩拉/体力 StatChange 命令消费点——
+        /// 参数=玩家ID / 属性子类型（StatKindMora/StatKindStamina）/ 变化量；HUD 订阅即时刷新，
+        /// 快照权威兜底）</summary>
+        public event Action<string, int, int> OnResourceDelta;
+
         private IBattleTransport _transport;
         private Transform _viewRoot;
         private BattleDamageNumbers _damageNumbers;
@@ -365,7 +370,14 @@ namespace GIC.Battle
                         break;
 
                     case BattleCommandType.StatChange:
-                        // 属性变化增量（B6a 首个=元能；能量环视觉=B6d 画面批次，此处只更新缓存）
+                        // 属性变化增量：元能（B6a）→单位缓存；摩拉/体力（B6d）→玩家资源事件——
+                        // 玩家资源命令的 targetUnitId=玩家 ID 不在 _views，先分流否则被静默丢弃
+                        if (command.metadata == BattleCommand.StatKindMora
+                            || command.metadata == BattleCommand.StatKindStamina)
+                        {
+                            OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);
+                            break;
+                        }
                         if (_views.TryGetValue(command.targetUnitId, out var statChanged))
                         {
                             if (command.metadata == BattleCommand.StatKindEnergy)

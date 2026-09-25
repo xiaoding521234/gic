@@ -45,17 +45,20 @@ namespace GIC.Battle
 
         // ==================== 玩家注册 ====================
 
-        public void RegisterPlayer(string playerId, int initialMora = 200, int initialStamina = 60)
+        public void RegisterPlayer(string playerId)
         {
             if (!_playerIds.Contains(playerId))
                 _playerIds.Add(playerId); // 注册序即 spawnCenters 映射序（List 保序）
             if (!_resources.ContainsKey(playerId))
             {
+                // 资源池 0 起步（2026-09-25 拍板「获得卡片=手牌构建唯一入口」）——开局初始 200/60
+                // 不在此初始化，由装配期 GainCard 统一获得（编没编货币卡都送、落在牌上）；
+                // BattleMetrics.InitialMora/InitialStamina 仍为口径常量（装配处引用）
                 _resources[playerId] = new PlayerResourceState
                 {
                     playerId = playerId,
-                    mora = initialMora,
-                    stamina = initialStamina,
+                    mora = 0,
+                    stamina = 0,
                     handCardCount = 0,
                     deckCardCount = 0,
                 };
@@ -64,21 +67,32 @@ namespace GIC.Battle
 
         public IReadOnlyList<string> PlayerIds => _playerIds;
 
-        // ==================== 局内手牌与资源（B6c：手牌=玩家当前卡组完整投影，卡不消耗可重复出战） ====================
+        // ==================== 局内手牌与资源（2026-09-25 拍板：获得卡片=手牌构建唯一入口，完全统一） ====================
 
-        private readonly Dictionary<string, List<CardId>> _hands = new Dictionary<string, List<CardId>>();
+        private readonly Dictionary<string, List<HandCard>> _hands = new Dictionary<string, List<HandCard>>();
 
-        /// <summary>注册玩家手牌（开局从存档当前卡组构建；2026-09-22 拍板：完整卡组含物品卡）</summary>
-        public void RegisterHand(string playerId, List<CardId> handCards)
+        /// <summary>注册玩家手牌（开局=空表起步，一切牌经 GainCard 获得）</summary>
+        public void RegisterHand(string playerId, List<HandCard> handCards)
         {
-            _hands[playerId] = handCards ?? new List<CardId>();
+            _hands[playerId] = handCards ?? new List<HandCard>();
             if (_resources.TryGetValue(playerId, out var res))
                 res.handCardCount = _hands[playerId].Count;
         }
 
-        public IReadOnlyList<CardId> GetHand(string playerId)
+        public IReadOnlyList<HandCard> GetHand(string playerId)
         {
             return _hands.TryGetValue(playerId, out var hand) ? hand : null;
+        }
+
+        /// <summary>手牌条目列表（未注册手牌时建空表——GainCard 可先于 RegisterHand 安全调用）</summary>
+        private List<HandCard> HandList(string playerId)
+        {
+            if (!_hands.TryGetValue(playerId, out var hand))
+            {
+                hand = new List<HandCard>();
+                _hands[playerId] = hand;
+            }
+            return hand;
         }
 
         /// <summary>摩拉查询（无注册返回 0）</summary>
@@ -87,12 +101,152 @@ namespace GIC.Battle
             return _resources.TryGetValue(playerId, out var res) ? res.mora : 0;
         }
 
-        /// <summary>摩拉消耗（不足返回 false 且不改动；B6c 部署扣费）</summary>
+        /// <summary>体力查询（无注册返回 0）</summary>
+        public int GetStamina(string playerId)
+        {
+            return _resources.TryGetValue(playerId, out var res) ? res.stamina : 0;
+        }
+
+        /// <summary>摩拉消耗（不足返回 false 且不改动；B6c 部署扣费。扣减走 ApplyMoraDelta——
+        /// 池写自动同步摩拉牌条目存亡）</summary>
         public bool TrySpendMora(string playerId, int cost)
         {
+            if (cost <= 0) return true;
             if (!_resources.TryGetValue(playerId, out var res) || res.mora < cost) return false;
-            res.mora -= cost;
+            ApplyMoraDelta(playerId, -cost);
             return true;
+        }
+
+        /// <summary>体力是否够一次配额行动（B6d；消耗量收口 BattleMetrics.StaminaCostPerAction）</summary>
+        public bool HasEnoughStamina(string playerId, int cost)
+        {
+            return cost <= 0 || GetStamina(playerId) >= cost;
+        }
+
+        /// <summary>摩拉增量（货币物品牌堆张数变化：回合结束发放/部署扣费/开局获得共用入口）。
+        /// 池写后自动同步摩拉牌手牌条目存亡（SyncCurrencyEntry——获得与失去对称）</summary>
+        public void ApplyMoraDelta(string playerId, int delta)
+        {
+            if (!_resources.TryGetValue(playerId, out var res)) return;
+            res.mora = Math.Max(0, res.mora + delta);
+            SyncCurrencyEntry(playerId, ItemName.Mora, res.mora);
+        }
+
+        /// <summary>体力增量（货币物品牌堆张数变化：回合结束发放/行动消耗/开局获得共用入口）。
+        /// 池写后自动同步体力牌手牌条目存亡（SyncCurrencyEntry——获得与失去对称）</summary>
+        public void ApplyStaminaDelta(string playerId, int delta)
+        {
+            if (!_resources.TryGetValue(playerId, out var res)) return;
+            res.stamina = Math.Max(0, res.stamina + delta);
+            SyncCurrencyEntry(playerId, ItemName.Stamina, res.stamina);
+        }
+
+        // ==================== 获得卡片 / 失去卡片（2026-09-25 拍板：手牌构建唯一入口，获得/失去对称） ====================
+
+        /// <summary>
+        /// 获得卡片（公用方法，用户拍板原语义：「如果手牌已经有该卡，则加数量，如果没有，
+        /// 则加上这个卡」）。手牌构建/开局初始量/货币获得的统一入口——普通卡（角色/物品）数量=条目
+        /// 真源；货币物品牌（摩拉/体力）数量走资源池（池即牌堆张数）。装配期调用（快照前）无需产
+        /// 命令；局内获得（掠夺等）届时由调用方负责命令产出。
+        /// </summary>
+        public void GainCard(string playerId, CardId cardId, int count)
+        {
+            if (string.IsNullOrEmpty(playerId) || cardId.value <= 0 || count <= 0) return;
+
+            var entry = FindHandEntry(playerId, cardId);
+            if (entry != null && !IsCurrencyCard(cardId))
+            {
+                entry.count += count; // 普通卡：有则加数量
+                return;
+            }
+
+            if (IsCurrencyCard(cardId))
+            {
+                // 货币：池写（池>0 时 SyncCurrencyEntry 自动加卡——有则不重复加，无则加上这个卡）
+                if (cardId.AsItemName() == ItemName.Mora) ApplyMoraDelta(playerId, count);
+                else ApplyStaminaDelta(playerId, count);
+                return;
+            }
+
+            // 普通卡：没有则加上这个卡
+            var hand = HandList(playerId);
+            hand.Add(new HandCard(cardId, count));
+            if (_resources.TryGetValue(playerId, out var res))
+                res.handCardCount = hand.Count;
+        }
+
+        /// <summary>
+        /// 失去卡片（获得的对偶，用户拍板「失去数量时，同理」）：有则减数量、
+        /// 减至零移除卡。普通卡=条目真源；货币牌=池减（空堆时条目移除，再发放经池自动复活——
+        /// 与获得完全对称）。数量不足返回 false 且不改动。使用/装备消耗与掠夺由后续批次接线。
+        /// </summary>
+        public bool LoseCard(string playerId, CardId cardId, int count)
+        {
+            if (count <= 0) return true;
+
+            if (IsCurrencyCard(cardId))
+            {
+                int pool = cardId.AsItemName() == ItemName.Mora ? GetMora(playerId) : GetStamina(playerId);
+                if (pool < count) return false;
+                if (cardId.AsItemName() == ItemName.Mora) ApplyMoraDelta(playerId, -count);
+                else ApplyStaminaDelta(playerId, -count);
+                return true;
+            }
+
+            var entry = FindHandEntry(playerId, cardId);
+            if (entry == null || entry.count < count) return false;
+            entry.count -= count;
+            if (entry.count <= 0)
+            {
+                var hand = HandList(playerId);
+                hand.Remove(entry);
+                if (_resources.TryGetValue(playerId, out var res))
+                    res.handCardCount = hand.Count;
+            }
+            return true;
+        }
+
+        private static bool IsCurrencyCard(CardId cardId)
+        {
+            return cardId.cardType == CardType.Item
+                && (cardId.AsItemName() == ItemName.Mora || cardId.AsItemName() == ItemName.Stamina);
+        }
+
+        /// <summary>货币牌手牌条目存亡同步（池写后调用）：堆里有牌（池>0）→手牌必有该卡；
+        /// 空堆（池=0）→手牌移除该卡。发放/消耗/部署扣费/开局获得一切池写自动走此同步——
+        /// 货币牌的"加上这个卡/移除这个卡"无特判，与普通卡获得/失去语义对称。</summary>
+        private void SyncCurrencyEntry(string playerId, ItemName item, int pool)
+        {
+            if (item != ItemName.Mora && item != ItemName.Stamina) return;
+            var hand = HandList(playerId);
+            CardId id = new CardId(item);
+            var entry = FindHandEntry(playerId, id);
+            if (pool > 0)
+            {
+                if (entry == null)
+                {
+                    hand.Add(new HandCard(id, pool));
+                    if (_resources.TryGetValue(playerId, out var res))
+                        res.handCardCount = hand.Count;
+                }
+            }
+            else if (entry != null)
+            {
+                hand.Remove(entry);
+                if (_resources.TryGetValue(playerId, out var res))
+                    res.handCardCount = hand.Count;
+            }
+        }
+
+        private HandCard FindHandEntry(string playerId, CardId cardId)
+        {
+            if (!_hands.TryGetValue(playerId, out var hand)) return null;
+            foreach (var entry in hand)
+            {
+                if ((CardType)entry.cardType == cardId.cardType && entry.value == cardId.value)
+                    return entry;
+            }
+            return null;
         }
 
         /// <summary>玩家核心位置代理（B6c 部署落点判定基准；协议核心 B8 Unit 化后换真核心——
@@ -249,6 +403,16 @@ namespace GIC.Battle
             return skillData?.GetInt(SkillParamKey.EnergyCost, 0) ?? 0;
         }
 
+        /// <summary>技能行动的体力消耗（B6d；战技/爆发=StaminaCostPerAction（移动行动走常量直读），
+        /// 延奏/契约/天赋 0——docs/05 §5.1-5.2 口径。Host 门槛（StaminaGate）与客户端置灰共用此单源）</summary>
+        public static int GetStaminaCost(SkillConfig.SkillData skillData)
+        {
+            var type = skillData?.skillType ?? SkillType.Normal;
+            return type == SkillType.Normal || type == SkillType.Burst
+                ? BattleMetrics.StaminaCostPerAction
+                : 0;
+        }
+
         /// <summary>元能是否够施放（门槛=技能消耗值而非上限——延奏类不满即可放）</summary>
         public static bool HasEnoughEnergy(Unit unit, int energyCost)
         {
@@ -398,7 +562,16 @@ namespace GIC.Battle
                     deckCardCount = res.deckCardCount,
                 };
                 if (_hands.TryGetValue(kv.Key, out var hand))
-                    snapshotRes.handCards = new List<CardId>(hand);
+                {
+                    // 货币条目 count=资源池镜像（真源=池）；普通条目 count=局内真源
+                    foreach (var entry in hand)
+                    {
+                        var copy = new HandCard(entry.AsCardId(), entry.count);
+                        if (copy.IsCurrency)
+                            copy.count = copy.AsItemName() == ItemName.Mora ? res.mora : res.stamina;
+                        snapshotRes.handCards.Add(copy);
+                    }
+                }
                 snapshot.resources.Add(snapshotRes);
             }
 

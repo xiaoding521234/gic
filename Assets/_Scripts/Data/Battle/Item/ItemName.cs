@@ -121,6 +121,12 @@ namespace GIC.Data
             return itemName.ToString();
         }
 
+        /// <summary>是否为货币物品牌（摩拉/体力——手牌牌堆张数走资源池，2026-09-25「获得卡片」统一拍板）</summary>
+        public static bool IsCurrencyItem(this ItemName itemName)
+        {
+            return itemName == ItemName.Mora || itemName == ItemName.Stamina;
+        }
+
         /// <summary>
         /// 创建用于本地化系统的 LocalizedString 对象
         /// </summary>

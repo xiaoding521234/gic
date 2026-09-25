@@ -133,6 +133,11 @@ namespace GIC.Battle
         /// <summary>手牌签名（卡列表恒定时跳过重建——手牌不消耗，回合间签名不变，免每回合 Instantiate GC）</summary>
         private string _handSignature;
 
+        /// <summary>手牌货币物品牌卡（B6d：体力/摩拉=手牌（物品牌）拍板——恒占卡组投影末两位，
+        /// 数量=局内持有非备战数/存档数，随回合发放与行动消耗经资源刷新链动态更新）</summary>
+        private Card _moraHandCard;
+        private Card _staminaHandCard;
+
         private string _selectedUnitId;
         private SkillButtonDef _popupDef;  // 详情面板当前展示的键
         private SkillButtonDef _aimDef;    // 瞄准中的键
@@ -163,10 +168,12 @@ namespace GIC.Battle
             // 布局系统（2026-09-21）：运行时 AddComponent 不走场景注入扫描——手动注入取 SaveManager；
             // 建盘完成后按存档激活方案应用布局（-1/空槽=默认）
             Wargame.Instance.Context.Inject(this);
+            InitMyResourceChipIcons(); // B6d：chip 图标走 [Autowired] ItemConfig——必须在注入后初始化（寻址阶段为 null）
             ApplySavedLayoutOnStart();
 
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnSegmentPlaying += OnSegmentPlayingHandler;
+            _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
@@ -182,6 +189,7 @@ namespace GIC.Battle
                 {
                     _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
                     _session.Player.OnSegmentPlaying -= OnSegmentPlayingHandler;
+                    _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
                 }
                 if (_session.Flow != null) _session.Flow.OnPhaseChanged -= OnPhaseChanged;
             }
@@ -197,6 +205,14 @@ namespace GIC.Battle
         // ==================== 数据回调 ====================
 
         private void OnSnapshotUpdated(BattleSnapshot snapshot) => RefreshFromSnapshot(snapshot);
+
+        /// <summary>摩拉/体力命令增量（B6d）：仅我方驱动左上角 chip 即时刷新（敌方资源无即时表现需求，
+        /// 快照权威兜底）；实现落 TopBar 分件 ApplyMyResourceDelta</summary>
+        private void OnResourceDeltaHandler(string playerId, int statKind, int delta)
+        {
+            if (playerId != _myPlayerId) return;
+            ApplyMyResourceDelta(statKind, delta);
+        }
 
         private void OnPhaseChanged(BattlePhase phase, int turn)
         {
@@ -258,11 +274,8 @@ namespace GIC.Battle
             int minutes = _session.Flow.BattleTimeMinutes;
             _clockCombiner.SetSingleEntry($"{minutes / 60:D2}:{minutes % 60:D2}");
 
-            // 双方资源 chips
-            UpdatePlayerBlock(_myBlock, snapshot, _myPlayerId);
-            var enemyId = snapshot.resources.Where(r => r.playerId != _myPlayerId)
-                .Select(r => r.playerId).FirstOrDefault();
-            UpdatePlayerBlock(_enemyBlock, snapshot, enemyId);
+            // 我方资源 chips（左上角摩拉/体力物品牌计数，B6d；敌方资源不显示——2026-09-25 拍板）
+            UpdateMyResources(snapshot);
 
             // 攻速队列条
             RebuildQueue(snapshot);
@@ -316,16 +329,22 @@ namespace GIC.Battle
         {
             if (_handContent == null) return; // 壳未寻到（prefab 缺 HandCards），手牌不显示
 
-            // 卡列表签名比对：手牌不消耗（回合间恒定），签名未变只重置滚动位置不重建（免每回合 Instantiate/Destroy GC 尖峰）
-            var signature = myRes == null ? "" : string.Join(",", myRes.handCards);
+            // 卡列表签名比对（卡 id 列表，不含数量——货币数量每回合变化不触发重建，
+            // 角标经 RefreshHandCurrencyCards 随资源链动态刷；条目存亡变化（货币空堆移除/复活）自然反映）
+            var signature = myRes == null ? ""
+                : string.Join(",", myRes.handCards.ConvertAll(h => h.cardType + ":" + h.value));
             if (signature == _handSignature) return;
             _handSignature = signature;
 
             foreach (var btn in _handCardButtons)
                 if (btn != null) Destroy(btn.gameObject);
             _handCardButtons.Clear();
+            _moraHandCard = null;
+            _staminaHandCard = null;
             if (_handScroll != null) _handScroll.normalizedPosition = Vector2.zero;
-            if (myRes == null || myRes.handCards.Count == 0) return;
+            if (myRes == null) return;
+
+            int count = myRes.handCards.Count;
 
             if (_handCardPrefab == null)
                 _handCardPrefab = Resources.Load<GameObject>("Prefabs/Backpack/Card");
@@ -338,18 +357,21 @@ namespace GIC.Battle
             // 单位配置=[Autowired] 注入（Y10），不再 Resources.Load
             // 手牌规格=Card.prefab 原生 160×240（保持收藏卡原比例，与背包同款）
             float cardWidth = 160f, gap = 18f;
-            int count = myRes.handCards.Count;
             float rowWidth = count * cardWidth + (count - 1) * gap;
             // content 宽恒=行宽+左右边距 60（**勿夹到视口宽**——窄于视口才有 Elastic 拖程，
             // "1 张卡也能滑动"；宽于视口=正常滚动），卡排相对 content 中心对称排
             _handContent.sizeDelta = new Vector2(rowWidth + 120f, 260f);
             for (int i = 0; i < count; i++)
             {
-                var cardId = myRes.handCards[i];
-                bool isUnit = cardId.cardType == CardType.Unit;
-                // 配置校验：角色查 UnitConfig、物品查 ItemConfig——卡组条目无配置跳过并告警；
-                // 物品备战数=min(存档持有, maxPrepareCount 备战上限)——带入战斗的量
-                // （2026-09-22 拍板：如背包含 100 体力、备战上限 60 → 手牌显示 60；maxPrepareCount=0 的货币卡不可入组）
+                // 手牌条目（2026-09-25 拍板「获得卡片」统一）：卡+持有数量一等属性——
+                // 普通/角色卡 count=局内真源（开局=备战数）；货币物品牌 count=资源池镜像
+                // （发放/消耗经资源命令链即刷角标，RefreshHandCurrencyCards）
+                var handEntry = myRes.handCards[i];
+                var cardId = handEntry.AsCardId();
+                bool isUnit = handEntry.IsUnit;
+                bool isCurrency = handEntry.IsCurrency;
+
+                // 配置校验：角色查 UnitConfig、物品查 ItemConfig——条目无配置跳过并告警
                 int prepareCount = 0;
                 if (isUnit)
                 {
@@ -358,6 +380,7 @@ namespace GIC.Battle
                         GICLog.Warn($"[BattleHud] 手牌卡 {cardId} 无 UnitConfig 配置，跳过");
                         continue;
                     }
+                    prepareCount = handEntry.count;
                 }
                 else
                 {
@@ -367,9 +390,7 @@ namespace GIC.Battle
                         GICLog.Warn($"[BattleHud] 手牌卡 {cardId} 无 ItemConfig 配置，跳过");
                         continue;
                     }
-                    prepareCount = Mathf.Min(
-                        _saveManager?.CurrentSave?.GetItemCount(cardId.AsItemName()) ?? 0,
-                        itemData.maxPrepareCount);
+                    prepareCount = handEntry.count;
                 }
 
                 // 外层 wrapper=点击接收层（Button）；pivot=顶边中点，卡排相对 content 中心对称
@@ -403,6 +424,13 @@ namespace GIC.Battle
                     else saveData.SaveItem(cardId.AsItemName(), prepareCount);
                     card.SetViewType(ViewType.OnlyDisplay);
                     card.Init(saveData, null); // 手牌不挂详情面板（点卡=角色进部署瞄准/物品提示）
+
+                    // 货币物品牌持有引用（B6d）：数量随局内 resources 动态，资源刷新链重 Init 更新
+                    if (isCurrency)
+                    {
+                        if (cardId.AsItemName() == ItemName.Mora) _moraHandCard = card;
+                        else _staminaHandCard = card;
+                    }
                 }
 
                 // 部署费角标（手牌语义叠加层，右下；仅角色卡——物品卡无部署费，使用链后续批次）
@@ -428,10 +456,27 @@ namespace GIC.Battle
                 btn.onClick.AddListener(() =>
                 {
                     if (captured.cardType == CardType.Unit) EnterDeployAim(captured.value);
-                    else SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入，不进部署链
+                    else SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入，不进部署链（货币物品牌同款）
                 });
                 _handCardButtons.Add(btn);
             }
+        }
+
+        /// <summary>手牌货币物品牌卡数量刷新（B6d：体力/摩拉数量=局内持有，快照/命令增量时随资源链调用；
+        /// 重 Init 复用 ItemCardViewStrategy 数量渲染=池化重复 Init 既有用法）</summary>
+        private void RefreshHandCurrencyCards()
+        {
+            RefreshCurrencyCard(_moraHandCard, ItemName.Mora, _myMora);
+            RefreshCurrencyCard(_staminaHandCard, ItemName.Stamina, _myStamina);
+        }
+
+        private void RefreshCurrencyCard(Card card, ItemName item, int count)
+        {
+            if (card == null) return;
+            var saveData = new GIC.Framework.SaveCardData();
+            saveData.SaveItem(item, count);
+            card.SetViewType(ViewType.OnlyDisplay);
+            card.Init(saveData, null);
         }
 
         /// <summary>进入部署瞄准（点手牌卡）：可选格=核心半径 2（客户端粗筛，Host IsDeployCellValid 兜底）</summary>
@@ -995,6 +1040,10 @@ namespace GIC.Battle
         /// 2026-09-23 审查 Y10 收口：全 HUD 分件共用此字段，勿再 Resources.Load 旁路）</summary>
         [Autowired] private UnitConfig _unitConfig;
 
+        /// <summary>物品配置（B6d：左上角摩拉/体力物品牌计数 chip 的图标数据链——体力/摩拉=物品牌，
+        /// 图标走 ItemConfig 单源勿手塞 prefab）</summary>
+        [Autowired] private ItemConfig _itemConfig;
+
         /// <summary>选中角色的配置数据（头像/技能表/元素全在；BattlePlayer 同款注入）</summary>
         private UnitConfig.UnitData GetSelectedUnitData()
         {
@@ -1041,7 +1090,8 @@ namespace GIC.Battle
 
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
         /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）；
-        /// 元能不足=置灰（B6a：爆发/延奏等 EnergyCost>0 的技能，门槛=技能消耗值，门槛随快照刷新）</summary>
+        /// 元能不足=置灰（B6a：爆发/延奏等 EnergyCost>0 的技能，门槛=技能消耗值，门槛随快照刷新）；
+        /// 体力不足=置灰（B6d：战技/爆发消耗 10 体力，docs/05 §5.1——门槛随快照刷新）</summary>
         private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null) return;
@@ -1049,7 +1099,7 @@ namespace GIC.Battle
             def.view.gameObject.SetActive(data != null);
             var toggle = def.view.GetComponent<Toggle>();
             if (toggle != null)
-                toggle.interactable = data != null && HasEnergyForSkill(data);
+                toggle.interactable = data != null && HasEnergyForSkill(data) && HasStaminaForSkill(data);
             if (data == null) return;
 
             def.view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
@@ -1103,6 +1153,10 @@ namespace GIC.Battle
                 def.nameText.ClearAllEntries();
                 def.nameText.AddEntry(nameId.GetEntry());
             }
+
+            // 体力置灰（B6d）：移动=配额行动消耗 10 体力（低级单位不可选中不涉此判定），不足置灰
+            if (def.view.toggle != null)
+                def.view.toggle.interactable = _myStamina >= BattleMetrics.StaminaCostPerAction;
         }
 
         /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>

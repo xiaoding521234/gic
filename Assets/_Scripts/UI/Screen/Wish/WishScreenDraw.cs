@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using GIC.Framework;
 using GIC.Data;
+using GIC.UI;
 
 namespace GIC.UI
 {
@@ -20,9 +21,9 @@ namespace GIC.UI
         [SerializeField] private Button wish10Button;
 
         [Header("货币显示")]
-        [SerializeField] private TextMeshProUGUI fateCountText;
+        [SerializeField] private ItemCounterChip primogemCounter;      // 原石计数（公用组件化，2026-09-25 B6d——原 fateCountText 字段直连 TMP）
         [SerializeField] private RectTransform primogemDisplay;
-        [SerializeField] private TextMeshProUGUI starglitterCountText;
+        [SerializeField] private ItemCounterChip starglitterCounter;   // 星辉计数
 
         private WishManager _wishManager;
         private WishPoolConfig _currentPool;
@@ -206,14 +207,14 @@ namespace GIC.UI
 
         private void UpdateFateCount()
         {
-            if (fateCountText == null) return;
+            if (primogemCounter == null) return;
             var save = saveManager?.CurrentSave;
             if (save == null) return;
 
-            fateCountText.text = save.GetItemCount(ItemName.Primogem).ToString();
+            primogemCounter.SetCount(save.GetItemCount(ItemName.Primogem));
 
-            if (starglitterCountText != null)
-                starglitterCountText.text = save.GetItemCount(ItemName.Starglitter).ToString();
+            if (starglitterCounter != null)
+                starglitterCounter.SetCount(save.GetItemCount(ItemName.Starglitter));
         }
 
         /// <summary>

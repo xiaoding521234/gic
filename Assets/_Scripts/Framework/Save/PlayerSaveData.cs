@@ -501,8 +501,9 @@ namespace GIC.Framework
     }
 
     /// <summary>
-    /// 单件布局条目：key=布局注册键（burst/skill/enso/move/cancel/settings/turn/countdown/clock/queue/myinfo/enemyinfo/hand/tip），
-    /// u/v=画布归一锚点（0..1）、scale=统一缩放（0.6..1.6）——归一锚点跨视口比例不漂（比例锚点方案，docs/17 §7）
+    /// 单件布局条目：key=布局注册键（burst/skill/enso/move/cancel/settings/turn/countdown/clock/queue/myinfo/hand/tip——
+    /// enemyinfo 已移除，存量方案中的旧键按未知 key 跳过）、u/v=画布归一锚点（0..1）、scale=统一缩放（0.6..1.6）
+    /// ——归一锚点跨视口比例不漂（比例锚点方案，docs/17 §7）
     /// </summary>
     [Serializable]
     public class HudLayoutEntry
