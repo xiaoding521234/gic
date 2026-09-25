@@ -378,11 +378,15 @@ namespace GIC.Battle
 
                     case BattleCommandType.StatChange:
                         // 属性变化增量：元能（B6a）→单位缓存；摩拉/体力（B6d）→玩家资源事件——
-                        // 玩家资源命令的 targetUnitId=玩家 ID 不在 _views，先分流否则被静默丢弃
+                        // 玩家资源命令的 targetUnitId=玩家 ID 不在 _views，先分流否则被静默丢弃。
+                        // 摩拉掠夺命令带命中时刻（B-3，同元能「命中时才给」）：launchMs>0 到点再应用
                         if (command.metadata == BattleCommand.StatKindMora
                             || command.metadata == BattleCommand.StatKindStamina)
                         {
-                            OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);
+                            if (command.metadata == BattleCommand.StatKindMora && command.launchMs > 0)
+                                playbacks.Add(StartCoroutine(PlayResourceDeltaCoroutine(command)));
+                            else
+                                OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);
                             break;
                         }
                         if (_views.TryGetValue(command.targetUnitId, out var statChanged))
@@ -533,6 +537,14 @@ namespace GIC.Battle
         {
             yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
             view.ApplyEnergyDelta(command.value);
+        }
+
+        /// <summary>玩家资源命令命中时刻应用（B-3 摩拉掠夺，同元能「命中时才给」）：到点再发资源事件；
+        /// 0=立即不走本协程（部署扣费/回合发放/体力恒立即）</summary>
+        private IEnumerator PlayResourceDeltaCoroutine(BattleCommand command)
+        {
+            yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+            OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);
         }
 
         /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>

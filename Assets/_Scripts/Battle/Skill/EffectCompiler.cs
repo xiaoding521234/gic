@@ -67,13 +67,15 @@ namespace GIC.Battle
             var delta = SkillHitResolver.DirectionToDelta(action.direction);
             var from = casterState.position;
 
-            if (skillData.skillType == SkillType.Burst)
+            // 整线迸发段编译：Burst 型；或**配了 LineBurst clip 的技能**（Normal 型同消费——2026-09-25
+            // 修法 A：修复前 Normal+LineBurst clip 读不到投射物 clip 走"无时轮兜底"=24 格首停投射物，
+            // 与预判工厂/HUD 瞄准推荐/文档「前方 2 格」三处漂移；凯亚霜袭=首个消费方，多目标整线全中）
+            var burstClips = SkillTimelineQuery.JudgmentClips(skillData.timeline, SkillJudgmentKind.LineBurst);
+            if (skillData.skillType == SkillType.Burst || burstClips.Count > 0)
             {
-                // 整线迸发：每段独立时刻对线上全部敌人即时命中（快照口径——各段读同一片初附着）
-                var clips = SkillTimelineQuery.JudgmentClips(skillData.timeline, SkillJudgmentKind.LineBurst);
-                if (clips.Count > 0)
+                if (burstClips.Count > 0)
                 {
-                    foreach (var clip in clips)
+                    foreach (var clip in burstClips)
                         for (int i = 0; i < damageCount; i++)
                             CompileLineBurstSegment(sim, action, snapshot, skillData, from, delta,
                                 damagePercent, clip.startTime + clip.hitInterval * i, clip.maxRange, effects);
@@ -312,6 +314,24 @@ namespace GIC.Battle
                     // HitSeconds=命中时刻（战技获能「命中时才给」——客户端元能到点跳变，2026-09-25 拍板；
                     // OnCast 协奏元能恒 0=立即）
                     effects.Add(new EnergyEffect(targetUnitId, delta, energyCategory) { HitSeconds = hitSeconds });
+                    break;
+                }
+
+                case SkillEffectKind.MoraPlunder:
+                {
+                    // 摩拉掠夺（B-3 首个资源类原子，霜袭「每命中一个敌人掠夺其 5 摩拉」）：被掠夺方=
+                    // 命中敌人的所属玩家、掠夺方=施法者玩家（璃月先例=玩家池转移）；数值引参数表
+                    // （paramKey=MoraPlunder）防双源；实际量按被掠夺方池钳出（ApplyEffects）
+                    int amount = atom.paramKey != SkillParamKey.None ? skillData.GetInt(atom.paramKey, 0) : atom.value;
+                    if (amount > 0)
+                    {
+                        var targetIdentity = target.GetUnitComponent<UnitIdentity>();
+                        if (targetIdentity != null)
+                            effects.Add(new MoraPlunderEffect(targetIdentity.OwnerPlayerID, action.playerId, amount)
+                            {
+                                HitSeconds = hitSeconds,
+                            });
+                    }
                     break;
                 }
 

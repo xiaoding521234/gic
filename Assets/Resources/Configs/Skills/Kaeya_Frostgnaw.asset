@@ -58,3 +58,13 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+    - trigger: 1
+      kind: 7
+      targetFilter: 0
+      paramKey: 75
+      paramKey2: 0
+      paramKey3: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7

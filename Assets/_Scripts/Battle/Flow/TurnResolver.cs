@@ -422,6 +422,25 @@ namespace GIC.Battle
                 segment.commands.Add(BattleCommand.StatChange(stamina.TargetUnitId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindStamina, stamina.Delta));
             }
+            // 摩拉掠夺（B-3 首个资源类原子）：实际量双向 StatChange(Mora)——被掠夺方 −Gain / 掠夺方 +Gain
+            //（AppliedGain=应用钳出的实际量，池空零动作零命令；命令按应用后实际值发，客户端增量与 Host 一致）。
+            // 命中时刻（同元能「命中时才给」）：HitSeconds>0 时双命令带应用时刻；霜袭瞬发段恒 0=立即
+            foreach (var effect in EnumerateEffects<MoraPlunderEffect>(effects))
+            {
+                if (effect.AppliedGain <= 0) continue;
+                var takeCommand = BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindMora, -effect.AppliedGain);
+                var giveCommand = BattleCommand.StatChange(effect.ToPlayerId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindMora, effect.AppliedGain);
+                if (effect.HitSeconds > 0f)
+                {
+                    int hitMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                    takeCommand.launchMs = hitMs;
+                    giveCommand.launchMs = hitMs;
+                }
+                segment.commands.Add(takeCommand);
+                segment.commands.Add(giveCommand);
+            }
             foreach (var effect in MergeHealEffects(effects))
             {
                 var healCommand = BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount);
@@ -528,6 +547,21 @@ namespace GIC.Battle
                 if (effect is StaminaEffect stamina)
                 {
                     _sim.ApplyStaminaDelta(stamina.TargetUnitId, stamina.Delta);
+                    continue;
+                }
+
+                // 摩拉掠夺（B-3 首个资源类原子）：玩家池转移——实际量=min(掠夺量, 被掠夺方池)，
+                // 池空抢不到（AppliedGain=0 零命令）；双向池写（含手牌货币条目同步）。同片多命中
+                // （霜袭打 2 敌）按序结算=各抢各的，总量=每次命中各 5
+                if (effect is MoraPlunderEffect plunder)
+                {
+                    int gain = Mathf.Min(plunder.Amount, _sim.GetMora(plunder.TargetUnitId));
+                    plunder.AppliedGain = gain;
+                    if (gain > 0)
+                    {
+                        _sim.ApplyMoraDelta(plunder.TargetUnitId, -gain);
+                        _sim.ApplyMoraDelta(plunder.ToPlayerId, gain);
+                    }
                     continue;
                 }
 

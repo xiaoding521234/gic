@@ -28,6 +28,8 @@ namespace GIC.Data
         [InspectorName("元素附着")] AttachElement = 4,    // element=0(Physical)=施法者自身元素（覆盖=消耗被反应附着，docs/06）
         [InspectorName("元能变化")] EnergyGain = 5,      // value 直读（机制常量；技能参数驱动的获能改走 paramKey）
         [InspectorName("触发技能")] TriggerSkill = 6,    // 技能链：targetSkillType=查目标该型技能并结算（延奏→变奏 Henka，docs/18 决策九 D8）
+
+        [InspectorName("摩拉掠夺")] MoraPlunder = 7,      // B-3 首扩（2026-09-25 随霜袭接线）：OnHit 每命中一个敌人，从其所属玩家摩拉池掠夺给施法者玩家（paramKey=MoraPlunder 键防双源；璃月契约先例=玩家池转移）
     }
 
     /// <summary>
