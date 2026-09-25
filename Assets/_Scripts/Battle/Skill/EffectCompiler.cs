@@ -128,26 +128,38 @@ namespace GIC.Battle
             foreach (var atom in skillData.effects)
             {
                 if (atom.trigger != SkillEffectTrigger.OnCast) continue;
-                var target = ResolveCastTarget(atom.targetFilter, action, snapshot, sim, casterState, directTarget);
-                if (target == null) continue;
-                CompileAtom(sim, action, snapshot, skillData, atom, target.unitId, casterState,
-                    0, 0, BattleCell.zero, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
+                foreach (var target in ResolveCastTargets(atom, action, snapshot, sim, casterState, directTarget))
+                    CompileAtom(sim, action, snapshot, skillData, atom, target.unitId, casterState,
+                        0, 0, BattleCell.zero, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
             }
         }
 
-        /// <summary>OnCast 目标解析（filter 不满足返回 null=跳过该原子；势力筛选=蒙德协奏规则 docs/07）</summary>
-        private static UnitState ResolveCastTarget(SkillEffectTargetFilter filter, ActionData action,
+        /// <summary>OnCast 目标解析（群体筛选=多目标；filter 不满足返回空=跳过该原子；势力筛选=蒙德协奏规则 docs/07）</summary>
+        private static IEnumerable<UnitState> ResolveCastTargets(SkillEffectConfig atom, ActionData action,
             BattleSnapshot snapshot, BattleSimState sim, UnitState casterState, UnitState directTarget)
         {
-            switch (filter)
+            switch (atom.targetFilter)
             {
-                case SkillEffectTargetFilter.Caster: return casterState;
+                case SkillEffectTargetFilter.Caster:
+                    yield return casterState;
+                    break;
+                case SkillEffectTargetFilter.AllAllies:
+                    // 我方全体存活（元气迸发——群体治疗各按目标自身 maxHp 换算）
+                    foreach (var u in snapshot.units)
+                        if (u.playerId == action.playerId && u.isCorpse == 0)
+                            yield return u;
+                    break;
                 case SkillEffectTargetFilter.MondstadtOrSelf:
-                    return directTarget != null && (directTarget.unitId == action.unitId || IsMondstadtUnit(sim, directTarget.unitName))
-                        ? directTarget : null;
+                    if (directTarget != null && (directTarget.unitId == action.unitId || IsMondstadtUnit(sim, directTarget.unitName)))
+                        yield return directTarget;
+                    break;
                 case SkillEffectTargetFilter.NotMondstadt:
-                    return directTarget != null && !IsMondstadtUnit(sim, directTarget.unitName) ? directTarget : null;
-                default: return directTarget; // Target=指向/命中目标（方向技能 OnCast Target=无目标跳过）
+                    if (directTarget != null && !IsMondstadtUnit(sim, directTarget.unitName))
+                        yield return directTarget;
+                    break;
+                default:
+                    if (directTarget != null) yield return directTarget; // Target=指向目标（方向技能 OnCast Target=无目标跳过）
+                    break;
             }
         }
 
@@ -166,6 +178,25 @@ namespace GIC.Battle
             foreach (var atom in skillData.effects)
             {
                 if (atom.trigger != SkillEffectTrigger.OnHit) continue;
+
+                // 群体语义（水之浅唱治疗）：以施法者为中心 radiusKey 格内我方存活各编译一次（含施法者）
+                if (atom.targetFilter == SkillEffectTargetFilter.CasterRadiusAllies)
+                {
+                    int radius = atom.radiusKey != SkillParamKey.None ? skillData.GetInt(atom.radiusKey) : 0;
+                    if (radius <= 0) continue;
+                    foreach (var ally in sliceSnapshot.units)
+                    {
+                        if (ally.playerId != action.playerId || ally.isCorpse != 0) continue; // 尸体不治疗
+                        int dist = Math.Max(Math.Abs(ally.position.x - casterState.position.x),
+                            Math.Abs(ally.position.y - casterState.position.y));
+                        if (dist > radius) continue;
+                        CompileAtom(sim, action, sliceSnapshot, skillData, atom, ally.unitId, casterState,
+                            attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, effects,
+                            EnergyEffect.CategorySkillHitGain);
+                    }
+                    continue;
+                }
+
                 CompileAtom(sim, action, sliceSnapshot, skillData, atom, targetUnitId, casterState,
                     attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, effects,
                     EnergyEffect.CategorySkillHitGain);
@@ -199,11 +230,24 @@ namespace GIC.Battle
                     {
                         Attacker = attacker,
                         Target = target,
-                        AttackPercent = attackPercent,
                         Element = (int)element,
                         VulnerabilityBonus = outcome.VulnerabilityBonus,
                         DamageBonusDelta = outcome.DamageBonusDelta,
                     };
+                    // 伤害基准分流（docs/20 §5.1）：BasedOnAttack=百分比×攻击（现行为——百分比由判定编译注入）；
+                    // BasedOnMaxHealth=百分比×施法者最大生命（水之浅唱——治疗角色伤害吃生命）→ FlatDamage 加法区承载
+                    var damageParam = FindParam(skillData, atom.paramKey);
+                    if (damageParam != null && damageParam.baseType == SkillBaseType.BasedOnMaxHealth)
+                    {
+                        var casterStats = attacker.GetUnitComponent<UnitStats>();
+                        request.AttackPercent = 0;
+                        request.FlatDamage = casterStats != null
+                            ? casterStats.GetStatStruct(StatType.HP).Max * attackPercent / 100 : 0;
+                    }
+                    else
+                    {
+                        request.AttackPercent = attackPercent;
+                    }
                     var result = DamagePipeline.Calculate(request);
                     if (!result.Cancelled && result.FinalDamage > 0)
                         effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage, (int)element,

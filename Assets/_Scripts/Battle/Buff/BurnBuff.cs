@@ -65,6 +65,8 @@ namespace GIC.Battle
         {
             if (type == BuffType.AttackUp)
                 return new AttackUpBuff(level, value, stackLimit, turns) { source = source };
+            if (type == BuffType.MoveSpeedUp)
+                return new MoveSpeedBuff(level, value, stackLimit, turns) { source = source };
             return Create(type, level, source, value);
         }
     }

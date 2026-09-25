@@ -383,6 +383,7 @@ namespace GIC.Battle
                 case BuffType.Burn: return config.GetElementIconStroke(ElementType.Pyro);
                 case BuffType.Freeze: return config.GetElementIconStroke(ElementType.Cryo);
                 case BuffType.AttackUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：延奏=蒙德协奏（风）；正式图标待拍板（docs/11）
+                case BuffType.MoveSpeedUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：移速提升（风系语义）；正式图标待拍板（docs/11）
                 default: return null;
             }
         }

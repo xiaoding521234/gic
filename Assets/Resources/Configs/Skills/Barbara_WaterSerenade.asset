@@ -29,4 +29,38 @@ MonoBehaviour:
     - key: 3
       value: 15
       baseType: 2
-    timeline: {fileID: 0}
+    timeline: {fileID: 11400000, guid: c354eb6ac0adb8a4c801e3cab1f1b049, type: 2}
+    effects:
+    - trigger: 1
+      kind: 1
+      targetFilter: 0
+      paramKey: 1
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 2
+      buffType: 1
+      targetSkillType: 7
+    - trigger: 1
+      kind: 4
+      targetFilter: 0
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 2
+      buffType: 1
+      targetSkillType: 7
+    - trigger: 1
+      kind: 2
+      targetFilter: 5
+      paramKey: 3
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 23
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7

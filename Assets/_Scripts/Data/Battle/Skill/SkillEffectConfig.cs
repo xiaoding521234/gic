@@ -31,7 +31,7 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// 作用目标筛选（OnCast 语义；OnHit 恒=命中目标无需筛选）
+    /// 作用目标筛选（OnCast=指向/施法者/势力语义；OnHit 恒=命中目标，除 CasterRadiusAllies 群体语义）
     /// </summary>
     public enum SkillEffectTargetFilter
     {
@@ -39,6 +39,8 @@ namespace GIC.Data
         [InspectorName("施法者")] Caster = 1,
         [InspectorName("蒙德或自身")] MondstadtOrSelf = 2, // 蒙德协奏规则（docs/07：目标=蒙德角色或施法者自身）
         [InspectorName("非蒙德")] NotMondstadt = 3,       // 蒙德协奏规则（非蒙德目标分支）
+        [InspectorName("我方全体")] AllAllies = 4,        // OnCast 群体：我方全部存活单位各编译一次（元气迸发）
+        [InspectorName("施法者半径内我方")] CasterRadiusAllies = 5, // OnHit 群体：以施法者为中心 radiusKey 格内我方存活（水之浅唱治疗）
     }
 
     /// <summary>
@@ -70,6 +72,10 @@ namespace GIC.Data
 
         /// <summary>第三参数键（ApplyBuff=Duration 键；None=无参 Buff 默认构造）</summary>
         public SkillParamKey paramKey3 = SkillParamKey.None;
+
+        /// <summary>范围半径参数键（targetFilter=CasterRadiusAllies 有效：以施法者为中心切比雪夫半径，
+        /// 数值引用参数表键防双源——如水之浅唱 HealRadius；None=无范围语义单目标）</summary>
+        public SkillParamKey radiusKey = SkillParamKey.None;
 
         /// <summary>机制常量直读值（paramKey=None 时生效——如协奏元能 +10/+20 这类势力规则值）</summary>
         public int value;
