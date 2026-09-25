@@ -87,7 +87,8 @@ namespace GIC.Battle
                 }
                 else if (effect is EnergyEffect energy)
                 {
-                    // B6a 元能：效应→StatChange 命令（注意合并语义=同片同目标多条只发一条，此处查存在性）
+                    // B6a 元能：效应→StatChange 命令（合并键=目标+来源类别——同类别去重、
+                    // 跨类别各一条，2026-09-25 R1 修复；对账按目标查存在性即可）
                     if (!energyKeys.Contains(energy.TargetUnitId))
                         Report(context, effect, BattleCommandType.StatChange);
                 }

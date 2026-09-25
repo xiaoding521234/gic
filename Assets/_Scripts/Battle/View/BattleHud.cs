@@ -140,7 +140,7 @@ namespace GIC.Battle
 
         /// <summary>可选且推荐的格（_aimCells 差集=可选但不推荐；2026-09-23 拍板瞄准分色数据源：
         /// 推荐与否见 BattlePalette 瞄准推荐色/瞄准不推荐色，不可选=无提示。推荐口径=直线技能该方向
-        /// 能命中敌人 / 移动该格实际能走到，单位指向与部署 v1 全推荐）</summary>
+        /// 能命中敌人 / 移动该格实际能走到 / 单位指向全推荐 / 部署=碰撞判定链镜像（2026-09-25 拍板）</summary>
         private readonly HashSet<BattleCell> _aimRecommendedCells = new HashSet<BattleCell>();
 
         /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——关闭只走 BattleHud 显式路径，
@@ -446,16 +446,18 @@ namespace GIC.Battle
             _aimCells.Clear();
             _aimRecommendedCells.Clear();
             var snapshot = _session.Player.LatestSnapshot;
+            var deployData = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
             var core = FindMyCorePosition(snapshot);
             for (int dx = -DeployUnitExecutor.DeployRadiusFromCore; dx <= DeployUnitExecutor.DeployRadiusFromCore; dx++)
             for (int dy = -DeployUnitExecutor.DeployRadiusFromCore; dy <= DeployUnitExecutor.DeployRadiusFromCore; dy++)
             {
                 var c = new BattleCell(core.x + dx, core.y + dy);
-                if (_board.Map.HasTile(c.x, c.y))
-                {
-                    _aimCells.Add(c);
-                    _aimRecommendedCells.Add(c); // 部署 v1 全推荐（落点无优劣数据，Host 校验同构）
-                }
+                if (!_board.Map.HasTile(c.x, c.y)) continue;
+                _aimCells.Add(c);
+                // 部署推荐分色（2026-09-25 拍板「根据碰撞决定」）：镜像 Host 碰撞判定链——
+                // 不推荐格仍可点击（Host 校验兜底，同移动瞄准「水面红格仍可点」语义）
+                if (CanDeployEnterPreview(c, deployData, snapshot))
+                    _aimRecommendedCells.Add(c);
             }
             ShowAimHighlights();
             ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
@@ -739,6 +741,33 @@ namespace GIC.Battle
                 bool sameTeam = u.playerId == self.playerId; // 1v1：playerId 同即同队（B7 多队换 team 字段）
                 if (sameTeam && occupantData.blockAllies) return false;
                 if (!sameTeam && occupantData.blockEnemies && selfData != null && selfData.blockedByEnemies)
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>部署落点推荐预判（镜像 DeployUnitExecutor.IsDeployCellValid 碰撞判定链的客户端静态版，
+        /// 2026-09-25 拍板「根据碰撞决定」）：地形层（按部署单位常态移动类型）→ 体积绝对层（现有+自身 ≤3，
+        /// 最高级不可绕过）→ 阻挡规则层（与格内全部单位互不阻挡才推荐）；碰撞配置读 UnitData——运行时
+        /// Buff 修改不可见，属提示非校验，Host 结算兜底。含尸体——尸体保留碰撞。部署单位尚未登场，无自身豁免。</summary>
+        private bool CanDeployEnterPreview(BattleCell cell, UnitConfig.UnitData deployData, BattleSnapshot snapshot)
+        {
+            var forceType = deployData != null ? deployData.normalMoveType : ForceType.Walk;
+            if (!_board.Map.IsPassable(cell.x, cell.y, forceType)) return false;
+
+            int selfVolume = deployData != null && deployData.unitType == UnitType.Building ? 2 : 1;
+            int existingVolume = 0;
+            foreach (var u in snapshot.units)
+            {
+                if (u.position.x != cell.x || u.position.y != cell.y) continue; // 含尸体——尸体保留碰撞
+                existingVolume += u.volume > 0 ? u.volume : 1;
+                if (existingVolume + selfVolume > 3) return false; // 体积绝对层（最高级，不可绕过）
+
+                var occupantData = TryGetUnitData(u.unitName);
+                if (occupantData == null) continue;
+                bool sameTeam = u.playerId == _myPlayerId; // 1v1：playerId 同即同队（B7 多队换 team 字段）
+                if (sameTeam && occupantData.blockAllies) return false;
+                if (!sameTeam && occupantData.blockEnemies && deployData != null && deployData.blockedByEnemies)
                     return false;
             }
             return true;

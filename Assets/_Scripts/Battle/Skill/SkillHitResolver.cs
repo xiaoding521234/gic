@@ -72,7 +72,8 @@ namespace GIC.Battle
             // 战技命中获能（B6a 拍板：至少 1 次命中 +10，多次命中不叠加——同片合并按行动者去重实现；
             // 爆发/延奏命中不获能，按行动技能类型分档）
             if (IsNormalSkillOfAction(attacker, action))
-                effects.Add(new EnergyEffect(action.unitId, BattleMetrics.EnergyGainPerSkillHit));
+                effects.Add(new EnergyEffect(action.unitId, BattleMetrics.EnergyGainPerSkillHit,
+                    EnergyEffect.CategorySkillHitGain));
 
             return effects;
         }

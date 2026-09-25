@@ -568,10 +568,10 @@ namespace GIC.Battle
 
             var team = (TeamType)state.team;
             var teamColor = team == TeamType.B ? Palette.敌方主色 : Palette.我方主色;
-            // 血条敌我染色：本地 1v1 惯例 A=先手（真人）→ 绿；B7 联机时应按 viewer 归属重定
-            bool allyHpBar = team != TeamType.B;
+            // 血条填充=队伍色（与底座同色，2026-09-25 拍板——BattleOverheadBars 消费 TeamColor；
+            // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
-                _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp, allyHpBar,
+                _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
                 useFullBody ? 全身立牌放大倍数 : 1f);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);

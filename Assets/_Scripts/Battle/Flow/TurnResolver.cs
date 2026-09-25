@@ -45,6 +45,10 @@ namespace GIC.Battle
                 yield return PushSegmentAndWaitAck(ResolveDeploySegment(turnNumber, 0, deploys));
             }
 
+            // 玩家级 Pass（空 unitId：超时自动空过/AI 无单位 Pass）无单位归属——分桶前静默剔除，
+            // 勿落进 BucketByAttackSpeed 的「行动引用了不存在的单位」Warn（2026-09-25 审查 S4）
+            actions.RemoveAll(a => a.actionType == ActionType.Pass && string.IsNullOrEmpty(a.unitId));
+
             // 攻速分桶：攻速值完全相同才同片；片按攻速降序（先结算高攻速）
             var buckets = BucketByAttackSpeed(actions);
             int maxSpeed = 0;
@@ -149,7 +153,7 @@ namespace GIC.Battle
 
             // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算——移动行动已使用）
             foreach (var mover in movers)
-                effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove));
+                effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
 
             // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整路径，
             // docs/active/22 §11——命中点/消散点随命令千分定点下发）
@@ -281,7 +285,7 @@ namespace GIC.Battle
                         MovementResolver.Resolve(_sim, moverList);
 
                         // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算）
-                        effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove));
+                        effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
 
                         AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
                     }
@@ -476,11 +480,14 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 效应统一应用（伤害/治疗/Buff 施加）；返回已施 Buff 列表（含合并后的级别与剩余回合，供命令产出）
+        /// 效应统一应用（伤害/治疗/Buff 施加）；返回已施 Buff 列表（含合并后的级别与剩余回合，供命令产出）。
+        /// 元能两段应用（2026-09-25 用户拍板「先扣除，再加」）：同段多来源元能效应先消耗后获取——
+        /// 获取先应用会被 baseEnergy 上限钳位吞掉（30+10→40 钳 30，再 −20=10 ≠ 期望 30−20+10=20）。
         /// </summary>
         private List<ApplyBuffEffect> ApplyEffects(List<BattleEffect> effects)
         {
             var appliedBuffs = new List<ApplyBuffEffect>();
+            List<EnergyEffect> energyCosts = null, energyGains = null;
             foreach (var effect in effects)
             {
                 var target = _sim.GetUnit(effect.TargetUnitId);
@@ -497,7 +504,8 @@ namespace GIC.Battle
                 }
                 else if (effect is EnergyEffect energy)
                 {
-                    _sim.ApplyEnergy(target, energy.Delta);
+                    if (energy.Delta < 0) (energyCosts ??= new List<EnergyEffect>()).Add(energy);
+                    else (energyGains ??= new List<EnergyEffect>()).Add(energy);
                 }
                 else if (effect is ApplyBuffEffect applyBuff)
                 {
@@ -522,6 +530,14 @@ namespace GIC.Battle
                     _sim.AttachElement(target, (ElementType)attach.Element); // 覆盖=消耗被反应附着（docs/06）
                 }
             }
+
+            // 元能第二阶段：先扣除后获取（与命令发射序 MergeEnergyEffects 同语义——客户端增量顺序与 Host 状态一致）
+            if (energyCosts != null)
+                foreach (var cost in energyCosts)
+                    _sim.ApplyEnergy(_sim.GetUnit(cost.TargetUnitId), cost.Delta);
+            if (energyGains != null)
+                foreach (var gain in energyGains)
+                    _sim.ApplyEnergy(_sim.GetUnit(gain.TargetUnitId), gain.Delta);
             return appliedBuffs;
         }
 
@@ -627,20 +643,27 @@ namespace GIC.Battle
                     yield return typed;
         }
 
-        /// <summary>同片同目标的多次元能变化合并为一条（取首条）——B6a 拍板"战技多次命中不再获得元能"：
-        /// Hit 对每个命中目标各产一条 +10，合并去重后只算一次；消耗（负值）每行动一次不会重复。
-        /// 未来附加获能参数（EnergyGain）需与基础获能相加时，改此合并键区分来源类别</summary>
+        /// <summary>同片元能效应合并（2026-09-25 审查 R1 修复）：合并键=目标+来源类别——
+        /// 同类别同目标取首条（B6a 拍板"战技多命中只获一次"的去重口径），跨类别各发一条命令互不吞
+        /// （协奏获能与目标同片自身移动获能、施法者消耗并存时全部下发；此前键只含目标、取首条
+        /// 会吞掉消耗/协奏命令致客户端元能显示背离，下回合快照才自愈）。
+        /// 发射序=先消耗后获取（与 ApplyEffects 元能两段应用同语义，2026-09-25 用户拍板「先扣除，再加」
+        /// ——获取先到会被 baseEnergy 上限钳位吞掉：30+10 钳 30 再 −20=10 ≠ 期望 20）。
+        /// 类别内跨行动同目标（如双延奏者同片协奏同一目标）当前角色池不可能出现，出现时再细分行动源。</summary>
         private static List<EnergyEffect> MergeEnergyEffects(List<BattleEffect> effects)
         {
             var seen = new HashSet<string>();
-            var result = new List<EnergyEffect>();
+            var costs = new List<EnergyEffect>();
+            var gains = new List<EnergyEffect>();
             foreach (var effect in effects)
             {
                 if (!(effect is EnergyEffect energy)) continue;
-                if (!seen.Add(energy.TargetUnitId)) continue;
-                result.Add(energy);
+                if (!seen.Add($"{energy.TargetUnitId}:{energy.Category}")) continue;
+                if (energy.Delta < 0) costs.Add(energy);
+                else gains.Add(energy);
             }
-            return result;
+            costs.AddRange(gains);
+            return costs;
         }
 
         // ==================== 推送与 ack ====================
