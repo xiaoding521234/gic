@@ -61,11 +61,12 @@ namespace GIC.Battle
 
         internal bool IsLayoutEditing => _layoutEditing;
 
-        /// <summary>布局槽全键（prefab 结构契约；加可拖件=BattleHud.prefab 加槽节点+此处登记一行）</summary>
+        /// <summary>布局槽全键（prefab 结构契约；加可拖件=BattleHud.prefab 加槽节点+此处登记一行）。
+        /// enemyinfo 已移除（2026-09-25 用户拍板「不需要显示敌人的资源等信息」——存量方案条目按未知 key 自然跳过）</summary>
         private static readonly string[] AllLayoutKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "settings",
-            "turn", "countdown", "clock", "queue", "myinfo", "enemyinfo", "hand", "tip",
+            "turn", "countdown", "clock", "queue", "myinfo", "hand", "tip",
         };
 
         /// <summary>

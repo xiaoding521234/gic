@@ -34,6 +34,7 @@ namespace GIC.Battle
             var attachKeys = new HashSet<string>();
             var reactionKeys = new HashSet<string>();
             var energyKeys = new HashSet<string>();
+            var staminaKeys = new HashSet<string>();
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -56,6 +57,8 @@ namespace GIC.Battle
                     case BattleCommandType.StatChange:
                         if (command.metadata == BattleCommand.StatKindEnergy)
                             energyKeys.Add(command.targetUnitId);
+                        else if (command.metadata == BattleCommand.StatKindStamina)
+                            staminaKeys.Add(command.targetUnitId);
                         break;
                 }
             }
@@ -90,6 +93,12 @@ namespace GIC.Battle
                     // B6a 元能：效应→StatChange 命令（合并键=目标+来源类别——同类别去重、
                     // 跨类别各一条，2026-09-25 R1 修复；对账按目标查存在性即可）
                     if (!energyKeys.Contains(energy.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is StaminaEffect stamina)
+                {
+                    // B6d 体力：TargetUnitId=玩家 ID；效应→StatChange(StatKindStamina) 命令
+                    if (!staminaKeys.Contains(stamina.TargetUnitId))
                         Report(context, effect, BattleCommandType.StatChange);
                 }
                 else if (effect is ApplyBuffEffect)

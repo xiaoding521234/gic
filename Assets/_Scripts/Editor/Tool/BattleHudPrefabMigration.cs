@@ -20,7 +20,8 @@ namespace GIC.Editor
         private const string HudPrefabPath = "Assets/Resources/Prefabs/Battle/BattleHud.prefab";
         private const string DialogPrefabPath = "Assets/Resources/Prefabs/Battle/BattleExitConfirmDialog.prefab";
 
-        /// <summary>布局槽全键（BattleHud 运行时按名寻址的契约；加件=加槽节点+此处登记）</summary>
+        /// <summary>布局槽全键（BattleHud 运行时按名寻址的契约；迁移后 prefab=结构真源，此表仅备查——
+        /// enemyinfo 已于 2026-09-25 B6d 移除，勿按此表复原）</summary>
         private static readonly string[] SlotKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "settings",

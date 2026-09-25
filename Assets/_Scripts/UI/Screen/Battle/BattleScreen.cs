@@ -159,10 +159,18 @@ namespace GIC.UI
             // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
             yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
 
-            // 局内手牌（B6c 拍板：初始手牌=玩家当前卡组投影，卡不消耗可重复出战）——
-            // 双方同用玩家存档当前卡组（对称测试；AI 出战决策 B6d 后续接 AI 脑）
+            // 局内手牌（2026-09-25 拍板「获得卡片=手牌构建唯一入口，获得/失去对称」）：
+            // 空表起步→初始卡组按顺序逐张获得（数量=备战数）→开局送初始资源 200 摩拉+60 体力
+            // （编没编货币卡都送，落在牌上）。双方同用玩家存档当前卡组（对称测试；
+            // AI 出战决策后续接 AI 脑）；卡不消耗可重复出战
             foreach (var setup in playerSetups)
-                _session.Sim.RegisterHand(setup.PlayerId, BuildHandFromCurrentDeck());
+            {
+                _session.Sim.RegisterHand(setup.PlayerId, new List<HandCard>());
+                foreach (var handCard in BuildHandFromCurrentDeck())
+                    _session.Sim.GainCard(setup.PlayerId, handCard.AsCardId(), handCard.count);
+                _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Mora), BattleMetrics.InitialMora);
+                _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
+            }
 
             // AI 玩家大脑（B1 固定脚本占位：攻击最近敌人；B6 换启发式）
             foreach (var setup in playerSetups)
@@ -365,14 +373,15 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 从玩家存档当前卡组构建局内手牌（B6c：初始手牌=当前卡组，docs/18 决策七）——
-        /// 2026-09-22 拍板：完整卡组投影（角色卡+物品卡全进手牌，物品使用/装备链后续批次）；
+        /// 从玩家存档当前卡组构建初始手牌获得清单（2026-09-25 拍板：初始卡组按顺序经 GainCard 获得）：
+        /// 每卡携带获得数量（角色=1、物品=备战数 min(存档持有, maxPrepareCount 备战上限)——
+        /// 如背包 100 体力牌、备战上限 60 → 获得 60）；**货币物品牌（摩拉/体力）跳过**——
+        /// 其开局量统一走「送 200 摩拉+60 体力」（编没编都送，勿双发）；空卡组回退丘丘人×2。
         /// 走 CardManager 卡组视图=与收藏卡组界面同源同排序（角色前物品后、SortOrder、星级）。
-        /// 卡不消耗留手牌。卡组为空时回退丘丘人×2（保证部署链路可目检）。
         /// </summary>
-        private List<CardId> BuildHandFromCurrentDeck()
+        private List<HandCard> BuildHandFromCurrentDeck()
         {
-            var result = new List<CardId>();
+            var result = new List<HandCard>();
             var save = _saveManager?.CurrentSave;
             if (save != null)
             {
@@ -381,13 +390,25 @@ namespace GIC.UI
                 if (decks != null && currentDeck >= 0 && currentDeck < decks.Length)
                 {
                     foreach (var card in decks[currentDeck].Cards)
-                        result.Add(card.id);
+                    {
+                        // 货币牌开局量统一由装配处的 GainCard(Mora/Stamina, 初始值) 获得
+                        if (card.id.cardType == CardType.Item && card.id.AsItemName().IsCurrencyItem()) continue;
+                        int count = 1;
+                        if (card.id.cardType == CardType.Item)
+                        {
+                            var itemData = CardConfigResolver.Instance?.ItemConfig?.GetItemData(card.id.AsItemName());
+                            count = Mathf.Min(
+                                _saveManager?.CurrentSave?.GetItemCount(card.id.AsItemName()) ?? 0,
+                                itemData?.maxPrepareCount ?? 0);
+                        }
+                        result.Add(new HandCard(card.id, count));
+                    }
                 }
             }
             if (result.Count == 0)
             {
-                result.Add(new CardId(UnitName.Hilichurl));
-                result.Add(new CardId(UnitName.Hilichurl));
+                result.Add(new HandCard(new CardId(UnitName.Hilichurl), 1));
+                result.Add(new HandCard(new CardId(UnitName.Hilichurl), 1));
             }
             return result;
         }

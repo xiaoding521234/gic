@@ -8,13 +8,15 @@ using UnityEngine.Localization;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
+using GIC.UI;
 
 namespace GIC.Battle
 {
     /// <summary>
     /// BattleHud 顶栏分件（2026-09-22 prefab 化：构建退役为寻址接线；结构改在 prefab 编辑器里做）：
-    /// 回合中枢/选择倒计时/战斗时钟/攻速队列条/双方信息块/设置钮 的引用解析 + 运行时刷新
-    /// （刷新逻辑纯搬运零变化）。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
+    /// 回合中枢/选择倒计时/战斗时钟/攻速队列条/我方信息块（左上角摩拉·体力物品牌计数，B6d）/
+    /// 设置钮 的引用解析 + 运行时刷新。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
+    /// 敌方信息块已移除（2026-09-25 拍板「不需要显示敌人的资源等信息」）。
     /// </summary>
     public partial class BattleHud
     {
@@ -32,9 +34,14 @@ namespace GIC.Battle
         private TextCombiner _queueLabelCombiner;
         private readonly List<QueueSlot> _queueSlots = new List<QueueSlot>();
 
-        // 双方信息块（徽标 + 体力/摩拉 chip；协议核心血条 B8 接入）
-        private PlayerBlock _myBlock;
-        private PlayerBlock _enemyBlock;
+        // 我方资源（B6d 经济闭环）：左上角 myinfo 块的摩拉/体力=物品牌计数（用户拍板
+        // 「体力/摩拉实际也是手牌（物品牌）+屏幕左上角显示数量」）——公用组件 ItemCounterChip
+        // （抽自祈愿界面货币显示改造公用化）。_myMora/_myStamina=当前值缓存（快照权威重置+命令增量维护）。
+        // 敌方信息块已整体移除（2026-09-25 用户拍板「不需要显示敌人的资源等信息」——布局键与槽一并退役）。
+        private ItemCounterChip _myMoraChip;
+        private ItemCounterChip _myStaminaChip;
+        private int _myMora;
+        private int _myStamina;
 
         private class QueueSlot
         {
@@ -42,12 +49,6 @@ namespace GIC.Battle
             public TextCombiner speed;
             public int attackSpeed;
             public Color baseColor;
-        }
-
-        private class PlayerBlock
-        {
-            public TextCombiner stamina;
-            public TextCombiner mora;
         }
 
         private void ResolveTopBar()
@@ -77,9 +78,17 @@ namespace GIC.Battle
             }
             else GICLog.Warn("[BattleHud] 布局槽缺失：queue");
 
-            // 双方信息块（左右镜像；协议核心血条 B8 接入）
-            _myBlock = ResolvePlayerBlock("myinfo", Palette.我方主色);
-            _enemyBlock = ResolvePlayerBlock("enemyinfo", Palette.敌方主色);
+            // 我方信息块（左上角）：徽标+队营色 chrome 保留，体力/摩拉换物品牌计数 chip（B6d——
+            // 结构契约=槽内 MoraChip/StaminaChip 两枚 ItemCounterChip；**图标初始化挪到 Bind 注入后**——
+            // ResolveHudReferences 先于 Wargame.Context.Inject 跑，此处 _itemConfig 尚为 null，
+            // InitItem 会 SetIcon(null) 把图标节点隐藏（首版实测"只有数字"的根因））
+            if (_layoutByKey.TryGetValue("myinfo", out var myinfo))
+            {
+                ResolveBlockChrome(myinfo.content, Palette.我方主色);
+                _myMoraChip = FindChip(myinfo.content, "MoraChip");
+                _myStaminaChip = FindChip(myinfo.content, "StaminaChip");
+            }
+            else GICLog.Warn("[BattleHud] 布局槽缺失：myinfo");
 
             // 设置/退出（走 BattleExitConfirmDialog 确认；布局编辑期点击让位——入口钮接管编辑开关）
             if (_layoutByKey.TryGetValue("settings", out var settings))
@@ -117,17 +126,9 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>玩家信息块解析：势力徽标（地图势力，ElementFactionConfig 现成链）+ 队营色 accent + 体力/摩拉 chip 数字</summary>
-        private PlayerBlock ResolvePlayerBlock(string key, Color accent)
+        /// <summary>信息块 chrome 解析（我方块）：势力徽标（地图势力，ElementFactionConfig 现成链）+ 队营色 accent 下划线</summary>
+        private void ResolveBlockChrome(RectTransform root, Color accent)
         {
-            var block = new PlayerBlock();
-            if (!_layoutByKey.TryGetValue(key, out var def))
-            {
-                GICLog.Warn($"[BattleHud] 布局槽缺失：{key}");
-                return block;
-            }
-            var root = def.content;
-
             // 徽标（地图所属势力；正式化后按玩家势力）
             var emblem = root.Find("Emblem")?.GetComponent<Image>();
             if (emblem != null)
@@ -141,22 +142,60 @@ namespace GIC.Battle
             // 队营色 accent 下划线（Palette 活色）
             var accentImage = root.Find("Accent")?.GetComponent<Image>();
             if (accentImage != null) accentImage.color = accent;
-
-            block.stamina = root.Find("StaminaChipNum")?.GetComponent<TextCombiner>();
-            block.mora = root.Find("MoraChipNum")?.GetComponent<TextCombiner>();
-            RecolorText(block.stamina, Palette.文字米白);
-            RecolorText(block.mora, Palette.文字米白);
-            return block;
         }
 
-        private void UpdatePlayerBlock(PlayerBlock block, BattleSnapshot snapshot, string playerId)
+        /// <summary>信息块内寻物品牌计数 chip（B6d 结构契约：槽内 MoraChip/StaminaChip）</summary>
+        private ItemCounterChip FindChip(RectTransform root, string chipName)
         {
-            if (block == null) return;
-            var res = string.IsNullOrEmpty(playerId)
-                ? null
-                : snapshot.resources.FirstOrDefault(r => r.playerId == playerId);
-            block.stamina.SetSingleEntry(res != null ? res.stamina.ToString() : "—");
-            block.mora.SetSingleEntry(res != null ? res.mora.ToString() : "—");
+            var chip = root.Find(chipName)?.GetComponent<ItemCounterChip>();
+            if (chip == null)
+                GICLog.Warn($"[BattleHud] myinfo 槽寻不到 {chipName}（<ItemCounterChip>），左上角资源计数将不显示");
+            return chip;
+        }
+
+        /// <summary>左上角 chip 图标初始化（B6d：Bind 在 Wargame.Context.Inject 之后调用——
+        /// _itemConfig 属 [Autowired] 注入，寻址阶段（ResolveHudReferences）拿不到；图标走 ItemConfig 单源）</summary>
+        private void InitMyResourceChipIcons()
+        {
+            if (_itemConfig == null)
+                GICLog.Warn("[BattleHud] ItemConfig 未注入（DI 容器缺 ItemConfig Bean？）——左上角 chip 图标将不显示");
+            if (_myMoraChip != null) _myMoraChip.InitItem(_itemConfig, ItemName.Mora);
+            if (_myStaminaChip != null) _myStaminaChip.InitItem(_itemConfig, ItemName.Stamina);
+        }
+
+        /// <summary>我方摩拉/体力刷新（快照权威：缓存重置；chip+手牌货币卡由 RefreshMyResourceChips 统一刷新）</summary>
+        private void UpdateMyResources(BattleSnapshot snapshot)
+        {
+            var res = snapshot.resources.FirstOrDefault(r => r.playerId == _myPlayerId);
+            _myMora = res != null ? res.mora : 0;
+            _myStamina = res != null ? res.stamina : 0;
+            RefreshMyResourceChips();
+        }
+
+        /// <summary>资源显示统一刷新口（左上角 chip+手牌两张货币物品牌卡数量——快照与命令增量共用）</summary>
+        private void RefreshMyResourceChips()
+        {
+            if (_myMoraChip != null) _myMoraChip.SetCount(_myMora);
+            if (_myStaminaChip != null) _myStaminaChip.SetCount(_myStamina);
+            RefreshHandCurrencyCards();
+        }
+
+        /// <summary>我方资源命令增量（B6d；BattlePlayer.OnResourceDelta→主件 OnResourceDeltaHandler 分流至此）：
+        /// 部署扣费/回合结束发放/行动消耗的命令流即时刷新，快照权威兜底校正</summary>
+        public void ApplyMyResourceDelta(int statKind, int delta)
+        {
+            if (statKind == BattleCommand.StatKindMora) _myMora = Mathf.Max(0, _myMora + delta);
+            else if (statKind == BattleCommand.StatKindStamina) _myStamina = Mathf.Max(0, _myStamina + delta);
+            else return;
+            RefreshMyResourceChips();
+        }
+
+        /// <summary>我方体力是否够放此技能（B6d 置灰判定；消耗口径单源=BattleSimState.GetStaminaCost，
+        /// 值=缓存 _myStamina（快照权威+命令增量），仅战技/爆发消耗）</summary>
+        private bool HasStaminaForSkill(SkillConfig.SkillData skillData)
+        {
+            int cost = BattleSimState.GetStaminaCost(skillData);
+            return cost <= 0 || _myStamina >= cost;
         }
 
         private void UpdateQueueLabel()
