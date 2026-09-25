@@ -105,7 +105,7 @@ namespace GIC.Battle
 
             // 元能消耗随效应产出（负值，随片统一应用；获取端=战技命中，在 SkillHitResolver）
             if (energyCost > 0)
-                effects.Add(new EnergyEffect(action.unitId, -energyCost));
+                effects.Add(new EnergyEffect(action.unitId, -energyCost, EnergyEffect.CategoryCost));
 
             return effects;
         }
@@ -130,9 +130,10 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 出战角色执行器（B6c，docs/18 决策七 + docs/05 §5.1）：校验链=摩拉够 → 落点合法（核心半径 2 内
-    /// 或己方建筑半径 1 内——建筑 DeployBuilding 后续批次，当前仅核心锚点）→ 生成单位登场。
-    /// 卡不消耗留手牌（可重复出战）；1~2 星直接铺场，3 星+重复出战升命座（命座 B8，当前重复铺场）。
+    /// 出战角色执行器（B6c，docs/18 决策七 + docs/05 §5.1）：校验链=配置存在 → 手牌成员（Host 权威）→
+    /// 落点合法（核心半径 2 内 + 碰撞判定链——2026-09-25 拍板「根据碰撞决定」：体积绝对层最高级不可绕过、
+    /// 与格内单位互不阻挡才可部署、地形按常态移动类型通行，与 MovementResolver 进入判定同构）→ 摩拉够 →
+    /// 生成单位登场。卡不消耗留手牌（可重复出战）；1~2 星直接铺场，3 星+重复出战升命座（命座 B8，当前重复铺场）。
     /// 直产命令（Summon+StatChange(Mora)），不走 BattleEffect 效应链（资源/召唤不是单位效应）。
     /// </summary>
     public static class DeployUnitExecutor
@@ -140,13 +141,46 @@ namespace GIC.Battle
         /// <summary>角色部署核心半径（docs/18 决策七拍板；建筑=核心半径 3/建筑半径 2 属 DeployBuilding 后续批次）</summary>
         public const int DeployRadiusFromCore = 2;
 
-        /// <summary>部署落点合法（角色）：协议核心半径 2 内（切比雪夫；核心位置代理=出生区中心，B8 换真核心）</summary>
-        public static bool IsDeployCellValid(BattleSimState sim, string playerId, BattleCell cell)
+        /// <summary>部署落点合法（角色）：协议核心半径 2 内（切比雪夫；核心位置代理=出生区中心，B8 换真核心）
+        /// + 碰撞判定链（2026-09-25 拍板「根据碰撞决定」——与移动进入判定同构，docs/05 §5.3）：
+        /// ① 体积绝对层（最高级，无视阻挡配置不可绕过）：格内现有体积+部署单位体积 ≤ 3；
+        /// ② 阻挡规则层：与格内任一单位互相阻挡即不可部署（互不阻挡时格内有我方单位也可部署）；
+        /// ③ 地形层：按部署单位常态移动类型通行（步行不可入水）。含尸体——尸体保留碰撞/体积。
+        /// 客户端镜像预判=BattleHud.CanDeployEnterPreview（快照静态口径，Host 结算兜底）</summary>
+        public static bool IsDeployCellValid(BattleSimState sim, string playerId, BattleCell cell,
+            UnitConfig.UnitData deployData)
         {
             if (!sim.Map.HasTile(cell.x, cell.y)) return false;
             var core = sim.GetCorePosition(playerId);
             int distance = Math.Max(Math.Abs(cell.x - core.x), Math.Abs(cell.y - core.y));
-            return distance <= DeployRadiusFromCore;
+            if (distance > DeployRadiusFromCore) return false;
+
+            // 地形层：按部署单位常态移动类型（步行不可入水等，与移动进入判定同构）
+            var forceType = deployData?.normalMoveType ?? ForceType.Walk;
+            if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) return false;
+
+            // 体积绝对层（最高级）：格内现有体积+自身体积 ≤ 3（建筑 2/角色造物 1，同 Unit.Volume 口径）
+            int selfVolume = deployData != null && deployData.unitType == UnitType.Building ? 2 : 1;
+            var occupants = sim.GetUnitsAt(cell); // 含尸体——尸体保留碰撞/体积
+            int existingVolume = 0;
+            foreach (var occupant in occupants)
+                existingVolume += occupant.Volume;
+            if (existingVolume + selfVolume > 3) return false;
+
+            // 阻挡规则层：与格内任一单位互相阻挡即不可部署（碰撞配置读运行时组件，与移动判定同源）
+            var selfTeam = sim.GetTeamOf(playerId);
+            foreach (var occupant in occupants)
+            {
+                var occupantMoveable = occupant.GetUnitComponent<UnitMoveable>();
+                var occupantIdentity = occupant.GetUnitComponent<UnitIdentity>();
+                if (occupantMoveable == null || occupantIdentity == null) continue;
+
+                bool sameTeam = occupantIdentity.Team == selfTeam;
+                if (sameTeam && occupantMoveable.BlockAllies) return false;
+                if (!sameTeam && occupantMoveable.BlockEnemies && deployData != null && deployData.blockedByEnemies)
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -189,9 +223,9 @@ namespace GIC.Battle
                 return false;
             }
 
-            if (!IsDeployCellValid(sim, action.playerId, action.deployCell))
+            if (!IsDeployCellValid(sim, action.playerId, action.deployCell, data))
             {
-                GICLog.Info($"[DeployUnit] {unitName} 落点 {action.deployCell} 不在核心半径 {DeployRadiusFromCore} 内，部署落空");
+                GICLog.Info($"[DeployUnit] {unitName} 落点 {action.deployCell} 不合法（核心半径 {DeployRadiusFromCore} 内+碰撞判定），部署落空");
                 return false;
             }
 

@@ -42,7 +42,7 @@ namespace GIC.Battle
 
             // 协奏元能归属：蒙德角色或施法者自身 +10 并触发变奏；非蒙德 +20（docs/07 蒙德）
             bool isMondstadtOrSelf = target.unitId == action.unitId || IsMondstadtUnit(sim, target.unitName);
-            effects.Add(new EnergyEffect(target.unitId, isMondstadtOrSelf ? 10 : 20));
+            effects.Add(new EnergyEffect(target.unitId, isMondstadtOrSelf ? 10 : 20, EnergyEffect.CategoryEnsoGain));
 
             // 变奏触发框架位：目标=蒙德/自身 → 调用其 Henka 技能结算（变奏未实现则空产出，B8 前按需实装）
             if (isMondstadtOrSelf)

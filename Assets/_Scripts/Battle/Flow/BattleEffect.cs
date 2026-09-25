@@ -166,16 +166,35 @@ namespace GIC.Battle
 
     /// <summary>
     /// 元能变化效应（B6a：正=获取——移动使用+10 / 战技至少1次命中+10（多次命中不叠加，
-    /// 同片按行动者合并实现）；负=爆发消耗。TargetUnitId=受益行动者自身）
+    /// 同片按行动者合并实现）；负=爆发消耗。TargetUnitId=受益行动者自身）。
+    /// 来源类别（2026-09-25 审查 R1 修复）：命令合并键=目标+类别——同类别去重（B6a 单行动
+    /// 多命中只发一条），跨类别各发一条互不吞；此前合并键只含目标，协奏获能与消耗/同片移动获能
+    /// 并存时取首条会静默吞掉命令（客户端元能显示背离）。类别内跨行动同目标（双延奏者同片协奏
+    /// 同一目标）当前角色池不可能出现，出现时再细分携带行动源。
     /// </summary>
     public class EnergyEffect : BattleEffect
     {
+        /// <summary>来源类别：未注明（兜底）</summary>
+        public const int CategoryDefault = 0;
+        /// <summary>来源类别：移动使用获能</summary>
+        public const int CategoryMoveGain = 1;
+        /// <summary>来源类别：战技命中获能</summary>
+        public const int CategorySkillHitGain = 2;
+        /// <summary>来源类别：协奏（延奏）获能</summary>
+        public const int CategoryEnsoGain = 3;
+        /// <summary>来源类别：技能元能消耗</summary>
+        public const int CategoryCost = 4;
+
         public int Delta;
 
-        public EnergyEffect(string targetUnitId, int delta)
+        /// <summary>来源类别（命令合并键成员；CategoryDefault=兜底）</summary>
+        public int Category;
+
+        public EnergyEffect(string targetUnitId, int delta, int category = CategoryDefault)
         {
             TargetUnitId = targetUnitId;
             Delta = delta;
+            Category = category;
         }
     }
 

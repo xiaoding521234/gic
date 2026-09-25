@@ -33,10 +33,6 @@ namespace GIC.Battle
         private TextCombiner _nameCombiner;
         private int _hp;
         private int _maxHp;
-        private bool _allyHpBar;
-
-        /// <summary>血条/元能层层读敌我染色（我方绿/敌方红）</summary>
-        public bool AllyHpBar => _allyHpBar;
 
         /// <summary>队伍色（底座圆盘同源；2026-09-25 目检拍板：血条填充=玩家所选队伍色）</summary>
         public Color TeamColor => _baseColor;
@@ -105,12 +101,11 @@ namespace GIC.Battle
         /// <param name="nameEntry">单位名本地化条目（UnitName.GetEntry()；null 时回退 displayName 静态文本）</param>
         /// <param name="hp">初始血量</param>
         /// <param name="maxHp">最大血量</param>
-        /// <param name="allyHpBar">血条敌我染色：true=我方绿 / false=敌方红（B7 联机时按 viewer 归属重定）</param>
         /// <param name="avatarScale">立牌整体放大倍数（1=头像版原尺寸）：全身立绘人物在图中占比小，放大对齐
         /// 头像版人物观感——底边原点贴地不漂移；血条/名字/Buff 行尺寸不变、随立牌顶同步抬高；
         /// B5 判定圆柱与底座不受视觉放大影响</param>
         public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
-            Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0, bool allyHpBar = true,
+            Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0,
             float avatarScale = 1f)
         {
             var root = new GameObject($"UnitView_{unitId}");
@@ -120,7 +115,6 @@ namespace GIC.Battle
             var view = root.AddComponent<UnitView>();
             view.UnitId = unitId;
             view.DisplayName = displayName;
-            view._allyHpBar = allyHpBar;
             view._tiltDegrees = tiltDegrees;
 
             // 头像立牌（SpriteRenderer 自动处理图集 UV）：

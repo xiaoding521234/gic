@@ -83,12 +83,7 @@ namespace GIC.Editor
         private void CreateGUI()
         {
             // GetWindow 复用已开窗口时 CreateGUI 不再触发——幂等重建
-            if (rootVisualElement.childCount > 0)
-            {
-                rootVisualElement.Clear();
-                BuildUI();
-                return;
-            }
+            rootVisualElement.Clear();
             BuildUI();
         }
 
@@ -242,15 +237,18 @@ namespace GIC.Editor
                 foreach (var skill in unitData.skills)
                 {
                     if (skill?.data == null || skill.data.skillID.ToString() != fileName) continue;
+                    // 被改对象=SkillConfig 资产（技能独立化后 timeline 字段在资产内）——标脏/撤销必须落在
+                    // 被改资产上：SetDirty UnitConfig 不写盘，SaveAssets 只保存已标脏资产（2026-09-25 审查 S1）
+                    Undo.RecordObject(skill, "时轮编辑器：接线到 UnitConfig");
                     skill.data.timeline = _asset;
+                    EditorUtility.SetDirty(skill);
                     wired++;
                 }
             }
             if (wired > 0)
             {
-                EditorUtility.SetDirty(config);
                 AssetDatabase.SaveAssets();
-                GICLog.Info($"[时轮编辑器] {_asset.name} 已接线 UnitConfig（{wired} 处 skillID 匹配）");
+                GICLog.Info($"[时轮编辑器] {_asset.name} 已接线 UnitConfig（{wired} 处 skillID 匹配，已写盘）");
                 _statusLabel.text = StatusText();
             }
             else
@@ -465,7 +463,6 @@ namespace GIC.Editor
                     clip.endTime = Mathf.Max(clip.startTime + Snap, SnapTo(drag.startValue + delta));
                 }
                 ApplyClipGeometry(block, clip);
-                RefreshClipPanelFields(clip);
                 MarkDirtyLight();
             });
 
@@ -675,12 +672,6 @@ namespace GIC.Editor
             return field;
         }
 
-        /// <summary>拖拽中的轻量字段刷新（不重建面板——重建会打断拖拽）</summary>
-        private void RefreshClipPanelFields(SkillTimelineClip clip)
-        {
-            // 拖拽只改时刻：重建面板会销毁正在交互的块，改为刷新标尺文本即可（字段值在松手后的重建中同步）
-        }
-
         private void AfterTimeEdit(SkillTimelineClip clip)
         {
             MarkDirtyLight();
@@ -712,6 +703,11 @@ namespace GIC.Editor
             }
             if (_asset.clips.Count > 0 && !_asset.clips.Any(c => c.trackType == SkillTrackType.Judgment))
                 issues.Add("无判定轨 clip——该技能将无任何判定产出（纯演出技能才允许）");
+            // 同 kind 判定 clip 多于一处（2026-09-25 审查 S2）：技能消费模型=单 clip 承载整轮连发
+            //（hitInterval×DamageCount），多 clip 会被技能侧逐 clip × 发数全量放大（语义未定义）
+            foreach (var group in _asset.clips.Where(c => c.trackType == SkillTrackType.Judgment)
+                .GroupBy(c => c.kind).Where(g => g.Count() > 1))
+                issues.Add($"判定轨「{(SkillJudgmentKind)group.Key}」有 {group.Count()} 个 clip——技能侧会逐 clip × 发数放大发射量（消费模型=单 clip 承载连发），多 clip 语义未定义");
             if (_asset.totalTime <= 0f)
                 issues.Add("总时长为 0（移动类动态时长约定除外，docs/active/28 §10）");
             _validationLabel.text = issues.Count > 0 ? "⚠ " + string.Join("；", issues) : "✓ 校验通过";
