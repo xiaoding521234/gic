@@ -1477,3 +1477,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**（本地化写入标准姿势）：①FindAssets("t:SharedTableData") 按资产名（"UIText Shared Data.asset"/"PopupText Shared Data.asset"）加载共享数据；②FindAssets("t:StringTable") 按表名前缀（UIText_/PopupText_）加载各语言表；③加键=shared.GetEntry(key) 查重→shared.AddKey(key, id)（指定 id 重载）；④写值=table.GetEntry(id)==null ? table.AddEntry(id, value) : entry.Value = value；⑤SetDirty(shared+各表)+SaveAssets+回读核验。
 
 **How to apply**：见 gic-localization skill 陷阱节（同日补录）；各表 id 体系独立——UIText 用手编 12000 分段，PopupText 走 Unity 自动全局大 id（取表内最大+1 续排，勿照搬 12000 段）。
+
+## 84. TMP 大字描边：UGUI Outline 固定像素式在缩放视口下不可见——大字一律用 SDF 着色器原生描边（2026-09-26 报障返修）
+
+**症状**：倒计时数字（61.2pt）加 UGUI Outline（effectDistance 3,-3）用户目检"未看出有描边"。
+
+**根因**：UGUI Outline=复制网格 4 副本对角偏移染色——粗细是**固定画布像素**且只有 4 个对角方向（大字笔画间有断缝）；画布 2560 宽在用户视口按 scaleFactor 缩放（如 1280 窗口=0.5），3px 描边只剩 ~1.5 屏幕像素——视觉归零。小字号（伤害数字 ~40pt 配 2.2px）同样受缩放压缩，只是未被告障。
+
+**修法**：TMP 文字描边用 SDF 着色器原生 `_OutlineWidth`/`_OutlineColor`（宽度相对字形、随缩放恒定、连续无断缝）——**运行时独立材质实例**（`new Material(fontSharedMaterial)` + SetColor/SetFloat + 赋 `tmp.fontMaterial`），勿直接改共享字体材质（全项目文字共用会全员描边）；实例调用方 OnDestroy 释放（TMP 不自销，§63 生命周期纪律）。zh-cn SDF=TextMeshPro/Distance Field 全属性在；图集 4096 已到上限不会重建（材质实例 _MainTex 引用不失效）；若字体材质无 _OutlineWidth 属性（变体 shader）应 Warn 降级。
+
+**How to apply**：新 UI 需要文字描边（尤其大字/要跨分辨率恒定可见）直接 SDF 原生描边；UGUI Outline 只适合"同屏固定像素量的轻投影/小字"场景。倒计时实现=BattleHud.TopBar.cs（_countdownOutlineMat），宽度=BattleHud Inspector「倒计时描边宽度」0.15 可调（迭代链 0.3→0.22→0.15，2026-09-26 用户两拍「调细」）；**伤害数字已同法迁移（2026-09-26 拍板「让伤害数字也用」）**=BattleDamageNumbers（池条目独立材质实例 Entry.OutlineMat+OnDestroy 统一释放，宽度=Inspector「描边宽度」0.15 同口径可调）——全项目 UGUI Outline 文字描边已清零，勿再加回。**§74 冻结陷阱复发注记（同日）**：BattleHud 组件挂 prefab——「倒计时描边宽度」0.22/0.15 两改脚本默认值均未生效（prefab 烘焙/缓存值恒 0.3，用户目检"两次调细没变化"即此），修复=LoadPrefabContents+反射 SetValue+SaveAsPrefabAsset 烘 0.15 进 prefab；**改"挂 prefab 组件"的 [SerializeField] 默认值后必须同步烘 prefab**（运行时 AddComponent 的组件如 BattleDamageNumbers 才吃脚本默认值）。另证（探针）：祈愿界面卡池文字描边本就是 SDF 原生——zh-cn SDF 共享材质本体 _OutlineWidth=0.15 黑（角色名 128.7pt）、zh-cn SDF 1 预设 0.08 白（称号 150pt），与倒计时/伤害数字同族无需迁移。

@@ -25,6 +25,9 @@ namespace GIC.Battle
     /// 点空白取消选中；技能瞄准 = 可选格推荐分色高亮（推荐/不推荐=BattlePalette 瞄准推荐色/瞄准
     /// 不推荐色，色相勿写死在此处——2026-09-23 拍板分色、09-24 白改金；推荐=该方向能命中敌人/
     /// 该格实际能走到；不可选=无提示）+ 右上取消按钮 + 选中单位脚下金色标记。
+    /// 瞄准提交制（2026-09-26 拍板）：点可选格=金色待定（BattlePalette.瞄准已选色，可点其它格变更、
+    /// 点空白取消技能回选中态），确认=顶部「完成选择」按钮——待定格提交行动/无待定空过完成选择
+    /// （多人提前开演=各真人交齐一份，AI 由脑自动上交）；倒计时归零=自动按下该按钮（统一复用链路）。
     /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）+ LayoutEditing（编辑态门控）。
     /// 输入 = BattleCameraController.OnBoardTap（Drag 短点击复合发射，docs/24 §7.10 tap+pan 同体）。
     /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产。
@@ -44,6 +47,26 @@ namespace GIC.Battle
         [SerializeField] private float 队列槽边长 = 64f;
         [SerializeField] private float 队列槽间距 = 14f;
         [SerializeField] private int 队列槽位数 = 6;
+
+        [Header("手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移）")]
+        [Tooltip("默认下沉藏量=半张卡（卡高 240 之半，按手牌槽缩放自动换算画布量）")]
+        [SerializeField] private float 手牌下沉半卡 = 120f;
+        [Tooltip("接近热区：手牌矩形左右外扩余量（画布单位）")]
+        [SerializeField] private float 手牌热区侧探 = 60f;
+        [Tooltip("接近热区：手牌矩形向上外扩余量（画布单位）——接近主方向探测带")]
+        [SerializeField] private float 手牌热区上探 = 100f;
+        [Tooltip("升/降指数趋近系数（1/s，12≈0.25s 到位）")]
+        [SerializeField] private float 手牌升降速度 = 12f;
+
+        [Header("倒计时（2026-09-26 拍板：3 倍字号+黑描边；小于告急秒数=红色+字号持续脉动）")]
+        [Tooltip("告急阈值（秒）——剩余时间低于此值进入红色脉动")]
+        [SerializeField] private float 倒计时告急秒数 = 5f;
+        [Tooltip("告急字号呼吸幅度（基准字号的比例，0.12=±12%）")]
+        [SerializeField] private float 倒计时脉动幅度 = 0.12f;
+        [Tooltip("告急字号呼吸频率（次/秒）")]
+        [SerializeField] private float 倒计时脉动频率 = 1.5f;
+        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放恒定；迭代链 0.3→0.22→0.15（2026-09-26 两拍「调细」）；首版 UGUI Outline 固定像素描边在缩放视口下不可见已弃用）")]
+        [SerializeField] private float 倒计时描边宽度 = 0.15f;
 
         // 瞄准常量（运行时计算用）
         private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
@@ -88,6 +111,9 @@ namespace GIC.Battle
         private RectTransform _handZone;
         private RectTransform _cancelButton;
         private TextCombiner _handTextCombiner;
+        // 完成选择按钮（2026-09-26：顶部阶段级按钮，样式=祈愿 Marketplace 同款 prefab 烘焙；
+        // 瞄准待定确认/无待定 Pass 双语义，显隐随选择阶段——Update 轮询同 countdown）
+        private Button _confirmButton;
 
         // 技能盘按钮（表驱动四键；现成 Skill.prefab/SkillIconView 视觉填充走 InitWithData 现有链。
         // 移动=特殊技能同款建法+同款交互（2026-09-18 拍板"技能按钮统一，移动是特殊的技能"）：
@@ -114,7 +140,10 @@ namespace GIC.Battle
         // 世界层运行时材质（单实例缓存，OnDestroy 释放——Destroy 物体不销材质，逐次 new 会累积泄漏）
         private Material _aimRecommendedMaterial;    // 可选且推荐（色=BattlePalette.瞄准推荐色）
         private Material _aimNotRecommendedMaterial; // 可选但不推荐（色=BattlePalette.瞄准不推荐色）
+        private Material _aimPendingMaterial;       // 待定金格（色=BattlePalette.瞄准已选色，2026-09-26）
         private Material _selectMarkerMaterial;
+        // 高亮 quad 按格索引（待定金格材质换装用——sharedMaterial 换装不产副本，还原回共享单实例）
+        private readonly Dictionary<BattleCell, MeshRenderer> _aimQuadByCell = new Dictionary<BattleCell, MeshRenderer>();
 
         // 状态机（AimMode 枚举已并表——瞄准语义由 _aimDef.type 承载，2026-09-18 A 案）
         private enum HudState { Idle, UnitSelected, Aiming }
@@ -144,6 +173,13 @@ namespace GIC.Battle
         private Card _moraHandCard;
         private Card _staminaHandCard;
 
+        // 手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移）：
+        // 只动 HandCards.anchoredPosition（槽内件）——hand 槽锚点/布局方案数据零接触
+        private RectTransform _handCardsRect;
+        /// <summary>当前下沉量（画布单位；-1=未初始化，首帧直接落沉态不播动画）</summary>
+        private float _handSinkCanvas = -1f;
+        private readonly Vector3[] _handCornersBuffer = new Vector3[4];
+
         private string _selectedUnitId;
         private SkillButtonDef _popupDef;  // 详情面板当前展示的键
         private SkillButtonDef _aimDef;    // 瞄准中的键
@@ -153,6 +189,17 @@ namespace GIC.Battle
         /// 推荐与否见 BattlePalette 瞄准推荐色/瞄准不推荐色，不可选=无提示。推荐口径=直线技能该方向
         /// 能命中敌人 / 移动该格实际能走到 / 单位指向全推荐 / 部署=碰撞判定链镜像（2026-09-25 拍板）</summary>
         private readonly HashSet<BattleCell> _aimRecommendedCells = new HashSet<BattleCell>();
+
+        /// <summary>瞄准待定格（2026-09-26 拍板：点可选格不再立即提交——格子变金待定、
+        /// 可点其它可选格变更、点空白=取消技能回选中态；确认提交=顶部「完成选择」按钮）。
+        /// null=无待定</summary>
+        private BattleCell? _pendingAimCell;
+
+        /// <summary>本回合完成选择已定死（2026-09-26 拍板「确认行动后就应当定死了」）：
+        /// 点过完成选择（或超时自动按下）并成功上交后为 true——按钮置灰、再按/超时自动按下
+        /// 均为无操作（完全统一：按已定死的按钮=无事发生）；新回合选择阶段复位。
+        /// 旧「后交覆盖先交、可再瞄准再确认改行动」语义随之废除，Host 侧同拒绝双保险</summary>
+        private bool _actionConfirmed;
 
         /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——关闭只走 BattleHud 显式路径，
         /// 自带点外关闭已在 BuildSkillPopup 关闭，docs/14 §64b）</summary>
@@ -182,6 +229,7 @@ namespace GIC.Battle
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
+            _session.Flow.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
 
@@ -199,7 +247,11 @@ namespace GIC.Battle
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
                 }
-                if (_session.Flow != null) _session.Flow.OnPhaseChanged -= OnPhaseChanged;
+                if (_session.Flow != null)
+                {
+                    _session.Flow.OnPhaseChanged -= OnPhaseChanged;
+                    _session.Flow.OnSelectTimerExpired -= OnSelectTimerExpiredHandler;
+                }
             }
             if (_camera != null)
                 _camera.OnBoardTap -= OnBoardTap;
@@ -207,7 +259,13 @@ namespace GIC.Battle
             // 世界层运行时材质释放（Destroy 物体不销材质，不释放则跨战斗累积）
             if (_aimRecommendedMaterial != null) Destroy(_aimRecommendedMaterial);
             if (_aimNotRecommendedMaterial != null) Destroy(_aimNotRecommendedMaterial);
+            if (_aimPendingMaterial != null) Destroy(_aimPendingMaterial);
             if (_selectMarkerMaterial != null) Destroy(_selectMarkerMaterial);
+            if (_countdownOutlineMat != null) // SDF 描边实例（TopBar 分件，TMP 不自销）
+            {
+                Destroy(_countdownOutlineMat);
+                _countdownOutlineMat = null;
+            }
         }
 
         // ==================== 数据回调 ====================
@@ -240,9 +298,11 @@ namespace GIC.Battle
                 DeselectUnit();
                 if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
             }
-            else if (!_layoutEditing)
+            else
             {
-                SetTip("Battle_TipSelect");
+                _actionConfirmed = false; // 新回合选择阶段开：完成选择定死复位（编辑期也要复位——编辑不挡阶段推进）
+                if (!_layoutEditing)
+                    SetTip("Battle_TipSelect");
             }
             RefreshFromSnapshot(_session.Player.LatestSnapshot);
         }
@@ -262,17 +322,43 @@ namespace GIC.Battle
 
         private void Update()
         {
+            UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
+
             // 选择倒计时（docs/04 §4.2；每秒级刷新，静态数字条目）
             if (_session == null || _session.Flow == null || _countdownText == null) return;
             var flow = _session.Flow;
             bool selecting = flow.Phase == BattlePhase.Selecting;
             bool show = selecting && flow.SelectRemainingSeconds >= 0f;
             SetLayoutWidgetActive("countdown", show); // 编辑态强制可见由统一口处理（数字冻结展示）
+            SetLayoutWidgetActive("confirm", show);  // 完成选择按钮=选择阶段常显（2026-09-26）
+            if (_confirmButton != null)
+                _confirmButton.interactable = !_actionConfirmed; // 已定死置灰——再按=无操作（超时自动按下同款）
+            UpdateCountdownUrgency(show && flow.SelectRemainingSeconds < 倒计时告急秒数); // 告急红+脉动（早退前调保还原）
             if (!show && !_layoutEditing) return;
 
             string seconds = Mathf.CeilToInt(Mathf.Max(0f, flow.SelectRemainingSeconds)).ToString();
             if (_countdownCombiner.GetCombinedText() != seconds)
                 _countdownCombiner.SetSingleEntry(seconds);
+        }
+
+        /// <summary>倒计时告急态（2026-09-26 拍板「当时间小于5秒时，数字大小持续循环变化，颜色变为红色」）：
+        /// 剩余<告急秒数=伤害红+基准字号呼吸脉动（持续循环，Cos 0→1→0 无跳变）；离告急/离选择阶段
+        /// 还原暖金与基准字号一次（等值守卫免每帧重写）。描边/字号基准接线在 TopBar 分件 ResolveTopBar</summary>
+        private void UpdateCountdownUrgency(bool urgent)
+        {
+            if (_countdownText == null) return;
+            if (urgent)
+            {
+                _countdownText.color = Palette.伤害红;
+                float pulse = 1f + 倒计时脉动幅度 * (0.5f - 0.5f * Mathf.Cos(2f * Mathf.PI * 倒计时脉动频率 * Time.time));
+                _countdownText.fontSize = _countdownBaseFontSize * pulse;
+            }
+            else if (!Mathf.Approximately(_countdownText.fontSize, _countdownBaseFontSize)
+                     || _countdownText.color != Palette.暖金)
+            {
+                _countdownText.fontSize = _countdownBaseFontSize;
+                _countdownText.color = Palette.暖金;
+            }
         }
 
         private void RefreshFromSnapshot(BattleSnapshot snapshot)
@@ -496,6 +582,66 @@ namespace GIC.Battle
             card.Init(saveData, null);
         }
 
+        // ==================== 手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移） ====================
+
+        /// <summary>手牌下沉热区轮询+升降动画（每帧 Update 顶部调用）：
+        /// 指针入热区（HandCards 矩形四向外扩）=全升，出区=沉「半张卡到画布底缘下」；
+        /// 下沉量按升起态底缘动态测量——视口比例变化/布局槽拖动缩放全自适应；
+        /// 升起态底缘用「现底缘+当前下沉量」恒等重建（防随动画回环漂移）；手牌隐藏期间照常趋沉
+        /// （不可见），复显即默认沉态。布局系统安全：只写 HandCards.anchoredPosition，槽锚点不动</summary>
+        private void UpdateHandHover()
+        {
+            if (_handCardsRect == null || _canvas == null) return;
+            var canvasRt = (RectTransform)_canvas.transform;
+
+            // 手牌槽缩放（画布量→HandCards 局部量换算；布局缩放 0.6~1.6，防 0 除）
+            float slotScale = 1f;
+            if (_layoutByKey.TryGetValue("hand", out var handDef) && handDef.slot != null)
+                slotScale = Mathf.Max(0.01f, Mathf.Abs(handDef.slot.localScale.y));
+
+            // 升起态底缘（距画布底缘，画布单位）：现底缘＋已应用的下沉量（首帧 anchoredPosition 尚为 0
+            // 即升起位，恒等式自然成立）；半卡视觉量=120×槽缩放
+            float currentBottom = HandCardsBottomFromCanvasBottom(canvasRt);
+            float risenBottom = currentBottom + Mathf.Max(0f, _handSinkCanvas);
+
+            // 热区检测：指针（鼠标/末次触点）在手牌矩形+余量内=接近
+            bool risen = _handCardsRect.gameObject.activeInHierarchy && IsPointerNearHand(canvasRt);
+            float targetSink = risen ? 0f : risenBottom + 手牌下沉半卡 * slotScale;
+
+            if (_handSinkCanvas < 0f)
+                _handSinkCanvas = targetSink; // 首帧直接落沉态（无升起闪现）
+            else
+                _handSinkCanvas = Mathf.Lerp(_handSinkCanvas, targetSink,
+                    1f - Mathf.Exp(-手牌升降速度 * Time.deltaTime));
+
+            // 应用：局部偏移=画布下沉量/槽缩放（槽缩放下局部单位视觉量随缩放）
+            _handCardsRect.anchoredPosition = new Vector2(0f, -_handSinkCanvas / slotScale);
+        }
+
+        /// <summary>HandCards 底缘距画布底缘的距离（画布单位；Overlay 画布世界角=屏幕像素，
+        /// 经画布逆变换取局部 y 再平移半高）</summary>
+        private float HandCardsBottomFromCanvasBottom(RectTransform canvasRt)
+        {
+            _handCardsRect.GetWorldCorners(_handCornersBuffer);
+            float bottomY = canvasRt.InverseTransformPoint(_handCornersBuffer[0]).y;
+            return bottomY + canvasRt.rect.height * 0.5f;
+        }
+
+        /// <summary>指针接近判定：画布局部指针点 ∈ HandCards 当前矩形外扩（上探+侧探，下方不外扩——
+        /// 屏幕底缘无从自下接近）；触屏取末次触点（Input.mousePosition 同源）</summary>
+        private bool IsPointerNearHand(RectTransform canvasRt)
+        {
+            _handCardsRect.GetWorldCorners(_handCornersBuffer);
+            Vector2 min = canvasRt.InverseTransformPoint(_handCornersBuffer[0]);
+            Vector2 max = canvasRt.InverseTransformPoint(_handCornersBuffer[2]);
+            min.x -= 手牌热区侧探;
+            max.x += 手牌热区侧探;
+            max.y += 手牌热区上探;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRt, Input.mousePosition, null, out var local)) return false;
+            return local.x >= min.x && local.x <= max.x && local.y >= min.y && local.y <= max.y;
+        }
+
         /// <summary>进入部署瞄准（点手牌卡）：可选格=核心半径 2（客户端粗筛，Host IsDeployCellValid 兜底）</summary>
         private void EnterDeployAim(int unitNameValue)
         {
@@ -503,6 +649,7 @@ namespace GIC.Battle
             _deployAimUnit = unitNameValue;
             _state = HudState.Aiming;
             _aimDef = null;
+            _pendingAimCell = null; // 新瞄准会话待定清零（高亮 quad 重建，材质无残留）
             ClosePopup();
 
             _aimCells.Clear();
@@ -557,12 +704,13 @@ namespace GIC.Battle
             // 同格多单位优先选中己方（自己的单位先被点中，敌方需点到无己方的格）
             var myUnit = FindUnitAt(snapshot, cell, UnitSide.Mine);
             var anyUnit = myUnit != null ? myUnit : FindUnitAt(snapshot, cell, UnitSide.Enemy);
-            var enemyUnit = FindUnitAt(snapshot, cell, UnitSide.Enemy);
 
             switch (_state)
             {
                 case HudState.Aiming:
-                    if (inBounds && _aimCells.Contains(cell)) { SubmitAim(cell, enemyUnit); return; }
+                    // 点可选格=金色待定（2026-09-26 拍板：不立即提交，可反复点其它格变更，
+                    // 确认走「完成选择」按钮；目标单位由确认时再取快照）
+                    if (inBounds && _aimCells.Contains(cell)) { SetPendingAimCell(cell); return; }
                     // 瞄准态点非可选格 = 退回选中态（不算"点空白取消选中"）
                     ExitAiming();
                     return;
@@ -627,6 +775,7 @@ namespace GIC.Battle
             if (def == null) return;
             _aimDef = def;
             _state = HudState.Aiming;
+            _pendingAimCell = null; // 新瞄准会话待定清零
             SetAimSelectRing(def, true);
             ClosePopup();
             ComputeAimCells();
@@ -650,6 +799,8 @@ namespace GIC.Battle
         private void ExitAiming()
         {
             if (_state != HudState.Aiming) return;
+            // 待定金格随高亮 quad 一并消失（ClearHighlights 销 quad），字段清零防陈旧提交
+            _pendingAimCell = null;
             // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
             bool wasDeployAim = _deployAimUnit != 0;
             _deployAimUnit = 0;
@@ -846,7 +997,11 @@ namespace GIC.Battle
             return true;
         }
 
-        private void SubmitAim(BattleCell cell, UnitState enemyAtCell)
+        /// <summary>提交瞄准行动（单出口：部署/移动/直线/单位指向）。2026-09-26 起唯一调用方=
+        /// 「完成选择」按钮的待定确认路径（点格只产待定金格不提交）；防线拦截（非己方/低级单位）
+        /// 弹 toast 后保持瞄准态待定不变。
+        /// 返回值（完成选择定死拍板）：true=已成功上交（调用方置定死）；false=防线拦截未上交（勿定死）</summary>
+        private bool SubmitAim(BattleCell cell, UnitState enemyAtCell)
         {
             // 部署瞄准分支（B6c）：点可选格=出战上交（玩家级行动，占本回合行动配额）
             if (_deployAimUnit != 0)
@@ -861,12 +1016,12 @@ namespace GIC.Battle
                 _session.SubmitAction(deployAction);
                 GICLog.Info($"[BattleHud] {_myPlayerId} 上交：出战 {(UnitName)_deployAimUnit} @ {cell}");
                 ExitAiming();
-                return;
+                return true;
             }
 
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-            if (sel == null) return;
+            if (sel == null) return false;
             bool isMove = _aimDef.IsMove;
 
             // 提交时行动防线（2026-09-26 拍板改版：选中/瞄准开放任意单位供查看技能盘与攻击范围，
@@ -878,14 +1033,14 @@ namespace GIC.Battle
             {
                 GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 不是玩家 {_myPlayerId} 的角色");
                 ShowBattleToast("Battle_NotYourUnit");
-                return;
+                return false;
             }
             var selData = TryGetUnitData(sel.unitName);
             if (selData == null || selData.starLevel < 3)
             {
                 GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为低级单位（自主行动）");
                 ShowBattleToast("Battle_MinorUnit");
-                return;
+                return false;
             }
 
             var action = new ActionData
@@ -934,6 +1089,7 @@ namespace GIC.Battle
             ExitAiming();
             DeselectUnit();
             SetTip("Battle_TipSubmitted");
+            return true;
         }
 
         /// <summary>格差归一到十字方向（|dx|≥|dy| 取横轴，否则取纵轴；0,0 防御回 Right）</summary>
@@ -1010,6 +1166,55 @@ namespace GIC.Battle
             if (_state == HudState.Aiming) ExitAiming();
         }
 
+        /// <summary>顶部「完成选择」按钮（2026-09-26 拍板；同日追加拍板「确认行动后就应当定死了」）：
+        /// ① 瞄准态有待定金格=确认提交该行动（SubmitAim 内非己方/低级防线拦截时弹 toast 保持瞄准态、
+        /// 不算完成选择）；② 其余情况（未选单位/已选未瞄准/瞄准未定格）无论是否已选=以 Pass 完成
+        /// 本回合选择。**成功上交即定死**——按钮置灰、再按/超时自动按下均无操作（按已定死的按钮=
+        /// 无事发生，超时与手动零差异）；Host 侧同拒绝重复上交双保险。
+        /// 多人提前开演口径：真人玩家的「完成选择」=各交一份行动（含 Pass），全员交齐即提前开演
+        /// （AI 由脑自动上交，与既有 TryBeginResolve 收齐判定天然契合，无需新协议）</summary>
+        private void OnConfirmButtonClicked()
+        {
+            if (_layoutEditing) return;
+            if (_session == null || _session.Flow == null) return;
+            if (_session.Flow.Phase != BattlePhase.Selecting) return;
+            if (_actionConfirmed) return; // 已定死（按钮置灰，本条=超时自动按下的同款守卫）
+
+            // 瞄准待定确认：提交待定格上的行动（部署/移动/直线/单位指向全在 SubmitAim 单出口）
+            if (_state == HudState.Aiming && _pendingAimCell.HasValue)
+            {
+                var snapshot = _session.Player.LatestSnapshot;
+                if (snapshot == null) return;
+                var cell = _pendingAimCell.Value;
+                var enemyAtCell = FindUnitAt(snapshot, cell, UnitSide.Enemy);
+                if (SubmitAim(cell, enemyAtCell)) _actionConfirmed = true; // 防线拦截（false）不定死
+                return;
+            }
+
+            // 无待定瞄准：完成选择=空过上交——本回合就此定死（再瞄准再确认不再受理）
+            _session.SubmitAction(new ActionData
+            {
+                playerId = _myPlayerId,
+                actionType = ActionType.Pass,
+            });
+            _actionConfirmed = true;
+            GICLog.Info($"[BattleHud] {_myPlayerId} 完成选择：空过（已定死）");
+            ExitAiming();
+            DeselectUnit();
+            SetTip("Battle_TipSubmitted");
+        }
+
+        /// <summary>倒计时归零=自动按下完成选择（2026-09-26 拍板「统一复用链路」**完全统一版**）：
+        /// 无条件复用 OnConfirmButtonClicked，超时与手动按下按钮**零差异**——待定金格确认提交/
+        /// 无待定上交空过；**已定死（本回合点过完成选择）则按钮同款无操作**——已确认的行动 A
+        /// 天然保留，无需任何特例。事件在 Host 超时 Pass 兜底填充**之前**同步触发——HUD 先交，
+        /// Host 兜底只填仍未交的玩家；B7 LAN 分端时 Host 兜底语义不变，客户端迟到上交按超时丢弃。</summary>
+        private void OnSelectTimerExpiredHandler(int turn)
+        {
+            GICLog.Info($"[BattleHud] 倒计时归零：{_myPlayerId} 自动按下完成选择");
+            OnConfirmButtonClicked();
+        }
+
         // ==================== 可选格高亮 + 选中标记（世界层） ====================
 
         private void ShowAimHighlights()
@@ -1032,6 +1237,7 @@ namespace GIC.Battle
                 quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
                 quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
                 _highlightQuads.Add(quad);
+                _aimQuadByCell[cell] = quad.GetComponent<MeshRenderer>(); // 待定金格材质换装索引
             }
         }
 
@@ -1055,11 +1261,48 @@ namespace GIC.Battle
             return _aimNotRecommendedMaterial;
         }
 
+        // ==================== 瞄准待定金格（2026-09-26 拍板：点格待定+完成选择确认） ====================
+
+        /// <summary>点可选格=金色待定（不立即提交）：旧待定格还原推荐/不推荐色、新格换金色；
+        /// 重复点同格=保持不变。换装走 sharedMaterial（换 renderer.material 会产副本泄漏，docs/14 §63）</summary>
+        private void SetPendingAimCell(BattleCell cell)
+        {
+            if (_pendingAimCell.HasValue && _pendingAimCell.Value.Equals(cell)) return;
+            RestorePendingCellMaterial();
+            _pendingAimCell = cell;
+            if (_aimQuadByCell.TryGetValue(cell, out var renderer) && renderer != null)
+                renderer.sharedMaterial = GetAimPendingMaterial();
+        }
+
+        /// <summary>待定格还原回推荐/不推荐共享材质（变更待定格/退出瞄准前调用）</summary>
+        private void RestorePendingCellMaterial()
+        {
+            if (!_pendingAimCell.HasValue) return;
+            if (_aimQuadByCell.TryGetValue(_pendingAimCell.Value, out var renderer) && renderer != null)
+            {
+                var material = _aimRecommendedCells.Contains(_pendingAimCell.Value)
+                    ? GetAimRecommendedMaterial()
+                    : GetAimNotRecommendedMaterial();
+                renderer.sharedMaterial = material;
+            }
+        }
+
+        /// <summary>待定金格材质（色=BattlePalette.瞄准已选色——原神风格金；懒建单实例，
+        /// 每次刷新活色，OnDestroy 释放，与推荐/不推荐两材质同生命周期）</summary>
+        private Material GetAimPendingMaterial()
+        {
+            if (_aimPendingMaterial == null)
+                _aimPendingMaterial = BattleViewFactory.CreateAimCellMaterial(Palette.瞄准已选色);
+            _aimPendingMaterial.color = Palette.瞄准已选色;
+            return _aimPendingMaterial;
+        }
+
         private void ClearHighlights()
         {
             foreach (var quad in _highlightQuads)
                 if (quad != null) Destroy(quad);
             _highlightQuads.Clear();
+            _aimQuadByCell.Clear();
         }
 
         /// <summary>选中单位脚下金色圆盘标记（选中无棋盘反馈的补全；选中态/瞄准态常显）</summary>

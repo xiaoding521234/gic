@@ -1011,6 +1011,10 @@ MonoBehaviour:
     m_Key: Battle_Defeat
     m_Metadata:
       m_Items: []
+  - m_Id: 12033
+    m_Key: Battle_ConfirmSelect
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

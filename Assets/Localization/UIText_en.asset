@@ -937,12 +937,13 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12010
-    m_Localized: "Pick a target tile (8-way line, up to 3 tiles) \u2014 cancel at
-      top right"
+    m_Localized: "Pick a move target tile \u2014 press Confirm to submit, click empty
+      space to cancel"
     m_Metadata:
       m_Items: []
   - m_Id: 12011
-    m_Localized: "Pick the target unit's tile \u2014 cancel at top right"
+    m_Localized: "Pick the target's tile \u2014 press Confirm to submit, click empty
+      space to cancel"
     m_Metadata:
       m_Items: []
   - m_Id: 12012
@@ -954,7 +955,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12014
-    m_Localized: "Pick a direction tile (4-way) \u2014 cancel at top right"
+    m_Localized: "Pick a direction tile (4-way) \u2014 press Confirm to submit, click
+      empty space to cancel"
     m_Metadata:
       m_Items: []
   - m_Id: 12015
@@ -1027,6 +1029,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 12032
     m_Localized: Defeat
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12033
+    m_Localized: Confirm
     m_Metadata:
       m_Items: []
   references:
