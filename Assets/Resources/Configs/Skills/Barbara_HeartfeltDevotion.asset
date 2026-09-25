@@ -24,3 +24,15 @@ MonoBehaviour:
       value: 20
       baseType: 0
     timeline: {fileID: 0}
+    effects:
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      paramKey: 3
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7

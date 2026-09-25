@@ -19,6 +19,9 @@ namespace GIC.Data
 
         [InspectorName("攻击提升")]
         AttackUp = 3,
+
+        [InspectorName("移速提升")]
+        MoveSpeedUp = 4,
     }
 
     /// <summary>
