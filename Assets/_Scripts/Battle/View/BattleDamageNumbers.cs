@@ -68,8 +68,8 @@ namespace GIC.Battle
         [SerializeField] private float 尺寸上限 = 1.65f;
 
         [Header("描边（2026-09-26 返修：UGUI Outline 固定像素式缩放视口下不可见——改 SDF 原生，docs/14 §84）")]
-        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放/数字缩放恒定可见；与倒计时同口径，迭代链 0.22→0.15）")]
-        [SerializeField] private float 描边宽度 = 0.15f;
+        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放/数字缩放恒定可见；与倒计时同口径，迭代链 0.22→0.15→0.08（2026-09-26 拍板「从 0.15 改为 0.08」））")]
+        [SerializeField] private float 描边宽度 = 0.08f;
 
         private Camera _camera;
         private Canvas _canvas;

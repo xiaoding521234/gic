@@ -38,7 +38,7 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 1
+    blockAllies: 0
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 8
@@ -241,7 +241,7 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 1
+    blockAllies: 0
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 2
@@ -287,7 +287,7 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: 30
     normalMoveType: 2
-    blockAllies: 1
+    blockAllies: 0
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 1
@@ -738,7 +738,7 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 1
+    blockAllies: 0
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 3
@@ -1689,7 +1689,7 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 1
+    blockAllies: 0
     blockEnemies: 1
     blockedByEnemies: 1
     selfElement: 1
