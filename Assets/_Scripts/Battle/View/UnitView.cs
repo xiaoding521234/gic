@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Video;
 using TMPro;
 using GIC.Data;
 using GIC.Tool;
@@ -68,6 +69,63 @@ namespace GIC.Battle
 
         private const float AvatarHeight = 0.55f;
 
+        // ==================== 序列帧 idle（B-S3 立牌动作段·AI 直出循环帧试点） ====================
+        // 帧数组=UnitConfig 立牌动画帧（sheet 网格切片，各帧 rect 同格恒定 → 换帧 bounds 不跳、
+        // 角色在格内的位置差即动画起伏）；随机相位=多单位不同步扇翼；冻结/尸体停摆（保留当前帧）
+        private Sprite[] _idleFrames;
+        private float _idleFps = 12f;
+        private int _idleIndex;
+        private float _idleTimer;
+
+        // ==================== 立牌循环动画视频（B-S3 视频路线：绿幕 mp4 → VideoPlayer→RT → 运行时 ChromaKey 抠色） ====================
+        // 显存恒定（流式解码+RT，与帧数无关）；优先级高于序列帧；随机相位与序列帧同语义；
+        // 冻结/尸体 Pause 停摆（保留当前帧）；解码失败（errorReceived）回落静态立牌 sprite
+        private VideoPlayer _videoPlayer;
+        private RenderTexture _videoRt;
+        private Material _videoMaterial; // ChromaKey 材质（本组件持有，OnDestroy 释放——docs/14 §63①）
+        private bool _videoFailed;
+        private bool _videoHalted;
+
+        private void Update()
+        {
+            if (_videoPlayer != null)
+            {
+                if (IsCorpse || IsFrozen)
+                {
+                    if (_videoPlayer.isPlaying) { _videoPlayer.Pause(); _videoHalted = true; }
+                }
+                else if (_videoHalted && !_videoFailed)
+                {
+                    _videoPlayer.Play(); // 解冻自动恢复（尸体永不复苏=永不恢复）
+                    _videoHalted = false;
+                }
+                return;
+            }
+            if (_idleFrames == null || _idleFrames.Length < 2 || _avatarRenderer == null) return;
+            if (IsCorpse || IsFrozen) return; // 尸体灰显/冻结冰色时停摆（保留当前帧）
+            _idleTimer += Time.deltaTime;
+            float interval = 1f / _idleFps;
+            while (_idleTimer >= interval)
+            {
+                _idleTimer -= interval;
+                _idleIndex = (_idleIndex + 1) % _idleFrames.Length;
+                if (_idleIndex == 0) _idleTimer = 0f; // 回绕丢弃余量，防长跑计时漂移
+                _avatarRenderer.sprite = _idleFrames[_idleIndex];
+            }
+        }
+
+        /// <summary>立牌动画视频播放失败兜底（平台解码失败/文件缺失等）：停播 + 禁用 ChromaKey quad、
+        /// 恢复静态立牌 sprite（尺寸/贴地基准与视频路径同源，无感切换）</summary>
+        private void OnVideoError(VideoPlayer source, string message)
+        {
+            if (_videoFailed) return;
+            _videoFailed = true;
+            Debug.LogWarning($"[UnitView] 立牌动画视频播放失败，回落静态立牌：{message}");
+            source.Stop();
+            source.gameObject.SetActive(false);
+            if (_avatarRenderer != null) _avatarRenderer.enabled = true;
+        }
+
         // 名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
         // 全身放大时行 Y 随立牌顶同步抬高、行自身尺寸不变；HpBarY 仅存为头顶条锚点高度——条状视觉已上移屏幕空间层）
         private const float HpBarY = 0.66f;
@@ -90,6 +148,8 @@ namespace GIC.Battle
         private void OnDestroy()
         {
             if (_baseDiscMaterial != null) Destroy(_baseDiscMaterial);
+            if (_videoMaterial != null) Destroy(_videoMaterial); // ChromaKey 材质（调用方持有纪律，docs/14 §63①）
+            if (_videoRt != null) { _videoRt.Release(); Destroy(_videoRt); } // RT 随单位释放（视频路线显存恒定的收口）
         }
 
         /// <summary>
@@ -104,9 +164,14 @@ namespace GIC.Battle
         /// <param name="avatarScale">立牌整体放大倍数（1=头像版原尺寸）：全身立绘人物在图中占比小，放大对齐
         /// 头像版人物观感——底边原点贴地不漂移；血条/名字/Buff 行尺寸不变、随立牌顶同步抬高；
         /// B5 判定圆柱与底座不受视觉放大影响</param>
+        /// <param name="idleFrames">立牌循环动画帧（B-S3 立牌动作段：AI 直出 sheet 网格切片，按序循环；
+        /// null/空=静态立牌兜底。各帧 rect 同格恒定 → 缩放/贴地基准取帧 0，换帧不跳 bounds）</param>
+        /// <param name="idleFps">动画播放帧率（fps）</param>
+        /// <param name="idleVideo">立牌循环动画视频（B-S3 视频路线：绿幕 mp4+运行时 ChromaKey 抠色；
+        /// 优先级高于 idleFrames——配了视频的单位不再消费序列帧；ChromaKey shader 缺失时回落静态立牌）</param>
         public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0,
-            float avatarScale = 1f)
+            float avatarScale = 1f, Sprite[] idleFrames = null, float idleFps = 12f, VideoClip idleVideo = null)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -130,18 +195,65 @@ namespace GIC.Battle
             var spriteGo = new GameObject("Avatar");
             spriteGo.transform.SetParent(avatarGo.transform, false);
             view._avatarRenderer = spriteGo.AddComponent<SpriteRenderer>();
-            view._avatarRenderer.sprite = avatar;
+            // 有帧数组时以帧 0 为基准 sprite（同格恒定 bounds）：缩放/贴地/头顶行都按它算，
+            // 角色在格内的位置差即飞行动画的自然起伏（格底贴地 → 飞行单位悬停属正确语义）
+            bool hasIdle = idleFrames != null && idleFrames.Length > 1;
+            var baseSprite = hasIdle ? idleFrames[0] : avatar;
+            view._avatarRenderer.sprite = baseSprite;
             view._avatarRenderer.sortingOrder = 10;
 
-            if (avatar != null)
+            if (baseSprite != null)
             {
                 float displayHeight = AvatarHeight * avatarScale;
-                float worldHeight = avatar.bounds.size.y;
+                float worldHeight = baseSprite.bounds.size.y;
                 float scale = worldHeight > 0f ? displayHeight / worldHeight : 1f;
                 spriteGo.transform.localScale = Vector3.one * scale;
                 // sprite 中心置于半高处（外层原点=底边 → 底边贴地、立牌居中于半高）
                 spriteGo.transform.localPosition = new Vector3(0f, displayHeight * 0.5f, 0f);
                 view._avatarDisplayHeight = displayHeight;
+            }
+
+            if (hasIdle)
+            {
+                view._idleFrames = idleFrames;
+                view._idleFps = Mathf.Max(1f, idleFps);
+                // 随机相位：多枚同款单位不同步扇翼（两枚安柏测试军互错开即目检点）
+                view._idleIndex = UnityEngine.Random.Range(0, idleFrames.Length);
+                view._avatarRenderer.sprite = idleFrames[view._idleIndex];
+            }
+
+            // 立牌循环动画视频（B-S3 视频路线）：绿幕 mp4 → VideoPlayer→RT → ChromaKey quad 运行时抠色。
+            // 静态 sprite（上方已按同尺寸建好）保留作兜底但禁用——解码失败时 OnVideoError 恢复；
+            // shader 缺失（构建剥离防线）时整块跳过=自然回落静态立牌
+            if (idleVideo != null && BattleViewFactory.ChromaKeyShader != null)
+            {
+                view._avatarRenderer.enabled = false;
+                float videoDisplayHeight = AvatarHeight * avatarScale;
+                float videoAspect = idleVideo.height > 0 ? idleVideo.width / (float)idleVideo.height : 1f;
+                view._videoRt = new RenderTexture((int)idleVideo.width, (int)idleVideo.height, 0,
+                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                view._videoMaterial = BattleViewFactory.CreateChromaKeyMaterial();
+                view._videoMaterial.mainTexture = view._videoRt;
+
+                var videoGo = BattleViewFactory.CreateQuad(view._tiltGroup, "AvatarVideo", view._videoMaterial);
+                // 与 sprite 路径同基准：全画布高=displayHeight、中心悬于半高处（底边贴地）
+                videoGo.transform.localPosition = new Vector3(0f, videoDisplayHeight * 0.5f, 0f);
+                videoGo.transform.localScale = new Vector3(videoDisplayHeight * videoAspect, videoDisplayHeight, 1f);
+                videoGo.GetComponent<MeshRenderer>().sortingOrder = 10; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
+
+                var vp = videoGo.AddComponent<VideoPlayer>();
+                vp.playOnAwake = false;
+                vp.clip = idleVideo;
+                vp.renderMode = VideoRenderMode.RenderTexture;
+                vp.targetTexture = view._videoRt;
+                vp.isLooping = true;
+                vp.audioOutputMode = VideoAudioOutputMode.None;
+                // 随机相位：与序列帧路径同语义（多枚同款单位错开扇翼）
+                if (idleVideo.length > 0.0)
+                    vp.time = UnityEngine.Random.Range(0f, (float)idleVideo.length);
+                vp.errorReceived += view.OnVideoError;
+                vp.Play();
+                view._videoPlayer = vp;
             }
 
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=BattleMetrics.UnitCylinderDiameter，
@@ -231,12 +343,10 @@ namespace GIC.Battle
         private void RefreshTint()
         {
             if (_avatarRenderer == null) return;
-            if (IsCorpse)
-                _avatarRenderer.color = Palette.立牌尸体灰;
-            else if (IsFrozen)
-                _avatarRenderer.color = Palette.冻结冰色;
-            else
-                _avatarRenderer.color = Color.white;
+            Color tint = IsCorpse ? Palette.立牌尸体灰 : IsFrozen ? Palette.冻结冰色 : Color.white;
+            _avatarRenderer.color = tint;
+            if (_videoMaterial != null)
+                _videoMaterial.color = tint; // 视频路径同 tint（ChromaKey _Color，同 SpriteRenderer.color 语义）
             if (_nameText != null)
                 _nameText.color = IsCorpse ? Palette.名字尸体灰 : Palette.文字米白;
         }
@@ -248,6 +358,8 @@ namespace GIC.Battle
         {
             if (_avatarRenderer != null && !IsCorpse)
                 _avatarRenderer.color = Palette.受击闪红;
+            if (_videoMaterial != null && !IsCorpse)
+                _videoMaterial.color = Palette.受击闪红; // 视频路径同步闪红
         }
 
         public void RestoreColor()

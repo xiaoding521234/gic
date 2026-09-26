@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization;
+using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
@@ -623,6 +624,9 @@ namespace GIC.Battle
             bool useFullBody = false;
             string displayName = state.unitId;
             TextEntry nameEntry = null;
+            Sprite[] idleFrames = null;
+            float idleFps = 12f;
+            VideoClip idleVideo = null;
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
                 _unitConfig.TryGetUnitData(unitName, out var unitData))
             {
@@ -631,6 +635,13 @@ namespace GIC.Battle
                 avatar = useFullBody ? unitData.立牌图 : unitData.avatar;
                 displayName = unitName.ToString();
                 nameEntry = unitName.GetEntry(); // 单位名本地化条目（UnitName 表）
+                // 立牌循环动画（B-S3 视频路线拍板）：视频（绿幕+运行时 ChromaKey 抠色）优先于序列帧；都缺=静态兜底
+                idleVideo = unitData.立牌动画视频;
+                if (idleVideo == null && unitData.立牌动画帧 != null && unitData.立牌动画帧.Length > 1)
+                {
+                    idleFrames = unitData.立牌动画帧;
+                    idleFps = unitData.立牌动画帧率;
+                }
             }
 
             var team = (TeamType)state.team;
@@ -639,7 +650,7 @@ namespace GIC.Battle
             // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
                 _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
-                useFullBody ? 全身立牌放大倍数 : 1f);
+                useFullBody ? 全身立牌放大倍数 : 1f, idleFrames, idleFps, idleVideo);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);
