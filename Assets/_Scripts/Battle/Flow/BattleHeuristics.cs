@@ -46,32 +46,45 @@ namespace GIC.Battle
         /// </summary>
         public static Unit FindNearestEnemy(BattleSimState sim, Unit self)
         {
+            var enemies = FindEnemiesByDistance(sim, self);
+            return enemies.Count > 0 ? enemies[0] : null;
+        }
+
+        /// <summary>全部存活敌方单位按切比雪夫距离升序（等距平局 unitId 升序=枚举序铁律）——
+        /// 低级单位换目标巡逻用（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标巡逻」：
+        /// 逐敌试逼近步，贴身打不了/不可达的自动换下一个）；纯读不改状态</summary>
+        public static List<Unit> FindEnemiesByDistance(BattleSimState sim, Unit self)
+        {
             var selfId = self.GetUnitComponent<UnitIdentity>();
-            if (selfId == null) return null;
+            var result = new List<Unit>();
+            if (selfId == null) return result;
             var selfPos = sim.GetPosition(self);
 
-            Unit best = null;
-            int bestDistance = int.MaxValue;
-            string bestUnitId = null;
             foreach (var kv in sim.Units)
             {
                 var unit = kv.Value;
                 var id = unit.GetUnitComponent<UnitIdentity>();
-                if (id == null || id.Team == selfId.Team) continue; // 敌我=TeamType 口径（2026-09-25 三轮审查 C2：2v2 不把队友当敌人）
+                if (id == null || id.Team == selfId.Team) continue; // 敌我=TeamType 口径（2026-09-25 三轮审查 C2）
                 if (BattleSimState.IsDead(unit)) continue;
-
-                var pos = sim.GetPosition(unit);
-                int distance = Math.Max(Math.Abs(pos.x - selfPos.x), Math.Abs(pos.y - selfPos.y));
-                var unitId = kv.Key;
-                // 等距平局：unitId 升序（枚举序铁律，确定性）
-                if (distance < bestDistance || (distance == bestDistance && string.CompareOrdinal(unitId, bestUnitId) < 0))
-                {
-                    best = unit;
-                    bestDistance = distance;
-                    bestUnitId = unitId;
-                }
+                result.Add(unit);
             }
-            return best;
+            var posOf = new Dictionary<Unit, BattleCell>();
+            var distOf = new Dictionary<Unit, int>();
+            foreach (var unit in result)
+            {
+                var pos = sim.GetPosition(unit);
+                posOf[unit] = pos;
+                distOf[unit] = Math.Max(Math.Abs(pos.x - selfPos.x), Math.Abs(pos.y - selfPos.y));
+            }
+            result.Sort((a, b) =>
+            {
+                int da = distOf[a], db = distOf[b];
+                if (da != db) return da.CompareTo(db);
+                sim.TryGetUnitId(a, out var ia);
+                sim.TryGetUnitId(b, out var ib);
+                return string.CompareOrdinal(ia, ib); // 等距平局：unitId 升序（枚举序铁律，确定性）
+            });
+            return result;
         }
 
         // ==================== 方向与技能 ====================
@@ -86,6 +99,89 @@ namespace GIC.Battle
             if (Math.Abs(dx) >= Math.Abs(dy))
                 return dx > 0 ? Direction2D.Right : Direction2D.Left;
             return dy > 0 ? Direction2D.Up : Direction2D.Down;
+        }
+
+        /// <summary>朝目标格的最短路首步（十字 BFS 绕行，2026-09-26 报障「低级单位不会绕路，一直卡在
+        /// 湖旁边」+同日二轮报障「走了两步后就再也不走了」）：替代直行方向分量——直行被湖/虚空/单位
+        /// 挡时按 BFS 拐弯绕行；小兵每回合重算走一步=逐回合沿最短路逼近。
+        /// **目标集=敌格十字邻格中「可通行且无阻挡单位占据」的格**——敌格本身剔除（走进必被敌挡弹回）
+        /// +被占/不可行邻格剔除（二轮报障根因：goal 豁免让小兵走进被占格/水格，结算弹回、被挡也算
+        /// 已使用→每回合原地弹回看起来再也不走）。通行=地形按移动者常态类型 IsPassable；阻挡=存活+
+        /// 尸体单位格（移动者开「与友方互不阻挡」时友方格放行，与 MovementResolver 口径一致）。
+        /// 返回 0=已贴身/同格/无路（缺席）。方向域=十字四向，方向纪律不变；枚举序展开=决策确定性。</summary>
+        public static Direction2D FindApproachFirstStep(BattleSimState sim, Unit self, BattleCell target)
+        {
+            var map = sim.Map;
+            if (map == null || map.width <= 0 || map.height <= 0) return 0;
+            var from = sim.GetPosition(self);
+            if (from.x == target.x && from.y == target.y) return 0; // 同格：无逼近意义
+
+            var moveable = self.GetUnitComponent<UnitMoveable>();
+            var forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
+            bool passAllies = moveable != null && moveable.与友方互不阻挡;
+            var selfIdentity = self.GetUnitComponent<UnitIdentity>();
+
+            // 单位占据格（含尸体——尸体保留碰撞）：自身除外；互不阻挡开启时友方格放行
+            var occupied = new bool[map.width, map.height];
+            foreach (var kv in sim.Units)
+            {
+                var pos = sim.GetPosition(kv.Value);
+                if (pos.x == from.x && pos.y == from.y) continue;
+                bool isAlly = false;
+                if (passAllies && selfIdentity != null)
+                {
+                    var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                    isAlly = id != null && id.Team == selfIdentity.Team;
+                }
+                if (!isAlly && pos.x >= 0 && pos.x < map.width && pos.y >= 0 && pos.y < map.height)
+                    occupied[pos.x, pos.y] = true;
+            }
+
+            // 目标集：敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
+            // 被占/不可行邻格一律剔除——否则小兵走进去每回合被弹回=二轮报障根因）
+            var goals = new bool[map.width, map.height];
+            foreach (var dir in CrossDirections)
+            {
+                var delta = SkillHitResolver.DirectionToDelta(dir);
+                int gx = target.x + delta.x, gy = target.y + delta.y;
+                if (!map.HasTile(gx, gy)) continue;
+                if (!map.IsPassable(gx, gy, forceType)) continue;
+                if (occupied[gx, gy]) continue;
+                goals[gx, gy] = true;
+            }
+            if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
+
+            // BFS（十字域）：队列携带首步方向；到任一目标格即回传
+            var visited = new bool[map.width, map.height];
+            var queue = new Queue<(int x, int y, Direction2D first)>();
+            visited[from.x, from.y] = true;
+            foreach (var dir in CrossDirections)
+            {
+                var delta = SkillHitResolver.DirectionToDelta(dir);
+                int nx = from.x + delta.x, ny = from.y + delta.y;
+                if (!map.HasTile(nx, ny) || visited[nx, ny]) continue;
+                if (occupied[nx, ny]) continue;
+                if (!map.IsPassable(nx, ny, forceType)) continue;
+                visited[nx, ny] = true;
+                if (goals[nx, ny]) return dir; // 一步贴身：直接到位
+                queue.Enqueue((nx, ny, dir));
+            }
+            while (queue.Count > 0)
+            {
+                var cur = queue.Dequeue();
+                foreach (var dir in CrossDirections)
+                {
+                    var delta = SkillHitResolver.DirectionToDelta(dir);
+                    int nx = cur.x + delta.x, ny = cur.y + delta.y;
+                    if (!map.HasTile(nx, ny) || visited[nx, ny]) continue;
+                    if (occupied[nx, ny]) continue;
+                    if (!map.IsPassable(nx, ny, forceType)) continue;
+                    visited[nx, ny] = true;
+                    if (goals[nx, ny]) return cur.first; // 到达目标集：回传首步方向
+                    queue.Enqueue((nx, ny, cur.first));
+                }
+            }
+            return 0; // 无路（真不可达）：缺席
         }
 
         /// <summary>单位技能实例列表中首个指定类型技能的索引（-1=无）——遍历 unit.Skills

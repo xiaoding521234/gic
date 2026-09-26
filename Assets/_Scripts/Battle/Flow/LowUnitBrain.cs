@@ -10,8 +10,13 @@ namespace GIC.Battle
     /// v2（2026-09-25 方向纪律收口）：战技预判/移动方向一律十字四向（docs/18 决策八「十字方向其一」
     /// ——八向上交在技能侧被归一主轴斜向必空放，docs/11 方向纪律①④）；预判走技能实例
     /// WouldHitEnemyInDirection（与 HUD 瞄准推荐/结算形态同源）+ 存活目标校验（纯尸体线不浪费行动）。
+    /// v3（2026-09-26 报障「不会绕路卡湖边」）：移动档改 BFS 最短路首步（FindApproachFirstStep）——
+    /// 直行被湖/虚空挡时拐弯绕行，每回合重算走一步沿最短路逼近；小兵蠕动 1 步/回合语义不变。
+    /// v4（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标巡逻」）：攻击档打不了时按距离
+    /// 升序逐敌试逼近步（FindEnemiesByDistance）——贴身已到/不可达的目标自动跳过换下一个，
+    /// 不再对着打不了的目标站桩；全部敌都无逼近步才缺席。
     /// 纯读 BattleSimState 由 Host 在选择阶段头生成（docs/18 决策一），行动与玩家行动合并进执行阶段。
-    /// 决策档（v1 语义保留）：战技可命中→打 → 否则朝最近敌蠕动 1 步 → 无敌可向/不可动=缺席。
+    /// 决策档：战技可命中→打 → 否则逐敌（近→远）沿最短路蠕动 1 步 → 全部敌打不了也走不近=缺席。
     /// </summary>
     public static class LowUnitBrain
     {
@@ -39,18 +44,15 @@ namespace GIC.Battle
 
         /// <summary>
         /// 单个低级单位决策：①战技可命中（十字向预判有存活敌）→ 战技朝敌；
-        /// ②否则朝最近敌蠕动 1 步（小兵蠕动；被挡由 MovementResolver 结算弹回——被挡也算已使用，
-        /// 低级单位无体力配额 B6d 豁免）；③无敌人/同格堆叠 → 缺席
+        /// ②否则按距离升序逐敌试 BFS 最短路首步（v3 绕行+v4 换目标巡逻——某敌贴身已到/不可达
+        /// 即换下一个目标，被挡由 MovementResolver 结算弹回——被挡也算已使用，低级单位无体力配额 B6d 豁免）；
+        /// ③无敌人/全场敌都无逼近步 → 缺席
         /// </summary>
         private static ActionData DecideOne(BattleSimState sim, BattleSnapshot snapshot,
             string unitId, Unit unit, int turnNumber)
         {
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null) return null;
-            var enemy = BattleHeuristics.FindNearestEnemy(sim, unit);
-            if (enemy == null) return null; // 无敌人（终局/空场）：不出行动
-
-            var selfPos = sim.GetPosition(unit);
 
             // 战技（丘丘族无技能=自动跳过此档；占位技能不可施放同理）
             int skillIndex = BattleHeuristics.FindSkillIndex(unit, SkillType.Normal);
@@ -76,22 +78,26 @@ namespace GIC.Battle
                 }
             }
 
-            // 朝最近敌蠕动 1 步（低级单位=小兵蠕动，非战棋全距离；十字逼近——方向纪律同玩家）
-            var enemyPos = sim.GetPosition(enemy);
-            int dx = enemyPos.x - selfPos.x;
-            int dy = enemyPos.y - selfPos.y;
-            var moveDirection = BattleHeuristics.BestCrossApproachDirection(dx, dy);
-            if (moveDirection == 0) return null; // 同格堆叠：无逼近意义，缺席
-
-            return new ActionData
+            // 朝敌蠕动 1 步——v4 换目标巡逻（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标
+            // 巡逻」）：攻击档打不了时按距离升序逐敌试 BFS 最短路首步（FindApproachFirstStep——
+            // 贴身已到/不可达返回 0 的敌自动跳过换下一个，不再对着打不了的目标站桩）；
+            // 全部敌都无逼近步（全贴身/全不可达）才缺席。小兵蠕动 1 步/回合+十字方向纪律不变。
+            foreach (var target in BattleHeuristics.FindEnemiesByDistance(sim, unit))
             {
-                playerId = identity.OwnerPlayerID,
-                unitId = unitId,
-                actionType = ActionType.Move,
-                direction = moveDirection,
-                moveMagnitude = 1,
-                turnNumber = turnNumber,
-            };
+                var moveDirection = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(target));
+                if (moveDirection == 0) continue; // 该敌打不了也走不近：换下一个目标
+
+                return new ActionData
+                {
+                    playerId = identity.OwnerPlayerID,
+                    unitId = unitId,
+                    actionType = ActionType.Move,
+                    direction = moveDirection,
+                    moveMagnitude = 1,
+                    turnNumber = turnNumber,
+                };
+            }
+            return null; // 全场敌都无可逼近步：缺席
         }
     }
 }

@@ -38,9 +38,10 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 0
+    blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 8
     visionRange: -64
     tags: a60f0000
@@ -88,6 +89,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 7
     visionRange: -64
     tags: bf0b0000bb0b0000ea030000
@@ -140,6 +142,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 7
     visionRange: -64
     tags: a10f0000a20f0000d2070000
@@ -192,6 +195,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 7
     visionRange: -64
     tags: ed030000a70f0000ea030000
@@ -241,9 +245,10 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 0
+    blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 2
     visionRange: -64
     tags: 
@@ -287,9 +292,10 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: 30
     normalMoveType: 2
-    blockAllies: 0
+    blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 1
     visionRange: -64
     tags: 72170000a10f0000ba0b0000e9030000ed030000
@@ -402,6 +408,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 5
     visionRange: -64
     tags: 71170000eb030000be0b000089130000
@@ -528,6 +535,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 2
     visionRange: -64
     tags: 72170000a20f0000a50f0000
@@ -644,6 +652,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 4
     visionRange: -64
     tags: 74170000a30f0000ba0b0000bf0b0000
@@ -695,6 +704,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 5
     visionRange: -64
     tags: ef030000a20f000072170000
@@ -738,9 +748,10 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 0
+    blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 3
     visionRange: -64
     tags: 
@@ -787,6 +798,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 1
     visionRange: -64
     tags: a20f0000e903000071170000
@@ -834,6 +846,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 3
     visionRange: -64
     tags: 75170000c10b0000a30f0000bf0b0000ef030000f0030000
@@ -886,6 +899,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 7
     visionRange: -64
     tags: 71170000ef030000bd0b0000ba0b0000
@@ -938,6 +952,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 2
     visionRange: -64
     tags: 73170000c00b0000ba0b0000
@@ -990,6 +1005,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 4
     visionRange: -64
     tags: a50f0000a20f0000
@@ -1042,6 +1058,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 1
     visionRange: -64
     tags: a50f0000a20f0000
@@ -1094,6 +1111,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 7
     visionRange: -64
     tags: 
@@ -1140,6 +1158,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1186,6 +1205,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1232,6 +1252,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1278,6 +1299,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 4
     visionRange: -64
     tags: 
@@ -1324,6 +1346,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1370,6 +1393,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1416,6 +1440,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1462,6 +1487,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 
@@ -1508,6 +1534,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1554,6 +1581,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1600,6 +1628,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 6
     visionRange: -64
     tags: 0000000000000000
@@ -1646,6 +1675,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 2
     visionRange: -64
     tags: 
@@ -1689,9 +1719,10 @@ MonoBehaviour:
     baseHealEfficiency: -64
     baseEnergy: -64
     normalMoveType: 2
-    blockAllies: 0
+    blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 1
     visionRange: -64
     tags: 
@@ -1738,6 +1769,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     selfElement: 0
     visionRange: -64
     tags: 
@@ -1784,6 +1816,7 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 0
     visionRange: -64
     tags: bd0b0000
@@ -1830,10 +1863,13 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     selfElement: 0
     visionRange: -64
     tags: 71170000
-    skills: []
+    skills:
+    - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
+    - {fileID: 11400000, guid: 11730c209a3be904d9511af87b531a45, type: 2}
     voices:
       onGoWar:
         clips: []
