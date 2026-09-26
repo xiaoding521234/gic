@@ -80,7 +80,7 @@ namespace GIC.Battle
         [Header("拖动瞄准圆盘（2026-09-26 三拍：大圆盘=键上锚点+距离转盘、小圆盘不超大圆盘不出屏幕；选中格精确性全在大圆盘内——盘缘=最远格）")]
         [Tooltip("大圆盘半径（画布单位）——锚在被拖技能键圆心；方向型步距转盘=盘缘对应该方向最远可选格（半径越大选格越精细）")]
         [SerializeField] private float 拖动瞄准大圆盘半径 = 340f;
-        [Tooltip("小圆盘半径（画布单位）——手指跟随盘（盘心不超大圆盘半径、盘缘不出屏幕）")]
+        [Tooltip("小圆盘半径（画布单位）——手指跟随盘（盘心不超大圆盘半径、盘缘不出屏幕）；兼作键心死区半径：拖动瞄准中小盘未拖出此半径=未真离键，无瞄准、松手取消（防微拖误触/拖回取消目标）")]
         [SerializeField] private float 拖动瞄准小圆盘半径 = 56f;
         [Tooltip("小圆盘屏幕边距（画布单位）——盘缘距屏幕边缘的最小留白（轮盘靠屏角时屏幕边界优先于轮盘界）")]
         [SerializeField] private float 拖动瞄准圆盘屏幕边距 = 16f;
@@ -744,10 +744,8 @@ namespace GIC.Battle
             if (_layoutEditing) return; // 布局编辑期棋盘交互全静默
             if (_session == null || _session.Flow.Phase != BattlePhase.Selecting) return;
             if (_camera == null || _board == null || _board.Map == null) return;
-            if (!_camera.TryGetBoardPoint(screenPos, out Vector3 world)) return;
+            if (!TryPickBoardCell(screenPos, out var cell, out bool inBounds)) return;
 
-            var cell = _board.WorldToCell(world);
-            bool inBounds = _board.Map.HasTile(cell.x, cell.y);
             var snapshot = _session.Player.LatestSnapshot;
             if (snapshot == null) return;
 
@@ -777,6 +775,30 @@ namespace GIC.Battle
                     if (anyUnit != null) SelectUnit(anyUnit.unitId);
                     return;
             }
+        }
+
+        /// <summary>板面点击拾取（视差修正，2026-09-26 报障根因，docs/14 §86）：玩家视觉点击面=
+        /// 地块顶面（草顶 TileTopHeight=0.5/水顶更低，瞄准高亮 quad 再抬 0.03），若按 y=0 底面
+        /// 平面交点取格，交点沿视线向远端漂 h/tan(射线俯角)≈0.2~0.6 格（越靠屏幕上方射线越平
+        /// 漂得越多）——点在推荐格（尤其远处格）上半部会被解析进屏幕上方邻格，邻格不在可选集=
+        /// 「点了空白」取消瞄准。修正：先按顶面高度平面交射线初判格；水面格再按其真实表面
+        /// 高度交一次收敛（表面高度仅两档，二次即稳）。相机平移抓取仍走 y=0 平面（同面差值恒定）。</summary>
+        private bool TryPickBoardCell(Vector2 screenPos, out BattleCell cell, out bool inBounds)
+        {
+            cell = default;
+            inBounds = false;
+            if (!_camera.TryGetPlanePoint(screenPos, _board.TileTopHeight, out var world)) return false;
+            var first = _board.WorldToCell(world);
+            if (_board.Map.HasTile(first.x, first.y))
+            {
+                var surface = _board.GetSurfaceHeight(first);
+                if (surface < _board.TileTopHeight &&
+                    _camera.TryGetPlanePoint(screenPos, surface, out var refined))
+                    world = refined;
+            }
+            cell = _board.WorldToCell(world);
+            inBounds = _board.Map.HasTile(cell.x, cell.y);
+            return true;
         }
 
         /// <summary>单位侧向（2026-09-25 三轮审查 C2）：Mine=操控权归属（playerId）、
@@ -1232,9 +1254,11 @@ namespace GIC.Battle
         }
 
         /// <summary>松手收束（与点击式同款待定制，2026-09-26 拍板「松手后不应该立即完成选择」）：
-        /// 有效瞄准=保持金色待定单格与瞄准态，确认走「完成选择」按钮；**拖回技能盘任一键/取消钮上
-        /// 松手=取消回选中态**（王者荣耀"拖回轮盘中心取消"，兼防微拖误触）；无有效瞄准（方向臂空/
-        /// 指向无锁定）松手=取消。终帧以松手位校准（快甩时松手位与末帧 drag 位差一拍）。
+        /// 有效瞄准=保持金色待定单格与瞄准态，确认走「完成选择」按钮；**拖回键心死区（小圆盘半径内
+        /// ——盘拖回键心金色即隐）/取消钮上松手=取消回选中态**（2026-09-26 报障返修：原「技能盘任一
+        /// 键矩形」取消区几何上盖住「第 1 格」整条盘距带，短拖松手必判空放——取消区收窄，键矩形不再
+        /// 作松手取消判定）；无有效瞄准（键心死区/方向臂空/指向无锁定）松手=取消。终帧以松手位校准
+        /// （快甩时松手位与末帧 drag 位差一拍）。
         /// 会话中途被外部收口（超时自动确认/阶段切换经 ExitAiming）时 _dragAiming 已清，此处无为。</summary>
         private void OnSkillButtonDragEnd(SkillButtonDef def, PointerEventData eventData)
         {
@@ -1265,13 +1289,16 @@ namespace GIC.Battle
 
         /// <summary>方向型拖动瞄准解析（轮盘内单格，2026-09-26 三拍「选中格子的精确性应当限制在
         /// 大圆盘范围里」）：轮心→小盘的**画布**位移定十字方向（相机 yaw 恒 0，画布轴向=世界轴向——
-        /// 不再反投影，大圆盘即瞄准面）；步数=盘距占大圆盘半径的比例×臂长（**盘缘=该方向最远可选格、
-        /// 近心=第 1 格**，四舍五入钳 1..臂长）——大圆盘=距离转盘，盘越大选格越精细。臂步 1..maxStep
-        /// 连续由 ComputeAimCells 保证（遇虚空截断）。无位移/无臂=null</summary>
+        /// 不再反投影，大圆盘即瞄准面）；步数=盘距越过死区后的比例×臂长（**盘缘=该方向最远可选格、
+        /// 死区缘=第 1 格**，四舍五入钳 1..臂长）——大圆盘=距离转盘，盘越大选格越精细。臂步 1..maxStep
+        /// 连续由 ComputeAimCells 保证（遇虚空截断）。键心死区内（小盘未真离键）/无臂=null</summary>
         private BattleCell? ComputeDragAimCellFromWheel(Vector2 discLocal)
         {
             Vector2 d = discLocal - _dragWheelCenterLocal;
-            if (d.sqrMagnitude < 1f) return null;
+            // 键心死区（=小圆盘半径）：小盘仍压着键心=未真离键——防微拖误触/拖回取消目标。
+            // 2026-09-26 报障返修：键槽矩形（220×220，半宽 110）做松手取消区会把「第 1 格」整条
+            // 盘距带（0~102px）吃掉——短拖松手指针必在键槽内，被判「拖回键区」空放。
+            if (d.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null;
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return null;
@@ -1291,9 +1318,10 @@ namespace GIC.Battle
             }
             if (maxStep == 0) return null; // 该方向无臂（虚空/无格）
 
-            // 盘距→步数：大圆盘半径=全臂程（阴影可见缘已贴齐描环线——实心盘贴图补偿；盘缘=最远格、近心=第 1 格）
+            // 盘距→步数：死区缘=第 1 格、盘缘=最远格（大圆盘半径=全臂程，阴影可见缘已贴齐描环线——实心盘贴图补偿）
             float axisCanvas = horizontal ? Mathf.Abs(d.x) : Mathf.Abs(d.y);
-            float norm = Mathf.Clamp01(axisCanvas / Mathf.Max(1f, 拖动瞄准大圆盘半径));
+            float span = Mathf.Max(1f, 拖动瞄准大圆盘半径 - 拖动瞄准小圆盘半径);
+            float norm = Mathf.Clamp01((axisCanvas - 拖动瞄准小圆盘半径) / span);
             int k = Mathf.Clamp(Mathf.RoundToInt(norm * maxStep), 1, maxStep);
             foreach (var c in _aimCells)
             {
@@ -1315,7 +1343,7 @@ namespace GIC.Battle
             var canvasRt = CanvasRect;
             if (canvasRt == null || _camera == null) return null;
             Vector2 dir = discLocal - _dragWheelCenterLocal;
-            if (dir.sqrMagnitude < 1f) return null;
+            if (dir.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null; // 键心死区（同方向型，2026-09-26 返修）
             dir.Normalize();
 
             float minCos = Mathf.Cos(拖动瞄准指向锥角 * Mathf.Deg2Rad);
@@ -1335,16 +1363,14 @@ namespace GIC.Battle
             return best;
         }
 
-        /// <summary>松手是否落在取消钮/技能盘任一键上（王者荣耀"拖回轮盘中心取消"——拖出后拖回键区
-        /// 松手=取消瞄准；同时防微拖误触：不出键区不落待定）</summary>
+        /// <summary>松手是否落在取消钮上（2026-09-26 报障返修：原「技能盘任一键矩形」取消区已删——
+        /// 键槽 220×220 矩形（半宽 110）几何上盖住「第 1 格」整条盘距带（1 格带 0~102px），右侧键簇
+        /// （skill↔burst 仅隔 39.6px）连 2 格带也被盖，短拖松手必判「拖回键区」空放。「拖回取消」
+        /// 语义收窄为：键心死区（小圆盘半径内=解析返回 null 走 !pending 取消）+ 取消钮）</summary>
         private bool ReleaseOverDiscOrCancel(Vector2 screenPos)
         {
-            if (_cancelButton != null
-                && RectTransformUtility.RectangleContainsScreenPoint(_cancelButton, screenPos, null)) return true;
-            foreach (var def in _skillButtons)
-                if (def?.rect != null && def.rect.gameObject.activeInHierarchy
-                    && RectTransformUtility.RectangleContainsScreenPoint(def.rect, screenPos, null)) return true;
-            return false;
+            return _cancelButton != null
+                && RectTransformUtility.RectangleContainsScreenPoint(_cancelButton, screenPos, null);
         }
 
         // ==================== 拖动瞄准圆盘（2026-09-26 拍板：王者荣耀式大圆盘+小圆盘） ====================

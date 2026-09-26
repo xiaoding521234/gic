@@ -24,6 +24,9 @@ namespace GIC.Battle
 
         public BattleMapData Map { get; private set; }
 
+        /// <summary>地面格顶面高度（板面点击拾取的视差修正初判平面高度，docs/14 §86）</summary>
+        public float TileTopHeight => _tileTopHeight;
+
         private Transform _tilesRoot;
 
         /// <summary>

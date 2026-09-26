@@ -278,16 +278,24 @@ namespace GIC.Battle
             return focus;
         }
 
-        /// <summary>屏幕点射线与棋盘平面（y=0，地块底面）的交点（HUD 拾取共用，B6）</summary>
-        public bool TryGetBoardPoint(Vector3 screenPos, out Vector3 point)
+        /// <summary>屏幕点射线与 y=planeHeight 水平面的交点（板面拾取视差修正用；false=射线不与平面相交）</summary>
+        public bool TryGetPlanePoint(Vector3 screenPos, float planeHeight, out Vector3 point)
         {
             point = default;
             if (_camera == null) return false;
             var ray = _camera.ScreenPointToRay(screenPos);
-            var plane = new Plane(Vector3.up, Vector3.zero);
+            var plane = new Plane(Vector3.up, Vector3.up * planeHeight);
             if (!plane.Raycast(ray, out float enter) || enter <= 0f) return false;
             point = ray.GetPoint(enter);
             return true;
+        }
+
+        /// <summary>屏幕点射线与棋盘平面（y=0，地块底面）的交点（相机平移抓取沿用，B6）。
+        /// 点击取格勿用本方法——y=0 交点在俯角下沿视线向远端漂 h/tan(俯角)≈0.2~0.6 格，
+        /// 而玩家视觉点击面是地块顶面（docs/14 §86）；取格走 BattleHud.TryPickBoardCell 视差修正版。</summary>
+        public bool TryGetBoardPoint(Vector3 screenPos, out Vector3 point)
+        {
+            return TryGetPlanePoint(screenPos, 0f, out point);
         }
 
         // （IsPointerOverUI 已删——UI 命中收编为 GestureHub 门2 唯一实现，docs/24 §1.1-2）
