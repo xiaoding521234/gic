@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization;
+using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Tool;
 namespace GIC.Data
@@ -28,6 +29,16 @@ namespace GIC.Data
 
             /// <summary>战斗立牌图（纸片人全身立绘，gic-paperdoll 产物）；null 时立牌回落 avatar 头像</summary>
             public Sprite 立牌图;
+
+            /// <summary>立牌循环动画帧（AI 直出序列帧 sheet 的网格切片，按序循环播放；null/空=静态立牌兜底）</summary>
+            public Sprite[] 立牌动画帧;
+
+            /// <summary>立牌动画播放帧率（fps，默认 12；序列帧循环速度）</summary>
+            public float 立牌动画帧率 = 12f;
+
+            /// <summary>立牌循环动画视频（B-S3 视频路线：绿幕 mp4 + VideoPlayer→RT + 运行时 ChromaKey 抠色；
+            /// 显存恒定、与帧数无关；优先级高于 立牌动画帧；null=序列帧/静态兜底）</summary>
+            public VideoClip 立牌动画视频;
 
             public bool hideInBackpack = false;
 

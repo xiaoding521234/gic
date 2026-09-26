@@ -59,6 +59,33 @@ namespace GIC.Battle
             return material;
         }
 
+        private static Shader _chromaKeyShader;
+
+        /// <summary>立牌动画视频 ChromaKey shader（GIC/Battle/ChromaKeyVideo，B-S3 视频路线）——
+        /// 已登记 GraphicsSettings Always Included Shaders 防构建剥离（同 URP Unlit 清单纪律，docs/14 §63③）；
+        /// 找不到返回 null（调用方自然回落静态立牌）</summary>
+        public static Shader ChromaKeyShader
+        {
+            get
+            {
+                if (_chromaKeyShader == null)
+                {
+                    _chromaKeyShader = Shader.Find("GIC/Battle/ChromaKeyVideo");
+                    if (_chromaKeyShader == null)
+                        Debug.LogWarning("[BattleViewFactory] ChromaKeyVideo shader 未找到（未导入/被剥离），立牌动画视频将回落静态立牌");
+                }
+                return _chromaKeyShader;
+            }
+        }
+
+        /// <summary>新建立牌动画视频 ChromaKey 材质（消费 VideoPlayer→RT 的绿幕画面运行时抠色；
+        /// _Color 承载尸体灰/冻结冰色/受击闪红 tint（UnitView.RefreshTint 写入，同 SpriteRenderer.color 语义）。
+        /// 调用方负责持有与 OnDestroy 释放）</summary>
+        public static Material CreateChromaKeyMaterial()
+        {
+            return new Material(ChromaKeyShader);
+        }
+
         // 瞄准格底图（白芯+内嵌黑边环；运行时生成免资产文件）
         private static Texture2D _aimCellTexture;
 

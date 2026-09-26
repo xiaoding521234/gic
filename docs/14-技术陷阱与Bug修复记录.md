@@ -1557,6 +1557,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **exec_editor_script（Edit Mode 内联脚本）**：
 
 - 内联脚本用 Newtonsoft `JObject` 必报 CS0433（与 Unity.Localization.ThirdParty.Editor 撞名，脚本环境无法 extern alias）——计数/取字段改用 `Regex.Match`，或返回原始 JSON 字符串在 AI 侧解析；本地化表桥脚本写入姿势/条目类型/字符串转义/zh-TW code 四坑=gic-localization skill「桥脚本」两节 + §83。
+- 桥脚本环境引用集不含 UnityEngine.VideoModule——`VideoClip` 类型直接 CS0246；mp4 接线以 `AssetDatabase.LoadAssetAtPath<Object>` 加载 + 反射读写目标字段（实例运行时仍是 VideoClip，仅静态类型不可达），width/height/length 元数据经 GetProperty 反射读（2026-09-27 B-S3 视频接线实证）。
 
 **exec_runtime_script（Play Mode 活体取证）**：
 
