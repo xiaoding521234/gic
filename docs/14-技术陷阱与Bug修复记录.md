@@ -253,7 +253,7 @@ CSV 导入后检查 `SharedData.Entries` 中的 Id 是否与枚举值一致；�
 
 **修复**：仅在 `textComponent.font != currentFont`（字体真正变更，如语言切换）时才同时切 font + fontMaterial；字体已一致时不动材质，保留场景变体。
 
-**规则**：需要描边/特殊配色的 TMP 文本 = 同字体 + 变体材质（放 `TextMesh Pro/Resources/Fonts & Materials/`，该目录 git 忽略，改材质不入库，重装环境需手动备份）。另注意 rg/搜索工具默认跳过 git 忽略目录，排查 TextMesh Pro/ 下资产时需加 `--no-ignore`；Codely 搜索工具（search_file_content/glob/list_directory）ignore 层=.codelyignore**加**.gitignore 双层（.codelyignore 另吞 Assets 的 png/prefab/asset/mat/wav 与 Mirror/kcp2k/Plugins 整目录）——被任一层命中即**静默零命中/无名**，下"查无引用/文件不存在/skill 不存在"类结论前一律先想 ignore 层，改走原生 `rg --no-ignore` 或 Get-ChildItem；analyze_multimedia 对被忽略路径同样拒读（Assets 图片先复制到 .codely-cli/tmp 再传）。
+**规则**：需要描边/特殊配色的 TMP 文本 = 同字体 + 变体材质（放 `TextMesh Pro/Resources/Fonts & Materials/`，该目录 git 忽略，改材质不入库，重装环境需手动备份）。另注意 rg/搜索工具默认跳过 git 忽略目录，排查 TextMesh Pro/ 下资产时需加 `--no-ignore`；Codely 搜索工具（search_file_content/glob/list_directory）ignore 层=.codelyignore**加**.gitignore 双层（.codelyignore 另吞 Assets 的 png/prefab/asset/mat/wav 与 Mirror/kcp2k/Plugins 整目录）——被任一层命中即**静默零命中/无名**，下"查无引用/文件不存在/skill 不存在"类结论前一律先想 ignore 层，改走原生 `rg --no-ignore` 或 Get-ChildItem；analyze_multimedia 对被忽略路径同样拒读（Assets 图片先复制到 .codely-cli/tmp 再传）。另：**prefab 中文序列化字段名以大写 \uXXXX 转义存储**（如 GlassPanelAnimator 的模糊层字段=`\u6A21\u7CCA\u5C42`）——rg 直搜中文字面与小写 `\u6a21` 形式均零命中，文本反查 prefab 接线时把 .cs 字段名转成大写 \uXXXX 再 `rg -F --no-ignore` 搜；场景 YAML 中文同理（docs/20 §1.3）。
 
 ### 6.3 引用相等判断在打包后误判字体变更（真机描边二次丢失，2026-08-16）
 
@@ -1549,3 +1549,20 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **第六轮（远端贴片仍到水面下=透明排序，高度修复后残余）**：第五轮后用户再报「安柏向北方瞄准，第一格正常，后四格在水面下」并授权暂停现场取证。活体取证实锤：**贴片高度全对**（水格 0.43/草格 0.53 恒高于波峰），真根因=**单 Mesh 水面的透明排序按整物体包围盒中心**：Unity 同队列（3000）透明件按「renderer 包围盒中心→相机距离」远者先画，整片水面一个 renderer（湖心距相机 13.86）——比湖心远的贴片（北臂 12_10~12_13 距 14.15~16.21）先画、被半透明水面叠画盖过=「水面下」；比湖心近的第一格 12_9（13.54）后画正常。**角度/位置相关**=此前验证恰在近侧未暴露。修法=水面 shader Queue 降 `Transparent-1`（2999，BattleWaterFlow.shader Tags 一行）：一切 3000 标准透明件（瞄准贴片/立牌 sprite/选中金盘/箭矢）恒后画于水面之上；水下无其它透明物（湖床 2000 不透明写深度），零副作用。**与⑧互补**：不动贴片队列（保贴片 vs 立牌距离排序），降大面积透明表面队列。现场取证方法论再证：暂停态先 resume 单帧解握手（§坑③），反射脆弱时按名寻址（AimHighlight_{x}_{y} 自带格坐标）+全公开 API（BattleBoard）零反射取证；Camera.main 在战斗场景为 null（相机未挂 MainCamera tag，立牌 billboard 同款坑），取场景 Camera 实例。
 
 **How to apply**：①新增地形/水面类地块先量 mesh 实际尺寸 vs 格间距（编辑器读 bounds/顶点范围），勿信"应该是一格"；②**半透明表面分格渲染必显格界**（双重混合+UV 跳变双源，均不可在分格内修补）——整片表面需求一律合并焊接单 Mesh+世界坐标 UV，勿试图靠扩边/微重叠（重叠=更宽的双重混合带）；③**水下勿留格子墙**：闭口盒墙顶会随波浪下探穿出水面显动态缝——水下只有连续湖床、岸壁挡视线交给相邻地形块；④贴图 Repeat+世界 UV 的图案密度=每 1 世界单位重复一次，改密度调 _MainTex_ST 而非改 UV 写法；⑤顶点位移类波浪按波长 1/8~1/4 细分采样密度（每格 4 顶点不够），共享角点必须焊接成同顶点防撕裂；⑥退役 submesh 用 SetTriangles(空数组, i) 保留材质槽位比删 submesh+改 renderer 数组更稳（材质槽可作跨对象材质载体）；⑦**动态表面上的贴片（高亮/标记/选中圈）高度一律走 GetDecalHeight 单出口**，勿手写 GetSurfaceHeight+常数——抬升量必须清过波峰带，否则波峰经过即被水面盖过；⑧透明队列内「远处先画」规则=同队列贴片与半透明表面的遮挡关系由几何高度决定——**贴片队列勿硬抬**（破坏与立牌 sprite 的距离排序），遮挡问题靠⑩降表面队列解；⑨**动态表面上的站位视觉件（单位/投射物/贴片）高度一律走 GetVisualSurfaceHeight（贴片经 GetDecalHeight 间接走它）**，与拾取/Host 名义表面（GetSurfaceHeight）分离——视觉波峰带与判定几何解耦，勿把波峰带写进 GetSurfaceHeight（拾取第二交平面会漂）；⑩**单一大面积半透明表面（水面/雾面/大面积玻璃）渲染队列降到 Transparent-1（2999）**：合并单 Mesh 后透明排序按整物体中心算，远端小透明件必被后画盖过且角度相关难复现——凡「表面下大片透明板+板上方大量小透明件」结构，一律把板的队列压到标准透明件之下，小件队列保持 3000 不动；⑪**同队列两个透明件遮挡 bug 先算「各自包围盒中心→相机距离」再下结论**——与几何高度无关的「时隐时现/角度相关」遮挡=排序指纹。
+
+---
+
+## 90. 桥脚本环境与运行时取证坑（exec_editor_script / exec_runtime_script；2026-09-13/23 实证合集，2026-09-26 自 CODELY.md 记忆并入）
+
+**exec_editor_script（Edit Mode 内联脚本）**：
+
+- 内联脚本用 Newtonsoft `JObject` 必报 CS0433（与 Unity.Localization.ThirdParty.Editor 撞名，脚本环境无法 extern alias）——计数/取字段改用 `Regex.Match`，或返回原始 JSON 字符串在 AI 侧解析；本地化表桥脚本写入姿势/条目类型/字符串转义/zh-TW code 四坑=gic-localization skill「桥脚本」两节 + §83。
+
+**exec_runtime_script（Play Mode 活体取证）**：
+
+- **动真实存档的断言必须先快照+finally 恢复**——编辑器 Play 用的就是玩家真实档（LocalLow/HGAME/gic/gic_save.json，删档测试模式是否启用勿假设）：GetItemCount/ownedUnits 快照→恢复（未拥有条目=Remove、count=0 复活态=还原 0）+RebuildOwnedCards；TimeUtility 偏移测试尾 reset。
+- 脚本正常完成后 Play 不自动退出——紧接要 refresh/编译先手动 stop（桥随后推 state=stale+custom_tools_reloaded 属常态，unity_refresh 重连即可）。
+- 用户暂停现场（isPaused）时握手直接 Operation timed out 不报原因——先 unity_editor resume 再取证。
+- 池化面板/常驻管理器在 DontDestroyOnLoad 的 GameScene/UIRoot 下 get_hierarchy 看不见，须 `FindObjectsByType(FindObjectsInactive.Include)` 反射读。
+- 懒建/构建后才存在的私有字段每断言点现取（顶部缓存=null→NRE 或假失败）；无参私有方法反射调用=Invoke(ctrl, null)，传 new object[]{null} 报 parameter count mismatch。
+- 断言失败先 try/catch 打印完整内部堆栈定位归属（脚本 vs 产品代码）；活体取证时序纪律（超时污染/暂停态/按名寻址/Camera.main=null）见 §64b/§39/§89。
