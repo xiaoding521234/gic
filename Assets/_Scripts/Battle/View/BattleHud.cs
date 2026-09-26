@@ -1581,7 +1581,7 @@ namespace GIC.Battle
                     $"AimHighlight_{cell.x}_{cell.y}", material);
                 quad.transform.position = new Vector3(
                     _board.CellToWorld(cell).x,
-                    _board.GetSurfaceHeight(cell) + 0.03f,
+                    _board.GetDecalHeight(cell, 0.03f), // 水格含波峰带防高亮被波峰盖过（docs/14 §89 第四轮）
                     _board.CellToWorld(cell).z);
                 quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
                 quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
@@ -1672,7 +1672,7 @@ namespace GIC.Battle
 
             var cellWorld = _board.CellToWorld(unit.position);
             _selectMarker.transform.position = new Vector3(
-                cellWorld.x, _board.GetSurfaceHeight(unit.position) + 0.024f, cellWorld.z);
+                cellWorld.x, _board.GetDecalHeight(unit.position, 0.024f), cellWorld.z); // 水格含波峰带（docs/14 §89 第四轮）
             _selectMarker.SetActive(true);
         }
 
