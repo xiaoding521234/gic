@@ -37,6 +37,12 @@ namespace GIC.Battle
         [Tooltip("键盘平移速度 = 视轴距离 × 此系数（单位/秒）")]
         [SerializeField] private float _keyPanSpeedFactor = 0.35f;
 
+        [Header("拖动瞄准屏幕跟随（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」）")]
+        [Tooltip("跟随平滑速度（1/s，指数趋近；8≈0.3s 基本到位——丝滑）")]
+        [SerializeField] private float 拖动瞄准跟随速度 = 8f;
+        [Tooltip("金格视口安全边距（屏幕像素）——金格投影超出此边距即触发跟随，跟随目标=金格居中；40≈金格半格出屏才动，勿设大（贴边就平移会扰）")]
+        [SerializeField] private float 拖动瞄准跟随边距 = 40f;
+
         [Header("边界")]
         [Tooltip("注视点允许范围（棋盘半宽 10 + 余量，世界单位）")]
         [SerializeField] private float _focusBounds = 12f;
@@ -46,6 +52,7 @@ namespace GIC.Battle
         private float _targetDistance = 35f;   // 缩放目标距离（滚轮只改它，实际距离逐帧平滑逼近）
         private Vector2 _focus = Vector2.zero;   // 棋盘平面注视点（XZ）
         private Vector2 _grabPoint;              // 拖拽抓取点（棋盘 XZ；判定在 DragRecognizer，响应在本类）
+        private Vector3? _dragFollowWorld;       // 拖动瞄准跟随目标（HUD 每帧喂金色待定格世界位；null=停）
 
         // ── 手势层接线（docs/24 P3）──
         [Autowired] private GestureHub _gestureHub;
@@ -185,6 +192,25 @@ namespace GIC.Battle
                 _focus = ClampFocus(_focus + keyMove * (_keyPanSpeedFactor * _distance * Time.unscaledDeltaTime));
             }
 
+            // 拖动瞄准屏幕跟随（2026-09-26 拍板）：金格投影出视口安全区 → 注视点指数趋近金格 XZ
+            // （金格居中即入屏）——"丝滑移动过去"；入区即停（相机停在新位不回弹，与手拖平移一致）。
+            // 瞄准不随平移重判：HUD 拖动瞄准只在指针移动事件重算，相机平移不触发（方向位移两投影点
+            // 随平移同移、差向量不变，故方向型跟随全程稳定）
+            if (_dragFollowWorld.HasValue)
+            {
+                var p = _dragFollowWorld.Value;
+                var s = _camera.WorldToScreenPoint(p);
+                bool off = s.z <= 0f
+                    || s.x < 拖动瞄准跟随边距 || s.x > Screen.width - 拖动瞄准跟随边距
+                    || s.y < 拖动瞄准跟随边距 || s.y > Screen.height - 拖动瞄准跟随边距;
+                if (off)
+                {
+                    var target = ClampFocus(new Vector2(p.x, p.z));
+                    _focus = Vector2.Lerp(_focus, target,
+                        1f - Mathf.Exp(-拖动瞄准跟随速度 * Time.unscaledDeltaTime));
+                }
+            }
+
             ApplyTransform();
         }
 
@@ -209,6 +235,27 @@ namespace GIC.Battle
             if (distance > 0f) _distance = Mathf.Clamp(distance, _minDistance, _maxDistance);
             _targetDistance = _distance;
             ApplyTransform();
+        }
+
+        /// <summary>
+        /// 拖动瞄准屏幕跟随喂点（HUD Update 每帧调；null=停）：金色待定格世界位投影出视口安全区时
+        /// 注视点指数趋近其 XZ（Update 内执行，金格居中即入屏、入区即停不回弹）。
+        /// 2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」。
+        /// </summary>
+        public void SetDragFollowTarget(Vector3? worldPoint)
+        {
+            _dragFollowWorld = worldPoint;
+        }
+
+        /// <summary>世界点→屏幕位（HUD 拖动圆盘指向锁定用；z≤0=相机背后=不可投影返回 false）</summary>
+        public bool TryProjectToScreen(Vector3 worldPos, out Vector2 screenPos)
+        {
+            screenPos = default;
+            if (_camera == null) return false;
+            var s = _camera.WorldToScreenPoint(worldPos);
+            if (s.z <= 0f) return false;
+            screenPos = new Vector2(s.x, s.y);
+            return true;
         }
 
         // ==================== 内部 ====================

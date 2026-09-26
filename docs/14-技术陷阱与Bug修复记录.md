@@ -1487,3 +1487,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：TMP 文字描边用 SDF 着色器原生 `_OutlineWidth`/`_OutlineColor`（宽度相对字形、随缩放恒定、连续无断缝）——**运行时独立材质实例**（`new Material(fontSharedMaterial)` + SetColor/SetFloat + 赋 `tmp.fontMaterial`），勿直接改共享字体材质（全项目文字共用会全员描边）；实例调用方 OnDestroy 释放（TMP 不自销，§63 生命周期纪律）。zh-cn SDF=TextMeshPro/Distance Field 全属性在；图集 4096 已到上限不会重建（材质实例 _MainTex 引用不失效）；若字体材质无 _OutlineWidth 属性（变体 shader）应 Warn 降级。
 
 **How to apply**：新 UI 需要文字描边（尤其大字/要跨分辨率恒定可见）直接 SDF 原生描边；UGUI Outline 只适合"同屏固定像素量的轻投影/小字"场景。倒计时实现=BattleHud.TopBar.cs（_countdownOutlineMat），宽度=BattleHud Inspector「倒计时描边宽度」0.15 可调（迭代链 0.3→0.22→0.15，2026-09-26 用户两拍「调细」）；**伤害数字已同法迁移（2026-09-26 拍板「让伤害数字也用」）**=BattleDamageNumbers（池条目独立材质实例 Entry.OutlineMat+OnDestroy 统一释放，宽度=Inspector「描边宽度」0.15 同口径可调）——全项目 UGUI Outline 文字描边已清零，勿再加回。**§74 冻结陷阱复发注记（同日）**：BattleHud 组件挂 prefab——「倒计时描边宽度」0.22/0.15 两改脚本默认值均未生效（prefab 烘焙/缓存值恒 0.3，用户目检"两次调细没变化"即此），修复=LoadPrefabContents+反射 SetValue+SaveAsPrefabAsset 烘 0.15 进 prefab；**改"挂 prefab 组件"的 [SerializeField] 默认值后必须同步烘 prefab**（运行时 AddComponent 的组件如 BattleDamageNumbers 才吃脚本默认值）。另证（探针）：祈愿界面卡池文字描边本就是 SDF 原生——zh-cn SDF 共享材质本体 _OutlineWidth=0.15 黑（角色名 128.7pt）、zh-cn SDF 1 预设 0.08 白（称号 150pt），与倒计时/伤害数字同族无需迁移。
+
+## 85. 贴图可见边距陷阱：同 sizeDelta 拼装的多张贴图可见缘天然错位——「X 比 Y 小」类报障先实测贴图可见半径，勿当设计拍板执行（2026-09-26 拖动圆盘实证）
+
+**症状**：拖动瞄准大圆盘的半透明阴影可见缘比金色描环明显小一圈（约 17%），用户报障「半透明阴影比圆环小一点，这是不对的」。首轮误读为「再缩小阴影」的设计拍板（×0.92 收缩比）反向放大了错误，用户澄清后回滚修正。
+
+**根因**：`disc.png`（TabGlyphs 实心盘）的可见圆缘只占纹理半宽 **0.830**（四周大片透明边距），`circle.png`（Skills 细环）的描环线贴纹理外缘 **0.998**——两张贴图同 sizeDelta 摆放时，可见缘天然错位 ~17%（340 名义半径下阴影只显示到 ~282）。同尺寸≠同可见尺寸。
+
+**取证**：Unity 侧 editor 脚本 RenderTexture.ReadPixels 扫中心行 alpha 带（外缘比例=0.830/0.998 实测）。注意 **System.Drawing 读该 PNG 的 alpha 恒 0**（格式/预乘误读不可信）——PNG 像素取证一律走 Unity 导入后的纹理实测（与「识图 AI 不可作内容判定依据」同族：视觉差异数字必须实测）。
+
+**修法**：实心盘纹理（大圆盘阴影+小圆盘）×`实心盘贴图补偿` 1.202（=0.998/0.830）放大，可见缘贴齐描环线/名义半径；多出的透明边距被描环盖住不可见。常量在 BattleHud.cs（实心盘贴图补偿），换贴图资产按实测重算。
+
+**How to apply**：①用户报「X 比 Y 小/不对/错位」类视觉差异，先像素级量各贴图**可见缘比例**再动手——透明边距是素材常态，勿直接当"缩小/放大"设计拍板执行；②多张贴图拼装对齐按可见缘而非 sizeDelta；③补偿系数=目标可见缘比例÷本贴图可见缘比例，写注释留实测数字。

@@ -4,6 +4,7 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.Localization;
 using GIC.Framework;
 using GIC.Data;
@@ -31,7 +32,11 @@ namespace GIC.Battle
     /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）+ LayoutEditing（编辑态门控）。
     /// 输入 = BattleCameraController.OnBoardTap（Drag 短点击复合发射，docs/24 §7.10 tap+pan 同体）。
     /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产。
-    /// 拖动式瞄准/手牌卡列表/协议核心血条 = B4/B8 接线。
+    /// 拖动式瞄准已落地（B4 2026-09-26：王者荣耀式手势+待定制——技能键按下拖出→**拖向=瞄准方向**
+    /// （轮心→小圆盘位移定方向与距离，与指针落点无关）→金色待定**单格**实时跟随→松手=留待定
+    /// （不提交，确认=完成选择按钮），拖回技能盘/取消钮松手=取消；拖动时键上现**大圆盘**（距离转盘
+    /// ——盘缘=最远格）、手指处**小圆盘**（不超大圆盘、不出屏幕）+金格出屏时相机丝滑移过去——
+    /// 见 OnSkillButtonDragBegin/ShowDragWheel）；协议核心血条 = B8 接线。
     /// </summary>
     public partial class BattleHud : MonoBehaviour
     {
@@ -67,6 +72,24 @@ namespace GIC.Battle
         [SerializeField] private float 倒计时脉动频率 = 1.5f;
         [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放恒定；迭代链 0.3→0.22→0.15（2026-09-26 两拍「调细」）；首版 UGUI Outline 固定像素描边在缩放视口下不可见已弃用）")]
         [SerializeField] private float 倒计时描边宽度 = 0.15f;
+
+        [Header("拖动式瞄准（B4，2026-09-26 落地：王者荣耀式手势+待定制——按下拖出，拖向=瞄准方向，松手=留金色待定单格）")]
+        [Tooltip("指向型瞄准（延奏/契约）拖向锁定锥角（度）：候选目标屏幕方向与「轮心→小盘」拖向的夹角不超过此值才锁定（轮盘化后小盘无法位移到目标——以拖向选目标，夹角最小者胜；精确选择仍可点击式点格）")]
+        [SerializeField] private float 拖动瞄准指向锥角 = 60f;
+
+        [Header("拖动瞄准圆盘（2026-09-26 三拍：大圆盘=键上锚点+距离转盘、小圆盘不超大圆盘不出屏幕；选中格精确性全在大圆盘内——盘缘=最远格）")]
+        [Tooltip("大圆盘半径（画布单位）——锚在被拖技能键圆心；方向型步距转盘=盘缘对应该方向最远可选格（半径越大选格越精细）")]
+        [SerializeField] private float 拖动瞄准大圆盘半径 = 340f;
+        [Tooltip("小圆盘半径（画布单位）——手指跟随盘（盘心不超大圆盘半径、盘缘不出屏幕）")]
+        [SerializeField] private float 拖动瞄准小圆盘半径 = 56f;
+        [Tooltip("小圆盘屏幕边距（画布单位）——盘缘距屏幕边缘的最小留白（轮盘靠屏角时屏幕边界优先于轮盘界）")]
+        [SerializeField] private float 拖动瞄准圆盘屏幕边距 = 16f;
+
+        /// <summary>disc.png 实心盘可见缘只占纹理半宽 0.830（四周透明边距大）、circle.png 描环线贴
+        /// 纹理外缘 0.998——同尺寸下阴影可见缘比描环天然内缩约 17%（2026-09-26 用户报障
+        /// 「半透明阴影比圆环小一点，这是不对的」的根因，非设计意图）。实心盘（大圆盘阴影+小圆盘）
+        /// 纹理放大 0.998/0.830≈1.202 补偿：可见缘贴齐描环线/名义半径，多出的透明边距被描环盖住不可见</summary>
+        private const float 实心盘贴图补偿 = 1.202f;
 
         // 瞄准常量（运行时计算用）
         private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
@@ -194,6 +217,25 @@ namespace GIC.Battle
         /// 可点其它可选格变更、点空白=取消技能回选中态；确认提交=顶部「完成选择」按钮）。
         /// null=无待定</summary>
         private BattleCell? _pendingAimCell;
+
+        /// <summary>拖动式瞄准会话中（B4，2026-09-26 落地）：技能键 OnBeginDrag 起手置位，
+        /// OnDrag 逐帧刷金色待定单格、OnEndDrag 松手=留待定（确认走完成选择）；任何瞄准退出
+        /// （取消/完成选择确认/超时/阶段切换）经 ExitAiming 统一收口清零</summary>
+        private bool _dragAiming;
+
+        // 拖动瞄准圆盘（2026-09-26 拍板「和王者一样，技能上显示一个大圆盘，并且手指拖拽位置还有小圆盘；
+        // 圆盘不可超出屏幕边缘」+同日三拍「大圆盘太小/小圆盘不超大圆盘/选中格精确性全在大圆盘内」）：
+        // 运行时建在 HUD 画布（非布局件、Image.raycastTarget 全关勿拦截；换美术素材改 EnsureDragWheel
+        // 的 sprite 加载即可——现用 disc.png 实心圆盘+circle.png 细环）
+        private GameObject _dragWheelRoot;
+        private RectTransform _dragWheelBigFill;  // 大圆盘填充（disc.png×底盘半透明）
+        private RectTransform _dragWheelBigRing;  // 大圆盘描环（circle.png×高亮金细线）
+        private RectTransform _dragWheelSmall;    // 小圆盘（disc.png×瞄准已选色——与金色待定格同色系联动）
+        private Vector2 _dragWheelCenterLocal;    // 大圆盘圆心（=被拖技能键圆心，画布局部）——拖向/步距转盘原点
+        private Vector2 _dragDiscLocal;           // 小圆盘画布局部（轮盘界+屏幕界双夹取后）——瞄准解析唯一输入
+
+        /// <summary>HUD 画布 RectTransform（盘位换算用；Overlay 画布世界坐标=屏幕像素）</summary>
+        private RectTransform CanvasRect => _canvas != null ? (RectTransform)_canvas.transform : null;
 
         /// <summary>本回合完成选择已定死（2026-09-26 拍板「确认行动后就应当定死了」）：
         /// 点过完成选择（或超时自动按下）并成功上交后为 true——按钮置灰、再按/超时自动按下
@@ -323,6 +365,16 @@ namespace GIC.Battle
         private void Update()
         {
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
+
+            // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」）：
+            // 仅拖动会话中且有金色待定格才喂；相机侧判出/入屏并指数趋近（金格居中即入屏，入屏即停）
+            if (_camera != null)
+            {
+                Vector3? followWorld = null;
+                if (_dragAiming && _pendingAimCell.HasValue && _board != null && _board.Map != null)
+                    followWorld = _board.CellToWorld(_pendingAimCell.Value);
+                _camera.SetDragFollowTarget(followWorld);
+            }
 
             // 选择倒计时（docs/04 §4.2；每秒级刷新，静态数字条目）
             if (_session == null || _session.Flow == null || _countdownText == null) return;
@@ -799,6 +851,8 @@ namespace GIC.Battle
         private void ExitAiming()
         {
             if (_state != HudState.Aiming) return;
+            _dragAiming = false; // 拖动会话统一收口（松手取消/确认提交/超时/阶段切换同一处清零）
+            HideDragWheel();      // 圆盘随会话收口（EndDrag 已隐藏，此处=外部退出安全网，幂等）
             // 待定金格随高亮 quad 一并消失（ClearHighlights 销 quad），字段清零防陈旧提交
             _pendingAimCell = null;
             // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
@@ -1112,11 +1166,11 @@ namespace GIC.Battle
             return Direction2D.DownLeft;
         }
 
-        // ==================== 技能按钮（点击式三情况） ====================
+        // ==================== 技能按钮（点击式三情况 + 拖动式瞄准） ====================
 
         /// <summary>点击式三情况（四键全统一，含移动——2026-09-18 拍板）：①面板开着再点同键=隐藏面板进入瞄准
         /// ②面板没开第一次点=开面板 ③换点其它技能=切内容。移动与其余三键唯一差异=瞄准语义（def.IsMove）；
-        /// 拖动式=B4 接线；瞄准态点按钮=无操作（退出走取消按钮/点非可选格）。</summary>
+        /// 拖动式=同键按下拖出即起瞄准（OnSkillButtonDragBegin）；瞄准态点按钮=无操作（退出走取消按钮/点非可选格）。</summary>
         private void OnSkillButtonClicked(SkillButtonDef def)
         {
             if (def == null || _state != HudState.UnitSelected) return;
@@ -1137,6 +1191,261 @@ namespace GIC.Battle
                 return;
             }
             ShowSkillPopup(def);
+        }
+
+        // ==================== 拖动式瞄准（B4，2026-09-26 落地；王者荣耀式手势+待定制：docs/18 决策六两方式之拖动） ====================
+
+        /// <summary>拖动式起手（SkillDragForwarder 转发，UGUI 拖拽阈值即起）：按住技能键拖出 → 进瞄准态
+        /// 高亮可选格（与点击式共用 EnterAiming/高亮/待定/取消全链）→ 拖动全程金色待定**单格**实时跟随 →
+        /// 松手=留待定（**不立即提交**——2026-09-26 拍板「一次选择 1 个格子、松手后不应立即完成选择」，
+        /// 与点击式同款，确认唯一入口=「完成选择」按钮）。瞄准=拖向（王者荣耀手势，同日纠偏拍板
+        /// 「不是拖出到格子上」）：方向由「按下点→指针」屏幕位移反投影到棋盘平面决定，**与指针落在
+        /// 棋盘哪里无关、手指不必离开按键区**。其余口径：①面板开着直接拖=无缝切换拖动式（决策六点击式③）
+        /// ②瞄准中拖另一键=换技能重瞄准（ExitAiming 收口旧选中环/待定后重进）③置灰键（无数据/元能/
+        /// 体力门槛）同点击式不可起手 ④部署瞄准（点手牌卡）无选中单位不接管 ⑤相机平移不串扰——
+        /// 拖拽起手在 UI 上，GestureHub 门2 拦下，BattleCameraController 的 Drag 识别器全程不见此指针序列。</summary>
+        private void OnSkillButtonDragBegin(SkillButtonDef def, PointerEventData eventData)
+        {
+            if (def == null || _layoutEditing) return;
+            if (_session == null || _session.Flow == null) return;
+            if (_session.Flow.Phase != BattlePhase.Selecting) return;
+            if (_deployAimUnit != 0) return;
+            // 置灰防线收口在处理端（同 OnSkillButtonClicked：Toggle.interactable 只拦 Selectable 自身，
+            // 转发件不受拦，docs/14 §63）
+            var toggle = def.view != null ? def.view.GetComponent<Toggle>() : null;
+            if (toggle != null && !toggle.interactable) return;
+
+            if (_state == HudState.Aiming) ExitAiming(); // 换技能重瞄准（_dragAiming 随收口清零）
+            if (_state != HudState.UnitSelected) return;  // Idle（无选中单位）不响应
+            _dragAiming = true;
+            EnterAiming(def);
+            ShowDragWheel(def, eventData.position);   // 王者荣耀式圆盘（大=键上锚点、小=手指夹取跟随）
+            UpdateDragAimPreview(eventData); // 起手即刷待定（阈值位移已含方向）
+        }
+
+        /// <summary>拖动中：金色待定单格实时跟随瞄准结果（方向型=拖向臂上第 k 格；指向型=指针附近
+        /// 锁定的目标格）；无有效瞄准=清待定（松手取消）</summary>
+        private void OnSkillButtonDrag(SkillButtonDef def, PointerEventData eventData)
+        {
+            if (!_dragAiming) return;
+            UpdateDragAimPreview(eventData);
+        }
+
+        /// <summary>松手收束（与点击式同款待定制，2026-09-26 拍板「松手后不应该立即完成选择」）：
+        /// 有效瞄准=保持金色待定单格与瞄准态，确认走「完成选择」按钮；**拖回技能盘任一键/取消钮上
+        /// 松手=取消回选中态**（王者荣耀"拖回轮盘中心取消"，兼防微拖误触）；无有效瞄准（方向臂空/
+        /// 指向无锁定）松手=取消。终帧以松手位校准（快甩时松手位与末帧 drag 位差一拍）。
+        /// 会话中途被外部收口（超时自动确认/阶段切换经 ExitAiming）时 _dragAiming 已清，此处无为。</summary>
+        private void OnSkillButtonDragEnd(SkillButtonDef def, PointerEventData eventData)
+        {
+            if (!_dragAiming) return;
+            _dragAiming = false;
+            if (_state != HudState.Aiming) { HideDragWheel(); return; }
+            UpdateDragAimPreview(eventData); // 圆盘未收——终帧校准与拖动中同用夹取指针（屏缘一致）
+            HideDragWheel(); // 手指已离键——圆盘随会话收（留待定路径也隐藏）
+            if (ReleaseOverDiscOrCancel(eventData.position) || !_pendingAimCell.HasValue)
+                ExitAiming();
+            // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
+        }
+
+        /// <summary>拖动瞄准实时解析（单格）：方向型（移动/直线）=轮心→小盘画布位移定十字方向+盘距
+        /// 占大圆盘半径的比例定步数（盘缘=该方向最远可选格）；指向型（延奏/契约）=拖向选目标（候选
+        /// 屏幕方向与拖向夹角最小且≤锥角者锁定——小盘限在轮盘内无法位移到目标）。
+        /// 输入=_dragDiscLocal（双夹取后盘位）——选中格的精确性全在大圆盘内。无有效瞄准=清待定</summary>
+        private void UpdateDragAimPreview(PointerEventData eventData)
+        {
+            UpdateDragWheel(eventData.position); // 小盘跟手+轮盘/屏幕双夹取（_dragDiscLocal=瞄准唯一输入）
+            bool directionSkill = _aimDef != null && (_aimDef.IsMove || IsLineSkill(_aimDef));
+            BattleCell? cell = directionSkill
+                ? ComputeDragAimCellFromWheel(_dragDiscLocal)
+                : FindNearestAimCellByWheelDirection(_dragDiscLocal);
+            if (cell.HasValue) SetPendingAimCell(cell.Value);
+            else ClearPendingAimCell();
+        }
+
+        /// <summary>方向型拖动瞄准解析（轮盘内单格，2026-09-26 三拍「选中格子的精确性应当限制在
+        /// 大圆盘范围里」）：轮心→小盘的**画布**位移定十字方向（相机 yaw 恒 0，画布轴向=世界轴向——
+        /// 不再反投影，大圆盘即瞄准面）；步数=盘距占大圆盘半径的比例×臂长（**盘缘=该方向最远可选格、
+        /// 近心=第 1 格**，四舍五入钳 1..臂长）——大圆盘=距离转盘，盘越大选格越精细。臂步 1..maxStep
+        /// 连续由 ComputeAimCells 保证（遇虚空截断）。无位移/无臂=null</summary>
+        private BattleCell? ComputeDragAimCellFromWheel(Vector2 discLocal)
+        {
+            Vector2 d = discLocal - _dragWheelCenterLocal;
+            if (d.sqrMagnitude < 1f) return null;
+            var snapshot = _session.Player.LatestSnapshot;
+            var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel == null) return null;
+
+            bool horizontal = Mathf.Abs(d.x) >= Mathf.Abs(d.y);
+            int cdx = horizontal ? (d.x >= 0 ? 1 : -1) : 0;
+            int cdy = horizontal ? 0 : (d.y >= 0 ? 1 : -1);
+
+            int maxStep = 0;
+            foreach (var c in _aimCells)
+            {
+                int adx = c.x - sel.position.x, ady = c.y - sel.position.y;
+                bool onArm = horizontal
+                    ? (ady == 0 && adx * cdx > 0)
+                    : (adx == 0 && ady * cdy > 0);
+                if (onArm) maxStep = Mathf.Max(maxStep, Mathf.Max(Mathf.Abs(adx), Mathf.Abs(ady)));
+            }
+            if (maxStep == 0) return null; // 该方向无臂（虚空/无格）
+
+            // 盘距→步数：大圆盘半径=全臂程（阴影可见缘已贴齐描环线——实心盘贴图补偿；盘缘=最远格、近心=第 1 格）
+            float axisCanvas = horizontal ? Mathf.Abs(d.x) : Mathf.Abs(d.y);
+            float norm = Mathf.Clamp01(axisCanvas / Mathf.Max(1f, 拖动瞄准大圆盘半径));
+            int k = Mathf.Clamp(Mathf.RoundToInt(norm * maxStep), 1, maxStep);
+            foreach (var c in _aimCells)
+            {
+                int adx = c.x - sel.position.x, ady = c.y - sel.position.y;
+                bool onArm = horizontal
+                    ? (ady == 0 && adx * cdx == k)
+                    : (adx == 0 && ady * cdy == k);
+                if (onArm) return c;
+            }
+            return null;
+        }
+
+        /// <summary>指向型拖动锁定（轮盘化推论，2026-09-26 三拍「小圆盘不超大圆盘」——小盘无法位移
+        /// 到散布全图的目标，改为**拖向选目标**）：候选目标格的屏幕方向与「轮心→小盘」拖向夹角最小者
+        /// 锁定，夹角须≤「拖动瞄准指向锥角」（默认 60°）；精确选择仍可点击式点格。无匹配=无锁定
+        /// （松手取消）</summary>
+        private BattleCell? FindNearestAimCellByWheelDirection(Vector2 discLocal)
+        {
+            var canvasRt = CanvasRect;
+            if (canvasRt == null || _camera == null) return null;
+            Vector2 dir = discLocal - _dragWheelCenterLocal;
+            if (dir.sqrMagnitude < 1f) return null;
+            dir.Normalize();
+
+            float minCos = Mathf.Cos(拖动瞄准指向锥角 * Mathf.Deg2Rad);
+            BattleCell? best = null;
+            float bestCos = minCos;
+            foreach (var c in _aimCells)
+            {
+                if (!_camera.TryProjectToScreen(_board.CellToWorld(c), out var screen)) continue;
+                if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, screen, null, out var candLocal))
+                    continue;
+                Vector2 candDir = candLocal - _dragWheelCenterLocal;
+                float candLen = candDir.magnitude;
+                if (candLen < 1f) continue;
+                float cos = Vector2.Dot(dir, candDir / candLen);
+                if (cos > bestCos) { bestCos = cos; best = c; }
+            }
+            return best;
+        }
+
+        /// <summary>松手是否落在取消钮/技能盘任一键上（王者荣耀"拖回轮盘中心取消"——拖出后拖回键区
+        /// 松手=取消瞄准；同时防微拖误触：不出键区不落待定）</summary>
+        private bool ReleaseOverDiscOrCancel(Vector2 screenPos)
+        {
+            if (_cancelButton != null
+                && RectTransformUtility.RectangleContainsScreenPoint(_cancelButton, screenPos, null)) return true;
+            foreach (var def in _skillButtons)
+                if (def?.rect != null && def.rect.gameObject.activeInHierarchy
+                    && RectTransformUtility.RectangleContainsScreenPoint(def.rect, screenPos, null)) return true;
+            return false;
+        }
+
+        // ==================== 拖动瞄准圆盘（2026-09-26 拍板：王者荣耀式大圆盘+小圆盘） ====================
+
+        /// <summary>圆盘显示：大圆盘锚在被拖技能键圆心（拖动位移的参照原点可视化）、小圆盘随手指。
+        /// 素材=项目现成资产复用（拍板纪律）：disc.png 实心圆盘（大=底盘色半透明+小=瞄准已选色金，
+        /// 小盘与金色待定格同色系联动）+ circle.png 细环做大圆盘描边（高亮金）；换美术只改
+        /// EnsureDragWheel 的 sprite 加载。Image.raycastTarget 全关——盘覆盖技能盘区域不拦点击/拖拽</summary>
+        private void ShowDragWheel(SkillButtonDef def, Vector2 pointerScreen)
+        {
+            EnsureDragWheel();
+            if (_dragWheelRoot == null) return;
+            _dragWheelRoot.SetActive(true);
+
+            // 大圆盘=技能键圆心（rect 世界角→画布局部；Overlay 画布世界坐标=屏幕像素）——
+            // 圆心即拖向/步距转盘原点（拍板三：选中格的精确性全在大圆盘内）
+            if (def?.rect != null)
+            {
+                def.rect.GetWorldCorners(_handCornersBuffer);
+                var centerWorld = (_handCornersBuffer[0] + _handCornersBuffer[2]) * 0.5f;
+                var local = CanvasRect.InverseTransformPoint(centerWorld);
+                _dragWheelCenterLocal = local;
+                _dragWheelBigFill.anchoredPosition = local;
+                _dragWheelBigRing.anchoredPosition = local;
+            }
+            else _dragWheelCenterLocal = Vector2.zero;
+            UpdateDragWheel(pointerScreen);
+        }
+
+        /// <summary>小圆盘跟手（双夹取）：①轮盘界——盘心不超大圆盘半径（拍板「小圆盘不应该超出
+        /// 大圆盘范围」）；②屏幕界——盘缘距屏幕边缘至少留「盘半径+边距」（拍板「圆盘不可超出屏幕
+        /// 边缘」；轮盘靠屏角时屏幕界优先）。夹取后的盘位 _dragDiscLocal=瞄准解析唯一输入</summary>
+        private void UpdateDragWheel(Vector2 pointerScreen)
+        {
+            var canvasRt = CanvasRect;
+            if (_dragWheelRoot == null || !_dragWheelRoot.activeSelf || canvasRt == null) return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, pointerScreen, null, out var local))
+                return;
+
+            // 轮盘界：轮心→盘向量夹到盘心距 ≤ 大圆盘半径
+            Vector2 d = local - _dragWheelCenterLocal;
+            float len = d.magnitude;
+            if (len > 拖动瞄准大圆盘半径 && len > 0f)
+                local = _dragWheelCenterLocal + d * (拖动瞄准大圆盘半径 / len);
+
+            // 屏幕界：盘缘不出屏（画布 rect=实际屏幕/scaleFactor，画布单位）
+            var half = canvasRt.rect.size * 0.5f;
+            float margin = 拖动瞄准小圆盘半径 + 拖动瞄准圆盘屏幕边距;
+            local.x = Mathf.Clamp(local.x, -half.x + margin, half.x - margin);
+            local.y = Mathf.Clamp(local.y, -half.y + margin, half.y - margin);
+
+            _dragWheelSmall.anchoredPosition = local;
+            _dragDiscLocal = local;
+        }
+
+        /// <summary>圆盘隐藏（松手/会话收口；幂等）</summary>
+        private void HideDragWheel()
+        {
+            if (_dragWheelRoot != null) _dragWheelRoot.SetActive(false);
+        }
+
+        /// <summary>圆盘三件懒建（首次拖动起手时建，BattleHud 随战斗实例销毁即回收）</summary>
+        private void EnsureDragWheel()
+        {
+            if (_dragWheelRoot != null || _canvas == null) return;
+            var canvasRt = (RectTransform)_canvas.transform;
+            _dragWheelRoot = new GameObject("DragAimWheel", typeof(RectTransform));
+            var rootRt = (RectTransform)_dragWheelRoot.transform;
+            rootRt.SetParent(canvasRt, false);
+            rootRt.anchorMin = Vector2.zero; // 全拉伸壳：子件中心锚=画布中心，anchoredPosition 即画布局部坐标
+            rootRt.anchorMax = Vector2.one;
+            rootRt.offsetMin = rootRt.offsetMax = Vector2.zero;
+            rootRt.SetAsLastSibling(); // 盘画在 HUD 最上层（仅视觉，无射线）
+            _dragWheelRoot.SetActive(false);
+
+            var disc = Resources.Load<Sprite>("UI/Backpack/TabGlyphs/disc");   // 实心白圆盘
+            var ring = Resources.Load<Sprite>("UI/Skills/circle");              // 细环
+            if (disc == null) GICLog.Warn("[BattleHud] disc.png（TabGlyphs）未找到——拖动圆盘不显示");
+            if (ring == null) GICLog.Warn("[BattleHud] circle.png（Skills）未找到——大圆盘描环不显示");
+            _dragWheelBigFill = MakeWheelDisc("BigFill", rootRt, disc, 拖动瞄准大圆盘半径 * 实心盘贴图补偿,
+                new Color(Palette.按钮底盘.r, Palette.按钮底盘.g, Palette.按钮底盘.b, 0.45f));
+            _dragWheelBigRing = MakeWheelDisc("BigRing", rootRt, ring, 拖动瞄准大圆盘半径,
+                new Color(Palette.高亮金.r, Palette.高亮金.g, Palette.高亮金.b, 0.8f));
+            _dragWheelSmall = MakeWheelDisc("SmallDisc", rootRt, disc, 拖动瞄准小圆盘半径 * 实心盘贴图补偿,
+                Palette.瞄准已选色);
+        }
+
+        /// <summary>圆盘子件（中心锚；尺寸=半径×2；raycastTarget 恒关）</summary>
+        private static RectTransform MakeWheelDisc(string name, RectTransform parent, Sprite sprite,
+            float radius, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(radius * 2f, radius * 2f);
+            var img = go.GetComponent<Image>();
+            img.sprite = sprite;
+            img.color = color;
+            img.raycastTarget = false; // 盘覆盖技能盘区，勿拦射线
+            return rt;
         }
 
         private void ShowSkillPopup(SkillButtonDef def)
@@ -1272,6 +1581,14 @@ namespace GIC.Battle
             _pendingAimCell = cell;
             if (_aimQuadByCell.TryGetValue(cell, out var renderer) && renderer != null)
                 renderer.sharedMaterial = GetAimPendingMaterial();
+        }
+
+        /// <summary>清待定格并还原材质（拖动瞄准用：拖向移出有效区/无有效瞄准时调用——松手即"无待定=取消"）</summary>
+        private void ClearPendingAimCell()
+        {
+            if (!_pendingAimCell.HasValue) return;
+            RestorePendingCellMaterial();
+            _pendingAimCell = null;
         }
 
         /// <summary>待定格还原回推荐/不推荐共享材质（变更待定格/退出瞄准前调用）</summary>

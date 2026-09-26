@@ -78,6 +78,14 @@ namespace GIC.Battle
                     forwarder = def.content.gameObject.AddComponent<SkillClickForwarder>();
                 var captured = buttonDef; // 闭包捕获
                 forwarder.onClick = () => OnSkillButtonClicked(captured);
+                // 拖动式瞄准转发（B4，2026-09-26）：拖过 UGUI 阈值起拖动瞄准——按下未拖/拖回原键松手
+                // 仍走点击式三情况（指针未离键时 UGUI 不判拖拽起手/点击照发）
+                var dragForwarder = def.content.GetComponent<SkillDragForwarder>();
+                if (dragForwarder == null)
+                    dragForwarder = def.content.gameObject.AddComponent<SkillDragForwarder>();
+                dragForwarder.onBeginDrag = e => OnSkillButtonDragBegin(captured, e);
+                dragForwarder.onDrag = e => OnSkillButtonDrag(captured, e);
+                dragForwarder.onEndDrag = e => OnSkillButtonDragEnd(captured, e);
                 buttonDef.nameText = def.content.Find("Name")?.GetComponent<TextCombiner>();
                 _skillButtons.Add(buttonDef);
                 if (buttonDef.IsMove) _moveDef = buttonDef;
@@ -228,6 +236,25 @@ namespace GIC.Battle
         {
             public Action onClick;
             public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData) => onClick?.Invoke();
+        }
+
+        /// <summary>技能按钮拖动转发（拖动式瞄准，B4 2026-09-26）：与 SkillClickForwarder 同思路——
+        /// Toggle 是 Selectable 非 IDragHandler 宿主，拖拽事件由独立转发件承载。事件冒泡说明：
+        /// 命中在控件/图标上时冒泡至本件（content 层）；布局编辑期命中在拖拽板（DragPlate，slot 直属）
+        /// 上时冒泡至 slot 的 LayoutDragHandler，与本件互不串扰（编辑期拖动瞄准由
+        /// OnSkillButtonDragBegin 的 _layoutEditing 守卫双保险）。</summary>
+        private class SkillDragForwarder : MonoBehaviour,
+            UnityEngine.EventSystems.IBeginDragHandler,
+            UnityEngine.EventSystems.IDragHandler,
+            UnityEngine.EventSystems.IEndDragHandler
+        {
+            public Action<UnityEngine.EventSystems.PointerEventData> onBeginDrag;
+            public Action<UnityEngine.EventSystems.PointerEventData> onDrag;
+            public Action<UnityEngine.EventSystems.PointerEventData> onEndDrag;
+
+            public void OnBeginDrag(UnityEngine.EventSystems.PointerEventData eventData) => onBeginDrag?.Invoke(eventData);
+            public void OnDrag(UnityEngine.EventSystems.PointerEventData eventData) => onDrag?.Invoke(eventData);
+            public void OnEndDrag(UnityEngine.EventSystems.PointerEventData eventData) => onEndDrag?.Invoke(eventData);
         }
     }
 }
