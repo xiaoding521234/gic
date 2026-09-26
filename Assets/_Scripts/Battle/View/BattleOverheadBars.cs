@@ -11,7 +11,7 @@ namespace GIC.Battle
     /// 不参与 3D 深度测试：不受场景遮挡、任何角度读正面。逐帧把立牌头顶锚点（UnitView.OverheadBarAnchor，
     /// 含 55° 后仰偏移）投影为屏幕位置——相机缩放/相机平移/队形位移时条条都贴住单位头顶。
     /// 结构（自上往下）：血条（**填充色=队伍色**（2026-09-25 目检拍板：与底座同色，替换原敌我绿/红）+圆角黑边底图
-    /// +原神分隔线，默认 4 段）→ 元能条（**白色**（同日拍板，原元能蓝退役）+圆角黑边，分隔量子=10 与 B6a 获取粒度
+    /// +原神量子刻度（2026-09-26 拍板「每 50 段，上限 10 段」：血条每 50 点血一格、上限 10 段，MaxHp 不足一段=无刻度线）→ 元能条（**白色**（同日拍板，原元能蓝退役）+圆角黑边，分隔量子=10 与 B6a 获取粒度
     /// 一致，段数上限 10）→ 附着小图标在血条左缘（风格沿用原神血条左侧附着的排法）。
     /// 底图=BattleViewFactory.BarBgSprite/BarFillSprite 运行时程序化圆角 sprite（黑边框 rgb=0 恒黑、白芯乘 tint=本色）；
     /// 名字/Buff 徽章仍挂立牌倾斜组（「都应当斜」拍板未推翻）。无 GraphicRaycaster（勿补——会挡 HUD 点击）。
@@ -26,9 +26,12 @@ namespace GIC.Battle
         [SerializeField] private float 附着图标宽 = 16f;
         [SerializeField] private float 分隔线宽 = 2f;
 
-        [Header("分隔（原神分隔风格：条内均匀竖线刻度）")]
-        [Tooltip("血条分隔段数（4=3 条分隔线，刻度在 25%/50%/75%）")]
-        [SerializeField] private int 血条分隔段数 = 4;
+        [Header("分隔（原神分隔风格）")]
+        [Tooltip("血条每段血量（每 50 点血一格；MaxHp 不足一段=无刻度线）")]
+        [SerializeField] private int 血条每段血量 = 50;
+
+        [Tooltip("血条分隔段数上限（大血量单位钳制防刻度拥挤）")]
+        [SerializeField] private int 血条分隔段数上限 = 10;
 
         [Tooltip("元能条每段量子（=B6a 获取粒度 +10：每攒 10 成一格）")]
         [SerializeField] private int 元能分隔量子 = 10;
@@ -146,10 +149,10 @@ namespace GIC.Battle
             var enBar = NewBar("EnergyBar", rootRect, new Vector2(0f, -(血条高 * 0.5f + 条间距 + 元能条高 * 0.5f)),
                 血条宽, 元能条高, Palette.血条底, Palette.元能条色, out var enFill);
 
-            BuildTicks(hpBar, 血条宽, 血条高, NormalizeSegments(血条分隔段数));
-            int enSegments = Mathf.Clamp(
-                view.EnergyMax > 0 && 元能分隔量子 > 0 ? view.EnergyMax / 元能分隔量子 : 0, 0, 元能分隔段数上限);
-            BuildTicks(enBar, 血条宽, 元能条高, enSegments);
+            // 量子刻度（2026-09-26 拍板「每 50 段，上限 10 段」）：刻度线落在 每段值×k/总量 处——
+            // 血条每 50 点血一格（MaxHp 非 50 倍数时末段不满，线位仍=50 的整数倍血）；元能=每 10 点一格
+            BuildTicks(hpBar, 血条宽, 血条高, 血条每段血量, view.MaxHp, 血条分隔段数上限);
+            BuildTicks(enBar, 血条宽, 元能条高, 元能分隔量子, view.EnergyMax, 元能分隔段数上限);
 
             // 附着图标（血条左缘外；Physical=隐藏由 Update 驱动）
             var iconGo = new GameObject("AttachIcon", typeof(RectTransform), typeof(Image));
@@ -169,8 +172,6 @@ namespace GIC.Battle
                 HpFill = hpFill, EnFill = enFill, EnBarRoot = enBar.gameObject, AttachIcon = iconImage,
             };
         }
-
-        private static int NormalizeSegments(int segments) => Mathf.Max(0, segments);
 
         /// <summary>单条：圆角底（黑边框+白芯乘底色 tint；sprite=资产 BarBg.png）+ 填充（圆角 BarFill.png，
         /// **内缩边框厚度**——同尺寸会整盖住底图边框环致黑边不可见，2026-09-25 目检实锤；Image Filled 左起，
@@ -200,13 +201,18 @@ namespace GIC.Battle
         }
 
         /// <summary>分隔线组（原神分隔：count 段=count−1 条竖线，均布于条内；count≤1 不画）</summary>
-        private void BuildTicks(RectTransform bar, float w, float h, int segments)
+        /// <summary>量子刻度线组（原神分隔）：每段=quantum 个单位，段数=ceil(total/quantum) 钳 [0, maxSegments]；
+        /// 刻度线落在 quantum×k / total 比例处（k=1..段数−1）——total 为 quantum 整数倍时=均分（元能条恒如此，
+        /// 与旧均分画法数学恒等）；非整数倍时末段不满、线位仍标在 quantum 整数倍血量处。quantum/total≤0 不画</summary>
+        private void BuildTicks(RectTransform bar, float w, float h, int quantum, float total, int maxSegments)
         {
+            if (quantum <= 0 || total <= 0f) return;
+            int segments = Mathf.Clamp(Mathf.CeilToInt(total / quantum), 0, Mathf.Max(0, maxSegments));
             if (segments <= 1) return;
             var tickColor = Palette.血条底;
             for (int i = 1; i < segments; i++)
             {
-                float x = -w * 0.5f + w * i / segments;
+                float x = -w * 0.5f + w * (quantum * i) / total;
                 NewImage(bar, $"Tick{i}", new Vector2(x, 0f), new Vector2(分隔线宽, h), tickColor);
             }
         }

@@ -93,7 +93,8 @@ namespace GIC.Data
 
             public int GetHPByStarLevel()
             {
-                return starLevel switch { 1 => 150, 2 => 200, 3 => 200, 4 => 300, 5 => 600, _ => 200 };
+                // 2026-09-26 拍板：1★=100、2★=150（低星更脆）；3~5★ 维持原值
+                return starLevel switch { 1 => 100, 2 => 150, 3 => 200, 4 => 300, 5 => 600, _ => 200 };
             }
 
             public int GetAttackByWeaponType()

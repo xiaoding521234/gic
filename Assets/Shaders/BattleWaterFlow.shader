@@ -21,7 +21,10 @@ Shader "GIC/Battle/WaterFlow"
     {
         Tags
         {
-            "Queue"="Transparent"
+            // Transparent-1=2999：整片水面单 Mesh 的透明排序按物体包围盒中心算——远端小贴片（瞄准高亮/
+            // 选中标记）比湖心远时被水面后画盖过「贴片到水面下」（2026-09-26 报障实锤，docs/14 §89 第六轮）。
+            // 降到标准透明件之下：一切 3000 件（贴片/立牌/箭矢）恒后画于水面；水下无其它透明物（湖床 2000 不透明）。
+            "Queue"="Transparent-1"
             "RenderType"="Transparent"
             "IgnoreProjector"="True"
         }

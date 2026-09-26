@@ -274,8 +274,24 @@ namespace GIC.Battle
             _session.Flow.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
+            if (_inputManager != null)
+            {
+                _inputManager.OnActionTriggered -= OnInputAction; // 幂等：重复 Bind 防重订阅
+                _inputManager.OnActionTriggered += OnInputAction; // 快捷键：KeyAction.Confirm（默认空格/回车）→完成选择
+            }
 
             RefreshFromSnapshot(_session.Player.LatestSnapshot);
+        }
+
+        /// <summary>输入系统快捷键派发（[Autowired] 注入；Bind 注入后订阅，docs/14 §78 寻址/注入分离）</summary>
+        [Autowired] private InputManager _inputManager;
+
+        /// <summary>快捷键动作（2026-09-26 拍板「按下空格=快速按下完成选择按钮」）：
+        /// 复用 KeyAction.Confirm 通用确认（默认绑定 空格/回车，设置页可重绑）——战斗场景订阅触发，
+        /// 语义全在 OnConfirmButtonClicked（阶段门/布局编辑守卫/定死/待定金格提交/无待定空过，与按钮零差异）</summary>
+        private void OnInputAction(GIC.Framework.KeyAction action)
+        {
+            if (action == KeyAction.Confirm) OnConfirmButtonClicked();
         }
 
         private void OnDestroy()
@@ -297,6 +313,8 @@ namespace GIC.Battle
             }
             if (_camera != null)
                 _camera.OnBoardTap -= OnBoardTap;
+            if (_inputManager != null)
+                _inputManager.OnActionTriggered -= OnInputAction;
 
             // 世界层运行时材质释放（Destroy 物体不销材质，不释放则跨战斗累积）
             if (_aimRecommendedMaterial != null) Destroy(_aimRecommendedMaterial);
@@ -364,6 +382,11 @@ namespace GIC.Battle
 
         private void Update()
         {
+            // 防快捷键双触发：UGUI 选中件把 Space/Enter 当 Submit 重发 onClick（KeyBindingSettingItem 同款坑）——
+            // 战斗 HUD 无键盘导航、选中态无用途，每帧清空（2026-09-26 空格快捷键接线）
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+                EventSystem.current.SetSelectedGameObject(null);
+
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
 
             // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」）：
