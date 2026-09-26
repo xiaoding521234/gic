@@ -24,11 +24,15 @@ namespace GIC.Battle
         [SerializeField] private List<ForceData> _activeForces = new();
 
         private List<MoveableModifier> _modifiers = new();
+        private bool _与友方互不阻挡; // 非序列化：UnitConfig 单源（Init 镜像），勿做 Inspector 第二编辑点
 
         public ForceType NormalMoveType => GetFinalNormalMoveType();
         public bool BlockAllies => GetFinalBlockAllies();
         public bool BlockEnemies => GetFinalBlockEnemies();
         public bool BlockedByEnemies => GetFinalBlockedByEnemies();
+        /// <summary>与友方互不阻挡（双向：本单位不挡友方+本单位穿友方；UnitConfig.与友方互不阻挡 单源镜像；
+        /// 暂无 Buff 修饰路径——未来需要再加 MoveableModifierType）</summary>
+        public bool 与友方互不阻挡 => _与友方互不阻挡;
         public IReadOnlyList<ForceData> ActiveForces => _activeForces;
 
         public void Init(Unit owner)
@@ -40,6 +44,7 @@ namespace GIC.Battle
             _blockAllies = owner.RawData.blockAllies;
             _blockEnemies = owner.RawData.blockEnemies;
             _blockedByEnemies = owner.RawData.blockedByEnemies;
+            _与友方互不阻挡 = owner.RawData.与友方互不阻挡;
         }
 
         private ForceType GetFinalNormalMoveType()

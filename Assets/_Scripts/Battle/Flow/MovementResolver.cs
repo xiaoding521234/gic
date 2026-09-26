@@ -183,9 +183,12 @@ namespace GIC.Battle
                 var occupantIdentity = occupant.GetUnitComponent<UnitIdentity>();
                 bool sameTeam = selfIdentity != null && occupantIdentity != null && selfIdentity.IsSameTeam(occupantIdentity);
 
-                // 2026-09-26 拍板「所有飞行单位与我方互不阻挡」：飞行移动者忽略友方阻挡
-                //（另一方向=飞行单位自身 blockAllies=false 由 UnitConfig 批改承接）。
-                if (sameTeam && occupantMoveable.BlockAllies && forceType != ForceType.Fly)
+                // 与友方互不阻挡（UnitConfig.与友方互不阻挡 单字段双向，2026-09-26 拍板「只要这个
+                // 单位 互不阻挡 字段为 true，无论是他穿其它友军，还是友军穿他，都不阻挡」——
+                // 配置驱动：改 UnitConfig 即四处全响应，勿写死类型/拆字段）。
+                if (sameTeam && occupantMoveable.BlockAllies
+                    && !occupantMoveable.与友方互不阻挡
+                    && (moveable == null || !moveable.与友方互不阻挡))
                     return false;
 
                 if (!sameTeam && occupantMoveable.BlockEnemies && moveable != null && moveable.BlockedByEnemies)

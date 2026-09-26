@@ -1039,8 +1039,10 @@ namespace GIC.Battle
                 var occupantData = TryGetUnitData(u.unitName);
                 if (occupantData == null) continue;
                 bool sameTeam = (TeamType)u.team == (TeamType)self.team; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
-                // 飞行单位与我方互不阻挡（2026-09-26 拍板）：飞行移动者忽略友方阻挡（Host MovementResolver 同口径）
-                if (sameTeam && occupantData.blockAllies && forceType != ForceType.Fly) return false;
+                // 与友方互不阻挡（UnitConfig.与友方互不阻挡 单字段双向——配置驱动，Host MovementResolver 同口径）
+                if (sameTeam && occupantData.blockAllies
+                    && !occupantData.与友方互不阻挡
+                    && (selfData == null || !selfData.与友方互不阻挡)) return false;
                 if (!sameTeam && occupantData.blockEnemies && selfData != null && selfData.blockedByEnemies)
                     return false;
             }
@@ -1068,9 +1070,10 @@ namespace GIC.Battle
                 var occupantData = TryGetUnitData(u.unitName);
                 if (occupantData == null) continue;
                 bool sameTeam = (TeamType)u.team == MyTeam; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
-                // 飞行单位与我方互不阻挡（2026-09-26 拍板）：部署飞行单位忽略友方阻挡（Host DeployUnitExecutor 同口径）
+                // 与友方互不阻挡（UnitConfig.与友方互不阻挡 单字段双向——配置驱动，Host DeployUnitExecutor 同口径）
                 if (sameTeam && occupantData.blockAllies
-                    && (deployData == null || deployData.normalMoveType != ForceType.Fly)) return false;
+                    && !occupantData.与友方互不阻挡
+                    && (deployData == null || !deployData.与友方互不阻挡)) return false;
                 if (!sameTeam && occupantData.blockEnemies && deployData != null && deployData.blockedByEnemies)
                     return false;
             }

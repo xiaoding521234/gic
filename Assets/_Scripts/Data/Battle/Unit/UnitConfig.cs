@@ -62,6 +62,11 @@ namespace GIC.Data
             public bool blockAllies = true;
             public bool blockEnemies = true;
             public bool blockedByEnemies = true;
+            /// <summary>与友方互不阻挡（2026-09-26 拍板「只要这个单位 互不阻挡 字段为 true，无论是他穿
+            /// 其它友军，还是友军穿他，都不阻挡」——双向豁免单字段：本单位不阻挡友方进入其格 +
+            /// 本单位移动/部署也不被友方阻挡。配置驱动单源：MovementResolver/DeployUnitExecutor/
+            /// 两客户端预览四处同读，改配置即全链路响应）</summary>
+            public bool 与友方互不阻挡 = false;
 
             [Header("元素")]
             public ElementType selfElement = ElementType.Physical;
