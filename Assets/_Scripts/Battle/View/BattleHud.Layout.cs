@@ -280,7 +280,9 @@ namespace GIC.Battle
             def.slot.anchoredPosition = Vector2.zero;
         }
 
-        /// <summary>拖拽实时夹边（件中心保持在画布 2%~98% 内）</summary>
+        /// <summary>拖拽实时夹边：**件完整矩形**保持在画布内（+16px 边距）——2026-09-26 拍板
+        /// 「确保技能按钮不会超出屏幕」：原仅夹中心到 2%~98%，半宽件可伸出屏外约半宽
+        /// （220 槽中心贴 2% 时挂出 ~59px）。画布装不下整件（缩小视口/超大缩放）时退回夹中心 2%~98%。</summary>
         private void ClampSlotToCanvas(LayoutWidgetDef def)
         {
             var canvasRect = _canvas.GetComponent<RectTransform>().rect;
@@ -289,8 +291,13 @@ namespace GIC.Battle
             Vector2 uv = def.slot.anchorMin;
             Vector2 ap = def.slot.anchoredPosition;
             Vector2 center = new Vector2((uv.x - 0.5f) * w + ap.x, (uv.y - 0.5f) * h + ap.y);
-            float mx = w * (0.5f - LayoutUVMargin);
-            float my = h * (0.5f - LayoutUVMargin);
+            // 槽自身矩形×布局缩放=画布单位实际尺寸；半宽+16px 边距=完整矩形不出屏的钳制半径
+            var sr = def.slot.rect;
+            var sc = def.slot.localScale;
+            float halfW = Mathf.Abs(sr.width) * Mathf.Abs(sc.x) * 0.5f + 16f;
+            float halfH = Mathf.Abs(sr.height) * Mathf.Abs(sc.y) * 0.5f + 16f;
+            float mx = w * 0.5f > halfW ? w * 0.5f - halfW : w * (0.5f - LayoutUVMargin);
+            float my = h * 0.5f > halfH ? h * 0.5f - halfH : h * (0.5f - LayoutUVMargin);
             def.slot.anchoredPosition = new Vector2(
                 ap.x + Mathf.Clamp(center.x, -mx, mx) - center.x,
                 ap.y + Mathf.Clamp(center.y, -my, my) - center.y);

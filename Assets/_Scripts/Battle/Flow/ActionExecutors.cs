@@ -205,6 +205,9 @@ namespace GIC.Battle
 
             // 阻挡规则层：与格内任一单位互相阻挡即不可部署（碰撞配置读运行时组件，与移动判定同源）
             var selfTeam = sim.GetTeamOf(playerId);
+            // 2026-09-26 拍板「所有飞行单位与我方互不阻挡」：部署飞行单位忽略友方阻挡
+            //（另一方向=飞行单位自身 blockAllies=false 由 UnitConfig 批改承接）
+            bool deployIsFly = deployData != null && deployData.normalMoveType == ForceType.Fly;
             foreach (var occupant in occupants)
             {
                 var occupantMoveable = occupant.GetUnitComponent<UnitMoveable>();
@@ -212,7 +215,7 @@ namespace GIC.Battle
                 if (occupantMoveable == null || occupantIdentity == null) continue;
 
                 bool sameTeam = occupantIdentity.Team == selfTeam;
-                if (sameTeam && occupantMoveable.BlockAllies) return false;
+                if (sameTeam && occupantMoveable.BlockAllies && !deployIsFly) return false;
                 if (!sameTeam && occupantMoveable.BlockEnemies && deployData != null && deployData.blockedByEnemies)
                     return false;
             }

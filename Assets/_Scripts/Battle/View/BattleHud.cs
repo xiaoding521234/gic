@@ -70,8 +70,8 @@ namespace GIC.Battle
         [SerializeField] private float 倒计时脉动幅度 = 0.12f;
         [Tooltip("告急字号呼吸频率（次/秒）")]
         [SerializeField] private float 倒计时脉动频率 = 1.5f;
-        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放恒定；迭代链 0.3→0.22→0.15（2026-09-26 两拍「调细」）；首版 UGUI Outline 固定像素描边在缩放视口下不可见已弃用）")]
-        [SerializeField] private float 倒计时描边宽度 = 0.15f;
+        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放恒定；迭代链 0.3→0.22→0.15→0.08（2026-09-26 三拍「调细」）；首版 UGUI Outline 固定像素描边在缩放视口下不可见已弃用）")]
+        [SerializeField] private float 倒计时描边宽度 = 0.08f;
 
         [Header("拖动式瞄准（B4，2026-09-26 落地：王者荣耀式手势+待定制——按下拖出，拖向=瞄准方向，松手=留金色待定单格）")]
         [Tooltip("指向型瞄准（延奏/契约）拖向锁定锥角（度）：候选目标屏幕方向与「轮心→小盘」拖向的夹角不超过此值才锁定（轮盘化后小盘无法位移到目标——以拖向选目标，夹角最小者胜；精确选择仍可点击式点格）")]
@@ -231,8 +231,8 @@ namespace GIC.Battle
         private RectTransform _dragWheelBigFill;  // 大圆盘填充（disc.png×底盘半透明）
         private RectTransform _dragWheelBigRing;  // 大圆盘描环（circle.png×高亮金细线）
         private RectTransform _dragWheelSmall;    // 小圆盘（disc.png×瞄准已选色——与金色待定格同色系联动）
-        private Vector2 _dragWheelCenterLocal;    // 大圆盘圆心（=被拖技能键圆心，画布局部）——拖向/步距转盘原点
-        private Vector2 _dragDiscLocal;           // 小圆盘画布局部（轮盘界+屏幕界双夹取后）——瞄准解析唯一输入
+        private Vector2 _dragWheelCenterLocal;    // 大圆盘圆心（自适应位：键心沿两轴夹进画布内，画布局部）——格子判定基准/转盘原点
+        private Vector2 _dragDiscLocal;           // 小圆盘画布局部（指针贴身、夹在盘内）——瞄准解析唯一输入（对盘心取差=盘上位置）
 
         /// <summary>HUD 画布 RectTransform（盘位换算用；Overlay 画布世界坐标=屏幕像素）</summary>
         private RectTransform CanvasRect => _canvas != null ? (RectTransform)_canvas.transform : null;
@@ -1039,7 +1039,8 @@ namespace GIC.Battle
                 var occupantData = TryGetUnitData(u.unitName);
                 if (occupantData == null) continue;
                 bool sameTeam = (TeamType)u.team == (TeamType)self.team; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
-                if (sameTeam && occupantData.blockAllies) return false;
+                // 飞行单位与我方互不阻挡（2026-09-26 拍板）：飞行移动者忽略友方阻挡（Host MovementResolver 同口径）
+                if (sameTeam && occupantData.blockAllies && forceType != ForceType.Fly) return false;
                 if (!sameTeam && occupantData.blockEnemies && selfData != null && selfData.blockedByEnemies)
                     return false;
             }
@@ -1049,7 +1050,8 @@ namespace GIC.Battle
         /// <summary>部署落点推荐预判（镜像 DeployUnitExecutor.IsDeployCellValid 碰撞判定链的客户端静态版，
         /// 2026-09-25 拍板「根据碰撞决定」）：地形层（按部署单位常态移动类型）→ 体积绝对层（现有+自身 ≤3，
         /// 最高级不可绕过）→ 阻挡规则层（与格内全部单位互不阻挡才推荐）；碰撞配置读 UnitData——运行时
-        /// Buff 修改不可见，属提示非校验，Host 结算兜底。含尸体——尸体保留碰撞。部署单位尚未登场，无自身豁免。</summary>
+        /// Buff 修改不可见，属提示非校验，Host 结算兜底。含尸体——尸体保留碰撞。部署单位尚未登场无运行时
+        /// 组件——飞行互不阻挡豁免按 UnitData.normalMoveType 配置口径判（2026-09-26 拍板）。</summary>
         private bool CanDeployEnterPreview(BattleCell cell, UnitConfig.UnitData deployData, BattleSnapshot snapshot)
         {
             var forceType = deployData != null ? deployData.normalMoveType : ForceType.Walk;
@@ -1066,7 +1068,9 @@ namespace GIC.Battle
                 var occupantData = TryGetUnitData(u.unitName);
                 if (occupantData == null) continue;
                 bool sameTeam = (TeamType)u.team == MyTeam; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
-                if (sameTeam && occupantData.blockAllies) return false;
+                // 飞行单位与我方互不阻挡（2026-09-26 拍板）：部署飞行单位忽略友方阻挡（Host DeployUnitExecutor 同口径）
+                if (sameTeam && occupantData.blockAllies
+                    && (deployData == null || deployData.normalMoveType != ForceType.Fly)) return false;
                 if (!sameTeam && occupantData.blockEnemies && deployData != null && deployData.blockedByEnemies)
                     return false;
             }
@@ -1241,8 +1245,8 @@ namespace GIC.Battle
             if (_state != HudState.UnitSelected) return;  // Idle（无选中单位）不响应
             _dragAiming = true;
             EnterAiming(def);
-            ShowDragWheel(def, eventData.position);   // 王者荣耀式圆盘（大=键上锚点、小=手指夹取跟随）
-            UpdateDragAimPreview(eventData); // 起手即刷待定（阈值位移已含方向）
+            ShowDragWheel(def, eventData.position);   // 王者荣耀式圆盘（大=键心自适应锚位、小=指针贴身不出盘）
+            UpdateDragAimPreview(eventData); // 起手即按盘上位置刷待定（键位≠盘心时起手即有初始待定——判定相对盘心的直接后果）
         }
 
         /// <summary>拖动中：金色待定单格实时跟随瞄准结果（方向型=拖向臂上第 k 格；指向型=指针附近
@@ -1272,10 +1276,10 @@ namespace GIC.Battle
             // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
         }
 
-        /// <summary>拖动瞄准实时解析（单格）：方向型（移动/直线）=轮心→小盘画布位移定十字方向+盘距
-        /// 占大圆盘半径的比例定步数（盘缘=该方向最远可选格）；指向型（延奏/契约）=拖向选目标（候选
-        /// 屏幕方向与拖向夹角最小且≤锥角者锁定——小盘限在轮盘内无法位移到目标）。
-        /// 输入=_dragDiscLocal（双夹取后盘位）——选中格的精确性全在大圆盘内。无有效瞄准=清待定</summary>
+        /// <summary>拖动瞄准实时解析（单格）：判定基准=**大圆盘圆心**——方向型（移动/直线）=盘心→小盘
+        /// 位移定十字方向+盘距比例定步数（盘缘=该方向最远可选格、死区缘=第 1 格）；指向型（延奏/契约）=
+        /// 拖向选目标（候选屏幕方向（相对盘心）与拖向夹角最小且≤锥角者锁定）。输入=_dragDiscLocal
+        /// （小盘位=盘上位置）。无有效瞄准=清待定</summary>
         private void UpdateDragAimPreview(PointerEventData eventData)
         {
             UpdateDragWheel(eventData.position); // 小盘跟手+轮盘/屏幕双夹取（_dragDiscLocal=瞄准唯一输入）
@@ -1287,18 +1291,18 @@ namespace GIC.Battle
             else ClearPendingAimCell();
         }
 
-        /// <summary>方向型拖动瞄准解析（轮盘内单格，2026-09-26 三拍「选中格子的精确性应当限制在
-        /// 大圆盘范围里」）：轮心→小盘的**画布**位移定十字方向（相机 yaw 恒 0，画布轴向=世界轴向——
-        /// 不再反投影，大圆盘即瞄准面）；步数=盘距越过死区后的比例×臂长（**盘缘=该方向最远可选格、
-        /// 死区缘=第 1 格**，四舍五入钳 1..臂长）——大圆盘=距离转盘，盘越大选格越精细。臂步 1..maxStep
-        /// 连续由 ComputeAimCells 保证（遇虚空截断）。键心死区内（小盘未真离键）/无臂=null</summary>
+        /// <summary>方向型拖动瞄准解析（轮盘内单格）：**判定基准=大圆盘圆心**（2026-09-26 三拍
+        /// 「拖动的格子判定应当是相对于大圆盘中心」）——小盘在盘上的位置=瞄准真值，盘=标尺：
+        /// 十字方向=盘心→小盘位移的轴主导量化（相机 yaw 恒 0，画布轴向=世界轴向——不再反投影）；
+        /// 步数=盘距越过盘心死区后的比例×臂长（**盘缘=该方向最远可选格、死区缘=第 1 格**，四舍五入
+        /// 钳 1..臂长）——大圆盘=距离转盘，盘越大选格越精细；小盘被夹在盘内，拖到盘缘=该方向拖满
+        /// （盘已自适应入屏，盘上任一位置鼠标可达）。臂步 1..maxStep 连续由 ComputeAimCells 保证
+        /// （遇虚空截断）。盘心死区内（小盘未拖出盘心圈）/无臂=null。
+        /// 键心死区带拍板=2026-09-26 报障返修「只拖最近的1格松开判定我空放」（docs/14 §87）。</summary>
         private BattleCell? ComputeDragAimCellFromWheel(Vector2 discLocal)
         {
             Vector2 d = discLocal - _dragWheelCenterLocal;
-            // 键心死区（=小圆盘半径）：小盘仍压着键心=未真离键——防微拖误触/拖回取消目标。
-            // 2026-09-26 报障返修：键槽矩形（220×220，半宽 110）做松手取消区会把「第 1 格」整条
-            // 盘距带（0~102px）吃掉——短拖松手指针必在键槽内，被判「拖回键区」空放。
-            if (d.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null;
+            if (d.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null; // 盘心死区
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return null;
@@ -1318,7 +1322,8 @@ namespace GIC.Battle
             }
             if (maxStep == 0) return null; // 该方向无臂（虚空/无格）
 
-            // 盘距→步数：死区缘=第 1 格、盘缘=最远格（大圆盘半径=全臂程，阴影可见缘已贴齐描环线——实心盘贴图补偿）
+            // 盘距→步数：死区缘=第 1 格、盘缘=最远格（大圆盘半径=全臂程；小盘夹在盘内，
+            // 拖到盘缘=该方向拖满——盘已自适应入屏）
             float axisCanvas = horizontal ? Mathf.Abs(d.x) : Mathf.Abs(d.y);
             float span = Mathf.Max(1f, 拖动瞄准大圆盘半径 - 拖动瞄准小圆盘半径);
             float norm = Mathf.Clamp01((axisCanvas - 拖动瞄准小圆盘半径) / span);
@@ -1334,16 +1339,15 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>指向型拖动锁定（轮盘化推论，2026-09-26 三拍「小圆盘不超大圆盘」——小盘无法位移
-        /// 到散布全图的目标，改为**拖向选目标**）：候选目标格的屏幕方向与「轮心→小盘」拖向夹角最小者
-        /// 锁定，夹角须≤「拖动瞄准指向锥角」（默认 60°）；精确选择仍可点击式点格。无匹配=无锁定
-        /// （松手取消）</summary>
+        /// <summary>指向型拖动锁定：候选目标格的屏幕方向（相对**盘心**——与拖向同基准）与
+        /// 「盘心→小盘」拖向夹角最小者锁定，夹角须≤「拖动瞄准指向锥角」（默认 60°）；
+        /// 精确选择仍可点击式点格。无匹配=无锁定（松手取消）</summary>
         private BattleCell? FindNearestAimCellByWheelDirection(Vector2 discLocal)
         {
             var canvasRt = CanvasRect;
             if (canvasRt == null || _camera == null) return null;
             Vector2 dir = discLocal - _dragWheelCenterLocal;
-            if (dir.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null; // 键心死区（同方向型，2026-09-26 返修）
+            if (dir.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null; // 盘心死区（同方向型，2026-09-26 返修）
             dir.Normalize();
 
             float minCos = Mathf.Cos(拖动瞄准指向锥角 * Mathf.Deg2Rad);
@@ -1375,23 +1379,35 @@ namespace GIC.Battle
 
         // ==================== 拖动瞄准圆盘（2026-09-26 拍板：王者荣耀式大圆盘+小圆盘） ====================
 
-        /// <summary>圆盘显示：大圆盘锚在被拖技能键圆心（拖动位移的参照原点可视化）、小圆盘随手指。
-        /// 素材=项目现成资产复用（拍板纪律）：disc.png 实心圆盘（大=底盘色半透明+小=瞄准已选色金，
-        /// 小盘与金色待定格同色系联动）+ circle.png 细环做大圆盘描边（高亮金）；换美术只改
-        /// EnsureDragWheel 的 sprite 加载。Image.raycastTarget 全关——盘覆盖技能盘区域不拦点击/拖拽</summary>
+        /// <summary>圆盘显示：大圆盘圆心=被拖技能键圆心**沿两轴夹进画布内**（自适应位，
+        /// 2026-09-26 拍板「大圆盘应当自适应位置，让自己不会超出屏幕」——盘+小盘屏幕余量全入屏，
+        /// 靠边键的盘不再挂出屏外；**格子判定基准=盘心**（三拍「拖动的格子判定应当是相对于大圆盘中心」
+        /// ——盘=标尺，小盘在盘上的位置=瞄准真值）、小圆盘=指针贴身且不出盘（三拍「小圆盘不可超出
+        /// 大圆盘」）。素材=项目现成资产复用（拍板纪律）：disc.png
+        /// 实心圆盘（大=底盘色半透明+小=瞄准已选色金，小盘与金色待定格同色系联动）+ circle.png 细环
+        /// 做大圆盘描边（高亮金）；换美术只改 EnsureDragWheel 的 sprite 加载。
+        /// Image.raycastTarget 全关——盘覆盖技能盘区域不拦点击/拖拽</summary>
         private void ShowDragWheel(SkillButtonDef def, Vector2 pointerScreen)
         {
             EnsureDragWheel();
             if (_dragWheelRoot == null) return;
             _dragWheelRoot.SetActive(true);
 
-            // 大圆盘=技能键圆心（rect 世界角→画布局部；Overlay 画布世界坐标=屏幕像素）——
-            // 圆心即拖向/步距转盘原点（拍板三：选中格的精确性全在大圆盘内）
+            // 大圆盘=技能键圆心（rect 世界角→画布局部；Overlay 画布世界坐标=屏幕像素）→
+            // 自适应夹取：圆心沿两轴夹进 [盘半径+小盘半径+屏幕边距] 画布内（盘上任一点皆在屏内可拖到）
             if (def?.rect != null)
             {
                 def.rect.GetWorldCorners(_handCornersBuffer);
                 var centerWorld = (_handCornersBuffer[0] + _handCornersBuffer[2]) * 0.5f;
-                var local = CanvasRect.InverseTransformPoint(centerWorld);
+                var keyCenter = (Vector2)CanvasRect.InverseTransformPoint(centerWorld);
+                var rect = CanvasRect.rect;
+                float fit = 拖动瞄准大圆盘半径 + 拖动瞄准小圆盘半径 + 拖动瞄准圆盘屏幕边距;
+                float loX = rect.xMin + fit, hiX = rect.xMax - fit;
+                float loY = rect.yMin + fit, hiY = rect.yMax - fit;
+                // 画布过小（fit 装不下）时回退画布中心，勿让 Clamp 反转
+                var local = new Vector2(
+                    hiX > loX ? Mathf.Clamp(keyCenter.x, loX, hiX) : (rect.xMin + rect.xMax) * 0.5f,
+                    hiY > loY ? Mathf.Clamp(keyCenter.y, loY, hiY) : (rect.yMin + rect.yMax) * 0.5f);
                 _dragWheelCenterLocal = local;
                 _dragWheelBigFill.anchoredPosition = local;
                 _dragWheelBigRing.anchoredPosition = local;
@@ -1400,9 +1416,10 @@ namespace GIC.Battle
             UpdateDragWheel(pointerScreen);
         }
 
-        /// <summary>小圆盘跟手（双夹取）：①轮盘界——盘心不超大圆盘半径（拍板「小圆盘不应该超出
-        /// 大圆盘范围」）；②屏幕界——盘缘距屏幕边缘至少留「盘半径+边距」（拍板「圆盘不可超出屏幕
-        /// 边缘」；轮盘靠屏角时屏幕界优先）。夹取后的盘位 _dragDiscLocal=瞄准解析唯一输入</summary>
+        /// <summary>小圆盘=指针贴身且**不出大圆盘**（2026-09-26 三拍「小圆盘不可超出大圆盘」）：
+        /// 盘位=指针画布局部，盘心距夹到≤大圆盘半径——拖出盘范围时小盘贴盘缘（盘缘=最远格，拖到头即满）。
+        /// 判定基准=大圆盘圆心（解析函数对 _dragWheelCenterLocal 取差）——盘=标尺，盘上位置=瞄准真值。
+        /// 屏幕界夹取不需要（盘已自适应入屏，小盘在盘内必在屏内）。</summary>
         private void UpdateDragWheel(Vector2 pointerScreen)
         {
             var canvasRt = CanvasRect;
@@ -1410,20 +1427,14 @@ namespace GIC.Battle
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, pointerScreen, null, out var local))
                 return;
 
-            // 轮盘界：轮心→盘向量夹到盘心距 ≤ 大圆盘半径
+            // 轮盘界：小盘不超大圆盘（拍板「小圆盘不可超出大圆盘」）——超出时贴盘缘
             Vector2 d = local - _dragWheelCenterLocal;
             float len = d.magnitude;
             if (len > 拖动瞄准大圆盘半径 && len > 0f)
                 local = _dragWheelCenterLocal + d * (拖动瞄准大圆盘半径 / len);
 
-            // 屏幕界：盘缘不出屏（画布 rect=实际屏幕/scaleFactor，画布单位）
-            var half = canvasRt.rect.size * 0.5f;
-            float margin = 拖动瞄准小圆盘半径 + 拖动瞄准圆盘屏幕边距;
-            local.x = Mathf.Clamp(local.x, -half.x + margin, half.x - margin);
-            local.y = Mathf.Clamp(local.y, -half.y + margin, half.y - margin);
-
-            _dragWheelSmall.anchoredPosition = local;
             _dragDiscLocal = local;
+            _dragWheelSmall.anchoredPosition = local;
         }
 
         /// <summary>圆盘隐藏（松手/会话收口；幂等）</summary>
