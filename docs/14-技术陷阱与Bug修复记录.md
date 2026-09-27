@@ -1567,3 +1567,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 - 池化面板/常驻管理器在 DontDestroyOnLoad 的 GameScene/UIRoot 下 get_hierarchy 看不见，须 `FindObjectsByType(FindObjectsInactive.Include)` 反射读。
 - 懒建/构建后才存在的私有字段每断言点现取（顶部缓存=null→NRE 或假失败）；无参私有方法反射调用=Invoke(ctrl, null)，传 new object[]{null} 报 parameter count mismatch。
 - 断言失败先 try/catch 打印完整内部堆栈定位归属（脚本 vs 产品代码）；活体取证时序纪律（超时污染/暂停态/按名寻址/Camera.main=null）见 §64b/§39/§89。
+
+## 91. 视频资产内容替换：Play 态 VideoPlayer 握文件句柄锁死覆盖 + 管道过滤掩盖 ffmpeg 失败（2026-09-27 实证）
+
+**症状**：对已入库且被 VideoClip 引用的 mp4 做内容替换（`ffmpeg -y` 覆盖）「流程看似成功但覆盖没生效」——探测发现游戏内文件仍是旧内容。
+**根因**：①编辑器停在 Play（含暂停态）时，VideoPlayer/WMF 解码器握着 mp4 文件句柄，ffmpeg 打开输出报 Permission denied；②`ffmpeg ... 2>&1 | Select-String "frame="` 过滤掉了错误行，且 PS 命令链 `;` 串联时整体 exit code=最后一个命令的——ffmpeg 失败被后续 Copy-Item 成功掩盖。
+**修法/纪律**：①改写被 VideoPlayer 消费的 mp4 前先 `unity_editor stop` 退出 Play（既有授权 2026-09-16「之后你可以自行退出play」）；②覆盖后必做**探测回读**（ffprobe duration/帧数 vs 预期值）确认新内容落盘，勿信命令链 exit code；③要看 ffmpeg 报错时用 `Select-Object -Last N` 看尾部全文，勿 Select-String 过滤。
+**连带**：落盘后还需 `unity_editor refresh` 重导入（VideoClip 缓存的 length/width/height 不会自动刷新）+编辑器回读断言（桥环境 VideoClip 类型不可达→Object+反射，§90）。
