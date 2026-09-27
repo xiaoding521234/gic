@@ -1574,3 +1574,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：①编辑器停在 Play（含暂停态）时，VideoPlayer/WMF 解码器握着 mp4 文件句柄，ffmpeg 打开输出报 Permission denied；②`ffmpeg ... 2>&1 | Select-String "frame="` 过滤掉了错误行，且 PS 命令链 `;` 串联时整体 exit code=最后一个命令的——ffmpeg 失败被后续 Copy-Item 成功掩盖。
 **修法/纪律**：①改写被 VideoPlayer 消费的 mp4 前先 `unity_editor stop` 退出 Play（既有授权 2026-09-16「之后你可以自行退出play」）；②覆盖后必做**探测回读**（ffprobe duration/帧数 vs 预期值）确认新内容落盘，勿信命令链 exit code；③要看 ffmpeg 报错时用 `Select-Object -Last N` 看尾部全文，勿 Select-String 过滤。
 **连带**：落盘后还需 `unity_editor refresh` 重导入（VideoClip 缓存的 length/width/height 不会自动刷新）+编辑器回读断言（桥环境 VideoClip 类型不可达→Object+反射，§90）。
+
+## 92. 立牌「陷地」归因两连反转 + 归一化机制凭 meta 推断翻车：机制结论必须活体实测，素材/渲染/几何三层归因以用户目检+像素数据双定（2026-09-27 立牌缩放/离地批实证）
+
+**症状**：①凯亚全身立牌「脚有一点陷入地下」；②立牌高度对比分析中「sprite 路线按 tight bounds 归一、视频路线按整帧归一=基准分叉」的机制结论写出后需推翻。
+**根因**：①两次归因反转——首版归因=素材底部 alpha 16~102 渐隐行压地面线混色（像素实证存在但**非主因**），用户目检纠偏「原因不是画图，而是底部圆盘」：实体不透明盘面 y=0.52 高过补偿前脚底 0.507（盘面在世界高度上确实「高于」脚底 0.013），脚站盘心=「栽进坑」观感——**素材侧像素证据齐全也可能不是主因，渲染/几何层归因用户一眼就能定**；②`spriteMeshType: 1`(Tight) 被想当然推出「bounds=alpha 裁切」，活体实测 sprite.bounds=**整画布**（608×1088→Extents 3.04/5.44 精确等于半宽半高）——Tuanjie 该构建 bounds 恒为整 rect，两条立牌路线归一基准其实相同。
+**修法/纪律**：①归因结论落档前必须过活体实测（exec_runtime_script 读 renderer.bounds/sprite.bounds/transform 链）——尤其「X 路线 vs Y 路线基准不同」类机制断言，一行回读就能定案；②报障排查顺序=先问渲染/几何层（盘/排序/深度）再查素材像素——素材证据易得易误导（渐隐行真实存在且诱导归因）；③补偿值先现场运行态调参目检（AvatarTilt.localPosition 即改即看、退 Play 回滚零风险），确认值再烘资产；④YAML 里序列化字段名带双引号（`"\u79BB..."`），rg 模式须含引号+用无反斜杠的十六进制尾段（`5EA6": 0.5`）定位值，全字段名正则在 PS 双引号转义链下不稳定（Select-String 直印行更稳）。
+**连带**：盘半透明后所有写盘颜色的路径须过单出口保 alpha（WithDiscAlpha——SetFrozenVisual 直接 sharedMaterial.color=满色会复辟实体观感）；盘透明化排序=sortingOrder -1（恒在贴片 0/立牌 10/箭矢 12 之下、水面 2999 之上，与 §89 第六轮水面队列互不冲突）。

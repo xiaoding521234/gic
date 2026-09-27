@@ -24,6 +24,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 4
     deployCost: -64
@@ -75,6 +77,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -131,6 +135,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -187,6 +193,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -243,6 +251,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -293,6 +303,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 32900000, guid: 459b2ecbd7ec1604bac1d16cdda32e00, type: 3}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.5
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -409,6 +421,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -539,6 +553,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -659,6 +675,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -714,6 +732,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -764,6 +784,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 5
     deployCost: -64
@@ -814,6 +836,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -865,6 +889,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 4
     deployCost: -64
@@ -921,6 +947,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -977,6 +1005,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1033,6 +1063,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1089,6 +1121,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1145,6 +1179,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1195,6 +1231,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1245,6 +1283,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1295,6 +1335,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1345,6 +1387,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1395,6 +1439,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1445,6 +1491,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1495,6 +1543,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1545,6 +1595,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1595,6 +1647,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1645,6 +1699,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1695,6 +1751,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 3
     deployCost: -64
@@ -1745,6 +1803,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1795,6 +1855,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 5
     deployCost: -64
@@ -1845,6 +1907,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 1
     starLevel: 4
     deployCost: -64
@@ -1895,6 +1959,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 2
     deployCost: -64
@@ -1945,6 +2011,8 @@ MonoBehaviour:
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
     "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
     starLevel: 1
     deployCost: -64
