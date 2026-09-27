@@ -40,8 +40,6 @@ namespace GIC.Battle
             ResolveMiscWidgets();   // 手牌/提示/取消/布局入口/编辑工具栏
             ResolveSkillPopup();   // 技能详情面板（prefab 嵌套实例接线）
 
-            if (Application.isPlaying) CreateSelectMarker(); // 世界层运行时材质，不入 prefab
-
             // 初始 = 手牌态（件显隐统一走 ApplyStateVisibility；方案应用在 Bind 尾按存档激活槽执行）
             ApplyStateVisibility();
             SetTip("Battle_TipSelect");
@@ -182,17 +180,6 @@ namespace GIC.Battle
                 var relatedRect = _skillDetailView.relatedPanel.GetComponent<RectTransform>();
                 _skillDetailView.RepositionRelatedPanel(relatedRect.anchoredPosition);
             }
-        }
-
-        /// <summary>选中单位脚下金色圆盘标记（世界层 quad，法线朝上；工厂出品，OnDestroy 释放材质）——运行时建（材质不可入 prefab）</summary>
-        private void CreateSelectMarker()
-        {
-            _selectMarkerMaterial = BattleViewFactory.CreateUnlitMaterial(Palette.高亮金);
-            var quad = BattleViewFactory.CreateQuad(_highlightRoot, "SelectMarker", _selectMarkerMaterial);
-            quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            quad.transform.localScale = new Vector3(0.55f, 0.55f, 1f);
-            quad.SetActive(false);
-            _selectMarker = quad;
         }
 
         // ==================== 运行时 UI 基础件（动态件仍用：队列槽重建/文本挂接） ====================

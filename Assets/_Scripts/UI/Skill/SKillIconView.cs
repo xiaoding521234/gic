@@ -11,9 +11,11 @@ namespace GIC.UI
     {
         public Image skillIcon;
         public Image skillCircle;
-        public Image skillSelect;
         public Image skillBadge;
         public Toggle toggle;
+
+        private OrbitBeamsUi _selectBeams; // 选中态两束元素色环绕弧光（打钩图 2026-09-27 全项目退役，运行时建件勿入 prefab）
+        private Color _elementColor = Color.white;
 
         private ViewType viewType;
         private SkillConfig.SkillData skillData;
@@ -24,11 +26,7 @@ namespace GIC.UI
 
         public void Awake()
         {
-        
             toggle.onValueChanged.AddListener(OnToggleValueChanged);
-            
-            skillSelect.gameObject.SetActive(false);
-            
         }
 
         public void InitWithData(SkillConfig.SkillData skillData, UnitConfig.UnitData unitData, ViewType viewType, SkillDetailView skillDetailView)
@@ -51,7 +49,8 @@ namespace GIC.UI
             }
             if (skillBadge != null)
                 skillBadge.color = elementColor;
-                
+            _elementColor = elementColor; // 选中弧光同元素色（与战斗 BattleHud.SelectedElementColor 同源）
+
             if (skillData.skillType.IsActive())
             {
                 if (skillCircle != null)
@@ -62,11 +61,6 @@ namespace GIC.UI
                 if (skillCircle != null)
                     skillCircle.color = SkillCircleColor.colorPassive;
             }
-            
-            if (skillSelect != null)
-            {
-                skillSelect.gameObject.SetActive(false);
-            }
         }
 
         public void InitWithSkill(BaseSkill skill, ViewType viewType, SkillDetailView skillDetailView)
@@ -75,6 +69,8 @@ namespace GIC.UI
             this.skill = skill;
         }
 
+        /// <summary>选中态=两束元素色环绕弧光（2026-09-27 拍板全项目统一：打钩图退役、
+        /// 战斗/背包同表现；战斗屏 OnlyDisplay 不走此链——由 BattleHud.SetAimSelectRing 驱动同款弧光）</summary>
         private void OnToggleValueChanged(bool isOn)
         {
             if(viewType == ViewType.OnlyDisplay)
@@ -82,13 +78,29 @@ namespace GIC.UI
                 return;
             }
 
-            skillSelect.gameObject.SetActive(isOn);
-            
-            
+            SetSelectBeams(isOn);
+
             if (isOn && viewType == ViewType.Display)
             {
                 skillDetailView.OpenPanel();
                 skillDetailView.InitWithData(skillData, unitData,this);
+            }
+        }
+
+        /// <summary>选中弧光亮/灭（元素色=InitWithData 染底图同色；首次点亮懒建）</summary>
+        private void SetSelectBeams(bool on)
+        {
+            if (!on)
+            {
+                if (_selectBeams != null) _selectBeams.gameObject.SetActive(false);
+                return;
+            }
+            if (_selectBeams == null)
+                _selectBeams = OrbitBeamsUi.Create((RectTransform)transform);
+            if (_selectBeams != null)
+            {
+                _selectBeams.SetColor(_elementColor);
+                _selectBeams.gameObject.SetActive(true);
             }
         }
 
