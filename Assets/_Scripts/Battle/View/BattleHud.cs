@@ -31,14 +31,17 @@ namespace GIC.Battle
     /// 瞄准提交制（2026-09-26 拍板）：点可选格=金色待定（BattlePalette.瞄准已选色，可点其它格变更、
     /// 点空白取消技能回选中态），确认=顶部「完成选择」按钮——待定格提交行动/无待定空过完成选择
     /// （多人提前开演=各真人交齐一份，AI 由脑自动上交）；倒计时归零=自动按下该按钮（统一复用链路）。
+    /// 技能键点击循环（2026-09-27 拍板）：首点=瞄准、同键再点=详情模式（面板自适应摆在键旁）、
+    /// 再点=切回瞄准（循环切换）；选中技能后再点其它键=切换到新技能重新瞄准。
     /// 交互状态机：Idle（手牌态）→ UnitSelected（行动态）→ Aiming（瞄准态）+ LayoutEditing（编辑态门控）。
     /// 输入 = BattleCameraController.OnBoardTap（Drag 短点击复合发射，docs/24 §7.10 tap+pan 同体）。
     /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产。
     /// 拖动式瞄准已落地（B4 2026-09-26：王者荣耀式手势+待定制——技能键按下拖出→**拖向=瞄准方向**
     /// （轮心→小圆盘位移定方向与距离，与指针落点无关）→金色待定**单格**实时跟随→松手=留待定
     /// （不提交，确认=完成选择按钮），拖回技能盘/取消钮松手=取消；拖动时键上现**大圆盘**（距离转盘
-    /// ——盘缘=最远格）、手指处**小圆盘**（不超大圆盘、不出屏幕）+金格出屏时相机丝滑移过去——
-    /// 见 OnSkillButtonDragBegin/ShowDragWheel）；协议核心血条 = B8 接线。
+    /// ——盘缘=最远格）、手指处**小圆盘**（不超大圆盘、不出屏幕）+金格出屏时相机丝滑移过去
+    /// ——见 OnSkillButtonDragBegin/ShowDragWheel）；拖动时被拖技能键**临时挪到盘心**作摇杆底座、
+    /// 松手/会话收口还原回槽（2026-09-27 拍板）；协议核心血条 = B8 接线。
     /// </summary>
     public partial class BattleHud : MonoBehaviour
     {
@@ -86,6 +89,12 @@ namespace GIC.Battle
         [SerializeField] private float 拖动瞄准小圆盘半径 = 56f;
         [Tooltip("小圆盘屏幕边距（画布单位）——盘缘距屏幕边缘的最小留白（轮盘靠屏角时屏幕边界优先于轮盘界）")]
         [SerializeField] private float 拖动瞄准圆盘屏幕边距 = 16f;
+
+        [Header("技能详情面板（2026-09-27 拍板：同键再点=详情模式——面板自适应摆在技能键旁，不遮挡该键、不出屏）")]
+        [Tooltip("面板与技能键的间隙（画布单位）")]
+        [SerializeField] private float 详情面板与按钮间距 = 24f;
+        [Tooltip("面板距屏幕边缘的最小留白（画布单位）")]
+        [SerializeField] private float 详情面板屏幕边距 = 16f;
 
         /// <summary>disc.png 实心盘可见缘只占纹理半宽 0.830（四周透明边距大）、circle.png 描环线贴
         /// 纹理外缘 0.998——同尺寸下阴影可见缘比描环天然内缩约 17%（2026-09-26 用户报障
@@ -206,8 +215,7 @@ namespace GIC.Battle
         private readonly Vector3[] _handCornersBuffer = new Vector3[4];
 
         private string _selectedUnitId;
-        private SkillButtonDef _popupDef;  // 详情面板当前展示的键
-        private SkillButtonDef _aimDef;    // 瞄准中的键
+        private SkillButtonDef _aimDef;    // 瞄准中的键（同键点击循环/异键换技能的判定源，2026-09-27）
         private readonly HashSet<BattleCell> _aimCells = new HashSet<BattleCell>();
 
         /// <summary>可选且推荐的格（_aimCells 差集=可选但不推荐；2026-09-23 拍板瞄准分色数据源：
@@ -235,6 +243,13 @@ namespace GIC.Battle
         private RectTransform _dragWheelSmall;    // 小圆盘（disc.png×瞄准已选色——与金色待定格同色系联动）
         private Vector2 _dragWheelCenterLocal;    // 大圆盘圆心（自适应位：键心沿两轴夹进画布内，画布局部）——格子判定基准/转盘原点
         private Vector2 _dragDiscLocal;           // 小圆盘画布局部（指针贴身、夹在盘内）——瞄准解析唯一输入（对盘心取差=盘上位置）
+
+        // 拖动时临时挪到盘心的技能键（2026-09-27 拍板「拖动式使用技能时，临时把技能按钮移动到新出现的
+        // 大圆盘中间位置」）：键心≠盘心（盘心自适应夹取后偏移可达百像素）——拖动会话中把控件临时挪到
+        // 盘心作摇杆底座，松手/会话收口经 HideDragWheel 单点还原回槽（还原守卫幂等，只动控件不动槽——
+        // 布局方案数据/槽锚点零接触）
+        private RectTransform _dragMovedRect;
+        private Vector2 _dragMovedOriginalPos;
 
         /// <summary>HUD 画布 RectTransform（盘位换算用；Overlay 画布世界坐标=屏幕像素）</summary>
         private RectTransform CanvasRect => _canvas != null ? (RectTransform)_canvas.transform : null;
@@ -899,6 +914,8 @@ namespace GIC.Battle
             if (_state != HudState.Aiming) return;
             _dragAiming = false; // 拖动会话统一收口（松手取消/确认提交/超时/阶段切换同一处清零）
             HideDragWheel();      // 圆盘随会话收口（EndDrag 已隐藏，此处=外部退出安全网，幂等）
+            ClosePopup();         // 详情面板随会话收口（2026-09-27 点击循环：详情模式=瞄准+面板并开，
+                                  // 任何瞄准退出路径——点非可选格/取消钮/确认提交/阶段切换——面板一并收）
             // 待定金格随高亮 quad 一并消失（ClearHighlights 销 quad），字段清零防陈旧提交
             _pendingAimCell = null;
             // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
@@ -1239,30 +1256,36 @@ namespace GIC.Battle
             return Direction2D.DownLeft;
         }
 
-        // ==================== 技能按钮（点击式三情况 + 拖动式瞄准） ====================
+        // ==================== 技能按钮（点击循环 + 拖动式瞄准） ====================
 
-        /// <summary>点击式三情况（四键全统一，含移动——2026-09-18 拍板）：①面板开着再点同键=隐藏面板进入瞄准
-        /// ②面板没开第一次点=开面板 ③换点其它技能=切内容。移动与其余三键唯一差异=瞄准语义（def.IsMove）；
-        /// 拖动式=同键按下拖出即起瞄准（OnSkillButtonDragBegin）；瞄准态点按钮=无操作（退出走取消按钮/点非可选格）。</summary>
+        /// <summary>技能键点击循环（2026-09-27 拍板「第一次点击为瞄准模式，第二次点击为详情模式，
+        /// 再点击则又再次切换回瞄准模式（循环切换）；当选中了一个技能时，再点击其它技能，则切换到
+        /// 新点击的技能」——原「首点开详情/再点同键进瞄准」顺序反转）：①UnitSelected 首点=进瞄准
+        /// ②Aiming 同键=瞄准↔详情循环（瞄准态保持——高亮/待定金格不动，仅开/收详情面板，面板自适应
+        /// 摆键旁）③Aiming 异键=切换到新技能重新瞄准（详情模式下面板随收口关闭）。置灰防线收口在
+        /// Button.Press 的 IsInteractable 门（Toggle→SelectButton 改版 2026-09-27：onClick 直连后拦截
+        /// 天然生效，docs/14 §63）；移动与其余三键唯一差异=瞄准语义（def.IsMove）。</summary>
         private void OnSkillButtonClicked(SkillButtonDef def)
         {
-            if (def == null || _state != HudState.UnitSelected) return;
-            if (_layoutEditing) return; // 编辑期点击让位给拖拽/选框（拖拽板在控件之上）
-            // 置灰防线已收口进 Button.Press 的 IsInteractable 门（Toggle→SelectButton 改版 2026-09-27：
-            // onClick 直连后拦截天然生效，旧 SkillClickForwarder 时代「转发件不受 Toggle.interactable 拦截」
-            // 的手动检查随之退役，docs/14 §63）
-            if (PopupOpen)
+            if (def == null || _layoutEditing) return; // 编辑期点击让位给拖拽/选框（拖拽板在控件之上）
+
+            if (_state == HudState.Aiming)
             {
-                if (_popupDef == def)
-                    EnterAiming(def);
-                else
+                if (_aimDef == def)
                 {
-                    ClosePopup();
-                    ShowSkillPopup(def);
+                    // 同键循环：瞄准 ↔ 详情（详情模式=瞄准+面板并开，回瞄准=仅收面板）
+                    if (PopupOpen) ClosePopup();
+                    else ShowSkillPopup(def);
+                    return;
                 }
+                // 异键：切换到新点击的技能（瞄准模式重开，旧详情随收口关闭）
+                ExitAiming();
+                EnterAiming(def);
                 return;
             }
-            ShowSkillPopup(def);
+
+            if (_state == HudState.UnitSelected)
+                EnterAiming(def); // 第一次点击=瞄准模式
         }
 
         // ==================== 拖动式瞄准（B4，2026-09-26 落地；王者荣耀式手势+待定制：docs/18 决策六两方式之拖动） ====================
@@ -1270,9 +1293,9 @@ namespace GIC.Battle
         /// <summary>拖动式起手（SkillDragForwarder 转发，UGUI 拖拽阈值即起）：按住技能键拖出 → 进瞄准态
         /// 高亮可选格（与点击式共用 EnterAiming/高亮/待定/取消全链）→ 拖动全程金色待定**单格**实时跟随 →
         /// 松手=留待定（**不立即提交**——2026-09-26 拍板「一次选择 1 个格子、松手后不应立即完成选择」，
-        /// 与点击式同款，确认唯一入口=「完成选择」按钮）。瞄准=拖向（王者荣耀手势，同日纠偏拍板
-        /// 「不是拖出到格子上」）：方向由「按下点→指针」屏幕位移反投影到棋盘平面决定，**与指针落在
-        /// 棋盘哪里无关、手指不必离开按键区**。其余口径：①面板开着直接拖=无缝切换拖动式（决策六点击式③）
+        /// 与点击式同款，确认唯一入口=「完成选择」按钮）。瞄准=拖向（王者荣耀手势，判定基准=大圆盘圆心
+        /// ——盘=标尺，与指针落在棋盘哪里无关、手指不必离开按键区）。其余口径：①详情模式（面板开着）
+        /// 直接拖=收面板无缝切换拖动式（2026-09-27 点击循环后 EnterAiming/ExitAiming 统一收口）
         /// ②瞄准中拖另一键=换技能重瞄准（ExitAiming 收口旧选中环/待定后重进）③置灰键（无数据/元能/
         /// 体力门槛）同点击式不可起手 ④部署瞄准（点手牌卡）无选中单位不接管 ⑤相机平移不串扰——
         /// 拖拽起手在 UI 上，GestureHub 门2 拦下，BattleCameraController 的 Drag 识别器全程不见此指针序列。</summary>
@@ -1457,9 +1480,37 @@ namespace GIC.Battle
                 _dragWheelCenterLocal = local;
                 _dragWheelBigFill.anchoredPosition = local;
                 _dragWheelBigRing.anchoredPosition = local;
+                MoveDragButtonToWheelCenter(def); // 技能键临时挪到盘心作摇杆底座（2026-09-27 拍板）
             }
             else _dragWheelCenterLocal = Vector2.zero;
             UpdateDragWheel(pointerScreen);
+        }
+
+        /// <summary>被拖技能键临时挪到大圆盘圆心（2026-09-27 拍板「临时把技能按钮移动到新出现的大圆盘
+        /// 中间位置」）：盘心先按键心算好并夹进画布（ShowDragWheel 主体），再把键控件中心对齐盘心——
+        /// 键与盘同心=王者式摇杆底座（环绕光束挂键上随动、小盘贴指针绕键转）。只写控件 anchoredPosition
+        /// （父级=布局槽，位移经坐标系两跳换算，槽缩放无关）；还原守卫=HideDragWheel 单点收口</summary>
+        private void MoveDragButtonToWheelCenter(SkillButtonDef def)
+        {
+            RestoreDragMovedButton(); // 幂等：上一会话残位先还原（正常路径已随 HideDragWheel 还原）
+            if (def?.rect == null) return;
+            var canvasRt = CanvasRect;
+            if (canvasRt == null) return;
+            def.rect.GetWorldCorners(_handCornersBuffer);
+            var centerWorld = (_handCornersBuffer[0] + _handCornersBuffer[2]) * 0.5f;
+            var targetWorld = canvasRt.TransformPoint((Vector3)_dragWheelCenterLocal);
+            var deltaLocal = def.rect.parent.InverseTransformVector(targetWorld - centerWorld);
+            _dragMovedRect = def.rect;
+            _dragMovedOriginalPos = def.rect.anchoredPosition;
+            def.rect.anchoredPosition = _dragMovedOriginalPos + (Vector2)deltaLocal;
+        }
+
+        /// <summary>还原临时挪位的技能键（幂等；盘隐藏随会话收口同点调用）</summary>
+        private void RestoreDragMovedButton()
+        {
+            if (_dragMovedRect == null) return;
+            _dragMovedRect.anchoredPosition = _dragMovedOriginalPos;
+            _dragMovedRect = null;
         }
 
         /// <summary>小圆盘=指针贴身且**不出大圆盘**（2026-09-26 三拍「小圆盘不可超出大圆盘」）：
@@ -1483,10 +1534,11 @@ namespace GIC.Battle
             _dragWheelSmall.anchoredPosition = local;
         }
 
-        /// <summary>圆盘隐藏（松手/会话收口；幂等）</summary>
+        /// <summary>圆盘隐藏（松手/会话收口；幂等）——临时挪到盘心的技能键随盘一并还原回槽</summary>
         private void HideDragWheel()
         {
             if (_dragWheelRoot != null) _dragWheelRoot.SetActive(false);
+            RestoreDragMovedButton();
         }
 
         /// <summary>圆盘三件懒建（首次拖动起手时建，BattleHud 随战斗实例销毁即回收）</summary>
@@ -1531,9 +1583,10 @@ namespace GIC.Battle
             return rt;
         }
 
+        /// <summary>开详情面板（详情模式，2026-09-27 点击循环二击）：InitWithData 先行（RefreshLayout
+        /// 后面板尺寸=内容终态）→ 自适应摆到技能键旁 → OpenPanel 滑入（滑入目标已随摆位重定）</summary>
         private void ShowSkillPopup(SkillButtonDef def)
         {
-            _popupDef = def;
             if (_skillDetailView == null) return;
 
             // 走现有技能详情体系：UnitData.skills 的 SkillData → SkillDetailView（图标/类型/名称/描述/参数全本地化）
@@ -1543,7 +1596,129 @@ namespace GIC.Battle
 
             _skillDetailView.skillDetailPanel.SetActive(true);
             _skillDetailView.InitWithData(skillData, unitData, null);
+            PositionSkillPopupBesideButton(def);
             _skillDetailView.OpenPanel();
+        }
+
+        /// <summary>详情面板自适应摆位（2026-09-27 拍板「弹出的详情面板应当出现在该技能的旁边——
+        /// 不得遮挡该技能按钮、不得超出屏幕、需要灵活的自适应位置」）：候选=键四侧（上下左右按键位
+        /// 定偏好序：键在下半=上侧优先、在右半=左侧优先）×三种横轴对齐（键心/键近缘/键远缘），
+        /// 逐候选夹进画布 → 源键交叠=硬否决（键必须保持可点——点击循环依赖它）、其余可见件
+        /// （技能键/取消/完成选择）计软交叠；取零交叠的偏好序最早候选，全候选取软交叠最少者，
+        /// 再无则键位夹画布兜底。落位=面板中心位移（对锚点体系无关，RepositionPanel 同步滑入目标，
+        /// RelatedPanel 为面板子件随动无需另摆）</summary>
+        private void PositionSkillPopupBesideButton(SkillButtonDef def)
+        {
+            var canvasRt = CanvasRect;
+            var panelRect = _skillDetailView != null && _skillDetailView.skillDetailPanel != null
+                ? _skillDetailView.skillDetailPanel.GetComponent<RectTransform>()
+                : null;
+            if (canvasRt == null || panelRect == null || def == null || def.rect == null) return;
+            if (!RectToCanvasAabb(def.rect, out var keyMin, out var keyMax)) return;
+            if (!RectToCanvasAabb(panelRect, out var panelMin, out var panelMax)) return;
+
+            var rect = canvasRt.rect;
+            Vector2 keyCenter = (keyMin + keyMax) * 0.5f;
+            Vector2 half = (panelMax - panelMin) * 0.5f;
+            Vector2 panelCenter = (panelMin + panelMax) * 0.5f;
+
+            // 软避让件：其余可见技能键+取消钮+完成选择（能躲则躲，躲不开允许盖；源键=硬避让）
+            var softRects = new List<(Vector2 min, Vector2 max)>();
+            foreach (var b in _skillButtons)
+            {
+                if (b == def || b.rect == null || !b.rect.gameObject.activeInHierarchy) continue;
+                if (RectToCanvasAabb(b.rect, out var bMin, out var bMax)) softRects.Add((bMin, bMax));
+            }
+            if (_cancelButton != null && _cancelButton.gameObject.activeInHierarchy
+                && RectToCanvasAabb(_cancelButton, out var cMin, out var cMax))
+                softRects.Add((cMin, cMax));
+            if (_confirmButton != null && _confirmButton.gameObject.activeInHierarchy
+                && RectToCanvasAabb((RectTransform)_confirmButton.transform, out var fMin, out var fMax))
+                softRects.Add((fMin, fMax));
+
+            bool upFirst = keyCenter.y < rect.center.y;
+            bool leftFirst = keyCenter.x >= rect.center.x;
+            var sides = new[]
+            {
+                upFirst ? Vector2.up : Vector2.down,
+                leftFirst ? Vector2.left : Vector2.right,
+                leftFirst ? Vector2.right : Vector2.left,
+                upFirst ? Vector2.down : Vector2.up,
+            };
+
+            Vector2? chosen = null;      // 零交叠候选（偏好序最早）
+            Vector2? softChoice = null;  // 源键安全但盖了软件的候选（软交叠最少）
+            int softBest = int.MaxValue;
+            foreach (var side in sides)
+            {
+                bool vertical = side.y != 0f;
+                for (int align = 0; align < 3 && chosen == null; align++)
+                {
+                    // 侧向：近缘+间距+面板半尺寸；横轴：键心/键近缘/键远缘三对齐
+                    Vector2 center = keyCenter;
+                    if (vertical)
+                    {
+                        center.y = side.y > 0f ? keyMax.y + 详情面板与按钮间距 + half.y
+                                                : keyMin.y - 详情面板与按钮间距 - half.y;
+                        center.x = align == 0 ? keyCenter.x
+                                 : align == 1 ? keyMin.x + half.x
+                                 : keyMax.x - half.x;
+                    }
+                    else
+                    {
+                        center.x = side.x > 0f ? keyMax.x + 详情面板与按钮间距 + half.x
+                                               : keyMin.x - 详情面板与按钮间距 - half.x;
+                        center.y = align == 0 ? keyCenter.y
+                                 : align == 1 ? keyMin.y + half.y
+                                 : keyMax.y - half.y;
+                    }
+                    center = ClampPanelCenter(center, half, rect);
+
+                    if (OverlapsRect(center, half, keyMin, keyMax)) continue; // 硬：不遮挡该技能按钮
+                    int softCount = 0;
+                    foreach (var s in softRects)
+                        if (OverlapsRect(center, half, s.min, s.max)) softCount++;
+                    if (softCount == 0) { chosen = center; break; }
+                    if (softCount < softBest) { softBest = softCount; softChoice = center; }
+                }
+                if (chosen != null) break;
+            }
+
+            var target = chosen ?? softChoice ?? ClampPanelCenter(keyCenter, half, rect); // 兜底=键位夹画布
+
+            // 中心位移 → anchoredPosition 位移（TransformVector 两跳换父级坐标系，锚点/缩放无关）
+            var worldDelta = canvasRt.TransformVector((Vector3)(target - panelCenter));
+            var parentDelta = (Vector2)panelRect.parent.InverseTransformVector(worldDelta);
+            _skillDetailView.RepositionPanel(panelRect.anchoredPosition + parentDelta);
+        }
+
+        /// <summary>面板中心夹进画布（留屏幕边距；画布装不下整面板的轴回退画布中心）</summary>
+        private Vector2 ClampPanelCenter(Vector2 center, Vector2 half, Rect canvas)
+        {
+            float loX = canvas.xMin + 详情面板屏幕边距 + half.x, hiX = canvas.xMax - 详情面板屏幕边距 - half.x;
+            float loY = canvas.yMin + 详情面板屏幕边距 + half.y, hiY = canvas.yMax - 详情面板屏幕边距 - half.y;
+            return new Vector2(
+                hiX > loX ? Mathf.Clamp(center.x, loX, hiX) : canvas.center.x,
+                hiY > loY ? Mathf.Clamp(center.y, loY, hiY) : canvas.center.y);
+        }
+
+        private static bool OverlapsRect(Vector2 center, Vector2 half, Vector2 min, Vector2 max)
+        {
+            return center.x + half.x > min.x && center.x - half.x < max.x
+                && center.y + half.y > min.y && center.y - half.y < max.y;
+        }
+
+        /// <summary>rt 当前世界矩形 → 画布局部 AABB（Overlay 画布世界坐标=屏幕像素、局部原点=画布中心
+        /// ——与拖动圆盘同一坐标系；角序 [0]=左下 [2]=右上，UI 无旋转恒成立）</summary>
+        private bool RectToCanvasAabb(RectTransform rt, out Vector2 min, out Vector2 max)
+        {
+            min = max = Vector2.zero;
+            var canvasRt = CanvasRect;
+            if (rt == null || canvasRt == null) return false;
+            rt.GetWorldCorners(_handCornersBuffer);
+            min = (Vector2)canvasRt.InverseTransformPoint(_handCornersBuffer[0]);
+            max = (Vector2)canvasRt.InverseTransformPoint(_handCornersBuffer[2]);
+            return true;
         }
 
         private void ClosePopup()
@@ -1719,9 +1894,14 @@ namespace GIC.Battle
             if (_discOrbit == null && _highlightRoot != null)
                 _discOrbit = OrbitBeamsWorld.Create(_highlightRoot);
             if (_discOrbit != null)
+            {
                 _discOrbit.Setup(
                     new Vector3(cellWorld.x, _board.GetDecalHeight(unit.position, 0.045f), cellWorld.z),
                     (TeamType)unit.team == TeamType.B ? Palette.敌方主色 : Palette.我方主色);
+                _discOrbit.gameObject.SetActive(true); // 复用件重显（2026-09-27 报障返修：件缓存战斗期复用，
+                                                       // HideSelectMarker 收起后再次选中须重激活——原版漏此行，
+                                                       // 首次选中（Create 即 active）可见、第二次起永远隐形）
+            }
         }
 
         private void HideSelectMarker()

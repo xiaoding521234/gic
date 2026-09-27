@@ -1600,7 +1600,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **症状**：同一段彗尾贴图（头亮尾渐隐、头在角度高端）——UGUI Image 版 +z 旋转目检头前尾后正确；平铺地面 quad（Euler(90,yaw,0)）+yaw 同号旋转后目检「旋转方向反了」（尾在前）。
 **根因**：**Unity 左手系绕 +Y 的正角旋转在角量意义上是 atan2(Z,X) 递减（俯视顺时针）**，与 2D/UGUI 绕 +Z 正角旋转（数学逆时针、角度递增）方向相反；贴图 UV 映射不镜像（quad 本地 +X→世界 X、+Y→世界 Z，atan2(Z,X)=贴图数学角），「头在角度高端」在两种驱动下必然一头一尾。
-**修法/纪律**：①世界平铺 quad 旋转贴图类效果（光弧/箭头/指针）角速度默认取**负值**对齐 2D 语义（OrbitBeamsWorld.环绕角速度=-150），或驱动处 Euler(90,-angle,0)；②同贴图双消费方（UI+世界）方向语义冲突时改单值符号、勿镜像贴图（共享贴图镜像会弄坏另一消费方）；③quad 经 Rx(90) 后法线 -Z→+Y 朝上可见（Unity Quad 法线=-Z，勿按 +Z 推）。
+**修法/纪律**：①世界平铺 quad 旋转贴图类效果（光弧/箭头/指针）角速度默认取**负值**对齐 2D 语义（OrbitBeamsWorld.环绕角速度：方向修正取负；大小=按钮版同速拍板，迭代 −150→**−240**），或驱动处 Euler(90,-angle,0)；②同贴图双消费方（UI+世界）方向语义冲突时改单值符号、勿镜像贴图（共享贴图镜像会弄坏另一消费方）；③quad 经 Rx(90) 后法线 -Z→+Y 朝上可见（Unity Quad 法线=-Z，勿按 +Z 推）。
 **连带**：头尾方向可像素判定=弧段两端分半算平均 alpha，亮端=头（角度高端）——驱动方向定符号前先跑该检测，勿靠目测试错。
 
 ## 96. 同基类组件置换迁移三坑：单 Selectable 强制 / Tuanjie 无 CopyFromSerializedProperty / prefab 组件不在根 GO（2026-09-27 Toggle→SelectButton 七 prefab 迁移实证）
@@ -1609,3 +1609,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：①Unity 对 Selectable 派生类强制单 Selectable（连瞬时共存都不许——菜单层的限制就是引擎层硬约束）；②Tuanjie 序列化 API 面与标准版分叉（与 §91 TextureImporter、§93 maxTextureSize 同族的版本分叉行为）；③prefab 根 GO≠逻辑组件宿主是该屏的历史结构（多根/子 GO 摆位），迁移脚本按"根组件"惯性写就漏。
 **修法/纪律**：①同基类组件置换一律走「**快照（公共属性直读）→DestroyImmediate 旧件→新建/沿用继承件→回填**」四步，绝不依赖新旧共存；Selectable 基类配置用公共属性直拷（targetGraphic/colors/spriteState/animationTriggers/transition/navigation/interactable，两派生类同基类布局一致），自有私有字段用 SerializedObject.FindProperty 按字段名写；②跨对象拷序列化配置优先公共属性/手写字段映射，勿押 CopyFromSerializedProperty；③迁移/重接脚本枚举组件一律 `GetComponentsInChildren<T>(true)` 而非 `root.GetComponent`；嵌套实例先转资产本体再转父 prefab（父内 dangling 覆盖块回落继承态），字段按同 GO/向上寻组结构重接并输出逐条报告。
 **连带**：①嵌套实例的组件块在资产迁移后变 dangling/added 形态仍会被 GetComponentsInChildren 枚举到——正是置换回填的输入，销毁后父 prefab 记录正确回落；②零登记 SelectionGroup+对象池组合：**凡池化成员先归还后重建，重建前 ClearSelection**（按钮侧 Group 清了组侧 Current 仍持旧实例，同实例复用命中 Select 的 Current==item no-op——进背包初始选中返修实证，docs/18 决策十三返修条）；③诊断只读脚本对 inactive 资产对象 `GetComponentInParent<T>()` 无参版本因 active 链全 false 恒空——须手写 transform.parent 链逐级 GetComponent 或带 includeInactive:true 的数组版。
+
+## 97. 缓存复用特效件的显/隐配对：收起走 SetActive(false) 后，复用路径必须显式 SetActive(true)——「首建即 active」掩盖漏激活（2026-09-27 底座弧光「第二次选中起隐形」报障实证）
+
+**症状**：选中角色立牌底座的两束队伍色弧光「不见了」——**首次选中正常显示**，取消选中后再选任何单位永远隐形；编译零错、Console 零警（纯逻辑断链，目检才可见）。
+**根因**：OrbitBeamsWorld 为战斗期缓存复用件（`_discOrbit` 只在 null 时 Create）；new GameObject 首建默认 active，HideSelectMarker 把它 `SetActive(false)` 收起，而 ShowSelectMarker 复用路径只调 `Setup(位置, 色)`——**Setup 内无激活**。首建即 active 的天然状态掩盖了「再显须重激活」的缺口：会话 Y 首次验证（只选中一次）通过后潜伏，多轮选中/取消后才暴露。
+**修法/纪律**：①特效件显/隐必须在同一驱动点**成对**（范式=SetAimSelectRing(true/false) 两分支各写一次 SetActive）；②「懒建+缓存复用」件再显一律显式激活，勿依赖首建默认态；③显隐类复用件审查口诀=沿「创建/收起/复用」三条路径各核一遍激活写法。
+**连带**：同库扫一遍同模式无同族（OrbitBeamsUi=SetAimSelectRing 成对 ✓、SkillIconView=onSelectedChanged 成对 ✓、拖动圆盘/详情面板/RelatedPanel 三件均显↔隐成对 ✓）。

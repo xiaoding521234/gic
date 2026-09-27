@@ -104,8 +104,8 @@ namespace GIC.Battle
         [Header("环绕光弧（底座圆盘选中特效；世界单位）")]
         [Tooltip("环绕半径（弧带中心轨道半径，世界单位）。0.242=可见弧带内缘贴底座圆盘缘（盘半径=UnitCylinderDiameter/2=0.21；v2 彗尾贴图实测同 UI 版口径折算——2026-09-27 追拍「紧紧贴着圆盘」；改大=离盘远）")]
         [SerializeField] private float 环绕半径 = 0.242f;
-        [Tooltip("环绕角速度（度/秒，两束随图对径同速）。负值=修正向：Unity 左手系正 yaw 与 2D 正 z 旋向相反，同贴图取正会头尾倒置（尾在前），2026-09-27 目检实证后取负——头前尾后")]
-        [SerializeField] private float 环绕角速度 = -150f;
+        [Tooltip("环绕角速度（度/秒，两束随图对径同速）。负值=修正向：Unity 左手系正 yaw 与 2D 正 z 旋向相反，同贴图取正会头尾倒置（尾在前），2026-09-27 目检实证后取负——头前尾后；大小=与技能按钮版（OrbitBeamsUi 240）一致（2026-09-27 拍板「转圈速度应当与技能的转圈速度一致」）")]
+        [SerializeField] private float 环绕角速度 = -240f;
         [Tooltip("光弧在贴图中的环半径占比（弧环圆心=贴图中心；实测=0.692（v2 彗尾，2026-09-27 重生成），换贴图按像素实测重算）")]
         [SerializeField] private float 光弧半径占比 = 0.692f;
 
