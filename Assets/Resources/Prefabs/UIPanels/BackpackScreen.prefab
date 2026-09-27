@@ -13194,6 +13194,10 @@ PrefabInstance:
       propertyPath: m_IsOn
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 7378803965498831814, guid: bcd82c28f1c2473498a19145e0ef6beb, type: 3}
+      propertyPath: "\u6240\u5C5E\u9009\u4E2D\u7EC4"
+      value: 
+      objectReference: {fileID: 6896578770760372973}
     - target: {fileID: 8656273872449679092, guid: bcd82c28f1c2473498a19145e0ef6beb, type: 3}
       propertyPath: m_Name
       value: UnitButton
@@ -13329,6 +13333,10 @@ PrefabInstance:
       propertyPath: m_Sprite
       value: 
       objectReference: {fileID: 21300000, guid: e7fa968de70613647a3896a0771be330, type: 3}
+    - target: {fileID: 7378803965498831814, guid: bcd82c28f1c2473498a19145e0ef6beb, type: 3}
+      propertyPath: "\u6240\u5C5E\u9009\u4E2D\u7EC4"
+      value: 
+      objectReference: {fileID: 6896578770760372973}
     - target: {fileID: 8656273872449679092, guid: bcd82c28f1c2473498a19145e0ef6beb, type: 3}
       propertyPath: m_Name
       value: NormalButton
@@ -13464,6 +13472,10 @@ PrefabInstance:
       propertyPath: m_Sprite
       value: 
       objectReference: {fileID: 21300000, guid: acd5701e0904f1d4b8c7efe5085d25e8, type: 3}
+    - target: {fileID: 7378803965498831814, guid: bcd82c28f1c2473498a19145e0ef6beb, type: 3}
+      propertyPath: "\u6240\u5C5E\u9009\u4E2D\u7EC4"
+      value: 
+      objectReference: {fileID: 6896578770760372973}
     - target: {fileID: 8656273872449679092, guid: bcd82c28f1c2473498a19145e0ef6beb, type: 3}
       propertyPath: m_Name
       value: ValuableButton
