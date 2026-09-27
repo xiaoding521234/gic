@@ -1581,3 +1581,24 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：①两次归因反转——首版归因=素材底部 alpha 16~102 渐隐行压地面线混色（像素实证存在但**非主因**），用户目检纠偏「原因不是画图，而是底部圆盘」：实体不透明盘面 y=0.52 高过补偿前脚底 0.507（盘面在世界高度上确实「高于」脚底 0.013），脚站盘心=「栽进坑」观感——**素材侧像素证据齐全也可能不是主因，渲染/几何层归因用户一眼就能定**；②`spriteMeshType: 1`(Tight) 被想当然推出「bounds=alpha 裁切」，活体实测 sprite.bounds=**整画布**（608×1088→Extents 3.04/5.44 精确等于半宽半高）——Tuanjie 该构建 bounds 恒为整 rect，两条立牌路线归一基准其实相同。
 **修法/纪律**：①归因结论落档前必须过活体实测（exec_runtime_script 读 renderer.bounds/sprite.bounds/transform 链）——尤其「X 路线 vs Y 路线基准不同」类机制断言，一行回读就能定案；②报障排查顺序=先问渲染/几何层（盘/排序/深度）再查素材像素——素材证据易得易误导（渐隐行真实存在且诱导归因）；③补偿值先现场运行态调参目检（AvatarTilt.localPosition 即改即看、退 Play 回滚零风险），确认值再烘资产；④YAML 里序列化字段名带双引号（`"\u79BB..."`），rg 模式须含引号+用无反斜杠的十六进制尾段（`5EA6": 0.5`）定位值，全字段名正则在 PS 双引号转义链下不稳定（Select-String 直印行更稳）。
 **连带**：盘半透明后所有写盘颜色的路径须过单出口保 alpha（WithDiscAlpha——SetFrozenVisual 直接 sharedMaterial.color=满色会复辟实体观感）；盘透明化排序=sortingOrder -1（恒在贴片 0/立牌 10/箭矢 12 之下、水面 2999 之上，与 §89 第六轮水面队列互不冲突）。
+
+## 93. Tuanjie 1.9.3 贴图 maxTextureSize 三通道写不生效：实际尺寸由**活动平台块**（Standalone overridden=1）拍板——TJGenerators 生成贴图瘦身必写平台块（2026-09-27 OrbitBeamArc 落盘实证）
+
+**症状**：TJGenerators 生成的 2K 贴图瘦身到 512——`ti.maxTextureSize=512`、`TextureImporterSettings.maxTextureSize=512`（经 `ReadTextureSettings/SetTextureSettings` 通道）、`GetDefaultPlatformTextureSettings()` 写 DefaultTexturePlatform 块（overridden=1）三条路全写了，`SaveAndReimport` 后 `tex.width` 仍 2048。
+**根因**：生成器写入的 meta 里 **Standalone 平台块 overridden=1 且 maxTextureSize=2048**——导入管线取「活动 build target（Standalone）的平台块」，overridden=1 时平台块压过一切顶层/Default 块设置（meta 顶层 `maxTextureSizeSet: 0` 也印证顶层 maxTextureSize 只是摆设）。DefaultTexturePlatform 块只在活动平台**未** override 时兜底。
+**修法/纪律**：改生成贴图尺寸一律 `ti.GetPlatformTextureSettings("Standalone").maxTextureSize=N; ti.SetPlatformTextureSettings(...)`（或先查 `EditorUserBuildSettings.activeBuildTarget` 对应平台名），写完 SaveAndReimport 回读 `tex.width` 断言；顶层属性/Settings 结构/Default 块三通道全不生效属 Tuanjie 1.9.3 分叉行为（与 §91 TextureImporter 帧动画分叉同族）。
+**连带**：①平台块写入后 `sprite.pixelsPerUnit` 读回漂移（meta `spritePixelsToUnits=100` 正确、Sprite 对象缓存 25）——PPU 仅 SpriteRenderer/SetNativeSize 消费，UGUI Image（显式 sizeDelta）与直用纹理的 quad 材质均不受影响，勿为它反复重导；②生成贴图落 Resources 记得 `AssetDatabase.MoveAsset`（保 GUID）+ 烘 Sprite/Clamp/关 mipmap——History 目录为未跟踪草稿区，废稿 `DeleteAsset` 清掉防误提交；③AI 生成光弧类「同心几何」素材必须**像素实测**环半径占比/弧跨/对称度再烘进代码常量（本轮两弧 41°×2/对径 178°/占比 0.661，识图不可信=既有拍板）。
+
+## 94. AI 生成发光贴图自带边缘暗杂线：亮核心杂点检测漏检低 alpha 杂质——落库必做「盘外清零」防线（2026-09-27 OrbitBeamArc v2 彗尾返修实证）
+
+**症状**：AI 生成黑底发光贴图（亮度提取 alpha 落库）用户目检见底部一条多余横线；此前质检脚本却报 stray=0「无杂点」。
+**根因**：①生成图最底边 y2042~2045 整条暗线（alpha≈10~30%、全宽）——质检只扫 alpha≥128 亮核心像素且径向界外判定，**暗线（低 alpha）全数漏检**；②生成器产物常带四边边缘杂线/噪点（本轮顶边另有 12px/行小噪点），与黑底噪声（提取 FLOOR≈18 已压）不同属结构脏物。
+**修法/纪律**：①发光贴图落库前一律**盘外清零**：保留 r≤K×半画布（K=内容最远径占比×安全系数，本轮 0.83，环内容最远 0.78）、盘外 alpha=0——一条规则清掉四边所有边缘杂线；②杂点检测勿只盯亮核心：暗线/暗条才是生成器常见产物，最低限度补「行/列像素数剖面」扫描（单行像素数异常=横线指纹）；③净化后复测弧带几何（环占比/带宽/弧跨）应零漂移——盘外内容本就在测量分位之外，有漂移=清错内容。
+**连带**：黑底生成→亮度提取 alpha→RGB 纯白化是发光贴图落库通用路线（segmentation 硬抠会砍光晕软边勿用）；AI 生成图另可能带「设计外的淡环」类生成器语义表达（本轮 alpha≈20% 满环淡圆环，保留属设计拍板非脏点）——报障先区分「结构脏物 vs 生成器语义内容」。
+
+## 95. Unity 左手系正 yaw 与 2D 正 z 旋向相反：同贴图同取正角速，UGUI 版头前尾后、世界平铺 quad 版头尾倒置（2026-09-27 OrbitBeamsWorld 彗尾方向返修实证）
+
+**症状**：同一段彗尾贴图（头亮尾渐隐、头在角度高端）——UGUI Image 版 +z 旋转目检头前尾后正确；平铺地面 quad（Euler(90,yaw,0)）+yaw 同号旋转后目检「旋转方向反了」（尾在前）。
+**根因**：**Unity 左手系绕 +Y 的正角旋转在角量意义上是 atan2(Z,X) 递减（俯视顺时针）**，与 2D/UGUI 绕 +Z 正角旋转（数学逆时针、角度递增）方向相反；贴图 UV 映射不镜像（quad 本地 +X→世界 X、+Y→世界 Z，atan2(Z,X)=贴图数学角），「头在角度高端」在两种驱动下必然一头一尾。
+**修法/纪律**：①世界平铺 quad 旋转贴图类效果（光弧/箭头/指针）角速度默认取**负值**对齐 2D 语义（OrbitBeamsWorld.环绕角速度=-150），或驱动处 Euler(90,-angle,0)；②同贴图双消费方（UI+世界）方向语义冲突时改单值符号、勿镜像贴图（共享贴图镜像会弄坏另一消费方）；③quad 经 Rx(90) 后法线 -Z→+Y 朝上可见（Unity Quad 法线=-Z，勿按 +Z 推）。
+**连带**：头尾方向可像素判定=弧段两端分半算平均 alpha，亮端=头（角度高端）——驱动方向定符号前先跑该检测，勿靠目测试错。

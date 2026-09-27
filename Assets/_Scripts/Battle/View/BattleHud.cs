@@ -25,7 +25,9 @@ namespace GIC.Battle
     /// 单位选择交互（2026-09-18 拍板）：点立牌选中 → 技能盘现+手牌藏（选中态/手牌态互斥），
     /// 点空白取消选中；技能瞄准 = 可选格推荐分色高亮（推荐/不推荐=BattlePalette 瞄准推荐色/瞄准
     /// 不推荐色，色相勿写死在此处——2026-09-23 拍板分色、09-24 白改金；推荐=该方向能命中敌人/
-    /// 该格实际能走到；不可选=无提示）+ 右上取消按钮 + 选中单位脚下金色标记。
+    /// 该格实际能走到；不可选=无提示）+ 右上取消按钮 + 选中单位脚下金色标记与两束队伍色环绕光束。
+    /// 选中/瞄准提示特效（2026-09-27 拍板）：技能按钮瞄准态=两束元素色光环绕飞行（旧打钩图
+    /// skillSelect 退役不再点亮）；立牌选中=底座圆盘两束队伍主色光环绕（OrbitBeams.cs 两驱动）。
     /// 瞄准提交制（2026-09-26 拍板）：点可选格=金色待定（BattlePalette.瞄准已选色，可点其它格变更、
     /// 点空白取消技能回选中态），确认=顶部「完成选择」按钮——待定格提交行动/无待定空过完成选择
     /// （多人提前开演=各真人交齐一份，AI 由脑自动上交）；倒计时归零=自动按下该按钮（统一复用链路）。
@@ -153,18 +155,18 @@ namespace GIC.Battle
             public RectTransform rect;
             public SkillIconView view;
             public TextCombiner nameText;
+            public OrbitBeamsUi orbitFx; // 瞄准态环绕光束（2026-09-27 选中提示特效，懒建随键存留）
             public bool IsMove => type == SkillType.Move;
         }
 
         // 高亮（世界层）+ 选中标记
         private Transform _highlightRoot;
-        private GameObject _selectMarker;
+        private OrbitBeamsWorld _discOrbit; // 底座圆盘环绕光束（2026-09-27 选中提示特效；金盘同日退役，选中仅此弧光）
         private readonly List<GameObject> _highlightQuads = new List<GameObject>();
         // 世界层运行时材质（单实例缓存，OnDestroy 释放——Destroy 物体不销材质，逐次 new 会累积泄漏）
         private Material _aimRecommendedMaterial;    // 可选且推荐（色=BattlePalette.瞄准推荐色）
         private Material _aimNotRecommendedMaterial; // 可选但不推荐（色=BattlePalette.瞄准不推荐色）
         private Material _aimPendingMaterial;       // 待定金格（色=BattlePalette.瞄准已选色，2026-09-26）
-        private Material _selectMarkerMaterial;
         // 高亮 quad 按格索引（待定金格材质换装用——sharedMaterial 换装不产副本，还原回共享单实例）
         private readonly Dictionary<BattleCell, MeshRenderer> _aimQuadByCell = new Dictionary<BattleCell, MeshRenderer>();
 
@@ -320,7 +322,6 @@ namespace GIC.Battle
             if (_aimRecommendedMaterial != null) Destroy(_aimRecommendedMaterial);
             if (_aimNotRecommendedMaterial != null) Destroy(_aimNotRecommendedMaterial);
             if (_aimPendingMaterial != null) Destroy(_aimPendingMaterial);
-            if (_selectMarkerMaterial != null) Destroy(_selectMarkerMaterial);
             if (_countdownOutlineMat != null) // SDF 描边实例（TopBar 分件，TMP 不自销）
             {
                 Destroy(_countdownOutlineMat);
@@ -924,11 +925,31 @@ namespace GIC.Battle
             SetTip("Battle_TipUnitSelected");
         }
 
-        /// <summary>瞄准态视觉反馈：亮/灭对应技能按钮的选中环（prefab 自带 skillSelect）</summary>
-        private static void SetAimSelectRing(SkillButtonDef def, bool on)
+        /// <summary>瞄准态视觉反馈：亮/灭对应技能按钮的两束环绕光束（2026-09-27 拍板「让两束光，
+        /// 环绕飞行选中的技能按钮」——色=选中单位元素色；旧打钩图 skillSelect 不再点亮，
+        /// prefab 节点保留仅供非战斗屏复用）</summary>
+        private void SetAimSelectRing(SkillButtonDef def, bool on)
         {
-            if (def?.view?.skillSelect != null)
-                def.view.skillSelect.gameObject.SetActive(on);
+            if (def == null) return;
+            if (!on)
+            {
+                if (def.orbitFx != null) def.orbitFx.gameObject.SetActive(false);
+                return;
+            }
+            if (def.orbitFx == null) def.orbitFx = OrbitBeamsUi.Create(def.rect);
+            def.orbitFx.SetColor(SelectedElementColor());
+            def.orbitFx.gameObject.SetActive(true);
+        }
+
+        /// <summary>选中单位的元素色（技能按钮环绕光束用；与 SkillIconView.InitWithData 底图
+        /// 染色同源=ElementFactionConfig.GetElementColor(selfElement)，无配置回退物理灰）</summary>
+        private Color SelectedElementColor()
+        {
+            var unitData = GetSelectedUnitData();
+            return ElementFactionConfig.Instance != null
+                ? ElementFactionConfig.Instance.GetElementColor(
+                    unitData != null ? unitData.selfElement : ElementType.Physical)
+                : Palette.高亮金;
         }
 
         /// <summary>瞄准可选格：移动 = 十字四向 1..N 步；战技/爆发（直线型）= 十字方向瞄准；
@@ -1685,23 +1706,28 @@ namespace GIC.Battle
             _aimQuadByCell.Clear();
         }
 
-        /// <summary>选中单位脚下金色圆盘标记（选中无棋盘反馈的补全；选中态/瞄准态常显）</summary>
+        /// <summary>选中单位脚下两束队伍色环绕彗尾弧光（2026-09-27 拍板「底座圆盘也要」；
+        /// 同日验证后追加拍板：金盘退役——底座圆盘本体不替换，选中仅额外加弧光。
+        /// 选中态/瞄准态常显，色=该单位所属玩家队伍主色（与底座圆盘同源 BattlePlayer 口径）</summary>
         private void ShowSelectMarker(string unitId)
         {
-            if (_selectMarker == null) return;
             var snapshot = _session.Player.LatestSnapshot;
             var unit = snapshot?.units.FirstOrDefault(u => u.unitId == unitId);
             if (unit == null) { HideSelectMarker(); return; }
 
             var cellWorld = _board.CellToWorld(unit.position);
-            _selectMarker.transform.position = new Vector3(
-                cellWorld.x, _board.GetDecalHeight(unit.position, 0.024f), cellWorld.z); // 水格含波峰带（docs/14 §89 第四轮）
-            _selectMarker.SetActive(true);
+            // 环绕光束：贴片高度略高于瞄准格（波峰带之上同链），色=队伍主色（TeamType.A=我方/B=敌方）
+            if (_discOrbit == null && _highlightRoot != null)
+                _discOrbit = OrbitBeamsWorld.Create(_highlightRoot);
+            if (_discOrbit != null)
+                _discOrbit.Setup(
+                    new Vector3(cellWorld.x, _board.GetDecalHeight(unit.position, 0.045f), cellWorld.z),
+                    (TeamType)unit.team == TeamType.B ? Palette.敌方主色 : Palette.我方主色);
         }
 
         private void HideSelectMarker()
         {
-            if (_selectMarker != null) _selectMarker.SetActive(false);
+            if (_discOrbit != null) _discOrbit.gameObject.SetActive(false);
         }
 
         // ==================== 技能数据链（现有体系：UnitConfig.skills → SkillData；2026-09-18 复用拍板） ====================
