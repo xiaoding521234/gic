@@ -155,6 +155,12 @@ namespace GIC.Data
             public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;
             public int GetEffectiveDeployCost() => IsSpecified(deployCost) ? deployCost : GetDeployCost();
 
+            /// <summary>单位体积单出口（2026-09-27 复审收口：原「Building?2:1」在 Unit.Volume 与部署校验各写一份=双源，
+            /// 违反 docs/20 §1.6 判定规则字段单源）。docs/05 §5.3：角色/造物=1、建筑=2，格子体积容量 3——
+            /// 体积判定在阻挡规则之上，无视阻挡配置不可绕过。消费方=Unit.Volume（移动/占据）与
+            /// DeployUnitExecutor.IsDeployCellValid（部署预判，实例化前）两链路同读</summary>
+            public int GetVolume() => unitType == UnitType.Building ? 2 : 1;
+
             /// <summary>
             /// 获取指定技能的语音组
             /// </summary>

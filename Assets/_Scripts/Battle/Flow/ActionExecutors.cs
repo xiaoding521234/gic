@@ -84,6 +84,9 @@ namespace GIC.Battle
     /// 目标校验读片前快照（瞬发效应按片初状态结算）。
     /// 时轮（B-S1）：通过全部门槛的施放各产一条 SkillCast 命令（castsOut，段内最前发射——
     /// 客户端时轮演出起点；元能不足/不可施放=行动落空，不产施放事件）。
+    /// 目标失效口径（2026-09-27 拍板 docs/18 决策十四，A 案=维持）：门槛过后目标在结算时已亡
+    /// （同时制必然场景——选择时有效、执行时死亡）=行动已使用——体力元能照扣、SkillCast 照播；
+    /// 与「门槛不足=落空不扣」为并行口径（不足=未获执行权；失效=已执行无效果）。
     /// </summary>
     public static class SkillExecutor
     {
@@ -195,8 +198,9 @@ namespace GIC.Battle
             var forceType = deployData?.normalMoveType ?? ForceType.Walk;
             if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) return false;
 
-            // 体积绝对层（最高级）：格内现有体积+自身体积 ≤ 3（建筑 2/角色造物 1，同 Unit.Volume 口径）
-            int selfVolume = deployData != null && deployData.unitType == UnitType.Building ? 2 : 1;
+            // 体积绝对层（最高级）：格内现有体积+自身体积 ≤ 3（真源=UnitData.GetVolume() 单出口，
+            // 与 Unit.Volume 同读——2026-09-27 复审收口双源）
+            int selfVolume = deployData != null ? deployData.GetVolume() : 1;
             var occupants = sim.GetUnitsAt(cell); // 含尸体——尸体保留碰撞/体积
             int existingVolume = 0;
             foreach (var occupant in occupants)

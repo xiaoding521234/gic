@@ -96,10 +96,10 @@ namespace GIC.Data
                 case 'S': return TileType.StonePath;
                 case 'D': return TileType.Dirt;
                 case 'C': return TileType.Cobblestone;
-                case '.': return (TileType)0; // 虚空：无地形
+                case '.': return TileType.None; // 虚空：无地形
                 default:
                     GICLog.Warn($"[BattleMapConfig] 未知地形字符 '{c}'，按虚空处理");
-                    return (TileType)0;
+                    return TileType.None;
             }
         }
     }

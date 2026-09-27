@@ -19,8 +19,9 @@ namespace GIC.Battle
         /// 等效百分比或走 FlatDamage，否则固定伤害会被误当百分比（参数基准结算纪律，docs/20）</summary>
         public int AttackPercent = 100;
 
-        /// <summary>额外固定伤害（加法区；Fixed 基准伤害/附加伤害走此）</summary>
-        public int FlatDamage;
+        /// <summary>额外固定伤害（加法区；Fixed 基准伤害/附加伤害走此。float——换算端 float 直入、
+        /// 管线末点单次截断（舍弃小数），防中途截断产生双取整点，2026-09-27 复审修复+拍板）</summary>
+        public float FlatDamage;
         public int Element;
 
         /// <summary>易伤乘区增量（元素反应提供：如 1 级融化 +0.5；同乘区加法并入，docs/18 决策五）</summary>
@@ -81,7 +82,9 @@ namespace GIC.Battle
                 ? 100f / (100f + defense)
                 : 1f - defense / 100f) + request.VulnerabilityBonus;
 
-            result.FinalDamage = Mathf.Max(0, Mathf.RoundToInt(baseZone * bonusZone * vulnerability));
+            // 末点单次截断（2026-09-27 拍板「最终伤害舍弃小数点」——RoundToInt 改 FloorToInt；
+            // 中途全 float，此处为伤害唯一取整点，勿在中途截断）
+            result.FinalDamage = Mathf.Max(0, Mathf.FloorToInt(baseZone * bonusZone * vulnerability));
 
             return result;
         }

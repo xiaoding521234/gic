@@ -229,6 +229,12 @@ namespace GIC.Battle
                     if (_resources.TryGetValue(playerId, out var res))
                         res.handCardCount = hand.Count;
                 }
+                else
+                {
+                    // 2026-09-27 复审修复：已有条目同步池值——快照序列化虽会重映射（IsCurrency 分支），
+                    // 但 in-sim 消费方读条目 count 会拿到陈旧值（潜伏双源），此处与快照双保险
+                    entry.count = pool;
+                }
             }
             else if (entry != null)
             {

@@ -35,6 +35,9 @@ namespace GIC.Data
     /// </summary>
     public enum TileType
     {
+        [InspectorName("无地形")]
+        None = 0, // 虚空/越界哨兵（tiles 值 0=无地形、HasTile 判 >0——2026-09-27 复审显式化，原 0 为隐式约定；勿配 TileTag）
+
         #region basicTerrain (1-99)
         [InspectorName("平原")]
         [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]

@@ -250,6 +250,8 @@ namespace GIC.Battle
 
                     // 元素反应预判（融化=易伤/蒸发=增伤/冻结=控制，docs/06）
                     var outcome = ElementReactionResolver.Preview((ElementType)targetState.dyedElement, element);
+                    // stats 取活态 UnitStats（当前片内无属性突变点=与片前快照恒等；未来若引入片中属性
+                    // 变化——光环/移动触发效果等——须统一改读快照，防快照纪律分叉，2026-09-27 复审注记）
                     var request = new DamageRequest
                     {
                         Attacker = attacker,
@@ -265,8 +267,10 @@ namespace GIC.Battle
                     {
                         var casterStats = attacker.GetUnitComponent<UnitStats>();
                         request.AttackPercent = 0;
+                        // float 除法至管线末点单次截断（2026-09-27 复审修复+拍板「舍弃小数」：
+                        // 原 int 截断=双取整点；现中途全 float、DamagePipeline 末点 FloorToInt）
                         request.FlatDamage = casterStats != null
-                            ? casterStats.GetStatStruct(StatType.HP).Max * attackPercent / 100 : 0;
+                            ? casterStats.GetStatStruct(StatType.HP).Max * attackPercent / 100f : 0;
                     }
                     else
                     {
@@ -383,6 +387,13 @@ namespace GIC.Battle
                     }
                     break;
                 }
+
+                default:
+                    // 2026-09-27 复审修复（对齐 BattleEffectCommandAudit 哲学）：未接编译的原子 kind
+                    // 此前静默 no-op——新 kind 忘接编译器/配置误填=效果无声丢失，Warn 暴露
+                    GICLog.Warn($"[EffectCompiler] 未接编译的效果原子 kind={atom.kind}（{skillData?.skillID} → target={targetUnitId}）——" +
+                                $"该原子不产出任何效应；新 kind 请在 CompileAtom 接入，误配请修 SkillConfig");
+                    break;
             }
         }
 
@@ -411,9 +422,11 @@ namespace GIC.Battle
             switch (baseType)
             {
                 case SkillBaseType.BasedOnMaxHealth:
-                    return targetStats != null ? targetStats.GetStatStruct(StatType.HP).Max * rawValue / 100 : 0;
+                    // float 计算后末点截断（2026-09-27 拍板「最终治疗舍弃小数点」——FloorToInt；
+                    // 消除中途 int 截断的双取整点，最终值与旧 int 截断口径一致：205 血×8%=16.4→16）
+                    return targetStats != null ? Mathf.FloorToInt(targetStats.GetStatStruct(StatType.HP).Max * rawValue / 100f) : 0;
                 case SkillBaseType.BasedOnAttack:
-                    return attackerStats != null ? attackerStats.Attack * rawValue / 100 : 0;
+                    return attackerStats != null ? Mathf.FloorToInt(attackerStats.Attack * rawValue / 100f) : 0;
                 default: // Fixed/Percent=直读（Percent 语境百分比由技能语义指定，治疗无语境默认直读）
                     return rawValue;
             }
