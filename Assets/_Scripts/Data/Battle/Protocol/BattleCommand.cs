@@ -59,6 +59,25 @@ namespace GIC.Data
     /// <summary>
     /// 单条战斗命令（union 风格平铺 payload，按 type 部分有效）
     /// </summary>
+    /// <remarks>
+    /// 字段有效性矩阵（复用字段总表——新增命令类型/新增复用语义时同步更新此表防误用；
+    /// 返修先例=launchMs 双语义、direction 复用投放形态，2026-09-27 复审批1 收口）：
+    /// type            | value    | metadata         | direction        | cell      | path | hitX/Y | launchMs              | buff 载荷      | summonUnit
+    /// ----------------|----------|------------------|------------------|-----------|------|--------|-----------------------|----------------|-----------
+    /// Move            | —        | MoveBlocked 标记 | 被挡方向         | 终点格    | 路径 | —      | —                     | —              | —
+    /// Damage          | 伤害量   | 元素             | 投放形态 delivery | 发射格    | —    | 命中点 | 发射时刻（投射物前摇） | —              | —
+    /// Heal            | 治疗量   | —                | —                | —         | —    | —      | 应用时刻（命中类治疗） | —              | —
+    /// Death           | —        | —                | —                | —         | —    | —      | —                     | —              | —
+    /// ApplyBuff       | —        | —                | —                | —         | —    | —      | —                     | 类型/级别/回合 | —
+    /// RemoveBuff      | —        | —                | —                | —         | —    | —      | —                     | buffType       | —
+    /// ElementAttach   | —        | 附着元素         | —                | —         | —    | —      | —                     | —              | —
+    /// Reaction        | 反应级别 | 反应子类型       | —                | —         | —    | —      | —                     | —              | —
+    /// StatChange      | 变化量   | 属性子类型       | —                | —         | —    | —      | 应用时刻（元能/命中） | —              | —
+    /// Summon          | —        | —                | —                | —         | —    | —      | —                     | —              | 新单位全量态
+    /// Effect          | 特效值   | 特效子类型       | 飞行方向         | 发射格    | —    | —      | 发射时刻              | —              | —
+    /// SkillCast       | skillID  | —                | 瞄准方向         | 施放者位置| —    | —      | —                     | —              | —
+    /// Pause/Resume/UI | —        | —                | —                | —         | —    | —      | —                     | —              | —
+    /// </remarks>
     [Serializable]
     public class BattleCommand
     {

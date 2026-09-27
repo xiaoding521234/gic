@@ -17,9 +17,10 @@ namespace GIC.Battle
 
         /// <summary>
         /// 单位体积（docs/05 §5.3：角色/造物 = 1，建筑 = 2；格子体积容量 3。
-        /// 体积判定在阻挡规则之上，无视阻挡能力也不可绕过）
+        /// 体积判定在阻挡规则之上，无视阻挡能力也不可绕过）——
+        /// 真源=UnitData.GetVolume() 单出口（2026-09-27 复审收口：原「Building?2:1」在此与部署校验双源）
         /// </summary>
-        public int Volume => RawData != null && RawData.unitType == UnitType.Building ? 2 : 1;
+        public int Volume => RawData != null ? RawData.GetVolume() : 1;
 
 
         private void Awake()

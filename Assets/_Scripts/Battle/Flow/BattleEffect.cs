@@ -185,7 +185,8 @@ namespace GIC.Battle
         public const int CategoryMoveGain = 1;
         /// <summary>来源类别：战技命中获能</summary>
         public const int CategorySkillHitGain = 2;
-        /// <summary>来源类别：协奏（延奏）获能</summary>
+        /// <summary>来源类别：协奏（延奏）获能——EffectCompiler 按**触发点**分类：一切 OnCast 获能
+        /// 原子皆入此类别（命名沿协奏先例；未来 Normal 技能 OnCast 获能同用，无「协奏专属」语义，2026-09-27 复审注记）</summary>
         public const int CategoryEnsoGain = 3;
         /// <summary>来源类别：技能元能消耗</summary>
         public const int CategoryCost = 4;

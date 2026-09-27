@@ -62,7 +62,8 @@ namespace GIC.Battle
 
         // ==================== 选择时限（docs/04 §4.2，B6 落地） ====================
         // 第 1 回合 25 秒；2~6 回合 16 秒；第 7 回合起每回合 -0.5 秒，下限 8 秒（第 22 回合触底）。
-        // 超时行为 docs 未明确定义，按"未交玩家自动上交 Pass（空过）"实现——待用户拍板确认。
+        // 超时行为已拍板（2026-09-26，docs/18 决策六）：先触发 OnSelectTimerExpired（HUD 无条件复用
+        // 完成选择按钮链路=待定金格自动确认），未交玩家再自动上交 Pass（空过）。
 
         public const float FirstTurnSelectSeconds = 25f;
         public const float BaseSelectSeconds = 16f;
@@ -140,7 +141,6 @@ namespace GIC.Battle
         private Coroutine _resolveCoroutine;
 
         // ack 门控状态（Host 永不跑在客户端前面）
-        private string _pendingAckKey;
         private readonly HashSet<string> _ackedKeys = new HashSet<string>();
 
         public void Bind(BattleSimState sim, IBattleTransport transport)
@@ -201,6 +201,14 @@ namespace GIC.Battle
             if (action == null || !_sim.PlayerIds.Contains(action.playerId))
             {
                 GICLog.Warn($"[TurnFlow] 未知玩家 {action?.playerId}，忽略");
+                return;
+            }
+
+            // 回合号校验（2026-09-27 复审修复，LAN 纵深二道防线）：本地模式 BattleSession.SubmitAction
+            // 提交时即写当前回合恒等价、零行为变化；B7 分端后拦截错轮/迟到重放上交（阶段门之外）
+            if (action.turnNumber != TurnNumber)
+            {
+                GICLog.Warn($"[TurnFlow] 上交回合号 {action.turnNumber} ≠ 当前 {TurnNumber}，忽略（错轮/迟到上交）");
                 return;
             }
 
@@ -346,8 +354,9 @@ namespace GIC.Battle
 
         public void NotifySegmentPushed(int turnNumber, int sliceIndex)
         {
-            _pendingAckKey = AckKey(turnNumber, sliceIndex);
-            _ackedKeys.Remove(_pendingAckKey);
+            // 同键复推防御：先清旧 ack（正常流片号单调递增不撞键；超时快进后亦不重推同片）——
+            // 2026-09-27 复审清理：残字段 _pendingAckKey 无外部读者，就地局部化
+            _ackedKeys.Remove(AckKey(turnNumber, sliceIndex));
         }
 
         public bool HasSegmentAck(int turnNumber, int sliceIndex)

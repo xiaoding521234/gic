@@ -870,6 +870,22 @@ namespace GIC.Editor
                     issues.Add("OnHit 效果但判定轨无 clip——走无时轮合并兜底（单发/单段）");
             }
 
+            // 参数引用完整性（2026-09-27 复审批2 修复）：原子引用的参数键不在参数表=运行时静默按
+            // 缺省值 0 处理（治疗/获能变 0、群体半径 0 跳过）——编辑期暴露（每原子报首缺）
+            if (data != null && data.effects != null)
+            {
+                for (int i = 0; i < data.effects.Count; i++)
+                {
+                    var atom = data.effects[i];
+                    string label = $"第 {i + 1} 原子（{atom.kind}）";
+                    var miss = MissingParamRefIssue(data, atom.paramKey, label + " 主参数键")
+                        ?? MissingParamRefIssue(data, atom.paramKey2, label + " 第二参数键")
+                        ?? MissingParamRefIssue(data, atom.paramKey3, label + " 第三参数键")
+                        ?? MissingParamRefIssue(data, atom.radiusKey, label + " 范围半径键");
+                    if (miss != null) issues.Add(miss);
+                }
+            }
+
             if (issues.Count == 0)
                 return new HelpBox("✓ 效果配置校验通过", HelpBoxMessageType.None);
 
@@ -877,6 +893,15 @@ namespace GIC.Editor
             box.style.whiteSpace = WhiteSpace.Normal;
             box.style.marginTop = 6;
             return box;
+        }
+
+        /// <summary>参数键引用完整性（2026-09-27 复审批2）：键非 None 且参数表缺该键 → 返回 issue 文案
+        /// （null=通过）——运行时 GetInt 缺键按缺省 0 静默处理的配置错误源头，编辑期拦截</summary>
+        private static string MissingParamRefIssue(SkillConfig.SkillData data, SkillParamKey key, string label)
+        {
+            if (key == SkillParamKey.None) return null;
+            if (data.customParams != null && System.Array.Exists(data.customParams, p => p.key == key)) return null;
+            return $"{label} {key} 不在参数表——运行时按缺省值 0 处理（效果静默变空）";
         }
 
         #endregion

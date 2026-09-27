@@ -25,11 +25,12 @@ namespace GIC.Data
         public bool InBounds(int x, int y) => x >= 0 && x < width && y >= 0 && y < height;
 
         /// <summary>
-        /// 获取地形类型；越界视为虚空（不可通行不可放置）
+        /// 获取地形类型；越界返回 TileType.None（2026-09-27 复审修复：原返回 Plain 属可通行型，
+        /// 正确性全靠调用方先查 HasTile 兜着，属 API 陷阱）。调用方判定通行/放置前须经 HasTile/InBounds。
         /// </summary>
         public TileType GetTile(int x, int y)
         {
-            if (!InBounds(x, y)) return TileType.Plain; // 越界返回默认值，配合 HasTile 使用
+            if (!InBounds(x, y)) return TileType.None;
             return (TileType)tiles[y * width + x];
         }
 
