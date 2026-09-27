@@ -227,7 +227,12 @@
 
 - [2026-09-19 01:57:27] [project] UnityInsight 索引系统档案（活锁 bug 已提交 Bug Hunter，证据包=.codely\有效bug活动\已提交\index-build-failure）：架构=CLI 侧 node 守护进程（unity-insight-cli.js serve --daemon）持有全部索引，**被动模式**——杀掉不自动重生、重生后须 Cowork GUI 发构建指令（编辑器 AI/ 菜单只有 Check Connections/Force Reload）；数据目录=<项目>\.codely-cli\UnityInsight\（构建中=index.db.tmp+WAL，ready 后写 index.current 指针）。活锁特征：first_build 磁盘写入 ~6 分钟后冻结、进程 4~5 核满负荷+RSS 狂涨至 7.5GB+零 I/O、index_building=true 永不翻转、GUI 无进度无报错；~\.codely-cli\crash-logs\exit-*.json（uptime<1s）=单实例锁握手记录属常态勿误判崩溃。处置=Stop-Process 杀 daemon+清 tmp 三件套。
 
-- [2026-09-23 00:03:26] [project] Bug Hunter 提交活动：权威状态板=.codely\有效bug活动\00-新会话交接总览.md（涉提交/查已立包状态先读它）；活动规则与四件套流程=全局 skill codely-bughunter；2026-09-20 轮结算积分已到账、闭环。
+- [2026-09-27 13:29:16] [project] Bug Hunter 提交活动：权威状态板=.codely\有效bug活动\00-新会话交接总览.md（涉提交/查已立包状态先读它）；活动规则与四件套流程=全局 skill codely-bughunter；**立包位置约定（9/27 用户拍板）=待交包一律放 .codely\有效bug活动\ 根，提交后移 已提交\、撤案移 不正确\（skill 已同步）**。**9/22 上周结算已了结：兑换码到账并已全部用完（分值待补记）；9/27 用户提交本周 3 件并自行归位已提交\**：①bughunter-context-157-percent（上下文显示 157%，真实 37%）②bughunter-video-cost-gate-threshold（视频生成>500 门槛逐单弹回，建议可配置阈值/开关）③bughunter-core-oom-deadair（core V8 堆 OOM 崩溃 code=3+回合死等 26 分钟+重试两连败；截图=弹窗现场含被吞回合 diff 残留+会话导出+JSONL；崩溃实例=最新版 2.1.1；core 崩溃不留 crash-logs，V8 原文只在 cowork [Core Error] 透传块，GC trace 首列 ms=进程 uptime，被吞消息可从 session JSONL 完整找回）。**新待交一包（9/27 13:4x 立包，四件套齐）**：bughunter-credit-deduction-order（功能建议：扣减顺序固定「赠送>订阅>增值包」（用量页+官方文档明示；订阅积分月底清零/增值包 365 天/赠送永久），永久赠送积分优先烧致订阅积分压队尾作废——用户 4 万永久赠送积分+MAX 订阅实测整月额度难花完；建议用户可指定顺序或"先到期先扣"；提交时机取决于遗留三件本周是否已交——都交则本件为第 7 件超周上限）。**待确认**：popup 竖线串/CDN 链接/积分误拒三件 9/20 遗留包网站侧是否已交（目录已全部在已提交区）；下周二 9/29 结算本周，兑换码一周内须核销。
+
+
+
+
+
 
 
 
@@ -291,7 +296,8 @@
 
 
 
-- [2026-09-23 00:04:49] 【战斗表现纸片人方案与素材路线定案（2026-09-20 用户拍板）】GI 动画提取判死后战斗表现=纸片人方案；GI 七圣卡面 Spine 素材路线被否决（卡面人物只有半身/坐姿场景图不完整）→纸片人素材走 AI 生成（安柏滑翔立牌终版=提交 ba3d847：v4 基版+AI 局部擦除中上多余第三翼，用户拍板局部擦除优于全新生成、v5 退役；站姿 v2 定基准）。生成工作流+立牌设计规则+局部擦除配方=gic-paperdoll skill，后续角色直接复用。Spine 技术管线已验证保留（skel 4.0 解析器+AtlasDump harness，坑清单在工具链内；工具链=.codely-cli/tmp/paperdoll_amber_gcg/ + webrefs/spine-paperdoll/），将来做 GI 素材骨骼动画可复用。**How to apply:** 战斗单位表现素材走 AI 生成立绘；GI 提取素材只做图标/头像/卡面类完整资源。
+- [2026-09-27 14:15:45] 【战斗表现纸片人方案与素材路线定案（2026-09-20 用户拍板）】GI 动画提取判死后战斗表现=纸片人方案；GI 七圣卡面 Spine 素材路线被否决（卡面人物只有半身/坐姿场景图不完整）→纸片人素材走 AI 生成（安柏滑翔立牌终版=提交 ba3d847：v4 基版+AI 局部擦除中上多余第三翼，用户拍板局部擦除优于全新生成、v5 退役；站姿 v2 已作废（2026-09-27 用户拍板「作废，不要管它」）勿再引用）。生成工作流+立牌设计规则+局部擦除配方=gic-paperdoll skill，后续角色直接复用。Spine 技术管线已验证保留（skel 4.0 解析器+AtlasDump harness，坑清单在工具链内；工具链=.codely-cli/tmp/paperdoll_amber_gcg/ + webrefs/spine-paperdoll/），将来做 GI 素材骨骼动画可复用。**How to apply:** 战斗单位表现素材走 AI 生成立绘；GI 提取素材只做图标/头像/卡面类完整资源。
+
 
 
 
@@ -391,8 +397,7 @@
 
 - [2026-09-26 21:06:34] 【git quotepath 转义陷阱（2026-09-26 GIC 实证）】git diff --name-only 对非 ASCII 路径输出带引号+八进制转义（形如 "docs/00-\346\246\202\350\277\260.md"）——PS 拿它 Join-Path/ReadAllText 必炸 Illegal characters in path（且异常后变量残留 null 会产出假「pureLF」结果，极误导）。正解=git -c core.quotepath=false diff --name-only（原始 UTF-8 路径）；本仓文件名全中文，凡 shell 管道消费 git 路径输出一律加 quotepath=false。同类坑：rg --files 与 Get-ChildItem 输出不受影响可直接用。
 - [2026-09-27 12:02:43] 【B-S3 立牌动作段·视频路线已闭环（提交 66a9eda+追加批；内容终版=H3-Max v2）】用户拍板「不用序列帧（太占内存），使用透明底视频形式」——**立牌循环动画=绿幕 mp4+运行时 ChromaKey 抠色**（真 alpha WebM/VP9-YUVA 不押注）：实现=UnitData.立牌动画视频（VideoClip，优先级高于立牌动画帧，都缺=静态兜底）→UnitView 视频路径（VideoPlayer→RT ARGB32 sRGB→ChromaKeyVideo shader 运行时抠色，阈值与离线管线同参=excess 平滑带 20~45/255+暗部门 g>60/255+despill；随机相位=vp.time；冻结/尸体 Pause 停摆；errorReceived 回落静态立牌；RT/材质 OnDestroy 释放，显存恒定与帧数无关）；BattleViewFactory.CreateChromaKeyMaterial 唯一出口；shader 登记 Always Included Shaders 防剥离；三张序列帧 sheet 已删（tmp 存档）。**内容终版=MiniMax-H3-Max v2**（36 帧/1.5s/768²，amber_fly_loop.mp4 同路径同 GUID 内容替换）：四模型同题 A/B（Seedance 2.5/2.0+H3/H3-Max，共 2370 积分）——几何指标 Seedance 家族全优（方幅/零裁切/接缝 2.5 与 2.0 同级 0.41×；2.0 动作幅度大 2 倍），MiniMax 动作过大（漂移 14~16%）+贴边、H3 方幅跟随失败（1344×768 横幅）、H3-Max v1 接缝 1.31× 游戏内可见顿挫（用户报障）→**v2 重生成加「明确循环节拍」提示词（周期约 2.5s+任意相邻 2.5s 片段完全相同）→接缝 1.31×→0.16×、贴边 26/48→9/36**，用户目检通过定稿；Seedance 2.5 版 tmp 备份（amber_fly_loop_seedance25_backup.mp4）可一键还原。**方法论：客观指标推荐 Seedance 家族、内容/画风终判归用户目检；MiniMax 循环补救配方=明确循环节拍提示词**。落档=docs/18 决策八两条+active/28 §8+17 §7+14 §90/§91（桥脚本 VideoClip CS0246→Object+反射；Play 态 VideoPlayer 握 mp4 句柄锁覆盖→内容替换前必 stop Play+探测回读勿信管道 exit code）。工具链=.codely-cli/tmp/paperdoll_seedance/（extract_build.py 抽帧抠底循环检测+各版原片/预览 GIF；桌面对比材料 amber_video_test/ 看后可删）。症状归因：安柏立牌不动→立牌动画视频+OnVideoError 日志；安柏显示绿块→ChromaKey 阈值/shader 剥离；循环顿挫→回绕差分超 1×（管线验收线）；其余单位静态=未配置属预期。
-
-
+- [2026-09-27 14:17:35] 【立牌朝向规则补拍+凯亚立牌 v1 待目检（2026-09-27）】①朝向新拍板：人物不可完全面向右边（完全面向一侧=只能看见半边脸，禁止）；面部须大部分可见（双眼区域），合格样板=amber_glide 定稿——已入 gic-paperdoll skill「立牌设计规则」节。②凯亚全身立牌已定稿入库（2026-09-27 用户目检「满意」一次过）：Assets/Art/PaperDoll/kaeya_stand.png=并行会话生成版并已接线 UnitConfig 凯亚「立牌图」（本会话同题并行的另一份 kaeya_v1.png 留 tmp 未用）；配方=日辉双参考第一张 amber_glide 锁画风/朝向+第二张 UI/Cards/kaeya.png（800×1200 白底半身人物锚够用；NameCards/kaeya.png 无人物勿用作参考）；608×1088 原生透明。像素判定经验：a>0 bbox 贴右/下缘是低 alpha 光晕非裁切，判定 bbox 必须带 alpha 阈值（≥16 后四边留白为正=零裁切）。遗留可选项=凯亚 idle 循环动画（B-S3 绿幕视频路线）待拍板。
 
 
 ### Reference
