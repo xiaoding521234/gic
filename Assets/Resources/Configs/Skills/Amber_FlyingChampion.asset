@@ -30,3 +30,9 @@ MonoBehaviour:
       value: 5
       baseType: 0
     timeline: {fileID: 11400000, guid: 2be8c522766a7e449bd6c4f9ccd394d5, type: 2}
+    effects: []
+    costs:
+    - kind: 2
+      item: 0
+      subType: 4
+      amount: 10

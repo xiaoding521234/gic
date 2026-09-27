@@ -31,6 +31,7 @@ MonoBehaviour:
       paramKey: 1
       paramKey2: 0
       paramKey3: 0
+      radiusKey: 0
       value: 0
       element: 0
       buffType: 1
@@ -41,6 +42,7 @@ MonoBehaviour:
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
+      radiusKey: 0
       value: 0
       element: 1
       buffType: 1
@@ -51,7 +53,13 @@ MonoBehaviour:
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
+      radiusKey: 0
       value: 10
       element: 0
       buffType: 1
       targetSkillType: 7
+    costs:
+    - kind: 2
+      item: 0
+      subType: 4
+      amount: 10

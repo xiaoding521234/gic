@@ -207,6 +207,10 @@ namespace GIC.Battle
         private Card _moraHandCard;
         private Card _staminaHandCard;
 
+        /// <summary>手牌普通物品牌卡引用（统一消耗模型 C-1：ItemName→Card——技能吃物品（酒/苹果）时
+        /// OnItemConsumed 事件即时重 Init 刷新对应卡数量角标；货币走 _moraHandCard/_staminaHandCard 既有链）</summary>
+        private readonly Dictionary<ItemName, Card> _handItemCards = new Dictionary<ItemName, Card>();
+
         // 手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移）：
         // 只动 HandCards.anchoredPosition（槽内件）——hand 槽锚点/布局方案数据零接触
         private RectTransform _handCardsRect;
@@ -286,6 +290,7 @@ namespace GIC.Battle
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnSegmentPlaying += OnSegmentPlayingHandler;
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
+            _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
             _session.Flow.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
@@ -320,6 +325,7 @@ namespace GIC.Battle
                     _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
                     _session.Player.OnSegmentPlaying -= OnSegmentPlayingHandler;
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
+                    _session.Player.OnItemConsumed -= OnItemConsumedHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
                 }
                 if (_session.Flow != null)
@@ -354,6 +360,38 @@ namespace GIC.Battle
         {
             if (playerId != _myPlayerId) return;
             ApplyMyResourceDelta(statKind, delta);
+        }
+
+        /// <summary>物品消耗命令（统一消耗模型 C-1）：我方技能吃物品（酒/苹果等）——按 BattlePlayer 已扣的
+        /// 本地 handCards 镜像重 Init 对应卡（数量角标即时刷新；条目减尽=下回合快照重建移除，
+        /// 本帧卡残留一回合属可接受——Host 权威镜像已在，签名比对到点自然重建）</summary>
+        private void OnItemConsumedHandler(string playerId, int itemName, int amount)
+        {
+            if (playerId != _myPlayerId) return;
+            if (!_handItemCards.TryGetValue((ItemName)itemName, out var card) || card == null) return;
+            // 镜像数量（BattlePlayer 已扣）：非货币物品牌 count=条目真源——从本地快照读当前值
+            var snapshot = _session?.Player?.LatestSnapshot;
+            PlayerResourceState myRes = null;
+            if (snapshot != null)
+            {
+                foreach (var r in snapshot.resources)
+                {
+                    if (r.playerId == _myPlayerId) { myRes = r; break; }
+                }
+            }
+            int count = 0;
+            if (myRes != null)
+            {
+                foreach (var entry in myRes.handCards)
+                {
+                    if ((CardType)entry.cardType == CardType.Item && entry.value == itemName)
+                    {
+                        count = entry.count;
+                        break;
+                    }
+                }
+            }
+            RefreshCurrencyCard(card, (ItemName)itemName, count); // 复用重 Init 链（数量渲染=ItemCardViewStrategy）
         }
 
         /// <summary>战斗结束（S10 轻量全灭软停）：胜负 Tip 常驻，退出走既有设置钮确认流程；
@@ -535,6 +573,7 @@ namespace GIC.Battle
             _handCardButtons.Clear();
             _moraHandCard = null;
             _staminaHandCard = null;
+            _handItemCards.Clear();
             if (_handScroll != null) _handScroll.normalizedPosition = Vector2.zero;
             if (myRes == null) return;
 
@@ -624,6 +663,11 @@ namespace GIC.Battle
                     {
                         if (cardId.AsItemName() == ItemName.Mora) _moraHandCard = card;
                         else _staminaHandCard = card;
+                    }
+                    else if (!isUnit)
+                    {
+                        // 普通物品牌持有引用（C-1 统一消耗模型）：技能吃物品时即时刷新数量角标
+                        _handItemCards[cardId.AsItemName()] = card;
                     }
                 }
 
@@ -1979,7 +2023,7 @@ namespace GIC.Battle
             {
                 bool controllable = IsSelectedControllable();
                 selectButton.interactable = data != null
-                    && (!controllable || (HasEnergyForSkill(data) && HasStaminaForSkill(data)));
+                    && (!controllable || HasSkillResources(data));
             }
             if (data == null) return;
 
@@ -2003,15 +2047,88 @@ namespace GIC.Battle
             return data != null && data.starLevel >= 3;
         }
 
-        /// <summary>选中单位的元能是否够放此技能（EnergyCost=0 恒可；读快照运行态，选择阶段头权威刷新）</summary>
-        private bool HasEnergyForSkill(SkillConfig.SkillData skillData)
+        /// <summary>技能资源门槛单源（统一消耗模型，docs/active/30 §2.3——预判/结算同形纪律）：
+        /// 逐条镜像 ResourceGate.Has（元能=选中单位快照 energy / 体力·摩拉=本端缓存 /
+        /// 物品=本地手牌镜像条目 count——Host 侧 HasAll 同口径）。
+        /// **C-2 起消耗全量迁移完成：costs 空=免费技能**（无消耗语义，数据即事实）；
+        /// 旧 EnergyCost 参数/体力类型分档双查已退役</summary>
+        private bool HasSkillResources(SkillConfig.SkillData skillData)
         {
-            int cost = BattleSimState.GetEnergyCost(skillData);
-            if (cost <= 0) return true;
+            if (skillData == null || !skillData.HasCosts) return true; // 免费技能/空数据
             var snapshot = _session?.Player?.LatestSnapshot;
-            if (snapshot == null || string.IsNullOrEmpty(_selectedUnitId)) return false;
-            var sel = snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-            return sel != null && sel.energy >= cost;
+            foreach (var cost in skillData.costs)
+            {
+                if (cost == null || cost.amount <= 0) continue;
+                switch (cost.kind)
+                {
+                    case CostKind.Energy:
+                        var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+                        if (sel == null || sel.energy < cost.amount) return false;
+                        break;
+                    case CostKind.Stamina:
+                        if (_myStamina < cost.amount) return false;
+                        break;
+                    case CostKind.Mora:
+                        if (_myMora < cost.amount) return false;
+                        break;
+                    case CostKind.Item:
+                        if (!HasHandItem(cost.item, cost.amount)) return false;
+                        break;
+                    case CostKind.AnyItem:
+                        if (!HasHandAnyItem(cost.subType, cost.amount)) return false;
+                        break;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>本地手牌镜像是否持有足量物品（C-1 客户端镜像=LatestSnapshot.resources.handCards 条目；
+        /// 物品牌条目 count=局内真源，与 Host LoseCard 判定同源——快照权威）</summary>
+        private bool HasHandItem(ItemName item, int amount)
+        {
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot == null) return false;
+            PlayerResourceState myRes = null;
+            foreach (var r in snapshot.resources)
+            {
+                if (r.playerId == _myPlayerId) { myRes = r; break; }
+            }
+            if (myRes == null) return false;
+            foreach (var entry in myRes.handCards)
+            {
+                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item)
+                    return entry.count >= amount;
+            }
+            return false;
+        }
+
+        /// <summary>本地手牌镜像是否持有足量**任意同类**物品（C-1 AnyItem 客户端镜像——镜像
+        /// ResourceGate.CountAnyItems 同口径：跨同类条目聚合、货币卡不可匹配；ItemConfig 走
+        /// CardConfigResolver 与 RebuildHandCards 同链）</summary>
+        private bool HasHandAnyItem(ItemSubType subType, int amount)
+        {
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot == null) return false;
+            PlayerResourceState myRes = null;
+            foreach (var r in snapshot.resources)
+            {
+                if (r.playerId == _myPlayerId) { myRes = r; break; }
+            }
+            if (myRes == null) return false;
+            var itemConfig = CardConfigResolver.Instance?.ItemConfig;
+            if (itemConfig == null) return false;
+            if (subType == ItemSubType.Currency) return false; // 货币=账户资源不经物品消耗链（Host 同口径）
+            int total = 0;
+            foreach (var entry in myRes.handCards)
+            {
+                if ((CardType)entry.cardType != CardType.Item) continue;
+                var name = (ItemName)entry.value;
+                if (name == ItemName.Mora || name == ItemName.Stamina) continue;
+                var data = itemConfig.GetItemData(name);
+                if (data != null && data.subType == subType)
+                    total += entry.count;
+            }
+            return total >= amount;
         }
 
         /// <summary>移动按钮刷新（特殊技能）：数据链走 skills[Move]（InitWithData 染角色元素色底+主动环；
@@ -2046,11 +2163,13 @@ namespace GIC.Battle
                 def.nameText.AddEntry(nameId.GetEntry());
             }
 
-            // 体力置灰（B6d）：移动=配额行动消耗 10 体力，不足置灰——仅约束己方可操控单位
-            // （2026-09-26 查看态恒可点，同 ApplySkillButton 口径）
+            // 体力置灰（B6d→C-2 costs 单源）：移动消耗走移动技能 costs 镜像（HasSkillResources 镜像
+            // ResourceGate.HasAll）——仅约束己方可操控单位（2026-09-26 查看态恒可点，同 ApplySkillButton 口径）；
+            // 无 Move 条目单位=常量兜底（Host MoveExecutor.GetMoveCosts 同口径）
             if (def.view.selectButton != null)
                 def.view.selectButton.interactable = !IsSelectedControllable()
-                    || _myStamina >= BattleMetrics.StaminaCostPerAction;
+                    || (move != null ? HasSkillResources(move)
+                        : _myStamina >= BattleMetrics.StaminaCostPerAction);
         }
 
         /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>

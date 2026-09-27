@@ -42,6 +42,13 @@ namespace GIC.Data
             [Header("加/改效果=编辑此列表零代码；无注册类且非空→ConfiguredSkill 通用类，docs/18 决策九 D5）")]
             public System.Collections.Generic.List<SkillEffectConfig> effects;
 
+            [Header("消耗声明（统一消耗模型，docs/active/30：技能消耗=数据驱动 (资源,数量) 列表——")]
+            [Header("C-2 存量迁移完成：消耗运行时唯一真源=本列表，**空=免费技能**；EnergyCost 参数仅描述渲染")]
+            public System.Collections.Generic.List<SkillCostEntry> costs;
+
+            /// <summary>是否声明了消耗条目（非空=走 ResourceGate 统一管道）</summary>
+            public bool HasCosts => costs != null && costs.Count > 0;
+
             /// <summary>是否有数据驱动效果（非空=走 EffectCompiler 新管线）</summary>
             public bool HasEffects => effects != null && effects.Count > 0;
 

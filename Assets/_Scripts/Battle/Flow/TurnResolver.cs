@@ -128,10 +128,15 @@ namespace GIC.Battle
                     case ActionType.Move:
                         var mover = MoveExecutor.BuildMover(_sim, action);
                         if (mover == null) break;
-                        // 体力门槛（B6d）：移动=配额行动消耗 10 体力（低级单位豁免）；不足→移动落空
-                        if (!StaminaGate.TryCharge(_sim, unit, action.playerId,
-                            BattleMetrics.StaminaCostPerAction, "移动", effects))
+                        // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
+                        // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
+                        var moveCosts = MoveExecutor.GetMoveCosts(unit);
+                        if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _))
+                        {
+                            GICLog.Info($"[TurnResolver] 单位 {action.unitId} 移动消耗不足，移动落空");
                             break;
+                        }
+                        ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects);
                         movers.Add(mover);
                         AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
                         break;
@@ -292,10 +297,15 @@ namespace GIC.Battle
                 case ActionType.Move:
                     var mover = MoveExecutor.BuildMover(_sim, action);
                     if (mover == null) break;
-                    // 体力门槛（B6d）：移动=配额行动消耗 10 体力（低级单位豁免）；不足→移动落空
-                    if (!StaminaGate.TryCharge(_sim, unit, action.playerId,
-                        BattleMetrics.StaminaCostPerAction, "移动", effects))
+                    // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
+                    // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
+                    var moveCosts = MoveExecutor.GetMoveCosts(unit);
+                    if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _))
+                    {
+                        GICLog.Info($"[TurnResolver] 单位 {action.unitId} 移动消耗不足，移动落空");
                         break;
+                    }
+                    ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects);
                     moverList.Add(mover);
                     MovementResolver.Resolve(_sim, moverList);
 
@@ -441,6 +451,22 @@ namespace GIC.Battle
                 segment.commands.Add(takeCommand);
                 segment.commands.Add(giveCommand);
             }
+            // 摩拉消耗（统一消耗模型 C-1）：AppliedAmount=0 零命令（不足额防御路径）；客户端 §78 分流已备
+            foreach (var effect in EnumerateEffects<MoraSpendEffect>(effects))
+            {
+                if (effect.AppliedAmount <= 0) continue;
+                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindMora, -effect.AppliedAmount));
+            }
+            // 物品消耗（统一消耗模型 C-1）：按 Consumed 明细逐条 ItemConsume（指定模式=单条；
+            // 同类任意模式=每实际扣到的物品一条——客户端逐条扣镜像刷角标）；明细空=零命令
+            foreach (var effect in EnumerateEffects<ItemConsumeEffect>(effects))
+            {
+                if (effect.AppliedAmount <= 0 || effect.Consumed.Count == 0) continue;
+                foreach (var spent in effect.Consumed)
+                    segment.commands.Add(BattleCommand.ItemConsume(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                        spent.item, spent.count));
+            }
             foreach (var effect in MergeHealEffects(effects))
             {
                 var healCommand = BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount);
@@ -561,6 +587,68 @@ namespace GIC.Battle
                     {
                         _sim.ApplyMoraDelta(plunder.TargetUnitId, -gain);
                         _sim.ApplyMoraDelta(plunder.ToPlayerId, gain);
+                    }
+                    continue;
+                }
+
+                // 摩拉消耗（统一消耗模型 C-1，玩家级）：TrySpendMora 池写——不足理论不可达（门槛先行+
+                // 每玩家每回合单行动），防御性钳制 Warn 记账（AppliedAmount=0 零命令，对账按 0 非漏发）
+                if (effect is MoraSpendEffect moraSpend)
+                {
+                    int applied = _sim.GetMora(moraSpend.TargetUnitId) >= moraSpend.Amount
+                        ? moraSpend.Amount : _sim.GetMora(moraSpend.TargetUnitId);
+                    if (applied < moraSpend.Amount)
+                        GICLog.Warn($"[TurnResolver] 摩拉消耗效应不足额（{moraSpend.TargetUnitId} 池" +
+                                    $"{_sim.GetMora(moraSpend.TargetUnitId)}/{moraSpend.Amount}）——实际扣 {applied}");
+                    moraSpend.AppliedAmount = applied;
+                    if (applied > 0)
+                        _sim.TrySpendMora(moraSpend.TargetUnitId, applied);
+                    continue;
+                }
+
+                // 物品消耗（统一消耗模型 C-1，玩家级）：LoseCard 手牌条目真源扣减（减尽移除）——
+                // 不足理论不可达（门槛先行+每玩家每回合单行动）；指定模式=单条 LoseCard；
+                // 同类任意模式=按手牌列表序逐条凑量（零随机，ResourceGate 原语）。
+                // **原子性**：防御路径未足额=GainCard 回滚已扣部分（获得/失去对偶）→零命令（语义=支付要么全额要么不支付）
+                if (effect is ItemConsumeEffect itemConsume)
+                {
+                    int remaining = itemConsume.Amount;
+                    itemConsume.Consumed.Clear();
+                    if (itemConsume.AnyOfSubType)
+                    {
+                        foreach (var anyPair in ResourceGate.CollectAnyItems(
+                                     _sim, itemConsume.TargetUnitId, (ItemSubType)itemConsume.SubType))
+                        {
+                            if (remaining <= 0) break;
+                            int take = System.Math.Min(remaining, anyPair.count);
+                            if (_sim.LoseCard(itemConsume.TargetUnitId, new CardId(anyPair.item), take))
+                            {
+                                itemConsume.Consumed.Add(((int)anyPair.item, take));
+                                remaining -= take;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (_sim.LoseCard(itemConsume.TargetUnitId,
+                                new CardId((ItemName)itemConsume.Item), itemConsume.Amount))
+                            itemConsume.Consumed.Add((itemConsume.Item, itemConsume.Amount));
+                    }
+
+                    if (remaining > 0)
+                    {
+                        // 原子性回滚：未足额=把已扣部分如数还回（GainCard=获得对偶，含条目复活）
+                        foreach (var spent in itemConsume.Consumed)
+                            _sim.GainCard(itemConsume.TargetUnitId, new CardId((ItemName)spent.item), spent.count);
+                        itemConsume.Consumed.Clear();
+                        itemConsume.AppliedAmount = 0;
+                        GICLog.Warn($"[TurnResolver] 物品消耗效应未足额（{itemConsume.TargetUnitId} " +
+                                    $"{(itemConsume.AnyOfSubType ? ((ItemSubType)itemConsume.SubType).ToString() : ((ItemName)itemConsume.Item).ToString())}" +
+                                    $"×{itemConsume.Amount}，差 {remaining}）——原子回滚零命令（防御路径，理论不可达）");
+                    }
+                    else
+                    {
+                        itemConsume.AppliedAmount = itemConsume.Amount;
                     }
                     continue;
                 }

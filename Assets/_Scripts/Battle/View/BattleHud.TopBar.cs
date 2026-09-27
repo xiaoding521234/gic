@@ -210,14 +210,6 @@ namespace GIC.Battle
             RefreshMyResourceChips();
         }
 
-        /// <summary>我方体力是否够放此技能（B6d 置灰判定；消耗口径单源=BattleSimState.GetStaminaCost，
-        /// 值=缓存 _myStamina（快照权威+命令增量），仅战技/爆发消耗）</summary>
-        private bool HasStaminaForSkill(SkillConfig.SkillData skillData)
-        {
-            int cost = BattleSimState.GetStaminaCost(skillData);
-            return cost <= 0 || _myStamina >= cost;
-        }
-
         private void UpdateQueueLabel()
         {
             if (_queueLabelCombiner == null) return;

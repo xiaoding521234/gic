@@ -17,8 +17,8 @@ namespace GIC.Battle
 
         private SkillType skillType = SkillType.Normal;
 
-        // 消耗类数值不走独立字段——一律经 SkillParamKey（EnergyCost 等）customParams：
-        // 取值入口=BattleSimState.GetEnergyCost(skill.RawData)，勿在此另设字段防双源（2026-09-23 审查 Y7 清理）
+        // 消耗类数值不走独立字段——运行时消耗单源=SkillData.costs（统一消耗模型 C-2，docs/active/30；
+        // EnergyCost 参数仅描述渲染），勿在此另设字段防双源（2026-09-23 审查 Y7 清理原则延续）
         public Sprite icon;
 
         /// <summary>时轮时间轴（B-S1；null=无时轮——技能走旧即时行为兜底）</summary>
