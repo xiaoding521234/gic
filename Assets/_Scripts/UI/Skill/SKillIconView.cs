@@ -12,7 +12,7 @@ namespace GIC.UI
         public Image skillIcon;
         public Image skillCircle;
         public Image skillBadge;
-        public Toggle toggle;
+        public SelectButton selectButton;
 
         private OrbitBeamsUi _selectBeams; // 选中态两束元素色环绕弧光（打钩图 2026-09-27 全项目退役，运行时建件勿入 prefab）
         private Color _elementColor = Color.white;
@@ -26,7 +26,8 @@ namespace GIC.UI
 
         public void Awake()
         {
-            toggle.onValueChanged.AddListener(OnToggleValueChanged);
+            if (selectButton != null)
+                selectButton.onSelectedChanged.AddListener(OnSelectedChanged);
         }
 
         public void InitWithData(SkillConfig.SkillData skillData, UnitConfig.UnitData unitData, ViewType viewType, SkillDetailView skillDetailView)
@@ -70,17 +71,18 @@ namespace GIC.UI
         }
 
         /// <summary>选中态=两束元素色环绕弧光（2026-09-27 拍板全项目统一：打钩图退役、
-        /// 战斗/背包同表现；战斗屏 OnlyDisplay 不走此链——由 BattleHud.SetAimSelectRing 驱动同款弧光）</summary>
-        private void OnToggleValueChanged(bool isOn)
+        /// 战斗/背包同表现；战斗屏 OnlyDisplay 不走此链——由 BattleHud.SetAimSelectRing 驱动同款弧光。
+        /// Toggle→SelectButton 改版同日：视觉订阅 onSelectedChanged 状态事件）</summary>
+        private void OnSelectedChanged(bool isSelected)
         {
             if(viewType == ViewType.OnlyDisplay)
             {
                 return;
             }
 
-            SetSelectBeams(isOn);
+            SetSelectBeams(isSelected);
 
-            if (isOn && viewType == ViewType.Display)
+            if (isSelected && viewType == ViewType.Display)
             {
                 skillDetailView.OpenPanel();
                 skillDetailView.InitWithData(skillData, unitData,this);
@@ -114,19 +116,20 @@ namespace GIC.UI
 
         private void OnDestroy()
         {
-            if (toggle != null)
-                toggle.onValueChanged.RemoveListener(OnToggleValueChanged);
+            if (selectButton != null)
+                selectButton.onSelectedChanged.RemoveListener(OnSelectedChanged);
         }
 
-        
+
         public void SetSelected(bool isSelected)
         {
-            toggle.isOn = isSelected;
+            if (selectButton != null)
+                selectButton.SetSelected(isSelected);
         }
-        
+
         public bool IsSelected()
         {
-            return toggle.isOn;
+            return selectButton != null && selectButton.Selected;
         }
     }
 
@@ -137,5 +140,3 @@ namespace GIC.UI
         public static Color colorPassive = "9C27B0".FromHex();
     }
 }
-
-

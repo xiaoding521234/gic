@@ -251,7 +251,7 @@ namespace GIC.UI
                 card.SetViewType(ViewType.Display);
                 card.transform.localScale = Vector3.one * deckCardScale;
 
-                if (card.toggle != null) card.toggle.group = null;
+                if (card.selectButton != null) card.selectButton.Group = null;
                 deckSpawnedCards.Add(card);
             }
         }

@@ -239,8 +239,8 @@ GameObject:
   - component: {fileID: 5359542770362904246}
   - component: {fileID: 1960403100050678183}
   - component: {fileID: 6263284353010956378}
-  - component: {fileID: 6681107872397352416}
   - component: {fileID: 3703906214779025695}
+  - component: {fileID: 7378803965498831814}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: InventoryCategoryButton
@@ -310,7 +310,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &6681107872397352416
+--- !u!114 &3703906214779025695
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -319,7 +319,27 @@ MonoBehaviour:
   m_GameObject: {fileID: 8656273872449679092}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
+  m_Script: {fileID: 11500000, guid: d2017ef2342283547b36bf84ad6dd357, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  selectButton: {fileID: 7378803965498831814}
+  selectIcon: {fileID: 0}
+  selectDisc: {fileID: 8798257183600434316}
+  selectGlyph: {fileID: 3289387202572245605}
+  tab: 0
+  popDuration: 0.2
+  selectedColor: {r: 1, g: 1, b: 1, a: 1}
+  unselectedColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+--- !u!114 &7378803965498831814
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8656273872449679092}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fe9045296dbeed4f85472084acd17c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Navigation:
@@ -351,33 +371,16 @@ MonoBehaviour:
     m_DisabledTrigger: Disabled
   m_Interactable: 1
   m_TargetGraphic: {fileID: 6534631391279807422}
-  toggleTransition: 1
-  graphic: {fileID: 0}
-  m_Group: {fileID: 0}
-  onValueChanged:
+  m_OnClick:
     m_PersistentCalls:
       m_Calls: []
-  m_IsOn: 0
---- !u!114 &3703906214779025695
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8656273872449679092}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d2017ef2342283547b36bf84ad6dd357, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  toggle: {fileID: 6681107872397352416}
-  selectIcon: {fileID: 0}
-  selectDisc: {fileID: 8798257183600434316}
-  selectGlyph: {fileID: 3289387202572245605}
-  tab: 0
-  popDuration: 0.2
-  selectedColor: {r: 1, g: 1, b: 1, a: 1}
-  unselectedColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  "\u9009\u4E2D\u6A21\u5F0F": 2
+  "\u70B9\u6309\u6539\u53D8\u9009\u4E2D": 1
+  "\u521D\u59CB\u9009\u4E2D": 0
+  "\u6240\u5C5E\u9009\u4E2D\u7EC4": {fileID: 0}
+  _onSelectedChanged:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &9050327083914598083
 GameObject:
   m_ObjectHideFlags: 0

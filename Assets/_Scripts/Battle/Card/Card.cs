@@ -16,10 +16,17 @@ namespace GIC.Battle
         public CardType cardType => saveCardData?.id.cardType ?? CardType.Item;
         public ViewType viewType = ViewType.Display;
         public bool isEditMode = false;
-        public bool isDeckPanelMode = false;
         public bool skipFadeIn = false;
 
-        public Toggle toggle;
+        // 卡组面板内卡牌（点击=移出卡组，纯边沿动作不选）——置位时同步关点按选中
+        [SerializeField] private bool _isDeckPanelMode;
+        public bool isDeckPanelMode
+        {
+            get => _isDeckPanelMode;
+            set { _isDeckPanelMode = value; RefreshClickSelects(); }
+        }
+
+        public SelectButton selectButton;
         public Image cardBack;
         public Image select;
         public Image overlay;
@@ -53,7 +60,11 @@ namespace GIC.Battle
         public void Awake()
         {
             Wargame.Instance?.Context?.Inject(this);
-            toggle.onValueChanged.AddListener(OnToggleValueChanged);
+            if (selectButton != null)
+            {
+                selectButton.onClick.AddListener(OnClicked);
+                selectButton.onSelectedChanged.AddListener(OnSelectedChanged);
+            }
         }
 
         private void OnEnable()
@@ -116,54 +127,74 @@ namespace GIC.Battle
             if (type == ViewType.OnlyDisplay)
             {
                 skipFadeIn = true;
-                if (toggle != null) toggle.enabled = false;
+                if (selectButton != null) selectButton.enabled = false;
             }
         }
 
         public void EnterEditMode()
         {
             isEditMode = true;
+            RefreshClickSelects();
             _strategy?.EnterEditMode(this);
         }
 
         public void ExitEditDeck()
         {
             isEditMode = false;
+            RefreshClickSelects();
             _strategy?.ExitEditDeck(this);
         }
 
-        public void OnToggleValueChanged(bool isOn)
+        /// <summary>点按是否改变选中：仅浏览模式选（编辑/卡组面板=纯边沿动作，
+        /// Toggle→SelectButton 改版 2026-09-27——旧「Toggle 当 Button 用、选中后手动关视觉」拧巴语义根除）</summary>
+        private void RefreshClickSelects()
         {
-            select.gameObject.SetActive(isOn);
+            if (selectButton != null)
+                selectButton.ClickChangesSelected = !(isEditMode || _isDeckPanelMode);
+        }
 
-            if (isOn)
+        /// <summary>点击=边沿动作：浏览开详情 / 编辑与卡组面板发事件（onClick，Button 原生含置灰门）</summary>
+        private void OnClicked()
+        {
+            if (isDeckPanelMode)
             {
-                if (isDeckPanelMode)
+                // 面板内卡片点击 → 移出卡组
+                EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
                 {
-                    // 面板内卡片点击 → 移出卡组
-                    EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
-                    {
-                        CardData = saveCardData,
-                        IsInDeck = true
-                    });
-                    select.gameObject.SetActive(false);
-                }
-                else if (isEditMode)
-                {
-                    bool inDeck = saveCardData?.HasInDeck(GetCurrentDeckId()) ?? false;
-                    EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
-                    {
-                        CardData = saveCardData,
-                        IsInDeck = inDeck
-                    });
-                    select.gameObject.SetActive(false);
-                }
-                else
-                {
-                    cardDetailView.gameObject.Reactivate();
-                    cardDetailView.Init(this);
-                }
+                    CardData = saveCardData,
+                    IsInDeck = true
+                });
+                select.gameObject.SetActive(false);
             }
+            else if (isEditMode)
+            {
+                bool inDeck = saveCardData?.HasInDeck(GetCurrentDeckId()) ?? false;
+                EventBusHub.Instance.SendImmediate(new OnCardClickedInEditModeEvent
+                {
+                    CardData = saveCardData,
+                    IsInDeck = inDeck
+                });
+                select.gameObject.SetActive(false);
+            }
+            else
+            {
+                OpenDetailView();
+            }
+        }
+
+        /// <summary>浏览模式打开本卡详情（点击与背包初始选中共用；2026-09-27 SelectButton 改版：
+        /// 旧 Toggle 时代由 onValueChanged(true) 承载（初始选中也走它），改版后开详情=onClick 边沿独占，
+        /// 故初始选中须显式调用恢复等价行为——进背包=第一张卡选中+详情面板自动开）</summary>
+        public void OpenDetailView()
+        {
+            cardDetailView.gameObject.Reactivate();
+            cardDetailView.Init(this);
+        }
+
+        /// <summary>选中态视觉（select 图层开关——仅浏览模式会变化，视觉链唯一职责）</summary>
+        private void OnSelectedChanged(bool isSelected)
+        {
+            select.gameObject.SetActive(isSelected);
         }
 
         private int GetCurrentDeckId()

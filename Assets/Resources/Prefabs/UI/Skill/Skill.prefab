@@ -240,7 +240,7 @@ GameObject:
   - component: {fileID: 4721039869550037575}
   - component: {fileID: 616712834140933135}
   - component: {fileID: 6125411031847043227}
-  - component: {fileID: 4726552218965850403}
+  - component: {fileID: 5485574523227217044}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Skill
@@ -324,9 +324,9 @@ MonoBehaviour:
   skillIcon: {fileID: 41932993180658910}
   skillCircle: {fileID: 8073703792750041267}
   skillBadge: {fileID: 3659938512320176139}
-  toggle: {fileID: 4726552218965850403}
+  selectButton: {fileID: 5485574523227217044}
   skillDetailView: {fileID: 0}
---- !u!114 &4726552218965850403
+--- !u!114 &5485574523227217044
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -335,7 +335,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 7495448033152760185}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
+  m_Script: {fileID: 11500000, guid: 8fe9045296dbeed4f85472084acd17c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Navigation:
@@ -367,10 +367,13 @@ MonoBehaviour:
     m_DisabledTrigger: Disabled
   m_Interactable: 1
   m_TargetGraphic: {fileID: 41932993180658910}
-  toggleTransition: 1
-  graphic: {fileID: 0}
-  m_Group: {fileID: 0}
-  onValueChanged:
+  m_OnClick:
     m_PersistentCalls:
       m_Calls: []
-  m_IsOn: 0
+  "\u9009\u4E2D\u6A21\u5F0F": 2
+  "\u70B9\u6309\u6539\u53D8\u9009\u4E2D": 1
+  "\u521D\u59CB\u9009\u4E2D": 0
+  "\u6240\u5C5E\u9009\u4E2D\u7EC4": {fileID: 0}
+  _onSelectedChanged:
+    m_PersistentCalls:
+      m_Calls: []

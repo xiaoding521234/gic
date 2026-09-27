@@ -205,7 +205,7 @@ namespace GIC.Tool
                     }
                 }
                 // 清理孤儿层：同名 SelectDisc/SelectGlyph 但未被字段引用的对象（v1 遗留 added objects）
-                var referenced = new HashSet<UnityEngine.Object> { view.selectDisc, view.selectGlyph, view.selectIcon, view.toggle };
+                var referenced = new HashSet<UnityEngine.Object> { view.selectDisc, view.selectGlyph, view.selectIcon, view.selectButton };
                 foreach (var child in view.GetComponentsInChildren<Image>(true))
                 {
                     if ((child.name == "SelectDisc" || child.name == "SelectGlyph") && !referenced.Contains(child))

@@ -71,11 +71,18 @@ namespace GIC.Battle
                 }
 
                 var buttonDef = new SkillButtonDef { key = row.key, type = row.type, rect = def.content, view = view };
-                var forwarder = def.content.GetComponent<SkillClickForwarder>();
-                if (forwarder == null)
-                    forwarder = def.content.gameObject.AddComponent<SkillClickForwarder>();
-                var captured = buttonDef; // 闭包捕获
-                forwarder.onClick = () => OnSkillButtonClicked(captured);
+                // 点击直连（Toggle→SelectButton 改版 2026-09-27）：onClick 含 Button.Press 置灰门，
+                // 旧 SkillClickForwarder（Toggle 无 onClick、IPointerClickHandler 绕行件）退役删除
+                var captured = buttonDef; // 闭包捕获（点击+拖拽共用）
+                var selectButton = view.selectButton != null ? view.selectButton : def.content.GetComponent<SelectButton>();
+                if (selectButton != null)
+                {
+                    selectButton.onClick.AddListener(() => OnSkillButtonClicked(captured));
+                }
+                else
+                {
+                    GICLog.Warn($"[BattleHud] 槽 {row.key} 控件缺 SelectButton，技能键不可点击");
+                }
                 // 拖动式瞄准转发（B4，2026-09-26）：拖过 UGUI 阈值起拖动瞄准——按下未拖/拖回原键松手
                 // 仍走点击式三情况（指针未离键时 UGUI 不判拖拽起手/点击照发）
                 var dragForwarder = def.content.GetComponent<SkillDragForwarder>();
@@ -218,15 +225,8 @@ namespace GIC.Battle
             return text;
         }
 
-        /// <summary>技能按钮点击转发（非 Selectable，可与 Toggle 共存——Toggle/Button 单 Selectable 限制绕行）</summary>
-        private class SkillClickForwarder : MonoBehaviour, UnityEngine.EventSystems.IPointerClickHandler
-        {
-            public Action onClick;
-            public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData) => onClick?.Invoke();
-        }
-
-        /// <summary>技能按钮拖动转发（拖动式瞄准，B4 2026-09-26）：与 SkillClickForwarder 同思路——
-        /// Toggle 是 Selectable 非 IDragHandler 宿主，拖拽事件由独立转发件承载。事件冒泡说明：
+        /// <summary>技能按钮拖动转发（拖动式瞄准，B4 2026-09-26）：与旧点击转发件同思路——
+        /// Button/SelectButton 均为 Selectable 非 IDragHandler 宿主，拖拽事件由独立转发件承载。事件冒泡说明：
         /// 命中在控件/图标上时冒泡至本件（content 层）；布局编辑期命中在拖拽板（DragPlate，slot 直属）
         /// 上时冒泡至 slot 的 LayoutDragHandler，与本件互不串扰（编辑期拖动瞄准由
         /// OnSkillButtonDragBegin 的 _layoutEditing 守卫双保险）。</summary>

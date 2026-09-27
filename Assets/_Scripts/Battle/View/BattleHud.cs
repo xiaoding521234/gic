@@ -1248,10 +1248,9 @@ namespace GIC.Battle
         {
             if (def == null || _state != HudState.UnitSelected) return;
             if (_layoutEditing) return; // 编辑期点击让位给拖拽/选框（拖拽板在控件之上）
-            // 置灰防线收口在处理端：SkillClickForwarder=IPointerClickHandler 不受 Toggle.interactable 拦截
-            //（UGUI 对同物体全部兼容 handler 执行，interactable 只拦 Selectable 自身，docs/14 §63）
-            var toggle = def.view != null ? def.view.GetComponent<Toggle>() : null;
-            if (toggle != null && !toggle.interactable) return;
+            // 置灰防线已收口进 Button.Press 的 IsInteractable 门（Toggle→SelectButton 改版 2026-09-27：
+            // onClick 直连后拦截天然生效，旧 SkillClickForwarder 时代「转发件不受 Toggle.interactable 拦截」
+            // 的手动检查随之退役，docs/14 §63）
             if (PopupOpen)
             {
                 if (_popupDef == def)
@@ -1283,10 +1282,10 @@ namespace GIC.Battle
             if (_session == null || _session.Flow == null) return;
             if (_session.Flow.Phase != BattlePhase.Selecting) return;
             if (_deployAimUnit != 0) return;
-            // 置灰防线收口在处理端（同 OnSkillButtonClicked：Toggle.interactable 只拦 Selectable 自身，
-            // 转发件不受拦，docs/14 §63）
-            var toggle = def.view != null ? def.view.GetComponent<Toggle>() : null;
-            if (toggle != null && !toggle.interactable) return;
+            // 置灰防线收口在处理端（拖拽转发件不受 interactable 拦截——Button.interactable 只拦
+            // Selectable 自身处理器，转发件须手动检查，docs/14 §63）
+            var selectButton = def.view != null ? def.view.GetComponent<SelectButton>() : null;
+            if (selectButton != null && !selectButton.interactable) return;
 
             if (_state == HudState.Aiming) ExitAiming(); // 换技能重瞄准（_dragAiming 随收口清零）
             if (_state != HudState.UnitSelected) return;  // Idle（无选中单位）不响应
@@ -1795,11 +1794,11 @@ namespace GIC.Battle
             if (def?.view == null) return;
             var data = GetSelectedSkillData(def);
             def.view.gameObject.SetActive(data != null);
-            var toggle = def.view.GetComponent<Toggle>();
-            if (toggle != null)
+            var selectButton = def.view.GetComponent<SelectButton>();
+            if (selectButton != null)
             {
                 bool controllable = IsSelectedControllable();
-                toggle.interactable = data != null
+                selectButton.interactable = data != null
                     && (!controllable || (HasEnergyForSkill(data) && HasStaminaForSkill(data)));
             }
             if (data == null) return;
@@ -1869,8 +1868,8 @@ namespace GIC.Battle
 
             // 体力置灰（B6d）：移动=配额行动消耗 10 体力，不足置灰——仅约束己方可操控单位
             // （2026-09-26 查看态恒可点，同 ApplySkillButton 口径）
-            if (def.view.toggle != null)
-                def.view.toggle.interactable = !IsSelectedControllable()
+            if (def.view.selectButton != null)
+                def.view.selectButton.interactable = !IsSelectedControllable()
                     || _myStamina >= BattleMetrics.StaminaCostPerAction;
         }
 

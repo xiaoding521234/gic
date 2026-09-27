@@ -17,7 +17,7 @@ namespace GIC.UI
     {
         [Header("卡片展示")]
         public GameObject cardContent;
-        public ToggleGroup cardToggleGroup;
+        public SelectionGroup cardSelectionGroup;
         public GameObject cardPrefab;
 
         [Header("类别切换")]
