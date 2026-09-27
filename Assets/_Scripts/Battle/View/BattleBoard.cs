@@ -17,6 +17,12 @@ namespace GIC.Battle
         [SerializeField] private GameObject _grassTilePrefab;
         [SerializeField] private GameObject _waterTilePrefab;
         [SerializeField] private GameObject _stoneTilePrefab;
+        [SerializeField] private GameObject _dirtTilePrefab;
+        [SerializeField] private GameObject _cobbleTilePrefab;
+
+        [Header("地块视觉")]
+        [Tooltip("地块视觉配置（顶面变体材质/草簇装饰参数；null=全部用地块 prefab 自带材质、无草簇）")]
+        [SerializeField] private TileVisualsConfig _tileVisuals;
 
         [Header("表面高度")]
         [Tooltip("地面格顶面高度（单位站此高度）")]
@@ -65,6 +71,7 @@ namespace GIC.Battle
                     var tile = Instantiate(prefab, _tilesRoot);
                     tile.name = $"Tile_{x}_{y}";
                     tile.transform.localPosition = TileBottomPosition(x, y);
+                    ApplyTopVariant(tile, tileType, x, y);
                     // 朝向默认统一（2026-09-21 用户拍板：随机 90° 旋转观感乱，全盘同向）
                 }
             }
@@ -214,9 +221,48 @@ namespace GIC.Battle
                     return _waterTilePrefab;
                 case TileType.StonePath:
                     return _stoneTilePrefab;
+                case TileType.Dirt:
+                    return _dirtTilePrefab;
+                case TileType.Cobblestone:
+                    return _cobbleTilePrefab;
                 default:
                     return _grassTilePrefab;
             }
+        }
+
+        /// <summary>
+        /// 顶面材质变体（2026-09-27 地形批次）：同型地块每格确定性随机选一变体，防整片重复。
+        /// 确定性哈希（非 UnityEngine.Random）=重建稳定，编辑器建盘断言与运行时同结果。
+        /// </summary>
+        private void ApplyTopVariant(GameObject tile, TileType tileType, int x, int y)
+        {
+            var variants = _tileVisuals != null ? _tileVisuals.GetTopVariants(tileType) : null;
+            if (variants == null || variants.Length == 0) return;
+            var renderer = tile.GetComponent<MeshRenderer>();
+            if (renderer == null) return;
+            var mats = renderer.sharedMaterials;
+            if (mats.Length < 2) return; // 顶面=材质槽 1
+            mats[1] = variants[CellVariantIndex(x, y, variants.Length)];
+            renderer.sharedMaterials = mats;
+        }
+
+        /// <summary>格坐标确定性哈希 → [0, count) 变体序号</summary>
+        private static int CellVariantIndex(int x, int y, int count)
+        {
+            unchecked
+            {
+                uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663) ^ 0x9E3779B9u;
+                return (int)(h % (uint)count);
+            }
+        }
+
+        /// <summary>
+        /// 构建草簇装饰层（2026-09-27 地形批次：立牌式草簇随机铺满草地格）。
+        /// BattlePlayer 建盘后传战场相机（编辑器侧建盘断言无相机时传 null，朝向兜底正北）。
+        /// </summary>
+        public void BuildGrassDecor(Camera cam)
+        {
+            BattleGrassDecor.Build(_tilesRoot, Map, this, _tileVisuals, cam);
         }
 
         /// <summary>

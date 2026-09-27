@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 630e3a4c7c5ab89468ac1de5eda1f2ec, type: 3}
+        m_Texture: {fileID: 2800000, guid: a52e507e2a40449488ece04b4b7ff894, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
@@ -32,6 +32,7 @@ Material:
     - _FlowSpeed: 0.045
     - _Highlight: 0.3
     - _LayerBStrength: 0.4
+    - _TexColorBlend: 0.6
     - _WaveAmplitude: 0.02
     - _WaveSpeed: 1.9
     m_Colors:
