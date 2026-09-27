@@ -12,9 +12,9 @@ GameObject:
   - component: {fileID: 8400436940749253743}
   - component: {fileID: 6926094525614804487}
   - component: {fileID: 5099845873229954349}
-  - component: {fileID: 8940383523474038002}
   - component: {fileID: 881100285268239610}
   - component: {fileID: 8282733212709217530}
+  - component: {fileID: 7102673608524354584}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Card
@@ -96,9 +96,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   viewType: 0
   isEditMode: 0
-  isDeckPanelMode: 0
   skipFadeIn: 0
-  toggle: {fileID: 8940383523474038002}
+  _isDeckPanelMode: 0
+  selectButton: {fileID: 7102673608524354584}
   cardBack: {fileID: 6926094525614804487}
   select: {fileID: 5545465833802944716}
   overlay: {fileID: 366373814761405662}
@@ -144,7 +144,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   slideOffset: 30
   content: {fileID: 6594733522636842194}
---- !u!114 &8940383523474038002
+--- !u!114 &881100285268239610
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -153,7 +153,34 @@ MonoBehaviour:
   m_GameObject: {fileID: 213453043530044941}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
+  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.627451}
+  m_EffectDistance: {x: 5, y: -5}
+  m_UseGraphicAlpha: 1
+--- !u!225 &8282733212709217530
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 213453043530044941}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &7102673608524354584
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 213453043530044941}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fe9045296dbeed4f85472084acd17c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Navigation:
@@ -185,40 +212,16 @@ MonoBehaviour:
     m_DisabledTrigger: Disabled
   m_Interactable: 1
   m_TargetGraphic: {fileID: 6926094525614804487}
-  toggleTransition: 1
-  graphic: {fileID: 0}
-  m_Group: {fileID: 0}
-  onValueChanged:
+  m_OnClick:
     m_PersistentCalls:
       m_Calls: []
-  m_IsOn: 0
---- !u!114 &881100285268239610
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 213453043530044941}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.627451}
-  m_EffectDistance: {x: 5, y: -5}
-  m_UseGraphicAlpha: 1
---- !u!225 &8282733212709217530
-CanvasGroup:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 213453043530044941}
-  m_Enabled: 1
-  m_Alpha: 1
-  m_Interactable: 1
-  m_BlocksRaycasts: 1
-  m_IgnoreParentGroups: 0
+  "\u9009\u4E2D\u6A21\u5F0F": 2
+  "\u70B9\u6309\u6539\u53D8\u9009\u4E2D": 1
+  "\u521D\u59CB\u9009\u4E2D": 0
+  "\u6240\u5C5E\u9009\u4E2D\u7EC4": {fileID: 0}
+  _onSelectedChanged:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &975661148738078700
 GameObject:
   m_ObjectHideFlags: 0

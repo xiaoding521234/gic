@@ -56,10 +56,10 @@ namespace GIC.Framework
         public void Release(Card card)
         {
             if (card == null) return;
-            if (card.toggle != null)
+            if (card.selectButton != null)
             {
-                card.toggle.group = null;
-                card.toggle.isOn = false;
+                card.selectButton.Group = null;
+                card.selectButton.SetSelected(false);
             }
             card.gameObject.SetActive(false);
             card.transform.SetParent(_parent, false);

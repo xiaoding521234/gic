@@ -22,7 +22,7 @@ namespace GIC.UI
         public GameObject skillsPanel;
         public GameObject skillViewPrefab;
         public SkillDetailView skillDetailView;
-        public ToggleGroup toggleGroup;
+        public SelectionGroup selectionGroup;
 
         [Header("标签芯片")]
         [SerializeField] private GameObject tagChipPrefab;
@@ -169,8 +169,8 @@ namespace GIC.UI
                 if (skillIconView != null)
                 {
                     skillIconView.InitWithData(skillData, unitData, ViewType.Display, skillDetailView);
-                    Toggle t = skillIconView.toggle;
-                    if (t != null && toggleGroup != null) t.group = toggleGroup;
+                    if (skillIconView.selectButton != null && selectionGroup != null)
+                        skillIconView.selectButton.Group = selectionGroup;
                 }
             }
         }

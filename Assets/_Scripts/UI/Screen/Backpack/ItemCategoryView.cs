@@ -10,7 +10,7 @@ namespace GIC.UI
 
     public class ItemCategoryView : MonoBehaviour
     {
-        public Toggle toggle;
+        public SelectButton selectButton;
         public Image selectIcon;
         public Image selectDisc;   // 选中态公共圆盘层（原神式：盘+glyph 分层染色）
         public Image selectGlyph;  // 选中态 glyph 层（与 NormalIcon 同 sprite，染深色）
@@ -27,7 +27,8 @@ namespace GIC.UI
 
         public void Awake()
         {
-            toggle.onValueChanged.AddListener(OnToggleValueChanged);
+            if (selectButton != null)
+                selectButton.onSelectedChanged.AddListener(OnSelectedChanged);
 
             _syncHandler = new CategorySyncHandler(this);
             EventBusHub.Instance.Subscribe(_syncHandler, this);
@@ -54,12 +55,15 @@ namespace GIC.UI
 
         public void OnDestroy()
         {
-            toggle.onValueChanged.RemoveListener(OnToggleValueChanged);
+            if (selectButton != null)
+                selectButton.onSelectedChanged.RemoveListener(OnSelectedChanged);
 
             EventBusHub.Instance?.UnsubscribeOwner(this);
         }
 
-        private void OnToggleValueChanged(bool isOn)
+        /// <summary>选中态变化（点按经组单选或 EventBus 同步两路都汇到这）：
+        /// 视觉=pop 动画；切页=SendImmediate（Toggle→SelectButton 改版，语义不变）</summary>
+        private void OnSelectedChanged(bool isOn)
         {
             PlayPop(isOn);
 
@@ -74,7 +78,8 @@ namespace GIC.UI
 
         private void SetVisual(bool isOn)
         {
-            toggle.SetIsOnWithoutNotify(isOn);
+            if (selectButton != null)
+                selectButton.SetSelectedWithoutNotify(isOn);
             PlayPop(isOn);
         }
 

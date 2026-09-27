@@ -61,6 +61,9 @@ namespace GIC.UI
         {
             RefreshCurrentDeckCache();
             ReleaseSpawnedCards();
+            // 清组引用（2026-09-27 SelectButton 改版返修）：卡牌归还池时 Group 置空但组的 Current 仍持旧实例——
+            // 池化复用下同实例再当第一张会命中 Select 的 Current==item no-op，初始选中彻底失效；释放列表后清 Current
+            if (cardSelectionGroup != null) cardSelectionGroup.ClearSelection(false);
             if (_spawnCoroutine != null) StopCoroutine(_spawnCoroutine);
             _spawnCoroutine = StartCoroutine(SpawnCardsWithDelay(BuildDisplayList()));
         }
@@ -73,9 +76,12 @@ namespace GIC.UI
             foreach (var data in cardDataList)
             {
                 SpawnCard(data);
-                if (isFirst && spawnedCards.Count > 0 && spawnedCards[0]?.toggle != null)
+                if (isFirst && spawnedCards.Count > 0 && spawnedCards[0]?.selectButton != null)
                 {
-                    spawnedCards[0].toggle.isOn = true;
+                    // 初始选中第一张卡（2026-09-27 返修：旧 Toggle 语义=选中+详情面板自动开——
+                    // 开详情已迁 onClick 边沿，此处显式补调恢复等价行为）
+                    spawnedCards[0].selectButton.SetSelected(true);
+                    spawnedCards[0].OpenDetailView();
                     isFirst = false;
                 }
                 // 帧率无关的间隔等待
@@ -101,10 +107,10 @@ namespace GIC.UI
             if (card == null) return;
 
             card.onDeck?.gameObject.SetActive(currentDeckCards.Contains(data));
-            if (card.toggle != null)
+            if (card.selectButton != null)
             {
-                card.toggle.isOn = false;
-                card.toggle.group = cardToggleGroup;
+                card.selectButton.SetSelected(false);
+                card.selectButton.Group = cardSelectionGroup;
             }
             card.SetViewType(ViewType.Display);
             spawnedCards.Add(card);

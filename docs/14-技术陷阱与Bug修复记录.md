@@ -1602,3 +1602,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：**Unity 左手系绕 +Y 的正角旋转在角量意义上是 atan2(Z,X) 递减（俯视顺时针）**，与 2D/UGUI 绕 +Z 正角旋转（数学逆时针、角度递增）方向相反；贴图 UV 映射不镜像（quad 本地 +X→世界 X、+Y→世界 Z，atan2(Z,X)=贴图数学角），「头在角度高端」在两种驱动下必然一头一尾。
 **修法/纪律**：①世界平铺 quad 旋转贴图类效果（光弧/箭头/指针）角速度默认取**负值**对齐 2D 语义（OrbitBeamsWorld.环绕角速度=-150），或驱动处 Euler(90,-angle,0)；②同贴图双消费方（UI+世界）方向语义冲突时改单值符号、勿镜像贴图（共享贴图镜像会弄坏另一消费方）；③quad 经 Rx(90) 后法线 -Z→+Y 朝上可见（Unity Quad 法线=-Z，勿按 +Z 推）。
 **连带**：头尾方向可像素判定=弧段两端分半算平均 alpha，亮端=头（角度高端）——驱动方向定符号前先跑该检测，勿靠目测试错。
+
+## 96. 同基类组件置换迁移三坑：单 Selectable 强制 / Tuanjie 无 CopyFromSerializedProperty / prefab 组件不在根 GO（2026-09-27 Toggle→SelectButton 七 prefab 迁移实证）
+
+**症状**：编辑器脚本把全项目 Toggle 置换为自研 SelectButton（同基类 Selectable 派生）时连续三坑：①`AddComponent<SelectButton>` 静默失败（日志「Can't add 'SelectButton' to X because a 'Toggle' is already added! A GameObject can only contain one 'Selectable' component」），返回值 null 继续赋值→NRE，且 7 资产全部同错；②`SerializedProperty.CopyFromSerializedProperty` 编译报 CS1061（标准 2022.3 有、Tuanjie 1.9.3 分叉无此 API）；③迁移脚本 `root.GetComponent<T>()` 取屏组件落空——BackpackScreen 组件不在 prefab 根 GO 上（挂在子 GO「BackpackScreen」上，编辑期摆位坐标），字段重接全被跳过。
+**根因**：①Unity 对 Selectable 派生类强制单 Selectable（连瞬时共存都不许——菜单层的限制就是引擎层硬约束）；②Tuanjie 序列化 API 面与标准版分叉（与 §91 TextureImporter、§93 maxTextureSize 同族的版本分叉行为）；③prefab 根 GO≠逻辑组件宿主是该屏的历史结构（多根/子 GO 摆位），迁移脚本按"根组件"惯性写就漏。
+**修法/纪律**：①同基类组件置换一律走「**快照（公共属性直读）→DestroyImmediate 旧件→新建/沿用继承件→回填**」四步，绝不依赖新旧共存；Selectable 基类配置用公共属性直拷（targetGraphic/colors/spriteState/animationTriggers/transition/navigation/interactable，两派生类同基类布局一致），自有私有字段用 SerializedObject.FindProperty 按字段名写；②跨对象拷序列化配置优先公共属性/手写字段映射，勿押 CopyFromSerializedProperty；③迁移/重接脚本枚举组件一律 `GetComponentsInChildren<T>(true)` 而非 `root.GetComponent`；嵌套实例先转资产本体再转父 prefab（父内 dangling 覆盖块回落继承态），字段按同 GO/向上寻组结构重接并输出逐条报告。
+**连带**：①嵌套实例的组件块在资产迁移后变 dangling/added 形态仍会被 GetComponentsInChildren 枚举到——正是置换回填的输入，销毁后父 prefab 记录正确回落；②零登记 SelectionGroup+对象池组合：**凡池化成员先归还后重建，重建前 ClearSelection**（按钮侧 Group 清了组侧 Current 仍持旧实例，同实例复用命中 Select 的 Current==item no-op——进背包初始选中返修实证，docs/18 决策十三返修条）；③诊断只读脚本对 inactive 资产对象 `GetComponentInParent<T>()` 无参版本因 active 链全 false 恒空——须手写 transform.parent 链逐级 GetComponent 或带 includeInactive:true 的数组版。
