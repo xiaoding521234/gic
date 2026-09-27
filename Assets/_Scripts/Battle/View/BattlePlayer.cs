@@ -35,8 +35,8 @@ namespace GIC.Battle
         [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
         [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
 
-        [Tooltip("全身立牌（UnitData.立牌图）放大倍数：全身立绘人物在图中占比小，放大对齐头像版人物观感（2026-09-21 先试 2.5）；血条/名字/Buff 行尺寸不变、随立牌顶抬高；头像版（无立牌图回落 avatar）恒为原尺寸")]
-        [SerializeField, Min(0.1f)] private float 全身立牌放大倍数 = 2.5f;
+        [Tooltip("全身立牌（UnitData.立牌图）放大倍数：全身立绘人物在图中占比小，放大对齐头像版人物观感（2026-09-21 先试 2.5；2026-09-27 拍板 2.5→2：站立全身图 tight bounds 撑满 1.375 格超格子、且比安柏视频立牌（主体仅占帧 69~87%）高 15~45%，降至 2 后显示高=1.1 格）；血条/名字/Buff 行尺寸不变、随立牌顶抬高；头像版（无立牌图回落 avatar）恒为原尺寸")]
+        [SerializeField, Min(0.1f)] private float 全身立牌放大倍数 = 2f;
 
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 _teamAColor/_teamBColor 场景序列化值
         // 与代码默认一致，迁移零损失——队伍色与 HUD 队列框/accent 同源对齐）
@@ -627,6 +627,8 @@ namespace GIC.Battle
             Sprite[] idleFrames = null;
             float idleFps = 12f;
             VideoClip idleVideo = null;
+            float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放）
+            float hoverHeight = 0f; // UnitData.离地高度（2026-09-27 拍板：飞行/悬浮单位纸片人整体上浮）
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
                 _unitConfig.TryGetUnitData(unitName, out var unitData))
             {
@@ -642,6 +644,8 @@ namespace GIC.Battle
                     idleFrames = unitData.立牌动画帧;
                     idleFps = unitData.立牌动画帧率;
                 }
+                unitScale = unitData.额外缩放;
+                hoverHeight = unitData.离地高度;
             }
 
             var team = (TeamType)state.team;
@@ -650,7 +654,7 @@ namespace GIC.Battle
             // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
                 _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
-                useFullBody ? 全身立牌放大倍数 : 1f, idleFrames, idleFps, idleVideo);
+                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleFrames, idleFps, idleVideo, hoverHeight);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);

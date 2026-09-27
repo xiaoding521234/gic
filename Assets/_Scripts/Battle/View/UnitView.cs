@@ -136,6 +136,13 @@ namespace GIC.Battle
         private const float NameFontSize = 36f;   // 世界高度 ≈ 3.43 × scale
         private const float NameScale = 0.038f;   // → 约 0.13 世界高
 
+        /// <summary>底座盘不透明度（2026-09-27 拍板半透明投影感：实体色板读作「坑/板」，脚站盘心显陷地
+        /// ——主因归圆盘（用户目检）；受击圆柱判定语义不变仅观感透明化。调 0=隐藏盘）</summary>
+        private const float 底座盘不透明度 = 0.7f;
+
+        /// <summary>底座盘颜色写入单出口（alpha 恒=底座盘不透明度——冻结/常态回写防满 alpha 复辟实体观感）</summary>
+        private static Color WithDiscAlpha(Color c) => new Color(c.r, c.g, c.b, 底座盘不透明度);
+
         /// <summary>头顶行面内 Y：立牌顶 + 与原 0.55 高版本相同的间隙（全身放大仅抬高位置）</summary>
         private float OverheadRowY(float baseY) => _avatarDisplayHeight + (baseY - AvatarHeight);
 
@@ -169,9 +176,13 @@ namespace GIC.Battle
         /// <param name="idleFps">动画播放帧率（fps）</param>
         /// <param name="idleVideo">立牌循环动画视频（B-S3 视频路线：绿幕 mp4+运行时 ChromaKey 抠色；
         /// 优先级高于 idleFrames——配了视频的单位不再消费序列帧；ChromaKey shader 缺失时回落静态立牌）</param>
+        /// <param name="hoverHeight">立牌离地高度（世界单位=格；UnitData.离地高度，2026-09-27 拍板新增）：
+        /// 纸片人整体上浮——飞行/悬浮单位；底座圆盘留地面（受击圆柱可视化=视觉即判定不随浮空）；
+        /// 血条/名字/Buff 行挂倾斜组随浮空同步抬高</param>
         public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0,
-            float avatarScale = 1f, Sprite[] idleFrames = null, float idleFps = 12f, VideoClip idleVideo = null)
+            float avatarScale = 1f, Sprite[] idleFrames = null, float idleFps = 12f, VideoClip idleVideo = null,
+            float hoverHeight = 0f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -185,10 +196,12 @@ namespace GIC.Battle
             // 头像立牌（SpriteRenderer 自动处理图集 UV）：
             // 外层 AvatarTilt 原点=格面底边（旋转轴=底边），内层挂 sprite 居于半高处——
             // 后仰时立牌绕底边倒（底边保持贴地），非绕中心转（那会让底边翘起/插地）。
-            // 血条/名字/Buff 行同挂此倾斜组（用户拍板：头顶信息随立牌同平面后仰）
+            // 血条/名字/Buff 行同挂此倾斜组（用户拍板：头顶信息随立牌同平面后仰）。
+            // 离地高度（2026-09-27 拍板）：倾斜组整体上浮 hoverHeight——飞行/悬浮单位（安柏=0.5），
+            // 底座圆盘是 root 子级不随浮空（受击圆柱可视化=视觉即判定，判定恒在地面格）
             var avatarGo = new GameObject("AvatarTilt");
             avatarGo.transform.SetParent(root.transform, false);
-            avatarGo.transform.localPosition = Vector3.zero;
+            avatarGo.transform.localPosition = new Vector3(0f, hoverHeight, 0f);
             avatarGo.transform.localRotation = Quaternion.Euler(tiltDegrees, 0f, 0f);
             view._tiltGroup = avatarGo.transform;
 
@@ -257,12 +270,15 @@ namespace GIC.Battle
             }
 
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=BattleMetrics.UnitCylinderDiameter，
-            // 视觉即判定，docs/18 决策二）
-            view._baseDiscMaterial = BattleViewFactory.CreateUnlitMaterial(teamColor);
+            // 视觉即判定，docs/18 决策二）。半透明投影感（2026-09-27 拍板：实体色板读作「坑/板」，
+            // 脚站盘心显陷地——主因归圆盘，用户目检归因）；sortingOrder=-1 恒先画于一切 3000 透明件
+            // （瞄准贴片 0/立牌 10/箭矢 12）之下、水面（2999）之上
+            view._baseDiscMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(WithDiscAlpha(teamColor));
             var baseGo = BattleViewFactory.CreateDisc(root.transform, "BaseDisc", view._baseDiscMaterial);
             baseGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             baseGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             baseGo.transform.localScale = new Vector3(BattleMetrics.UnitCylinderDiameter, BattleMetrics.UnitCylinderDiameter, 1f);
+            baseGo.GetComponent<MeshRenderer>().sortingOrder = -1;
             view._baseDisc = baseGo.transform;
             view._baseColor = teamColor;
 
@@ -334,9 +350,8 @@ namespace GIC.Battle
             IsFrozen = frozen;
             RefreshTint();
             if (_baseDisc != null && _baseDisc.GetComponent<MeshRenderer>() != null)
-                _baseDisc.GetComponent<MeshRenderer>().sharedMaterial.color = frozen
-                    ? Palette.冻结冰色
-                    : _baseColor;
+                _baseDisc.GetComponent<MeshRenderer>().sharedMaterial.color =
+                    WithDiscAlpha(frozen ? Palette.冻结冰色 : _baseColor); // 保盘半透明（2026-09-27 拍板，回写防满 alpha）
         }
 
         /// <summary>立牌着色统一收口：尸体灰 > 冻结冰色 > 受击闪红 > 常态白</summary>
