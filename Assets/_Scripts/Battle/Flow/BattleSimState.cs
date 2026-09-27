@@ -416,23 +416,8 @@ namespace GIC.Battle
             stats.SetStatStruct(StatType.Energy, energy);
         }
 
-        /// <summary>技能的元能消耗（技能条目 EnergyCost 参数；0=无消耗——战技/移动不耗能）</summary>
-        public static int GetEnergyCost(SkillConfig.SkillData skillData)
-        {
-            return skillData?.GetInt(SkillParamKey.EnergyCost, 0) ?? 0;
-        }
-
-        /// <summary>技能行动的体力消耗（B6d；战技/爆发=StaminaCostPerAction（移动行动走常量直读），
-        /// 延奏/契约/天赋 0——docs/05 §5.1-5.2 口径。Host 门槛（StaminaGate）与客户端置灰共用此单源）</summary>
-        public static int GetStaminaCost(SkillConfig.SkillData skillData)
-        {
-            var type = skillData?.skillType ?? SkillType.Normal;
-            return type == SkillType.Normal || type == SkillType.Burst
-                ? BattleMetrics.StaminaCostPerAction
-                : 0;
-        }
-
-        /// <summary>元能是否够施放（门槛=技能消耗值而非上限——延奏类不满即可放）</summary>
+        /// <summary>元能是否够施放（门槛=技能消耗值而非上限——延奏类不满即可放）。
+        /// C-2 起消耗声明单源=SkillData.costs（ResourceGate 消费；本判定为元能条目底层原语）</summary>
         public static bool HasEnoughEnergy(Unit unit, int energyCost)
         {
             if (energyCost <= 0) return true;

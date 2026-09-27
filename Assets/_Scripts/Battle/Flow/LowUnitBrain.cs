@@ -59,8 +59,10 @@ namespace GIC.Battle
             if (skillIndex >= 0)
             {
                 var skill = unit.Skills[skillIndex];
+                // 消耗门槛（统一消耗模型 C-2）：costs 单源镜像（ResourceGate.HasAll——低级单位豁免玩家
+                // 资源、元能照查，与 Host 同口径）
                 if (skill != null && skill.CanCast(unit)
-                    && BattleSimState.HasEnoughEnergy(unit, BattleSimState.GetEnergyCost(skill.RawData)))
+                    && ResourceGate.HasAll(sim, unit, identity.OwnerPlayerID, skill.RawData?.costs, out _))
                 {
                     var direction = BattleHeuristics.FindAttackDirection(sim, snapshot, unit, skill);
                     if (direction != 0)

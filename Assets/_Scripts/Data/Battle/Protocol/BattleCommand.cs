@@ -54,6 +54,9 @@ namespace GIC.Data
 
         [InspectorName("技能施放")]
         SkillCast = 14,
+
+        [InspectorName("物品消耗")]
+        ItemConsume = 15,
     }
 
     /// <summary>
@@ -76,6 +79,7 @@ namespace GIC.Data
     /// Summon          | —        | —                | —                | —         | —    | —      | —                     | —              | 新单位全量态
     /// Effect          | 特效值   | 特效子类型       | 飞行方向         | 发射格    | —    | —      | 发射时刻              | —              | —
     /// SkillCast       | skillID  | —                | 瞄准方向         | 施放者位置| —    | —      | —                     | —              | —
+    /// ItemConsume     | 消耗数量 | 物品名 ItemName  | —                | —         | —    | —      | —                     | —              | —（targetUnitId=玩家）
     /// Pause/Resume/UI | —        | —                | —                | —         | —    | —      | —                     | —              | —
     /// </remarks>
     [Serializable]
@@ -323,6 +327,24 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 metadata = statKind,
                 value = delta,
+            };
+        }
+
+        /// <summary>物品消耗命令工厂（统一消耗模型 C-1，docs/active/30）：技能消耗手牌物品牌（如酒/苹果）
+        /// ——targetUnitId=归属玩家、metadata=物品名（ItemName 枚举值）、value=消耗数量。
+        /// 客户端应用=本地 handCards 镜像条目扣减（减尽移除）+手牌角标即时刷新（不等下回合快照）</summary>
+        public static BattleCommand ItemConsume(string playerId, int sliceIndex, int indexInSlice,
+            int itemName, int amount)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.ItemConsume,
+                actorUnitId = playerId,
+                targetUnitId = playerId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = itemName,
+                value = amount,
             };
         }
 

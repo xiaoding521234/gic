@@ -24,3 +24,13 @@ MonoBehaviour:
       value: 30
       baseType: 0
     timeline: {fileID: 0}
+    effects: []
+    costs:
+    - kind: 2
+      item: 0
+      subType: 4
+      amount: 10
+    - kind: 1
+      item: 0
+      subType: 4
+      amount: 30

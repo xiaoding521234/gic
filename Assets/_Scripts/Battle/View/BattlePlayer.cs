@@ -58,6 +58,11 @@ namespace GIC.Battle
         /// 快照权威兜底）</summary>
         public event Action<string, int, int> OnResourceDelta;
 
+        /// <summary>手牌物品牌消耗（统一消耗模型 C-1，docs/active/30）：技能吃物品（如酒/苹果）的
+        /// ItemConsume 命令消费点——参数=玩家ID / 物品名（ItemName）/ 消耗量。本类先扣本地快照
+        /// handCards 镜像（减尽移除条目），HUD 订阅刷新对应卡角标；快照权威兜底</summary>
+        public event Action<string, int, int> OnItemConsumed;
+
         /// <summary>战斗结束事件（2026-09-25 三轮审查 S10 轻量全灭软停；订阅方=HUD 胜负提示，
         /// 结算画面=B8）</summary>
         public event Action<BattleOverMessage> BattleOver;
@@ -416,6 +421,13 @@ namespace GIC.Battle
                         }
                         break;
 
+                    case BattleCommandType.ItemConsume:
+                        // 物品消耗（统一消耗模型 C-1）：先扣本地 handCards 镜像（减尽移除条目），再广播
+                        // HUD 刷新角标；下回合快照权威兜底（镜像偏离自愈）
+                        ApplyItemConsumeToLocalHand(command.targetUnitId, (ItemName)command.metadata, command.value);
+                        OnItemConsumed?.Invoke(command.targetUnitId, command.metadata, command.value);
+                        break;
+
                     case BattleCommandType.Summon:
                         // 部署登场（B6c）：按命令携带的全量状态即时建 view（快照权威自愈兜底）
                         if (command.summonUnit != null && !_views.ContainsKey(command.summonUnit.unitId))
@@ -568,6 +580,34 @@ namespace GIC.Battle
         {
             yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
             OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);
+        }
+
+        /// <summary>物品消耗命令扣本地手牌镜像（统一消耗模型 C-1）：LatestSnapshot.resources 内该玩家
+        /// handCards 条目数量减/减尽移除——片内即时反映（HUD 角标刷新走 OnItemConsumed 事件）；
+        /// 非我方玩家命令仅镜像维护（HUD 只刷我方手牌），下回合快照权威兜底</summary>
+        private void ApplyItemConsumeToLocalHand(string playerId, ItemName item, int amount)
+        {
+            var snapshot = LatestSnapshot;
+            if (snapshot == null) return;
+            PlayerResourceState res = null;
+            foreach (var r in snapshot.resources)
+            {
+                if (r.playerId == playerId) { res = r; break; }
+            }
+            if (res == null) return;
+            HandCard target = null;
+            foreach (var entry in res.handCards)
+            {
+                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item) { target = entry; break; }
+            }
+            if (target == null)
+            {
+                GICLog.Warn($"[BattlePlayer] ItemConsume 镜像无条目（{playerId} {item}×{amount}）——快照权威自愈兜底");
+                return;
+            }
+            target.count -= amount;
+            if (target.count <= 0)
+                res.handCards.Remove(target);
         }
 
         /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>

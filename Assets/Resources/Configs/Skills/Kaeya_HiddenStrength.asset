@@ -75,3 +75,8 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+    costs:
+    - kind: 1
+      item: 0
+      subType: 4
+      amount: 10

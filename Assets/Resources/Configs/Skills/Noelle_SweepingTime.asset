@@ -24,3 +24,9 @@ MonoBehaviour:
       value: 2
       baseType: 0
     timeline: {fileID: 0}
+    effects: []
+    costs:
+    - kind: 2
+      item: 0
+      subType: 4
+      amount: 10

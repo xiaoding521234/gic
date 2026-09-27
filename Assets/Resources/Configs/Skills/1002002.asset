@@ -18,3 +18,9 @@ MonoBehaviour:
     skillType: 3
     customParams: []
     timeline: {fileID: 0}
+    effects: []
+    costs:
+    - kind: 2
+      item: 0
+      subType: 4
+      amount: 10

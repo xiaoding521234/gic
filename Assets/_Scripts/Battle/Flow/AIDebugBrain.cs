@@ -163,8 +163,9 @@ namespace GIC.Battle
                 if (data.skillType != SkillType.Normal && data.skillType != SkillType.Burst) continue;
                 if (!skill.CanCast(unit)) continue;
 
-                if (!BattleSimState.HasEnoughEnergy(unit, BattleSimState.GetEnergyCost(data))) continue;
-                if (!sim.HasEnoughStamina(_playerId, BattleSimState.GetStaminaCost(data))) continue;
+                // 消耗门槛（统一消耗模型 C-2，docs/active/30）：costs 全条目镜像 Host 判定
+                // （ResourceGate.HasAll 同源——含低级单位豁免口径；AI 脑不感知 costs 的遗留就此销案）
+                if (!ResourceGate.HasAll(sim, unit, _playerId, data?.costs, out _)) continue;
 
                 int perTarget = BattleHeuristics.EstimatePerTargetDamage(unit, data);
                 if (perTarget <= 0) continue;
@@ -206,7 +207,7 @@ namespace GIC.Battle
                 var data = skill?.RawData;
                 if (data == null || data.skillType != SkillType.Enso) continue;
                 if (!skill.CanCast(unit)) continue;
-                if (!BattleSimState.HasEnoughEnergy(unit, BattleSimState.GetEnergyCost(data))) continue;
+                if (!ResourceGate.HasAll(sim, unit, _playerId, data?.costs, out _)) continue; // 消耗门槛（C-2 costs 单源）
 
                 // 候选目标：我军存活单位（含自身）unitId 升序——延奏目标域=阵营口径
                 // （2026-09-25 三轮审查 C2：2v2 可协奏队友单位）；行动者归属=playerId 保留
@@ -325,7 +326,7 @@ namespace GIC.Battle
         private void EvaluateMove(BattleSimState sim, BattleSnapshot snapshot,
             (string unitId, Unit unit) entry, int turn, CandidateTracker tracker)
         {
-            if (!sim.HasEnoughStamina(_playerId, BattleMetrics.StaminaCostPerAction)) return;
+            if (!ResourceGate.HasAll(sim, entry.unit, _playerId, MoveExecutor.GetMoveCosts(entry.unit), out _)) return; // 移动消耗（C-2 costs 单源）
 
             var enemy = BattleHeuristics.FindNearestEnemy(sim, entry.unit);
             if (enemy == null) return;
@@ -379,7 +380,7 @@ namespace GIC.Battle
                 if (data == null) continue;
                 if (data.skillType != SkillType.Normal && data.skillType != SkillType.Burst) continue;
                 if (!skill.CanCast(unit)) continue;
-                if (!BattleSimState.HasEnoughEnergy(unit, BattleSimState.GetEnergyCost(data))) continue;
+                if (!ResourceGate.HasAll(sim, unit, _playerId, data?.costs, out _)) continue; // 消耗门槛（C-2 costs 单源）
                 if (BattleHeuristics.EstimatePerTargetDamage(unit, data) <= 0) continue;
 
                 foreach (var direction in BattleHeuristics.CrossDirections)

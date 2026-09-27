@@ -36,6 +36,7 @@ namespace GIC.Battle
             var energyKeys = new HashSet<string>();
             var staminaKeys = new HashSet<string>();
             var moraKeys = new HashSet<string>();
+            var itemConsumeKeys = new HashSet<string>();
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -62,6 +63,9 @@ namespace GIC.Battle
                             staminaKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindMora)
                             moraKeys.Add(command.targetUnitId);
+                        break;
+                    case BattleCommandType.ItemConsume:
+                        itemConsumeKeys.Add($"{command.targetUnitId}:{command.metadata}");
                         break;
                 }
             }
@@ -111,6 +115,29 @@ namespace GIC.Battle
                     if (plunder.AppliedGain > 0
                         && !(moraKeys.Contains(plunder.TargetUnitId) && moraKeys.Contains(plunder.ToPlayerId)))
                         Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is MoraSpendEffect moraSpend)
+                {
+                    // 统一消耗模型 C-1 摩拉消耗：AppliedAmount=0 零命令=非漏发（防御性不足额路径）；
+                    // 有产出=StatChange(StatKindMora)
+                    if (moraSpend.AppliedAmount > 0 && !moraKeys.Contains(moraSpend.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is ItemConsumeEffect itemConsume)
+                {
+                    // 统一消耗模型 C-1 物品消耗：明细空=零命令非漏发（原子回滚）；
+                    // 有产出=按 Consumed 明细逐条查 (玩家,物品) 存在性
+                    if (itemConsume.AppliedAmount > 0)
+                    {
+                        foreach (var spent in itemConsume.Consumed)
+                        {
+                            if (!itemConsumeKeys.Contains($"{itemConsume.TargetUnitId}:{spent.item}"))
+                            {
+                                Report(context, effect, BattleCommandType.ItemConsume);
+                                break;
+                            }
+                        }
+                    }
                 }
                 else if (effect is ApplyBuffEffect)
                 {

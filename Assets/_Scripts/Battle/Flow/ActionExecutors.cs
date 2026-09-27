@@ -7,34 +7,6 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 体力门槛（B6d 经济闭环，docs/05 §5.1）：配额行动（移动/战技/爆发）消耗玩家 10 体力。
-    /// 豁免口径：①低级单位（1~2 星）自主行动不占玩家配额故不消耗（按行动者星级判定，
-    /// docs/04 §4.1）②延奏/契约/天赋等特殊技能 0 消耗（docs/05 §5.2"视技能而定"未定，暂 0）。
-    /// 体力不足→行动落空（同元能语义，B6a 先例）+Log；通过→随行动产出 StaminaEffect
-    /// （效应链统一应用→StatChange 命令→对账登记）。
-    /// </summary>
-    public static class StaminaGate
-    {
-        /// <summary>
-        /// 体力门槛检查+消耗登记：0 消耗/低级单位直接过；高级单位配额行动消耗量不足则落空。
-        /// 通过时向 effects 追加 StaminaEffect（负值）。技能消耗口径单源=BattleSimState.GetStaminaCost。
-        /// </summary>
-        /// <param name="actionDesc">落空日志用行动描述（如"移动"/"技能 XXX"）</param>
-        public static bool TryCharge(BattleSimState sim, Unit actor, string playerId, int cost,
-            string actionDesc, List<BattleEffect> effects)
-        {
-            if (cost <= 0 || !BattleHeuristics.IsMajorUnit(actor)) return true;
-            if (sim.HasEnoughStamina(playerId, cost))
-            {
-                effects.Add(new StaminaEffect(playerId, -cost));
-                return true;
-            }
-            GICLog.Info($"[StaminaGate] 玩家 {playerId} 体力不足（{sim.GetStamina(playerId)}/{cost}），{actionDesc}落空");
-            return false;
-        }
-    }
-
-    /// <summary>
     /// 移动行动执行器：构建移动者状态，实际结算由 MovementResolver 同片同步逐步展开。
     /// 移动是特殊的技能（2026-09-23 B-S1b 拍板）：步数上限=移动技能条目 MoveDistance 参数
     /// （skills[0]·Move 型，数据驱动与 HUD 瞄准同源）；无移动技能/无参数回落 3（旧默认）。
@@ -75,6 +47,29 @@ namespace GIC.Battle
             }
             return 3; // 无移动技能条目=旧默认回落
         }
+
+        /// <summary>移动消耗声明（统一消耗模型 C-2，docs/active/30）：移动技能条目的 costs（C-2 起全移动
+        /// 技能资产已配 Stamina 条目）——**无移动技能条目单位走常量兜底**（配额行动 10 体力，规则真源
+        /// =BattleMetrics.StaminaCostPerAction；2026-09-28 盘点 21/34 单位无 Move 条目=兜底是主路径非边角）。
+        /// 返回共享只读实例（HasAll/ChargeAll 只读消费，调用方勿改）。
+        /// 有 Move 条目但未声明消耗=免费移动（costs 空=无消耗语义，数据即事实）</summary>
+        public static List<SkillCostEntry> GetMoveCosts(Unit unit)
+        {
+            if (unit?.Skills != null)
+            {
+                foreach (var skill in unit.Skills)
+                {
+                    if (skill?.RawData?.skillType != SkillType.Move) continue;
+                    return skill.RawData.HasCosts ? skill.RawData.costs : null;
+                }
+            }
+            return FallbackMoveCosts;
+        }
+
+        private static readonly List<SkillCostEntry> FallbackMoveCosts = new()
+        {
+            new SkillCostEntry { kind = CostKind.Stamina, amount = BattleMetrics.StaminaCostPerAction }
+        };
     }
 
     /// <summary>
@@ -106,7 +101,7 @@ namespace GIC.Battle
                 return effects;
             }
 
-            // 可施放检查前置（2026-09-25 三轮审查 S6 正序）：占位/不可施放技能先拦，再查元能/体力
+            // 可施放检查前置（2026-09-25 三轮审查 S6 正序）：占位/不可施放技能先拦，再查消耗
             // ——原顺序会让不可施放的占位技能白扣 10 体力后才落空（UI 置灰防了常规路径，异常上交仍会撞）
             if (!skill.CanCast(attacker))
             {
@@ -114,22 +109,21 @@ namespace GIC.Battle
                 return effects;
             }
 
-            // 元能门槛（B6a）：消耗值=技能条目 EnergyCost（0=无消耗——战技/移动不耗能；
-            // 爆发 30/40/100、延奏 20，攒够才可放；不足→行动落空）
-            int energyCost = BattleSimState.GetEnergyCost(skill.RawData);
-            if (energyCost > 0 && !BattleSimState.HasEnoughEnergy(attacker, energyCost))
+            // ==================== 消耗段（统一消耗模型 C-2：全量迁移完成，双轨回落退役）====================
+            // 消耗单源=SkillData.costs（docs/active/30）：先全查后全扣（多 cost 防「扣了体力才发现苹果不够」
+            // ——任一不足=行动落空且不登记任何消耗）；**costs 空=免费技能**（无消耗语义，数据即事实）
+            if (!ResourceGate.HasAll(sim, attacker, action.playerId, skill.RawData?.costs, out var missing))
             {
-                var stats = attacker.GetUnitComponent<UnitStats>();
-                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 元能不足" +
-                            $"（{stats?.Energy ?? 0}/{energyCost}），行动落空");
+                string missingDesc = missing.kind == CostKind.Item
+                    ? missing.item.ToString()
+                    : missing.kind == CostKind.AnyItem
+                        ? $"任意{missing.subType}"
+                        : missing.kind.ToString();
+                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 消耗不足" +
+                            $"（{missingDesc}×{missing.amount}），行动落空");
                 return effects;
             }
-
-            // 体力门槛（B6d，docs/05 §5.1）：战技/爆发消耗玩家 10 体力——低级单位/延奏契约豁免；
-            // 不足→行动落空（同元能语义，不产生任何效应）
-            if (!StaminaGate.TryCharge(sim, attacker, action.playerId, BattleSimState.GetStaminaCost(skill.RawData),
-                $"技能 {skill.RawData?.skillID}", effects))
-                return effects;
+            ResourceGate.ChargeAll(sim, attacker, action.playerId, skill.RawData?.costs, effects);
 
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
 
@@ -141,10 +135,6 @@ namespace GIC.Battle
                     (int)skill.RawData.skillID, (int)action.direction,
                     casterState != null ? casterState.position : BattleCell.zero));
             }
-
-            // 元能消耗随效应产出（负值，随片统一应用；获取端=战技命中，在 SkillHitResolver）
-            if (energyCost > 0)
-                effects.Add(new EnergyEffect(action.unitId, -energyCost, EnergyEffect.CategoryCost));
 
             return effects;
         }

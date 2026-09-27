@@ -886,6 +886,31 @@ namespace GIC.Editor
                 }
             }
 
+            // 消耗声明校验（统一消耗模型 C-2）：costs=运行时消耗唯一真源（EnergyCost 参数仅描述渲染）
+            if (data != null && (data.HasEffects || data.HasCosts)) // 占位技能（无效果无消耗）不查
+            {
+                bool quota = data.skillType == SkillType.Normal || data.skillType == SkillType.Burst
+                    || data.skillType == SkillType.Move;
+                bool hasStaminaCost = data.costs != null && data.costs.Exists(c => c != null && c.kind == CostKind.Stamina);
+                if (quota && !hasStaminaCost)
+                    issues.Add($"{data.skillType} 技能缺 Stamina 消耗条目——C-2 起消耗全走 costs（配额行动 10 体力）");
+                if (data.GetInt(SkillParamKey.EnergyCost, 0) > 0
+                    && (data.costs == null || !data.costs.Exists(c => c != null && c.kind == CostKind.Energy)))
+                    issues.Add("EnergyCost 参数已声明但 costs 无元能条目——运行时以 costs 为准（参数仅描述渲染），请补元能条目防漂移");
+                if (data.costs != null)
+                {
+                    foreach (var cost in data.costs)
+                    {
+                        if (cost == null) { issues.Add("消耗声明含空条目"); continue; }
+                        if (cost.amount <= 0) issues.Add($"消耗条目 {cost.kind} 数量≤0");
+                        if (cost.kind == CostKind.AnyItem && cost.subType == ItemSubType.Currency)
+                            issues.Add("AnyItem 配了 Currency 子类型——货币不经物品消耗链（恒不可匹配）");
+                        if (cost.kind == CostKind.Item && cost.item == ItemName.None)
+                            issues.Add("Item 消耗未指定物品");
+                    }
+                }
+            }
+
             if (issues.Count == 0)
                 return new HelpBox("✓ 效果配置校验通过", HelpBoxMessageType.None);
 
