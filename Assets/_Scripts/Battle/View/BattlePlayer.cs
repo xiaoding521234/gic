@@ -145,6 +145,7 @@ namespace GIC.Battle
             }
 
             _board.Build(message.map);
+            _board.BuildGrassDecor(_viewCamera); // 草簇装饰（2026-09-27 地形批次：立牌式草簇随机铺满草地格）
             ClearViews();
 
             foreach (var state in message.initialSnapshot.units)

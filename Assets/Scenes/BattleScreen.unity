@@ -171,8 +171,9 @@ MonoBehaviour:
   _board: {fileID: 976017328}
   _viewCamera: {fileID: 1233798859}
   _playbackSpeed: 1
-  _teamAColor: {r: 0.25, g: 0.55, b: 1, a: 1}
-  _teamBColor: {r: 1, g: 0.35, b: 0.3, a: 1}
+  "\u88AB\u6321\u649E\u5899\u63A2\u51FA\u5E45\u5EA6": 0.45
+  "\u7ACB\u724C\u540E\u503E\u89D2": 55
+  "\u5168\u8EAB\u7ACB\u724C\u653E\u5927\u500D\u6570": 2
 --- !u!114 &311523754
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -188,7 +189,7 @@ MonoBehaviour:
   _board: {fileID: 976017328}
   _player: {fileID: 311523753}
   _flow: {fileID: 311523752}
-  _debugPanel: {fileID: 0}
+  _hud: {fileID: 0}
 --- !u!4 &311523755
 Transform:
   m_ObjectHideFlags: 0
@@ -358,8 +359,12 @@ MonoBehaviour:
   _grassTilePrefab: {fileID: 5147625123567983884, guid: f67caae1c164dcc499913c4b6b6803f0, type: 3}
   _waterTilePrefab: {fileID: 7655067814495520768, guid: 0a493dffe539dd242af0cd05bb76a3b7, type: 3}
   _stoneTilePrefab: {fileID: 5435488007869102299, guid: 4e1afb44652b97b4d9d6c95079525bd8, type: 3}
+  _dirtTilePrefab: {fileID: 2804491520440548016, guid: a6e04bf9dbb3f5f4697675420f660d9b, type: 3}
+  _cobbleTilePrefab: {fileID: 1338634653829532485, guid: f831fcf74a86ee14d8b95aac0bbec3d9, type: 3}
+  _tileVisuals: {fileID: 11400000, guid: bbfa2fb27b391454aa294e09de4ddced, type: 2}
   _tileTopHeight: 0.5
   _waterSurfaceHeight: 0.36
+  _waterSurfaceSubdiv: 4
 --- !u!4 &976017329
 Transform:
   m_ObjectHideFlags: 0

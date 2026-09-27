@@ -21,7 +21,7 @@ namespace GIC.Data
 
     /// <summary>
     /// 战场地图配置（字符行布局，可读可手编）
-    /// 字符约定：G=草地 W=水 S=石路 P=平原 .=虚空（无地形）
+    /// 字符约定：G=草地 W=水 S=石路 P=平原 D=土地 C=圆石 .=虚空（无地形）
     /// </summary>
     [CreateAssetMenu(fileName = "BattleMapConfig", menuName = "Game/BattleMapConfig")]
     public class BattleMapConfig : ScriptableObject
@@ -94,6 +94,8 @@ namespace GIC.Data
                 case 'P': return TileType.Plain;
                 case 'W': return TileType.Water;
                 case 'S': return TileType.StonePath;
+                case 'D': return TileType.Dirt;
+                case 'C': return TileType.Cobblestone;
                 case '.': return (TileType)0; // 虚空：无地形
                 default:
                     GICLog.Warn($"[BattleMapConfig] 未知地形字符 '{c}'，按虚空处理");

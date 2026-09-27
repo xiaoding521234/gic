@@ -59,6 +59,14 @@ namespace GIC.Data
         [InspectorName("石路")]
         [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
         StonePath = 6,
+
+        [InspectorName("土地")]
+        [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
+        Dirt = 7,
+
+        [InspectorName("圆石")]
+        [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
+        Cobblestone = 8,
         #endregion
 
         #region waterTerrain (100-199)

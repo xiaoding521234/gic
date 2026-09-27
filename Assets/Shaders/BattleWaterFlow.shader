@@ -15,6 +15,7 @@ Shader "GIC/Battle/WaterFlow"
         _WaveAmplitude ("表面起伏", Float) = 0.02
         _WaveSpeed ("起伏速度", Float) = 1.9
         _Highlight ("波峰高光", Range(0, 1)) = 0.3
+        _TexColorBlend ("贴图色强度", Range(0, 1)) = 0.6
     }
 
     SubShader
@@ -50,6 +51,7 @@ Shader "GIC/Battle/WaterFlow"
             float _WaveAmplitude;
             float _WaveSpeed;
             float _Highlight;
+            float _TexColorBlend;
 
             struct appdata
             {
@@ -82,13 +84,17 @@ Shader "GIC/Battle/WaterFlow"
 
             fixed4 frag(v2f i) : SV_Target
             {
-                // 双层反向滚动 → 持续流动感
+                // 双层反向滚动 → 持续流动感（pattern=亮度：AI 水面贴图为蓝调，.r 通道对比不足，2026-09-27 地形批次）
                 half4 layerA = tex2D(_MainTex, i.uvBase + _Time.y * _FlowSpeed * _FlowDirA.xy);
                 half4 layerB = tex2D(_MainTex, i.uvBase + _Time.y * _FlowSpeed * _FlowDirB.xy);
-                half pattern = lerp(layerA.r, layerB.r, _LayerBStrength);
+                half lumaA = dot(layerA.rgb, half3(0.299, 0.587, 0.114));
+                half lumaB = dot(layerB.rgb, half3(0.299, 0.587, 0.114));
+                half pattern = lerp(lumaA, lumaB, _LayerBStrength);
 
-                // 基色 × 贴图亮度 + 波峰高光
-                fixed3 col = _DeepColor.rgb + (_BaseColor.rgb - _DeepColor.rgb) * (0.35 + 0.65 * pattern);
+                // 调色板基色 × 贴图亮度，贴图自身颜色按强度混入（贴图=原神水面截图同源配色）+ 波峰高光
+                fixed3 paletteCol = _DeepColor.rgb + (_BaseColor.rgb - _DeepColor.rgb) * (0.35 + 0.65 * pattern);
+                fixed3 texCol = lerp(layerA.rgb, layerB.rgb, _LayerBStrength);
+                fixed3 col = lerp(paletteCol, texCol, _TexColorBlend);
                 col += _Highlight * saturate(i.wave * 0.5 + 0.5) * pattern;
 
                 fixed alpha = _BaseColor.a + pattern * 0.08;
