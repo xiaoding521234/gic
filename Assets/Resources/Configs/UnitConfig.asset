@@ -299,10 +299,10 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 77ae75539af390344a1169e1639e645c, type: 3}
     nameCard: {fileID: 21300000, guid: 61c683655e18f9e4995cfdc5ec9e8d42, type: 3}
-    "\u7ACB\u724C\u56FE": {fileID: 21300000, guid: 8361bb751fcfded408707eea5b061d07, type: 3}
+    "\u7ACB\u724C\u56FE": {fileID: 21300000, guid: 7a4b8524296381140bf35a70a2f8aa85, type: 3}
     "\u7ACB\u724C\u52A8\u753B\u5E27": []
     "\u7ACB\u724C\u52A8\u753B\u5E27\u7387": 12
-    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 32900000, guid: 459b2ecbd7ec1604bac1d16cdda32e00, type: 3}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 32900000, guid: 7055f14f612c40540a6a49b76a243f82, type: 3}
     "\u79BB\u5730\u9AD8\u5EA6": 0.5
     "\u989D\u5916\u7F29\u653E": 1
     hideInBackpack: 0
