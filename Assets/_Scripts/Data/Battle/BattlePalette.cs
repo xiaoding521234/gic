@@ -28,7 +28,7 @@ namespace GIC.Data
         [Tooltip("头顶条元能填充色（BattleOverheadBars 元能条，2026-09-24；09-25 目检拍板改白色）")]
         public Color 元能条色 = new Color(0.95f, 0.95f, 0.95f);
 
-        [Header("投射物（B5 表现批次换正式箭矢素材前的白色光条占位）")]
+        [Header("投射物（箭矢素材缺失时的白色光条占位兜底——正式箭矢已落地 2026-09-28，运行时元素色染色不走此色）")]
         public Color 箭矢占位色 = new Color(0.98f, 0.93f, 0.80f, 1f);
 
         [Header("HUD 基调")]

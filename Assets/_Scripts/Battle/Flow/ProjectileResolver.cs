@@ -95,6 +95,9 @@ namespace GIC.Battle
                     vanishCmd.hitX = Mathf.RoundToInt(vanishPoint.x * 1000f);
                     vanishCmd.hitY = Mathf.RoundToInt(vanishPoint.y * 1000f);
                     vanishCmd.launchMs = Mathf.RoundToInt(launch * 1000f);
+                    // 投射物元素（箭矢染色单源 2026-09-28）：与命中 Damage.metadata 同口径——
+                    // 丘丘人借凯亚霜袭时消散箭也是冰色，非施法者物理灰
+                    vanishCmd.reactionKind = (int)SkillHitResolver.ResolveProjectileElement(sim, projectile.Action);
                     vanishes.Add(vanishCmd);
                     continue;
                 }

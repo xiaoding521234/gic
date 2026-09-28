@@ -38,6 +38,10 @@ namespace GIC.Battle
         [Tooltip("全身立牌（UnitData.立牌图）放大倍数：全身立绘人物在图中占比小，放大对齐头像版人物观感（2026-09-21 先试 2.5；2026-09-27 拍板 2.5→2：站立全身图 tight bounds 撑满 1.375 格超格子、且比安柏视频立牌（主体仅占帧 69~87%）高 15~45%，降至 2 后显示高=1.1 格）；血条/名字/Buff 行尺寸不变、随立牌顶抬高；头像版（无立牌图回落 avatar）恒为原尺寸")]
         [SerializeField, Min(0.1f)] private float 全身立牌放大倍数 = 2f;
 
+        [Header("投射物箭矢")]
+        [Tooltip("箭矢屏幕长度（格）——正式素材长轴按 bounds 归一到该长度，高度随素材纵横比；十字四向全长（2026-09-28 拍板方案 A：屏幕平行布告板+屏幕平面内旋转，上下射=屏幕竖直箭；0.7→0.49=同日目检拍板调小 30%）")]
+        [SerializeField, Min(0.1f)] private float 箭矢长度 = 0.49f;
+
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 _teamAColor/_teamBColor 场景序列化值
         // 与代码默认一致，迁移零损失——队伍色与 HUD 队列框/accent 同源对齐）
         private static BattlePalette Palette => BattlePalette.Instance;
@@ -225,7 +229,9 @@ namespace GIC.Battle
                 ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
                 : target.transform.position + new Vector3(0f, 0.45f, 0f); // 兜底：无定点数据时飞向目标
 
-            var arrowGo = CreateProjectileVisual(from);
+            // 元素色动态染色（2026-09-28 拍板）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
+            var arrowGo = CreateProjectileVisual(from, to,
+                ElementFactionConfig.Instance.GetElementColor((ElementType)command.metadata));
 
             float distance = Vector3.Distance(from, to);
             float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
@@ -261,7 +267,10 @@ namespace GIC.Battle
                     command.cell.y + delta.y * command.value)) + new Vector3(0f, 0.45f, 0f);
             }
 
-            var arrowGo = CreateProjectileVisual(from);
+            // 元素色=消散命令随带投射物元素（reactionKind，Host 与命中 Damage.metadata 同口径回填——
+            // 丘丘人借凯亚霜袭时消散箭同为冰色，非施法者物理灰）
+            var arrowGo = CreateProjectileVisual(from, to,
+                ElementFactionConfig.Instance.GetElementColor((ElementType)command.reactionKind));
 
             float distance = Vector3.Distance(from, to);
             float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
@@ -270,7 +279,26 @@ namespace GIC.Battle
             Destroy(arrowGo);
         }
 
-        /// <summary>投射物光条 sprite（程序化 1×1 白图缓存；B5 表现批次换正式箭矢素材）</summary>
+        /// <summary>正式箭矢 sprite（Resources/UI/Battle/ArrowBolt——AI 生成白色箭矢，运行时元素色染色；
+        /// B-S3 箭矢正式素材 2026-09-28 拍板落地。加载失败回退程序化白色光条占位）</summary>
+        private static Sprite _arrowSprite;
+        private static bool _arrowSpriteLoaded;
+        private static Sprite ArrowSprite
+        {
+            get
+            {
+                if (!_arrowSpriteLoaded)
+                {
+                    _arrowSpriteLoaded = true;
+                    _arrowSprite = Resources.Load<Sprite>("UI/Battle/ArrowBolt");
+                    if (_arrowSprite == null)
+                        GICLog.Warn("[BattlePlayer] 箭矢素材 UI/Battle/ArrowBolt 加载失败，回退白色光条占位");
+                }
+                return _arrowSprite;
+            }
+        }
+
+        /// <summary>投射物光条 sprite（程序化 1×1 白图缓存；箭矢素材缺失时的占位兜底）</summary>
         private static Sprite _projectileSprite;
         private static Sprite ProjectileSprite
         {
@@ -285,19 +313,46 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>箭矢视觉（billboard 白色光条；B5 换正式素材——创建即就位，飞行由调用方 tween。
-        /// 配色=BattlePalette「箭矢占位色」活色（2026-09-23 审查 Y9 收口，勿写字面量）</summary>
-        private GameObject CreateProjectileVisual(Vector3 from)
+        /// <summary>箭矢视觉（2026-09-28 拍板方案 A：屏幕平行布告板 + 屏幕平面内旋转对齐飞行方向——
+        /// 固定视角十字四向只有 0/90/180/270 四角，上下射=屏幕竖直箭、四向全长；元素色动态染色。
+        /// 创建即就位，飞行由调用方 tween；占位兜底配色=BattlePalette「箭矢占位色」活色勿写字面量）</summary>
+        private GameObject CreateProjectileVisual(Vector3 from, Vector3 to, Color tint)
         {
             var arrowGo = new GameObject("Projectile");
             arrowGo.transform.SetParent(_viewRoot, false);
             arrowGo.transform.position = from;
-            arrowGo.transform.rotation = _billboardRotation;
-            arrowGo.transform.localScale = new Vector3(0.05f, 0.30f, 1f);
+
+            // 朝向：先取屏幕平行布告板（面正对视线，与立牌后仰同族），再按飞行方向的屏幕投影
+            // 绕视线轴旋转到四向其一（投影走 WorldToScreenPoint，不假设画布/世界轴向映射）
+            var cam = _viewCamera != null ? _viewCamera : Camera.main;
+            if (cam != null && (to - from).sqrMagnitude > 1e-8f)
+            {
+                var screenFrom = cam.WorldToScreenPoint(from);
+                var screenTo = cam.WorldToScreenPoint(to);
+                var angle = Mathf.Atan2(screenTo.y - screenFrom.y, screenTo.x - screenFrom.x) * Mathf.Rad2Deg;
+                arrowGo.transform.rotation = cam.transform.rotation * Quaternion.Euler(0f, 0f, angle);
+            }
+            else
+            {
+                arrowGo.transform.rotation = _billboardRotation; // 无相机/零程兜底：竖立布告板
+            }
+
             var renderer = arrowGo.AddComponent<SpriteRenderer>();
-            renderer.sprite = ProjectileSprite;
-            renderer.color = Palette.箭矢占位色;
             renderer.sortingOrder = BattleMetrics.ProjectileSortingOrder;
+            var sprite = ArrowSprite;
+            if (sprite != null)
+            {
+                var scale = 箭矢长度 / sprite.bounds.size.x; // 箭矢长度=屏幕长轴全长，高度随素材纵横比
+                arrowGo.transform.localScale = new Vector3(scale, scale, 1f);
+                renderer.sprite = sprite;
+                renderer.color = tint;
+            }
+            else
+            {
+                arrowGo.transform.localScale = new Vector3(0.05f, 0.30f, 1f); // 占位兜底：白色光条
+                renderer.sprite = ProjectileSprite;
+                renderer.color = Palette.箭矢占位色;
+            }
             return arrowGo;
         }
 

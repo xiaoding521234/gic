@@ -111,7 +111,7 @@ namespace GIC.Data
         [Header("发射时刻（Damage 投射物/Effect 消散=发射延迟；StatChange(元能)·Heal=应用时刻——命中时才给，2026-09-25；毫秒，相对片播放起点；0=立即）")]
         public int launchMs;
 
-        [Header("反应标记（Damage 命令有效；0=无反应——本次命中触发的元素反应子类型，供客户端伤害数字带反应名）")]
+        [Header("反应标记（Damage 命令=元素反应子类型，0=无反应——本次命中触发的反应，客户端伤害数字带反应名；Effect(投射物消散)=投射物元素 ElementType——箭矢元素色染色单源，Host 按 Damage.metadata 同口径下发）")]
         public int reactionKind;
 
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
@@ -185,8 +185,9 @@ namespace GIC.Data
         }
 
         /// <summary>特效命令工厂（Effect）。metadata=特效子类型（EffectKindProjectileVanish=投射物消散：
-        /// cell=发射格、direction=飞行方向 Direction2D、value=最大飞行格数——客户端播放飞至尽头消散）；
-        /// launchMs=发射时刻毫秒（时轮 B-S1）</summary>
+        /// cell=发射格、direction=飞行方向 Direction2D、value=最大飞行格数——客户端播放飞至尽头消散；
+        /// hitX/hitY=消散点千分定点、launchMs=发射时刻毫秒（时轮 B-S1）、reactionKind=投射物元素
+        /// （箭矢染色单源，与 Damage.metadata 同口径）——三者由调用方回填）</summary>
         public static BattleCommand Effect(string actorUnitId, int sliceIndex, int indexInSlice,
             int effectKind, int direction, BattleCell fromCell, int intValue, int launchMs = 0)
         {
