@@ -1626,3 +1626,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**：①顶面 UV **按位置重建**而非翻转：`u=x+0.5（东）、v=z+0.5（北）`——image-top 恒=北，未来换贴图免预处理；侧/底 submesh 未动。②mesh 批量改顶点属性**必先按位置索引去重或直接用位置重建法**（位置→属性的纯函数重写天然幂等自愈，无「翻过再翻」态）。③格内偏移公式统一 `root = x + ox − halfWidth` 基准（ox 为格内偏移、半宽居中），改后归属断言 off=0 全绿。
 **连带（绕向）**：草簇立牌式 billboard 的正面判定=Unity 左手裁剪空间下 **cross(b−a, c−a) 朝观察者=顶点顺时针=front**（与 OpenGL 右手惯例相反）；写绕向断言必须**读存储的三角形序**算 cross，勿按固定边序假定。
 **How to apply**：顶面类贴图方位一律以 u=x+0.5 / v=z+0.5 为准；任何 mesh 顶点批改走「位置重建」优先于「逐顶点翻转/平移」；格内装饰偏移先核基准点是格心还是格角（±0.5 漂移指纹即此坑）。
+
+## 99. manifest 包版本≠编辑器 builtin 版本：在线重解析撞网络瞬断即剔包清缓存——钉回 builtin 同版后离线免疫（2026-09-28「编辑器报错」ugui 缓存丢失实证）
+
+**症状**：编辑器打开即全项目几百条编译错误——CS0246（`EventSystem`/`PointerEventData`/`Text`/`UnityEngine.UI` 找不到）遍布 visualscripting/render-pipelines.core/Mirror/codely.bridge/Assets，伴 CS2001「PackageCache\com.unity.ugui@1.0.0 源文件找不到」。
+**根因**：manifest 把 `com.unity.ugui` 写成 **2.0.0**，而编辑器 builtin 实为 **1.0.0**（`Editor\Data\Resources\PackageManager\BuiltInPackages\com.unity.ugui\package.json`）——71 包中唯一 manifest 版本≠builtin 版本者，也唯一需要走网络验证；当日在线重解析（155s）撞 packages.tuanjie.cn **ECONNRESET** 瞬断 →「Project has invalid dependencies」→ ugui 被从注册表剔除（72→71）+ PackageCache\com.unity.ugui@1.0.0 目录被清 → UGUI 程序集编译不出 → 全下游级联。昨日离线解析（6.82s）不触发此链。
+**修法**：manifest+packages-lock 把 ugui 钉回 **1.0.0**（=builtin 同版、所有依赖方要求版本、同编辑器 umc 项目正常写法、昨日实际工作状态）→ 重启编辑器 → 解析 4.62s 纯离线 72 包全注册、ugui builtin 本地物化（695 文件）零网络依赖；UnityEngine.UI.dll/Assembly-CSharp.dll 编译成、后段零 error CS。
+**How to apply**：①包缓存类报错先查两件事：`Library\PackageCache\` 该包目录是否还在、manifest 版本是否=编辑器 builtin 版本（builtin 查 `BuiltInPackages\包名\package.json`）——版本不匹配=每次解析挂网络=网络抖动即剔包清缓存；②钉版与 builtin 一致后该包纯离线解析，免疫网络瞬断；③**重启后首轮编译几百条 CS 过渡噪声（包物化完成前的首 pass）属预期**，判据=后段 CompileScripts 干净+ScriptAssemblies 产物时间戳新（本例 310 条错误全在日志 757~3809 行，5362 行 CompileScripts 干净收尾）；④GUIStateObj 刷屏=启动 import 期噪声自停；licensing ProductNameResponse 反序列化错/Curl 35 证书错=Clash 代理 MITM 干扰编辑器 HTTPS，无害。

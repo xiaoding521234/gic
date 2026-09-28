@@ -11,7 +11,7 @@
     "com.unity.test-framework": "1.1.33",
     "com.unity.textmeshpro": "3.0.9",
     "com.unity.timeline": "1.7.7",
-    "com.unity.ugui": "2.0.0",
+    "com.unity.ugui": "1.0.0",
     "com.unity.visualscripting": "1.9.11",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
@@ -46,8 +46,9 @@
     "com.unity.modules.xr": "1.0.0",
     "cn.tuanjie.shadergraph-mcptools": "file:../.codely-cli/extensions/ShaderGraph-AI/Packages/cn.tuanjie.shadergraph-mcptools",
     "cn.tuanjie.figma2unity": "file:../.codely-cli/extensions/Figma2Unity/Packages/cn.tuanjie.figma2unity",
-    "cn.tuanjie.codely.bridge": "file:../.codely.packages/cn.tuanjie.codely.bridge@1.0.85-785dea6a",
-    "cn.tuanjie.profiler.assistant": "file:../.codely-cli/extensions/profiler-assistant/Packages/cn.tuanjie.profiler.assistant"
+    "cn.tuanjie.codely.bridge": "file:../.codely.packages/cn.tuanjie.codely.bridge@1.0.85-47f31100",
+    "cn.tuanjie.profiler.assistant": "file:../.codely-cli/extensions/profiler-assistant/Packages/cn.tuanjie.profiler.assistant",
+    "cn.tuanjie.ai.generators": "file:../.codely-cli/extensions/TJGenerators/Packages/cn.tuanjie.ai.generators"
   },
   "testables": [
     "com.besty.unity-skills"
