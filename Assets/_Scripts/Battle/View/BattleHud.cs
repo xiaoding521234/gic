@@ -38,8 +38,9 @@ namespace GIC.Battle
     /// 文案 = TextCombiner 本地化（docs/20 §2；UIText 12000 战斗段）；素材全部复用项目内资产。
     /// 拖动式瞄准已落地（B4 2026-09-26：王者荣耀式手势+待定制——技能键按下拖出→**拖向=瞄准方向**
     /// （轮心→小圆盘位移定方向与距离，与指针落点无关）→金色待定**单格**实时跟随→松手=留待定
-    /// （不提交，确认=完成选择按钮），拖回技能盘/取消钮松手=取消；拖动时键上现**大圆盘**（距离转盘
-    /// ——盘缘=最远格）、手指处**小圆盘**（不超大圆盘、不出屏幕）+金格出屏时相机丝滑移过去
+    /// （不提交，确认=完成选择按钮），拖回技能盘/取消钮松手=取消；拖动时键上现**圆角矩形大盘**
+    /// （距离转盘——盘缘=最远格；2026-09-28 拍板「大圆盘改圆角矩形，贴合格子战场」）、手指处
+    /// **小圆盘**（不超大盘、不出屏幕）+金格出屏时相机丝滑移过去
     /// ——见 OnSkillButtonDragBegin/ShowDragWheel）；拖动时被拖技能键**临时挪到盘心**作摇杆底座、
     /// 松手/会话收口还原回槽（2026-09-27 拍板）；协议核心血条 = B8 接线。
     /// </summary>
@@ -82,10 +83,11 @@ namespace GIC.Battle
         [Tooltip("指向型瞄准（延奏/契约）拖向锁定锥角（度）：候选目标屏幕方向与「轮心→小盘」拖向的夹角不超过此值才锁定（轮盘化后小盘无法位移到目标——以拖向选目标，夹角最小者胜；精确选择仍可点击式点格）")]
         [SerializeField] private float 拖动瞄准指向锥角 = 60f;
 
-        [Header("拖动瞄准圆盘（2026-09-26 三拍：大圆盘=键上锚点+距离转盘、小圆盘不超大圆盘不出屏幕；选中格精确性全在大圆盘内——盘缘=最远格）")]
-        [Tooltip("大圆盘半径（画布单位）——锚在被拖技能键圆心；方向型步距转盘=盘缘对应该方向最远可选格（半径越大选格越精细）")]
-        [SerializeField] private float 拖动瞄准大圆盘半径 = 340f;
-        [Tooltip("小圆盘半径（画布单位）——手指跟随盘（盘心不超大圆盘半径、盘缘不出屏幕）；兼作键心死区半径：拖动瞄准中小盘未拖出此半径=未真离键，无瞄准、松手取消（防微拖误触/拖回取消目标）")]
+        [Header("拖动瞄准圆盘（2026-09-26 三拍：大盘=键上锚点+距离转盘、小圆盘不超大盘不出屏幕；选中格精确性全在大盘内——盘缘=最远格；2026-09-28 拍板：大盘=圆角矩形（方形），贴合格子战场）")]
+        [Tooltip("大盘半边距（画布单位）——圆角矩形盘中心到边的距离（两轴同值=方形盘）；锚在被拖技能键圆心；方向型步距转盘=盘缘对应该方向最远可选格（半边越大选格越精细）")]
+        [UnityEngine.Serialization.FormerlySerializedAs("拖动瞄准大圆盘半径")]
+        [SerializeField] private float 拖动瞄准大盘半边 = 340f;
+        [Tooltip("小圆盘半径（画布单位）——手指跟随盘（盘心两轴不超大盘半边、盘缘不出屏幕）；兼作键心死区半径：拖动瞄准中小盘未拖出此半径=未真离键，无瞄准、松手取消（防微拖误触/拖回取消目标）")]
         [SerializeField] private float 拖动瞄准小圆盘半径 = 56f;
         [Tooltip("小圆盘屏幕边距（画布单位）——盘缘距屏幕边缘的最小留白（轮盘靠屏角时屏幕边界优先于轮盘界）")]
         [SerializeField] private float 拖动瞄准圆盘屏幕边距 = 16f;
@@ -96,11 +98,17 @@ namespace GIC.Battle
         [Tooltip("面板距屏幕边缘的最小留白（画布单位）")]
         [SerializeField] private float 详情面板屏幕边距 = 16f;
 
-        /// <summary>disc.png 实心盘可见缘只占纹理半宽 0.830（四周透明边距大）、circle.png 描环线贴
-        /// 纹理外缘 0.998——同尺寸下阴影可见缘比描环天然内缩约 17%（2026-09-26 用户报障
-        /// 「半透明阴影比圆环小一点，这是不对的」的根因，非设计意图）。实心盘（大圆盘阴影+小圆盘）
-        /// 纹理放大 0.998/0.830≈1.202 补偿：可见缘贴齐描环线/名义半径，多出的透明边距被描环盖住不可见</summary>
+        /// <summary>disc.png 实心盘可见缘只占纹理半宽 0.830（四周透明边距大）——纹理放大 0.998/0.830≈1.202
+        /// 补偿：小圆盘可见缘贴齐名义半径。2026-09-28 大盘圆角矩形化改版后**仅小圆盘消费本常量**
+        /// （大盘=DragWheelFill/DragWheelRing 裁剪到内容框的圆角矩形素材，补偿恒 1.0）</summary>
         private const float 实心盘贴图补偿 = 1.202f;
+
+        /// <summary>大盘填充内缩（画布单位）：填充件与描环两素材角弧不同（对角向有效半径@680 盘
+        /// 填充≈56px、描环带≈88px），平齐绘制时四角填充缘会突出金框线外 ~9px（2026-09-28 像素
+        /// 探针实测）；内缩 11 后填充缘全程落在金环带内（唇口/空洞双零——全角度 0.1° 步进扫描，
+        /// 干净窗口 10~14 取中）——v7「阴影贴齐描环」契约的圆角矩形版。换美术素材须重扫重定
+        /// （扫描脚本=.codely-cli/tmp/wheel_rect/sweep.py）</summary>
+        private const float 大盘填充内缩 = 11f;
 
         // 瞄准常量（运行时计算用）
         private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
@@ -238,14 +246,15 @@ namespace GIC.Battle
         private bool _dragAiming;
 
         // 拖动瞄准圆盘（2026-09-26 拍板「和王者一样，技能上显示一个大圆盘，并且手指拖拽位置还有小圆盘；
-        // 圆盘不可超出屏幕边缘」+同日三拍「大圆盘太小/小圆盘不超大圆盘/选中格精确性全在大圆盘内」）：
-        // 运行时建在 HUD 画布（非布局件、Image.raycastTarget 全关勿拦截；换美术素材改 EnsureDragWheel
-        // 的 sprite 加载即可——现用 disc.png 实心圆盘+circle.png 细环）
+        // 圆盘不可超出屏幕边缘」+同日三拍「大圆盘太小/小圆盘不超大圆盘/选中格精确性全在大圆盘内」；
+        // 2026-09-28 拍板「大盘改圆角矩形，贴合格子战场」）：运行时建在 HUD 画布（非布局件、
+        // Image.raycastTarget 全关勿拦截；换美术素材改 EnsureDragWheel 的 sprite 加载即可——
+        // 大盘=DragWheelFill/DragWheelRing 圆角矩形素材+小盘=disc.png 实心圆盘）
         private GameObject _dragWheelRoot;
-        private RectTransform _dragWheelBigFill;  // 大圆盘填充（disc.png×底盘半透明）
-        private RectTransform _dragWheelBigRing;  // 大圆盘描环（circle.png×高亮金细线）
+        private RectTransform _dragWheelBigFill;  // 大盘填充（DragWheelFill 圆角矩形×底盘半透明）
+        private RectTransform _dragWheelBigRing;  // 大盘描环（DragWheelRing 圆角矩形细环×高亮金）
         private RectTransform _dragWheelSmall;    // 小圆盘（disc.png×瞄准已选色——与金色待定格同色系联动）
-        private Vector2 _dragWheelCenterLocal;    // 大圆盘圆心（自适应位：键心沿两轴夹进画布内，画布局部）——格子判定基准/转盘原点
+        private Vector2 _dragWheelCenterLocal;    // 大盘中心（自适应位：键心沿两轴夹进画布内，画布局部）——格子判定基准/转盘原点
         private Vector2 _dragDiscLocal;           // 小圆盘画布局部（指针贴身、夹在盘内）——瞄准解析唯一输入（对盘心取差=盘上位置）
 
         // 拖动时临时挪到盘心的技能键（2026-09-27 拍板「拖动式使用技能时，临时把技能按钮移动到新出现的
@@ -1337,7 +1346,7 @@ namespace GIC.Battle
         /// <summary>拖动式起手（SkillDragForwarder 转发，UGUI 拖拽阈值即起）：按住技能键拖出 → 进瞄准态
         /// 高亮可选格（与点击式共用 EnterAiming/高亮/待定/取消全链）→ 拖动全程金色待定**单格**实时跟随 →
         /// 松手=留待定（**不立即提交**——2026-09-26 拍板「一次选择 1 个格子、松手后不应立即完成选择」，
-        /// 与点击式同款，确认唯一入口=「完成选择」按钮）。瞄准=拖向（王者荣耀手势，判定基准=大圆盘圆心
+        /// 与点击式同款，确认唯一入口=「完成选择」按钮）。瞄准=拖向（王者荣耀手势，判定基准=大盘中心
         /// ——盘=标尺，与指针落在棋盘哪里无关、手指不必离开按键区）。其余口径：①详情模式（面板开着）
         /// 直接拖=收面板无缝切换拖动式（2026-09-27 点击循环后 EnterAiming/ExitAiming 统一收口）
         /// ②瞄准中拖另一键=换技能重瞄准（ExitAiming 收口旧选中环/待定后重进）③置灰键（无数据/元能/
@@ -1389,7 +1398,7 @@ namespace GIC.Battle
             // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
         }
 
-        /// <summary>拖动瞄准实时解析（单格）：判定基准=**大圆盘圆心**——方向型（移动/直线）=盘心→小盘
+        /// <summary>拖动瞄准实时解析（单格）：判定基准=**大盘中心**——方向型（移动/直线）=盘心→小盘
         /// 位移定十字方向+盘距比例定步数（盘缘=该方向最远可选格、死区缘=第 1 格）；指向型（延奏/契约）=
         /// 拖向选目标（候选屏幕方向（相对盘心）与拖向夹角最小且≤锥角者锁定）。输入=_dragDiscLocal
         /// （小盘位=盘上位置）。无有效瞄准=清待定</summary>
@@ -1404,11 +1413,11 @@ namespace GIC.Battle
             else ClearPendingAimCell();
         }
 
-        /// <summary>方向型拖动瞄准解析（轮盘内单格）：**判定基准=大圆盘圆心**（2026-09-26 三拍
+        /// <summary>方向型拖动瞄准解析（轮盘内单格）：**判定基准=大盘中心**（2026-09-26 三拍
         /// 「拖动的格子判定应当是相对于大圆盘中心」）——小盘在盘上的位置=瞄准真值，盘=标尺：
         /// 十字方向=盘心→小盘位移的轴主导量化（相机 yaw 恒 0，画布轴向=世界轴向——不再反投影）；
         /// 步数=盘距越过盘心死区后的比例×臂长（**盘缘=该方向最远可选格、死区缘=第 1 格**，四舍五入
-        /// 钳 1..臂长）——大圆盘=距离转盘，盘越大选格越精细；小盘被夹在盘内，拖到盘缘=该方向拖满
+        /// 钳 1..臂长）——大盘=距离转盘（2026-09-28 起为圆角矩形），盘越大选格越精细；小盘被夹在盘内，拖到盘缘=该方向拖满
         /// （盘已自适应入屏，盘上任一位置鼠标可达）。臂步 1..maxStep 连续由 ComputeAimCells 保证
         /// （遇虚空截断）。盘心死区内（小盘未拖出盘心圈）/无臂=null。
         /// 键心死区带拍板=2026-09-26 报障返修「只拖最近的1格松开判定我空放」（docs/14 §87）。</summary>
@@ -1435,10 +1444,10 @@ namespace GIC.Battle
             }
             if (maxStep == 0) return null; // 该方向无臂（虚空/无格）
 
-            // 盘距→步数：死区缘=第 1 格、盘缘=最远格（大圆盘半径=全臂程；小盘夹在盘内，
-            // 拖到盘缘=该方向拖满——盘已自适应入屏）
+            // 盘距→步数：死区缘=第 1 格、盘缘=最远格（大盘半边=全臂程——方形盘两轴同值；
+            // 小盘夹在盘内，拖到盘缘=该方向拖满——盘已自适应入屏）
             float axisCanvas = horizontal ? Mathf.Abs(d.x) : Mathf.Abs(d.y);
-            float span = Mathf.Max(1f, 拖动瞄准大圆盘半径 - 拖动瞄准小圆盘半径);
+            float span = Mathf.Max(1f, 拖动瞄准大盘半边 - 拖动瞄准小圆盘半径);
             float norm = Mathf.Clamp01((axisCanvas - 拖动瞄准小圆盘半径) / span);
             int k = Mathf.Clamp(Mathf.RoundToInt(norm * maxStep), 1, maxStep);
             foreach (var c in _aimCells)
@@ -1492,13 +1501,13 @@ namespace GIC.Battle
 
         // ==================== 拖动瞄准圆盘（2026-09-26 拍板：王者荣耀式大圆盘+小圆盘） ====================
 
-        /// <summary>圆盘显示：大圆盘圆心=被拖技能键圆心**沿两轴夹进画布内**（自适应位，
+        /// <summary>圆盘显示：大盘中心=被拖技能键圆心**沿两轴夹进画布内**（自适应位，
         /// 2026-09-26 拍板「大圆盘应当自适应位置，让自己不会超出屏幕」——盘+小盘屏幕余量全入屏，
         /// 靠边键的盘不再挂出屏外；**格子判定基准=盘心**（三拍「拖动的格子判定应当是相对于大圆盘中心」
         /// ——盘=标尺，小盘在盘上的位置=瞄准真值）、小圆盘=指针贴身且不出盘（三拍「小圆盘不可超出
-        /// 大圆盘」）。素材=项目现成资产复用（拍板纪律）：disc.png
-        /// 实心圆盘（大=底盘色半透明+小=瞄准已选色金，小盘与金色待定格同色系联动）+ circle.png 细环
-        /// 做大圆盘描边（高亮金）；换美术只改 EnsureDragWheel 的 sprite 加载。
+        /// 大圆盘」）。素材（2026-09-28 大盘圆角矩形化拍板「贴合格子战场」）：大盘=DragWheelFill/
+        /// DragWheelRing 圆角矩形 AI 素材（裁剪到内容框，贴图补偿恒 1.0）+小盘=disc.png 实心圆盘
+        /// （瞄准已选色金，与金色待定格同色系联动）；换美术只改 EnsureDragWheel 的 sprite 加载。
         /// Image.raycastTarget 全关——盘覆盖技能盘区域不拦点击/拖拽</summary>
         private void ShowDragWheel(SkillButtonDef def, Vector2 pointerScreen)
         {
@@ -1506,15 +1515,16 @@ namespace GIC.Battle
             if (_dragWheelRoot == null) return;
             _dragWheelRoot.SetActive(true);
 
-            // 大圆盘=技能键圆心（rect 世界角→画布局部；Overlay 画布世界坐标=屏幕像素）→
-            // 自适应夹取：圆心沿两轴夹进 [盘半径+小盘半径+屏幕边距] 画布内（盘上任一点皆在屏内可拖到）
+            // 大盘中心=技能键圆心（rect 世界角→画布局部；Overlay 画布世界坐标=屏幕像素）→
+            // 自适应夹取：盘心沿两轴夹进 [盘半边+小盘半径+屏幕边距] 画布内（方形盘两轴同值，
+            // 盘上任一点皆在屏内可拖到）
             if (def?.rect != null)
             {
                 def.rect.GetWorldCorners(_handCornersBuffer);
                 var centerWorld = (_handCornersBuffer[0] + _handCornersBuffer[2]) * 0.5f;
                 var keyCenter = (Vector2)CanvasRect.InverseTransformPoint(centerWorld);
                 var rect = CanvasRect.rect;
-                float fit = 拖动瞄准大圆盘半径 + 拖动瞄准小圆盘半径 + 拖动瞄准圆盘屏幕边距;
+                float fit = 拖动瞄准大盘半边 + 拖动瞄准小圆盘半径 + 拖动瞄准圆盘屏幕边距;
                 float loX = rect.xMin + fit, hiX = rect.xMax - fit;
                 float loY = rect.yMin + fit, hiY = rect.yMax - fit;
                 // 画布过小（fit 装不下）时回退画布中心，勿让 Clamp 反转
@@ -1530,7 +1540,7 @@ namespace GIC.Battle
             UpdateDragWheel(pointerScreen);
         }
 
-        /// <summary>被拖技能键临时挪到大圆盘圆心（2026-09-27 拍板「临时把技能按钮移动到新出现的大圆盘
+        /// <summary>被拖技能键临时挪到大盘中心（2026-09-27 拍板「临时把技能按钮移动到新出现的大圆盘
         /// 中间位置」）：盘心先按键心算好并夹进画布（ShowDragWheel 主体），再把键控件中心对齐盘心——
         /// 键与盘同心=王者式摇杆底座（环绕光束挂键上随动、小盘贴指针绕键转）。只写控件 anchoredPosition
         /// （父级=布局槽，位移经坐标系两跳换算，槽缩放无关）；还原守卫=HideDragWheel 单点收口</summary>
@@ -1557,9 +1567,10 @@ namespace GIC.Battle
             _dragMovedRect = null;
         }
 
-        /// <summary>小圆盘=指针贴身且**不出大圆盘**（2026-09-26 三拍「小圆盘不可超出大圆盘」）：
-        /// 盘位=指针画布局部，盘心距夹到≤大圆盘半径——拖出盘范围时小盘贴盘缘（盘缘=最远格，拖到头即满）。
-        /// 判定基准=大圆盘圆心（解析函数对 _dragWheelCenterLocal 取差）——盘=标尺，盘上位置=瞄准真值。
+        /// <summary>小圆盘=指针贴身且**不出大盘**（2026-09-26 三拍「小圆盘不可超出大圆盘」；2026-09-28
+        /// 大盘圆角矩形化后改两轴夹取）：盘位=指针画布局部，小盘中心两轴位移各夹到≤盘半边——
+        /// 拖出盘范围时小盘贴矩形盘缘（盘缘=最远格，拖到头即满）。
+        /// 判定基准=大盘中心（解析函数对 _dragWheelCenterLocal 取差）——盘=标尺，盘上位置=瞄准真值。
         /// 屏幕界夹取不需要（盘已自适应入屏，小盘在盘内必在屏内）。</summary>
         private void UpdateDragWheel(Vector2 pointerScreen)
         {
@@ -1568,11 +1579,12 @@ namespace GIC.Battle
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, pointerScreen, null, out var local))
                 return;
 
-            // 轮盘界：小盘不超大圆盘（拍板「小圆盘不可超出大圆盘」）——超出时贴盘缘
+            // 轮盘界：小盘不超大盘（拍板「小圆盘不可超出大圆盘」——大盘=圆角矩形，按两轴半边夹取，
+            // 圆形径向夹取随 2026-09-28 矩形化退役）：小盘中心贴到矩形边界=该轴向拖满
             Vector2 d = local - _dragWheelCenterLocal;
-            float len = d.magnitude;
-            if (len > 拖动瞄准大圆盘半径 && len > 0f)
-                local = _dragWheelCenterLocal + d * (拖动瞄准大圆盘半径 / len);
+            d.x = Mathf.Clamp(d.x, -拖动瞄准大盘半边, 拖动瞄准大盘半边);
+            d.y = Mathf.Clamp(d.y, -拖动瞄准大盘半边, 拖动瞄准大盘半边);
+            local = _dragWheelCenterLocal + d;
 
             _dragDiscLocal = local;
             _dragWheelSmall.anchoredPosition = local;
@@ -1599,13 +1611,17 @@ namespace GIC.Battle
             rootRt.SetAsLastSibling(); // 盘画在 HUD 最上层（仅视觉，无射线）
             _dragWheelRoot.SetActive(false);
 
-            var disc = Resources.Load<Sprite>("UI/Backpack/TabGlyphs/disc");   // 实心白圆盘
-            var ring = Resources.Load<Sprite>("UI/Skills/circle");              // 细环
-            if (disc == null) GICLog.Warn("[BattleHud] disc.png（TabGlyphs）未找到——拖动圆盘不显示");
-            if (ring == null) GICLog.Warn("[BattleHud] circle.png（Skills）未找到——大圆盘描环不显示");
-            _dragWheelBigFill = MakeWheelDisc("BigFill", rootRt, disc, 拖动瞄准大圆盘半径 * 实心盘贴图补偿,
+            var disc = Resources.Load<Sprite>("UI/Backpack/TabGlyphs/disc");   // 实心白圆盘（小盘）
+            var fill = Resources.Load<Sprite>("UI/Battle/DragWheelFill");      // 圆角矩形实心盘（大盘填充）
+            var ring = Resources.Load<Sprite>("UI/Battle/DragWheelRing");      // 圆角矩形细环（大盘描边）
+            if (disc == null) GICLog.Warn("[BattleHud] disc.png（TabGlyphs）未找到——小圆盘不显示");
+            if (fill == null) GICLog.Warn("[BattleHud] DragWheelFill.png（UI/Battle）未找到——大盘填充不显示");
+            if (ring == null) GICLog.Warn("[BattleHud] DragWheelRing.png（UI/Battle）未找到——大盘描环不显示");
+            // 大盘两件=裁剪到内容框的圆角矩形素材（补偿恒 1.0——实心盘贴图补偿仅小盘消费）；
+            // 填充件内缩 11 见「大盘填充内缩」常量注（两素材角弧不同，平齐绘制四角有暗唇）
+            _dragWheelBigFill = MakeWheelDisc("BigFill", rootRt, fill, 拖动瞄准大盘半边 - 大盘填充内缩,
                 new Color(Palette.按钮底盘.r, Palette.按钮底盘.g, Palette.按钮底盘.b, 0.45f));
-            _dragWheelBigRing = MakeWheelDisc("BigRing", rootRt, ring, 拖动瞄准大圆盘半径,
+            _dragWheelBigRing = MakeWheelDisc("BigRing", rootRt, ring, 拖动瞄准大盘半边,
                 new Color(Palette.高亮金.r, Palette.高亮金.g, Palette.高亮金.b, 0.8f));
             _dragWheelSmall = MakeWheelDisc("SmallDisc", rootRt, disc, 拖动瞄准小圆盘半径 * 实心盘贴图补偿,
                 Palette.瞄准已选色);
