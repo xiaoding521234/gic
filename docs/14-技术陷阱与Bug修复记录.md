@@ -1576,6 +1576,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：①编辑器停在 Play（含暂停态）时，VideoPlayer/WMF 解码器握着 mp4 文件句柄，ffmpeg 打开输出报 Permission denied；②`ffmpeg ... 2>&1 | Select-String "frame="` 过滤掉了错误行，且 PS 命令链 `;` 串联时整体 exit code=最后一个命令的——ffmpeg 失败被后续 Copy-Item 成功掩盖。
 **修法/纪律**：①改写被 VideoPlayer 消费的 mp4 前先 `unity_editor stop` 退出 Play（既有授权 2026-09-16「之后你可以自行退出play」）；②覆盖后必做**探测回读**（ffprobe duration/帧数 vs 预期值）确认新内容落盘，勿信命令链 exit code；③要看 ffmpeg 报错时用 `Select-Object -Last N` 看尾部全文，勿 Select-String 过滤。
 **连带**：落盘后还需 `unity_editor refresh` 重导入（VideoClip 缓存的 length/width/height 不会自动刷新）+编辑器回读断言（桥环境 VideoClip 类型不可达→Object+反射，§90）。
+**连带二（2026-09-28 待机循环首裁翻车）**：循环段裁剪勿用 `select='between(n,a,b)'` 过滤器+`-r`——select 保留原 PTS（输出首帧时间戳仍在 1.4s 处），`-r` 会用重复帧填补 seek 空洞（dup=34 → 产物前段冻结假循环，编码器看似正常）；正解=`-ss a/fps` 输入端 seek（时间戳归零）+`-frames:v k`。**穿帮指纹=验证脚本把重复帧当完美周期：检出「最优循环」bbox 恒定/零漂移/接缝 0——三项全绿即中此坑勿信**；全案=gic-paperdoll skill 生成配方第 4 步。
 
 ## 92. 立牌「陷地」归因两连反转 + 归一化机制凭 meta 推断翻车：机制结论必须活体实测，素材/渲染/几何三层归因以用户目检+像素数据双定（2026-09-27 立牌缩放/离地批实证）
 
