@@ -42,6 +42,17 @@ namespace GIC.Battle
 
         private Transform _tilesRoot;
 
+        /// <summary>本盘运行时生成的 mesh（水面焊接面等；Build 重建/OnDestroy 显式销毁——
+        /// Destroy 物体不销 mesh，§63① mesh 条款，2026-09-28 批6）</summary>
+        private readonly List<Mesh> _runtimeMeshes = new List<Mesh>();
+
+        private void OnDestroy()
+        {
+            foreach (var mesh in _runtimeMeshes)
+                if (mesh != null) Destroy(mesh);
+            _runtimeMeshes.Clear();
+        }
+
         /// <summary>
         /// 建盘（幂等：重复调用先清空重建）
         /// </summary>
@@ -55,6 +66,10 @@ namespace GIC.Battle
                 rootGo.transform.SetParent(transform, false);
                 _tilesRoot = rootGo.transform;
             }
+            // 旧盘运行时 mesh 显式销毁（Destroy 物体不销 mesh——§63① mesh 条款，2026-09-28 批6）
+            foreach (var mesh in _runtimeMeshes)
+                if (mesh != null) Destroy(mesh);
+            _runtimeMeshes.Clear();
             for (int i = _tilesRoot.childCount - 1; i >= 0; i--)
                 Destroy(_tilesRoot.GetChild(i).gameObject);
 
@@ -127,6 +142,7 @@ namespace GIC.Battle
             var surfaceGo = new GameObject("WaterSurface");
             surfaceGo.transform.SetParent(_tilesRoot, false);
             var surfaceMesh = new Mesh { name = "BattleWaterSurface" };
+            _runtimeMeshes.Add(surfaceMesh); // 运行时 mesh 登记（Build 重建/OnDestroy 显式销毁，§63①）
             surfaceMesh.SetVertices(verts);
             surfaceMesh.SetUVs(0, uvs);
             surfaceMesh.SetTriangles(tris, 0);

@@ -133,7 +133,7 @@ namespace GIC.Battle
             _material = BattleViewFactory.CreateTransparentUnlitMaterial(Color.white);
             _material.mainTexture = sprite.texture;
             _beam = BattleViewFactory.CreateQuad(transform, "BeamArc", _material).transform;
-            _beam.GetComponent<MeshRenderer>().sortingOrder = 1; // 瞄准贴片(0)之上、立牌(10)之下（金盘 2026-09-27 已退役）
+            _beam.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.DiscOrbitSortingOrder; // 瞄准贴片之上、立牌之下（金盘 2026-09-27 已退役）
             Place();
         }
 

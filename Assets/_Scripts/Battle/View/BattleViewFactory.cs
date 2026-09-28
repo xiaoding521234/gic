@@ -141,35 +141,44 @@ namespace GIC.Battle
             return quad;
         }
 
+        /// <summary>圆盘扇面分段数（中心顶点+24 段圆周）</summary>
+        private const int DiscSegments = 24;
+
+        /// <summary>共享圆盘 mesh（工厂持有常驻——Destroy 物体不销 mesh，共享单实例免释放）</summary>
+        private static Mesh _discMesh;
+
         /// <summary>世界层纯色圆面片（程序化扇面 mesh：中心顶点+24 段圆周，直径 1、法线 -Z 与 Quad 同向；
         /// 单位受击圆柱的底座圆盘可视化——视觉即判定，直径=BattleMetrics.UnitCylinderDiameter，docs/18 决策二。
-        /// localScale x/y 语义与 Quad 一致（旋转 90° 平铺后=地面直径），支持非均匀缩放出椭圆（尸体压扁）</summary>
-        public static GameObject CreateDisc(Transform parent, string name, Material sharedMaterial, int segments = 24)
+        /// localScale x/y 语义与 Quad 一致（旋转 90° 平铺后=地面直径），支持非均匀缩放出椭圆（尸体压扁）。
+        /// mesh=工厂静态共享单实例（全单位同构，2026-09-28 批6 收口：原每调用 new Mesh=同构 mesh ×N 份
+        /// 且无持有者释放——共享根治 §63① mesh 条款）</summary>
+        public static GameObject CreateDisc(Transform parent, string name, Material sharedMaterial)
         {
-            var vertices = new Vector3[segments + 1];
-            var triangles = new int[segments * 3];
-            vertices[0] = Vector3.zero;
-            for (int i = 0; i < segments; i++)
+            if (_discMesh == null)
             {
-                float angle = 2f * Mathf.PI * i / segments;
-                vertices[i + 1] = new Vector3(Mathf.Cos(angle) * 0.5f, Mathf.Sin(angle) * 0.5f, 0f);
-                int next = i + 1 == segments ? 1 : i + 2;
-                triangles[i * 3] = 0;
-                triangles[i * 3 + 1] = next;
-                triangles[i * 3 + 2] = i + 1;
-            }
+                var vertices = new Vector3[DiscSegments + 1];
+                var triangles = new int[DiscSegments * 3];
+                vertices[0] = Vector3.zero;
+                for (int i = 0; i < DiscSegments; i++)
+                {
+                    float angle = 2f * Mathf.PI * i / DiscSegments;
+                    vertices[i + 1] = new Vector3(Mathf.Cos(angle) * 0.5f, Mathf.Sin(angle) * 0.5f, 0f);
+                    int next = i + 1 == DiscSegments ? 1 : i + 2;
+                    triangles[i * 3] = 0;
+                    triangles[i * 3 + 1] = next;
+                    triangles[i * 3 + 2] = i + 1;
+                }
 
-            var mesh = new Mesh
-            {
-                vertices = vertices,
-                triangles = triangles,
-            };
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
+                _discMesh = new Mesh { name = "BattleDiscMesh" };
+                _discMesh.vertices = vertices;
+                _discMesh.triangles = triangles;
+                _discMesh.RecalculateNormals();
+                _discMesh.RecalculateBounds();
+            }
 
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshFilter>().sharedMesh = _discMesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
             return go;
         }

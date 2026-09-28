@@ -13,7 +13,8 @@ namespace GIC.Battle
     /// 结构（自上往下）：血条（**填充色=队伍色**（2026-09-25 目检拍板：与底座同色，替换原敌我绿/红）+圆角黑边底图
     /// +原神量子刻度（2026-09-26 拍板「每 50 段，上限 10 段」：血条每 50 点血一格、上限 10 段，MaxHp 不足一段=无刻度线）→ 元能条（**白色**（同日拍板，原元能蓝退役）+圆角黑边，分隔量子=10 与 B6a 获取粒度
     /// 一致，段数上限 10）→ 附着小图标在血条左缘（风格沿用原神血条左侧附着的排法）。
-    /// 底图=BattleViewFactory.BarBgSprite/BarFillSprite 运行时程序化圆角 sprite（黑边框 rgb=0 恒黑、白芯乘 tint=本色）；
+    /// 底图=真实资产 Resources/UI/Battle/BarBg.png/BarFill.png（2026-09-25 拍板「不要程序化生成」——
+    /// 美术出图直接覆盖文件即可；BarBg=黑边框环+白芯乘底色、BarFill=纯白药丸形）；
     /// 名字/Buff 徽章仍挂立牌倾斜组（「都应当斜」拍板未推翻）。无 GraphicRaycaster（勿补——会挡 HUD 点击）。
     /// </summary>
     public class BattleOverheadBars : MonoBehaviour
@@ -71,7 +72,7 @@ namespace GIC.Battle
             canvasGo.transform.SetParent(transform, false);
             _canvas = canvasGo.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 38; // 伤害数字 39 之下、HUD 40 之下——数字漂过条上方时数字在上
+            _canvas.sortingOrder = BattleMetrics.OverheadBarsCanvasOrder; // 伤害数字 39 之下、HUD 40 之下——数字漂过条上方时数字在上
             // 勿加 GraphicRaycaster：Overlay 画布无射线器即不吃射线（加了会挡 HUD 按钮/棋盘）
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
