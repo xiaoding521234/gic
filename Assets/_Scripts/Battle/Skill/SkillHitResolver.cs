@@ -61,6 +61,25 @@ namespace GIC.Battle
                 attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds);
         }
 
+        /// <summary>投射物元素（箭矢元素色单源，2026-09-28 箭矢正式素材批）：技能 OnHit 首个 Damage
+        /// 原子的元素（Physical=施法者自身元素，与 CompileAtom 伤害同口径）；无 Damage 原子/无 effects
+        /// =施法者元素。ProjectileResolver 消散命令回填 reactionKind 用——命中箭取 Damage.metadata、
+        /// 消散箭取此处，两路恒同元素（丘丘人借凯亚霜袭=冰箭而非施法者物理灰）</summary>
+        public static ElementType ResolveProjectileElement(BattleSimState sim, ActionData action)
+        {
+            var attacker = sim.GetUnit(action.unitId);
+            if (attacker == null) return ElementType.Physical;
+            var attackerElement = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
+            var skillData = GetActionSkillData(attacker, action);
+            if (skillData == null || !skillData.HasEffects) return attackerElement;
+            foreach (var atom in skillData.effects)
+            {
+                if (atom.trigger == SkillEffectTrigger.OnHit && atom.kind == SkillEffectKind.Damage)
+                    return atom.element != ElementType.Physical ? atom.element : attackerElement;
+            }
+            return attackerElement;
+        }
+
         /// <summary>行动选中技能的配置数据（attacker.Skills[skillIndex].RawData；越界/空返回 null）</summary>
         private static SkillConfig.SkillData GetActionSkillData(Unit attacker, ActionData action)
         {
