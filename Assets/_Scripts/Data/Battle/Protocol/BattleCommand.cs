@@ -67,7 +67,7 @@ namespace GIC.Data
     /// 返修先例=launchMs 双语义、direction 复用投放形态，2026-09-27 复审批1 收口）：
     /// type            | value    | metadata         | direction        | cell      | path | hitX/Y | launchMs              | buff 载荷      | summonUnit
     /// ----------------|----------|------------------|------------------|-----------|------|--------|-----------------------|----------------|-----------
-    /// Move            | —        | MoveBlocked 标记 | 被挡方向         | 终点格    | 路径 | —      | —                     | —              | —
+    /// Move            | —        | MoveBlocked 标记 | 移动方向（恒填；被挡=被挡方向。2026-09-29 前仅被挡填——拍板③朝向镜像据此翻立牌，成功移动传 0 曾把朝向重置回右） | 终点格    | 路径 | —      | —                     | —              | —
     /// Damage          | 伤害量   | 元素             | 投放形态 delivery | 发射格    | —    | 命中点 | 发射时刻（投射物前摇） | —              | —
     /// Heal            | 治疗量   | —                | —                | —         | —    | —      | 应用时刻（命中类治疗） | —              | —
     /// Death           | —        | —                | —                | —         | —    | —      | —                     | —              | —
@@ -111,7 +111,7 @@ namespace GIC.Data
         [Header("发射时刻（Damage 投射物/Effect 消散=发射延迟；StatChange(元能)·Heal=应用时刻——命中时才给，2026-09-25；毫秒，相对片播放起点；0=立即）")]
         public int launchMs;
 
-        [Header("反应标记（Damage 命令=元素反应子类型，0=无反应——本次命中触发的反应，客户端伤害数字带反应名；Effect(投射物消散)=投射物元素 ElementType——箭矢元素色染色单源，Host 按 Damage.metadata 同口径下发）")]
+        [Header("反应标记（Damage 命令=元素反应子类型，0=无反应——本次命中触发的反应，客户端伤害数字带反应名；Effect(投射物消散)/SkillCast(技能施放)=投射物/技能元素 ElementType——箭矢/箭雨元素色染色单源，Host 按 Damage.metadata 同口径下发）")]
         public int reactionKind;
 
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
@@ -206,12 +206,13 @@ namespace GIC.Data
         }
 
         /// <summary>技能施放命令工厂（时轮 B-S1）：片内每个通过门槛的技能行动各产一条、
-        /// 段内最前发射——客户端的时轮演出起点事件（按 skillID 加载 SkillTimelineAsset 播
-        /// 动作/音效/特效轨；素材接线=B-S3）。value=skillID（SkillName 枚举值）、
-        /// direction=瞄准方向、cell=施放者片初位置（朝向参考）。无表现素材时不产出视觉，
-        /// 投射物延迟起飞由 Damage/Effect 命令的 launchMs 承载。</summary>
+        /// 段内最前发射——客户端的时轮演出起点事件（按 skillID 加载时轮资产播
+        /// 动作/音效/特效轨；特效轨首个消费方=arrow_rain 箭雨天降，2026-09-28）。value=skillID（SkillName 枚举值）、
+        /// direction=瞄准方向、cell=施放者片初位置（朝向参考）；reactionKind=技能元素
+        /// （箭雨染色单源=ResolveProjectileElement，移动施放不填=物理）。
+        /// 前摇期投射物视觉由 Damage/Effect 命令的 launchMs 承载。</summary>
         public static BattleCommand SkillCast(string unitId, int sliceIndex, int indexInSlice,
-            int skillId, int direction, BattleCell fromCell)
+            int skillId, int direction, BattleCell fromCell, int element = 0)
         {
             return new BattleCommand
             {
@@ -222,6 +223,7 @@ namespace GIC.Data
                 value = skillId,
                 direction = direction,
                 cell = fromCell,
+                reactionKind = element,
             };
         }
 
