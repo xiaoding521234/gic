@@ -51,3 +51,12 @@ MonoBehaviour:
     hitDiameter: 0
     maxRange: 0
     cueName: recover
+  - trackType: 3
+    startTime: 0.3
+    endTime: 0.75
+    kind: 0
+    hitInterval: 0
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    cueName: arrow_rain

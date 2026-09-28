@@ -127,13 +127,15 @@ namespace GIC.Battle
 
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
 
-            // 时轮施放事件（B-S1）：施放者片初位置=发射格/朝向参考（sliceIndex/indexInSlice 由发射出口回填）
+            // 时轮施放事件（B-S1）：施放者片初位置=发射格/朝向参考（sliceIndex/indexInSlice 由发射出口回填）；
+            // 技能元素随命令下发（箭雨染色单源——丘丘人借凯亚霜袭=冰色箭雨非施法者物理灰）
             if (castsOut != null)
             {
                 var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
                 castsOut.Add(BattleCommand.SkillCast(action.unitId, 0, 0,
                     (int)skill.RawData.skillID, (int)action.direction,
-                    casterState != null ? casterState.position : BattleCell.zero));
+                    casterState != null ? casterState.position : BattleCell.zero,
+                    (int)SkillHitResolver.ResolveProjectileElement(sim, action)));
             }
 
             return effects;

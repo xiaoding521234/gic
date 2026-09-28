@@ -373,14 +373,15 @@ namespace GIC.Battle
             }
 
             // Move：被挡也发命令（全挡 path=[原格] / 部分挡 path=已走段），携带 MoveBlocked 标记+方向
-            // 供客户端播"撞墙弹回"表现（2026-09-21）
+            // 供客户端播"撞墙弹回"表现（2026-09-21）；direction 恒传真实移动方向（2026-09-29 拍板③：
+            // 立牌朝向随移动方向镜像——此前成功移动传 0，客户端把朝向重置回右，移动转向失效根因）
             if (movers != null)
             {
                 foreach (var mover in movers)
                 {
                     if (mover.Path.Count > 1 || mover.Blocked)
                         segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path),
-                            mover.Blocked ? BattleCommand.MoveBlocked : 0, mover.Blocked ? (int)mover.Direction : 0));
+                            mover.Blocked ? BattleCommand.MoveBlocked : 0, (int)mover.Direction));
                 }
             }
 

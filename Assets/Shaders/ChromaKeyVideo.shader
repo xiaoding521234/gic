@@ -25,6 +25,10 @@ Shader "GIC/Battle/ChromaKeyVideo"
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
 
+        // 朝向镜像（2026-09-29 拍板③）用负 localScale.x 翻面：绕向随之翻转会被默认 Cull Back 剔成隐形——
+        // 立牌恒面向相机无背面可言，直接 Cull Off（零开销）
+        Cull Off
+
         Pass
         {
             CGPROGRAM

@@ -85,6 +85,17 @@ namespace GIC.Battle
         private Material _videoMaterial; // ChromaKey 材质（本组件持有，OnDestroy 释放——docs/14 §63①）
         private bool _videoFailed;
         private bool _videoHalted;
+        private VideoClip _idleVideoClip; // 待机片=回切目标（B-S4a 移动态接线，2026-09-29）
+        private VideoClip _moveVideoClip; // 移动态片（null=无移动态动画，移动期间照播待机）
+
+        // ==================== 立牌朝向（B-S4a 方向镜像，2026-09-29 拍板③：素材统一朝右单份复用） ====================
+        // 行动方向 ∈ {上,左上,左,左下} → 朝左（水平镜像），其余 → 朝右；行动后保持（待机延续朝向）；
+        // 只翻立牌本体（sprite+视频 quad），名字/Buff 行/底座盘不翻；后续背后刺杀技能可读 FaceLeft
+        private bool _faceLeft;
+        private Transform _avatarSpriteFlip;      // Avatar sprite（静态/序列帧共用渲染器宿主）
+        private Vector3 _avatarSpriteFlipBaseScale;
+        private Transform _avatarVideoFlip;       // AvatarVideo quad
+        private Vector3 _avatarVideoFlipBaseScale;
 
         private void Update()
         {
@@ -124,6 +135,56 @@ namespace GIC.Battle
             source.Stop();
             source.gameObject.SetActive(false);
             if (_avatarRenderer != null) _avatarRenderer.enabled = true;
+        }
+
+        // ==================== 移动态动画切换（B-S4a 移动态接线，2026-09-29 拍板「正式化安柏待机+移动动画」） ====================
+
+        /// <summary>移动态动画切换（BattlePlayer.PlayMoveCoroutine 移动片起止驱动）：true=播 移动动画视频、
+        /// false=回 立牌动画视频。幂等（同片/无视频路径/解码失败早退）；换片随机相位（多枚同款单位不同步）；
+        /// 冻结/尸体态不 Play（Update 停摆逻辑每帧接管，解冻自然恢复）</summary>
+        public void SetMoveAnimation(bool moving)
+        {
+            var vp = _videoPlayer;
+            if (vp == null || _videoFailed) return;
+            var clip = moving ? _moveVideoClip : _idleVideoClip;
+            if (clip == null || vp.clip == clip) return;
+            vp.clip = clip;
+            if (clip.length > 0.0)
+                vp.time = UnityEngine.Random.Range(0f, (float)clip.length);
+            if (IsCorpse || IsFrozen)
+            {
+                if (vp.isPlaying) { vp.Pause(); _videoHalted = true; }
+            }
+            else
+            {
+                vp.Play();
+            }
+        }
+
+        // ==================== 立牌朝向（拍板③：方向镜像） ====================
+
+        /// <summary>当前立牌朝向（朝左=素材水平镜像态；后续背后刺杀等方向判定技能读此值，权威态届时随 B7 进快照）</summary>
+        public bool FaceLeft => _faceLeft;
+
+        /// <summary>设置立牌朝向（2026-09-29 拍板③）：faceLeft=true 立牌本体水平镜像（素材统一朝右，反方向不生成第二份）；
+        /// 幂等；只翻 sprite 与视频 quad（负 localScale.x——视频 shader 已 Cull Off 防翻面剔除），
+        /// 名字/Buff 行/底座盘不动；行动后保持=待机延续朝向</summary>
+        public void SetFacing(bool faceLeft)
+        {
+            if (_faceLeft == faceLeft) return;
+            _faceLeft = faceLeft;
+            ApplyFacing();
+        }
+
+        private void ApplyFacing()
+        {
+            float sign = _faceLeft ? -1f : 1f;
+            if (_avatarSpriteFlip != null)
+                _avatarSpriteFlip.localScale = new Vector3(
+                    sign * _avatarSpriteFlipBaseScale.x, _avatarSpriteFlipBaseScale.y, _avatarSpriteFlipBaseScale.z);
+            if (_avatarVideoFlip != null)
+                _avatarVideoFlip.localScale = new Vector3(
+                    sign * _avatarVideoFlipBaseScale.x, _avatarVideoFlipBaseScale.y, _avatarVideoFlipBaseScale.z);
         }
 
         // 名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
@@ -176,13 +237,15 @@ namespace GIC.Battle
         /// <param name="idleFps">动画播放帧率（fps）</param>
         /// <param name="idleVideo">立牌循环动画视频（B-S3 视频路线：绿幕 mp4+运行时 ChromaKey 抠色；
         /// 优先级高于 idleFrames——配了视频的单位不再消费序列帧；ChromaKey shader 缺失时回落静态立牌）</param>
+        /// <param name="moveVideo">移动中循环动画视频（B-S4a 移动态接线：移动命令片内播放、片末回 idleVideo；
+        /// null=无移动态动画，待机片常驻=旧行为）</param>
         /// <param name="hoverHeight">立牌离地高度（世界单位=格；UnitData.离地高度，2026-09-27 拍板新增）：
         /// 纸片人整体上浮——飞行/悬浮单位；底座圆盘留地面（受击圆柱可视化=视觉即判定不随浮空）；
         /// 血条/名字/Buff 行挂倾斜组随浮空同步抬高</param>
         public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, Sprite[] idleFrames = null, float idleFps = 12f, VideoClip idleVideo = null,
-            float hoverHeight = 0f)
+            VideoClip moveVideo = null, float hoverHeight = 0f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -224,6 +287,9 @@ namespace GIC.Battle
                 // sprite 中心置于半高处（外层原点=底边 → 底边贴地、立牌居中于半高）
                 spriteGo.transform.localPosition = new Vector3(0f, displayHeight * 0.5f, 0f);
                 view._avatarDisplayHeight = displayHeight;
+                // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（默认朝右=base 不动）
+                view._avatarSpriteFlip = spriteGo.transform;
+                view._avatarSpriteFlipBaseScale = spriteGo.transform.localScale;
             }
 
             if (hasIdle)
@@ -253,6 +319,9 @@ namespace GIC.Battle
                 videoGo.transform.localPosition = new Vector3(0f, videoDisplayHeight * 0.5f, 0f);
                 videoGo.transform.localScale = new Vector3(videoDisplayHeight * videoAspect, videoDisplayHeight, 1f);
                 videoGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AvatarSortingOrder; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
+                // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（视频 quad 依赖 shader Cull Off）
+                view._avatarVideoFlip = videoGo.transform;
+                view._avatarVideoFlipBaseScale = videoGo.transform.localScale;
 
                 var vp = videoGo.AddComponent<VideoPlayer>();
                 vp.playOnAwake = false;
@@ -267,6 +336,8 @@ namespace GIC.Battle
                 vp.errorReceived += view.OnVideoError;
                 vp.Play();
                 view._videoPlayer = vp;
+                view._idleVideoClip = idleVideo; // 待机/回切目标片（B-S4a 移动态接线）
+                view._moveVideoClip = moveVideo;
             }
 
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=BattleMetrics.UnitCylinderDiameter，

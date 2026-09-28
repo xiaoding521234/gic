@@ -42,6 +42,30 @@ namespace GIC.Battle
         [Tooltip("箭矢屏幕长度（格）——正式素材长轴按 bounds 归一到该长度，高度随素材纵横比；十字四向全长（2026-09-28 拍板方案 A：屏幕平行布告板+屏幕平面内旋转，上下射=屏幕竖直箭；0.7→0.49=同日目检拍板调小 30%）")]
         [SerializeField, Min(0.1f)] private float 箭矢长度 = 0.49f;
 
+        [Header("箭雨天降（arrow_rain cue；时轮特效轨→整线迸发技能视觉）")]
+        [Tooltip("每格每段落箭数（「大量箭矢」密度轴）")]
+        [SerializeField, Min(1)] private int 箭雨每格每段箭数 = 2;
+        [Tooltip("落箭箭矢缩放（相对「箭矢长度」基准；1=与飞行箭同大）")]
+        [SerializeField, Range(0.3f, 2f)] private float 箭雨箭矢缩放 = 1f;
+        [Tooltip("落箭起点离落点高度（格；读作从天而降）")]
+        [SerializeField, Min(0.5f)] private float 箭雨起始高度 = 2.2f;
+        [Tooltip("落下倾斜角（度；0=竖直落下；正=沿安柏射向斜落（起点向安柏一侧侧移——东射自西向东落、北射自南向北落，读作安柏射出的箭坠入格内）、负=逆射向；2026-09-28 拍板「斜着落下」+追拍板「方向应当根据安柏的位置来」；侧移=tan(角)×起始高度（世界倾角），落点/落地时刻/节拍不变）")]
+        [SerializeField, Range(-60f, 60f)] private float 箭雨落下倾斜角 = 30f;
+        [Tooltip("单箭坠落时长（秒；起飞时刻=段时刻-坠落时长，落地与伤害数字同拍）")]
+        [SerializeField, Min(0.02f)] private float 箭雨坠落时长 = 0.14f;
+        [Tooltip("落点在格内的随机散布半径（格）")]
+        [SerializeField, Range(0f, 0.45f)] private float 箭雨格内散布 = 0.3f;
+        [Tooltip("段内每支箭的随机起飞延迟上限（秒；散开成阵雨而非整排齐落）")]
+        [SerializeField, Range(0f, 0.2f)] private float 箭雨逐箭散布延迟 = 0.06f;
+        [Tooltip("落地后沿箭轴向落点内压入的深度（格；尖入土、尾翘起=插在表面观感，入土段被地形深度裁掉；0=不压入）")]
+        [SerializeField, Min(0f)] private float 箭雨入土深度 = 0.15f;
+        [Tooltip("落地压入时长（秒；0=瞬间到位）")]
+        [SerializeField, Min(0f)] private float 箭雨入土时长 = 0.05f;
+        [Tooltip("落地插稳后原地滞留时长（秒；2026-09-28 拍板「箭落地后应当插在表面 3 秒」默认 3）")]
+        [SerializeField, Min(0f)] private float 箭雨落地滞留 = 3f;
+        [Tooltip("滞留后的淡出时长（秒）")]
+        [SerializeField, Range(0f, 1f)] private float 箭雨落地淡出 = 0.18f;
+
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 _teamAColor/_teamBColor 场景序列化值
         // 与代码默认一致，迁移零损失——队伍色与 HUD 队列框/accent 同源对齐）
         private static BattlePalette Palette => BattlePalette.Instance;
@@ -356,6 +380,142 @@ namespace GIC.Battle
             return arrowGo;
         }
 
+        // ==================== 时轮表现轨（SkillCast 消费，B-S3 ②首个接线=2026-09-28 箭雨） ====================
+
+        private static readonly Dictionary<int, SkillConfig> _skillConfigCache = new Dictionary<int, SkillConfig>();
+
+        /// <summary>按 skillID 约定路径加载技能配置（Resources/Configs/Skills/{SkillName}——技能独立化约定；
+        /// 缺失 Warn 一次；缓存防逐段重复加载）</summary>
+        private static SkillConfig.SkillData LoadSkillData(int skillId)
+        {
+            if (_skillConfigCache.TryGetValue(skillId, out var config)) return config?.data;
+            config = Resources.Load<SkillConfig>($"Configs/Skills/{(SkillName)skillId}");
+            if (config == null)
+                GICLog.Warn($"[BattlePlayer] 技能配置缺失：Configs/Skills/{(SkillName)skillId}（表现轨无源可播）");
+            _skillConfigCache[skillId] = config;
+            return config?.data;
+        }
+
+        /// <summary>时轮特效轨播放入口：SkillCast 命令→技能配置→时轮资产，cueName→视觉开关台
+        ///（首个 cue=arrow_rain 箭雨天降；动作/音效轨素材落地后同入口扩展）。
+        /// fire-and-forget 不 gate 片 ack（片节拍由 Damage 数字 launchMs 承载，同 S5 装饰尾巴口径）</summary>
+        private IEnumerator PlaySkillCastVfxCoroutine(BattleCommand command)
+        {
+            var timeline = LoadSkillData(command.value)?.timeline;
+            if (timeline == null) yield break; // 无时轮技能（移动等）——无表现轨可播，静默
+            foreach (var clip in SkillTimelineQuery.ClipsOf(timeline, SkillTrackType.Vfx))
+            {
+                switch (clip.cueName)
+                {
+                    case "arrow_rain":
+                        yield return PlayArrowRainCoroutine(timeline, command);
+                        break;
+                    // 后续特效 cue 随 B-S3 素材落地扩（音效轨 cueName=arrow_rain_release 同期接播放）
+                }
+            }
+        }
+
+        /// <summary>箭雨天降（arrow_rain）：判定轨 LineBurst 为节拍/射程单源——段时刻=startTime+hitInterval×段
+        ///（与 CompileLineBurstSegment 同源）、整线格集=step≥1 虚空截断同口径、段数=参数表 DamageCount
+        ///（数值归参数表铁律）；每段每格 N 支技能元素色箭自高处**斜落**（复用箭矢素材，起点沿安柏射向
+        /// 反方向侧移=落向随安柏射向「箭雨落下倾斜角」——2026-09-28 拍板「斜着落下」+追拍板「方向根据
+        /// 安柏的位置」）。
+        /// 落地时刻=段时刻（与 Damage 数字同拍）——起飞提前一个坠落时长</summary>
+        private IEnumerator PlayArrowRainCoroutine(SkillTimelineAsset timeline, BattleCommand command)
+        {
+            var burstClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst);
+            if (burstClips.Count == 0) yield break;
+            var clip = burstClips[0];
+            var skillData = LoadSkillData(command.value);
+            int waves = skillData != null ? skillData.GetInt(SkillParamKey.DamageCount, 1) : 1;
+            int maxRange = clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
+
+            var cells = new List<BattleCell>(); // 整线格集（Host CompileLineBurstSegment 同口径）
+            var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
+            var shotDir = new Vector3(delta.x, 0f, delta.y); // 射向世界向量（落箭斜落沿它、起点向安柏一侧回撤）
+            for (int step = 1; step <= maxRange; step++)
+            {
+                var cell = new BattleCell(command.cell.x + delta.x * step, command.cell.y + delta.y * step);
+                if (_board == null || _board.Map == null || !_board.Map.HasTile(cell.x, cell.y)) break;
+                cells.Add(cell);
+            }
+            if (cells.Count == 0) yield break;
+
+            var tint = ElementFactionConfig.Instance.GetElementColor((ElementType)command.reactionKind);
+            float prevSpawn = 0f;
+            for (int wave = 0; wave < waves; wave++)
+            {
+                float spawnAt = Mathf.Max(0f, clip.startTime + clip.hitInterval * wave - 箭雨坠落时长);
+                if (spawnAt > prevSpawn)
+                {
+                    yield return new WaitForSeconds((spawnAt - prevSpawn) / _playbackSpeed);
+                    prevSpawn = spawnAt;
+                }
+                foreach (var cell in cells)
+                {
+                    for (int i = 0; i < 箭雨每格每段箭数; i++)
+                        StartCoroutine(PlayRainArrowCoroutine(cell, shotDir, tint,
+                            UnityEngine.Random.Range(0f, 箭雨逐箭散布延迟))); // 单箭 fire-and-forget（不 gate ack）
+                }
+            }
+        }
+
+        /// <summary>单支落箭：延迟起飞→斜落（落向沿安柏射向「箭雨落下倾斜角」）→落地沿箭轴压入插土
+        ///（入土段被地形深度裁掉=尖插表面、尾翘起；水面格落点=波浪表面之上）→原地滞留（2026-09-28
+        /// 拍板「插在表面 3 秒」）→淡出销毁</summary>
+        private IEnumerator PlayRainArrowCoroutine(BattleCell cell, Vector3 shotDir, Color tint, float delaySeconds)
+        {
+            if (delaySeconds > 0f)
+                yield return new WaitForSeconds(delaySeconds / _playbackSpeed);
+
+            var jitter = new Vector3(UnityEngine.Random.Range(-箭雨格内散布, 箭雨格内散布), 0f,
+                UnityEngine.Random.Range(-箭雨格内散布, 箭雨格内散布));
+            var basePos = _board.CellToWorld(cell) + jitter;
+            var from = basePos + new Vector3(0f, 箭雨起始高度, 0f);
+            var to = new Vector3(basePos.x, _board.GetVisualSurfaceHeight(cell) + 0.02f, basePos.z);
+            // 斜落方向=沿安柏射向（2026-09-28 追拍板「斜落的方向应当根据安柏的位置来」）：起点沿射向
+            // 反方向侧移——落箭读作安柏射出的箭越过格心继续飞行坠入该格（东射=自西侧高处向东落、
+            // 北射=自南侧高处向北落，起点天然在安柏一侧）；侧移量=tan(倾斜角)×起始高度（世界倾角）；
+            // 落点/落地时刻/节拍全不变（纯视觉，判定无涉）
+            if (shotDir.sqrMagnitude > 1e-6f && 箭雨落下倾斜角 != 0f)
+            {
+                from -= shotDir * (Mathf.Tan(箭雨落下倾斜角 * Mathf.Deg2Rad) * 箭雨起始高度);
+            }
+            var arrowGo = CreateProjectileVisual(from, to, tint);
+            arrowGo.transform.localScale *= 箭雨箭矢缩放;
+
+            yield return BattleViewTween.Over(箭雨坠落时长 / _playbackSpeed,
+                t => { if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(from, to, t); });
+
+            // 落地插土：沿箭轴向落点内压入「箭雨入土深度」——屏幕平面布告板，入土段被地形深度裁掉
+            //（尖插表面、尾翘起；水面格插在波浪表面，透明水体不裁=透水可见属预期）
+            if (arrowGo != null && 箭雨入土深度 > 0f)
+            {
+                var stuckTo = to + arrowGo.transform.right * 箭雨入土深度; // transform.right=屏面内飞行方向（尖朝前）
+                yield return BattleViewTween.Over(箭雨入土时长 / _playbackSpeed,
+                    t => { if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(to, stuckTo, t); });
+            }
+
+            if (箭雨落地滞留 > 0f)
+                yield return new WaitForSeconds(箭雨落地滞留 / _playbackSpeed);
+
+            var renderer = arrowGo != null ? arrowGo.GetComponent<SpriteRenderer>() : null;
+            if (renderer != null && 箭雨落地淡出 > 0f)
+            {
+                var color = renderer.color;
+                yield return BattleViewTween.Over(箭雨落地淡出 / _playbackSpeed, t =>
+                {
+                    if (renderer != null)
+                    {
+                        var c = color;
+                        c.a = color.a * (1f - t);
+                        renderer.color = c;
+                    }
+                });
+            }
+            if (arrowGo != null) Destroy(arrowGo);
+        }
+
         private IEnumerator PlaySegmentCoroutine(Segment segment)
         {
             // 片开始时刻 =（全场最高攻速 − 自身攻速）÷ 10 秒（连续换算）；
@@ -395,8 +555,16 @@ namespace GIC.Battle
                                 // 不吃命令 stagger；命中点由命令定点下发
                                 playbacks.Add(StartCoroutine(PlayProjectileThenDamageCoroutine(target, command, 0f)));
                             else
-                                playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, stagger, false,
+                            {
+                                // 直击数字节拍（2026-09-28 对齐 Heal 分支口径）：launchMs>0=时轮段时刻到点再弹
+                                //（箭雨 4 段 0.15s 间隔与落箭同拍连续弹）；0=立即维持命令 stagger 旧节拍
+                                //（霜袭等 startTime=0 技能与无时轮兜底路径不变）
+                                float dmgDelay = command.launchMs > 0
+                                    ? command.launchMs / 1000f / _playbackSpeed
+                                    : stagger;
+                                playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
                                     command.reactionKind)));
+                            }
                         }
                         break;
 
@@ -495,11 +663,15 @@ namespace GIC.Battle
                         break;
 
                     case BattleCommandType.SkillCast:
-                        // 时轮演出起点事件（B-S1 协议占位）：按 skillID 加载时轮资产播动作/音效/特效轨
-                        // =B-S3 素材落地后接线；当前无表现资产，前摇期视觉由投射物命令的 launchMs
-                        // 延迟起飞承载（施放者动作/音效待素材批次）
+                        // 时轮演出起点事件（B-S1）：按 skillID 加载时轮资产播动作/音效/特效轨
+                        // ——特效轨首个消费方=arrow_rain 箭雨天降（2026-09-28），动作/音效轨待素材同入口扩展；
+                        // fire-and-forget 不进 playbacks（不 gate 片 ack，节拍由 Damage launchMs 承载）；
+                        // 前摇期投射物视觉由投射物命令的 launchMs 延迟起飞承载（施放者动作/音效待素材批次）
                         GICLog.Info($"[BattlePlayer] 技能施放：{command.actorUnitId} → {(SkillName)command.value}" +
                                     $" 方向 {(Direction2D)command.direction}");
+                        if (_views.TryGetValue(command.actorUnitId, out var caster))
+                            caster.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随施放方向（拍板③：向左射箭→转向左）
+                        StartCoroutine(PlaySkillCastVfxCoroutine(command));
                         break;
 
                     case BattleCommandType.Effect:
@@ -529,23 +701,42 @@ namespace GIC.Battle
             });
         }
 
+        /// <summary>行动方向→立牌朝向（2026-09-29 拍板③：方向 ∈ {上,左上,左,左下} 朝左水平镜像，其余朝右——
+        /// 素材统一朝右单份复用；朝向行动后保持、待机延续；后续背后刺杀类技能可读 UnitView.FaceLeft）</summary>
+        private static bool IsLeftFacing(int direction)
+        {
+            return direction == (int)Direction2D.Up || direction == (int)Direction2D.UpLeft
+                || direction == (int)Direction2D.Left || direction == (int)Direction2D.DownLeft;
+        }
+
         private IEnumerator PlayMoveCoroutine(UnitView view, BattleCommand command)
         {
-            var path = command.path;
-            float stepSeconds = MoveStepSeconds / _playbackSpeed;
-            for (int i = 1; i < path.Count; i++)
+            // 移动态动画（B-S4a，2026-09-29 拍板「正式化安柏待机+移动动画」）：移动片内切 移动动画视频、
+            // 片末回 待机（含被挡弹回段——弹回也是移动表现）；try/finally 保异常不滞留移动态
+            view.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随移动方向（拍板③）；行动后保持=待机延续
+            view.SetMoveAnimation(true);
+            try
             {
-                Vector3 from = _board.CellToWorld(path[i - 1]);
-                Vector3 to = _board.CellToWorld(path[i]);
-                yield return BattleViewTween.Over(stepSeconds, t => view.ApplyPosition(Vector3.Lerp(from, to, t)));
-            }
-            if (path.Count > 0)
-                view.ApplyPosition(_board.CellToWorld(path[path.Count - 1]));
+                var path = command.path;
+                float stepSeconds = MoveStepSeconds / _playbackSpeed;
+                for (int i = 1; i < path.Count; i++)
+                {
+                    Vector3 from = _board.CellToWorld(path[i - 1]);
+                    Vector3 to = _board.CellToWorld(path[i]);
+                    yield return BattleViewTween.Over(stepSeconds, t => view.ApplyPosition(Vector3.Lerp(from, to, t)));
+                }
+                if (path.Count > 0)
+                    view.ApplyPosition(_board.CellToWorld(path[path.Count - 1]));
 
-            // 被挡撞墙弹回：Host 已停在被挡格前（全挡=原格 / 部分挡=被挡格前一格），表现层探出再弹回
-            if (command.metadata == BattleCommand.MoveBlocked)
-                yield return PlayBlockedBumpCoroutine(view, path.Count > 0 ? path[path.Count - 1] : view.Cell,
-                    command.direction, stepSeconds);
+                // 被挡撞墙弹回：Host 已停在被挡格前（全挡=原格 / 部分挡=被挡格前一格），表现层探出再弹回
+                if (command.metadata == BattleCommand.MoveBlocked)
+                    yield return PlayBlockedBumpCoroutine(view, path.Count > 0 ? path[path.Count - 1] : view.Cell,
+                        command.direction, stepSeconds);
+            }
+            finally
+            {
+                view.SetMoveAnimation(false);
+            }
         }
 
         /// <summary>
@@ -721,6 +912,7 @@ namespace GIC.Battle
             Sprite[] idleFrames = null;
             float idleFps = 12f;
             VideoClip idleVideo = null;
+            VideoClip moveVideo = null; // 移动态动画（B-S4a，2026-09-29 拍板「正式化安柏待机+移动动画」）
             float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放）
             float hoverHeight = 0f; // UnitData.离地高度（2026-09-27 拍板：飞行/悬浮单位纸片人整体上浮）
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
@@ -733,6 +925,7 @@ namespace GIC.Battle
                 nameEntry = unitName.GetEntry(); // 单位名本地化条目（UnitName 表）
                 // 立牌循环动画（B-S3 视频路线拍板）：视频（绿幕+运行时 ChromaKey 抠色）优先于序列帧；都缺=静态兜底
                 idleVideo = unitData.立牌动画视频;
+                moveVideo = unitData.移动动画视频; // 移动态片（null=移动期间照播待机=旧行为）
                 if (idleVideo == null && unitData.立牌动画帧 != null && unitData.立牌动画帧.Length > 1)
                 {
                     idleFrames = unitData.立牌动画帧;
@@ -748,7 +941,7 @@ namespace GIC.Battle
             // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
                 _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
-                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleFrames, idleFps, idleVideo, hoverHeight);
+                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleFrames, idleFps, idleVideo, moveVideo, hoverHeight);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);
