@@ -107,7 +107,11 @@ namespace GIC.Battle
         /// **目标集=敌格十字邻格中「可通行且无阻挡单位占据」的格**——敌格本身剔除（走进必被敌挡弹回）
         /// +被占/不可行邻格剔除（二轮报障根因：goal 豁免让小兵走进被占格/水格，结算弹回、被挡也算
         /// 已使用→每回合原地弹回看起来再也不走）。通行=地形按移动者常态类型 IsPassable；阻挡=存活+
-        /// 尸体单位格（移动者开「与友方互不阻挡」时友方格放行，与 MovementResolver 口径一致）。
+        /// 尸体单位格（移动者开「与友方互不阻挡」时友方格放行——**注意：这是 MovementResolver.CanEnter
+        /// 的保守近似而非同口径**（2026-09-28 批5 复审勘正）：CanEnter 实为「占据者.BlockAllies 且双方
+        /// 都未开 flag」才挡、另有体积绝对层；此处只查移动者侧 flag 且一律视为阻挡——偏差全为保守向
+        /// （多绕路不会被结算弹回），现役低级单位全开 flag 时与 CanEnter 等价；首个不开 flag 的低级
+        /// 单位落地时须同步双侧条件）。
         /// 返回 0=已贴身/同格/无路（缺席）。方向域=十字四向，方向纪律不变；枚举序展开=决策确定性。</summary>
         public static Direction2D FindApproachFirstStep(BattleSimState sim, Unit self, BattleCell target)
         {

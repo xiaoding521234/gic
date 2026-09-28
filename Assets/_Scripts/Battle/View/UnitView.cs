@@ -213,7 +213,7 @@ namespace GIC.Battle
             bool hasIdle = idleFrames != null && idleFrames.Length > 1;
             var baseSprite = hasIdle ? idleFrames[0] : avatar;
             view._avatarRenderer.sprite = baseSprite;
-            view._avatarRenderer.sortingOrder = 10;
+            view._avatarRenderer.sortingOrder = BattleMetrics.AvatarSortingOrder;
 
             if (baseSprite != null)
             {
@@ -252,7 +252,7 @@ namespace GIC.Battle
                 // 与 sprite 路径同基准：全画布高=displayHeight、中心悬于半高处（底边贴地）
                 videoGo.transform.localPosition = new Vector3(0f, videoDisplayHeight * 0.5f, 0f);
                 videoGo.transform.localScale = new Vector3(videoDisplayHeight * videoAspect, videoDisplayHeight, 1f);
-                videoGo.GetComponent<MeshRenderer>().sortingOrder = 10; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
+                videoGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AvatarSortingOrder; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
 
                 var vp = videoGo.AddComponent<VideoPlayer>();
                 vp.playOnAwake = false;
@@ -278,7 +278,7 @@ namespace GIC.Battle
             baseGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             baseGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             baseGo.transform.localScale = new Vector3(BattleMetrics.UnitCylinderDiameter, BattleMetrics.UnitCylinderDiameter, 1f);
-            baseGo.GetComponent<MeshRenderer>().sortingOrder = -1;
+            baseGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.BaseDiscSortingOrder;
             view._baseDisc = baseGo.transform;
             view._baseColor = teamColor;
 
@@ -479,7 +479,7 @@ namespace GIC.Battle
                 iconGo.transform.localPosition = new Vector3(x, 0f, 0f);
                 var renderer = iconGo.AddComponent<SpriteRenderer>();
                 renderer.sprite = icon;
-                renderer.sortingOrder = 11;
+                renderer.sortingOrder = BattleMetrics.BuffBadgeSortingOrder;
                 float worldHeight = icon.bounds.size.y;
                 if (worldHeight > 0f)
                     iconGo.transform.localScale = Vector3.one * (BuffBadgeSize / worldHeight);

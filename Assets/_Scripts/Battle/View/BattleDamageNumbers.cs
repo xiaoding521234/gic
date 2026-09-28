@@ -99,7 +99,7 @@ namespace GIC.Battle
             canvasGo.transform.SetParent(transform, false);
             _canvas = canvasGo.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 39; // 战斗 HUD=40 之下——数字是战场反馈非面板，面板应盖过它
+            _canvas.sortingOrder = BattleMetrics.DamageNumbersCanvasOrder; // 战斗 HUD=40 之下——数字是战场反馈非面板，面板应盖过它
             // 勿加 GraphicRaycaster：Overlay 画布无射线器即不吃射线（加了会挡 HUD 按钮/棋盘）
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

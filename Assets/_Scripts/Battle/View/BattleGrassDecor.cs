@@ -16,6 +16,14 @@ namespace GIC.Battle
     /// </summary>
     public class BattleGrassDecor : MonoBehaviour
     {
+        /// <summary>本层合并 mesh（OnDestroy 显式销毁——Destroy 物体不销 mesh，§63① mesh 条款，2026-09-28 批6）</summary>
+        private Mesh _mesh;
+
+        private void OnDestroy()
+        {
+            if (_mesh != null) Destroy(_mesh);
+        }
+
         /// <summary>
         /// 构建草簇层（挂 Tiles 根下；建盘 Build 清空重建时随 Tiles 一并销毁=幂等）。
         /// cam=null 时朝向兜底正北（编辑器侧建盘断言无相机的场景）。
@@ -128,6 +136,7 @@ namespace GIC.Battle
             mesh.RecalculateBounds();
 
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            decor._mesh = mesh; // 登记（OnDestroy 显式销毁，§63①）
             var renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterials = tuftMats.ToArray();
             renderer.shadowCastingMode = ShadowCastingMode.Off;

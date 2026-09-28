@@ -46,6 +46,33 @@ namespace GIC.Battle
         /// <summary>配额行动消耗体力（docs/05 §5.1：移动/战技/爆发各 10；
         /// 低级单位 1~2 星自主行动豁免，延奏/契约等特殊技能 0）</summary>
         public const int StaminaCostPerAction = 10;
+
+        // ==================== 世界/画布 sortingOrder 层级表（2026-09-28 批6 收口：8 处散布字面量单源） ====================
+        // 完整层序自下而上：底座盘 -1 → 瞄准贴片 0（隐式默认，无显式设置点）→ 底座弧光 1 → 立牌 10 →
+        // Buff 徽章 11 → 箭矢 12 →〔水面走 shader renderQueue 2999，另一体系（docs/14 §89⑥）〕→
+        // 头顶条 Overlay 画布 38 → 伤害数字 Overlay 画布 39 → 战斗 HUD 画布 40（BattleHud.prefab 序列化值）。
+        // 插新层只改这里；消费方引用常量勿再写字面量。
+
+        /// <summary>单位底座圆盘（恒先画于一切透明件——透明盘投影感，2026-09-27 拍板）</summary>
+        public const int BaseDiscSortingOrder = -1;
+
+        /// <summary>底座环绕弧光（选中特效；瞄准贴片之上、立牌之下）</summary>
+        public const int DiscOrbitSortingOrder = 1;
+
+        /// <summary>单位立牌（sprite 与视频 quad 同序——跨单位立牌遮挡排序语义一致）</summary>
+        public const int AvatarSortingOrder = 10;
+
+        /// <summary>头顶 Buff 徽章行（立牌之上、箭矢之下）</summary>
+        public const int BuffBadgeSortingOrder = 11;
+
+        /// <summary>投射物箭矢光条</summary>
+        public const int ProjectileSortingOrder = 12;
+
+        /// <summary>头顶条 Overlay 画布（伤害数字 39 之下、HUD 40 之下——数字漂过条上方时数字在上）</summary>
+        public const int OverheadBarsCanvasOrder = 38;
+
+        /// <summary>伤害数字 Overlay 画布（HUD 40 之下——数字是战场反馈非面板，面板应盖过它）</summary>
+        public const int DamageNumbersCanvasOrder = 39;
     }
 
     /// <summary>

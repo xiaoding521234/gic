@@ -73,7 +73,6 @@ namespace GIC.Battle
         private BattleOverheadBars _overheadBars;
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
-        private readonly Dictionary<UnitView, Vector3> _formationOffsets = new Dictionary<UnitView, Vector3>();
 
         /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
         [Autowired] private UnitConfig _unitConfig;
@@ -298,7 +297,7 @@ namespace GIC.Battle
             var renderer = arrowGo.AddComponent<SpriteRenderer>();
             renderer.sprite = ProjectileSprite;
             renderer.color = Palette.箭矢占位色;
-            renderer.sortingOrder = 12;
+            renderer.sortingOrder = BattleMetrics.ProjectileSortingOrder;
             return arrowGo;
         }
 
@@ -651,7 +650,6 @@ namespace GIC.Battle
                 if (kv.Value != null)
                     Destroy(kv.Value.gameObject);
             _views.Clear();
-            _formationOffsets.Clear();
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
         }
 
@@ -732,7 +730,6 @@ namespace GIC.Battle
                 for (int i = 0; i < occupants.Count; i++)
                 {
                     Vector3 offset = spread ? GetFormationOffset(occupants.Count, i) : Vector3.zero;
-                    _formationOffsets[occupants[i]] = offset;
                     occupants[i].ApplyPosition(_board.CellToWorld(kv.Key) + offset);
                 }
             }
