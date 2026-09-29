@@ -163,7 +163,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 11001
-    m_Localized: ???
+    m_Localized: The player's base on the battlefield. If the Protocol Core is destroyed,
+      that player loses.
     m_Metadata:
       m_Items: []
   - m_Id: 11002

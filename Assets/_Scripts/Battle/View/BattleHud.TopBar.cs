@@ -76,10 +76,12 @@ namespace GIC.Battle
             _clockCombiner = FindSlotCombiner("clock", "ClockText");
             RecolorText(_clockCombiner, Palette.文字米白);
 
-            // 我方信息块（左上角）：徽标+队营色 chrome 保留，体力/摩拉换物品牌计数 chip（B6d——
+            // 我方信息块（左上角）：队营色 chrome 保留，体力/摩拉换物品牌计数 chip（B6d——
             // 结构契约=槽内 MoraChip/StaminaChip 两枚 ItemCounterChip；**图标初始化挪到 Bind 注入后**——
             // ResolveHudReferences 先于 Wargame.Context.Inject 跑，此处 _itemConfig 尚为 null，
-            // InitItem 会 SetIcon(null) 把图标节点隐藏（首版实测"只有数字"的根因））
+            // InitItem 会 SetIcon(null) 把图标节点隐藏（首版实测"只有数字"的根因））。
+            // 徽标已移除（2026-09-29 用户拍板「移除 HUD 左上角的徽标和血条，协议核心不需要额外显示」——
+            // prefab myinfo 槽 Emblem 节点同批删除）
             if (_layoutByKey.TryGetValue("myinfo", out var myinfo))
             {
                 ResolveBlockChrome(myinfo.content, Palette.我方主色);
@@ -124,19 +126,10 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>信息块 chrome 解析（我方块）：势力徽标（地图势力，ElementFactionConfig 现成链）+ 队营色 accent 下划线</summary>
+        /// <summary>信息块 chrome 解析（我方块）：队营色 accent 下划线（Palette 活色）。
+        /// 徽标已移除（2026-09-29 拍板：myinfo 只余摩拉/体力 chip + accent 下划线，协议核心不做顶栏显示）</summary>
         private void ResolveBlockChrome(RectTransform root, Color accent)
         {
-            // 徽标（地图所属势力；正式化后按玩家势力）
-            var emblem = root.Find("Emblem")?.GetComponent<Image>();
-            if (emblem != null)
-            {
-                emblem.sprite = _session != null && _session.Sim != null && _session.Sim.Map != null
-                    && ElementFactionConfig.Instance != null
-                    ? ElementFactionConfig.Instance.GetFactionIcon((FactionType)(_session.Sim.Map.faction))
-                    : null;
-            }
-
             // 队营色 accent 下划线（Palette 活色）
             var accentImage = root.Find("Accent")?.GetComponent<Image>();
             if (accentImage != null) accentImage.color = accent;

@@ -398,8 +398,12 @@ namespace GIC.Battle
         }
 
         /// <summary>治疗量换算（docs/20 §5.1 基准纪律）：Fixed=value、BasedOnMaxHealth=百分比×目标最大生命、
-        /// BasedOnAttack=百分比×施法者攻击；paramKey=None 时用 value（Fixed 语义）</summary>
-        private static int ResolveHealAmount(SkillConfig.SkillData skillData, SkillParamKey paramKey, int fallbackValue,
+        /// BasedOnAttack=百分比×施法者攻击；paramKey=None 时用 value（Fixed 语义）。
+        /// 末段乘**受疗者治疗效率**（协议核心批 2026-09-29 拍板「治疗效率-50%」——目标侧结算：
+        /// 全单位默认 100=零行为变化；协议核心 50=守家续航减半防不死流；UnitStats.HealEfficiency 经
+        /// Buff 修饰符同生效=GetFinalStat 口径）。internal=三脑治疗估值镜像（CompanionBrain/
+        /// PlayerQuotaBrain）同走此单出口，勿再手抄公式（旧镜像已收口）</summary>
+        internal static int ResolveHealAmount(SkillConfig.SkillData skillData, SkillParamKey paramKey, int fallbackValue,
             Unit attacker, Unit target)
         {
             var param = FindParam(skillData, paramKey != SkillParamKey.None ? paramKey : SkillParamKey.None);
@@ -419,17 +423,26 @@ namespace GIC.Battle
 
             var attackerStats = attacker.GetUnitComponent<UnitStats>();
             var targetStats = target.GetUnitComponent<UnitStats>();
+            int amount;
             switch (baseType)
             {
                 case SkillBaseType.BasedOnMaxHealth:
                     // float 计算后末点截断（2026-09-27 拍板「最终治疗舍弃小数点」——FloorToInt；
                     // 消除中途 int 截断的双取整点，最终值与旧 int 截断口径一致：205 血×8%=16.4→16）
-                    return targetStats != null ? Mathf.FloorToInt(targetStats.GetStatStruct(StatType.HP).Max * rawValue / 100f) : 0;
+                    amount = targetStats != null ? Mathf.FloorToInt(targetStats.GetStatStruct(StatType.HP).Max * rawValue / 100f) : 0;
+                    break;
                 case SkillBaseType.BasedOnAttack:
-                    return attackerStats != null ? Mathf.FloorToInt(attackerStats.Attack * rawValue / 100f) : 0;
+                    amount = attackerStats != null ? Mathf.FloorToInt(attackerStats.Attack * rawValue / 100f) : 0;
+                    break;
                 default: // Fixed/Percent=直读（Percent 语境百分比由技能语义指定，治疗无语境默认直读）
-                    return rawValue;
+                    amount = rawValue;
+                    break;
             }
+            // 受疗者治疗效率（目标侧，协议核心批）：整数地板=末点截断口径；默认 100 恒等原值
+            int efficiency = targetStats != null ? targetStats.HealEfficiency : 100;
+            if (efficiency != 100 && amount > 0)
+                amount = amount * Mathf.Max(0, efficiency) / 100;
+            return amount;
         }
 
         private static SkillParam FindParam(SkillConfig.SkillData skillData, SkillParamKey key)
@@ -459,13 +472,14 @@ namespace GIC.Battle
         }
 
         /// <summary>投射物圆柱接触预判（原安柏战技覆写泛化）：距离空间版 Host maxT/VoidBoundary 同口径；
-        /// 敌方恒=快照格心（移动中命中不可预知，属提示非校验）</summary>
+        /// 敌方恒=快照格心（移动中命中不可预知，属提示非校验）。
+        /// per-enemy 受击半径（协议核心批 2026-09-29）：技能 hitDiameter 覆写优先，否则该单位自身
+        /// 受击圆柱（默认 0.42/协议核心 0.8）——与 ProjectileResolver 接触判定同口径，推荐色不漂移</summary>
         private static bool WouldHitProjectile(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
             BattleCell from, Direction2D direction, SkillTimelineClip clip)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
-            float radius = clip != null && clip.hitDiameter > 0f ? clip.hitDiameter : BattleMetrics.UnitCylinderDiameter;
-            radius *= 0.5f;
+            bool skillOverride = clip != null && clip.hitDiameter > 0f; // per-skill 判定圆柱覆写（替代单位圆柱）
             int maxRange = clip != null && clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
 
             float maxDist = maxRange + 0.5f;
@@ -481,6 +495,7 @@ namespace GIC.Battle
             foreach (var enemy in snapshot.units)
             {
                 if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
+                float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
                 var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
                 if (rel.sqrMagnitude <= radius * radius) return true; // 发射即贴脸（同格堆叠）
                 float along = Vector2.Dot(rel, dir);

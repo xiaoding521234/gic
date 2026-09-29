@@ -31,6 +31,11 @@ namespace GIC.Data
         public int energy;
         public int maxEnergy;
         public int volume;
+
+        /// <summary>受击圆柱直径（格=世界单位；0=未指定回落全局 0.42——BattleMetrics.CylinderDiameterOf 单出口解析）。
+        /// 协议核心批（2026-09-29）：投射物接触判定/命中预判/底座盘视觉/选中弧光贴紧四消费方同源；
+        /// Host BuildUnitState 从 UnitData.受击圆柱直径 填充，B7 联机随快照自动携带</summary>
+        public float cylinderDiameter;
         public List<BuffState> buffs = new List<BuffState>();
     }
 

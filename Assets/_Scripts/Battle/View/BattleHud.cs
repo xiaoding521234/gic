@@ -42,7 +42,8 @@ namespace GIC.Battle
     /// （距离转盘——盘缘=最远格；2026-09-28 拍板「大圆盘改圆角矩形，贴合格子战场」）、手指处
     /// **小圆盘**（不超大盘、不出屏幕）+金格出屏时相机丝滑移过去
     /// ——见 OnSkillButtonDragBegin/ShowDragWheel）；拖动时被拖技能键**临时挪到盘心**作摇杆底座、
-    /// 松手/会话收口还原回槽（2026-09-27 拍板）；协议核心血条 = B8 接线。
+    /// 松手/会话收口还原回槽（2026-09-27 拍板）；协议核心=场上单位（2026-09-29 拍板「核心不需要
+    /// 额外显示」——顶栏不加核心血条、myinfo 徽标移除，核心血量读场上头顶条 BattleOverheadBars）。
     /// </summary>
     public partial class BattleHud : MonoBehaviour
     {
@@ -843,9 +844,15 @@ namespace GIC.Battle
             SetTip("Battle_TipAimDirection"); // v1 复用方向瞄准提示；专属提示键随 B6c-2 卡面 polish
         }
 
-        /// <summary>我方核心位置（部署半径圆心；v1=出生区中心=spawnCenters 第一个——双端 PlayerIds 同序）</summary>
+        /// <summary>我方核心位置（部署半径圆心）。协议核心 Unit 化（2026-09-29 拍板）：真源=快照里的
+        /// 我方核心单位位置（与 Host GetCorePosition 同源语义）；防御回落=出生区中心代理→我方任一单位位</summary>
         private BattleCell FindMyCorePosition(BattleSnapshot snapshot)
         {
+            // 我方协议核心（快照真源；核心免疫位移恒=出生区中心，换的是数据源正确性）
+            var core = snapshot?.units.FirstOrDefault(u =>
+                u.unitName == UnitName.ProtocolCore.ToString() && u.playerId == _myPlayerId);
+            if (core != null) return core.position;
+
             var centers = _board.Map.spawnCenters;
             if (centers != null && centers.Count > 0)
             {
@@ -1996,7 +2003,8 @@ namespace GIC.Battle
             {
                 _discOrbit.Setup(
                     new Vector3(cellWorld.x, _board.GetDecalHeight(unit.position, 0.045f), cellWorld.z),
-                    (TeamType)unit.team == TeamType.B ? Palette.敌方主色 : Palette.我方主色);
+                    (TeamType)unit.team == TeamType.B ? Palette.敌方主色 : Palette.我方主色,
+                    unit.cylinderDiameter); // per-unit 盘径贴紧（协议核心批：0.8 大盘弧光同步外扩）
                 _discOrbit.gameObject.SetActive(true); // 复用件重显（2026-09-27 报障返修：件缓存战斗期复用，
                                                        // HideSelectMarker 收起后再次选中须重激活——原版漏此行，
                                                        // 首次选中（Create 即 active）可见、第二次起永远隐形）
@@ -2049,11 +2057,20 @@ namespace GIC.Battle
         }
 
         /// <summary>选中单位时刷新技能盘：表驱动全键统一（移动走 ApplyMoveButton，其余走 ApplySkillButton）；
-        /// 图标/元素色环/主动被动色全走 SkillIconView.InitWithData 现有链</summary>
+        /// 图标/元素色环/主动被动色全走 SkillIconView.InitWithData 现有链。
+        /// 建筑例外（协议核心批 2026-09-29 拍板「选中=纯查看」）：建筑无任何行动——全部键隐藏
+        /// （含移动键——ApplyMoveButton 对无 Move 条目单位恒显示，建筑勿走该兜底）</summary>
         private void RefreshSkillButtons()
         {
             var unitData = GetSelectedUnitData();
             if (unitData == null) return;
+
+            if (unitData.unitType == UnitType.Building)
+            {
+                foreach (var def in _skillButtons)
+                    if (def.view != null) def.view.gameObject.SetActive(false);
+                return;
+            }
 
             foreach (var def in _skillButtons)
             {

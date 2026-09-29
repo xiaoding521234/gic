@@ -29,6 +29,11 @@ namespace GIC.Battle
         private Transform _baseDisc;
         private Color _baseColor = Color.white;
 
+        /// <summary>受击圆柱直径（协议核心批 2026-09-29：per-unit 受击体——Create 传入，0=回落全局 0.42；
+        /// 底座圆盘可视化同源=视觉即判定；OrbitBeamsWorld 选中弧光贴紧折算消费 BattleHud）</summary>
+        private float _cylinderDiameter = BattleMetrics.UnitCylinderDiameter;
+        public float CylinderDiameter => _cylinderDiameter;
+
         // 名字 + Buff 徽章行（血条/元能条视觉归 BattleOverheadBars 屏幕空间层，此处只存数据）
         private TextMeshPro _nameText;
         private TextCombiner _nameCombiner;
@@ -245,7 +250,7 @@ namespace GIC.Battle
         public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, Sprite[] idleFrames = null, float idleFps = 12f, VideoClip idleVideo = null,
-            VideoClip moveVideo = null, float hoverHeight = 0f)
+            VideoClip moveVideo = null, float hoverHeight = 0f, float cylinderDiameter = 0f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -340,15 +345,17 @@ namespace GIC.Battle
                 view._moveVideoClip = moveVideo;
             }
 
-            // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=BattleMetrics.UnitCylinderDiameter，
-            // 视觉即判定，docs/18 决策二）。半透明投影感（2026-09-27 拍板：实体色板读作「坑/板」，
+            // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=该单位受击圆柱直径
+            // （协议核心批 per-unit：默认 0.42/协议核心 0.8），视觉即判定，docs/18 决策二）。
+            // 半透明投影感（2026-09-27 拍板：实体色板读作「坑/板」，
             // 脚站盘心显陷地——主因归圆盘，用户目检归因）；sortingOrder=-1 恒先画于一切 3000 透明件
             // （瞄准贴片 0/立牌 10/箭矢 12）之下、水面（2999）之上
+            view._cylinderDiameter = cylinderDiameter > 0f ? cylinderDiameter : BattleMetrics.UnitCylinderDiameter;
             view._baseDiscMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(WithDiscAlpha(teamColor));
             var baseGo = BattleViewFactory.CreateDisc(root.transform, "BaseDisc", view._baseDiscMaterial);
             baseGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             baseGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            baseGo.transform.localScale = new Vector3(BattleMetrics.UnitCylinderDiameter, BattleMetrics.UnitCylinderDiameter, 1f);
+            baseGo.transform.localScale = new Vector3(view._cylinderDiameter, view._cylinderDiameter, 1f);
             baseGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.BaseDiscSortingOrder;
             view._baseDisc = baseGo.transform;
             view._baseColor = teamColor;
@@ -409,8 +416,8 @@ namespace GIC.Battle
             RefreshTint();
             if (_baseDisc != null)
                 _baseDisc.localScale = corpse
-                    ? new Vector3(BattleMetrics.UnitCylinderDiameter, 0.28f, 1f) // 尸体底座压扁（压扁值沿用旧观感）
-                    : new Vector3(BattleMetrics.UnitCylinderDiameter, BattleMetrics.UnitCylinderDiameter, 1f);
+                    ? new Vector3(_cylinderDiameter, 0.28f, 1f) // 尸体底座压扁（压扁值沿用旧观感）
+                    : new Vector3(_cylinderDiameter, _cylinderDiameter, 1f);
         }
 
         /// <summary>冻结态（B4：水+冰反应）：立牌冰色 tint + 底座冰色（快照权威同步）</summary>

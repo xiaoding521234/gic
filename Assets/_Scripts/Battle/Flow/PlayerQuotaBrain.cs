@@ -106,12 +106,14 @@ namespace GIC.Battle
             return tracker.Best ?? Pass(turn);
         }
 
-        /// <summary>己方存活魔神（5★，玩家域单位行动——配额脑唯一可操单位档）</summary>
+        /// <summary>己方存活魔神（5★，玩家域单位行动——配额脑唯一可操单位档）。
+        /// 建筑排除（协议核心批 2026-09-29）：协议核心是 5★ 勿被当魔神操——建筑不参与任何行动</summary>
         private List<KeyValuePair<string, Unit>> CollectArchons(BattleSimState sim)
         {
             var archons = new List<KeyValuePair<string, Unit>>();
             foreach (var kv in sim.Units)
             {
+                if (BattleHeuristics.IsBuilding(kv.Value)) continue; // 协议核心 5★ ≠ 可操魔神
                 if (!BattleHeuristics.IsArchon(kv.Value)) continue;
                 if (BattleSimState.IsDead(kv.Value) || !BattleSimState.CanAct(kv.Value)) continue;
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
@@ -122,12 +124,14 @@ namespace GIC.Battle
             return archons;
         }
 
-        /// <summary>己方存活单位全集（号令施法者候选域——含眷属：其技能表无势力技能条目则天然空集）</summary>
+        /// <summary>己方存活单位全集（号令施法者候选域——含眷属：其技能表无势力技能条目则天然空集）。
+        /// 建筑排除（协议核心批 2026-09-29）：核心无技能条目天然空集，显式排除保单一判据口径</summary>
         private List<KeyValuePair<string, Unit>> CollectFactionCasters(BattleSimState sim)
         {
             var casters = new List<KeyValuePair<string, Unit>>();
             foreach (var kv in sim.Units)
             {
+                if (BattleHeuristics.IsBuilding(kv.Value)) continue; // 建筑不参与任何行动
                 if (BattleSimState.IsDead(kv.Value) || !BattleSimState.CanAct(kv.Value)) continue;
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.OwnerPlayerID != _playerId) continue;
@@ -192,18 +196,9 @@ namespace GIC.Battle
                 {
                     case SkillEffectKind.Heal:
                     {
-                        // 治疗换算（EffectCompiler.ResolveHealAmount 同语义）：BasedOnMaxHealth=目标
-                        // 各自、BasedOnAttack=施法者、Fixed=直读；有效治疗=min(治疗量, 缺口)
-                        var param = FindHealParam(data, atom);
-                        int raw = param?.value ?? atom.value;
-                        var baseType = param?.baseType ?? SkillBaseType.Fixed;
-                        int heal;
-                        if (baseType == SkillBaseType.BasedOnMaxHealth)
-                            heal = allyStats.GetStatStruct(StatType.HP).Max * raw / 100;
-                        else if (baseType == SkillBaseType.BasedOnAttack)
-                            heal = caster.GetUnitComponent<UnitStats>()?.Attack * raw / 100 ?? 0;
-                        else
-                            heal = raw;
+                        // 治疗换算单出口（协议核心批 2026-09-29 收口：EffectCompiler.ResolveHealAmount
+                        // 同源，含受疗者治疗效率——协议核心 50%=守家续航估值同步减半）；有效治疗=min(治疗量, 缺口)
+                        int heal = EffectCompiler.ResolveHealAmount(data, atom.paramKey, atom.value, caster, ally);
                         int missing = Math.Max(0, allyStats.GetStatStruct(StatType.HP).Max - allyStats.HP);
                         int effective = Math.Min(heal, missing);
                         if (effective * 100 < heal * CompanionBrain.HealWorthRatioPercent) break; // 缺口不足半量：不占行动
@@ -237,16 +232,6 @@ namespace GIC.Battle
                 }
             }
             return value;
-        }
-
-        /// <summary>治疗参数查找（EffectCompiler.ResolveHealAmount 的 paramKey→None 兜底同构）</summary>
-        private static SkillParam FindHealParam(SkillConfig.SkillData data, SkillEffectConfig atom)
-        {
-            var key = atom.paramKey != SkillParamKey.None ? atom.paramKey : SkillParamKey.None;
-            if (key == SkillParamKey.None || data.customParams == null) return null;
-            foreach (var p in data.customParams)
-                if (p.key == key) return p;
-            return null;
         }
 
         /// <summary>单位是否持有指定类型的已实装技能（effects 非空；TriggerSkill 链估值用）</summary>

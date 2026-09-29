@@ -91,6 +91,7 @@ namespace GIC.Battle
             foreach (var kv in sim.Units)
             {
                 var unit = kv.Value;
+                if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（协议核心批单一判据）
                 if (!BattleHeuristics.IsCompanion(unit)) continue;
                 if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue;
                 var identity = unit.GetUnitComponent<UnitIdentity>();
@@ -358,9 +359,6 @@ namespace GIC.Battle
                 if (atom.trigger != SkillEffectTrigger.OnCast && atom.trigger != SkillEffectTrigger.OnHit) continue;
 
                 int radius = atom.radiusKey != SkillParamKey.None ? data.GetInt(atom.radiusKey, 1) : 1;
-                var param = FindHealParam(data, atom);
-                int raw = param?.value ?? atom.value;
-                var baseType = param?.baseType ?? SkillBaseType.Fixed;
 
                 foreach (var kv in sim.Units)
                 {
@@ -387,13 +385,9 @@ namespace GIC.Battle
 
                     var allyStats = ally.GetUnitComponent<UnitStats>();
                     if (allyStats == null) continue;
-                    int heal;
-                    if (baseType == SkillBaseType.BasedOnMaxHealth)
-                        heal = allyStats.GetStatStruct(StatType.HP).Max * raw / 100; // 被治疗者各自
-                    else if (baseType == SkillBaseType.BasedOnAttack)
-                        heal = casterStats.Attack * raw / 100; // 施法者
-                    else
-                        heal = raw;
+                    // 治疗换算单出口（协议核心批 2026-09-29 收口：EffectCompiler.ResolveHealAmount
+                    // 同源，含受疗者治疗效率——协议核心 50%=守家续航估值同步减半，勿再手抄公式）
+                    int heal = EffectCompiler.ResolveHealAmount(data, atom.paramKey, atom.value, caster, ally);
                     int missing = Math.Max(0, allyStats.GetStatStruct(StatType.HP).Max - allyStats.HP);
                     int effective = Math.Min(heal, missing);
                     if (effective * 100 < heal * HealWorthRatioPercent) continue; // 缺口不足半量不占行动
@@ -401,16 +395,6 @@ namespace GIC.Battle
                 }
             }
             return total;
-        }
-
-        /// <summary>治疗参数查找（EffectCompiler.ResolveHealAmount 的 paramKey→None 兜底同构）</summary>
-        private static SkillParam FindHealParam(SkillConfig.SkillData data, SkillEffectConfig atom)
-        {
-            var key = atom.paramKey != SkillParamKey.None ? atom.paramKey : SkillParamKey.None;
-            if (key == SkillParamKey.None || data.customParams == null) return null;
-            foreach (var p in data.customParams)
-                if (p.key == key) return p;
-            return null;
         }
 
         // ==================== 足迹与工具 ====================

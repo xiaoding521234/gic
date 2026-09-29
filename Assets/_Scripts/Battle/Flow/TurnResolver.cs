@@ -43,6 +43,7 @@ namespace GIC.Battle
             {
                 actions.RemoveAll(a => a.actionType == ActionType.DeployUnit);
                 yield return PushSegmentAndWaitAck(ResolveDeploySegment(turnNumber, 0, deploys));
+                if (_sim.AnyCoreDestroyed()) yield break; // 核心片末检查（协议核心批）：防御性同口径
             }
 
             // 玩家级 Pass（空 unitId：超时自动空过/AI 无单位 Pass）无单位归属——分桶前静默剔除，
@@ -67,6 +68,10 @@ namespace GIC.Battle
                 var segment = ResolveSlice(turnNumber, sliceIndex, bucket.speed, maxSpeed, bucket.actions);
                 yield return PushSegmentAndWaitAck(segment);
                 sliceIndex++;
+                // 片末核心检查（协议核心批 2026-09-29 拍板「片末检查立即停」）：任一核心已毁→
+                // 剩余片不再结算与推送（MOBA 观感：核心倒下即终局）；胜负广播由 TurnFlowController
+                // 既有 CheckBattleOver 位置接住（顺序铁律不变：先阶段事件再 BattleOver）
+                if (_sim.AnyCoreDestroyed()) yield break;
             }
 
             // 片边界 poll 即时行动队列（连携/契约类；B1 调试验证协议预留）
@@ -80,6 +85,7 @@ namespace GIC.Battle
                 {
                     yield return PushSegmentAndWaitAck(segment);
                     sliceIndex++;
+                    if (_sim.AnyCoreDestroyed()) yield break; // 即时段同口径
                 }
             }
 

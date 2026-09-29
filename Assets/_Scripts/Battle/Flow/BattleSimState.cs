@@ -23,6 +23,10 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _units = new Dictionary<string, Unit>();
         private int _nextUnitId = 1;
 
+        /// <summary>协议核心登记（playerId → 核心 unitId；2026-09-29 拍板核心 Unit 化——
+        /// RegisterUnit 时按 UnitName 识别登记，胜负判据/部署基准/片末检查全走此单一登记）</summary>
+        private readonly Dictionary<string, string> _coreUnitIds = new Dictionary<string, string>();
+
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
 
@@ -255,10 +259,14 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>玩家核心位置代理（B6c 部署落点判定基准；协议核心 B8 Unit 化后换真核心——
-        /// 数据源收口此处一处：v1=出生区中心，spawnCenters 与 PlayerIds 注册序同序）</summary>
+        /// <summary>玩家核心位置（B6c 部署落点判定基准）。协议核心 Unit 化（2026-09-29 拍板）：
+        /// 真源=该玩家核心单位位置（核心免疫强制位移、永不移动，与出生区中心坐标恒等——换的是
+        /// 数据源正确性，未来核心位类技能/多地图不再依赖注册序）；无核心（装配异常防御）回落
+        /// 出生区中心代理（spawnCenters 与 PlayerIds 注册序同序）</summary>
         public BattleCell GetCorePosition(string playerId)
         {
+            var core = GetCoreUnit(playerId);
+            if (core != null) return GetPosition(core);
             int index = _playerIds.IndexOf(playerId);
             if (index >= 0 && Map.spawnCenters != null && index < Map.spawnCenters.Count)
                 return Map.spawnCenters[index];
@@ -289,6 +297,9 @@ namespace GIC.Battle
             unit.GetUnitComponent<UnitIdentity>()?.SetIdentity(unitId, playerId, team);
             unit.GetUnitComponent<UnitGridPosition>()?.SetPosition(BoardType.MainWorld, position.ToVector2Int());
             _units[unitId] = unit;
+            // 协议核心登记（同玩家重复注册=后者覆盖——对局装配每玩家恰一枚，防御性取最新）
+            if (unit.RawData != null && unit.RawData.unitName == UnitName.ProtocolCore)
+                _coreUnitIds[playerId] = unitId;
             return unitId;
         }
 
@@ -316,8 +327,8 @@ namespace GIC.Battle
             return status != null && status.CanAct;
         }
 
-        /// <summary>该队伍是否还有存活单位（2026-09-25 三轮审查 S10 全灭软停检测；
-        /// 敌我=TeamType 口径与全项目一致）</summary>
+        /// <summary>该队伍是否还有存活单位（旧全灭软停检测——核心判据落地后仅作装配异常防御回落，
+        /// 正常对局胜负唯一判据=协议核心，TurnFlowController.CheckBattleOver 消费）</summary>
         public bool HasLivingUnits(TeamType team)
         {
             foreach (var kv in _units)
@@ -327,6 +338,51 @@ namespace GIC.Battle
                     return true;
             }
             return false;
+        }
+
+        // ==================== 协议核心（2026-09-29 拍板 Unit 化：HP/胜负判据/部署基准） ====================
+
+        /// <summary>玩家的核心单位（未登记返回 null）</summary>
+        public Unit GetCoreUnit(string playerId)
+        {
+            return _coreUnitIds.TryGetValue(playerId, out var unitId) ? GetUnit(unitId) : null;
+        }
+
+        /// <summary>该玩家的协议核心是否存活（未登记=视作存活，避免装配异常秒判负）</summary>
+        public bool HasLivingCore(string playerId)
+        {
+            var core = GetCoreUnit(playerId);
+            return core == null || !IsDead(core);
+        }
+
+        /// <summary>全对局是否有任一已登记核心（装配异常判定：无核心对局回落旧全灭口径）</summary>
+        public bool HasAnyRegisteredCore() => _coreUnitIds.Count > 0;
+
+        /// <summary>任一已登记核心已被摧毁（片末检查：核心死→中断剩余片结算，胜负广播由
+        /// TurnFlowController 既有 CheckBattleOver 位置接住——docs/18 协议核心决策条）</summary>
+        public bool AnyCoreDestroyed()
+        {
+            foreach (var kv in _coreUnitIds)
+            {
+                var core = GetUnit(kv.Value);
+                if (core != null && IsDead(core)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>队伍是否仍有存活的协议核心（多人：队内任一玩家的核心存活=该队未败；
+        /// 队内无已登记核心=视作未败——防御口径）</summary>
+        public bool TeamHasLivingCore(TeamType team)
+        {
+            bool anyRegistered = false;
+            foreach (var kv in _coreUnitIds)
+            {
+                if (GetTeamOf(kv.Key) != team) continue;
+                anyRegistered = true;
+                var core = GetUnit(kv.Value);
+                if (core != null && !IsDead(core)) return true;
+            }
+            return !anyRegistered;
         }
 
         // ==================== 位置查询 ====================
@@ -536,6 +592,7 @@ namespace GIC.Battle
                 volume = unit.Volume,
                 energy = stats?.Energy ?? 0,
                 maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
+                cylinderDiameter = unit.RawData?.受击圆柱直径 ?? 0f,
             };
             foreach (var buff in unit.Buffs)
                 state.buffs.Add(new BuffState
