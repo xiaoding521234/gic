@@ -110,6 +110,10 @@ MonoBehaviour:
     m_Localized: Minor units act on their own
     m_Metadata:
       m_Items: []
+  - m_Id: 34455252137226240
+    m_Localized: Companion units act on their own; only faction skills can command
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

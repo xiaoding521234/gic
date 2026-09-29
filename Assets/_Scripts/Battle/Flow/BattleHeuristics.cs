@@ -6,9 +6,9 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// AI 决策共享工具（B6b；2026-09-25 v2 强化）：AI 玩家脑（AIDebugBrain）与低级单位脑
-    /// （LowUnitBrain）共用的敌人查找/方向/技能查询/命中预判启发式原语。
-    /// 全部纯读 BattleSimState/BattleSnapshot，不改状态（docs/18 决策一）。
+    /// AI 决策共享工具（B6b；2026-09-25 v2 强化；D 批次术语迁移）：配额脑（PlayerQuotaBrain）与
+    /// 眷属脑（FamiliarBrain）、伙伴脑（CompanionBrain）共用的敌人查找/方向/技能查询/命中预判
+    /// 启发式原语。全部纯读 BattleSimState/BattleSnapshot，不改状态（docs/18 决策一）。
     /// 方向纪律（docs/18 决策八）：移动与直线技能瞄准全员=「十字方向其一」——AI 上交方向
     /// 一律十字四向，勿走八向（八向上交技能侧被 SkillHitResolver.DirectionToDelta 归一主轴，
     /// 斜向敌人必空放=白耗元能，docs/11 方向纪律①④ 已收口）。
@@ -26,17 +26,23 @@ namespace GIC.Battle
 
         // ==================== 单位分拣 ====================
 
-        /// <summary>是否低级单位（1~2 星，自主行动如 MOBA 小兵，docs/04 §4.1；3~5 星=高级单位）</summary>
-        public static bool IsMinorUnit(Unit unit)
+        /// <summary>单位层级（D 批次操控分层，docs/active/32 §2）：星级→UnitTier 单一换算出口，
+        /// 全部层级门控/豁免/分拣逻辑只看此枚举——禁止散落星级区间判断</summary>
+        public static UnitTier TierOf(Unit unit)
         {
-            return unit.RawData != null && unit.RawData.starLevel <= 2;
+            return unit.RawData != null
+                ? UnitTierHelper.FromStars(unit.RawData.starLevel)
+                : UnitTier.Familiar; // 无配置数据按最低档处理（不参与任何玩家域/消耗扣减）
         }
 
-        /// <summary>是否高级单位（3~5 星，由所属玩家操控）</summary>
-        public static bool IsMajorUnit(Unit unit)
-        {
-            return unit.RawData != null && unit.RawData.starLevel >= 3;
-        }
+        /// <summary>是否眷属（1~2 星：AI 自主小兵，启发式脑决策、玩家资源全豁免）</summary>
+        public static bool IsFamiliar(Unit unit) => TierOf(unit) == UnitTier.Familiar;
+
+        /// <summary>是否伙伴（3~4 星：AI 自主+可被号令——评分制脑决策，玩家资源消耗按伙伴档）</summary>
+        public static bool IsCompanion(Unit unit) => TierOf(unit) == UnitTier.Companion;
+
+        /// <summary>是否魔神（5 星：玩家全手操，无 AI 兜底——不操=站桩）</summary>
+        public static bool IsArchon(Unit unit) => TierOf(unit) == UnitTier.Archon;
 
         // ==================== 敌人查找 ====================
 

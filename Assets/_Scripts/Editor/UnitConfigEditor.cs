@@ -907,6 +907,11 @@ namespace GIC.Editor
                             issues.Add("AnyItem 配了 Currency 子类型——货币不经物品消耗链（恒不可匹配）");
                         if (cost.kind == CostKind.Item && cost.item == ItemName.None)
                             issues.Add("Item 消耗未指定物品");
+                        // 体力声明=基准值校验（D 批次操控分层，docs/active/32 §5.2）：Stamina 实际扣值按施法者
+                        // 层级强制换算（眷属0/伙伴5/魔神10），声明值仅作基准/校验——漂移即 Warn 防误配口径
+                        if (cost.kind == CostKind.Stamina && cost.amount != GIC.Battle.BattleMetrics.StaminaCostPerAction)
+                            issues.Add($"Stamina 条目数量 {cost.amount}≠基准 {GIC.Battle.BattleMetrics.StaminaCostPerAction}——" +
+                                       "体力按施法者层级换算（眷属0/伙伴5/魔神10），声明值=基准值，请改回基准防口径漂移");
                     }
                 }
             }

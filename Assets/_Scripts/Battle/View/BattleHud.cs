@@ -165,7 +165,10 @@ namespace GIC.Battle
             public SkillIconView view;
             public TextCombiner nameText;
             public OrbitBeamsUi orbitFx; // 瞄准态环绕光束（2026-09-27 选中提示特效，懒建随键存留）
+            public CanvasGroup tierGateGroup; // 层级门控置灰组（D-5：眷属/伙伴 AI 域键半透明——懒建）
             public bool IsMove => type == SkillType.Move;
+            /// <summary>势力技能键（号令入口，D-5 层级门控豁免——伙伴选中可点=号令；docs/active/32 §8）</summary>
+            public bool IsFaction => type == SkillType.Enso || type == SkillType.Contract;
         }
 
         // 高亮（世界层）+ 选中标记
@@ -1256,10 +1259,17 @@ namespace GIC.Battle
                 return false;
             }
             var selData = TryGetUnitData(sel.unitName);
-            if (selData == null || selData.starLevel < 3)
+            var selTier = selData != null ? UnitTierHelper.FromStars(selData.starLevel) : UnitTier.Familiar;
+            if (selTier == UnitTier.Familiar)
             {
-                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为低级单位（自主行动）");
+                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为眷属（启发式脑自主行动）");
                 ShowBattleToast("Battle_MinorUnit");
+                return false;
+            }
+            if (selTier == UnitTier.Companion && (_aimDef == null || !_aimDef.IsFaction))
+            {
+                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为伙伴（评分制脑自主行动），仅势力技能可号令");
+                ShowBattleToast("Battle_Autonomous");
                 return false;
             }
 
@@ -1345,6 +1355,10 @@ namespace GIC.Battle
         {
             if (def == null || _layoutEditing) return; // 编辑期点击让位给拖拽/选框（拖拽板在控件之上）
 
+            // 层级门控键（D-5 置灰+「AI 自主」角标=视觉提示）：**点击/拖拽照常进瞄准**——显示瞄准格
+            // =直观看到技能范围、可留待定金格（2026-09-29 用户拍板）；操控权拦截在提交时轻弹窗
+            // （SubmitAim 防线：眷属 Battle_MinorUnit / 伙伴非势力技能 Battle_Autonomous / 非己方
+            // Battle_NotYourUnit，拦截后保持瞄准态继续查看——C1 同款交互模式）
             if (_state == HudState.Aiming)
             {
                 if (_aimDef == def)
@@ -1385,6 +1399,8 @@ namespace GIC.Battle
             // Selectable 自身处理器，转发件须手动检查，docs/14 §63）
             var selectButton = def.view != null ? def.view.GetComponent<SelectButton>() : null;
             if (selectButton != null && !selectButton.interactable) return;
+            // 层级门控键（眷属/伙伴 AI 域）可起手拖动瞄准——显示范围+留待定，拦截在提交时轻弹窗
+            // （2026-09-29 用户拍板，同点击式口径）
 
             if (_state == HudState.Aiming) ExitAiming(); // 换技能重瞄准（_dragAiming 随收口清零）
             if (_state != HudState.UnitSelected) return;  // Idle（无选中单位）不响应
@@ -2047,22 +2063,30 @@ namespace GIC.Battle
         }
 
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
-        /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）；
-        /// 元能不足=置灰（B6a：爆发/延奏等 EnergyCost>0 的技能，门槛=技能消耗值，门槛随快照刷新）；
-        /// 体力不足=置灰（B6d：战技/爆发消耗 10 体力，docs/05 §5.1——门槛随快照刷新）。
-        /// 查看态恒可点（2026-09-26 选中开放任意单位：敌人/低级单位无操控权即无消耗语义，
-        /// 元能/体力置灰只约束己方可操控单位——勿把"查看敌人技能盘"也灰掉）</summary>
+        /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）。
+        /// 置灰两源（D-5 置灰单源，docs/active/32 §8——置灰原因=「AI 自主」或「资源不足」，后者对魔神才可能）：
+        /// ①「AI 自主」层级门控——眷属/伙伴（任意归属，含敌方——其行动域同属 AI）的移动/战技/爆发键=
+        ///   AI 域：半透明置灰+「AI 自主」角标；**interactable 保持 true**（点击/拖拽照常进瞄准——显示
+        ///   瞄准格直观看到技能范围、可留待定金格；操控权拦截在提交时轻弹窗=SubmitAim 防线，
+        ///   2026-09-29 用户拍板）；
+        /// ②「资源不足」——玩家域（己方魔神全键/己方伙伴势力技能键）按 HasSkillResources 门槛
+        ///   （元能/体力=消耗值随快照刷新，体力按层级换算镜像）；查看态（敌方/眷属）无操控权=
+        ///   无消耗语义恒可点——勿把"查看敌人技能盘"也灰掉</summary>
         private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null) return;
             var data = GetSelectedSkillData(def);
             def.view.gameObject.SetActive(data != null);
+            bool tierGated = data != null && IsTierGatedButton(def);
+            ApplyTierGateVisual(def, tierGated);
             var selectButton = def.view.GetComponent<SelectButton>();
             if (selectButton != null)
             {
-                bool controllable = IsSelectedControllable();
-                selectButton.interactable = data != null
-                    && (!controllable || HasSkillResources(data));
+                if (tierGated)
+                    selectButton.interactable = true; // 门控置灰=纯视觉提示——点击/拖拽照常进瞄准查看（拦截在提交时）
+                else
+                    selectButton.interactable = data != null
+                        && (!IsSelectedPlayerDomain(def.type) || HasSkillResources(data));
             }
             if (data == null) return;
 
@@ -2075,26 +2099,62 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>选中单位是否可操控=己方高级单位（行动提交门槛，SubmitAim 同口径）；
-        /// false=查看态（敌人/低级/无配置）——技能盘与瞄准开放，仅提交被轻提示拦截</summary>
-        private bool IsSelectedControllable()
+        /// <summary>该技能键是否受层级门控（D-5，docs/active/32 §8）：眷属/伙伴的 移动/战技/爆发 键=
+        /// AI 域（置灰+角标）；势力技能键（延奏/契约）豁免=号令入口对伙伴开放；魔神选中恒不门控（全亮）</summary>
+        private bool IsTierGatedButton(SkillButtonDef def)
+        {
+            if (def == null || def.IsFaction) return false;
+            var tier = SelectedUnitTier();
+            return tier == UnitTier.Familiar || tier == UnitTier.Companion;
+        }
+
+        /// <summary>层级门控视觉：半透明置灰（懒建 CanvasGroup；「AI 自主」文字角标已按用户拍板
+        /// 2026-09-29 移除——置灰本身+提交时轻弹窗已足够传达，prefab AutoBadge 节点同步删除）</summary>
+        private void ApplyTierGateVisual(SkillButtonDef def, bool gated)
+        {
+            if (def?.view == null) return;
+            if (def.tierGateGroup == null)
+                def.tierGateGroup = def.view.GetComponent<CanvasGroup>();
+            if (def.tierGateGroup == null)
+                def.tierGateGroup = def.view.gameObject.AddComponent<CanvasGroup>();
+            def.tierGateGroup.alpha = gated ? 0.55f : 1f;
+        }
+
+        /// <summary>选中单位层级（D 批次操控分层，docs/active/32 §2；无配置数据按眷属档=保守全门控）</summary>
+        private UnitTier SelectedUnitTier()
+        {
+            var data = GetSelectedUnitData();
+            return data != null ? UnitTierHelper.FromStars(data.starLevel) : UnitTier.Familiar;
+        }
+
+        /// <summary>玩家域判定（D-5 资源门槛的前提，取代旧 IsSelectedControllable=己方≥3星口径）：
+        /// 己方魔神=全键玩家域（全手操）；己方伙伴=仅势力技能键（号令入口）；眷属/敌方单位=
+        /// 无操控权（查看态恒可点，提交被防线轻提示拦截）</summary>
+        private bool IsSelectedPlayerDomain(SkillType buttonType)
         {
             var snapshot = _session?.Player?.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null || sel.playerId != _myPlayerId) return false;
             var data = TryGetUnitData(sel.unitName);
-            return data != null && data.starLevel >= 3;
+            if (data == null) return false;
+            var tier = UnitTierHelper.FromStars(data.starLevel);
+            if (tier == UnitTier.Archon) return true;
+            return tier == UnitTier.Companion
+                && (buttonType == SkillType.Enso || buttonType == SkillType.Contract);
         }
 
         /// <summary>技能资源门槛单源（统一消耗模型，docs/active/30 §2.3——预判/结算同形纪律）：
         /// 逐条镜像 ResourceGate.Has（元能=选中单位快照 energy / 体力·摩拉=本端缓存 /
         /// 物品=本地手牌镜像条目 count——Host 侧 HasAll 同口径）。
         /// **C-2 起消耗全量迁移完成：costs 空=免费技能**（无消耗语义，数据即事实）；
+        /// 体力条目按**选中单位层级换算**镜像（D 批次操控分层 docs/active/32 §5.2——实际扣值=施法者
+        /// 层级表 眷属0/伙伴5/魔神10，声明值=基准/校验值；与 ResourceGate.StaminaAmountOf 同口径）；
         /// 旧 EnergyCost 参数/体力类型分档双查已退役</summary>
         private bool HasSkillResources(SkillConfig.SkillData skillData)
         {
             if (skillData == null || !skillData.HasCosts) return true; // 免费技能/空数据
             var snapshot = _session?.Player?.LatestSnapshot;
+            var selUnitData = GetSelectedUnitData();
             foreach (var cost in skillData.costs)
             {
                 if (cost == null || cost.amount <= 0) continue;
@@ -2105,8 +2165,13 @@ namespace GIC.Battle
                         if (sel == null || sel.energy < cost.amount) return false;
                         break;
                     case CostKind.Stamina:
-                        if (_myStamina < cost.amount) return false;
+                    {
+                        int amount = selUnitData != null
+                            ? UnitTierHelper.StaminaCostOf(UnitTierHelper.FromStars(selUnitData.starLevel))
+                            : cost.amount; // 无配置兜底按声明值（理论不可达）
+                        if (amount > 0 && _myStamina < amount) return false;
                         break;
+                    }
                     case CostKind.Mora:
                         if (_myMora < cost.amount) return false;
                         break;
@@ -2202,13 +2267,28 @@ namespace GIC.Battle
                 def.nameText.AddEntry(nameId.GetEntry());
             }
 
-            // 体力置灰（B6d→C-2 costs 单源）：移动消耗走移动技能 costs 镜像（HasSkillResources 镜像
-            // ResourceGate.HasAll）——仅约束己方可操控单位（2026-09-26 查看态恒可点，同 ApplySkillButton 口径）；
-            // 无 Move 条目单位=常量兜底（Host MoveExecutor.GetMoveCosts 同口径）
+            // 置灰两源（同 ApplySkillButton D-5 单源口径）：层级门控（眷属/伙伴的移动=AI 域——置灰+角标、
+            // interactable 保持 true，点击/拖拽照常进瞄准查看——拦截在提交时轻弹窗）；资源门槛仅玩家域
+            // （己方魔神）——移动消耗走移动技能 costs 镜像（HasSkillResources 镜像 ResourceGate.HasAll）；
+            // 无 Move 条目单位=常量兜底（Host MoveExecutor.GetMoveCosts 同口径），体力按选中单位层级换算镜像
+            // （D 批次 docs/active/32 §5.2：眷属0/伙伴5/魔神10）
+            bool tierGated = IsTierGatedButton(def);
+            ApplyTierGateVisual(def, tierGated);
             if (def.view.selectButton != null)
-                def.view.selectButton.interactable = !IsSelectedControllable()
-                    || (move != null ? HasSkillResources(move)
-                        : _myStamina >= BattleMetrics.StaminaCostPerAction);
+            {
+                if (tierGated)
+                    def.view.selectButton.interactable = true; // 门控置灰=纯视觉提示——照常进瞄准查看（拦截在提交时）
+                else
+                {
+                    var selUnitDataFallback = GetSelectedUnitData();
+                    int fallbackStamina = selUnitDataFallback != null
+                        ? UnitTierHelper.StaminaCostOf(UnitTierHelper.FromStars(selUnitDataFallback.starLevel))
+                        : BattleMetrics.StaminaCostPerAction;
+                    def.view.selectButton.interactable = !IsSelectedPlayerDomain(SkillType.Move)
+                        || (move != null ? HasSkillResources(move)
+                            : _myStamina >= fallbackStamina);
+                }
+            }
         }
 
         /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>
