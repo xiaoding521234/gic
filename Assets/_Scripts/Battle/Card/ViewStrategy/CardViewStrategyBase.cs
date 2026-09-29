@@ -21,7 +21,9 @@ namespace GIC.Battle
             card.countText.text = data.count.ToString();
         }
 
-        /// <summary>皮肤写入公共部分：更新存档 skin 并把对应图赋给目标 Image</summary>
+        /// <summary>皮肤写入公共部分：更新存档 skin 并把对应图赋给目标 Image。
+        /// 注意：直写的是存档实例——标脏责任在调用方（唯一调用链=CardDetailView.OnSkinButtonClicked
+        /// 已包 SaveManager.Modify，此处同值幂等重写；新调用方接入时必须自行 Modify 标脏）</summary>
         protected static void ApplySkinTo(Card card, int skinIndex, Image targetImage)
         {
             card.saveCardData.skin = skinIndex;

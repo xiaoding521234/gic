@@ -20,7 +20,6 @@ namespace GIC.UI
         private ViewType viewType;
         private SkillConfig.SkillData skillData;
         private UnitConfig.UnitData unitData;
-        private BaseSkill skill;
 
         public SkillDetailView skillDetailView;
 
@@ -62,12 +61,6 @@ namespace GIC.UI
                 if (skillCircle != null)
                     skillCircle.color = SkillCircleColor.colorPassive;
             }
-        }
-
-        public void InitWithSkill(BaseSkill skill, ViewType viewType, SkillDetailView skillDetailView)
-        {
-            this.viewType = viewType;
-            this.skill = skill;
         }
 
         /// <summary>选中态=两束元素色环绕弧光（2026-09-27 拍板全项目统一：打钩图退役、
@@ -133,6 +126,9 @@ namespace GIC.UI
         }
     }
 
+    /// <summary>技能圈三色（主动橙/不可用米白/被动紫）=SkillIconView 组件级固有视觉（背包/战斗同色），
+    /// 非战斗域全局配色——刻意不入 BattlePalette（本组件在 UI 层，读 Battle 域资产=反向依赖）。
+    /// 归属随 B7 域内化（SkillIconView 归属定案）再统一裁决，已登记 docs/11。</summary>
     public static class SkillCircleColor
     {
         public static Color colorAvailable = "FF9800".FromHex();

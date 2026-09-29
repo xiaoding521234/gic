@@ -211,7 +211,15 @@ namespace GIC.UI
                 hudGo.name = "BattleHud";
                 _hud = hudGo.GetComponent<BattleHud>();
             }
+            // 批9 复审②：相机守卫补全——原 null 时静默传 HUD.Bind，板面点击/拖动跟随全链静默死；
+            // 守卫链（EventSystem/Board/HUD prefab 缺失都 Error+DoClose）唯独相机漏，同款补齐
             var cameraCtrl = GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>();
+            if (cameraCtrl == null)
+            {
+                GICLog.Error("[BattleScreen] 场景缺少 BattleCamera/BattleCameraController，HUD 板面交互链不可用——无法开战");
+                DoClose();
+                yield break;
+            }
             _hud.Bind(_session, _board, cameraCtrl, Close);
 
             _session.StartBattle();

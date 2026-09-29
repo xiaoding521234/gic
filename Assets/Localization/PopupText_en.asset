@@ -114,6 +114,10 @@ MonoBehaviour:
     m_Localized: Companion units act on their own; only faction skills can command
     m_Metadata:
       m_Items: []
+  - m_Id: 34521518164226048
+    m_Localized: "Action already confirmed \u2014 new picks won't execute"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

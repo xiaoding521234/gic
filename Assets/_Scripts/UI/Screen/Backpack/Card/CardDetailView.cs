@@ -129,7 +129,14 @@ namespace GIC.UI
                 return;
             }
 
-            card.saveCardData.skin = (card.saveCardData.skin + 1) % totalSkins;
+            // 存档写纪律（批3②修复）：skin 落存档必须经 Modify 标脏——此前直写 SaveCardData 实例
+            // 绕过标脏，换肤后退出可能不落盘；Modify 闭包改捕获实例（SaveManager 注释同款先例）
+            int newSkin = (card.saveCardData.skin + 1) % totalSkins;
+            var saveManager = Wargame.Instance?.Context?.Get<SaveManager>();
+            if (saveManager != null)
+                saveManager.Modify(_ => card.saveCardData.skin = newSkin);
+            else
+                card.saveCardData.skin = newSkin; // 无容器兜底（理论不可达）
             _strategy.ApplySkin(card, card.saveCardData.skin);
             RefreshSkinDisplay();
 

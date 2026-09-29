@@ -51,12 +51,11 @@ namespace GIC.Battle
                 messageType = type,
                 json = _serializer.Serialize(message),
             };
-            var wire = _serializer.Serialize(envelope);
+            // 双层信封序列化持续验证可序列化性（B7 联机前置保障——Serialize 抛异常即暴露消息缺陷；
+            // 批9 复审①：原每消息 Debug.Log 刷屏已删——命令流每回合几十条×2 方向持续刷、且
+            // Debug.Log 不受 GICLog 编译期删除纪律管；验证本质=Serialize 调用本身每条消息都在执行）
+            _serializer.Serialize(envelope);
             _clientHandler?.Invoke(envelope.messageType, envelope.json);
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            // 本地也落一份 wire 字符串，证明消息可完整序列化（B7 联机前置保障）
-            UnityEngine.Debug.Log($"[BattleTransport] Host→Client {type} ({wire.Length} chars)");
-#endif
         }
 
         public void ClientSend(BattleMessageType type, object message)
@@ -66,11 +65,8 @@ namespace GIC.Battle
                 messageType = type,
                 json = _serializer.Serialize(message),
             };
-            var wire = _serializer.Serialize(envelope);
+            _serializer.Serialize(envelope); // 序列化验证保留、Log 删（同 HostSend）
             _hostHandler?.Invoke(envelope.messageType, envelope.json);
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            UnityEngine.Debug.Log($"[BattleTransport] Client→Host {type} ({wire.Length} chars)");
-#endif
         }
     }
 

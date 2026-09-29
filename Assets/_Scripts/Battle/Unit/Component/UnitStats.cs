@@ -161,10 +161,12 @@ namespace GIC.Battle
                 }
             }
 
-            int finalBase = Mathf.RoundToInt(baseValue * (1 + basePercent / 100f) + baseFlat);
-            int finalMin = Mathf.RoundToInt(min * (1 + minPercent / 100f) + minFlat);
-            int finalMax = Mathf.RoundToInt(max * (1 + maxPercent / 100f) + maxFlat);
-            int finalValue = Mathf.RoundToInt(finalBase * (1 + valuePercent / 100f) + valueFlat);
+            // 末点截断（2026-09-29 批3④统一口径：与伤害/治疗 FloorToInt 同拍板——全项目终值单一取整
+            // 口径，float 计算到底、末点单次舍弃小数；此前 RoundToInt 为两套并存口径的另一半）
+            int finalBase = Mathf.FloorToInt(baseValue * (1 + basePercent / 100f) + baseFlat);
+            int finalMin = Mathf.FloorToInt(min * (1 + minPercent / 100f) + minFlat);
+            int finalMax = Mathf.FloorToInt(max * (1 + maxPercent / 100f) + maxFlat);
+            int finalValue = Mathf.FloorToInt(finalBase * (1 + valuePercent / 100f) + valueFlat);
 
             return Mathf.Clamp(finalValue, finalMin, finalMax);
         }
