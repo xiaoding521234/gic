@@ -55,6 +55,12 @@ namespace GIC.Battle
             if (buckets.Count > 0)
                 maxSpeed = buckets[0].speed;
 
+            // 行动预告（2026-09-29 执行预览拍板）：分桶后、首片推送前下发——与后续攻速片一一对应；
+            // 部署段（已抽出）/玩家级 Pass（已剔除）天然不入表；单位级 Pass=无行动不入（预览只收
+            // 真行动）；attackSpeed 取分桶同源 UnitStats 活值。客户端据此建多行执行预览（攻速 10 点
+            // 分区间成行，HUD 侧归组——Host 仍按精确攻速分片结算，两套分组互不干扰）
+            SendTurnPlan(turnNumber, actions);
+
             int sliceIndex = hasDeploySegment ? 1 : 0; // 部署段占 0 号（ack 键 turn:slice 唯一性）
             foreach (var bucket in buckets)
             {
@@ -526,6 +532,31 @@ namespace GIC.Battle
                     casterState != null ? casterState.position : BattleCell.zero));
                 return;
             }
+        }
+
+        /// <summary>
+        /// 行动预告下发（2026-09-29 执行预览）：全部真行动扁平化广播（玩家上交+低级单位+AI 脑同源；
+        /// 部署/玩家级 Pass 不入——前者已抽出、后者已剔除；单位级 Pass 预览无行动不入）。
+        /// 攻速取 UnitStats 活值=分桶同源；未知名单位跳过（与分桶 Warn 同口径）
+        /// </summary>
+        private void SendTurnPlan(int turnNumber, List<ActionData> actions)
+        {
+            var msg = new TurnPlanMessage { turnNumber = turnNumber };
+            foreach (var action in actions)
+            {
+                if (action.actionType == ActionType.Pass) continue; // 空过=无行动不入预告
+                var unit = _sim.GetUnit(action.unitId);
+                if (unit == null) continue;
+                msg.entries.Add(new TurnPlanEntry
+                {
+                    unitId = action.unitId,
+                    playerId = action.playerId,
+                    actionType = (int)action.actionType,
+                    skillIndex = action.skillIndex,
+                    attackSpeed = unit.GetUnitComponent<UnitStats>()?.AttackSpeed ?? 0,
+                });
+            }
+            _transport.HostSend(BattleMessageType.TurnPlan, msg);
         }
 
         /// <summary>

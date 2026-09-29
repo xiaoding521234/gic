@@ -14,9 +14,11 @@ namespace GIC.Battle
 {
     /// <summary>
     /// BattleHud 顶栏分件（2026-09-22 prefab 化：构建退役为寻址接线；结构改在 prefab 编辑器里做）：
-    /// 回合中枢/选择倒计时/战斗时钟/攻速队列条/我方信息块（左上角摩拉·体力物品牌计数，B6d）/
-    /// 设置钮 的引用解析 + 运行时刷新。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
-    /// 敌方信息块已移除（2026-09-25 拍板「不需要显示敌人的资源等信息」）。
+    /// 回合中枢/选择倒计时/战斗时钟/我方信息块（左上角摩拉·体力物品牌计数，B6d）/设置钮
+    /// 的引用解析 + 运行时刷新。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
+    /// 敌方信息块已移除（2026-09-25 拍板「不需要显示敌人的资源等信息」）；
+    /// **攻速队列条已退役（2026-09-29 拍板整体删除——执行阶段改由 BattleExecutionPreview 多行
+    /// 行动预览接管，槽/prefab 代码/布局键全清；QueueSlot.prefab 保留作预览单位块嵌套件）**。
     /// </summary>
     public partial class BattleHud
     {
@@ -34,12 +36,6 @@ namespace GIC.Battle
         private TMP_Text _clockText;
         private TextCombiner _clockCombiner;
 
-        // 攻速队列条（选择阶段=执行预览；执行阶段高亮当前片）
-        private RectTransform _queueBar;
-        private TMP_Text _queueLabelText;
-        private TextCombiner _queueLabelCombiner;
-        private readonly List<QueueSlot> _queueSlots = new List<QueueSlot>();
-
         // 我方资源（B6d 经济闭环）：左上角 myinfo 块的摩拉/体力=物品牌计数（用户拍板
         // 「体力/摩拉实际也是手牌（物品牌）+屏幕左上角显示数量」）——公用组件 ItemCounterChip
         // （抽自祈愿界面货币显示改造公用化）。_myMora/_myStamina=当前值缓存（快照权威重置+命令增量维护）。
@@ -48,14 +44,6 @@ namespace GIC.Battle
         private ItemCounterChip _myStaminaChip;
         private int _myMora;
         private int _myStamina;
-
-        private class QueueSlot
-        {
-            public Image frame;
-            public TextCombiner speed;
-            public int attackSpeed;
-            public Color baseColor;
-        }
 
         private void ResolveTopBar()
         {
@@ -87,16 +75,6 @@ namespace GIC.Battle
             _clockText = FindSlotText("clock", "ClockText");
             _clockCombiner = FindSlotCombiner("clock", "ClockText");
             RecolorText(_clockCombiner, Palette.文字米白);
-
-            // 攻速队列条：槽内容=QueueBar 容器，内含 QueueLabel
-            if (_layoutByKey.TryGetValue("queue", out var queue))
-            {
-                _queueBar = queue.content;
-                _queueLabelText = _queueBar.Find("QueueLabel")?.GetComponent<TMP_Text>();
-                _queueLabelCombiner = _queueLabelText != null ? _queueLabelText.GetComponent<TextCombiner>() : null;
-                RecolorText(_queueLabelCombiner, Palette.暖金);
-            }
-            else GICLog.Warn("[BattleHud] 布局槽缺失：queue");
 
             // 我方信息块（左上角）：徽标+队营色 chrome 保留，体力/摩拉换物品牌计数 chip（B6d——
             // 结构契约=槽内 MoraChip/StaminaChip 两枚 ItemCounterChip；**图标初始化挪到 Bind 注入后**——
@@ -208,88 +186,6 @@ namespace GIC.Battle
             else if (statKind == BattleCommand.StatKindStamina) _myStamina = Mathf.Max(0, _myStamina + delta);
             else return;
             RefreshMyResourceChips();
-        }
-
-        private void UpdateQueueLabel()
-        {
-            if (_queueLabelCombiner == null) return;
-            string key = _session.Flow.Phase == BattlePhase.Selecting ? "Battle_QueuePreview" : "Battle_Executing";
-            _queueLabelCombiner.SetSingleEntry(new LocalizedString("UIText", key));
-        }
-
-        /// <summary>重建队列槽：存活单位按攻速降序（统一执行阶段跨双方），头像+攻速+队营色框</summary>
-        private void RebuildQueue(BattleSnapshot snapshot)
-        {
-            ClearQueueSlots();
-            if (_queueBar == null) return;
-
-            var order = snapshot.units
-                .Where(u => u.isCorpse == 0)
-                .OrderByDescending(u => u.attackSpeed)
-                .Take(Mathf.Max(1, 队列槽位数));
-
-            int index = 0;
-            foreach (var u in order)
-            {
-                var slotGo = new GameObject($"QueueSlot_{u.unitName}");
-                var rect = slotGo.AddComponent<RectTransform>();
-                rect.SetParent(_queueBar, false);
-                rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-                float slotSize = 队列槽边长;
-                rect.anchoredPosition = new Vector2(160f + index * (slotSize + 队列槽间距) + slotSize * 0.5f, 0f);
-                rect.sizeDelta = new Vector2(slotSize, slotSize);
-
-                // 队营色底盘框（circle 现成底盘图）；队营色=TeamType 口径（2026-09-25 三轮审查 C2：2v2 队友=我方色）
-                var frame = slotGo.AddComponent<Image>();
-                frame.sprite = Resources.Load<Sprite>("UI/Skills/circle");
-                Color baseColor = (TeamType)u.team == MyTeam ? Palette.我方主色 : Palette.敌方主色;
-                frame.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.55f);
-
-                // 头像（UnitConfig 数据链）
-                var avatarGo = new GameObject("Avatar");
-                var avatarRect = avatarGo.AddComponent<RectTransform>();
-                avatarRect.SetParent(rect, false);
-                avatarRect.anchorMin = avatarRect.anchorMax = new Vector2(0.5f, 1f);
-                avatarRect.pivot = new Vector2(0.5f, 1f);
-                avatarRect.anchoredPosition = Vector2.zero;
-                float avatarSize = slotSize * 0.62f;
-                avatarRect.sizeDelta = new Vector2(avatarSize, avatarSize);
-                var avatar = avatarGo.AddComponent<Image>();
-                avatar.sprite = GetAvatarSprite(u.unitName);
-                avatar.preserveAspect = true;
-
-                // 攻速数字（槽底）
-                var speedText = MakeText("Speed", rect, 顶栏字号 * 0.62f, Palette.暖金);
-                SetRect(speedText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                    new Vector2(0f, 2f), new Vector2(slotSize, 顶栏字号 * 0.62f + 4f));
-                var speedCombiner = AttachCombiner(speedText);
-                speedCombiner.SetSingleEntry(u.attackSpeed.ToString());
-
-                _queueSlots.Add(new QueueSlot
-                {
-                    frame = frame,
-                    speed = speedCombiner,
-                    attackSpeed = u.attackSpeed,
-                    baseColor = baseColor,
-                });
-                index++;
-            }
-        }
-
-        private void ClearQueueSlots()
-        {
-            foreach (var slot in _queueSlots)
-                if (slot.frame != null) Destroy(slot.frame.gameObject);
-            _queueSlots.Clear();
-        }
-
-        private Sprite GetAvatarSprite(string unitName)
-        {
-            // _unitConfig=[Autowired] 注入（主分件声明；Y10），不再懒加载
-            return _unitConfig != null && Enum.TryParse<UnitName>(unitName, out var name)
-                && _unitConfig.TryGetUnitData(name, out var data)
-                ? data.avatar : null;
         }
     }
 }

@@ -51,14 +51,6 @@ namespace GIC.Battle
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；接线时活色覆盖烘焙兜底色）
         private static BattlePalette Palette => BattlePalette.Instance;
 
-        [Header("文字（运行时动态件用）")]
-        [SerializeField] private float 顶栏字号 = 34f;
-
-        [Header("攻速队列条（运行时重建）")]
-        [SerializeField] private float 队列槽边长 = 64f;
-        [SerializeField] private float 队列槽间距 = 14f;
-        [SerializeField] private int 队列槽位数 = 6;
-
         [Header("手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移）")]
         [Tooltip("默认下沉藏量=半张卡（卡高 240 之半，按手牌槽缩放自动换算画布量）")]
         [SerializeField] private float 手牌下沉半卡 = 120f;
@@ -297,12 +289,12 @@ namespace GIC.Battle
             ApplySavedLayoutOnStart();
 
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
-            _session.Player.OnSegmentPlaying += OnSegmentPlayingHandler;
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
             _session.Flow.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
+            InitExecutionPreview(); // 执行预览（2026-09-29）：TopBar 攻速队列退役后的执行阶段多行行动预览
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
             if (_inputManager != null)
@@ -332,7 +324,6 @@ namespace GIC.Battle
                 if (_session.Player != null)
                 {
                     _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
-                    _session.Player.OnSegmentPlaying -= OnSegmentPlayingHandler;
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
                     _session.Player.OnItemConsumed -= OnItemConsumedHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
@@ -420,27 +411,61 @@ namespace GIC.Battle
                 ExitAiming();
                 DeselectUnit();
                 if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
+                // 2026-09-29 执行预览拍板「隐藏掉玩家之前打开的技能或手牌」：技能盘已随 DeselectUnit
+                // 收起，手牌随相位隐藏让位中下方预览（CanvasGroup 渐隐勿 SetActive——滚动壳/热区
+                // 探测逻辑常驻零中断）；回选择阶段恢复
+                SetHandVisible(false);
             }
             else
             {
                 _actionConfirmed = false; // 新回合选择阶段开：完成选择定死复位（编辑期也要复位——编辑不挡阶段推进）
                 if (!_layoutEditing)
                     SetTip("Battle_TipSelect");
+                SetHandVisible(true);
             }
             RefreshFromSnapshot(_session.Player.LatestSnapshot);
         }
 
-        /// <summary>执行阶段：高亮当前攻速片的行动者（其余降透明）</summary>
-        private void OnSegmentPlayingHandler(int sliceAttackSpeed)
+        /// <summary>手牌区相位显隐（2026-09-29 执行预览批）：执行/结束阶段隐藏、选择阶段恢复。
+        /// CanvasGroup 渐隐（0.2s）+ 射线关闭——手牌滚动壳与 UpdateHandHover 常驻逻辑零中断</summary>
+        private void SetHandVisible(bool visible)
         {
-            foreach (var slot in _queueSlots)
+            if (_handZone == null) return;
+            var group = _handZone.GetComponent<CanvasGroup>();
+            if (group == null) group = _handZone.gameObject.AddComponent<CanvasGroup>();
+            group.interactable = visible;
+            group.blocksRaycasts = visible;
+            if (_handFadeRoutine != null) StopCoroutine(_handFadeRoutine);
+            var from = group.alpha;
+            var target = visible ? 1f : 0f;
+            _handFadeRoutine = StartCoroutine(BattleViewTween.Over(0.2f, t =>
             {
-                bool active = slot.attackSpeed == sliceAttackSpeed;
-                var baseColor = slot.baseColor;
-                slot.frame.color = active
-                    ? Palette.高亮金
-                    : new Color(baseColor.r, baseColor.g, baseColor.b, 0.30f);
+                if (group != null) group.alpha = Mathf.Lerp(from, target, t);
+            }));
+        }
+
+        private Coroutine _handFadeRoutine;
+
+        /// <summary>执行预览装配（2026-09-29 拍板：TopBar 攻速队列退役——执行阶段中下方多行行动预览）：
+        /// prefab 实例化到 HUD 画布顶层（全部子件 raycastTarget 关）+组件自订阅相位/预告/片开始三事件</summary>
+        private void InitExecutionPreview()
+        {
+            var prefab = Resources.Load<GameObject>("Prefabs/Battle/ExecutionPreview");
+            if (prefab == null)
+            {
+                GICLog.Warn("[BattleHud] ExecutionPreview prefab 未找到（Resources/Prefabs/Battle/ExecutionPreview）——执行预览不显示");
+                return;
             }
+            var go = Instantiate(prefab, _canvas.transform, false);
+            go.name = "ExecutionPreview";
+            go.transform.SetAsLastSibling(); // 顶层纯展示件（无射线交互）
+            var preview = go.GetComponent<BattleExecutionPreview>();
+            if (preview == null)
+            {
+                GICLog.Warn("[BattleHud] ExecutionPreview prefab 缺 BattleExecutionPreview 组件——执行预览不显示");
+                return;
+            }
+            preview.Init(_session, _myPlayerId);
         }
 
         private void Update()
@@ -518,9 +543,7 @@ namespace GIC.Battle
             // 我方资源 chips（左上角摩拉/体力物品牌计数，B6d；敌方资源不显示——2026-09-25 拍板）
             UpdateMyResources(snapshot);
 
-            // 攻速队列条
-            RebuildQueue(snapshot);
-            UpdateQueueLabel();
+            // （攻速队列条已退役 2026-09-29——执行阶段改由 BattleExecutionPreview 多行预览接管）
 
             // 手牌（数量；卡列表 B8 接入）
             // 手牌（B6c：卡列表=当前卡组完整投影，含物品卡；数量文本与卡列表并存——文本做标签）

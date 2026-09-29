@@ -68,6 +68,8 @@ namespace GIC.Battle
                 msg => player.OnTurnEnd(msg));
             session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver,
                 msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播（订阅方=HUD 胜负提示）
+            session._clientRouter.Register<TurnPlanMessage>(BattleMessageType.TurnPlan,
+                msg => player.OnTurnPlan(msg)); // 行动预告（2026-09-29 执行预览：分桶后、首片推送前）
             transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
 
             player.Bind(transport, sim.Map);
