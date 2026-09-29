@@ -22,9 +22,13 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 回合状态机（B6b 四阶段：低级单位决策→玩家选择→统一执行→回合结束，docs/04 §4.1；
-    /// 阶段一/三/四已实装，低级决策与玩家选择同处 Selecting 推流——低级行动由 Host 在
-    /// 快照广播时即生成（决策先于玩家选择完成、不依赖玩家本回合选择），执行阶段统一攻速排序结算）
+    /// 回合状态机（D 批次操控分层五阶段，docs/active/32 §3 / docs/04 §4.1）：
+    /// 眷属决策（1-2★ 启发式脑，选择阶段头 Host 内部生成）→ 玩家选择（所有玩家同时提交 1 配额：
+    /// 号令/部署/升命/购买/物品/魔神操作/空过）→ **伙伴决策（3-4★ 评分制脑——收齐全部玩家选择后、
+    /// 开演前的机器瞬时阶段：感知己方已提交选择、跳过已被号令单位，无选择时限无 UI 态）** →
+    /// 统一执行（眷属+伙伴+玩家配额行动按攻速排序）→ 回合结束。
+    /// 「覆盖」机制不采用（玩家先选、伙伴后决策=天然无替换，伙伴决策额外获得己方玩家意图输入）；
+    /// 零新协议（伙伴决策=Host 内部阶段，与眷属决策同性质；本地双开同进程语义一致，LAN 无泄露路径）。
     /// </summary>
     public class TurnFlowController : MonoBehaviour
     {
@@ -134,9 +138,10 @@ namespace GIC.Battle
 
         private readonly Dictionary<string, ActionData> _pendingActions = new Dictionary<string, ActionData>();
 
-        /// <summary>低级单位（1~2星）本回合自主行动（B6b：Host 在选择阶段头生成——
-        /// docs/04 §4.1 低级单位决策先于玩家选择完成；不占玩家行动配额）</summary>
-        private List<ActionData> _minorUnitActions = new List<ActionData>();
+        /// <summary>眷属单位（1~2星）本回合自主行动（B6b 起：Host 在选择阶段头生成——
+        /// docs/04 §4.1 眷属决策先于玩家选择完成；不占玩家行动配额、不感知玩家本回合选择；
+        /// D-6 术语迁移改名 _minorUnitActions→_familiarUnitActions）</summary>
+        private List<ActionData> _familiarUnitActions = new List<ActionData>();
 
         private Coroutine _resolveCoroutine;
 
@@ -168,9 +173,9 @@ namespace GIC.Battle
             _pendingActions.Clear();
             _ackedKeys.Clear();
 
-            // 阶段一：低级单位决策（先于玩家选择完成、只决策不结算——快照广播时即定，
-            // 玩家选择期间看不见其行动内容，docs/04 §4.1）
-            _minorUnitActions = LowUnitBrain.DecideAll(_sim, TurnNumber);
+            // 阶段一：眷属决策（1-2★ 启发式脑——先于玩家选择完成、只决策不结算，快照广播时即定，
+            // 玩家选择期间看不见其行动内容，docs/04 §4.1；D-6 已随术语迁移改名 FamiliarBrain）
+            _familiarUnitActions = FamiliarBrain.DecideAll(_sim, TurnNumber);
 
             _transport.HostSend(BattleMessageType.Snapshot, new SnapshotMessage
             {
@@ -252,13 +257,20 @@ namespace GIC.Battle
                 return;
             }
 
-            // 低级单位防线（2026-09-25 三轮审查 C1）：1~2 星单位行动由 LowUnitBrain 自主决策
-            // （不占玩家配额、不走玩家上交通道）——玩家上交低级单位为行动者会与 _minorUnitActions
-            // 同单位双行动（双 mover 并发推进=移动翻倍/写回互踩/双 Move 命令）。UI 侧已同步过滤
-            // （BattleHud 不可选中低级单位），此处 Host 权威兜底（B7 LAN 客户端可凭空上交，双保险）
-            if (!BattleHeuristics.IsMajorUnit(unit))
+            // 单位级行动域校验（D 批次操控分层，docs/active/32 §1/§4）：眷属=AI 域（启发式脑自主，
+            // 不占配额不走玩家通道）；伙伴=AI 域——玩家仅可**号令**（势力技能 Enso/Contract，占 1 配额），
+            // 移动/战技/爆发上交会与伙伴自主决策同单位双行动（双 mover 并发推进=移动翻倍/写回互踩），
+            // 拒绝；魔神=玩家全手操（现行行为）。UI 侧技能盘层级门控（D-5）为第一道，此处 Host 权威
+            // 兜底（B7 LAN 客户端可凭空上交，双保险）
+            var tier = BattleHeuristics.TierOf(unit);
+            if (tier == UnitTier.Familiar)
             {
-                GICLog.Warn($"[TurnFlow] 低级单位 {action.unitId} 不接受玩家上交行动（LowUnitBrain 自主决策），忽略");
+                GICLog.Warn($"[TurnFlow] 眷属 {action.unitId} 不接受玩家上交行动（启发式脑自主决策），忽略");
+                return;
+            }
+            if (tier == UnitTier.Companion && !IsFactionSkillAction(unit, action))
+            {
+                GICLog.Warn($"[TurnFlow] 伙伴 {action.unitId} 仅接受势力技能号令（评分制脑自主决策），忽略 {action.actionType}");
                 return;
             }
 
@@ -269,17 +281,37 @@ namespace GIC.Battle
             TryBeginResolve();
         }
 
-        /// <summary>收齐全部玩家行动则进入执行阶段（提交/超时自动 Pass 共用入口）</summary>
+        /// <summary>收齐全部玩家行动 → 伙伴决策阶段 → 执行阶段（提交/超时自动 Pass 共用入口）</summary>
         private void TryBeginResolve()
         {
             if (Phase != BattlePhase.Selecting) return;
             if (_pendingActions.Count < _sim.PlayerIds.Count) return;
 
-            // 统一执行阶段：玩家行动 + 低级单位自主行动合并（全部按行动者攻速排序结算，docs/04 §4.1）
-            var actions = new List<ActionData>(_pendingActions.Values);
-            actions.AddRange(_minorUnitActions);
+            // 阶段三：伙伴决策（3-4★ 评分制脑，docs/active/32 §3——收齐全部玩家选择后、开演前的
+            // 机器瞬时阶段）：感知输入=各玩家已提交选择（号令跳过+体力预留）；己方眷属意图 v1 不可见
+            // （信息口径统一：执行前任何意图只在自己决策链路内可见），故感知源只传玩家行动不含眷属行动
+            var playerActions = new List<ActionData>(_pendingActions.Values);
+            var companionActions = CompanionBrain.DecideAll(_sim, TurnNumber, playerActions);
+
+            // 统一执行阶段：玩家配额行动 + 眷属自主 + 伙伴自主合并（全部按行动者攻速排序结算）
+            var actions = new List<ActionData>(playerActions);
+            actions.AddRange(_familiarUnitActions);
+            actions.AddRange(companionActions);
+
             if (_resolveCoroutine != null) StopCoroutine(_resolveCoroutine);
             _resolveCoroutine = StartCoroutine(ResolveTurnRoutine(actions));
+        }
+
+        /// <summary>行动是否为势力技能（号令通道，docs/active/32 §4）：Skill 类型且技能槽为
+        /// Enso/Contract——眷属技能表本无势力技能条目=天然无眷属号令，无需额外防线</summary>
+        private static bool IsFactionSkillAction(Unit unit, ActionData action)
+        {
+            if (action.actionType != ActionType.Skill) return false;
+            var skill = action.skillIndex >= 0 && action.skillIndex < unit.Skills.Count
+                ? unit.Skills[action.skillIndex]
+                : null;
+            var skillType = skill?.RawData?.skillType ?? SkillType.Talent;
+            return skillType == SkillType.Enso || skillType == SkillType.Contract;
         }
 
         private IEnumerator ResolveTurnRoutine(List<ActionData> actions)

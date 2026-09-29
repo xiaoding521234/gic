@@ -172,14 +172,15 @@ namespace GIC.UI
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
             }
 
-            // AI 玩家大脑（B1 固定脚本占位：攻击最近敌人；B6 换启发式）
+            // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/active/32 §6；
+            // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）
             foreach (var setup in playerSetups)
             {
                 if (!setup.IsAI) continue;
 
                 var brainGo = new GameObject($"AIBrain_{setup.PlayerId}");
                 brainGo.transform.SetParent(transform, false);
-                brainGo.AddComponent<AIDebugBrain>().Bind(_session, setup.PlayerId);
+                brainGo.AddComponent<PlayerQuotaBrain>().Bind(_session, setup.PlayerId);
                 GICLog.Info($"[BattleScreen] AI 玩家就位：{setup.PlayerId}（{setup.DisplayName}）");
             }
 
@@ -336,11 +337,14 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 固定测试军（2026-09-25 用户指令「双方场上各 1 个芭芭拉、安柏、凯亚、丘丘人」）：
-        /// 双方**对称镜像阵容**——各 1 安柏/凯亚/芭芭拉（3 星高级单位=双方操控面对称）+
-        /// 1 丘丘人（1 星=低级单位自主决策实测对象，docs/04 §4.1）；丽莎移出测试军。
-        /// 落点=出生区中心与三个镜像偏移位（3×3 出生区内：先手 center/(+1,0)/(0,+1)/(+1,1)、
-        /// 后手 center/(-1,0)/(0,-1)/(-1,-1)，点位对称保证双方接敌距离一致）。
+        /// 固定测试军（2026-09-25 用户指令「双方场上各 1 个芭芭拉、安柏、凯亚、丘丘人」+2026-09-29
+        /// D 批次操控分层补 5★ 魔神）：双方**对称镜像阵容**——各 1 安柏/凯亚/芭芭拉（3★ 伙伴=
+        /// 评分制自主决策实测对象）+1 丘丘人（1★ 眷属=启发式脑实测对象）+1 温迪（5★ 魔神=玩家
+        /// 全手操/层级体力 10 档实测对象——D 批次 docs/active/32 §10 验收「魔神：全手操、不操站桩」，
+        /// 无 5★ 则魔神路径不可测；温迪零技能→UnitConfig 借用安柏技能组=测试军临时装配，正式技能
+        /// 随温迪实装批替换）；丽莎移出测试军。
+        /// 落点=出生区中心与镜像偏移位（3×3 出生区内：先手 center/(+1,0)/(0,+1)/(+1,1)/(+1,-1)、
+        /// 后手 center/(-1,0)/(0,-1)/(-1,-1)/(-1,+1)，点位对称保证双方接敌距离一致）。
         /// 出生点来自地图配置的玩家出生区；正式出战队列 B6c 已落地（卡组手牌仍可部署，测试军=预铺场）。
         /// 分帧协程：逐单位 yield（单帧 1.1s 立牌尖峰摊薄，2026-09-13）。
         /// </summary>
@@ -360,6 +364,8 @@ namespace GIC.UI
             yield return null;
             _session.SpawnDebugUnit(UnitName.Hilichurl, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 1));
             yield return null;
+            _session.SpawnDebugUnit(UnitName.Venti, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, -1));
+            yield return null;
 
             _session.SpawnDebugUnit(UnitName.Amber, second.PlayerId, TeamType.B, secondCenter);
             yield return null;
@@ -368,6 +374,8 @@ namespace GIC.UI
             _session.SpawnDebugUnit(UnitName.Barbara, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, -1));
             yield return null;
             _session.SpawnDebugUnit(UnitName.Hilichurl, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, -1));
+            yield return null;
+            _session.SpawnDebugUnit(UnitName.Venti, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 1));
         }
 
         private static BattleCell FindSpawnCenter(BattleMapConfig config, string playerId, BattleCell fallback)
@@ -383,8 +391,10 @@ namespace GIC.UI
         /// <summary>
         /// 从玩家存档当前卡组构建初始手牌获得清单（2026-09-25 拍板：初始卡组按顺序经 GainCard 获得）：
         /// 每卡携带获得数量（角色=1、物品=备战数 min(存档持有, maxPrepareCount 备战上限)——
-        /// 如背包 100 体力牌、备战上限 60 → 获得 60）；**货币物品牌（摩拉/体力）跳过**——
-        /// 其开局量统一走「送 200 摩拉+60 体力」（编没编都送，勿双发）；空卡组回退丘丘人×2。
+        /// 如背包 100 体力牌、备战上限 60 → 获得 60）；**货币物品牌（摩拉/体力）编入=开局增量**
+        /// （2026-09-29 拍板 A，勘正旧「编没编都送勿双发」——货币牌此前可编入却零效果=死构筑位；
+        /// 现编入量并入开局资源池，统一赠送 200/60 照送，卡位换开局经济=真实构筑选择）；
+        /// 空卡组回退丘丘人×2。
         /// 走 CardManager 卡组视图=与收藏卡组界面同源同排序（角色前物品后、SortOrder、星级）。
         /// </summary>
         private List<HandCard> BuildHandFromCurrentDeck()
@@ -399,8 +409,6 @@ namespace GIC.UI
                 {
                     foreach (var card in decks[currentDeck].Cards)
                     {
-                        // 货币牌开局量统一由装配处的 GainCard(Mora/Stamina, 初始值) 获得
-                        if (card.id.cardType == CardType.Item && card.id.AsItemName().IsCurrencyItem()) continue;
                         int count = 1;
                         if (card.id.cardType == CardType.Item)
                         {

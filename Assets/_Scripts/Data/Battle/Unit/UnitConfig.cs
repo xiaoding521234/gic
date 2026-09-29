@@ -109,6 +109,12 @@ namespace GIC.Data
             [Header("语音")]
             public UnitVoiceData voices;
 
+            [Header("伙伴行为档案（操控分层 D 批次，docs/active/32 §6.1——评分骨架权重；null=中性档案）")]
+            /// <summary>个体行为档案：一套评分骨架+每单位一份档案——行为差异全在档案，加新伙伴=配档案零代码
+            ///（costs/时轮同哲学）。仅伙伴（3-4★）消费；眷属不配（启发式维持=层级特色+算量安全阀）、
+            /// 魔神无脑（玩家全手操）不消费。</summary>
+            public CompanionProfile 行为档案;
+
             private bool IsSpecified(int value) => value != Unspecified;
 
             public int GetDeployCost()
@@ -250,6 +256,53 @@ namespace GIC.Data
         {
             public SkillName skillName;
             public AudioClipRandom voices;
+        }
+
+        /// <summary>支援/输出倾向（行为档案「候选类别」）——支援型骨架多一个候选类别
+        /// （估「奶谁/去哪护」而非只「打谁」），非新脑（docs/active/32 §6.1）</summary>
+        public enum CompanionRole
+        {
+            [InspectorName("输出型")] DamageDealer = 1,
+            [InspectorName("支援型")] Support = 2,
+        }
+
+        /// <summary>行为档案「目标偏好」：输出型=攻击目标锚；支援型=移动/保护锚（docs/active/32 §6.1）</summary>
+        public enum CompanionTargetPreference
+        {
+            [InspectorName("最近敌人")] NearestEnemy = 1,
+            [InspectorName("最缺血我方")] MostWoundedAlly = 2,
+        }
+
+        /// <summary>伙伴个体行为档案（docs/active/32 §6.1：评分骨架共享维度框架——每维度乘档案权重，
+        /// 差异全在这）。v1 五维=偏好交战距离/技能优先权重/激进度/目标偏好/候选类别；
+        /// 权重 1=中性（=评分制 v2 原口径）。</summary>
+        [System.Serializable]
+        public class CompanionProfile
+        {
+            [Header("交战距离")]
+            [InspectorName("偏好交战距离（格；移动逼近到该距离止步，非无脑贴脸）")]
+            public int 偏好交战距离 = 1;
+
+            [Header("技能优先权重（同分冲突倾向；1=中性）")]
+            [InspectorName("战技优先权重")]
+            public float 战技优先权重 = 1f;
+
+            [InspectorName("爆发优先权重")]
+            public float 爆发优先权重 = 1f;
+
+            [InspectorName("移动优先权重")]
+            public float 移动优先权重 = 1f;
+
+            [Header("激进度（追击/斩杀倾向乘数；1=中性，<1 保守、>1 激进）")]
+            [InspectorName("激进度")]
+            public float 激进度 = 1f;
+
+            [Header("目标与角色")]
+            [InspectorName("目标偏好")]
+            public CompanionTargetPreference 目标偏好 = CompanionTargetPreference.NearestEnemy;
+
+            [InspectorName("候选类别")]
+            public CompanionRole 候选类别 = CompanionRole.DamageDealer;
         }
 
         [System.Serializable]

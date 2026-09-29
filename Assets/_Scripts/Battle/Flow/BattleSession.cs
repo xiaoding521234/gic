@@ -132,16 +132,17 @@ namespace GIC.Battle
             }
 
             // 归属校验（2026-09-25 三轮审查 S3：上交通道有、此处漏——B7 LAN 下客户端可上交
-            // 他人单位的即时行动=作弊口）+ 低级单位防线（C1 同款：自主决策不走即时通道）
+            // 他人单位的即时行动=作弊口）+ 眷属防线（操控分层 docs/active/32：眷属=启发式脑 AI 域
+            // 不走即时通道；伙伴/魔神的技能链即时行动放行——旧 IsMajorUnit 口径=非眷属即过，恒等）
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null || identity.OwnerPlayerID != action.playerId)
             {
                 GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 不属于 {action?.playerId}，丢弃");
                 return;
             }
-            if (!BattleHeuristics.IsMajorUnit(unit))
+            if (BattleHeuristics.IsFamiliar(unit))
             {
-                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为低级单位（LowUnitBrain 自主决策），丢弃");
+                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为眷属（FamiliarBrain 自主决策），丢弃");
                 return;
             }
 

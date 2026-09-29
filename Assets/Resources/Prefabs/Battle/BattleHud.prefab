@@ -11072,9 +11072,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ae194f322274484cb25b3602b722688, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  "\u961F\u5217\u69FD\u8FB9\u957F": 64
-  "\u961F\u5217\u69FD\u95F4\u8DDD": 14
-  "\u961F\u5217\u69FD\u4F4D\u6570": 6
   "\u624B\u724C\u4E0B\u6C89\u534A\u5361": 120
   "\u624B\u724C\u70ED\u533A\u4FA7\u63A2": 60
   "\u624B\u724C\u70ED\u533A\u4E0A\u63A2": 100
