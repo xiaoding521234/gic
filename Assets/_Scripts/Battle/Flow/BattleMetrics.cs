@@ -1,3 +1,4 @@
+using GIC.Data;
 namespace GIC.Battle
 {
 
@@ -20,6 +21,13 @@ namespace GIC.Battle
         /// 容错目检后可调（基线起点 0.42）</summary>
         public const float UnitCylinderDiameter = 0.42f;
 
+        /// <summary>per-unit 受击圆柱直径单出口（协议核心批 2026-09-29）：声明值>0 用声明值（协议核心=0.8，
+        /// 大目标易命中=攻城手感），0=回落全局 0.42。四消费方同源：ProjectileResolver 接触判定（Host 权威）、
+        /// EffectCompiler.WouldHitProjectile 命中预判（推荐色口径）、UnitView 底座圆盘视觉（视觉即判定）、
+        /// OrbitBeamsWorld 选中弧光贴紧折算</summary>
+        public static float CylinderDiameterOf(UnitState state)
+            => state != null && state.cylinderDiameter > 0f ? state.cylinderDiameter : UnitCylinderDiameter;
+
         // ==================== 元能（B6a；获取端拍板 2026-09-22） ====================
 
         /// <summary>移动使用即获得的元能（被挡也算——移动行动已使用）</summary>
@@ -37,11 +45,11 @@ namespace GIC.Battle
         /// <summary>开局体力（=玩家体力物品牌「原粹树脂」的初始持有数）</summary>
         public const int InitialStamina = 60;
 
-        /// <summary>每回合结束发放摩拉（docs/04 §4.3：与体力统一时机）</summary>
-        public const int MoraGainPerTurn = 5;
+        /// <summary>每回合结束发放摩拉（docs/04 §4.3：与体力统一时机；2026-09-29 拍板 5→10）</summary>
+        public const int MoraGainPerTurn = 10;
 
-        /// <summary>每回合结束发放体力</summary>
-        public const int StaminaGainPerTurn = 5;
+        /// <summary>每回合结束发放体力（2026-09-29 拍板 5→10）</summary>
+        public const int StaminaGainPerTurn = 10;
 
         /// <summary>配额行动消耗体力（docs/05 §5.1：移动/战技/爆发各 10；
         /// 低级单位 1~2 星自主行动豁免，延奏/契约等特殊技能 0）</summary>

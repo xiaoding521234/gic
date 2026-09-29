@@ -53,7 +53,6 @@ namespace GIC.Battle
             {
                 // 时轮（B-S1）：per-skill 投射物规格 + 发射时刻偏移（前摇）——0 值回落 BattleMetrics 默认
                 float speed = projectile.Speed > 0f ? projectile.Speed : BattleMetrics.ProjectileSpeed;
-                float radius = (projectile.Diameter > 0f ? projectile.Diameter : BattleMetrics.UnitCylinderDiameter) * 0.5f;
                 int maxRange = projectile.Range > 0 ? projectile.Range : ProjectileRule.MaxRange;
                 float launch = projectile.LaunchSeconds;
                 float maxT = launch + (maxRange + 0.5f) / speed;
@@ -74,7 +73,12 @@ namespace GIC.Battle
                 string hitUnitId = null;
                 foreach (var enemy in enemies)
                 {
-                    float t = FirstContactTime(projectile, enemy, moverPaths, maxT, speed, radius);
+                    // per-enemy 受击半径（协议核心批 2026-09-29）：技能声明 hitDiameter 覆写优先
+                    // （per-skill 判定圆柱，替代语义保持既有行为）；否则按该单位自身受击圆柱
+                    // （默认 0.42；协议核心 0.8——大目标接触距离更远=易命中，攻城手感）
+                    float enemyRadius = (projectile.Diameter > 0f ? projectile.Diameter
+                        : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
+                    float t = FirstContactTime(projectile, enemy, moverPaths, maxT, speed, enemyRadius);
                     if (t < hitT)
                     {
                         hitT = t;

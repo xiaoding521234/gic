@@ -36,6 +36,7 @@ namespace GIC.Battle
             foreach (var kv in sim.Units)
             {
                 var unit = kv.Value;
+                if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（含未来低星建筑）
                 if (!BattleHeuristics.IsFamiliar(unit)) continue;
                 if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue;
 

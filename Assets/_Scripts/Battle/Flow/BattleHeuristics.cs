@@ -44,6 +44,12 @@ namespace GIC.Battle
         /// <summary>是否魔神（5 星：玩家全手操，无 AI 兜底——不操=站桩）</summary>
         public static bool IsArchon(Unit unit) => TierOf(unit) == UnitTier.Archon;
 
+        /// <summary>是否建筑（协议核心批 2026-09-29 拍板「建筑不参与任何行动」——单一判据 unitType，
+        /// 与星级/层级无关：协议核心是 5★ 勿落进魔神操档，未来低星建筑也勿落眷属/伙伴档）。
+        /// 三脑分拣、玩家上交校验、即时通道、技能盘全按此排除</summary>
+        public static bool IsBuilding(Unit unit)
+            => unit != null && unit.RawData != null && unit.RawData.unitType == UnitType.Building;
+
         // ==================== 敌人查找 ====================
 
         /// <summary>

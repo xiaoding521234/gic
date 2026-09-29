@@ -257,6 +257,14 @@ namespace GIC.Battle
                 return;
             }
 
+            // 建筑防线（协议核心批 2026-09-29 拍板）：建筑（含协议核心）不参与任何行动——
+            // 无技能无移动无配额，玩家上交一律拒绝（B7 LAN 防作弊同构；5★ 核心勿落进魔神档）
+            if (unit.RawData != null && unit.RawData.unitType == UnitType.Building)
+            {
+                GICLog.Warn($"[TurnFlow] 建筑 {action.unitId}（含协议核心）不接受任何玩家上交行动，忽略");
+                return;
+            }
+
             // 单位级行动域校验（D 批次操控分层，docs/active/32 §1/§4）：眷属=AI 域（启发式脑自主，
             // 不占配额不走玩家通道）；伙伴=AI 域——玩家仅可**号令**（势力技能 Enso/Contract，占 1 配额），
             // 移动/战技/爆发上交会与伙伴自主决策同单位双行动（双 mover 并发推进=移动翻倍/写回互踩），
@@ -324,9 +332,9 @@ namespace GIC.Battle
 
             _resolveCoroutine = null;
 
-            // 全灭软停（2026-09-25 三轮审查 S10 轻量版；胜负判定/结算画面=B8）：恰好一队全灭→
-            // 停回合循环+广播胜负（避免全灭后回合空转继续发资源、AI 继续空过）。
-            // 双方同回合互灭不下发（结算语义 B8 定义）。
+            // 胜负判定（协议核心批 2026-09-29 拍板：核心摧毁=唯一败北判据，全灭软停退役；结算画面=B8）：
+            // TurnResolver 片末检查已在核心死亡片中止演算（剩余片不结算），此处统一广播胜负。
+            // 双方核心同回合互灭不下发（平局语义 B8 定义）。
             // 顺序：先阶段事件（HUD 会设 Tip=执行中）再发 BattleOver（客户端覆盖 Tip=胜负），勿颠倒
             var overWinner = CheckBattleOver();
             if (overWinner.HasValue)
@@ -346,20 +354,38 @@ namespace GIC.Battle
             BeginSelectPhase();
         }
 
-        /// <summary>全灭检测：恰好一队存活时返回该队（=胜方）；双方仍活/双方互灭返回 null。
-        /// 多人局同队玩家去重判定（2v2 一队两玩家）</summary>
+        /// <summary>胜负判定（协议核心批 2026-09-29 拍板，docs/02 §2）：核心摧毁=唯一败北判据——
+        /// 队伍败北=该队全部玩家的核心被摧毁（多人预留：核心每玩家一枚非每队一枚）；
+        /// 全灭不再结束对局（核心在=手牌可再出战，MOBA 基地语义翻盘）。
+        /// 恰好一队核心存活=胜方；双方核心同回合互灭返回 null（平局语义 B8 结算批定义）。
+        /// 防御：全对局无已登记核心（装配异常）回落旧 S10 全灭口径</summary>
         private TeamType? CheckBattleOver()
         {
-            TeamType? aliveTeam = null;
+            if (!_sim.HasAnyRegisteredCore())
+            {
+                // 旧 S10 全灭软停（防御回落——正常对局装配必含双方核心，勿再当主判据维护）
+                TeamType? aliveTeam = null;
+                foreach (var pid in _sim.PlayerIds)
+                {
+                    var team = _sim.GetTeamOf(pid);
+                    if (aliveTeam == team) continue; // 同队已查过（2v2）
+                    if (!_sim.HasLivingUnits(team)) continue;
+                    if (aliveTeam.HasValue) return null; // 两队都存活：战斗继续
+                    aliveTeam = team;
+                }
+                return aliveTeam; // 恰好一队存活=胜方；双方全灭=null
+            }
+
+            TeamType? coreAliveTeam = null;
             foreach (var pid in _sim.PlayerIds)
             {
                 var team = _sim.GetTeamOf(pid);
-                if (aliveTeam == team) continue; // 同队已查过（2v2）
-                if (!_sim.HasLivingUnits(team)) continue;
-                if (aliveTeam.HasValue) return null; // 两队都存活：战斗继续
-                aliveTeam = team;
+                if (coreAliveTeam == team) continue; // 同队已查过（多人口径：任一玩家核心存活=队未败）
+                if (!_sim.TeamHasLivingCore(team)) continue;
+                if (coreAliveTeam.HasValue) return null; // 两队核心都存活：战斗继续
+                coreAliveTeam = team;
             }
-            return aliveTeam; // 恰好一队存活=胜方；双方全灭=null
+            return coreAliveTeam; // 恰好一队核心存活=胜方；双方核心同回合互毁=null
         }
 
         /// <summary>

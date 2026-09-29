@@ -145,6 +145,12 @@ namespace GIC.Battle
                 GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为眷属（FamiliarBrain 自主决策），丢弃");
                 return;
             }
+            // 建筑防线（协议核心批 2026-09-29）：建筑（含 5★ 协议核心）不参与任何行动，即时通道同拒
+            if (BattleHeuristics.IsBuilding(unit))
+            {
+                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为建筑（含协议核心），丢弃");
+                return;
+            }
 
             if (action.actionType != ActionType.Skill && action.actionType != ActionType.Move && action.actionType != ActionType.Pass)
             {

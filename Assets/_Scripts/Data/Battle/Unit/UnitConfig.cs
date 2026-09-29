@@ -94,6 +94,13 @@ namespace GIC.Data
             /// 两客户端预览四处同读，改配置即全链路响应）</summary>
             public bool 与友方互不阻挡 = false;
 
+            /// <summary>受击圆柱直径（格=世界单位；2026-09-29 协议核心批新增）：连续命中判定的
+            /// per-unit 受击体直径（docs/05 §5.3「受击体=立牌真实大小的圆柱」），底座圆盘同源可视化
+            /// （视觉即判定）、选中弧光贴紧值按它折算。0=未指定回落全局 BattleMetrics.UnitCylinderDiameter
+            /// （0.42——消费侧经 BattleMetrics.CylinderDiameterOf 单出口解析，Data 层勿反向引用 Battle 常量）；
+            /// 协议核心=0.8（近乎占满格，大目标易命中=攻城手感）</summary>
+            public float 受击圆柱直径 = 0f;
+
             [Header("元素")]
             public ElementType selfElement = ElementType.Physical;
 

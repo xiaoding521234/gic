@@ -102,7 +102,7 @@ namespace GIC.Battle
     public class OrbitBeamsWorld : MonoBehaviour
     {
         [Header("环绕光弧（底座圆盘选中特效；世界单位）")]
-        [Tooltip("环绕半径（弧带中心轨道半径，世界单位）。0.242=可见弧带内缘贴底座圆盘缘（盘半径=UnitCylinderDiameter/2=0.21；v2 彗尾贴图实测同 UI 版口径折算——2026-09-27 追拍「紧紧贴着圆盘」；改大=离盘远）")]
+        [Tooltip("环绕半径（弧带中心轨道半径，世界单位；0.42 基准盘的贴紧值）。0.242=可见弧带内缘贴底座圆盘缘（盘半径=UnitCylinderDiameter/2=0.21；v2 彗尾贴图实测同 UI 版口径折算——2026-09-27 追拍「紧紧贴着圆盘」；改大=离盘远）。协议核心批（2026-09-29）：实际轨道半径按 Setup 传入的单位受击圆柱直径等比缩放（÷0.42）——大盘（核心 0.8）自动贴紧，Inspector 值仍是基准盘口径")]
         [SerializeField] private float 环绕半径 = 0.242f;
         [Tooltip("环绕角速度（度/秒，两束随图对径同速）。负值=修正向：Unity 左手系正 yaw 与 2D 正 z 旋向相反，同贴图取正会头尾倒置（尾在前），2026-09-27 目检实证后取负——头前尾后；大小=与技能按钮版（OrbitBeamsUi 240）一致（2026-09-27 拍板「转圈速度应当与技能的转圈速度一致」）")]
         [SerializeField] private float 环绕角速度 = -240f;
@@ -112,6 +112,7 @@ namespace GIC.Battle
         private Transform _beam;
         private Material _material; // 本组件持有，OnDestroy 释放——Destroy 物体不销材质（docs/14 §63①）
         private float _angle;
+        private float _diameterScale = 1f; // 环绕半径随受击圆柱直径等比缩放（协议核心批：基准盘=1）
 
         public static OrbitBeamsWorld Create(Transform parent)
         {
@@ -137,11 +138,14 @@ namespace GIC.Battle
             Place();
         }
 
-        /// <summary>落位+光色（center=底座圆盘中心世界坐标；色=玩家队伍主色）</summary>
-        public void Setup(Vector3 center, Color color)
+        /// <summary>落位+光色（center=底座圆盘中心世界坐标；色=玩家队伍主色）。
+        /// discDiameter=该单位受击圆柱直径（协议核心批 2026-09-29）：环绕半径按 直径/0.42 等比折算
+        /// ——盘径随单位变大（协议核心 0.8）时弧光贴紧值同步放大，0/省略=基准盘不缩放</summary>
+        public void Setup(Vector3 center, Color color, float discDiameter = 0f)
         {
             transform.position = center;
             if (_material != null) _material.color = color;
+            _diameterScale = discDiameter > 0f ? discDiameter / BattleMetrics.UnitCylinderDiameter : 1f;
         }
 
         private void Update()
@@ -153,7 +157,8 @@ namespace GIC.Battle
 
         private void Place()
         {
-            float size = Mathf.Max(0.01f, 2f * 环绕半径 / Mathf.Max(0.01f, 光弧半径占比));
+            float orbitRadius = 环绕半径 * _diameterScale; // per-unit 等比贴紧（协议核心批）
+            float size = Mathf.Max(0.01f, 2f * orbitRadius / Mathf.Max(0.01f, 光弧半径占比));
             // 平铺地面绕盘心飞行：quad 居盘心、整图绕竖轴旋转（Euler(90,yaw,0)=Ry(yaw)·Rx(90)——
             // Rx 平铺面朝上、Ry 绕盘心竖轴旋弧）、scale=弧图边长
             _beam.localPosition = Vector3.zero;

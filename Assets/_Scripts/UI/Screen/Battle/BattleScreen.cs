@@ -156,6 +156,17 @@ namespace GIC.UI
 
             yield return null; // ── 分帧：会话就绪/立牌是重活起点 ──
 
+            // 协议核心（2026-09-29 拍板 Unit 化——第一个建筑，也是玩家基地）：每玩家一枚立于出生区
+            // 中心格=胜负判据锚点（docs/02 §2：核心摧毁=战败）；SpawnDebugUnit=UnitFactory 真实链，
+            // 注册期 BattleSimState 登记核心、快照/客户端立牌自动成立；分帧同测试军
+            foreach (var setup in playerSetups)
+            {
+                _session.SpawnDebugUnit(UnitName.ProtocolCore, setup.PlayerId,
+                    _session.Sim.GetTeamOf(setup.PlayerId),
+                    FindSpawnCenter(mapConfig, setup.PlayerId, new BattleCell(3, 3)));
+                yield return null;
+            }
+
             // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
             yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
 
@@ -343,8 +354,8 @@ namespace GIC.UI
         /// 全手操/层级体力 10 档实测对象——D 批次 docs/active/32 §10 验收「魔神：全手操、不操站桩」，
         /// 无 5★ 则魔神路径不可测；温迪零技能→UnitConfig 借用安柏技能组=测试军临时装配，正式技能
         /// 随温迪实装批替换）；丽莎移出测试军。
-        /// 落点=出生区中心与镜像偏移位（3×3 出生区内：先手 center/(+1,0)/(0,+1)/(+1,1)/(+1,-1)、
-        /// 后手 center/(-1,0)/(0,-1)/(-1,-1)/(-1,+1)，点位对称保证双方接敌距离一致）。
+        /// 落点=出生区**环形偏移位**（3×3 出生区 8 环格取 5——中心格已让位协议核心，2026-09-29 拍板；
+        /// 先手 (+1,0)/(0,+1)/(+1,+1)/(+1,-1)/(0,-1)、后手全部取反镜像，点位对称保证双方接敌距离一致）。
         /// 出生点来自地图配置的玩家出生区；正式出战队列 B6c 已落地（卡组手牌仍可部署，测试军=预铺场）。
         /// 分帧协程：逐单位 yield（单帧 1.1s 立牌尖峰摊薄，2026-09-13）。
         /// </summary>
@@ -356,26 +367,26 @@ namespace GIC.UI
             var firstCenter = FindSpawnCenter(mapConfig, first.PlayerId, new BattleCell(3, 3));
             var secondCenter = FindSpawnCenter(mapConfig, second.PlayerId, new BattleCell(16, 16));
 
-            _session.SpawnDebugUnit(UnitName.Amber, first.PlayerId, TeamType.A, firstCenter);
+            _session.SpawnDebugUnit(UnitName.Amber, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 0));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Kaeya, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 0));
+            _session.SpawnDebugUnit(UnitName.Kaeya, first.PlayerId, TeamType.A, firstCenter + new BattleCell(0, 1));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Barbara, first.PlayerId, TeamType.A, firstCenter + new BattleCell(0, 1));
+            _session.SpawnDebugUnit(UnitName.Barbara, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 1));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Hilichurl, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 1));
+            _session.SpawnDebugUnit(UnitName.Hilichurl, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, -1));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Venti, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, -1));
+            _session.SpawnDebugUnit(UnitName.Venti, first.PlayerId, TeamType.A, firstCenter + new BattleCell(0, -1));
             yield return null;
 
-            _session.SpawnDebugUnit(UnitName.Amber, second.PlayerId, TeamType.B, secondCenter);
+            _session.SpawnDebugUnit(UnitName.Amber, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 0));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Kaeya, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 0));
+            _session.SpawnDebugUnit(UnitName.Kaeya, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, -1));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Barbara, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, -1));
+            _session.SpawnDebugUnit(UnitName.Barbara, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, -1));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Hilichurl, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, -1));
+            _session.SpawnDebugUnit(UnitName.Hilichurl, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 1));
             yield return null;
-            _session.SpawnDebugUnit(UnitName.Venti, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 1));
+            _session.SpawnDebugUnit(UnitName.Venti, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, 1));
         }
 
         private static BattleCell FindSpawnCenter(BattleMapConfig config, string playerId, BattleCell fallback)

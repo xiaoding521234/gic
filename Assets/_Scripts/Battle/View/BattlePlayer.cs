@@ -956,7 +956,8 @@ namespace GIC.Battle
             // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
                 _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
-                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleFrames, idleFps, idleVideo, moveVideo, hoverHeight);
+                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleFrames, idleFps, idleVideo, moveVideo, hoverHeight,
+                state.cylinderDiameter); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);
