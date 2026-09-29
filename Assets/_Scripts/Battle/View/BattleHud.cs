@@ -278,6 +278,7 @@ namespace GIC.Battle
 
         public void Bind(BattleSession session, BattleBoard board, BattleCameraController camera, Action onCloseBattle)
         {
+            if (_session != null) return; // 幂等守卫（批7③）：二次 Bind 会双订阅/双 AddListener/双预览实例
             _session = session;
             _board = board;
             _camera = camera;
@@ -841,7 +842,7 @@ namespace GIC.Battle
             }
             ShowAimHighlights();
             ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
-            SetTip("Battle_TipAimDirection"); // v1 复用方向瞄准提示；专属提示键随 B6c-2 卡面 polish
+            SetTip("Battle_TipAimDeploy"); // 部署专属提示（批7⑥：原复用方向瞄准键语义不符）
         }
 
         /// <summary>我方核心位置（部署半径圆心）。协议核心 Unit 化（2026-09-29 拍板）：真源=快照里的
@@ -885,7 +886,14 @@ namespace GIC.Battle
                 case HudState.Aiming:
                     // 点可选格=金色待定（2026-09-26 拍板：不立即提交，可反复点其它格变更，
                     // 确认走「完成选择」按钮；目标单位由确认时再取快照）
-                    if (inBounds && _aimCells.Contains(cell)) { SetPendingAimCell(cell); return; }
+                    if (inBounds && _aimCells.Contains(cell))
+                    {
+                        SetPendingAimCell(cell);
+                        // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属/伙伴非势力）或
+                        // 已定死时立即提示「不会执行」，防玩家选了却不知为何没被执行；金格照常显示
+                        NotifySelectionBlockedOrConfirmed();
+                        return;
+                    }
                     // 瞄准态点非可选格 = 退回选中态（不算"点空白取消选中"）
                     ExitAiming();
                     return;
@@ -1255,28 +1263,16 @@ namespace GIC.Battle
             bool isMove = _aimDef.IsMove;
 
             // 提交时行动防线（2026-09-26 拍板改版：选中/瞄准开放任意单位供查看技能盘与攻击范围，
-            // 行动只能由**自己的高级单位**执行——非己方/低级单位在此弹 toast 轻提示、保持瞄准态继续查看。
+            // 行动只能由**自己的高级单位**执行——非己方/眷属/伙伴非势力在此弹 toast 轻提示、保持瞄准态继续查看。
             // 轻提示走 PopupManager.ShowToast（2026-09-26 报障修正：首版用提示条 SetTip 文字切换太隐晦
             // 玩家看不见——顶部滑入 toast 才是项目轻弹窗正主，Wish_NoPrimogem/Deck_Full 同款）；
-            // Host 侧 OnSubmitAction 权威校验仍为双保险，B7 LAN 客户端绕 UI 也进不来）
-            if (sel.playerId != _myPlayerId)
+            // 判定单出口=GetSelectionBlockToastKey（2026-09-29 追拍：点格/拖拽落格时同判定提前提示——
+            // 提交时防线保留=双保险）；Host 侧 OnSubmitAction 权威校验仍为第二道，B7 LAN 客户端绕 UI 也进不来）
+            var blockKey = GetSelectionBlockToastKey(sel);
+            if (blockKey != null)
             {
-                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 不是玩家 {_myPlayerId} 的角色");
-                ShowBattleToast("Battle_NotYourUnit");
-                return false;
-            }
-            var selData = TryGetUnitData(sel.unitName);
-            var selTier = selData != null ? UnitTierHelper.FromStars(selData.starLevel) : UnitTier.Familiar;
-            if (selTier == UnitTier.Familiar)
-            {
-                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为眷属（启发式脑自主行动）");
-                ShowBattleToast("Battle_MinorUnit");
-                return false;
-            }
-            if (selTier == UnitTier.Companion && (_aimDef == null || !_aimDef.IsFaction))
-            {
-                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 为伙伴（评分制脑自主行动），仅势力技能可号令");
-                ShowBattleToast("Battle_Autonomous");
+                GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} → {blockKey}");
+                ShowBattleToast(blockKey);
                 return false;
             }
 
@@ -1327,6 +1323,39 @@ namespace GIC.Battle
             DeselectUnit();
             SetTip("Battle_TipSubmitted");
             return true;
+        }
+
+        /// <summary>操控防线判定单出口（2026-09-29 追拍：点格/拖拽落格/提交三触点同判定同文案）：
+        /// 返回 null=玩家可操作上交（己方魔神全键/己方伙伴势力技能键=号令入口）；否则返回拦截
+        /// toast 键——敌方（含队友）Battle_NotYourUnit / 眷属 Battle_MinorUnit / 伙伴非势力技能
+        /// Battle_Autonomous（键均在 PopupText 表）</summary>
+        private string GetSelectionBlockToastKey(UnitState sel)
+        {
+            if (sel.playerId != _myPlayerId) return "Battle_NotYourUnit";
+            var selData = TryGetUnitData(sel.unitName);
+            var selTier = selData != null ? UnitTierHelper.FromStars(selData.starLevel) : UnitTier.Familiar;
+            if (selTier == UnitTier.Familiar) return "Battle_MinorUnit";
+            if (selTier == UnitTier.Companion && (_aimDef == null || !_aimDef.IsFaction)) return "Battle_Autonomous";
+            return null;
+        }
+
+        /// <summary>待定格产生时刻轻提示（2026-09-29 追拍：玩家不可操作的技能（敌方/眷属/伙伴非势力）
+        /// 与已确认定死时，点可选格/拖拽松手落格即提示——不再等到按「完成选择」才弹，防玩家不知道
+        /// 自己选了但为何后面没执行。防线提示优先于定死提示（不可操作更根本）；金格照常显示
+        /// （视觉选择反馈保留）；提交侧防线不变=双保险。部署瞄准=玩家级行动无防线、仅定死提示</summary>
+        private void NotifySelectionBlockedOrConfirmed()
+        {
+            if (_deployAimUnit != 0)
+            {
+                if (_actionConfirmed) ShowBattleToast("Battle_ActionConfirmed");
+                return;
+            }
+            var snapshot = _session.Player.LatestSnapshot;
+            var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel == null) return;
+            var blockKey = GetSelectionBlockToastKey(sel);
+            if (blockKey != null) { ShowBattleToast(blockKey); return; }
+            if (_actionConfirmed) ShowBattleToast("Battle_ActionConfirmed");
         }
 
         /// <summary>格差归一到十字方向（|dx|≥|dy| 取横轴，否则取纵轴；0,0 防御回 Right）</summary>
@@ -1439,9 +1468,13 @@ namespace GIC.Battle
             if (_state != HudState.Aiming) { HideDragWheel(); return; }
             UpdateDragAimPreview(eventData); // 圆盘未收——终帧校准与拖动中同用夹取指针（屏缘一致）
             HideDragWheel(); // 手指已离键——圆盘随会话收（留待定路径也隐藏）
-            if (ReleaseOverDiscOrCancel(eventData.position) || !_pendingAimCell.HasValue)
+            if (ReleaseOverCancelButton(eventData.position) || !_pendingAimCell.HasValue)
                 ExitAiming();
             // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
+            // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属/伙伴非势力）或已定死时
+            // 立即提示「不会执行」——与点击式同判定同文案（NotifySelectionBlockedOrConfirmed 单出口）
+            else
+                NotifySelectionBlockedOrConfirmed();
         }
 
         /// <summary>拖动瞄准实时解析（单格）：判定基准=**大盘中心**——方向型（移动/直线）=盘心→小盘
@@ -1538,8 +1571,9 @@ namespace GIC.Battle
         /// <summary>松手是否落在取消钮上（2026-09-26 报障返修：原「技能盘任一键矩形」取消区已删——
         /// 键槽 220×220 矩形（半宽 110）几何上盖住「第 1 格」整条盘距带（1 格带 0~102px），右侧键簇
         /// （skill↔burst 仅隔 39.6px）连 2 格带也被盖，短拖松手必判「拖回键区」空放。「拖回取消」
-        /// 语义收窄为：键心死区（小圆盘半径内=解析返回 null 走 !pending 取消）+ 取消钮）</summary>
-        private bool ReleaseOverDiscOrCancel(Vector2 screenPos)
+        /// 语义收窄为：键心死区（小圆盘半径内=解析返回 null 走 !pending 取消）+ 取消钮。
+        /// 批7 复审改名 ReleaseOverDiscOrCancel→ReleaseOverCancelButton（名实对齐——盘不再参与判定）</summary>
+        private bool ReleaseOverCancelButton(Vector2 screenPos)
         {
             return _cancelButton != null
                 && RectTransformUtility.RectangleContainsScreenPoint(_cancelButton, screenPos, null);
@@ -2197,6 +2231,11 @@ namespace GIC.Battle
                         break;
                     case CostKind.AnyItem:
                         if (!HasHandAnyItem(cost.subType, cost.amount)) return false;
+                        break;
+                    default:
+                        // 镜像安全网（批7②）：与 Host ResourceGate.Has 同款——新增 CostKind 时此处若漏接
+                        // 路由会静默按可支付置灰（镜像偏乐观），Warn 提示补路由；ResourceGate 为权威
+                        GICLog.Warn($"[BattleHud] HasSkillResources 未接路由的消耗种类 {cost.kind}——按可支付处理（请补镜像路由）");
                         break;
                 }
             }

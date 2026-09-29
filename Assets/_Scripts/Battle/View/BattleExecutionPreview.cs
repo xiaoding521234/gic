@@ -67,9 +67,10 @@ namespace GIC.Battle
             public Coroutine tweenRoutine;                        // 槽位补间协程（新补间前先停）
         }
 
-        /// <summary>装配（Bind 链调用；自注入后订阅三事件，OnDestroy 对称退订）</summary>
+        /// <summary>装配（Bind 链调用；自注入后订阅三事件，OnDestroy 对称退订。幂等守卫防二次 Init 双订阅）</summary>
         public void Init(BattleSession session, string myPlayerId)
         {
+            if (_session != null) return;
             _session = session;
             _myPlayerId = myPlayerId;
             Wargame.Instance?.Context?.Inject(this); // [Autowired] UnitConfig（BattlePlayer.Bind 同模式）

@@ -107,6 +107,10 @@ MonoBehaviour:
     m_Key: Battle_Autonomous
     m_Metadata:
       m_Items: []
+  - m_Id: 34521518164226048
+    m_Key: Battle_ActionConfirmed
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

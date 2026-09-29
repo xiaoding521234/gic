@@ -6,22 +6,6 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 状态修改器
-    /// </summary>
-    public class StatusModifier
-    {
-        public StatusType StatusType;
-        public bool Value;
-
-
-        public StatusModifier(StatusType statusType, bool value)
-        {
-            StatusType = statusType;
-            Value = value;
-        }
-    }
-
-    /// <summary>
     /// 单位状态组件 - 管理单位的状态效果
     /// </summary>
     public class UnitStatus : MonoBehaviour, IUnitComponent
@@ -42,9 +26,6 @@ namespace GIC.Battle
 
         // ==================== 当前状态实例 ====================
         private Dictionary<StatusType, bool> _status = new();
-
-        // ==================== 修改器列表 ====================
-        private List<StatusModifier> _modifiers = new();
 
         // ==================== 属性 ====================
         public bool IsInvisible => GetFinalStatus(StatusType.Invisible);
@@ -92,18 +73,7 @@ namespace GIC.Battle
         {
             if (!_status.TryGetValue(statusType, out bool baseValue))
                 return false;
-
-            bool result = baseValue;
-
-            foreach (var mod in _modifiers)
-            {
-                if (mod.StatusType == statusType)
-                {
-                    result = mod.Value;
-                }
-            }
-
-            return result;
+            return baseValue; // 修改器系统已随死路径删除（2026-09-29 批3⑤裁决：StatusModifier 全库零构造点零消费，活路径=SetStatus 直写 base）
         }
 
         // ==================== 基础值管理 ====================
@@ -118,27 +88,6 @@ namespace GIC.Battle
         public bool GetBaseValue(StatusType statusType)
         {
             return _status.TryGetValue(statusType, out bool value) ? value : false;
-        }
-
-        // ==================== 修改器管理 ====================
-        public void AddModifier(StatusModifier modifier)
-        {
-            _modifiers.Add(modifier);
-        }
-
-        public bool RemoveModifier(StatusModifier modifier)
-        {
-            return _modifiers.Remove(modifier);
-        }
-
-        public void RemoveModifiers(System.Predicate<StatusModifier> match)
-        {
-            _modifiers.RemoveAll(match);
-        }
-
-        public void ClearAllModifiers()
-        {
-            _modifiers.Clear();
         }
 
         // ==================== 便利方法 ====================

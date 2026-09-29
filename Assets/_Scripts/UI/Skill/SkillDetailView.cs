@@ -39,7 +39,6 @@ namespace GIC.UI
 
         private SkillConfig.SkillData skillData;
         private UnitConfig.UnitData unitData;
-        private BaseSkill skill;
         private SkillIconView sourceSkillIconView;
 
         private RectTransform panelRect;
@@ -317,12 +316,6 @@ namespace GIC.UI
 
             this.sourceSkillIconView = sourceSkillIconView;
             SetParamDisplay(skillData);
-            RefreshLayout();
-        }
-
-        public void InitWithSkill(BaseSkill skill, SkillIconView sourceSkillIconView)
-        {
-            this.skill = skill;
             RefreshLayout();
         }
 

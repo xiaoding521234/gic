@@ -916,14 +916,6 @@ MonoBehaviour:
     m_Localized: Turn
     m_Metadata:
       m_Items: []
-  - m_Id: 12005
-    m_Localized: Execution order
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12006
-    m_Localized: Executing
-    m_Metadata:
-      m_Items: []
   - m_Id: 12007
     m_Localized: Hand
     m_Metadata:
@@ -1033,6 +1025,11 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 12033
     m_Localized: Confirm
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12034
+    m_Localized: "Pick a deploy tile (around the core) \u2014 press Confirm to deploy,
+      click empty space to cancel"
     m_Metadata:
       m_Items: []
   references:

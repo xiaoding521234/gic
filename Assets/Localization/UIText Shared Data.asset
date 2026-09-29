@@ -899,14 +899,6 @@ MonoBehaviour:
     m_Key: Battle_Turn
     m_Metadata:
       m_Items: []
-  - m_Id: 12005
-    m_Key: Battle_QueuePreview
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12006
-    m_Key: Battle_Executing
-    m_Metadata:
-      m_Items: []
   - m_Id: 12007
     m_Key: Battle_Hand
     m_Metadata:
@@ -1013,6 +1005,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 12033
     m_Key: Battle_ConfirmSelect
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12034
+    m_Key: Battle_TipAimDeploy
     m_Metadata:
       m_Items: []
   m_Metadata:
