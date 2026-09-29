@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 namespace GIC.Data
 {
 
@@ -18,6 +19,7 @@ namespace GIC.Data
         Pause = 7,             // Host↔Client：硬停交互点（B1 占位）
         Resume = 8,            // Host↔Client：硬停恢复（B1 占位）
         BattleOver = 9,        // Host→Client：战斗结束（2026-09-25 三轮审查 S10 轻量全灭软停；结算画面=B8）
+        TurnPlan = 10,         // Host→Client：本回合行动预告（执行预览用，2026-09-29；分桶后、首片推送前下发）
     }
 
     /// <summary>
@@ -92,5 +94,27 @@ namespace GIC.Data
     public class BattleOverMessage
     {
         public int winnerTeam;
+    }
+
+    /// <summary>本回合行动预告（2026-09-29 执行预览拍板）：执行阶段开始前 Host 下发——
+    /// 全部实际行动（玩家上交+低级单位自主+AI 脑；部署段/玩家级 Pass/回合结束段不入表，
+    /// 与片循环的攻速片一一对应）。载荷自含（unitId/playerId/actionType/skillIndex/attackSpeed
+    /// 快照攻速），客户端不依赖快照时序即可建行</summary>
+    [Serializable]
+    public class TurnPlanMessage
+    {
+        public int turnNumber;
+        public List<TurnPlanEntry> entries = new List<TurnPlanEntry>();
+    }
+
+    /// <summary>预告条目：一个即将行动的单位（actionType/skillIndex=图标解析源；attackSpeed=行分区间用）</summary>
+    [Serializable]
+    public class TurnPlanEntry
+    {
+        public string unitId;
+        public string playerId;
+        public int actionType;
+        public int skillIndex;
+        public int attackSpeed;
     }
 }

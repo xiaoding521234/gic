@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace GIC.Data
@@ -14,6 +15,19 @@ namespace GIC.Data
         [Header("队伍主色（立牌底座 / HUD 队列框 / 信息块 accent 同源）")]
         public Color 我方主色 = new Color(0.25f, 0.55f, 1f);
         public Color 敌方主色 = new Color(1f, 0.35f, 0.3f);
+
+        [Header("玩家配色（2026-09-29 执行预览拍板：头像描环按「归属玩家」染色——本端视角我=蓝、我队"
+                + "队友=绿、敌队玩家按序=红/紫…；数组式可扩 3v3。只新预览消费，队伍色口径（立牌底座等）不动）")]
+        public List<Color> 我方玩家色 = new List<Color>
+        {
+            new Color(0.25f, 0.55f, 1f),   // 我自己
+            new Color(0.35f, 0.78f, 0.42f), // 我队队友（2v2）
+        };
+        public List<Color> 敌方玩家色 = new List<Color>
+        {
+            new Color(1f, 0.35f, 0.3f),    // 敌队第 1 玩家
+            new Color(0.72f, 0.48f, 0.95f), // 敌队第 2 玩家（2v2）
+        };
 
         [Header("头顶血条（血量语义，与队伍色分离）")]
         public Color 血条我方绿 = new Color(0.31f, 0.83f, 0.42f);

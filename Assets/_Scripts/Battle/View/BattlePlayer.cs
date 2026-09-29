@@ -78,8 +78,14 @@ namespace GIC.Battle
         /// <summary>快照更新通知（选择阶段头 + 开局）</summary>
         public event Action<BattleSnapshot> SnapshotUpdated;
 
-        /// <summary>片开始播放（参数=本片攻速；HUD 高亮当前执行者用）</summary>
+        /// <summary>片开始播放（参数=本片攻速；执行预览推进行用）。2026-09-29 语义收紧：只对
+        /// **攻速行动片**发（部署段/回合结束段/即时行动块不发——它们不按攻速排程，行进推进语义
+        /// 只属攻速片；旧消费方=攻速队列高亮已随队列退役）</summary>
         public event Action<int> OnSegmentPlaying;
+
+        /// <summary>行动预告到达（2026-09-29 执行预览：Host 分桶后、首片推送前下发——
+        /// 订阅方=执行预览建行；载荷自含攻速/归属/技能索引。命名同 SnapshotUpdated 模式）</summary>
+        public event Action<TurnPlanMessage> TurnPlanUpdated;
 
         /// <summary>玩家资源增量（B6d 经济闭环：摩拉/体力 StatChange 命令消费点——
         /// 参数=玩家ID / 属性子类型（StatKindMora/StatKindStamina）/ 变化量；HUD 订阅即时刷新，
@@ -219,6 +225,13 @@ namespace GIC.Battle
         public void OnTurnEnd(TurnEndMessage message)
         {
             GICLog.Info($"[BattlePlayer] 回合 {message.turnNumber} 结束");
+        }
+
+        /// <summary>行动预告到达（2026-09-29 执行预览）：转发事件——订阅方（执行预览）在执行相位
+        /// 侧消费建行</summary>
+        public void OnTurnPlan(TurnPlanMessage message)
+        {
+            TurnPlanUpdated?.Invoke(message);
         }
 
         /// <summary>战斗结束（S10 轻量全灭软停）：一方全灭——HUD 胜负提示消费；结算画面=B8</summary>
@@ -530,8 +543,10 @@ namespace GIC.Battle
             if (delay > 0f)
                 yield return new WaitForSeconds(delay / _playbackSpeed);
 
-            if (segment.turnEnd == 0 && segment.deploy == 0)
-                OnSegmentPlaying?.Invoke(segment.sliceAttackSpeed); // 回合结束/部署段无"当前执行者"，不高亮
+            // 只对攻速行动片发（2026-09-29 语义收紧：部署/回合结束/即时行动块不按攻速排程——
+            // 执行预览的行进推进只属攻速片；旧消费方攻速队列已随队列退役）
+            if (segment.turnEnd == 0 && segment.deploy == 0 && segment.insertedInstantAction == 0)
+                OnSegmentPlaying?.Invoke(segment.sliceAttackSpeed);
 
             var playbacks = new List<Coroutine>();
             float stagger = 0f;

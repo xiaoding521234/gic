@@ -189,40 +189,13 @@ namespace GIC.Battle
             }
         }
 
-        // ==================== 运行时 UI 基础件（动态件仍用：队列槽重建/文本挂接） ====================
-
-        /// <summary>程序化 UI 挂 TextCombiner：TMP 与 Combiner 必须同物体（docs/20 §2）</summary>
-        private static TextCombiner AttachCombiner(TMP_Text text)
-        {
-            return text.gameObject.AddComponent<TextCombiner>();
-        }
+        // ==================== 运行时 UI 基础件（Palette 活色染色；2026-09-29 攻速队列退役批：
+        // 程序化建件/挂件助手 MakeText/SetRect/AttachCombiner 全部随队列删除——新 UI 一律 prefab 化） ====================
 
         /// <summary>Palette 活色：TextCombiner 的 TMP 同步染色（烘焙色仅兜底，改资产随下局生效）</summary>
         private static void RecolorText(TextCombiner combiner, Color color)
         {
             if (combiner?.textComponent != null) combiner.textComponent.color = color;
-        }
-
-        private static void SetRect(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 position, Vector2 size)
-        {
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = size;
-        }
-
-        private TextMeshProUGUI MakeText(string name, Transform parent, float fontSize, Color color)
-        {
-            var go = new GameObject(name);
-            var rect = go.AddComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            var text = go.AddComponent<TextMeshProUGUI>();
-            text.fontSize = fontSize;
-            text.color = color;
-            text.alignment = TextAlignmentOptions.Center;
-            text.raycastTarget = false;
-            return text;
         }
 
         /// <summary>技能按钮拖动转发（拖动式瞄准，B4 2026-09-26）：与旧点击转发件同思路——
