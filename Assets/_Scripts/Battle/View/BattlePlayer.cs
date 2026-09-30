@@ -7,6 +7,7 @@ using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
+using GIC.UI;
 namespace GIC.Battle
 {
 
@@ -652,6 +653,15 @@ namespace GIC.Battle
                             revived.SetCorpseVisual(false);
                             playbacks.Add(StartCoroutine(PlayDamageCoroutine(revived, command.value, stagger, true)));
                         }
+                        break;
+
+                    case BattleCommandType.UpgradeConstellation:
+                        // 命座提升（B8 批，docs/09）：3★+ 同名重复出战升命。被动属性/环参数由 Host 结算、
+                        // 快照权威自愈；此处轻提示反馈（数值随快照跳变；等级可视化显示待 UI 批）
+                        GICLog.Info($"[BattlePlayer] 命座提升：{command.targetUnitId} → C{command.value}");
+                        if (PopupManager.Instance != null)
+                            PopupManager.Instance.ShowToast(
+                                new LocalizedString(TableName.PopupText.ToString(), "Battle_ConstellationUp"));
                         break;
 
                     case BattleCommandType.Death:

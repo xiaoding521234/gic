@@ -18,6 +18,7 @@ using UnityEngine.UIElements;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
+using GIC.Battle;
 
 namespace GIC.Editor
 {
@@ -780,12 +781,18 @@ namespace GIC.Editor
                     $"参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}",
                 SkillEffectKind.Revive =>
                     $"参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}",
+                SkillEffectKind.StatBoost =>
+                    $"属性: {((StatType)el.FindPropertyRelative("statType").intValue)} 参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}",
+                SkillEffectKind.EnergyOverflowTransfer => "",
                 _ => "",
             };
             // 条件后缀（B-3 ② 存活态分叉——复苏/增益分支可视性）
             var condition = (SkillEffectCondition)el.FindPropertyRelative("condition").intValue;
             string conditionText = condition != SkillEffectCondition.None ? $" · 条件: {condition.GetInspectorName()}" : "";
-            return $"{kind.GetInspectorName()}{(summary.Length > 0 ? " · " + summary : "")}{conditionText}";
+            // 命座层后缀（B8 批：minConstellation>0 显示生效层）
+            int minC = el.FindPropertyRelative("minConstellation").intValue;
+            string minCText = minC > 0 ? $" · C{minC}起" : "";
+            return $"{kind.GetInspectorName()}{(summary.Length > 0 ? " · " + summary : "")}{minCText}{conditionText}";
         }
 
         /// <summary>选中效果的按 kind 显字段编辑卡（字段全建+显隐切换——kind 变化不丢绑定）</summary>
@@ -808,10 +815,14 @@ namespace GIC.Editor
             var kindField = new PropertyField(el.FindPropertyRelative("kind"), "效果类型");
             var filterField = new PropertyField(el.FindPropertyRelative("targetFilter"), "目标筛选(施放时)");
             var conditionField = new PropertyField(el.FindPropertyRelative("condition"), "作用条件(存活态)");
+            var statTypeField = new PropertyField(el.FindPropertyRelative("statType"), "属性类型(StatBoost)");
+            var minConstellationField = new PropertyField(el.FindPropertyRelative("minConstellation"), "生效命座层(0=固有)");
             effectAtomCard.Add(triggerField);
             effectAtomCard.Add(kindField);
             effectAtomCard.Add(filterField);
             effectAtomCard.Add(conditionField);
+            effectAtomCard.Add(statTypeField);
+            effectAtomCard.Add(minConstellationField);
 
             // 载荷字段（按 kind 部分有效——全建后显隐切换，kind 值变化时同步）
             var paramKeyField = new PropertyField(el.FindPropertyRelative("paramKey"), "主参数键");
@@ -827,13 +838,19 @@ namespace GIC.Editor
             void ApplyVisibility()
             {
                 var kind = (SkillEffectKind)el.FindPropertyRelative("kind").intValue;
+                bool isDeploy = (SkillEffectTrigger)el.FindPropertyRelative("trigger").intValue == SkillEffectTrigger.OnDeploy;
                 bool isCast = (SkillEffectTrigger)el.FindPropertyRelative("trigger").intValue == SkillEffectTrigger.OnCast;
                 filterField.style.display = isCast ? DisplayStyle.Flex : DisplayStyle.None;
+                // 命座被动载荷：OnDeploy 触发时显示（B8 批）
+                statTypeField.style.display = isDeploy && kind == SkillEffectKind.StatBoost
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+                minConstellationField.style.display = isDeploy ? DisplayStyle.Flex : DisplayStyle.None;
 
                 paramKeyField.style.display = kind switch
                 {
                     SkillEffectKind.Damage or SkillEffectKind.Heal or SkillEffectKind.ApplyBuff
                         or SkillEffectKind.EnergyGain or SkillEffectKind.MoraPlunder or SkillEffectKind.Revive
+                        or SkillEffectKind.StatBoost
                         => DisplayStyle.Flex, _ => DisplayStyle.None };
                 paramKey2Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
                 paramKey3Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
@@ -859,8 +876,24 @@ namespace GIC.Editor
             var data = sc.data;
             var issues = new List<string>();
 
-            if (data == null || !data.HasEffects)
+            // Talent 空效果=参数载体型命座被动（B8 批：芭芭拉命座——参数由歌声之环 Buff 消费），
+            // 合法形态不算占位问题；其余空效果=占位不可施放照旧提示
+            if (data != null && !data.HasEffects && data.skillType != SkillType.Talent)
                 issues.Add("无效果原子——未注册专属类时运行时=UnimplementedSkill 占位（不可施放）");
+
+            // 命座被动校验（B8 批）：OnDeploy 只被 Talent 命座技能消费；minConstellation 超上限永不生效
+            if (data != null && data.effects != null)
+            {
+                for (int i = 0; i < data.effects.Count; i++)
+                {
+                    var atom = data.effects[i];
+                    if (atom.trigger == SkillEffectTrigger.OnDeploy && data.skillType != SkillType.Talent)
+                        issues.Add($"第 {i + 1} 原子 OnDeploy：仅 Talent 命座技能消费（ConstellationApplier），其它类型无人消费");
+                    if (atom.trigger == SkillEffectTrigger.OnDeploy
+                        && (atom.minConstellation < 0 || atom.minConstellation > ConstellationApplier.MaxConstellation))
+                        issues.Add($"第 {i + 1} 原子 生效命座层 {atom.minConstellation} 越界（0~{ConstellationApplier.MaxConstellation}）——永不生效");
+                }
+            }
 
             if (data != null && (data.skillType == SkillType.Normal || data.skillType == SkillType.Burst))
             {

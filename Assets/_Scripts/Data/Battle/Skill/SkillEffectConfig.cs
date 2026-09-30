@@ -12,6 +12,7 @@ namespace GIC.Data
         [InspectorName("施放时")] OnCast = 0,
         [InspectorName("命中时")] OnHit = 1,
         [InspectorName("消散时")] OnVanish = 2, // B-3 预留（投射物消散点效果——采集类技能依赖）
+        [InspectorName("登场/升命时")] OnDeploy = 3, // 命座被动（B8 批 2026-09-30 实装）：Talent 技能专用——ConstellationApplier 登场与升命时幂等重算消费，不经 EffectCompiler 施放链
     }
 
     /// <summary>
@@ -32,6 +33,10 @@ namespace GIC.Data
         [InspectorName("摩拉掠夺")] MoraPlunder = 7,      // B-3 首扩（2026-09-25 随霜袭接线）：OnHit 每命中一个敌人，从其所属玩家摩拉池掠夺给施法者玩家（paramKey=MoraPlunder 键防双源；璃月契约先例=玩家池转移）
 
         [InspectorName("复苏")] Revive = 8,               // B-3 ②（2026-09-30 随芭芭拉闪耀奇迹接线）：目标为尸体时清除尸体态+治疗（paramKey=Heal 键按 baseType 换算；唯一复苏通道——docs/05 §5.4「血量永远0不复苏」例外条款）
+
+        [InspectorName("属性提升")] StatBoost = 9,        // B8 命座批（2026-09-30）：OnDeploy 被动属性——statType+paramKey/value（Fixed=BaseFlat/Percent=BasePercent 修改器；容量型属性〔Energy〕=直接扩上限）；minConstellation=生效命座层
+
+        [InspectorName("元能溢出转移")] EnergyOverflowTransfer = 10, // B8 命座批：OnDeploy 被动旗标——本命座层起，获得元能溢出部分转移给最近未满我方（安柏1命；ApplyEnergy 消费）
     }
 
     /// <summary>
@@ -111,5 +116,13 @@ namespace GIC.Data
 
         /// <summary>触发的目标技能类型（TriggerSkill 用：查目标该型技能并结算——延奏→Henka 变奏）</summary>
         public SkillType targetSkillType = SkillType.Henka;
+
+        [Header("命座被动载荷（B8 批：OnDeploy 用）")]
+        /// <summary>提升的属性类型（StatBoost 用；容量型属性〔Energy〕=直接扩上限非 BaseFlat）</summary>
+        public StatType statType = StatType.HP;
+
+        /// <summary>生效命座层（0=固有被动〔登场即有，docs/09「0命」〕；1~3=需升命到该层才生效——
+        /// ConstellationApplier 按当前命座层幂等重算，层数只增故重算=全撤后重挂）</summary>
+        public int minConstellation = 0;
     }
 }

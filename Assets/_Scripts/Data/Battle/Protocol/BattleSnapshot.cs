@@ -27,6 +27,10 @@ namespace GIC.Data
         public int isCorpse;
         public int isFrozen;
 
+        /// <summary>命座等级（B8 批 2026-09-30，docs/09：0~3——3★+同名重复出战升命；命座被动由 Host
+        /// ConstellationApplier 结算，本字段=展示/升命门控/B7 联机同源真源）</summary>
+        public int constellation;
+
         /// <summary>元能当前值/上限（B6a；上限=UnitConfig baseEnergy，爆发门槛=技能条目 EnergyCost）</summary>
         public int energy;
         public int maxEnergy;

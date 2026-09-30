@@ -300,6 +300,9 @@ namespace GIC.Battle
             // 协议核心登记（同玩家重复注册=后者覆盖——对局装配每玩家恰一枚，防御性取最新）
             if (unit.RawData != null && unit.RawData.unitName == UnitName.ProtocolCore)
                 _coreUnitIds[playerId] = unitId;
+            // 命座登场 Buff 授予（B8 批：0命固有被动的 Buff 形态——芭芭拉「获得歌声之环」，
+            // OnDeploy[ApplyBuff] 原子；随后的 BuildUnitState 携带 buffs，客户端零额外命令）
+            ConstellationApplier.ApplyDeployBuffs(this, unit);
             return unitId;
         }
 
@@ -460,16 +463,86 @@ namespace GIC.Battle
 
         /// <summary>
         /// 应用元能变化（B6a：正=获取——移动+10/战技至少1次命中+10；负=技能消耗。
-        /// 上限=UnitConfig baseEnergy（GetEffectiveEnergy）；消耗值=技能条目 EnergyCost
-        /// （三角色爆发 30/40/100 恰与上限相等=攒满才放；安柏延奏 20<上限 30=不必攒满，两者独立）
+        /// 上限=UnitConfig baseEnergy（GetEffectiveEnergy）+命座容量加成（SetStatRange 直扩）；消耗值=技能条目 EnergyCost。
+        /// 溢出转移（B8 命座批，安柏1命）：delta>0 且目标带 EnergyOverflowPassive 且溢出——自身只留
+        /// 装得下的部分，溢出转移给切比雪夫最近未满元能我方存活角色（同距 unitId 升序；全满则无效果）；
+        /// 接收方经 out 回传给调用方（TurnResolver 转移效应命令），本层不做二次转移（单跳）。
         /// </summary>
         public void ApplyEnergy(Unit target, int delta)
         {
+            ApplyEnergy(target, delta, out _, out _);
+        }
+
+        /// <summary>带溢出转移的元能应用（见上——overflowReceiverId/overflowAmount 回传转移事实）</summary>
+        public void ApplyEnergy(Unit target, int delta, out string overflowReceiverId, out int overflowAmount)
+        {
+            overflowReceiverId = null;
+            overflowAmount = 0;
+            if (target == null) return;
             var stats = target.GetUnitComponent<UnitStats>();
             if (stats == null) return;
             var energy = stats.GetStatStruct(StatType.Energy);
+
+            if (delta > 0 && target.EnergyOverflowPassive)
+            {
+                int room = energy.Max - energy.Value;
+                if (delta > room) // 溢出：自身留满，余量转移（room≤0=已满全额转移）
+                {
+                    overflowAmount = delta - System.Math.Max(0, room);
+                    if (room > 0)
+                    {
+                        energy.Add(room);
+                        stats.SetStatStruct(StatType.Energy, energy);
+                    }
+                    var ally = FindNearestNonFullEnergyAlly(target);
+                    if (ally != null && TryGetUnitId(ally, out var allyId))
+                    {
+                        overflowReceiverId = allyId;
+                        var allyStats = ally.GetUnitComponent<UnitStats>();
+                        var allyEnergy = allyStats.GetStatStruct(StatType.Energy);
+                        allyEnergy.Add(overflowAmount); // 单跳：接收方不再转移
+                        allyStats.SetStatStruct(StatType.Energy, allyEnergy);
+                    }
+                    else overflowAmount = 0; // 我方全满则无效果（安柏1命描述口径）
+                    return;
+                }
+            }
+
             energy.Add(delta);
             stats.SetStatStruct(StatType.Energy, energy);
+        }
+
+        /// <summary>切比雪夫距离最近、元能未满的我方存活角色（不含自身；同距 unitId 升序——
+        /// 安柏1命溢出转移的接收方判定；尸体不算「角色」）</summary>
+        private Unit FindNearestNonFullEnergyAlly(Unit self)
+        {
+            var selfPos = GetPosition(self);
+            var selfIdentity = self.GetUnitComponent<UnitIdentity>();
+            if (selfIdentity == null) return null;
+            Unit best = null;
+            int bestDist = int.MaxValue;
+            string bestId = null;
+            foreach (var kv in _units)
+            {
+                var candidate = kv.Value;
+                if (candidate == self || BattleSimState.IsDead(candidate)) continue;
+                var identity = candidate.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.Team != selfIdentity.Team) continue;
+                var stats = candidate.GetUnitComponent<UnitStats>();
+                if (stats == null) continue;
+                var energy = stats.GetStatStruct(StatType.Energy);
+                if (energy.Value >= energy.Max) continue; // 已满不接收
+                var pos = GetPosition(candidate);
+                int dist = System.Math.Max(System.Math.Abs(pos.x - selfPos.x), System.Math.Abs(pos.y - selfPos.y));
+                if (dist < bestDist || (dist == bestDist && bestId != null
+                    && string.CompareOrdinal(kv.Key, bestId) < 0))
+                {
+                    best = candidate;
+                    bestDist = dist;
+                    bestId = kv.Key;
+                }
+            }
+            return best;
         }
 
         /// <summary>元能是否够施放（门槛=技能消耗值而非上限——延奏类不满即可放）。
@@ -595,6 +668,7 @@ namespace GIC.Battle
                 energy = stats?.Energy ?? 0,
                 maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
                 cylinderDiameter = unit.RawData?.受击圆柱直径 ?? 0f,
+                constellation = unit.ConstellationLevel, // 命座（B8 批：展示/升命门控真源）
             };
             foreach (var buff in unit.Buffs)
                 state.buffs.Add(new BuffState

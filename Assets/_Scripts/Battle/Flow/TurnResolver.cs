@@ -783,7 +783,13 @@ namespace GIC.Battle
                     foreach (var gain in energyGains)
                     {
                         if (!appliedEnergy.Add($"{gain.TargetUnitId}:{gain.Category}")) continue;
-                        _sim.ApplyEnergy(_sim.GetUnit(gain.TargetUnitId), gain.Delta);
+                        // 溢出转移（B8 批，安柏1命）：状态层转移后回传事实→补发转移效应命令（独立类别，
+                        // 客户端到点跳接收方元能；发射层 MergeEnergyCommands 后续统一合并）
+                        _sim.ApplyEnergy(_sim.GetUnit(gain.TargetUnitId), gain.Delta,
+                            out var overflowReceiver, out var overflowAmount);
+                        if (overflowAmount > 0 && !string.IsNullOrEmpty(overflowReceiver))
+                            effects.Add(new EnergyEffect(overflowReceiver, overflowAmount,
+                                EnergyEffect.CategoryOverflowTransfer));
                     }
             }
             return appliedBuffs;

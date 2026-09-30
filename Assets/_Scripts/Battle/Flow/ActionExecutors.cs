@@ -261,6 +261,36 @@ namespace GIC.Battle
                 return false;
             }
 
+            // ==================== 升命座分支（B8 批 2026-09-30，docs/05 §5.2+docs/09）====================
+            // 3★+同名重复出战=提升命座（docs/05 §5.4：尸体也仅升命不复苏；封顶 MaxConstellation=3）——
+            // 不生成新单位、扣等同出战摩拉、占部署族配额（ActionType 仍=DeployUnit，语义由同名在场判定）
+            var existingUnit = FindOwnUnitByName(sim, action.playerId, unitName);
+            if (existingUnit != null && data.starLevel >= 3)
+            {
+                if (existingUnit.ConstellationLevel >= ConstellationApplier.MaxConstellation)
+                {
+                    GICLog.Info($"[DeployUnit] {unitName} 已满命（{ConstellationApplier.MaxConstellation}），升命落空");
+                    return false;
+                }
+                int upgradeCost = data.GetEffectiveDeployCost();
+                if (!sim.TrySpendMora(action.playerId, upgradeCost))
+                {
+                    GICLog.Info($"[DeployUnit] {action.playerId} 摩拉不足（{sim.GetMora(action.playerId)}/{upgradeCost}），升命落空");
+                    return false;
+                }
+                existingUnit.ConstellationLevel++;
+                ConstellationApplier.ApplyPassives(existingUnit); // 幂等重算（全撤→按新层重挂）
+                if (sim.TryGetUnitId(existingUnit, out var upgradedId))
+                {
+                    summonCommand = BattleCommand.UpgradeConstellation(action.playerId, upgradedId, 0, 0,
+                        existingUnit.ConstellationLevel);
+                }
+                moraCommand = BattleCommand.StatChange(action.playerId, 0, 0,
+                    BattleCommand.StatKindMora, -upgradeCost);
+                GICLog.Info($"[DeployUnit] {action.playerId} 升命 {unitName} → C{existingUnit.ConstellationLevel}（摩拉 {upgradeCost}）");
+                return true;
+            }
+
             if (!IsDeployCellValid(sim, action.playerId, action.deployCell, data))
             {
                 GICLog.Info($"[DeployUnit] {unitName} 落点 {action.deployCell} 不合法（核心半径 {DeployRadiusFromCore} 内+碰撞判定），部署落空");
@@ -292,6 +322,19 @@ namespace GIC.Battle
                 BattleCommand.StatKindMora, -cost);
             GICLog.Info($"[DeployUnit] {action.playerId} 出战 {unitName} @ {action.deployCell}（摩拉 {cost}）");
             return true;
+        }
+
+        /// <summary>玩家场上同名单位（含尸体——升命对尸体同样生效〔docs/05 §5.4 仅升命不复苏〕；
+        /// 3★+ 同名在场即升命，1~2★ 不适用〔眷属重复出战=加单位〕）</summary>
+        private static Unit FindOwnUnitByName(BattleSimState sim, string playerId, UnitName unitName)
+        {
+            foreach (var kv in sim.Units)
+            {
+                var identity = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.OwnerPlayerID != playerId) continue;
+                if (identity.UnitName == unitName) return kv.Value;
+            }
+            return null;
         }
     }
 }

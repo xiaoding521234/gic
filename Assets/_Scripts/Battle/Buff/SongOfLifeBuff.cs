@@ -7,25 +7,30 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 歌声之环（B-3 ②，芭芭拉闪耀奇迹的活体分支——docs/units/蒙德/芭芭拉.md「歌声之环」节）：
-    /// 永久光环（不计时，持有者倒下消失——RemoveOnHolderDeath 覆写 true），上限 1 层。
-    /// 每回合结束：对持有者切比雪夫半径 1 内敌人造成 10% 攻击力水伤（含尸体——鞭尸同 Burn 先例）；
-    /// 对半径内我方**存活**单位（含持有者）治疗 10 生命值并附着水元素。
-    /// 数值基准=施加者（source=施放闪耀奇迹的芭芭拉——技能数值随施法者成长；无施加者回落持有者，
-    /// 与 BurnBuff 伤害归属同款兜底）；Buff tick 伤害=平直值不进 DamagePipeline（Burn 先例：tick
-    /// 伤害无反应/防御乘区）。
-    /// 「恢复 1 理智」暂未落地——战斗协议无理智字段（UnitState 无 sanity），理智入战斗协议后补。
-    /// 命座扩展（C1 元能/C2 半径+免附着/C3 叠层上限）随 B8 命座批（参数届时经 ApplyBuff 通道注入）。
+    /// 歌声之环（B-3 ② + B8 命座批，芭芭拉闪耀奇迹——docs/units/蒙德/芭芭拉.md「歌声之环」节）：
+    /// 永久光环（不计时，持有者倒下消失——RemoveOnHolderDeath 覆写 true），叠层上限随施加者命座成长。
+    /// 每回合结束：①为**持有者**增加元能（**0命=+5**〔2026-09-30 用户拍板「0命就可以每回合加5元能」〕，
+    /// 1命起=C1EnergyGain 参数=+10——参数载体=施加者命座技能）；②对持有者切比雪夫半径内敌人造成
+    /// 10% 施加者攻击力水伤（含尸体——鞭尸同 Burn 先例；tick 平直值不进 DamagePipeline）；③对半径内
+    /// 我方**存活**单位（含持有者）治疗 10 生命值并附着水元素（**2命起不再附着**）。
+    /// 半径 1（**2命起 +C2Radius=2**）；叠层上限 1（**3命起 +C3StackLimit=2**——Level=层数，
+    /// 全部 tick 数值 ×层数，重复施加叠层钳上限）。
+    /// 命座参数读取=施加者（source=施放闪耀奇迹的芭芭拉）的 Talent 命座技能参数（命座也是技能——
+    /// 参数载体型被动，docs/09「0命=固有被动、1-3命=增强」）；施加者亡佚/无命座技能回落基础值。
+    /// 「恢复 1 理智」暂未落地——战斗协议无理智字段，理智入战斗协议后补。
     /// </summary>
     public class SongOfLifeBuff : BaseBuff
     {
-        /// <summary>每回合对半径内敌人的伤害（% 攻击力；docs/units/蒙德/芭芭拉.md）</summary>
+        /// <summary>每回合对半径内敌人的伤害（% 施加者攻击力；docs/units/蒙德/芭芭拉.md）</summary>
         public const int DamagePercentPerTurn = 10;
 
         /// <summary>每回合对半径内我方的治疗（固定值）</summary>
         public const int HealPerTurn = 10;
 
-        /// <summary>作用半径（切比雪夫，格）</summary>
+        /// <summary>0命每回合为持有者增加的元能（2026-09-30 拍板；1命起=C1EnergyGain 参数〔+10〕取代）</summary>
+        public const int EnergyGainPerTurnBase = 5;
+
+        /// <summary>作用半径（切比雪夫，格；2命起 +C2Radius）</summary>
         public const int Radius = 1;
 
         public override BuffType Type => BuffType.SongOfLife;
@@ -34,16 +39,16 @@ namespace GIC.Battle
 
         public SongOfLifeBuff()
         {
-            Level = 1;          // 恒 1 层（上限 1；命中座 C3 再扩）
+            Level = 1;          // 层数（上限随施加者命座：0命1层/3命2层）
             RemainingTurns = -1; // 永久（IsPermanent 标记——不计时，倒下即失）
         }
 
-        /// <summary>同类重复施加：上限 1 层——不叠层不续时（永久无时可续），仅刷新施加者
-        /// （数值基准随之更新）。</summary>
+        /// <summary>同类重复施加：叠层（钳当前施加者命座上限）+刷新施加者（数值基准随之更新）。</summary>
         public override void Merge(BaseBuff newer)
         {
             if (newer is SongOfLifeBuff)
                 source = newer.source;
+            Level = Mathf.Min(Level + 1, StackLimit());
         }
 
         public override List<BattleEffect> OnTurnEnd()
@@ -57,11 +62,23 @@ namespace GIC.Battle
             var holderTeam = holderIdentity.Team;
             var ownerId = holderIdentity.UnitID;
 
+            // 命座参数（施加者视角——数值随施法者命座成长；source 亡佚回落持有者=基础值）
+            var (cLevel, talent) = SourceConstellation();
+            int stacks = Mathf.Max(1, Level);
+            int energyGain = (cLevel >= 1
+                ? (talent != null ? talent.GetInt(SkillParamKey.C1EnergyGain, EnergyGainPerTurnBase * 2) : EnergyGainPerTurnBase * 2)
+                : EnergyGainPerTurnBase) * stacks;
+            int radius = Radius + (cLevel >= 2
+                ? (talent != null ? talent.GetInt(SkillParamKey.C2Radius, 1) : 1)
+                : 0);
+            bool attachAllies = cLevel < 2; // 2命起：不再为我方角色附着元素
+
             // 数值基准=施加者（施放闪耀奇迹的芭芭拉）；无施加者回落持有者（BurnBuff 伤害归属同款兜底）
             var attacker = source != null ? source : owner;
             string attackerId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
             int attack = attacker.GetUnitComponent<UnitStats>()?.Attack ?? 0;
-            int damage = attack * DamagePercentPerTurn / 100; // 末点截断口径（int 除法=FloorToInt 等价）
+            int damage = attack * DamagePercentPerTurn / 100 * stacks; // 末点截断口径（int 除法=FloorToInt 等价）
+            int heal = HealPerTurn * stacks;
 
             foreach (var kv in Sim.Units)
             {
@@ -69,7 +86,7 @@ namespace GIC.Battle
                 var identity = unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null) continue;
                 var pos = Sim.GetPosition(unit);
-                if (Math.Max(Math.Abs(pos.x - holderPos.x), Math.Abs(pos.y - holderPos.y)) > Radius)
+                if (Math.Max(Math.Abs(pos.x - holderPos.x), Math.Abs(pos.y - holderPos.y)) > radius)
                     continue; // 出半径
 
                 if (identity.Team != holderTeam)
@@ -80,13 +97,38 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    // 我方存活（含持有者）：治疗+水附着（尸体不治疗——血量恒 0 铁律 docs/05 §5.4）
+                    // 我方存活（含持有者）：治疗+元能+水附着（尸体不治疗——血量恒 0 铁律 docs/05 §5.4）
                     if (BattleSimState.IsDead(unit)) continue;
-                    effects.Add(new HealEffect(attackerId, kv.Key, HealPerTurn));
-                    effects.Add(new AttachElementEffect(attackerId, kv.Key, (int)ElementType.Hydro));
+                    effects.Add(new HealEffect(attackerId, kv.Key, heal));
+                    if (energyGain > 0)
+                        effects.Add(new EnergyEffect(kv.Key, energyGain, EnergyEffect.CategoryBuffTickGain));
+                    if (attachAllies)
+                        effects.Add(new AttachElementEffect(attackerId, kv.Key, (int)ElementType.Hydro));
                 }
             }
             return effects;
+        }
+
+        /// <summary>当前叠层上限（0命=1；3命起=1+C3StackLimit〔=2〕——按施加者命座与命座技能参数）</summary>
+        private int StackLimit()
+        {
+            var (cLevel, talent) = SourceConstellation();
+            return 1 + (cLevel >= 3 ? (talent != null ? talent.GetInt(SkillParamKey.C3StackLimit, 1) : 1) : 0);
+        }
+
+        /// <summary>施加者命座等级+其 Talent 命座技能数据（参数载体：C1EnergyGain/C2Radius/C3StackLimit）；
+        /// 无施加者回落持有者自身（跨命座语义仍正确——持有者升命只影响自己环的数值）</summary>
+        private (int level, SkillConfig.SkillData talent) SourceConstellation()
+        {
+            var s = source != null ? source : owner;
+            if (s == null) return (0, null);
+            foreach (var skill in s.Skills)
+            {
+                var data = skill?.RawData;
+                if (data == null || data.skillType != SkillType.Talent) continue;
+                return (s.ConstellationLevel, data);
+            }
+            return (s.ConstellationLevel, null);
         }
     }
 }

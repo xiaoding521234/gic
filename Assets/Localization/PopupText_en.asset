@@ -118,6 +118,14 @@ MonoBehaviour:
     m_Localized: "Action already confirmed \u2014 new picks won't execute"
     m_Metadata:
       m_Items: []
+  - m_Id: 34736311416467456
+    m_Localized: Constellation Upgraded
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34736311475187712
+    m_Localized: Constellation maxed out
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

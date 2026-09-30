@@ -737,11 +737,64 @@ namespace GIC.Battle
                 var captured = cardId;
                 btn.onClick.AddListener(() =>
                 {
-                    if (captured.cardType == CardType.Unit) EnterDeployAim(captured.value);
+                    if (captured.cardType == CardType.Unit) TryDeployOrUpgrade(captured.value);
                     else SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入，不进部署链（货币物品牌同款）
                 });
                 _handCardButtons.Add(btn);
             }
+        }
+
+        /// <summary>出战/升命路由（B8 命座批，docs/05 §5.2+docs/09）：3★+ 同名已在场（含尸体）→
+        /// 重复出战=提升命座——直接上交免落点瞄准（不生成新单位）；否则走部署瞄准（1~2★ 重复出战=
+        /// 加单位、首战=选格落地，均不变）。满命上交被 Host 拒绝，本端先行轻提示省一次落空。</summary>
+        private void TryDeployOrUpgrade(int unitNameValue)
+        {
+            if (IsConstellationUpgrade(unitNameValue))
+            {
+                if (UpgradeTargetAtMax(unitNameValue))
+                {
+                    ShowBattleToast("Battle_ConstellationMax");
+                    GICLog.Info($"[BattleHud] {(UnitName)unitNameValue} 已满命，升命拦截");
+                    return;
+                }
+                var action = new ActionData
+                {
+                    playerId = _myPlayerId,
+                    actionType = ActionType.DeployUnit,
+                    deployUnitName = unitNameValue,
+                };
+                _session.SubmitAction(action);
+                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：升命 {(UnitName)unitNameValue}");
+                _actionConfirmed = true; // 确认即定死（与 SubmitAim 部署同款——Host 已交忽略双保险）
+                SetTip("Battle_TipSubmitted");
+                DeselectUnit();
+                return;
+            }
+            EnterDeployAim(unitNameValue);
+        }
+
+        /// <summary>该卡是否升命目标：3★+ 非建筑、我方（本玩家）场上已有同名单位（含尸体）</summary>
+        private bool IsConstellationUpgrade(int unitNameValue)
+        {
+            var data = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
+            if (data == null || data.starLevel < 3 || data.unitType == UnitType.Building) return false;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot == null) return false;
+            foreach (var u in snapshot.units)
+                if (u.playerId == _myPlayerId && u.unitName == ((UnitName)unitNameValue).ToString())
+                    return true;
+            return false;
+        }
+
+        /// <summary>升命目标是否已满命（本端拦截省落空；Host 侧 ConstellationApplier.MaxConstellation 权威兜底）</summary>
+        private bool UpgradeTargetAtMax(int unitNameValue)
+        {
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot == null) return false;
+            foreach (var u in snapshot.units)
+                if (u.playerId == _myPlayerId && u.unitName == ((UnitName)unitNameValue).ToString())
+                    return u.constellation >= ConstellationApplier.MaxConstellation;
+            return false;
         }
 
         /// <summary>手牌货币物品牌卡数量刷新（B6d：体力/摩拉数量=局内持有，快照/命令增量时随资源链调用；

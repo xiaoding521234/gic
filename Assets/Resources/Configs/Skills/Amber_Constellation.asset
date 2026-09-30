@@ -33,3 +33,61 @@ MonoBehaviour:
       value: 30
       baseType: 0
     timeline: {fileID: 0}
+    effects:
+    - trigger: 3
+      kind: 9
+      targetFilter: 0
+      condition: 0
+      paramKey: 14
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7
+      statType: 10
+      minConstellation: 1
+    - trigger: 3
+      kind: 10
+      targetFilter: 0
+      condition: 0
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 1
+    - trigger: 3
+      kind: 9
+      targetFilter: 0
+      condition: 0
+      paramKey: 15
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7
+      statType: 4
+      minConstellation: 2
+    - trigger: 3
+      kind: 9
+      targetFilter: 0
+      condition: 0
+      paramKey: 36
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7
+      statType: 15
+      minConstellation: 2
+    costs: []
