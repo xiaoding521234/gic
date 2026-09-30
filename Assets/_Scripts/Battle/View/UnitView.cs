@@ -493,6 +493,23 @@ namespace GIC.Battle
             EnergyCurrent = Mathf.Clamp(EnergyCurrent + delta, 0, Mathf.Max(0, EnergyMax));
         }
 
+        // ==================== 理智（2026-09-30 歌声之环批：快照权威 + StatChange(Sanity) 命令增量；
+        // 视觉消费方随未来理智机制批，本批打通数据链——B7 联机随快照/命令自动同步） ====================
+
+        public int SanityCurrent { get; private set; }
+
+        /// <summary>快照权威同步理智（选择阶段头/开局）</summary>
+        public void SetSanity(int current)
+        {
+            SanityCurrent = current;
+        }
+
+        /// <summary>命令流增量理智（StatChange·StatKindSanity；下个快照自然校正；钳 -300~300 同 UnitStats）</summary>
+        public void ApplySanityDelta(int delta)
+        {
+            SanityCurrent = Mathf.Clamp(SanityCurrent + delta, -300, 300);
+        }
+
         // ==================== 头顶 Buff 徽章（B2；快照权威 + 命令流增量） ====================
 
         /// <summary>Buff 徽章行容器：挂立牌倾斜组，与立牌同平面同一旋转轴（2026-09-18 用户目检：

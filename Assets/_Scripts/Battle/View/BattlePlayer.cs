@@ -211,6 +211,7 @@ namespace GIC.Battle
                     view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（权威态）
                     view.SetHp(state.hp, state.maxHp);
                     view.SetEnergy(state.energy, state.maxEnergy); // 元能（权威态；B6a）
+                    view.SetSanity(state.sanity); // 理智（权威态；2026-09-30 歌声之环批）
                     view.SetBuffs(state.buffs); // 头顶 Buff 行（权威态）
                 }
             }
@@ -724,6 +725,12 @@ namespace GIC.Battle
                                 else
                                     statChanged.ApplyEnergyDelta(command.value);
                             }
+                            else if (command.metadata == BattleCommand.StatKindSanity)
+                            {
+                                // 理智恢复（2026-09-30 歌声之环批）：环 tick 立即应用数据缓存——
+                                // 视觉消费方随未来理智机制批；下个快照自然校正
+                                statChanged.ApplySanityDelta(command.value);
+                            }
                         }
                         break;
 
@@ -1050,6 +1057,7 @@ namespace GIC.Battle
             view.SetFrozenVisual(state.isFrozen != 0);
             view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（建场权威态）
             view.SetEnergy(state.energy, state.maxEnergy); // 元能（建场权威态；B6a）
+            view.SetSanity(state.sanity); // 理智（建场权威态；2026-09-30 歌声之环批）
             view.SetBuffs(state.buffs);
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;

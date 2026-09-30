@@ -34,6 +34,7 @@ namespace GIC.Battle
             var attachKeys = new HashSet<string>();
             var reactionKeys = new HashSet<string>();
             var energyKeys = new HashSet<string>();
+            var sanityKeys = new HashSet<string>();
             var staminaKeys = new HashSet<string>();
             var moraKeys = new HashSet<string>();
             var itemConsumeKeys = new HashSet<string>();
@@ -60,6 +61,8 @@ namespace GIC.Battle
                     case BattleCommandType.StatChange:
                         if (command.metadata == BattleCommand.StatKindEnergy)
                             energyKeys.Add(command.targetUnitId);
+                        else if (command.metadata == BattleCommand.StatKindSanity)
+                            sanityKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindStamina)
                             staminaKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindMora)
@@ -110,6 +113,13 @@ namespace GIC.Battle
                 {
                     // B6d 体力：TargetUnitId=玩家 ID；效应→StatChange(StatKindStamina) 命令
                     if (!staminaKeys.Contains(stamina.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is SanityEffect sanity)
+                {
+                    // 理智恢复（2026-09-30 歌声之环批）：效应→StatChange(StatKindSanity) 命令；
+                    // 合并键=目标去重（同元能按目标查存在性）
+                    if (!sanityKeys.Contains(sanity.TargetUnitId))
                         Report(context, effect, BattleCommandType.StatChange);
                 }
                 else if (effect is MoraPlunderEffect plunder)

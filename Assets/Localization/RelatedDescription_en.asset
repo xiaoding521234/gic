@@ -20,7 +20,7 @@ MonoBehaviour:
   m_TableData:
   - m_Id: 1
     m_Localized: 3 Durability. When the holder takes 50 or more DMG, Baron Bunny
-      blocks it and loses 1 Durability.
+      blocks it and loses 1 Durability. Vanishes when its Durability is depleted.
     m_Metadata:
       m_Items: []
   - m_Id: 11512500209799168
@@ -35,10 +35,10 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256256
-    m_Localized: At each turn end, grants the holder 5 Energy, deals Hydro DMG equal
-      to 10% ATK to enemies within 1 cell of the holder, and heals allies within
-      range for 5% of the applier's Max HP while applying Hydro to them. Disappears
-      when the holder falls.
+    m_Localized: Single stack. At each turn end, grants the holder 5 Energy; deals
+      10% ATK Hydro DMG to enemies within 1 tile of the holder; heals allies within
+      1 tile for 5% of the applier's Max HP, restores 1 Sanity and applies Hydro
+      to them. Vanishes when the holder is downed.
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256257

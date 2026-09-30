@@ -12,13 +12,14 @@ namespace GIC.Battle
     /// 每回合结束：①为**持有者**增加元能（**0命=+5**〔2026-09-30 用户拍板「0命就可以每回合加5元能」〕，
     /// 1命起=C1EnergyGain 参数=+10——参数载体=施加者命座技能）；②对持有者切比雪夫半径内敌人造成
     /// 10% 施加者攻击力水伤（含尸体——鞭尸同 Burn 先例；tick 平直值不进 DamagePipeline）；③对半径内
-    /// 我方**存活**单位（含持有者）治疗**施加者 5% 最大生命值**并附着水元素（**2命起不再附着**；
+    /// 我方**存活**单位（含持有者）治疗**施加者 5% 最大生命值**、恢复 1 理智并附着水元素（**2命起不再附着**；
     /// 2026-09-30 拍板：平值 10 无法成长改比例；基准=施加者芭芭拉自身最大生命〔非各自〕，末点截断后×层数）。
     /// 半径 1（**2命起 +C2Radius=2**）；叠层上限 1（**3命起 +C3StackLimit=2**——Level=层数，
     /// 全部 tick 数值 ×层数，重复施加叠层钳上限）。
     /// 命座参数读取=施加者（source=施放闪耀奇迹的芭芭拉）的 Talent 命座技能参数（命座也是技能——
     /// 参数载体型被动，docs/09「0命=固有被动、1-3命=增强」）；施加者亡佚/无命座技能回落基础值。
-    /// 「恢复 1 理智」暂未落地——战斗协议无理智字段，理智入战斗协议后补。
+    /// 「恢复 1 理智」已落地（2026-09-30 用户拍板「必须要的」——SanityEffect 结算+StatChange(Sanity)
+    /// 命令+UnitState.sanity 快照；玩法消费方随未来理智机制批）。
     /// </summary>
     public class SongOfLifeBuff : BaseBuff
     {
@@ -30,6 +31,10 @@ namespace GIC.Battle
 
         /// <summary>0命每回合为持有者增加的元能（2026-09-30 拍板；1命起=C1EnergyGain 参数〔+10〕取代）</summary>
         public const int EnergyGainPerTurnBase = 5;
+
+        /// <summary>每回合为半径内我方恢复的理智（2026-09-30 用户拍板「恢复1理智是必须要的」正式落地；
+        /// 玩法消费方随未来理智机制批，本批打通结算/命令/快照链）</summary>
+        public const int SanityGainPerTurn = 1;
 
         /// <summary>作用半径（切比雪夫，格；2命起 +C2Radius）</summary>
         public const int Radius = 1;
@@ -100,10 +105,12 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    // 我方存活（含持有者）：治疗+元能+水附着（尸体不治疗——血量恒 0 铁律 docs/05 §5.4）
+                    // 我方存活（含持有者）：治疗+理智+元能+水附着（尸体不治疗——血量恒 0 铁律 docs/05 §5.4；
+                    // 理智恢复 1×层数——与治疗/元能同拍结算，SanityEffect→StatChange(Sanity) 命令）
                     if (BattleSimState.IsDead(unit)) continue;
                     if (heal > 0)
                         effects.Add(new HealEffect(attackerId, kv.Key, heal));
+                    effects.Add(new SanityEffect(kv.Key, SanityGainPerTurn * stacks));
                     if (energyGain > 0)
                         effects.Add(new EnergyEffect(kv.Key, energyGain, EnergyEffect.CategoryBuffTickGain));
                     if (attachAllies)

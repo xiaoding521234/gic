@@ -512,6 +512,18 @@ namespace GIC.Battle
             stats.SetStatStruct(StatType.Energy, energy);
         }
 
+        /// <summary>理智应用（2026-09-30 歌声之环批）：RangedInt Add 自动钳 -300~300（到上限自然停涨）；
+        /// 玩法消费方随未来理智机制批接线，本批打通 配置→运行时→结算→命令→快照 全链</summary>
+        public void ApplySanity(Unit target, int delta)
+        {
+            if (target == null || delta == 0) return;
+            var stats = target.GetUnitComponent<UnitStats>();
+            if (stats == null) return;
+            var sanity = stats.GetStatStruct(StatType.Sanity);
+            sanity.Add(delta);
+            stats.SetStatStruct(StatType.Sanity, sanity);
+        }
+
         /// <summary>切比雪夫距离最近、元能未满的我方存活角色（不含自身；同距 unitId 升序——
         /// 安柏1命溢出转移的接收方判定；尸体不算「角色」）</summary>
         private Unit FindNearestNonFullEnergyAlly(Unit self)
@@ -667,6 +679,7 @@ namespace GIC.Battle
                 volume = unit.Volume,
                 energy = stats?.Energy ?? 0,
                 maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
+                sanity = stats?.Sanity ?? 0,
                 cylinderDiameter = unit.RawData?.受击圆柱直径 ?? 0f,
                 constellation = unit.ConstellationLevel, // 命座（B8 批：展示/升命门控真源）
             };
