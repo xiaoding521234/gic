@@ -241,6 +241,13 @@ namespace GIC.Battle
         /// （取消/完成选择确认/超时/阶段切换）经 ExitAiming 统一收口清零</summary>
         private bool _dragAiming;
 
+        /// <summary>拖动瞄准松手帧号（松手尾巴点击防线，2026-09-30 报障「很近的地方松手→落格
+        /// 变打开详情面板」）：UGUI 抬起时「按压/抬起命中同一 IPointerClickHandler」即补发一次点击
+        /// ——被拖键已挪到盘心，近距松手指针常仍压在键矩形内（键半宽 110>盘心死区 56），该尾巴点击
+        /// 被 OnSkillButtonClicked 当「同键再点」误开详情面板；与 _dragAiming 双保险覆盖
+        /// click/endDrag 执行顺序差异（§103）</summary>
+        private int _dragAimEndFrame = -1;
+
         // 拖动瞄准圆盘（2026-09-26 拍板「和王者一样，技能上显示一个大圆盘，并且手指拖拽位置还有小圆盘；
         // 圆盘不可超出屏幕边缘」+同日三拍「大圆盘太小/小圆盘不超大圆盘/选中格精确性全在大圆盘内」；
         // 2026-09-28 拍板「大盘改圆角矩形，贴合格子战场」）：运行时建在 HUD 画布（非布局件、
@@ -1391,6 +1398,12 @@ namespace GIC.Battle
         {
             if (def == null || _layoutEditing) return; // 编辑期点击让位给拖拽/选框（拖拽板在控件之上）
 
+            // 拖动瞄准松手尾巴（§103）：UGUI 抬起判定=按压/抬起命中同一 IPointerClickHandler 即补发
+            // 点击（StandaloneInputModule，且点击先于 endDrag 执行）——被拖键挪到盘心后近距松手指针
+            // 仍在键矩形内，尾巴会被本方法当「同键再点」误开详情面板。拖动会话中不可能有真按压
+            // （指针全程被按住）——吞掉，落格/取消交 OnSkillButtonDragEnd 松手链处理
+            if (_dragAiming || Time.frameCount == _dragAimEndFrame) return;
+
             // 层级门控键（D-5 置灰+「AI 自主」角标=视觉提示）：**点击/拖拽照常进瞄准**——显示瞄准格
             // =直观看到技能范围、可留待定金格（2026-09-29 用户拍板）；操控权拦截在提交时轻弹窗
             // （SubmitAim 防线：眷属 Battle_MinorUnit / 伙伴非势力技能 Battle_Autonomous / 非己方
@@ -1465,6 +1478,7 @@ namespace GIC.Battle
         {
             if (!_dragAiming) return;
             _dragAiming = false;
+            _dragAimEndFrame = Time.frameCount; // 松手尾巴点击防线同帧戳（_dragAiming 已清，此戳兜底 click/endDrag 异序）
             if (_state != HudState.Aiming) { HideDragWheel(); return; }
             UpdateDragAimPreview(eventData); // 圆盘未收——终帧校准与拖动中同用夹取指针（屏缘一致）
             HideDragWheel(); // 手指已离键——圆盘随会话收（留待定路径也隐藏）
