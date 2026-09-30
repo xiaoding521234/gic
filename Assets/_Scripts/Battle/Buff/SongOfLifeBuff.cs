@@ -12,7 +12,8 @@ namespace GIC.Battle
     /// 每回合结束：①为**持有者**增加元能（**0命=+5**〔2026-09-30 用户拍板「0命就可以每回合加5元能」〕，
     /// 1命起=C1EnergyGain 参数=+10——参数载体=施加者命座技能）；②对持有者切比雪夫半径内敌人造成
     /// 10% 施加者攻击力水伤（含尸体——鞭尸同 Burn 先例；tick 平直值不进 DamagePipeline）；③对半径内
-    /// 我方**存活**单位（含持有者）治疗 10 生命值并附着水元素（**2命起不再附着**）。
+    /// 我方**存活**单位（含持有者）治疗**施加者 5% 最大生命值**并附着水元素（**2命起不再附着**；
+    /// 2026-09-30 拍板：平值 10 无法成长改比例；基准=施加者芭芭拉自身最大生命〔非各自〕，末点截断后×层数）。
     /// 半径 1（**2命起 +C2Radius=2**）；叠层上限 1（**3命起 +C3StackLimit=2**——Level=层数，
     /// 全部 tick 数值 ×层数，重复施加叠层钳上限）。
     /// 命座参数读取=施加者（source=施放闪耀奇迹的芭芭拉）的 Talent 命座技能参数（命座也是技能——
@@ -24,8 +25,8 @@ namespace GIC.Battle
         /// <summary>每回合对半径内敌人的伤害（% 施加者攻击力；docs/units/蒙德/芭芭拉.md）</summary>
         public const int DamagePercentPerTurn = 10;
 
-        /// <summary>每回合对半径内我方的治疗（固定值）</summary>
-        public const int HealPerTurn = 10;
+        /// <summary>每回合对半径内我方的治疗（% 施加者最大生命值；2026-09-30 拍板「平值 10 无法成长」改比例——基准=芭芭拉自身，非各自）</summary>
+        public const int HealPercentPerTurn = 5;
 
         /// <summary>0命每回合为持有者增加的元能（2026-09-30 拍板；1命起=C1EnergyGain 参数〔+10〕取代）</summary>
         public const int EnergyGainPerTurnBase = 5;
@@ -76,9 +77,11 @@ namespace GIC.Battle
             // 数值基准=施加者（施放闪耀奇迹的芭芭拉）；无施加者回落持有者（BurnBuff 伤害归属同款兜底）
             var attacker = source != null ? source : owner;
             string attackerId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
-            int attack = attacker.GetUnitComponent<UnitStats>()?.Attack ?? 0;
+            var attackerStats = attacker.GetUnitComponent<UnitStats>();
+            int attack = attackerStats?.Attack ?? 0;
             int damage = attack * DamagePercentPerTurn / 100 * stacks; // 末点截断口径（int 除法=FloorToInt 等价）
-            int heal = HealPerTurn * stacks;
+            // 治疗基准=施加者（芭芭拉）最大生命（与伤害同基准单位；float 末点 FloorToInt 同 ResolveHealAmount 口径，再×层数）
+            int heal = (attackerStats != null ? Mathf.FloorToInt(attackerStats.GetStatStruct(StatType.HP).Max * HealPercentPerTurn / 100f) : 0) * stacks;
 
             foreach (var kv in Sim.Units)
             {
@@ -99,7 +102,8 @@ namespace GIC.Battle
                 {
                     // 我方存活（含持有者）：治疗+元能+水附着（尸体不治疗——血量恒 0 铁律 docs/05 §5.4）
                     if (BattleSimState.IsDead(unit)) continue;
-                    effects.Add(new HealEffect(attackerId, kv.Key, heal));
+                    if (heal > 0)
+                        effects.Add(new HealEffect(attackerId, kv.Key, heal));
                     if (energyGain > 0)
                         effects.Add(new EnergyEffect(kv.Key, energyGain, EnergyEffect.CategoryBuffTickGain));
                     if (attachAllies)
