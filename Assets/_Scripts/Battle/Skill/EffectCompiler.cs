@@ -56,6 +56,23 @@ namespace GIC.Battle
                 return effects;
             }
 
+            // 单位指向型爆发（B-3 ②，芭芭拉闪耀奇迹——时轮 aimMode=TargetUnit 声明，SkillData.IsUnitTargeted）：
+            // 目标校验=我方任意单位**含尸体**（复苏语义——docs/05 §5.4「尸体可被选中为目标」+复活例外条款）；
+            // 无判定轨（效果原子以 condition 声明分叉：尸体→复苏+治疗 / 活体→歌声之环），OnCast 即全部产出
+            if (skillData.IsUnitTargeted())
+            {
+                var target = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
+                var casterTeam = sim.GetTeamOf(action.playerId);
+                bool valid = target != null && (TeamType)target.team == casterTeam;
+                if (!valid)
+                {
+                    GICLog.Info($"[EffectCompiler] {action.unitId} {skillData.skillID} 目标无效（{action.targetUnitId}），行动落空");
+                    return effects;
+                }
+                CompileOnCast(sim, action, sliceSnapshot, casterState, target, skillData, effects);
+                return effects;
+            }
+
             // 直线/迸发型（战技/爆发）：判定轨编译（发射声明/逐段整线）+ OnCast 效果（filter=Caster 等）
             if (skillData.skillType == SkillType.Normal || skillData.skillType == SkillType.Burst)
                 CompileJudgment(sim, action, sliceSnapshot, casterState, skillData, effects);
@@ -241,6 +258,10 @@ namespace GIC.Battle
             var targetState = SkillHitResolver.FindUnitState(snapshot, targetUnitId);
             if (targetState == null) return; // 快照中不存在（瞬发读片初状态）
 
+            // 作用条件（B-3 ② 单点收口——OnCast 指向/OnHit 命中/施法者分支全过此闸）：
+            // 按目标存活态过滤（复苏/增益分支分叉声明）；None=无条件（存量原子零行为变化）
+            if (!PassesCondition(atom, targetState)) return;
+
             switch (atom.kind)
             {
                 case SkillEffectKind.Damage:
@@ -295,7 +316,8 @@ namespace GIC.Battle
                 case SkillEffectKind.Heal:
                 {
                     // 治疗换算出口（docs/11 裸 int 坑）：编译时按 baseType 换算后传值——Fixed=直读、
-                    // BasedOnMaxHealth=百分比×目标最大生命、BasedOnAttack=百分比×施法者攻击。
+                    // BasedOnMaxHealth=百分比×施法者最大生命（2026-09-30 拍板翻转，GI 语义）、
+                    // BasedOnTargetMaxHealth=百分比×目标最大生命、BasedOnAttack=百分比×施法者攻击。
                     // HitSeconds=命中时刻（OnHit 治疗如水之浅唱随投射物落地弹数字；OnCast 治疗恒 0=立即）
                     int amount = ResolveHealAmount(skillData, atom.paramKey, atom.value, attacker, target);
                     if (amount > 0)
@@ -349,6 +371,18 @@ namespace GIC.Battle
                     break;
                 }
 
+                case SkillEffectKind.Revive:
+                {
+                    // 复苏（B-3 ②，芭芭拉闪耀奇迹）：paramKey=Heal 键按 baseType 换算（BasedOnMaxHealth=
+                    // 施法者最大生命——2026-09-30 拍板翻转，含受疗者治疗效率单源）；
+                    // condition=TargetIsCorpse 保证目标为尸体，活体目标在条件闸已跳过；
+                    // 应用=清尸体态+治疗（ReviveEffect 单效应原子化），命令=Revive
+                    int amount = ResolveHealAmount(skillData, atom.paramKey, atom.value, attacker, target);
+                    if (amount > 0)
+                        effects.Add(new ReviveEffect(action.unitId, targetUnitId, amount));
+                    break;
+                }
+
                 case SkillEffectKind.TriggerSkill:
                 {
                     // 技能链（块内因果序——延奏→变奏串行展开，docs/active/22 §1）：目标该型技能的
@@ -397,8 +431,22 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>治疗量换算（docs/20 §5.1 基准纪律）：Fixed=value、BasedOnMaxHealth=百分比×目标最大生命、
-        /// BasedOnAttack=百分比×施法者攻击；paramKey=None 时用 value（Fixed 语义）。
+        /// <summary>效果原子作用条件（B-3 ②，docs/11「IfCorpse 条件原子」）：按目标存活态过滤——
+        /// TargetIsCorpse/TargetIsAlive（复苏与增益分支同技能分叉声明）；None=无条件。</summary>
+        private static bool PassesCondition(SkillEffectConfig atom, UnitState targetState)
+        {
+            switch (atom.condition)
+            {
+                case SkillEffectCondition.TargetIsCorpse: return targetState.isCorpse != 0;
+                case SkillEffectCondition.TargetIsAlive: return targetState.isCorpse == 0;
+                default: return true;
+            }
+        }
+
+        /// <summary>治疗量换算（docs/20 §5.1 基准纪律）：Fixed=value、BasedOnMaxHealth=百分比×**施法者**
+        /// 最大生命（2026-09-30 用户拍板翻转旧「被治疗者各自」口径——GI 语义：治疗量随施法者成长、
+        /// 与伤害基准 BasedOnMaxHealth=施法者对称）、BasedOnAttack=百分比×施法者攻击；
+        /// paramKey=None 时用 value（Fixed 语义）。
         /// 末段乘**受疗者治疗效率**（协议核心批 2026-09-29 拍板「治疗效率-50%」——目标侧结算：
         /// 全单位默认 100=零行为变化；协议核心 50=守家续航减半防不死流；UnitStats.HealEfficiency 经
         /// Buff 修饰符同生效=GetFinalStat 口径）。internal=三脑治疗估值镜像（CompanionBrain/
@@ -429,6 +477,12 @@ namespace GIC.Battle
                 case SkillBaseType.BasedOnMaxHealth:
                     // float 计算后末点截断（2026-09-27 拍板「最终治疗舍弃小数点」——FloorToInt；
                     // 消除中途 int 截断的双取整点，最终值与旧 int 截断口径一致：205 血×8%=16.4→16）
+                    // 基准=施法者最大生命（2026-09-30 拍板翻转：原读被治疗者各自）
+                    amount = attackerStats != null ? Mathf.FloorToInt(attackerStats.GetStatStruct(StatType.HP).Max * rawValue / 100f) : 0;
+                    break;
+                case SkillBaseType.BasedOnTargetMaxHealth:
+                    // 目标档（枚举词汇表显式前缀对——「按目标自身体型奶」类语义；现役无配置=休眠，
+                    // 展示层 SkillDescriptionBuilder 已渲染「目标最大生命值」，结算侧补全对齐 docs/20 §5.1）
                     amount = targetStats != null ? Mathf.FloorToInt(targetStats.GetStatStruct(StatType.HP).Max * rawValue / 100f) : 0;
                     break;
                 case SkillBaseType.BasedOnAttack:

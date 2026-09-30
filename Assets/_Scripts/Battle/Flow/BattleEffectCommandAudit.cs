@@ -37,6 +37,7 @@ namespace GIC.Battle
             var staminaKeys = new HashSet<string>();
             var moraKeys = new HashSet<string>();
             var itemConsumeKeys = new HashSet<string>();
+            var reviveKeys = new HashSet<string>();
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -66,6 +67,9 @@ namespace GIC.Battle
                         break;
                     case BattleCommandType.ItemConsume:
                         itemConsumeKeys.Add($"{command.targetUnitId}:{command.metadata}");
+                        break;
+                    case BattleCommandType.Revive:
+                        reviveKeys.Add(command.targetUnitId);
                         break;
                 }
             }
@@ -138,6 +142,12 @@ namespace GIC.Battle
                             }
                         }
                     }
+                }
+                else if (effect is ReviveEffect revive)
+                {
+                    // B-3 ② 复苏：Applied=false（活体防御性 no-op）零命令=非漏发；有产出=Revive 命令
+                    if (revive.Applied && !reviveKeys.Contains(revive.TargetUnitId))
+                        Report(context, effect, BattleCommandType.Revive);
                 }
                 else if (effect is ApplyBuffEffect)
                 {

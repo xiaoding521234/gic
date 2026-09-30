@@ -17,6 +17,18 @@ namespace GIC.Battle
         public Unit source;
         public int value;
 
+        /// <summary>所属战场门面（BattleSimState.ApplyBuff 注册时注入；回合结束效果需要战场查询的
+        /// Buff 消费——如歌声之环按持有者位置枚举半径内单位。单局生命周期，勿跨对局复用）</summary>
+        public BattleSimState Sim;
+
+        /// <summary>永久 Buff（RemainingTurns&lt;0 标记——歌声之环类：不计时，持有者倒下才消失）；
+        /// 回合递减与到期收集均跳过（TurnResolver/CollectExpiredBuffs 同判据）</summary>
+        public bool IsPermanent => RemainingTurns < 0;
+
+        /// <summary>持有者倒下时是否随之移除（默认否——尸体保留 Buff 属通则，如 BurnBuff 烧尸体；
+        /// 歌声之环类光环覆写 true，EmitSliceCommands 死亡循环随 Death 命令后发 RemoveBuff）</summary>
+        public virtual bool RemoveOnHolderDeath => false;
+
         /// <summary>协议类型标识（命令流/快照/客户端图标映射）</summary>
         public abstract BuffType Type { get; }
 

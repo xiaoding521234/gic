@@ -562,19 +562,23 @@ namespace GIC.Battle
                 if (worldHeight > 0f)
                     iconGo.transform.localScale = Vector3.one * (BuffBadgeSize / worldHeight);
 
-                // 剩余回合角标（右下小数字；世界 TMP=工厂字体链，fontSize×scale×0.1≈原 TextMesh characterSize 同高）
-                var turnsGo = new GameObject("Turns");
-                turnsGo.transform.SetParent(iconGo.transform, false);
-                turnsGo.transform.localPosition = new Vector3(0.14f, -0.14f, -0.01f);
-                turnsGo.transform.localScale = Vector3.one * 0.05f;
-                var turnsText = turnsGo.AddComponent<TextMeshPro>();
-                turnsText.font = BattleViewFactory.WorldTextFont;
-                turnsText.fontSize = 32;
-                turnsText.alignment = TextAlignmentOptions.Center;
-                turnsText.enableWordWrapping = false;
-                ((RectTransform)turnsGo.transform).sizeDelta = new Vector2(20f, 5f);
-                turnsText.text = buff.remainingTurns.ToString();
-                turnsText.color = Palette.文字米白;
+                // 剩余回合角标（右下小数字；世界 TMP=工厂字体链，fontSize×scale×0.1≈原 TextMesh characterSize 同高）；
+                // 永久 Buff（remainingTurns<0，如歌声之环）不计时——无角标
+                if (buff.remainingTurns > 0)
+                {
+                    var turnsGo = new GameObject("Turns");
+                    turnsGo.transform.SetParent(iconGo.transform, false);
+                    turnsGo.transform.localPosition = new Vector3(0.14f, -0.14f, -0.01f);
+                    turnsGo.transform.localScale = Vector3.one * 0.05f;
+                    var turnsText = turnsGo.AddComponent<TextMeshPro>();
+                    turnsText.font = BattleViewFactory.WorldTextFont;
+                    turnsText.fontSize = 32;
+                    turnsText.alignment = TextAlignmentOptions.Center;
+                    turnsText.enableWordWrapping = false;
+                    ((RectTransform)turnsGo.transform).sizeDelta = new Vector3(20f, 5f);
+                    turnsText.text = buff.remainingTurns.ToString();
+                    turnsText.color = Palette.文字米白;
+                }
             }
         }
 
@@ -589,6 +593,7 @@ namespace GIC.Battle
                 case BuffType.Freeze: return config.GetElementIconStroke(ElementType.Cryo);
                 case BuffType.AttackUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：延奏=蒙德协奏（风）；正式图标待拍板（docs/11）
                 case BuffType.MoveSpeedUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：移速提升（风系语义）；正式图标待拍板（docs/11）
+                case BuffType.SongOfLife: return config.GetElementIconStroke(ElementType.Hydro); // 占位：歌声之环=水光环（B-3 ②）；正式图标待拍板（docs/11）
                 default: return null;
             }
         }

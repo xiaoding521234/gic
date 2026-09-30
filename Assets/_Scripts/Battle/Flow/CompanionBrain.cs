@@ -51,6 +51,14 @@ namespace GIC.Battle
         /// <summary>治疗候选门槛：有效治疗 ≥ 治疗量一半才值得占行动（勿为挠痒花行动）</summary>
         public const int HealWorthRatioPercent = 50;
 
+        /// <summary>单位指向型爆发：复苏候选评分（B-3 ② 芭芭拉闪耀奇迹——回一整个单位+40% 血，
+        /// 价值对齐斩杀档之上：100&gt;KillBonus 80，有尸体=复苏即最优）</summary>
+        public const int UnitTargetBurstReviveScore = 100;
+
+        /// <summary>单位指向型爆发：增益候选评分（歌声之环永久光环——中等偏高：低于斩杀档、
+        /// 高于常规攻击均值，攒满即放勿囤积；调手感改此常量）</summary>
+        public const int UnitTargetBurstBuffScore = 45;
+
         /// <summary>中性档案（无配置/魔神档兜底：全 1 权重=评分制 v2 原口径）</summary>
         private static readonly UnitConfig.CompanionProfile NeutralProfile = new UnitConfig.CompanionProfile();
 
@@ -163,6 +171,13 @@ namespace GIC.Battle
                 // 决策期虚拟池透传——伙伴决策不超额承诺）
                 if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _, staminaPoolOverride)) continue;
 
+                // 单位指向型爆发（B-3 ② 首个=芭芭拉闪耀奇迹）：无方向域——目标估值档（复苏优先/增益次之）
+                if (data.IsUnitTargeted())
+                {
+                    ScoreUnitTargetBurst(sim, snapshot, unit, playerId, team, turn, i, data, tracker, profile);
+                    continue;
+                }
+
                 int perTarget = BattleHeuristics.EstimatePerTargetDamage(unit, data);
                 int healValue = profile.候选类别 == UnitConfig.CompanionRole.Support
                     ? EstimateSkillHealValue(sim, unit, team, data)
@@ -193,6 +208,73 @@ namespace GIC.Battle
                     tracker.Offer(score, Skill(playerId, unit, i, direction, turn));
                 }
             }
+        }
+
+        /// <summary>②b 单位指向型爆发候选（B-3 ② 首个=芭芭拉闪耀奇迹，无方向域）：复苏优先——
+        /// 我方尸体存在=高价值复苏（评分=复苏常量，尸体 unitId 升序首个保确定性）；无尸体=增益档
+        /// （技能 condition=TargetIsAlive 的 ApplyBuff 原子=待授光环，如歌声之环）给最缺血的**未持有**
+        /// 存活我方（等比平局 unitId 升序——FindMostWoundedAlly 同口径）；全员已持有=不占行动
+        /// （重施加 Merge 无增益，攒满也不空放）。评分均乘 profile.爆发优先权重（与攻击候选同池）。</summary>
+        private static void ScoreUnitTargetBurst(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+            string playerId, TeamType team, int turn, int skillIndex, SkillConfig.SkillData data,
+            CandidateTracker tracker, UnitConfig.CompanionProfile profile)
+        {
+            // 复苏候选：我方尸体（unitId 升序首个——枚举确定性铁律）
+            var corpses = new List<UnitState>();
+            foreach (var u in snapshot.units)
+                if ((TeamType)u.team == team && u.isCorpse != 0) corpses.Add(u);
+            if (corpses.Count > 0)
+            {
+                corpses.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
+                tracker.Offer(Mathf.RoundToInt(UnitTargetBurstReviveScore * profile.爆发优先权重),
+                    Skill(playerId, unit, skillIndex, Direction2D.Up, turn, corpses[0].unitId));
+                return; // 有尸体=复苏即本档最优（不再评增益）
+            }
+
+            // 增益原子（condition=TargetIsAlive 的 ApplyBuff——歌声之环）：已持有者重施加无增益，
+            // 候选排除持有者；无活体分支增益原子（纯复苏技能）且无尸体=不占行动
+            int grantBuffType = -1;
+            if (data.effects != null)
+                foreach (var atom in data.effects)
+                    if (atom.kind == SkillEffectKind.ApplyBuff
+                        && atom.condition == SkillEffectCondition.TargetIsAlive)
+                    {
+                        grantBuffType = (int)atom.buffType;
+                        break;
+                    }
+            if (grantBuffType < 0) return;
+
+            // 增益候选：最缺血的未持有存活我方（含施法者自身；等比平局 unitId 升序）
+            UnitState best = null;
+            int bestRatio = int.MaxValue;
+            string bestId = null;
+            foreach (var u in snapshot.units)
+            {
+                if ((TeamType)u.team != team || u.isCorpse != 0) continue;
+                if (HasBuffState(u.buffs, grantBuffType)) continue; // 已持有：重施加无增益，排除
+                if (u.maxHp <= 0) continue;
+                int ratio = u.hp * 10000 / u.maxHp;
+                if (ratio < bestRatio || (ratio == bestRatio && bestId != null
+                    && string.CompareOrdinal(u.unitId, bestId) < 0))
+                {
+                    best = u;
+                    bestRatio = ratio;
+                    bestId = u.unitId;
+                }
+            }
+            if (best == null) return; // 全员已持有光环：不占行动（攒满也不空放）
+
+            tracker.Offer(Mathf.RoundToInt(UnitTargetBurstBuffScore * profile.爆发优先权重),
+                Skill(playerId, unit, skillIndex, Direction2D.Up, turn, best.unitId));
+        }
+
+        /// <summary>快照 Buff 条目含类型判定（增益候选排除已持有者用——命令流/快照侧轻量读法）</summary>
+        private static bool HasBuffState(List<BuffState> buffs, int type)
+        {
+            if (buffs == null) return false;
+            foreach (var b in buffs)
+                if (b.type == type) return true;
+            return false;
         }
 
         /// <summary>②移动候选（2026-09-29 报障返修「单位堆积湖边试图走又被弹回」）：锚点=距离升序

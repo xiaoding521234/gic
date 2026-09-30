@@ -52,6 +52,18 @@ namespace GIC.Data
             /// <summary>是否有数据驱动效果（非空=走 EffectCompiler 新管线）</summary>
             public bool HasEffects => effects != null && effects.Count > 0;
 
+            /// <summary>是否单位指向型技能（延奏/契约=类型固有；爆发=时轮 aimMode 声明——
+            /// B-3 ② 芭芭拉闪耀奇迹首个消费者，docs/11「方向模式数据驱动化」在爆发档的落地）：
+            /// 三消费方=Host EffectCompiler.CompileSkill（目标校验+OnCast，无判定轨）、
+            /// HUD（IsLineSkill 判定与瞄准格域）、AI 脑（无方向域的目标估值档）。</summary>
+            public bool IsUnitTargeted()
+            {
+                if (skillType == SkillType.Enso || skillType == SkillType.Contract) return true;
+                return skillType == SkillType.Burst
+                    && timeline != null
+                    && timeline.aimMode == SkillAimMode.TargetUnit;
+            }
+
             /// <summary>
             /// 移动距离换算（2026-09-23 用户拍板：「配置文件里的10，还要看基于类型。拼接后为10%移速」）——
             /// MoveDistance 参数按 baseType 解释：BasedOnMoveSpeed=百分比×移速（10%×50=5 格）、

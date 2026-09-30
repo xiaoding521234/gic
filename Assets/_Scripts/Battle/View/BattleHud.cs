@@ -945,11 +945,12 @@ namespace GIC.Battle
         /// MyTeam/Enemy=阵营判定（TeamType）——三个语义勿再用 playerId 比较敌我</summary>
         private enum UnitSide { Mine, MyTeam, Enemy }
 
-        private UnitState FindUnitAt(BattleSnapshot snapshot, BattleCell cell, UnitSide side)
+        private UnitState FindUnitAt(BattleSnapshot snapshot, BattleCell cell, UnitSide side,
+            bool includeCorpses = false)
         {
             foreach (var u in snapshot.units)
             {
-                if (u.isCorpse != 0) continue;
+                if (u.isCorpse != 0 && !includeCorpses) continue; // 尸体默认不可选（单位指向型爆发例外——复苏目标）
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
                 bool pick;
                 if (side == UnitSide.Mine) pick = u.playerId == _myPlayerId;          // 操控权（B7 分端=本机玩家）
@@ -1000,14 +1001,13 @@ namespace GIC.Battle
                 : IsLineSkill(def) ? "Battle_TipAimDirection" : "Battle_TipAimSkill");
         }
 
-        /// <summary>该按钮技能是否直线型（战技/爆发=十字方向瞄准；延奏/契约=单位指向）</summary>
+        /// <summary>该按钮技能是否直线型（战技/爆发=十字方向瞄准；延奏/契约/单位指向型爆发=单位指向）</summary>
         private bool IsLineSkill(SkillButtonDef def)
         {
             var data = GetSelectedSkillData(def);
             return data != null
-                && data.skillType != SkillType.Enso
-                && data.skillType != SkillType.Contract
-                && data.skillType != SkillType.Interact;
+                && data.skillType != SkillType.Interact
+                && !data.IsUnitTargeted();
         }
 
         private void ExitAiming()
@@ -1138,6 +1138,24 @@ namespace GIC.Battle
                 foreach (var u in snapshot.units)
                 {
                     if (u.isCorpse != 0 || (TeamType)u.team == (TeamType)sel.team) continue;
+                    if (_board.Map.HasTile(u.position.x, u.position.y))
+                    {
+                        var c = new BattleCell(u.position.x, u.position.y);
+                        _aimCells.Add(c);
+                        _aimRecommendedCells.Add(c);
+                    }
+                }
+                return;
+            }
+
+            // 单位指向型爆发（B-3 ②，芭芭拉闪耀奇迹——时轮 aimMode=TargetUnit 声明）：全图我方任意
+            // 单位格**含尸体**（复苏目标——docs/05 §5.4 例外条款：唯一能让尸体站起来的通道）；
+            // 全推荐 v1（同延奏/契约口径：目标格即语义本身）
+            if (skillData.IsUnitTargeted())
+            {
+                foreach (var u in snapshot.units)
+                {
+                    if ((TeamType)u.team != (TeamType)sel.team) continue;
                     if (_board.Map.HasTile(u.position.x, u.position.y))
                     {
                         var c = new BattleCell(u.position.x, u.position.y);
@@ -1311,10 +1329,12 @@ namespace GIC.Battle
             else
             {
                 // 单位指向型：延奏=点中格上的我方角色（协奏，docs/07 蒙德；B-S1b 修正）；
+                // 单位指向型爆发=点中格上的我方角色**含尸体**（B-3 ② 复苏目标——芭芭拉闪耀奇迹）；
                 // 契约=点中格上的敌方单位（docs/05 §5.3）
                 var skillData = GetSelectedSkillData(_aimDef);
-                bool allyTargeting = skillData != null && skillData.skillType == SkillType.Enso;
-                var unitAtCell = allyTargeting ? FindUnitAt(snapshot, cell, UnitSide.MyTeam) : enemyAtCell;
+                bool enemyTargeting = skillData != null && skillData.skillType == SkillType.Contract;
+                bool includeCorpses = skillData != null && skillData.skillType == SkillType.Burst;
+                var unitAtCell = enemyTargeting ? enemyAtCell : FindUnitAt(snapshot, cell, UnitSide.MyTeam, includeCorpses);
                 action.targetUnitId = unitAtCell != null ? unitAtCell.unitId : "";
             }
 
