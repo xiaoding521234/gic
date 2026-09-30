@@ -27,3 +27,19 @@ MonoBehaviour:
       value: 1
       baseType: 0
     timeline: {fileID: 0}
+    effects:
+    - trigger: 3
+      kind: 3
+      targetFilter: 0
+      condition: 0
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 5
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+    costs: []

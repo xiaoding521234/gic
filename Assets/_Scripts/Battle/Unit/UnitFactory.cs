@@ -72,6 +72,7 @@ namespace GIC.Battle
             GameObject unitObj = UnityEngine.Object.Instantiate(_unitPrefab);
             Unit unit = unitObj.GetComponent<Unit>();
             unit.InitWithData(data);
+            ConstellationApplier.ApplyPassives(unit); // 命座被动（B8 批）：0命固有被动登场即挂；升命后由 DeployUnitExecutor 重算
 
             return unit;
         }

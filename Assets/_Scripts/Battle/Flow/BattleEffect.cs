@@ -191,6 +191,10 @@ namespace GIC.Battle
         public const int CategoryEnsoGain = 3;
         /// <summary>来源类别：技能元能消耗</summary>
         public const int CategoryCost = 4;
+        /// <summary>来源类别：Buff 回合末 tick 获取（B8 批 2026-09-30：歌声之环持有者元能——独立类别防与其它来源去重互吞）</summary>
+        public const int CategoryBuffTickGain = 5;
+        /// <summary>来源类别：元能溢出转移（B8 批，安柏1命被动——转移增量独立成类防与本体获能合并键互吞）</summary>
+        public const int CategoryOverflowTransfer = 6;
 
         public int Delta;
 

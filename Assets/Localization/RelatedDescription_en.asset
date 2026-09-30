@@ -35,9 +35,9 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256256
-    m_Localized: Single stack. At each turn end, deals 10% ATK Hydro DMG to enemies
-      within 1 tile of the holder, heals allies for 10 HP and restores 1 Sanity,
-      applying Hydro. Vanishes when the holder is downed.
+    m_Localized: At each turn end, grants the holder 5 Energy, deals Hydro DMG equal
+      to 10% ATK to enemies within 1 cell of the holder, and heals allies within
+      range for 10 HP while applying Hydro to them. Disappears when the holder falls.
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256257

@@ -60,6 +60,9 @@ namespace GIC.Data
 
         [InspectorName("复苏")]
         Revive = 16,
+
+        [InspectorName("命座提升")]
+        UpgradeConstellation = 17,
     }
 
     /// <summary>
@@ -84,6 +87,7 @@ namespace GIC.Data
     /// SkillCast       | skillID  | —                | 瞄准方向         | 施放者位置| —    | —      | —                     | —              | —
     /// ItemConsume     | 消耗数量 | 物品名 ItemName  | —                | —         | —    | —      | —                     | —              | —（targetUnitId=玩家）
     /// Revive          | 复苏治疗量 | —              | —                | —         | —    | —      | —                     | —              | —（B-3 ② 复苏+治疗单命令）
+    /// UpgradeConstellation | 新命座层 | —            | —                | —         | —    | —      | —                     | —              | —（B8 命座批；targetUnitId=升命单位）
     /// Pause/Resume/UI | —        | —                | —                | —         | —    | —      | —                     | —              | —
     /// </remarks>
     [Serializable]
@@ -269,6 +273,23 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 value = healAmount,
+            };
+        }
+
+        /// <summary>命座提升（B8 批，docs/09）：3★+同名重复出战→命座+1。value=新命座层；
+        /// targetUnitId=升命单位（不生成新单位——DeployUnitExecutor 升命分支产出）；
+        /// 客户端弹「命座提升」toast（等级显示待 UI 批）</summary>
+        public static BattleCommand UpgradeConstellation(string actorUnitId, string targetUnitId, int sliceIndex,
+            int indexInSlice, int newLevel)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.UpgradeConstellation,
+                actorUnitId = actorUnitId,
+                targetUnitId = targetUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                value = newLevel,
             };
         }
 

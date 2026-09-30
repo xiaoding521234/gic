@@ -31,7 +31,9 @@ namespace GIC.Battle
             }
             else
             {
-                if (data.skillID != SkillName.None)
+                // Talent 空效果=参数载体型命座被动（B8 批：芭芭拉命座——参数由歌声之环 Buff 消费），
+                // 合法形态不告警；其余空效果=占位不可施放照旧 Warn
+                if (data.skillID != SkillName.None && data.skillType != SkillType.Talent)
                     GICLog.Warn($"[SkillFactory] 未配置效果原子: {data.skillID} → 占位（不可施放）");
                 skill = new UnimplementedSkill(); // None 配置条目=空槽，占位保索引对齐（不告警）
             }
