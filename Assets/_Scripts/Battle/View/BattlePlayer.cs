@@ -247,6 +247,16 @@ namespace GIC.Battle
         // "所见即所得"=双方按同一速度常量推进时间轴）
         private const float ProjectileSpeed = BattleMetrics.ProjectileSpeed;
 
+        /// <summary>在途有意义行动计数（2026-09-30 拍板「跳过空等：只要这期间已经没有任何正在进行的
+        /// 行动，包括箭矢飞行等，必须已经没有任何意义了才可跳过空等」——攻速片片头空等跳过
+        /// WaitSliceDelaySkippingDeadAir 的探测源）：计数=行动类演出段未结算数量——投射物飞行
+        /// （命中/消散）、箭雨单箭下落（含散布延迟，fire-and-forget=**唯一跨片在途源**——片 ack
+        /// 不等它）、移动行走；结算反馈类（伤害数字飘字/元能跳变/闪色恢复/落箭插土滞留淡出）不计数
+        /// （已结算信息属装饰尾巴）。片 ack 门控保证 gate 型演出在下一片到达前必然演完，故计数实际
+        /// 只拦 fire-and-forget 段——gate 型行动段同样计数属防线冗余（防未来 fire-and-forget 化回归
+        /// 静默破约）；PlaySkillCastVfxCoroutine 后续新增 fire-and-forget 行动类 cue 必须同步计数。</summary>
+        private int _meaningfulActionInFlight;
+
         /// <summary>
         /// 直线投射物：箭矢从发射格飞至**命中点**（Host 接触判定千分定点下发，docs/active/22 §11——
         /// 移动中目标命中点=中途接触位置，所见即所得），到达后接伤害表现。
@@ -254,28 +264,36 @@ namespace GIC.Battle
         /// </summary>
         private IEnumerator PlayProjectileThenDamageCoroutine(UnitView target, BattleCommand command, float stagger)
         {
-            if (stagger > 0f)
-                yield return new WaitForSeconds(stagger);
+            _meaningfulActionInFlight++; // 在途有意义行动：投射物飞行（发射延迟+飞行+落地弹字）——空等跳过探测源
+            try
+            {
+                if (stagger > 0f)
+                    yield return new WaitForSeconds(stagger);
 
-            // 时轮（B-S1）：发射时刻延迟（Host 时轮资产下发，勿推算——前摇=箭矢延迟起飞）
-            if (command.launchMs > 0)
-                yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+                // 时轮（B-S1）：发射时刻延迟（Host 时轮资产下发，勿推算——前摇=箭矢延迟起飞）
+                if (command.launchMs > 0)
+                    yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
 
-            Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
-            Vector3 to = command.hitX != 0 || command.hitY != 0
-                ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
-                : target.transform.position + new Vector3(0f, 0.45f, 0f); // 兜底：无定点数据时飞向目标
+                Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
+                Vector3 to = command.hitX != 0 || command.hitY != 0
+                    ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
+                    : target.transform.position + new Vector3(0f, 0.45f, 0f); // 兜底：无定点数据时飞向目标
 
-            // 元素色动态染色（2026-09-28 拍板）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
-            var arrowGo = CreateProjectileVisual(from, to,
-                ElementFactionConfig.Instance.GetElementColor((ElementType)command.metadata));
+                // 元素色动态染色（2026-09-28 拍板）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
+                var arrowGo = CreateProjectileVisual(from, to,
+                    ElementFactionConfig.Instance.GetElementColor((ElementType)command.metadata));
 
-            float distance = Vector3.Distance(from, to);
-            float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
-            yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
+                float distance = Vector3.Distance(from, to);
+                float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
+                yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
 
-            Destroy(arrowGo);
-            yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind);
+                Destroy(arrowGo);
+                yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind);
+            }
+            finally
+            {
+                _meaningfulActionInFlight--;
+            }
         }
 
         /// <summary>
@@ -284,36 +302,44 @@ namespace GIC.Battle
         /// </summary>
         private IEnumerator PlayProjectileVanishCoroutine(BattleCommand command, float stagger)
         {
-            if (stagger > 0f)
-                yield return new WaitForSeconds(stagger);
-
-            // 时轮（B-S1）：发射时刻延迟（与命中侧投射物同源对齐）
-            if (command.launchMs > 0)
-                yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
-
-            Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
-            Vector3 to;
-            if (command.hitX != 0 || command.hitY != 0)
+            _meaningfulActionInFlight++; // 在途有意义行动：投射物飞行（发射延迟+飞行至消散）——空等跳过探测源
+            try
             {
-                to = _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f);
+                if (stagger > 0f)
+                    yield return new WaitForSeconds(stagger);
+
+                // 时轮（B-S1）：发射时刻延迟（与命中侧投射物同源对齐）
+                if (command.launchMs > 0)
+                    yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+
+                Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
+                Vector3 to;
+                if (command.hitX != 0 || command.hitY != 0)
+                {
+                    to = _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f);
+                }
+                else
+                {
+                    var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
+                    to = _board.CellToWorld(new BattleCell(command.cell.x + delta.x * command.value,
+                        command.cell.y + delta.y * command.value)) + new Vector3(0f, 0.45f, 0f);
+                }
+
+                // 元素色=消散命令随带投射物元素（reactionKind，Host 与命中 Damage.metadata 同口径回填——
+                // 丘丘人借凯亚霜袭时消散箭同为冰色，非施法者物理灰）
+                var arrowGo = CreateProjectileVisual(from, to,
+                    ElementFactionConfig.Instance.GetElementColor((ElementType)command.reactionKind));
+
+                float distance = Vector3.Distance(from, to);
+                float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
+                yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
+
+                Destroy(arrowGo);
             }
-            else
+            finally
             {
-                var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
-                to = _board.CellToWorld(new BattleCell(command.cell.x + delta.x * command.value,
-                    command.cell.y + delta.y * command.value)) + new Vector3(0f, 0.45f, 0f);
+                _meaningfulActionInFlight--;
             }
-
-            // 元素色=消散命令随带投射物元素（reactionKind，Host 与命中 Damage.metadata 同口径回填——
-            // 丘丘人借凯亚霜袭时消散箭同为冰色，非施法者物理灰）
-            var arrowGo = CreateProjectileVisual(from, to,
-                ElementFactionConfig.Instance.GetElementColor((ElementType)command.reactionKind));
-
-            float distance = Vector3.Distance(from, to);
-            float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
-            yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
-
-            Destroy(arrowGo);
         }
 
         /// <summary>正式箭矢 sprite（Resources/UI/Battle/ArrowBolt——AI 生成白色箭矢，运行时元素色染色；
@@ -478,27 +504,40 @@ namespace GIC.Battle
         /// 拍板「插在表面 3 秒」）→淡出销毁</summary>
         private IEnumerator PlayRainArrowCoroutine(BattleCell cell, Vector3 shotDir, Color tint, float delaySeconds)
         {
-            if (delaySeconds > 0f)
-                yield return new WaitForSeconds(delaySeconds / _playbackSpeed);
-
-            var jitter = new Vector3(UnityEngine.Random.Range(-箭雨格内散布, 箭雨格内散布), 0f,
-                UnityEngine.Random.Range(-箭雨格内散布, 箭雨格内散布));
-            var basePos = _board.CellToWorld(cell) + jitter;
-            var from = basePos + new Vector3(0f, 箭雨起始高度, 0f);
-            var to = new Vector3(basePos.x, _board.GetVisualSurfaceHeight(cell) + 0.02f, basePos.z);
-            // 斜落方向=沿安柏射向（2026-09-28 追拍板「斜落的方向应当根据安柏的位置来」）：起点沿射向
-            // 反方向侧移——落箭读作安柏射出的箭越过格心继续飞行坠入该格（东射=自西侧高处向东落、
-            // 北射=自南侧高处向北落，起点天然在安柏一侧）；侧移量=tan(倾斜角)×起始高度（世界倾角）；
-            // 落点/落地时刻/节拍全不变（纯视觉，判定无涉）
-            if (shotDir.sqrMagnitude > 1e-6f && 箭雨落下倾斜角 != 0f)
+            // 在途有意义行动计数（fire-and-forget 单箭=唯一跨片在途源——片 ack 不等它，下一片片头
+            // 空等跳过据此探测，2026-09-30 拍板）：散布延迟+斜落段=箭矢飞行；落地即结算，
+            // 插土/滞留/淡出=已结算装饰尾巴不计数
+            _meaningfulActionInFlight++;
+            GameObject arrowGo = null;
+            Vector3 to = Vector3.zero;
+            try
             {
-                from -= shotDir * (Mathf.Tan(箭雨落下倾斜角 * Mathf.Deg2Rad) * 箭雨起始高度);
-            }
-            var arrowGo = CreateProjectileVisual(from, to, tint);
-            arrowGo.transform.localScale *= 箭雨箭矢缩放;
+                if (delaySeconds > 0f)
+                    yield return new WaitForSeconds(delaySeconds / _playbackSpeed);
 
-            yield return BattleViewTween.Over(箭雨坠落时长 / _playbackSpeed,
-                t => { if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(from, to, t); });
+                var jitter = new Vector3(UnityEngine.Random.Range(-箭雨格内散布, 箭雨格内散布), 0f,
+                    UnityEngine.Random.Range(-箭雨格内散布, 箭雨格内散布));
+                var basePos = _board.CellToWorld(cell) + jitter;
+                var from = basePos + new Vector3(0f, 箭雨起始高度, 0f);
+                to = new Vector3(basePos.x, _board.GetVisualSurfaceHeight(cell) + 0.02f, basePos.z);
+                // 斜落方向=沿安柏射向（2026-09-28 追拍板「斜落的方向应当根据安柏的位置来」）：起点沿射向
+                // 反方向侧移——落箭读作安柏射出的箭越过格心继续飞行坠入该格（东射=自西侧高处向东落、
+                // 北射=自南侧高处向北落，起点天然在安柏一侧）；侧移量=tan(倾斜角)×起始高度（世界倾角）；
+                // 落点/落地时刻/节拍全不变（纯视觉，判定无涉）
+                if (shotDir.sqrMagnitude > 1e-6f && 箭雨落下倾斜角 != 0f)
+                {
+                    from -= shotDir * (Mathf.Tan(箭雨落下倾斜角 * Mathf.Deg2Rad) * 箭雨起始高度);
+                }
+                arrowGo = CreateProjectileVisual(from, to, tint);
+                arrowGo.transform.localScale *= 箭雨箭矢缩放;
+
+                yield return BattleViewTween.Over(箭雨坠落时长 / _playbackSpeed,
+                    t => { if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(from, to, t); });
+            }
+            finally
+            {
+                _meaningfulActionInFlight--; // 落地/中断都结算——插土滞留淡出段不阻下一片空等跳过
+            }
 
             // 落地插土：沿箭轴向落点内压入「箭雨入土深度」——屏幕平面布告板，入土段被地形深度裁掉
             //（尖插表面、尾翘起；水面格插在波浪表面，透明水体不裁=透水可见属预期）
@@ -541,7 +580,16 @@ namespace GIC.Battle
             else
                 delay = Mathf.Max(0f, (segment.turnMaxAttackSpeed - segment.sliceAttackSpeed) / 10f);
             if (delay > 0f)
-                yield return new WaitForSeconds(delay / _playbackSpeed);
+            {
+                // 空等跳过（2026-09-30 拍板「凯亚行动完后芭芭拉空等 3 秒，应当跳过空等时间——只要
+                // 这期间已经没有任何正在进行的行动（含箭矢飞行等）才可跳过」——docs/18 L44 既有
+                ///「衍生事件提早完成即跳过剩余等待」语义的落地）：攻速片片头等待逐帧探测在途有意义
+                // 行动，无在途即提前进片；部署/回合结束/即时块固定短拍不参与跳过
+                if (segment.turnEnd == 0 && segment.deploy == 0 && segment.insertedInstantAction == 0)
+                    yield return WaitSliceDelaySkippingDeadAir(delay / _playbackSpeed);
+                else
+                    yield return new WaitForSeconds(delay / _playbackSpeed);
+            }
 
             // 只对攻速行动片发（2026-09-29 语义收紧：部署/回合结束/即时行动块不按攻速排程——
             // 执行预览的行进推进只属攻速片；旧消费方攻速队列已随队列退役）
@@ -716,6 +764,22 @@ namespace GIC.Battle
             });
         }
 
+        /// <summary>攻速片片头等待——空等跳过（2026-09-30 拍板，docs/18「回合流程重排+攻速延迟执行模型」
+        /// 既有「行动及其衍生事件提早完成时，后续行动跳过剩余等待立即执行」语义的落地）：期间逐帧探测
+        /// 在途有意义行动计数（_meaningfulActionInFlight——箭矢飞行/箭雨下落/移动行走未结算）——
+        /// &gt;0 则继续等（等到其在途结算即止，**剩余空等不再补满**——空等只承担攻速节奏提示）；
+        /// ==0 立即进片。片 ack 门控保证 gate 型演出在下一片到达前演完，实际拦的只有 fire-and-forget
+        /// 行动段（箭雨单箭）；已结算装饰尾巴（飘字/插箭滞留淡出/闪色恢复）不计数不阻跳过。</summary>
+        private IEnumerator WaitSliceDelaySkippingDeadAir(float scaledDelay)
+        {
+            float elapsed = 0f;
+            while (elapsed < scaledDelay && _meaningfulActionInFlight > 0)
+            {
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+        }
+
         /// <summary>行动方向→立牌朝向（2026-09-29 拍板③：方向 ∈ {上,左上,左,左下} 朝左水平镜像，其余朝右——
         /// 素材统一朝右单份复用；朝向行动后保持、待机延续；后续背后刺杀类技能可读 UnitView.FaceLeft）</summary>
         private static bool IsLeftFacing(int direction)
@@ -730,6 +794,7 @@ namespace GIC.Battle
             // 片末回 待机（含被挡弹回段——弹回也是移动表现）；try/finally 保异常不滞留移动态
             view.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随移动方向（拍板③）；行动后保持=待机延续
             view.SetMoveAnimation(true);
+            _meaningfulActionInFlight++; // 在途有意义行动：移动行走（含被挡弹回段）——空等跳过探测源
             try
             {
                 var path = command.path;
@@ -751,6 +816,7 @@ namespace GIC.Battle
             finally
             {
                 view.SetMoveAnimation(false);
+                _meaningfulActionInFlight--; // 移动结算（正常/中断同收）
             }
         }
 
