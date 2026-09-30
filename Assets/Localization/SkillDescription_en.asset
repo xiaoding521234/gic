@@ -111,7 +111,7 @@ MonoBehaviour:
   - m_Id: 3003005
     m_Localized: "\xB7[C0] Summon <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color>\n\xB7[C1] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
-      Ring</link></u></color> grants holder {C1EnergyGain} energy each turn end\n\xB7[C2]
+      Ring</link></u></color> per-turn Energy gain increased to {C1EnergyGain}\n\xB7[C2]
       <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>
       radius +{C2Radius}, no longer applies elements to allies\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color> stack limit +{C3StackLimit}"

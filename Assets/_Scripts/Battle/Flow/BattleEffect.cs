@@ -215,6 +215,21 @@ namespace GIC.Battle
     }
 
     /// <summary>
+    /// 理智恢复效应（2026-09-30 歌声之环批：环 tick「恢复1理智」结算——Host 应用到 UnitStats
+    /// （RangedInt -300~300 自动钳）后经 TurnResolver 产 StatChange(Sanity) 命令；玩法消费方随未来理智机制批）
+    /// </summary>
+    public class SanityEffect : BattleEffect
+    {
+        public int Delta;
+
+        public SanityEffect(string targetUnitId, int delta)
+        {
+            TargetUnitId = targetUnitId;
+            Delta = delta;
+        }
+    }
+
+    /// <summary>
     /// 元素附着效应（B4）：反应消耗语义已由 ElementReactionResolver 在结算时定夺，
     /// 本效应=效应应用阶段直接 Dye 目标为 incoming 元素（覆盖旧附着=消耗）
     /// </summary>

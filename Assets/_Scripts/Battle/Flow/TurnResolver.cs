@@ -435,6 +435,16 @@ namespace GIC.Battle
                     energyCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
                 segment.commands.Add(energyCommand);
             }
+            // 理智恢复（2026-09-30 歌声之环批）：同片同目标防御性去重——环 tick 每目标一条；
+            // 客户端 UnitView 缓存即时增量（同元能链），快照 sanity 权威兜底
+            var sanitySeen = new HashSet<string>();
+            foreach (var effect in effects)
+            {
+                if (!(effect is SanityEffect sanity)) continue;
+                if (!sanitySeen.Add(sanity.TargetUnitId)) continue;
+                segment.commands.Add(BattleCommand.StatChange(sanity.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindSanity, sanity.Delta));
+            }
             // 体力变化（B6d）：TargetUnitId=玩家 ID；同片同玩家防御性去重（配额行动唯一，
             // 理论只一条——低级单位豁免、延奏契约 0 消耗，正常流不会同玩家多条）
             var staminaSeen = new HashSet<string>();
@@ -760,6 +770,11 @@ namespace GIC.Battle
                     applyBuff.Turns = state != null ? state.RemainingTurns : 0;
                     appliedBuffs.Add(applyBuff);
                 }
+                else if (effect is SanityEffect sanity)
+                {
+                    // 理智恢复（2026-09-30 歌声之环批）：RangedInt Add 自动钳 -300~300（到上限自然停涨）
+                    _sim.ApplySanity(target, sanity.Delta);
+                }
                 else if (effect is AttachElementEffect attach)
                 {
                     _sim.AttachElement(target, (ElementType)attach.Element); // 覆盖=消耗被反应附着（docs/06）
@@ -804,6 +819,7 @@ namespace GIC.Battle
         // | Heal            | (来源, 目标, 命中毫秒)               | 键含时刻对齐 Damage；同刻双源并跳（前瞻护栏）    |
         // | Revive          | 不合并（一一对应）                    | Applied=false（活体）零命令；单命令=解灰+血量   |
         // | Energy          | (目标, 来源类别 Category)；先扣后加   | 同类别去重=「多次命中只获一次」；跨类别各发      |
+        // | Sanity          | (目标) 防御性去重                     | 环 tick 每目标一条；RangedInt 钳 -300~300       |
         // | Stamina         | (目标=玩家 ID) 防御性去重             | 配额行动理论唯一；重复条目丢弃                  |
         // | MoraPlunder     | (被掠方, 掠夺方) 双命令               | AppliedGain=0 零命令；按应用后实际量+命中时刻发 |
         // | ApplyBuff       | (目标, BuffType)                     | 级别取大、回合取后施合并态；命令数以合并态为准  |

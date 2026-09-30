@@ -139,6 +139,7 @@ namespace GIC.Data
         public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；客户端 UnitView 缓存即时增量，B6a）
         public const int StatKindMora = 2;   // 摩拉（value=变化量；actorUnitId=归属玩家。B6c 部署扣费直产；B6d 回合结束发放直产+客户端 HUD 消费）
         public const int StatKindStamina = 3; // 体力（value=变化量；actorUnitId=归属玩家。B6d：配额行动消耗走 StaminaEffect 效应产出+回合结束发放直产）
+        public const int StatKindSanity = 4; // 理智（value=变化量；2026-09-30 歌声之环批：Buff tick 恢复走 SanityEffect 效应产出+客户端 UnitView 缓存；UnitState.sanity 快照携带）
 
         [Header("召唤载荷（Summon 命令有效；B6c 部署）")]
         /// <summary>新登场的单位全量状态（客户端建 view 用；与快照 UnitState 同构）</summary>

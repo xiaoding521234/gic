@@ -34,6 +34,10 @@ namespace GIC.Data
         /// <summary>元能当前值/上限（B6a；上限=UnitConfig baseEnergy，爆发门槛=技能条目 EnergyCost）</summary>
         public int energy;
         public int maxEnergy;
+
+        /// <summary>理智（2026-09-30 歌声之环批：歌声之环 tick 恢复结算携带；基值=UnitConfig baseSanity 回落 50、
+        /// 钳制 -300~300（UnitStats RangedInt）；玩法消费方随未来理智机制批接线）</summary>
+        public int sanity;
         public int volume;
 
         /// <summary>受击圆柱直径（格=世界单位；0=未指定回落全局 0.42——BattleMetrics.CylinderDiameterOf 单出口解析）。
