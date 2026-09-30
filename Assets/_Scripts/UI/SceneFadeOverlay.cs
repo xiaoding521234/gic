@@ -79,8 +79,8 @@ namespace GIC.UI
         /// <summary>
         /// 预热加载页：提前实例化 prefab 并激活两帧再隐藏——把首次 Cover 的 ~0.5s 同步开销
         /// （prefab 实例化+TMP 字体初始化等，2026-09-13 帧实测）挪到无感时机（建房等待期），
-        /// 转场淡入帧不再尖峰。同时预热战斗工厂（UnitFactory/SkillFactory：Resources.Load
-        /// prefab+反射注册），开局装配帧的同步成本进一步缩水。幂等（工厂自带 _isInitialized 守卫）。
+        /// 转场淡入帧不再尖峰。同时预热战斗工厂（UnitFactory：Resources.Load prefab），
+        /// 开局装配帧的同步成本进一步缩水。幂等。
         /// </summary>
         public static void PreWarm()
         {
@@ -89,10 +89,10 @@ namespace GIC.UI
             d.gameObject.SetActive(true); // 先激活（Awake/TMP 初始化同步发生；inactive 对象无法 StartCoroutine）
             d.StartCoroutine(PreWarmRoutine(d));
 
-            // 战斗工厂预热：装配帧不再付 Resources.Load+反射扫描+首枚单位实例化
-            // 的首次成本（UnitFactory.PreWarm 实例化一枚立牌再销毁，依赖资产进缓存）
+            // 战斗工厂预热：装配帧不再付 Resources.Load+首枚单位实例化
+            // 的首次成本（UnitFactory.PreWarm 实例化一枚立牌再销毁，依赖资产进缓存）。
+            // SkillFactory 反射注册预热已随技能类旧轨退役删除（2026-09-30——工厂零反射零注册态）
             GIC.Battle.UnitFactory.PreWarm();
-            GIC.Battle.SkillFactory.Initialize();
         }
 
         private static IEnumerator PreWarmRoutine(LoadingOverlayDriver d)

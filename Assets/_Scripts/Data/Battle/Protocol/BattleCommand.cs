@@ -57,6 +57,9 @@ namespace GIC.Data
 
         [InspectorName("物品消耗")]
         ItemConsume = 15,
+
+        [InspectorName("复苏")]
+        Revive = 16,
     }
 
     /// <summary>
@@ -80,6 +83,7 @@ namespace GIC.Data
     /// Effect          | 特效值   | 特效子类型       | 飞行方向         | 发射格    | —    | —      | 发射时刻              | —              | —
     /// SkillCast       | skillID  | —                | 瞄准方向         | 施放者位置| —    | —      | —                     | —              | —
     /// ItemConsume     | 消耗数量 | 物品名 ItemName  | —                | —         | —    | —      | —                     | —              | —（targetUnitId=玩家）
+    /// Revive          | 复苏治疗量 | —              | —                | —         | —    | —      | —                     | —              | —（B-3 ② 复苏+治疗单命令）
     /// Pause/Resume/UI | —        | —                | —                | —         | —    | —      | —                     | —              | —
     /// </remarks>
     [Serializable]
@@ -249,6 +253,22 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 value = amount,
+            };
+        }
+
+        /// <summary>复苏（B-3 ②，芭芭拉闪耀奇迹）：单命令=解灰+复活血量（客户端 SetCorpseVisual(false)
+        /// + 弹 +N 治疗数字+血量增量——复苏与治疗原子化无中间态）</summary>
+        public static BattleCommand Revive(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
+            int healAmount)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.Revive,
+                actorUnitId = actorUnitId,
+                targetUnitId = targetUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                value = healAmount,
             };
         }
 

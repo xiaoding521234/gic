@@ -30,6 +30,20 @@ namespace GIC.Data
         [InspectorName("触发技能")] TriggerSkill = 6,    // 技能链：targetSkillType=查目标该型技能并结算（延奏→变奏 Henka，docs/18 决策九 D8）
 
         [InspectorName("摩拉掠夺")] MoraPlunder = 7,      // B-3 首扩（2026-09-25 随霜袭接线）：OnHit 每命中一个敌人，从其所属玩家摩拉池掠夺给施法者玩家（paramKey=MoraPlunder 键防双源；璃月契约先例=玩家池转移）
+
+        [InspectorName("复苏")] Revive = 8,               // B-3 ②（2026-09-30 随芭芭拉闪耀奇迹接线）：目标为尸体时清除尸体态+治疗（paramKey=Heal 键按 baseType 换算；唯一复苏通道——docs/05 §5.4「血量永远0不复苏」例外条款）
+    }
+
+    /// <summary>
+    /// 效果原子作用条件（B-3 ②，docs/11「IfCorpse 条件原子」落地）：按目标存活态过滤——
+    /// 同一技能 effects 列表内用 condition 声明分支（芭芭拉闪耀奇迹：尸体→复苏+治疗 /
+    /// 活体→歌声之环）。None=无条件（存量原子全此档，纯新增字段零行为变化）。
+    /// </summary>
+    public enum SkillEffectCondition
+    {
+        [InspectorName("无条件")] None = 0,
+        [InspectorName("目标已倒下")] TargetIsCorpse = 1,
+        [InspectorName("目标未倒下")] TargetIsAlive = 2,
     }
 
     /// <summary>
@@ -52,7 +66,8 @@ namespace GIC.Data
     /// 编译期由 EffectCompiler 展开成 BattleEffect——应用/合并/对账/命令发射全链零改动。
     /// 分工三真源：时轮=时间与判定规格（WHERE/WHEN）；参数表=数值（HOW MUCH，paramKey 引用防双源）；
     /// 效果原子=产出声明（WHAT）。
-    /// 技能数据 effects 为空列表=走旧技能类兜底（渐进双轨，决策九 D5）。
+    /// 技能数据 effects 为空列表=UnimplementedSkill 占位不可施放（旧技能类兜底轨已随 2026-09-30
+    /// SkillFactory 旧轨退役拆除——加技能=配 effects 零代码）。
     /// </summary>
     [Serializable]
     public class SkillEffectConfig
@@ -65,6 +80,10 @@ namespace GIC.Data
 
         [Header("作用目标（OnCast 语义）")]
         public SkillEffectTargetFilter targetFilter = SkillEffectTargetFilter.Target;
+
+        [Header("作用条件（B-3 ②：按目标存活态过滤——复苏/增益分支声明位）")]
+        /// <summary>作用条件：None=无条件；TargetIsCorpse/TargetIsAlive=编译层按目标 isCorpse 过滤（docs/11 IfCorpse）</summary>
+        public SkillEffectCondition condition = SkillEffectCondition.None;
 
         [Header("数值（paramKey≠None 优先取参数表；value 为机制常量直读）")]
         /// <summary>主数值参数键（Damage/Heal=技能伤害/治疗键；ApplyBuff=BuffValue 键如 ATKBonus）</summary>

@@ -778,9 +778,14 @@ namespace GIC.Editor
                     $"触发: {((SkillType)el.FindPropertyRelative("targetSkillType").intValue)}",
                 SkillEffectKind.MoraPlunder =>
                     $"参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}",
+                SkillEffectKind.Revive =>
+                    $"参数: {((SkillParamKey)el.FindPropertyRelative("paramKey").intValue)}",
                 _ => "",
             };
-            return $"{kind.GetInspectorName()}{(summary.Length > 0 ? " · " + summary : "")}";
+            // 条件后缀（B-3 ② 存活态分叉——复苏/增益分支可视性）
+            var condition = (SkillEffectCondition)el.FindPropertyRelative("condition").intValue;
+            string conditionText = condition != SkillEffectCondition.None ? $" · 条件: {condition.GetInspectorName()}" : "";
+            return $"{kind.GetInspectorName()}{(summary.Length > 0 ? " · " + summary : "")}{conditionText}";
         }
 
         /// <summary>选中效果的按 kind 显字段编辑卡（字段全建+显隐切换——kind 变化不丢绑定）</summary>
@@ -798,13 +803,15 @@ namespace GIC.Editor
 
             var el = effectsProp.GetArrayElementAtIndex(selectedEffectIndex);
 
-            // 公共字段：触发时机 / 类型 / 目标筛选（OnCast 语义）
+            // 公共字段：触发时机 / 类型 / 目标筛选（OnCast 语义）/ 作用条件（B-3 ② 存活态分叉）
             var triggerField = new PropertyField(el.FindPropertyRelative("trigger"), "触发时机");
             var kindField = new PropertyField(el.FindPropertyRelative("kind"), "效果类型");
             var filterField = new PropertyField(el.FindPropertyRelative("targetFilter"), "目标筛选(施放时)");
+            var conditionField = new PropertyField(el.FindPropertyRelative("condition"), "作用条件(存活态)");
             effectAtomCard.Add(triggerField);
             effectAtomCard.Add(kindField);
             effectAtomCard.Add(filterField);
+            effectAtomCard.Add(conditionField);
 
             // 载荷字段（按 kind 部分有效——全建后显隐切换，kind 值变化时同步）
             var paramKeyField = new PropertyField(el.FindPropertyRelative("paramKey"), "主参数键");
@@ -826,7 +833,7 @@ namespace GIC.Editor
                 paramKeyField.style.display = kind switch
                 {
                     SkillEffectKind.Damage or SkillEffectKind.Heal or SkillEffectKind.ApplyBuff
-                        or SkillEffectKind.EnergyGain or SkillEffectKind.MoraPlunder
+                        or SkillEffectKind.EnergyGain or SkillEffectKind.MoraPlunder or SkillEffectKind.Revive
                         => DisplayStyle.Flex, _ => DisplayStyle.None };
                 paramKey2Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
                 paramKey3Field.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;

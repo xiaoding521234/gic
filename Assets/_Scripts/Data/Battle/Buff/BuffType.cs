@@ -22,6 +22,9 @@ namespace GIC.Data
 
         [InspectorName("移速提升")]
         MoveSpeedUp = 4,
+
+        [InspectorName("歌声之环")]
+        SongOfLife = 5, // B-3 ②（芭芭拉闪耀奇迹）：多行为永久光环——回合末对持有者半径1内敌人水伤/我方治疗+附着；持有者倒下消失（docs/units/蒙德/芭芭拉.md）
     }
 
     /// <summary>

@@ -643,6 +643,17 @@ namespace GIC.Battle
                         }
                         break;
 
+                    case BattleCommandType.Revive:
+                        // 复苏（B-3 ②，芭芭拉闪耀奇迹——docs/05 §5.4「血量永远0不复苏」唯一例外）：
+                        // 解灰+底座还原+视频恢复（SetCorpseVisual 原路反转）+ 复活血量与 +N 治疗数字
+                        // 复用 Heal 链（PlayDamageCoroutine isHeal——含 ApplyHpDelta 即时反馈）
+                        if (_views.TryGetValue(command.targetUnitId, out var revived))
+                        {
+                            revived.SetCorpseVisual(false);
+                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(revived, command.value, stagger, true)));
+                        }
+                        break;
+
                     case BattleCommandType.Death:
                         if (_views.TryGetValue(command.actorUnitId, out var dying))
                             playbacks.Add(StartCoroutine(PlayDeathCoroutine(dying, stagger)));

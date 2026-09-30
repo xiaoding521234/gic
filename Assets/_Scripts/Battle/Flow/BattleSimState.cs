@@ -510,6 +510,7 @@ namespace GIC.Battle
         {
             if (target == null || buff == null) return;
             buff.source = source;
+            buff.Sim = this; // 战场门面注入（回合结束效果需战场查询的 Buff 消费——如歌声之环半径枚举）
 
             var existing = target.Buffs.Find(b => b.Type == buff.Type);
             if (existing != null)
@@ -538,12 +539,13 @@ namespace GIC.Battle
             target?.GetUnitComponent<UnitElement>()?.Dye(element);
         }
 
-        /// <summary>按注册序结算后的到期收集（RemainingTurns≤0）</summary>
+        /// <summary>按注册序结算后的到期收集（RemainingTurns≤0；永久 Buff（RemainingTurns&lt;0）不计时
+        /// 不收集——歌声之环类持有者倒下才消失，走 EmitSliceCommands 死亡循环移除）</summary>
         public List<BaseBuff> CollectExpiredBuffs()
         {
             var expired = new List<BaseBuff>();
             foreach (var buff in _activeBuffs)
-                if (buff.RemainingTurns <= 0) expired.Add(buff);
+                if (!buff.IsPermanent && buff.RemainingTurns <= 0) expired.Add(buff);
             return expired;
         }
 

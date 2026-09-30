@@ -54,6 +54,9 @@ namespace GIC.Battle
                     return new BurnBuff(level) { source = source };
                 case BuffType.Freeze:
                     return new FreezeBuff(level) { source = source };
+                case BuffType.SongOfLife:
+                    // 歌声之环（B-3 ②）：永久 1 层光环——参数通道不适用（恒 1 层/不计时），走无参构造
+                    return new SongOfLifeBuff() { source = source };
                 default:
                     GICLog.Warn($"[BuffFactory] 未实现的 Buff 类型 {type}");
                     return null;

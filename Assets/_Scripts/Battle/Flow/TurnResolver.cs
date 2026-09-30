@@ -265,11 +265,11 @@ namespace GIC.Battle
 
             var effects = new List<BattleEffect>();
 
-            // 按注册序结算回合结束效果，随后计时减一（到期收集）
+            // 按注册序结算回合结束效果，随后计时减一（到期收集；永久 Buff（RemainingTurns<0）不计时——歌声之环类）
             foreach (var buff in _sim.ActiveBuffs)
             {
                 effects.AddRange(buff.OnTurnEnd());
-                buff.RemainingTurns--;
+                if (!buff.IsPermanent) buff.RemainingTurns--;
             }
             var expired = _sim.CollectExpiredBuffs();
 
@@ -480,6 +480,13 @@ namespace GIC.Battle
                     segment.commands.Add(BattleCommand.ItemConsume(effect.TargetUnitId, sliceIndex, indexInSlice++,
                         spent.item, spent.count));
             }
+            // 复苏（B-3 ②）：Applied=false（活体防御 no-op）零命令；单命令=解灰+复活血量（客户端 Revive 分支）
+            foreach (var effect in EnumerateEffects<ReviveEffect>(effects))
+            {
+                if (!effect.Applied) continue;
+                segment.commands.Add(BattleCommand.Revive(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.HealAmount));
+            }
             foreach (var effect in MergeHealEffects(effects))
             {
                 var healCommand = BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount);
@@ -496,8 +503,23 @@ namespace GIC.Battle
             }
             foreach (var dead in newlyDead)
             {
-                if (_sim.TryGetUnitId(dead, out var deadId))
+                bool hasId = _sim.TryGetUnitId(dead, out var deadId);
+                if (hasId)
                     segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
+                // 倒下即失的 Buff（B-3 ②：RemoveOnHolderDeath——歌声之环「持有者倒下，歌声之环消失」）：
+                // Death 命令后随发 RemoveBuff（客户端徽章即时移除），宿主注册表同步注销（倒序遍历边删）
+                for (int i = dead.Buffs.Count - 1; i >= 0; i--)
+                {
+                    var diedBuff = dead.Buffs[i];
+                    if (diedBuff == null || !diedBuff.RemoveOnHolderDeath) continue;
+                    string buffSourceId = deadId;
+                    if (diedBuff.source != null && _sim.TryGetUnitId(diedBuff.source, out var bsid))
+                        buffSourceId = bsid;
+                    _sim.RemoveBuff(dead, diedBuff);
+                    if (hasId)
+                        segment.commands.Add(BattleCommand.RemoveBuff(buffSourceId, deadId,
+                            sliceIndex, indexInSlice++, (int)diedBuff.Type));
+                }
             }
 
             // 到期 Buff：发射 RemoveBuff 后注销注册表（仅回合结束段传入）
@@ -703,6 +725,18 @@ namespace GIC.Battle
                 {
                     _sim.ApplyHeal(target, heal.Amount);
                 }
+                else if (effect is ReviveEffect revive)
+                {
+                    // 复苏（B-3 ②）：清尸体态+治疗——docs/05 §5.4「血量永远0不复苏」唯一例外通道。
+                    // 编译层 condition=TargetIsCorpse 已保证目标为尸体；活体目标=防御性 no-op 零命令
+                    //（对账按「应用前非尸体」豁免——ReviveEffect 仅在此处回填 Applied 标记）
+                    if (BattleSimState.IsDead(target))
+                    {
+                        target.GetUnitComponent<UnitStatus>()?.SetStatus(StatusType.Dead, false);
+                        _sim.ApplyHeal(target, revive.HealAmount);
+                        revive.Applied = true;
+                    }
+                }
                 else if (effect is EnergyEffect energy)
                 {
                     if (energy.Delta < 0) (energyCosts ??= new List<EnergyEffect>()).Add(energy);
@@ -762,11 +796,13 @@ namespace GIC.Battle
         // |-----------------|--------------------------------------|------------------------------------------------|
         // | Damage          | (攻击者, 目标, launchMs 发射时刻)    | 逐发不并（时轮逐发各跳数字）；同发同目标多来源并 |
         // | Heal            | (来源, 目标, 命中毫秒)               | 键含时刻对齐 Damage；同刻双源并跳（前瞻护栏）    |
+        // | Revive          | 不合并（一一对应）                    | Applied=false（活体）零命令；单命令=解灰+血量   |
         // | Energy          | (目标, 来源类别 Category)；先扣后加   | 同类别去重=「多次命中只获一次」；跨类别各发      |
         // | Stamina         | (目标=玩家 ID) 防御性去重             | 配额行动理论唯一；重复条目丢弃                  |
         // | MoraPlunder     | (被掠方, 掠夺方) 双命令               | AppliedGain=0 零命令；按应用后实际量+命中时刻发 |
         // | ApplyBuff       | (目标, BuffType)                     | 级别取大、回合取后施合并态；命令数以合并态为准  |
         // | Attach/Reaction | 不合并（一一对应）                    | 覆盖语义后到者胜属预期                          |
+        // 注：永久 Buff（RemainingTurns<0，歌声之环）不走到期收集——倒下即失走死亡循环 RemoveBuff
         // =================================================================================
 
         /// <summary>同片同 (目标,类型) 的多次施加合并为一条命令（回合数以最终合并态为准）</summary>
