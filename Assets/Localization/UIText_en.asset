@@ -1032,6 +1032,10 @@ MonoBehaviour:
       click empty space to cancel"
     m_Metadata:
       m_Items: []
+  - m_Id: 12035
+    m_Localized: Frozen
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

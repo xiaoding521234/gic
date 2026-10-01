@@ -21,9 +21,14 @@ namespace GIC.Battle
         /// Buff 消费——如歌声之环按持有者位置枚举半径内单位。单局生命周期，勿跨对局复用）</summary>
         public BattleSimState Sim;
 
-        /// <summary>永久 Buff（RemainingTurns&lt;0 标记——歌声之环类：不计时，持有者倒下才消失）；
-        /// 回合递减与到期收集均跳过（TurnResolver/CollectExpiredBuffs 同判据）</summary>
+        /// <summary>永久 Buff（RemainingTurns&lt;0 标记——歌声之环/寒冰之棱类：不计时）；
+        /// 回合递减与到期收集均跳过（TurnResolver/CollectExpiredBuffs 同判据），
+        /// 消失通道=持有者倒下（RemoveOnHolderDeath）或碎裂/驱散即时移除（BattleSimState.RemoveBuff）</summary>
         public bool IsPermanent => RemainingTurns < 0;
+
+        /// <summary>是否已达叠层上限（AI 脑增益候选排除用——重施加 Merge 无增益时不占行动）；
+        /// 默认否=不限/不适用，按命座成长的叠层型 Buff 覆写（寒冰之棱）</summary>
+        public virtual bool IsAtStackCap() => false;
 
         /// <summary>持有者倒下时是否随之移除（默认否——尸体保留 Buff 属通则，如 BurnBuff 烧尸体；
         /// 歌声之环类光环覆写 true，EmitSliceCommands 死亡循环随 Death 命令后发 RemoveBuff）</summary>
@@ -60,6 +65,22 @@ namespace GIC.Battle
         {
             RemainingTurns += newer.RemainingTurns;
             Level = Mathf.Max(Level, newer.Level);
+        }
+
+        /// <summary>施加者命座等级+其 Talent 命座技能数据（参数载体型命座——歌声之环/寒冰之棱的
+        /// C 系参数读取单出口，2026-09-30 歌声之环批立、凛冽轮舞批上收基类防第三份复制）；
+        /// 无施加者回落持有者自身（跨命座语义仍正确——持有者升命只影响自己光环的数值）</summary>
+        protected (int level, SkillConfig.SkillData talent) SourceConstellation()
+        {
+            var s = source != null ? source : owner;
+            if (s == null) return (0, null);
+            foreach (var skill in s.Skills)
+            {
+                var data = skill?.RawData;
+                if (data == null || data.skillType != SkillType.Talent) continue;
+                return (s.ConstellationLevel, data);
+            }
+            return (s.ConstellationLevel, null);
         }
     }
 }

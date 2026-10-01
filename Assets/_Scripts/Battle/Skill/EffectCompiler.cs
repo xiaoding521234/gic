@@ -73,6 +73,16 @@ namespace GIC.Battle
                 return effects;
             }
 
+            // 无目标自施放爆发（时轮 aimMode=None 声明，SkillData.IsSelfCast——首个=凯亚凛冽轮舞
+            // buff 型，2026-10-01 拍板「凯亚爆发实际并不是召唤，与歌声之环类似，都是buff」）：
+            // 无判定轨（不扫线/无投射物——否则 Burst 无 LineBurst clip 会走「无时轮兜底」误产
+            // 整线伤害），OnCast 效果直接全产出（targetFilter=Caster=自身施加 Buff）
+            if (skillData.IsSelfCast())
+            {
+                CompileOnCast(sim, action, sliceSnapshot, casterState, null, skillData, effects);
+                return effects;
+            }
+
             // 直线/迸发型（战技/爆发）：判定轨编译（发射声明/逐段整线）+ OnCast 效果（filter=Caster 等）
             if (skillData.skillType == SkillType.Normal || skillData.skillType == SkillType.Burst)
                 CompileJudgment(sim, action, sliceSnapshot, casterState, skillData, effects);
@@ -492,11 +502,36 @@ namespace GIC.Battle
                     amount = rawValue;
                     break;
             }
-            // 受疗者治疗效率（目标侧，协议核心批）：整数地板=末点截断口径；默认 100 恒等原值
-            int efficiency = targetStats != null ? targetStats.HealEfficiency : 100;
-            if (efficiency != 100 && amount > 0)
-                amount = amount * Mathf.Max(0, efficiency) / 100;
-            return amount;
+            // 治疗效率双乘区（施法者+受疗者，self 单次——单出口见 ApplyHealEfficiency）
+            return ApplyHealEfficiency(attacker, target, amount);
+        }
+
+        /// <summary>治疗效率乘区**单出口**（2026-10-01 拍板「治疗效率应当对所有的回血生效，无论是
+        /// 吸血还是被治疗」+追加拍板「发起治疗者也应当乘上治疗效率，例如+50%治疗效率的芭芭拉治疗
+        /// 其它角色；但自己治疗自己时，治疗效率不会乘两次」）：**双侧乘区**——施法者效率×受疗者效率
+        /// /100（各自独立百分比，默认 100 恒等原值）；**施法者==受疗者只乘一次**（按该单位效率——
+        /// 防 self 双乘：150% 效率奶自己=×150%，非 ×225%）；负效率钳 0、整数地板=末点截断口径。
+        /// **一切回血统一消费**——被治疗（ResolveHealAmount 末段）、吸血（受疗者=攻击者自身=单次）、
+        /// 光环 tick 治疗（歌声之环：施法者=施加者芭芭拉）、碎裂回血（寒冰之棱）勿在各回血点手抄
+        /// 乘区；治疗估值链（AI 双脑走 ResolveHealAmount）自动同源</summary>
+        internal static int ApplyHealEfficiency(Unit caster, Unit target, int amount)
+        {
+            if (amount <= 0) return 0;
+            int casterEfficiency = EfficiencyOf(caster);
+            int targetEfficiency = EfficiencyOf(target);
+            // 同一单位=单次（self 双乘防线）；跨单位=双侧相乘归一（150%×150%→225）
+            int efficiency = caster == target
+                ? casterEfficiency
+                : casterEfficiency * targetEfficiency / 100;
+            if (efficiency == 100) return amount;
+            return amount * Mathf.Max(0, efficiency) / 100;
+        }
+
+        /// <summary>单位治疗效率（无属性/无组件回落 100=恒等）</summary>
+        private static int EfficiencyOf(Unit unit)
+        {
+            var stats = unit?.GetUnitComponent<UnitStats>();
+            return stats != null ? stats.HealEfficiency : 100;
         }
 
         private static SkillParam FindParam(SkillConfig.SkillData skillData, SkillParamKey key)

@@ -25,6 +25,12 @@ namespace GIC.Data
 
         [InspectorName("歌声之环")]
         SongOfLife = 5, // B-3 ②（芭芭拉闪耀奇迹）：多行为永久光环——回合末对持有者半径1内敌人水伤/我方治疗+附着；持有者倒下消失（docs/units/蒙德/芭芭拉.md）
+
+        [InspectorName("寒冰之棱")]
+        Icicle = 6, // 凛冽轮舞批（2026-10-01 凯亚爆发=自施放 Buff，拍板「实际并不是召唤，与歌声之环类似」）：永久光环——回合末半径内敌冰伤、持有者元能超50%碎裂回血；持有者倒下仍生效（docs/units/蒙德/凯亚.md）
+
+        [InspectorName("防御减少")]
+        DefenseDown = 7, // 寒冰之棱2命（C2DefenseReduce）：命中敌人防御-5，永久单层不叠（StatBuff 族负值修改器）
     }
 
     /// <summary>

@@ -1054,13 +1054,15 @@ namespace GIC.Battle
                 : IsLineSkill(def) ? "Battle_TipAimDirection" : "Battle_TipAimSkill");
         }
 
-        /// <summary>该按钮技能是否直线型（战技/爆发=十字方向瞄准；延奏/契约/单位指向型爆发=单位指向）</summary>
+        /// <summary>该按钮技能是否直线型（战技/爆发=十字方向瞄准；延奏/契约/单位指向型爆发=单位指向；
+        /// 无目标自施放爆发〔aimMode=None，凛冽轮舞〕=自身格瞄准非直线）</summary>
         private bool IsLineSkill(SkillButtonDef def)
         {
             var data = GetSelectedSkillData(def);
             return data != null
                 && data.skillType != SkillType.Interact
-                && !data.IsUnitTargeted();
+                && !data.IsUnitTargeted()
+                && !data.IsSelfCast();
         }
 
         private void ExitAiming()
@@ -1215,6 +1217,19 @@ namespace GIC.Battle
                         _aimCells.Add(c);
                         _aimRecommendedCells.Add(c);
                     }
+                }
+                return;
+            }
+
+            // 无目标自施放爆发（aimMode=None——凛冽轮舞）：目标域=自身格（Buff 施加于自身；
+            // 全推荐同单位指向口径——目标格即语义本身；伙伴层级提交时被操控防线拦截，瞄准域仅供查看）
+            if (skillData.IsSelfCast())
+            {
+                var selfCell = new BattleCell(sel.position.x, sel.position.y);
+                if (_board.Map.HasTile(selfCell.x, selfCell.y))
+                {
+                    _aimCells.Add(selfCell);
+                    _aimRecommendedCells.Add(selfCell);
                 }
                 return;
             }

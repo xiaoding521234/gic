@@ -290,7 +290,8 @@ namespace GIC.Battle
                 yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
 
                 Destroy(arrowGo);
-                yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind);
+                yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind,
+                    command.metadata);
             }
             finally
             {
@@ -628,7 +629,7 @@ namespace GIC.Battle
                                     ? command.launchMs / 1000f / _playbackSpeed
                                     : stagger;
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
-                                    command.reactionKind)));
+                                    command.reactionKind, command.metadata)));
                             }
                         }
                         break;
@@ -719,11 +720,16 @@ namespace GIC.Battle
                             if (command.metadata == BattleCommand.StatKindEnergy)
                             {
                                 // 命中时刻（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
-                                // 到点再跳元能（与投射物命中表现同时刻）；0=立即（移动获能/协奏/消耗/回合发放）
+                                // 到点再跳元能（与投射物命中表现同时刻）；0=立即（移动获能/协奏/消耗/回合发放）。
+                                // 获取类随跳弹「+N」元能数字（2026-10-01 拍板④「目前少了元能数字弹出」
+                                // ——白=元能条色单源，消耗不弹）
                                 if (command.launchMs > 0)
                                     playbacks.Add(StartCoroutine(PlayEnergyDeltaCoroutine(statChanged, command)));
                                 else
+                                {
                                     statChanged.ApplyEnergyDelta(command.value);
+                                    SpawnEnergyNumber(statChanged, command.value);
+                                }
                             }
                             else if (command.metadata == BattleCommand.StatKindSanity)
                             {
@@ -871,18 +877,54 @@ namespace GIC.Battle
         }
 
         /// <summary>反应子类型 → 本地化反应名（短命数字对象直接求值当前语言，不挂 TextCombiner）。
-        /// 仅增伤反应（融化/蒸发）有名——冻结是控制反应、无伤害加成，数字不带名</summary>
+        /// 三反应全带名（2026-10-01 三次拍板「反应名都应该加上」——冻结不再例外；本地化键 Battle_ReactionFreeze=12035）</summary>
         private static string ReactionNameOf(int reactionKind)
         {
             string key = null;
             if (reactionKind == BattleCommand.ReactionKindMelt) key = "Battle_ReactionMelt";
             else if (reactionKind == BattleCommand.ReactionKindVaporize) key = "Battle_ReactionVaporize";
+            else if (reactionKind == BattleCommand.ReactionKindFreeze) key = "Battle_ReactionFreeze";
             if (key == null) return null;
             return new LocalizedString("UIText", key).GetLocalizedString();
         }
 
+        /// <summary>伤害数字配色（2026-10-01 拍板+同日网检勘正「与原神一致」）：
+        /// <summary>伤害数字配色（2026-10-01 拍板+二次拍板「原神里反应都有自己的颜色」）：
+        /// 普通伤害数字=BattlePalette 伤害数字元素色（原神数字=亮彩霓虹风，显著亮于元素主题色——
+        /// 图标/箭矢仍用 ElementFactionConfig 主题色，两套语义勿混）；三反应各独立色
+        /// （蒸发/融化/冻结——基准=官方反应图标双色调实测，按母元素冷暖拆分保互异，见 BattlePalette 字段注释）；
+        /// 三反应数字均带名（三次拍板「反应名都应该加上」——冻结例外废除）。配置缺失兜底链=数字色板→
+        /// ElementFactionConfig 主题色→白</summary>
+        private static Color ResolveDamageNumberColor(int reactionKind, int element)
+        {
+            var palette = Palette;
+            if (palette != null)
+            {
+                switch (reactionKind)
+                {
+                    case BattleCommand.ReactionKindMelt: return palette.反应融化色;
+                    case BattleCommand.ReactionKindVaporize: return palette.反应蒸发色;
+                    case BattleCommand.ReactionKindFreeze: return palette.反应冻结色;
+                }
+                switch ((ElementType)element)
+                {
+                    case ElementType.Pyro: return palette.伤害数字火色;
+                    case ElementType.Hydro: return palette.伤害数字水色;
+                    case ElementType.Cryo: return palette.伤害数字冰色;
+                    case ElementType.Electro: return palette.伤害数字雷色;
+                    case ElementType.Anemo: return palette.伤害数字风色;
+                    case ElementType.Geo: return palette.伤害数字岩色;
+                    case ElementType.Dendro: return palette.伤害数字草色;
+                    case ElementType.Light: return palette.伤害数字光色;
+                    default: return palette.伤害数字物理色; // Physical/未知=白（原神物理数字白）
+                }
+            }
+            var cfg = ElementFactionConfig.Instance; // 数字色板缺失兜底：回落元素主题色（观感偏深但可用）
+            return cfg != null ? cfg.GetElementColor((ElementType)element) : Color.white;
+        }
+
         private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal,
-            int reactionKind = 0)
+            int reactionKind = 0, int element = 0)
         {
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
@@ -905,12 +947,15 @@ namespace GIC.Battle
             string text = isHeal
                 ? $"+{value}"
                 : reactionName != null ? $"{reactionName} {value}" : value.ToString();
+            // 配色（2026-10-01 拍板「与原神一致」）：治疗=治疗绿；伤害=ResolveDamageNumberColor
+            // （元素色/反应独特色，见该方法注释）
+            var numberColor = isHeal ? Palette.治疗绿 : ResolveDamageNumberColor(reactionKind, element);
             // 随机偏移防同点多数字重叠（2026-09-24 目检后用户拍板加大散布：XZ 加宽、高度带随机）
             var randomOffset = new Vector3(
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
-                isHeal ? Palette.治疗绿 : Palette.伤害红, value, _playbackSpeed);
+                numberColor, value, _playbackSpeed);
         }
 
         /// <summary>受击闪色恢复尾巴（S5：不进 playbacks=不 gate ack——Host 片节拍只等位移/伤害主体）</summary>
@@ -921,11 +966,26 @@ namespace GIC.Battle
         }
 
         /// <summary>元能命中时刻应用（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
-        /// 到点再跳元能（与投射物命中表现同时刻）；0=立即不走本协程</summary>
+        /// 到点再跳元能（与投射物命中表现同时刻）；0=立即不走本协程。获取类到点随跳弹「+N」元能数字
+        /// （2026-10-01 拍板④——多层 tick 逐层错峰各弹）</summary>
         private IEnumerator PlayEnergyDeltaCoroutine(UnitView view, BattleCommand command)
         {
             yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
             view.ApplyEnergyDelta(command.value);
+            SpawnEnergyNumber(view, command.value);
+        }
+
+        /// <summary>元能获取数字（2026-10-01 拍板④「目前少了元能数字弹出」）：「+N」白=元能条色单源
+        /// （Palette.元能条色），复用伤害数字屏幕空间层（尺寸/停留/边缘夹取同链）；**消耗不弹**
+        /// （delta&lt;0 静默——爆发扣 40 不飘负数，条本身会掉）；随机偏移同伤害/治疗防同点重叠</summary>
+        private void SpawnEnergyNumber(UnitView view, int delta)
+        {
+            if (delta <= 0 || view == null) return;
+            var randomOffset = new Vector3(
+                UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
+                UnityEngine.Random.Range(-0.15f, 0.15f));
+            EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, $"+{delta}",
+                Palette.元能条色, delta, _playbackSpeed);
         }
 
         /// <summary>玩家资源命令命中时刻应用（B-3 摩拉掠夺，同元能「命中时才给」）：到点再发资源事件；

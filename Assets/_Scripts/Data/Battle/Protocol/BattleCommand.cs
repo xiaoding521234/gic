@@ -169,7 +169,7 @@ namespace GIC.Data
         /// <summary>Damage 命令工厂。metadata=元素；direction=投放形态（0=瞬发直击/1=直线投射物，复用字段）；
         /// cell=投射物发射格（Delivery≠0 时有效）；hitX/hitY=命中点千分定点连续格心坐标
         /// （Delivery=1 有效——Host 接触判定得出，客户端按此播放弹着点，勿自行推算）；
-        /// reactionKind=本次命中触发的元素反应（0=无；增伤反应时伤害数字带反应名）；
+        /// reactionKind=本次命中触发的元素反应（0=无；反应命中时伤害数字带反应名——三反应全带，2026-10-01 三次拍板「反应名都应该加上」）；
         /// launchMs=发射时刻毫秒（时轮 B-S1——客户端投射物延迟起飞/瞬发段伤害数字节拍；合并键含此值=逐发不并）</summary>
         public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
             int amount, int metadata, int delivery = 0, BattleCell fromCell = default, int hitX = 0, int hitY = 0,

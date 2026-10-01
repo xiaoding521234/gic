@@ -17,6 +17,12 @@ namespace GIC.Battle
         /// <summary>移动每格耗时（秒）——移动插值速度 = 1/此值 格/秒</summary>
         public const float MoveStepSeconds = 0.18f;
 
+        /// <summary>多层 Buff 逐层效果错峰间隔（秒，2026-10-01 拍板「每层的效果延后 0.15s 生效，
+        /// 避免同时弹出」——寒冰之棱/歌声之环多层 tick 各层独立弹数字；第 i 层时刻=i×此值，
+        /// 与箭雨段间隔同节拍语言；Host 状态恒即时结算，错峰纯表现层——客户端 Damage/Heal
+        /// launchMs 到点再弹已支持，零客户端改动）</summary>
+        public const float BuffLayerStaggerSeconds = 0.15f;
+
         /// <summary>单位受击圆柱直径（世界单位；底座圆盘可视化同源，视觉即判定——docs/18 决策二）。
         /// 容错目检后可调（基线起点 0.42）</summary>
         public const float UnitCylinderDiameter = 0.42f;

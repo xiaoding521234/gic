@@ -625,7 +625,8 @@ namespace GIC.Battle
         }
 
         /// <summary>按注册序结算后的到期收集（RemainingTurns≤0；永久 Buff（RemainingTurns&lt;0）不计时
-        /// 不收集——歌声之环类持有者倒下才消失，走 EmitSliceCommands 死亡循环移除）</summary>
+        /// 不收集——歌声之环/寒冰之棱类消失走 RemoveOnHolderDeath 倒下移除或碎裂即时移除
+        /// （BattleSimState.RemoveBuff——寒冰之棱 TryShatter 直接注销）</summary>
         public List<BaseBuff> CollectExpiredBuffs()
         {
             var expired = new List<BaseBuff>();

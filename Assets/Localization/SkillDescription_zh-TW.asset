@@ -59,7 +59,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002002
-    m_Localized: "\xB7\u53EC\u559A{ShardCount}\u679A<color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u5BD2\u51B0\u4E4B\u68F1</link></u></color>\uFF0C\u570D\u7E5E\u81EA\u8EAB\u65CB\u8F49"
+    m_Localized: "\xB7\u7372\u5F97{ShardCount}\u679A<color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u5BD2\u51B0\u4E4B\u7A1C</link></u></color>\uFF0C\u570D\u7E5E\u81EA\u8EAB\u65CB\u8F49"
     m_Metadata:
       m_Items: []
   - m_Id: 3002003

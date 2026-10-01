@@ -611,6 +611,8 @@ namespace GIC.Battle
                 case BuffType.AttackUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：延奏=蒙德协奏（风）；正式图标待拍板（docs/11）
                 case BuffType.MoveSpeedUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：移速提升（风系语义）；正式图标待拍板（docs/11）
                 case BuffType.SongOfLife: return config.GetElementIconStroke(ElementType.Hydro); // 占位：歌声之环=水光环（B-3 ②）；正式图标待拍板（docs/11）
+                case BuffType.Icicle: return config.GetElementIconStroke(ElementType.Cryo); // 占位：寒冰之棱=冰（凛冽轮舞批）；正式图标待拍板（docs/11）
+                case BuffType.DefenseDown: return config.GetElementIconStroke(ElementType.Cryo); // 占位：防御减少（寒冰之棱2命）；正式图标待拍板（docs/11）
                 default: return null;
             }
         }

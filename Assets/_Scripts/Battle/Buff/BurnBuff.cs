@@ -57,6 +57,10 @@ namespace GIC.Battle
                 case BuffType.SongOfLife:
                     // 歌声之环（B-3 ②）：永久 1 层光环——参数通道不适用（恒 1 层/不计时），走无参构造
                     return new SongOfLifeBuff() { source = source };
+                case BuffType.Icicle:
+                    // 寒冰之棱（凛冽轮舞批）：value 通道=初始层数（ShardCount 经 paramKey 注入——
+                    // 工厂按 Buff 类型解释 value 的既有先例同款，AttackUp=每层加成/寒冰之棱=初始层数）
+                    return new IcicleBuff(Mathf.Max(1, value)) { source = source };
                 default:
                     GICLog.Warn($"[BuffFactory] 未实现的 Buff 类型 {type}");
                     return null;
@@ -70,6 +74,8 @@ namespace GIC.Battle
                 return new AttackUpBuff(level, value, stackLimit, turns) { source = source };
             if (type == BuffType.MoveSpeedUp)
                 return new MoveSpeedBuff(level, value, stackLimit, turns) { source = source };
+            if (type == BuffType.DefenseDown)
+                return new DefenseDownBuff(level, value, stackLimit, turns) { source = source };
             return Create(type, level, source, value);
         }
     }

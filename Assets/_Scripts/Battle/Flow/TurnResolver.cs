@@ -179,8 +179,10 @@ namespace GIC.Battle
             var vanishes = new List<BattleCommand>();
             ProjectileResolver.Resolve(_sim, snapshot, effects, movers, vanishes);
 
-            // 效应统一应用（伤害/治疗合并 HP 天然成立；Buff 施加记入注册表）
-            var appliedBuffs = ApplyEffects(effects);
+            // 效应统一应用（伤害/治疗合并 HP 天然成立；Buff 施加记入注册表）；碎裂记录=寒冰之棱
+            // 「元能>50% 立刻触发」（2026-10-01 复测拍板）——ApplyEffects 元能增益段即时产出
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = ApplyEffects(effects, shatters);
 
             // 死亡判定（效应应用后统一判；同片互杀 = 同归于尽）
             var damagedUnits = CollectDamagedTargets(effects);
@@ -188,7 +190,8 @@ namespace GIC.Battle
 
             // 产出片命令块（三段唯一出口 EmitSliceCommands——命令发射序与对账见其内注释）
             EmitSliceCommands($"回合{turnNumber}片{sliceIndex}", segment, sliceIndex,
-                effects, appliedBuffs, movers, vanishes, newlyDead, expired: null, skillCasts: casts);
+                effects, appliedBuffs, movers, vanishes, newlyDead, expired: null, skillCasts: casts,
+                shattered: shatters);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -273,12 +276,13 @@ namespace GIC.Battle
             }
             var expired = _sim.CollectExpiredBuffs();
 
-            var appliedBuffs = ApplyEffects(effects);
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
             // 产出回合结束段命令（三段唯一出口；到期 Buff 的 RemoveBuff 发射+注册表注销在出口尾部）
             EmitSliceCommands($"回合{turnNumber}结束段", segment, sliceIndex,
-                effects, appliedBuffs, null, null, newlyDead, expired);
+                effects, appliedBuffs, null, null, newlyDead, expired, shattered: shatters);
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
@@ -337,7 +341,8 @@ namespace GIC.Battle
             var vanishes = new List<BattleCommand>();
             ProjectileResolver.Resolve(_sim, snapshot, effects, moverList, vanishes);
 
-            var appliedBuffs = ApplyEffects(effects);
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
             var segment = new Segment
@@ -351,7 +356,8 @@ namespace GIC.Battle
 
             // 产出即时段命令（三段唯一出口；单 mover 复用同一 Move 发射循环）
             EmitSliceCommands($"回合{turnNumber}即时段", segment, sliceIndex,
-                effects, appliedBuffs, moverList, vanishes, newlyDead, expired: null, skillCasts: casts);
+                effects, appliedBuffs, moverList, vanishes, newlyDead, expired: null, skillCasts: casts,
+                shattered: shatters);
 
             GICLog.Info($"[TurnResolver] 即时行动 {segment}");
             return segment;
@@ -369,7 +375,8 @@ namespace GIC.Battle
         private void EmitSliceCommands(string context, Segment segment, int sliceIndex,
             List<BattleEffect> effects, List<ApplyBuffEffect> appliedBuffs,
             List<MoveActionState> movers, List<BattleCommand> vanishes, List<Unit> newlyDead,
-            List<BaseBuff> expired = null, List<BattleCommand> skillCasts = null)
+            List<BaseBuff> expired = null, List<BattleCommand> skillCasts = null,
+            List<(string holderId, string sourceId, BaseBuff buff)> shattered = null)
         {
             int indexInSlice = segment.commands.Count;
 
@@ -506,6 +513,17 @@ namespace GIC.Battle
                     healCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
                 segment.commands.Add(healCommand);
             }
+            // 寒冰之棱碎裂（2026-10-01 复测拍板「元能>50% 立刻触发」）：碎裂治疗已随 HealEffect 在上方
+            // 发射（状态由 IcicleBuff.TryShatter 内联应用——效应=命令发射载体，同溢出转移先例）；
+            // 此处补发 RemoveBuff（客户端徽章即时消失），紧随治疗=观感上「碎裂回血、冰棱散去」
+            if (shattered != null)
+            {
+                foreach (var s in shattered)
+                {
+                    segment.commands.Add(BattleCommand.RemoveBuff(s.sourceId, s.holderId,
+                        sliceIndex, indexInSlice++, (int)s.buff.Type));
+                }
+            }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
@@ -632,11 +650,19 @@ namespace GIC.Battle
         /// 效应统一应用（伤害/治疗/Buff 施加）；返回已施 Buff 列表（含合并后的级别与剩余回合，供命令产出）。
         /// 元能两段应用（2026-09-25 用户拍板「先扣除，再加」）：同段多来源元能效应先消耗后获取——
         /// 获取先应用会被 baseEnergy 上限钳位吞掉（30+10→40 钳 30，再 −20=10 ≠ 期望 30−20+10=20）。
+        /// shatters=寒冰之棱碎裂记录（2026-10-01 复测拍板「元能&gt;50% 立刻触发」）：每笔元能增益
+        /// 落地后即时判定（IcicleBuff.TryShatter 内联应用治疗+移除），事实经本列表传给命令出口
+        /// 补发 RemoveBuff——由调用方创建传入（片/回合结束/即时段三处各自持有）。
         /// </summary>
-        private List<ApplyBuffEffect> ApplyEffects(List<BattleEffect> effects)
+        private List<ApplyBuffEffect> ApplyEffects(List<BattleEffect> effects,
+            List<(string holderId, string sourceId, BaseBuff buff)> shatters)
         {
             var appliedBuffs = new List<ApplyBuffEffect>();
             List<EnergyEffect> energyCosts = null, energyGains = null;
+            // 吸血治疗收集（2026-10-01 实装：DamageEffect 应用点按攻击者 LifeSteal% 结算——状态主循环内
+            // 直改 ApplyHeal，效应主循环后并入 effects=命令发射载体（同溢出转移先例：主循环 foreach
+            // 中 List.Add 会炸枚举器，故先收后并）；客户端随伤害 +N 绿字弹出）
+            var lifestealHeals = new List<HealEffect>();
             foreach (var effect in effects)
             {
                 // 体力效应（B6d）：TargetUnitId=玩家 ID 非 Unit——先于单位解析处理（GetUnit(玩家ID)=null 会被跳过）
@@ -730,6 +756,30 @@ namespace GIC.Battle
                 {
                     // 尸体 HP 恒 0，继续扣无意义但保持链路统一（属性保留）
                     _sim.ApplyDamage(target, damage.Amount);
+
+                    // 吸血（2026-10-01 实装——此前 LifeSteal 只有数据位零消费，用户问「当前吸血还没
+                    // 实际生效吗」实证未生效）：攻击者存活且吸血>0 → 按实际伤害量×LifeSteal% 回血
+                    // （一切伤害结算点统一结算：战技/箭矢/爆发/光环 tick/燃烧；末点 FloorToInt；
+                    // **治疗效率统一乘区**〔2026-10-01 拍板「治疗效率应当对所有的回血生效，无论
+                    // 吸血还是被治疗」——受疗者=攻击者自身，EffectCompiler.ApplyHealEfficiency 单出口〕；
+                    // 尸体攻击者不吸）
+                    var lifestealAttacker = _sim.GetUnit(damage.AttackerUnitId);
+                    if (lifestealAttacker != null && !BattleSimState.IsDead(lifestealAttacker))
+                    {
+                        int lifestealPercent = lifestealAttacker.GetUnitComponent<UnitStats>()?.LifeSteal ?? 0;
+                        if (lifestealPercent > 0 && damage.Amount > 0)
+                        {
+                            int heal = EffectCompiler.ApplyHealEfficiency(lifestealAttacker, lifestealAttacker,
+                                Mathf.FloorToInt(damage.Amount * lifestealPercent / 100f));
+                            if (heal > 0)
+                            {
+                                string attackerIdForHeal = damage.AttackerUnitId;
+                                if (_sim.TryGetUnitId(lifestealAttacker, out var lsId)) attackerIdForHeal = lsId;
+                                _sim.ApplyHeal(lifestealAttacker, heal);
+                                lifestealHeals.Add(new HealEffect(attackerIdForHeal, attackerIdForHeal, heal));
+                            }
+                        }
+                    }
                 }
                 else if (effect is HealEffect heal)
                 {
@@ -781,30 +831,60 @@ namespace GIC.Battle
                 }
             }
 
+            // 吸血治疗效应并入（状态已在主循环内联应用——此处仅为命令发射载体，同溢出转移先例；
+            // 主循环 foreach 内直接 Add 会炸枚举器，故先收后并）
+            effects.AddRange(lifestealHeals);
+
             // 元能第二阶段：先扣除后获取（与命令发射序 MergeEnergyEffects 同语义，2026-09-25 用户拍板「先扣除，再加」
             // ——获取先到会被 baseEnergy 上限钳位吞掉：30+10 钳 30 再 −20=10 ≠ 期望 20）。
             // (目标,类别) 去重=与 MergeEnergyEffects 命令合并口径恒等（2026-09-25 修复：逐条累加致状态背离命令——
             // 两发箭矢两条 +10 战技获能曾会状态 +20/命令 +10，B6a「多次命中只获一次」由此在状态层真正成立）
+            // 寒冰之棱碎裂收集（复测拍板①「元能>50% 立刻触发」）：治疗/移除由 TryShatter 内联应用；
+            // **逐层各一枚 HealEffect**（拍板「碎裂回血等效果各弹一次」——第 i 层 HitSeconds=i×
+            // BuffLayerStaggerSeconds 错峰，客户端 launchMs 到点各弹 +N；状态=总值已应用，效应=
+            // 命令发射载体同溢出转移先例）+碎裂事实（RemoveBuff 命令）；倒下/无 Buff/未过阈值零动作
+            void CollectIcicleShatter(Unit unit)
+            {
+                if (unit == null) return;
+                if (!IcicleBuff.TryShatter(_sim, unit, out var healPerShard, out var source, out var buff)) return;
+                string holderId = unit.GetUnitComponent<UnitIdentity>()?.UnitID ?? "";
+                string sourceId = (source != null ? source.GetUnitComponent<UnitIdentity>()?.UnitID : null) ?? holderId;
+                if (healPerShard > 0)
+                {
+                    int layers = Mathf.Max(1, buff.Level);
+                    for (int layer = 0; layer < layers; layer++)
+                        effects.Add(new HealEffect(sourceId, holderId, healPerShard)
+                        {
+                            HitSeconds = layer * BattleMetrics.BuffLayerStaggerSeconds,
+                        });
+                }
+                shatters.Add((holderId, sourceId, buff));
+            }
+
             if (energyCosts != null || energyGains != null)
             {
                 var appliedEnergy = new HashSet<string>();
                 if (energyCosts != null)
                     foreach (var cost in energyCosts)
                     {
-                        if (!appliedEnergy.Add($"{cost.TargetUnitId}:{cost.Category}")) continue;
+                        if (!appliedEnergy.Add(cost.MergeKey())) continue;
                         _sim.ApplyEnergy(_sim.GetUnit(cost.TargetUnitId), cost.Delta);
                     }
                 if (energyGains != null)
                     foreach (var gain in energyGains)
                     {
-                        if (!appliedEnergy.Add($"{gain.TargetUnitId}:{gain.Category}")) continue;
+                        if (!appliedEnergy.Add(gain.MergeKey())) continue;
                         // 溢出转移（B8 批，安柏1命）：状态层转移后回传事实→补发转移效应命令（独立类别，
                         // 客户端到点跳接收方元能；发射层 MergeEnergyCommands 后续统一合并）
                         _sim.ApplyEnergy(_sim.GetUnit(gain.TargetUnitId), gain.Delta,
                             out var overflowReceiver, out var overflowAmount);
                         if (overflowAmount > 0 && !string.IsNullOrEmpty(overflowReceiver))
+                        {
                             effects.Add(new EnergyEffect(overflowReceiver, overflowAmount,
                                 EnergyEffect.CategoryOverflowTransfer));
+                            CollectIcicleShatter(_sim.GetUnit(overflowReceiver)); // 溢出接收方元能已内联写入——同拍碎裂判定
+                        }
+                        CollectIcicleShatter(_sim.GetUnit(gain.TargetUnitId)); // 元能>50% 立刻碎裂（复测拍板①）
                     }
             }
             return appliedBuffs;
@@ -818,7 +898,8 @@ namespace GIC.Battle
         // | Damage          | (攻击者, 目标, launchMs 发射时刻)    | 逐发不并（时轮逐发各跳数字）；同发同目标多来源并 |
         // | Heal            | (来源, 目标, 命中毫秒)               | 键含时刻对齐 Damage；同刻双源并跳（前瞻护栏）    |
         // | Revive          | 不合并（一一对应）                    | Applied=false（活体）零命令；单命令=解灰+血量   |
-        // | Energy          | (目标, 来源类别 Category)；先扣后加   | 同类别去重=「多次命中只获一次」；跨类别各发      |
+        // | Energy          | (目标, 类别)——MergeKey() 单源；       | 同类别去重=「多次命中只获一次」；跨类别各发；     |
+        // |                 | BuffTickGain 例外=键含层时刻          | 逐层 tick 各跳各弹（拍板④）；同刻同目标仍并     |
         // | Sanity          | (目标) 防御性去重                     | 环 tick 每目标一条；RangedInt 钳 -300~300       |
         // | Stamina         | (目标=玩家 ID) 防御性去重             | 配额行动理论唯一；重复条目丢弃                  |
         // | MoraPlunder     | (被掠方, 掠夺方) 双命令               | AppliedGain=0 零命令；按应用后实际量+命中时刻发 |
@@ -951,7 +1032,7 @@ namespace GIC.Battle
             foreach (var effect in effects)
             {
                 if (!(effect is EnergyEffect energy)) continue;
-                if (!seen.Add($"{energy.TargetUnitId}:{energy.Category}")) continue;
+                if (!seen.Add(energy.MergeKey())) continue;
                 if (energy.Delta < 0) costs.Add(energy);
                 else gains.Add(energy);
             }
