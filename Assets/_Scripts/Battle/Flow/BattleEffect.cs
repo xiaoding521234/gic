@@ -66,6 +66,50 @@ namespace GIC.Battle
     }
 
     /// <summary>
+    /// 回合末光环命中待结算事件（决策二十四终版「同时进行」=逐拍交错，2026-10-01）：buff 的
+    /// OnTurnEnd 只**声明**命中（谁/打谁/元素/伤害请求/第几拍），TurnResolver 收齐全部 buff 的事件后
+    /// **按 (拍时刻, 施法者 unitId, 目标 unitId) 排序**、共享编译视图逐个结算（反应预判+1:1 消耗+
+    /// **每层附着**=每层命中都是一次元素应用）——双异元素光环同拍交错、每拍可触发反应（对齐原神：
+    /// 双光环同时活跃、反应在应用事件序列里自然发生）。Host 进程内引用不序列化；结算后被替换为
+    /// Damage/Reaction/Attach 全套产物，不进效应应用阶段。
+    /// </summary>
+    public class PendingAuraHit : BattleEffect
+    {
+        public string AttackerUnitId;
+
+        /// <summary>施法者（Host 进程内引用，不序列化）</summary>
+        public Unit Attacker;
+
+        /// <summary>目标（Host 进程内引用，不序列化）</summary>
+        public Unit Target;
+
+        /// <summary>来袭元素</summary>
+        public ElementType Element;
+
+        /// <summary>伤害请求（null=纯附着事件——环的附着我方分支）</summary>
+        public DamageRequest Request;
+
+        /// <summary>拍时刻（秒=layer×BuffLayerStaggerSeconds；排序主键）</summary>
+        public float BeatSeconds;
+
+        /// <summary>该层命中后附着来袭元素（默认 true；纯附着事件也走此位）</summary>
+        public bool Attach = true;
+
+        public PendingAuraHit(string attackerUnitId, string targetUnitId, Unit attacker, Unit target,
+            ElementType element, DamageRequest request, float beatSeconds, bool attach = true)
+        {
+            AttackerUnitId = attackerUnitId;
+            TargetUnitId = targetUnitId;
+            Attacker = attacker;
+            Target = target;
+            Element = element;
+            Request = request;
+            BeatSeconds = beatSeconds;
+            Attach = attach;
+        }
+    }
+
+    /// <summary>
     /// 投射物待判定效应（B5 连续判定体系）：技能结算阶段只声明"发射"（发射格/方向/伤害参数），
     /// 实际命中由 ProjectileResolver 在同片移动展开后按执行阶段时间轴连续判定（接触立牌圆柱之时、
     /// 读命中时刻连续插值位置，docs/18 决策二）。不进入效应应用阶段——命中后被替换为 Hit 全套产物。
@@ -284,6 +328,10 @@ namespace GIC.Battle
 
         /// <summary>反应级别（B4 层数简化恒 1）</summary>
         public int Level;
+
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即）——反应命令 launchMs 载荷（客户端到点
+        /// 清附着图标：反应 1:1 消耗双方、等层零残留，docs/06 §6.3 / docs/18 决策二十五）</summary>
+        public float HitSeconds;
 
         public ReactionEffect(string sourceUnitId, string targetUnitId, int reactionType, int level)
         {
