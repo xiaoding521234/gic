@@ -82,5 +82,17 @@ namespace GIC.Battle
             }
             return (s.ConstellationLevel, null);
         }
+
+        // ==================== 数值基准/几何原语（2026-10-02 执行阶段复审收口） ====================
+        // 光环/DoT 族 OnTurnEnd 的样板件单源——Burn/歌声之环/寒冰之棱三处逐字重复的
+        // 施加者回落与 id 推导收拢；新光环/DoT Buff（火环/岩环等）落地时勿再手抄。
+
+        /// <summary>数值基准单位（施加者优先——跨命座语义+亡佚兜底；无施加者回落持有者）。
+        /// 与 SourceConstellation 同款回落口径；伤害归属/治疗基准/吸血换算的攻击者统一走此口</summary>
+        protected Unit AttackerOf() => source != null ? source : owner;
+
+        /// <summary>AttackerOf() 的 unitId 形态（identity 缺失回落 fallbackId——通常传持有者 id）</summary>
+        protected string AttackerIdOf(string fallbackId)
+            => AttackerOf().GetUnitComponent<UnitIdentity>()?.UnitID ?? fallbackId;
     }
 }

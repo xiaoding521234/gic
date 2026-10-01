@@ -82,9 +82,9 @@ namespace GIC.Battle
                 : 0);
             bool attachAllies = cLevel < 2; // 2命起：不再为我方角色附着元素
 
-            // 数值基准=施加者（施放闪耀奇迹的芭芭拉）；无施加者回落持有者（BurnBuff 伤害归属同款兜底）
-            var attacker = source != null ? source : owner;
-            string attackerId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
+            // 数值基准=施加者（施放闪耀奇迹的芭芭拉）；无施加者回落持有者——AttackerOf/AttackerIdOf 单源
+            var attacker = AttackerOf();
+            string attackerId = AttackerIdOf(ownerId);
             var attackerStats = attacker.GetUnitComponent<UnitStats>();
             // 逐层口径（2026-10-01 拍板④「2层相当于有两个此buff，应当各弹一次」）：伤害/治疗/元能/理智
             // 逐层各弹一次（第 i 层时刻=i×BuffLayerStaggerSeconds 错峰；Host 状态恒即时结算）——元能=
@@ -99,9 +99,8 @@ namespace GIC.Battle
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null) continue;
-                var pos = Sim.GetPosition(unit);
-                if (Math.Max(Math.Abs(pos.x - holderPos.x), Math.Abs(pos.y - holderPos.y)) > radius)
-                    continue; // 出半径
+                if (Sim.GetPosition(unit).ChebyshevTo(holderPos) > radius)
+                    continue; // 出半径（ChebyshevTo 单源）
 
                 if (identity.Team != holderTeam)
                 {
@@ -111,7 +110,6 @@ namespace GIC.Battle
                     // 每层附着=决策二十四终版「同时进行」——双异元素光环同拍交错互融）
                     for (int layer = 0; layer < stacks; layer++)
                     {
-                        float beat = layer * BattleMetrics.BuffLayerStaggerSeconds;
                         effects.Add(new PendingAuraHit(attackerId, kv.Key, attacker, unit, ElementType.Hydro,
                             new DamageRequest
                             {
@@ -119,7 +117,7 @@ namespace GIC.Battle
                                 Target = unit,
                                 Element = (int)ElementType.Hydro,
                                 AttackPercent = DamagePercentPerTurn,
-                            }, beat));
+                            }, BattleMetrics.LayerBeatSeconds(layer)));
                     }
                 }
                 else
@@ -136,13 +134,13 @@ namespace GIC.Battle
                         for (int layer = 0; layer < stacks; layer++)
                             effects.Add(new HealEffect(attackerId, kv.Key, healForTarget)
                             {
-                                HitSeconds = layer * BattleMetrics.BuffLayerStaggerSeconds,
+                                HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
                             });
                     if (energyGainPerLayer > 0)
                         for (int layer = 0; layer < stacks; layer++)
                             effects.Add(new EnergyEffect(kv.Key, energyGainPerLayer, EnergyEffect.CategoryBuffTickGain)
                             {
-                                HitSeconds = layer * BattleMetrics.BuffLayerStaggerSeconds,
+                                HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
                             });
                     // 理智恢复逐层（2026-10-01 拍板②「+1 应当也是每层的效果」）：每层各一枚 +1
                     // ——命令层按目标合并总值（TurnResolver 发射，防状态/命令漂移）
@@ -153,7 +151,7 @@ namespace GIC.Battle
                     if (attachAllies)
                         for (int layer = 0; layer < stacks; layer++)
                             effects.Add(new PendingAuraHit(attackerId, kv.Key, attacker, unit, ElementType.Hydro,
-                                null, layer * BattleMetrics.BuffLayerStaggerSeconds));
+                                null, BattleMetrics.LayerBeatSeconds(layer)));
                 }
             }
             return effects;

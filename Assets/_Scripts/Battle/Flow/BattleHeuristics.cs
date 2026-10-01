@@ -80,14 +80,9 @@ namespace GIC.Battle
                 if (BattleSimState.IsDead(unit)) continue;
                 result.Add(unit);
             }
-            var posOf = new Dictionary<Unit, BattleCell>();
             var distOf = new Dictionary<Unit, int>();
             foreach (var unit in result)
-            {
-                var pos = sim.GetPosition(unit);
-                posOf[unit] = pos;
-                distOf[unit] = Math.Max(Math.Abs(pos.x - selfPos.x), Math.Abs(pos.y - selfPos.y));
-            }
+                distOf[unit] = sim.GetPosition(unit).ChebyshevTo(selfPos); // 切比雪夫单源（BattleCell.ChebyshevTo）；顺删零消费的 posOf（2026-10-02 复审）
             result.Sort((a, b) =>
             {
                 int da = distOf[a], db = distOf[b];

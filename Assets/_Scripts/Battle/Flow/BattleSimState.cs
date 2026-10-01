@@ -544,8 +544,7 @@ namespace GIC.Battle
                 if (stats == null) continue;
                 var energy = stats.GetStatStruct(StatType.Energy);
                 if (energy.Value >= energy.Max) continue; // 已满不接收
-                var pos = GetPosition(candidate);
-                int dist = System.Math.Max(System.Math.Abs(pos.x - selfPos.x), System.Math.Abs(pos.y - selfPos.y));
+                int dist = GetPosition(candidate).ChebyshevTo(selfPos); // 切比雪夫单源（BattleCell.ChebyshevTo）
                 if (dist < bestDist || (dist == bestDist && bestId != null
                     && string.CompareOrdinal(kv.Key, bestId) < 0))
                 {
