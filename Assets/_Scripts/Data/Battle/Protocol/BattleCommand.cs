@@ -141,6 +141,9 @@ namespace GIC.Data
         public const int StatKindStamina = 3; // 体力（value=变化量；actorUnitId=归属玩家。B6d：配额行动消耗走 StaminaEffect 效应产出+回合结束发放直产）
         public const int StatKindSanity = 4; // 理智（value=变化量；2026-09-30 歌声之环批：Buff tick 恢复走 SanityEffect 效应产出+客户端 UnitView 缓存；UnitState.sanity 快照携带）
 
+        [Header("治疗子类型（Heal 命令 metadata；2026-10-01 拍板 B——吸血自疗带名前缀）")]
+        public const int HealKindLifesteal = 1; // 吸血（客户端弹「吸血 +N」名前缀；普通治疗仍裸 +N）
+
         [Header("召唤载荷（Summon 命令有效；B6c 部署）")]
         /// <summary>新登场的单位全量状态（客户端建 view 用；与快照 UnitState 同构）</summary>
         public UnitState summonUnit;

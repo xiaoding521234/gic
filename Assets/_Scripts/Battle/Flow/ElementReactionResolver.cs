@@ -4,7 +4,8 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 元素反应预判结果（结算时读片前快照的附着元素；纯数据，不改状态）
+    /// 元素反应预判结果（附着实参由调用方从片内编译视图读出——快照初值+消耗/覆盖随编译序推进；
+    /// 纯数据，不改状态）
     /// </summary>
     public class ReactionOutcome
     {

@@ -1020,6 +1020,10 @@ MonoBehaviour:
     m_Localized: "\u51BB\u7ED3"
     m_Metadata:
       m_Items: []
+  - m_Id: 12036
+    m_Localized: "\u5438\u8840"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

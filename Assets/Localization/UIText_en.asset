@@ -1036,6 +1036,10 @@ MonoBehaviour:
     m_Localized: Frozen
     m_Metadata:
       m_Items: []
+  - m_Id: 12036
+    m_Localized: Lifesteal
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -9,7 +9,8 @@ namespace GIC.Battle
     /// 技能命中结算入口（B4 起；B-1 起为效果原子编译派发器，docs/active/29）：
     /// 技能 effects 非空 → EffectCompiler.CompileOnHit 数据驱动产出；空 → 内置三件套
     /// （伤害+附着+战技获能，B6a 硬编码分档）以隐式默认原子等价编译（未迁移旧技能类兜底，决策九 D5）。
-    /// 反应判定读片前快照的 DyedElement（快照一致性）；状态修改全部以效应形态产出。
+    /// 反应判定读片内附着编译视图（快照初值+反应消耗/新附着随编译序推进——2026-10-01 双蒸发修复）；
+    /// 状态修改全部以效应形态产出。
     /// </summary>
     public static class SkillHitResolver
     {

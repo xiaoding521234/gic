@@ -728,5 +728,35 @@ namespace GIC.Battle
 
             return snapshot;
         }
+
+        // ==================== 片内附着编译视图（2026-10-01 双蒸发修复） ====================
+        // 病灶：反应预览只读片前快照附着，而消耗/覆盖在效应统一应用才落状态——同片多次命中
+        // （安柏一箭双丘丘）后续命中仍见旧附着，一层水双蒸发（docs/06 §6.3 1比1消耗被打破）。
+        // 视图=编译期工作副本：初值回落快照，反应消耗/新附着随编译序即时推进；TurnResolver
+        // 片/即时段编译期以 Begin/End 包裹（命中编译全部走这两处）。真实状态仍由
+        // AttachElementEffect 统一应用写入——视图只服务反应预判，不落任何持久状态。
+
+        /// <summary>片内附着编译视图（unitId → 当前附着；null=未开启，读取回落快照=旧行为）</summary>
+        private Dictionary<string, ElementType> _compileDyeView;
+
+        /// <summary>开启编译视图（片/即时段编译期入口调用，紧跟 TakeSnapshot 之后）</summary>
+        public void BeginCompileDyeView() => _compileDyeView = new Dictionary<string, ElementType>();
+
+        /// <summary>关闭编译视图（片内全部命中编译完成后调用）</summary>
+        public void EndCompileDyeView() => _compileDyeView = null;
+
+        /// <summary>编译期附着读取：视图优先，未命中回退片前快照态（快照态缺失=Physical）</summary>
+        public ElementType GetCompileDye(string unitId, UnitState snapshotState)
+        {
+            if (_compileDyeView != null && _compileDyeView.TryGetValue(unitId, out var dye))
+                return dye;
+            return snapshotState != null ? (ElementType)snapshotState.dyedElement : ElementType.Physical;
+        }
+
+        /// <summary>编译期附着推进：反应消耗=Physical（docs/06 §6.3）；AttachElement 覆盖=来袭元素</summary>
+        public void SetCompileDye(string unitId, ElementType element)
+        {
+            if (_compileDyeView != null) _compileDyeView[unitId] = element;
+        }
     }
 }

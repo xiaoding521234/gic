@@ -117,8 +117,10 @@ namespace GIC.Battle
                 insertedInstantAction = 0,
             };
 
-            // 片前快照（瞬发效应读取状态）
+            // 片前快照（瞬发效应读取状态）+ 片内附着编译视图（2026-10-01 双蒸发修复）：
+            // 同片多次命中的反应消耗/新附着随编译序对后续命中可见——快照只是附着初值
             var snapshot = _sim.TakeSnapshot(turnNumber);
+            _sim.BeginCompileDyeView();
 
             var effects = new List<BattleEffect>();
             var movers = new List<MoveActionState>();
@@ -178,6 +180,7 @@ namespace GIC.Battle
             // docs/active/22 §11——命中点/消散点随命令千分定点下发）
             var vanishes = new List<BattleCommand>();
             ProjectileResolver.Resolve(_sim, snapshot, effects, movers, vanishes);
+            _sim.EndCompileDyeView(); // 命中编译全部完成（此后效应应用/命令发射不再读附着）
 
             // 效应统一应用（伤害/治疗合并 HP 天然成立；Buff 施加记入注册表）；碎裂记录=寒冰之棱
             // 「元能>50% 立刻触发」（2026-10-01 复测拍板）——ApplyEffects 元能增益段即时产出
@@ -301,6 +304,7 @@ namespace GIC.Battle
             }
 
             var snapshot = _sim.TakeSnapshot(turnNumber);
+            _sim.BeginCompileDyeView(); // 片内附着编译视图（同片多命中消耗序贯可见，双蒸发修复）
             var effects = new List<BattleEffect>();
             var moverList = new List<MoveActionState>();
             var casts = new List<BattleCommand>(); // 时轮施放事件（B-S1）
@@ -340,6 +344,7 @@ namespace GIC.Battle
             // 投射物连续命中判定（即时行动段无并发移动者，连续判定退化为静止接触）
             var vanishes = new List<BattleCommand>();
             ProjectileResolver.Resolve(_sim, snapshot, effects, moverList, vanishes);
+            _sim.EndCompileDyeView(); // 命中编译全部完成（此后效应应用/命令发射不再读附着）
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             var appliedBuffs = ApplyEffects(effects, shatters);
@@ -507,6 +512,9 @@ namespace GIC.Battle
             foreach (var effect in MergeHealEffects(effects))
             {
                 var healCommand = BattleCommand.Heal(effect.SourceUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount);
+                // 吸血标记（拍板 B 2026-10-01）：metadata=HealKindLifesteal——客户端弹「吸血 +N」名前缀
+                if (effect.IsLifesteal)
+                    healCommand.metadata = BattleCommand.HealKindLifesteal;
                 // 命中时刻（同元能「命中时才给」）：OnHit 治疗（水之浅唱）随投射物落地弹 +N；
                 // 0=立即——OnCast 治疗（延奏/变奏）无飞行段
                 if (effect.HitSeconds > 0f)
@@ -776,7 +784,18 @@ namespace GIC.Battle
                                 string attackerIdForHeal = damage.AttackerUnitId;
                                 if (_sim.TryGetUnitId(lifestealAttacker, out var lsId)) attackerIdForHeal = lsId;
                                 _sim.ApplyHeal(lifestealAttacker, heal);
-                                lifestealHeals.Add(new HealEffect(attackerIdForHeal, attackerIdForHeal, heal));
+                                // +N 应用时刻继承伤害命中时刻（2026-10-01 WYSIWYG 修复）：投射物=接触 hitT
+                                // 与箭落地同拍弹；tick 节拍走 LaunchMs 兜底。同源同刻合并（三次拍板终版
+                                // 「修改吸血，同源同刻合并」）：IsLifesteal=客户端「吸血 +N」名前缀标记
+                                // （不再豁免合并——吸血与普通治疗同走 (来源,目标,毫秒) 键，霜袭双敌并单
+                                // 「吸血 +60」；异源恒不并）
+                                lifestealHeals.Add(new HealEffect(attackerIdForHeal, attackerIdForHeal, heal)
+                                {
+                                    IsLifesteal = true,
+                                    HitSeconds = damage.HitSeconds > 0f
+                                        ? damage.HitSeconds
+                                        : damage.LaunchMs / 1000f,
+                                });
                             }
                         }
                     }
@@ -896,7 +915,7 @@ namespace GIC.Battle
         // | 效应            | 合并/去重键                          | 语义要点                                        |
         // |-----------------|--------------------------------------|------------------------------------------------|
         // | Damage          | (攻击者, 目标, launchMs 发射时刻)    | 逐发不并（时轮逐发各跳数字）；同发同目标多来源并 |
-        // | Heal            | (来源, 目标, 命中毫秒)               | 键含时刻对齐 Damage；同刻双源并跳（前瞻护栏）    |
+        // | Heal            | (来源, 目标, 命中毫秒)——全治疗统一 | 键含时刻对齐 Damage；同源同刻并跳（吸血同规则，2026-10-01 三拍终版）；异源恒不并 |
         // | Revive          | 不合并（一一对应）                    | Applied=false（活体）零命令；单命令=解灰+血量   |
         // | Energy          | (目标, 类别)——MergeKey() 单源；       | 同类别去重=「多次命中只获一次」；跨类别各发；     |
         // |                 | BuffTickGain 例外=键含层时刻          | 逐层 tick 各跳各弹（拍板④）；同刻同目标仍并     |
@@ -968,7 +987,8 @@ namespace GIC.Battle
                     // 命中点与反应标记取首条（同合并键合并时=最早一次接触的位置与反应）
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
                         damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY,
-                        damage.ReactionType, damage.LaunchMs);
+                        damage.ReactionType, damage.LaunchMs)
+                    { HitSeconds = damage.HitSeconds }; // 吸血治疗继承用（WYSIWYG）
                     merged[key] = copy;
                     result.Add(copy);
                 }
@@ -981,7 +1001,11 @@ namespace GIC.Battle
         /// 片内/即时段治疗命令发射——此前仅回合结束段发射，片内治疗对客户端不可见致双端血量背离）。
         /// 合并键含命中毫秒（2026-09-25 三轮审查 S4，对齐 MergeDamageEffects 键含 LaunchMs）：
         /// 同施法者同片同目标 OnCast(0=立即)+OnHit(延迟) 双治疗不再并成一条——并条时刻取首条会让
-        /// 投射物落地治疗在片头瞬跳。当前角色池一单位一行动不会出现同刻双源，属前瞻护栏。
+        /// 投射物落地治疗在片头瞬跳。
+        /// **吸血同规则（2026-10-01 三次拍板终版「修改吸血，同源同刻合并」——推翻同日拍板 B 的
+        /// 豁免）**：IsLifesteal 不再豁免——吸血与普通治疗同走 (来源,目标,毫秒) 键：同源同刻
+        /// 并一数字（霜袭双敌=单「吸血 +60」，合并副本保留 IsLifesteal=前缀标记）；异源恒不并
+        /// （两个芭芭拉的环各弹各的）。
         /// </summary>
         private static List<HealEffect> MergeHealEffects(List<BattleEffect> effects)
         {
@@ -997,10 +1021,12 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    // 命中时刻随合并副本保留（同合并键内取首条=最早一次命中的时刻）
+                    // 命中时刻随合并副本保留（同合并键内取首条=最早一次命中的时刻）；
+                    // IsLifesteal 同保留——合并后的吸血仍带「吸血 +N」前缀
                     var copy = new HealEffect(heal.SourceUnitId, heal.TargetUnitId, heal.Amount)
                     {
                         HitSeconds = heal.HitSeconds,
+                        IsLifesteal = heal.IsLifesteal,
                     };
                     merged[key] = copy;
                     result.Add(copy);
