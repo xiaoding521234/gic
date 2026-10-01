@@ -279,8 +279,10 @@ namespace GIC.Battle
                     var attackerElement = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
                     var element = atom.element != ElementType.Physical ? atom.element : attackerElement;
 
-                    // 元素反应预判（融化=易伤/蒸发=增伤/冻结=控制，docs/06）
-                    var outcome = ElementReactionResolver.Preview((ElementType)targetState.dyedElement, element);
+                    // 元素反应预判（融化=易伤/蒸发=增伤/冻结=控制，docs/06）——附着读片内编译视图
+                    // （2026-10-01 双蒸发修复）：快照只是初值，同片前序命中的反应消耗/新附着随编译序
+                    // 对后续命中可见（安柏双箭打一层水=第一发蒸发消耗、第二发见火同元素不反应）
+                    var outcome = ElementReactionResolver.Preview(sim.GetCompileDye(targetUnitId, targetState), element);
                     // stats 取活态 UnitStats（当前片内无属性突变点=与片前快照恒等；未来若引入片中属性
                     // 变化——光环/移动触发效果等——须统一改读快照，防快照纪律分叉，2026-09-27 复审注记）
                     var request = new DamageRequest
@@ -311,11 +313,15 @@ namespace GIC.Battle
                     if (!result.Cancelled && result.FinalDamage > 0)
                         effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage, (int)element,
                             delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType,
-                            Mathf.RoundToInt(launchSeconds * 1000f)));
+                            Mathf.RoundToInt(launchSeconds * 1000f))
+                        { HitSeconds = hitSeconds }); // 吸血治疗继承命中时刻（WYSIWYG）
 
                     if (outcome.HasReaction)
                     {
-                        // 反应发生事实载体 + 冻结控制 Buff（融化伤害已并入 DamageEffect）
+                        // 反应 1:1 消耗被反应附着（docs/06 §6.3）——片内后续命中不再见旧附着；
+                        // 新附着由同技能 AttachElement 原子覆盖（真实状态仍统一应用写入）
+                        sim.SetCompileDye(targetUnitId, ElementType.Physical);
+                        // 反应事实载体 + 冻结控制 Buff（融化伤害已并入 DamageEffect）
                         effects.Add(new ReactionEffect(action.unitId, targetUnitId, outcome.ReactionType, outcome.Level));
                         if (outcome.BuffType >= 0)
                             effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, outcome.BuffType, outcome.Level));
@@ -350,7 +356,10 @@ namespace GIC.Battle
                     var attackerElement = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
                     var element = atom.element != ElementType.Physical ? atom.element : attackerElement;
                     if (element != ElementType.Physical) // 物理不附着（docs/06）
+                    {
                         effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element));
+                        sim.SetCompileDye(targetUnitId, element); // 覆盖语义对片内后续命中可见（双蒸发修复）
+                    }
                     break;
                 }
 

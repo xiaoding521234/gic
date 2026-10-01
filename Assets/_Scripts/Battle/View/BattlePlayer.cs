@@ -122,6 +122,18 @@ namespace GIC.Battle
         private const float BlockedBumpOutSecondsFactor = 0.75f;  // 撞墙探出时长 = 步进节奏 × 0.75（缓出）
         private const float BlockedBumpBackSecondsFactor = 0.55f; // 撞墙弹回时长 = 步进节奏 × 0.55（快出缓停）
 
+        /// <summary>同段「攻击者最后一次 launchMs=0 直击的弹出延迟」（actor → delay）。吸血自疗 +N
+        /// 须与伤害数字**同拍**弹（MOBA 式，2026-10-01 实战报障）：launchMs=0 的直击按命令 stagger
+        /// 旧节拍弹、该时刻客户端侧才存在——Host 无从随命令携带，故段内就近绑定（自疗 source==target
+        /// 取本方最后一击节拍）；段首清空防跨段污染。多目标同拍多伤时绑最后一击（0.12s 槽内，观感同步）</summary>
+        private readonly Dictionary<string, float> _segmentLastDirectDamageDelay = new Dictionary<string, float>();
+
+        /// <summary>同段「launchMs=0 直击节拍队列」（actor → 该攻击者本段各次直击的弹出延迟）。
+        /// 吸血立即响应配对（2026-10-01 拍板 B 勘正「不要错峰」）：第 n 笔绑定自疗随**第 n 次直击**
+        /// 节拍同帧弹——严格对应「造成1次伤害就立刻弹1次吸血」；队列耗尽（多笔伤害并成一条命令等）
+        /// 回落 _segmentLastDirectDamageDelay=同帧各弹；两表同段首清空</summary>
+        private readonly Dictionary<string, List<float>> _segmentDirectDamageBeats = new Dictionary<string, List<float>>();
+
         public void Bind(IBattleTransport transport, BattleMapData map)
         {
             Wargame.Instance?.Context?.Inject(this); // [Autowired] UnitConfig（Y10）
@@ -601,6 +613,8 @@ namespace GIC.Battle
 
             var playbacks = new List<Coroutine>();
             float stagger = 0f;
+            _segmentLastDirectDamageDelay.Clear(); // 段首清空（防跨段污染——吸血自疗只绑本段节拍）
+            _segmentDirectDamageBeats.Clear();
             foreach (var command in segment.commands)
             {
                 switch (command.type)
@@ -628,6 +642,18 @@ namespace GIC.Battle
                                 float dmgDelay = command.launchMs > 0
                                     ? command.launchMs / 1000f / _playbackSpeed
                                     : stagger;
+                                if (command.launchMs == 0)
+                                {
+                                    // 吸血自疗同拍绑定源（§107 追记）+ 立即响应配对队列（拍板 B 勘正）：
+                                    // 逐次记录本方各次直击节拍，第 n 笔自疗随第 n 次直击同帧弹
+                                    _segmentLastDirectDamageDelay[command.actorUnitId] = dmgDelay;
+                                    if (!_segmentDirectDamageBeats.TryGetValue(command.actorUnitId, out var beats))
+                                    {
+                                        beats = new List<float>();
+                                        _segmentDirectDamageBeats[command.actorUnitId] = beats;
+                                    }
+                                    beats.Add(dmgDelay);
+                                }
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
                                     command.reactionKind, command.metadata)));
                             }
@@ -638,11 +664,30 @@ namespace GIC.Battle
                         if (_views.TryGetValue(command.targetUnitId, out var healed))
                         {
                             // 命中时刻（2026-09-25「命中时才给」）：OnHit 治疗（水之浅唱）到命中毫秒再弹 +N
-                            //（与投射物落地同时刻）；0=立即（OnCast 治疗/回合结束段，保持命令 stagger 节拍）
-                            float healDelay = command.launchMs > 0
-                                ? command.launchMs / 1000f / _playbackSpeed
-                                : stagger;
-                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(healed, command.value, healDelay, true)));
+                            //（与投射物落地同时刻）；0=立即（OnCast 治疗/回合结束段，保持命令 stagger 节拍）。
+                            // 吸血自疗同拍（2026-10-01 实战报障「伤害 40 先出、+30 慢一拍才出」）：
+                            // source==target 且本段该攻击者有 launchMs=0 直击（stagger 旧节拍、Host 无从
+                            // 携带该时刻）——绑定其直击节拍同帧弹，勿再吃治疗命令自己的 stagger 槽。
+                            // 立即响应配对（拍板 B 勘正「不要错峰」）：第 n 笔自疗随第 n 次直击节拍；
+                            // 队列耗尽回落最后一击节拍=同帧各弹（不造视觉时差）
+                            float healDelay;
+                            if (command.launchMs > 0)
+                                healDelay = command.launchMs / 1000f / _playbackSpeed;
+                            else if (command.actorUnitId == command.targetUnitId
+                                     && _segmentLastDirectDamageDelay.TryGetValue(command.actorUnitId, out var boundDelay))
+                            {
+                                if (_segmentDirectDamageBeats.TryGetValue(command.actorUnitId, out var beats) && beats.Count > 0)
+                                {
+                                    healDelay = beats[0];
+                                    beats.RemoveAt(0);
+                                }
+                                else
+                                    healDelay = boundDelay;
+                            }
+                            else
+                                healDelay = stagger;
+                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(healed, command.value, healDelay, true,
+                                lifestealPrefix: command.metadata == BattleCommand.HealKindLifesteal)));
                         }
                         break;
 
@@ -888,6 +933,10 @@ namespace GIC.Battle
             return new LocalizedString("UIText", key).GetLocalizedString();
         }
 
+        /// <summary>吸血名前缀（2026-10-01 拍板）：吸血自疗数字「吸血 +N」——与反应名前缀同源取词</summary>
+        private static string LifeStealName()
+            => new LocalizedString("UIText", "Battle_LifeSteal").GetLocalizedString();
+
         /// <summary>伤害数字配色（2026-10-01 拍板+同日网检勘正「与原神一致」）：
         /// <summary>伤害数字配色（2026-10-01 拍板+二次拍板「原神里反应都有自己的颜色」）：
         /// 普通伤害数字=BattlePalette 伤害数字元素色（原神数字=亮彩霓虹风，显著亮于元素主题色——
@@ -924,7 +973,7 @@ namespace GIC.Battle
         }
 
         private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal,
-            int reactionKind = 0, int element = 0)
+            int reactionKind = 0, int element = 0, bool lifestealPrefix = false)
         {
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
@@ -944,8 +993,10 @@ namespace GIC.Battle
             // 随机偏移防同点多数字重叠）
             var reactionName = !isHeal ? ReactionNameOf(reactionKind) : null;
             int value = Mathf.Abs(displayValue);
+            // 吸血名前缀（2026-10-01 拍板「吸血数字少了前缀」）：「吸血 +N」——与反应名前缀同风格，
+            // 普通治疗仍裸 +N（color=治疗绿共用）
             string text = isHeal
-                ? $"+{value}"
+                ? lifestealPrefix ? $"{LifeStealName()} +{value}" : $"+{value}"
                 : reactionName != null ? $"{reactionName} {value}" : value.ToString();
             // 配色（2026-10-01 拍板「与原神一致」）：治疗=治疗绿；伤害=ResolveDamageNumberColor
             // （元素色/反应独特色，见该方法注释）
@@ -967,7 +1018,8 @@ namespace GIC.Battle
 
         /// <summary>元能命中时刻应用（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
         /// 到点再跳元能（与投射物命中表现同时刻）；0=立即不走本协程。获取类到点随跳弹「+N」元能数字
-        /// （2026-10-01 拍板④——多层 tick 逐层错峰各弹）</summary>
+        /// （弹字链已实现——**暂不弹**：SpawnEnergyNumber 开关守卫，2026-10-01 拍板「暂时决定不弹」；
+        /// 恢复=Inspector 勾「元能获取弹数字」）</summary>
         private IEnumerator PlayEnergyDeltaCoroutine(UnitView view, BattleCommand command)
         {
             yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
@@ -975,11 +1027,17 @@ namespace GIC.Battle
             SpawnEnergyNumber(view, command.value);
         }
 
-        /// <summary>元能获取数字（2026-10-01 拍板④「目前少了元能数字弹出」）：「+N」白=元能条色单源
-        /// （Palette.元能条色），复用伤害数字屏幕空间层（尺寸/停留/边缘夹取同链）；**消耗不弹**
-        /// （delta&lt;0 静默——爆发扣 40 不飘负数，条本身会掉）；随机偏移同伤害/治疗防同点重叠</summary>
+        /// <summary>元能获取弹数字（2026-10-01 拍板④「目前少了元能数字弹出」曾启用；**同日拍板翻转
+        /// 「不要整个删掉，只是暂时决定不弹」——实现与两处调用全保留，仅关本开关**）</summary>
+        [SerializeField] [Tooltip("元能获取随条跳变弹「+N」白字（2026-10-01 拍板暂时关闭——实现保留，勾选即恢复）")]
+        private bool 元能获取弹数字 = false;
+
+        /// <summary>元能获取数字：「+N」白=元能条色单源（Palette.元能条色），复用伤害数字屏幕空间层
+        /// （尺寸/停留/边缘夹取同链）；**消耗不弹**（delta&lt;0 静默——爆发扣 40 不飘负数，条本身会掉）；
+        /// 随机偏移同伤害/治疗防同点重叠。两处调用（即时/到点协程）不动——恢复弹字只改开关</summary>
         private void SpawnEnergyNumber(UnitView view, int delta)
         {
+            if (!元能获取弹数字) return; // 拍板「暂时决定不弹」——实现与调用链全保留，恢复只改本开关
             if (delta <= 0 || view == null) return;
             var randomOffset = new Vector3(
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),

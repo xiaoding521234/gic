@@ -1015,6 +1015,10 @@ MonoBehaviour:
     m_Key: Battle_ReactionFreeze
     m_Metadata:
       m_Items: []
+  - m_Id: 12036
+    m_Key: Battle_LifeSteal
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

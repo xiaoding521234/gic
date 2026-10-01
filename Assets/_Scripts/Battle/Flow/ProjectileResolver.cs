@@ -13,9 +13,12 @@ namespace GIC.Battle
     /// 时间轴：片内行动同 t=0 起跑（快照结算=真同时）；移动速度=BattleMetrics 逻辑常量；
     /// 投射物速度/体积/射程=BattleMetrics 默认（时轮 B-S1 起 per-skill 可覆写），
     /// 投射物自发射时刻起存在（时轮前摇=发射时刻偏移，发射前不参与判定）。
-    /// 只有"位置"读命中时刻；HP/附着/Buff 等状态仍读片前快照（同片并发基石不变，docs/11 销案）。
+    /// 只有"位置"读命中时刻；HP/Buff 等状态仍读片前快照（同片并发基石，docs/11 销案）；
+    /// 附着读片内编译视图（反应消耗/新附着随编译序对同片后续命中可见——2026-10-01 双蒸发修复）。
     /// 虚空格截断弹道（对应旧逐格扫描的虚空消散）；无接触时产出消散 Effect 命令（客户端播飞至尽头）。
-    /// 枚举序：接触时刻严格平局按 unitId 升序先到先得（docs/active/22 §1 枚举序铁律）。
+    /// 编译序=命中时刻序（2026-10-01 WYSIWYG 拍板，docs/18 决策二十一）：同片全部投射物先求交收集、
+    /// 按 (hitT, 施法者 unitId) 排序后逐发编译——双单位多箭按**到达顺序**消耗附着（安柏近+甘雨远
+    /// =A1→G1→A2→G2）；同刻平局按 unitId 升序先到先得（枚举序铁律保留给真同时）。
     /// 与 B4 格级近似的差异：同格堆叠敌方（贴脸）发射即接触命中（旧实现从相邻格起扫描、不打同格）。
     /// </summary>
     public static class ProjectileResolver
@@ -49,6 +52,13 @@ namespace GIC.Battle
                     moverPaths[mover.UnitId] = mover.Path;
             }
 
+            // 两遍法·命中时刻序（2026-10-01 WYSIWYG 拍板，docs/18 决策二十一）：先求交收集全部接触
+            // 时刻，排序后逐发编译——双单位多箭按到达顺序消耗附着（A1→G1→A2→G2）。
+            // 求交彼此独立（投射物互不遮挡、尸体也算判定、目标位置只读移动路径）——先求交不改
+            // 任何单发的命中结果，只改编译序；seq=产出序尾键（List.Sort 不稳定，同刻同施法者兜底）
+            var contacts = new List<(float hitT, string attackerUnitId, int seq, ProjectileEffect projectile,
+                float launch, Vector2 hitPoint, List<UnitState> members)>();
+            int sequence = 0;
             foreach (var projectile in projectiles)
             {
                 // 时轮（B-S1）：per-skill 投射物规格 + 发射时刻偏移（前摇）——0 值回落 BattleMetrics 默认
@@ -113,13 +123,32 @@ namespace GIC.Battle
                 // docs/active/22 §11；堆叠同心下与旧"格内全中"结果一致，向后兼容）
                 var hitState = FindState(enemies, hitUnitId);
                 var hitCell = CellOf(PositionAt(hitState, moverPaths, hitT));
+                var members = new List<UnitState>();
                 foreach (var enemy in enemies)
                 {
                     if (!CellOf(PositionAt(enemy, moverPaths, hitT)).Equals(hitCell)) continue;
+                    members.Add(enemy);
+                }
+                contacts.Add((hitT, projectile.AttackerUnitId, sequence++, projectile, launch, hitPoint, members));
+            }
+
+            // 到达序编译：命中时刻升序，平局按施法者 unitId 升序（真同时=枚举序铁律），再按产出序
+            contacts.Sort((a, b) =>
+            {
+                int byTime = a.hitT.CompareTo(b.hitT);
+                if (byTime != 0) return byTime;
+                int byUnit = string.CompareOrdinal(a.attackerUnitId, b.attackerUnitId);
+                return byUnit != 0 ? byUnit : a.seq.CompareTo(b.seq);
+            });
+
+            foreach (var contact in contacts)
+            {
+                foreach (var enemy in contact.members)
+                {
                     // hitT=接触时刻随效应下发（「命中时才给」2026-09-25：战技获能/命中治疗到点应用）
-                    effects.AddRange(SkillHitResolver.Hit(sim, projectile.Action, sliceSnapshot, enemy.unitId,
-                        projectile.AttackPercent, ProjectileRule.LineDelivery, projectile.FromCell,
-                        hitPoint.x, hitPoint.y, launch, hitT));
+                    effects.AddRange(SkillHitResolver.Hit(sim, contact.projectile.Action, sliceSnapshot, enemy.unitId,
+                        contact.projectile.AttackPercent, ProjectileRule.LineDelivery, contact.projectile.FromCell,
+                        contact.hitPoint.x, contact.hitPoint.y, contact.launch, contact.hitT));
                 }
             }
         }

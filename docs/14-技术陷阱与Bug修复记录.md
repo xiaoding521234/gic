@@ -1671,3 +1671,19 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：**Percent 基准=BasePercent 修改器（基值×(1+value/100)），对基值 0 的属性数学上恒 0**（0×1.5=0）。「吸血提升50」的本意是 0→50 个百分点（绝对加值），配 Percent 相对提升后无效；治疗效率基值 100 所以 100→150 侥幸生效。本质=「提升X%」在百分比数值属性上天然双解（+X 百分点 vs ×(1+X%)），非代码 bug。
 **终版修法（2026-10-01 同日用户拍板「为什么不用 Percent？应当全部统一」——推翻首版「0 基值配 Fixed」局部方案）**：**Percent 双语义按属性族统一分流**（ConstellationApplier.PercentPanelStats 收口）——百分比面板属性（治疗效率/吸血等基值 0~100 效率刻度）的 Percent=**+X 个百分点**（BaseFlat，GI 命座口径：治疗加成/吸血「提升X%」=绝对百分点加值）；点数属性（移速/攻速）的 Percent=相对提升（BasePercent ×(1+X%)）。资产 C1LifeSteal 配 Percent 与 C1HealEfficiency 口径统一；未来暴击/暴伤/充能效率类百分比面板属性落地时入 PercentPanelStats 表。
 **How to apply**：①命座 StatBoost 配参数：一切「提升」类一律配 Percent（统一口径），属性族分流由 ConstellationApplier 自动裁决；②新增百分比面板属性（0~100 效率刻度类）→ 加进 PercentPanelStats，否则 0 基值踩恒 0；③「修改器已挂但终值不变」的取证指纹=先查 0 基值×PercentPanelStats 表；④旧结论「0 基值属性禁配 Percent」作废——统一后 Percent 全场景可配。
+
+## 106. 片前快照附着只读=同片多命中重复消耗同一附着：一层水吃两发火箭双蒸发（2026-10-01 实战报障实证）
+
+**症状**：敌人只有一层水附着，安柏战技一箭双丘丘的两发箭矢**都**触发蒸发反应（伤害数字双「蒸发 N」+反应色）。
+**根因**：**反应预判只读片前快照的 dyedElement，而附着消耗/覆盖在效应统一应用才落状态**——同片（ResolveSlice）内两发箭的命中编译全部对着同一份快照，第二发仍见水；「消耗被反应附着」对编译序不可见。决策八推翻 B4 简化①后逐发独立反应成立，但序贯消耗从未接上（HP/Buff 读快照=同片并发基石是对的，附着是**消耗性资源**不该只读快照——1 层水被两个消费者各消耗一次，docs/06 §6.3 1比1语义被打破）。
+**修法（片内附着编译视图）**：BattleSimState 增编译期工作副本（BeginCompileDyeView/EndCompileDyeView 由 TurnResolver 片段+即时段紧贴 TakeSnapshot/ProjectileResolver.Resolve 包裹；GetCompileDye 视图优先回落快照=未开启旧行为）——Damage 原子反应预判改读视图，反应发生即 SetCompileDye(Physical)（消耗）；AttachElement 原子 SetCompileDye(来袭元素)（覆盖）。真实状态仍由 AttachElementEffect 统一应用写入，视图只服务反应预判、不落持久状态。效果：第一发蒸发消耗水→第二发见火=同元素不反应只附着（终态与统一应用一致）；跨行动链（同片安柏火+凯亚冰接力）也随枚举序正确接力（后手见火=融化）。
+**How to apply**：①新增「读片前快照」类状态前先分类：**消耗性资源**（附着/可数次数类）编译期须随消耗推进视图，**并发基石类**（HP/Buff 存在性）维持只读快照；②新技能多段命中（箭雨 4 段/时轮逐发）自动获得序贯消耗，勿再各处特判；③视图生命周期铁律=只在编译窗口开启，效应应用/命令发射期必须已关闭（EndCompileDyeView 在 ProjectileResolver.Resolve 后）——否则视图会当第二真源漂移；④三层附着（多层消耗强化反应级别）落地时视图须升级为「元素+层数」而非单值。
+
+## 107. 派生效应不继承母效应命中时刻：吸血 +N 绿字片头瞬弹、早于箭矢落地（2026-10-01 WYSIWYG 审计发现）
+
+**症状**：吸血（2026-10-01 实装）的表现时序——箭矢还在飞，攻击者 +N 绿字已在片播放起点弹出，"先见回血、后见掉血"，违反「造成伤害后立刻加血」的所见即所得。
+**根因**：**DamageEffect 不携带命中时刻**（只有 LaunchMs=发射时刻；客户端伤害弹出时刻自推导=launch+飞行时长），而 HealEffect 有 HitSeconds 通道（0=立即）——吸血 HealEffect 构造时未填 → launchMs=0 → 客户端按命令 stagger 片头瞬弹。伤害与治疗两套时刻通道不对称，派生效应（吸血）无从继承母效应（伤害）的命中时刻。
+**修法**：①DamageEffect 增 `HitSeconds` 字段（投射物=接触 hitT；瞬发/整线迸发=段时刻与 LaunchMs 同值；tick=0 节拍随 LaunchMs 错峰；命令层不携带=仅供同片效应派生）；②CompileAtom 构造带入 hitSeconds；③MergeDamageEffects 合并副本保留（同命中点/反应取首条口径）；④吸血 HealEffect `HitSeconds = damage.HitSeconds>0 ? damage.HitSeconds : damage.LaunchMs/1000f`——投射物与箭落地同拍弹、tick 与错峰节拍同拍、瞬发双 0=立即原口径。逻辑层不变：Host 仍伤害应用同趟立即回血（ApplyEffects 内联）。
+**How to apply**：①新增「由既有效应派生」的效果（吸血/未来反伤/受击触发类）时，**应用时刻必须从母效应继承**——投射物场景母效应只有 LaunchMs 不够用（客户端弹出时刻=自推导的落地时刻），需要 HitSeconds 通道；②两套时刻通道语义=Damage 命令带 LaunchMs（客户端自推导弹出时刻）、Heal/StatChange 命令带「应用时刻」launchMs（到点应用）——派生效应对齐的是**后者**；③tick 类错峰用 LaunchMs 不用 HitSeconds 的存量约定保持——兜底分支已覆盖，勿改 IcicleBuff/SongOfLifeBuff 构造。
+
+**追记（同日实战复测报障「伤害数字 40 先出，+30 慢了一拍才出」——凯亚战技=霜袭是 LineBurst 整线迸发非投射物）**：HitSeconds 修复只覆盖**显式时刻**路径；launchMs=0 的直击（霜袭等 startTime=0 技能与无时轮兜底）按**命令 stagger 旧节拍**弹（每命令 +0.12s 槽）——治疗命令在发射序里晚于伤害 3~4 槽，+N 吃自己的槽=慢 ~0.4s；该时刻只存在于客户端、Host 无从随命令携带。修法=**客户端段内绑定**：`_segmentLastDirectDamageDelay`（actor→delay）段首清空，直击 launchMs=0 时记录本方弹出延迟；Heal 分支 launchMs=0 且 actor==target（吸血自疗签名）→ 绑定本方最后一击节拍**同帧弹**；多目标多伤绑最后一击（0.12s 槽内观感同步）。投射物自疗（hitT>0）仍走 Host 显式 launchMs 路径；零前摇+贴脸投射物 corner（hitT=0）走 stagger 兜底——当前角色池无此组合，撞上再议。**How to apply 补**：新增依赖「客户端 stagger 槽时刻」的表现时，同段绑定表模式可复用（记录方+绑定方两处，段首清空铁律）；判别「该时刻 Host 能否表达」=问"它是 Host 计算的显式毫秒还是客户端命令序节拍"，后者才需要绑定。
