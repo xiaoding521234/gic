@@ -21,8 +21,9 @@ namespace GIC.Battle
         private readonly IBattleTransport _transport;
         private readonly TurnFlowController _flow;
 
-        /// <summary>ack 等待超时（秒，真实时间；超时快进）</summary>
-        private const float AckTimeoutSeconds = 15f;
+        /// <summary>ack 等待超时（秒，真实时间；超时快进）——阈值真源=BattleMetrics.SegmentAckTimeoutSeconds
+        /// （2026-10-02 复审收口：协议常量入 Metrics，与其它战斗阈值同址）</summary>
+        private const float AckTimeoutSeconds = BattleMetrics.SegmentAckTimeoutSeconds;
 
         public TurnResolver(BattleSimState sim, IBattleTransport transport, TurnFlowController flow)
         {
@@ -420,6 +421,15 @@ namespace GIC.Battle
 
         // ==================== 段命令发射（三段唯一出口，2026-09-23 审查 Y1 收口） ====================
 
+        /// <summary>效应命中时刻→命令应用时刻注入（WYSIWYP 时间通道单源，2026-10-02 复审收口）：
+        /// HitSeconds>0 才覆写 launchMs（0=立即=构造默认）；Reaction/Energy/MoraPlunder/Heal 各发射
+        /// 分支统一走此口，勿散抄公式（新增带时刻效应同样走此口）</summary>
+        private static void ApplyHitMs(BattleCommand command, float hitSeconds)
+        {
+            if (hitSeconds > 0f)
+                command.launchMs = Mathf.RoundToInt(hitSeconds * 1000f);
+        }
+
         /// <summary>
         /// 段命令统一发射：片/即时段/回合结束段三处原为复制粘贴（曾致 turnEnd 段 Damage 漏带命中点/
         /// 反应标记的漂移）——收口后新效应→命令映射只加一处，BattleEffectCommandAudit 对账随发射统一覆盖三段。
@@ -487,8 +497,7 @@ namespace GIC.Battle
                 var reactionCommand = BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.ReactionType, effect.Level);
                 // 命中时刻（决策二十五）：客户端到点清附着图标（反应 1:1 双方全消耗、等层零残留）
-                if (effect.HitSeconds > 0f)
-                    reactionCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                ApplyHitMs(reactionCommand, effect.HitSeconds);
                 segment.commands.Add(reactionCommand);
             }
             foreach (var effect in MergeEnergyEffects(effects))
@@ -497,8 +506,7 @@ namespace GIC.Battle
                     BattleCommand.StatKindEnergy, effect.Delta);
                 // 命中时刻（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒，客户端到点跳元能；
                 // launchMs 字段复用为"应用时刻"（union 载荷；0=立即——移动获能/协奏/消耗/回合发放无命中时刻）
-                if (effect.HitSeconds > 0f)
-                    energyCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                ApplyHitMs(energyCommand, effect.HitSeconds);
                 segment.commands.Add(energyCommand);
             }
             // 理智恢复（2026-10-01 拍板②改逐层）：每层各一枚 SanityEffect（+1×层数），命令按目标
@@ -533,12 +541,9 @@ namespace GIC.Battle
                     BattleCommand.StatKindMora, -effect.AppliedGain);
                 var giveCommand = BattleCommand.StatChange(effect.ToPlayerId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindMora, effect.AppliedGain);
-                if (effect.HitSeconds > 0f)
-                {
-                    int hitMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
-                    takeCommand.launchMs = hitMs;
-                    giveCommand.launchMs = hitMs;
-                }
+                // 命中时刻（同元能「命中时才给」）；霜袭瞬发段恒 0=立即
+                ApplyHitMs(takeCommand, effect.HitSeconds);
+                ApplyHitMs(giveCommand, effect.HitSeconds);
                 segment.commands.Add(takeCommand);
                 segment.commands.Add(giveCommand);
             }
@@ -573,8 +578,7 @@ namespace GIC.Battle
                     healCommand.metadata = BattleCommand.HealKindLifesteal;
                 // 命中时刻（同元能「命中时才给」）：OnHit 治疗（水之浅唱）随投射物落地弹 +N；
                 // 0=立即——OnCast 治疗（延奏/变奏）无飞行段
-                if (effect.HitSeconds > 0f)
-                    healCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                ApplyHitMs(healCommand, effect.HitSeconds);
                 segment.commands.Add(healCommand);
             }
             // 寒冰之棱碎裂（2026-10-01 复测拍板「元能>50% 立刻触发」）：碎裂治疗已随 HealEffect 在上方
@@ -879,13 +883,11 @@ namespace GIC.Battle
                 }
                 else if (effect is ApplyBuffEffect applyBuff)
                 {
-                    // 带参数通道的 Buff（B-S1b：AttackUp 等——value/stackLimit/turns 全由技能参数单源注入）
-                    BaseBuff buff = applyBuff.DurationTurns > 0
-                        ? BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
-                            _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue, applyBuff.StackLimit,
-                            applyBuff.DurationTurns)
-                        : BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
-                            _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue);
+                    // 带参数通道的 Buff（B-S1b：AttackUp 等——value/stackLimit/turns 全由技能参数单源注入；
+                    // 工厂 2026-10-02 收口单一 Create：参数型类型缺 turns=Warn+null 防御，恒等于原双分支）
+                    BaseBuff buff = BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
+                        _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue, applyBuff.StackLimit,
+                        applyBuff.DurationTurns);
                     if (buff == null) continue;
                     _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
 
@@ -936,7 +938,7 @@ namespace GIC.Battle
                     for (int layer = 0; layer < layers; layer++)
                         effects.Add(new HealEffect(sourceId, holderId, healPerShard)
                         {
-                            HitSeconds = layer * BattleMetrics.BuffLayerStaggerSeconds,
+                            HitSeconds = BattleMetrics.LayerBeatSeconds(layer), // 逐层错峰单源（LayerBeatSeconds）
                         });
                 }
                 shatters.Add((holderId, sourceId, buff));

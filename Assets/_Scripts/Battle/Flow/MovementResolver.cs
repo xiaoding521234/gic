@@ -145,7 +145,7 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 下一格进入判定（体积绝对层 → 阻挡规则层 → 地形层）
+        /// 下一格进入判定（地形层 → 体积绝对层 → 阻挡规则层；体积/阻挡两段走下方共享原语）
         /// </summary>
         private static bool CanEnter(BattleSimState sim, MoveActionState mover, BattleCell next, Dictionary<string, BattleCell> roundStart)
         {
@@ -166,11 +166,8 @@ namespace GIC.Battle
                     occupants.Add(unit);
             }
 
-            // 体积绝对层：格内现有体积 + 自身体积 ≤ 3（无视阻挡能力不可绕过）
-            int existingVolume = 0;
-            foreach (var occupant in occupants)
-                existingVolume += occupant.Volume;
-            if (existingVolume + mover.Unit.Volume > 3)
+            // 体积绝对层：格内现有体积 + 自身体积 ≤ 3（共享原语——与部署落点判定同源）
+            if (!PassesVolumeLimit(occupants, mover.Unit.Volume))
                 return false;
 
             // 阻挡规则层：牵引不检查阻挡规则（仍受体积/地形约束，docs/05 §5.3）
@@ -178,26 +175,55 @@ namespace GIC.Battle
                 return true;
 
             var selfIdentity = mover.Unit.GetUnitComponent<UnitIdentity>();
+            return PassesBlockingRules(occupants, selfIdentity?.Team,
+                moveable == null || moveable.与友方互不阻挡,
+                moveable != null && moveable.BlockedByEnemies);
+        }
+
+        // ==================== 碰撞判定共享原语（2026-10-02 执行阶段复审收口） ====================
+        // 原移动进入（CanEnter）与部署落点（DeployUnitExecutor.IsDeployCellValid）两处平行手写的
+        // 同构链收单源——碰撞口径改动（体积规则/互不阻挡语义等）只改这里，两侧自动同响应；
+        // 地形层与占据收集保留在各调用方（移动=roundStart 工作位置收集、部署=GetUnitsAt 现位置）。
+
+        /// <summary>体积绝对层（最高级，无视阻挡配置不可绕过）：格内现有体积+自身体积 ≤
+        /// BattleMetrics.MaxTileVolume（docs/05 §5.3）。occupants=该格现有单位（含尸体——
+        /// 尸体保留碰撞/体积；调用方负责收集与排除自身）</summary>
+        public static bool PassesVolumeLimit(List<Unit> occupants, int selfVolume)
+        {
+            int existingVolume = 0;
+            foreach (var occupant in occupants)
+                existingVolume += occupant.Volume;
+            return existingVolume + selfVolume <= BattleMetrics.MaxTileVolume;
+        }
+
+        /// <summary>阻挡规则层（UnitMoveable 三配置+「与友方互不阻挡」双向豁免，2026-09-26 拍板
+        /// 「只要这个单位互不阻挡字段为 true，无论他穿其它友军还是友军穿他，都不阻挡」——
+        /// 配置驱动：改 UnitConfig 即四处全响应）：友方=占据者 BlockAllies 且双方均未开豁免；
+        /// 敌方=占据者 BlockEnemies 且自身 BlockedByEnemies。selfTeam=null=自身身份缺失恒按异队
+        /// （防御口径——注册单位必有 identity）；无 identity 的占据者同按异队（原移动侧口径；
+        /// 原部署侧对无 identity 占据者是跳过，该场景注册单位必带 identity 不可达）。
+        /// 自身规格参数：移动侧从 UnitMoveable 组件取、部署侧从 UnitConfig.UnitData 取
+        /// （部署单位尚未生成）——原语只认参数，两侧判定恒同口径</summary>
+        public static bool PassesBlockingRules(List<Unit> occupants, TeamType? selfTeam,
+            bool selfNoBlockAllies, bool selfBlockedByEnemies)
+        {
             foreach (var occupant in occupants)
             {
                 var occupantMoveable = occupant.GetUnitComponent<UnitMoveable>();
                 if (occupantMoveable == null) continue;
 
                 var occupantIdentity = occupant.GetUnitComponent<UnitIdentity>();
-                bool sameTeam = selfIdentity != null && occupantIdentity != null && selfIdentity.IsSameTeam(occupantIdentity);
+                bool sameTeam = selfTeam.HasValue && occupantIdentity != null
+                    && occupantIdentity.Team == selfTeam.Value;
 
-                // 与友方互不阻挡（UnitConfig.与友方互不阻挡 单字段双向，2026-09-26 拍板「只要这个
-                // 单位 互不阻挡 字段为 true，无论是他穿其它友军，还是友军穿他，都不阻挡」——
-                // 配置驱动：改 UnitConfig 即四处全响应，勿写死类型/拆字段）。
                 if (sameTeam && occupantMoveable.BlockAllies
                     && !occupantMoveable.与友方互不阻挡
-                    && (moveable == null || !moveable.与友方互不阻挡))
+                    && !selfNoBlockAllies)
                     return false;
 
-                if (!sameTeam && occupantMoveable.BlockEnemies && moveable != null && moveable.BlockedByEnemies)
+                if (!sameTeam && occupantMoveable.BlockEnemies && selfBlockedByEnemies)
                     return false;
             }
-
             return true;
         }
     }

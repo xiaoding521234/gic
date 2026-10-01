@@ -33,9 +33,9 @@ namespace GIC.Battle
             string ownerId = owner.GetUnitComponent<UnitIdentity>()?.UnitID;
             if (ownerId == null) return effects;
 
-            // 伤害归属=施加者（快照/命令流的 attacker），无施加者信息时归目标自身
-            var attacker = source != null ? source : owner;
-            string sourceId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
+            // 伤害归属=施加者（快照/命令流的 attacker），无施加者信息时归目标自身——AttackerOf 单源
+            var attacker = AttackerOf();
+            string sourceId = AttackerIdOf(ownerId);
             // 只声明命中（PendingAuraHit，拍 0）：回合末交错管道统一结算——10 火伤平直值走
             // DamagePipeline（吃目标防御/易伤）+反应预判+附着火（docs/06 §6.6「0层终点」废除）
             effects.Add(new PendingAuraHit(sourceId, ownerId, attacker, owner, ElementType.Pyro,
@@ -51,13 +51,17 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// Buff 工厂（B2 最小：switch 分发；B4 反应批次扩为注册表）
-    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（如 AttackUp 的每层 ATKBonus），
-    /// 与技能参数表同源、勿在各 Buff 内硬编码默认值以外的取值来源。
+    /// Buff 工厂（单一 switch 分发，2026-10-02 执行阶段复审收口：原双 Create 重载合一——
+    /// 封闭枚举 switch 即定式，不再挂「扩为注册表」的旧承诺）。
+    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（如 AttackUp 的每层
+    /// ATKBonus、寒冰之棱的初始层数），与技能参数表同源、勿在各 Buff 内硬编码默认值以外的取值来源。
+    /// 参数型 Buff（AttackUp 族三件套）必须配齐 turns——缺持续回合=Warn+null 防御（与原三参重载
+    /// 对参数型类型的 default 分支同语义；正常配置必带 Duration 参数）。
     /// </summary>
     public static class BuffFactory
     {
-        public static BaseBuff Create(BuffType type, int level, Unit source = null, int value = 0)
+        public static BaseBuff Create(BuffType type, int level, Unit source, int value = 0,
+            int stackLimit = 0, int turns = 0)
         {
             switch (type)
             {
@@ -72,22 +76,24 @@ namespace GIC.Battle
                     // 寒冰之棱（凛冽轮舞批）：value 通道=初始层数（ShardCount 经 paramKey 注入——
                     // 工厂按 Buff 类型解释 value 的既有先例同款，AttackUp=每层加成/寒冰之棱=初始层数）
                     return new IcicleBuff(Mathf.Max(1, value)) { source = source };
+                case BuffType.AttackUp:
+                case BuffType.MoveSpeedUp:
+                case BuffType.DefenseDown:
+                    if (turns <= 0)
+                    {
+                        GICLog.Warn($"[BuffFactory] 参数型 Buff {type} 缺持续回合（turns={turns}）——" +
+                                    "检查 ApplyBuffEffect 是否配齐 Duration 参数（paramKey3）");
+                        return null;
+                    }
+                    if (type == BuffType.AttackUp)
+                        return new AttackUpBuff(level, value, stackLimit, turns) { source = source };
+                    if (type == BuffType.MoveSpeedUp)
+                        return new MoveSpeedBuff(level, value, stackLimit, turns) { source = source };
+                    return new DefenseDownBuff(level, value, stackLimit, turns) { source = source };
                 default:
                     GICLog.Warn($"[BuffFactory] 未实现的 Buff 类型 {type}");
                     return null;
             }
-        }
-
-        /// <summary>带参构造（延奏等技能参数驱动 Buff：value=每层加成、stackLimit=叠层上限、turns=持续回合）</summary>
-        public static BaseBuff Create(BuffType type, int level, Unit source, int value, int stackLimit, int turns)
-        {
-            if (type == BuffType.AttackUp)
-                return new AttackUpBuff(level, value, stackLimit, turns) { source = source };
-            if (type == BuffType.MoveSpeedUp)
-                return new MoveSpeedBuff(level, value, stackLimit, turns) { source = source };
-            if (type == BuffType.DefenseDown)
-                return new DefenseDownBuff(level, value, stackLimit, turns) { source = source };
-            return Create(type, level, source, value);
         }
     }
 }

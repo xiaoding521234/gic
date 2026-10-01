@@ -77,9 +77,9 @@ namespace GIC.Battle
             var holderTeam = holderIdentity.Team;
             var ownerId = holderIdentity.UnitID;
 
-            // 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者——BurnBuff 伤害归属同款兜底）
-            var attacker = source != null ? source : owner;
-            string attackerId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
+            // 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者）——AttackerOf/AttackerIdOf 单源
+            var attacker = AttackerOf();
+            string attackerId = AttackerIdOf(ownerId);
 
             // tick：**逐层各弹一次**（2026-10-01 拍板「2层相当于有两个此buff，应当各弹一次」——每层=
             // 独立 buff 实例；第 i 层时刻=i×BuffLayerStaggerSeconds 错峰避免同拍弹出，Host 状态恒即时
@@ -96,9 +96,8 @@ namespace GIC.Battle
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team == holderTeam) continue; // 只作用敌方
-                var pos = Sim.GetPosition(unit);
-                if (Math.Max(Math.Abs(pos.x - holderPos.x), Math.Abs(pos.y - holderPos.y)) > radius)
-                    continue; // 出半径
+                if (Sim.GetPosition(unit).ChebyshevTo(holderPos) > radius)
+                    continue; // 出半径（ChebyshevTo 单源）
 
                 // 每层伤害=20% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：回合末
                 // 交错管道统一结算（反应预判+消耗+每层附着=决策二十四终版；伤害走 DamagePipeline 全
@@ -106,7 +105,6 @@ namespace GIC.Battle
                 // 统一结算（ApplyEffects）——tick 命中也吸血=预期
                 for (int layer = 0; layer < layers; layer++)
                 {
-                    float beat = layer * BattleMetrics.BuffLayerStaggerSeconds;
                     effects.Add(new PendingAuraHit(attackerId, kv.Key, attacker, unit, ElementType.Cryo,
                         new DamageRequest
                         {
@@ -114,7 +112,7 @@ namespace GIC.Battle
                             Target = unit,
                             Element = (int)ElementType.Cryo,
                             AttackPercent = DamagePercentPerTurn,
-                        }, beat));
+                        }, BattleMetrics.LayerBeatSeconds(layer)));
                     if (defReduce > 0)
                         effects.Add(new ApplyBuffEffect(attackerId, kv.Key, (int)BuffType.DefenseDown, 1,
                             defReduce, DefDownStackLimit, DefDownDurationTurns)); // 2命：防御减少——10 层 12 回合叠时长（逐层各施加）
@@ -160,7 +158,7 @@ namespace GIC.Battle
             if (energy.Max <= 0 || energy.Value <= energy.Max * ShatterEnergyThresholdPercent / 100f)
                 return false; // 未过阈值（「超过50%」=严格大于）
 
-            sourceUnit = buff.source != null ? buff.source : holder;
+            sourceUnit = buff.AttackerOf(); // 施加者优先、亡佚回落持有者（BaseBuff 单源）
             var attackerStats = sourceUnit.GetUnitComponent<UnitStats>();
             int attack = attackerStats?.Attack ?? 0;
             int layers = Mathf.Max(1, buff.Level);

@@ -87,6 +87,21 @@ namespace GIC.Battle
 
         /// <summary>伤害数字 Overlay 画布（HUD 40 之下——数字是战场反馈非面板，面板应盖过它）</summary>
         public const int DamageNumbersCanvasOrder = 39;
+
+        // ==================== 演算/碰撞规则常量（2026-10-02 执行阶段复审收口批次） ====================
+
+        /// <summary>Host 片 ack 等待超时（秒，真实时间；超时快进——客户端卡死不冻结演算；
+        /// B7 LAN 前按网络余量另议）</summary>
+        public const float SegmentAckTimeoutSeconds = 15f;
+
+        /// <summary>单格体积绝对层上限（docs/05 §5.3：格内现有体积+自身体积 ≤ 3——无视阻挡配置
+        /// 不可绕过的最高级；移动进入/部署落点共享原语 MovementResolver.PassesVolumeLimit 同读）</summary>
+        public const int MaxTileVolume = 3;
+
+        /// <summary>多层 Buff 第 i 层拍时刻（秒，相对段播放起点）——逐层错峰单源
+        /// （第 i 层=i×BuffLayerStaggerSeconds；消费方=光环 Buff OnTurnEnd 声明 PendingAuraHit/Heal/
+        /// Energy 的 HitSeconds 与 TurnResolver 碎裂回血错峰，勿再散抄公式）</summary>
+        public static float LayerBeatSeconds(int layer) => layer * BuffLayerStaggerSeconds;
     }
 
     /// <summary>

@@ -122,17 +122,31 @@ namespace GIC.Battle
         private const float BlockedBumpOutSecondsFactor = 0.75f;  // 撞墙探出时长 = 步进节奏 × 0.75（缓出）
         private const float BlockedBumpBackSecondsFactor = 0.55f; // 撞墙弹回时长 = 步进节奏 × 0.55（快出缓停）
 
-        /// <summary>同段「攻击者最后一次 launchMs=0 直击的弹出延迟」（actor → delay）。吸血自疗 +N
-        /// 须与伤害数字**同拍**弹（MOBA 式，2026-10-01 实战报障）：launchMs=0 的直击按命令 stagger
-        /// 旧节拍弹、该时刻客户端侧才存在——Host 无从随命令携带，故段内就近绑定（自疗 source==target
-        /// 取本方最后一击节拍）；段首清空防跨段污染。多目标同拍多伤时绑最后一击（0.12s 槽内，观感同步）</summary>
-        private readonly Dictionary<string, float> _segmentLastDirectDamageDelay = new Dictionary<string, float>();
+        /// <summary>同段直击节拍配对状态（§107 追记，2026-10-02 单表化收口：原双表中
+        /// _segmentLastDirectDamageDelay 恒为 beats 末项的镜像冗余，合一）。beats=该攻击者本段
+        /// 各次 launchMs=0 直击的弹出延迟；consumed=吸血配对游标——**立即响应配对**（2026-10-01
+        /// 拍板 B 勘正「不要错峰」）：第 n 笔自疗随第 n 次直击同帧弹（MOBA 式——launchMs=0 的直击
+        /// 按命令 stagger 旧节拍弹、Host 无从随命令携带，段内就近绑定；自疗 source==target 消费
+        /// 本方直击拍）；游标耗尽回落末次节拍=同帧各弹（多笔伤害并成一条命令等场景）；
+        /// 段首由 PlaySegmentCoroutine 清空防跨段污染；多目标同拍多伤时观感同步（0.12s 槽内）</summary>
+        private sealed class DirectDamageBeats
+        {
+            public readonly List<float> beats = new List<float>();
+            public int consumed;
 
-        /// <summary>同段「launchMs=0 直击节拍队列」（actor → 该攻击者本段各次直击的弹出延迟）。
-        /// 吸血立即响应配对（2026-10-01 拍板 B 勘正「不要错峰」）：第 n 笔绑定自疗随**第 n 次直击**
-        /// 节拍同帧弹——严格对应「造成1次伤害就立刻弹1次吸血」；队列耗尽（多笔伤害并成一条命令等）
-        /// 回落 _segmentLastDirectDamageDelay=同帧各弹；两表同段首清空</summary>
-        private readonly Dictionary<string, List<float>> _segmentDirectDamageBeats = new Dictionary<string, List<float>>();
+            /// <summary>取下一拍：游标未尽=依次配对；耗尽=末次节拍（beats 空=fallback 调用方节拍）</summary>
+            public float NextOrLast(float fallback)
+                => consumed < beats.Count ? beats[consumed++]
+                : (beats.Count > 0 ? beats[beats.Count - 1] : fallback);
+        }
+
+        /// <summary>段内吸血节拍配对表（actor → 直击节拍状态）</summary>
+        private readonly Dictionary<string, DirectDamageBeats> _segmentDirectDamage = new Dictionary<string, DirectDamageBeats>();
+
+        /// <summary>命令应用时刻（秒，含播放速率换算）——WYSIWYP 时间通道客户端单源
+        /// （2026-10-02 复审收口）：launchMs=0 返回 0=立即；Damage/Heal/Reaction/Energy/Mora/
+        /// 投射物起飞各到点消费分支统一走此口，勿散抄公式（新增带时刻命令同走此口）</summary>
+        private float LaunchDelayOf(BattleCommand command) => command.launchMs / 1000f / _playbackSpeed;
 
         public void Bind(IBattleTransport transport, BattleMapData map)
         {
@@ -286,7 +300,7 @@ namespace GIC.Battle
 
                 // 时轮（B-S1）：发射时刻延迟（Host 时轮资产下发，勿推算——前摇=箭矢延迟起飞）
                 if (command.launchMs > 0)
-                    yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+                    yield return new WaitForSeconds(LaunchDelayOf(command));
 
                 Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
                 Vector3 to = command.hitX != 0 || command.hitY != 0
@@ -325,7 +339,7 @@ namespace GIC.Battle
 
                 // 时轮（B-S1）：发射时刻延迟（与命中侧投射物同源对齐）
                 if (command.launchMs > 0)
-                    yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+                    yield return new WaitForSeconds(LaunchDelayOf(command));
 
                 Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
                 Vector3 to;
@@ -613,8 +627,7 @@ namespace GIC.Battle
 
             var playbacks = new List<Coroutine>();
             float stagger = 0f;
-            _segmentLastDirectDamageDelay.Clear(); // 段首清空（防跨段污染——吸血自疗只绑本段节拍）
-            _segmentDirectDamageBeats.Clear();
+            _segmentDirectDamage.Clear(); // 段首清空（防跨段污染——吸血自疗只绑本段节拍）
             foreach (var command in segment.commands)
             {
                 switch (command.type)
@@ -639,20 +652,17 @@ namespace GIC.Battle
                                 // 直击数字节拍（2026-09-28 对齐 Heal 分支口径）：launchMs>0=时轮段时刻到点再弹
                                 //（箭雨 4 段 0.15s 间隔与落箭同拍连续弹）；0=立即维持命令 stagger 旧节拍
                                 //（霜袭等 startTime=0 技能与无时轮兜底路径不变）
-                                float dmgDelay = command.launchMs > 0
-                                    ? command.launchMs / 1000f / _playbackSpeed
-                                    : stagger;
+                                float dmgDelay = command.launchMs > 0 ? LaunchDelayOf(command) : stagger;
                                 if (command.launchMs == 0)
                                 {
                                     // 吸血自疗同拍绑定源（§107 追记）+ 立即响应配对队列（拍板 B 勘正）：
                                     // 逐次记录本方各次直击节拍，第 n 笔自疗随第 n 次直击同帧弹
-                                    _segmentLastDirectDamageDelay[command.actorUnitId] = dmgDelay;
-                                    if (!_segmentDirectDamageBeats.TryGetValue(command.actorUnitId, out var beats))
+                                    if (!_segmentDirectDamage.TryGetValue(command.actorUnitId, out var beats))
                                     {
-                                        beats = new List<float>();
-                                        _segmentDirectDamageBeats[command.actorUnitId] = beats;
+                                        beats = new DirectDamageBeats();
+                                        _segmentDirectDamage[command.actorUnitId] = beats;
                                     }
-                                    beats.Add(dmgDelay);
+                                    beats.beats.Add(dmgDelay);
                                 }
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
                                     command.reactionKind, command.metadata)));
@@ -669,21 +679,13 @@ namespace GIC.Battle
                             // source==target 且本段该攻击者有 launchMs=0 直击（stagger 旧节拍、Host 无从
                             // 携带该时刻）——绑定其直击节拍同帧弹，勿再吃治疗命令自己的 stagger 槽。
                             // 立即响应配对（拍板 B 勘正「不要错峰」）：第 n 笔自疗随第 n 次直击节拍；
-                            // 队列耗尽回落最后一击节拍=同帧各弹（不造视觉时差）
+                            // 游标耗尽回落末次节拍=同帧各弹（不造视觉时差）
                             float healDelay;
                             if (command.launchMs > 0)
-                                healDelay = command.launchMs / 1000f / _playbackSpeed;
+                                healDelay = LaunchDelayOf(command);
                             else if (command.actorUnitId == command.targetUnitId
-                                     && _segmentLastDirectDamageDelay.TryGetValue(command.actorUnitId, out var boundDelay))
-                            {
-                                if (_segmentDirectDamageBeats.TryGetValue(command.actorUnitId, out var beats) && beats.Count > 0)
-                                {
-                                    healDelay = beats[0];
-                                    beats.RemoveAt(0);
-                                }
-                                else
-                                    healDelay = boundDelay;
-                            }
+                                     && _segmentDirectDamage.TryGetValue(command.actorUnitId, out var beats))
+                                healDelay = beats.NextOrLast(stagger);
                             else
                                 healDelay = stagger;
                             playbacks.Add(StartCoroutine(PlayDamageCoroutine(healed, command.value, healDelay, true,
@@ -746,9 +748,7 @@ namespace GIC.Battle
                         {
                             if (command.metadata == BattleCommand.ReactionKindFreeze)
                                 reacted.SetFrozenVisual(true);
-                            float consumeDelay = command.launchMs > 0
-                                ? command.launchMs / 1000f / _playbackSpeed
-                                : 0f;
+                            float consumeDelay = command.launchMs > 0 ? LaunchDelayOf(command) : 0f;
                             playbacks.Add(StartCoroutine(PlayAttachConsumeCoroutine(reacted, consumeDelay)));
                         }
                         break;
@@ -953,7 +953,6 @@ namespace GIC.Battle
                 view.SetAttachedElement(ElementType.Physical);
         }
 
-        /// <summary>伤害数字配色（2026-10-01 拍板+同日网检勘正「与原神一致」）：
         /// <summary>伤害数字配色（2026-10-01 拍板+二次拍板「原神里反应都有自己的颜色」）：
         /// 普通伤害数字=BattlePalette 伤害数字元素色（原神数字=亮彩霓虹风，显著亮于元素主题色——
         /// 图标/箭矢仍用 ElementFactionConfig 主题色，两套语义勿混）；三反应各独立色
@@ -1038,7 +1037,7 @@ namespace GIC.Battle
         /// 恢复=Inspector 勾「元能获取弹数字」）</summary>
         private IEnumerator PlayEnergyDeltaCoroutine(UnitView view, BattleCommand command)
         {
-            yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+            yield return new WaitForSeconds(LaunchDelayOf(command));
             view.ApplyEnergyDelta(command.value);
             SpawnEnergyNumber(view, command.value);
         }
@@ -1066,7 +1065,7 @@ namespace GIC.Battle
         /// 0=立即不走本协程（部署扣费/回合发放/体力恒立即）</summary>
         private IEnumerator PlayResourceDeltaCoroutine(BattleCommand command)
         {
-            yield return new WaitForSeconds(command.launchMs / 1000f / _playbackSpeed);
+            yield return new WaitForSeconds(LaunchDelayOf(command));
             OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);
         }
 

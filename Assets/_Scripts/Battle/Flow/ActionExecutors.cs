@@ -173,10 +173,10 @@ namespace GIC.Battle
         public const int DeployRadiusFromCore = 2;
 
         /// <summary>部署落点合法（角色）：协议核心半径 2 内（切比雪夫；核心位置代理=出生区中心，B8 换真核心）
-        /// + 碰撞判定链（2026-09-25 拍板「根据碰撞决定」——与移动进入判定同构，docs/05 §5.3）：
-        /// ① 体积绝对层（最高级，无视阻挡配置不可绕过）：格内现有体积+部署单位体积 ≤ 3；
-        /// ② 阻挡规则层：与格内任一单位互相阻挡即不可部署（互不阻挡时格内有我方单位也可部署）；
-        /// ③ 地形层：按部署单位常态移动类型通行（步行不可入水）。含尸体——尸体保留碰撞/体积。
+        /// + 地形层（按部署单位常态移动类型）+ 碰撞共享原语（体积绝对层+阻挡规则层=
+        /// MovementResolver.PassesVolumeLimit/PassesBlockingRules——与移动进入判定**同源**，
+        /// 2026-10-02 复审收口，碰撞口径改动只改原语处）：① 体积绝对层（无视阻挡配置不可绕过）；
+        /// ② 阻挡规则层（与格内任一单位互相阻挡即不可部署）。含尸体——尸体保留碰撞/体积。
         /// 客户端镜像预判=BattleHud.CanDeployEnterPreview（快照静态口径，Host 结算兜底）</summary>
         public static bool IsDeployCellValid(BattleSimState sim, string playerId, BattleCell cell,
             UnitConfig.UnitData deployData)
@@ -190,35 +190,16 @@ namespace GIC.Battle
             var forceType = deployData?.normalMoveType ?? ForceType.Walk;
             if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) return false;
 
-            // 体积绝对层（最高级）：格内现有体积+自身体积 ≤ 3（真源=UnitData.GetVolume() 单出口，
-            // 与 Unit.Volume 同读——2026-09-27 复审收口双源）
-            int selfVolume = deployData != null ? deployData.GetVolume() : 1;
+            // 体积绝对层+阻挡规则层（共享原语，2026-10-02 复审收口——与移动进入判定同源：原两处
+            // 平行手写的同构链收单源，碰撞口径改动只改原语处）：自身规格从 UnitData 取（部署单位
+            // 尚未生成）——体积真源=UnitData.GetVolume() 单出口（与 Unit.Volume 同读，2026-09-27
+            // 复审收口双源）、豁免/被挡=碰撞配置字段（与移动侧 UnitMoveable 组件同源字段）
             var occupants = sim.GetUnitsAt(cell); // 含尸体——尸体保留碰撞/体积
-            int existingVolume = 0;
-            foreach (var occupant in occupants)
-                existingVolume += occupant.Volume;
-            if (existingVolume + selfVolume > 3) return false;
-
-            // 阻挡规则层：与格内任一单位互相阻挡即不可部署（碰撞配置读运行时组件，与移动判定同源）
-            var selfTeam = sim.GetTeamOf(playerId);
-            // 与友方互不阻挡（UnitConfig.与友方互不阻挡 单字段双向，2026-09-26 拍板「只要这个单位
-            // 互不阻挡 字段为 true，无论是他穿其它友军，还是友军穿他，都不阻挡」——部署者与格内
-            // 占据者任一开豁免即互不阻挡；配置驱动：改 UnitConfig 即四处全响应）
-            bool deployNoBlock = deployData != null && deployData.与友方互不阻挡;
-            foreach (var occupant in occupants)
-            {
-                var occupantMoveable = occupant.GetUnitComponent<UnitMoveable>();
-                var occupantIdentity = occupant.GetUnitComponent<UnitIdentity>();
-                if (occupantMoveable == null || occupantIdentity == null) continue;
-
-                bool sameTeam = occupantIdentity.Team == selfTeam;
-                if (sameTeam && occupantMoveable.BlockAllies
-                    && !occupantMoveable.与友方互不阻挡
-                    && !deployNoBlock) return false;
-                if (!sameTeam && occupantMoveable.BlockEnemies && deployData != null && deployData.blockedByEnemies)
-                    return false;
-            }
-            return true;
+            if (!MovementResolver.PassesVolumeLimit(occupants, deployData != null ? deployData.GetVolume() : 1))
+                return false;
+            return MovementResolver.PassesBlockingRules(occupants, sim.GetTeamOf(playerId),
+                deployData != null && deployData.与友方互不阻挡,
+                deployData != null && deployData.blockedByEnemies);
         }
 
         /// <summary>
