@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using GIC.Data;
 namespace GIC.Battle
 {
@@ -211,6 +212,19 @@ namespace GIC.Battle
             TargetUnitId = targetUnitId;
             Delta = delta;
             Category = category;
+        }
+
+        /// <summary>状态/命令合并键单源（ApplyEffects 与 MergeEnergyEffects 同口径恒等）：
+        /// (目标, 来源类别)；**Buff 回合末 tick 逐层例外（2026-10-01 拍板④「元能条也逐层各跳一次，
+        /// 每次+10」）**——BuffTickGain 类别并入层时刻（第 i 层 HitSeconds=i×BuffLayerStaggerSeconds：
+        /// 逐层条目键各异=各跳各弹；同刻同目标仍并=同层多来源合并不变）。其余类别维持纯 (目标,类别)
+        /// ——战技多命中「多次命中只获一次」B6a 去重口径不变（其 HitSeconds=真实命中时刻，并入键
+        /// 会让两发箭矢各自成键破坏去重，勿扩）。</summary>
+        public string MergeKey()
+        {
+            return Category == CategoryBuffTickGain
+                ? $"{TargetUnitId}:{Category}:{Mathf.RoundToInt(HitSeconds * 1000f)}"
+                : $"{TargetUnitId}:{Category}";
         }
     }
 

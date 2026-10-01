@@ -1664,3 +1664,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **症状**：write_file 直改 BattleMap_FirstMap.asset 字符行（修一行湖形错位）后，立即 exec_editor_script 加载资产跑逐格断言——仍报同样 4 格不对称，修法看似无效；rg 核对磁盘文件内容却已是修好的。隔一轮 unity_editor.refresh 后同脚本复跑，断言全绿。
 **根因**：AssetDatabase 不感知外部工具对磁盘文件的改写——已加载进内存的资产实例保持旧值；未经 refresh/导入就直接 `AssetDatabase.LoadAssetAtPath` 拿到的是**陈旧实例**（首次写入后有 refresh、二修没有，恰好首断言读旧值暴露）。
 **How to apply**：①磁盘直改 .asset/.prefab/.unity 后，回读断言前必先 unity_editor.refresh（或桥脚本内先 `AssetDatabase.ImportAsset(path)` 再 Load）；②「改了没生效」类回读异常，先核改后是否 refresh 过，再怀疑修法本身；③断言输出与磁盘文本（rg/Get-Content）不符=陈旧实例指纹，直接定位本坑。
+
+## 105. Percent 基准对 0 基值属性恒 0：「提升 X」语义歧义——**已按属性族统一 Percent 双语义**（百分比面板属性=+X 个百分点/点数属性=相对提升；2026-10-01 凯亚 1命吸血报障实证+同日拍板「应当全部统一」）
+
+**症状**：1命凯亚攻击敌人后无吸血回血（用户暂停态现场取证授权）。取证实锤：命座修改器表两条全挂上（`LifeSteal type=BasePercent value=50`），但终值 `LifeSteal=0`、`HealEfficiency=150`——同配置一生效一无效。
+**根因**：**Percent 基准=BasePercent 修改器（基值×(1+value/100)），对基值 0 的属性数学上恒 0**（0×1.5=0）。「吸血提升50」的本意是 0→50 个百分点（绝对加值），配 Percent 相对提升后无效；治疗效率基值 100 所以 100→150 侥幸生效。本质=「提升X%」在百分比数值属性上天然双解（+X 百分点 vs ×(1+X%)），非代码 bug。
+**终版修法（2026-10-01 同日用户拍板「为什么不用 Percent？应当全部统一」——推翻首版「0 基值配 Fixed」局部方案）**：**Percent 双语义按属性族统一分流**（ConstellationApplier.PercentPanelStats 收口）——百分比面板属性（治疗效率/吸血等基值 0~100 效率刻度）的 Percent=**+X 个百分点**（BaseFlat，GI 命座口径：治疗加成/吸血「提升X%」=绝对百分点加值）；点数属性（移速/攻速）的 Percent=相对提升（BasePercent ×(1+X%)）。资产 C1LifeSteal 配 Percent 与 C1HealEfficiency 口径统一；未来暴击/暴伤/充能效率类百分比面板属性落地时入 PercentPanelStats 表。
+**How to apply**：①命座 StatBoost 配参数：一切「提升」类一律配 Percent（统一口径），属性族分流由 ConstellationApplier 自动裁决；②新增百分比面板属性（0~100 效率刻度类）→ 加进 PercentPanelStats，否则 0 基值踩恒 0；③「修改器已挂但终值不变」的取证指纹=先查 0 基值×PercentPanelStats 表；④旧结论「0 基值属性禁配 Percent」作废——统一后 Percent 全场景可配。

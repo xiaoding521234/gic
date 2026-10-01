@@ -21,6 +21,16 @@ namespace GIC.Battle
         /// <summary>命座上限（docs/09：共可提升 3 次）</summary>
         public const int MaxConstellation = 3;
 
+        /// <summary>百分比面板属性集（Percent 基准=**+X 个百分点**〔BaseFlat〕——GI 命座口径：
+        /// 「治疗加成/吸血提升X%」=绝对百分点加值，0 基值×相对提升恒 0 的坑见 docs/14 §105；
+        /// 表外点数属性〔移速/攻速〕的 Percent=相对提升 ×(1+X%)。未来暴击/暴击伤害/充能效率类
+        /// 百分比面板属性落地时入表，2026-10-01 拍板「应当全部统一」）</summary>
+        private static readonly HashSet<StatType> PercentPanelStats = new()
+        {
+            StatType.HealEfficiency,
+            StatType.LifeSteal,
+        };
+
         /// <summary>
         /// 按当前命座层重算全部 OnDeploy 被动（幂等：全撤→重挂）。调用触点=单位创建尾（UnitFactory）
         /// 与升命后（DeployUnitExecutor）。**只处理属性/旗标段**（StatBoost/OverflowTransfer）；
@@ -115,9 +125,15 @@ namespace GIC.Battle
                     }
                     else
                     {
-                        // 标量属性：BaseFlat/Percent 修改器（docs/20 §5.1 基准纪律——baseType 二元组生效）
+                        // 标量属性：BaseFlat/Percent 修改器（docs/20 §5.1 基准纪律——baseType 二元组生效）。
+                        // **Percent 双语义统一（2026-10-01 用户拍板「为什么不用 Percent？应当全部统一」——
+                        // 对齐 GI 命座口径）**：百分比面板属性（治疗效率/吸血等基值 0~100 效率刻度）的
+                        // 「提升X%」=**+X 个百分点**（BaseFlat——0 基值×相对提升恒 0=旧版吸血失效根因
+                        // docs/14 §105）；点数属性（移速/攻速等）的「提升X%」=相对提升（BasePercent
+                        // ×(1+X%)）。属性族清单收口 PercentPanelStats——未来暴击/暴伤/充能类入表
                         var param = FindParam(data, atom.paramKey);
-                        var type = param != null && param.baseType == SkillBaseType.Percent
+                        bool percent = param != null && param.baseType == SkillBaseType.Percent;
+                        var type = percent && !PercentPanelStats.Contains(atom.statType)
                             ? StatModifierType.BasePercent
                             : StatModifierType.BaseFlat;
                         var mod = new StatModifier(atom.statType, value, type);

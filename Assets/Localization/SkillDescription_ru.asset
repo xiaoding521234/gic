@@ -110,7 +110,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002002
-    m_Localized: "\xB7\u041F\u0440\u0438\u0437\u0432\u0430\u0442\u044C {ShardCount}
+    m_Localized: "\xB7\u041F\u043E\u043B\u0443\u0447\u0438\u0442\u044C {ShardCount}
       <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u041B\u0435\u0434\u044F\u043D\u044B\u0445
       \u043E\u0441\u043A\u043E\u043B\u043A\u0430</link></u></color>, \u0432\u0440\u0430\u0449\u0430\u044E\u0449\u0438\u0445\u0441\u044F
       \u0432\u043E\u043A\u0440\u0443\u0433 \u0441\u0435\u0431\u044F"

@@ -32,7 +32,7 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 9b61278d775731e4dae2152d5ed67a3d, type: 2}
   - {fileID: 2100000, guid: de3cea0386607b64697c1ade398f6ce1, type: 2}
   - {fileID: 2100000, guid: bfb0719b756946e418a6940e09b56ea5, type: 2}
-  "\u6BCF\u683C\u8349\u7C07\u6570": {x: 3, y: 5}
+  "\u6BCF\u683C\u8349\u7C07\u6570": {x: 15, y: 20}
   "\u8349\u7C07\u9AD8\u5EA6\u8303\u56F4": {x: 0.18, y: 0.3}
   "\u8349\u7C07\u540E\u503E\u89D2": 55
   "\u8349\u7C07\u671D\u5411\u6296\u52A8": 12

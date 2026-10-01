@@ -73,7 +73,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002002
-    m_Localized: "\xB7Summon {ShardCount} <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
+    m_Localized: "\xB7Gain {ShardCount} <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
       Shards</link></u></color> orbiting self"
     m_Metadata:
       m_Items: []

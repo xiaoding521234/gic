@@ -59,6 +59,11 @@ namespace GIC.Battle
         /// 高于常规攻击均值，攒满即放勿囤积；调手感改此常量）</summary>
         public const int UnitTargetBurstBuffScore = 45;
 
+        /// <summary>无目标自施放爆发：自身增益候选评分（aimMode=None——首个=凯亚凛冽轮舞寒冰之棱：
+        /// 持续冰伤+碎裂回血复合价值，对齐单位指向增益档；攒满即放勿囤积——能量满后继续获取即浪费；
+        /// 调手感改此常量）</summary>
+        public const int SelfCastBurstBuffScore = 45;
+
         /// <summary>中性档案（无配置/魔神档兜底：全 1 权重=评分制 v2 原口径）</summary>
         private static readonly UnitConfig.CompanionProfile NeutralProfile = new UnitConfig.CompanionProfile();
 
@@ -178,6 +183,13 @@ namespace GIC.Battle
                     continue;
                 }
 
+                // 无目标自施放爆发（aimMode=None——凛冽轮舞）：无方向域/无目标域——自身增益估值档
+                if (data.IsSelfCast())
+                {
+                    ScoreSelfCastBurst(unit, playerId, turn, i, data, tracker, profile);
+                    continue;
+                }
+
                 int perTarget = BattleHeuristics.EstimatePerTargetDamage(unit, data);
                 int healValue = profile.候选类别 == UnitConfig.CompanionRole.Support
                     ? EstimateSkillHealValue(sim, unit, team, data)
@@ -275,6 +287,25 @@ namespace GIC.Battle
             foreach (var b in buffs)
                 if (b.type == type) return true;
             return false;
+        }
+
+        /// <summary>②c 无目标自施放爆发候选（aimMode=None——首个=凯亚凛冽轮舞，无方向域无目标域）：
+        /// OnCast ApplyBuff(Caster) 自身增益（寒冰之棱）；已达叠层上限（IsAtStackCap——重施加 Merge
+        /// 无增益）不占行动；评分=增益常量乘爆发优先权重（伙伴脑/配额脑操魔神档共享骨架同分支）</summary>
+        private static void ScoreSelfCastBurst(Unit unit, string playerId, int turn, int skillIndex,
+            SkillConfig.SkillData data, CandidateTracker tracker, UnitConfig.CompanionProfile profile)
+        {
+            if (data.effects == null) return;
+            foreach (var atom in data.effects)
+            {
+                if (atom == null || atom.trigger != SkillEffectTrigger.OnCast) continue;
+                if (atom.kind != SkillEffectKind.ApplyBuff || atom.targetFilter != SkillEffectTargetFilter.Caster) continue;
+                var existing = unit.Buffs.Find(b => b != null && b.Type == atom.buffType);
+                if (existing != null && existing.IsAtStackCap()) return; // 已满层：重施加无增益不占行动
+                tracker.Offer(Mathf.RoundToInt(SelfCastBurstBuffScore * profile.爆发优先权重),
+                    Skill(playerId, unit, skillIndex, Direction2D.Up, turn));
+                return;
+            }
         }
 
         /// <summary>②移动候选（2026-09-29 报障返修「单位堆积湖边试图走又被弹回」）：锚点=距离升序

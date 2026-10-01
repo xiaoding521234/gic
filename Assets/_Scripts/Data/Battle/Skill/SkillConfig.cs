@@ -64,6 +64,18 @@ namespace GIC.Data
                     && timeline.aimMode == SkillAimMode.TargetUnit;
             }
 
+            /// <summary>是否无目标自施放爆发（时轮 aimMode=None 声明——首个=凯亚凛冽轮舞 buff 型爆发，
+            /// 2026-10-01 拍板「凯亚爆发实际并不是召唤，与歌声之环类似，都是buff」）：无判定轨、
+            /// 无方向/目标域，OnCast 效果（filter=Caster=自身）直接产出。
+            /// 三消费方=Host EffectCompiler.CompileSkill（跳过判定编译）、HUD（IsLineSkill 排除+
+            /// 瞄准域=自身格）、AI 脑（自身增益估值档）。</summary>
+            public bool IsSelfCast()
+            {
+                return skillType == SkillType.Burst
+                    && timeline != null
+                    && timeline.aimMode == SkillAimMode.None;
+            }
+
             /// <summary>
             /// 移动距离换算（2026-09-23 用户拍板：「配置文件里的10，还要看基于类型。拼接后为10%移速」）——
             /// MoveDistance 参数按 baseType 解释：BasedOnMoveSpeed=百分比×移速（10%×50=5 格）、
