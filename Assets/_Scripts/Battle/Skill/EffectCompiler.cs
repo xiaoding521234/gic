@@ -215,6 +215,10 @@ namespace GIC.Battle
             var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
             if (casterState == null) return effects;
 
+            // 反应命中登记（决策二十五：反应双方 1:1 全消耗、等层零残留——**反应命中的来袭元素
+            // 不附着**；本技能 AttachElement 原子对已反应目标跳过，无反应命中才附着〔覆盖〕）
+            var reactedHits = new HashSet<string>();
+
             foreach (var atom in skillData.effects)
             {
                 if (atom.trigger != SkillEffectTrigger.OnHit) continue;
@@ -230,9 +234,10 @@ namespace GIC.Battle
                         int dist = Math.Max(Math.Abs(ally.position.x - casterState.position.x),
                             Math.Abs(ally.position.y - casterState.position.y));
                         if (dist > radius) continue;
-                        CompileAtom(sim, action, sliceSnapshot, skillData, atom, ally.unitId, casterState,
-                            attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
-                            effects, EnergyEffect.CategorySkillHitGain);
+                        if (CompileAtom(sim, action, sliceSnapshot, skillData, atom, ally.unitId, casterState,
+                                attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
+                                effects, EnergyEffect.CategorySkillHitGain))
+                            reactedHits.Add(ally.unitId);
                     }
                     continue;
                 }
@@ -242,35 +247,86 @@ namespace GIC.Battle
                 // 2026-09-25 修复：此前三战技获能原子 targetFilter 误配 Target，+10 元能发给了被命中的敌人
                 if (atom.targetFilter == SkillEffectTargetFilter.Caster)
                 {
-                    CompileAtom(sim, action, sliceSnapshot, skillData, atom, action.unitId, casterState,
-                        attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
-                        effects, EnergyEffect.CategorySkillHitGain);
+                    // 反应命中的来袭元素不附着（决策二十五）——Caster 指向的附着原子同样跳过
+                    if (atom.kind == SkillEffectKind.AttachElement && reactedHits.Contains(action.unitId)) continue;
+                    if (CompileAtom(sim, action, sliceSnapshot, skillData, atom, action.unitId, casterState,
+                            attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
+                            effects, EnergyEffect.CategorySkillHitGain))
+                        reactedHits.Add(action.unitId);
                     continue;
                 }
 
-                CompileAtom(sim, action, sliceSnapshot, skillData, atom, targetUnitId, casterState,
-                    attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
-                    effects, EnergyEffect.CategorySkillHitGain);
+                // 反应命中的来袭元素不附着（决策二十五）——命中目标的附着原子跳过
+                if (atom.kind == SkillEffectKind.AttachElement && reactedHits.Contains(targetUnitId)) continue;
+                if (CompileAtom(sim, action, sliceSnapshot, skillData, atom, targetUnitId, casterState,
+                        attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
+                        effects, EnergyEffect.CategorySkillHitGain))
+                    reactedHits.Add(targetUnitId);
             }
             return effects;
         }
 
+        // ==================== 元素伤害统一出口（2026-10-01 拍板「与正常伤害一致，全部统一」=docs/18 决策二十三） ====================
+
+        /// <summary>元素伤害统一编译出口：反应预判（附着读片内编译视图，融化=易伤/蒸发=增伤/冻结=控制，
+        /// docs/06）→ DamagePipeline 全乘区（防御/易伤/增伤；Request=null 纯附着事件跳过伤害）→ 反应事实+
+        /// 冻结 Buff+1:1 消耗（视图即时推进）。**返回=是否发生反应**——调用方据此跳过附着：反应双方
+        /// 1:1 全消耗、等层零残留（docs/06 §6.3 / docs/18 决策二十五——反应命中的来袭元素不附着；
+        /// 无反应命中才附着〔覆盖〕）。正常命中（CompileAtom Damage 原子）、光环 tick（歌声之环/
+        /// 寒冰之棱）、反应 DoT（燃烧）、纯附着（环附着我方）共用——废除「tick 平直值不反应不附着」旁路。</summary>
+        public static bool CompileElementalDamage(BattleSimState sim, string attackerId, string targetUnitId,
+            UnitState targetState, ElementType element, DamageRequest request,
+            float launchSeconds, float hitSeconds, List<BattleEffect> effects,
+            int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f)
+        {
+            // 附着读片内编译视图（2026-10-01 双蒸发修复）：快照只是初值，同段前序命中的反应消耗/
+            // 新附着随编译序对后续命中可见（安柏双箭打一层水=第一发蒸发消耗、第二发见空平直）
+            var outcome = ElementReactionResolver.Preview(sim.GetCompileDye(targetUnitId, targetState), element);
+            if (request != null)
+            {
+                request.VulnerabilityBonus = outcome.VulnerabilityBonus;
+                request.DamageBonusDelta = outcome.DamageBonusDelta;
+                var result = DamagePipeline.Calculate(request);
+                if (!result.Cancelled && result.FinalDamage > 0)
+                    effects.Add(new DamageEffect(attackerId, targetUnitId, result.FinalDamage, (int)element,
+                        delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType,
+                        Mathf.RoundToInt(launchSeconds * 1000f))
+                    { HitSeconds = hitSeconds }); // 吸血治疗继承命中时刻（WYSIWYG）
+            }
+            if (outcome.HasReaction)
+            {
+                // 反应 1:1 消耗被反应附着（docs/06 §6.3）——段内后续命中/tick 不再见旧附着；
+                // 来袭元素同被消耗（等层零残留，决策二十五）——不附着，由返回值告知调用方
+                sim.SetCompileDye(targetUnitId, ElementType.Physical);
+                // 反应事实载体 + 冻结控制 Buff（融化伤害已并入 DamageEffect）
+                effects.Add(new ReactionEffect(attackerId, targetUnitId, outcome.ReactionType, outcome.Level)
+                {
+                    HitSeconds = hitSeconds, // 客户端到点清附着图标（反应消耗可见）
+                });
+                if (outcome.BuffType >= 0)
+                    effects.Add(new ApplyBuffEffect(attackerId, targetUnitId, outcome.BuffType, outcome.Level));
+            }
+            return outcome.HasReaction;
+        }
+
         // ==================== 单原子编译（OnCast/OnHit 共用） ====================
 
-        private static void CompileAtom(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
+        /// <summary>单原子编译（返回=该命中是否触发元素反应——CompileOnHit 据此跳过 AttachElement
+        /// 原子：反应双方 1:1 全消耗、等层零残留，docs/06 §6.3/docs/18 决策二十五）</summary>
+        private static bool CompileAtom(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
             SkillConfig.SkillData skillData, SkillEffectConfig atom, string targetUnitId, UnitState casterState,
             int attackPercent, int delivery, BattleCell fromCell, float hitPointX, float hitPointY,
             float launchSeconds, float hitSeconds, List<BattleEffect> effects, int energyCategory)
         {
             var attacker = sim.GetUnit(action.unitId);
             var target = sim.GetUnit(targetUnitId);
-            if (attacker == null || target == null) return;
+            if (attacker == null || target == null) return false;
             var targetState = SkillHitResolver.FindUnitState(snapshot, targetUnitId);
-            if (targetState == null) return; // 快照中不存在（瞬发读片初状态）
+            if (targetState == null) return false; // 快照中不存在（瞬发读片初状态）
 
             // 作用条件（B-3 ② 单点收口——OnCast 指向/OnHit 命中/施法者分支全过此闸）：
             // 按目标存活态过滤（复苏/增益分支分叉声明）；None=无条件（存量原子零行为变化）
-            if (!PassesCondition(atom, targetState)) return;
+            if (!PassesCondition(atom, targetState)) return false;
 
             switch (atom.kind)
             {
@@ -279,10 +335,6 @@ namespace GIC.Battle
                     var attackerElement = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
                     var element = atom.element != ElementType.Physical ? atom.element : attackerElement;
 
-                    // 元素反应预判（融化=易伤/蒸发=增伤/冻结=控制，docs/06）——附着读片内编译视图
-                    // （2026-10-01 双蒸发修复）：快照只是初值，同片前序命中的反应消耗/新附着随编译序
-                    // 对后续命中可见（安柏双箭打一层水=第一发蒸发消耗、第二发见火同元素不反应）
-                    var outcome = ElementReactionResolver.Preview(sim.GetCompileDye(targetUnitId, targetState), element);
                     // stats 取活态 UnitStats（当前片内无属性突变点=与片前快照恒等；未来若引入片中属性
                     // 变化——光环/移动触发效果等——须统一改读快照，防快照纪律分叉，2026-09-27 复审注记）
                     var request = new DamageRequest
@@ -290,8 +342,6 @@ namespace GIC.Battle
                         Attacker = attacker,
                         Target = target,
                         Element = (int)element,
-                        VulnerabilityBonus = outcome.VulnerabilityBonus,
-                        DamageBonusDelta = outcome.DamageBonusDelta,
                     };
                     // 伤害基准分流（docs/20 §5.1）：BasedOnAttack=百分比×攻击（现行为——百分比由判定编译注入）；
                     // BasedOnMaxHealth=百分比×施法者最大生命（水之浅唱——治疗角色伤害吃生命）→ FlatDamage 加法区承载
@@ -309,24 +359,11 @@ namespace GIC.Battle
                     {
                         request.AttackPercent = attackPercent;
                     }
-                    var result = DamagePipeline.Calculate(request);
-                    if (!result.Cancelled && result.FinalDamage > 0)
-                        effects.Add(new DamageEffect(action.unitId, targetUnitId, result.FinalDamage, (int)element,
-                            delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType,
-                            Mathf.RoundToInt(launchSeconds * 1000f))
-                        { HitSeconds = hitSeconds }); // 吸血治疗继承命中时刻（WYSIWYG）
-
-                    if (outcome.HasReaction)
-                    {
-                        // 反应 1:1 消耗被反应附着（docs/06 §6.3）——片内后续命中不再见旧附着；
-                        // 新附着由同技能 AttachElement 原子覆盖（真实状态仍统一应用写入）
-                        sim.SetCompileDye(targetUnitId, ElementType.Physical);
-                        // 反应事实载体 + 冻结控制 Buff（融化伤害已并入 DamageEffect）
-                        effects.Add(new ReactionEffect(action.unitId, targetUnitId, outcome.ReactionType, outcome.Level));
-                        if (outcome.BuffType >= 0)
-                            effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, outcome.BuffType, outcome.Level));
-                    }
-                    break;
+                    // 统一元素伤害出口（2026-10-01 拍板「全部统一」=docs/18 决策二十三）：正常命中/光环
+                    // tick/反应 DoT 共用反应预判+全乘区链；返回=是否反应——反应双方 1:1 全消耗（等层
+                    // 零残留，决策二十五），CompileOnHit 据此跳过本技能 AttachElement 原子（无反应才附着）
+                    return CompileElementalDamage(sim, action.unitId, targetUnitId, targetState, element, request,
+                        launchSeconds, hitSeconds, effects, delivery, fromCell, hitPointX, hitPointY);
                 }
 
                 case SkillEffectKind.Heal:
@@ -448,6 +485,7 @@ namespace GIC.Battle
                                 $"该原子不产出任何效应；新 kind 请在 CompileAtom 接入，误配请修 SkillConfig");
                     break;
             }
+            return false;
         }
 
         /// <summary>效果原子作用条件（B-3 ②，docs/11「IfCorpse 条件原子」）：按目标存活态过滤——

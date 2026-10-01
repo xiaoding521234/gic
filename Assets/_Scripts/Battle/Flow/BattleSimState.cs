@@ -624,6 +624,13 @@ namespace GIC.Battle
             target?.GetUnitComponent<UnitElement>()?.Dye(element);
         }
 
+        /// <summary>清除附着（反应消耗的真实状态落点——决策二十五：反应 1:1 双方全消耗、等层
+        /// 零残留；反应命中不再发 AttachElementEffect，清除由 ReactionEffect 应用分支执行）</summary>
+        public void ClearDye(Unit target)
+        {
+            target?.GetUnitComponent<UnitElement>()?.ClearDye();
+        }
+
         /// <summary>按注册序结算后的到期收集（RemainingTurns≤0；永久 Buff（RemainingTurns&lt;0）不计时
         /// 不收集——歌声之环/寒冰之棱类消失走 RemoveOnHolderDeath 倒下移除或碎裂即时移除
         /// （BattleSimState.RemoveBuff——寒冰之棱 TryShatter 直接注销）</summary>
@@ -745,12 +752,17 @@ namespace GIC.Battle
         /// <summary>关闭编译视图（片内全部命中编译完成后调用）</summary>
         public void EndCompileDyeView() => _compileDyeView = null;
 
-        /// <summary>编译期附着读取：视图优先，未命中回退片前快照态（快照态缺失=Physical）</summary>
+        /// <summary>编译期附着读取：视图优先，未命中回退片前快照态；无快照（回合结束段 tick——
+        /// 2026-10-01 tick 统一拍板）回退**活态**（染色写入仍走效应统一应用，活态在该编译时点=段初真值）</summary>
         public ElementType GetCompileDye(string unitId, UnitState snapshotState)
         {
             if (_compileDyeView != null && _compileDyeView.TryGetValue(unitId, out var dye))
                 return dye;
-            return snapshotState != null ? (ElementType)snapshotState.dyedElement : ElementType.Physical;
+            if (snapshotState != null) return (ElementType)snapshotState.dyedElement;
+            var unit = GetUnit(unitId);
+            return unit != null
+                ? (unit.GetUnitComponent<UnitElement>()?.DyedElement ?? ElementType.Physical)
+                : ElementType.Physical;
         }
 
         /// <summary>编译期附着推进：反应消耗=Physical（docs/06 §6.3）；AttachElement 覆盖=来袭元素</summary>

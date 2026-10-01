@@ -86,11 +86,11 @@ namespace GIC.Battle
             var attacker = source != null ? source : owner;
             string attackerId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
             var attackerStats = attacker.GetUnitComponent<UnitStats>();
-            // 逐层口径（2026-10-01 拍板④「2层相当于有两个此buff，应当各弹一次」）：伤害/治疗/元能
+            // 逐层口径（2026-10-01 拍板④「2层相当于有两个此buff，应当各弹一次」）：伤害/治疗/元能/理智
             // 逐层各弹一次（第 i 层时刻=i×BuffLayerStaggerSeconds 错峰；Host 状态恒即时结算）——元能=
-            // 拍板④追加「元能条也逐层各跳，每次+10」：每层一枚 EnergyEffect（BuffTickGain 合并键含
-            // 层时刻=EnergyEffect.MergeKey 例外，逐层条目不互吞）；理智/附着=总额单发——理智无弹数字
-            // 且 SanityEffect 命令按目标去重（逐层会吞尾条致状态与命令漂移），附着覆盖语义幂等
+            // 每层一枚 EnergyEffect（BuffTickGain 合并键含层时刻=逐层条目不互吞）；理智=每层一枚 +1
+            //（同日拍板②；命令层按目标合并总值防漂移）；附着=每目标一枚（覆盖幂等；敌方附着为
+            // 统一拍板新增——tick 参与反应链，docs/18 决策二十三）
             // 治疗基准=施加者（芭芭拉）最大生命（与伤害同基准单位；float 末点 FloorToInt 同 ResolveHealAmount 口径）
             int healPerLayer = (attackerStats != null ? Mathf.FloorToInt(attackerStats.GetStatStruct(StatType.HP).Max * HealPercentPerTurn / 100f) : 0);
 
@@ -106,24 +106,25 @@ namespace GIC.Battle
                 if (identity.Team != holderTeam)
                 {
                     // 敌方（含尸体——尸体保留势力归属仍算敌人，鞭尸同 Burn 先例）：逐层各弹一次。
-                    // 伤害=10% 施加者攻——**走 DamagePipeline**（2026-10-01 拍板「这些伤害都应该统一」：
-                    // 与寒冰之棱 tick 同口径，吃目标防御/易伤乘区；不经反应预览=维持不反应/不附着）
-                    var result = DamagePipeline.Calculate(new DamageRequest
+                    // 伤害=10% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：
+                    // TurnResolver 回合末交错管道按拍排序过共享编译视图统一结算（反应预判+消耗+
+                    // 每层附着=决策二十四终版「同时进行」——双异元素光环同拍交错互融）
+                    for (int layer = 0; layer < stacks; layer++)
                     {
-                        Attacker = attacker,
-                        Target = unit,
-                        Element = (int)ElementType.Hydro,
-                        AttackPercent = DamagePercentPerTurn,
-                    });
-                    int damagePerLayer = result.FinalDamage;
-                    if (damagePerLayer > 0)
-                        for (int layer = 0; layer < stacks; layer++)
-                            effects.Add(new DamageEffect(attackerId, kv.Key, damagePerLayer, (int)ElementType.Hydro,
-                                launchMs: Mathf.RoundToInt(layer * BattleMetrics.BuffLayerStaggerSeconds * 1000f)));
+                        float beat = layer * BattleMetrics.BuffLayerStaggerSeconds;
+                        effects.Add(new PendingAuraHit(attackerId, kv.Key, attacker, unit, ElementType.Hydro,
+                            new DamageRequest
+                            {
+                                Attacker = attacker,
+                                Target = unit,
+                                Element = (int)ElementType.Hydro,
+                                AttackPercent = DamagePercentPerTurn,
+                            }, beat));
+                    }
                 }
                 else
                 {
-                    // 我方存活（含持有者）：治疗/元能逐层各弹一次+理智/附着总额单发
+                    // 我方存活（含持有者）：治疗/元能/理智逐层各弹一次+附着逐层声明
                     // （尸体不治疗——血量恒 0 铁律 docs/05 §5.4；理智恢复与治疗同拍结算）
                     if (BattleSimState.IsDead(unit)) continue;
                     // 治疗效率双乘区（2026-10-01 拍板「发起治疗者也应当乘治疗效率；自己治疗自己
@@ -143,9 +144,16 @@ namespace GIC.Battle
                             {
                                 HitSeconds = layer * BattleMetrics.BuffLayerStaggerSeconds,
                             });
-                    effects.Add(new SanityEffect(kv.Key, SanityGainPerTurn * stacks));
+                    // 理智恢复逐层（2026-10-01 拍板②「+1 应当也是每层的效果」）：每层各一枚 +1
+                    // ——命令层按目标合并总值（TurnResolver 发射，防状态/命令漂移）
+                    for (int layer = 0; layer < stacks; layer++)
+                        effects.Add(new SanityEffect(kv.Key, SanityGainPerTurn));
+                    // 附着我方（0~1命）：逐层纯附着声明（Request=null）——同进交错管道，敌方异元素
+                    // 光环 tick 同拍可见可反应（挂水的我方被敌方冰棱 tick 冻结等）
                     if (attachAllies)
-                        effects.Add(new AttachElementEffect(attackerId, kv.Key, (int)ElementType.Hydro));
+                        for (int layer = 0; layer < stacks; layer++)
+                            effects.Add(new PendingAuraHit(attackerId, kv.Key, attacker, unit, ElementType.Hydro,
+                                null, layer * BattleMetrics.BuffLayerStaggerSeconds));
                 }
             }
             return effects;

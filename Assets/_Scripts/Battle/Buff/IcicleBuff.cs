@@ -100,25 +100,21 @@ namespace GIC.Battle
                 if (Math.Max(Math.Abs(pos.x - holderPos.x), Math.Abs(pos.y - holderPos.y)) > radius)
                     continue; // 出半径
 
-                // 每层伤害=20% 施加者攻——**走 DamagePipeline**（2026-10-01 现场取证返修：用户报
-                // 「3命凯亚冰棱伤害恒 8 减防看似未生效」——取证实证 DefenseDown 已挂（敌防 0→-20）
-                // 但 tick 平直值不吃防御/易伤故恒 8；改走管线吃目标防御/易伤乘区=C2 减防对 tick 生效。
-                // 不经 EffectCompiler 反应预览=维持不触发反应/不附着现状；凯亚 1命吸血数据位已挂但
-                // 全工程零消费，走管线无吸血副作用）
-                var result = DamagePipeline.Calculate(new DamageRequest
-                {
-                    Attacker = attacker,
-                    Target = unit,
-                    Element = (int)ElementType.Cryo,
-                    AttackPercent = DamagePercentPerTurn,
-                });
-                int damagePerLayer = result.FinalDamage;
-
+                // 每层伤害=20% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：回合末
+                // 交错管道统一结算（反应预判+消耗+每层附着=决策二十四终版；伤害走 DamagePipeline 全
+                // 乘区——C2 减防对 tick 生效〔现场取证返修口径延续〕）。凯亚 1命吸血随一切 DamageEffect
+                // 统一结算（ApplyEffects）——tick 命中也吸血=预期
                 for (int layer = 0; layer < layers; layer++)
                 {
-                    if (damagePerLayer > 0)
-                        effects.Add(new DamageEffect(attackerId, kv.Key, damagePerLayer, (int)ElementType.Cryo,
-                            launchMs: Mathf.RoundToInt(layer * BattleMetrics.BuffLayerStaggerSeconds * 1000f)));
+                    float beat = layer * BattleMetrics.BuffLayerStaggerSeconds;
+                    effects.Add(new PendingAuraHit(attackerId, kv.Key, attacker, unit, ElementType.Cryo,
+                        new DamageRequest
+                        {
+                            Attacker = attacker,
+                            Target = unit,
+                            Element = (int)ElementType.Cryo,
+                            AttackPercent = DamagePercentPerTurn,
+                        }, beat));
                     if (defReduce > 0)
                         effects.Add(new ApplyBuffEffect(attackerId, kv.Key, (int)BuffType.DefenseDown, 1,
                             defReduce, DefDownStackLimit, DefDownDurationTurns)); // 2命：防御减少——10 层 12 回合叠时长（逐层各施加）

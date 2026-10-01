@@ -739,11 +739,17 @@ namespace GIC.Battle
 
                     case BattleCommandType.Reaction:
                         // 反应发生事件：冻结=立牌冰色即时同步（此前冰色只随快照来，反应当回合不显）；
-                        // 融化=反应爆发特效属 B5/B6 画面批次，此处仅留挂点
+                        // 融化=反应爆发特效属 B5/B6 画面批次，此处仅留挂点。
+                        // 反应消耗（决策二十五：反应 1:1 双方全消耗、等层零残留）——到点清附着图标
+                        // （命中时刻 launchMs>0 延迟到点；0=立即；Physical=图标隐藏）
                         if (_views.TryGetValue(command.targetUnitId, out var reacted))
                         {
                             if (command.metadata == BattleCommand.ReactionKindFreeze)
                                 reacted.SetFrozenVisual(true);
+                            float consumeDelay = command.launchMs > 0
+                                ? command.launchMs / 1000f / _playbackSpeed
+                                : 0f;
+                            playbacks.Add(StartCoroutine(PlayAttachConsumeCoroutine(reacted, consumeDelay)));
                         }
                         break;
 
@@ -936,6 +942,16 @@ namespace GIC.Battle
         /// <summary>吸血名前缀（2026-10-01 拍板）：吸血自疗数字「吸血 +N」——与反应名前缀同源取词</summary>
         private static string LifeStealName()
             => new LocalizedString("UIText", "Battle_LifeSteal").GetLocalizedString();
+
+        /// <summary>反应消耗附着图标（决策二十五：反应 1:1 双方全消耗、等层零残留——到点清；
+        /// Physical=图标隐藏；与伤害数字/清附着同一时刻=反应消耗所见即所得）</summary>
+        private IEnumerator PlayAttachConsumeCoroutine(UnitView view, float delay)
+        {
+            if (delay > 0f)
+                yield return new WaitForSeconds(delay);
+            if (view != null)
+                view.SetAttachedElement(ElementType.Physical);
+        }
 
         /// <summary>伤害数字配色（2026-10-01 拍板+同日网检勘正「与原神一致」）：
         /// <summary>伤害数字配色（2026-10-01 拍板+二次拍板「原神里反应都有自己的颜色」）：

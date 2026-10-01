@@ -272,11 +272,15 @@ namespace GIC.Battle
             var effects = new List<BattleEffect>();
 
             // 按注册序结算回合结束效果，随后计时减一（到期收集；永久 Buff（RemainingTurns<0）不计时——歌声之环类）
+            // **回合末=同时结算（决策二十四终版「逐拍交错」）**：buff 的 OnTurnEnd 只产出声明（元素
+            // 伤害走 PendingAuraHit），循环后统一按 (拍时刻, 施法者, 目标) 排序逐个过共享编译视图结算
+            // ——双异元素光环同拍交错、每层附着、每拍可触发反应（对齐原神双光环同开互融）
             foreach (var buff in _sim.ActiveBuffs)
             {
                 effects.AddRange(buff.OnTurnEnd());
                 if (!buff.IsPermanent) buff.RemainingTurns--;
             }
+            ResolveAuraHits(effects);
             var expired = _sim.CollectExpiredBuffs();
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
@@ -289,6 +293,52 @@ namespace GIC.Battle
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
+        }
+
+        /// <summary>
+        /// 回合末光环命中交错结算管道（决策二十四终版「同时进行」=逐拍交错）：从 effects 收集全部
+        /// PendingAuraHit（buff 的 OnTurnEnd 只声明），按 (拍时刻, 施法者 unitId, 目标 unitId) 排序后
+        /// 共享编译视图逐个结算——同拍并列枚举序铁律（unitId 升序）；每层命中都是一次完整元素应用
+        /// （反应预判+1:1 消耗+附着，CompileElementalDamage 统一出口）——双异元素光环每拍交错、
+        /// 反应在应用序列里自然发生（火环 L0 挂火→冰环 L0 融化挂冰→火环 L1 融化挂火…）。
+        /// 编译产物追加进 effects（命令时刻=拍时刻显式携带，段内发射序无关紧要）；附着统一应用
+        /// 落定=排序序后到者胜。
+        /// </summary>
+        private void ResolveAuraHits(List<BattleEffect> effects)
+        {
+            var hits = new List<PendingAuraHit>();
+            for (int i = effects.Count - 1; i >= 0; i--)
+            {
+                if (effects[i] is PendingAuraHit hit)
+                {
+                    hits.Add(hit);
+                    effects.RemoveAt(i);
+                }
+            }
+            if (hits.Count == 0) return;
+            hits.Sort((a, b) =>
+            {
+                int byBeat = a.BeatSeconds.CompareTo(b.BeatSeconds);
+                if (byBeat != 0) return byBeat;
+                int byAttacker = string.CompareOrdinal(a.AttackerUnitId, b.AttackerUnitId);
+                if (byAttacker != 0) return byAttacker;
+                return string.CompareOrdinal(a.TargetUnitId, b.TargetUnitId);
+            });
+
+            _sim.BeginCompileDyeView(); // 共享视图：初值回落活态=回合末开始态；交错序列全程接力
+            foreach (var hit in hits)
+            {
+                // 统一出口（Request=null=纯附着事件只过反应预判）；返回=是否反应——
+                // 反应双方 1:1 全消耗（决策二十五）：该层**不附着**，无反应层才附着（覆盖）
+                bool reacted = EffectCompiler.CompileElementalDamage(_sim, hit.AttackerUnitId, hit.TargetUnitId, null,
+                    hit.Element, hit.Request, hit.BeatSeconds, hit.BeatSeconds, effects);
+                if (hit.Attach && !reacted)
+                {
+                    effects.Add(new AttachElementEffect(hit.AttackerUnitId, hit.TargetUnitId, (int)hit.Element));
+                    _sim.SetCompileDye(hit.TargetUnitId, hit.Element);
+                }
+            }
+            _sim.EndCompileDyeView();
         }
 
         /// <summary>
@@ -434,8 +484,12 @@ namespace GIC.Battle
             }
             foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
             {
-                segment.commands.Add(BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
-                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level));
+                var reactionCommand = BattleCommand.Reaction(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.ReactionType, effect.Level);
+                // 命中时刻（决策二十五）：客户端到点清附着图标（反应 1:1 双方全消耗、等层零残留）
+                if (effect.HitSeconds > 0f)
+                    reactionCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
+                segment.commands.Add(reactionCommand);
             }
             foreach (var effect in MergeEnergyEffects(effects))
             {
@@ -447,16 +501,18 @@ namespace GIC.Battle
                     energyCommand.launchMs = Mathf.RoundToInt(effect.HitSeconds * 1000f);
                 segment.commands.Add(energyCommand);
             }
-            // 理智恢复（2026-09-30 歌声之环批）：同片同目标防御性去重——环 tick 每目标一条；
-            // 客户端 UnitView 缓存即时增量（同元能链），快照 sanity 权威兜底
-            var sanitySeen = new HashSet<string>();
+            // 理智恢复（2026-10-01 拍板②改逐层）：每层各一枚 SanityEffect（+1×层数），命令按目标
+            // **合并总值**一条——理智无弹数字，逐条首值发射=状态 N×1 vs 命令 +1 漂移（合并两清）
+            var sanityTotals = new Dictionary<string, int>();
             foreach (var effect in effects)
             {
                 if (!(effect is SanityEffect sanity)) continue;
-                if (!sanitySeen.Add(sanity.TargetUnitId)) continue;
-                segment.commands.Add(BattleCommand.StatChange(sanity.TargetUnitId, sliceIndex, indexInSlice++,
-                    BattleCommand.StatKindSanity, sanity.Delta));
+                sanityTotals.TryGetValue(sanity.TargetUnitId, out var total);
+                sanityTotals[sanity.TargetUnitId] = total + sanity.Delta;
             }
+            foreach (var sanityPair in sanityTotals)
+                segment.commands.Add(BattleCommand.StatChange(sanityPair.Key, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindSanity, sanityPair.Value));
             // 体力变化（B6d）：TargetUnitId=玩家 ID；同片同玩家防御性去重（配额行动唯一，
             // 理论只一条——低级单位豁免、延奏契约 0 消耗，正常流不会同玩家多条）
             var staminaSeen = new HashSet<string>();
@@ -848,6 +904,12 @@ namespace GIC.Battle
                 {
                     _sim.AttachElement(target, (ElementType)attach.Element); // 覆盖=消耗被反应附着（docs/06）
                 }
+                else if (effect is ReactionEffect)
+                {
+                    // 反应消耗的真实状态落点（决策二十五：反应 1:1 双方全消耗、等层零残留——
+                    // 被反应附着清除；此前靠「附着覆盖」近似消耗，反应命中不再附着后必须显式清）
+                    _sim.ClearDye(target);
+                }
             }
 
             // 吸血治疗效应并入（状态已在主循环内联应用——此处仅为命令发射载体，同溢出转移先例；
@@ -919,7 +981,7 @@ namespace GIC.Battle
         // | Revive          | 不合并（一一对应）                    | Applied=false（活体）零命令；单命令=解灰+血量   |
         // | Energy          | (目标, 类别)——MergeKey() 单源；       | 同类别去重=「多次命中只获一次」；跨类别各发；     |
         // |                 | BuffTickGain 例外=键含层时刻          | 逐层 tick 各跳各弹（拍板④）；同刻同目标仍并     |
-        // | Sanity          | (目标) 防御性去重                     | 环 tick 每目标一条；RangedInt 钳 -300~300       |
+        // | Sanity          | 逐层各 +1 效应；命令按目标合并总值   | 环 tick 逐层（拍板②）；RangedInt 钳 -300~300 |
         // | Stamina         | (目标=玩家 ID) 防御性去重             | 配额行动理论唯一；重复条目丢弃                  |
         // | MoraPlunder     | (被掠方, 掠夺方) 双命令               | AppliedGain=0 零命令；按应用后实际量+命中时刻发 |
         // | ApplyBuff       | (目标, BuffType)                     | 级别取大、回合取后施合并态；命令数以合并态为准  |

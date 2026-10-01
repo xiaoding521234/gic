@@ -7,13 +7,15 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 燃烧（docs/06 元素与反应系统）：每回合结束受到 10 点火伤（0 层），持续 3 回合 × 级别。
+    /// 燃烧（docs/06 元素与反应系统）：每回合结束受到 10 点火伤，持续 3 回合 × 级别。
     /// 来源=火+草反应（B4 接）；B2 由调试技能附带施加验证 DoT 链路。
     /// 草元素延长机制（附着草→消耗草→延长 3 回合 × 层数）B4 随元素反应落地。
+    /// 2026-10-01 统一拍板（docs/18 决策二十三）：火伤走统一元素伤害出口——吃防御/易伤乘区+
+    /// 参与反应预判+附着火（docs/06 §6.6「0层终点不连锁」概念废除）。
     /// </summary>
     public class BurnBuff : BaseBuff
     {
-        public const int DamagePerTurn = 10;  // docs/06：每回合结束 10 点火伤（0 层）
+        public const int DamagePerTurn = 10;  // docs/06：每回合结束 10 点火伤
         public const int TurnsPerLevel = 3;   // docs/06：持续 3 回合 × 级别
 
         public override BuffType Type => BuffType.Burn;
@@ -27,14 +29,23 @@ namespace GIC.Battle
         public override List<BattleEffect> OnTurnEnd()
         {
             var effects = new List<BattleEffect>();
-            string ownerId = owner?.GetUnitComponent<UnitIdentity>()?.UnitID;
+            if (owner == null || Sim == null) return effects;
+            string ownerId = owner.GetUnitComponent<UnitIdentity>()?.UnitID;
             if (ownerId == null) return effects;
 
             // 伤害归属=施加者（快照/命令流的 attacker），无施加者信息时归目标自身
-            string sourceId = source != null
-                ? (source.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId)
-                : ownerId;
-            effects.Add(new DamageEffect(sourceId, ownerId, DamagePerTurn, (int)ElementType.Pyro));
+            var attacker = source != null ? source : owner;
+            string sourceId = attacker.GetUnitComponent<UnitIdentity>()?.UnitID ?? ownerId;
+            // 只声明命中（PendingAuraHit，拍 0）：回合末交错管道统一结算——10 火伤平直值走
+            // DamagePipeline（吃目标防御/易伤）+反应预判+附着火（docs/06 §6.6「0层终点」废除）
+            effects.Add(new PendingAuraHit(sourceId, ownerId, attacker, owner, ElementType.Pyro,
+                new DamageRequest
+                {
+                    Attacker = attacker,
+                    Target = owner,
+                    Element = (int)ElementType.Pyro,
+                    FlatDamage = DamagePerTurn,
+                }, 0f));
             return effects;
         }
     }
