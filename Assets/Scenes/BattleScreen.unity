@@ -174,6 +174,18 @@ MonoBehaviour:
   "\u88AB\u6321\u649E\u5899\u63A2\u51FA\u5E45\u5EA6": 0.45
   "\u7ACB\u724C\u540E\u503E\u89D2": 55
   "\u5168\u8EAB\u7ACB\u724C\u653E\u5927\u500D\u6570": 2
+  "\u7BAD\u77E2\u957F\u5EA6": 0.49
+  "\u7BAD\u96E8\u6BCF\u683C\u6BCF\u6BB5\u7BAD\u6570": 2
+  "\u7BAD\u96E8\u7BAD\u77E2\u7F29\u653E": 1
+  "\u7BAD\u96E8\u8D77\u59CB\u9AD8\u5EA6": 2.2
+  "\u7BAD\u96E8\u843D\u4E0B\u503E\u659C\u89D2": 30
+  "\u7BAD\u96E8\u5760\u843D\u65F6\u957F": 0.14
+  "\u7BAD\u96E8\u683C\u5185\u6563\u5E03": 0.3
+  "\u7BAD\u96E8\u9010\u7BAD\u6563\u5E03\u5EF6\u8FDF": 0.06
+  "\u7BAD\u96E8\u5165\u571F\u6DF1\u5EA6": 0.15
+  "\u7BAD\u96E8\u5165\u571F\u65F6\u957F": 0.05
+  "\u7BAD\u96E8\u843D\u5730\u6EDE\u7559": 3
+  "\u7BAD\u96E8\u843D\u5730\u6DE1\u51FA": 0.18
 --- !u!114 &311523754
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -460,7 +472,7 @@ Transform:
   m_GameObject: {fileID: 1233798858}
   serializedVersion: 2
   m_LocalRotation: {x: 0.46174863, y: 0, z: 0, w: 0.8870109}
-  m_LocalPosition: {x: 0, y: 29, z: -20}
+  m_LocalPosition: {x: -0, y: 16.500612, z: -11.553854}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

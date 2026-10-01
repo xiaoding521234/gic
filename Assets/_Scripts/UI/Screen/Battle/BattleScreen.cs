@@ -163,7 +163,7 @@ namespace GIC.UI
             {
                 _session.SpawnDebugUnit(UnitName.ProtocolCore, setup.PlayerId,
                     _session.Sim.GetTeamOf(setup.PlayerId),
-                    FindSpawnCenter(mapConfig, setup.PlayerId, new BattleCell(3, 3)));
+                    FindSpawnCenter(mapConfig, setup.PlayerId, new BattleCell(2, 2)));
                 yield return null;
             }
 
@@ -372,8 +372,8 @@ namespace GIC.UI
             var first = playerSetups[0];
             var second = playerSetups[1];
 
-            var firstCenter = FindSpawnCenter(mapConfig, first.PlayerId, new BattleCell(3, 3));
-            var secondCenter = FindSpawnCenter(mapConfig, second.PlayerId, new BattleCell(16, 16));
+            var firstCenter = FindSpawnCenter(mapConfig, first.PlayerId, new BattleCell(2, 2));
+            var secondCenter = FindSpawnCenter(mapConfig, second.PlayerId, new BattleCell(12, 12));
 
             _session.SpawnDebugUnit(UnitName.Amber, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 0));
             yield return null;
