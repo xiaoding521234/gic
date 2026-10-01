@@ -44,8 +44,8 @@ namespace GIC.Battle
         [SerializeField] private float 拖动瞄准跟随边距 = 40f;
 
         [Header("边界")]
-        [Tooltip("注视点允许范围（棋盘半宽 10 + 余量，世界单位）")]
-        [SerializeField] private float _focusBounds = 12f;
+        [Tooltip("注视点允许范围（棋盘半宽 7.5 + 余量 2，世界单位；2026-09-30 战场 20×20→15×15 两轮缩小同步，原 12）")]
+        [SerializeField] private float _focusBounds = 9.5f;
 
         private Camera _camera;
         private float _distance = 35f;

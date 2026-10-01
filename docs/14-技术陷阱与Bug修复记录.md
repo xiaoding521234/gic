@@ -1658,3 +1658,9 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **症状**：拖动式瞄准在很近处松手（金格=第 1 格显示正常，已越过盘心死区）→不落格，反而打开该技能的详情面板；远拖（指针出键矩形）松手一切正常。
 **根因**（StandaloneInputModule.cs 1.0.0 源码级）：①**拖动不取消点击资格**——`eligibleForClick` 仅在 `pointerPress != pointerDrag`（拖拽处理器在父级 GO）时被 ProcessDrag 清零；SkillDragForwarder 与 SelectButton 同挂 def.content 同一 GO → `pointerDrag == pointerPress` → 整个拖动过程点击资格恒在；②**抬起判定=按压/抬起命中同一 IPointerClickHandler**（`pointerClick == GetEventHandler<IPointerClickHandler>(currentOverGo) && eligibleForClick`）——B4「拖动键挪盘心」把控件临时挪到盘心，近距松手时抬手指针仍压在键矩形内（键半宽 110 > 盘心死区 56，第 1 格盘距带整条被键盖住）→抬起命中同一键→onClick 补发；③**点击先于 endDrag 执行**（ReleaseMouse/ProcessMousePress 抬起分支：先 click 后 endDrag）→尾巴点击在 `_dragAiming` 清零**之前**到达 OnSkillButtonClicked，命中「Aiming 同键=瞄准↔详情」循环分支误开面板（随后 endDrag 的落格链照跑，观感=落格没成、面板弹开）。
 **How to apply**：①「拖动松手不应触发点击」类需求=**吞尾巴点击**：点击入口先 `if (_dragAiming || Time.frameCount == _dragAimEndFrame) return;`——会话旗（click 先到时仍在位）+同帧戳（endDrag 先到的引擎序差异兜底）双保险；两判据都不会误吞真点击（拖动会话中指针全程被按住不可能有新按压，真按压不可能与松手同帧）；②勿依赖「拖出阈值自动取消点击」——UGUI 拖拽从不清 eligibleForClick（仅 press≠drag 父子分裂才清）；③**拖动中把控件挪到指针下方（摇杆底座类 UI）=自造「抬起飞点击」——凡挪被按压件必配吞点击防线**；④松手判定与补发点击是两条独立链，排障勿假设「松手链正确=无点击」（本例 ReleaseOverCancelButton/死区链本就正确，症结全在补发点击链）。
+
+## 104. 磁盘直改资产后编辑器内存实例陈旧：不 refresh 就回读断言=读旧数据误判「修法无效」（2026-10-01 棋盘缩图批实证）
+
+**症状**：write_file 直改 BattleMap_FirstMap.asset 字符行（修一行湖形错位）后，立即 exec_editor_script 加载资产跑逐格断言——仍报同样 4 格不对称，修法看似无效；rg 核对磁盘文件内容却已是修好的。隔一轮 unity_editor.refresh 后同脚本复跑，断言全绿。
+**根因**：AssetDatabase 不感知外部工具对磁盘文件的改写——已加载进内存的资产实例保持旧值；未经 refresh/导入就直接 `AssetDatabase.LoadAssetAtPath` 拿到的是**陈旧实例**（首次写入后有 refresh、二修没有，恰好首断言读旧值暴露）。
+**How to apply**：①磁盘直改 .asset/.prefab/.unity 后，回读断言前必先 unity_editor.refresh（或桥脚本内先 `AssetDatabase.ImportAsset(path)` 再 Load）；②「改了没生效」类回读异常，先核改后是否 refresh 过，再怀疑修法本身；③断言输出与磁盘文本（rg/Get-Content）不符=陈旧实例指纹，直接定位本坑。
