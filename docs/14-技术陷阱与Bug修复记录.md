@@ -1699,3 +1699,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **症状**：①改 FrozenFrost.cginc 后 `unity_shader.compile` 报 SourceAssetDB modification time 告警/结果不更新；②shader Properties 改了默认值，场景里仍显示旧效果（FrozenSpriteTest.mat 实测）。
 **根因**：①增量库时间戳未刷新——编辑器还没 import 新版 cginc，compile 用的是旧缓存；②**材质资产序列化值覆盖 shader 新默认**——已存 .mat 里每个属性都有序列化副本，改 shader 默认值不影响存量材质；且**新属性在 shader 未导入前 SetFloat 静默失败无日志**。
 **How to apply**：①改 .cginc/.shader 后先 `refresh`（或编辑器脚本 ForceSynchronousImport）再 compile，告警即净（两轮实证）；②改默认值后同步刷新所有已存材质（SetColor/SetFloat+SetDirty+SaveAssets，**写完回读断言**——静默失败防线）；新属性必须先 import 再写材质。
+
+## 110. AI 移动骨架「驻位早退」隐含假设未验证：对角错位目标=伙伴永久挂机（2026-10-02 报障「伙伴安柏击杀敌方安柏后不攻城」）
+
+**症状**：伙伴击杀最后一个敌方单位后与协议核心成**对角相邻**（切比雪夫 1）——攻击候选零（十字攻击线打不到对角格）+ 移动候选零（`steps=distance−偏好交战距离=1−1=0` 触发驻位早退）→ 每回合缺席站桩、永久挂机不攻城。
+**根因**：`CompanionBrain.ScoreMoveCandidate` 的 `if (steps <= 0) return`（驻位即最优位）建立在「近了就能打」的隐含假设上，**未验证本单位是否真有攻击线/行动候选**——假设在对角错位、costs 门槛、射程豁口等场景全部失效；眷属脑无此坑（BFS 目标=敌格邻格，对角自然一步对齐——v4 换目标巡逻语义兜底）。
+**修法**：攻击档回报 per-unit 候选存在性（ScoreAttackCandidates→bool，Offer 调用即算——**勿用 tracker.Best 判定：配额脑共享 tracker 跨单位取全场最优，Best 非空≠本单位有行动**）；steps≤0 且有候选=驻位（原语义不变），无候选=降级**对齐走位**（TryOfferAlignmentStep：BFS 首步→十字枚举序逐向试 1 格，落点地形可行+无占据+`WouldHaveFiringLineFrom` 开火线三查全过才动——纯挪动无增益不白耗体力）。
+**二轮返修（同日「连续 3 回合挂机」报障，暂停态活体取证回合 19 实锤）**：首版修复对齐失败后直接 `return` 保持缺席——漏了**「首锚驻位无效应换下一锚」**。现场指纹：安柏 (9,7) 零攻击候选，首锚=核心 (12,12) 恰在偏好交战距离 5 边界 `steps=5−5=0`，四向 1 格对齐探针全换不来开火线（核心斜向远、其余敌在左上远处）→ return=永久挂机；而第二锚 Venti 距离 6 `steps=1` 本可 BFS 逼近。终版=对齐失败 `continue` 换下一锚（成功仍立即收）。
+**How to apply**：改共享评分骨架时，「驻位/不动」类早退必须绑定「本单位有可用行动」的显式验证，隐含假设（近=能打/满=能放）逐个审；**降级/兜底路径失败后先问「换目标/换锚是否还有解」再 return**——首候选的无解≠全场无解；配额脑与伙伴脑共用骨架，tracker 共享性差异（全场最优 vs 单位最优）是骨架内判定最容易漂移的点。

@@ -68,7 +68,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -137,7 +137,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -205,7 +205,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -273,7 +273,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -335,7 +335,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -463,7 +463,7 @@ MonoBehaviour:
           - clip: {fileID: 8300000, guid: 8d951c27979d7194784ffcb32c427f27, type: 3}
             weight: 1
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 5
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1.2
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 0.9
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -605,7 +605,7 @@ MonoBehaviour:
           - clip: {fileID: 8300000, guid: b15b2584c15aca844ab659791c531f37, type: 3}
             weight: 1
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -737,7 +737,7 @@ MonoBehaviour:
           - clip: {fileID: 8300000, guid: ff537bd67aa911141bf3c718f6abe76f, type: 3}
             weight: 1
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 2
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -804,7 +804,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 3
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -866,7 +866,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -932,7 +932,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 3
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -994,7 +994,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1063,7 +1063,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 2
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1131,7 +1131,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1198,7 +1198,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1267,7 +1267,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1335,7 +1335,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1397,7 +1397,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1459,7 +1459,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1521,7 +1521,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1583,7 +1583,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1645,7 +1645,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1707,7 +1707,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1769,7 +1769,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1831,7 +1831,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1893,7 +1893,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -1955,7 +1955,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2017,7 +2017,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2079,7 +2079,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2141,7 +2141,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2203,7 +2203,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2265,7 +2265,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2327,7 +2327,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2391,7 +2391,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
@@ -2452,7 +2452,7 @@ MonoBehaviour:
         clips: []
       skillVoices: []
     "\u884C\u4E3A\u6863\u6848":
-      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 1
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
       "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
       "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1

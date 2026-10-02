@@ -277,7 +277,10 @@ namespace GIC.Battle
         /// <summary>
         /// 技能对单个目标的预估伤害（AI 评分用；口径=Damage×DamageCount 按基准换算——
         /// BasedOnMaxHealth=施法者最大生命（芭芭拉水之浅唱类，与 EffectCompiler.Damage 同语义）、
-        /// 其余=施法者攻击。未计防御/反应乘区=启发式估值，斩杀判定按保守口径）
+        /// 其余=施法者攻击 ×暴击期望乘区 1+(幸运/100)×(理智/100)（2026-10-02 幸运暴击批接入
+        /// AI 估值，docs/18 决策二十七——确定性期望值非 roll、模拟核心随机纪律不破；全员幸运 0
+        /// 时恒等零行为变化；斩杀判定随之由保守口径转为期望口径=幸运高的单位更倾向预判暴击斩杀）。
+        /// 未计防御/反应乘区=启发式估值
         /// </summary>
         public static int EstimatePerTargetDamage(Unit caster, SkillConfig.SkillData skillData)
         {
@@ -291,7 +294,10 @@ namespace GIC.Battle
             int baseValue = stats.Attack;
             if (FindParam(skillData, SkillParamKey.Damage)?.baseType == SkillBaseType.BasedOnMaxHealth)
                 baseValue = stats.GetStatStruct(StatType.HP).Max;
-            return baseValue * percent * count / 100;
+            int raw = baseValue * percent * count / 100;
+            // 暴击期望（整数万分比）：1 + (幸运/100)×(理智/100)——负幸运不进此路（roll 侧 ≤0 恒否）
+            int critExpectPercent = 10000 + Math.Max(0, stats.Luck) * stats.Sanity;
+            return raw * critExpectPercent / 10000;
         }
 
         /// <summary>
@@ -316,6 +322,45 @@ namespace GIC.Battle
             foreach (var faction in data.factions)
                 if (faction == FactionType.Mondstadt) return true;
             return false;
+        }
+
+        /// <summary>
+        /// 单位方向攻击射程（CR-Move 驻位基准，2026-10-02 拍板「像皇室战争那样」）：全部可施放
+        /// 方向攻击技能（Normal/Burst、非单位指向/自施放、伤害>0、消耗门槛过）能命中的最远格数。
+        /// 射程语义与 PreviewLineTargets 两分支**完全同口径**（投射物=clip.maxRange 缺省 24 截停；
+        /// 整线=clip.maxRange 缺省 24——安柏箭矢/箭雨未配 maxRange=全图 24 狙击射程；凯亚霜袭=2；
+        /// 芭芭拉水球=5）。无可施放方向攻击技能=0（驻位距离回落 0=贴身逼近）。
+        /// 纯读不 roll 不查命中线——有射程≠有线（无线时走对齐/兜底链，勿在此混入线判定）
+        /// </summary>
+        public static int AttackRangeOf(BattleSimState sim, Unit unit, string playerId)
+        {
+            int best = 0;
+            var skills = unit?.Skills;
+            if (skills == null) return 0;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                var skill = skills[i];
+                var data = skill?.RawData;
+                if (data == null) continue;
+                if (data.skillType != SkillType.Normal && data.skillType != SkillType.Burst) continue;
+                if (data.IsUnitTargeted() || data.IsSelfCast()) continue;
+                if (!skill.CanCast(unit)) continue;
+                if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _)) continue;
+                if (EstimatePerTargetDamage(unit, data) <= 0) continue;
+
+                int range;
+                var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
+                if (projClips.Count > 0)
+                    range = projClips[0].maxRange > 0 ? projClips[0].maxRange : ProjectileRule.MaxRange;
+                else
+                {
+                    var burstClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst);
+                    range = burstClips.Count > 0 && burstClips[0].maxRange > 0
+                        ? burstClips[0].maxRange : ProjectileRule.MaxRange;
+                }
+                if (range > best) best = range;
+            }
+            return best;
         }
 
         /// <summary>技能参数表查参数（EffectCompiler.FindParam 同构私有出口）</summary>

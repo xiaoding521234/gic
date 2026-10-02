@@ -287,8 +287,8 @@ namespace GIC.Data
         public class CompanionProfile
         {
             [Header("交战距离")]
-            [InspectorName("偏好交战距离（格；移动逼近到该距离止步，非无脑贴脸）")]
-            public int 偏好交战距离 = 1;
+            [InspectorName("偏好交战距离（格；0=自动=攻击射程单源〔CR-Move 拍板，皇室战争式「进射程即停」〕；>0=手动覆写微调手感）")]
+            public int 偏好交战距离 = 0;
 
             [Header("技能优先权重（同分冲突倾向；1=中性）")]
             [InspectorName("战技优先权重")]
