@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Video;
@@ -104,6 +105,9 @@ namespace GIC.Battle
 
         private void Update()
         {
+            // 冻结中持续刷新霜化锚点：被击退/牵引等罕见位移也贴住（几 float 写入，代价可忽略）
+            if (IsFrozen && _frostAmount > 0f) ApplyFrost(_frostAmount);
+
             if (_videoPlayer != null)
             {
                 if (IsCorpse || IsFrozen)
@@ -118,7 +122,7 @@ namespace GIC.Battle
                 return;
             }
             if (_idleFrames == null || _idleFrames.Length < 2 || _avatarRenderer == null) return;
-            if (IsCorpse || IsFrozen) return; // 尸体灰显/冻结冰色时停摆（保留当前帧）
+            if (IsCorpse || IsFrozen) return; // 尸体灰显/冻结霜化时停摆（保留当前帧）
             _idleTimer += Time.deltaTime;
             float interval = 1f / _idleFps;
             while (_idleTimer >= interval)
@@ -420,23 +424,129 @@ namespace GIC.Battle
                     : new Vector3(_cylinderDiameter, _cylinderDiameter, 1f);
         }
 
-        /// <summary>冻结态（B4：水+冰反应）：立牌冰色 tint + 底座冰色（快照权威同步）</summary>
+        // ==================== 冻结霜化（2026-10-02 二次拍板「像真的结冰=shader 技术」，原神级路线） ====================
+        // 三层视觉（数学单源=FrozenFrost.cginc，网检一手信源拆解）：霜色重映射（保明度结构：暗部→深冰蓝、
+        // 亮部→霜白）+边缘霜光（2D 菲涅尔，边缘实中间透）+晶体闪烁；冻结遮罩从脚往头噪声扰动蔓延、缓慢流动。
+        // 首版「AI 冰壳贴图罩立牌」被否决已拆勿回退。双渲染路径同源：sprite 路径=冻结换装共享 FrozenSprite
+        // 材质（tint=mesh 顶点色、进度/锚点=MPB）；视频路径=ChromaKeyVideo shader 内建霜化（材质实例直写）。
+
+        [Header("冻结霜化（2026-10-02 拍板「像真的结冰」）")]
+        [Tooltip("上冻结冰蔓延时长（秒，从脚往头）")]
+        [SerializeField] private float 冻结蔓延时长 = 0.45f;
+
+        [Tooltip("解冻退冰时长（秒）")]
+        [SerializeField] private float 解冻时长 = 0.3f;
+
+        private static readonly int FrostAmountId = Shader.PropertyToID("_FrozenAmount");
+        private static readonly int FrostFootYId = Shader.PropertyToID("_FreezeFootY");
+        private static readonly int FrostTopYId = Shader.PropertyToID("_FreezeTopY");
+        private static Shader _frostSpriteShader;       // GIC/Battle/FrozenSprite（GraphicsSettings Always Included）
+        private static Material _frostSpriteMaterial;  // 全单位共享单材质（tint 走顶点色、进度走 MPB——零实例化）
+
+        private Material _avatarOriginalMaterial;      // 冻结换装前记录（还原用）
+        private MaterialPropertyBlock _frostMpb;      // sprite 路径逐帧写进度/锚点
+        private Coroutine _frostCo;
+        private float _frostAmount;                     // 当前进度（快照同步重入时从中断处续播）
+
+        /// <summary>冻结态（B4：水+冰反应）：霜化 shader 结冰（快照权威同步；2026-10-02 起立牌冻结配色由
+        /// shader 接管——tint 置白，shader 缺失时回落冻结冰色 tint；底座盘不变色——2026-10-02 拍板）</summary>
         public bool IsFrozen { get; private set; }
 
         public void SetFrozenVisual(bool frozen)
         {
             IsFrozen = frozen;
             RefreshTint();
-            if (_baseDisc != null && _baseDisc.GetComponent<MeshRenderer>() != null)
-                _baseDisc.GetComponent<MeshRenderer>().sharedMaterial.color =
-                    WithDiscAlpha(frozen ? Palette.冻结冰色 : _baseColor); // 保盘半透明（2026-09-27 拍板，回写防满 alpha）
+            if (_frostCo != null) { StopCoroutine(_frostCo); _frostCo = null; }
+            _frostCo = StartCoroutine(FrostRoutine(frozen ? 1f : 0f));
         }
 
-        /// <summary>立牌着色统一收口：尸体灰 > 冻结冰色 > 受击闪红 > 常态白</summary>
+        /// <summary>霜化进度协程：目标 1=上冻（从脚往头蔓延）、0=解冻退冰；已到目标时单次落地即返回</summary>
+        private IEnumerator FrostRoutine(float target)
+        {
+            float from = _frostAmount;
+            if (Mathf.Approximately(from, target)) { ApplyFrost(target); yield break; }
+            float duration = target > from ? 冻结蔓延时长 : 解冻时长;
+            yield return BattleViewTween.Over(duration, t =>
+            {
+                _frostAmount = Mathf.Lerp(from, target, t);
+                ApplyFrost(_frostAmount);
+            });
+            _frostAmount = target;
+            ApplyFrost(target);
+        }
+
+        /// <summary>霜化落地单点：写双路径进度与脚/头顶世界锚点。sprite 路径——进度&gt;0 换装共享霜化材质、
+        /// 回 0 还原默认材质（视频解码失败回退 sprite 路径也覆盖）；shader 缺失（构建剥离）时 null 守卫跳过
+        /// =tint 兜底。锚点随每次写入刷新（冻结中被击退/牵引的罕见位移也贴住）</summary>
+        private void ApplyFrost(float amount)
+        {
+            float footY = _tiltGroup != null ? _tiltGroup.position.y : transform.position.y;
+            float topY = _tiltGroup != null
+                ? _tiltGroup.TransformPoint(new Vector3(0f, _avatarDisplayHeight, 0f)).y
+                : footY + _avatarDisplayHeight;
+
+            if (_videoMaterial != null) // 视频路径：per-unit ChromaKey 材质实例直写（shader 内建霜化）
+            {
+                _videoMaterial.SetFloat(FrostAmountId, amount);
+                _videoMaterial.SetFloat(FrostFootYId, footY);
+                _videoMaterial.SetFloat(FrostTopYId, topY);
+            }
+
+            if (_avatarRenderer == null) return;
+            if (amount > 0f)
+            {
+                var frostMat = FrostSpriteMaterial;
+                if (frostMat != null)
+                {
+                    // 原材质只捕获一次；起步已挂霜化 shader 材质的（测试场景静态冻结/换装中断重入）不当
+                    // 「原材质」——还原路径保持霜化材质、量归 0（amount=0 直通渲染与默认 sprite 材质恒等）
+                    var current = _avatarRenderer.sharedMaterial;
+                    if (_avatarOriginalMaterial == null && current != frostMat
+                        && (current == null || current.shader != _frostSpriteShader))
+                        _avatarOriginalMaterial = current;
+                    _avatarRenderer.sharedMaterial = frostMat;
+                    if (_frostMpb == null) _frostMpb = new MaterialPropertyBlock();
+                    _avatarRenderer.GetPropertyBlock(_frostMpb);
+                    _frostMpb.SetFloat(FrostAmountId, amount);
+                    _frostMpb.SetFloat(FrostFootYId, footY);
+                    _frostMpb.SetFloat(FrostTopYId, topY);
+                    _avatarRenderer.SetPropertyBlock(_frostMpb);
+                }
+            }
+            else
+            {
+                if (_avatarOriginalMaterial != null)
+                    _avatarRenderer.sharedMaterial = _avatarOriginalMaterial; // 还原默认 sprite 材质
+                if (_frostMpb != null)
+                {
+                    _avatarRenderer.GetPropertyBlock(_frostMpb);
+                    _frostMpb.SetFloat(FrostAmountId, 0f); // 勿 Clear——保留块内 Unity 侧条目（_MainTex 等）
+                    _avatarRenderer.SetPropertyBlock(_frostMpb);
+                }
+            }
+        }
+
+        /// <summary>共享霜化 sprite 材质（懒建单例；shader 缺失返回 null=ApplyFrost 守卫跳过）</summary>
+        private static Material FrostSpriteMaterial
+        {
+            get
+            {
+                if (_frostSpriteMaterial != null) return _frostSpriteMaterial;
+                if (_frostSpriteShader == null) _frostSpriteShader = Shader.Find("GIC/Battle/FrozenSprite");
+                if (_frostSpriteShader == null) return null;
+                _frostSpriteMaterial = new Material(_frostSpriteShader);
+                return _frostSpriteMaterial;
+            }
+        }
+
+        /// <summary>立牌着色统一收口：尸体灰 > 冻结（霜化 shader 接管配色 tint 置白；shader 缺失回落冻结
+        /// 冰色）> 受击闪红 > 常态白</summary>
         private void RefreshTint()
         {
             if (_avatarRenderer == null) return;
-            Color tint = IsCorpse ? Palette.立牌尸体灰 : IsFrozen ? Palette.冻结冰色 : Color.white;
+            Color tint = IsCorpse ? Palette.立牌尸体灰
+                : IsFrozen && FrostSpriteMaterial == null ? Palette.冻结冰色 // shader 缺失兜底=纯冰色 tint
+                : Color.white;
             _avatarRenderer.color = tint;
             if (_videoMaterial != null)
                 _videoMaterial.color = tint; // 视频路径同 tint（ChromaKey _Color，同 SpriteRenderer.color 语义）

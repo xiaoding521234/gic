@@ -18,6 +18,9 @@ namespace GIC.Battle
     /// log10(max(1,|量值|)), 时长下限, 时长上限)——与尺寸映射同构（对数），小伤害≈原 0.95s、大伤害渐长封顶。
     /// 屏幕边缘夹取（2026-09-26 拍板「玩家屏幕里没有该伤害数字时，数字完整显示在屏幕边缘」）：
     /// 投影点按文本实测半尺寸夹到视口内——屏外/贴边目标受伤在最近边缘完整可见=战斗方向提醒。
+    /// 回血类（吸血/治疗，Spawn isHeal=true）曲线例外（2026-10-02 拍板「不应和伤害一样从大变小，直接以
+    /// 最终大小出现+上浮更多+比伤害更小」）：不爆裂——全程恒定停留尺寸；尺寸=同映射×回血尺寸倍率（更小）；
+    /// 上浮取回血上浮像素（比伤害更高）。
     /// 池化复用；本图层不挂 GraphicRaycaster（Overlay 画布无射线器即不吃射线，勿补——会挡 HUD 按钮）。
     /// </summary>
     public class BattleDamageNumbers : MonoBehaviour
@@ -34,6 +37,12 @@ namespace GIC.Battle
 
         [Tooltip("上浮位移（参考分辨率 2560×1440 下的像素值，随 CanvasScaler 随分辨率等比缩放）")]
         [SerializeField] private float 上浮像素 = 60f;
+
+        [Tooltip("回血类（吸血/治疗）上浮位移（同上浮像素口径）——比伤害上浮更高，2026-10-02 拍板「上浮更多」")]
+        [SerializeField] private float 回血上浮像素 = 100f;
+
+        [Tooltip("回血类（吸血/治疗）停留尺寸对伤害的倍率（尺寸映射结果整体再乘本系数）——比伤害数字更小，2026-10-02 拍板")]
+        [SerializeField] private float 回血尺寸倍率 = 0.75f;
 
         [Tooltip("屏幕边缘夹取留白（屏幕像素）——屏幕外/贴边伤害数字夹到视口内完整显示=战斗方向提醒，2026-09-26 拍板")]
         [SerializeField] private float 屏幕边缘留白 = 12f;
@@ -108,8 +117,8 @@ namespace GIC.Battle
             scaler.matchWidthOrHeight = 0.5f;
         }
 
-        /// <summary>弹一个数字。worldAnchor=受击点世界坐标（投影为屏幕锚点）；magnitude=量值绝对值（驱动尺寸映射）；speed=播放速率倍率（与 BattlePlayer._playbackSpeed 同语义）</summary>
-        public void Spawn(Vector3 worldAnchor, string text, Color color, float magnitude, float speed)
+        /// <summary>弹一个数字。worldAnchor=受击点世界坐标（投影为屏幕锚点）；magnitude=量值绝对值（驱动尺寸映射）；speed=播放速率倍率（与 BattlePlayer._playbackSpeed 同语义）；isHeal=回血类（吸血/治疗）——不爆裂、上浮更高、尺寸更小（2026-10-02 拍板「直接以最终大小出现+上浮更多+比伤害更小」）</summary>
+        public void Spawn(Vector3 worldAnchor, string text, Color color, float magnitude, float speed, bool isHeal = false)
         {
             if (_canvas == null || text == null || text.Length == 0) return;
 
@@ -123,36 +132,42 @@ namespace GIC.Battle
 
             float settleScale = Mathf.Clamp(
                 尺寸基准 + 尺寸对数系数 * Mathf.Log10(Mathf.Max(1f, magnitude)), 尺寸下限, 尺寸上限);
+            // 回血类尺寸=伤害同映射×回血尺寸倍率（2026-10-02 拍板「比伤害更小」）；
+            // Play 中回血全程恒定该尺寸（不爆裂），伤害爆裂→收缩也回到同一映射基准
+            if (isHeal) settleScale *= 回血尺寸倍率;
             // 停留时长映射（2026-09-26 拍板「数值越大，停留时间越长」）：与尺寸映射同构=对数——
             // 小伤害≈原 0.95s 观感，大伤害渐长封顶 2.2s；收缩段与淡出比例不变=延长的是停留与渐隐段
             float totalSeconds = Mathf.Clamp(
                 时长基准 + 时长对数系数 * Mathf.Log10(Mathf.Max(1f, magnitude)), 时长下限, 时长上限);
-            entry.Co = StartCoroutine(Play(entry, worldAnchor, settleScale, Mathf.Max(0.1f, speed), totalSeconds));
+            entry.Co = StartCoroutine(Play(entry, worldAnchor, settleScale, Mathf.Max(0.1f, speed), totalSeconds, isHeal));
         }
 
-        private IEnumerator Play(Entry entry, Vector3 anchor, float settleScale, float speed, float totalSeconds)
+        private IEnumerator Play(Entry entry, Vector3 anchor, float settleScale, float speed, float totalSeconds, bool isHeal)
         {
             float total = totalSeconds / speed;
             float shrink = 收缩时长 / speed;
             float popScale = settleScale * 初始停留比;
             float fadeSpan = 1f - 淡出起点比例;
+            float risePixels = isHeal ? 回血上浮像素 : 上浮像素;
 
             yield return BattleViewTween.Over(total, t =>
             {
                 var cam = _camera != null ? _camera : Camera.main;
                 if (cam == null) return;
 
-                // 缩放：收缩段内 easeOutCubic 从爆裂回停留，其后恒定（先算——边缘夹取要用当前帧尺寸）
+                // 缩放（先算——边缘夹取要用当前帧尺寸）：伤害=首帧爆裂 easeOut 收缩回停留尺寸；
+                // 回血类（吸血/治疗）不爆裂——全程恒定停留尺寸（2026-10-02 拍板「直接以最终大小出现」）
                 float sT = shrink > 0f ? Mathf.Clamp01(t * total / shrink) : 1f;
                 float eOut = 1f - (1f - sT) * (1f - sT) * (1f - sT);
-                entry.Rect.localScale = Vector3.one * Mathf.Lerp(popScale, settleScale, eOut);
+                entry.Rect.localScale = Vector3.one *
+                    (isHeal ? settleScale : Mathf.Lerp(popScale, settleScale, eOut));
 
-                // 位置：锚点逐帧投影（相机微调/缩放下仍贴住单位）+ 先快后慢上浮；
+                // 位置：锚点逐帧投影（相机微调/缩放下仍贴住单位）+ 先快后慢上浮（回血类取回血上浮像素=更高）；
                 // 屏幕边缘夹取（2026-09-26 拍板「玩家屏幕里没有该伤害数字时，数字完整显示在屏幕边缘
                 // ——提醒这边有战斗」）：按文本实测半尺寸（TMP textBounds×弹跳缩放×画布缩放+留白）夹到
                 // 视口内——屏外/贴边目标受伤数字在最近边缘完整可见；相机背面投影（z<0）的屏幕坐标是
                 // 镜像的，先绕屏幕中心翻回正确方位再夹取（否则方向指反/误落在视口内）
-                float rise = 上浮像素 * (1f - (1f - t) * (1f - t));
+                float rise = risePixels * (1f - (1f - t) * (1f - t));
                 var screenPoint = cam.WorldToScreenPoint(anchor);
                 float viewW = Screen.width, viewH = Screen.height;
                 Vector2 p = screenPoint + Vector3.up * rise;

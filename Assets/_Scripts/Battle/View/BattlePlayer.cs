@@ -1004,8 +1004,8 @@ namespace GIC.Battle
             view.ApplyHpDelta(displayValue); // 头顶血条即时反馈（快照权威，下个选择阶段头校正）
 
             // 伤害/治疗数字=原神式屏幕空间层（2026-09-24 拍板「按照原神的做法」：Overlay 画布永不遮挡、
-            // 首帧爆裂收缩、尺寸随伤害对数放大；反应名前缀为 GIC 特色保留、伤害不带负号、治疗带 +；
-            // 随机偏移防同点多数字重叠）
+            // 尺寸随伤害对数放大；反应名前缀为 GIC 特色保留、伤害不带负号、治疗带 +；随机偏移防同点重叠。
+            // 回血类曲线例外=不爆裂直接最终大小+上浮更高，2026-10-02 拍板）
             var reactionName = !isHeal ? ReactionNameOf(reactionKind) : null;
             int value = Mathf.Abs(displayValue);
             // 吸血名前缀（2026-10-01 拍板「吸血数字少了前缀」）：「吸血 +N」——与反应名前缀同风格，
@@ -1021,7 +1021,7 @@ namespace GIC.Battle
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
-                numberColor, value, _playbackSpeed);
+                numberColor, value, _playbackSpeed, isHeal);
         }
 
         /// <summary>受击闪色恢复尾巴（S5：不进 playbacks=不 gate ack——Host 片节拍只等位移/伤害主体）</summary>

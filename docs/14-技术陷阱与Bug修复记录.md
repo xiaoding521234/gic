@@ -1687,3 +1687,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **How to apply**：①新增「由既有效应派生」的效果（吸血/未来反伤/受击触发类）时，**应用时刻必须从母效应继承**——投射物场景母效应只有 LaunchMs 不够用（客户端弹出时刻=自推导的落地时刻），需要 HitSeconds 通道；②两套时刻通道语义=Damage 命令带 LaunchMs（客户端自推导弹出时刻）、Heal/StatChange 命令带「应用时刻」launchMs（到点应用）——派生效应对齐的是**后者**；③tick 类错峰用 LaunchMs 不用 HitSeconds 的存量约定保持——兜底分支已覆盖，勿改 IcicleBuff/SongOfLifeBuff 构造。
 
 **追记（同日实战复测报障「伤害数字 40 先出，+30 慢了一拍才出」——凯亚战技=霜袭是 LineBurst 整线迸发非投射物）**：HitSeconds 修复只覆盖**显式时刻**路径；launchMs=0 的直击（霜袭等 startTime=0 技能与无时轮兜底）按**命令 stagger 旧节拍**弹（每命令 +0.12s 槽）——治疗命令在发射序里晚于伤害 3~4 槽，+N 吃自己的槽=慢 ~0.4s；该时刻只存在于客户端、Host 无从随命令携带。修法=**客户端段内绑定**：`_segmentLastDirectDamageDelay`（actor→delay）段首清空，直击 launchMs=0 时记录本方弹出延迟；Heal 分支 launchMs=0 且 actor==target（吸血自疗签名）→ 绑定本方最后一击节拍**同帧弹**；多目标多伤绑最后一击（0.12s 槽内观感同步）。投射物自疗（hitT>0）仍走 Host 显式 launchMs 路径；零前摇+贴脸投射物 corner（hitT=0）走 stagger 兜底——当前角色池无此组合，撞上再议。**How to apply 补**：新增依赖「客户端 stagger 槽时刻」的表现时，同段绑定表模式可复用（记录方+绑定方两处，段首清空铁律）；判别「该时刻 Host 能否表达」=问"它是 Host 计算的显式毫秒还是客户端命令序节拍"，后者才需要绑定。
+
+## 108. GraphicsSettings 手改 YAML 登记 shader 两坑：Always Included 计数器不同步=清单截断、meta guid 密文≠资产 guid（2026-10-02 冻结霜化批实证）
+
+**症状**：FrozenSprite.shader 手改 `ProjectSettings/GraphicsSettings.asset` 追加 Always Included Shaders 条目后不生效/清单被截断。
+**根因**：①该资产有 `m_LengthOfAlwaysIncludedShadersInInspector` 计数器字段，追加条目必须同步 +1，漏改=Inspector 按旧计数截断清单，新条目静默不显示；②shader 的 `.meta` 里 guid 行是**密文**（非真实资产 guid），`GraphicsSettings.asset` 里必须写**明文 guid**——从 meta 文本里抄=错 guid。
+**修法/How to apply**：手改 GraphicsSettings.asset 时计数器与条目数同步核对；shader 明文 guid 一律 `AssetDatabase.AssetPathToGUID` 经编辑器脚本取（顺带可核 meta 密文陷阱勿文本反查，§9 同理）。
+
+## 109. shader 迭代两坑：改 .cginc 后直接 compile 报 SourceAssetDB 时间戳告警、改默认值不追改已存材质（2026-10-02 冻结霜化多轮迭代实证）
+
+**症状**：①改 FrozenFrost.cginc 后 `unity_shader.compile` 报 SourceAssetDB modification time 告警/结果不更新；②shader Properties 改了默认值，场景里仍显示旧效果（FrozenSpriteTest.mat 实测）。
+**根因**：①增量库时间戳未刷新——编辑器还没 import 新版 cginc，compile 用的是旧缓存；②**材质资产序列化值覆盖 shader 新默认**——已存 .mat 里每个属性都有序列化副本，改 shader 默认值不影响存量材质；且**新属性在 shader 未导入前 SetFloat 静默失败无日志**。
+**How to apply**：①改 .cginc/.shader 后先 `refresh`（或编辑器脚本 ForceSynchronousImport）再 compile，告警即净（两轮实证）；②改默认值后同步刷新所有已存材质（SetColor/SetFloat+SetDirty+SaveAssets，**写完回读断言**——静默失败防线）；新属性必须先 import 再写材质。

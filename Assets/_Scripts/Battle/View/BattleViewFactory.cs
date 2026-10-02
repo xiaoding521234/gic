@@ -79,7 +79,8 @@ namespace GIC.Battle
         }
 
         /// <summary>新建立牌动画视频 ChromaKey 材质（消费 VideoPlayer→RT 的绿幕画面运行时抠色；
-        /// _Color 承载尸体灰/冻结冰色/受击闪红 tint（UnitView.RefreshTint 写入，同 SpriteRenderer.color 语义）。
+        /// _Color 承载尸体灰/受击闪红 tint（UnitView.RefreshTint 写入，同 SpriteRenderer.color 语义；
+        /// 冻结配色 2026-10-02 起由 _FrozenAmount 霜化接管——tint 置白）。
         /// 调用方负责持有与 OnDestroy 释放）</summary>
         public static Material CreateChromaKeyMaterial()
         {
