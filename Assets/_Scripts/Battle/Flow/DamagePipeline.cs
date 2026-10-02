@@ -29,6 +29,12 @@ namespace GIC.Battle
 
         /// <summary>增伤乘区增量（元素反应提供：如 1 级蒸发 +0.5——与易伤分属两区，docs/06 §反应表）</summary>
         public float DamageBonusDelta;
+
+        /// <summary>暴击乘区增量（2026-10-02 拍板「幸运=暴击率/理智=暴击效果，独立乘区」：暴击时
+        /// =攻击者理智/100——理智 20=+20% 伤害、默认 50=×1.5〔GI 同款默认暴伤〕；未暴击恒 0=×1
+        /// 零行为变化。roll 不在本管线——种子 RNG 判定在编译出口 EffectCompiler.CompileElementalDamage
+        /// 〔模拟核心唯一 Calculate 调用方〕，暴击事实经该入口注入本字段）</summary>
+        public float CritBonus;
     }
 
     /// <summary>
@@ -42,8 +48,10 @@ namespace GIC.Battle
 
     /// <summary>
     /// 伤害管线（docs/05 §5.6 核心公式）
-    /// 最终伤害 = (攻击力 × 攻击百分比 + 额外伤害) × (增伤 − 免伤) × 易伤
+    /// 最终伤害 = (攻击力 × 攻击百分比 + 额外伤害) × (增伤 − 免伤) × 易伤 × (1 + 暴击)
     /// 易伤 = 防御 ≥ 0 ? 100/(100+防御) : 1 − 防御/100
+    /// 暴击乘区 = 1 + 攻击者理智/100（暴击时；理智 20=×1.2、默认 50=×1.5——2026-10-02 拍板，
+    /// roll 判定在编译出口，见 DamageRequest.CritBonus）
     ///
     /// B1 预留的三段静态 hooks 已删除（2026-09-25 三轮审查 S9：全项目零注册零清理的死代码，
     /// 静态 List 跨对局有残留风险，且"以为反应走 PreDamage"的注释反而误导——元素反应实际走
@@ -82,9 +90,13 @@ namespace GIC.Battle
                 ? 100f / (100f + defense)
                 : 1f - defense / 100f) + request.VulnerabilityBonus;
 
+            // 暴击乘区（2026-10-02 拍板「理智=暴击效果，需要单独的暴击乘区」）：独立第四乘区
+            // ×(1+理智/100)，未暴击 CritBonus=0 恒等；负理智暴击可缩伤（乘出负值由末点 Max(0,·) 兜底）
+            float critZone = 1f + request.CritBonus;
+
             // 末点单次截断（2026-09-27 拍板「最终伤害舍弃小数点」——RoundToInt 改 FloorToInt；
             // 中途全 float，此处为伤害唯一取整点，勿在中途截断）
-            result.FinalDamage = Mathf.Max(0, Mathf.FloorToInt(baseZone * bonusZone * vulnerability));
+            result.FinalDamage = Mathf.Max(0, Mathf.FloorToInt(baseZone * bonusZone * vulnerability * critZone));
 
             return result;
         }

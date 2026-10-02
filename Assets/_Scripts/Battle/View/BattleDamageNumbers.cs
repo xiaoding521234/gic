@@ -44,6 +44,9 @@ namespace GIC.Battle
         [Tooltip("回血类（吸血/治疗）停留尺寸对伤害的倍率（尺寸映射结果整体再乘本系数）——比伤害数字更小，2026-10-02 拍板")]
         [SerializeField] private float 回血尺寸倍率 = 0.75f;
 
+        [Tooltip("暴击数字停留尺寸倍率（尺寸映射结果整体再乘本系数；爆裂初值随停留尺寸同乘）——GI 式暴击=更大同色+后缀!，2026-10-02 幸运暴击批；同日拍板 1.4→1.2")]
+        [SerializeField] private float 暴击尺寸倍率 = 1.2f;
+
         [Tooltip("屏幕边缘夹取留白（屏幕像素）——屏幕外/贴边伤害数字夹到视口内完整显示=战斗方向提醒，2026-09-26 拍板")]
         [SerializeField] private float 屏幕边缘留白 = 12f;
 
@@ -117,8 +120,8 @@ namespace GIC.Battle
             scaler.matchWidthOrHeight = 0.5f;
         }
 
-        /// <summary>弹一个数字。worldAnchor=受击点世界坐标（投影为屏幕锚点）；magnitude=量值绝对值（驱动尺寸映射）；speed=播放速率倍率（与 BattlePlayer._playbackSpeed 同语义）；isHeal=回血类（吸血/治疗）——不爆裂、上浮更高、尺寸更小（2026-10-02 拍板「直接以最终大小出现+上浮更多+比伤害更小」）</summary>
-        public void Spawn(Vector3 worldAnchor, string text, Color color, float magnitude, float speed, bool isHeal = false)
+        /// <summary>弹一个数字。worldAnchor=受击点世界坐标（投影为屏幕锚点）；magnitude=量值绝对值（驱动尺寸映射）；speed=播放速率倍率（与 BattlePlayer._playbackSpeed 同语义）；isHeal=回血类（吸血/治疗）——不爆裂、上浮更高、尺寸更小（2026-10-02 拍板「直接以最终大小出现+上浮更多+比伤害更小」）；isCrit=暴击（2026-10-02 幸运暴击批）——停留尺寸×暴击尺寸倍率（爆裂初值随停留尺寸同乘=全程更大），色不变</summary>
+        public void Spawn(Vector3 worldAnchor, string text, Color color, float magnitude, float speed, bool isHeal = false, bool isCrit = false)
         {
             if (_canvas == null || text == null || text.Length == 0) return;
 
@@ -135,6 +138,9 @@ namespace GIC.Battle
             // 回血类尺寸=伤害同映射×回血尺寸倍率（2026-10-02 拍板「比伤害更小」）；
             // Play 中回血全程恒定该尺寸（不爆裂），伤害爆裂→收缩也回到同一映射基准
             if (isHeal) settleScale *= 回血尺寸倍率;
+            // 暴击尺寸（2026-10-02 幸运暴击批）：停留尺寸整体×暴击尺寸倍率——爆裂初值=停留×初始停留比
+            // 自然随乘（首帧与停留同步更大），色不变（GI 式暴击=更大同色）
+            if (isCrit) settleScale *= 暴击尺寸倍率;
             // 停留时长映射（2026-09-26 拍板「数值越大，停留时间越长」）：与尺寸映射同构=对数——
             // 小伤害≈原 0.95s 观感，大伤害渐长封顶 2.2s；收缩段与淡出比例不变=延长的是停留与渐隐段
             float totalSeconds = Mathf.Clamp(
