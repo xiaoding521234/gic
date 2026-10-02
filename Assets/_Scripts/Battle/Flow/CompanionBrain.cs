@@ -151,18 +151,25 @@ namespace GIC.Battle
         {
             if (unit == null || tracker == null) return;
             profile ??= NeutralProfile;
-            ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride, profile);
-            ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride, profile);
+            // 攻击档先跑并回报「本单位是否有攻击/增益候选」（2026-10-02 挂机修复：驻位判定用
+            // per-unit 候选存在性——配额脑共享 tracker，勿用 tracker.Best 判定〔那是全场最优〕）
+            bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
+                tracker, staminaPoolOverride, profile);
+            ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
+                profile, hasActionCandidate);
         }
 
         /// <summary>①攻击技能候选（战技/爆发）：预判与结算形态同源（WouldHitEnemyInDirection）；评分=逐目标
-        /// 有效伤害+斩杀×激进度+战技获能；乘技能类型优先权重；支援型并入治疗原子估值</summary>
-        private static void ScoreAttackCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+        /// 有效伤害+斩杀×激进度+战技获能；乘技能类型优先权重；支援型并入治疗原子估值。
+        /// 返回=本单位是否存在任何攻击/增益候选（Offer 调用即算——共享 tracker 下被更优候选
+        /// 压制不等于无候选；挂机修复的驻位判定消费此值）</summary>
+        private static bool ScoreAttackCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile)
         {
             var skills = unit.Skills;
             var from = sim.GetPosition(unit);
+            bool offeredAny = false; // 本单位任一技能产生过候选（Offer 调用即算——驻位判定消费）
 
             for (int i = 0; i < skills.Count; i++)
             {
@@ -179,14 +186,14 @@ namespace GIC.Battle
                 // 单位指向型爆发（B-3 ② 首个=芭芭拉闪耀奇迹）：无方向域——目标估值档（复苏优先/增益次之）
                 if (data.IsUnitTargeted())
                 {
-                    ScoreUnitTargetBurst(sim, snapshot, unit, playerId, team, turn, i, data, tracker, profile);
+                    offeredAny |= ScoreUnitTargetBurst(sim, snapshot, unit, playerId, team, turn, i, data, tracker, profile);
                     continue;
                 }
 
                 // 无目标自施放爆发（aimMode=None——凛冽轮舞）：无方向域/无目标域——自身增益估值档
                 if (data.IsSelfCast())
                 {
-                    ScoreSelfCastBurst(unit, playerId, turn, i, data, tracker, profile);
+                    offeredAny |= ScoreSelfCastBurst(unit, playerId, turn, i, data, tracker, profile);
                     continue;
                 }
 
@@ -218,16 +225,19 @@ namespace GIC.Battle
                         : profile.爆发优先权重));
 
                     tracker.Offer(score, Skill(playerId, unit, i, direction, turn));
+                    offeredAny = true;
                 }
             }
+            return offeredAny;
         }
 
         /// <summary>②b 单位指向型爆发候选（B-3 ② 首个=芭芭拉闪耀奇迹，无方向域）：复苏优先——
         /// 我方尸体存在=高价值复苏（评分=复苏常量，尸体 unitId 升序首个保确定性）；无尸体=增益档
         /// （技能 condition=TargetIsAlive 的 ApplyBuff 原子=待授光环，如歌声之环）给最缺血的**未持有**
         /// 存活我方（等比平局 unitId 升序——FindMostWoundedAlly 同口径）；全员已持有=不占行动
-        /// （重施加 Merge 无增益，攒满也不空放）。评分均乘 profile.爆发优先权重（与攻击候选同池）。</summary>
-        private static void ScoreUnitTargetBurst(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+        /// （重施加 Merge 无增益，攒满也不空放）。评分均乘 profile.爆发优先权重（与攻击候选同池）。
+        /// 返回=是否产生候选（挂机修复的驻位判定消费——非方向型候选也证明本单位有可行动作）</summary>
+        private static bool ScoreUnitTargetBurst(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, int skillIndex, SkillConfig.SkillData data,
             CandidateTracker tracker, UnitConfig.CompanionProfile profile)
         {
@@ -240,7 +250,7 @@ namespace GIC.Battle
                 corpses.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
                 tracker.Offer(Mathf.RoundToInt(UnitTargetBurstReviveScore * profile.爆发优先权重),
                     Skill(playerId, unit, skillIndex, Direction2D.Up, turn, corpses[0].unitId));
-                return; // 有尸体=复苏即本档最优（不再评增益）
+                return true; // 有尸体=复苏即本档最优（不再评增益）
             }
 
             // 增益原子（condition=TargetIsAlive 的 ApplyBuff——歌声之环）：已持有者重施加无增益，
@@ -254,7 +264,7 @@ namespace GIC.Battle
                         grantBuffType = (int)atom.buffType;
                         break;
                     }
-            if (grantBuffType < 0) return;
+            if (grantBuffType < 0) return false;
 
             // 增益候选：最缺血的未持有存活我方（含施法者自身；等比平局 unitId 升序）
             UnitState best = null;
@@ -274,10 +284,11 @@ namespace GIC.Battle
                     bestId = u.unitId;
                 }
             }
-            if (best == null) return; // 全员已持有光环：不占行动（攒满也不空放）
+            if (best == null) return false; // 全员已持有光环：不占行动（攒满也不空放）
 
             tracker.Offer(Mathf.RoundToInt(UnitTargetBurstBuffScore * profile.爆发优先权重),
                 Skill(playerId, unit, skillIndex, Direction2D.Up, turn, best.unitId));
+            return true;
         }
 
         /// <summary>快照 Buff 条目含类型判定（增益候选排除已持有者用——命令流/快照侧轻量读法）</summary>
@@ -291,21 +302,23 @@ namespace GIC.Battle
 
         /// <summary>②c 无目标自施放爆发候选（aimMode=None——首个=凯亚凛冽轮舞，无方向域无目标域）：
         /// OnCast ApplyBuff(Caster) 自身增益（寒冰之棱）；已达叠层上限（IsAtStackCap——重施加 Merge
-        /// 无增益）不占行动；评分=增益常量乘爆发优先权重（伙伴脑/配额脑操魔神档共享骨架同分支）</summary>
-        private static void ScoreSelfCastBurst(Unit unit, string playerId, int turn, int skillIndex,
+        /// 无增益）不占行动；评分=增益常量乘爆发优先权重（伙伴脑/配额脑操魔神档共享骨架同分支）。
+        /// 返回=是否产生候选（挂机修复的驻位判定消费）</summary>
+        private static bool ScoreSelfCastBurst(Unit unit, string playerId, int turn, int skillIndex,
             SkillConfig.SkillData data, CandidateTracker tracker, UnitConfig.CompanionProfile profile)
         {
-            if (data.effects == null) return;
+            if (data.effects == null) return false;
             foreach (var atom in data.effects)
             {
                 if (atom == null || atom.trigger != SkillEffectTrigger.OnCast) continue;
                 if (atom.kind != SkillEffectKind.ApplyBuff || atom.targetFilter != SkillEffectTargetFilter.Caster) continue;
                 var existing = unit.Buffs.Find(b => b != null && b.Type == atom.buffType);
-                if (existing != null && existing.IsAtStackCap()) return; // 已满层：重施加无增益不占行动
+                if (existing != null && existing.IsAtStackCap()) return false; // 已满层：重施加无增益不占行动
                 tracker.Offer(Mathf.RoundToInt(SelfCastBurstBuffScore * profile.爆发优先权重),
                     Skill(playerId, unit, skillIndex, Direction2D.Up, turn));
-                return;
+                return true;
             }
+            return false;
         }
 
         /// <summary>②移动候选（2026-09-29 报障返修「单位堆积湖边试图走又被弹回」）：锚点=距离升序
@@ -313,11 +326,17 @@ namespace GIC.Battle
         /// 全水=BFS 目标集空，旧直行逼近=每回合原地弹回白耗体力（现场取证：凯亚/芭芭拉 Up×3 撞
         /// (7,5) 水格弹回）；方向=BFS 最短路首步（FindApproachFirstStep，眷属 v3/v4 同款——绕湖/
         /// 绕虚空拐弯），步数三重钳=偏好交战距离余量 × 移速上限 × 该向地形可行程（移动是推力直线
-        /// 语义，转向留给下一回合重算=BFS 取直线段）；已在偏好距离内=驻位即最优位不再逼近。
-        /// 评分=兜底+逼近进度+接敌×激进度+走位进射击线，乘移动优先权重</summary>
+        /// 语义，转向留给下一回合重算=BFS 取直线段）；已在偏好距离内**且有攻击/增益候选**=驻位即
+        /// 最优位不再逼近；无候选≠驻位最优——对角错位等十字线打不到的站位会永久挂机
+        /// （2026-10-02 报障「伙伴安柏击杀敌方安柏后挂机不攻城」），降级=对齐走位（1 格进射击线），
+        /// **对齐失败换下一锚继续试**（同日二轮报障「连续 3 回合挂机」现场实证：首锚恰在偏好距离
+        /// 边界且四向都换不来开火线，直接 return=永久挂机——第二锚逼近步才是出口）。
+        /// 评分=兜底+逼近进度+接敌×激进度+走位进射击线，乘移动优先权重。
+        /// hasActionCandidate=攻击档回报的本单位候选存在性（**勿改用 tracker.Best**——配额脑共享
+        /// tracker 跨单位取全场最优，Best 非空≠本单位有行动）</summary>
         private static void ScoreMoveCandidate(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
-            int? staminaPoolOverride, UnitConfig.CompanionProfile profile)
+            int? staminaPoolOverride, UnitConfig.CompanionProfile profile, bool hasActionCandidate)
         {
             if (!ResourceGate.HasAll(sim, unit, playerId, MoveExecutor.GetMoveCosts(unit), out _, staminaPoolOverride))
             {
@@ -327,6 +346,14 @@ namespace GIC.Battle
             var from = sim.GetPosition(unit);
             var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
             int maxMove = MoveExecutor.MaxMoveDistance(unit);
+
+            // 驻位基准（CR-Move，2026-10-02 拍板「像皇室战争那样」）：偏好交战距离>0=手动覆写
+            // 微调手感；0=**自动=攻击射程单源**（BattleHeuristics.AttackRangeOf——皇室战争
+            /// 「进攻击范围即停」的回合制等价：安柏箭矢/箭雨未配 clip 射程=24 全图狙击=射程内
+            // 恒驻位只换线、凯亚霜袭 2=逼近到 2 格外停、芭芭拉水球 5=5 格外停）
+            int engageDistance = profile.偏好交战距离 > 0
+                ? profile.偏好交战距离
+                : BattleHeuristics.AttackRangeOf(sim, unit, playerId);
 
             // 锚序：支援型先试最缺血我方（奶谁/去哪护），全军敌迭代殿后
             var anchors = new List<Unit>();
@@ -351,10 +378,26 @@ namespace GIC.Battle
                 var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, to);
                 if (direction == 0) continue;
 
-                // 步数三重钳：偏好距离余量 → 移速上限 → 该向地形可行程（BFS 只保证首步，直线段
+                // 步数三重钳：驻位距离余量 → 移速上限 → 该向地形可行程（BFS 只保证首步，直线段
                 // 可能中途遇湖——按地形截断；被单位挡由 MovementResolver 停格前=预期部分行进）
-                int steps = Math.Min(Math.Max(0, distance - Math.Max(0, profile.偏好交战距离)), maxMove);
-                if (steps <= 0) return; // 已在偏好交战距离内（就近锚）：驻位即最优位，不换锚逼近
+                int steps = Math.Min(Math.Max(0, distance - engageDistance), maxMove);
+                if (steps <= 0)
+                {
+                    // 已在驻位距离内：有攻击/增益候选=驻位即最优位，不换锚逼近（原语义）
+                    if (hasActionCandidate) return;
+                    // ① 轴对齐直飞（2026-10-02 拍板「根据当前目标的位置直接尽可能飞过去」）：射程内
+                    //    无线=不在目标行/列——沿轴直飞对齐（对满轴=落点在目标行/列=下回合开火；
+                    //    全图级射程如安柏 24=落点即线），取代 1 格试线成为主档
+                    if (TryOfferAxisAlignStep(sim, snapshot, unit, playerId, team, turn, from, to,
+                            maxMove, forceType, tracker, profile))
+                        return;
+                    // ② 1 格对齐探针（边缘兜底：已对轴但线被尸体/虚空截断——侧移换线；
+                    //    失败勿 return=换下一锚继续试，首锚驻位无效≠全场无解）
+                    if (!TryOfferAlignmentStep(sim, snapshot, unit, playerId, team, turn, from, forceType,
+                        direction, tracker, profile))
+                        continue;
+                    return;
+                }
                 var step = SkillHitResolver.DirectionToDelta(direction);
                 int straightRun = 0;
                 for (int s = 1; s <= steps; s++)
@@ -393,6 +436,40 @@ namespace GIC.Battle
                 });
                 return; // 首个可达成锚即选（勿迭代全锚取最高分——保持最近可达优先的确定性）
             }
+
+            // 真无解兜底（2026-10-02 三轮报障「重开局安柏凯亚双挂机」回合 25 现场实证）：全部锚都
+            // 未能产出移动候选（steps0 档对齐失败且无后续锚/不可达/首步被占）——朝**首锚** BFS
+            // 方向**走满可行程**（CR-Move 拍板：1 格版换线太慢——全图级狙击射程下这是必经链路，
+            // 每回合满速换位直到与锚行/列交线；地形截断+移速上限钳制，被单位挡由执行层停格前=预期
+            // 部分行进、下回合重算）。纯兜底分=裸 MoveBaseScore（低于一切正常候选）；
+            // BFS=0（首步即无路）=保持缺席
+            if (!hasActionCandidate && anchors.Count > 0)
+            {
+                var fallbackDir = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(anchors[0]));
+                if (fallbackDir != 0)
+                {
+                    var fd = SkillHitResolver.DirectionToDelta(fallbackDir);
+                    int run = 0;
+                    for (int s = 1; s <= maxMove; s++)
+                    {
+                        var cell = new BattleCell(from.x + fd.x * s, from.y + fd.y * s);
+                        if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                        run++;
+                    }
+                    if (run > 0)
+                    {
+                        tracker.Offer(Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重), new ActionData
+                        {
+                            playerId = playerId,
+                            unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                            actionType = ActionType.Move,
+                            direction = fallbackDir,
+                            moveMagnitude = run,
+                            turnNumber = turn,
+                        });
+                    }
+                }
+            }
         }
 
         /// <summary>落点是否有可开火攻击线（任一可施放攻击技能从该点十字向可命中存活敌）——走位估值用</summary>
@@ -416,6 +493,118 @@ namespace GIC.Battle
                     if (BattleHeuristics.PreviewLineTargets(sim, snapshot, team, cell, data, direction).Count > 0)
                         return true;
                 }
+            }
+            return false;
+        }
+
+        /// <summary>轴对齐直飞（2026-10-02 用户拍板「根据当前目标的位置，直接尽可能飞过去」）：
+        /// 射程内但目标不在十字线上——沿横/纵轴朝目标直飞：列对齐=朝目标 x 走 |dx| 格、行对齐=朝
+        /// 目标 y 走 |dy| 格（步数=轴差钳移速上限+直线地形，永不越过目标行/列）。两轴候选择优
+        /// （确定性）：①对满轴且落点有开火线 ②对满轴 ③落点有开火线（部分进展但换到线）④部分
+        /// 进展（轴差小者优先=更快收敛）；同级横轴优先（枚举序）。已对轴但线被断（尸体/虚空截线）
+        /// 时另一轴候选自然成为换线出路。落点占据由执行层停格前处理（部分行进=预期，与正常路径
+        /// 同语义）。返回=是否 Offer；失败走 1 格探针/换锚链</summary>
+        private static bool TryOfferAxisAlignStep(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+            string playerId, TeamType team, int turn, BattleCell from, BattleCell to, int maxMove,
+            ForceType forceType, CandidateTracker tracker, UnitConfig.CompanionProfile profile)
+        {
+            int dx = to.x - from.x;
+            int dy = to.y - from.y;
+            int bestRank = -1, bestDiff = 0, bestRun = 0;
+            Direction2D bestDir = 0;
+            bool bestLineOk = false;
+
+            for (int axis = 0; axis <= 1; axis++)
+            {
+                int diff = axis == 0 ? Math.Abs(dx) : Math.Abs(dy);
+                if (diff == 0) continue; // 已对轴：另一轴候选即换线出路
+                var dir = axis == 0
+                    ? (dx > 0 ? Direction2D.Right : Direction2D.Left)
+                    : (dy > 0 ? Direction2D.Up : Direction2D.Down);
+                var delta = SkillHitResolver.DirectionToDelta(dir);
+
+                int run = 0;
+                int cap = Math.Min(maxMove, diff);
+                for (int s = 1; s <= cap; s++)
+                {
+                    var cell = new BattleCell(from.x + delta.x * s, from.y + delta.y * s);
+                    if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                    run++;
+                }
+                if (run <= 0) continue;
+
+                var landing = new BattleCell(from.x + delta.x * run, from.y + delta.y * run);
+                bool aligned = run == diff;
+                bool lineOk = WouldHaveFiringLineFrom(sim, snapshot, unit, playerId, team, landing);
+                int rank = aligned && lineOk ? 3 : aligned ? 2 : lineOk ? 1 : 0;
+                if (rank > bestRank || (rank == bestRank && diff < bestDiff))
+                {
+                    bestRank = rank;
+                    bestDiff = diff;
+                    bestRun = run;
+                    bestDir = dir;
+                    bestLineOk = lineOk;
+                }
+            }
+            if (bestRank < 0) return false;
+
+            int score = MoveBaseScore + MoveProgressScorePerCell * bestRun + (bestLineOk ? MoveLineUpScore : 0);
+            score = Mathf.RoundToInt(score * profile.移动优先权重);
+            tracker.Offer(score, new ActionData
+            {
+                playerId = playerId,
+                unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                actionType = ActionType.Move,
+                direction = bestDir,
+                moveMagnitude = bestRun,
+                turnNumber = turn,
+            });
+            return true;
+        }
+
+        /// <summary>对齐走位（1 格探针，边缘兜底档）：轴对齐不可行（两轴首格即地形断/已对轴但
+        /// 线被截）时的侧移换线——先沿 BFS 首步（天然合法且指向目标正交邻格=对角一步即成线），
+        /// 再按十字枚举序逐向试；落点三查=地形可行+无阻挡占据+开火线成立才 Offer。
+        /// 探测序确定性：BFS 首步 → CrossDirections 枚举序。占据查=任何单位（含尸体）占格即挡
+        ///（MovementResolver 结算侧同保守近似——多绕不弹回，偏差保守向）。
+        /// 返回=是否成功 Offer（失败时调用方换下一锚继续试——首锚驻位无效≠全场无解，勿 return）</summary>
+        private static bool TryOfferAlignmentStep(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+            string playerId, TeamType team, int turn, BattleCell from, ForceType forceType,
+            Direction2D bfsDirection, CandidateTracker tracker, UnitConfig.CompanionProfile profile)
+        {
+            for (int probe = 0; probe <= BattleHeuristics.CrossDirections.Length; probe++)
+            {
+                var dir = probe == 0 ? bfsDirection : BattleHeuristics.CrossDirections[probe - 1];
+                var delta = SkillHitResolver.DirectionToDelta(dir);
+                var cell = new BattleCell(from.x + delta.x, from.y + delta.y);
+                if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) continue;
+                if (IsCellOccupiedForStep(sim, cell)) continue; // 尸体/友敌占格：挪进去必被弹回（保守挡）
+                if (!WouldHaveFiringLineFrom(sim, snapshot, unit, playerId, team, cell)) continue;
+
+                int score = Mathf.RoundToInt((MoveBaseScore + MoveLineUpScore) * profile.移动优先权重);
+                tracker.Offer(score, new ActionData
+                {
+                    playerId = playerId,
+                    unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                    actionType = ActionType.Move,
+                    direction = dir,
+                    moveMagnitude = 1,
+                    turnNumber = turn,
+                });
+                return true; // 首个成立落点即选（枚举序确定性）
+            }
+            return false; // 全向无成立落点：调用方换下一锚继续试（勿当全场无解）
+        }
+
+        /// <summary>对齐走位落点占据查（保守口径）：任何单位（含尸体——尸体保留碰撞）占格即视为挡，
+        /// 与 FindApproachFirstStep 的 occupied 同近似（友方互不阻挡 flag 的精确判定不在对齐档做——
+        /// 保守向偏差=少选格不会被结算弹回）</summary>
+        private static bool IsCellOccupiedForStep(BattleSimState sim, BattleCell cell)
+        {
+            foreach (var kv in sim.Units)
+            {
+                var pos = sim.GetPosition(kv.Value);
+                if (pos.x == cell.x && pos.y == cell.y) return true;
             }
             return false;
         }
