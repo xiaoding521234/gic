@@ -48,6 +48,11 @@ namespace GIC.Battle
         /// 命令层不携带（客户端伤害弹出时刻自推导，此字段仅供同片效应派生）</summary>
         public float HitSeconds;
 
+        /// <summary>本次命中是否暴击（2026-10-02 幸运暴击批：roll 于编译出口 CompileElementalDamage，
+        /// 理智乘区已并入 Amount——本字段仅供命令层表现〔客户端数字放大〕非结算量）；
+        /// 同 (来源,目标,时刻) 合并时取「任一段暴击即暴」（MergeDamageEffects）</summary>
+        public bool IsCrit;
+
         public DamageEffect(string attackerUnitId, string targetUnitId, int amount, int element = 0,
             int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f,
             int reactionType = 0, int launchMs = 0)

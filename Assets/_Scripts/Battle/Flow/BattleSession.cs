@@ -33,10 +33,13 @@ namespace GIC.Battle
 
         // ==================== 装配 ====================
 
-        public static BattleSession CreateLocal(BattleMapData map, BattlePlayer player, TurnFlowController flow, Transform logicRoot)
+        /// <param name="seed">战斗种子（模拟核心概率事件 RNG 初始化——幸运暴击 roll；
+        /// 联机 B7 两端经同一 BattleLaunchConfig 广播得到同 seed，客户端零 roll）</param>
+        public static BattleSession CreateLocal(BattleMapData map, BattlePlayer player, TurnFlowController flow,
+            Transform logicRoot, int seed)
         {
             var transport = new LocalBattleTransport();
-            var sim = new BattleSimState(map);
+            var sim = new BattleSimState(map, seed);
             flow.Bind(sim, transport);
 
             var session = new BattleSession

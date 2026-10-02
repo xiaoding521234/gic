@@ -317,7 +317,7 @@ namespace GIC.Battle
 
                 Destroy(arrowGo);
                 yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind,
-                    command.metadata);
+                    command.metadata, isCrit: command.crit == 1);
             }
             finally
             {
@@ -665,7 +665,7 @@ namespace GIC.Battle
                                     beats.beats.Add(dmgDelay);
                                 }
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
-                                    command.reactionKind, command.metadata)));
+                                    command.reactionKind, command.metadata, isCrit: command.crit == 1)));
                             }
                         }
                         break;
@@ -988,7 +988,7 @@ namespace GIC.Battle
         }
 
         private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal,
-            int reactionKind = 0, int element = 0, bool lifestealPrefix = false)
+            int reactionKind = 0, int element = 0, bool lifestealPrefix = false, bool isCrit = false)
         {
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
@@ -1010,9 +1010,12 @@ namespace GIC.Battle
             int value = Mathf.Abs(displayValue);
             // 吸血名前缀（2026-10-01 拍板「吸血数字少了前缀」）：「吸血 +N」——与反应名前缀同风格，
             // 普通治疗仍裸 +N（color=治疗绿共用）
+            // 暴击后缀「!」（2026-10-02 拍板）：伤害数字尾部追加，与反应名前缀共存（如"蒸发 40!"）；
+            // 治疗不暴（暴击只 roll 伤害）恒无后缀
+            string critSuffix = !isHeal && isCrit ? "!" : "";
             string text = isHeal
                 ? lifestealPrefix ? $"{LifeStealName()} +{value}" : $"+{value}"
-                : reactionName != null ? $"{reactionName} {value}" : value.ToString();
+                : reactionName != null ? $"{reactionName} {value}{critSuffix}" : $"{value}{critSuffix}";
             // 配色（2026-10-01 拍板「与原神一致」）：治疗=治疗绿；伤害=ResolveDamageNumberColor
             // （元素色/反应独特色，见该方法注释）
             var numberColor = isHeal ? Palette.治疗绿 : ResolveDamageNumberColor(reactionKind, element);
@@ -1021,7 +1024,7 @@ namespace GIC.Battle
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
-                numberColor, value, _playbackSpeed, isHeal);
+                numberColor, value, _playbackSpeed, isHeal, isCrit);
         }
 
         /// <summary>受击闪色恢复尾巴（S5：不进 playbacks=不 gate ack——Host 片节拍只等位移/伤害主体）</summary>

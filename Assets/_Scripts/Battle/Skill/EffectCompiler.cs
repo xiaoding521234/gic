@@ -284,6 +284,15 @@ namespace GIC.Battle
             var outcome = ElementReactionResolver.Preview(sim.GetCompileDye(targetUnitId, targetState), element);
             if (request != null)
             {
+                // 暴击判定（2026-10-02 幸运暴击批，docs/18 决策二十七）：幸运=暴击率（20 点=20%、
+                // 负值恒不暴、默认 0=无暴击）——roll 走 sim 种子 RNG 单出口（BattleSimState.RollChance，
+                // 回放/联机确定性）；理智=暴击效果（默认 50=×1.5）经 CritBonus 注入独立乘区。
+                // 本方法=全伤害唯一编译出口（正常命中/光环 tick/DoT 全经此），判定收拢于此=所有伤害
+                // 都可暴击（docs/05 §5.6）
+                var attackerStats = request.Attacker?.GetUnitComponent<UnitStats>();
+                bool isCrit = attackerStats != null && sim.RollChance(attackerStats.Luck);
+                if (isCrit) request.CritBonus = attackerStats.Sanity / 100f;
+
                 request.VulnerabilityBonus = outcome.VulnerabilityBonus;
                 request.DamageBonusDelta = outcome.DamageBonusDelta;
                 var result = DamagePipeline.Calculate(request);
@@ -291,7 +300,7 @@ namespace GIC.Battle
                     effects.Add(new DamageEffect(attackerId, targetUnitId, result.FinalDamage, (int)element,
                         delivery, fromCell, hitPointX, hitPointY, outcome.ReactionType,
                         Mathf.RoundToInt(launchSeconds * 1000f))
-                    { HitSeconds = hitSeconds }); // 吸血治疗继承命中时刻（WYSIWYG）
+                    { HitSeconds = hitSeconds, IsCrit = isCrit }); // 吸血治疗继承命中时刻（WYSIWYG）+暴击事实传命令层
             }
             if (outcome.HasReaction)
             {

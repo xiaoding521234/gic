@@ -474,7 +474,7 @@ namespace GIC.Battle
                 segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount,
                     effect.Element, effect.Delivery, effect.FromCell,
                     Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType,
-                    effect.LaunchMs));
+                    effect.LaunchMs, effect.IsCrit ? 1 : 0));
             }
 
             if (vanishes != null)
@@ -1045,6 +1045,9 @@ namespace GIC.Battle
                 if (merged.TryGetValue(key, out var existing))
                 {
                     existing.Amount += damage.Amount;
+                    // 暴击合并口径（2026-10-02 幸运暴击批）：任一段暴击即标暴——Amount 已含暴击
+                    // 份额，标大更近真（非首条独裁；命中点/反应标记仍取首条不变）
+                    existing.IsCrit |= damage.IsCrit;
                 }
                 else
                 {
@@ -1052,7 +1055,7 @@ namespace GIC.Battle
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
                         damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY,
                         damage.ReactionType, damage.LaunchMs)
-                    { HitSeconds = damage.HitSeconds }; // 吸血治疗继承用（WYSIWYG）
+                    { HitSeconds = damage.HitSeconds, IsCrit = damage.IsCrit }; // 吸血治疗继承用（WYSIWYG）+暴击事实
                     merged[key] = copy;
                     result.Add(copy);
                 }

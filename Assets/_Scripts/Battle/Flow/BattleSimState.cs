@@ -13,6 +13,15 @@ namespace GIC.Battle
     {
         public BattleMapData Map { get; }
 
+        /// <summary>战斗种子（2026-10-02 幸运暴击批）：构造注入，模拟核心概率事件唯一随机源的
+        /// 初始化种子——同 seed+同命令序列=同战局（回放/复现/联机确定性）；客户端零 roll 不消费</summary>
+        public int Seed { get; }
+
+        /// <summary>Host 概率事件 RNG（System.Random=种子可注入、与 Unity 帧无关）——模拟核心
+        /// 唯一随机源；模拟核心禁直调 UnityEngine.Random（联机双端漂移/回放破坏），一切概率
+        /// 判定走 RollChance 单出口</summary>
+        private readonly System.Random _rng;
+
         /// <summary>已注册玩家ID（**注册序保序**——部署核心位置代理按注册序映射 spawnCenters、回合提交完成度判定用。
         /// 2026-09-23 审查 Y5：原 HashSet 迭代序 .NET 无保证，B7 换注册实现会静默错位部署基准）</summary>
         private readonly List<string> _playerIds = new List<string>();
@@ -39,9 +48,22 @@ namespace GIC.Battle
         public IReadOnlyDictionary<string, Unit> Units => _units;
         public IReadOnlyList<ActionData> InstantActionQueue => _instantActionQueue;
 
-        public BattleSimState(BattleMapData map)
+        public BattleSimState(BattleMapData map, int seed)
         {
             Map = map;
+            Seed = seed;
+            _rng = new System.Random(seed);
+        }
+
+        /// <summary>概率判定单出口（2026-10-02 幸运暴击批）：percent 0~100（20 即 20%）；
+        /// ≤0 恒否、≥100 恒是（负幸运=永不暴击、满幸运=必暴）。当前消费方=幸运暴击 roll
+        /// （EffectCompiler.CompileElementalDamage：暴击率=攻击者幸运）；未来概率事件（核心宝箱
+        /// 随机刷 docs/03 等）一律经此，勿在模拟核心散播第二随机源</summary>
+        public bool RollChance(float percent)
+        {
+            if (percent <= 0f) return false;
+            if (percent >= 100f) return true;
+            return _rng.NextDouble() * 100.0 < percent;
         }
 
         /// <summary>逻辑单位隐藏根（装配时设置；部署等运行时生成单位挂此——纯逻辑容器勿落场景根，BattleSession._logicRoot 同源）</summary>

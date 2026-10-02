@@ -144,7 +144,9 @@ namespace GIC.UI
             var logicGo = new GameObject("LogicUnits");
             logicGo.transform.SetParent(transform, false);
 
-            _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform);
+            // 战斗种子（2026-10-02 幸运暴击批）：配置带种用配置（联机/复现），调试直开随机生成
+            int battleSeed = launchConfig != null ? launchConfig.Seed : UnityEngine.Random.Range(0, int.MaxValue);
+            _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform, battleSeed);
             _session.Sim.LogicRoot = logicGo.transform; // 部署等运行时生成单位挂同根（B6c）
             for (int i = 0; i < playerSetups.Count; i++)
             {

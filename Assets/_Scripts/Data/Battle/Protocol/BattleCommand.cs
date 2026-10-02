@@ -122,6 +122,9 @@ namespace GIC.Data
         [Header("反应标记（Damage 命令=元素反应子类型，0=无反应——本次命中触发的反应，客户端伤害数字带反应名；Effect(投射物消散)/SkillCast(技能施放)=投射物/技能元素 ElementType——箭矢/箭雨元素色染色单源，Host 按 Damage.metadata 同口径下发）")]
         public int reactionKind;
 
+        [Header("暴击标记（Damage 命令；1=本次命中暴击——Host 幸运 roll 结论〔暴击率=幸运/100、效果=理智乘区〕，客户端数字放大；0=未暴击。2026-10-02 幸运暴击批）")]
+        public int crit;
+
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
         public int buffLevel;
@@ -173,10 +176,11 @@ namespace GIC.Data
         /// cell=投射物发射格（Delivery≠0 时有效）；hitX/hitY=命中点千分定点连续格心坐标
         /// （Delivery=1 有效——Host 接触判定得出，客户端按此播放弹着点，勿自行推算）；
         /// reactionKind=本次命中触发的元素反应（0=无；反应命中时伤害数字带反应名——三反应全带，2026-10-01 三次拍板「反应名都应该加上」）；
-        /// launchMs=发射时刻毫秒（时轮 B-S1——客户端投射物延迟起飞/瞬发段伤害数字节拍；合并键含此值=逐发不并）</summary>
+        /// launchMs=发射时刻毫秒（时轮 B-S1——客户端投射物延迟起飞/瞬发段伤害数字节拍；合并键含此值=逐发不并）；
+        /// crit=暴击标记（0/1——幸运 roll 结论，客户端暴击数字放大，2026-10-02 幸运暴击批）</summary>
         public static BattleCommand Damage(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
             int amount, int metadata, int delivery = 0, BattleCell fromCell = default, int hitX = 0, int hitY = 0,
-            int reactionKind = 0, int launchMs = 0)
+            int reactionKind = 0, int launchMs = 0, int crit = 0)
         {
             return new BattleCommand
             {
@@ -193,6 +197,7 @@ namespace GIC.Data
                 hitY = hitY,
                 reactionKind = reactionKind,
                 launchMs = launchMs,
+                crit = crit,
             };
         }
 

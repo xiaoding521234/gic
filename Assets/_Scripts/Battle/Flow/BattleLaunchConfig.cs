@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using GIC.Data;
 namespace GIC.Battle
 {
@@ -27,6 +28,13 @@ namespace GIC.Battle
 
         public string MapConfigName = DefaultMapName;
         public List<BattlePlayerSetup> Players = new List<BattlePlayerSetup>();
+
+        /// <summary>战斗种子（2026-10-02 幸运暴击批）：模拟核心概率事件唯一随机源的初始化种子
+        /// （Host 端 BattleSimState 按 seed 建 System.Random，同 seed+同命令序列=同战局——回放/复现/
+        /// 联机防漂移；客户端零 roll 不消费）。BuildSinglePlayer 自动随机生成；测试/复现可显式注入；
+        /// 未经本工厂直接 new 的配置 Seed=0=确定性种子（合法，仅同输入对局暴击序列一致）。
+        /// B7 LAN：Host 广播本配置即双端同 seed</summary>
+        public int Seed;
 
         public static BattleLaunchConfig Current { get; private set; }
 
@@ -66,6 +74,8 @@ namespace GIC.Battle
             return new BattleLaunchConfig
             {
                 MapConfigName = string.IsNullOrEmpty(mapConfigName) ? DefaultMapName : mapConfigName,
+                // 种子用表现层 UnityEngine.Random 生成（开局壳层，不入模拟流；模拟核心禁该随机源）
+                Seed = UnityEngine.Random.Range(0, int.MaxValue),
                 Players = new List<BattlePlayerSetup>
                 {
                     new BattlePlayerSetup
