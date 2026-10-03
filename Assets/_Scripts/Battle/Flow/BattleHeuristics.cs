@@ -122,44 +122,9 @@ namespace GIC.Battle
         /// 返回 0=已贴身/同格/无路（缺席）。方向域=十字四向，方向纪律不变；枚举序展开=决策确定性。</summary>
         public static Direction2D FindApproachFirstStep(BattleSimState sim, Unit self, BattleCell target)
         {
+            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType))
+                return 0;
             var map = sim.Map;
-            if (map == null || map.width <= 0 || map.height <= 0) return 0;
-            var from = sim.GetPosition(self);
-            if (from.x == target.x && from.y == target.y) return 0; // 同格：无逼近意义
-
-            var moveable = self.GetUnitComponent<UnitMoveable>();
-            var forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
-            bool passAllies = moveable != null && moveable.与友方互不阻挡;
-            var selfIdentity = self.GetUnitComponent<UnitIdentity>();
-
-            // 单位占据格（含尸体——尸体保留碰撞）：自身除外；互不阻挡开启时友方格放行
-            var occupied = new bool[map.width, map.height];
-            foreach (var kv in sim.Units)
-            {
-                var pos = sim.GetPosition(kv.Value);
-                if (pos.x == from.x && pos.y == from.y) continue;
-                bool isAlly = false;
-                if (passAllies && selfIdentity != null)
-                {
-                    var id = kv.Value.GetUnitComponent<UnitIdentity>();
-                    isAlly = id != null && id.Team == selfIdentity.Team;
-                }
-                if (!isAlly && pos.x >= 0 && pos.x < map.width && pos.y >= 0 && pos.y < map.height)
-                    occupied[pos.x, pos.y] = true;
-            }
-
-            // 目标集：敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
-            // 被占/不可行邻格一律剔除——否则小兵走进去每回合被弹回=二轮报障根因）
-            var goals = new bool[map.width, map.height];
-            foreach (var dir in CrossDirections)
-            {
-                var delta = SkillHitResolver.DirectionToDelta(dir);
-                int gx = target.x + delta.x, gy = target.y + delta.y;
-                if (!map.HasTile(gx, gy)) continue;
-                if (!map.IsPassable(gx, gy, forceType)) continue;
-                if (occupied[gx, gy]) continue;
-                goals[gx, gy] = true;
-            }
             if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
 
             // BFS（十字域）：队列携带首步方向；到任一目标格即回传
@@ -193,6 +158,131 @@ namespace GIC.Battle
                 }
             }
             return 0; // 无路（真不可达）：缺席
+        }
+
+        /// <summary>逼近场构建（FindApproachFirstStep/FindApproachStraightSteps 共用口径，防双份漂移
+        /// ——2026-10-03 抽提）：同格判定+单位占据格（含尸体；互不阻挡开启时友方格放行=CanEnter 的
+        /// 保守近似，细节与同步条件见 FindApproachFirstStep 注释）+目标集（敌格十字邻格中「可通行且
+        /// 无阻挡占据」的格）。false=同格/地图无效（调用方一律按"无逼近"处理）</summary>
+        private static bool BuildApproachField(BattleSimState sim, Unit self, BattleCell target,
+            out bool[,] occupied, out bool[,] goals, out BattleCell from, out ForceType forceType)
+        {
+            occupied = null; goals = null;
+            from = new BattleCell(0, 0);
+            forceType = ForceType.Walk;
+            var map = sim.Map;
+            if (map == null || map.width <= 0 || map.height <= 0) return false;
+            from = sim.GetPosition(self);
+            if (from.x == target.x && from.y == target.y) return false; // 同格：无逼近意义
+
+            var moveable = self.GetUnitComponent<UnitMoveable>();
+            forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
+            bool passAllies = moveable != null && moveable.与友方互不阻挡;
+            var selfIdentity = self.GetUnitComponent<UnitIdentity>();
+
+            // 单位占据格（含尸体——尸体保留碰撞）：自身除外；互不阻挡开启时友方格放行
+            occupied = new bool[map.width, map.height];
+            foreach (var kv in sim.Units)
+            {
+                var pos = sim.GetPosition(kv.Value);
+                if (pos.x == from.x && pos.y == from.y) continue;
+                bool isAlly = false;
+                if (passAllies && selfIdentity != null)
+                {
+                    var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                    isAlly = id != null && id.Team == selfIdentity.Team;
+                }
+                if (!isAlly && pos.x >= 0 && pos.x < map.width && pos.y >= 0 && pos.y < map.height)
+                    occupied[pos.x, pos.y] = true;
+            }
+
+            // 目标集：敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
+            // 被占/不可行邻格一律剔除——否则小兵走进去每回合被弹回=二轮报障根因）
+            goals = new bool[map.width, map.height];
+            foreach (var dir in CrossDirections)
+            {
+                var delta = SkillHitResolver.DirectionToDelta(dir);
+                int gx = target.x + delta.x, gy = target.y + delta.y;
+                if (!map.HasTile(gx, gy)) continue;
+                if (!map.IsPassable(gx, gy, forceType)) continue;
+                if (occupied[gx, gy]) continue;
+                goals[gx, gy] = true;
+            }
+            return true;
+        }
+
+        /// <summary>沿 BFS 最短路的「直线前缀」步数（2026-10-03 报障「丘丘人来回左右移动持续多回合」
+        /// 返修原语——眷属 v6 多格移动专用）：从单位位到目标攻击位集的最短路上，沿首步方向**不拐弯**
+        /// 能连续走几格——只踏「到攻击位距离严格递减」的最短路格，**踏上攻击位（dist=0）即停不越过**。
+        /// 与「首步方向×N 直线飞」（旧 v6 写法=振荡根源：L 形路径越拐点偏航+越过攻击位不停，下回合
+        /// BFS 指回程=左右乒乓，打不进射程就永不收敛）的区别：每回合距离单调递减，数学上不可能振荡。
+        /// 返回 0=已贴身/同格/无路（与 FindApproachFirstStep 同判）；direction out=首步方向。
+        /// 口径=BuildApproachField 共用（保守近似同 FindApproachFirstStep 注释）</summary>
+        public static int FindApproachStraightSteps(BattleSimState sim, Unit self, BattleCell target,
+            int maxSteps, out Direction2D direction)
+        {
+            direction = 0;
+            if (maxSteps <= 0) return 0;
+            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType))
+                return 0;
+            var map = sim.Map;
+            if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
+
+            // 多源 BFS（自攻击位集反向扩散）：每格到最近攻击位的步数 dist
+            var dist = new int[map.width, map.height];
+            var queue = new Queue<(int x, int y)>();
+            for (int x = 0; x < map.width; x++)
+                for (int y = 0; y < map.height; y++)
+                {
+                    if (goals[x, y]) { dist[x, y] = 0; queue.Enqueue((x, y)); }
+                    else dist[x, y] = -1;
+                }
+            while (queue.Count > 0)
+            {
+                var cur = queue.Dequeue();
+                foreach (var dir in CrossDirections)
+                {
+                    var delta = SkillHitResolver.DirectionToDelta(dir);
+                    int nx = cur.x + delta.x, ny = cur.y + delta.y;
+                    if (!map.HasTile(nx, ny) || dist[nx, ny] >= 0) continue;
+                    if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) continue;
+                    dist[nx, ny] = dist[cur.x, cur.y] + 1;
+                    queue.Enqueue((nx, ny));
+                }
+            }
+            if (dist[from.x, from.y] < 0) return 0; // 无路（真不可达）
+
+            // 首方向=十字序首个「距离严格缩短」的邻格（与 FindApproachFirstStep 同为确定性最短路首步）
+            var firstX = 0; var firstY = 0;
+            foreach (var dir in CrossDirections)
+            {
+                var delta = SkillHitResolver.DirectionToDelta(dir);
+                int nx = from.x + delta.x, ny = from.y + delta.y;
+                if (!map.HasTile(nx, ny)) continue;
+                if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) continue;
+                if (dist[nx, ny] == dist[from.x, from.y] - 1)
+                {
+                    direction = dir; firstX = delta.x; firstY = delta.y;
+                    break;
+                }
+            }
+            if (direction == 0) return 0;
+
+            // 直线前缀逐格推进：距离不严格递减（拐弯/绕行起点）即停；被地形/单位挡即停；
+            // 踏上攻击位（dist=0）即停——到位不越点
+            int steps = 0;
+            int cx = from.x, cy = from.y;
+            while (steps < maxSteps)
+            {
+                int nx = cx + firstX, ny = cy + firstY;
+                if (!map.HasTile(nx, ny)) break;
+                if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) break;
+                if (dist[nx, ny] != dist[cx, cy] - 1) break; // 偏离最短路：停在拐点，下回合重算换向
+                steps++;
+                cx = nx; cy = ny;
+                if (dist[cx, cy] == 0) break; // 踏上攻击位：本回合到此为止
+            }
+            return steps;
         }
 
         /// <summary>单位技能实例列表中首个指定类型技能的索引（-1=无）——遍历 unit.Skills

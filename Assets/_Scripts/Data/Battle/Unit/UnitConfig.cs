@@ -104,8 +104,18 @@ namespace GIC.Data
             [Header("元素")]
             public ElementType selfElement = ElementType.Physical;
 
-            [Header("视野")]
-            public int visionRange = Unspecified;
+            [Header("视野（2026-10-03 拍板拆分：攻击视野=AI 追击感知半径 / 迷雾视野=破雾半径）")]
+            /// <summary>攻击视野（2026-10-03 拍板「眷属总是向协议核心进攻，除非攻击视野内有其它敌人」）：
+            /// 眷属 AI 追击**非核心**敌人的感知半径（切比雪夫，格）——视野外的敌不关心（皇室战争式）；
+            /// 协议核心无视野门槛恒为目标，非核心敌还须严格近于核心（同距核心优先）。
+            /// Unspecified=回落 5；安柏=24（对齐全图狙击射程）。攻击档自身射程即感知边界（射程≤视野
+            /// 对现役单位恒成立）。未来 Buff 要改它时再入 StatType（预留勿提前造）。</summary>
+            public int 攻击视野 = Unspecified;
+
+            /// <summary>迷雾视野（战争迷雾系统预留，2026-10-03 拍板）：可自动破除迷雾的范围（切比雪夫，格）。
+            /// Unspecified=回落 2；现行消费方=StatType.VisionRange 基值（安柏 1命「视野提升」休眠数据位
+            /// 挂此管线——迷雾批落地时接线）。</summary>
+            public int 迷雾视野 = Unspecified;
 
             [Header("标签")]
             public UnitTag[] tags;
@@ -167,7 +177,8 @@ namespace GIC.Data
             public int GetEffectiveMastery() => IsSpecified(baseMastery) ? baseMastery : 0;
             public int GetEffectiveSanity() => IsSpecified(baseSanity) ? baseSanity : 50;
             public int GetEffectiveHP() => IsSpecified(baseHP) ? baseHP : GetHPByStarLevel();
-            public int GetEffectiveVisionRange() => IsSpecified(visionRange) ? visionRange : 1;
+            public int GetEffectiveAttackVision() => IsSpecified(攻击视野) ? 攻击视野 : 5;
+            public int GetEffectiveFogVision() => IsSpecified(迷雾视野) ? 迷雾视野 : 2;
             public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
             public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
             public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;

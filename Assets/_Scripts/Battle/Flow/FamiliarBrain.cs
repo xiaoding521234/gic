@@ -22,10 +22,18 @@ namespace GIC.Battle
     /// 单位指向/无目标自施放型无方向域不消费——眷属现无此类，出现时再扩）。
     /// v6（2026-10-03 报障「移速 20 根本没发挥出来」）：移动步数退役「小兵蠕动 1 步/回合」硬编码
     /// ——改读 MoveExecutor.MaxMoveDistance（MoveDistance×移速单源换算=10%×移速，含 Buff 减速，
-    /// 与玩家移动/HUD 同口径）；BFS 首步方向+v4 换目标巡逻不变，遇阻由 MovementResolver 结算截停。
+    /// 与玩家移动/HUD 同口径）；遇阻由 MovementResolver 结算截停。
+    /// v6.1（2026-10-03 同日报障「来回左右移动持续多回合」）：步进改走 BFS 最短路「直线前缀」
+    /// （FindApproachStraightSteps——只踏距离严格递减格、踏上攻击位即停）；「首步方向×N 直线飞」
+    /// 越过拐点/攻击位=振荡根源，每回合距离单调递减后数学上不可能振荡。
+    /// v7（2026-10-03 拍板「眷属总是向协议核心进攻，除非攻击视野内有其它敌人…同距离时优先协议
+    /// 核心，不在攻击视野则不关心——就像皇室战争的单位一样」）：移动档目标序改**核心锚定**——
+    /// 核心无视野门槛恒为目标；非核心敌须「攻击视野内（Unspecified 回落 5）且严格近于核心」才追
+    /// （UnitData.攻击视野 字段）；核心已破=退化为视野内纯距离序。攻击档（战技/爆发）射程即感知
+    /// 边界，不另设视野门。
     /// 纯读 BattleSimState 由 Host 在选择阶段头生成（docs/18 决策一），行动与玩家行动合并进执行阶段。
-    /// 决策档：爆发可命中（满槽）→ 爆发朝敌 → 战技可命中→打 → 否则逐敌（近→远）沿最短路按移速步进
-    /// → 全部敌打不了也走不近=缺席。
+    /// 决策档：爆发可命中（满槽）→ 爆发朝敌 → 战技可命中→打 → 否则按「核心锚定视野序」逐敌
+    /// 沿最短路按移速步进 → 全部敌打不了也走不近=缺席。
     /// 眷属不配行为档案（启发式维持=层级特色，也是数量安全阀——场上眷属多，评分制算量敏感，
     /// docs/active/32 §6.1）。
     /// </summary>
@@ -80,18 +88,43 @@ namespace GIC.Battle
 
             // 朝敌按移速步进——v6（2026-10-03 报障「移速 20 根本没发挥出来」）：步数上限退役
             // 「小兵蠕动 1 步/回合」硬编码，改读 MoveExecutor.MaxMoveDistance（移动技能 MoveDistance×
-            // 移速单源换算=10%×移速，含 Buff 减速——与玩家移动/HUD 同口径）；v4 换目标巡逻不变
-            // （攻击档打不了时按距离升序逐敌试 BFS 最短路首步——贴身已到/不可达返回 0 的敌自动跳过
-            // 换下一个，不再对着打不了的目标站桩）；直线步进遇阻由 MovementResolver 结算截停
-            // （被挡也算已使用，BFS 路径拐弯处下一回合重算自然修正）。移速被压到 0 步（重减速）
-            // =缺席不空耗。
+            // 移速单源换算=10%×移速，含 Buff 减速——与玩家移动/HUD 同口径）。
+            // v6.1（2026-10-03 同日报障「来回左右移动持续多回合」）：步进改走 BFS 最短路「直线前缀」
+            // （FindApproachStraightSteps——只踏到攻击位距离严格递减的最短路格、踏上攻击位即停）；
+            // 旧写法「首步方向×N 直线飞」会越过路径拐点与攻击位，下回合 BFS 指回程=左右振荡
+            // 永不收敛（L 形路径+对角目标场景），每回合距离单调递减后数学上不可能振荡。v4 换目标
+            // 巡逻不变（攻击档打不了时按距离升序逐敌试逼近步）；遇阻/拐点由原语就地截停（被挡也算
+            // 已使用）；移速被压到 0 步（重减速）=缺席不空耗。
             int moveSteps = MoveExecutor.MaxMoveDistance(unit);
             if (moveSteps > 0)
             {
-                foreach (var target in BattleHeuristics.FindEnemiesByDistance(sim, unit))
+                // v7（2026-10-03 拍板「眷属总是向协议核心进攻，除非攻击视野内有其它敌人，才会去追
+                // （需要比协议核心更近才行，同距离时优先协议核心），不在攻击视野则不关心——就像
+                // 皇室战争的单位一样」）：目标序从纯距离升序改**核心锚定**——
+                // ①敌方协议核心（建筑）=永恒目标：无视野门槛；
+                // ②非核心敌须同时满足：在攻击视野内（RawData.GetEffectiveAttackVision 切比雪夫半径，
+                //   Unspecified 回落 5）**且**严格近于核心（同距核心优先）才可追；视野外不关心。
+                // 核心已破（不在场）=无锚，退化为「视野内最近敌」纯距离序兜底。逐敌距离升序+等距
+                // unitId 升序铁律不变（确定性）；v6.1 直线前缀步进不变。
+                var enemies = BattleHeuristics.FindEnemiesByDistance(sim, unit);
+                Unit core = null;
+                foreach (var e in enemies)
+                    if (BattleHeuristics.IsBuilding(e)) { core = e; break; } // 现役唯一建筑=双方协议核心
+                var selfPos = sim.GetPosition(unit);
+                int coreDist = core != null ? selfPos.ChebyshevTo(sim.GetPosition(core)) : int.MaxValue;
+                int attackVision = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;
+
+                foreach (var target in enemies)
                 {
-                    var moveDirection = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(target));
-                    if (moveDirection == 0) continue; // 该敌打不了也走不近：换下一个目标
+                    if (target != core)
+                    {
+                        int targetDist = selfPos.ChebyshevTo(sim.GetPosition(target));
+                        if (targetDist > attackVision) continue; // 攻击视野外：不关心（CR 式感知）
+                        if (targetDist >= coreDist) continue;   // 不严格近于核心：不追（同距核心优先）
+                    }
+
+                    var steps = BattleHeuristics.FindApproachStraightSteps(sim, unit, sim.GetPosition(target), moveSteps, out var moveDirection);
+                    if (steps <= 0) continue; // 该敌打不了也走不近：换下一个目标
 
                     return new ActionData
                     {
@@ -99,7 +132,7 @@ namespace GIC.Battle
                         unitId = unitId,
                         actionType = ActionType.Move,
                         direction = moveDirection,
-                        moveMagnitude = moveSteps,
+                        moveMagnitude = steps,
                         turnNumber = turnNumber,
                     };
                 }
