@@ -1751,4 +1751,6 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 - ②**双方同名单位撞 key**：对称测试军双方各一 Amber/Kaeya——按 unitName 聚合（死亡登记/统计）会双方混淆，按 unitId 分、展示层才映射 name；死亡登记记得报后从存活集移除（否则每回合重复报）；
 - ③exec_runtime_script 的 Task<string> 轮询等待用 Task.Delay（不占主线程）——别用 Thread.Sleep；
 - ④超时预算：单回合 ~10s 结算+1.6s 选择，28 回合实测 200s；timeoutSeconds 按「回合数×12s」给。
+- **⑤seed 对战局无效（2026-10-03 G 批实证）**：全员幸运 0 时 `RollChance` 判定 ≤0 恒否**从不消费 RNG**——战局 100% 由确定性评分+AI 决定，**换 seed 战局逐位一致≠代码没生效**（三局同构假象的根源）；要验证行为变化，改的是评分/决策代码本身，别怀疑 seed。
+- **⑥反射探针法（行为归因的标准工具，G 批三轮归因全靠它）**：exec_runtime_script 直接反射调 private 评分方法（`typeof(CompanionBrain).GetMethod("ScoreSupportCell"/"ScoreMoveCandidate", NonPublic|Static)`+Activator 建 CandidateTracker）dump 逐格评分明细/档案实值/锚延续槽（_lastMoveAnchors static 字段）/地形图（HasTile×IsPassable 逐格渲染 15×15）——比快照对比纸上推演高效一个量级（环湖 BFS 走歪/伤员自身奶程锁两案均一发定位）。**探针调用陷阱**：调 ScoreMoveCandidate 要先跑 ScoreAttackCandidates 拿真实 hasActionCandidate（传 false 会改变驻位分支行为）。
 **How to apply**：AI 决策类批次的**结构化行为验证**默认走本 harness（非视觉：决策序列+快照 diff 足够判断行为正确性——画面观感仍交用户）；全量逐回合日志落盘（`File.WriteAllText`+UTF8 无 BOM）防返回截断——注意 Unity 的 `Temp/` 目录**编辑器退出时清空**，长存拷出。本节 harness 完整可抄范本=2026-10-03 会话 exec_runtime_script（战斗 AI 观察两局：8 回合抽样局+28 回合完整局）。

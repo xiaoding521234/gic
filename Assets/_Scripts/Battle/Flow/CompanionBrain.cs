@@ -83,6 +83,52 @@ namespace GIC.Battle
         /// 小于此值=「站敌人刀口」——支援型自保负分生效阈值</summary>
         public const int SupportDangerRadius = 2;
 
+        /// <summary>光环敌覆盖每敌加分（G-1 光环位置价值，docs/active/35）：持有半径型 tick 光环
+        /// 时落点光环半径内每敌 +6——量级对齐走位线分 8（3 敌=18 显著牵引）：光环挂水/挂冰引擎
+        /// 的贴敌驱动力；乘档案「光环贴敌权重」（0=默认不消费）与形态因子（保险形态归零 G-2）</summary>
+        public const int SupportAuraPerEnemy = 6;
+
+        /// <summary>支援形态切换血线门（G-2，docs/active/35 §2）：hp% 低于此值=保险形态
+        ///（贴敌分归零+自保×SupportStanceSafeFactor 后撤）——她活着=复活保险在（复苏无限程，
+        /// 生存问题非站位问题）；光环 tick 含持有者自奶→奶回线上自动重返前线</summary>
+        public const int SupportStanceRetreatHpPercent = 60;
+
+        /// <summary>支援形态切换预警门（G-2）：威胁图预期承伤 ≥ hp×此百分比=保险形态——
+        /// 提前一回合后撤（不等到掉血才反应；E-1 威胁图基建复用零新感知；threat=null 时仅血线门）</summary>
+        public const int SupportStanceRetreatThreatPercent = 50;
+
+        /// <summary>保险形态自保倍率（G-2）：自保负分 ×3=贴敌格扣 45 分——后撤位（远离敌仍在
+        /// 奶程内）自然胜出</summary>
+        public const int SupportStanceSafeFactor = 3;
+
+        /// <summary>光环前瞻基准距离（G-5 光环前瞻梯度，docs/active/35 §2 返修——远距趋近驱动力）：
+        /// 距最近敌此距离处=0 分起点，每近 1 格 +SupportAuraApproachPerStep，上限 Cap。
+        /// **2026-10-03 验证局调参 8→14**：开局敌距 9~11 格、旧值 8=零牵引（她缩角到敌自己走过来）；
+        /// 14 覆盖测试军地图对角开局距</summary>
+        public const int SupportAuraApproachBase = 14;
+
+        /// <summary>光环前瞻每步分（G-5）：每近敌 1 格 +3（权重 1 档）——**验证局调参 2→3**：
+        /// 4 格敌距=+12 恰好对冲火线扣分 12（站位评分器内支援型火线减半后=净正 +6）、6 格=+6
+        /// 净正——趋敌梯度在前线形态全程为正</summary>
+        public const int SupportAuraApproachPerStep = 3;
+
+        /// <summary>光环前瞻上限（G-5）：+12=对齐「光环内 2 敌」满档——近身光环实分接管后前瞻失效
+        ///（enemiesInAura>0 时不再叠加前瞻，防双计）</summary>
+        public const int SupportAuraApproachCap = 12;
+
+        /// <summary>支援站位火线扣分减半系数（G-5 验证局调参）：站位评分器内火线扣分 ×50%——
+        /// 支援型前线形态「接受中等风险换贴敌挂水」（整列火线吓退支援型=缩角实证）；E-1 配额脑
+        /// 原路径全额不动（输出型零回归）</summary>
+        public const float SupportThreatPenaltyScale = 0.5f;
+
+        /// <summary>保险形态后撤梯度（G-5 验证局调参——保险形态零移动驱动返修）：远离最近敌每格
+        /// +2（上限 12）——旧版保险形态贴敌归零+前瞻归零后 2~11 格区间无任何驱动=驻位挨打；
+        /// 后撤梯度给她方向性（撤到我方阵内/敌方射程外）</summary>
+        public const int SupportRetreatPerStep = 2;
+
+        /// <summary>保险形态后撤梯度上限（G-5）</summary>
+        public const int SupportRetreatCap = 12;
+
         /// <summary>支援自保基准扣分（F-1）：量级压过移动兜底（10）+走位进射击线（8）——有更远
         /// 候选时支援型不选贴敌落点；乘档案「自保权重」（0=默认不消费，1=标准）</summary>
         public const int SupportSelfPreserveScore = 15;
@@ -403,8 +449,11 @@ namespace GIC.Battle
                 return true; // 有尸体=复苏即本档最优（不再评增益）
             }
 
-            // 增益原子（condition=TargetIsAlive 的 ApplyBuff——歌声之环）：已持有者重施加无增益，
-            // 候选排除持有者；无活体分支增益原子（纯复苏技能）且无尸体=不占行动
+            // 增益原子（condition=TargetIsAlive 的 ApplyBuff——歌声之环）。G-3 发放语义修正
+            //（2026-10-03 用户勘正：闪耀奇迹=**发放**非转移——施加只给目标挂新实例，施法者持有
+            // 不消失）：排除条件从「已持有」改「**已满层**」——3命 C3StackLimit=2 时给 1 层持有者
+            // 施加=叠层=有增益（旧「已持有即排除」漏此候选）；无活体分支增益原子（纯复苏技能）
+            // 且无尸体=不占行动
             int grantBuffType = -1;
             if (data.effects != null)
                 foreach (var atom in data.effects)
@@ -416,14 +465,17 @@ namespace GIC.Battle
                     }
             if (grantBuffType < 0) return false;
 
-            // 增益候选：最缺血的未持有存活我方（含施法者自身；等比平局 unitId 升序）
+            // 增益候选：最缺血的未满层存活我方（含施法者自身；等比平局 unitId 升序）——
+            // 满层判定走活体 BaseBuff.IsAtStackCap（快照 BuffState 无层数/上限字段）
             UnitState best = null;
             int bestRatio = int.MaxValue;
             string bestId = null;
             foreach (var u in snapshot.units)
             {
                 if ((TeamType)u.team != team || u.isCorpse != 0) continue;
-                if (HasBuffState(u.buffs, grantBuffType)) continue; // 已持有：重施加无增益，排除
+                var live = sim.GetUnit(u.unitId);
+                var existingBuff = live?.Buffs.Find(b => b != null && b.Type == (BuffType)grantBuffType);
+                if (existingBuff != null && existingBuff.IsAtStackCap()) continue; // 已满层：重施加无增益
                 if (u.maxHp <= 0) continue;
                 int ratio = u.hp * 10000 / u.maxHp;
                 if (ratio < bestRatio || (ratio == bestRatio && bestId != null
@@ -434,7 +486,7 @@ namespace GIC.Battle
                     bestId = u.unitId;
                 }
             }
-            if (best == null) return false; // 全员已持有光环：不占行动（攒满也不空放）
+            if (best == null) return false; // 全员已满层光环：不占行动（攒满也不空放）
 
             tracker.Offer(Mathf.RoundToInt(UnitTargetBurstBuffScore * profile.爆发优先权重),
                 Skill(playerId, unit, skillIndex, Direction2D.Up, turn, best.unitId));
@@ -509,13 +561,23 @@ namespace GIC.Battle
             // F-2 支援站位评分器（docs/active/34 §4，Ellie 式候选格多维评分）：支援型+伤员存在时
             // **全接管移动档**——取代朝单锚 BFS 直冲的「位置=选格」语义：候选=十字射线直线可达格
             // （移动=推力直线，BFS 拐弯格不可达——与现有直线段钳制同构）∪当前格，多维评分选最优
-            // 站位（奶程×开火线×火线规避×自保）。最优=当前格 → 无移动候选（驻位语义内化）；
-            // 无伤员（全员满血）→ 回退下方原锚循环（敌锚逼近=打水球，F-1 分流语义不变）；输出型
-            // 路径零触碰（零回归基线）
+            // 站位（奶程×开火线×火线规避×自保）。最优=当前格 → 无移动候选（驻位语义内化）。
+            // G-5 修 3（docs/active/35 §4——三态接管，光环引擎完整形态）：支援型站位评分器接管态
+            // 扩为三态——①伤员锚（原语义）②**光环贴敌模式**（无伤员但持有光环且档案「光环贴敌
+            // 权重」>0：woundedPos=自身=奶程恒满〔woundedIsSelf〕，光环前瞻分主导趋敌——治「开局
+            // 无伤员阶段走锚循环、光环驱动不参与决策」的接管错位）③保险后撤模式（血线/威胁预警：
+            // 贴敌归零+后撤梯度主导）。输出型路径零触碰（零回归基线）。
             if (profile.候选类别 == UnitConfig.CompanionRole.Support
                 && profile.目标偏好 == UnitConfig.CompanionTargetPreference.MostWoundedAlly)
             {
                 var wounded = FindMostWoundedAlly(sim, unit, team);
+                if (wounded == null
+                    && BattleHeuristics.AuraRadiusOf(unit) > 0
+                    && profile.光环贴敌权重 > 0f)
+                    wounded = unit; // G-5 修 3：光环贴敌模式（自体假锚——奶程恒满，光环前瞻主导）
+                if (wounded == null
+                    && SupportStanceOf(sim, unit, team, threat) > 1)
+                    wounded = unit; // G-5 保险后撤模式：自体假锚（贴敌归零+后撤梯度主导）
                 if (wounded != null)
                 {
                     TryOfferSupportPosition(sim, snapshot, unit, playerId, team, turn, from,
@@ -559,7 +621,6 @@ namespace GIC.Battle
                 // 眷属 v4 换目标巡逻同语义）
                 var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, to);
                 if (direction == 0) continue;
-
                 // F-1 支援锚驻位分流（docs/active/34 §5.1）：锚的敌我决定距离语义——
                 // 伤员锚（我方）=治疗半径（SupportRadiusOf 自动提取技能集最大治疗原子半径；档案
                 // 「支援贴近距离」>0 覆写）=贴身奶；敌锚=攻击射程 engageDistance（CR-Move 语义
@@ -606,7 +667,12 @@ namespace GIC.Battle
                     straightRun++;
                 }
                 if (straightRun <= 0) continue; // 首步即被单位占住（BFS 保守近似外的兜底）：换下一锚
-                steps = Math.Min(steps, straightRun);
+                // G-5 修 1（docs/active/35 §4，§114 同族防歪）：步长钳改「BFS 最短路首段直线前缀」——
+                // 治「BFS 首步×N 直线飞越路径拐点」（环湖绕行首步=Left 被直线化执行成纯西行滑边、
+                // 探针实证 A 芭锁 B 芭跨湖锚+滑向 (0,3) 角落的根因）；前缀步长 ≤ 三重钳步长
+                BattleHeuristics.ApproachStraightPrefix(sim, unit, to, steps, out var prefixDir, out var prefixRun);
+                if (prefixRun <= 0) continue; // 路径开头即拐点（首格即距离不减）：换下一锚
+                steps = Math.Min(steps, prefixRun);
 
                 // 逼近进度：沿 BFS 方向实际位移后的切比雪夫距离缩减量（绕行段进度可为 0——
                 // 兜底分仍 >0，移动候选照常参与评分）
@@ -722,14 +788,16 @@ namespace GIC.Battle
             UnitConfig.CompanionProfile profile)
         {
             var woundedPos = sim.GetPosition(wounded);
+            bool woundedIsSelf = ReferenceEquals(wounded, unit); // G-5：伤员=自身（含保险后撤假锚）——治疗半径随她走
             int supportRadius = profile.支援贴近距离 > 0
                 ? profile.支援贴近距离
                 : BattleHeuristics.SupportRadiusOf(unit);
             if (supportRadius <= 0) supportRadius = 1; // 无治疗原子防御：贴 1 格（支援语义兜底）
+            int auraRadius = BattleHeuristics.AuraRadiusOf(unit); // G-1 光环感知（无光环=0 不消费）
 
             // 当前格评分（「不动」基准——所有候选格与它比，选出比它好的才动）
             int currentScore = ScoreSupportCell(sim, snapshot, unit, playerId, team, from,
-                woundedPos, supportRadius, threat, profile);
+                woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile);
 
             int bestScore = currentScore;
             Direction2D bestDir = 0;
@@ -744,7 +812,7 @@ namespace GIC.Battle
                         break; // 直线射线：地形断止（与主逼近档直线段钳制同构）
                     if (IsCellOccupiedForStep(sim, cell)) continue; // 占据格不可停：跳过续评（执行层停格前保守近似）
                     int score = ScoreSupportCell(sim, snapshot, unit, playerId, team, cell,
-                        woundedPos, supportRadius, threat, profile);
+                        woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile);
                     if (score > bestScore)
                     {
                         bestScore = score;
@@ -770,21 +838,83 @@ namespace GIC.Battle
             RememberMoveAnchor(sim, unit, wounded, team); // 敌方锚才记录（wounded=我方→内部跳过）——E-3 槽不污染
         }
 
-        /// <summary>支援站位单格评分（F-2）：奶程梯度 + 开火线 − 火线规避 − 自保（四维正交）</summary>
+        /// <summary>支援站位单格评分（F-2 四维 + G-1 光环维度）：
+        /// 奶程梯度 + 开火线 − 火线规避 − 自保 + 光环敌覆盖（G-1——各维正交）。
+        /// woundedIsSelf（伤员=施法者自身）：治疗半径随施法者移动——distToWounded 恒 0
+        ///（G-5 返修 2，2026-10-03 验证局实证「伤员=自己 → 旧位奶程锁 → 永久驻位」盲区）</summary>
         private static int ScoreSupportCell(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, BattleCell cell, BattleCell woundedPos, int supportRadius,
-            OpponentThreatModel.ThreatMap threat, UnitConfig.CompanionProfile profile)
+            int auraRadius, bool woundedIsSelf, OpponentThreatModel.ThreatMap threat,
+            UnitConfig.CompanionProfile profile)
         {
-            int distToWounded = Math.Max(Math.Abs(cell.x - woundedPos.x), Math.Abs(cell.y - woundedPos.y));
+            int stance = SupportStanceOf(sim, unit, team, threat); // G-2 形态因子（本格评估用）
+            int distToWounded = woundedIsSelf ? 0 : Math.Max(Math.Abs(cell.x - woundedPos.x), Math.Abs(cell.y - woundedPos.y));
             int score = distToWounded <= supportRadius
                 ? SupportHealReachScore
                 : Math.Max(0, SupportHealReachScore - (distToWounded - supportRadius) * SupportHealReachDecayPerCell);
             if (WouldHaveFiringLineFrom(sim, snapshot, unit, playerId, team, cell))
                 score += MoveLineUpScore; // 支援型照常输出：落点有开火线=能打水球
-            int threatPenalty = ThreatPenaltyAt(threat, cell);
-            if (threatPenalty > 0) score = Math.Max(1, score - threatPenalty); // E-1 火线规避（钳 1 防负）
-            score -= SelfPreservePenalty(sim, unit, team, cell, profile); // F-1 自保（权重 0 恒 0）
+            // E-1 火线规避——支援型站位评分内 ×SupportThreatPenaltyScale 减半（G-5 调参：整列火线
+            // 吓退支援型的实证返修——前线形态接受中等风险换贴敌；配额脑/锚循环路径全额不动）
+            int threatPenalty = Mathf.CeilToInt(ThreatPenaltyAt(threat, cell) * SupportThreatPenaltyScale);
+            if (threatPenalty > 0) score = Math.Max(1, score - threatPenalty);
+            score -= SelfPreservePenalty(sim, unit, team, cell, profile); // F-1 自保（内含 G-2 形态因子）
+            // G-5 保险形态后撤梯度：远离最近敌每格 +2（上限 12）——保险形态贴敌分归零后旧版无任何
+            // 移动驱动（驻位挨打实证）；后撤梯度给方向性（撤向敌射程外/我方阵内），与自保负分
+            //（<2 格）正交互补：近距自保扣+远距后撤加=全程「离敌越远越好」
+            int nearestEnemyForStance = NearestEnemyDistance(sim, unit, team, cell);
+            if (stance > 1 && nearestEnemyForStance < int.MaxValue)
+                score += Math.Min(SupportRetreatCap, nearestEnemyForStance * SupportRetreatPerStep);
+            // G-1 光环敌覆盖（docs/active/35 §2）：持有半径型 tick 光环且档案权重>0——落点光环半径内
+            // 每敌 +SupportAuraPerEnemy×权重（光环挂水/挂冰引擎的贴敌驱动力；队友 E-3 反应预期分自发
+            // 消费挂水目标=冻结/蒸发联动零新机制）；G-2 保险形态（stance>1）贴敌分归零——血线/威胁
+            // 预警时她后撤保命（复苏无限程，活着=复活保险在）。
+            // G-5 前瞻梯度（2026-10-03 验证局盲区 1 返修）：光环半径内 0 敌时（远距趋近段）按
+            // 「落点距最近敌」给梯度分（每近 1 格 +2，上限 12=2 敌满档）——旧版只对「已在光环内」
+            // 给分，远距无驱动力+趋近格被火线扣分压制=恒缩角（28 回合实证）；前瞻与自保负分在
+            // 1~2 格处对抗（前线形态净贴脸 +7.5/保险形态净负后撤）——权衡轴单一化
+            if (auraRadius > 0 && profile.光环贴敌权重 > 0f && stance == 1)
+            {
+                int nearestEnemy = NearestEnemyDistance(sim, unit, team, cell);
+                int enemiesInAura = 0;
+                foreach (var kv in sim.Units)
+                {
+                    var enemy = kv.Value;
+                    var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
+                    if (enemyIdentity == null || enemyIdentity.Team == team) continue;
+                    if (BattleSimState.IsDead(enemy)) continue;
+                    var pos = sim.GetPosition(enemy);
+                    int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
+                    if (dist <= auraRadius) enemiesInAura++;
+                }
+                int auraScore = Mathf.RoundToInt(SupportAuraPerEnemy * profile.光环贴敌权重) * enemiesInAura;
+                if (enemiesInAura == 0 && nearestEnemy < int.MaxValue)
+                    // G-5 修 2（前瞻公式勘误）：(Base − dist) × PerStep——14 格内有梯度（每近 1 格 +3），
+                    // 旧斜率式 Base − dist×PerStep 在 5 格外恒 0（探针实证 9 格敌距=0 分=无趋近驱动）
+                    auraScore += Math.Min(SupportAuraApproachCap,
+                        Math.Max(0, (SupportAuraApproachBase - nearestEnemy) * SupportAuraApproachPerStep))
+                        * Mathf.RoundToInt(Mathf.Min(1f, profile.光环贴敌权重));
+                score += auraScore;
+            }
             return score;
+        }
+
+        /// <summary>落点距最近存活敌切比雪夫（G-5 抽提共用——光环前瞻/保险后撤梯度两消费方；
+        /// 无敌=int.MaxValue）</summary>
+        private static int NearestEnemyDistance(BattleSimState sim, Unit unit, TeamType team, BattleCell cell)
+        {
+            int nearest = int.MaxValue;
+            foreach (var kv in sim.Units)
+            {
+                var enemy = kv.Value;
+                var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
+                if (enemyIdentity == null || enemyIdentity.Team == team) continue;
+                if (BattleSimState.IsDead(enemy)) continue;
+                var pos = sim.GetPosition(enemy);
+                int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
+                if (dist < nearest) nearest = dist;
+            }
+            return nearest;
         }
 
         /// 进展（轴差小者优先=更快收敛）；同级横轴优先（枚举序）。已对轴但线被断（尸体/虚空截线）
@@ -956,8 +1086,9 @@ namespace GIC.Battle
 
         /// <summary>支援自保扣分（F-1，docs/active/34 §5.3）：落点距最近敌切比雪夫 &lt; 危险半径=
         ///「站敌人刀口」扣 SupportSelfPreserveScore × 档案「自保权重」（默认 0=恒 0=非支援/未配置
-        /// 零变化）；与 E-1 火线扣分正交（火线=具体危险格、近敌=广义贴脸风险）。支援型核心行为=
-        /// 躲伤害（Ellie：她的失误会被玩家归因于 AI——先活下来才奶得动人）</summary>
+        /// 零变化）；与 E-1 火线扣分正交（火线=具体危险格、近敌=广义贴脸风险）。
+        /// G-2 形态切换（docs/active/35）：返回值乘 SupportStanceOf 形态因子——保险形态（血线低/
+        /// 威胁预警）×3（贴敌格扣 45=后撤位自然胜出）；threat=null（配额脑路径）仅血线门生效</summary>
         private static int SelfPreservePenalty(BattleSimState sim, Unit unit, TeamType team,
             BattleCell cell, UnitConfig.CompanionProfile profile)
         {
@@ -972,9 +1103,30 @@ namespace GIC.Battle
                 if (BattleSimState.IsDead(enemy)) continue; // 尸体不构成贴脸威胁
                 var pos = sim.GetPosition(enemy);
                 if (Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y)) < SupportDangerRadius)
-                    return Mathf.RoundToInt(SupportSelfPreserveScore * profile.自保权重); // 任一活敌近于危险半径即触发
+                    return Mathf.RoundToInt(SupportSelfPreserveScore * profile.自保权重)
+                        * SupportStanceOf(sim, unit, team, null); // 任一活敌近于危险半径即触发（×G-2 形态因子）
             }
             return 0;
+        }
+
+        /// <summary>支援形态因子（G-2 形态切换，docs/active/35 §2）：1=前线形态（光环贴敌满效）/
+        /// SupportStanceSafeFactor(3)=保险形态（贴敌分归零+自保×3 后撤）。双门控纯函数判据：
+        /// ①血线门=hp% &lt; SupportStanceRetreatHpPercent(60)；②预警门（threatThreat 非 null 时）=
+        /// 威胁图预期承伤 ≥ hp × SupportStanceRetreatThreatPercent(50)%——提前一回合后撤。
+        /// 她（光环载体+复苏持有者）活着=复活保险与光环引擎都在——形态切换承担「前线战斗」与
+        /// 「稳定复活」两诉求的动态权衡</summary>
+        private static int SupportStanceOf(BattleSimState sim, Unit unit, TeamType team,
+            OpponentThreatModel.ThreatMap threatThreat)
+        {
+            var stats = unit.GetUnitComponent<UnitStats>();
+            var hpStruct = stats != null ? stats.GetStatStruct(StatType.HP) : default;
+            if (hpStruct.Max <= 0) return 1;
+            if (stats.HP * 100 < hpStruct.Max * SupportStanceRetreatHpPercent) return SupportStanceSafeFactor;
+            if (threatThreat != null
+                && threatThreat.ExpectedDamageOnAlly.TryGetValue(UnitIdOf(sim, unit), out var expected)
+                && expected * 100 >= stats.HP * SupportStanceRetreatThreatPercent)
+                return SupportStanceSafeFactor;
+            return 1;
         }
 
         // ==================== 支援型估值原语 ====================
