@@ -1154,7 +1154,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: abc0710349333f94fab1c01e99c3bfb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  "\u51BB\u7ED3\u8513\u5EF6\u65F6\u957F": 0.45
+  "\u51BB\u7ED3\u8513\u5EF6\u65F6\u957F": 0.9
   "\u89E3\u51BB\u65F6\u957F": 0.3
 --- !u!4 &2022726242
 Transform:
