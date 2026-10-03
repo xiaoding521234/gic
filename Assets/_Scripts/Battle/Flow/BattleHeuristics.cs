@@ -485,5 +485,55 @@ namespace GIC.Battle
             }
             return best;
         }
+
+        /// <summary>沿 BFS 最短路的「首段直线前缀」（G-5 修 1，docs/active/35 §4——伙伴锚循环
+        /// 移动语义直线前缀化，眷属 v6.1/FindApproachStraightSteps 同族防歪）：BFS 首步方向上
+        /// 逐格推进，「到目标 BFS 距离严格递减」判据截断=路径开头的连续直线段（钳 maxSteps 与
+        /// 该向地形可行程）。治「BFS 首步×N 直线飞越路径拐点」（环湖绕行首步=Left 被直线化
+        /// 执行成纯西行滑边——2026-10-03 探针实证，docs/14 §114 同族）。不可达/无直线段=
+        ///（direction=0, steps=0）</summary>
+        public static void ApproachStraightPrefix(BattleSimState sim, Unit unit, BattleCell to,
+            int maxSteps, out Direction2D direction, out int steps)
+        {
+            direction = FindApproachFirstStep(sim, unit, to);
+            steps = 0;
+            if (direction == 0 || maxSteps <= 0) { direction = 0; return; }
+
+            var delta = SkillHitResolver.DirectionToDelta(direction);
+            var from = sim.GetPosition(unit);
+            var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
+            int prevDist = Math.Max(Math.Abs(to.x - from.x), Math.Abs(to.y - from.y));
+            int run = 0;
+            for (int s = 1; s <= maxSteps; s++)
+            {
+                var cell = new BattleCell(from.x + delta.x * s, from.y + delta.y * s);
+                if (!sim.Map.HasTile(cell.x, cell.y)) break;
+                if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                int nextDist = Math.Max(Math.Abs(to.x - cell.x), Math.Abs(to.y - cell.y));
+                if (nextDist >= prevDist) break; // 距离不减=越过路径拐点（直线前缀终点）
+                prevDist = nextDist;
+                run++;
+            }
+            steps = run;
+            if (run <= 0) direction = 0;
+        }
+
+        /// <summary>单位光环半径（G-1 光环位置价值，docs/active/35：持有「半径型 tick 光环」Buff
+        /// 的有效作用半径——光环挂水/挂冰引擎的贴敌驱动力来源）。现役白名单=SongOfLife/Icicle
+        ///（**新光环类落地时在 is-pattern 补一行**——BaseBuff 无通用 Radius 基座，白名单是显式
+        /// 扩展点非硬编码）；无光环=0（天然不消费）。**静态基础值口径**：Radius 是 Buff 静态成员、
+        /// 命座加成（如歌声之环 2命 +C2Radius=2）在 Buff 类内部结算——本原语取基础值=保守感知
+        ///（命座单位感知半径略小于实际，贴敌判定不越界）。注意「发放」语义（2026-10-03 用户勘正）：
+        /// 闪耀奇迹=发放非转移——施加只给目标挂新实例，施法者持有不消失，光环在谁身上谁带贴敌驱动力</summary>
+        public static int AuraRadiusOf(Unit unit)
+        {
+            if (unit?.Buffs == null) return 0;
+            foreach (var buff in unit.Buffs)
+            {
+                if (buff is SongOfLifeBuff) return SongOfLifeBuff.Radius;
+                if (buff is IcicleBuff) return IcicleBuff.Radius;
+            }
+            return 0;
+        }
     }
 }

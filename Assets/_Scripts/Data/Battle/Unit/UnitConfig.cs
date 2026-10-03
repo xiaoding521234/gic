@@ -326,6 +326,9 @@ namespace GIC.Data
             [InspectorName("自保权重（0=不自保；1=标准——落点距最近敌 < 危险半径扣 15 分/档，奶妈不站敌人刀口）")]
             public float 自保权重 = 0f;
 
+            [InspectorName("光环贴敌权重（G-1：0=不贴敌；1=标准——持有半径型 tick 光环时落点光环内每敌 +6 分〔光环挂水/挂冰引擎——配合队友反应预期分联动冻结/蒸发〕；血线/威胁预警保险形态下自动归零〔G-2 形态切换〕）")]
+            public float 光环贴敌权重 = 0f;
+
             [Header("目标与角色")]
             [InspectorName("目标偏好")]
             public CompanionTargetPreference 目标偏好 = CompanionTargetPreference.NearestEnemy;
