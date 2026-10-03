@@ -329,6 +329,9 @@ namespace GIC.Data
             [InspectorName("光环贴敌权重（G-1：0=不贴敌；1=标准——持有半径型 tick 光环时落点光环内每敌 +6 分〔光环挂水/挂冰引擎——配合队友反应预期分联动冻结/蒸发〕；血线/威胁预警保险形态下自动归零〔G-2 形态切换〕）")]
             public float 光环贴敌权重 = 0f;
 
+            [InspectorName("先锋伴随权重（H 批，docs/active/36：0=不跟随；1=标准——无伤员+前线形态时锚=本方近战先锋〔单手剑/双手剑/长枪/臂铠的最近存活单位〕，站先锋邻位=奶程+光环双覆盖、先锋冲她跟/先锋停她停，优先于光环贴敌的「自己冲敌脸」；伤员/保险形态优先级更高）")]
+            public float 先锋伴随权重 = 0f;
+
             [Header("目标与角色")]
             [InspectorName("目标偏好")]
             public CompanionTargetPreference 目标偏好 = CompanionTargetPreference.NearestEnemy;

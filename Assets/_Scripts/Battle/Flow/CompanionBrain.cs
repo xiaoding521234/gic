@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using GIC.Data;
 namespace GIC.Battle
@@ -129,6 +130,26 @@ namespace GIC.Battle
         /// <summary>保险形态后撤梯度上限（G-5）</summary>
         public const int SupportRetreatCap = 12;
 
+        /// <summary>先锋交战判定距离（H-2 交战就位，docs/active/36 §5——2026-10-04 拍板「先锋与敌人
+        /// 交战时优先主动上前贴脸敌人」）：锚单位（先锋/伤员=先锋）距最近敌 ≤ 此值=交战态
+        ///（对齐凯亚霜袭 2/丘丘人挥棒 1 的近战交换距离）</summary>
+        public const int VanguardEngageRange = 2;
+
+        /// <summary>交战就位优先 Offer 托底分（H-2）：锚交战+未就位（当前格光环罩不到敌）+最优格
+        /// 光环罩得到敌（就位可达）时，移动 Offer 分托底到恒压常规技能（水球伤害+获能+治疗、
+        /// VitalityBurst 群奶≈50-90）。**让位门控**（恒在就位之上，勿靠分数竞争——救命/复苏量级
+        /// 与常规技能挤同窗）：威胁图将死队友存在→救命奶让位；我方尸体在场且爆发满槽→复苏让位；
+        /// 斩杀分（+80×激进度）自然 &gt;95 恒赢。双覆盖格（光环同时罩敌+先锋）=奶程 20+光环 6×敌
+        /// 已是评分器天然最高分格（交集格无需专项逻辑）</summary>
+        public const int SupportAuraTakePositionScore = 95;
+
+        /// <summary>伴随语境光环敌分倍率（H-3 随军优化，2026-10-04 拍板「主动跑去先锋攻击视野内的
+        /// 敌，让光环尽可能覆盖多的敌人，覆盖先锋为其次」）：伴随调用（视野敌集传入）时光环内
+        /// 每敌分=SupportAuraPerEnemy×此倍率——视野敌群覆盖主导选格（罩 2~3 视野敌的格压过先锋旁
+        /// 单敌格）；同敌数下奶程仍区分先锋旁 vs 远格（「覆盖先锋为其次」的其次语义）。非伴随调用
+        /// （伤员/光环贴敌/保险）恒 ×1=G 批基线不动</summary>
+        public const int VanguardAuraPerEnemyMult = 2;
+
         /// <summary>支援自保基准扣分（F-1）：量级压过移动兜底（10）+走位进射击线（8）——有更远
         /// 候选时支援型不选贴敌落点；乘档案「自保权重」（0=默认不消费，1=标准）</summary>
         public const int SupportSelfPreserveScore = 15;
@@ -157,6 +178,20 @@ namespace GIC.Battle
         /// 消费=ScoreMoveCandidate 锚序锁定插队（CR 式 target lock，治多锚贪心抖动）</summary>
         private static readonly Dictionary<string, string> _lastMoveAnchors = new Dictionary<string, string>();
 
+        /// <summary>追随外推槽（H-4，docs/active/36 §7——2026-10-04 拍板「不在先锋 1 格内就立刻跟上，
+        /// 治同速追逐恒滞后」）：跟随者 unitId → (先锋 unitId, 上回合先锋位置, 回合号)。static 生命
+        /// 周期=进程——DecideAll 里 turn≤1 自清（与 _lastMoveAnchors 同款零接线）；消费=伴随分支
+        /// 按先锋上回合位移向量外推本回合追逐目标=当前位置+位移（迎头追逐——同速追逐〔双方皆
+        /// 2 格/回合〕物理上永不收敛，先锋驻位她才贴上=「凯亚走了四格远才跟」的根因）；先锋换人
+        /// （死亡换先锋）=记录失配按真实位置追逐（位移向量不可信）</summary>
+        private static readonly Dictionary<string, (string vanguardId, BattleCell pos, int turn)> _vanguardTrack =
+            new Dictionary<string, (string, BattleCell, int)>();
+
+        /// <summary>申报段标志（I-A 两遍法，docs/active/37 §2.2）：DecideAll 申报遍置 true——评分器
+        /// 内全部副作用（槽写入/板声明）统一抑制（「没承诺不记槽」：未获名额伙伴零槽脏写）；执行遍
+        /// 复位 false。单线程同步决策链=static 安全；try/finally 保证复位</summary>
+        private static bool _bidPhase;
+
         // ==================== 决策主入口（伙伴决策阶段） ====================
 
         /// <summary>
@@ -168,7 +203,10 @@ namespace GIC.Battle
             var actions = new List<ActionData>();
             var snapshot = sim.TakeSnapshot(turnNumber);
             if (turnNumber <= 1)
+            {
                 _lastMoveAnchors.Clear(); // E-3：新战斗自清（StartBattle 恒从回合 1 起）
+                _vanguardTrack.Clear(); // H-4：追随外推槽同款自清
+            }
 
             // 玩家选择足迹：号令占用集 + 各玩家体力预留（己方已提交单位级行动的层级消耗）
             var commanded = new HashSet<string>();
@@ -190,13 +228,53 @@ namespace GIC.Battle
                 }
             }
 
-            // 已定伙伴消耗（决策序内虚拟扣减——同池多伙伴不超额承诺）
+            // 已定伙伴消耗：I-A 起分离两计数器——packed=装包遍预算承诺、committed=执行遍定稿
+            // 累计（名额承诺≠已定稿：执行遍 pool 只见前位已定稿消耗，防被装包总额误扣；
+            // packed≥committed 恒成立，执行遍不会超支——资源门槛内建真实递减池检查）
             var committed = new Dictionary<string, int>();
+            var packed = new Dictionary<string, int>();
 
-            // E-2 本方意图板（决策序内登记-消费，docs/active/33 §3）：前位伙伴已定行动入板，后位评分
+            // E-2 本方意图板（决策序内登记-消费，docs/active/33 §3）：前位已定行动入板，后位评分
             // 消费（伤害溢出去重/治疗去重/集火跟随）——与 committed 虚拟池同构；配额脑无此机制
             //（每回合仅 1 配额行动，无跨单位声明域）
             var board = new TeamIntentBoard();
+
+            // I-B 全玩家行动入板（docs/active/37 §3，2026-10-04 拍板「玩家做出的选择伙伴脑需要
+            // 考虑进去」——玩家选择已定稿=非隐私，阶段三本就感知）：Skill（魔神战技/爆发、伙伴
+            // 号令）经 DeclareIntent 同口径声明攻击/治疗面——伙伴感知「魔神打了谁」自动补刀/
+            // 转火、集火权重对魔神目标生效；Move/DeployUnit 落点入移动意图占位（I-D）——伙伴
+            // 不撞魔神换位与新出战单位落格。三表全按目标单位 id 键控、id 空间按队分割=跨队
+            // 天然零命中（E-2 单板双队共用同机制实证），无需分板
+            if (playerActions != null)
+            {
+                foreach (var pa in playerActions)
+                {
+                    if (pa == null) continue;
+                    if (pa.actionType == ActionType.Skill)
+                    {
+                        var actor = sim.GetUnit(pa.unitId);
+                        if (actor == null) continue;
+                        var actorIdentity = actor.GetUnitComponent<UnitIdentity>();
+                        if (actorIdentity == null) continue;
+                        DeclareIntent(sim, snapshot, actor, actorIdentity.Team, pa, board);
+                    }
+                    else if (pa.actionType == ActionType.Move)
+                    {
+                        var actor = sim.GetUnit(pa.unitId);
+                        if (actor == null) continue;
+                        var delta = SkillHitResolver.DirectionToDelta(pa.direction);
+                        var actorFrom = sim.GetPosition(actor);
+                        int mag = Math.Max(0, pa.moveMagnitude);
+                        board.DeclareMovement(pa.unitId, new BattleCell(
+                            actorFrom.x + delta.x * mag, actorFrom.y + delta.y * mag));
+                    }
+                    else if (pa.actionType == ActionType.DeployUnit)
+                    {
+                        if (sim.Map != null && sim.Map.HasTile(pa.deployCell.x, pa.deployCell.y))
+                            board.DeclareMovement("deploy:" + pa.playerId, pa.deployCell); // 部署单位不在场：合成 key 不撞任何在场 id，全员避让
+                    }
+                }
+            }
 
             // F-1 威胁图接伙伴脑（兑现 E 批拍板 #4，范围=支援型，docs/active/34 §5.2）：检出支援型
             // 在场才构建（每回合至多一次——无支援型零成本；输出型 threat=null 路径恒不变=复测基线）。
@@ -213,43 +291,169 @@ namespace GIC.Battle
                 break; // 支援型威胁图为全队共享（Build 不分我方玩家——敌方威胁对我队全体一致）
             }
 
-            foreach (var kv in sim.Units)
+            // I-A 申报遍（docs/active/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分
+            //（「假如只有我」的独立视角——排序公平；满池=实池−玩家预留，不扣同队申报）产出
+            // (bestScore, bestAction, cost) 申报表。_bidPhase=true 抑制全部副作用（槽写入/板
+            // 声明——「没承诺不记槽」，未获名额伙伴零脏写）。
+            // I 返修 2（2026-10-04 实测「凯亚走了 3 格芭芭拉没立刻跟上」）：申报遍拆两轮——
+            // **输出型先申报**（纯独立视角 board=null），**支援型后申报且消费「申报落点板」**
+            //（bidBoard=输出型申报中的移动落点预广播——跟随者的追逐锚当回合即读到先锋申报
+            // 落点，治 T1 申报死角：快照视角下她与凯亚同在出生区=「已贴伴」驻位无候选→无
+            // 名额→结算后凯亚冲出 3 格她原地不动。支援型=天然响应者，独立视角原则对跟随者
+            // 修正为「消费先锋申报」）。执行序同构修复见 grants 重排（先锋先正式声明）
+            var bids = new List<CompanionBid>();
+            _bidPhase = true;
+            try
             {
-                var unit = kv.Value;
-                if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（协议核心批单一判据）
-                if (!BattleHeuristics.IsCompanion(unit)) continue;
-                if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue;
-                var identity = unit.GetUnitComponent<UnitIdentity>();
+                for (int pass = 0; pass < 2; pass++)
+                {
+                    bool supportPass = pass == 1;
+                    var bidBoard = supportPass ? new TeamIntentBoard() : null;
+                    if (supportPass)
+                    {
+                        // 输出型申报中的移动落点预广播（申报表=意图的第一次广播——讨论的起点）
+                        foreach (var b in bids)
+                        {
+                            if (b.bid.actionType != ActionType.Move) continue;
+                            var delta = SkillHitResolver.DirectionToDelta(b.bid.direction);
+                            var bFrom = sim.GetPosition(b.unit);
+                            int bMag = Math.Max(0, b.bid.moveMagnitude);
+                            bidBoard.DeclareMovement(b.unitId, new BattleCell(
+                                bFrom.x + delta.x * bMag, bFrom.y + delta.y * bMag));
+                        }
+                    }
+                    foreach (var kv in sim.Units)
+                    {
+                        var unit = kv.Value;
+                        if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（协议核心批单一判据）
+                        if (!BattleHeuristics.IsCompanion(unit)) continue;
+                        if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue;
+                        var identity = unit.GetUnitComponent<UnitIdentity>();
+                        if (identity == null) continue;
+                        if (commanded.Contains(kv.Key)) continue; // 已被号令：行动=号令技能，不占自主名额
+                        var profile = unit.RawData?.行为档案;
+                        bool isSupport = profile != null
+                            && profile.候选类别 == UnitConfig.CompanionRole.Support;
+                        if (isSupport != supportPass) continue; // 两轮分拣：输出型→支援型
+
+                        int? pool = staminaReserve.TryGetValue(identity.OwnerPlayerID, out var r2) && r2 > 0
+                            ? Math.Max(0, sim.GetStamina(identity.OwnerPlayerID) - r2)
+                            : (int?)null;
+                        var tracker = new CandidateTracker();
+                        var unitThreat = isSupport ? threat : null;
+                        ScoreUnitCandidates(sim, snapshot, unit, identity.OwnerPlayerID, identity.Team,
+                            turnNumber, tracker, pool, profile, unitThreat, bidBoard);
+                        if (tracker.Best == null) continue; // 无候选=不占名额
+                        bids.Add(new CompanionBid
+                        {
+                            unit = unit,
+                            unitId = kv.Key,
+                            owner = identity.OwnerPlayerID,
+                            team = identity.Team,
+                            score = tracker.BestScore,
+                            bid = tracker.Best,
+                            cost = ActionStaminaCost(sim, tracker.Best, unit),
+                            isSupport = isSupport,
+                        });
+                    }
+                }
+            }
+            finally
+            {
+                _bidPhase = false; // 执行遍副作用恢复
+            }
+
+            // I-A 装包遍：按队伍独立装包（池 per playerId）。cost=0=白给（不占预算直接获名额，
+            // unitId 升序）；cost>0 按单位体力价值（score/cost 交叉相乘降序——cost 恒 5 时退化为
+            // 分数降序；long 防溢出）+unitId 决胜逐个扣预算，装不下的跳过（低价者仍可能装得下）
+            var grants = new List<CompanionBid>();
+            foreach (var teamGroup in bids.GroupBy(b => b.team).OrderBy(g => (int)g.Key)) // Team 枚举升序=确定性
+            {
+                foreach (var b in teamGroup.Where(b => b.cost <= 0).OrderBy(b => b.unitId, StringComparer.Ordinal))
+                    grants.Add(b);
+                foreach (var b in teamGroup.Where(b => b.cost > 0).OrderBy(b => b, BidValueComparer.Instance))
+                {
+                    int left = Math.Max(0, sim.GetStamina(b.owner)
+                        - (staminaReserve.TryGetValue(b.owner, out var rv) ? rv : 0)
+                        - (packed.TryGetValue(b.owner, out var pv) ? pv : 0));
+                    if (b.cost > left) continue;
+                    packed[b.owner] = (packed.TryGetValue(b.owner, out var pv2) ? pv2 : 0) + b.cost;
+                    grants.Add(b);
+                }
+            }
+
+            // I 返修 3（docs/active/37 §2.1 追记）：执行序=同队内支援型**稳定殿后**——先锋/输出型
+            // 先正式声明移动落点，跟随者后重评分消费正式声明（「凯亚宣告、芭芭拉响应」的顺序
+            // 保证：追逐锚读到的声明落点=先锋本回合真实决策位）。OrderBy 稳定排序保持装包
+            // 价值序；无支援型队伍=恒等重排零变化；支援型后决策同时获得更多板信息（输出型
+            // 集火/伤害声明）=决策质量只增不减
+            grants = grants.GroupBy(g => g.team).OrderBy(g => (int)g.Key)
+                .SelectMany(g => g.OrderBy(b => b.isSupport ? 1 : 0))
+                .ToList();
+
+            // I-A 执行遍：获名额者按（Team 升序→队内装包序）带正式板重评分定稿——名额分配依据
+            //（裸分）与执行依据（板后协调分）分离：E-2 去重/集火/预治疗语义全保留；重评与申报
+            // 不同=正常重定向（前位声明改变后位最优），null=名额浪费（罕见，下回合自愈）
+            foreach (var g in grants)
+            {
+                var identity = g.unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null) continue;
-                if (commanded.Contains(kv.Key)) continue; // 已被号令：跳过自主决策（本回合行动=号令技能）
-
-                // 虚拟体力池：实池 − 己方已提交行动预留 − 决策序内已定伙伴消耗
-                int reserved = (staminaReserve.TryGetValue(identity.OwnerPlayerID, out var r2) ? r2 : 0)
-                              + (committed.TryGetValue(identity.OwnerPlayerID, out var c) ? c : 0);
-                int? pool = reserved > 0
-                    ? Math.Max(0, sim.GetStamina(identity.OwnerPlayerID) - reserved)
+                int gReserved = (staminaReserve.TryGetValue(g.owner, out var r3) ? r3 : 0)
+                              + (committed.TryGetValue(g.owner, out var c2) ? c2 : 0);
+                int? pool = gReserved > 0
+                    ? Math.Max(0, sim.GetStamina(g.owner) - gReserved)
                     : (int?)null;
-
                 var tracker = new CandidateTracker();
-                var profile = unit.RawData?.行为档案;
-                // F-1：支援型传威胁图（避火线/反威胁自动生效）；输出型恒 null（零回归基线）
+                var profile = g.unit.RawData?.行为档案;
                 var unitThreat = profile != null && profile.候选类别 == UnitConfig.CompanionRole.Support
                     ? threat
                     : null;
-                ScoreUnitCandidates(sim, snapshot, unit, identity.OwnerPlayerID, identity.Team,
-                    turnNumber, tracker, pool, profile, unitThreat, board);
-
-                if (tracker.Best != null)
+                ScoreUnitCandidates(sim, snapshot, g.unit, g.owner, g.team, turnNumber,
+                    tracker, pool, profile, unitThreat, board);
+                if (tracker.Best == null) continue;
+                DeclareIntent(sim, snapshot, g.unit, g.team, tracker.Best, board); // E-2：意图入板
+                actions.Add(tracker.Best);
+                // I-D 移动意图占位：移动定稿落点入板（乐观口径——执行层停格偏差保守向，下回合吸收）
+                if (tracker.Best.actionType == ActionType.Move)
                 {
-                    DeclareIntent(sim, snapshot, unit, identity.Team, tracker.Best, board); // E-2：意图入板
-                    actions.Add(tracker.Best);
-                    int cost = ActionStaminaCost(sim, tracker.Best, unit);
-                    if (cost > 0)
-                        committed[identity.OwnerPlayerID] =
-                            (committed.TryGetValue(identity.OwnerPlayerID, out var c2) ? c2 : 0) + cost;
+                    var delta = SkillHitResolver.DirectionToDelta(tracker.Best.direction);
+                    var from = sim.GetPosition(g.unit);
+                    int mag = Math.Max(0, tracker.Best.moveMagnitude);
+                    board.DeclareMovement(g.unitId, new BattleCell(
+                        from.x + delta.x * mag, from.y + delta.y * mag));
                 }
+                int cost = ActionStaminaCost(sim, tracker.Best, g.unit);
+                if (cost > 0)
+                    committed[g.owner] = (committed.TryGetValue(g.owner, out var c3) ? c3 : 0) + cost;
             }
             return actions;
+        }
+
+        /// <summary>I-A 申报条目（docs/active/37 §2）：申报遍产物——裸分最优候选+消耗，装包遍消费</summary>
+        private sealed class CompanionBid
+        {
+            public Unit unit;
+            public string unitId;
+            public string owner;
+            public TeamType team;
+            public int score;
+            public ActionData bid;
+            public int cost;
+            public bool isSupport; // I 返修：执行序支援型殿后（先锋先正式声明、跟随者后消费）
+        }
+
+        /// <summary>I-A 装包价值比较器（docs/active/37 §2.1）：单位体力价值 score/cost 降序
+        /// （交叉相乘 long 防溢出——cost 恒 5 现实下退化为分数降序）+unitId 升序决胜=确定性全序</summary>
+        private sealed class BidValueComparer : IComparer<CompanionBid>
+        {
+            public static readonly BidValueComparer Instance = new BidValueComparer();
+            public int Compare(CompanionBid x, CompanionBid y)
+            {
+                long vx = (long)x.score * y.cost;
+                long vy = (long)y.score * x.cost;
+                if (vx != vy) return vy.CompareTo(vx); // 价值降序
+                return string.CompareOrdinal(x.unitId, y.unitId);
+            }
         }
 
         /// <summary>行动意图入板（E-2，docs/active/33 §3）：对已定行动按决策快照反推声明面——
@@ -307,7 +511,7 @@ namespace GIC.Battle
             bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
                 tracker, staminaPoolOverride, profile, threat, board);
             ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
-                profile, hasActionCandidate, threat);
+                profile, hasActionCandidate, threat, board);
         }
 
         /// <summary>①攻击技能候选（战技/爆发）：预判与结算形态同源（WouldHitEnemyInDirection）；评分=逐目标
@@ -539,7 +743,7 @@ namespace GIC.Battle
         private static void ScoreMoveCandidate(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile, bool hasActionCandidate,
-            OpponentThreatModel.ThreatMap threat)
+            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board = null)
         {
             if (!ResourceGate.HasAll(sim, unit, playerId, MoveExecutor.GetMoveCosts(unit), out _, staminaPoolOverride))
             {
@@ -549,6 +753,9 @@ namespace GIC.Battle
             var from = sim.GetPosition(unit);
             var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
             int maxMove = MoveExecutor.MaxMoveDistance(unit);
+            // I-D 移动意图占位：前位已声明落点物化为 BFS 占位集（排除自身声明）——全 BFS 消费方透传；
+            // board=null（配额/申报裸跑）=null 零变化
+            var reservedCells = BoardReservedCells(sim, board, unit);
 
             // 驻位基准（CR-Move，2026-10-02 拍板「像皇室战争那样」）：偏好交战距离>0=手动覆写
             // 微调手感；0=**自动=攻击射程单源**（BattleHeuristics.AttackRangeOf——皇室战争
@@ -567,22 +774,140 @@ namespace GIC.Battle
             // 权重」>0：woundedPos=自身=奶程恒满〔woundedIsSelf〕，光环前瞻分主导趋敌——治「开局
             // 无伤员阶段走锚循环、光环驱动不参与决策」的接管错位）③保险后撤模式（血线/威胁预警：
             // 贴敌归零+后撤梯度主导）。输出型路径零触碰（零回归基线）。
+            // H 近战先锋伴随（docs/active/36，2026-10-04 拍板「协助凯亚这样的近战单位，开局就进攻」）：
+            // ④先锋伴随模式插在光环贴敌之前——无伤员+前线形态+「先锋伴随权重」>0 时锚=本方近战
+            // 先锋（凯亚/丘丘人），「自己冲敌脸」改「跟着近战压战线」：站先锋邻位=奶程+光环双覆盖、
+            // 先锋冲她跟/先锋停她停（开局满血即跟随集团推进）；伤员锚（伤员=先锋时两者重合）与
+            // 保险形态（活着>跟队）优先级更高。全射线无可停格（环湖绕行）→ 先锋入锚循环 BFS 逼近。
+            Unit vanguard = null; // H：方法级——锚循环 fallback 消费
             if (profile.候选类别 == UnitConfig.CompanionRole.Support
                 && profile.目标偏好 == UnitConfig.CompanionTargetPreference.MostWoundedAlly)
             {
                 var wounded = FindMostWoundedAlly(sim, unit, team);
-                if (wounded == null
+                if (wounded == null && profile.先锋伴随权重 > 0f
+                    && SupportStanceOf(sim, unit, team, threat) == 1) // H：仅前线形态伴随
+                    vanguard = FindMeleeVanguard(sim, unit, team, board);
+                if (wounded == null && vanguard == null
                     && BattleHeuristics.AuraRadiusOf(unit) > 0
                     && profile.光环贴敌权重 > 0f)
                     wounded = unit; // G-5 修 3：光环贴敌模式（自体假锚——奶程恒满，光环前瞻主导）
-                if (wounded == null
+                if (wounded == null && vanguard == null
                     && SupportStanceOf(sim, unit, team, threat) > 1)
                     wounded = unit; // G-5 保险后撤模式：自体假锚（贴敌归零+后撤梯度主导）
                 if (wounded != null)
                 {
                     TryOfferSupportPosition(sim, snapshot, unit, playerId, team, turn, from,
-                        maxMove, forceType, wounded, threat, tracker, profile);
+                        maxMove, forceType, wounded, sim.GetPosition(wounded), threat, tracker, profile, null);
                     return; // 站位评分器已给全档候选（或最优=当前格），锚循环不再参与
+                }
+                // H-3 视野敌集（2026-10-04 拍板「主动跑去先锋攻击视野内的敌，让光环尽可能覆盖多的
+                // 敌人，覆盖先锋为其次，先锋攻击视野外的敌人不关心」）：先锋攻击视野内（切比雪夫
+                // ≤GetEffectiveAttackVision，与眷属 v7 追击域同口径）的存活敌集——光环敌覆盖分/
+                // 前瞻梯度/就位判定的过滤域（null=不过滤=G 批基线，伤员/光环/保险恒 null）
+                HashSet<string> visionEnemies = null;
+                if (vanguard != null)
+                    visionEnemies = CollectVisionEnemies(sim, vanguard, team);
+                // H-4 追随外推（2026-10-04 拍板「不在先锋 1 格内就立刻跟上」——治同速追逐恒滞后）：
+                // 按先锋上回合位移向量把本回合追逐锚前移=当前位置+位移（迎头追逐：双方皆 2 格/回合
+                // 时追逐永不收敛、先锋驻位她才贴上=「凯亚走了四格远才跟」的根因；外推一步=先锋继续
+                // 推进她恰好迎头贴上）。先锋换人（死亡换先锋）=位移向量不可信，回落真实位置追逐。
+                // I 批讨论直连（docs/active/37 §5，2026-10-04 实测返修「凯亚走了 3 格芭芭拉没立刻
+                // 跟上」）：追逐锚优先=先锋**已声明/已申报的落点**（board.DeclaredMovement——凯亚
+                // 「告诉」芭芭拉「我要走到 X」，当回合即消费=治 WEGO 快照滞后首拍窗口；申报遍支援
+                // 轮读申报落点、执行遍读正式声明落点）。声明落点=真实决策位>外推猜测>快照滞后位，
+                // 有声明时跳过外推（双外推过度）。无声明回落外推链不变
+                string vanguardId = vanguard != null
+                    ? vanguard.GetUnitComponent<UnitIdentity>()?.UnitID : null;
+                var vanguardDeclaredPos = default(BattleCell);
+                bool vanguardDeclared = vanguard != null && board != null
+                    && board.DeclaredMovement.TryGetValue(vanguardId, out vanguardDeclaredPos);
+                BattleCell vanguardPos = vanguardDeclared
+                    ? vanguardDeclaredPos
+                    : (vanguard != null
+                        ? new BattleCell(sim.GetPosition(vanguard).x, sim.GetPosition(vanguard).y)
+                        : new BattleCell(from.x, from.y));
+                string unitIdH4 = unit.GetUnitComponent<UnitIdentity>()?.UnitID;
+                if (!vanguardDeclared
+                    && vanguard != null
+                    && _vanguardTrack.TryGetValue(unitIdH4, out var trackH4)
+                    && trackH4.vanguardId == vanguardId)
+                {
+                    int dx = vanguardPos.x - trackH4.pos.x;
+                    int dy = vanguardPos.y - trackH4.pos.y;
+                    if (dx != 0 || dy != 0)
+                        vanguardPos = new BattleCell(vanguardPos.x + dx,
+                            vanguardPos.y + dy); // 外推=沿上回合位移向量再走一步（迎头追逐）
+                }
+                if (vanguard != null)
+                {
+                    if (!_bidPhase) // I-A 申报遍槽写入抑制；候选 Offer 照常（纯读申报语义）
+                        _vanguardTrack[unitIdH4] = (vanguardId,
+                            new BattleCell(sim.GetPosition(vanguard).x, sim.GetPosition(vanguard).y), turn);
+                    if (!_bidPhase) board?.DeclareFollow(vanguardId); // I-C：跟随名额声明（执行遍）
+                    if (TryOfferSupportPosition(sim, snapshot, unit, playerId, team, turn, from,
+                            maxMove, forceType, vanguard, vanguardPos, threat, tracker, profile, visionEnemies))
+                        return; // H：伴随位已 Offer（或最优=当前格=已罩满视野敌）——锚=外推追逐位（H-4）
+                }
+                if (vanguard != null)
+                {
+                    var vPos = vanguardPos; // H-4：追逐锚=外推位（奶程评分/BFS goals 一致用外推——先锋推进中她迎头，驻位时外推=自身=现状语义）
+                    // H-3：视野敌集非空=光环有目标域——覆盖评估/豁免按视野口径；视野外敌全不关心
+                    //（不再以先锋邻位为驻位完成条件——驻位判定改「已罩到视野敌」）
+                    int vgFloor = ShouldTakeAuraPosition(sim, unit, team, threat, profile,
+                        new BattleCell(vPos.x, vPos.y), visionEnemies)
+                        ? SupportAuraTakePositionScore : 0;
+                    if (vgFloor > 0)
+                    {
+                        // H-3 未就位且评分器直线跟不到敌群（平行/地形断）：先按先锋邻兜底贴身
+                        //（FindApproachStraightSteps——BFS dist 场绕行；goals=先锋十字邻格），
+                        // 次回合先锋推进后评分器视野敌群格自然接管
+                        var vgSteps = BattleHeuristics.FindApproachStraightSteps(sim, unit,
+                            new BattleCell(vPos.x, vPos.y), maxMove, out var vgDir, reservedCells);
+                        if (vgSteps > 0)
+                        {
+                            tracker.Offer(Mathf.Max(vgFloor,
+                                Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重)), new ActionData
+                            {
+                                playerId = playerId,
+                                unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                                actionType = ActionType.Move,
+                                direction = vgDir,
+                                moveMagnitude = vgSteps,
+                                turnNumber = turn,
+                            });
+                            return;
+                        }
+                    }
+                    // H-3 就位豁免 + 无视野敌（或就位豁免不触发）时才回到「先锋邻位驻位」旧语义
+                    int accompanyRadius = profile.支援贴近距离 > 0
+                        ? profile.支援贴近距离
+                        : BattleHeuristics.SupportRadiusOf(unit);
+                    if (vgFloor == 0
+                        && Math.Max(Math.Abs(vPos.x - from.x), Math.Abs(vPos.y - from.y)) <= accompanyRadius)
+                        return; // H：已在伴随半径内（切比≤治疗半径——含对角位，十字 goals 之外的达标位）=驻位完成
+                    if (vgFloor == 0)
+                    {
+                        // H 返修（2026-10-04 探针实证 T4 环湖现场）：伴随绕行=眷属 v6.1 同款 BFS dist 场
+                        // 直线前缀（FindApproachStraightSteps）——锚循环 ApproachStraightPrefix 是**切比判据**，
+                        // 平行绕行段（沿湖岸平移、切比距离不减）恒 0 前缀=废；BFS 步数场递减判据对绕行段可走。
+                        // goals=先锋十字邻格（BuildApproachField 原语义）=伴随位集
+                        var vgSteps0 = BattleHeuristics.FindApproachStraightSteps(sim, unit,
+                            new BattleCell(vPos.x, vPos.y), maxMove, out var vgDir0, reservedCells);
+                        if (vgSteps0 > 0)
+                        {
+                            tracker.Offer(Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重), new ActionData
+                            {
+                                playerId = playerId,
+                                unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                                actionType = ActionType.Move,
+                                direction = vgDir0,
+                                moveMagnitude = vgSteps0,
+                                turnNumber = turn,
+                            });
+                            return;
+                        }
+                    }
+                    // BFS 也不可达（先锋被围死/真不可达）：落出=本回合无移动候选（缺席兜底）
                 }
             }
 
@@ -619,7 +944,7 @@ namespace GIC.Battle
 
                 // BFS 最短路首步（0=该锚不可达〔四邻不可进入或真无路〕→ 换下一锚——最近可达优先，
                 // 眷属 v4 换目标巡逻同语义）
-                var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, to);
+                var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, to, reservedCells);
                 if (direction == 0) continue;
                 // F-1 支援锚驻位分流（docs/active/34 §5.1）：锚的敌我决定距离语义——
                 // 伤员锚（我方）=治疗半径（SupportRadiusOf 自动提取技能集最大治疗原子半径；档案
@@ -658,21 +983,18 @@ namespace GIC.Battle
                     RememberMoveAnchor(sim, unit, anchor, team); // E-3：换线成功=延续该锚
                     return;
                 }
+                // 坑⑧ 返修回填（docs/14 §115 坑⑧，2026-10-04 报障「凯亚开局只走 1 格、移速 30
+                // 没发挥」）：直线前缀化由切比判据换成 BFS dist 场递减判据——切比判据
+                // （ApproachStraightPrefix）在集团拥挤场景 BFS 首步=侧向绕行、到锚切比距离不严格
+                // 递减=前缀恒 1 格（移速被结构性吞掉）；dist 场判据（FindApproachStraightSteps——
+                // 眷属 v6.1/H 批伴随路径同族原语）沿最短路实格推进（逐格已查单位占位+地形），
+                // 绕行段照常走满三重钳预算。方向改用 dist 场首向=实际推进方向（与步数恒匹配）
+                int prefixRun = BattleHeuristics.FindApproachStraightSteps(sim, unit, to, steps, out var prefixDir,
+                    reservedCells);
+                if (prefixRun <= 0) continue; // 无最短路直线段（首步被占/不可达/首格即拐点）：换下一锚
+                direction = prefixDir;
+                steps = prefixRun; // dist 场内置钳：驻位余量（maxSteps）+移速上限+地形+单位占位
                 var step = SkillHitResolver.DirectionToDelta(direction);
-                int straightRun = 0;
-                for (int s = 1; s <= steps; s++)
-                {
-                    var cell = new BattleCell(from.x + step.x * s, from.y + step.y * s);
-                    if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
-                    straightRun++;
-                }
-                if (straightRun <= 0) continue; // 首步即被单位占住（BFS 保守近似外的兜底）：换下一锚
-                // G-5 修 1（docs/active/35 §4，§114 同族防歪）：步长钳改「BFS 最短路首段直线前缀」——
-                // 治「BFS 首步×N 直线飞越路径拐点」（环湖绕行首步=Left 被直线化执行成纯西行滑边、
-                // 探针实证 A 芭锁 B 芭跨湖锚+滑向 (0,3) 角落的根因）；前缀步长 ≤ 三重钳步长
-                BattleHeuristics.ApproachStraightPrefix(sim, unit, to, steps, out var prefixDir, out var prefixRun);
-                if (prefixRun <= 0) continue; // 路径开头即拐点（首格即距离不减）：换下一锚
-                steps = Math.Min(steps, prefixRun);
 
                 // 逼近进度：沿 BFS 方向实际位移后的切比雪夫距离缩减量（绕行段进度可为 0——
                 // 兜底分仍 >0，移动候选照常参与评分）
@@ -714,7 +1036,8 @@ namespace GIC.Battle
             // BFS=0（首步即无路）=保持缺席
             if (!hasActionCandidate && anchors.Count > 0)
             {
-                var fallbackDir = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(anchors[0]));
+                var fallbackDir = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(anchors[0]),
+                    reservedCells);
                 if (fallbackDir != 0)
                 {
                     var fd = SkillHitResolver.DirectionToDelta(fallbackDir);
@@ -781,13 +1104,15 @@ namespace GIC.Battle
         /// ④自保（SelfPreservePenalty——距最近敌 &lt; 危险半径扣分×档案权重）
         /// 确定性：CrossDirections 枚举序 × 步数升序 + 严格大于替换（同分先到先得）；零 roll。
         /// 最优=当前格 → 不 Offer（驻位内化：转攻/转 Pass 由攻击档与缺席兜底）；全射线无候选
-        /// → 不 Offer（伤员不可直线达=保持原位不空耗）</summary>
-        private static void TryOfferSupportPosition(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+        /// → 不 Offer（伤员不可直线达=保持原位不空耗）。
+        /// 返回值（H 伴随批，docs/active/36）：true=已 Offer；false=最优=当前格（无改进落点）——
+        /// 伤员/光环/保险三态调用方不看返回值（驻位语义不变）；伴随模式 false=直线跟不到
+        ///（平行线/地形断），调用方回落 FindApproachStraightSteps BFS 绕行</summary>
+        private static bool TryOfferSupportPosition(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, BattleCell from, int maxMove, ForceType forceType,
-            Unit wounded, OpponentThreatModel.ThreatMap threat, CandidateTracker tracker,
-            UnitConfig.CompanionProfile profile)
+            Unit wounded, BattleCell woundedPos, OpponentThreatModel.ThreatMap threat, CandidateTracker tracker,
+            UnitConfig.CompanionProfile profile, HashSet<string> visionEnemies)
         {
-            var woundedPos = sim.GetPosition(wounded);
             bool woundedIsSelf = ReferenceEquals(wounded, unit); // G-5：伤员=自身（含保险后撤假锚）——治疗半径随她走
             int supportRadius = profile.支援贴近距离 > 0
                 ? profile.支援贴近距离
@@ -795,13 +1120,24 @@ namespace GIC.Battle
             if (supportRadius <= 0) supportRadius = 1; // 无治疗原子防御：贴 1 格（支援语义兜底）
             int auraRadius = BattleHeuristics.AuraRadiusOf(unit); // G-1 光环感知（无光环=0 不消费）
 
+            // H-2 交战就位态（docs/active/36 §5，2026-10-04 拍板「先锋与敌人交战时优先主动上前
+            // 贴脸敌人，发挥光环挂水——考虑光环同时覆盖敌人和先锋的更优站位」）：锚=真实单位
+            //（先锋/伤员=先锋）+交战（锚距最近敌≤VanguardEngageRange）+未就位（当前格光环罩不到
+            // 敌）+让位门控过（救命奶/满槽复苏恒在就位之上，勿靠分数竞争——三者量级与常规技能挤
+            // 同窗）。就位态=罩敌格**无条件优先**（豁免「严格大于当前格」——罩敌格与当前格同分
+            //〔奶程+6光环=平〕是交战常态，卡死即 T6-T13 站距敌 3-4 连放水球不贴脸的复测实锤）；
+            // 罩敌格=奶程 20+光环 6×敌天然双计分=「同时覆盖敌+先锋」交集格自然胜出。
+            bool takePosition = !woundedIsSelf
+                && ShouldTakeAuraPosition(sim, unit, team, threat, profile, woundedPos, visionEnemies);
+
             // 当前格评分（「不动」基准——所有候选格与它比，选出比它好的才动）
             int currentScore = ScoreSupportCell(sim, snapshot, unit, playerId, team, from,
-                woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile);
+                woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies);
 
             int bestScore = currentScore;
             Direction2D bestDir = 0;
             int bestRun = 0;
+            int auraBestScore = -1; Direction2D auraBestDir = 0; int auraBestRun = 0; // H-2 罩敌格跟踪（就位豁免备选）
             foreach (var direction in BattleHeuristics.CrossDirections)
             {
                 var delta = SkillHitResolver.DirectionToDelta(direction);
@@ -812,7 +1148,13 @@ namespace GIC.Battle
                         break; // 直线射线：地形断止（与主逼近档直线段钳制同构）
                     if (IsCellOccupiedForStep(sim, cell)) continue; // 占据格不可停：跳过续评（执行层停格前保守近似）
                     int score = ScoreSupportCell(sim, snapshot, unit, playerId, team, cell,
-                        woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile);
+                        woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies);
+                    if (takePosition && auraRadius > 0
+                        && EnemiesInAuraAt(sim, unit, team, cell, auraRadius, visionEnemies) > 0
+                        && score > auraBestScore)
+                    {
+                        auraBestScore = score; auraBestDir = direction; auraBestRun = run;
+                    }
                     if (score > bestScore)
                     {
                         bestScore = score;
@@ -822,10 +1164,34 @@ namespace GIC.Battle
                 }
             }
 
-            if (bestDir == 0) return; // 最优=当前格或全射线不可达：无移动候选（驻位/保持原位）
+            // H-2 就位豁免：交战未就位+射线存在罩敌可停格→罩敌格直接成为移动目标（准号令语义，
+            // 豁免严格大于；罩敌格内部取评分最高者=双覆盖交集格）
+            if (takePosition && auraBestDir != 0
+                && (bestDir == 0 || auraBestScore >= bestScore || EnemiesInAuraAt(sim, unit, team,
+                        new BattleCell(from.x + SkillHitResolver.DirectionToDelta(bestDir).x * bestRun,
+                            from.y + SkillHitResolver.DirectionToDelta(bestDir).y * bestRun), auraRadius, visionEnemies) == 0))
+            {
+                bestDir = auraBestDir;
+                bestRun = auraBestRun;
+                bestScore = Math.Max(auraBestScore, bestScore);
+            }
+
+            if (bestDir == 0) return false; // 无改进落点（最优=当前格）：伤员/光环/保险三态=驻位（调用方不看返回值，行为不变）；伴随模式=直线跟不到（平行线/地形断）→调用方回落 BFS 绕行
+
+            // H-2 就位 Offer 托底：交战未就位+选中罩敌格→Offer 分托底 SupportAuraTakePositionScore
+            // 恒压常规技能（水球伤害+获能+治疗、VitalityBurst 群奶≈50-90）——她先就位贴脸再输出
+            int offerFloor = 0;
+            if (takePosition && auraBestDir != 0)
+            {
+                var chosen = new BattleCell(from.x + SkillHitResolver.DirectionToDelta(bestDir).x * bestRun,
+                    from.y + SkillHitResolver.DirectionToDelta(bestDir).y * bestRun);
+                if (EnemiesInAuraAt(sim, unit, team, chosen, auraRadius, visionEnemies) > 0)
+                    offerFloor = SupportAuraTakePositionScore;
+            }
 
             // Offer 分=最优格的绝对站位分（与攻击候选同池可比——量级≈奶程 20+开火线 8）
-            int offerScore = Mathf.RoundToInt(bestScore * profile.移动优先权重);
+            int offerScore = Mathf.Max(offerFloor,
+                Mathf.RoundToInt(bestScore * profile.移动优先权重));
             tracker.Offer(offerScore, new ActionData
             {
                 playerId = playerId,
@@ -836,6 +1202,7 @@ namespace GIC.Battle
                 turnNumber = turn,
             });
             RememberMoveAnchor(sim, unit, wounded, team); // 敌方锚才记录（wounded=我方→内部跳过）——E-3 槽不污染
+            return true;
         }
 
         /// <summary>支援站位单格评分（F-2 四维 + G-1 光环维度）：
@@ -845,7 +1212,7 @@ namespace GIC.Battle
         private static int ScoreSupportCell(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, BattleCell cell, BattleCell woundedPos, int supportRadius,
             int auraRadius, bool woundedIsSelf, OpponentThreatModel.ThreatMap threat,
-            UnitConfig.CompanionProfile profile)
+            UnitConfig.CompanionProfile profile, HashSet<string> visionEnemies)
         {
             int stance = SupportStanceOf(sim, unit, team, threat); // G-2 形态因子（本格评估用）
             int distToWounded = woundedIsSelf ? 0 : Math.Max(Math.Abs(cell.x - woundedPos.x), Math.Abs(cell.y - woundedPos.y));
@@ -873,12 +1240,18 @@ namespace GIC.Battle
             // 「落点距最近敌」给梯度分（每近 1 格 +2，上限 12=2 敌满档）——旧版只对「已在光环内」
             // 给分，远距无驱动力+趋近格被火线扣分压制=恒缩角（28 回合实证）；前瞻与自保负分在
             // 1~2 格处对抗（前线形态净贴脸 +7.5/保险形态净负后撤）——权衡轴单一化
+            // H-3 视野口径（2026-10-04 拍板「让光环尽可能覆盖先锋攻击视野内多的敌人，覆盖先锋为
+            // 其次，视野外敌不关心」）：visionEnemies 非空（伴随语境）→光环敌覆盖与前瞻梯度都只对
+            // 先锋视野内敌计——她主动朝视野敌群跑；每敌分 ×VanguardAuraPerEnemyMult=敌群覆盖主导
+            // 选格（罩 2~3 视野敌的格压过先锋旁单敌格）；同敌数下奶程仍区分先锋旁/远格=「覆盖先锋
+            // 为其次」的其次语义。null（伤员/光环贴敌/保险语境）恒 G 批基线。
             if (auraRadius > 0 && profile.光环贴敌权重 > 0f && stance == 1)
             {
-                int nearestEnemy = NearestEnemyDistance(sim, unit, team, cell);
+                int nearestEnemy = NearestEnemyDistance(sim, unit, team, cell, visionEnemies);
                 int enemiesInAura = 0;
                 foreach (var kv in sim.Units)
                 {
+                    if (visionEnemies != null && !visionEnemies.Contains(kv.Key)) continue;
                     var enemy = kv.Value;
                     var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                     if (enemyIdentity == null || enemyIdentity.Team == team) continue;
@@ -887,7 +1260,9 @@ namespace GIC.Battle
                     int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
                     if (dist <= auraRadius) enemiesInAura++;
                 }
-                int auraScore = Mathf.RoundToInt(SupportAuraPerEnemy * profile.光环贴敌权重) * enemiesInAura;
+                int perEnemy = SupportAuraPerEnemy
+                    * (visionEnemies != null ? VanguardAuraPerEnemyMult : 1); // H-3：伴随语境敌分翻倍
+                int auraScore = Mathf.RoundToInt(perEnemy * profile.光环贴敌权重) * enemiesInAura;
                 if (enemiesInAura == 0 && nearestEnemy < int.MaxValue)
                     // G-5 修 2（前瞻公式勘误）：(Base − dist) × PerStep——14 格内有梯度（每近 1 格 +3），
                     // 旧斜率式 Base − dist×PerStep 在 5 格外恒 0（探针实证 9 格敌距=0 分=无趋近驱动）
@@ -900,12 +1275,15 @@ namespace GIC.Battle
         }
 
         /// <summary>落点距最近存活敌切比雪夫（G-5 抽提共用——光环前瞻/保险后撤梯度两消费方；
-        /// 无敌=int.MaxValue）</summary>
-        private static int NearestEnemyDistance(BattleSimState sim, Unit unit, TeamType team, BattleCell cell)
+        /// 无敌=int.MaxValue。filter=null 不过滤；非空（H-3 视野敌集）=只对集合内敌求最近——
+        /// 光环前瞻只朝先锋视野内敌推进（视野外敌不关心）；保险后撤梯度恒 null（保命不问视野）</summary>
+        private static int NearestEnemyDistance(BattleSimState sim, Unit unit, TeamType team, BattleCell cell,
+            HashSet<string> filter = null)
         {
             int nearest = int.MaxValue;
             foreach (var kv in sim.Units)
             {
+                if (filter != null && !filter.Contains(kv.Key)) continue;
                 var enemy = kv.Value;
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue;
@@ -1072,10 +1450,26 @@ namespace GIC.Battle
         /// 锁定反而滞后；敌方锚=火力目标，锁定语义成立）。我方锚/取不到 id=不记录</summary>
         private static void RememberMoveAnchor(BattleSimState sim, Unit unit, Unit anchor, TeamType team)
         {
+            if (_bidPhase) return; // I-A 申报遍：纯读申报，槽写入抑制（未获名额伙伴零脏写）
             var anchorIdentity = anchor?.GetUnitComponent<UnitIdentity>();
             if (anchorIdentity == null || anchorIdentity.Team == team) return;
             if (sim.TryGetUnitId(unit, out var unitId) && sim.TryGetUnitId(anchor, out var anchorId))
                 _lastMoveAnchors[unitId] = anchorId;
+        }
+
+        /// <summary>意图板移动落点物化（I-D，docs/active/37 §5）：把板内已声明落点转为 BFS 占位集
+        /// （排除消费单位自身的声明——自己不避自己）。board=null/空板=null（BFS 默认参数零变化）</summary>
+        private static List<BattleCell> BoardReservedCells(BattleSimState sim, TeamIntentBoard board, Unit self)
+        {
+            if (board == null || board.DeclaredMovement.Count == 0) return null;
+            if (!sim.TryGetUnitId(self, out var selfId)) selfId = null;
+            var cells = new List<BattleCell>(board.DeclaredMovement.Count);
+            foreach (var kv in board.DeclaredMovement)
+            {
+                if (kv.Key == selfId) continue;
+                cells.Add(kv.Value);
+            }
+            return cells.Count > 0 ? cells : null;
         }
 
         /// <summary>单位 id 轻取（E-3 锚延续槽键；取不到=null）</summary>
@@ -1160,6 +1554,140 @@ namespace GIC.Battle
                 }
             }
             return best;
+        }
+
+        /// <summary>近战先锋选择（H 批伴随，docs/active/36）：本方存活单位中「近战武器」
+        /// （单手剑/双手剑/长枪/臂铠——原神口径法器/弓/枪=远程）的最近者（切比雪夫；
+        /// 同距 unitId 升序——确定性铁律）。排除建筑（含协议核心）/支援型（奶妈互随=无人跟
+        /// 战线）/自己。近战=武器身份判定（与体力/元能状态解耦——体力暂缺的凯亚仍是先锋，
+        /// AttackRangeOf 的动态过滤不适用于身份域）；无候选=null（回落光环贴敌/锚循环）。
+        /// I-C 跟随目标分配（docs/active/37 §4）：board 非 null 时比较键前置「跟随者数升序」
+        /// ——后位支援型选跟随者最少的先锋（「你跟凯亚、我跟丘丘人」的讨论分散；单先锋/
+        /// 板 null=原语义零变化）</summary>
+        private static Unit FindMeleeVanguard(BattleSimState sim, Unit self, TeamType team,
+            TeamIntentBoard board = null)
+        {
+            Unit best = null;
+            int bestDist = int.MaxValue;
+            int bestFollowers = int.MaxValue;
+            string bestId = null;
+            var from = sim.GetPosition(self);
+            foreach (var kv in sim.Units)
+            {
+                var candidate = kv.Value;
+                if (BattleSimState.IsDead(candidate) || ReferenceEquals(candidate, self)) continue;
+                if (BattleHeuristics.IsBuilding(candidate)) continue;
+                var identity = candidate.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.Team != team) continue;
+                var weapon = identity.WeaponType;
+                if (weapon != WeaponType.Claymore && weapon != WeaponType.Sword
+                    && weapon != WeaponType.Polearm && weapon != WeaponType.Gauntlet) continue; // 近战武器域
+                var candidateProfile = candidate.RawData?.行为档案;
+                if (candidateProfile != null
+                    && candidateProfile.候选类别 == UnitConfig.CompanionRole.Support) continue; // 支援型不充当先锋
+                var pos = sim.GetPosition(candidate);
+                int dist = Math.Max(Math.Abs(pos.x - from.x), Math.Abs(pos.y - from.y));
+                int followers = board != null ? board.FollowersOf(kv.Key) : 0;
+                if (followers < bestFollowers
+                    || (followers == bestFollowers && dist < bestDist)
+                    || (followers == bestFollowers && dist == bestDist && bestId != null
+                        && string.CompareOrdinal(kv.Key, bestId) < 0))
+                {
+                    best = candidate;
+                    bestDist = dist;
+                    bestFollowers = followers;
+                    bestId = kv.Key;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>落点光环半径内敌数（H-2 交战就位——与 ScoreSupportCell 光环敌覆盖同口径：
+        /// 切比雪夫 ≤ 半径；含尸体——尸体可被光环 tick 打，挂水判定同含。filter=null 不过滤；
+        /// 非空（H-3 视野敌集）=只数集合内的敌=「先锋攻击视野外的敌人不关心」）</summary>
+        private static int EnemiesInAuraAt(BattleSimState sim, Unit unit, TeamType team,
+            BattleCell cell, int auraRadius, HashSet<string> filter)
+        {
+            int count = 0;
+            foreach (var kv in sim.Units)
+            {
+                if (filter != null && !filter.Contains(kv.Key)) continue;
+                var enemy = kv.Value;
+                var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
+                if (enemyIdentity == null || enemyIdentity.Team == team) continue;
+                if (BattleSimState.IsDead(enemy)) continue;
+                var pos = sim.GetPosition(enemy);
+                int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
+                if (dist <= auraRadius) count++;
+            }
+            return count;
+        }
+
+        /// <summary>H-3 视野敌集（2026-10-04 拍板「主动跑去先锋攻击视野内的敌」）：先锋攻击视野内
+        ///（切比雪夫 ≤ GetEffectiveAttackVision——Unspecified 回落 5，与眷属 v7 追击域同口径，
+        /// 决策三十一）的存活敌 id 集——伴随语境光环敌覆盖分/前瞻梯度/就位判定的过滤域；
+        /// 视野外敌全不关心（不为它们移动、不被它们吸引）</summary>
+        private static HashSet<string> CollectVisionEnemies(BattleSimState sim, Unit vanguard, TeamType myTeam)
+        {
+            var result = new HashSet<string>();
+            int vision = vanguard.RawData != null ? vanguard.RawData.GetEffectiveAttackVision() : 5;
+            var vp = sim.GetPosition(vanguard);
+            foreach (var kv in sim.Units)
+            {
+                var enemy = kv.Value;
+                var identity = enemy.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.Team == myTeam) continue;
+                if (BattleSimState.IsDead(enemy)) continue;
+                var pos = sim.GetPosition(enemy);
+                if (Math.Max(Math.Abs(pos.x - vp.x), Math.Abs(pos.y - vp.y)) <= vision)
+                    result.Add(kv.Key);
+            }
+            return result;
+        }
+
+        /// <summary>H-2 交战就位态判定（评分器豁免/托底与伴随 fallback BFS 共用单源）：锚=真实单位
+        ///（先锋/伤员——woundedIsSelf 由调用方先行排除）+触发域+未就位（当前格光环罩不到敌）
+        /// +让位门控过（威胁图将死队友→救命奶让位；我方尸体在场且爆发满槽→复苏让位——量级挤
+        /// 同窗勿靠分数竞争）。**触发域两口径（H-3）**：visionEnemies 非空=伴随语境，先锋攻击视野
+        /// 内敌集非空即触发（交战与否不再是门槛——她该主动朝视野敌群跑）；null=伤员语境，维持
+        /// H-2 交战口径（锚距最近敌 ≤ VanguardEngageRange=2）——伤员=先锋交战时贴脸、伤员=远程
+        /// 被打者时不触发（F 批贴伤员语义保持）</summary>
+        private static bool ShouldTakeAuraPosition(BattleSimState sim, Unit unit, TeamType team,
+            OpponentThreatModel.ThreatMap threat, UnitConfig.CompanionProfile profile, BattleCell anchorPos,
+            HashSet<string> visionEnemies)
+        {
+            int auraRadius = BattleHeuristics.AuraRadiusOf(unit);
+            if (auraRadius <= 0 || profile.光环贴敌权重 <= 0f) return false;
+            if (threat != null && threat.DoomedAllies != null && threat.DoomedAllies.Count > 0) return false;
+            if (HasAllyCorpse(sim, team) && BurstEnergyReady(unit)) return false;
+            if (visionEnemies != null)
+            {
+                if (visionEnemies.Count == 0) return false;
+            }
+            else if (NearestEnemyDistance(sim, unit, team, anchorPos) > VanguardEngageRange) return false;
+            var from = sim.GetPosition(unit);
+            return EnemiesInAuraAt(sim, unit, team, from, auraRadius, visionEnemies) == 0;
+        }
+
+        /// <summary>本方是否有尸体（H-2 就位让位门控——尸体在场且爆发满槽时复苏候选恒优先）</summary>
+        private static bool HasAllyCorpse(BattleSimState sim, TeamType team)
+        {
+            foreach (var kv in sim.Units)
+            {
+                if (!BattleSimState.IsDead(kv.Value)) continue;
+                var identity = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (identity != null && identity.Team == team) return true;
+            }
+            return false;
+        }
+
+        /// <summary>爆发元能是否已满槽（H-2 就位让位门控——未满槽=复苏不可施放，就位不受让位约束）</summary>
+        private static bool BurstEnergyReady(Unit unit)
+        {
+            var stats = unit.GetUnitComponent<UnitStats>();
+            if (stats == null) return false;
+            var es = stats.GetStatStruct(StatType.Energy);
+            return es.Max > 0 && stats.Energy >= es.Max;
         }
 
         /// <summary>技能携带治疗原子的估值（支援型评分用）：按 targetFilter 估受治者集合
@@ -1302,6 +1830,15 @@ namespace GIC.Battle
             /// <summary>已被我方声明攻击的敌方目标集（集火跟随消费——「已被集火」判定）</summary>
             public readonly HashSet<string> FocusedEnemies = new HashSet<string>();
 
+            /// <summary>先锋跟随声明（先锋 unitId → 跟随者数——I-C 跟随目标分配消费：
+            /// 后位支援型选跟随者最少的先锋=「你跟凯亚、我跟丘丘人」的讨论分散）</summary>
+            public readonly Dictionary<string, int> DeclaredVanguardFollow = new Dictionary<string, int>();
+
+            /// <summary>移动意图落点（单位 id → 决策落点——I-D 移动意图占位：伙伴移动定稿/玩家
+            /// Move/DeployUnit 预载声明；后位 BFS 视作占位避让，集团推进不互撞。声明口径=乐观
+            /// 落点，结算偏差保守向，下回合重算吸收）</summary>
+            public readonly Dictionary<string, BattleCell> DeclaredMovement = new Dictionary<string, BattleCell>();
+
             public void DeclareDamage(string enemyId, int amount)
             {
                 if (amount <= 0) return;
@@ -1317,6 +1854,26 @@ namespace GIC.Battle
                 DeclaredHealOnAlly[allyId] = cur + amount;
             }
 
+            /// <summary>跟随名额声明（I-C）：选定伴随先锋时调用——后位支援型经 FollowersOf 感知分散</summary>
+            public void DeclareFollow(string vanguardId)
+            {
+                if (string.IsNullOrEmpty(vanguardId)) return;
+                DeclaredVanguardFollow.TryGetValue(vanguardId, out var cur);
+                DeclaredVanguardFollow[vanguardId] = cur + 1;
+            }
+
+            /// <summary>移动落点声明（I-D）：key=属主单位 id（消费端排除自身声明；部署预载用
+            /// "deploy:"+playerId 合成 key——部署单位不在场，任何在场伙伴都该避让）</summary>
+            public void DeclareMovement(string ownerId, BattleCell cell)
+            {
+                if (string.IsNullOrEmpty(ownerId)) return;
+                DeclaredMovement[ownerId] = cell;
+            }
+
+            /// <summary>该先锋当前跟随者数（I-C 复合键首序）</summary>
+            public int FollowersOf(string vanguardId) =>
+                DeclaredVanguardFollow.TryGetValue(vanguardId, out var v) ? v : 0;
+
             public int DeclaredDamage(string enemyId) =>
                 DeclaredDamageOnEnemy.TryGetValue(enemyId, out var v) ? v : 0;
 
@@ -1325,11 +1882,15 @@ namespace GIC.Battle
         }
 
         /// <summary>候选追踪：严格大于替换（同分先到先得——枚举序即决策确定性）。
-        /// 配额脑（PlayerQuotaBrain）跨单位共享一个实例取全场最优；伙伴脑每单位一个实例取该单位最优。</summary>
+        /// 配额脑（PlayerQuotaBrain）跨单位共享一个实例取全场最优；伙伴脑每单位一个实例取该单位最优。
+        /// I-A 申报遍消费 BestScore（装包价值排序输入）。</summary>
         public sealed class CandidateTracker
         {
             public ActionData Best { get; private set; }
             private int _bestScore;
+
+            /// <summary>当前最优候选分数（无候选=0——I-A 申报用；执行遍勿消费）</summary>
+            public int BestScore => _bestScore;
 
             public void Offer(int score, ActionData action)
             {
