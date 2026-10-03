@@ -432,7 +432,7 @@ namespace GIC.Battle
 
         [Header("冻结霜化（2026-10-02 拍板「像真的结冰」）")]
         [Tooltip("上冻结冰蔓延时长（秒，从脚往头）")]
-        [SerializeField] private float 冻结蔓延时长 = 0.45f;
+        [SerializeField] private float 冻结蔓延时长 = 0.9f;
 
         [Tooltip("解冻退冰时长（秒）")]
         [SerializeField] private float 解冻时长 = 0.3f;

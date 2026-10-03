@@ -49,11 +49,15 @@ float FrostNoise(float2 p)
     return lerp(lerp(a, b, fp.x), lerp(c, d, fp.x), fp.y);
 }
 
-// 冻结遮罩：0=原样 1=完全冻。世界 Y 归一化到 [0.115, 0.885]（外扩 15%，amount=1 时脚部也满）
+// 冻结遮罩：0=原样 1=完全冻。世界 Y 梯度按「离头顶距离」倒序归一（头顶 g=0.115、脚 g=0.885，
+// 头顶上方外扩 15% 缓冲带——amount=1 时头顶也满）；冻结条件 g+amount≥1 → g 大的脚部先过阈值=
+// 从脚往头蔓延。（2026-10-03 报障「霜化并不总是从脚蔓延到头，有时反向」返修：原式 g 随高度递增
+// =头 g 最大先冻、frontier 自上而下扫，与「脚往头」设计及冰雾「与蔓延同向」注释相反；定格态/
+// 静态截图验证不了方向，动态蔓延首次实战目检才现形。朝向=纯 X 镜像对世界 Y 梯度零影响）
 float FrostMask(float worldY, float2 uv)
 {
     float range = max(0.0001, _FreezeTopY - _FreezeFootY);
-    float g = saturate((worldY - _FreezeFootY + range * 0.15) / (range * 1.3));
+    float g = 1.0 - saturate((worldY - _FreezeFootY + range * 0.15) / (range * 1.3));
     float n = FrostNoise(uv * 9.0 + float2(0.0, _Time.y * 0.045));
     return saturate((g + _FrozenAmount - 1.0) / 0.12 + n * 0.28 - 0.05);
 }
@@ -89,6 +93,12 @@ void FrostApply(inout half4 col, float worldY, float2 uv, half baseAlpha, half n
     float mask = FrostMask(worldY, uv);
     if (mask <= 0.003) return; // 非冻结像素零后续成本
 
+    // 形状域门（2026-10-03 报障「循环动画把绿幕也算进去冰冻」返修）：FrostRim(0)=1 会把 baseAlpha=0
+    // 的纯背景（视频绿幕整幅/sprite 透明 padding）误读成「边缘」，rim 与冰雾两条 max alpha 抬升把
+    // 背景冻成实心霜块——sprite 路径 Tight mesh 裁掉透明区不可见、视频路径整幅四边形全暴露。
+    // 形状外仅保留 fringe 自带的 ±4 texel 轮廓外冰缘；rim/冰雾 alpha 只在形状内生效
+    half shapePresent = step(0.003, baseAlpha);
+
     // ① 霜色重映射（2026-10-02 原神实机测量定版）：先对原色强去饱和+提亮（奶白霜感=
     // 原神冻结核心特征），再与「暗部灰蓝→亮部霜白」色板五五混合——纯色板整幅替换=信源
     // 「蓝色塑料袋」坑，纯原色提亮又丢冰蓝倾向，五五混合兼保角色体积感与霜化色相；
@@ -108,7 +118,7 @@ void FrostApply(inout half4 col, float worldY, float2 uv, half baseAlpha, half n
 
     // ② 冰体半透明（2026-10-02 报障「应半透明、当前全不透明」返修）：冻结区内部按原 alpha 比例
     // 收向 _FrostAlpha——底面透出=冰的通透；边缘带反向拉实（信源「边缘实中间透」口径）
-    half rim = FrostRim(baseAlpha);
+    half rim = FrostRim(baseAlpha) * shapePresent;
     col.rgb = lerp(col.rgb, _FrostBrightColor.rgb, saturate(rim * 1.6) * mask);
     half interior = saturate(1.0 - rim);
     col.a = lerp(col.a, _FrostAlpha * col.a, mask * interior);
@@ -123,8 +133,8 @@ void FrostApply(inout half4 col, float worldY, float2 uv, half baseAlpha, half n
 
     // ②c 冰雾（实机=冻结体底部缠绕的蓝白色雾气，色相~210°）：脚部低带、高度二次衰减、
     // 噪声漂移流动；乘 mask 随蔓延进度一起出现（脚部先冻→冰雾先起，与蔓延同向）；
-    // 雾带下锚点外放低 1/4 雾高（脚部以下也有薄雾）；alpha 通道同步叠加——轮廓外缘也可见=缭绕感
-    //（噪声零值带天然破形，不会读出 sprite 矩形边）
+    // 雾带下锚点外放低 1/4 雾高（脚部以下也有薄雾）；alpha 抬升受形状域门约束只在形状内叠加
+    //（轮廓外整幅抬 alpha=视频路径把绿幕冻成雾矩形，2026-10-03 返修；缭绕感由 fringe 冰缘承载）
     float mrange = max(0.0001, _FreezeTopY - _FreezeFootY);
     float mh = saturate((worldY - _FreezeFootY + mrange * _MistHeight * 0.25) / (mrange * _MistHeight * 1.25));
     float mist = (1.0 - mh) * (1.0 - mh);
@@ -132,7 +142,7 @@ void FrostApply(inout half4 col, float worldY, float2 uv, half baseAlpha, half n
     mist *= (0.3 + 0.7 * mnoise) * mask;
     mist = saturate(mist);
     col.rgb = lerp(col.rgb, _MistColor.rgb, mist * _MistAlpha);
-    col.a = max(col.a, mist * _MistAlpha * 0.85);
+    col.a = max(col.a, mist * _MistAlpha * 0.85 * shapePresent);
 
     // ③ 晶体闪烁：锐脉冲白点叠加
     col.rgb += _FrostBrightColor.rgb * FrostSparkle(uv) * mask * 0.55;
