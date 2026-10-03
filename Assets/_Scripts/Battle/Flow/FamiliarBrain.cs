@@ -68,9 +68,12 @@ namespace GIC.Battle
         /// ③否则按距离升序逐敌试 BFS 最短路首步、按移速步进（v3 绕行+v4 换目标巡逻+v6 移速步数
         /// 单源——某敌贴身已到/不可达即换下一个目标，被挡由 MovementResolver 结算截回——被挡也算
         /// 已使用，眷属无体力配额=层级表 0 档）；
-        /// ④无敌人/全场敌都无逼近步 → 缺席
+        /// ④无敌人/全场敌都无逼近步 → 缺席。
+        /// E-1 对手建模复用（docs/active/33 §2.1）：public 即预测器入口——启发式纯函数（同快照
+        /// 恒同输出），配额脑对敌方眷属的预测=本方法原样直跑（「行为可被玩家轻易预测」决策三十一
+        /// 特性的 AI 侧对偶——AI 玩家同样按可预测模型推演敌方眷属）
         /// </summary>
-        private static ActionData DecideOne(BattleSimState sim, BattleSnapshot snapshot,
+        public static ActionData DecideOne(BattleSimState sim, BattleSnapshot snapshot,
             string unitId, Unit unit, int turnNumber)
         {
             var identity = unit.GetUnitComponent<UnitIdentity>();

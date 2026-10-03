@@ -315,6 +315,17 @@ namespace GIC.Data
             [InspectorName("激进度")]
             public float 激进度 = 1f;
 
+            [Header("集火权重（E-2 协调层：0=游走型不跟随集火；1~10=对已被我方声明攻击的未死目标每档加 3 分——集中优势兵力 vs 分散火力的取舍）")]
+            [InspectorName("集火权重")]
+            public int 集火权重 = 0;
+
+            [Header("支援行为（F 批次支援型架构重构，docs/active/34 §5.4）")]
+            [InspectorName("支援贴近距离（0=自动=技能集最大治疗原子半径——伤员锚驻位语义；>0=手动覆写微调手感）")]
+            public int 支援贴近距离 = 0;
+
+            [InspectorName("自保权重（0=不自保；1=标准——落点距最近敌 < 危险半径扣 15 分/档，奶妈不站敌人刀口）")]
+            public float 自保权重 = 0f;
+
             [Header("目标与角色")]
             [InspectorName("目标偏好")]
             public CompanionTargetPreference 目标偏好 = CompanionTargetPreference.NearestEnemy;
