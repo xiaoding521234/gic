@@ -461,5 +461,29 @@ namespace GIC.Battle
                 if (p.key == key) return p;
             return null;
         }
+
+        /// <summary>单位支援半径（F-1 支援锚驻位分流，docs/active/34 §5.1）：技能集内全部
+        /// Heal 原子（OnCast/OnHit）的 radiusKey 参数最大值（GetInt 缺省 1——与
+        /// EnumerateSkillHeals 的半径提取同口径）；无治疗原子=0（非支援型天然不消费）。
+        /// 伤员锚驻位距离=此值（贴身奶），敌锚仍=AttackRangeOf</summary>
+        public static int SupportRadiusOf(Unit unit)
+        {
+            int best = 0;
+            var skills = unit?.Skills;
+            if (skills == null) return 0;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                var data = skills[i]?.RawData;
+                if (data?.effects == null) continue;
+                foreach (var atom in data.effects)
+                {
+                    if (atom == null || atom.kind != SkillEffectKind.Heal) continue;
+                    if (atom.trigger != SkillEffectTrigger.OnCast && atom.trigger != SkillEffectTrigger.OnHit) continue;
+                    int radius = atom.radiusKey != SkillParamKey.None ? data.GetInt(atom.radiusKey, 1) : 1;
+                    if (radius > best) best = radius;
+                }
+            }
+            return best;
+        }
     }
 }

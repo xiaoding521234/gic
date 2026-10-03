@@ -71,15 +71,24 @@ namespace GIC.Battle
         {
             var attacker = sim.GetUnit(action.unitId);
             if (attacker == null) return ElementType.Physical;
-            var attackerElement = attacker.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
             var skillData = GetActionSkillData(attacker, action);
-            if (skillData == null || !skillData.HasEffects) return attackerElement;
-            foreach (var atom in skillData.effects)
+            return SkillElementOf(attacker, skillData);
+        }
+
+        /// <summary>技能元素（E-3 抽提单源：ResolveProjectileElement 与估值侧共用）：OnHit 首个
+        /// Damage 原子的元素优先（Physical=施法者自身元素回落，与 CompileAtom 伤害同口径）；无
+        /// Damage 原子/无 effects/施法者缺组件=施法者元素。E-3 反应预期估值消费（CompanionBrain
+        /// 反应分预判）——加新消费方一律经此方法勿手抄遍历</summary>
+        public static ElementType SkillElementOf(Unit attacker, SkillConfig.SkillData data)
+        {
+            var self = attacker?.GetUnitComponent<UnitElement>()?.SelfElement ?? ElementType.Physical;
+            if (data?.effects == null) return self;
+            foreach (var atom in data.effects)
             {
                 if (atom.trigger == SkillEffectTrigger.OnHit && atom.kind == SkillEffectKind.Damage)
-                    return atom.element != ElementType.Physical ? atom.element : attackerElement;
+                    return atom.element != ElementType.Physical ? atom.element : self;
             }
-            return attackerElement;
+            return self;
         }
 
         /// <summary>行动选中技能的配置数据（attacker.Skills[skillIndex].RawData；越界/空返回 null）</summary>

@@ -1735,3 +1735,20 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：v6 多格移动拿 `FindApproachFirstStep`（只返回最短路的**首步方向**）×步数直线飞——两个越点：①**越过路径拐点**：最短路 L 形（右1+上1）时直线飞 2 格被甩离路径；②**越过目标集攻击位**：BFS goal=敌格十字邻格（就是攻击位置），直线步进飞过不停留。落点与目标重新成对角→下回合 BFS 首步指向回程→左右乒乓；挥棒射程=前方 1 格直线、对角永打不中→攻击档永不触发，振荡无自然终点。旧 magnitude=1 时代每步=BFS 精确首步（沿最短路走 1 格），无此问题——**多格化把「沿路径走」近似成「首向直线飞」即引入振荡**。
 **修法**：新原语 `BattleHeuristics.FindApproachStraightSteps`（多源 BFS 自攻击位集反向扩散求「到攻击位步数场 dist」；首向=十字序首个 dist 严格递减邻格；**直线前缀**=沿首向逐格、只踏 dist 严格递减的最短路格、踏上 dist=0 攻击位即停不越过）——每回合 dist 单调递减，数学上不可能振荡；顺带抽提 `BuildApproachField` 共用逼近场构建（与 FindApproachFirstStep 同口径防双份漂移）。
 **How to apply**：①「方向×步数」类多格移动**不得**拿首步方向近似「沿路径走」——拐点与终点都会被越过；要么直线前缀逐格校验（本修法），要么按路径分段；②多格移动 AI 的验收清单必须含**对角目标/拐弯路径**场景（直线追逐场景测不出振荡）；③「每回合重算」不是收敛保证——只有「每回合距离/势能单调递减」才是。
+
+## 115. AI 单位行为观察 harness：反射眷属真实决策+评分制纯函数旁听+全 Pass 放权对局（2026-10-03 E+F 批复测实证，28 回合自动打到核心分出胜负）
+
+**场景**：AI 决策类改动（三脑增强/支援型重构）需要验证「眷属/伙伴行为是否正常」——纯编译验证只证不炸，行为正确性要么交用户目检（慢、难归因单回合决策），要么自动对局观察。
+**技法**（exec_runtime_script 全链，Play 自动进入）：
+1. **开局**=`BattleLaunchConfig.LaunchSinglePlayer(null)`（P1 真人+P2 AI 配额脑就位；绕过主界面直开战斗场景——BattleScreen 有装配兜底链可裸启）；
+2. **放权观察**=真人位每回合 `SubmitAction(Pass)`——自主军团（眷属+伙伴）照常运转=最干净的观察模式；
+3. **眷属真实决策**=反射 `TurnFlowController._familiarUnitActions`（private 字段，BeginSelectPhase 头已定——Selecting 期间可读，与旁听同输入可互证确定性）；
+4. **伙伴决策旁听**=直接调 `CompanionBrain.DecideAll(sim, turn, [P1Pass])`——评分制是纯函数（同快照恒同输出），旁听安全；**旁听口径注记**：真实伙伴脑跑在收齐全部玩家选择后（含 P2 行动），旁听时 P2 未交（0.8s 延迟）=少 P2 输入的近似，体力预留维度可能有偏差，行为方向观察够用；
+5. **回合推进等待**=轮询 `flow.Phase`（Selecting→交 Pass→Resolving 片循环+ack→下一回合 Selecting）——Play 下客户端自动 ack，单回合 ~10s；**等待条件必须含 `TurnNumber > turn`**（Phase 回 Selecting 且回合号推进才算本回合完）；
+6. **僵局检测**=全场总 HP 连续 N 回合不变即终止（防双方自奶打不死的死局）。
+**坑（本会话实证）**：
+- ①`Unit.Skills[i]` 是 BaseSkill 非 SkillConfig——`.name` 不存在，技能名经 `Skills[i].RawData.skillID`；编辑器侧同理 SkillConfig 数据体在 `.data` 字段（SkillConfig.name ✓/skillType 在 data 上）——直接猜成员名必炸，Repl 反射查真实签名；
+- ②**双方同名单位撞 key**：对称测试军双方各一 Amber/Kaeya——按 unitName 聚合（死亡登记/统计）会双方混淆，按 unitId 分、展示层才映射 name；死亡登记记得报后从存活集移除（否则每回合重复报）；
+- ③exec_runtime_script 的 Task<string> 轮询等待用 Task.Delay（不占主线程）——别用 Thread.Sleep；
+- ④超时预算：单回合 ~10s 结算+1.6s 选择，28 回合实测 200s；timeoutSeconds 按「回合数×12s」给。
+**How to apply**：AI 决策类批次的**结构化行为验证**默认走本 harness（非视觉：决策序列+快照 diff 足够判断行为正确性——画面观感仍交用户）；全量逐回合日志落盘（`File.WriteAllText`+UTF8 无 BOM）防返回截断——注意 Unity 的 `Temp/` 目录**编辑器退出时清空**，长存拷出。本节 harness 完整可抄范本=2026-10-03 会话 exec_runtime_script（战斗 AI 观察两局：8 回合抽样局+28 回合完整局）。

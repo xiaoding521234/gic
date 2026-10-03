@@ -45,6 +45,9 @@ namespace GIC.Battle
         /// <summary>协奏元能转移（+10/+20）的评分</summary>
         private const int EnsoEnergyTransferScore = 4;
 
+        // 救命分已上提共享单源（F-3，docs/active/34）：CompanionBrain.RescueScore=30——配额脑号令
+        // 与伙伴脑预治疗两处同口径防漂移；本脑消费点直接引用（原 private EnsoRescueScore 退役）
+
         public void Bind(BattleSession session, string playerId)
         {
             _session = session;
@@ -92,16 +95,20 @@ namespace GIC.Battle
             var tracker = new CompanionBrain.CandidateTracker();
 
             // ① 操魔神：己方魔神（5★）单位行动——共享评分骨架（CompanionBrain.ScoreUnitCandidates，
-            //    中性档案；实池判定无虚拟预留——配额行动本脑独占，伙伴决策在其后自适应）
+            //    中性档案；实池判定无虚拟预留——配额行动本脑独占，伙伴决策在其后自适应）。
+            //    E-1 对手建模（docs/active/33 §2）：威胁图传骨架——魔神攻击候选吃反威胁分、移动
+            //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）
+            var threat = OpponentThreatModel.Build(sim, snapshot, MyTeam, turn);
             foreach (var entry in CollectArchons(sim))
                 CompanionBrain.ScoreUnitCandidates(sim, snapshot, entry.Value, _playerId, MyTeam,
-                    turn, tracker, null, null);
+                    turn, tracker, null, null, threat);
 
             // ② 号令：势力技能（延奏/契约）候选——施法者=己方存活单位（眷属/伙伴/魔神均可，
             //    眷属技能表本无势力技能条目=天然只有伙伴/魔神当施法者）；对伙伴施法者=本回合号令
-            //    （CompanionBrain 跳过其自主决策），对魔神施法者=直接操控
+            //    （CompanionBrain 跳过其自主决策），对魔神施法者=直接操控。
+            //    E-1：威胁图传号令估值（治疗救命档消费 DoomedAllies，docs/active/33 §2.3）
             foreach (var entry in CollectFactionCasters(sim))
-                EvaluateEnsoSkills(sim, entry.Value, turn, tracker);
+                EvaluateEnsoSkills(sim, entry.Value, turn, tracker, threat);
 
             return tracker.Best ?? Pass(turn);
         }
@@ -147,7 +154,8 @@ namespace GIC.Battle
         /// 估值=治疗缺口+增益未满层+变奏链+协奏元能（OnCast 效果原子逐个粗估，与 EffectCompiler 产出同语义）
         /// </summary>
         private void EvaluateEnsoSkills(BattleSimState sim,
-            Unit caster, int turn, CompanionBrain.CandidateTracker tracker)
+            Unit caster, int turn, CompanionBrain.CandidateTracker tracker,
+            OpponentThreatModel.ThreatMap threat)
         {
             var skills = caster.Skills;
             for (int i = 0; i < skills.Count; i++)
@@ -173,15 +181,17 @@ namespace GIC.Battle
                 foreach (var ally in allies)
                 {
                     if (!BattleHeuristics.IsMondstadtOrSelfUnit(caster, ally.unit)) continue;
-                    int value = EvaluateEnsoTarget(data, caster, ally.unit);
+                    int value = EvaluateEnsoTarget(data, caster, ally.unit, ally.unitId, threat);
                     if (value <= 0) continue;
                     tracker.Offer(value, Skill(caster, i, Direction2D.Right, turn, ally.unitId));
                 }
             }
         }
 
-        /// <summary>延奏对某目标的估值：按 OnCast 效果原子逐个粗估（与 EffectCompiler 产出同语义）</summary>
-        private int EvaluateEnsoTarget(SkillConfig.SkillData data, Unit caster, Unit ally)
+        /// <summary>延奏对某目标的估值：按 OnCast 效果原子逐个粗估（与 EffectCompiler 产出同语义）。
+        /// E-1：threat=威胁图（治疗救命档消费；null=无威胁上下文零加成）</summary>
+        private int EvaluateEnsoTarget(SkillConfig.SkillData data, Unit caster, Unit ally,
+            string allyUnitId, OpponentThreatModel.ThreatMap threat)
         {
             if (data.effects == null) return 0;
             var allyStats = ally.GetUnitComponent<UnitStats>();
@@ -203,6 +213,11 @@ namespace GIC.Battle
                         int effective = Math.Min(heal, missing);
                         if (effective * 100 < heal * CompanionBrain.HealWorthRatioPercent) break; // 缺口不足半量：不占行动
                         value += effective;
+                        // E-1 救命分（docs/active/33 §2.3→F-3 上提共享单源 CompanionBrain.RescueScore）：
+                        // 伤员在威胁图 DoomedAllies（敌方预测合计承伤 ≥ 当前 hp=将被集火致死）
+                        // → 预治疗保命档（斩杀档对偶）
+                        if (threat != null && threat.DoomedAllies.Contains(allyUnitId))
+                            value += CompanionBrain.RescueScore;
                         break;
                     }
 
