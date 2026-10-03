@@ -120,9 +120,11 @@ namespace GIC.Battle
         /// （多绕路不会被结算弹回），现役低级单位全开 flag 时与 CanEnter 等价；首个不开 flag 的低级
         /// 单位落地时须同步双侧条件）。
         /// 返回 0=已贴身/同格/无路（缺席）。方向域=十字四向，方向纪律不变；枚举序展开=决策确定性。</summary>
-        public static Direction2D FindApproachFirstStep(BattleSimState sim, Unit self, BattleCell target)
+        public static Direction2D FindApproachFirstStep(BattleSimState sim, Unit self, BattleCell target,
+            List<BattleCell> reservedCells = null)
         {
-            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType))
+            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType,
+                reservedCells))
                 return 0;
             var map = sim.Map;
             if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
@@ -163,9 +165,13 @@ namespace GIC.Battle
         /// <summary>逼近场构建（FindApproachFirstStep/FindApproachStraightSteps 共用口径，防双份漂移
         /// ——2026-10-03 抽提）：同格判定+单位占据格（含尸体；互不阻挡开启时友方格放行=CanEnter 的
         /// 保守近似，细节与同步条件见 FindApproachFirstStep 注释）+目标集（敌格十字邻格中「可通行且
-        /// 无阻挡占据」的格）。false=同格/地图无效（调用方一律按"无逼近"处理）</summary>
+        /// 无阻挡占据」的格）。false=同格/地图无效（调用方一律按"无逼近"处理）。
+        /// I-D 移动意图占位（docs/active/37 §5，2026-10-04）：reservedCells=意图板已声明的落点
+        ///（前位伙伴/玩家魔神的决策落点）——后位 BFS 视作占位避让（集团推进不互撞）；null=零行为
+        /// 变化（眷属/配额路径不传）。</summary>
         private static bool BuildApproachField(BattleSimState sim, Unit self, BattleCell target,
-            out bool[,] occupied, out bool[,] goals, out BattleCell from, out ForceType forceType)
+            out bool[,] occupied, out bool[,] goals, out BattleCell from, out ForceType forceType,
+            List<BattleCell> reservedCells = null)
         {
             occupied = null; goals = null;
             from = new BattleCell(0, 0);
@@ -208,6 +214,16 @@ namespace GIC.Battle
                 if (occupied[gx, gy]) continue;
                 goals[gx, gy] = true;
             }
+            // I-D 移动意图占位：前位已声明落点并入 occupied（越界格跳过；声明口径=乐观落点，
+            // 结算偏差保守向——多绕路不会死锁，真实结算后下回合重算吸收）
+            if (reservedCells != null)
+            {
+                foreach (var rc in reservedCells)
+                {
+                    if (rc.x >= 0 && rc.x < map.width && rc.y >= 0 && rc.y < map.height)
+                        occupied[rc.x, rc.y] = true;
+                }
+            }
             return true;
         }
 
@@ -219,11 +235,12 @@ namespace GIC.Battle
         /// 返回 0=已贴身/同格/无路（与 FindApproachFirstStep 同判）；direction out=首步方向。
         /// 口径=BuildApproachField 共用（保守近似同 FindApproachFirstStep 注释）</summary>
         public static int FindApproachStraightSteps(BattleSimState sim, Unit self, BattleCell target,
-            int maxSteps, out Direction2D direction)
+            int maxSteps, out Direction2D direction, List<BattleCell> reservedCells = null)
         {
             direction = 0;
             if (maxSteps <= 0) return 0;
-            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType))
+            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType,
+                reservedCells))
                 return 0;
             var map = sim.Map;
             if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
@@ -491,7 +508,10 @@ namespace GIC.Battle
         /// 逐格推进，「到目标 BFS 距离严格递减」判据截断=路径开头的连续直线段（钳 maxSteps 与
         /// 该向地形可行程）。治「BFS 首步×N 直线飞越路径拐点」（环湖绕行首步=Left 被直线化
         /// 执行成纯西行滑边——2026-10-03 探针实证，docs/14 §114 同族）。不可达/无直线段=
-        ///（direction=0, steps=0）</summary>
+        ///（direction=0, steps=0）
+        /// 【2026-10-04 退役】：切比判据在绕行段恒短前缀=「凯亚开局只走 1 格」根因（§115 坑⑧），
+        /// 最后一处生产调用点（伙伴锚循环）已换 FindApproachStraightSteps（BFS dist 场递减判据）。
+        /// **勿新增消费方**——绕行/集团拥挤场景一律用 FindApproachStraightSteps。</summary>
         public static void ApproachStraightPrefix(BattleSimState sim, Unit unit, BattleCell to,
             int maxSteps, out Direction2D direction, out int steps)
         {
