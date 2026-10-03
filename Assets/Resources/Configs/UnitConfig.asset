@@ -2351,19 +2351,19 @@ MonoBehaviour:
     hideInBackpack: 0
     starLevel: 1
     deployCost: -64
-    weaponType: 5
+    weaponType: 1
     baseHP: -64
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: -64
+    baseMoveSpeed: 20
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 100
+    baseEnergy: 50
     normalMoveType: 1
     blockAllies: 1
     blockEnemies: 1
@@ -2372,10 +2372,11 @@ MonoBehaviour:
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 0
     visionRange: -64
-    tags: 71170000
+    tags: 71170000bb0b0000be0b0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
-    - {fileID: 11400000, guid: 11730c209a3be904d9511af87b531a45, type: 2}
+    - {fileID: 11400000, guid: 52a78aad2aeb59845b6ead04bd53692d, type: 2}
+    - {fileID: 11400000, guid: 83711007077ad8c45b121884fe659421, type: 2}
     voices:
       onGoWar:
         clips: []

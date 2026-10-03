@@ -17,8 +17,15 @@ namespace GIC.Battle
     /// v4（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标巡逻」）：攻击档打不了时按距离
     /// 升序逐敌试逼近步（FindEnemiesByDistance）——贴身已到/不可达的目标自动跳过换下一个，
     /// 不再对着打不了的目标站桩；全部敌都无逼近步才缺席。
+    /// v5（2026-10-03 拍板「扩眷属脑会放爆发」）：新增爆发档——满槽即放、优先于战技（元能门槛经
+    /// ResourceGate 元能照查；方向攻击型爆发与战技走同一十字预判口 WouldHitEnemyInDirection；
+    /// 单位指向/无目标自施放型无方向域不消费——眷属现无此类，出现时再扩）。
+    /// v6（2026-10-03 报障「移速 20 根本没发挥出来」）：移动步数退役「小兵蠕动 1 步/回合」硬编码
+    /// ——改读 MoveExecutor.MaxMoveDistance（MoveDistance×移速单源换算=10%×移速，含 Buff 减速，
+    /// 与玩家移动/HUD 同口径）；BFS 首步方向+v4 换目标巡逻不变，遇阻由 MovementResolver 结算截停。
     /// 纯读 BattleSimState 由 Host 在选择阶段头生成（docs/18 决策一），行动与玩家行动合并进执行阶段。
-    /// 决策档：战技可命中→打 → 否则逐敌（近→远）沿最短路蠕动 1 步 → 全部敌打不了也走不近=缺席。
+    /// 决策档：爆发可命中（满槽）→ 爆发朝敌 → 战技可命中→打 → 否则逐敌（近→远）沿最短路按移速步进
+    /// → 全部敌打不了也走不近=缺席。
     /// 眷属不配行为档案（启发式维持=层级特色，也是数量安全阀——场上眷属多，评分制算量敏感，
     /// docs/active/32 §6.1）。
     /// </summary>
@@ -48,10 +55,12 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 单个眷属单位决策：①战技可命中（十字向预判有存活敌）→ 战技朝敌；
-        /// ②否则按距离升序逐敌试 BFS 最短路首步（v3 绕行+v4 换目标巡逻——某敌贴身已到/不可达
-        /// 即换下一个目标，被挡由 MovementResolver 结算弹回——被挡也算已使用，眷属无体力配额=层级表 0 档）；
-        /// ③无敌人/全场敌都无逼近步 → 缺席
+        /// 单个眷属单位决策：①爆发可命中且消耗门槛过（满槽即放，v5 2026-10-03 拍板）→ 爆发朝敌；
+        /// ②战技可命中（十字向预判有存活敌）→ 战技朝敌；
+        /// ③否则按距离升序逐敌试 BFS 最短路首步、按移速步进（v3 绕行+v4 换目标巡逻+v6 移速步数
+        /// 单源——某敌贴身已到/不可达即换下一个目标，被挡由 MovementResolver 结算截回——被挡也算
+        /// 已使用，眷属无体力配额=层级表 0 档）；
+        /// ④无敌人/全场敌都无逼近步 → 缺席
         /// </summary>
         private static ActionData DecideOne(BattleSimState sim, BattleSnapshot snapshot,
             string unitId, Unit unit, int turnNumber)
@@ -59,52 +68,70 @@ namespace GIC.Battle
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null) return null;
 
-            // 战技（丘丘族无技能=自动跳过此档；占位技能不可施放同理）
-            int skillIndex = BattleHeuristics.FindSkillIndex(unit, SkillType.Normal);
-            if (skillIndex >= 0)
+            // 爆发档（v5，2026-10-03 拍板「扩眷属脑会放爆发」）：满槽即放、优先于战技——单次伤害
+            // 更高+倾倒元能（攒满即放勿囤积，同凛冽轮舞 AI 口径）；方向攻击型爆发与战技走同一
+            // 十字预判口（单位指向/无目标自施放型无方向域不消费——眷属现无此类）
+            var burstAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Burst);
+            if (burstAction != null) return burstAction;
+
+            // 战技（无该型技能=自动跳过此档；占位技能不可施放同理）
+            var skillAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Normal);
+            if (skillAction != null) return skillAction;
+
+            // 朝敌按移速步进——v6（2026-10-03 报障「移速 20 根本没发挥出来」）：步数上限退役
+            // 「小兵蠕动 1 步/回合」硬编码，改读 MoveExecutor.MaxMoveDistance（移动技能 MoveDistance×
+            // 移速单源换算=10%×移速，含 Buff 减速——与玩家移动/HUD 同口径）；v4 换目标巡逻不变
+            // （攻击档打不了时按距离升序逐敌试 BFS 最短路首步——贴身已到/不可达返回 0 的敌自动跳过
+            // 换下一个，不再对着打不了的目标站桩）；直线步进遇阻由 MovementResolver 结算截停
+            // （被挡也算已使用，BFS 路径拐弯处下一回合重算自然修正）。移速被压到 0 步（重减速）
+            // =缺席不空耗。
+            int moveSteps = MoveExecutor.MaxMoveDistance(unit);
+            if (moveSteps > 0)
             {
-                var skill = unit.Skills[skillIndex];
-                // 消耗门槛（统一消耗模型 C-2）：costs 单源镜像（ResourceGate.HasAll——眷属豁免玩家
-                // 资源、元能照查，与 Host 同口径）
-                if (skill != null && skill.CanCast(unit)
-                    && ResourceGate.HasAll(sim, unit, identity.OwnerPlayerID, skill.RawData?.costs, out _))
+                foreach (var target in BattleHeuristics.FindEnemiesByDistance(sim, unit))
                 {
-                    var direction = BattleHeuristics.FindAttackDirection(sim, snapshot, unit, skill);
-                    if (direction != 0)
+                    var moveDirection = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(target));
+                    if (moveDirection == 0) continue; // 该敌打不了也走不近：换下一个目标
+
+                    return new ActionData
                     {
-                        return new ActionData
-                        {
-                            playerId = identity.OwnerPlayerID,
-                            unitId = unitId,
-                            actionType = ActionType.Skill,
-                            skillIndex = skillIndex,
-                            direction = direction,
-                            turnNumber = turnNumber,
-                        };
-                    }
+                        playerId = identity.OwnerPlayerID,
+                        unitId = unitId,
+                        actionType = ActionType.Move,
+                        direction = moveDirection,
+                        moveMagnitude = moveSteps,
+                        turnNumber = turnNumber,
+                    };
                 }
             }
+            return null; // 全场敌都无可逼近步（或移速被压到 0）：缺席
+        }
 
-            // 朝敌蠕动 1 步——v4 换目标巡逻（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标
-            // 巡逻」）：攻击档打不了时按距离升序逐敌试 BFS 最短路首步（FindApproachFirstStep——
-            // 贴身已到/不可达返回 0 的敌自动跳过换下一个，不再对着打不了的目标站桩）；
-            // 全部敌都无逼近步（全贴身/全不可达）才缺席。小兵蠕动 1 步/回合+十字方向纪律不变。
-            foreach (var target in BattleHeuristics.FindEnemiesByDistance(sim, unit))
+        /// <summary>
+        /// 攻击技能施放尝试（战技/爆发共用，v5 爆发档抽提）：类型槽定位（FindSkillIndex——与
+        /// SkillExecutor.GetSkill 同源索引）+ CanCast（占位技能不可施放）+ 消耗门槛（统一消耗模型
+        /// C-2：costs 单源镜像 ResourceGate.HasAll——眷属豁免玩家资源、元能照查，与 Host 同口径）
+        /// + 十字向首可命中方向（FindAttackDirection：WouldHitEnemyInDirection+存活目标校验）
+        /// </summary>
+        private static ActionData TryCastAttack(BattleSimState sim, BattleSnapshot snapshot,
+            Unit unit, UnitIdentity identity, string unitId, int turnNumber, SkillType skillType)
+        {
+            int skillIndex = BattleHeuristics.FindSkillIndex(unit, skillType);
+            if (skillIndex < 0) return null;
+            var skill = unit.Skills[skillIndex];
+            if (skill == null || !skill.CanCast(unit)) return null;
+            if (!ResourceGate.HasAll(sim, unit, identity.OwnerPlayerID, skill.RawData?.costs, out _)) return null;
+            var direction = BattleHeuristics.FindAttackDirection(sim, snapshot, unit, skill);
+            if (direction == 0) return null;
+            return new ActionData
             {
-                var moveDirection = BattleHeuristics.FindApproachFirstStep(sim, unit, sim.GetPosition(target));
-                if (moveDirection == 0) continue; // 该敌打不了也走不近：换下一个目标
-
-                return new ActionData
-                {
-                    playerId = identity.OwnerPlayerID,
-                    unitId = unitId,
-                    actionType = ActionType.Move,
-                    direction = moveDirection,
-                    moveMagnitude = 1,
-                    turnNumber = turnNumber,
-                };
-            }
-            return null; // 全场敌都无可逼近步：缺席
+                playerId = identity.OwnerPlayerID,
+                unitId = unitId,
+                actionType = ActionType.Skill,
+                skillIndex = skillIndex,
+                direction = direction,
+                turnNumber = turnNumber,
+            };
         }
     }
 }
