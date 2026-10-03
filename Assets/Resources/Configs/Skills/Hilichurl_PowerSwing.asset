@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d32616f6019bec45b6eb2e6a4fe45b7, type: 3}
+  m_Name: Hilichurl_PowerSwing
+  m_EditorClassIdentifier: 
+  data:
+    skillID: 10002002
+    icon: {fileID: 21300000, guid: 592dbf0824b63e244883dd117104989a, type: 3}
+    skillType: 3
+    customParams:
+    - key: 1
+      value: 150
+      baseType: 1
+    - key: 31
+      value: 1
+      baseType: 0
+    - key: 9
+      value: 50
+      baseType: 0
+    timeline: {fileID: 11400000, guid: c5a0bccf27662ad4f8f441ca5dca63c9, type: 2}
+    effects:
+    - trigger: 1
+      kind: 1
+      targetFilter: 0
+      condition: 0
+      paramKey: 1
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+    costs:
+    - kind: 2
+      item: 0
+      subType: 4
+      amount: 10
+    - kind: 1
+      item: 0
+      subType: 4
+      amount: 50

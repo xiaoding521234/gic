@@ -192,6 +192,14 @@ namespace GIC.Data
         Xingqiu_Constellation = 4001004,
         #endregion
 
+        #region 丘丘人 (10002)
+        [InspectorName("挥棒")]
+        Hilichurl_Swing = 10002001,
+
+        [InspectorName("全力挥棒")]
+        Hilichurl_PowerSwing = 10002002,
+        #endregion
+
         #region empty/旅行者 (11002)
         [InspectorName("风涡剑")]
         Traveler_WindBlade = 11002001,

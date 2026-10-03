@@ -254,6 +254,14 @@ MonoBehaviour:
     m_Localized: Noelle's Constellation
     m_Metadata:
       m_Items: []
+  - m_Id: 10002001
+    m_Localized: Club Swing
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002002
+    m_Localized: Powerful Club Swing
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

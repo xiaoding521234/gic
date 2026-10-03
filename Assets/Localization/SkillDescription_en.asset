@@ -265,6 +265,17 @@ MonoBehaviour:
       takes Geo"
     m_Metadata:
       m_Items: []
+  - m_Id: 10002001
+    m_Localized: "\xB7Swing the club in one of the four cardinal directions\n\xB7Deal
+      {Damage} physical DMG to enemies within {DamageDistance} tiles ahead"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 10002002
+    m_Localized: "\xB7Deliver a full-power club swing in one of the four cardinal
+      directions\n\xB7Deal {Damage} physical DMG to enemies within {DamageDistance}
+      tiles ahead"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

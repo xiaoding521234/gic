@@ -63,10 +63,12 @@ SpriteAtlas:
     - 09f633e4fc72fcd46878a839b79ee026: 21300000
     - d72ecd35e6924114b95f51402007f837: 21300000
     - bcd88e26649e3fc4cbe3cbceac56cbb0: 21300000
+    - d5775896f3014e047a7ad89f3b17b3fc: 21300000
     - a47534b6fe0888444b82db899e95683d: 21300000
     - c54119b6fe915994d9346433dfed462b: 21300000
     - bdd686e661bbce84eaf3ac90bafc5c68: 21300000
     - 904790a7b6578e443899548661a1c8e5: 21300000
+    - 592dbf0824b63e244883dd117104989a: 21300000
     - 79595858371497641a128d88edd01616: 21300000
     - 028585a8761cbcc47be102af0f342b88: 21300000
     - f9bbea59072d2a841af9e60db99816c4: 21300000
@@ -121,10 +123,12 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 09f633e4fc72fcd46878a839b79ee026, type: 3}
   - {fileID: 21300000, guid: d72ecd35e6924114b95f51402007f837, type: 3}
   - {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
+  - {fileID: 21300000, guid: d5775896f3014e047a7ad89f3b17b3fc, type: 3}
   - {fileID: 21300000, guid: a47534b6fe0888444b82db899e95683d, type: 3}
   - {fileID: 21300000, guid: c54119b6fe915994d9346433dfed462b, type: 3}
   - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
   - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
+  - {fileID: 21300000, guid: 592dbf0824b63e244883dd117104989a, type: 3}
   - {fileID: 21300000, guid: 79595858371497641a128d88edd01616, type: 3}
   - {fileID: 21300000, guid: 028585a8761cbcc47be102af0f342b88, type: 3}
   - {fileID: 21300000, guid: f9bbea59072d2a841af9e60db99816c4, type: 3}
@@ -178,10 +182,12 @@ SpriteAtlas:
   - xingqiu_raindeep_gate
   - select
   - sharpshooter
+  - hilichurl_swing
   - teleport
   - circle
   - raw_meat
   - dandelion_wine
+  - hilichurl_power_swing
   - constellation
   - barbara_vitality_burst
   - noelle_clean_sweep

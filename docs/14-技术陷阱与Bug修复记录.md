@@ -1721,3 +1721,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：`FrostMask` 的 `g=saturate((worldY−FootY+0.15r)/1.3r)` 随高度**递增**（头 g≈0.885、脚 g≈0.115），冻结条件 `g+amount≥1` 让 **g 最大者先过阈值=头先冻**——梯度定义与冻结条件组合后方向恒反。四轮截图自检全是 amount=1 定格态、FrozenTest 静态材质也是定格，方向类 bug 在定格验证下零暴露，动态蔓延首次实战目检才现形；且 cginc 内冰雾注释「脚部先冻→冰雾先起，与蔓延同向」与实现自相矛盾——注释与代码冲突时信注释查代码。
 **修法**：`g` 倒序=按「离头顶距离」归一（`g=1−saturate(...)`，头顶 g=0.115、脚 g=0.885，0 缓冲带随倒序移到头顶上方——amount=1 时头顶也满）；冻结条件不变，脚部先过阈值=从脚往头。解冻随之自上而下退冰（头先解冻、脚下残冰最后化）。
 **How to apply**：①「按 X 梯度显现」类遮罩，写完先代入两端点值手推「amount 微增时谁先过阈值」再定格验证；②定格态/静态截图**验证不了过程方向**——含时序语义（蔓延/生长/退避）的效果，验收清单必须含一次动态观察项；③注释与实现冲突=bug 信号，勿当注释写错糊弄过去。
+
+## 113. 桥脚本内 PackAtlases 后对象句柄失效：同提交回读必炸 destroyed（2026-10-03 丘丘人图标批实证）
+
+**症状**：exec_editor_script 单提交完成「改资产 → SaveAssets → SpriteAtlasUtility.PackAtlases(全部图集, activeBuildTarget) → 回读验证」，在回读段炸 `The object of type 'SkillConfig' has been destroyed but you are still trying to access it`——改动实际已 SaveAssets 落盘，崩的只是验证段，易误判为改动失败。
+**根因**：PackAtlases 触发资产库整理，**此前 LoadAssetAtPath/CreateInstance 拿到的内存对象引用被销毁**（SkillConfig/Sprite 等均中招），脚本内继续持有旧句柄访问 .name 即崩；同款风险存在于任何「重操作（Pack/Import/Refresh）后触碰先前句柄」的脚本。
+**修法**：①改动提交与回读验证**拆成两个 exec_editor_script 提交**——第二提交全新 LoadAssetAtPath 从磁盘加载（本例实证：第二提交全链回读全绿）；②或 Pack 后全部重载再读。附：图集页 Texture2D（ASTC 压缩页 sactx-*）不可 GetPixels（ArgumentException not readable）——skill 记载的 sp.uv 逐像素读回在压缩页上不可行时，退化验证=sp.textureRect（图集页真实区域，tight 打包区域≠256 方形属正常）+两 sprite 区域互异即可。
+**How to apply**：写「重操作+回读」型编辑器脚本时默认双提交结构；单提交必须 Pack 后重载；回读报 destroyed 先怀疑句柄失效，勿怀疑改动未落盘（SaveAssets 先于 Pack 已持久化）。
