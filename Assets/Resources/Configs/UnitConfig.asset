@@ -50,7 +50,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 8
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: a60f0000
     skills: []
     voices:
@@ -113,7 +114,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 7
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: bf0b0000bb0b0000ea030000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -181,7 +183,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 7
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: a10f0000a20f0000d2070000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -249,7 +252,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 7
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: ed030000a70f0000ea030000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -317,7 +321,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 2
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -379,7 +384,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 1
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": 24
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 72170000a10f0000ba0b0000e9030000ed030000
     skills:
     - {fileID: 11400000, guid: 8eaea0381581b5948b39b95386f6cc6d, type: 2}
@@ -507,7 +513,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 5
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 71170000eb030000be0b000089130000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -649,7 +656,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 2
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 72170000a20f0000a50f0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -781,7 +789,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 4
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 74170000a30f0000ba0b0000bf0b0000
     skills:
     - {fileID: 11400000, guid: 2b470eaee1f8d9b48b9a672c72590395, type: 2}
@@ -848,7 +857,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 5
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: ef030000a20f000072170000
     skills: []
     voices:
@@ -910,7 +920,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 3
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills:
     - {fileID: 11400000, guid: 8eaea0381581b5948b39b95386f6cc6d, type: 2}
@@ -976,7 +987,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 1
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: a20f0000e903000071170000
     skills: []
     voices:
@@ -1039,7 +1051,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 3
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 75170000c10b0000a30f0000bf0b0000ef030000f0030000
     skills:
     - {fileID: 11400000, guid: 721f56b6cbd19a849b01edbd0ec1b4ff, type: 2}
@@ -1107,7 +1120,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 7
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 71170000ef030000bd0b0000ba0b0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -1175,7 +1189,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 2
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 73170000c00b0000ba0b0000
     skills:
     - {fileID: 11400000, guid: 5dd2f4d91e7bba045a2d1edfa1104c03, type: 2}
@@ -1243,7 +1258,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 4
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: a50f0000a20f0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -1311,7 +1327,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 1
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: a50f0000a20f0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -1379,7 +1396,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 7
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -1441,7 +1459,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1503,7 +1522,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1565,7 +1585,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1627,7 +1648,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 4
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -1689,7 +1711,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1751,7 +1774,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1813,7 +1837,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1875,7 +1900,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -1937,7 +1963,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -1999,7 +2026,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -2061,7 +2089,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 6
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 0000000000000000
     skills: []
     voices:
@@ -2123,7 +2152,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 2
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -2185,7 +2215,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 1
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -2247,7 +2278,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 0
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
@@ -2309,7 +2341,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 0
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: bd0b0000
     skills: []
     voices:
@@ -2371,7 +2404,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 0
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 71170000bb0b0000be0b0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
@@ -2435,7 +2469,8 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
     selfElement: 0
-    visionRange: -64
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u8FF7\u96FE\u89C6\u91CE": -64
     tags: 
     skills: []
     voices:
