@@ -42,6 +42,13 @@ namespace GIC.Framework
         // v12（2026-09-13）：无 schema 变化——零迁移政策落定（docs/20 §1.6）后的开发期重置重启，旧档清零重建
         private const int CURRENT_SAVE_VERSION = 12;
 
+        // 快速迭代期存档策略（2026-10-04 用户拍板「无论怎么样，每次启动游戏都直接重建，除非我要求
+        // 快速迭代期结束，才改」）：true=LoadSaveData 跳过读档直接建档——每次启动全新进度，旧档不再
+        // 被读（磁盘文件保留、被建档首存覆盖）。迭代期结束=用户宣布后改回 false 即恢复三级读档链
+        // （读档链/版本门原样保留未动）。pet.json 同款开关在 PetPrefs。
+        // static readonly 而非 const：const=true 会把下方读档链判为不可达代码（CS0162）
+        public static readonly bool 快速迭代期每次启动重建 = true;
+
         private float lastSaveTime = -999f;
         // 落盘间隔（2026-09-05 时机优化）：SaveGame() 只标脏，变更由 Update 在距上次写盘 ≥该间隔后合并落盘。
         // 旧语义="1 秒 CD 内连发的保存被静默丢弃"（连发修改会丢数据），新语义="延迟合并"——永不丢，只推迟 ≤1s。
@@ -230,6 +237,14 @@ namespace GIC.Framework
         /// </summary>
         public void LoadSaveData()
         {
+            // 快速迭代期（2026-10-04 拍板）：每次启动直接建档，三级读档链与版本门暂不参与
+            if (快速迭代期每次启动重建)
+            {
+                GICLog.Info("快速迭代期：跳过读档，每次启动重建新档");
+                CreateNewSave();
+                return;
+            }
+
             LoadOutcome main = TryLoadFile(SavePath, fromBackup: false);
             if (main == LoadOutcome.Loaded)
                 return;

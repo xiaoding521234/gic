@@ -28,6 +28,8 @@ namespace GIC.Pet
     /// 缩放基准适配：全屏视野下模型基准 localScale ×(等效画布逻辑高/屏幕参考逻辑高)（825/1080），
     /// 保持屏幕显示尺寸与桌面版 750×825 逻辑窗口一致；缩放上限动态钳制（模型最大屏高占比 ≤95%，
     /// 对齐桌面版"工作区 95% 预算"语义——放大到最大恰好占满屏不截断）。
+    /// 手机端缩放适配（2026-10-04 拍板）：初始倍率 1.5+下限抬高 0.75（屏幕小、太小难以双指捏合），
+    /// 字段 手机初始倍率/手机缩放下限，桌面路径零变化。
     /// 持久化：PetPrefs 游戏内字段（骨盆归一化屏幕位+缩放，分辨率无关）。
     /// </summary>
     public class PetInGameHostController : PetHostBase, IGestureSurface
@@ -44,6 +46,12 @@ namespace GIC.Pet
         [Header("缩放（其余缩放参数在 PetHostBase）")]
         [Tooltip("模型最大屏高占比（动态缩放上限的预算，对齐桌面版工作区 95% 语义）")]
         [SerializeField, Range(0.5f, 1f)] private float maxScreenHeightRatio = 0.95f;
+
+        [Header("手机端缩放适配（2026-10-04 拍板：屏幕小——初始放大 1.5 倍+下限抬高，太小难以双指捏合）")]
+        [Tooltip("手机端初始缩放倍率（无存档时；桌面沿用 initScaleFactor）")]
+        [SerializeField] private float 手机初始倍率 = 1.5f;
+        [Tooltip("手机端缩放倍率下限——比 scaleMin 抬高，太小手指难以命中模型捏合；桌面沿用 scaleMin")]
+        [SerializeField] private float 手机缩放下限 = 0.75f;
 
         [Header("基准适配（全屏视野折算）")]
         [Tooltip("等效画布逻辑高：桌面版窗口逻辑高 825——全屏视野下模型基准缩放按 825/屏幕参考逻辑高 折算，保持屏幕显示尺寸与桌面版一致")]
@@ -142,6 +150,11 @@ namespace GIC.Pet
 
         void Awake()
         {
+            // 手机端缩放适配（2026-10-04）：抬高下限单点覆盖全部 clamp 位（restorePrefs/滚轮/捏合/
+            // 有效上限守卫）——只改运行时字段值，prefab 序列化值不动（桌面语义零变化）
+            if (Application.isMobilePlatform)
+                scaleMin = Mathf.Max(scaleMin, 手机缩放下限);
+
             petCamera = petCamera != null ? petCamera : GetComponentInChildren<Camera>(true);
             dragPhysics = dragPhysics != null ? dragPhysics : GetComponentInChildren<PetDragPhysicsController>(true);
             if (bodyRenderer == null) bodyRenderer = FindBodyRenderer(transform);
@@ -833,7 +846,14 @@ namespace GIC.Pet
         void restorePrefs()
         {
             var d = PetPrefs.Load();
-            targetScale = d.ingameScale > 0f ? d.ingameScale : initScaleFactor;
+            // 初始倍率：手机端取 1.5（2026-10-04 拍板——屏幕小初始放大），桌面沿用 initScaleFactor。
+            // 零迁移政策（2026-10-04 用户确认，docs/20 §1.6）：下限抬高后，低于新下限的旧档值=旧语义
+            // 产物，直接当无档重建起步 1.5（不迁移、不钳着沿用——新语义下限起不可能再存出更低的值，
+            // 判据自洽）；≥下限的存档值=新语义期真实偏好照常沿用
+            if (Application.isMobilePlatform && d.ingameScale > 0f && d.ingameScale < 手机缩放下限)
+                d.ingameScale = -1f;
+            float initFactor = Application.isMobilePlatform ? 手机初始倍率 : initScaleFactor;
+            targetScale = d.ingameScale > 0f ? d.ingameScale : initFactor;
             targetScale = Mathf.Clamp(targetScale, scaleMin, effectiveMaxScale);
             displayScale = targetScale;
             if (baseScale <= 0.001f) calcBaseAndLimit(); // Awake 顺序兜底

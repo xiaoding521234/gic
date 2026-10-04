@@ -1770,3 +1770,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **边界（非病勿修）**：绕行拐点处的剩余步丢弃（Left 2 后第 3 步无处直走）=单方向移动（推力直线）语义固有，L 形移动=游戏模型级变更。
 **判据**：①修「格间无差别」类缺陷时，同步审计全部选格/选向循环的平局语义（严格大于 vs 最深 vs 最长）；②距离度量与移动几何必须同构（切比雪夫配八向、或给十字移动用轴向度量/单调递减分），否则平坦区平局交给 tie-break 拍板——而 tie-break 必须显式设计（本轮「严格大于」即隐性拍板给了最短格）。
 **补记（同日二犯·穿占虚 Offer 族，T36 安柏撞尸实锤，docs/18 决策三十九）**：**地形-only run 计数循环**（只查 HasTile/IsPassable、不查占据）= offer 落点/路径含不可停格=虚假目标——执行器撞占停格零位移、下回合同决策=**永久撞尸循环**（安柏 E-3 锁温迪、Up 对齐 offer Up5 首格即敌芭尸体）。全收口清单：`TryOfferAxisAlignStep`（轴对齐）+真无解兜底走满（本批修）；支援射线（J 批四刀④已修）；`FindApproachStraightSteps`/`TryOfferAlignmentStep` 本就占位感知；`ApproachStraightPrefix`=退役零消费方豁免。**判据升级（§115 坑⑧同族二犯）：修「检查缺陷」类原语病灶时，rg 全部同型循环**——本次=`for s<=cap/maxSteps` 地形-only 走行族——只修报障路径=同型循环给下一个场景埋雷。另：飞行单位（Amber_FlyingChampion，NormalMoveType=Fly）越水可走——按 Walk 渲染地形图对飞行单位失真，取证时按移动者本人 forceType 逐格判。
+
+## 117. hub 双指晋升路径：第二指 Began 全量投递让刚取消的 Immediate 拖拽同帧复活、挤掉等第二指的捏合（2026-10-04 手机端报障「无法在大地图，战斗地图上两指缩放」）
+
+**场景**：真机双指捏合永远起不了手，第二指落下反而触发一次全新的单指拖拽（相机乱飘）。桌面鼠标单指针永远不走该路径；P1 合成事件流断言**直喂识别器**绕过了 hub Dispatch——双指晋升+仲裁从未被端到端验证，两层测试盲区叠加把 bug 藏到上手机才暴露。
+**根因**：GestureHub.Dispatch 对第二指 Began 先 `CancelSinglePointerGestures`（双指取代单指），但同一事件随后仍全量 Deliver——刚被 ForceCancel 复位回 Idle 的 `DragRecognizer(Immediate)` 把第二指当**全新序列**重新 SetBegan 宣胜，仲裁把正等第二指的 PinchRecognizer（_id0 已登记 f1）ForceFail 清簿记 → 捏合死在 Possible、f2 变单指拖图。次要耦合：`OnRecognizerWon` 单指宣胜 fail 全部识别器（含多指），Map 靠 [Drag,Pinch] 列表顺序侥幸存活（drag 宣胜瞬间 pinch 尚 Idle=ForceFail 空操作）——识别器集合顺序隐性决定捏合存亡。
+**修法**：①第二指 Began 改走 `DeliverToMultiPointer`（只喂 MaxPointers≥2 的识别器）——单指识别器被取消后不得被同帧复活；第二指后续 Moved/Ended 仍全量投递（Idle 识别器对陌生指针自然忽略）；②`OnRecognizerWon` 单指宣胜豁免多指识别器（多指晋升由 hub「双指取代单指」规则专管，与列表顺序无关）。修后离线反射 Dispatch 打合成流断言 12 项全过（主链 8 项/反序面 2 项/鼠标零回归 2 项——hub 层也可合成断言，不止识别器）。
+**判据**：①「取消型投递」与「同帧新事件」共存的调度点必须自查：被取消的接收方会不会把新事件当全新序列复活？②纯 C# 组件的合成断言尽量从 hub/组合根层注入事件流——直喂子组件会跳过调度逻辑制造盲区（P1 直喂识别器=本陷阱潜伏三周的代价）；③「某平台某功能不可用」类报障先确认功能**是否接线**再查回归——战场捏合此前从未接线（docs/24 §5 原表 Battle 只有 Drag），手机无滚轮=战场缩放整个不存在，属缺件非回归。
+**附**：BattleCameraController 同批补 PinchRecognizer（捏合=中心缩放、注视点不动——与滚轮 2026-09-12 拍板「不锚定指针」同口径，不像大地图锚定捏合中点；直写实际距离并同步目标，不污染滚轮平滑链）。
