@@ -17,6 +17,11 @@ namespace GIC.UI
         private OrbitBeamsUi _selectBeams; // 选中态两束元素色环绕弧光（打钩图 2026-09-27 全项目退役，运行时建件勿入 prefab）
         private Color _elementColor = Color.white;
 
+        // 使用条件不足置暗的三图基准色（SetConditionDimmed 用——InitWithData 每次刷新时缓存）
+        private Color _baseIconColor = Color.white;
+        private Color _baseBadgeColor = Color.white;
+        private Color _baseCircleColor = SkillCircleColor.colorAvailable;
+
         private ViewType viewType;
         private SkillConfig.SkillData skillData;
         private UnitConfig.UnitData unitData;
@@ -61,7 +66,30 @@ namespace GIC.UI
                 if (skillCircle != null)
                     skillCircle.color = SkillCircleColor.colorPassive;
             }
+
+            // 基准色缓存：InitWithData 每次刷新都重写三图颜色=基准重置点，置暗在该点之上叠加
+            //（战斗 HUD 刷新序恒为 InitWithData → SetConditionDimmed）
+            _baseIconColor = skillIcon != null ? skillIcon.color : Color.white;
+            _baseBadgeColor = skillBadge != null ? skillBadge.color : Color.white;
+            _baseCircleColor = skillCircle != null ? skillCircle.color : SkillCircleColor.colorAvailable;
         }
+
+        /// <summary>使用条件不足整体置暗（2026-10-04 战斗 HUD 拍板「不止图标，包括底面、圆环」）：
+        /// 图标/底板/色环三图基准色统一乘暗系数——RGB 乘、alpha 不动（变暗非变透明）；与层级门控
+        /// CanvasGroup 半透明为正交机制，两源同键命中时视觉叠加（拍板「两者可以同时叠加」）。
+        /// 须在 InitWithData 之后调用（基准色随刷新重写入）；背包等非战斗消费方不调用恒为亮态。</summary>
+        public void SetConditionDimmed(bool dimmed, float factor)
+        {
+            factor = Mathf.Clamp01(factor);
+            float f = dimmed ? factor : 1f;
+            if (skillIcon != null) skillIcon.color = Darken(_baseIconColor, f);
+            if (skillBadge != null) skillBadge.color = Darken(_baseBadgeColor, f);
+            if (skillCircle != null) skillCircle.color = Darken(_baseCircleColor, f);
+        }
+
+        /// <summary>RGB 乘暗系数、alpha 保持（Color 运算符连 alpha 一起乘=变透明，非本拍板语义）</summary>
+        private static Color Darken(Color c, float factor) =>
+            new Color(c.r * factor, c.g * factor, c.b * factor, c.a);
 
         /// <summary>选中态=两束元素色环绕弧光（2026-09-27 拍板全项目统一：打钩图退役、
         /// 战斗/背包同表现；战斗屏 OnlyDisplay 不走此链——由 BattleHud.SetAimSelectRing 驱动同款弧光。

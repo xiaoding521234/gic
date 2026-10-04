@@ -376,6 +376,18 @@ namespace GIC.Framework
                 save.AddItemCount(entry.item, entry.count);
 #endif
 
+            // 初始卡组名（2026-10-04）：配置声明的卡组自定义名写入新档（deckId 直接寻址，无条目顺序依赖）。
+            // 越界/空名跳过；超长截断与 CardManager.SetDeckName 同口径（粘贴/外部写入口径防御）。
+            foreach (var entry in initialSaveConfig.initialDeckNames)
+            {
+                if (entry == null || string.IsNullOrEmpty(entry.name)) continue;
+                var names = save.progress.deckNames;
+                if (entry.deckId < 0 || entry.deckId >= names.Count) continue;
+                names[entry.deckId] = entry.name.Length > CardManager.MaxDeckNameLength
+                    ? entry.name.Substring(0, CardManager.MaxDeckNameLength)
+                    : entry.name;
+            }
+
             save.progress.currentDeck = initialSaveConfig.defaultDeck;
         }
 

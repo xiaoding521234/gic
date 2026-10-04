@@ -78,6 +78,12 @@ namespace GIC.Battle
                 if (selectButton != null)
                 {
                     selectButton.onClick.AddListener(() => OnSkillButtonClicked(captured));
+                    // 资源不足整键变暗（2026-10-04 拍板「不止图标，包括底面，圆环」）由 SkillIconView.SetConditionDimmed
+                    // 三图统一接管——UGUI disabled tint 只染 targetGraphic（Icon）单图，置恒等白防 Icon 被双重压暗；
+                    // hover/pressed 染色不受影响（仅 disabled 态失效，战斗键置灰语义已由置暗链承担）
+                    var colors = selectButton.colors;
+                    colors.disabledColor = Color.white;
+                    selectButton.colors = colors;
                 }
                 else
                 {
