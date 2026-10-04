@@ -98,6 +98,12 @@ namespace GIC.Pet
 
         public static string SavePath => Path.Combine(Application.persistentDataPath, "pet.json");
 
+        /// <summary>快速迭代期存档策略（2026-10-04 用户拍板「无论怎么样，每次启动游戏都直接重建，除非我要求
+        /// 快速迭代期结束，才改」）：true=每次进程启动首次读档时重建易变状态（缩放/位置回默认），
+        /// 设置类字段照搬旧档保留（API key 密文/快捷消息/语音配置=用户环境配置，非测试状态）；
+        /// 迭代期结束=用户宣布后改回 false。主存档同款开关在 SaveManager.快速迭代期每次启动重建。</summary>
+        public const bool 快速迭代期每次启动重建 = true;
+
         /// <summary>原子落盘（2026-08-31 修复）：临时文件写入+File.Replace 替换（Windows ReplaceFile
         /// 原子语义）——直接 WriteAllText 覆盖写一半崩溃/断电=JSON 截断坏档，丢全部状态含 key 密文。
         /// 旧文件不存在（首次写）走 File.Move（同卷原子）。.tmp 残留由下次写入覆盖，无碍。</summary>
@@ -156,8 +162,17 @@ namespace GIC.Pet
 
         /// <summary>直读磁盘存档（绕进程缓存；文件缺失/损坏返回默认实例不抛）。
         /// v1-v4 中文键→v5 英文键迁移在每次解析时内存完成，下次落盘自动固化。</summary>
+        static bool _迭代重建已执行;
+
         static PetSave ReadDiskSave()
         {
+            // 快速迭代期（2026-10-04 拍板）：每次进程启动首次读档时重建——易变状态（缩放/位置）回默认、
+            // 设置类字段照搬旧档保留，有旧档时固化落盘（此后直读通道/另一进程读到的都是重建档）
+            if (快速迭代期每次启动重建 && !_迭代重建已执行)
+            {
+                _迭代重建已执行 = true;
+                return RebuildForIteration();
+            }
             try
             {
                 if (File.Exists(SavePath))
@@ -168,6 +183,39 @@ namespace GIC.Pet
                 Debug.LogWarning($"[PetPrefs] pet.json 读取失败（按无存档处理）：{e.Message}");
             }
             return new PetSave();
+        }
+
+        /// <summary>迭代期启动重建：易变状态清零 + 设置类字段照搬磁盘旧档（清单与 Save() 的
+        /// "以磁盘现值为准"合并表同源）；有旧档时立即固化（无旧档=纯默认不落盘）。</summary>
+        static PetSave RebuildForIteration()
+        {
+            var fresh = new PetSave();
+            try
+            {
+                if (File.Exists(SavePath))
+                {
+                    var old = ParseAndMigrate(File.ReadAllText(SavePath));
+                    fresh.chatProvider = old.chatProvider;
+                    fresh.chatCiphers = old.chatCiphers;
+                    fresh.quickMessages = old.quickMessages;
+                    fresh.quickSeeded = old.quickSeeded;
+                    fresh.voiceMode = old.voiceMode;
+                    fresh.voiceSidecarUrl = old.voiceSidecarUrl;
+                    fresh.voiceSidecarPath = old.voiceSidecarPath;
+                    fresh.voiceSidecarRefPath = old.voiceSidecarRefPath;
+                    fresh.voiceSidecarRefText = old.voiceSidecarRefText;
+                    fresh.voiceCloudKeyCipher = old.voiceCloudKeyCipher;
+                    fresh.voiceCloudVoiceId = old.voiceCloudVoiceId;
+                    fresh.voiceVolume = old.voiceVolume;
+                    WriteAtomic(JsonUtility.ToJson(fresh, true));
+                    Debug.Log("[PetPrefs] 快速迭代期：启动重建 pet.json（易变状态清零，设置类保留）");
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PetPrefs] 迭代期重建失败（按无档默认继续）：{e.Message}");
+            }
+            return fresh;
         }
 
         /// <summary>解析+旧键迁移（纯函数无 IO——存档迁移测试直调）：v1-v4 中文键/旧字段名 → v5 英文键。

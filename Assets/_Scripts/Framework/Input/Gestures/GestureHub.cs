@@ -154,8 +154,16 @@ namespace GIC.Framework
                     if (locked && !surface.IgnoresInputLocks) continue;
                     _bindings[e.Id] = new PointerBinding { Surface = surface, Kind = e.Kind, LastPos = e.Position };
                     if (secondTouch)
-                        CancelSinglePointerGestures(surface); // 双指起手取代单指（先于识别器收事件——Map L292/桌宠 L636 现语义）
-                    Deliver(surface, e);
+                    {
+                        // 双指起手取代单指（先于识别器收事件——Map L292/桌宠 L636 现语义）。
+                        // 取消后的单指识别器不得被同帧第二指 Began 复活——Immediate 拖拽会把第二指当全新
+                        // 序列重新宣胜并挤掉等第二指的捏合（手机端两指缩放全灭根因，2026-10-04）：
+                        // 第二指 Began 只喂多指识别器；其后续 Moved/Ended 走全量投递（Idle 单指识别器对陌生指针自然忽略）
+                        CancelSinglePointerGestures(surface);
+                        DeliverToMultiPointer(surface, e);
+                    }
+                    else
+                        Deliver(surface, e);
                     return;
                 }
                 return;
@@ -186,6 +194,17 @@ namespace GIC.Framework
                 list[i].HandlePointerEvent(e);
         }
 
+        /// <summary>第二指 Began 的定向投递：只喂 MaxPointers≥2 的识别器（捏合等晋升型手势）。
+        /// 单指识别器刚被「双指取代单指」取消，若同帧收到该 Began 会把第二指当全新序列重新起手
+        /// （Immediate 拖拽重新宣胜并挤掉捏合——手机端捏合失效根因）。第二指的后续事件仍走全量投递。</summary>
+        private static void DeliverToMultiPointer(IGestureSurface surface, in PointerEvent e)
+        {
+            var list = surface.Recognizers;
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].MaxPointers >= 2)
+                    list[i].HandlePointerEvent(e);
+        }
+
         // ── 仲裁（first-accept-wins，docs/24 §7.3）──
 
         private void OnRecognizerWon(GestureRecognizer winner)
@@ -195,8 +214,13 @@ namespace GIC.Framework
                 var list = _surfaces[s].Recognizers;
                 if (!ContainsRecognizer(list, winner)) continue;
                 for (int r = 0; r < list.Count; r++)
-                    if (list[r] != winner)
-                        list[r].ForceFail();
+                {
+                    if (list[r] == winner) continue;
+                    // 单指宣胜不挤多指识别器：捏合可能还在等第二指（多指晋升路径由 hub「双指取代单指」
+                    // 规则专管，不参与单指间 first-accept-wins）——否则识别器列表顺序会隐性决定捏合存亡
+                    if (winner.MaxPointers < 2 && list[r].MaxPointers >= 2) continue;
+                    list[r].ForceFail();
+                }
                 return;
             }
         }

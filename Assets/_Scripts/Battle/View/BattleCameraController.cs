@@ -13,7 +13,9 @@ namespace GIC.Battle
     /// - 手势输入：本类=GestureHub 的 surface（docs/24 P3）——Drag(Immediate) 识别器做拖拽判定
     ///   （按在 UI 上不起手由 hub 门2 把关），本类只做相机响应（抓取棋盘点跟随）；
     ///   B6 落地左键点击交互时直接在 _recognizers 加 TapRecognizer 即用（位移阈值=GestureMetrics 双档）
-    /// - 滚轮缩放：轴输入维持本类 Update 轮询（以屏幕中心缩放，乘法步进，平滑缓动；不随鼠标锚点——2026-09-12 用户拍板）
+    /// - 两指捏合缩放：PinchRecognizer（2026-10-04 手机端补——判定在识别器/hub 晋升规则，
+    ///   本类只按张合比缩放视轴距离，中心缩放语义与滚轮拍板一致）；滚轮缩放：轴输入维持本类
+    ///   Update 轮询（以屏幕中心缩放，乘法步进，平滑缓动；不随鼠标锚点——2026-09-12 用户拍板）
     /// - WASD/方向键平移（速度随距离缩放，任意缩放级别手感一致）
     /// - 输入锁期间冻结（弹窗/场景切换——hub 门1 ForceCancel 识别器）
     /// 手感参考 MapScreen 的 MapCameraController（乘法缩放/边界 clamp）。
@@ -59,7 +61,11 @@ namespace GIC.Battle
         // emitShortTap=true：短位移点击复合发射（2026-09-18 报障修复：漏传该参导致 HUD OnBoardTap 全链不触发，
         // 点立牌无反应；Map 同款写法。tap+pan 同体=docs/24 §7.10）
         private readonly DragRecognizer _dragRecognizer = new DragRecognizer(DragBeginMode.Immediate, emitShortTap: true);
+        // 两指捏合缩放（2026-10-04 补接线：手机端无滚轮，战场此前只有滚轮一条缩放路；判定全在
+        // PinchRecognizer/hub 晋升规则，本类只做相机响应——与大地图同款架构，docs/24 §5）
+        private readonly PinchRecognizer _pinchRecognizer = new PinchRecognizer();
         private readonly List<GestureRecognizer> _recognizers = new List<GestureRecognizer>();
+        private float _pinchStartDistance; // 捏合起手距离快照（比例基准=pinchStartDistance×张合比）
 
         /// <summary>当前视轴距离（探针/未来 UI 缩放按钮用）</summary>
         public float CurrentDistance => _distance;
@@ -74,10 +80,27 @@ namespace GIC.Battle
         {
             _camera = GetComponent<Camera>();
             _recognizers.Add(_dragRecognizer);
+            _recognizers.Add(_pinchRecognizer);
             _dragRecognizer.OnDragBegan += OnDragBeganHandler;
             _dragRecognizer.OnDragDelta += OnDragDeltaHandler;
             _dragRecognizer.OnShortTap += OnShortTapHandler;
+            _pinchRecognizer.OnPinchBegan += OnPinchBeganHandler;
+            _pinchRecognizer.OnPinchRatio += OnPinchRatioHandler;
             InitFromTransform();
+        }
+
+        private void OnPinchBeganHandler(float startDist, Vector2 midScreenPos)
+        {
+            _pinchStartDistance = _distance;
+        }
+
+        /// <summary>捏合缩放：战斗缩放语义=中心缩放、注视点不动（与滚轮 2026-09-12 拍板「不锚定指针」
+        /// 同口径，不像大地图锚定捏合中点）。直写实际距离并同步目标——跟手零缓动，且不污染滚轮平滑链。</summary>
+        private void OnPinchRatioHandler(float ratio, Vector2 midScreenPos)
+        {
+            _distance = Mathf.Clamp(_pinchStartDistance * ratio, _minDistance, _maxDistance);
+            _targetDistance = _distance;
+            ApplyTransform();
         }
 
         private void OnShortTapHandler(Vector2 screenPos)
