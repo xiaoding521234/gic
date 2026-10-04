@@ -555,5 +555,17 @@ namespace GIC.Battle
             }
             return 0;
         }
+
+        /// <summary>J-2 光环 Buff 半径按 BuffType 直查（自施放爆发**施放前**预判用——Buff 尚未
+        /// 上身，AuraRadiusOf 查不到；白名单与 AuraRadiusOf 同源，新光环类落地时同步补一行）</summary>
+        public static int AuraRadiusOfBuffType(BuffType type)
+        {
+            switch (type)
+            {
+                case BuffType.SongOfLife: return SongOfLifeBuff.Radius;
+                case BuffType.Icicle: return IcicleBuff.Radius;
+                default: return 0;
+            }
+        }
     }
 }
