@@ -55,5 +55,17 @@ namespace GIC.Data
         [Header("默认卡组")]
         [InspectorName("初始选中的卡组")]
         public int defaultDeck = 1;
+
+        [Serializable]
+        public class DeckNameEntry
+        {
+            public int deckId = 0;
+            public string name = "";
+        }
+
+        [Header("初始卡组名")]
+        [Tooltip("新档卡组自定义名（deckId 直接寻址，无条目顺序依赖；未列出的卡组保持未命名，UI 显示本地化默认「卡组N」）。超长在建档时按 CardManager.MaxDeckNameLength 截断。")]
+        [InspectorName("卡组命名条目")]
+        public List<DeckNameEntry> initialDeckNames = new List<DeckNameEntry>();
     }
 }

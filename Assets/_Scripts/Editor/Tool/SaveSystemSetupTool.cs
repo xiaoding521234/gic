@@ -63,7 +63,7 @@ namespace GIC.Tool
             cfg.initialUnits.Add(new InitialSaveConfig.UnitEntry { unit = UnitName.Kirara,      decks = new List<int> { 3 } });
 
             // ── 初始物品/货币 ──
-            cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Mora,            count = 100 });
+            cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Mora,            count = 100, decks = new List<int> { 0 } }); // 蒙德新手卡组（卡组1）构筑：安柏/凯亚/芭芭拉/体力/摩拉
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.IntertwinedFate, count = 0 }); // 2026-09-06 拍板：命运之缘不随新档赠送（0/0）且不可入卡组（maxPrepareCount=0）。开发测试物资走资产 devTestItems 分区（#if 开发态建档发放），不属本工具重建范围
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Stamina,         count = 100, decks = new List<int> { 0 } });
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Primogem,        count = 16000 });
@@ -73,7 +73,9 @@ namespace GIC.Tool
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Wheat,           count = 10 });
             cfg.initialItems.Add(new InitialSaveConfig.ItemEntry { item = ItemName.Radish,         count = 10 });
 
-            cfg.defaultDeck = 1;
+            // ── 默认卡组与初始卡组名（2026-10-04：卡组1=蒙德新手卡组，初始选中也用它）──
+            cfg.defaultDeck = 0;
+            cfg.initialDeckNames.Add(new InitialSaveConfig.DeckNameEntry { deckId = 0, name = "蒙德新手卡组" });
 
             AssetDatabase.CreateAsset(cfg, AssetPath);
             AssetDatabase.SaveAssets();

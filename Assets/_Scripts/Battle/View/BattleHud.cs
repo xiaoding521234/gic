@@ -93,6 +93,10 @@ namespace GIC.Battle
         [Tooltip("面板距屏幕边缘的最小留白（画布单位）")]
         [SerializeField] private float 详情面板屏幕边距 = 16f;
 
+        [Header("技能键置灰（2026-10-04 拍板：AI 自主键不透明度 45%；使用条件不足整键变暗——不止图标，含底面/圆环；两源同键可叠加）")]
+        [Tooltip("使用条件不足（资源不够等）时整键置暗系数——图标/底板/色环基准色统一乘该值（RGB 乘、alpha 不动=变暗非变透明）；与 AI 自主键 45% 半透明为正交机制，同键命中时视觉叠加")]
+        [SerializeField, Range(0f, 1f)] private float 资源不足变暗系数 = 0.6f; // 首版 0.45 目检「太暗」调亮（2026-10-04）
+
         /// <summary>disc.png 实心盘可见缘只占纹理半宽 0.830（四周透明边距大）——纹理放大 0.998/0.830≈1.202
         /// 补偿：小圆盘可见缘贴齐名义半径。2026-09-28 大盘圆角矩形化改版后**仅小圆盘消费本常量**
         /// （大盘=DragWheelFill/DragWheelRing 裁剪到内容框的圆角矩形素材，补偿恒 1.0）</summary>
@@ -2235,14 +2239,16 @@ namespace GIC.Battle
 
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
         /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）。
-        /// 置灰两源（D-5 置灰单源，docs/active/32 §8——置灰原因=「AI 自主」或「资源不足」，后者对魔神才可能）：
+        /// 置灰两源（D-5 置灰单源 docs/active/32 §8；2026-10-04 拍板两源视觉独立可叠加）：
         /// ①「AI 自主」层级门控——眷属/伙伴（任意归属，含敌方——其行动域同属 AI）的移动/战技/爆发键=
-        ///   AI 域：半透明置灰+「AI 自主」角标；**interactable 保持 true**（点击/拖拽照常进瞄准——显示
+        ///   AI 域：45% 半透明（CanvasGroup）；**interactable 保持 true**（点击/拖拽照常进瞄准——显示
         ///   瞄准格直观看到技能范围、可留待定金格；操控权拦截在提交时轻弹窗=SubmitAim 防线，
-        ///   2026-09-29 用户拍板）；
-        /// ②「资源不足」——玩家域（己方魔神全键/己方伙伴势力技能键）按 HasSkillResources 门槛
-        ///   （元能/体力=消耗值随快照刷新，体力按层级换算镜像）；查看态（敌方/眷属）无操控权=
-        ///   无消耗语义恒可点——勿把"查看敌人技能盘"也灰掉</summary>
+        ///   2026-09-29 拍板）；
+        /// ②「资源不足」（HasSkillResources 门槛，元能/体力=消耗值随快照刷新，体力按层级换算镜像）——
+        ///   玩家域键（己方魔神全键/己方伙伴势力键）=interactable 拦截+**整键变暗**（图标/底板/圆环
+        ///   统一乘暗系数——2026-10-04 拍板「不止图标」）；**己方眷属/伙伴的 AI 域键同样整键置暗**
+        ///   （AI 当前也用不了=信息层，不拦 interactable 保持可查看）——与 45% 半透明同键叠加；
+        ///   查看态（敌方单位）无消耗语义不灰（拍板不变）</summary>
         private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null) return;
@@ -2250,18 +2256,27 @@ namespace GIC.Battle
             def.view.gameObject.SetActive(data != null);
             bool tierGated = data != null && IsTierGatedButton(def);
             ApplyTierGateVisual(def, tierGated);
+            bool conditionDimmed = false;
             var selectButton = def.view.GetComponent<SelectButton>();
             if (selectButton != null)
             {
                 if (tierGated)
+                {
                     selectButton.interactable = true; // 门控置灰=纯视觉提示——点击/拖拽照常进瞄准查看（拦截在提交时）
+                    conditionDimmed = IsSelectedOwnUnit() && !HasSkillResources(data); // 己方 AI 域键资源不足=同置暗（信息层，可叠加）
+                }
                 else
-                    selectButton.interactable = data != null
-                        && (!IsSelectedPlayerDomain(def.type) || HasSkillResources(data));
+                {
+                    bool playerDomain = IsSelectedPlayerDomain(def.type);
+                    bool resourcesOk = !playerDomain || HasSkillResources(data);
+                    selectButton.interactable = data != null && resourcesOk;
+                    conditionDimmed = data != null && !resourcesOk;
+                }
             }
             if (data == null) return;
 
             def.view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
+            def.view.SetConditionDimmed(conditionDimmed, 资源不足变暗系数); // 须在 InitWithData 后（基准色随刷新重写入）
 
             if (def.nameText != null)
             {
@@ -2279,8 +2294,8 @@ namespace GIC.Battle
             return tier == UnitTier.Familiar || tier == UnitTier.Companion;
         }
 
-        /// <summary>层级门控视觉：半透明置灰（懒建 CanvasGroup；不透明度 50%——2026-10-04 拍板
-        /// 「AI自主决定的技能，需要不透明度为50%」，原 0.55；「AI 自主」文字角标已按用户拍板
+        /// <summary>层级门控视觉：半透明置灰（懒建 CanvasGroup；不透明度 45%——2026-10-04 拍板
+        /// 「AI自主的技能，不透明度为45」（迭代链 0.55→0.5→0.45）；「AI 自主」文字角标已按用户拍板
         /// 2026-09-29 移除——置灰本身+提交时轻弹窗已足够传达，prefab AutoBadge 节点同步删除）</summary>
         private void ApplyTierGateVisual(SkillButtonDef def, bool gated)
         {
@@ -2289,7 +2304,7 @@ namespace GIC.Battle
                 def.tierGateGroup = def.view.GetComponent<CanvasGroup>();
             if (def.tierGateGroup == null)
                 def.tierGateGroup = def.view.gameObject.AddComponent<CanvasGroup>();
-            def.tierGateGroup.alpha = gated ? 0.5f : 1f;
+            def.tierGateGroup.alpha = gated ? 0.45f : 1f;
         }
 
         /// <summary>选中单位层级（D 批次操控分层，docs/active/32 §2；无配置数据按眷属档=保守全门控）</summary>
@@ -2313,6 +2328,15 @@ namespace GIC.Battle
             if (tier == UnitTier.Archon) return true;
             return tier == UnitTier.Companion
                 && (buttonType == SkillType.Enso || buttonType == SkillType.Contract);
+        }
+
+        /// <summary>选中单位是否己方（AI 域键资源置暗的前提——2026-10-04 拍板「资源不足整键变暗」扩展到
+        /// 己方眷属/伙伴的 AI 域键：玩家不可提交但 AI 同样用不了=信息层；敌方=查看态无消耗语义不灰）</summary>
+        private bool IsSelectedOwnUnit()
+        {
+            var snapshot = _session?.Player?.LatestSnapshot;
+            var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            return sel != null && sel.playerId == _myPlayerId;
         }
 
         /// <summary>技能资源门槛单源（统一消耗模型，docs/active/30 §2.3——预判/结算同形纪律）：
@@ -2444,28 +2468,36 @@ namespace GIC.Battle
                 def.nameText.AddEntry(nameId.GetEntry());
             }
 
-            // 置灰两源（同 ApplySkillButton D-5 单源口径）：层级门控（眷属/伙伴的移动=AI 域——置灰+角标、
-            // interactable 保持 true，点击/拖拽照常进瞄准查看——拦截在提交时轻弹窗）；资源门槛仅玩家域
-            // （己方魔神）——移动消耗走移动技能 costs 镜像（HasSkillResources 镜像 ResourceGate.HasAll）；
-            // 无 Move 条目单位=常量兜底（Host MoveExecutor.GetMoveCosts 同口径），体力按选中单位层级换算镜像
-            // （D 批次 docs/active/32 §5.2：眷属0/伙伴5/魔神10）
+            // 置灰两源（同 ApplySkillButton D-5 单源口径+2026-10-04 整键变暗扩展）：层级门控（眷属/伙伴的
+            // 移动=AI 域——45% 半透明、interactable 保持 true，点击/拖拽照常进瞄准查看——拦截在提交时轻弹窗）；
+            // 资源门槛（移动消耗走移动技能 costs 镜像 HasSkillResources，无 Move 条目单位=常量兜底
+            // Host MoveExecutor.GetMoveCosts 同口径，体力按选中单位层级换算镜像 眷属0/伙伴5/魔神10）——
+            // 玩家域（己方魔神）拦截+整键变暗；己方眷属/伙伴的 AI 域键资源不足同置暗（可叠加）
             bool tierGated = IsTierGatedButton(def);
             ApplyTierGateVisual(def, tierGated);
+            bool conditionDimmed = false;
             if (def.view.selectButton != null)
             {
+                var selUnitDataFallback = GetSelectedUnitData();
+                int fallbackStamina = selUnitDataFallback != null
+                    ? UnitTierHelper.StaminaCostOf(UnitTierHelper.FromStars(selUnitDataFallback.starLevel))
+                    : BattleMetrics.StaminaCostPerAction;
+                bool resourcesOk = move != null ? HasSkillResources(move)
+                    : _myStamina >= fallbackStamina;
                 if (tierGated)
+                {
                     def.view.selectButton.interactable = true; // 门控置灰=纯视觉提示——照常进瞄准查看（拦截在提交时）
+                    conditionDimmed = IsSelectedOwnUnit() && !resourcesOk;
+                }
                 else
                 {
-                    var selUnitDataFallback = GetSelectedUnitData();
-                    int fallbackStamina = selUnitDataFallback != null
-                        ? UnitTierHelper.StaminaCostOf(UnitTierHelper.FromStars(selUnitDataFallback.starLevel))
-                        : BattleMetrics.StaminaCostPerAction;
-                    def.view.selectButton.interactable = !IsSelectedPlayerDomain(SkillType.Move)
-                        || (move != null ? HasSkillResources(move)
-                            : _myStamina >= fallbackStamina);
+                    bool playerDomain = IsSelectedPlayerDomain(SkillType.Move);
+                    def.view.selectButton.interactable = !playerDomain || resourcesOk;
+                    conditionDimmed = playerDomain && !resourcesOk;
                 }
             }
+            // 移动键染色在方法头部已刷新（InitWithData 在 gating 前）——置暗/恢复在此收口
+            def.view.SetConditionDimmed(conditionDimmed, 资源不足变暗系数);
         }
 
         /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>

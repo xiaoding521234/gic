@@ -162,8 +162,11 @@ namespace GIC.UI
             float height = GetToastCanvasHeight(dialog);
             float toastH = GetToastHeight();
             // 子节点锚定在屏幕中心 (0.5, 0.5)，Y=0 是中心，正值向上
-            // 目标位置：距顶部 toastPosRatio 比例高度（默认 5%）
-            float y = height * 0.5f - height * toastPosRatio - index * (toastH + toastGap);
+            // 顶边定位：toast 顶边距屏幕顶 toastPosRatio 比例高度（默认 5%）。
+            // 旧式中心定位（y=H/2−ratio·H）在内容高度超过 10% 屏高时顶半越出屏幕
+            // （2026-10-04 报障：内容高 170/屏高 1376，顶边越界 ~17px）。
+            float y = height * 0.5f - height * toastPosRatio - toastH * 0.5f
+                    - index * (toastH + toastGap);
             return new Vector2(0f, y);
         }
 

@@ -55,7 +55,7 @@ MonoBehaviour:
   initialItems:
   - item: 1001
     count: 100
-    decks: 
+    decks: 00000000
   - item: 1002
     count: 0
     decks: 
@@ -85,4 +85,7 @@ MonoBehaviour:
     count: 10
   - item: 1004
     count: 10
-  defaultDeck: 1
+  defaultDeck: 0
+  initialDeckNames:
+  - deckId: 0
+    name: "\u8499\u5FB7\u65B0\u624B\u5361\u7EC4"
