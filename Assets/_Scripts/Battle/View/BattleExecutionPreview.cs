@@ -12,7 +12,9 @@ namespace GIC.Battle
 {
     /// <summary>
     /// 执行阶段多行行动预览（2026-09-29 拍板落地，取代退役的 TopBar 攻速队列条）：
-    /// 执行阶段开始（相位 Resolving + 行动预告 TurnPlan 到达）→ 中下方居中显示「谁将按什么顺序行动」。
+    /// 执行阶段开始（相位 Resolving + 行动预告 TurnPlan 到达）→ 底部居中显示「谁将按什么顺序行动」
+    /// （2026-10-04 下移贴底批：第二行底距画布底仅一点间距；实例烘焙于 BattleHud.prefab Slots/preview
+    /// 槽——摆位/缩放随 HUD 自定义布局系统，布局编辑模式=ShowLayoutPlaceholder 占位行显形）。
     /// **行=攻速 10 点区间**（0~9/10~19/…降序）——同区间全部单位横排一行（Host 仍按精确攻速分片结算，
     /// 预览区间分组是 HUD 侧归组，两套互不干扰）；行最左/最右显示区间下界/上界（13、17 两个单位同行
     /// 左 10 右 19，拍板②+③）。稳态两行（拍板⑤）：当前行（下一行动，正常大小）+即将行（下方更小更暗）。
@@ -374,6 +376,44 @@ namespace GIC.Battle
                 if (row.root != null) Destroy(row.root.gameObject);
             }
             _rows.Clear();
+        }
+
+        // ==================== 布局编辑占位（2026-10-04 下移贴底+自定义布局批） ====================
+
+        /// <summary>布局编辑占位行：预览在选择阶段无行不可见、编辑模式拖拽无从下手——建两行纯行壳
+        /// （区间标签+胶囊底，无条目）供定位/缩放。真实行在场（执行阶段）不动；占位行入 _rows 走
+        /// 常规清理链（真实预告到达 Build 先 ClearRows，占位自然让位；相位切换 Dismiss 同）</summary>
+        public void ShowLayoutPlaceholder()
+        {
+            if (_shown || _rows.Count > 0) return;
+            if (行预制体 == null || 行容器 == null) return;
+            for (int i = 0; i < 2; i++)
+            {
+                var rowGo = Instantiate(行预制体.gameObject, 行容器, false);
+                rowGo.name = $"PreviewRow_Placeholder{i}";
+                var rt = (RectTransform)rowGo.transform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                var row = new PreviewRow
+                {
+                    root = rt,
+                    group = rowGo.GetComponent<CanvasGroup>(),
+                    bandLow = 90 - i * 10,
+                };
+                var bandMin = rt.Find("BandMin")?.GetComponent<TMP_Text>();
+                var bandMax = rt.Find("BandMax")?.GetComponent<TMP_Text>();
+                if (bandMin != null) bandMin.text = (90 - i * 10).ToString();
+                if (bandMax != null) bandMax.text = (99 - i * 10).ToString();
+                _rows.Add(row);
+                ApplyRowState(row, new Vector2(0f, SlotY(i)), SlotScale(i), SlotAlpha(i)); // 直接摆稳态槽位（无入场动画）
+            }
+        }
+
+        /// <summary>退出布局编辑：清占位行（_shown=真实行在场时 ShowLayoutPlaceholder 早退未建，此处不动）</summary>
+        public void HideLayoutPlaceholder()
+        {
+            if (_shown) return;
+            ClearRows();
         }
 
         private static float EaseOutCubic(float t) => 1f - Mathf.Pow(1f - t, 3f);

@@ -65,11 +65,13 @@ namespace GIC.Battle
         /// enemyinfo 已移除（2026-09-25 用户拍板「不需要显示敌人的资源等信息」）；
         /// queue 已退役（2026-09-29 拍板：攻速队列整体删除，执行阶段改 BattleExecutionPreview——存量
         /// 方案条目按未知 key 自然跳过，同 enemyinfo 先例）；
-        /// confirm=完成选择按钮（2026-09-26 新增，选择阶段常显、显隐随 Update 轮询同 countdown）</summary>
+        /// confirm=完成选择按钮（2026-09-26 新增，选择阶段常显、显隐随 Update 轮询同 countdown）；
+        /// preview=执行预览（2026-10-04 下移贴底批接入：执行阶段无行不可见——布局编辑模式由
+        /// _executionPreview.ShowLayoutPlaceholder 建占位行显形，可拖可缩同其它件）</summary>
         private static readonly string[] AllLayoutKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "settings",
-            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm",
+            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview",
         };
 
         /// <summary>
@@ -216,6 +218,7 @@ namespace GIC.Battle
 
             foreach (var def in _layoutWidgets)
                 def.plate.SetActive(true);
+            _executionPreview?.ShowLayoutPlaceholder(); // 预览无行时建占位行（否则编辑态不可见无从拖）；真实行在场则跳过
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(true); // prefab 烘焙工具栏，编辑态激活
             SelectWidget(null);
             SetTip("Battle_LayoutHint");
@@ -228,6 +231,7 @@ namespace GIC.Battle
             if (_session != null && _session.Flow != null)
                 _session.Flow.SelectTimerPaused = false;
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(false); // 隐藏回烘焙态（引用保留，重进即用）
+            _executionPreview?.HideLayoutPlaceholder(); // 清编辑占位行（真实行在场不受影响——ShowLayoutPlaceholder 早退未建）
             foreach (var def in _layoutWidgets)
             {
                 def.plate.SetActive(false);

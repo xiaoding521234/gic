@@ -52,13 +52,15 @@ namespace GIC.Battle
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；接线时活色覆盖烘焙兜底色）
         private static BattlePalette Palette => BattlePalette.Instance;
 
-        [Header("手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移）")]
-        [Tooltip("默认下沉藏量=半张卡（卡高 240 之半，按手牌槽缩放自动换算画布量）")]
+        [Header("手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移；2026-10-04 拍板「不需要自动降下了，暂时移除这个功能」=总开关默认关）")]
+        [Tooltip("手牌下沉热区总开关——false=手牌恒升起态完全可见（2026-10-04 拍板「暂时移除」）；true=恢复自动下沉/接近上移（下列热区/升降参数随之生效，链路全保留）")]
+        [SerializeField] private bool 手牌自动下沉 = false;
+        [Tooltip("默认下沉藏量=半张卡（卡高 240 之半，按手牌槽缩放×手牌壳缩放自动换算画布量）")]
         [SerializeField] private float 手牌下沉半卡 = 120f;
-        [Tooltip("接近热区：手牌矩形左右外扩余量（画布单位）")]
-        [SerializeField] private float 手牌热区侧探 = 60f;
-        [Tooltip("接近热区：手牌矩形向上外扩余量（画布单位）——接近主方向探测带")]
-        [SerializeField] private float 手牌热区上探 = 100f;
+        [Tooltip("接近热区：手牌矩形左右外扩余量（画布单位）——2026-10-04 拍板「再收：都改为30」（原 60）")]
+        [SerializeField] private float 手牌热区侧探 = 30f;
+        [Tooltip("接近热区：手牌矩形向上外扩余量（画布单位）——接近主方向探测带；2026-10-04 拍板「再收：都改为30」（原 100）")]
+        [SerializeField] private float 手牌热区上探 = 30f;
         [Tooltip("升/降指数趋近系数（1/s，12≈0.25s 到位）")]
         [SerializeField] private float 手牌升降速度 = 12f;
 
@@ -79,7 +81,7 @@ namespace GIC.Battle
         [Header("拖动瞄准圆盘（2026-09-26 三拍：大盘=键上锚点+距离转盘、小圆盘不超大盘不出屏幕；选中格精确性全在大盘内——盘缘=最远格；2026-09-28 拍板：大盘=圆角矩形（方形），贴合格子战场）")]
         [Tooltip("大盘半边距（画布单位）——圆角矩形盘中心到边的距离（两轴同值=方形盘）；锚在被拖技能键圆心；方向型步距转盘=盘缘对应该方向最远可选格（半边越大选格越精细）")]
         [UnityEngine.Serialization.FormerlySerializedAs("拖动瞄准大圆盘半径")]
-        [SerializeField] private float 拖动瞄准大盘半边 = 340f;
+        [SerializeField] private float 拖动瞄准大盘半边 = 238f; // 2026-10-04 拍板「矩形盘缩小30%」：340→238
         [Tooltip("小圆盘半径（画布单位）——手指跟随盘（盘心两轴不超大盘半边、盘缘不出屏幕）；兼作键心死区半径：拖动瞄准中小盘未拖出此半径=未真离键，无瞄准、松手取消（防微拖误触/拖回取消目标）")]
         [SerializeField] private float 拖动瞄准小圆盘半径 = 56f;
         [Tooltip("小圆盘屏幕边距（画布单位）——盘缘距屏幕边缘的最小留白（轮盘靠屏角时屏幕边界优先于轮盘界）")]
@@ -96,12 +98,13 @@ namespace GIC.Battle
         /// （大盘=DragWheelFill/DragWheelRing 裁剪到内容框的圆角矩形素材，补偿恒 1.0）</summary>
         private const float 实心盘贴图补偿 = 1.202f;
 
-        /// <summary>大盘填充内缩（画布单位）：填充件与描环两素材角弧不同（对角向有效半径@680 盘
+        /// <summary>大盘填充内缩比例（相对半边）：填充件与描环两素材角弧不同（对角向有效半径@680 盘
         /// 填充≈56px、描环带≈88px），平齐绘制时四角填充缘会突出金框线外 ~9px（2026-09-28 像素
-        /// 探针实测）；内缩 11 后填充缘全程落在金环带内（唇口/空洞双零——全角度 0.1° 步进扫描，
-        /// 干净窗口 10~14 取中）——v7「阴影贴齐描环」契约的圆角矩形版。换美术素材须重扫重定
-        /// （扫描脚本=.codely-cli/tmp/wheel_rect/sweep.py）</summary>
-        private const float 大盘填充内缩 = 11f;
+        /// 探针实测）；680 盘内缩 11 后填充缘全程落在金环带内（唇口/空洞双零——全角度 0.1° 步进
+        /// 扫描，干净窗口 10~14 取中）——v7「阴影贴齐描环」契约的圆角矩形版。**素材随盘径等比拉伸**
+        /// ——角弧差随盘径线性缩放，内缩量亦须随半边等比（=11/340；2026-10-04 盘径缩小 30% 批
+        /// 由常量改比例，盘径再调零漂移）。换美术素材须重扫重定（扫描脚本=.codely-cli/tmp/wheel_rect/sweep.py）</summary>
+        private const float 大盘填充内缩比例 = 11f / 340f;
 
         // 瞄准常量（运行时计算用）
         private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
@@ -458,25 +461,23 @@ namespace GIC.Battle
 
         private Coroutine _handFadeRoutine;
 
-        /// <summary>执行预览装配（2026-09-29 拍板：TopBar 攻速队列退役——执行阶段中下方多行行动预览）：
-        /// prefab 实例化到 HUD 画布顶层（全部子件 raycastTarget 关）+组件自订阅相位/预告/片开始三事件</summary>
+        /// <summary>执行预览组件（2026-10-04 下移贴底+自定义布局批起=Slots/preview 槽内烘焙实例；
+        /// 布局编辑模式占位行=BattleExecutionPreview.Show/HideLayoutPlaceholder）</summary>
+        private BattleExecutionPreview _executionPreview;
+
+        /// <summary>执行预览装配（2026-09-29 拍板：TopBar 攻速队列退役——执行阶段中下方多行行动预览；
+        /// 2026-10-04 下移贴底+自定义布局批：实例烘焙进 BattleHud.prefab 的 Slots/preview 槽〔首子级=
+        /// ExecutionPreview 实例〕，运行时只寻址接线，摆位/缩放随布局系统槽锚点走）</summary>
         private void InitExecutionPreview()
         {
-            var prefab = Resources.Load<GameObject>("Prefabs/Battle/ExecutionPreview");
-            if (prefab == null)
-            {
-                GICLog.Warn("[BattleHud] ExecutionPreview prefab 未找到（Resources/Prefabs/Battle/ExecutionPreview）——执行预览不显示");
-                return;
-            }
-            var go = Instantiate(prefab, _canvas.transform, false);
-            go.name = "ExecutionPreview";
-            go.transform.SetAsLastSibling(); // 顶层纯展示件（无射线交互）
-            var preview = go.GetComponent<BattleExecutionPreview>();
+            var content = _canvas.transform.Find("Slots/preview")?.GetChild(0);
+            var preview = content?.GetComponent<BattleExecutionPreview>();
             if (preview == null)
             {
-                GICLog.Warn("[BattleHud] ExecutionPreview prefab 缺 BattleExecutionPreview 组件——执行预览不显示");
+                GICLog.Warn("[BattleHud] 布局槽 preview 缺执行预览（BattleHud.prefab Slots/preview 首子级应为 ExecutionPreview 实例）——执行预览不显示");
                 return;
             }
+            _executionPreview = preview;
             preview.Init(_session, _myPlayerId);
         }
 
@@ -816,7 +817,9 @@ namespace GIC.Battle
 
         // ==================== 手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移） ====================
 
-        /// <summary>手牌下沉热区轮询+升降动画（每帧 Update 顶部调用）：
+        /// <summary>手牌下沉热区轮询+升降动画（每帧 Update 顶部调用）——**2026-10-04 拍板「不需要
+        /// 自动降下了，暂时移除这个功能」：手牌自动下沉开关默认关=手牌恒升起态**（开关在「手牌下沉」
+        /// 段首位，恢复勾选即复原，本方法其余链路原样保留）：
         /// 指针入热区（HandCards 矩形四向外扩）=全升，出区=沉「半张卡到画布底缘下」；
         /// 下沉量按升起态底缘动态测量——视口比例变化/布局槽拖动缩放全自适应；
         /// 升起态底缘用「现底缘+当前下沉量」恒等重建（防随动画回环漂移）；手牌隐藏期间照常趋沉
@@ -824,6 +827,17 @@ namespace GIC.Battle
         private void UpdateHandHover()
         {
             if (_handCardsRect == null || _canvas == null) return;
+            if (!手牌自动下沉)
+            {
+                // 功能暂停（2026-10-04 拍板「暂时移除」）：手牌恒升起态——归零一次暂停前写入的
+                // 下沉偏移/进度（编辑器热切换守卫；恒等式随之成立，开关恢复 true 从升起位平滑沉下）
+                if (_handCardsRect.anchoredPosition != Vector2.zero)
+                {
+                    _handCardsRect.anchoredPosition = Vector2.zero;
+                    _handSinkCanvas = 0f;
+                }
+                return;
+            }
             var canvasRt = (RectTransform)_canvas.transform;
 
             // 手牌槽缩放（画布量→HandCards 局部量换算；布局缩放 0.6~1.6，防 0 除）
@@ -831,14 +845,18 @@ namespace GIC.Battle
             if (_layoutByKey.TryGetValue("hand", out var handDef) && handDef.slot != null)
                 slotScale = Mathf.Max(0.01f, Mathf.Abs(handDef.slot.localScale.y));
 
+            // 手牌壳缩放（2026-10-04 拍板「手牌的大小，缩小30%」：HandCards 烘焙 0.7——卡牌/间距/
+            // 字体/点击区整壳等比缩小，pivot 底边=卡底线不动；下沉换算须乘壳缩放，半卡=局部量）
+            float handScale = Mathf.Max(0.01f, Mathf.Abs(_handCardsRect.localScale.y));
+
             // 升起态底缘（距画布底缘，画布单位）：现底缘＋已应用的下沉量（首帧 anchoredPosition 尚为 0
-            // 即升起位，恒等式自然成立）；半卡视觉量=120×槽缩放
+            // 即升起位，恒等式自然成立）；半卡视觉量=120×槽缩放×壳缩放（HandCards 壳 0.7，2026-10-04 手牌缩小批）
             float currentBottom = HandCardsBottomFromCanvasBottom(canvasRt);
             float risenBottom = currentBottom + Mathf.Max(0f, _handSinkCanvas);
 
             // 热区检测：指针（鼠标/末次触点）在手牌矩形+余量内=接近
             bool risen = _handCardsRect.gameObject.activeInHierarchy && IsPointerNearHand(canvasRt);
-            float targetSink = risen ? 0f : risenBottom + 手牌下沉半卡 * slotScale;
+            float targetSink = risen ? 0f : risenBottom + 手牌下沉半卡 * slotScale * handScale;
 
             if (_handSinkCanvas < 0f)
                 _handSinkCanvas = targetSink; // 首帧直接落沉态（无升起闪现）
@@ -846,8 +864,8 @@ namespace GIC.Battle
                 _handSinkCanvas = Mathf.Lerp(_handSinkCanvas, targetSink,
                     1f - Mathf.Exp(-手牌升降速度 * Time.deltaTime));
 
-            // 应用：局部偏移=画布下沉量/槽缩放（槽缩放下局部单位视觉量随缩放）
-            _handCardsRect.anchoredPosition = new Vector2(0f, -_handSinkCanvas / slotScale);
+            // 应用：局部偏移=画布下沉量/（槽缩放×壳缩放）（双层缩放下局部单位视觉量随缩放）
+            _handCardsRect.anchoredPosition = new Vector2(0f, -_handSinkCanvas / (slotScale * handScale));
         }
 
         /// <summary>HandCards 底缘距画布底缘的距离（画布单位；Overlay 画布世界角=屏幕像素，
@@ -1800,8 +1818,8 @@ namespace GIC.Battle
             if (fill == null) GICLog.Warn("[BattleHud] DragWheelFill.png（UI/Battle）未找到——大盘填充不显示");
             if (ring == null) GICLog.Warn("[BattleHud] DragWheelRing.png（UI/Battle）未找到——大盘描环不显示");
             // 大盘两件=裁剪到内容框的圆角矩形素材（补偿恒 1.0——实心盘贴图补偿仅小盘消费）；
-            // 填充件内缩 11 见「大盘填充内缩」常量注（两素材角弧不同，平齐绘制四角有暗唇）
-            _dragWheelBigFill = MakeWheelDisc("BigFill", rootRt, fill, 拖动瞄准大盘半边 - 大盘填充内缩,
+            // 填充件按比例内缩见「大盘填充内缩比例」常量注（两素材角弧不同，平齐绘制四角有暗唇）
+            _dragWheelBigFill = MakeWheelDisc("BigFill", rootRt, fill, 拖动瞄准大盘半边 * (1f - 大盘填充内缩比例),
                 new Color(Palette.按钮底盘.r, Palette.按钮底盘.g, Palette.按钮底盘.b, 0.45f));
             _dragWheelBigRing = MakeWheelDisc("BigRing", rootRt, ring, 拖动瞄准大盘半边,
                 new Color(Palette.高亮金.r, Palette.高亮金.g, Palette.高亮金.b, 0.8f));
@@ -2261,7 +2279,8 @@ namespace GIC.Battle
             return tier == UnitTier.Familiar || tier == UnitTier.Companion;
         }
 
-        /// <summary>层级门控视觉：半透明置灰（懒建 CanvasGroup；「AI 自主」文字角标已按用户拍板
+        /// <summary>层级门控视觉：半透明置灰（懒建 CanvasGroup；不透明度 50%——2026-10-04 拍板
+        /// 「AI自主决定的技能，需要不透明度为50%」，原 0.55；「AI 自主」文字角标已按用户拍板
         /// 2026-09-29 移除——置灰本身+提交时轻弹窗已足够传达，prefab AutoBadge 节点同步删除）</summary>
         private void ApplyTierGateVisual(SkillButtonDef def, bool gated)
         {
@@ -2270,7 +2289,7 @@ namespace GIC.Battle
                 def.tierGateGroup = def.view.GetComponent<CanvasGroup>();
             if (def.tierGateGroup == null)
                 def.tierGateGroup = def.view.gameObject.AddComponent<CanvasGroup>();
-            def.tierGateGroup.alpha = gated ? 0.55f : 1f;
+            def.tierGateGroup.alpha = gated ? 0.5f : 1f;
         }
 
         /// <summary>选中单位层级（D 批次操控分层，docs/active/32 §2；无配置数据按眷属档=保守全门控）</summary>
