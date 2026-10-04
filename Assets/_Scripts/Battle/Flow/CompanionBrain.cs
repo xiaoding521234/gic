@@ -775,15 +775,20 @@ namespace GIC.Battle
             // 无伤员阶段走锚循环、光环驱动不参与决策」的接管错位）③保险后撤模式（血线/威胁预警：
             // 贴敌归零+后撤梯度主导）。输出型路径零触碰（零回归基线）。
             // H 近战先锋伴随（docs/active/36，2026-10-04 拍板「协助凯亚这样的近战单位，开局就进攻」）：
-            // ④先锋伴随模式插在光环贴敌之前——无伤员+前线形态+「先锋伴随权重」>0 时锚=本方近战
-            // 先锋（凯亚/丘丘人），「自己冲敌脸」改「跟着近战压战线」：站先锋邻位=奶程+光环双覆盖、
-            // 先锋冲她跟/先锋停她停（开局满血即跟随集团推进）；伤员锚（伤员=先锋时两者重合）与
-            // 保险形态（活着>跟队）优先级更高。全射线无可停格（环湖绕行）→ 先锋入锚循环 BFS 逼近。
+            // ④先锋伴随模式插在光环贴敌之前——前线形态+「先锋伴随权重」>0 时锚=本方近战先锋
+            // （凯亚/丘丘人），「自己冲敌脸」改「跟着近战压战线」：站先锋邻位=奶程+光环双覆盖、
+            // 先锋冲她跟/先锋停她停（开局满血即跟随集团推进）；保险形态（活着>跟队）优先级更高。
+            // 追加拍板（2026-10-04「伤员不用管了，只关心先锋即可」）：随军支援（先锋伴随权重>0）
+            // **伤员锚退役**——四态退化三态（先锋伴随>光环贴敌>保险后撤），不再为最缺血我方跑位；
+            // 伤员锚保留给未配先锋伴随的支援型（F 批语义，数据分流零迁移）。
+            // 全射线无可停格（环湖绕行）→ 先锋入锚循环 BFS 逼近。
             Unit vanguard = null; // H：方法级——锚循环 fallback 消费
             if (profile.候选类别 == UnitConfig.CompanionRole.Support
                 && profile.目标偏好 == UnitConfig.CompanionTargetPreference.MostWoundedAlly)
             {
-                var wounded = FindMostWoundedAlly(sim, unit, team);
+                var wounded = profile.先锋伴随权重 > 0f
+                    ? null // 随军支援不锚伤员（拍板「只关心先锋」）
+                    : FindMostWoundedAlly(sim, unit, team);
                 if (wounded == null && profile.先锋伴随权重 > 0f
                     && SupportStanceOf(sim, unit, team, threat) == 1) // H：仅前线形态伴随
                     vanguard = FindMeleeVanguard(sim, unit, team, board);
@@ -927,7 +932,8 @@ namespace GIC.Battle
             }
             var anchors = new List<Unit>();
             if (profile.候选类别 == UnitConfig.CompanionRole.Support
-                && profile.目标偏好 == UnitConfig.CompanionTargetPreference.MostWoundedAlly)
+                && profile.目标偏好 == UnitConfig.CompanionTargetPreference.MostWoundedAlly
+                && profile.先锋伴随权重 <= 0f) // 随军支援锚循环不掺伤员（拍板「只关心先锋」）——保持纯敌锚
             {
                 var wounded = FindMostWoundedAlly(sim, unit, team);
                 if (wounded != null) anchors.Add(wounded);
@@ -1138,6 +1144,11 @@ namespace GIC.Battle
             Direction2D bestDir = 0;
             int bestRun = 0;
             int auraBestScore = -1; Direction2D auraBestDir = 0; int auraBestRun = 0; // H-2 罩敌格跟踪（就位豁免备选）
+            // H-3b 覆盖最优格跟踪（2026-10-04 现场实锤返修）：随军语境（visionEnemies 非空）跟踪
+            // 「视野敌覆盖数严格多于当前格」的最优可停格——覆盖数主导、并列取评分高者
+            int currentCoverage = visionEnemies != null && auraRadius > 0
+                ? EnemiesInAuraAt(sim, unit, team, from, auraRadius, visionEnemies) : -1;
+            int coverBestCount = currentCoverage; Direction2D coverBestDir = 0; int coverBestRun = 0; int coverBestScore = -1;
             foreach (var direction in BattleHeuristics.CrossDirections)
             {
                 var delta = SkillHitResolver.DirectionToDelta(direction);
@@ -1149,11 +1160,19 @@ namespace GIC.Battle
                     if (IsCellOccupiedForStep(sim, cell)) continue; // 占据格不可停：跳过续评（执行层停格前保守近似）
                     int score = ScoreSupportCell(sim, snapshot, unit, playerId, team, cell,
                         woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies);
+                    int cellCoverage = auraRadius > 0 && (visionEnemies != null || takePosition)
+                        ? EnemiesInAuraAt(sim, unit, team, cell, auraRadius, visionEnemies) : 0;
                     if (takePosition && auraRadius > 0
-                        && EnemiesInAuraAt(sim, unit, team, cell, auraRadius, visionEnemies) > 0
+                        && cellCoverage > 0
                         && score > auraBestScore)
                     {
                         auraBestScore = score; auraBestDir = direction; auraBestRun = run;
+                    }
+                    if (visionEnemies != null && auraRadius > 0
+                        && (cellCoverage > coverBestCount
+                            || (cellCoverage == coverBestCount && cellCoverage > currentCoverage && score > coverBestScore)))
+                    {
+                        coverBestCount = cellCoverage; coverBestDir = direction; coverBestRun = run; coverBestScore = score;
                     }
                     if (score > bestScore)
                     {
@@ -1176,6 +1195,25 @@ namespace GIC.Battle
                 bestScore = Math.Max(auraBestScore, bestScore);
             }
 
+            // H-3b 覆盖提升接管（2026-10-04 现场实锤返修）：就位判定是二值口径（罩到≥1 视野敌即
+            // 「已就位」）——实测 (1,13) 罩 1 视野敌、邻格 (2,13) 罩 2 视野敌+先锋，移动分≈45 恒输
+            // 技能分 50-90=站桩放技能不挪，拍板「尽可能覆盖多的敌」落空。随军语境存在**严格更多
+            // 视野敌覆盖**的射线可停格 → 覆盖最优格无条件成为移动目标（覆盖数主导、并列取评分=
+            // H-3「敌群覆盖主导/同数奶程区分」的配额级保障）+Offer 托底 95 压常规技能——先占满
+            // 覆盖位再输出；斩杀（+80×激进度）自然 >95 恒赢；驻位=无严格更优覆盖格（并列不动，
+            // 防逐格蹭分震荡）。让位：仅尸体+满槽复苏（无限程、错失一回合成本高）；**将死集不再
+            // 让位**（2026-10-04 拍板「伤员不用管了，只关心先锋」——挪进先锋治疗半径本身即先锋
+            // 照顾，站桩处奶程外奶不到先锋=本次现场实证）。
+            bool reviveYield = HasAllyCorpse(sim, team) && BurstEnergyReady(unit);
+            bool improveTake = visionEnemies != null && auraRadius > 0 && !reviveYield
+                && coverBestCount > currentCoverage && coverBestDir != 0;
+            if (improveTake)
+            {
+                bestDir = coverBestDir;
+                bestRun = coverBestRun;
+                bestScore = Math.Max(coverBestScore, bestScore);
+            }
+
             if (bestDir == 0) return false; // 无改进落点（最优=当前格）：伤员/光环/保险三态=驻位（调用方不看返回值，行为不变）；伴随模式=直线跟不到（平行线/地形断）→调用方回落 BFS 绕行
 
             // H-2 就位 Offer 托底：交战未就位+选中罩敌格→Offer 分托底 SupportAuraTakePositionScore
@@ -1188,6 +1226,8 @@ namespace GIC.Battle
                 if (EnemiesInAuraAt(sim, unit, team, chosen, auraRadius, visionEnemies) > 0)
                     offerFloor = SupportAuraTakePositionScore;
             }
+            if (improveTake)
+                offerFloor = Math.Max(offerFloor, SupportAuraTakePositionScore); // H-3b：覆盖提升移动同享就位托底
 
             // Offer 分=最优格的绝对站位分（与攻击候选同池可比——量级≈奶程 20+开火线 8）
             int offerScore = Mathf.Max(offerFloor,
