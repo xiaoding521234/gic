@@ -232,7 +232,8 @@ namespace GIC.Battle
         /// 能连续走几格——只踏「到攻击位距离严格递减」的最短路格，**踏上攻击位（dist=0）即停不越过**。
         /// 与「首步方向×N 直线飞」（旧 v6 写法=振荡根源：L 形路径越拐点偏航+越过攻击位不停，下回合
         /// BFS 指回程=左右乒乓，打不进射程就永不收敛）的区别：每回合距离单调递减，数学上不可能振荡。
-        /// 返回 0=已贴身/同格/无路（与 FindApproachFirstStep 同判）；direction out=首步方向。
+        /// 返回 0=已贴身/同格/无路（与 FindApproachFirstStep 同判）；direction out=四向中
+        /// **最长递减直线段**的方向（2026-10-04 择优——旧为十字序首个递减向；同长保持十字序）。
         /// 口径=BuildApproachField 共用（保守近似同 FindApproachFirstStep 注释）</summary>
         public static int FindApproachStraightSteps(BattleSimState sim, Unit self, BattleCell target,
             int maxSteps, out Direction2D direction, List<BattleCell> reservedCells = null)
@@ -269,37 +270,36 @@ namespace GIC.Battle
             }
             if (dist[from.x, from.y] < 0) return 0; // 无路（真不可达）
 
-            // 首方向=十字序首个「距离严格缩短」的邻格（与 FindApproachFirstStep 同为确定性最短路首步）
-            var firstX = 0; var firstY = 0;
+            // 直线段择优（2026-10-04 寻路优化，docs/18 决策三十八）：十字四向各算一条「距离严格
+            // 递减直线段」的长度，取**最长**者为本回合推进向。旧版取十字序首个递减向——选中向
+            // 1 步即拐点/撞地形时富余预算被整段丢弃（凯亚 T3 实证：Right 递减段 1 步撞水、Up 向
+            // 递减段更长，枚举序却取了 Right=整回合只走 1 格）。同长保持十字序（确定性不动）；
+            // 每格仍严格递减=每回合单调收敛的防振荡性质保持。
+            int bestLen = 0;
             foreach (var dir in CrossDirections)
             {
                 var delta = SkillHitResolver.DirectionToDelta(dir);
-                int nx = from.x + delta.x, ny = from.y + delta.y;
-                if (!map.HasTile(nx, ny)) continue;
-                if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) continue;
-                if (dist[nx, ny] == dist[from.x, from.y] - 1)
+                // 该向严格递减直线段长度：距离不严格递减（拐弯/绕行起点）即停；被地形/单位挡即停；
+                // 踏上攻击位（dist=0）即停——到位不越点（逐格判定与旧版推进环同口径）
+                int len = 0;
+                int cx = from.x, cy = from.y;
+                while (len < maxSteps)
                 {
-                    direction = dir; firstX = delta.x; firstY = delta.y;
-                    break;
+                    int nx = cx + delta.x, ny = cy + delta.y;
+                    if (!map.HasTile(nx, ny)) break;
+                    if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) break;
+                    if (dist[nx, ny] != dist[cx, cy] - 1) break; // 偏离最短路：停在拐点，下回合重算换向
+                    len++;
+                    cx = nx; cy = ny;
+                    if (dist[cx, cy] == 0) break; // 踏上攻击位：本回合到此为止
+                }
+                if (len > bestLen)
+                {
+                    bestLen = len;
+                    direction = dir;
                 }
             }
-            if (direction == 0) return 0;
-
-            // 直线前缀逐格推进：距离不严格递减（拐弯/绕行起点）即停；被地形/单位挡即停；
-            // 踏上攻击位（dist=0）即停——到位不越点
-            int steps = 0;
-            int cx = from.x, cy = from.y;
-            while (steps < maxSteps)
-            {
-                int nx = cx + firstX, ny = cy + firstY;
-                if (!map.HasTile(nx, ny)) break;
-                if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) break;
-                if (dist[nx, ny] != dist[cx, cy] - 1) break; // 偏离最短路：停在拐点，下回合重算换向
-                steps++;
-                cx = nx; cy = ny;
-                if (dist[cx, cy] == 0) break; // 踏上攻击位：本回合到此为止
-            }
-            return steps;
+            return bestLen; // 0=四向均无递减首步（同旧版无路口径）
         }
 
         /// <summary>单位技能实例列表中首个指定类型技能的索引（-1=无）——遍历 unit.Skills
