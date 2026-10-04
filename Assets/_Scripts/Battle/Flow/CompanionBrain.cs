@@ -1060,7 +1060,7 @@ namespace GIC.Battle
                 }
 
                 // 步数三重钳：驻位距离余量 → 移速上限 → 该向地形可行程（BFS 只保证首步，直线段
-                // 可能中途遇湖——按地形截断；被单位挡由 MovementResolver 停格前=预期部分行进）
+                // 可能中途遇湖——按地形截断；占位由 FindApproachStraightSteps 逐格吸收，offer=实格可停）
                 int steps = Math.Min(Math.Max(0, distance - anchorEngage), maxMove);
                 if (steps <= 0)
                 {
@@ -1132,8 +1132,9 @@ namespace GIC.Battle
             // 真无解兜底（2026-10-02 三轮报障「重开局安柏凯亚双挂机」回合 25 现场实证）：全部锚都
             // 未能产出移动候选（steps0 档对齐失败且无后续锚/不可达/首步被占）——朝**首锚** BFS
             // 方向**走满可行程**（CR-Move 拍板：1 格版换线太慢——全图级狙击射程下这是必经链路，
-            // 每回合满速换位直到与锚行/列交线；地形截断+移速上限钳制，被单位挡由执行层停格前=预期
-            // 部分行进、下回合重算）。纯兜底分=裸 MoveBaseScore（低于一切正常候选）；
+            // 每回合满速换位直到与锚行/列交线；地形截断+移速上限钳制；占位逐格吸收〔2026-10-04
+            // 穿占虚 Offer 修复——硬断截停/互不阻挡友军可穿不可停，offer=实格可停〕）。纯兜底分=
+            // 裸 MoveBaseScore（低于一切正常候选）；
             // BFS=0（首步即无路）=保持缺席
             if (!hasActionCandidate && anchors.Count > 0)
             {
@@ -1147,6 +1148,13 @@ namespace GIC.Battle
                     {
                         var cell = new BattleCell(from.x + fd.x * s, from.y + fd.y * s);
                         if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                        if (IsCellOccupiedForStep(sim, cell))
+                        {
+                            // 2026-10-04 穿占虚 Offer 修复（同 TryOfferAxisAlignStep——T36 安柏撞尸
+                            // 实证的同族补全）：硬断截停；互不阻挡友军可穿不可停
+                            if (!CanPassThroughCell(sim, unit, cell)) break;
+                            continue;
+                        }
                         run++;
                     }
                     if (run > 0)
@@ -1278,7 +1286,12 @@ namespace GIC.Battle
                     {
                         coverBestCount = cellCoverage; coverBestDir = direction; coverBestRun = run; coverBestScore = score;
                     }
-                    if (score > bestScore)
+                    // 2026-10-04 平局改判深格（观察局实锤返修，docs/18 决策三十八）：奶程梯度按
+                    // 切比雪夫、移动按十字直线——锚在非行进轴上横向偏移≥2 时，沿射线切比距离降到
+                    // y差=x差处即冻结，奶程分平坦区逐格同分（T3 探针实锤：Up run2/run3 同 26 分）；
+                    // 旧版严格大于把平局判给先找到的更短格=系统性少走 1 格（先锋 3/回合 vs 她有效
+                    // 2/回合=永远追不上）。同分且同向时取更深格——富余移速花掉；跨向平局行为不变。
+                    if (score > bestScore || (score == bestScore && direction == bestDir && run > bestRun))
                     {
                         bestScore = score;
                         bestDir = direction;
@@ -1447,8 +1460,9 @@ namespace GIC.Battle
         }
 
         /// 进展（轴差小者优先=更快收敛）；同级横轴优先（枚举序）。已对轴但线被断（尸体/虚空截线）
-        /// 时另一轴候选自然成为换线出路。落点占据由执行层停格前处理（部分行进=预期，与正常路径
-        /// 同语义）。返回=是否 Offer；失败走 1 格探针/换锚链</summary>
+        /// 时另一轴候选自然成为换线出路。run 计数吸收占位（2026-10-04 穿占虚 Offer 修复——T36
+        /// 安柏 Up5 撞敌芭尸体实证：敌/尸体/未开互不阻挡友军硬断、互不阻挡友军可穿不可停，offer=
+        /// 实格可停）。返回=是否 Offer；失败走 1 格探针/换锚链</summary>
         private static bool TryOfferAxisAlignStep(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, BattleCell from, BattleCell to, int maxMove,
             ForceType forceType, CandidateTracker tracker, UnitConfig.CompanionProfile profile,
@@ -1475,6 +1489,14 @@ namespace GIC.Battle
                 {
                     var cell = new BattleCell(from.x + delta.x * s, from.y + delta.y * s);
                     if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                    if (IsCellOccupiedForStep(sim, cell))
+                    {
+                        // 2026-10-04 穿占虚 Offer 修复（J 批四刀④同族，观察局 T36 实锤：安柏 Up5
+                        // 落点在敌芭尸体后——执行器首步撞尸零位移、每回合同决策=反复撞死尸）：敌/尸体/
+                        // 未开互不阻挡友军=硬断；互不阻挡友军=可穿不可停（run 不更新——落点必为实格）
+                        if (!CanPassThroughCell(sim, unit, cell)) break;
+                        continue;
+                    }
                     run++;
                 }
                 if (run <= 0) continue;
