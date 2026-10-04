@@ -65,6 +65,22 @@ namespace GIC.Battle
         /// 调手感改此常量）</summary>
         public const int SelfCastBurstBuffScore = 45;
 
+        /// <summary>J-2 自施放爆发语境评分（2026-10-04 拍板）：即将施加的光环半径内每个存活敌的
+        /// 加分——贴敌群施放=每回合 tick 逐层吃满（优先于常规攻击先放），空场施放=预载（Buff 永久
+        /// 非浪费，维持基础分照常放）</summary>
+        public const int SelfCastBurstPerEnemyScore = 15;
+
+        /// <summary>J-1 冻结协同分（2026-10-04 拍板）：反应预览命中冻结（控制反应——目标冰冻 2 回合
+        /// 跳过行动）的 flat 加分——旧口径冻结无增伤乘区恒 0 分，凯亚对「打哪个敌人」无偏好；
+        /// 芭芭拉光环挂水后霜袭打水附着目标=冻结联动主链；量级低于斩杀 80、高于常规集火每档 3</summary>
+        public const int FreezeControlScore = 25;
+
+        /// <summary>随军追逐兜底分（2026-10-04 观察局返修）：先锋伴随 BFS 追逐兜底原为裸
+        /// MoveBaseScore(10)——恒输一切技能（水球≈57）=被先锋落后超过伴随半径后永远站桩施法不再
+        /// 归队。托底 60=压常规单体技能（先归队再输出）、低于群奶/救命奶（75-90，途中仍救场）
+        /// 与就位托底 95；调手感改此常量</summary>
+        public const int VanguardChaseFloorScore = 60;
+
         /// <summary>反威胁分上限（E-1 配额脑对手建模，docs/active/33 §2.3）：攻击候选目标是敌方
         /// 威胁源（威胁图 EnemyThreatScore 高者）时加分——优先拆除敌方火力核心；上限低于斩杀 80
         /// （反威胁优先于平打、不优先于斩杀）。伙伴脑 threat=null 不消费=零行为变化</summary>
@@ -91,8 +107,16 @@ namespace GIC.Battle
 
         /// <summary>支援形态切换血线门（G-2，docs/active/35 §2）：hp% 低于此值=保险形态
         ///（贴敌分归零+自保×SupportStanceSafeFactor 后撤）——她活着=复活保险在（复苏无限程，
-        /// 生存问题非站位问题）；光环 tick 含持有者自奶→奶回线上自动重返前线</summary>
+        /// 生存问题非站位问题）；光环 tick 含持有者自奶→奶回线上自动重返前线。
+        /// 2026-10-04 观察局返修（W1）：伙伴流 threat=null 时血线门补「近敌存在」条件——
+        /// 无近敌+低血线=安全区（低血不构成危险，随军照常、光环途中自愈）；有近敌+低血线
+        /// 才保险后撤（G-2 语义保持）。观察局实证：她在 (2,13) 周围 7+ 格无敌却因 49% 血
+        /// 保险驻场 15+ 回合，先锋前排单打至死无奶</summary>
         public const int SupportStanceRetreatHpPercent = 60;
+
+        /// <summary>保险形态近敌半径（2026-10-04 W1 返修）：血线门降级判定的「威胁可及域」——
+        /// 最近敌切比雪夫 ≤ 此值=有近敌（保险候选），否则=安全区（攻击视野回落 5 同口径）</summary>
+        public const int InsuranceDangerRadius = 5;
 
         /// <summary>支援形态切换预警门（G-2）：威胁图预期承伤 ≥ hp×此百分比=保险形态——
         /// 提前一回合后撤（不等到掉血才反应；E-1 威胁图基建复用零新感知；threat=null 时仅血线门）</summary>
@@ -552,7 +576,7 @@ namespace GIC.Battle
                 // 无目标自施放爆发（aimMode=None——凛冽轮舞）：无方向域/无目标域——自身增益估值档
                 if (data.IsSelfCast())
                 {
-                    offeredAny |= ScoreSelfCastBurst(unit, playerId, turn, i, data, tracker, profile);
+                    offeredAny |= ScoreSelfCastBurst(sim, unit, playerId, turn, i, data, tracker, profile);
                     continue;
                 }
 
@@ -610,6 +634,11 @@ namespace GIC.Battle
                             if (reaction.HasReaction
                                 && reaction.DamageBonusDelta + reaction.VulnerabilityBonus > 0)
                                 score += effPerTarget / 2;
+                            // J-1 冻结协同分（2026-10-04 拍板）：冻结控制反应无增伤乘区（旧口径恒 0 分）
+                            // ——目标跳过 2 回合行动的 flat 控制值；芭芭拉挂水→霜袭/冰棱 tick 冻结联动主链
+                            else if (reaction.HasReaction
+                                && reaction.ReactionType == BattleCommand.ReactionKindFreeze)
+                                score += FreezeControlScore;
                             // E-2 集火跟随：档案「集火权重」>0 时对已被我方声明攻击的**未死**目标
                             // 加分（remaining>0=未死——死透的目标不构成集火锚）
                             if (board != null && profile.集火权重 > 0 && board.FocusedEnemies.Contains(target.unitId))
@@ -709,8 +738,11 @@ namespace GIC.Battle
         /// <summary>②c 无目标自施放爆发候选（aimMode=None——首个=凯亚凛冽轮舞，无方向域无目标域）：
         /// OnCast ApplyBuff(Caster) 自身增益（寒冰之棱）；已达叠层上限（IsAtStackCap——重施加 Merge
         /// 无增益）不占行动；评分=增益常量乘爆发优先权重（伙伴脑/配额脑操魔神档共享骨架同分支）。
+        /// J-2 语境评分（2026-10-04 拍板）：即将施加的光环半径内每存活敌 +SelfCastBurstPerEnemyScore
+        ///（半径=BuffType 直查 AuraRadiusOfBuffType——施放前 Buff 未在身上 AuraRadiusOf 查不到）——
+        /// 贴敌群施放=每回合 tick 逐层吃满（优先于常规攻击先放）；空场施放=预载（Buff 永久非浪费）。
         /// 返回=是否产生候选（挂机修复的驻位判定消费）</summary>
-        private static bool ScoreSelfCastBurst(Unit unit, string playerId, int turn, int skillIndex,
+        private static bool ScoreSelfCastBurst(BattleSimState sim, Unit unit, string playerId, int turn, int skillIndex,
             SkillConfig.SkillData data, CandidateTracker tracker, UnitConfig.CompanionProfile profile)
         {
             if (data.effects == null) return false;
@@ -720,7 +752,24 @@ namespace GIC.Battle
                 if (atom.kind != SkillEffectKind.ApplyBuff || atom.targetFilter != SkillEffectTargetFilter.Caster) continue;
                 var existing = unit.Buffs.Find(b => b != null && b.Type == atom.buffType);
                 if (existing != null && existing.IsAtStackCap()) return false; // 已满层：重施加无增益不占行动
-                tracker.Offer(Mathf.RoundToInt(SelfCastBurstBuffScore * profile.爆发优先权重),
+                int auraRadiusJ2 = BattleHeuristics.AuraRadiusOfBuffType(atom.buffType);
+                int enemiesInAuraJ2 = 0;
+                if (auraRadiusJ2 > 0)
+                {
+                    var selfIdJ2 = unit.GetUnitComponent<UnitIdentity>();
+                    var selfPosJ2 = sim.GetPosition(unit);
+                    if (selfIdJ2 != null)
+                        foreach (var kv in sim.Units)
+                        {
+                            var e = kv.Value;
+                            var eid = e.GetUnitComponent<UnitIdentity>();
+                            if (eid == null || eid.Team == selfIdJ2.Team) continue;
+                            if (BattleSimState.IsDead(e)) continue;
+                            if (sim.GetPosition(e).ChebyshevTo(selfPosJ2) <= auraRadiusJ2) enemiesInAuraJ2++;
+                        }
+                }
+                tracker.Offer(Mathf.RoundToInt((SelfCastBurstBuffScore
+                        + enemiesInAuraJ2 * SelfCastBurstPerEnemyScore) * profile.爆发优先权重),
                     Skill(playerId, unit, skillIndex, Direction2D.Up, turn));
                 return true;
             }
@@ -900,7 +949,12 @@ namespace GIC.Battle
                             new BattleCell(vPos.x, vPos.y), maxMove, out var vgDir0, reservedCells);
                         if (vgSteps0 > 0)
                         {
-                            tracker.Offer(Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重), new ActionData
+                            // 2026-10-04 观察局返修：追逐兜底原为裸 MoveBaseScore(10)×权重——恒输一切
+                            // 技能（水球≈57）=被先锋落后超过伴随半径后永远站桩施法不再归队（观察局实证）。
+                            // 托底 VanguardChaseFloorScore=压常规单体技能（先归队再输出）、低于群奶/救命奶
+                            //（75-90，途中仍救场）与就位托底 95
+                            tracker.Offer(Mathf.Max(VanguardChaseFloorScore,
+                                Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重)), new ActionData
                             {
                                 playerId = playerId,
                                 unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
@@ -929,6 +983,29 @@ namespace GIC.Battle
                 var locked = sim.GetUnit(lockedAnchorId);
                 if (locked != null && !BattleSimState.IsDead(locked) && enemyAnchors.Remove(locked))
                     enemyAnchors.Insert(0, locked); // 锁定插队敌序首（不在敌列表=同队错配，自然回落）
+            }
+            // J-4 伙伴推核心（2026-10-04 拍板「伙伴应当去推核心，攻击视野内没有其它敌人时」）：
+            // 自身攻击视野内（GetEffectiveAttackVision 回落 5，眷属 v7 同口径）无普通敌单位（建筑不算
+            // 「其它敌人」）→ 敌协议核心（IsBuilding——现役唯一建筑=双方核心，眷属 v7 同识别）插队
+            // 锚序首直奔推进；视野内有普通敌=原最近敌锚序零变化。核心插在 lock 之后=无视野敌时推核心
+            // 优先于上回合锁定。
+            int attackVisionJ4 = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;
+            bool anyVisionEnemyJ4 = false;
+            foreach (var e in enemyAnchors)
+            {
+                if (BattleHeuristics.IsBuilding(e)) continue;
+                if (sim.GetPosition(e).ChebyshevTo(from) <= attackVisionJ4) { anyVisionEnemyJ4 = true; break; }
+            }
+            if (!anyVisionEnemyJ4)
+            {
+                for (int ci = 0; ci < enemyAnchors.Count; ci++)
+                {
+                    if (!BattleHeuristics.IsBuilding(enemyAnchors[ci])) continue;
+                    var coreJ4 = enemyAnchors[ci];
+                    enemyAnchors.RemoveAt(ci);
+                    enemyAnchors.Insert(0, coreJ4);
+                    break;
+                }
             }
             var anchors = new List<Unit>();
             if (profile.候选类别 == UnitConfig.CompanionRole.Support
@@ -964,6 +1041,23 @@ namespace GIC.Battle
                         ? profile.支援贴近距离
                         : BattleHeuristics.SupportRadiusOf(unit))
                     : engageDistance;
+                // J-3 爆发态贴脸（2026-10-04 拍板）：持有半径型 tick 光环（AuraRadiusOf 单源——寒冰之棱/
+                // 歌声之环）时敌锚驻位收紧到光环半径——光环 tick+冰附着链（冰棱 tick 打芭芭拉挂水目标
+                // =冻结联动）只在半径内吃得到，恒距敌 2 射程驻位=光环空转。**托底只在「射程内收紧带」**
+                //（2026-10-04 观察局返修：distance ≤ 原攻击驻位距离才托底——射程外=接近阶段走常规评分
+                // 竞争，有攻击候选时攻击赢；旧版任意锚距都托 95=凯亚弃贴脸敌群奔 9 格外锁定的核心而死，
+                // T6 探针实锤 attack52 vs move95）；斩杀 +80×激进度恒赢
+                bool auraTighten = false;
+                if (!isAllyAnchor)
+                {
+                    int auraRadiusJ3 = BattleHeuristics.AuraRadiusOf(unit);
+                    if (auraRadiusJ3 > 0 && auraRadiusJ3 < anchorEngage)
+                    {
+                        int engageDistanceJ3 = anchorEngage; // 原攻击驻位距离（托底带判定）
+                        anchorEngage = auraRadiusJ3;
+                        auraTighten = distance <= engageDistanceJ3;
+                    }
+                }
 
                 // 步数三重钳：驻位距离余量 → 移速上限 → 该向地形可行程（BFS 只保证首步，直线段
                 // 可能中途遇湖——按地形截断；被单位挡由 MovementResolver 停格前=预期部分行进）
@@ -1020,7 +1114,8 @@ namespace GIC.Battle
                 if (threatPenalty > 0) score = Mathf.Max(1, score - threatPenalty); // E-1 避险（钳 1 保底 Offer）
                 score -= SelfPreservePenalty(sim, unit, team, projectedCell, profile); // F-1 支援自保（错配 3——档案权重 0 恒 0）
                 score = Mathf.RoundToInt(score * profile.移动优先权重);
-
+                if (auraTighten)
+                    score = Math.Max(score, SupportAuraTakePositionScore); // J-3：收紧就位托底（压攻击档先就位，斩杀恒赢）
                 tracker.Offer(score, new ActionData
                 {
                     playerId = playerId,
@@ -1157,7 +1252,16 @@ namespace GIC.Battle
                     var cell = new BattleCell(from.x + delta.x * run, from.y + delta.y * run);
                     if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType))
                         break; // 直线射线：地形断止（与主逼近档直线段钳制同构）
-                    if (IsCellOccupiedForStep(sim, cell)) continue; // 占据格不可停：跳过续评（执行层停格前保守近似）
+                    if (IsCellOccupiedForStep(sim, cell))
+                    {
+                        // 2026-10-04 观察局返修（穿占虚 Offer——G 批「占据格跳过续评」保守近似勘正）：
+                        // 占据格=射线硬阻断（敌/尸体/未开互不阻挡的友军——执行层停格前，越格落点=虚假
+                        // 目标；实证：芭芭拉被 U11 尸体挡 (3,13)、Right 3 连续 9 回合零位移、挨远程狙至死
+                        // 却每回合元能+10「白走」）；仅移动者开「与友方互不阻挡」且占据者=友军时可穿过
+                        //（执行层 CanEnter 同判），维持跳过续评（不停留）
+                        if (!CanPassThroughCell(sim, unit, cell)) break;
+                        continue;
+                    }
                     int score = ScoreSupportCell(sim, snapshot, unit, playerId, team, cell,
                         woundedPos, supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies);
                     int cellCoverage = auraRadius > 0 && (visionEnemies != null || takePosition)
@@ -1232,6 +1336,13 @@ namespace GIC.Battle
             // Offer 分=最优格的绝对站位分（与攻击候选同池可比——量级≈奶程 20+开火线 8）
             int offerScore = Mathf.Max(offerFloor,
                 Mathf.RoundToInt(bestScore * profile.移动优先权重));
+            // 2026-10-04 T15 探针返修：先锋/伤员追赶期（锚=真实单位、超出伴随半径）的移动 Offer 同享
+            // VanguardChaseFloorScore 托底——旧版裸分（奶程梯度≈40）被尸体线自奶（水球打尸 OnHit 自治疗
+            // ≈42，拍板 A 合法战术）2 分压过=被先锋落后后永远站桩自奶不归队（观察局 15+ 回合实证）；
+            // 托底 60=压常规单体技能（含尸体线自奶）、低于群奶/救命奶（75-90，途中仍救场）与就位托底 95
+            if (!woundedIsSelf && offerScore < VanguardChaseFloorScore
+                && Math.Max(Math.Abs(from.x - woundedPos.x), Math.Abs(from.y - woundedPos.y)) > supportRadius)
+                offerScore = VanguardChaseFloorScore;
             tracker.Offer(offerScore, new ActionData
             {
                 playerId = playerId,
@@ -1454,6 +1565,24 @@ namespace GIC.Battle
             return false;
         }
 
+        /// <summary>移动者能否穿过占据格（2026-10-04 穿占虚 Offer 返修）：移动者开「与友方互不阻挡」
+        /// 且占据者=我方单位（执行层 CanEnter 同判——尸体保留碰撞恒不可穿、敌方恒不可穿）</summary>
+        private static bool CanPassThroughCell(BattleSimState sim, Unit mover, BattleCell cell)
+        {
+            var moveable = mover.GetUnitComponent<UnitMoveable>();
+            if (moveable == null || !moveable.与友方互不阻挡) return false;
+            var selfId = mover.GetUnitComponent<UnitIdentity>();
+            if (selfId == null) return false;
+            foreach (var kv in sim.Units)
+            {
+                var pos = sim.GetPosition(kv.Value);
+                if (pos.x != cell.x || pos.y != cell.y) continue;
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                return id != null && id.Team == selfId.Team;
+            }
+            return false;
+        }
+
         // ==================== E-1 威胁消费原语（配额脑对手建模，docs/active/33 §2.3） ====================
 
         /// <summary>反威胁加分：目标是敌方威胁源（EnemyThreatScore 高者）加 min(威胁值/2, 上限)——
@@ -1555,7 +1684,16 @@ namespace GIC.Battle
             var stats = unit.GetUnitComponent<UnitStats>();
             var hpStruct = stats != null ? stats.GetStatStruct(StatType.HP) : default;
             if (hpStruct.Max <= 0) return 1;
-            if (stats.HP * 100 < hpStruct.Max * SupportStanceRetreatHpPercent) return SupportStanceSafeFactor;
+            if (stats.HP * 100 < hpStruct.Max * SupportStanceRetreatHpPercent)
+            {
+                // W1 返修（2026-10-04 观察局）：threat=null（伙伴流）时血线门补近敌判定——
+                // 无近敌（>InsuranceDangerRadius）+低血线=安全区随军（随军/光环照常，光环自愈回线）；
+                // 有近敌+低血线=保险后撤（G-2 语义）。threat!=null（配额脑操魔神档）维持原双门
+                if (threatThreat == null
+                    && NearestEnemyDistance(sim, unit, team, sim.GetPosition(unit)) > InsuranceDangerRadius)
+                    return 1;
+                return SupportStanceSafeFactor;
+            }
             if (threatThreat != null
                 && threatThreat.ExpectedDamageOnAlly.TryGetValue(UnitIdOf(sim, unit), out var expected)
                 && expected * 100 >= stats.HP * SupportStanceRetreatThreatPercent)
