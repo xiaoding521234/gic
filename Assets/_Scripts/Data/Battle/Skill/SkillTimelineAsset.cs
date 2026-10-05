@@ -78,6 +78,13 @@ namespace GIC.Data
         /// <summary>射程上限（格；0=用 ProjectileRule.MaxRange 默认）</summary>
         public int maxRange;
 
+        /// <summary>箭矢视觉飞行高度（**面内高**=立牌倾斜组局部 y，从立牌底〔含悬浮〕起算；0=用
+        /// BattleMetrics.ArrowFlightHeight 默认 0.45）——校准用：时轮编辑器预览水平线=同语义绝对面内高
+        /// （预览帧摆放与运行时 quad 中心锚定同构），贴动作片松弦位读数即实战值；实战箭矢全程贴立牌面
+        /// 飞（起点=面内弓位点、终点 z 同加面前伸量——2026-10-05「箭和立牌同一平面」十轮定案）；纯视觉
+        /// 参数，判定圆柱与世界高度无关；用户拍板「调整射出去的箭矢的高度，对齐动画里的箭矢位置」，规格族归时轮）</summary>
+        public float projectileHeight;
+
         [Header("表现轨载荷（动作/音效/特效轨；B-S3 接素材）")]
 
         /// <summary>表现资源名（音效名/动作段名/特效名——B-S3 素材落地后接线消费）</summary>

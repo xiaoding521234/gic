@@ -125,6 +125,9 @@ namespace GIC.Data
         [Header("暴击标记（Damage 命令；1=本次命中暴击——Host 幸运 roll 结论〔暴击率=幸运/100、效果=理智乘区〕，客户端数字放大；0=未暴击。2026-10-02 幸运暴击批）")]
         public int crit;
 
+        [Header("箭矢视觉高度（Damage 投射物/Effect 消散有效；千分=格面起算高度×1000；0=客户端回落 BattleMetrics.ArrowFlightHeight 默认——纯视觉参数对齐动画松弦位，判定圆柱与世界高度无关。2026-10-05）")]
+        public int arrowHeightY;
+
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
         public int buffLevel;

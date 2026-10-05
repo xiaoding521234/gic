@@ -471,10 +471,14 @@ namespace GIC.Battle
 
             foreach (var effect in MergeDamageEffects(effects))
             {
-                segment.commands.Add(BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount,
+                var dmgCmd = BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount,
                     effect.Element, effect.Delivery, effect.FromCell,
                     Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType,
-                    effect.LaunchMs, effect.IsCrit ? 1 : 0));
+                    effect.LaunchMs, effect.IsCrit ? 1 : 0);
+                // 箭矢视觉高度（2026-10-05 对齐动画松弦位）：投射物路径经发射声明透传千分下发；
+                // 瞬发直击（Delivery=0）无箭矢视觉不消费
+                dmgCmd.arrowHeightY = Mathf.RoundToInt(effect.ProjectileHeightY * 1000f);
+                segment.commands.Add(dmgCmd);
             }
 
             if (vanishes != null)
@@ -1055,7 +1059,7 @@ namespace GIC.Battle
                     var copy = new DamageEffect(damage.AttackerUnitId, damage.TargetUnitId, damage.Amount,
                         damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY,
                         damage.ReactionType, damage.LaunchMs)
-                    { HitSeconds = damage.HitSeconds, IsCrit = damage.IsCrit }; // 吸血治疗继承用（WYSIWYG）+暴击事实
+                    { HitSeconds = damage.HitSeconds, IsCrit = damage.IsCrit, ProjectileHeightY = damage.ProjectileHeightY }; // 吸血治疗继承用（WYSIWYG）+暴击事实+箭高透传（2026-10-05 报障「调整箭矢高度没变化」根因：副本重建漏抄=箭高恒丢回落默认）
                     merged[key] = copy;
                     result.Add(copy);
                 }

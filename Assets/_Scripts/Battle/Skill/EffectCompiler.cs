@@ -124,7 +124,8 @@ namespace GIC.Battle
                 return;
             }
 
-            // 直线投射物：逐发发射声明（逐发独立判定/附着/反应——决策八"推翻 B4 简化①"）
+            // 直线投射物：逐发发射声明（逐发独立判定/附着/反应——决策八"推翻 B4 简化①"）；
+            // projectileHeight=箭矢视觉高度（2026-10-05 对齐动画松弦位，纯视觉随命令透传）
             var projClips = SkillTimelineQuery.JudgmentClips(skillData.timeline, SkillJudgmentKind.LineProjectile);
             if (projClips.Count > 0)
             {
@@ -132,7 +133,7 @@ namespace GIC.Battle
                     for (int i = 0; i < damageCount; i++)
                         effects.Add(new ProjectileEffect(action.unitId, action, damagePercent,
                             from, delta.x, delta.y, clip.startTime + clip.hitInterval * i,
-                            clip.projectileSpeed, clip.hitDiameter, clip.maxRange));
+                            clip.projectileSpeed, clip.hitDiameter, clip.maxRange, clip.projectileHeight));
             }
             else
             {
