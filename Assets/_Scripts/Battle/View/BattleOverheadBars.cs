@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using GIC.Data;
+using GIC.UI;
 
 namespace GIC.Battle
 {
@@ -23,7 +24,8 @@ namespace GIC.Battle
         [SerializeField] private float 血条宽 = 120f;
         [SerializeField] private float 血条高 = 10f;
         [SerializeField] private float 元能条高 = 7f;
-        [SerializeField] private float 条间距 = 4f;
+        [Tooltip("血条与元能条之间的间隙——2026-10-06 拍板「能量条紧贴血条不要有间隙」改 0（两 BarBg 黑边框相贴=略粗分隔线，属边框非间隙）")]
+        [SerializeField] private float 条间距 = 0f;
         [SerializeField] private float 附着图标宽 = 16f;
         [SerializeField] private float 分隔线宽 = 2f;
 
@@ -61,6 +63,7 @@ namespace GIC.Battle
         }
 
         private readonly List<Item> _items = new List<Item>();
+        private readonly List<Item> _sortBuffer = new List<Item>();   // 深度排序复用（零逐帧分配）
 
         /// <summary>初始化（确保画布+相机；幂等——重复调用不重建）</summary>
         public void Init(Camera cam)
@@ -118,7 +121,9 @@ namespace GIC.Battle
                     ? Mathf.Clamp01((float)item.View.EnergyCurrent / item.View.EnergyMax) : 0f;
 
                 var enGo = item.EnBarRoot;
-                bool showEnergy = item.View.EnergyMax > 0 && !item.View.IsCorpse;
+                // 元能条显隐：EnergyMax>0 即显（2026-10-06 拍板「尸体应当同样显示血条和能量条」
+                // ——旧「尸体隐藏元能条」预期作废；尸血条恒显=空条、元能=死亡残留值）
+                bool showEnergy = item.View.EnergyMax > 0;
                 if (enGo != null && enGo.activeSelf != showEnergy) enGo.SetActive(showEnergy);
 
                 var element = item.View.AttachedElement;
@@ -127,10 +132,56 @@ namespace GIC.Battle
                 {
                     var config = ElementFactionConfig.Instance;
                     var icon = config != null ? config.GetElementIconStroke(element) : null;
-                    if (icon != null && item.AttachIcon.sprite != icon) item.AttachIcon.sprite = icon;
+                    // 缺图兜底（2026-10-06 拍板全位点接入）：附着图标缺失=missing_image 占位
+                    var target = MissingImageGuard.Ensure(icon);
+                    if (target != null && item.AttachIcon.sprite != target) item.AttachIcon.sprite = target;
                 }
             }
+
+            SortItemsByDepth(cam);
         }
+
+        /// <summary>重叠深度排序（2026-10-06 报障修复「上方 1 格的芭芭拉条盖住下方安柏的条」）：
+        /// Overlay 同级条目 painter 序=sibling 序，原=建场注册序（快照单位序）与空间无关——
+        /// 上下相邻单位条区屏幕重叠时（取证实证：两单位条锚点屏幕 y 仅差 1px），远处单位可能后画
+        /// 盖住近处。修=按相机距离排 sibling：**远者先画（底层）、近者后画（顶层）**——近处
+        /// （屏幕下方）单位的条覆盖远处单位，与空间直觉一致。顺序稳定时零写（校验后才 SetSiblingIndex），
+        /// ≤70 项每帧排序可忽略</summary>
+        private void SortItemsByDepth(Camera cam)
+        {
+            if (_items.Count < 2) return;
+            _sortBuffer.Clear();
+            foreach (var item in _items)
+            {
+                if (item.View == null || item.Go == null) continue;
+                _sortBuffer.Add(item);
+            }
+            _depthComparer.CamPos = cam.transform.position;
+            _sortBuffer.Sort(_depthComparer); // 远→近（升序=距离降序；零逐帧分配——比较器实例复用）
+
+            bool changed = false;
+            for (int i = 0; i < _sortBuffer.Count; i++)
+            {
+                if (_sortBuffer[i].Go.transform.GetSiblingIndex() != i) { changed = true; break; }
+            }
+            if (!changed) return; // 顺序稳定零写（免逐帧 canvas reorder 脏标记）
+
+            for (int i = 0; i < _sortBuffer.Count; i++)
+                _sortBuffer[i].Go.transform.SetSiblingIndex(i); // sibling 序=画序（大序后画=顶层）
+        }
+
+        /// <summary>距离降序比较器（远者在前=先画底层；CamPos 每帧注入；平方距离同序免开方）</summary>
+        private sealed class DepthComparer : System.Collections.Generic.IComparer<Item>
+        {
+            public Vector3 CamPos;
+            public int Compare(Item a, Item b)
+            {
+                float db = (CamPos - b.View.transform.position).sqrMagnitude;
+                float da = (CamPos - a.View.transform.position).sqrMagnitude;
+                return db.CompareTo(da); // b 更远=b 排前 → 升序输出=远→近
+            }
+        }
+        private static readonly DepthComparer _depthComparer = new DepthComparer();
 
         /// <summary>建单个条目：容器（锚点居中）→ 血条（底+填充+分隔线）+ 元能条→ 附着图标（血条左缘外）</summary>
         private Item BuildItem(UnitView view)

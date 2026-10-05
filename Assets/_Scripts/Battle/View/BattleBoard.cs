@@ -152,6 +152,11 @@ namespace GIC.Battle
             meshFilter.sharedMesh = surfaceMesh;
             var meshRenderer = surfaceGo.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterial = GetWaterSurfaceMaterial();
+            // 透明排序实证（2026-10-06 像素回读定裁）：sortingOrder 支配 renderQueue——水面若留
+            // order 0 会整片画在底座圆盘（-1）之上=「圆盘沉到水面下」报障根因（旧认知「盘 queue3000
+            // > 水 2999 故盘在水面之上」被推翻）。-2=水面恒为最低透明层（画于盘 -1 之下、瞄准贴片 0/
+            // 立牌 10/箭矢 12 等一切之上），显式实现 2999 队列的本意。勿"修"回 0
+            meshRenderer.sortingOrder = -2;
             meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
             meshRenderer.receiveShadows = false;
         }

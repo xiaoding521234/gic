@@ -5,6 +5,9 @@
 // 与 Sprites/Default 同构的透明混合/顶点色消费；Cull Off——立牌 SetFacing 负 localScale.x 翻面
 // 绕向翻转会被默认 Cull Back 剔成隐形（ChromaKeyVideo 同理）。
 // 必须登记 GraphicsSettings→Always Included Shaders（运行时 Shader.Find 防构建剥离，docs/14 §63③）。
+// 2026-10-05 选中描边批：sprite 路径选中态（未冻结）也复用本材质——_FrozenAmount=0 时霜化直通
+// （渲染与默认 sprite 材质恒等，§92 已验证），描边块 _OutlineEnabled/_OutlineColor/_OutlineWidth
+// 经同一 MPB 写入（UnitView.ApplyAvatarMaterial 单点选择材质）。
 Shader "GIC/Battle/FrozenSprite"
 {
     Properties
@@ -23,6 +26,12 @@ Shader "GIC/Battle/FrozenSprite"
         _MistHeight ("冰雾高度占比", Range(0.05, 1)) = 0.3
         _FrostAlpha ("冰体不透明度", Range(0.05, 1)) = 0.78
         _FrostFringeAlpha ("轮廓外冰缘不透明度", Range(0, 1)) = 0.38
+
+        // 选中描边（2026-10-05 拍板「立牌加描边，颜色=所属玩家色」；shader 装饰性 Header 属性
+        // 带连字符会炸 ShaderLab 解析器，故用普通注释分区）
+        _OutlineEnabled ("选中描边", Range(0, 1)) = 0
+        _OutlineColor ("描边色", Color) = (1, 1, 1, 1)
+        _OutlineWidth ("描边宽(texel)", Range(1, 16)) = 9
     }
 
     SubShader
@@ -47,7 +56,11 @@ Shader "GIC/Battle/FrozenSprite"
             #include "FrozenFrost.cginc"
 
             sampler2D _MainTex;
-            float4 _MainTex_TexelSize; // 轮廓外延冰缘的四邻域采样步长
+            float4 _MainTex_TexelSize; // 轮廓外延冰缘/选中描边的邻域采样步长
+
+            float _OutlineEnabled;
+            float4 _OutlineColor;
+            float _OutlineWidth;
 
             struct appdata
             {
@@ -87,6 +100,30 @@ Shader "GIC/Battle/FrozenSprite"
                     max(tex2D(_MainTex, i.uv + float2(0.0, o4.y)).a, tex2D(_MainTex, i.uv - float2(0.0, o4.y)).a));
 
                 FrostApply(c, i.worldPos.y, i.uv, texAlpha, neighborAlpha);
+
+                // 选中描边（2026-10-05 拍板「立牌加描边，颜色=所属玩家色」）：sprite 路径选中态复用本材质
+                // （_FrozenAmount=0 直通渲染与默认 sprite 材质恒等——§92 已验证），形状=tex alpha；
+                // 8 方向 ±_OutlineWidth texel 环采样；frost 之后应用。_OutlineEnabled 经 MPB 写入
+                // （与霜化参数共用同一 MPB 互不覆盖——GetPropertyBlock 先拷贝既有条目）
+                if (_OutlineEnabled > 0.5 && texAlpha < 0.35)
+                {
+                    float2 oo = _MainTex_TexelSize.xy * _OutlineWidth;
+                    half ring = max(
+                        max(tex2D(_MainTex, i.uv + float2(oo.x, 0.0)).a,
+                            tex2D(_MainTex, i.uv - float2(oo.x, 0.0)).a),
+                        max(tex2D(_MainTex, i.uv + float2(0.0, oo.y)).a,
+                            tex2D(_MainTex, i.uv - float2(0.0, oo.y)).a));
+                    float2 odd = oo * 0.7071;
+                    ring = max(ring,
+                        max(
+                            max(tex2D(_MainTex, i.uv + odd).a,
+                                tex2D(_MainTex, i.uv - odd).a),
+                            max(tex2D(_MainTex, i.uv + float2(odd.x, -odd.y)).a,
+                                tex2D(_MainTex, i.uv - float2(odd.x, -odd.y)).a)));
+                    half m = saturate((ring - 0.2) * 1.6);
+                    c.rgb = lerp(c.rgb, _OutlineColor.rgb, m);
+                    c.a = max(c.a, m * _OutlineColor.a);
+                }
                 return c;
             }
             ENDCG

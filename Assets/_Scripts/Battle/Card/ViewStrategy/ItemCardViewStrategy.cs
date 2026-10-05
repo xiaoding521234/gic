@@ -18,7 +18,7 @@ namespace GIC.Battle
             {
                 card.cardBack.color = cfg.GetStarColor();
                 card.itemImage.gameObject.SetActive(true);
-                card.itemImage.sprite = cfg.GetSprite(data.skin);
+                MissingImageGuard.Assign(card.itemImage, cfg.GetSprite(data.skin)); // 物品图缺失兜底（2026-10-06 全位点接入）
                 card.countImage.gameObject.SetActive(true);
             }
 

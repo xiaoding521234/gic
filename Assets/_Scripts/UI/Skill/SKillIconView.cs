@@ -49,7 +49,7 @@ namespace GIC.UI
                 : ElementFactionConfig.Instance.GetElementColor(ElementType.Physical);
             if (skillIcon != null)
             {
-                skillIcon.sprite = skillData.icon;
+                MissingImageGuard.Assign(skillIcon, skillData.icon); // 技能图标缺失兜底（2026-10-06 拍板全位点接入）
                 skillIcon.color = Color.white;
             }
             if (skillBadge != null)
