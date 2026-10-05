@@ -27,9 +27,12 @@ namespace GIC.Battle
         // ==================== 单位分拣 ====================
 
         /// <summary>单位层级（D 批次操控分层，docs/active/32 §2）：星级→UnitTier 单一换算出口，
-        /// 全部层级门控/豁免/分拣逻辑只看此枚举——禁止散落星级区间判断</summary>
+        /// 全部层级门控/豁免/分拣逻辑只看此枚举——禁止散落星级区间判断。
+        /// TierOverrideStars 覆盖（-1=无）：试招沙盒把编辑单位置 5=魔神档玩家全手操（2026-10-05）</summary>
         public static UnitTier TierOf(Unit unit)
         {
+            if (unit == null) return UnitTier.Familiar;
+            if (unit.TierOverrideStars >= 0) return UnitTierHelper.FromStars(unit.TierOverrideStars);
             return unit.RawData != null
                 ? UnitTierHelper.FromStars(unit.RawData.starLevel)
                 : UnitTier.Familiar; // 无配置数据按最低档处理（不参与任何玩家域/消耗扣减）

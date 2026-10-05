@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System;
 using UnityEngine.Localization;
+using UnityEngine.Video;
 using GIC.Tool;
 namespace GIC.Data
 {
@@ -37,6 +38,20 @@ namespace GIC.Data
 
             [Header("时轮时间轴（B-S1；null=无时轮兜底=旧即时行为）")]
             public SkillTimelineAsset timeline;
+
+            [Header("动作视频（B-S4c 战技/爆发动作轨，2026-10-04）：绿幕 mp4 一次性动作片")]
+            [Header("（时长≈timeline.totalTime——拉弓/释放/收势整段，发射时刻由裁剪对齐时轮 startTime；")]
+            [Header("SkillCast 片头从头播、播完自动回待机循环；null=无动作视频=待机照播）")]
+            public VideoClip 动作视频;
+
+            [Tooltip("动作片缩放补偿（1=不补偿；=idle 片主体高/动作片主体高——宽幅 16:9 动作片构图主体小，播放放大回 idle 主体视觉大小，UnitView.PlayActionVideo 内乘 quad scale；安柏宽幅构图实测=1.29（idle 主体 554px/动作片主体 430px））")]
+            public float 动作片缩放补偿 = 1f;
+
+            [Tooltip("动作片播放速度倍率（1=原速；0/负=按 1 处理。运行时实际速度=战斗回放速度×本倍率——校准动作内容节拍与时轮判定时刻对齐（安柏二连射：第二箭松弦对齐第二发 0.30+0.39s）或片长铺满 totalTime；时轮编辑器「动作片校准」区实时预览所见即所得）")]
+            public float 动作片播放速度 = 1f;
+
+            [Tooltip("动作片位置微调（世界单位=格；X=水平、Y=垂直，相对待机 quad 基准位）：校准宽幅动作片构图主体与待机片主体视觉重合（观感统一）；播放期间偏移、播完/被打断随 RestoreIdleVideoSurface 恢复基准位。时轮编辑器「动作片校准」区实时预览所见即所得")]
+            public Vector2 动作片位置偏移;
 
             [Header("效果原子列表（B-1，docs/active/29：空=走旧技能类兜底；非空=数据驱动管线——")]
             [Header("加/改效果=编辑此列表零代码；无注册类且非空→ConfiguredSkill 通用类，docs/18 决策九 D5）")]

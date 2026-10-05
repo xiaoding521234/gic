@@ -24,10 +24,15 @@ MonoBehaviour:
       value: 2
       baseType: 0
     timeline: {fileID: 11400000, guid: ec9aa34604b44244abe5726fc44f37dd, type: 2}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 32900000, guid: 8184c16a7c7260b49a58e7e7581d841d, type: 3}
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1.29
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1.002
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0.023, y: -0.071}
     effects:
     - trigger: 1
       kind: 1
       targetFilter: 0
+      condition: 0
       paramKey: 1
       paramKey2: 0
       paramKey3: 0
@@ -36,9 +41,12 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     - trigger: 1
       kind: 4
       targetFilter: 0
+      condition: 0
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
@@ -47,9 +55,12 @@ MonoBehaviour:
       element: 1
       buffType: 1
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     - trigger: 1
       kind: 5
       targetFilter: 1
+      condition: 0
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
@@ -58,6 +69,8 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     costs:
     - kind: 2
       item: 0

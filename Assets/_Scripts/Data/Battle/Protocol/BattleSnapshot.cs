@@ -44,6 +44,12 @@ namespace GIC.Data
         /// 协议核心批（2026-09-29）：投射物接触判定/命中预判/底座盘视觉/选中弧光贴紧四消费方同源；
         /// Host BuildUnitState 从 UnitData.受击圆柱直径 填充，B7 联机随快照自动携带</summary>
         public float cylinderDiameter;
+
+        /// <summary>操控层级（UnitTier 枚举值；Host BuildUnitState 从 BattleHeuristics.TierOf 填充——
+        /// 试招沙盒的层级覆盖 Unit.TierOverrideStars 经此进快照，客户端技能盘门控与 Host 同源
+        /// （2026-10-05「开一把试招」：覆盖不进快照则客户端按原星判 3★=伙伴档，战技被门控置灰拦截）；
+        /// 0=未填（旧快照/异常）——消费方回落 UnitConfig 星级换算）</summary>
+        public int tier;
         public List<BuffState> buffs = new List<BuffState>();
     }
 

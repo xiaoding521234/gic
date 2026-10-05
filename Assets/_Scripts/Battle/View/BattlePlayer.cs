@@ -307,9 +307,8 @@ namespace GIC.Battle
                     ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
                     : target.transform.position + new Vector3(0f, 0.45f, 0f); // 兜底：无定点数据时飞向目标
 
-                // 元素色动态染色（2026-09-28 拍板）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
-                var arrowGo = CreateProjectileVisual(from, to,
-                    ElementFactionConfig.Instance.GetElementColor((ElementType)command.metadata));
+                // 元素色动态染色（2026-09-28 拍板方案 A；2026-10-04 起走箭矢色板单源）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
+                var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.metadata));
 
                 float distance = Vector3.Distance(from, to);
                 float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
@@ -355,9 +354,8 @@ namespace GIC.Battle
                 }
 
                 // 元素色=消散命令随带投射物元素（reactionKind，Host 与命中 Damage.metadata 同口径回填——
-                // 丘丘人借凯亚霜袭时消散箭同为冰色，非施法者物理灰）
-                var arrowGo = CreateProjectileVisual(from, to,
-                    ElementFactionConfig.Instance.GetElementColor((ElementType)command.reactionKind));
+                // 丘丘人借霜袭时消散箭同为冰色，非施法者物理灰；2026-10-04 起走箭矢色板单源）
+                var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.reactionKind));
 
                 float distance = Vector3.Distance(from, to);
                 float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
@@ -509,7 +507,7 @@ namespace GIC.Battle
             }
             if (cells.Count == 0) yield break;
 
-            var tint = ElementFactionConfig.Instance.GetElementColor((ElementType)command.reactionKind);
+            var tint = ResolveArrowTint(command.reactionKind);
             float prevSpawn = 0f;
             for (int wave = 0; wave < waves; wave++)
             {
@@ -812,13 +810,28 @@ namespace GIC.Battle
 
                     case BattleCommandType.SkillCast:
                         // 时轮演出起点事件（B-S1）：按 skillID 加载时轮资产播动作/音效/特效轨
-                        // ——特效轨首个消费方=arrow_rain 箭雨天降（2026-09-28），动作/音效轨待素材同入口扩展；
+                        // ——特效轨首个消费方=arrow_rain 箭雨天降（2026-09-28）、动作轨=技能资产 动作视频
+                        // （B-S4c 战技/爆发立牌动作，2026-10-04），音效轨待素材同入口扩展；
                         // fire-and-forget 不进 playbacks（不 gate 片 ack，节拍由 Damage launchMs 承载）；
-                        // 前摇期投射物视觉由投射物命令的 launchMs 延迟起飞承载（施放者动作/音效待素材批次）
+                        // 前摇期投射物视觉由投射物命令的 launchMs 延迟起飞承载
                         GICLog.Info($"[BattlePlayer] 技能施放：{command.actorUnitId} → {(SkillName)command.value}" +
                                     $" 方向 {(Direction2D)command.direction}");
                         if (_views.TryGetValue(command.actorUnitId, out var caster))
+                        {
                             caster.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随施放方向（拍板③：向左射箭→转向左）
+                            // 动作轨（B-S4c）：技能资产 动作视频≠null → 立牌从头播一次性动作片（拉弓-释放-收势，
+                            // 时长≈时轮 totalTime）、播完自动回待机循环（UnitView.PlayActionVideo 双 RT+缩放补偿
+                            // ——宽幅 16:9 动作片原生尺寸独立 RT 渲染+主体视觉大小恒等补偿）；null=待机照播
+                            var skillData = LoadSkillData(command.value);
+                            var actionClip = skillData?.动作视频;
+                            if (actionClip != null)
+                            {
+                                // B-S4c 校准批次：播放速度=战斗回放速度×技能校准倍率（0/负=按 1，非法回落原速）
+                                var 校准速度 = skillData.动作片播放速度 > 0f ? skillData.动作片播放速度 : 1f;
+                                caster.PlayActionVideo(actionClip, _playbackSpeed * 校准速度,
+                                    skillData.动作片缩放补偿, skillData.动作片位置偏移);
+                            }
+                        }
                         StartCoroutine(PlaySkillCastVfxCoroutine(command));
                         break;
 
@@ -984,6 +997,32 @@ namespace GIC.Battle
                 }
             }
             var cfg = ElementFactionConfig.Instance; // 数字色板缺失兜底：回落元素主题色（观感偏深但可用）
+            return cfg != null ? cfg.GetElementColor((ElementType)element) : Color.white;
+        }
+
+        /// <summary>箭矢染色单源（2026-10-04 拍板「箭矢的颜色应当为红色」）：命中箭/消散箭/箭雨落箭
+        /// 三路同源走 BattlePalette「箭矢元素色」色板——主题色≠箭矢表现色（主题火红 #EF5350 染白箭偏粉
+        /// 不被读作红；同「伤害数字元素色」色板先例分家）。配置缺失兜底链=箭矢色板→ElementFactionConfig
+        /// 主题色→白</summary>
+        private static Color ResolveArrowTint(int element)
+        {
+            var palette = Palette;
+            if (palette != null)
+            {
+                switch ((ElementType)element)
+                {
+                    case ElementType.Pyro: return palette.箭矢火色;
+                    case ElementType.Hydro: return palette.箭矢水色;
+                    case ElementType.Cryo: return palette.箭矢冰色;
+                    case ElementType.Electro: return palette.箭矢雷色;
+                    case ElementType.Anemo: return palette.箭矢风色;
+                    case ElementType.Geo: return palette.箭矢岩色;
+                    case ElementType.Dendro: return palette.箭矢草色;
+                    case ElementType.Light: return palette.箭矢光色;
+                    default: return palette.箭矢物理色; // Physical/未知=灰白
+                    }
+            }
+            var cfg = ElementFactionConfig.Instance; // 色板缺失兜底：回落元素主题色（旧行为）
             return cfg != null ? cfg.GetElementColor((ElementType)element) : Color.white;
         }
 

@@ -29,6 +29,11 @@ namespace GIC.Battle
         /// 获取元能溢出部分转移给切比雪夫最近未满我方〔同距 unitId 升序〕）</summary>
         public bool EnergyOverflowPassive;
 
+        /// <summary>操控层级覆盖星（-1=无覆盖读 RawData.starLevel；试招沙盒置 5=魔神档玩家全手操——
+        /// 仅改操控分档（TierOf 唯一消费方），数值回落公式仍读原星=数值原味；Unit 为运行时实例
+        /// 零资产污染、随战斗销毁自然回收，无需还原。2026-10-05 时轮编辑器「开一把试招」）</summary>
+        [NonSerialized] public int TierOverrideStars = -1;
+
         /// <summary>
         /// 单位体积（docs/05 §5.3：角色/造物 = 1，建筑 = 2；格子体积容量 3。
         /// 体积判定在阻挡规则之上，无视阻挡能力也不可绕过）——

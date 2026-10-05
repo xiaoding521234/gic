@@ -88,6 +88,7 @@ namespace GIC.Battle
         // 冻结/尸体 Pause 停摆（保留当前帧）；解码失败（errorReceived）回落静态立牌 sprite
         private VideoPlayer _videoPlayer;
         private RenderTexture _videoRt;
+        private RenderTexture _actionRt; // 动作片独立 RT（B-S4c 宽幅动作片，2026-10-04）：16:9 动作片与 idle 片原生尺寸不同——双 RT 各按原生尺寸渲染，素材零裁剪零缩放=零画质损失
         private Material _videoMaterial; // ChromaKey 材质（本组件持有，OnDestroy 释放——docs/14 §63①）
         private bool _videoFailed;
         private bool _videoHalted;
@@ -102,6 +103,7 @@ namespace GIC.Battle
         private Vector3 _avatarSpriteFlipBaseScale;
         private Transform _avatarVideoFlip;       // AvatarVideo quad
         private Vector3 _avatarVideoFlipBaseScale;
+        private Vector3 _avatarVideoFlipBasePosition; // 视频 quad 基准位（B-S4c 校准：动作片位置偏移的回退锚点）
 
         private void Update()
         {
@@ -150,6 +152,7 @@ namespace GIC.Battle
 
         /// <summary>移动态动画切换（BattlePlayer.PlayMoveCoroutine 移动片起止驱动）：true=播 移动动画视频、
         /// false=回 立牌动画视频。幂等（同片/无视频路径/解码失败早退）；换片随机相位（多枚同款单位不同步）；
+        /// 移动打断动作片时经 RestoreIdleVideoSurface 回主 RT+原比例（B-S4c 双 RT 收口）；
         /// 冻结/尸体态不 Play（Update 停摆逻辑每帧接管，解冻自然恢复）</summary>
         public void SetMoveAnimation(bool moving)
         {
@@ -158,6 +161,8 @@ namespace GIC.Battle
             var clip = moving ? _moveVideoClip : _idleVideoClip;
             if (clip == null || vp.clip == clip) return;
             vp.clip = clip;
+            vp.isLooping = true; // 循环片恒置回（动作片 isLooping=false 残留时被移动打断→移动片只播一遍即停）
+            RestoreIdleVideoSurface(); // 动作片（独立 RT+补偿比例）被移动打断时回 idle RT 与原比例
             if (clip.length > 0.0)
                 vp.time = UnityEngine.Random.Range(0f, (float)clip.length);
             if (IsCorpse || IsFrozen)
@@ -167,6 +172,106 @@ namespace GIC.Battle
             else
             {
                 vp.Play();
+            }
+        }
+
+        // ==================== 技能动作片（B-S4c 战技/爆发动作轨：一次性动作视频，播完自动回待机循环） ====================
+
+        /// <summary>播放一次性技能动作片（BattlePlayer SkillCast 分支驱动，fire-and-forget）：从头播、
+        /// 不循环、播完自动回 待机片（OnActionVideoFinished）。同片每次施放都重播（无幂等早退——连续两次
+        /// 同技能应两次起手）。**双 RT 路线（B-S4c 宽幅动作片，2026-10-04）**：动作片与 idle 片原生尺寸不同
+        /// （16:9 1344×768）时各用各的 RT——素材零裁剪零缩放=零画质损失（共用 RT 会拉伸变形）；quad scale×
+        /// 缩放补偿（scaleCompensation=idle 主体高/动作片主体高，安柏宽幅构图实测 1.29）令主体视觉大小与
+        /// idle 片恒等——绿幕区 ChromaKey 抠透明后仅透明域变宽，无观感影响。冻结/尸体态 Pause 由 Update
+        /// 停摆逻辑接管、解冻续播到回切</summary>
+        public void PlayActionVideo(VideoClip clip, float playbackSpeed, float scaleCompensation, Vector2 位置偏移)
+        {
+            var vp = _videoPlayer;
+            if (vp == null || _videoFailed || clip == null || clip.width <= 0 || clip.height <= 0) return;
+            if (scaleCompensation <= 0f) scaleCompensation = 1f;
+            // 动作片独立 RT（按 clip 原生尺寸建/换片规格变则重建；共用主 RT 会拉伸变形）
+            if (_actionRt == null || _actionRt.width != (int)clip.width || _actionRt.height != (int)clip.height)
+            {
+                if (_actionRt != null) { _actionRt.Release(); Destroy(_actionRt); }
+                _actionRt = new RenderTexture((int)clip.width, (int)clip.height, 0,
+                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            }
+            vp.isLooping = false;
+            vp.playbackSpeed = Mathf.Max(0.1f, playbackSpeed); // 动作片=战斗回放速度×技能校准倍率（循环片维持恒 1x 现状）
+            vp.clip = clip;
+            vp.targetTexture = _actionRt;
+            _videoMaterial.mainTexture = _actionRt;
+            // quad 缩放补偿：动作片全幅按 comp×基准高显示（主体视觉高=idle 主体视觉高）；宽=片宽高比×同高；
+            // x 分量乘朝向 sign（B-S4c 校准批次修复：旧版覆盖 localScale 丢 sign——向左施放时动作片恒朝右）
+            if (_avatarVideoFlip != null)
+            {
+                float sign = _faceLeft ? -1f : 1f;
+                float aspect = clip.width / (float)clip.height;
+                _avatarVideoFlip.localScale = new Vector3(
+                    sign * _avatarVideoFlipBaseScale.y * aspect * scaleCompensation,
+                    _avatarVideoFlipBaseScale.y * scaleCompensation,
+                    _avatarVideoFlipBaseScale.z);
+                // 位置微调（B-S4c 校准）：播放期间偏移基准位，播完/被打断经 RestoreIdleVideoSurface 恢复
+                _avatarVideoFlip.localPosition = new Vector3(
+                    _avatarVideoFlipBasePosition.x + 位置偏移.x,
+                    _avatarVideoFlipBasePosition.y + 位置偏移.y,
+                    _avatarVideoFlipBasePosition.z);
+            }
+            vp.time = 0.0;
+            if (IsCorpse || IsFrozen)
+            {
+                if (vp.isPlaying) { vp.Pause(); _videoHalted = true; }
+            }
+            else
+            {
+                vp.Play();
+            }
+        }
+
+        /// <summary>视频路径回待机/移动常态：主 RT 回接+quad 恢复原比例与基准位（OnActionVideoFinished 回切与
+        /// SetMoveAnimation 打断动作片两路共用；幂等——常态时零开销直通）。恢复的 scale 带朝向 sign
+        /// （B-S4c 校准批次修复：旧版直接写回 baseScale 丢 sign——动作片播完后向左单位立牌翻回朝右）</summary>
+        private void RestoreIdleVideoSurface()
+        {
+            var vp = _videoPlayer;
+            if (vp != null && _videoRt != null && vp.targetTexture != _videoRt)
+                vp.targetTexture = _videoRt;
+            if (_videoMaterial != null && _videoMaterial.mainTexture != _videoRt)
+                _videoMaterial.mainTexture = _videoRt;
+            if (_avatarVideoFlip != null)
+            {
+                var facingScale = new Vector3(
+                    (_faceLeft ? -1f : 1f) * _avatarVideoFlipBaseScale.x,
+                    _avatarVideoFlipBaseScale.y,
+                    _avatarVideoFlipBaseScale.z);
+                if (_avatarVideoFlip.localScale != facingScale)
+                    _avatarVideoFlip.localScale = facingScale;
+                if (_avatarVideoFlip.localPosition != _avatarVideoFlipBasePosition)
+                    _avatarVideoFlip.localPosition = _avatarVideoFlipBasePosition;
+            }
+        }
+
+        /// <summary>一次性动作片播完回待机（loopPointReached 仅 isLooping=false 的动作片走到这里——
+        /// isLooping=true 的循环片每次循环点也触发本事件，直接 return 无操作）；回待机循环片+随机相位+
+        /// 回放速度归 1（循环片恒 1x 现状）+主 RT 与原比例回接（B-S4c 双 RT 收口）</summary>
+        private void OnActionVideoFinished(VideoPlayer source)
+        {
+            if (source.isLooping) return;
+            var idle = _idleVideoClip;
+            if (idle == null || _videoFailed) return;
+            RestoreIdleVideoSurface();
+            source.playbackSpeed = 1f;
+            source.isLooping = true;
+            source.clip = idle;
+            if (idle.length > 0.0)
+                source.time = UnityEngine.Random.Range(0f, (float)idle.length);
+            if (IsCorpse || IsFrozen)
+            {
+                if (source.isPlaying) { source.Pause(); _videoHalted = true; }
+            }
+            else
+            {
+                source.Play();
             }
         }
 
@@ -227,6 +332,7 @@ namespace GIC.Battle
             if (_baseDiscMaterial != null) Destroy(_baseDiscMaterial);
             if (_videoMaterial != null) Destroy(_videoMaterial); // ChromaKey 材质（调用方持有纪律，docs/14 §63①）
             if (_videoRt != null) { _videoRt.Release(); Destroy(_videoRt); } // RT 随单位释放（视频路线显存恒定的收口）
+            if (_actionRt != null) { _actionRt.Release(); Destroy(_actionRt); } // 动作片独立 RT 同释放（B-S4c 双 RT）
         }
 
         /// <summary>
@@ -331,6 +437,7 @@ namespace GIC.Battle
                 // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（视频 quad 依赖 shader Cull Off）
                 view._avatarVideoFlip = videoGo.transform;
                 view._avatarVideoFlipBaseScale = videoGo.transform.localScale;
+                view._avatarVideoFlipBasePosition = videoGo.transform.localPosition; // 基准位（动作片位置偏移回退锚点）
 
                 var vp = videoGo.AddComponent<VideoPlayer>();
                 vp.playOnAwake = false;
@@ -343,6 +450,7 @@ namespace GIC.Battle
                 if (idleVideo.length > 0.0)
                     vp.time = UnityEngine.Random.Range(0f, (float)idleVideo.length);
                 vp.errorReceived += view.OnVideoError;
+                vp.loopPointReached += view.OnActionVideoFinished; // 一次性动作片播完回待机（B-S4c 动作轨）
                 vp.Play();
                 view._videoPlayer = vp;
                 view._idleVideoClip = idleVideo; // 待机/回切目标片（B-S4a 移动态接线）

@@ -29,6 +29,14 @@ namespace GIC.Battle
         public string MapConfigName = DefaultMapName;
         public List<BattlePlayerSetup> Players = new List<BattlePlayerSetup>();
 
+        /// <summary>试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A 方=正在编辑时轮的持有单位
+        /// （层级覆盖 5★魔神档=玩家全手操全部技能）；B 方=木桩空座（IsAI=false：配额脑不挂=木桩纯站桩，
+        /// 选择阶段经 Sim.SandboxAutoPassPlayerId 即时自动 Pass 不拖节奏）；阵容走沙盒 spawn
+        /// （BattleScreen：A 单位出生区偏东 1 格、木桩同行再东 5 格=十字射程内同屏）</summary>
+        public bool IsSandbox;
+        public UnitName SandboxAllyUnit;
+        public UnitName SandboxDummyUnit;
+
         /// <summary>战斗种子（2026-10-02 幸运暴击批）：模拟核心概率事件唯一随机源的初始化种子
         /// （Host 端 BattleSimState 按 seed 建 System.Random，同 seed+同命令序列=同战局——回放/复现/
         /// 联机防漂移；客户端零 roll 不消费）。BuildSinglePlayer 自动随机生成；测试/复现可显式注入；
@@ -98,6 +106,35 @@ namespace GIC.Battle
         public static void LaunchSinglePlayer(string mapConfigName)
         {
             Launch(BuildSinglePlayer(mapConfigName));
+        }
+
+        /// <summary>试招沙盒开局配置（时轮编辑器「开一把试招」入口，2026-10-05）：P1 真人手操试探单位、
+        /// P2 空座木桩（IsAI=false=配额脑不挂，站桩挨打；回合推进由沙盒即时自动 Pass 承接）</summary>
+        public static BattleLaunchConfig BuildSandbox(UnitName ally, UnitName dummy)
+        {
+            return new BattleLaunchConfig
+            {
+                MapConfigName = DefaultMapName,
+                Seed = UnityEngine.Random.Range(0, int.MaxValue),
+                IsSandbox = true,
+                SandboxAllyUnit = ally,
+                SandboxDummyUnit = dummy,
+                Players = new List<BattlePlayerSetup>
+                {
+                    new BattlePlayerSetup
+                    {
+                        PlayerId = BattleDebugPlayerIds.P1,
+                        DisplayName = "试招",
+                        IsAI = false,
+                    },
+                    new BattlePlayerSetup
+                    {
+                        PlayerId = BattleDebugPlayerIds.P2,
+                        DisplayName = "木桩",
+                        IsAI = false, // 空座：不挂配额脑=木桩不还手（勿改 true——AI 会操温迪反击）
+                    },
+                },
+            };
         }
     }
 }

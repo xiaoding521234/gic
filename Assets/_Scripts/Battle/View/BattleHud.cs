@@ -1449,8 +1449,10 @@ namespace GIC.Battle
         private string GetSelectionBlockToastKey(UnitState sel)
         {
             if (sel.playerId != _myPlayerId) return "Battle_NotYourUnit";
-            var selData = TryGetUnitData(sel.unitName);
-            var selTier = selData != null ? UnitTierHelper.FromStars(selData.starLevel) : UnitTier.Familiar;
+            // 层级=快照 tier 优先（TierOverrideStars 覆盖同源——沙盒层级覆盖经此生效，2026-10-05）；
+            // 0=未填回落原星级换算
+            var selTier = sel.tier != 0 ? (UnitTier)sel.tier
+                : UnitTierHelper.FromStars(TryGetUnitData(sel.unitName)?.starLevel ?? 1);
             if (selTier == UnitTier.Familiar) return "Battle_MinorUnit";
             if (selTier == UnitTier.Companion && (_aimDef == null || !_aimDef.IsFaction)) return "Battle_Autonomous";
             return null;
@@ -2307,24 +2309,34 @@ namespace GIC.Battle
             def.tierGateGroup.alpha = gated ? 0.45f : 1f;
         }
 
-        /// <summary>选中单位层级（D 批次操控分层，docs/active/32 §2；无配置数据按眷属档=保守全门控）</summary>
+        /// <summary>选中单位层级（D 批次操控分层，docs/active/32 §2；无配置数据按眷属档=保守全门控）。
+        /// 快照 tier 优先（2026-10-05 试招沙盒：Unit.TierOverrideStars 覆盖经 BuildUnitState 进快照——
+        /// 读原星会让沙盒的层级覆盖在客户端门控失效=战技被误拦「伙伴技能自主」）；0=未填回落原星级换算</summary>
         private UnitTier SelectedUnitTier()
         {
+            var sel = _session?.Player?.LatestSnapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel != null && sel.tier != 0) return (UnitTier)sel.tier;
             var data = GetSelectedUnitData();
             return data != null ? UnitTierHelper.FromStars(data.starLevel) : UnitTier.Familiar;
         }
 
         /// <summary>玩家域判定（D-5 资源门槛的前提，取代旧 IsSelectedControllable=己方≥3星口径）：
         /// 己方魔神=全键玩家域（全手操）；己方伙伴=仅势力技能键（号令入口）；眷属/敌方单位=
-        /// 无操控权（查看态恒可点，提交被防线轻提示拦截）</summary>
+        /// 无操控权（查看态恒可点，提交被防线轻提示拦截）。层级读快照 tier（TierOverrideStars
+        /// 覆盖经快照同源——沙盒层级覆盖在客户端生效，2026-10-05）；0=未填回落原星级换算</summary>
         private bool IsSelectedPlayerDomain(SkillType buttonType)
         {
             var snapshot = _session?.Player?.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null || sel.playerId != _myPlayerId) return false;
-            var data = TryGetUnitData(sel.unitName);
-            if (data == null) return false;
-            var tier = UnitTierHelper.FromStars(data.starLevel);
+            UnitTier tier;
+            if (sel.tier != 0) tier = (UnitTier)sel.tier;
+            else
+            {
+                var data = TryGetUnitData(sel.unitName);
+                if (data == null) return false;
+                tier = UnitTierHelper.FromStars(data.starLevel);
+            }
             if (tier == UnitTier.Archon) return true;
             return tier == UnitTier.Companion
                 && (buttonType == SkillType.Enso || buttonType == SkillType.Contract);
@@ -2363,7 +2375,7 @@ namespace GIC.Battle
                     case CostKind.Stamina:
                     {
                         int amount = selUnitData != null
-                            ? UnitTierHelper.StaminaCostOf(UnitTierHelper.FromStars(selUnitData.starLevel))
+                            ? UnitTierHelper.StaminaCostOf(SelectedUnitTier())
                             : cost.amount; // 无配置兜底按声明值（理论不可达）
                         if (amount > 0 && _myStamina < amount) return false;
                         break;
@@ -2480,7 +2492,7 @@ namespace GIC.Battle
             {
                 var selUnitDataFallback = GetSelectedUnitData();
                 int fallbackStamina = selUnitDataFallback != null
-                    ? UnitTierHelper.StaminaCostOf(UnitTierHelper.FromStars(selUnitDataFallback.starLevel))
+                    ? UnitTierHelper.StaminaCostOf(SelectedUnitTier())
                     : BattleMetrics.StaminaCostPerAction;
                 bool resourcesOk = move != null ? HasSkillResources(move)
                     : _myStamina >= fallbackStamina;

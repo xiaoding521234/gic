@@ -49,7 +49,7 @@ namespace GIC.Data
         [Tooltip("头顶条元能填充色（BattleOverheadBars 元能条，2026-09-24；09-25 目检拍板改白色）")]
         public Color 元能条色 = new Color(0.95f, 0.95f, 0.95f);
 
-        [Header("伤害数字元素色（2026-10-01 网检对齐原神：数字=亮彩霓虹风、显著亮于元素主题色（图标/箭矢用 ElementFactionConfig 勿混）——白=物理/橙=火/青=水/冰青=冰/淡紫=雷/薄荷=风/淡金=岩/黄绿=草；基准=社区原神复刻 Baity mod 实测色系）")]
+        [Header("伤害数字元素色（2026-10-01 网检对齐原神：数字=亮彩霓虹风、显著亮于元素主题色——图标用 ElementFactionConfig、箭矢用下方「箭矢元素色」段〔2026-10-04 起分家〕勿混——白=物理/橙=火/青=水/冰青=冰/淡紫=雷/薄荷=风/淡金=岩/黄绿=草；基准=社区原神复刻 Baity mod 实测色系）")]
         [Tooltip("物理伤害数字=纯白 #FFFFFF（原神物理数字白）")]
         public Color 伤害数字物理色 = new Color(1f, 1f, 1f);
         [Tooltip("火伤害数字=橙 #FF9B00（原神火数字是橙而非红——元素主题火红勿用于数字）")]
@@ -68,6 +68,28 @@ namespace GIC.Data
         public Color 伤害数字草色 = new Color(0.729f, 1f, 0.216f);
         [Tooltip("光伤害数字（GIC 自定——原神无光元素，取淡暖金白）")]
         public Color 伤害数字光色 = new Color(1f, 0.95f, 0.72f);
+
+        [Header("箭矢元素色（2026-10-04 拍板「箭矢的颜色应当为红色」——箭矢表现色与元素主题色分家：")]
+        [Header("主题火红 #EF5350 染白箭观感偏粉不被读作红（主题色≠表现色二次实证，色板结构同「伤害数字元素色」先例）；")]
+        [Header("消费=BattlePlayer.ResolveArrowTint 单源（命中箭/消散箭/箭雨落箭三路）；未列元素回落主题色")]
+        [Tooltip("物理箭矢=主题灰白同值")]
+        public Color 箭矢物理色 = new Color(0.729f, 0.729f, 0.729f);
+        [Tooltip("火箭矢=饱和正红 #F23829（2026-10-04 拍板：安柏箭矢应为红色）")]
+        public Color 箭矢火色 = new Color(0.949f, 0.22f, 0.16f);
+        [Tooltip("水箭矢=主题亮青蓝同值")]
+        public Color 箭矢水色 = new Color(0.314f, 0.635f, 0.937f);
+        [Tooltip("冰箭矢=主题冰青同值")]
+        public Color 箭矢冰色 = new Color(0.557f, 0.812f, 0.902f);
+        [Tooltip("雷箭矢=主题淡紫同值")]
+        public Color 箭矢雷色 = new Color(0.655f, 0.31f, 0.839f);
+        [Tooltip("风箭矢=主题薄荷同值")]
+        public Color 箭矢风色 = new Color(0.314f, 0.784f, 0.69f);
+        [Tooltip("岩箭矢=主题淡金同值")]
+        public Color 箭矢岩色 = new Color(0.906f, 0.725f, 0.298f);
+        [Tooltip("草箭矢=主题黄绿同值")]
+        public Color 箭矢草色 = new Color(0.408f, 0.698f, 0.149f);
+        [Tooltip("光箭矢=主题淡暖金白同值")]
+        public Color 箭矢光色 = new Color(0.976f, 0.925f, 0.612f);
 
         [Header("投射物（箭矢素材缺失时的白色光条占位兜底——正式箭矢已落地 2026-09-28，运行时元素色染色不走此色）")]
         public Color 箭矢占位色 = new Color(0.98f, 0.93f, 0.80f, 1f);

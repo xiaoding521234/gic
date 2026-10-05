@@ -187,6 +187,19 @@ namespace GIC.Battle
             if (_selectTimerCoroutine != null) StopCoroutine(_selectTimerCoroutine);
             _selectTimerCoroutine = StartCoroutine(SelectTimerRoutine(TurnNumber));
 
+            // 试招沙盒空座即时 Pass（2026-10-05 时轮编辑器「开一把试招」）：木桩方无真人无配额脑——
+            // 选择阶段一开即交 Pass（不等超时兜底），试招方节奏不被每回合 8~25s 白等拖累
+            if (_sim.SandboxAutoPassPlayerId != null && !_pendingActions.ContainsKey(_sim.SandboxAutoPassPlayerId))
+            {
+                _pendingActions[_sim.SandboxAutoPassPlayerId] = new ActionData
+                {
+                    playerId = _sim.SandboxAutoPassPlayerId,
+                    actionType = ActionType.Pass,
+                    turnNumber = TurnNumber,
+                };
+                TryBeginResolve(); // 试招方已交时收齐即开演；未交=直通等其提交
+            }
+
             OnPhaseChanged?.Invoke(Phase, TurnNumber);
         }
 
