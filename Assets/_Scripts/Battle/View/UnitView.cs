@@ -70,6 +70,23 @@ namespace GIC.Battle
         /// <summary>立牌后倾角缓存</summary>
         private float _tiltDegrees = 55f;
 
+        /// <summary>立牌底世界高度（含悬浮离地——AvatarTilt 世界 y；无倾斜组回落根 y）：箭矢等贴牌
+        /// 视觉件的起算基准——投射物箭高从立牌底起算=预览贴地坐标系校准值实战直接复用
+        /// （2026-10-05 箭高校准悬浮锚定：UnitView 根只到格面，悬浮在 AvatarTilt 子物体上）</summary>
+        public float AvatarBaseWorldY => _tiltGroup != null ? _tiltGroup.position.y : transform.position.y;
+
+        /// <summary>投射物发射弓位锚点（2026-10-05 十轮定案「箭和立牌同一平面」）：把「箭高」（**面内语义**=
+        /// tiltGroup 局部 y，时轮预览贴弓直读）沿面片取世界点=**箭矢飞行起点本体**；BattlePlayer 终点 z
+        /// 同加面前伸量→两端同面同深=东西向屏幕水平直线且与立牌共面（六报「斜着飞」根因=当年终点落
+        /// 格心、两端深度差所致；八轮「格心起飞+屏幕解算」案被「箭不在立牌平面上」报障推翻——教训=
+        /// 两端必须同面同深勿混合）</summary>
+        public Vector3 ProjectileOriginWorld(float facialHeight)
+        {
+            if (_tiltGroup != null)
+                return _tiltGroup.TransformPoint(new Vector3(0f, facialHeight, 0f));
+            return transform.position + new Vector3(0f, facialHeight, 0f);
+        }
+
         /// <summary>立牌面内显示高度（Create 按 avatarScale 算出；头顶行 Y 以立牌顶为基准 + 原间隙，行尺寸不变）</summary>
         private float _avatarDisplayHeight = AvatarHeight;
 

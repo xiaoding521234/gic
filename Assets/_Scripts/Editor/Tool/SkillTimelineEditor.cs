@@ -854,7 +854,12 @@ namespace GIC.Editor
                     MarkDirtyLight();
                 });
                 row3b.Add(rangeField);
-                var hint = new Label("0=用 BattleMetrics 默认（速度8格/s·直径0.42·射程24）");
+                row3b.Add(FloatFieldOf("箭高", clip.projectileHeight, v =>
+                {
+                    clip.projectileHeight = Mathf.Max(0f, v); // 0=默认 0.45；绝对面内高语义（立牌底起算——贴弓读数即实战值，2026-10-05 十轮定案）
+                    MarkDirtyLight();
+                }));
+                var hint = new Label("0=用 BattleMetrics 默认（速度8格/s·直径0.42·射程24·箭高0.45）");
                 hint.style.fontSize = 10;
                 hint.style.color = new Color(0.55f, 0.58f, 0.6f);
                 hint.style.alignSelf = Align.Center;
@@ -1604,9 +1609,10 @@ namespace GIC.Editor
             var offset = data.动作片位置偏移;
             float totalTime = Mathf.Max(0.05f, asset.totalTime);
 
-            // 比例尺：1 立牌高（AvatarHeight=0.55 世界单位）= idleH 像素——位置偏移的世界单位→像素换算
+            // 比例尺：立牌面内全高 1.1 世界单位（AvatarHeight 0.55×avatarScale 2=全身立牌——与运行时
+            // UnitView 摆放同值）= idleH 像素；偏移/箭高等一切世界单位换算统一用此（旧版 /0.55=2 倍错）
             float idleH = (groundY - canvas.y - 6f) * 0.86f;
-            float pxPerWorld = idleH / 0.55f;
+            float pxPerWorld = idleH / 1.1f;
 
             // 待机基准（幽灵底图）：DrawTexture 后盖黑纱——可见形状但不抢戏
             if (_idleKeyedRt != null)
@@ -1617,13 +1623,15 @@ namespace GIC.Editor
                 EditorGUI.DrawRect(idleRect, new Color(0f, 0f, 0f, 0.5f));
             }
 
-            // 动作片当前帧：comp/offset 同构摆放（与战斗 UnitView quad 数学一致：Y正上浮、X正右移）
+            // 动作片当前帧：comp/offset 摆放与运行时 UnitView.PlayActionVideo **完全同构**——quad 中心
+            // 锚定在 基准位（面内 0.55=立牌半高）+位置偏移、缩放绕中心（帧底面内=0.55+offset.y−0.55×comp，
+            // 缩放后帧底沉入地面线下属正常；旧版按底边锚定=预览与实机系统性错位，2026-10-05 箭高报障根因）
             if (_actionKeyedRt != null)
             {
                 float actionAspect = _actionKeyedRt.width / (float)_actionKeyedRt.height;
                 float actionH = idleH * comp;
                 float actionW = actionH * actionAspect;
-                float bottom = groundY - offset.y * pxPerWorld;
+                float bottom = groundY - (0.55f + offset.y - 0.55f * comp) * pxPerWorld; // 帧底=中心锚定同构
                 float cx = canvas.center.x + offset.x * pxPerWorld;
                 GUI.DrawTexture(new Rect(cx - actionW * 0.5f, bottom - actionH, actionW, actionH), _actionKeyedRt);
             }
@@ -1642,6 +1650,25 @@ namespace GIC.Editor
                     if (t > totalTime) break;
                     var c = i == 0 ? new Color(1f, 0.4f, 0.35f, 0.30f) : new Color(1f, 0.8f, 0.35f, 0.26f);
                     EditorGUI.DrawRect(new Rect(XOf(t), canvas.y, 1f, ruler.y - canvas.y), c);
+                }
+            }
+
+            // 箭矢视觉高度指示线（2026-10-05 十轮定案=**绝对面内高**）：箭高字段=立牌面内高
+            // （tiltGroup 局部 y、地面线〔=立牌底〕起算——与运行时 ProjectileOriginWorld 消费语义 1:1）：
+            // 预览线=地面线起 arrowYFacial×pxPerWorld 的绝对高度，**不随帧动**（帧随 comp/位置偏移
+            // 移动后需重贴弓）；线贴帧上弓位时的读数=实战面内值零换算（旧版「帧内比例」映射因预览帧
+            // 底边锚定 vs 运行时中心锚定不一致而系统性说谎——同值预览贴弓、实机箭过头顶）
+            foreach (var clip in judgments)
+            {
+                if (clip.kind != (int)SkillJudgmentKind.LineProjectile) continue;
+                float arrowYFacial = clip.projectileHeight > 0f ? clip.projectileHeight : BattleMetrics.ArrowFlightHeight;
+                float lineY = groundY - arrowYFacial * pxPerWorld; // 绝对面内高直读（与运行时同语义）
+                float startX = XOf(clip.startTime);
+                if (startX < ruler.x + ruler.width)
+                {
+                    EditorGUI.DrawRect(new Rect(startX, lineY - 1f, ruler.x + ruler.width - startX, 2f),
+                        new Color(0.95f, 0.62f, 0.28f, 0.5f)); // 箭色板火橙半透明
+                    GUI.Label(new Rect(startX + 4f, lineY - 17f, 90f, 14f), $"箭高 {arrowYFacial:0.00}", _rulerTickStyle);
                 }
             }
 

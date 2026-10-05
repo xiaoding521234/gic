@@ -53,6 +53,11 @@ namespace GIC.Battle
         /// 同 (来源,目标,时刻) 合并时取「任一段暴击即暴」（MergeDamageEffects）</summary>
         public bool IsCrit;
 
+        /// <summary>箭矢视觉飞行高度（格=世界单位；0=BattleMetrics.ArrowFlightHeight 默认——纯视觉；
+        /// 投射物路径=ProjectileResolver 从发射声明 ProjectileEffect.Height 透传，随 Damage 命令
+        /// 千分下发 arrowHeightY，客户端箭矢起飞/落点同高；2026-10-05 对齐动画松弦位）</summary>
+        public float ProjectileHeightY;
+
         public DamageEffect(string attackerUnitId, string targetUnitId, int amount, int element = 0,
             int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f,
             int reactionType = 0, int launchMs = 0)
@@ -151,9 +156,14 @@ namespace GIC.Battle
         /// <summary>射程上限（格；0=ProjectileRule.MaxRange 默认）</summary>
         public int Range;
 
+        /// <summary>箭矢视觉飞行高度（格=世界单位；0=BattleMetrics.ArrowFlightHeight 默认——纯视觉，
+        /// 判定圆柱与世界高度无关；per-skill 时轮 clip.projectileHeight，2026-10-05 对齐动画松弦位）</summary>
+        public float Height;
+
         public ProjectileEffect(string attackerUnitId, ActionData action, int attackPercent,
             BattleCell fromCell, int deltaX, int deltaY,
-            float launchSeconds = 0f, float speed = 0f, float diameter = 0f, int range = 0)
+            float launchSeconds = 0f, float speed = 0f, float diameter = 0f, int range = 0,
+            float height = 0f)
         {
             AttackerUnitId = attackerUnitId;
             TargetUnitId = null; // 命中前未定
@@ -167,6 +177,7 @@ namespace GIC.Battle
             Speed = speed;
             Diameter = diameter;
             Range = range;
+            Height = height;
         }
     }
 

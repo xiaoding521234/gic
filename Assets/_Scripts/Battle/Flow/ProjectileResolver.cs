@@ -112,6 +112,8 @@ namespace GIC.Battle
                     // 投射物元素（箭矢染色单源 2026-09-28）：与命中 Damage.metadata 同口径——
                     // 丘丘人借凯亚霜袭时消散箭也是冰色，非施法者物理灰
                     vanishCmd.reactionKind = (int)SkillHitResolver.ResolveProjectileElement(sim, projectile.Action);
+                    // 箭矢视觉高度（2026-10-05 对齐动画松弦位）：发射声明透传千分下发，客户端消散箭同高
+                    vanishCmd.arrowHeightY = Mathf.RoundToInt(projectile.Height * 1000f);
                     vanishes.Add(vanishCmd);
                     continue;
                 }
@@ -146,9 +148,14 @@ namespace GIC.Battle
                 foreach (var enemy in contact.members)
                 {
                     // hitT=接触时刻随效应下发（「命中时才给」2026-09-25：战技获能/命中治疗到点应用）
-                    effects.AddRange(SkillHitResolver.Hit(sim, contact.projectile.Action, sliceSnapshot, enemy.unitId,
+                    var hitEffects = SkillHitResolver.Hit(sim, contact.projectile.Action, sliceSnapshot, enemy.unitId,
                         contact.projectile.AttackPercent, ProjectileRule.LineDelivery, contact.projectile.FromCell,
-                        contact.hitPoint.x, contact.hitPoint.y, contact.launch, contact.hitT));
+                        contact.hitPoint.x, contact.hitPoint.y, contact.launch, contact.hitT);
+                    // 箭矢视觉高度透传（2026-10-05 对齐动画松弦位）：发射声明 → 命中产物，
+                    // 随 Damage 命令千分下发（纯视觉参数，判定圆柱与世界高度无关零影响）
+                    foreach (var e in hitEffects)
+                        if (e is DamageEffect dmg) dmg.ProjectileHeightY = contact.projectile.Height;
+                    effects.AddRange(hitEffects);
                 }
             }
         }

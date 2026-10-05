@@ -302,10 +302,26 @@ namespace GIC.Battle
                 if (command.launchMs > 0)
                     yield return new WaitForSeconds(LaunchDelayOf(command));
 
-                Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
+                // 箭矢全程贴立牌面飞（2026-10-05 十轮定案「箭和立牌同一平面」）：起点=施放者立牌面内
+                // 弓位点（ProjectileOriginWorld——箭高=**面内语义**〔tiltGroup 局部 y〕，预览贴弓直读）；
+                // 终点 z 同加立牌面前伸量——两端同面同深：东西向全程等深=屏幕水平直线，且与一切同俯仰
+                // 立牌共面（目标立牌面同深≈到点贴上目标身）。历史：八轮「格心 xz+屏幕解算 y」箭在立牌面
+                // 前 ~0.5 格飞=「不在一个平面上」报障根因；六报前「面内起点+格心终点」两端深度差=屏幕
+                // 斜线——教训=两端必须同面同深，勿混合
+                float arrowFacial = command.arrowHeightY > 0 ? command.arrowHeightY / 1000f : BattleMetrics.ArrowFlightHeight;
+                Vector3 from = _board.CellToWorld(command.cell);
+                float planeDepth = 0f; // 立牌面前伸量（55° 后仰：面上点随高度前移 sin55°×面内高）
+                if (_views.TryGetValue(command.actorUnitId, out var casterView))
+                {
+                    Vector3 cellCenter = from;
+                    from = casterView.ProjectileOriginWorld(arrowFacial);
+                    planeDepth = from.z - cellCenter.z;
+                }
                 Vector3 to = command.hitX != 0 || command.hitY != 0
-                    ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f)
-                    : target.transform.position + new Vector3(0f, 0.45f, 0f); // 兜底：无定点数据时飞向目标
+                    ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f)
+                    : target.transform.position; // 兜底：无定点数据时飞向目标
+                to.y = from.y; // 与发射点同高=水平直线（飞行段世界系正常视差）
+                to.z += planeDepth; // 全程保持发射面深度=贴面飞行（东西向与一切立牌共面）
 
                 // 元素色动态染色（2026-09-28 拍板方案 A；2026-10-04 起走箭矢色板单源）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
                 var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.metadata));
@@ -340,18 +356,30 @@ namespace GIC.Battle
                 if (command.launchMs > 0)
                     yield return new WaitForSeconds(LaunchDelayOf(command));
 
-                Vector3 from = _board.CellToWorld(command.cell) + new Vector3(0f, 0.45f, 0f);
+                // 箭矢视觉高度（与命中侧同源）：命令千分携带（**面内语义**=tiltGroup 局部 y）；
+                // 起点=施放者立牌面内弓位点+全程保持面深（十轮定案「箭和立牌同一平面」，详见命中侧注释）
+                float vanishArrowFacial = command.arrowHeightY > 0 ? command.arrowHeightY / 1000f : BattleMetrics.ArrowFlightHeight;
+                Vector3 from = _board.CellToWorld(command.cell);
+                float vanishPlaneDepth = 0f;
+                if (_views.TryGetValue(command.actorUnitId, out var vanishView))
+                {
+                    Vector3 vanishCellCenter = from;
+                    from = vanishView.ProjectileOriginWorld(vanishArrowFacial);
+                    vanishPlaneDepth = from.z - vanishCellCenter.z;
+                }
                 Vector3 to;
                 if (command.hitX != 0 || command.hitY != 0)
                 {
-                    to = _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f) + new Vector3(0f, 0.45f, 0f);
+                    to = _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f);
                 }
                 else
                 {
                     var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
                     to = _board.CellToWorld(new BattleCell(command.cell.x + delta.x * command.value,
-                        command.cell.y + delta.y * command.value)) + new Vector3(0f, 0.45f, 0f);
+                        command.cell.y + delta.y * command.value));
                 }
+                to.y = from.y; // 与发射点同高=水平直线
+                to.z += vanishPlaneDepth; // 消散端保持发射面深度（无目标立牌可贴，东西向全程同面）
 
                 // 元素色=消散命令随带投射物元素（reactionKind，Host 与命中 Damage.metadata 同口径回填——
                 // 丘丘人借霜袭时消散箭同为冰色，非施法者物理灰；2026-10-04 起走箭矢色板单源）

@@ -17,6 +17,10 @@ namespace GIC.Battle
         /// <summary>移动每格耗时（秒）——移动插值速度 = 1/此值 格/秒</summary>
         public const float MoveStepSeconds = 0.18f;
 
+        /// <summary>箭矢视觉飞行高度（格=世界单位，格面起算；默认 0.45）——纯视觉参数（判定圆柱与世界
+        /// 高度无关）；per-skill 覆写=时轮 clip.projectileHeight（对齐动作片弓的松弦位置，2026-10-05）</summary>
+        public const float ArrowFlightHeight = 0.45f;
+
         /// <summary>多层 Buff 逐层效果错峰间隔（秒，2026-10-01 拍板「每层的效果延后 0.15s 生效，
         /// 避免同时弹出」——寒冰之棱/歌声之环多层 tick 各层独立弹数字；第 i 层时刻=i×此值，
         /// 与箭雨段间隔同节拍语言；Host 状态恒即时结算，错峰纯表现层——客户端 Damage/Heal
