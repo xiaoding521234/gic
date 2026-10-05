@@ -1338,20 +1338,30 @@ namespace GIC.Editor
             float span = clipLen > 0f ? clipLen / speed : 0f; // 校准速度下的播放长（战斗 1x 回放视角）
             float total = Mathf.Max(0f, _asset.totalTime);
             float diff = span - total;
+            bool isMoveSkill = data.skillType == SkillType.Move; // 决策四十四：Move 动作视频=循环态移动片
 
             // 富文本状态色：绿=对齐、黄=轻微偏差、红=明显偏差——一眼可读（易用性重排）
             var sb = new System.Text.StringBuilder();
             sb.Append($"<b>{data.skillID}</b>（{_previewUnitData?.unitName.ToString() ?? "？"}）");
             sb.Append($" · 待机基准：{(_previewIdleClip != null ? "<color=#7fd67f>✓</color>" : "<color=#d6a25f>无</color>")}");
-            sb.Append($"\n片长 {clipLen:0.00}s × 速度 {speed:0.00} = <color=#b8c4d4>{span:0.00}s</color> vs 总时长 {total:0.00}s ");
-            if (clipLen > 0f && total > 0f)
+            if (isMoveSkill)
             {
-                if (diff > 0.02f)
-                    sb.Append($"<color=#d67f7f>超出 {diff:0.00}s</color>");
-                else if (diff < -0.02f)
-                    sb.Append($"<color=#d6c27f>短 {Mathf.Abs(diff):0.00}s</color>");
-                else
-                    sb.Append("<color=#7fd67f>✓铺满</color>");
+                // 循环态移动片：行走时长随步数可变，时长对齐不适用——只校准观感（速度=扇翼频率/缩放/位置）
+                sb.Append($"\n循环态移动片：片长 {clipLen:0.00}s × 速度 {speed:0.00}（行走时长随步数可变，不比总时长）");
+                sb.Append("\n只校准观感（速度=循环节奏、缩放补偿、位置偏移）——运行时=行走期间循环、片末回待机");
+            }
+            else
+            {
+                sb.Append($"\n片长 {clipLen:0.00}s × 速度 {speed:0.00} = <color=#b8c4d4>{span:0.00}s</color> vs 总时长 {total:0.00}s ");
+                if (clipLen > 0f && total > 0f)
+                {
+                    if (diff > 0.02f)
+                        sb.Append($"<color=#d67f7f>超出 {diff:0.00}s</color>");
+                    else if (diff < -0.02f)
+                        sb.Append($"<color=#d6c27f>短 {Mathf.Abs(diff):0.00}s</color>");
+                    else
+                        sb.Append("<color=#7fd67f>✓铺满</color>");
+                }
             }
             var shots = Mathf.Max(1, data.GetInt(SkillParamKey.DamageCount, 1));
             var judgments = SkillTimelineQuery.ClipsOf(_asset, SkillTrackType.Judgment);
@@ -1433,7 +1443,8 @@ namespace GIC.Editor
             var chromaShader = Shader.Find("GIC/Battle/ChromaKeyVideo");
             if (chromaShader != null) _previewChromaMat = new Material(chromaShader);
 
-            // 动作片：一次性（isLooping=false），起始帧先渲一帧作静态预览
+            // 动作片预览：Move 型=循环播（真实移动态观感——翼扇动循环），其余=一次性（isLooping=false，
+            // 起始帧先渲一帧作静态预览）。决策四十四：Move 技能的动作视频=循环态移动片
             _actionRawRt = MakeRt(actionClip.width, actionClip.height);
             _actionKeyedRt = MakeRt(actionClip.width, actionClip.height);
             _actionPlayer = _previewRoot.AddComponent<VideoPlayer>();
@@ -1441,7 +1452,7 @@ namespace GIC.Editor
             _actionPlayer.clip = actionClip;
             _actionPlayer.renderMode = VideoRenderMode.RenderTexture;
             _actionPlayer.targetTexture = _actionRawRt;
-            _actionPlayer.isLooping = false;
+            _actionPlayer.isLooping = _previewSkillData != null && _previewSkillData.skillType == SkillType.Move;
             _actionPlayer.audioOutputMode = VideoAudioOutputMode.None;
             _actionPlayer.playbackSpeed = PreviewSpeed();
             _actionPlayer.Play(); // 开播首帧（paused 态从未 Play 的 VideoPlayer 可能不渲染 RT——起播即渲染）

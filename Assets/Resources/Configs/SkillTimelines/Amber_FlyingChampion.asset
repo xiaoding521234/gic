@@ -23,6 +23,7 @@ MonoBehaviour:
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 0
+    projectileHeight: 0
     cueName: takeoff
   - trackType: 4
     startTime: 0.2
@@ -32,4 +33,5 @@ MonoBehaviour:
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 0
+    projectileHeight: 0
     cueName: wing_flap
