@@ -30,20 +30,22 @@ namespace GIC.Data
             /// <summary>战斗立牌图（纸片人全身立绘，gic-paperdoll 产物）；null 时立牌回落 avatar 头像</summary>
             public Sprite 立牌图;
 
-            /// <summary>立牌循环动画帧（AI 直出序列帧 sheet 的网格切片，按序循环播放；null/空=静态立牌兜底）</summary>
-            public Sprite[] 立牌动画帧;
-
-            /// <summary>立牌动画播放帧率（fps，默认 12；序列帧循环速度）</summary>
-            public float 立牌动画帧率 = 12f;
-
             /// <summary>立牌循环动画视频（B-S3 视频路线：绿幕 mp4 + VideoPlayer→RT + 运行时 ChromaKey 抠色；
-            /// 显存恒定、与帧数无关；优先级高于 立牌动画帧；null=序列帧/静态兜底）</summary>
+            /// 显存恒定、与帧数无关；null=静态立牌兜底。序列帧路线（立牌动画帧/立牌动画帧率）已随
+            /// 2026-10-05 拍板「序列帧是以前尝试时遗留下的，全部移除，统一用视频或静态立牌兜底」全库退役。
+            /// 移动循环片同日迁移至 per-skill（决策四十四「尽可能统一」）：配 Move 型技能 SkillData.动作视频
+            /// ——单位级 移动动画视频 字段已删除，本字段只承载待机片</summary>
             public VideoClip 立牌动画视频;
 
-            /// <summary>移动中循环动画视频（B-S4a 移动态接线，2026-09-29 拍板「正式化安柏待机+移动动画」）：
-            /// 移动命令片内切此片、片末回 立牌动画视频（UnitView.SetMoveAnimation，驱动=BattlePlayer.PlayMoveCoroutine 起止）；
-            /// null=无移动态动画（立牌动画视频 常驻=旧行为）</summary>
-            public VideoClip 移动动画视频;
+            /// <summary>专属弹射物（2026-10-05 拍板「每位伙伴角色单独定制弹射物，通用染色箭矢保留给眷属」）：
+            /// 本单位一切投射物表现（命中箭/消散箭/箭雨落箭三路）改用此 Sprite、不做元素染色（美术即最终色）；
+            /// null=回落通用 ArrowBolt+箭矢色板元素染色（眷属/未定制单位路径，零回归）。
+            /// 素材约定：长轴横向（箭头朝右）、导入规格对齐 ArrowBolt（PPU 100/中心 pivot/maxSize 512）</summary>
+            public Sprite 专属弹射物;
+
+            /// <summary>专属弹射物缩放（乘在 BattlePlayer「箭矢长度」归一化之上；1=与通用箭矢同大——
+            /// 圆形弹射物（水球等）按观感另调）</summary>
+            public float 专属弹射物缩放 = 1f;
 
             /// <summary>立牌离地高度（格，1 格=1 世界单位；2026-09-27 拍板新增）：纸片人整体上浮——
             /// 飞行/悬浮单位调高（安柏=0.5）；**默认 0.05=AI 生成立牌底部渐隐行的陷地观感补偿基线**

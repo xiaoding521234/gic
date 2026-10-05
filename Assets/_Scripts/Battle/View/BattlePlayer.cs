@@ -109,6 +109,13 @@ namespace GIC.Battle
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
 
+        /// <summary>per-unit 专属弹射物登记（UnitData.专属弹射物/缩放，2026-10-05 拍板「每位伙伴角色
+        /// 单独定制弹射物，通用染色箭矢保留给眷属」）：CreateView 建场登记、ClearViews 清空；命中箭/
+        /// 消散箭/箭雨落箭三路经 actorUnitId 查此表——命中=专属素材+白染（美术即最终色）、
+        /// 未登记=通用 ArrowBolt+箭矢色板元素染色（眷属路径零回归）</summary>
+        private readonly Dictionary<string, (Sprite sprite, float scale)> _customProjectiles =
+            new Dictionary<string, (Sprite, float)>();
+
         /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
         [Autowired] private UnitConfig _unitConfig;
         private TurnFlowController _flow;
@@ -323,8 +330,9 @@ namespace GIC.Battle
                 to.y = from.y; // 与发射点同高=水平直线（飞行段世界系正常视差）
                 to.z += planeDepth; // 全程保持发射面深度=贴面飞行（东西向与一切立牌共面）
 
-                // 元素色动态染色（2026-09-28 拍板方案 A；2026-10-04 起走箭矢色板单源）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源
-                var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.metadata));
+                // 元素色动态染色（2026-09-28 拍板方案 A；2026-10-04 起走箭矢色板单源）：命中箭取 Damage 命令自带伤害元素（metadata）——与结算同源；
+                // 施法者配了专属弹射物时 CreateProjectileVisual 内改走专属素材+白染（2026-10-05 per-unit 定制）
+                var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.metadata), command.actorUnitId);
 
                 float distance = Vector3.Distance(from, to);
                 float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
@@ -382,8 +390,9 @@ namespace GIC.Battle
                 to.z += vanishPlaneDepth; // 消散端保持发射面深度（无目标立牌可贴，东西向全程同面）
 
                 // 元素色=消散命令随带投射物元素（reactionKind，Host 与命中 Damage.metadata 同口径回填——
-                // 丘丘人借霜袭时消散箭同为冰色，非施法者物理灰；2026-10-04 起走箭矢色板单源）
-                var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.reactionKind));
+                // 丘丘人借霜袭时消散箭同为冰色，非施法者物理灰；2026-10-04 起走箭矢色板单源；
+                // 施法者配了专属弹射物时 CreateProjectileVisual 内改走专属素材+白染）
+                var arrowGo = CreateProjectileVisual(from, to, ResolveArrowTint(command.reactionKind), command.actorUnitId);
 
                 float distance = Vector3.Distance(from, to);
                 float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
@@ -433,8 +442,10 @@ namespace GIC.Battle
 
         /// <summary>箭矢视觉（2026-09-28 拍板方案 A：屏幕平行布告板 + 屏幕平面内旋转对齐飞行方向——
         /// 固定视角十字四向只有 0/90/180/270 四角，上下射=屏幕竖直箭、四向全长；元素色动态染色。
-        /// 创建即就位，飞行由调用方 tween；占位兜底配色=BattlePalette「箭矢占位色」活色勿写字面量）</summary>
-        private GameObject CreateProjectileVisual(Vector3 from, Vector3 to, Color tint)
+        /// 创建即就位，飞行由调用方 tween；占位兜底配色=BattlePalette「箭矢占位色」活色勿写字面量。
+        /// per-unit 专属弹射物（2026-10-05 拍板）：actorUnitId 已登记=专属素材+白染（美术即最终色，
+        /// 缩放乘「箭矢长度」归一化）；未登记=通用 ArrowBolt+传入 tint 元素染色</summary>
+        private GameObject CreateProjectileVisual(Vector3 from, Vector3 to, Color tint, string actorUnitId = null)
         {
             var arrowGo = new GameObject("Projectile");
             arrowGo.transform.SetParent(_viewRoot, false);
@@ -458,12 +469,20 @@ namespace GIC.Battle
             var renderer = arrowGo.AddComponent<SpriteRenderer>();
             renderer.sortingOrder = BattleMetrics.ProjectileSortingOrder;
             var sprite = ArrowSprite;
+            float customScale = 1f;
+            var color = tint;
+            if (actorUnitId != null && _customProjectiles.TryGetValue(actorUnitId, out var custom))
+            {
+                sprite = custom.sprite;   // 专属弹射物：美术即最终色
+                customScale = custom.scale;
+                color = Color.white;     // 白染=不再元素染色（专属素材自带角色元素配色）
+            }
             if (sprite != null)
             {
-                var scale = 箭矢长度 / sprite.bounds.size.x; // 箭矢长度=屏幕长轴全长，高度随素材纵横比
+                var scale = 箭矢长度 / sprite.bounds.size.x * customScale; // 箭矢长度=屏幕长轴全长，高度随素材纵横比
                 arrowGo.transform.localScale = new Vector3(scale, scale, 1f);
                 renderer.sprite = sprite;
-                renderer.color = tint;
+                renderer.color = color;
             }
             else
             {
@@ -548,7 +567,7 @@ namespace GIC.Battle
                 foreach (var cell in cells)
                 {
                     for (int i = 0; i < 箭雨每格每段箭数; i++)
-                        StartCoroutine(PlayRainArrowCoroutine(cell, shotDir, tint,
+                        StartCoroutine(PlayRainArrowCoroutine(cell, shotDir, tint, command.actorUnitId,
                             UnityEngine.Random.Range(0f, 箭雨逐箭散布延迟))); // 单箭 fire-and-forget（不 gate ack）
                 }
             }
@@ -557,7 +576,7 @@ namespace GIC.Battle
         /// <summary>单支落箭：延迟起飞→斜落（落向沿安柏射向「箭雨落下倾斜角」）→落地沿箭轴压入插土
         ///（入土段被地形深度裁掉=尖插表面、尾翘起；水面格落点=波浪表面之上）→原地滞留（2026-09-28
         /// 拍板「插在表面 3 秒」）→淡出销毁</summary>
-        private IEnumerator PlayRainArrowCoroutine(BattleCell cell, Vector3 shotDir, Color tint, float delaySeconds)
+        private IEnumerator PlayRainArrowCoroutine(BattleCell cell, Vector3 shotDir, Color tint, string actorUnitId, float delaySeconds)
         {
             // 在途有意义行动计数（fire-and-forget 单箭=唯一跨片在途源——片 ack 不等它，下一片片头
             // 空等跳过据此探测，2026-09-30 拍板）：散布延迟+斜落段=箭矢飞行；落地即结算，
@@ -583,7 +602,7 @@ namespace GIC.Battle
                 {
                     from -= shotDir * (Mathf.Tan(箭雨落下倾斜角 * Mathf.Deg2Rad) * 箭雨起始高度);
                 }
-                arrowGo = CreateProjectileVisual(from, to, tint);
+                arrowGo = CreateProjectileVisual(from, to, tint, actorUnitId);
                 arrowGo.transform.localScale *= 箭雨箭矢缩放;
 
                 yield return BattleViewTween.Over(箭雨坠落时长 / _playbackSpeed,
@@ -856,8 +875,20 @@ namespace GIC.Battle
                             {
                                 // B-S4c 校准批次：播放速度=战斗回放速度×技能校准倍率（0/负=按 1，非法回落原速）
                                 var 校准速度 = skillData.动作片播放速度 > 0f ? skillData.动作片播放速度 : 1f;
-                                caster.PlayActionVideo(actionClip, _playbackSpeed * 校准速度,
-                                    skillData.动作片缩放补偿, skillData.动作片位置偏移);
+                                if (skillData.skillType == SkillType.Move)
+                                {
+                                    // 移动技能动作片=循环态移动片（2026-10-05 决策四十四「尽可能统一」）：
+                                    // SkillCast 片头登记（每段移动行动同产 SkillCast——AddMoveCast，登记恒新鲜）、
+                                    // Move 命令片起止 SetMoveAnimation 消费；速度同一次性动作片口径乘回放速度
+                                    // （行走 tween 同按回放速度缩放，快进不脚滑）
+                                    caster.SetMoveVideo(actionClip, _playbackSpeed * 校准速度,
+                                        skillData.动作片缩放补偿, skillData.动作片位置偏移);
+                                }
+                                else
+                                {
+                                    caster.PlayActionVideo(actionClip, _playbackSpeed * 校准速度,
+                                        skillData.动作片缩放补偿, skillData.动作片位置偏移);
+                                }
                             }
                         }
                         StartCoroutine(PlaySkillCastVfxCoroutine(command));
@@ -916,8 +947,9 @@ namespace GIC.Battle
 
         private IEnumerator PlayMoveCoroutine(UnitView view, BattleCommand command)
         {
-            // 移动态动画（B-S4a，2026-09-29 拍板「正式化安柏待机+移动动画」）：移动片内切 移动动画视频、
-            // 片末回 待机（含被挡弹回段——弹回也是移动表现）；try/finally 保异常不滞留移动态
+            // 移动态动画（B-S4a；2026-10-05 决策四十四 per-skill 统一）：移动片内切登记的移动循环片
+            // （SkillCast 片头经 SetMoveVideo 登记）、片末回 待机（含被挡弹回段——弹回也是移动表现）；
+            // try/finally 保异常不滞留移动态
             view.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随移动方向（拍板③）；行动后保持=待机延续
             view.SetMoveAnimation(true);
             _meaningfulActionInFlight++; // 在途有意义行动：移动行走（含被挡弹回段）——空等跳过探测源
@@ -1208,6 +1240,7 @@ namespace GIC.Battle
                 if (kv.Value != null)
                     Destroy(kv.Value.gameObject);
             _views.Clear();
+            _customProjectiles.Clear(); // per-unit 专属弹射物随场同清（与 _views 同生命周期）
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
         }
 
@@ -1221,10 +1254,8 @@ namespace GIC.Battle
             bool useFullBody = false;
             string displayName = state.unitId;
             TextEntry nameEntry = null;
-            Sprite[] idleFrames = null;
-            float idleFps = 12f;
             VideoClip idleVideo = null;
-            VideoClip moveVideo = null; // 移动态动画（B-S4a，2026-09-29 拍板「正式化安柏待机+移动动画」）
+            var prewarmClips = new List<VideoClip>(); // 动作片预热线（决策四十五）：本单位全部技能动作视频（含 Move）
             float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放）
             float hoverHeight = 0f; // UnitData.离地高度（2026-09-27 拍板：飞行/悬浮单位纸片人整体上浮）
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
@@ -1235,16 +1266,25 @@ namespace GIC.Battle
                 avatar = useFullBody ? unitData.立牌图 : unitData.avatar;
                 displayName = unitName.ToString();
                 nameEntry = unitName.GetEntry(); // 单位名本地化条目（UnitName 表）
-                // 立牌循环动画（B-S3 视频路线拍板）：视频（绿幕+运行时 ChromaKey 抠色）优先于序列帧；都缺=静态兜底
+                // 立牌循环动画（B-S3 视频路线）：视频（绿幕+运行时 ChromaKey 抠色）；null=静态立牌兜底
+                // （序列帧路线已退役——2026-10-05 拍板全库移除，旧尝试遗留零单位在用）。
+                // 移动循环片=per-skill（决策四十四「尽可能统一」：Move 型技能 SkillData.动作视频，
+                // SkillCast 登记+Move 片起止消费——不再走单位级字段）
                 idleVideo = unitData.立牌动画视频;
-                moveVideo = unitData.移动动画视频; // 移动态片（null=移动期间照播待机=旧行为）
-                if (idleVideo == null && unitData.立牌动画帧 != null && unitData.立牌动画帧.Length > 1)
-                {
-                    idleFrames = unitData.立牌动画帧;
-                    idleFps = unitData.立牌动画帧率;
-                }
+                // 动作片预热线（决策四十五：首次施放/移动零黑屏）——仅视频路径单位有意义
+                // （动作片走主视频机，PlayActionVideo 无播放器早退）
+                if (idleVideo != null && unitData.skills != null)
+                    foreach (var s in unitData.skills)
+                    {
+                        var d = s != null ? s.data : null;
+                        if (d != null && d.动作视频 != null && !prewarmClips.Contains(d.动作视频))
+                            prewarmClips.Add(d.动作视频);
+                    }
                 unitScale = unitData.额外缩放;
                 hoverHeight = unitData.离地高度;
+                if (unitData.专属弹射物 != null) // per-unit 专属弹射物登记（2026-10-05 拍板；命中/消散/箭雨三路消费）
+                    _customProjectiles[state.unitId] = (unitData.专属弹射物,
+                        unitData.专属弹射物缩放 > 0f ? unitData.专属弹射物缩放 : 1f);
             }
 
             var team = (TeamType)state.team;
@@ -1253,7 +1293,7 @@ namespace GIC.Battle
             // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
             var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
                 _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
-                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleFrames, idleFps, idleVideo, moveVideo, hoverHeight,
+                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
                 state.cylinderDiameter); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
@@ -1264,6 +1304,8 @@ namespace GIC.Battle
             view.SetBuffs(state.buffs);
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;
+            if (prewarmClips.Count > 0)
+                view.PrewarmActionClips(prewarmClips); // 动作片建场预热（决策四十五）：首次施放/移动零黑屏
             EnsureOverheadBars().Register(view); // 原神式头顶条（血条+元能条+附着图标，2026-09-24）
         }
 

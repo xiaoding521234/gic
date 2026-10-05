@@ -39,9 +39,10 @@ namespace GIC.Data
             [Header("时轮时间轴（B-S1；null=无时轮兜底=旧即时行为）")]
             public SkillTimelineAsset timeline;
 
-            [Header("动作视频（B-S4c 战技/爆发动作轨，2026-10-04）：绿幕 mp4 一次性动作片")]
-            [Header("（时长≈timeline.totalTime——拉弓/释放/收势整段，发射时刻由裁剪对齐时轮 startTime；")]
-            [Header("SkillCast 片头从头播、播完自动回待机循环；null=无动作视频=待机照播）")]
+            [Header("动作视频（B-S4c 战技/爆发动作轨，2026-10-04；2026-10-05 决策四十四扩到 Move 型=循环态移动片）：绿幕 mp4 动作片")]
+            [Header("（战技/爆发=一次性：时长≈timeline.totalTime——拉弓/释放/收势整段，发射时刻由裁剪对齐时轮 startTime；")]
+            [Header("SkillCast 片头从头播、播完自动回待机循环。Move 型=循环态：SkillCast 登记+Move 命令片起止，")]
+            [Header("行走期间循环、片末回待机、速度乘回放速度（快进不脚滑）。null=无动作视频=待机照播）")]
             public VideoClip 动作视频;
 
             [Tooltip("动作片缩放补偿（1=不补偿；=idle 片主体高/动作片主体高——宽幅 16:9 动作片构图主体小，播放放大回 idle 主体视觉大小，UnitView.PlayActionVideo 内乘 quad scale；安柏宽幅构图实测=1.29（idle 主体 554px/动作片主体 430px））")]

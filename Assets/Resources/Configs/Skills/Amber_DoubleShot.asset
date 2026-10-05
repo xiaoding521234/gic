@@ -27,7 +27,7 @@ MonoBehaviour:
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 32900000, guid: 8184c16a7c7260b49a58e7e7581d841d, type: 3}
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1.29
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1.002
-    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0.023, y: -0.071}
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0.054, y: -0.01}
     effects:
     - trigger: 1
       kind: 1
