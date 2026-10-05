@@ -199,6 +199,19 @@ namespace GIC.Battle
             return Sim.RegisterUnit(unit, playerId, team, cell);
         }
 
+        /// <summary>试招沙盒单位生成（2026-10-05 时轮编辑器「开一把试招」）：同 SpawnDebugUnit 真实链，
+        /// 生成后置层级覆盖星（默认 5=魔神档玩家全手操全部技能——操控分层按星级的既定语义，
+        /// 数值回落公式仍读原星=数值原味；TierOverrideStars 是 Unit 运行时实例位，零资产污染随战斗回收）</summary>
+        public string SpawnSandboxUnit(UnitName unitName, string playerId, TeamType team, BattleCell cell, int tierStars = 5)
+        {
+            var unitId = SpawnDebugUnit(unitName, playerId, team, cell);
+            if (unitId == null) return null;
+            var unit = Sim.GetUnit(unitId);
+            if (unit != null)
+                unit.TierOverrideStars = tierStars;
+            return unitId;
+        }
+
         public void RegisterDebugPlayer(string playerId)
         {
             Sim.RegisterPlayer(playerId);

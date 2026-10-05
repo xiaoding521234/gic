@@ -69,6 +69,11 @@ namespace GIC.Battle
         /// <summary>逻辑单位隐藏根（装配时设置；部署等运行时生成单位挂此——纯逻辑容器勿落场景根，BattleSession._logicRoot 同源）</summary>
         public UnityEngine.Transform LogicRoot { get; set; }
 
+        /// <summary>试招沙盒空座玩家（2026-10-05 时轮编辑器「开一把试招」）：该玩家每回合选择阶段
+        /// 开始即自动上交 Pass（不等时限超时——木桩空座无真人无配额脑，TurnFlow.BeginSelectPhase 消费；
+        /// null=常规对局零行为）</summary>
+        public string SandboxAutoPassPlayerId;
+
         // ==================== 玩家注册 ====================
 
         public void RegisterPlayer(string playerId)
@@ -711,6 +716,7 @@ namespace GIC.Battle
                 sanity = stats?.Sanity ?? 0,
                 cylinderDiameter = unit.RawData?.受击圆柱直径 ?? 0f,
                 constellation = unit.ConstellationLevel, // 命座（B8 批：展示/升命门控真源）
+                tier = (int)BattleHeuristics.TierOf(unit), // 操控层级单源（TierOverrideStars 覆盖随此进快照——客户端门控同源）
             };
             foreach (var buff in unit.Buffs)
                 state.buffs.Add(new BuffState

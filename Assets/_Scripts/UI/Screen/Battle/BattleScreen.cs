@@ -169,8 +169,24 @@ namespace GIC.UI
                 yield return null;
             }
 
-            // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
-            yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
+            // 试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A=编辑单位（层级覆盖 5★魔神档全手操）、
+            // B=木桩空座（即时自动 Pass，站桩挨打）；否则走 B1 固定测试军
+            if (launchConfig != null && launchConfig.IsSandbox)
+            {
+                _session.Sim.SandboxAutoPassPlayerId = playerSetups[1].PlayerId; // 空座回合即时 Pass（TurnFlow 消费）
+                var allyCenter = FindSpawnCenter(mapConfig, playerSetups[0].PlayerId, new BattleCell(2, 2));
+                // 试探单位：出生中心东 1 格（中心格已让位协议核心）；木桩同行再东 5 格=十字射程内同屏
+                _session.SpawnSandboxUnit(launchConfig.SandboxAllyUnit, playerSetups[0].PlayerId, TeamType.A,
+                    allyCenter + new BattleCell(1, 0));
+                yield return null;
+                _session.SpawnDebugUnit(launchConfig.SandboxDummyUnit, playerSetups[1].PlayerId, TeamType.B,
+                    allyCenter + new BattleCell(6, 0));
+            }
+            else
+            {
+                // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
+                yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
+            }
 
             // 局内手牌（2026-09-25 拍板「获得卡片=手牌构建唯一入口，获得/失去对称」）：
             // 空表起步→初始卡组按顺序逐张获得（数量=备战数）→开局送初始资源 200 摩拉+60 体力
