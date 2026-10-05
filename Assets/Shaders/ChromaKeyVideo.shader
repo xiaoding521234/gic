@@ -27,6 +27,12 @@ Shader "GIC/Battle/ChromaKeyVideo"
         _MistHeight ("冰雾高度占比", Range(0.05, 1)) = 0.3
         _FrostAlpha ("冰体不透明度", Range(0.05, 1)) = 0.78
         _FrostFringeAlpha ("轮廓外冰缘不透明度", Range(0, 1)) = 0.38
+
+        // 选中描边（2026-10-05 拍板「立牌加描边，颜色=所属玩家色」；shader 装饰性 Header 属性
+        // 带连字符会炸 ShaderLab 解析器，故用普通注释分区）
+        _OutlineEnabled ("选中描边", Range(0, 1)) = 0
+        _OutlineColor ("描边色", Color) = (1, 1, 1, 1)
+        _OutlineWidth ("描边宽(texel)", Range(1, 16)) = 9
     }
 
     SubShader
@@ -56,8 +62,11 @@ Shader "GIC/Battle/ChromaKeyVideo"
             #include "FrozenFrost.cginc"
 
             sampler2D _MainTex;
-            float4 _MainTex_TexelSize; // 轮廓外延冰缘的四邻域采样步长
+            float4 _MainTex_TexelSize; // 轮廓外延冰缘/选中描边的邻域采样步长
             fixed4 _Color;
+            float _OutlineEnabled;
+            float4 _OutlineColor;
+            float _OutlineWidth;
 
             // 抠色形状 alpha（=1-键值）：抽帧管线同参 excess 平滑带+暗部亮度门；霜化边缘/冰缘共用
             half ChromaShape(half3 c)
@@ -108,6 +117,29 @@ Shader "GIC/Battle/ChromaKeyVideo"
                         ChromaShape(tex2D(_MainTex, i.uv - float2(0.0, o4.y)).rgb)));
 
                 FrostApply(col, i.worldPos.y, i.uv, shapeAlpha, neighborAlpha); // _FrozenAmount=0 时零成本直通
+
+                // 选中描边（2026-10-05 拍板「立牌加描边，颜色=所属玩家色」）：形状外邻域环采样
+                // （8 方向 ±_OutlineWidth texel，形状=各自抠色）→ 队伍色描边；frost 之后应用
+                // （选中态描边盖过轮廓外冰缘保可读）。_OutlineEnabled=0 时分支不执行
+                if (_OutlineEnabled > 0.5 && shapeAlpha < 0.35)
+                {
+                    float2 oo = _MainTex_TexelSize.xy * _OutlineWidth;
+                    half ring = max(
+                        max(ChromaShape(tex2D(_MainTex, i.uv + float2(oo.x, 0.0)).rgb),
+                            ChromaShape(tex2D(_MainTex, i.uv - float2(oo.x, 0.0)).rgb)),
+                        max(ChromaShape(tex2D(_MainTex, i.uv + float2(0.0, oo.y)).rgb),
+                            ChromaShape(tex2D(_MainTex, i.uv - float2(0.0, oo.y)).rgb)));
+                    float2 odd = oo * 0.7071;
+                    ring = max(ring,
+                        max(
+                            max(ChromaShape(tex2D(_MainTex, i.uv + odd).rgb),
+                                ChromaShape(tex2D(_MainTex, i.uv - odd).rgb)),
+                            max(ChromaShape(tex2D(_MainTex, i.uv + float2(odd.x, -odd.y)).rgb),
+                                ChromaShape(tex2D(_MainTex, i.uv - float2(odd.x, -odd.y)).rgb))));
+                    half m = saturate((ring - 0.2) * 1.6); // 环命中强度（贴边采样 alpha 低处平滑收尾）
+                    col.rgb = lerp(col.rgb, _OutlineColor.rgb, m);
+                    col.a = max(col.a, m * _OutlineColor.a);
+                }
                 return col;
             }
             ENDCG

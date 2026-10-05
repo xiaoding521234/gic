@@ -183,5 +183,71 @@ namespace GIC.Battle
             go.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
             return go;
         }
+
+        /// <summary>底座盘描边环 mesh（内径 0.465/外径 0.535 归一化——localScale=盘径即等比带宽：
+        /// 盘缘 0.5 平分环带，外露黑边=盘径×3.5%〔首版 7% 用户目检「太粗了，砍一半」2026-10-06〕；
+        /// 拍板「底部圆盘加不透明黑色描边」。共享单实例常驻（同 _discMesh；环宽随盘径等比=
+        /// 核心 0.8 大盘描边自动加粗，免参数化缓存）</summary>
+        private static Mesh _discOutlineMesh;
+
+        /// <summary>描边环共享不透明黑材质（常驻单实例免释放——环靠 opaque 深度天然画于水面之上，
+        /// 与透明盘的 sortingOrder 排序体系正交；Cull Off=薄带环绕向免究恒可见）</summary>
+        private static Material _discOutlineMaterial;
+
+        /// <summary>底座盘描边环共享黑材质（不透明 Geometry 队列——黑边不透出底下的地形/水面；
+        /// 懒建常驻单实例勿 Destroy，同 _discMesh 生命周期口径）</summary>
+        public static Material DiscOutlineMaterial
+        {
+            get
+            {
+                if (_discOutlineMaterial == null)
+                {
+                    _discOutlineMaterial = new Material(UnlitShader)
+                    {
+                        color = Color.black,
+                        renderQueue = (int)UnityEngine.Rendering.RenderQueue.Geometry,
+                    };
+                    _discOutlineMaterial.SetFloat("_Cull", 0f); // Cull Off——双面渲染，环带绕向免究
+                }
+                return _discOutlineMaterial;
+            }
+        }
+
+        /// <summary>世界层圆环面片（程序化双圈带状 mesh：内圈 0.465+外圈 0.535 各 DiscSegments 段；
+        /// mesh=工厂静态共享单实例〔全单位同构，§63① mesh 条款〕；姿态/缩放由调用方补——
+        /// localScale=(盘径,盘径,1) 即盘缘平分环带=外露描边 3.5% 盘径；支持非均匀缩放出椭圆（尸体压扁）。
+        /// 消费方=UnitView 底座盘不透明黑描边（2026-10-06 拍板）</summary>
+        public static GameObject CreateRing(Transform parent, string name, Material sharedMaterial)
+        {
+            if (_discOutlineMesh == null)
+            {
+                int segs = DiscSegments;
+                var vertices = new Vector3[segs * 2];
+                var triangles = new int[segs * 6];
+                for (int i = 0; i < segs; i++)
+                {
+                    float angle = 2f * Mathf.PI * i / segs;
+                    var dir = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                    vertices[i] = dir * 0.465f;         // 内圈
+                    vertices[segs + i] = dir * 0.535f;  // 外圈
+                    int next = (i + 1) % segs;
+                    int inA = i, inB = next, outA = segs + i, outB = segs + next;
+                    int t = i * 6; // 段四边形（法线 RecalculateNormals 补；绕向交由材质 Cull Off 免究）
+                    triangles[t] = inA; triangles[t + 1] = inB; triangles[t + 2] = outB;
+                    triangles[t + 3] = inA; triangles[t + 4] = outB; triangles[t + 5] = outA;
+                }
+                _discOutlineMesh = new Mesh { name = "BattleDiscOutlineMesh" };
+                _discOutlineMesh.vertices = vertices;
+                _discOutlineMesh.triangles = triangles;
+                _discOutlineMesh.RecalculateNormals();
+                _discOutlineMesh.RecalculateBounds();
+            }
+
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = _discOutlineMesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
+            return go;
+        }
     }
 }

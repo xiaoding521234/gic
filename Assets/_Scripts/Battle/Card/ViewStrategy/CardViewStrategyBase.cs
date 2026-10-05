@@ -23,11 +23,12 @@ namespace GIC.Battle
 
         /// <summary>皮肤写入公共部分：更新存档 skin 并把对应图赋给目标 Image。
         /// 注意：直写的是存档实例——标脏责任在调用方（唯一调用链=CardDetailView.OnSkinButtonClicked
-        /// 已包 SaveManager.Modify，此处同值幂等重写；新调用方接入时必须自行 Modify 标脏）</summary>
+        /// 已包 SaveManager.Modify，此处同值幂等重写；新调用方接入时必须自行 Modify 标脏）。
+        /// 皮肤图缺失走 missing_image 兜底（2026-10-06 拍板全位点接入）</summary>
         protected static void ApplySkinTo(Card card, int skinIndex, Image targetImage)
         {
             card.saveCardData.skin = skinIndex;
-            targetImage.sprite = card.saveCardData.Config?.GetSprite(skinIndex);
+            MissingImageGuard.Assign(targetImage, card.saveCardData.Config?.GetSprite(skinIndex));
         }
 
         /// <summary>统一设置遮罩与获取文本的可见性（文本独立于遮罩，初始态不显示）</summary>

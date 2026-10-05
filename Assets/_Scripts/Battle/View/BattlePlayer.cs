@@ -109,6 +109,9 @@ namespace GIC.Battle
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
 
+        /// <summary>单位立牌视图表（unitId → UnitView；HUD 点击拾取/选中描边消费，2026-10-05 拍板）</summary>
+        public IReadOnlyDictionary<string, UnitView> Views => _views;
+
         /// <summary>per-unit 专属弹射物登记（UnitData.专属弹射物/缩放，2026-10-05 拍板「每位伙伴角色
         /// 单独定制弹射物，通用染色箭矢保留给眷属」）：CreateView 建场登记、ClearViews 清空；命中箭/
         /// 消散箭/箭雨落箭三路经 actorUnitId 查此表——命中=专属素材+白染（美术即最终色）、

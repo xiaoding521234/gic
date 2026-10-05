@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using GIC.Framework;
 using GIC.Data;
+using GIC.UI;
 
 namespace GIC.Battle
 {
@@ -191,8 +192,8 @@ namespace GIC.Battle
                 Destroy(go); // 快照无此单位/配置缺失=无效条目，勿留空牌
                 return false;
             }
-            if (avatar != null) avatar.sprite = data.avatar;
-            if (icon != null) icon.sprite = ResolveSkillIcon(data, e);
+            if (avatar != null) MissingImageGuard.Assign(avatar, data.avatar); // 头像缺失兜底（2026-10-06 全位点接入）
+            if (icon != null) MissingImageGuard.Assign(icon, ResolveSkillIcon(data, e));
             if (ring != null)
             {
                 var baseColor = BattlePlayerColors.Resolve(_session.Sim, _myPlayerId, e.playerId);

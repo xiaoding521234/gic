@@ -79,7 +79,8 @@ namespace GIC.Battle
             // 我方信息块（左上角）：队营色 chrome 保留，体力/摩拉换物品牌计数 chip（B6d——
             // 结构契约=槽内 MoraChip/StaminaChip 两枚 ItemCounterChip；**图标初始化挪到 Bind 注入后**——
             // ResolveHudReferences 先于 Wargame.Context.Inject 跑，此处 _itemConfig 尚为 null，
-            // InitItem 会 SetIcon(null) 把图标节点隐藏（首版实测"只有数字"的根因））。
+            // 注入前 InitItem 图标为空（首版实测"只有数字"的根因；2026-10-06 缺图兜底批起
+            // 空图标走 missing_image 占位而非隐藏图标节点）。
             // 徽标已移除（2026-09-29 用户拍板「移除 HUD 左上角的徽标和血条，协议核心不需要额外显示」——
             // prefab myinfo 槽 Emblem 节点同批删除）
             if (_layoutByKey.TryGetValue("myinfo", out var myinfo))

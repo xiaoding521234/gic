@@ -6,6 +6,7 @@ using UnityEngine.Video;
 using TMPro;
 using GIC.Data;
 using GIC.Tool;
+using GIC.UI;
 namespace GIC.Battle
 {
 
@@ -28,6 +29,7 @@ namespace GIC.Battle
 
         private SpriteRenderer _avatarRenderer;
         private Transform _baseDisc;
+        private Transform _baseDiscOutline; // 底座盘不透明黑描边环（2026-10-06 拍板；尸体压扁随盘同步）
         private Color _baseColor = Color.white;
 
         /// <summary>受击圆柱直径（协议核心批 2026-09-29：per-unit 受击体——Create 传入，0=回落全局 0.42；
@@ -468,8 +470,10 @@ namespace GIC.Battle
             var spriteGo = new GameObject("Avatar");
             spriteGo.transform.SetParent(avatarGo.transform, false);
             view._avatarRenderer = spriteGo.AddComponent<SpriteRenderer>();
-            // 基准 sprite=立牌图/头像（缩放/贴地/头顶行都按它算；格底贴地 → 飞行单位悬停属正确语义）
-            var baseSprite = avatar;
+            // 基准 sprite=立牌图/头像（缩放/贴地/头顶行都按它算；格底贴地 → 飞行单位悬停属正确语义）；
+            // 缺图兜底（2026-10-06 拍板全位点接入）：立牌图/头像都缺失时=missing_image 占位
+            // （bounds 换算按占位图实际尺寸拉伸到标准立牌显示高——强制拉伸语义）
+            var baseSprite = MissingImageGuard.Ensure(avatar);
             view._avatarRenderer.sprite = baseSprite;
             view._avatarRenderer.sortingOrder = BattleMetrics.AvatarSortingOrder;
 
@@ -530,8 +534,11 @@ namespace GIC.Battle
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=该单位受击圆柱直径
             // （协议核心批 per-unit：默认 0.42/协议核心 0.8），视觉即判定，docs/18 决策二）。
             // 半透明投影感（2026-09-27 拍板：实体色板读作「坑/板」，
-            // 脚站盘心显陷地——主因归圆盘，用户目检归因）；sortingOrder=-1 恒先画于一切 3000 透明件
-            // （瞄准贴片 0/立牌 10/箭矢 12）之下、水面（2999）之上
+            // 脚站盘心显陷地——主因归圆盘，用户目检归因）；sortingOrder=-1 恒先画于一切 ≥0 透明件
+            // （瞄准贴片 0/立牌 10/箭矢 12）之下、焊接水面（-2）之上——**2026-10-06 实证勘正**
+            // （sortingOrder 支配 renderQueue：旧「盘 queue3000>水 2999 故盘在水面之上」认知错误，
+            // 水面 order 0 时整片盖盘=「圆盘沉水」报障根因，水面已改 -2 收口，docs/14 §123）；
+            // 深度上盘=视觉表面（水格含波峰带）+0.02 恒高出波峰——盘沉水观感恒=排序问题非几何
             view._cylinderDiameter = cylinderDiameter > 0f ? cylinderDiameter : BattleMetrics.UnitCylinderDiameter;
             view._baseDiscMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(WithDiscAlpha(teamColor));
             var baseGo = BattleViewFactory.CreateDisc(root.transform, "BaseDisc", view._baseDiscMaterial);
@@ -541,6 +548,18 @@ namespace GIC.Battle
             baseGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.BaseDiscSortingOrder;
             view._baseDisc = baseGo.transform;
             view._baseColor = teamColor;
+
+            // 不透明黑描边环（2026-10-06 拍板「底部圆盘加不透明黑色描边」；同日追拍「太粗了，砍一半」
+            // =外露 7%→3.5%）：垫在盘缘正下方 0.001——环内半（46.5%~50%）被半透明盘压暗成自然过渡、
+            // 外半（50%~53.5%）露出纯黑实心描边（外露宽=盘径 3.5%，核心 0.8 大盘自动加粗）；
+            // opaque 队列+深度写入=天然画于水面/透明件之上（环更近相机，透明件在其像素处 ZTest 淘汰），
+            // 与盘(-1)/水面(-2) 的 sortingOrder 透明排序体系正交——描边在水格上同样实心不被冲刷
+            var outlineGo = BattleViewFactory.CreateRing(root.transform, "BaseDiscOutline",
+                BattleViewFactory.DiscOutlineMaterial);
+            outlineGo.transform.localPosition = new Vector3(0f, 0.019f, 0f);
+            outlineGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            outlineGo.transform.localScale = new Vector3(view._cylinderDiameter, view._cylinderDiameter, 1f);
+            view._baseDiscOutline = outlineGo.transform;
 
             view.BuildName(nameEntry);
             view.BuildBuffRow();
@@ -600,6 +619,10 @@ namespace GIC.Battle
                 _baseDisc.localScale = corpse
                     ? new Vector3(_cylinderDiameter, 0.28f, 1f) // 尸体底座压扁（压扁值沿用旧观感）
                     : new Vector3(_cylinderDiameter, _cylinderDiameter, 1f);
+            if (_baseDiscOutline != null) // 描边环随盘同形（2026-10-06；非均匀缩放出椭圆=同款压扁观感）
+                _baseDiscOutline.localScale = corpse
+                    ? new Vector3(_cylinderDiameter, _cylinderDiameter * 0.28f, 1f)
+                    : new Vector3(_cylinderDiameter, _cylinderDiameter, 1f);
         }
 
         // ==================== 冻结霜化（2026-10-02 二次拍板「像真的结冰=shader 技术」，原神级路线） ====================
@@ -618,11 +641,13 @@ namespace GIC.Battle
         private static readonly int FrostAmountId = Shader.PropertyToID("_FrozenAmount");
         private static readonly int FrostFootYId = Shader.PropertyToID("_FreezeFootY");
         private static readonly int FrostTopYId = Shader.PropertyToID("_FreezeTopY");
+        private static readonly int OutlineEnabledId = Shader.PropertyToID("_OutlineEnabled");
+        private static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor");
+        private static readonly int OutlineWidthId = Shader.PropertyToID("_OutlineWidth");
         private static Shader _frostSpriteShader;       // GIC/Battle/FrozenSprite（GraphicsSettings Always Included）
         private static Material _frostSpriteMaterial;  // 全单位共享单材质（tint 走顶点色、进度走 MPB——零实例化）
 
-        private Material _avatarOriginalMaterial;      // 冻结换装前记录（还原用）
-        private MaterialPropertyBlock _frostMpb;      // sprite 路径逐帧写进度/锚点
+        private MaterialPropertyBlock _frostMpb;      // sprite 路径逐帧写进度/锚点（+描边参数共用）
         private Coroutine _frostCo;
         private float _frostAmount;                     // 当前进度（快照同步重入时从中断处续播）
 
@@ -655,7 +680,9 @@ namespace GIC.Battle
 
         /// <summary>霜化落地单点：写双路径进度与脚/头顶世界锚点。sprite 路径——进度&gt;0 换装共享霜化材质、
         /// 回 0 还原默认材质（视频解码失败回退 sprite 路径也覆盖）；shader 缺失（构建剥离）时 null 守卫跳过
-        /// =tint 兜底。锚点随每次写入刷新（冻结中被击退/牵引的罕见位移也贴住）</summary>
+        /// =tint 兜底。锚点随每次写入刷新（冻结中被击退/牵引的罕见位移也贴住）。
+        /// 2026-10-05 描边批重构：sprite 材质换装收口到 ApplyAvatarMaterial 单点（霜化/描边任一激活
+        /// →共享 FrozenSprite 材质；双双关闭→回默认），霜化只负责写 MPB 进度/锚点</summary>
         private void ApplyFrost(float amount)
         {
             float footY = _tiltGroup != null ? _tiltGroup.position.y : transform.position.y;
@@ -671,18 +698,11 @@ namespace GIC.Battle
             }
 
             if (_avatarRenderer == null) return;
+            ApplyAvatarMaterial(); // 材质选择单点（frost>outline>默认）
             if (amount > 0f)
             {
-                var frostMat = FrostSpriteMaterial;
-                if (frostMat != null)
+                if (FrostSpriteMaterial != null)
                 {
-                    // 原材质只捕获一次；起步已挂霜化 shader 材质的（测试场景静态冻结/换装中断重入）不当
-                    // 「原材质」——还原路径保持霜化材质、量归 0（amount=0 直通渲染与默认 sprite 材质恒等）
-                    var current = _avatarRenderer.sharedMaterial;
-                    if (_avatarOriginalMaterial == null && current != frostMat
-                        && (current == null || current.shader != _frostSpriteShader))
-                        _avatarOriginalMaterial = current;
-                    _avatarRenderer.sharedMaterial = frostMat;
                     if (_frostMpb == null) _frostMpb = new MaterialPropertyBlock();
                     _avatarRenderer.GetPropertyBlock(_frostMpb);
                     _frostMpb.SetFloat(FrostAmountId, amount);
@@ -693,15 +713,116 @@ namespace GIC.Battle
             }
             else
             {
-                if (_avatarOriginalMaterial != null)
-                    _avatarRenderer.sharedMaterial = _avatarOriginalMaterial; // 还原默认 sprite 材质
                 if (_frostMpb != null)
                 {
                     _avatarRenderer.GetPropertyBlock(_frostMpb);
-                    _frostMpb.SetFloat(FrostAmountId, 0f); // 勿 Clear——保留块内 Unity 侧条目（_MainTex 等）
+                    _frostMpb.SetFloat(FrostAmountId, 0f); // 勿 Clear——保留块内 Unity 侧条目与描边条目
                     _avatarRenderer.SetPropertyBlock(_frostMpb);
                 }
             }
+        }
+
+        // ==================== 选中描边（2026-10-05 拍板「选中时立牌加描边，颜色=所属玩家色」） ====================
+        // 双路径同源：视频路径=per-unit ChromaKey 材质直写；sprite 路径=换装共享 FrozenSprite 材质
+        // （_FrozenAmount=0 直通渲染与默认 sprite 材质恒等——§92 已验证，描边复用免新 shader）+
+        // MPB 写描边参数（全单位共享单材质零实例化，同霜化模式）。描边色=底座圆盘同源队伍色；
+        // 调用方=BattleHud.RefreshOutlines 统一收口（选中单位+指定单位型瞄准的待定目标两槽）。
+        // 幂等守卫：状态不变直通（全量遍历刷新的重复调用零开销）
+
+        private bool _outlineOn;
+        private Material _defaultAvatarMaterial; // 常态 sprite 材质（懒捕获：首个非 FrozenSprite 材质）
+
+        public void SetSelectedOutline(bool on)
+        {
+            if (_outlineOn == on) return;
+            _outlineOn = on;
+            ApplyOutlineParams();
+        }
+
+        /// <summary>描边参数落地（视频材质直写 / sprite MPB 写入）。描边宽=图元像素高的 1.2%
+        /// （图集 sprite 用 textureRect 高——atlas 空间一致），钳 3~12 texel</summary>
+        private void ApplyOutlineParams()
+        {
+            var color = _baseColor; // 队伍色（与底座圆盘同源）
+            if (_videoMaterial != null)
+            {
+                _videoMaterial.SetFloat(OutlineEnabledId, _outlineOn ? 1f : 0f);
+                if (_outlineOn)
+                {
+                    _videoMaterial.SetColor(OutlineColorId, color);
+                    float videoH = _videoRt != null ? _videoRt.height : 768f;
+                    _videoMaterial.SetFloat(OutlineWidthId, Mathf.Clamp(Mathf.Round(videoH * 0.012f), 3f, 12f));
+                }
+            }
+            if (_avatarRenderer == null) return;
+            ApplyAvatarMaterial();
+            if (_frostMpb == null) _frostMpb = new MaterialPropertyBlock();
+            _avatarRenderer.GetPropertyBlock(_frostMpb);
+            _frostMpb.SetFloat(OutlineEnabledId, _outlineOn ? 1f : 0f);
+            if (_outlineOn)
+            {
+                _frostMpb.SetColor(OutlineColorId, color);
+                var sprite = _avatarRenderer.sprite;
+                float spriteH = sprite != null ? sprite.textureRect.height : 256f;
+                _frostMpb.SetFloat(OutlineWidthId, Mathf.Clamp(Mathf.Round(spriteH * 0.012f), 3f, 12f));
+            }
+            _avatarRenderer.SetPropertyBlock(_frostMpb);
+        }
+
+        /// <summary>sprite 路径材质选择单点（2026-10-05 描边批）：霜化/描边任一激活 → 共享 FrozenSprite
+        /// 材质（描边态 _FrozenAmount=0 时霜化直通、渲染与默认 sprite 材质恒等）；双双关闭 → 回默认材质
+        /// （懒捕获首个非霜化 shader 材质——测试场景预挂的 FrozenSpriteTest 等霜化系材质不当默认）。
+        /// shader 缺失（构建剥离）frostMat=null=霜化/描边 sprite 路径降级不可用（视频路径不受影响）</summary>
+        private void ApplyAvatarMaterial()
+        {
+            if (_avatarRenderer == null) return;
+            var frostMat = FrostSpriteMaterial;
+            var cur = _avatarRenderer.sharedMaterial;
+            if (_defaultAvatarMaterial == null && cur != null
+                && (frostMat == null || cur.shader != frostMat.shader))
+                _defaultAvatarMaterial = cur;
+            Material target;
+            if ((_frostAmount > 0f || _outlineOn) && frostMat != null) target = frostMat;
+            else target = _defaultAvatarMaterial;
+            if (target != null && cur != target)
+                _avatarRenderer.sharedMaterial = target;
+        }
+
+        // ==================== 立牌面片世界拾取（2026-10-05 拍板「点击立牌也能选中」） ====================
+        // BattleHud 点击拾取消费：立牌是 55° 后仰的悬空面片，平面取格会把立牌上的点击解析到
+        // 身后格（视差 docs/14 §86 同族）——按当前激活面片（视频 quad / 静态 sprite）的世界四角
+        // 做屏幕空间命中。视频 quad 宽幅动作片时 scale/偏移实时变，取当前 transform 即自动适配
+
+        private static readonly Vector3[] QuadCornerOffsets =
+        {
+            new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
+            new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f),
+        };
+
+        /// <summary>当前激活立牌面片的世界四角（顺时针矩形序 [0]=左下 [1]=右下 [2]=右上 [3]=左上）。
+        /// false=无可用面片（无渲染器）。视频路径取 quad transform（含宽幅动作片实时缩放/位置偏移）；
+        /// 静态路径取 SpriteRenderer.localBounds（图集 UV 无关的 local 矩形）</summary>
+        public bool TryGetPaperdollWorldCorners(Vector3[] corners)
+        {
+            if (corners == null || corners.Length < 4) return false;
+            if (_videoPlayer != null && !_videoFailed && _avatarVideoFlip != null)
+            {
+                for (int i = 0; i < 4; i++)
+                    corners[i] = _avatarVideoFlip.TransformPoint(QuadCornerOffsets[i]);
+                return true;
+            }
+            if (_avatarRenderer != null && _avatarRenderer.enabled)
+            {
+                var bounds = _avatarRenderer.localBounds;
+                var c = bounds.center;
+                var e = bounds.extents;
+                corners[0] = _avatarRenderer.transform.TransformPoint(new Vector3(c.x - e.x, c.y - e.y, 0f));
+                corners[1] = _avatarRenderer.transform.TransformPoint(new Vector3(c.x + e.x, c.y - e.y, 0f));
+                corners[2] = _avatarRenderer.transform.TransformPoint(new Vector3(c.x + e.x, c.y + e.y, 0f));
+                corners[3] = _avatarRenderer.transform.TransformPoint(new Vector3(c.x - e.x, c.y + e.y, 0f));
+                return true;
+            }
+            return false;
         }
 
         /// <summary>共享霜化 sprite 材质（懒建单例；shader 缺失返回 null=ApplyFrost 守卫跳过）</summary>
@@ -852,8 +973,10 @@ namespace GIC.Battle
             for (int i = 0; i < count; i++)
             {
                 var buff = _buffs[i];
-                var icon = BuffIconOf(buff.type);
-                if (icon == null) continue;
+                // 缺图兜底（2026-10-06 拍板全位点接入）：未知 Buff 类型/图标缺失=missing_image 占位徽章
+                //（"有 Buff 但没图标"照常可见——bounds 换算拉伸到标准徽章尺寸）
+                var icon = MissingImageGuard.Ensure(BuffIconOf(buff.type));
+                if (icon == null) continue; // 兜底图自身也缺失（Resources 加载失败，理论不可达）
 
                 float x = (i - (count - 1) * 0.5f) * BuffBadgeGap;
 

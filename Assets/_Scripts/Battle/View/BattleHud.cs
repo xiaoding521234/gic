@@ -87,6 +87,12 @@ namespace GIC.Battle
         [Tooltip("小圆盘屏幕边距（画布单位）——盘缘距屏幕边缘的最小留白（轮盘靠屏角时屏幕边界优先于轮盘界）")]
         [SerializeField] private float 拖动瞄准圆盘屏幕边距 = 16f;
 
+        [Header("拖动瞄准头像盘（2026-10-05 拍板：指定单位型拖动瞄准，盘内出现可选角色头像——复用 QueueSlot 头像牌；从左往右、从上往下每行每列 4 个（4×4），超 16 缩头像变 5×5 以此类推；头像上松手=指定该角色，悬停保持该角色所在格高亮）")]
+        [Tooltip("头像阵列区自盘缘的内缩边距（画布单位）——头像不压盘描环")]
+        [SerializeField] private float 拖动瞄准头像盘边距 = 24f;
+        [Tooltip("悬停头像放大倍率（悬停反馈——格金高亮与目标描边之外的轻量确认）")]
+        [SerializeField] private float 拖动瞄准头像悬停放大 = 1.12f;
+
         [Header("技能详情面板（2026-09-27 拍板：同键再点=详情模式——面板自适应摆在技能键旁，不遮挡该键、不出屏）")]
         [Tooltip("面板与技能键的间隙（画布单位）")]
         [SerializeField] private float 详情面板与按钮间距 = 24f;
@@ -243,6 +249,12 @@ namespace GIC.Battle
         /// null=无待定</summary>
         private BattleCell? _pendingAimCell;
 
+        /// <summary>瞄准待定目标单位（2026-10-05 拍板「指定单位型瞄准同格多候选重复点击轮换」+
+        /// 拖动瞄准头像盘）：指定单位型技能（延奏/契约/单位指向型爆发）点格/拖动时记录具体目标，
+        /// 重复点击同格轮换、头像盘悬停/松手指定；提交时优先消费（目标消失/换格残留回落
+        /// FindUnitAt 旧行为）。非指定单位型恒 null（方向语义）</summary>
+        private string _pendingTargetUnitId;
+
         /// <summary>拖动式瞄准会话中（B4，2026-09-26 落地）：技能键 OnBeginDrag 起手置位，
         /// OnDrag 逐帧刷金色待定单格、OnEndDrag 松手=留待定（确认走完成选择）；任何瞄准退出
         /// （取消/完成选择确认/超时/阶段切换）经 ExitAiming 统一收口清零</summary>
@@ -273,6 +285,23 @@ namespace GIC.Battle
         // 布局方案数据/槽锚点零接触）
         private RectTransform _dragMovedRect;
         private Vector2 _dragMovedOriginalPos;
+
+        // ==================== 拖动瞄准头像盘（2026-10-05 拍板：指定单位型拖动瞄准，盘内可选角色头像阵列） ====================
+        // 候选目标头像=复用 QueueSlot 头像牌 prefab（Plate/AvatarMask/Ring 结构、raycastTarget 全关——
+        // 命中测试走手动 rect 包含：拖拽中指针被 UGUI 捕获，不派发 Enter/Exit 事件）。从左往右、
+        // 从上往下排列，每行每列 4 个（4×4=16）；候选超 16 缩头像变 5×5（cols=4 起、cols*cols&lt;n 递增）。
+        // 悬停头像=该角色所在格金格高亮+待定目标描边+头像轻放大；头像上松手=指定该角色
+        // （UpdateDragAimPreview 头像命中优先，未命中回落锥角锁定旧行为）
+        private GameObject _dragAvatarGrid;
+        private readonly List<RectTransform> _dragAvatarRects = new List<RectTransform>();
+        private readonly List<UnitState> _dragAvatarUnits = new List<UnitState>();
+        private int _dragAvatarHover = -1;
+        private float _dragAvatarBaseScale = 1f; // 阵列基准缩放（悬停放大除数/复位基准）
+        private GameObject _avatarTilePrefab;    // QueueSlot（Resources/Prefabs/Battle/，懒加载）
+
+        // 立牌点击拾取缓冲（2026-10-05 拍板「点击立牌也能选中」——屏幕空间面片命中）
+        private readonly Vector3[] _paperdollCorners = new Vector3[4];
+        private readonly Vector2[] _paperdollScreen = new Vector2[4];
 
         /// <summary>HUD 画布 RectTransform（盘位换算用；Overlay 画布世界坐标=屏幕像素）</summary>
         private RectTransform CanvasRect => _canvas != null ? (RectTransform)_canvas.transform : null;
@@ -571,11 +600,13 @@ namespace GIC.Battle
                 _handTextCombiner.AddStaticEntry(" ×" + myRes.handCardCount);
             RebuildHandCards(myRes);
 
-            // 选中单位若已死亡（对局中不可能复苏），清选中
+            // 选中单位若已从快照消失（被移除/对局结束清场）清选中；尸体不清——2026-10-06 追拍
+            // 「尸体也能点选查看」（旧防线会把刚选中的尸体在下次快照刷新时清掉）；尸体选中态
+            // 技能盘照常刷新（查看语义：技能键/详情开放，提交防线+Host 权威校验兜底同敌方查看态）
             if (!string.IsNullOrEmpty(_selectedUnitId))
             {
                 var sel = snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-                if (sel == null || sel.isCorpse != 0)
+                if (sel == null)
                 {
                     ExitAiming();
                     DeselectUnit();
@@ -957,20 +988,29 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             if (snapshot == null) return;
 
-            // 选中开放任意单位（2026-09-26 拍板改版：含敌人/低级单位——可看技能盘/进瞄准查攻击范围；
-            // 行动拦截移到提交时轻提示，SubmitAim 处把关；Host 侧 OnSubmitAction 权威校验不变）。
-            // 同格多单位优先选中己方（自己的单位先被点中，敌方需点到无己方的格）
-            var myUnit = FindUnitAt(snapshot, cell, UnitSide.Mine);
-            var anyUnit = myUnit != null ? myUnit : FindUnitAt(snapshot, cell, UnitSide.Enemy);
+            // 点击拾取升级（2026-10-05 拍板「点立牌也能选中，点击立牌/所在地面/底座圆盘同规」）：
+            // 立牌=55° 后仰的悬空面片，平面取格会把立牌上的点击解析到身后格（视差 §86 同族）——
+            // 先做屏幕空间面片命中（多立牌重叠取离相机最近者），命中则点击目标=该单位及其所在格；
+            // 未命中回落地面取格（底座圆盘/地面=原路径，选中开放任意单位语义不变——2026-09-26 拍板：
+            // 含敌人/低级单位，行动拦截在提交时轻提示；同格多单位己方优先）。
+            // 尸体立牌同样参与命中（悬空面片必须命中其格——复苏瞄准点尸体立牌的精确指定）。
+            // 2026-10-06 追拍「尸体也能点选查看」：选中态尸体 precise 不再落空——尸体可选中
+            // （技能盘/详情/描边全开=查看语义，提交防线 toast+Host 权威校验照旧兜底，同敌方查看态）；
+            // 瞄准态 precise 由 HandleAimTap 候选域校验收编（复苏型爆发含尸体、延奏/契约域外 precise
+            // 视同未点）
+            var paperdollUnit = PickPaperdollUnit(screenPos, snapshot);
+            var precise = paperdollUnit;
+            var targetCell = paperdollUnit != null ? paperdollUnit.position : cell;
+            bool targetInBounds = paperdollUnit != null || inBounds;
 
             switch (_state)
             {
                 case HudState.Aiming:
                     // 点可选格=金色待定（2026-09-26 拍板：不立即提交，可反复点其它格变更，
-                    // 确认走「完成选择」按钮；目标单位由确认时再取快照）
-                    if (inBounds && _aimCells.Contains(cell))
+                    // 确认走「完成选择」按钮；2026-10-05：指定单位型同格多候选重复点击轮换目标）
+                    if (targetInBounds && _aimCells.Contains(targetCell))
                     {
-                        SetPendingAimCell(cell);
+                        HandleAimTap(targetCell, precise, snapshot);
                         // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属/伙伴非势力）或
                         // 已定死时立即提示「不会执行」，防玩家选了却不知为何没被执行；金格照常显示
                         NotifySelectionBlockedOrConfirmed();
@@ -982,13 +1022,278 @@ namespace GIC.Battle
 
                 case HudState.UnitSelected:
                     if (PopupOpen) { ClosePopup(); return; }          // 情况②：面板开着点外部=收面板（选中保持）
-                    if (anyUnit != null) { SelectUnit(anyUnit.unitId); return; } // 换选中（任意单位，己方优先）
-                    DeselectUnit();                                   // 点空白=取消选中
+                    // 2026-10-05 拍板：同格多单位重复点击轮换下一个；精确点到非当前选中的立牌直接选它；
+                    // 点空白=取消选中
+                    HandleSelectionTap(targetCell, precise, snapshot, deselectOnEmpty: true);
                     return;
 
                 case HudState.Idle:
-                    if (anyUnit != null) SelectUnit(anyUnit.unitId);
+                    HandleSelectionTap(targetCell, precise, snapshot, deselectOnEmpty: false);
                     return;
+            }
+        }
+
+        /// <summary>屏幕空间立牌命中（2026-10-05 拍板「点击立牌也能选中」）：遍历全部立牌视图，
+        /// 当前激活面片四角投影成屏幕四边形、指针在内=命中；多立牌重叠取离相机最近者
+        /// （前排先被点中）。**尸体立牌同参与命中**（悬空面片必须命中其格——复苏瞄准点尸体立牌
+        /// 的精确指定；尸体可不可选由消费方按状态分流，见 OnBoardTap）</summary>
+        private UnitState PickPaperdollUnit(Vector2 screenPos, BattleSnapshot snapshot)
+        {
+            var views = _session.Player.Views;
+            if (views == null || views.Count == 0) return null;
+            UnitState best = null;
+            float bestDist = float.MaxValue;
+            var camPos = _camera.transform.position;
+            foreach (var kv in views)
+            {
+                var view = kv.Value;
+                if (view == null) continue;
+                UnitState unit = null;
+                foreach (var u in snapshot.units)
+                {
+                    if (u.unitId == kv.Key) { unit = u; break; }
+                }
+                if (unit == null) continue; // 尸体不排除——立牌仍在场（灰显），点击须命中其格
+                if (!view.TryGetPaperdollWorldCorners(_paperdollCorners)) continue;
+
+                // 四角投影 + 凸四边形点内测试（任一 winding；±1px 容差含线上）
+                var q = _paperdollScreen;
+                bool projected = true;
+                for (int i = 0; i < 4; i++)
+                {
+                    if (!_camera.TryProjectToScreen(_paperdollCorners[i], out var p)) { projected = false; break; }
+                    q[i] = p;
+                }
+                if (!projected) continue; // 任一角投影失败（相机背后）=该立牌不可点
+                if (!PointInQuad(screenPos, q)) continue;
+
+                float dist = Vector3.Distance(camPos, (_paperdollCorners[0] + _paperdollCorners[2]) * 0.5f);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    best = unit;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>点在凸四边形内（全 cross 同侧即命中；±1px 容差——线上/贴边算命中）</summary>
+        private static bool PointInQuad(Vector2 p, Vector2[] q)
+        {
+            float minC = float.MaxValue, maxC = float.MinValue;
+            for (int i = 0; i < 4; i++)
+            {
+                var a = q[i];
+                var b = q[(i + 1) & 3];
+                float cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+                if (cross < minC) minC = cross;
+                if (cross > maxC) maxC = cross;
+            }
+            return minC >= -1f || maxC <= 1f;
+        }
+
+        /// <summary>选中态点击（2026-10-05 拍板：立牌/地面/底座圆盘同规+同格轮换；2026-10-06 追拍
+        /// 「尸体也能点选查看」）。precise=立牌精确指到的单位（可空，含尸体）。序=己方活体 → 队友
+        /// 活体 → 敌方活体 → 尸体垫底（己方优先与旧 FindUnitAt(Mine) 兼容，队友插入使 2v2 队友
+        /// 单位可选中——2026-09-26 拍板「任意单位可选中」补全）：
+        /// ① 该格已有当前选中单位（重复点击）→ 轮换到该格下一个单位（活体轮尽轮到尸体）；
+        /// ② 精确点到非当前选中的立牌（含尸体立牌）→ 直接选它；
+        /// ③ 其余 → 按序选首个。格上无单位：deselectOnEmpty 决定点空白=取消选中（UnitSelected）或无操作（Idle）</summary>
+        private void HandleSelectionTap(BattleCell cell, UnitState precise, BattleSnapshot snapshot, bool deselectOnEmpty)
+        {
+            var units = UnitsAtCellOrdered(snapshot, cell);
+            if (units.Count == 0)
+            {
+                if (deselectOnEmpty) DeselectUnit();
+                return;
+            }
+            int selIdx = units.FindIndex(u => u.unitId == _selectedUnitId);
+            if (selIdx >= 0)
+            {
+                SelectUnit(units[(selIdx + 1) % units.Count].unitId); // 重复点击该格 → 轮换
+                return;
+            }
+            var target = precise != null && precise.unitId != _selectedUnitId ? precise : units[0];
+            SelectUnit(target.unitId);
+        }
+
+        /// <summary>该格的可选中单位，序=己方活体 → 队友活体 → 敌方活体 → 尸体垫底（各段快照序内
+        /// 保序）。2026-10-06 追拍「尸体也能点选查看」：尸体入轮换序（点尸体格不再=取消选中）；
+        /// 垫底=活体优先（默认选中目标仍是活体），精确点尸体立牌则直接选尸体（HandleSelectionTap
+        /// precise 优先）。瞄准候选域（CollectAimTargets）与本序独立——延奏/契约仍只活体</summary>
+        private List<UnitState> UnitsAtCellOrdered(BattleSnapshot snapshot, BattleCell cell)
+        {
+            var result = new List<UnitState>();
+            foreach (var side in new[] { UnitSide.Mine, UnitSide.MyTeam, UnitSide.Enemy })
+            {
+                foreach (var u in snapshot.units)
+                {
+                    if (u.isCorpse != 0) continue;
+                    if (u.position.x != cell.x || u.position.y != cell.y) continue;
+                    bool pick = side == UnitSide.Mine ? u.playerId == _myPlayerId
+                        : side == UnitSide.MyTeam ? ((TeamType)u.team == MyTeam && u.playerId != _myPlayerId)
+                        : (TeamType)u.team != MyTeam;
+                    if (pick) result.Add(u);
+                }
+            }
+            foreach (var u in snapshot.units) // 尸体垫底段（不分敌我——查看语义无优先级需求）
+            {
+                if (u.isCorpse == 0) continue;
+                if (u.position.x != cell.x || u.position.y != cell.y) continue;
+                result.Add(u);
+            }
+            return result;
+        }
+
+        // ==================== 指定单位型瞄准目标（2026-10-05 拍板：同格多候选重复点击轮换+拖动瞄准头像盘） ====================
+
+        /// <summary>当前瞄准是否指定单位型（延奏/契约/单位指向型爆发——IsUnitTargeted 单源）；
+        /// 部署瞄准（_aimDef=null）与方向型/自施放恒 false</summary>
+        private bool IsCurrentAimUnitTargeted()
+        {
+            if (_aimDef == null) return false;
+            var data = GetSelectedSkillData(_aimDef);
+            return data != null && data.IsUnitTargeted();
+        }
+
+        /// <summary>瞄准目标域枚举（与 ComputeAimCells 同域同序单源——caster 队伍口径；查看敌方单位时
+        /// 目标域随施法者视角，2026-09-26 拍板）：延奏=施法者队伍存活；契约=敌队存活；
+        /// 单位指向型爆发=施法者队伍**含尸体**（复苏目标，docs/05 §5.4 例外条款）。
+        /// cell=null 全域（头像盘/高亮格生成）；非空=该格候选（点格轮换）。序=快照序（轮换确定性）</summary>
+        private void CollectAimTargets(BattleSnapshot snapshot, BattleCell? cell, List<UnitState> into)
+        {
+            var skillData = _aimDef != null ? GetSelectedSkillData(_aimDef) : null;
+            if (skillData == null || !skillData.IsUnitTargeted()) return;
+            var sel = snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel == null) return;
+            bool contract = skillData.skillType == SkillType.Contract;
+            bool burstUnit = skillData.skillType == SkillType.Burst; // 单位指向型爆发（IsUnitTargeted 已保证）
+            foreach (var u in snapshot.units)
+            {
+                if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
+                if ((TeamType)u.team == (TeamType)sel.team)
+                {
+                    if (contract) continue;
+                    if (u.isCorpse != 0 && !burstUnit) continue; // 延奏只活体；爆发单位指向含尸体
+                }
+                else
+                {
+                    if (!contract) continue;    // 延奏/爆发只我方侧
+                    if (u.isCorpse != 0) continue; // 契约只活体
+                }
+                if (!_board.Map.HasTile(u.position.x, u.position.y)) continue;
+                into.Add(u);
+            }
+        }
+
+        /// <summary>瞄准态点击可选格（2026-10-05 拍板：指定单位型同格多候选重复点击轮换目标；
+        /// 金格语义不变=2026-09-26 待定制）。precise=立牌精确指到的单位（可空，**含尸体立牌命中**）：
+        /// precise 须在当前技能候选域内才生效（复苏爆发点尸体立牌=直选尸体；延奏点同格尸体立牌=
+        /// 尸体不在域 → 视同未点、按格选首个候选——域外 precise 勿污染目标）。规则：
+        /// ① 同格重复点击 → 轮换到下一候选（域内精确点到非当前候选的立牌=直接选它）；
+        /// ② 新格 → 首个候选（域内精确命中优先）。非指定单位型/无候选 → 纯方向语义待定（目标恒 null）</summary>
+        private void HandleAimTap(BattleCell cell, UnitState precise, BattleSnapshot snapshot)
+        {
+            if (IsCurrentAimUnitTargeted())
+            {
+                var candidates = new List<UnitState>();
+                CollectAimTargets(snapshot, cell, candidates);
+                if (candidates.Count > 0)
+                {
+                    // 域校验：precise 不在候选域内（如延奏点尸体立牌）视同未精确点
+                    UnitState preciseValid = null;
+                    if (precise != null)
+                    {
+                        foreach (var c in candidates)
+                            if (c.unitId == precise.unitId) { preciseValid = c; break; }
+                    }
+                    bool sameCell = _pendingAimCell.HasValue && _pendingAimCell.Value.Equals(cell);
+                    UnitState target;
+                    if (sameCell)
+                    {
+                        int idx = candidates.FindIndex(c => c.unitId == _pendingTargetUnitId);
+                        target = preciseValid != null && idx >= 0 && preciseValid.unitId != _pendingTargetUnitId
+                            ? preciseValid
+                            : candidates[(idx + 1) % candidates.Count];
+                    }
+                    else
+                    {
+                        target = preciseValid != null ? preciseValid : candidates[0];
+                    }
+                    _pendingTargetUnitId = target.unitId;
+                    if (!sameCell) SetPendingAimCell(cell); // 金格换装（同格仅换目标——金格不动）
+                    RefreshOutlines(); // 待定目标描边反馈（轮换到谁一目了然）
+                    return;
+                }
+            }
+            SetPendingAimCell(cell); // 方向型/部署：纯方向语义待定
+            if (_pendingTargetUnitId != null)
+            {
+                _pendingTargetUnitId = null;
+                RefreshOutlines();
+            }
+        }
+
+        /// <summary>待定格+目标单位（拖动瞄准路径消费）：头像命中=直接指定该单位；无精确目标=该格首个
+        /// 候选（锥角锁定回落同口径）。同格幂等快路径——锥角锁定连续命中同格不重算候选（免逐帧分配）</summary>
+        private void SetPendingAimCellWithTarget(BattleCell cell, UnitState unit)
+        {
+            bool sameCell = _pendingAimCell.HasValue && _pendingAimCell.Value.Equals(cell);
+            if (unit != null && unit.position.Equals(cell))
+            {
+                if (sameCell && _pendingTargetUnitId == unit.unitId) return; // 同格同目标幂等
+                SetPendingAimCell(cell);
+                _pendingTargetUnitId = unit.unitId;
+                RefreshOutlines();
+                return;
+            }
+            // 无精确目标：同格且目标已定（或方向型无目标语义）→幂等直通（金格本就同格无操作）
+            if (sameCell && (!IsCurrentAimUnitTargeted() || !string.IsNullOrEmpty(_pendingTargetUnitId)))
+                return;
+            string targetId = null;
+            if (IsCurrentAimUnitTargeted())
+            {
+                var candidates = new List<UnitState>();
+                CollectAimTargets(_session.Player.LatestSnapshot, cell, candidates);
+                if (candidates.Count > 0) targetId = candidates[0].unitId;
+            }
+            SetPendingAimCell(cell);
+            _pendingTargetUnitId = targetId;
+            RefreshOutlines();
+        }
+
+        /// <summary>提交时刻待定目标解析（2026-10-05）：_pendingTargetUnitId 仍在待定格上才有效
+        /// （目标当回合死亡/换格残留由快照对账拦下），有效则优先于格上按域找（FindUnitAt 旧行为回落）</summary>
+        private UnitState ResolvePendingTarget(BattleSnapshot snapshot, BattleCell cell)
+        {
+            if (string.IsNullOrEmpty(_pendingTargetUnitId) || !IsCurrentAimUnitTargeted()) return null;
+            UnitState u = null;
+            foreach (var x in snapshot.units)
+            {
+                if (x.unitId == _pendingTargetUnitId) { u = x; break; }
+            }
+            if (u == null || u.position.x != cell.x || u.position.y != cell.y) return null;
+            return u;
+        }
+
+        // ==================== 选中/待定目标描边（2026-10-05 拍板「选中时立牌加描边，颜色=所属玩家色」） ====================
+
+        /// <summary>描边统一收口（全量遍历按幂等开关写，≤70 单位低频调用）：两个槽各至多一单位——
+        /// ① 选中单位（瞄准态选中仍在=描边保持）；② 指定单位型瞄准的待定目标（点击轮换/头像盘悬停
+        /// 的目标反馈）。色=队伍主色（与底座圆盘/弧光同源 BattlePlayer 建盘口径）</summary>
+        private void RefreshOutlines()
+        {
+            var views = _session?.Player?.Views;
+            if (views == null) return;
+            string selected = _selectedUnitId;
+            string target = _state == HudState.Aiming && !string.IsNullOrEmpty(_pendingTargetUnitId)
+                ? _pendingTargetUnitId
+                : null;
+            foreach (var kv in views)
+            {
+                var view = kv.Value;
+                if (view == null) continue;
+                view.SetSelectedOutline(kv.Key == selected || kv.Key == target);
             }
         }
 
@@ -1047,6 +1352,7 @@ namespace GIC.Battle
             ApplyStateVisibility(); // 先态显隐、后数据刷新——无数据技能键的隐藏由 RefreshSkillButtons 终态定
             RefreshSkillButtons();
             ShowSelectMarker(unitId);
+            RefreshOutlines(); // 选中描边（2026-10-05 拍板：立牌描边=队伍色；ExitAiming 已随收口刷过一次）
             SetTip("Battle_TipUnitSelected");
         }
 
@@ -1057,6 +1363,7 @@ namespace GIC.Battle
             ClosePopup();
             HideSelectMarker();
             ApplyStateVisibility();
+            RefreshOutlines(); // 选中/目标描边随选中一并清（2026-10-05）
             SetTip("Battle_TipSelect");
         }
 
@@ -1066,11 +1373,13 @@ namespace GIC.Battle
             _aimDef = def;
             _state = HudState.Aiming;
             _pendingAimCell = null; // 新瞄准会话待定清零
+            _pendingTargetUnitId = null; // 待定目标随会话清零（2026-10-05 指定单位型轮换）
             SetAimSelectRing(def, true);
             ClosePopup();
             ComputeAimCells();
             ShowAimHighlights();
             ApplyStateVisibility(); // Aiming 态：技能盘+移动+取消可见、手牌藏
+            RefreshOutlines();      // 瞄准态选中描边保持（目标未定=null 槽）
             SetTip(def.IsMove
                 ? "Battle_TipAimMove"
                 : IsLineSkill(def) ? "Battle_TipAimDirection" : "Battle_TipAimSkill");
@@ -1096,6 +1405,7 @@ namespace GIC.Battle
                                   // 任何瞄准退出路径——点非可选格/取消钮/确认提交/阶段切换——面板一并收）
             // 待定金格随高亮 quad 一并消失（ClearHighlights 销 quad），字段清零防陈旧提交
             _pendingAimCell = null;
+            _pendingTargetUnitId = null; // 待定目标随会话收口（2026-10-05）
             // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
             bool wasDeployAim = _deployAimUnit != 0;
             _deployAimUnit = 0;
@@ -1107,6 +1417,7 @@ namespace GIC.Battle
                 _aimRecommendedCells.Clear();
                 ClearHighlights();
                 ApplyStateVisibility();
+                RefreshOutlines(); // 目标描边随会话收口（2026-10-05；部署路径无选中=全灭）
                 SetTip("Battle_TipSelect");
                 return;
             }
@@ -1117,6 +1428,7 @@ namespace GIC.Battle
             _aimRecommendedCells.Clear();
             ClearHighlights();
             ApplyStateVisibility();
+            RefreshOutlines(); // 目标描边随会话收口、选中描边保持（2026-10-05）
             SetTip("Battle_TipUnitSelected");
         }
 
@@ -1191,54 +1503,22 @@ namespace GIC.Battle
             var skillData = GetSelectedSkillData(_aimDef);
             if (skillData == null) return;
 
-            // 单位指向型：延奏=全图我方存活角色（含施法者自身——协奏语义，docs/07 蒙德；B-S1b 修正，
-            // 此前误按敌方指向）；契约=敌方存活单位（docs/05 §5.3 目标判定不经格子）。
+            // 单位指向型（三分支合一，2026-10-05 域单源化：延奏=施法者队伍存活角色〔含施法者自身
+            // ——协奏语义，docs/07 蒙德；B-S1b 修正〕；契约=敌方存活〔docs/05 §5.3 目标判定不经格子〕；
+            // 单位指向型爆发〔时轮 aimMode=TargetUnit，芭芭拉闪耀奇迹〕=施法者队伍**含尸体**〔复苏目标
+            // ——docs/05 §5.4 例外条款：唯一能让尸体站起来的通道〕。队伍口径=**选中单位**的队伍
+            // （2026-09-26 选中开放任意单位：查看敌方延奏/契约时目标域随施法者视角）。
             // 推荐分色 v1：单位指向全推荐（目标格即语义本身，无优劣数据可分）。
-            // 队伍口径=**选中单位**的队伍（2026-09-26 选中开放任意单位：查看敌方延奏/契约时
-            // 目标域随施法者视角——敌方延奏高亮敌方全体、契约高亮我方全体）
-            if (skillData.skillType == SkillType.Enso)
-            {
-                foreach (var u in snapshot.units)
-                {
-                    if (u.isCorpse != 0 || (TeamType)u.team != (TeamType)sel.team) continue;
-                    if (_board.Map.HasTile(u.position.x, u.position.y))
-                    {
-                        var c = new BattleCell(u.position.x, u.position.y);
-                        _aimCells.Add(c);
-                        _aimRecommendedCells.Add(c);
-                    }
-                }
-                return;
-            }
-            if (skillData.skillType == SkillType.Contract)
-            {
-                foreach (var u in snapshot.units)
-                {
-                    if (u.isCorpse != 0 || (TeamType)u.team == (TeamType)sel.team) continue;
-                    if (_board.Map.HasTile(u.position.x, u.position.y))
-                    {
-                        var c = new BattleCell(u.position.x, u.position.y);
-                        _aimCells.Add(c);
-                        _aimRecommendedCells.Add(c);
-                    }
-                }
-                return;
-            }
-
-            // 单位指向型爆发（B-3 ②，芭芭拉闪耀奇迹——时轮 aimMode=TargetUnit 声明）：全图我方任意
-            // 单位格**含尸体**（复苏目标——docs/05 §5.4 例外条款：唯一能让尸体站起来的通道）；
-            // 全推荐 v1（同延奏/契约口径：目标格即语义本身）
+            // 域枚举=CollectAimTargets 单源（同格轮换/拖动头像盘/高亮格三方同域同序）
             if (skillData.IsUnitTargeted())
             {
-                foreach (var u in snapshot.units)
+                var targets = new List<UnitState>();
+                CollectAimTargets(snapshot, null, targets);
+                foreach (var u in targets)
                 {
-                    if ((TeamType)u.team != (TeamType)sel.team) continue;
-                    if (_board.Map.HasTile(u.position.x, u.position.y))
-                    {
-                        var c = new BattleCell(u.position.x, u.position.y);
-                        _aimCells.Add(c);
-                        _aimRecommendedCells.Add(c);
-                    }
+                    var c = new BattleCell(u.position.x, u.position.y);
+                    _aimCells.Add(c);
+                    _aimRecommendedCells.Add(c);
                 }
                 return;
             }
@@ -1420,11 +1700,15 @@ namespace GIC.Battle
             {
                 // 单位指向型：延奏=点中格上的我方角色（协奏，docs/07 蒙德；B-S1b 修正）；
                 // 单位指向型爆发=点中格上的我方角色**含尸体**（B-3 ② 复苏目标——芭芭拉闪耀奇迹）；
-                // 契约=点中格上的敌方单位（docs/05 §5.3）
+                // 契约=点中格上的敌方单位（docs/05 §5.3）。
+                // 待定目标优先（2026-10-05：同格多候选点击轮换/拖动头像盘指定的具体目标）；
+                // 无待定目标（旧会话/拖动回落）按域找首个——旧行为不变
                 var skillData = GetSelectedSkillData(_aimDef);
                 bool enemyTargeting = skillData != null && skillData.skillType == SkillType.Contract;
                 bool includeCorpses = skillData != null && skillData.skillType == SkillType.Burst;
-                var unitAtCell = enemyTargeting ? enemyAtCell : FindUnitAt(snapshot, cell, UnitSide.MyTeam, includeCorpses);
+                var unitAtCell = ResolvePendingTarget(snapshot, cell);
+                if (unitAtCell == null)
+                    unitAtCell = enemyTargeting ? enemyAtCell : FindUnitAt(snapshot, cell, UnitSide.MyTeam, includeCorpses);
                 action.targetUnitId = unitAtCell != null ? unitAtCell.unitId : "";
             }
 
@@ -1604,17 +1888,42 @@ namespace GIC.Battle
         }
 
         /// <summary>拖动瞄准实时解析（单格）：判定基准=**大盘中心**——方向型（移动/直线）=盘心→小盘
-        /// 位移定十字方向+盘距比例定步数（盘缘=该方向最远可选格、死区缘=第 1 格）；指向型（延奏/契约）=
-        /// 拖向选目标（候选屏幕方向（相对盘心）与拖向夹角最小且≤锥角者锁定）。输入=_dragDiscLocal
-        /// （小盘位=盘上位置）。无有效瞄准=清待定</summary>
+        /// 位移定十字方向+盘距比例定步数；指向型（延奏/契约/单位指向型爆发）=**头像阵列命中=唯一
+        /// 选择途径**（2026-10-05 拍板「盘内可选角色头像，头像上松手=指定该角色」+2026-10-06 追拍
+        /// 「松手没在头像上=视为取消」：悬停头像=该角色所在格金格高亮+待定目标描边——既有格高亮
+        /// 行为保留改由头像命中驱动；**未命中头像=无有效瞄准**——拖动中金格即隐、松手取消；
+        /// 锥角锁定回落已按拍板移除，头像盘=精确选择器非模糊吸附）。自施放爆发（aimMode=None
+        /// 单格）与方向型维持原解析（无头像盘）。输入=_dragDiscLocal（小盘位=盘上位置）。
+        /// 无有效瞄准=清待定</summary>
         private void UpdateDragAimPreview(PointerEventData eventData)
         {
             UpdateDragWheel(eventData.position); // 小盘跟手+轮盘/屏幕双夹取（_dragDiscLocal=瞄准唯一输入）
             bool directionSkill = _aimDef != null && (_aimDef.IsMove || IsLineSkill(_aimDef));
-            BattleCell? cell = directionSkill
-                ? ComputeDragAimCellFromWheel(_dragDiscLocal)
-                : FindNearestAimCellByWheelDirection(_dragDiscLocal);
-            if (cell.HasValue) SetPendingAimCell(cell.Value);
+            BattleCell? cell;
+            UnitState targetUnit = null;
+            if (!directionSkill && IsCurrentAimUnitTargeted())
+            {
+                // 指定单位型：头像阵列命中=唯一选择途径（2026-10-06 追拍「松手没在头像上=视为取消」
+                // ——锥角锁定回落已按拍板移除，头像盘=精确选择器非模糊吸附；盘外拖动金格即隐、松手取消）
+                int hit = AvatarIndexAtScreenPos(eventData.position);
+                SetDragAvatarHover(hit);
+                if (hit >= 0)
+                {
+                    targetUnit = _dragAvatarUnits[hit];
+                    cell = targetUnit.position;
+                }
+                else
+                {
+                    cell = null;
+                }
+            }
+            else
+            {
+                cell = directionSkill
+                    ? ComputeDragAimCellFromWheel(_dragDiscLocal)
+                    : FindNearestAimCellByWheelDirection(_dragDiscLocal); // 自施放单格锁定（方向型走盘距解析）
+            }
+            if (cell.HasValue) SetPendingAimCellWithTarget(cell.Value, targetUnit);
             else ClearPendingAimCell();
         }
 
@@ -1743,6 +2052,7 @@ namespace GIC.Battle
                 MoveDragButtonToWheelCenter(def); // 技能键临时挪到盘心作摇杆底座（2026-09-27 拍板）
             }
             else _dragWheelCenterLocal = Vector2.zero;
+            BuildDragAvatarGrid(def); // 指定单位型：盘内候选头像阵列（2026-10-05；其它技能类型直通不建）
             UpdateDragWheel(pointerScreen);
         }
 
@@ -1796,11 +2106,124 @@ namespace GIC.Battle
             _dragWheelSmall.anchoredPosition = local;
         }
 
-        /// <summary>圆盘隐藏（松手/会话收口；幂等）——临时挪到盘心的技能键随盘一并还原回槽</summary>
+        /// <summary>圆盘隐藏（松手/会话收口；幂等）——临时挪到盘心的技能键随盘一并还原回槽；
+        /// 头像阵列随盘销（2026-10-05）</summary>
         private void HideDragWheel()
         {
             if (_dragWheelRoot != null) _dragWheelRoot.SetActive(false);
+            ClearDragAvatarGrid();
             RestoreDragMovedButton();
+        }
+
+        // ==================== 拖动瞄准头像阵列盘（2026-10-05 拍板「拖动瞄准矩形盘里出现可选角色的头像，
+        // 从左往右从上往下每行每列 4 个；超 16 缩头像变 5×5 以此类推；头像上松手=指定该角色」） ====================
+        // 头像牌=复用 QueueSlot.prefab（Plate/AvatarMask/Avatar/Ring 结构，raycastTarget 全关——
+        // 命中测试走手动 rect 包含：拖拽中指针被 UGUI 拖拽捕获，不派发 hover 事件）。描环=归属玩家色
+        // （BattlePlayerColors 同执行预览口径）；尸体候选（复苏目标）头像灰染。候选=CollectAimTargets 全域。
+
+        /// <summary>构建头像阵列（ShowDragWheel 时调；指定单位型才建，幂等先清）：
+        /// cols=4 起、cols*cols&lt;候选数递增（4×4=16 → 5×5=25 以此类推），rows=ceil(count/cols)
+        /// 居中排布；头像尺寸=min(横/纵 pitch)×0.86 随 cols 收缩（「缩小每个头像以容纳」）</summary>
+        private void BuildDragAvatarGrid(SkillButtonDef def)
+        {
+            ClearDragAvatarGrid();
+            if (_dragWheelRoot == null || def == null) return;
+            var skillData = GetSelectedSkillData(def);
+            if (skillData == null || !skillData.IsUnitTargeted()) return; // 移动/直线/自施放/部署无头像盘
+            var snapshot = _session.Player.LatestSnapshot;
+            if (snapshot == null) return;
+            var candidates = new List<UnitState>();
+            CollectAimTargets(snapshot, null, candidates); // ShowDragWheel 恒在 EnterAiming(def) 之后调（_aimDef==def）
+            int count = candidates.Count;
+            if (count == 0) return;
+
+            if (_avatarTilePrefab == null)
+                _avatarTilePrefab = Resources.Load<GameObject>("Prefabs/Battle/QueueSlot");
+            if (_avatarTilePrefab == null)
+            {
+                GICLog.Warn("[BattleHud] QueueSlot.prefab 未找到（Resources/Prefabs/Battle/QueueSlot）——拖动瞄准头像盘不显示");
+                return;
+            }
+
+            _dragAvatarGrid = new GameObject("DragAimAvatars", typeof(RectTransform));
+            var gridRt = (RectTransform)_dragAvatarGrid.transform;
+            gridRt.SetParent(_dragWheelRoot.transform, false);
+            gridRt.SetAsLastSibling(); // 阵列画在盘填充/描环之上、小盘之下（小盘随后再抬到最顶）
+
+            int cols = 4;
+            while (cols * cols < count) cols++; // 4×4=16 容纳不下 → 5×5（以此类推）
+            int rows = Mathf.CeilToInt(count / (float)cols);
+            float span = Mathf.Max(1f, 2f * (拖动瞄准大盘半边 - 拖动瞄准头像盘边距));
+            float pitchX = span / cols;
+            float pitchY = span / Mathf.Max(1, rows);
+            const float tileNative = 64f; // QueueSlot 原生 64×64——缩放走 localScale（描环/圆角同比）
+            float size = Mathf.Min(pitchX, pitchY) * 0.86f;
+            _dragAvatarBaseScale = size / tileNative;
+
+            for (int i = 0; i < count; i++)
+            {
+                var u = candidates[i];
+                int col = i % cols, row = i / cols;
+                var tile = Instantiate(_avatarTilePrefab, gridRt, false);
+                tile.name = $"Aim_{u.unitId}";
+                var rt = (RectTransform)tile.transform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = _dragWheelCenterLocal + new Vector2(
+                    (col - (cols - 1) * 0.5f) * pitchX,
+                    -(row - (rows - 1) * 0.5f) * pitchY); // 从左往右、从上往下（画布 y 向上 → 行号取负）
+                rt.localScale = Vector3.one * _dragAvatarBaseScale;
+
+                var avatar = rt.Find("AvatarMask/Avatar")?.GetComponent<UnityEngine.UI.Image>();
+                var ring = rt.Find("Ring")?.GetComponent<UnityEngine.UI.Image>();
+                var data = TryGetUnitData(u.unitName);
+                if (avatar != null)
+                {
+                    MissingImageGuard.Assign(avatar, data != null ? data.avatar : null); // 头像缺失兜底（2026-10-06 全位点接入）
+                    avatar.color = u.isCorpse != 0 ? Palette.立牌尸体灰 : Color.white; // 尸体候选（复苏）灰染
+                }
+                if (ring != null) // 描环=归属玩家色（执行预览同款：直观看出这个单位是谁的）
+                {
+                    var pc = BattlePlayerColors.Resolve(_session.Sim, _myPlayerId, u.playerId);
+                    ring.color = new Color(pc.r, pc.g, pc.b, 0.8f);
+                }
+                _dragAvatarRects.Add(rt);
+                _dragAvatarUnits.Add(u);
+            }
+            if (_dragWheelSmall != null) _dragWheelSmall.SetAsLastSibling(); // 小盘保持最顶（指针盘可见）
+        }
+
+        /// <summary>头像阵列销毁（HideDragWheel 单点收口；幂等）</summary>
+        private void ClearDragAvatarGrid()
+        {
+            if (_dragAvatarGrid != null) Destroy(_dragAvatarGrid);
+            _dragAvatarGrid = null;
+            _dragAvatarRects.Clear();
+            _dragAvatarUnits.Clear();
+            _dragAvatarHover = -1;
+        }
+
+        /// <summary>拖拽中头像命中（手动 rect 包含——指针被拖拽捕获无 UGUI hover 事件；Overlay 画布 camera=null）</summary>
+        private int AvatarIndexAtScreenPos(Vector2 screenPos)
+        {
+            for (int i = 0; i < _dragAvatarRects.Count; i++)
+            {
+                var rt = _dragAvatarRects[i];
+                if (rt == null) continue;
+                if (RectTransformUtility.RectangleContainsScreenPoint(rt, screenPos, null)) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>悬停头像放大反馈（金格高亮+目标描边之外的轻量确认；切悬停复位旧格）</summary>
+        private void SetDragAvatarHover(int index)
+        {
+            if (_dragAvatarHover == index) return;
+            if (_dragAvatarHover >= 0 && _dragAvatarHover < _dragAvatarRects.Count
+                && _dragAvatarRects[_dragAvatarHover] != null)
+                _dragAvatarRects[_dragAvatarHover].localScale = Vector3.one * _dragAvatarBaseScale;
+            _dragAvatarHover = index;
+            if (index >= 0 && index < _dragAvatarRects.Count && _dragAvatarRects[index] != null)
+                _dragAvatarRects[index].localScale = Vector3.one * (_dragAvatarBaseScale * 拖动瞄准头像悬停放大);
         }
 
         /// <summary>圆盘三件懒建（首次拖动起手时建，BattleHud 随战斗实例销毁即回收）</summary>
@@ -2107,12 +2530,18 @@ namespace GIC.Battle
                 renderer.sharedMaterial = GetAimPendingMaterial();
         }
 
-        /// <summary>清待定格并还原材质（拖动瞄准用：拖向移出有效区/无有效瞄准时调用——松手即"无待定=取消"）</summary>
+        /// <summary>清待定格并还原材质（拖动瞄准用：拖向移出有效区/无有效瞄准时调用——松手即"无待定=取消"）；
+        /// 待定目标随格一并清（2026-10-05）</summary>
         private void ClearPendingAimCell()
         {
             if (!_pendingAimCell.HasValue) return;
             RestorePendingCellMaterial();
             _pendingAimCell = null;
+            if (_pendingTargetUnitId != null)
+            {
+                _pendingTargetUnitId = null;
+                RefreshOutlines();
+            }
         }
 
         /// <summary>待定格还原回推荐/不推荐共享材质（变更待定格/退出瞄准前调用）</summary>
@@ -2473,7 +2902,7 @@ namespace GIC.Battle
                 iconPath = "UI/Skills/amphibious";
             }
             if (def.view.skillIcon != null)
-                def.view.skillIcon.sprite = Resources.Load<Sprite>(iconPath);
+                MissingImageGuard.Assign(def.view.skillIcon, Resources.Load<Sprite>(iconPath)); // 图标缺失兜底（2026-10-06 全位点接入）
             if (def.nameText != null)
             {
                 def.nameText.ClearAllEntries();

@@ -27,11 +27,14 @@ namespace GIC.UI
             icon.gameObject.SetActive(sprite != null);
         }
 
-        /// <summary>按物品配置初始化图标（ItemConfig 数据链单源——物品图标不散落 prefab 手塞）</summary>
+        /// <summary>按物品配置初始化图标（ItemConfig 数据链单源——物品图标不散落 prefab 手塞）。
+        /// 期望显示语义：配置/图标缺失走 missing_image 兜底不再隐藏图标位（2026-10-06 拍板全位点接入）</summary>
         public void InitItem(ItemConfig config, ItemName itemId)
         {
             var data = config != null ? config.GetItemData(itemId) : null;
-            SetIcon(data != null ? data.GetIcon(0) : null);
+            if (icon == null) return;
+            MissingImageGuard.Assign(icon, data != null ? data.GetIcon(0) : null);
+            icon.gameObject.SetActive(true);
         }
 
         /// <summary>刷新数量（纯数字——祈愿界面现状口径，语言无关）</summary>

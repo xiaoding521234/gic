@@ -104,13 +104,13 @@ namespace GIC.UI
             if (titleText != null)
                 EnsureTextCombiner(titleText).SetSingleEntry(data.GetTitleEntry());
 
-            // 元素图标
+            // 元素图标（缺失兜底 2026-10-06 全位点接入）
             if (elementIcon != null && _iconConfig != null)
-                elementIcon.sprite = _iconConfig.GetElementIconDeep(data.selfElement);
+                MissingImageGuard.Assign(elementIcon, _iconConfig.GetElementIconDeep(data.selfElement));
 
-            // 势力图标（取第一个 faction）
+            // 势力图标（取第一个 faction；缺失兜底同上）
             if (factionIcon != null && _iconConfig != null && data.factions?.Length > 0)
-                factionIcon.sprite = _iconConfig.GetFactionIcon(data.factions[0]);
+                MissingImageGuard.Assign(factionIcon, _iconConfig.GetFactionIcon(data.factions[0]));
 
             // 立绘背景色 = 元素对应颜色（配置文件）
             if (colorImage != null && _iconConfig != null)

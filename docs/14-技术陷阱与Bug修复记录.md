@@ -913,6 +913,7 @@ generate_image 走 `is_segmentation=true`，任务 completed 但产物落在 `ai
 - 缺失图兜底只能**调用点显式接入**（MissingImageGuard.Assign/Ensure）：在"应当有图"的赋值处（立绘/名片/图标加载回调）显式调用——为空即兜底+拉伸填满（preserveAspect=false）；"故意无图"的纯色块不经过守卫，天然免疫
 - **禁止**再做任何形式的"扫描-替换断链图"全局方案（含编辑器批量工具）；审计类需求只能做"报告不改动"
 - 兜底资产放 Resources（同步加载保障）：`Resources/UI/missing_image`（548x533，用户指定的醒目图）
+- **2026-10-06 追拍「所有期望显示但实际缺少时都渲染此图代替」=全内容位点接入**——已接清单：技能图标（SkillIconView.InitWithData 中央单点，含战斗键/背包/详情）+移动键图标（BattleHud.ApplyMoveButton）+立牌纸片人（UnitView.Create——Ensure 经 bounds 换算拉伸到标准立牌高）+Buff 徽章（UnitView.RebuildBuffBadges——未知类型照常显示占位徽章）+附着图标（BattleOverheadBars）+头像牌（执行预览 CreateEntry/拖动瞄准头像盘 BuildDragAvatarGrid）+卡面（UnitCardViewStrategy 立绘既有/ItemCardViewStrategy 物品图/CardViewStrategyBase.ApplySkinTo 皮肤切换）+物品详情（ItemDetailPanel）+物品计数条（ItemCounterChip.InitItem——空图标不再隐藏图标位）+祈愿角色面板元素/势力图标（CharacterPanelController）。**不经守卫**：程序化 UI 镀层（拖动盘贴图/弧光贴图/光柱/聊天气泡=自带降级链）+既有专属降级（箭矢素材缺失=白光条 Warn，勿当 bug 修）。**新内容图显示点接入纪律**：赋值处走 Assign/Ensure（勿裸 `.sprite=`）——全局扫描方案仍是禁区
 
 ---
 
@@ -1803,3 +1804,17 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：两层拆解后真因与直觉不同——①视频**资产**（VideoClip 对象）是 Config 直引用，随 UnitConfig/SkillConfig 加载即常驻，不存在「首次加载」；②黑的是**解码器首开**：VideoPlayer 对新 clip 首次 Play 要开文件+建解复用+解码首帧（WMF ~100-300ms），期间素材 quad 显示的是刚分配的动作片 RT（**新 RenderTexture 恒黑**）——待机片共主 RT 换片无此象（RT 留上一帧），动作片双 RT 路线每片独立 RT 才显形。
 **修法**：建场预热——CreateView 收集本单位全部技能动作视频（含 Move 移动片）→ UnitView.PrewarmActionClips：per-clip RT 池+临时 VideoPlayer `Prepare()` 预解码**首帧渲入池**（5s 超时兜底回落旧行为）；PlayActionVideo 按片取 RT=预热命中带首帧零黑屏。RT 单槽→Dictionary 池化顺带消除异尺寸片交替播的重建浪费。
 **判据**：①**「AssetCache/Addressables 预载」治不了解码器**——它管资产驻留（大贴图/立绘域），VideoPlayer 首开延迟只能靠 Prepare 预热或预渲首帧；诊断「首次卡/黑」先分层：资产驻留（Config 直引用=已驻留）vs 解码首开 vs RT 初始内容；②**新分配 RenderTexture 恒黑**是常被忽略的第三因素——凡「换 RT 渲染」的切换，切换瞬间显示的都是 RT 旧内容/黑，预渲一帧入池即可无缝；③预热协程必带超时兜底（Prepare 可能挂死，预热失败应回落旧行为而非卡建场）。
+
+## 122. 悬空面片点击视差（平面取格对 2D 立牌失准）+ ShaderLab `[Header]` 属性连字符解析崩（2026-10-05 决策四十六批实证）
+
+**场景**：①用户点角色立牌（尤其上半身）经常选不中/选到身后格——立牌是 55° 后仰的 2D 面片，屏幕上悬空覆盖身后格；②给 shader Properties 加 `[Header(Selected Outline 2026-10-05)]` 装饰行后 `unity_shader.compile` 报 `Parse error: syntax error, unexpected $undefined, expecting TVAL_ID or TVAL_VARREF`。
+**根因**：①OnBoardTap 用「射线交 y=顶面平面→取格」拾取，对**悬空面片**天然失准——点击落在面片上半部时视线早已越过自身格（俯角下漂移 h/tan(俯角) 与 §86 地块顶面视差同族，但面片悬空高度更高、漂移更大格数）；②ShaderLab 属性抽屉 `[Header(text)]` 的 text 含连字符/特殊符号会炸解析器（property drawer 属性语法远比 C# Attribute 窄）。
+**修法**：①**屏幕空间面片命中**——立牌面片四角（视频 quad 实时 transform/静态 localBounds）→ 各角 `WorldToScreenPoint` → 凸四边形点内测试（全 cross 同侧 ±1px 容差，任一 winding）→ 多面片重叠取离相机最近者；命中则点击目标=该单位+其所在格，未命中回落平面取格。**凡「点击 2D 面片状物体（立牌/布告板/卡片）」的拾取勿走地面平面取格**——面片视觉格与判定格天然错位，屏幕四边形测试零物理成本且透视正确；②shader Properties 分区用普通注释，`[Header]` 只用不带特殊字符的单词。
+**判据**：①「点击立牌无反应/选错人」先查拾取是平面取格还是面片命中（平面取格对面片=系统性错位，越靠面片顶部错得越远）；②shader 解析错误行号落在 Properties 块且报 `$undefined/TVAL_ID`——先查装饰性属性（[Header]/[Space]/[Enum] 等）里是否混了连字符、括号、冒号；③**unity_shader.compile 对刚改的 .shader 报错可能是 SourceAssetDB 陈旧态**（磁盘改动未经 refresh 导入）——先 `unity_editor.refresh` 再 compile 才是干净判据（本批实证：同错误 refresh 后消失，与 §109 .cginc 同族）。
+
+## 123. 透明排序实证：sortingOrder 支配 renderQueue——「queue 2999<3000 所以先画」是幻觉（2026-10-06 底座盘「沉水」报障根因）
+
+**现象**：飞行单位站水格上，底座圆盘看起来沉到水面之下（被水波盖住冲刷）——但几何推演全对：盘=视觉表面（水面 0.36+波峰 1.5×振幅 0.02+余量 0.01）+0.02=0.42，恒高出波峰（0.39）0.03。
+**根因**：**Unity 透明渲染序=SortingLayer → SortingOrder → renderQueue → 距离**（order 支配 queue；像素回读实验实锤：A=queue3000/order-1/红 vs B=queue2999/order0/绿 共面叠放→渲染结果纯绿）。焊接水面 MeshRenderer sortingOrder=0（默认）> 盘 sortingOrder=-1 → **水面后画、整片盖在盘上**（含波峰高光），盘被水冲刷=「沉水」观感。旧认知「盘 queue3000>水 2999 故盘画于水面之上」（UnitView/§92 注释遗留）从排序规则上就不成立——此前无人察觉只因极少有单位真正站上水格（飞行跨水=决策三十九后才常见）。
+**修法**：焊接水面 `meshRenderer.sortingOrder = -2`（BattleBoard.BuildWaterSurface）——水面恒为最低透明层（画于盘 -1 之下、瞄准贴片 0/立牌 10/箭矢 12 之上），显式实现 2999 队列的本意；勿"修"回 0。
+**判据**：①**凡跨 renderer 排透明序一律显式用 sortingOrder 排，勿依赖 renderQueue 相对大小**（queue 只在 order 相同时才参与比较——本实验把 3000 vs 2999 的"先后"直觉直接推翻）；②「贴片沉到水面下」类报障先分层：几何高度（视觉表面含波峰带 §89）vs 画家序（order 对比）——两者都可独立致"沉水"观感；③共面双 quad+像素回读=排序规则的最小定裁实验（勿凭文档/记忆断言排序规则）。

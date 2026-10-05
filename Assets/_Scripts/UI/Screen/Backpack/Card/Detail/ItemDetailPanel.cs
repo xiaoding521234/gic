@@ -72,8 +72,8 @@ namespace GIC.UI
             _cardName.ClearAllEntries();
             _cardName.AddEntry(raw.itemID.GetEntry());
 
-            // 图标
-            itemImage.sprite = raw.GetIcon(data.skin);
+            // 图标（缺失兜底 2026-10-06 全位点接入）
+            MissingImageGuard.Assign(itemImage, raw.GetIcon(data.skin));
 
             // 主标签
             mainTag.ClearAllEntries();
