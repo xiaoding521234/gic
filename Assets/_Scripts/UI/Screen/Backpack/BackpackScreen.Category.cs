@@ -68,6 +68,17 @@ namespace GIC.UI
             if (!isInit) RefreshCardList();
         }
 
+        /// <summary>滑线唯一写入口：X 用世界坐标对齐标签，Y 每帧锚回本地值。
+        /// 毛玻璃入场/退场动画会移动父级 TopPanel（内容元素，从上偏移 100）——若钉死世界 Y，
+        /// 滑线与动画重叠时线会被留在父级位移态的高度上，本地 Y 永久漂移（池化实例不重建，§39 同族）。</summary>
+        private void SetLineWorldX(float worldX)
+        {
+            float localY = sharedSelectLine.anchoredPosition.y;
+            sharedSelectLine.position = new Vector3(worldX, sharedSelectLine.position.y, sharedSelectLine.position.z);
+            var ap = sharedSelectLine.anchoredPosition;
+            sharedSelectLine.anchoredPosition = new Vector2(ap.x, localY);
+        }
+
         private void SnapSelectLineTo(BackpackTab tab)
         {
             if (sharedSelectLine == null) return;
@@ -79,8 +90,7 @@ namespace GIC.UI
             }
             if (target == null) return;
 
-            var targetRT = target.GetComponent<RectTransform>();
-            sharedSelectLine.position = new Vector2(targetRT.position.x, sharedSelectLine.position.y);
+            SetLineWorldX(target.GetComponent<RectTransform>().position.x);
         }
 
         private void SlideSelectLineTo(BackpackTab tab)
@@ -109,7 +119,6 @@ namespace GIC.UI
         {
             float startX = sharedSelectLine.position.x;
             float targetX = targetRT.position.x;
-            float y = sharedSelectLine.position.y; // 固定 Y
 
             float elapsed = 0f;
             while (elapsed < lineSlideDuration)
@@ -118,12 +127,11 @@ namespace GIC.UI
                 float t = elapsed / lineSlideDuration;
                 t = 1f - Mathf.Pow(1f - t, 3f); // ease out cubic
 
-                float x = Mathf.Lerp(startX, targetX, t);
-                sharedSelectLine.position = new Vector2(x, y);
+                SetLineWorldX(Mathf.Lerp(startX, targetX, t));
                 yield return null;
             }
 
-            sharedSelectLine.position = new Vector2(targetX, y);
+            SetLineWorldX(targetX);
         }
 
         private void OnClose()
