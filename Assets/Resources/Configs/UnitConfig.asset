@@ -508,7 +508,7 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 07a454e67a67d8a48aa2ca98cc2dbd0d, type: 3}
     nameCard: {fileID: 21300000, guid: 6c409b229a14b5e46b479d2d5d19528f, type: 3}
     "\u7ACB\u724C\u56FE": {fileID: 21300000, guid: b8b70c4b96d387845bcca5f12b510c1d, type: 3}
-    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 32900000, guid: 364282ddee26d4944b7c406ded0b6ca1, type: 3}
     "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
     "\u4E13\u5C5E\u5F39\u5C04\u7269\u7F29\u653E": 1
     "\u79BB\u5730\u9AD8\u5EA6": 0.05
