@@ -67,11 +67,13 @@ namespace GIC.Battle
         /// 方案条目按未知 key 自然跳过，同 enemyinfo 先例）；
         /// confirm=完成选择按钮（2026-09-26 新增，选择阶段常显、显隐随 Update 轮询同 countdown）；
         /// preview=执行预览（2026-10-04 下移贴底批接入：执行阶段无行不可见——布局编辑模式由
-        /// _executionPreview.ShowLayoutPlaceholder 建占位行显形，可拖可缩同其它件）</summary>
+        /// _executionPreview.ShowLayoutPlaceholder 建占位行显形，可拖可缩同其它件）；
+        /// quick=快捷面板（2026-10-06 拍板：左侧竖条，己方魔神/伙伴每行=头像+爆发+势力技能，
+        /// 点击行=选中该角色+相机丝滑居中；常驻战斗全程不走 ApplyStateVisibility——存量方案缺条目自然回落默认位）</summary>
         private static readonly string[] AllLayoutKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "settings",
-            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview",
+            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick",
         };
 
         /// <summary>
