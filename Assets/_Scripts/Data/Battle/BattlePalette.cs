@@ -105,6 +105,8 @@ namespace GIC.Data
         public Color 瞄准不推荐色 = new Color(1f, 0.3f, 0.25f, 0.8f);
         [Tooltip("瞄准待定金格（2026-09-26 拍板：点可选格不立即提交——变金待定、完成选择按钮确认；原神风格金色）")]
         public Color 瞄准已选色 = new Color(0.96f, 0.79f, 0.27f, 0.85f);
+        [Tooltip("瞄准悬停格（2026-10-06 拍板：点击式瞄准鼠标停留可选格=该格提亮预览；金格优先于悬停）")]
+        public Color 瞄准悬停色 = new Color(1f, 1f, 1f, 0.45f);
 
         [Header("立牌状态")]
         public Color 冻结冰色 = new Color(0.62f, 0.83f, 0.96f);

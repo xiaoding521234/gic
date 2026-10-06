@@ -22,7 +22,7 @@ namespace GIC.Battle
     {
         [Header("棋盘引用")]
         [SerializeField] private BattleBoard _board;
-        [Tooltip("立牌朝向相机（Additive 场景下 Camera.main 是 MainHall 相机，必须显式指定）")]
+        [Tooltip("立牌朝向相机（兜底走 CameraContext.Resolve()，战斗场景已解析到战斗相机；场景序列化引用仍是主路径）")]
         [SerializeField] private Camera _viewCamera;
 
         [Header("播放参数")]
@@ -199,7 +199,7 @@ namespace GIC.Battle
         private void Update()
         {
             // 立牌面向战场相机（固定斜俯视，逐帧保持即可；相机不动时开销可忽略）
-            var cam = _viewCamera != null ? _viewCamera : Camera.main;
+            var cam = _viewCamera != null ? _viewCamera : CameraContext.Resolve();
             if (cam != null)
             {
                 var forward = cam.transform.forward;
@@ -456,7 +456,7 @@ namespace GIC.Battle
 
             // 朝向：先取屏幕平行布告板（面正对视线，与立牌后仰同族），再按飞行方向的屏幕投影
             // 绕视线轴旋转到四向其一（投影走 WorldToScreenPoint，不假设画布/世界轴向映射）
-            var cam = _viewCamera != null ? _viewCamera : Camera.main;
+            var cam = _viewCamera != null ? _viewCamera : CameraContext.Resolve();
             if (cam != null && (to - from).sqrMagnitude > 1e-8f)
             {
                 var screenFrom = cam.WorldToScreenPoint(from);
@@ -1210,7 +1210,7 @@ namespace GIC.Battle
                 var go = new GameObject("DamageNumbers");
                 go.transform.SetParent(transform, false);
                 _damageNumbers = go.AddComponent<BattleDamageNumbers>();
-                _damageNumbers.Init(_viewCamera != null ? _viewCamera : Camera.main);
+                _damageNumbers.Init(_viewCamera != null ? _viewCamera : CameraContext.Resolve());
             }
             return _damageNumbers;
         }
@@ -1223,7 +1223,7 @@ namespace GIC.Battle
                 var go = new GameObject("OverheadBars");
                 go.transform.SetParent(transform, false);
                 _overheadBars = go.AddComponent<BattleOverheadBars>();
-                _overheadBars.Init(_viewCamera != null ? _viewCamera : Camera.main);
+                _overheadBars.Init(_viewCamera != null ? _viewCamera : CameraContext.Resolve());
             }
             return _overheadBars;
         }

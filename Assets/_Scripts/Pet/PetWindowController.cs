@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
+using GIC.Framework;
 using static GIC.Pet.PetWin32; // Win32 声明集中在 PetWin32（2026-08-27 抽取去重），调用点免限定
 using UnityEngine.Serialization;
 
@@ -220,7 +221,7 @@ namespace GIC.Pet
 
         private void Start()
         {
-            cam = Camera.main;
+            cam = CameraContext.Resolve();
             behaviorCtrl = FindObjectOfType<PetBehaviorController>();
             _edgeSitCtrl = FindObjectOfType<PetEdgeSitController>();
             if (dragPhysics == null) dragPhysics = FindObjectOfType<PetDragPhysicsController>();

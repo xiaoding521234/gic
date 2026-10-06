@@ -135,6 +135,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!115 &111625336
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: CameraContextAnchor
+  m_Namespace: GIC.Framework
+  m_AssemblyName: Assembly-CSharp
 --- !u!114 &136555272 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5159800755864158815, guid: a87899e7dc509034da7bd532dc49c521, type: 3}
@@ -273,6 +288,9 @@ GameObject:
   m_Component:
   - component: {fileID: 328748161}
   - component: {fileID: 328748160}
+  - component: {fileID: 328748162}
+  - component: {fileID: 328748163}
+  - component: {fileID: 328748164}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: Main Camera
@@ -349,6 +367,42 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &328748162
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 328748158}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 671345286}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &328748163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 328748158}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1889342901}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &328748164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 328748158}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 111625336}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!114 &544942460 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5159800755864158815, guid: a87899e7dc509034da7bd532dc49c521, type: 3}
@@ -365,6 +419,21 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 2286064946475171248, guid: a87899e7dc509034da7bd532dc49c521, type: 3}
   m_PrefabInstance: {fileID: 1454076018}
   m_PrefabAsset: {fileID: 0}
+--- !u!115 &671345286
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: CameraContextAnchor
+  m_Namespace: GIC.Framework
+  m_AssemblyName: Assembly-CSharp
 --- !u!1001 &748663288
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1244,6 +1313,21 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 2286064946475171248, guid: a87899e7dc509034da7bd532dc49c521, type: 3}
   m_PrefabInstance: {fileID: 748663288}
   m_PrefabAsset: {fileID: 0}
+--- !u!115 &1889342901
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: CameraContextAnchor
+  m_Namespace: GIC.Framework
+  m_AssemblyName: Assembly-CSharp
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

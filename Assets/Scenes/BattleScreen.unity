@@ -124,6 +124,21 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!115 &45935739
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: CameraContextAnchor
+  m_Namespace: GIC.Framework
+  m_AssemblyName: Assembly-CSharp
 --- !u!1 &311523751
 GameObject:
   m_ObjectHideFlags: 0
@@ -186,6 +201,7 @@ MonoBehaviour:
   "\u7BAD\u96E8\u5165\u571F\u65F6\u957F": 0.05
   "\u7BAD\u96E8\u843D\u5730\u6EDE\u7559": 3
   "\u7BAD\u96E8\u843D\u5730\u6DE1\u51FA": 0.18
+  "\u5143\u80FD\u83B7\u53D6\u5F39\u6570\u5B57": 0
 --- !u!114 &311523754
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -402,6 +418,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1233798860}
   - component: {fileID: 1233798859}
+  - component: {fileID: 1233798861}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: BattleCamera
@@ -478,6 +495,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1233798861
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1233798858}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 45935739}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

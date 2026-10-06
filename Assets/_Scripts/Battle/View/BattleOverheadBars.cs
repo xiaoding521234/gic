@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using GIC.Framework;
 using GIC.Data;
 using GIC.UI;
 
@@ -107,7 +108,7 @@ namespace GIC.Battle
 
         private void Update()
         {
-            var cam = _camera != null ? _camera : Camera.main;
+            var cam = _camera != null ? _camera : CameraContext.Resolve();
             if (cam == null) return;
 
             foreach (var item in _items)
