@@ -1019,6 +1019,78 @@ MonoBehaviour:
     m_Key: Battle_LifeSteal
     m_Metadata:
       m_Items: []
+  - m_Id: 13001
+    m_Key: Stat_HP
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13002
+    m_Key: Stat_Attack
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13003
+    m_Key: Stat_Defense
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13004
+    m_Key: Stat_Mastery
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13005
+    m_Key: Stat_Luck
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13006
+    m_Key: Stat_Sanity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13007
+    m_Key: Stat_AttackSpeed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13008
+    m_Key: Stat_MoveSpeed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13009
+    m_Key: Stat_Tenacity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13010
+    m_Key: Stat_HealEfficiency
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13011
+    m_Key: Stat_LifeSteal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13012
+    m_Key: Stat_Energy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13013
+    m_Key: Stat_DeployCost
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13014
+    m_Key: Stat_AttackVision
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13015
+    m_Key: Stat_FogVision
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13016
+    m_Key: StatPanel_Basic
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13017
+    m_Key: StatPanel_Advanced
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13018
+    m_Key: StatPanel_Battle
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

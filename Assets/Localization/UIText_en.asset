@@ -1040,6 +1040,78 @@ MonoBehaviour:
     m_Localized: Lifesteal
     m_Metadata:
       m_Items: []
+  - m_Id: 13001
+    m_Localized: HP
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13002
+    m_Localized: ATK
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13003
+    m_Localized: DEF
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13004
+    m_Localized: Mastery
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13005
+    m_Localized: Luck
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13006
+    m_Localized: Sanity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13007
+    m_Localized: ATK SPD
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13008
+    m_Localized: Movement SPD
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13009
+    m_Localized: Tenacity
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13010
+    m_Localized: Healing Efficiency
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13011
+    m_Localized: Lifesteal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13012
+    m_Localized: Max Energy
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13013
+    m_Localized: Deploy Cost
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13014
+    m_Localized: Attack Vision
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13015
+    m_Localized: Fog Vision
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13016
+    m_Localized: Basic Stats
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13017
+    m_Localized: Advanced Stats
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13018
+    m_Localized: Combat Stats
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
