@@ -342,6 +342,15 @@ namespace GIC.Battle
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             _session.Flow.OnPhaseChanged += OnPhaseChanged;
             _session.Flow.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
+
+            // 头顶 Buff 图标批（2026-10-06）接线：来源玩家色解析器（本端视角单源）+ 相机缩放源
+            // （放大=半速率跟随、缩小=下限不缩）——层侧每帧/重建时消费；Bind 先于建场亦安全（懒取值）
+            var bars = _session.Player.OverheadBars;
+            if (bars != null)
+            {
+                bars.PlayerColorOf = OverheadBuffSourceColor;
+                bars.CameraController = camera;
+            }
             InitExecutionPreview(); // 执行预览（2026-09-29）：TopBar 攻速队列退役后的执行阶段多行行动预览
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
@@ -356,6 +365,23 @@ namespace GIC.Battle
 
         /// <summary>输入系统快捷键派发（[Autowired] 注入；Bind 注入后订阅，docs/14 §78 寻址/注入分离）</summary>
         [Autowired] private InputManager _inputManager;
+
+        /// <summary>头顶 Buff 图标描环=来源单位所属玩家色（2026-10-06 拍板「框的颜色采用来源单位所属
+        /// 玩家色」）：unitId→快照 playerId→BattlePlayerColors 本端视角解析——与快捷面板/执行预览
+        /// 头像描环同口径单源；来源单位不在快照（理论不可达）回落敌方主色（Resolve 空参语义）</summary>
+        private Color OverheadBuffSourceColor(string unitId)
+        {
+            string playerId = null;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot?.units != null)
+            {
+                foreach (var u in snapshot.units)
+                {
+                    if (u != null && u.unitId == unitId) { playerId = u.playerId; break; }
+                }
+            }
+            return BattlePlayerColors.Resolve(_session?.Sim, _myPlayerId, playerId);
+        }
 
         /// <summary>快捷键动作（2026-09-26 拍板「按下空格=快速按下完成选择按钮」）：
         /// 复用 KeyAction.Confirm 通用确认（默认绑定 空格/回车，设置页可重绑）——战斗场景订阅触发，

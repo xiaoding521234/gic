@@ -21,7 +21,8 @@ namespace GIC.Battle
     /// 平直值口径致 C2 减防对 tick 无效报障〕、不经反应预览=不触发反应/不附着）。
     /// 命座参数（施加者 Talent 命座技能参数，SourceConstellation 单出口）：叠层上限 2
     /// （2命 +C2StackLimit、3命 +C3StackLimit）；半径 1（3命 +C3Radius）；
-    /// 2命起 tick 命中敌人额外施加防御减少 Buff（-C2DefenseReduce，10 层 12 回合叠时长）。
+    /// 2命起 tick 命中敌人额外施加防御减少 Buff（-C2DefenseReduce，10 层上限、**永久不计时**
+    /// 〔2026-10-07 拍板「持续时间改为无限」，同 StatBuff 永久保护〕）。
     /// 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者——BurnBuff 归属同款兜底）。
     /// </summary>
     public class IcicleBuff : BaseBuff
@@ -44,9 +45,9 @@ namespace GIC.Battle
         /// <summary>2命减防 Buff 叠层上限（2026-10-01 复测拍板「可以叠加10层」）</summary>
         public const int DefDownStackLimit = 10;
 
-        /// <summary>2命减防 Buff 持续回合（2026-10-01 复测拍板「持续12回合，持续时间随层数叠加」——
-        /// StatBuff 族时长累加原生语义，与攻击提升/移速提升同构）</summary>
-        public const int DefDownDurationTurns = 12;
+        /// <summary>2命减防 Buff 持续时长（2026-10-07 拍板「凯亚的减防buff持续时间改为无限」：-1=永久
+        /// ——IsPermanent 同歌声之环/寒冰之棱口径不计时；StatBuff.Merge 永久保护防混叠转回计时）</summary>
+        public const int DefDownDurationTurns = -1;
 
         public override BuffType Type => BuffType.Icicle;
 
@@ -115,7 +116,7 @@ namespace GIC.Battle
                         }, BattleMetrics.LayerBeatSeconds(layer)));
                     if (defReduce > 0)
                         effects.Add(new ApplyBuffEffect(attackerId, kv.Key, (int)BuffType.DefenseDown, 1,
-                            defReduce, DefDownStackLimit, DefDownDurationTurns)); // 2命：防御减少——10 层 12 回合叠时长（逐层各施加）
+                            defReduce, DefDownStackLimit, DefDownDurationTurns)); // 2命：防御减少——10 层上限、永久（2026-10-07 拍板，逐层各施加）
                 }
             }
             return effects;

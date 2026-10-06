@@ -393,8 +393,11 @@ namespace GIC.Battle
                     int buffValue = atom.paramKey != SkillParamKey.None ? skillData.GetInt(atom.paramKey) : atom.value;
                     int stackLimit = atom.paramKey2 != SkillParamKey.None ? skillData.GetInt(atom.paramKey2) : 0;
                     int duration = atom.paramKey3 != SkillParamKey.None ? skillData.GetInt(atom.paramKey3) : 0;
+                    // SourceSkillId=本技能（2026-10-06 头顶 Buff 图标批：延奏 AttackUp/凯亚加速/凛冽轮舞
+                    // 寒冰之棱/闪耀奇迹歌声之环全经此原子——客户端按来源技能图标渲染）；
+                    // TriggerSkill 链（延奏→变奏）按实际施加技能的 skillData 编译=来源随链归属正确
                     effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, (int)atom.buffType, 1,
-                        buffValue, stackLimit, duration));
+                        buffValue, stackLimit, duration, (int)skillData.skillID));
                     break;
                 }
 

@@ -189,6 +189,16 @@ namespace GIC.Data
             this.baseType = baseType;
         }
 
+        /// <summary>永久声明展示文本（2026-10-07 拍板「加攻/减防持续时间改为无限」：Duration&lt;0 =
+        /// 永久——展示=本地化「永久」而非负数；SkillParamName 表 Permanent 键，表未加载/缺条目回落
+        /// 中文）。GetDisplayValueText 与 SkillDescriptionBuilder 占位符渲染共用单源</summary>
+        public static string LocalizedPermanentDisplay()
+        {
+            var table = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(TableName.SkillParamName.ToString());
+            return table?.GetEntry("Permanent")?.Value ?? "永久";
+        }
+
         /// <summary>
         /// 获取展示值文本（不含颜色）：
         /// 固定值 → "3"
@@ -197,6 +207,10 @@ namespace GIC.Data
         public string GetDisplayValueText()
         {
             if (key == SkillParamKey.None) return null;
+
+            // 永久声明（Duration<0）：参数表右侧展示本地化「永久」——勿把 -1 直显给玩家
+            if (key == SkillParamKey.Duration && baseType == SkillBaseType.Fixed && value < 0)
+                return LocalizedPermanentDisplay();
 
             if (baseType == SkillBaseType.Fixed)
             {

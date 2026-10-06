@@ -27,8 +27,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus} for {Duration}
-      turns\n\xB7Stacks up to {StackLimit} times, duration extends with each stack"
+    m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus} for the entire
+      battle\n\xB7Stacks up to {StackLimit} times"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001

@@ -724,6 +724,11 @@ namespace GIC.Battle
                     type = (int)buff.Type,
                     level = buff.Level,
                     remainingTurns = buff.RemainingTurns,
+                    // 来源（2026-10-06 头顶 Buff 图标批）：来源单位 id（客户端描环按其玩家色）+
+                    // 来源技能 id（客户端图标取 SkillConfig.icon；反应类 Buff=0 回落元素图标）
+                    sourceUnitId = buff.source != null
+                        ? buff.source.GetUnitComponent<UnitIdentity>()?.UnitID ?? "" : "",
+                    sourceSkillId = buff.SourceSkillId,
                 });
             return state;
         }

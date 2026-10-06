@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Video;
-using TMPro;
 using GIC.Data;
 using GIC.Tool;
 using GIC.UI;
@@ -16,14 +15,14 @@ namespace GIC.Battle
     /// 风格参考饥荒：2D 立牌 + 底座投影；格子表现尺寸明显大于单位立牌。
     /// 立牌朝向 = 饥荒式"斜插卡片"：yaw 跟随相机（root，billboard），绕底边固定后倾（2026-09-18 拍板，
     /// 35°=90°−55°俯角，立牌面正对相机视线——完全垂直会被俯角透视压扁，与饥荒观感差异大的根因）。
-    /// 头顶血条/元能条=屏幕空间层 BattleOverheadBars 显示（2026-09-24 拍板，原神式：不受遮挡+原神分隔线），
-    /// 本组件只持数据（Hp/MaxHp/Energy/AttachedElement/OverheadBarAnchor）；
-    /// 名字/Buff 徽章仍挂立牌倾斜组（世界空间 TMP + TextCombiner 本地化条目，docs/active/22 §13）。
+    /// 头顶血条/元能条/命座徽章/Buff 图标=屏幕空间层 BattleOverheadBars 显示（2026-09-24 拍板原神式
+    /// +2026-10-06 拍板「血条上名字改命座数字、能量条下方 Buff 图标」——名字与旧世界空间 Buff 徽章
+    /// 行随本批退役），本组件只持数据（Hp/MaxHp/Energy/命座/眷属/Buffs/AttachedElement/
+    /// OverheadBarAnchor）；Buff 变更经 BuffRevision 版本号驱动层侧重建。
     /// </summary>
     public class UnitView : MonoBehaviour
     {
         public string UnitId { get; private set; }
-        public string DisplayName { get; private set; }
         public BattleCell Cell { get; set; }
         public bool IsCorpse { get; private set; }
 
@@ -37,11 +36,15 @@ namespace GIC.Battle
         private float _cylinderDiameter = BattleMetrics.UnitCylinderDiameter;
         public float CylinderDiameter => _cylinderDiameter;
 
-        // 名字 + Buff 徽章行（血条/元能条视觉归 BattleOverheadBars 屏幕空间层，此处只存数据）
-        private TextMeshPro _nameText;
-        private TextCombiner _nameCombiner;
         private int _hp;
         private int _maxHp;
+
+        /// <summary>命座等级（快照权威同步，UnitState.constellation；BattleOverheadBars 命座徽章消费
+        /// ——眷属/0命不显示、满命彩色渐变）</summary>
+        public int ConstellationLevel { get; private set; }
+
+        /// <summary>眷属（UnitTier.Familiar——命座徽章不显示的层级门控；快照 tier 0=未填回落星级换算）</summary>
+        public bool IsFamiliar { get; private set; }
 
         /// <summary>队伍色（底座圆盘同源；2026-09-25 目检拍板：血条填充=玩家所选队伍色）</summary>
         public Color TeamColor => _baseColor;
@@ -50,13 +53,20 @@ namespace GIC.Battle
         public int Hp => _hp;
         public int MaxHp => _maxHp;
 
-        /// <summary>头顶条锚点（世界坐标，含 55° 后仰偏移——与名字/Buff 徽章同一平面高度）</summary>
+        /// <summary>头顶条锚点（世界坐标，含 55° 后仰偏移——血条/命座/Buff 行整簇以此为基准）</summary>
         public Vector3 OverheadBarAnchor =>
             _tiltGroup != null ? _tiltGroup.TransformPoint(new Vector3(0f, OverheadRowY(HpBarY), 0f)) : transform.position;
 
-        // Buff 徽章（快照权威 + ApplyBuff/RemoveBuff 命令增量；图标=元素 Stroke 现成图）
+        // Buff 状态（快照权威 + ApplyBuff/RemoveBuff 命令增量；**数据载体**——视觉归 BattleOverheadBars
+        // 屏幕空间层〔能量条下方图标行，2026-10-06 拍板〕，本类不再建世界空间徽章〔旧名字/Buff 徽章行
+        // 随命座徽章批退役〕；BuffRevision 每次变更递增=层侧重建触发器）
         private readonly List<BuffState> _buffs = new List<BuffState>();
-        private Transform _buffRow;
+
+        /// <summary>当前 Buff 列表（BattleOverheadBars 消费；引用勿改——增删走 Set/Apply/Remove 三口）</summary>
+        public IReadOnlyList<BuffState> Buffs => _buffs;
+
+        /// <summary>Buff 数据版本号（每次变更递增——BattleOverheadBars 比对后重建图标行，零签名拼串）</summary>
+        public int BuffRevision { get; private set; }
 
         // 元素附着（快照权威 + ElementAttach 命令增量，2026-09-22 接线）；视觉归 BattleOverheadBars（血条左缘，
         // 2026-09-24 随血条同改屏幕空间），此处只存状态
@@ -387,15 +397,10 @@ namespace GIC.Battle
                     sign * _avatarVideoFlipBaseScale.x, _avatarVideoFlipBaseScale.y, _avatarVideoFlipBaseScale.z);
         }
 
-        // 名字/Buff 行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
-        // 全身放大时行 Y 随立牌顶同步抬高、行自身尺寸不变；HpBarY 仅存为头顶条锚点高度——条状视觉已上移屏幕空间层）
+        // 头顶行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，
+        // 全身放大时行 Y 随立牌顶同步抬高、行自身尺寸不变；HpBarY=头顶条锚点高度——血条/命座徽章/
+        // Buff 图标行整簇（屏幕空间层）以此为投影基准；旧名字/Buff 徽章世界空间行随命座徽章批退役）
         private const float HpBarY = 0.66f;
-        private const float NameY = 0.84f;
-        private const float BuffRowY = 1.08f;
-        private const float BuffBadgeSize = 0.22f;
-        private const float BuffBadgeGap = 0.28f;
-        private const float NameFontSize = 36f;   // 世界高度 ≈ 3.43 × scale
-        private const float NameScale = 0.038f;   // → 约 0.13 世界高
 
         /// <summary>底座盘不透明度（2026-09-27 拍板半透明投影感：实体色板读作「坑/板」，脚站盘心显陷地
         /// ——主因归圆盘（用户目检）；受击圆柱判定语义不变仅观感透明化。调 0=隐藏盘）</summary>
@@ -424,25 +429,24 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 创建立牌（头像 SpriteRenderer + 阵营色底座 + 头顶血条/单位名）
+        /// 创建立牌（头像 SpriteRenderer + 阵营色底座；头顶条/命座徽章/Buff 图标归屏幕空间层 BattleOverheadBars）
         /// </summary>
         /// <param name="tiltDegrees">立牌后仰角（饥荒式"斜插卡片"：相机固定俯角 55°，立牌向后仰倾角=俯角时
         /// 立牌面恰好正对视线（完全消俯视压扁），与地面夹角=90°−倾角；2026-09-18 两轮目检修正：方向=顶部
         /// 远离相机后仰，正对值=55°）</param>
-        /// <param name="nameEntry">单位名本地化条目（UnitName.GetEntry()；null 时回退 displayName 静态文本）</param>
         /// <param name="hp">初始血量</param>
         /// <param name="maxHp">最大血量</param>
         /// <param name="avatarScale">立牌整体放大倍数（1=头像版原尺寸）：全身立绘人物在图中占比小，放大对齐
-        /// 头像版人物观感——底边原点贴地不漂移；血条/名字/Buff 行尺寸不变、随立牌顶同步抬高；
+        /// 头像版人物观感——底边原点贴地不漂移；头顶条锚点随立牌顶同步抬高、条自身尺寸不变；
         /// B5 判定圆柱与底座不受视觉放大影响</param>
         /// <param name="idleVideo">立牌循环动画视频（B-S3 视频路线：绿幕 mp4+运行时 ChromaKey 抠色；
         /// null=静态立牌兜底；ChromaKey shader 缺失时回落静态立牌。序列帧路线已退役〔2026-10-05 拍板全库移除〕；
         /// 移动循环片不再经此参数（决策四十四：per-skill 登记 SetMoveVideo）</param>
         /// <param name="hoverHeight">立牌离地高度（世界单位=格；UnitData.离地高度，2026-09-27 拍板新增）：
         /// 纸片人整体上浮——飞行/悬浮单位；底座圆盘留地面（受击圆柱可视化=视觉即判定不随浮空）；
-        /// 血条/名字/Buff 行挂倾斜组随浮空同步抬高</param>
-        public static UnitView Create(Transform parent, string unitId, string displayName, Sprite avatar, Color teamColor,
-            Quaternion billboardRotation, float tiltDegrees = 55f, TextEntry nameEntry = null, int hp = 0, int maxHp = 0,
+        /// 头顶条锚点挂倾斜组随浮空同步抬高</param>
+        public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color teamColor,
+            Quaternion billboardRotation, float tiltDegrees = 55f, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, VideoClip idleVideo = null,
             float hoverHeight = 0f, float cylinderDiameter = 0f)
         {
@@ -452,7 +456,6 @@ namespace GIC.Battle
 
             var view = root.AddComponent<UnitView>();
             view.UnitId = unitId;
-            view.DisplayName = displayName;
             view._tiltDegrees = tiltDegrees;
 
             // 头像立牌（SpriteRenderer 自动处理图集 UV）：
@@ -561,8 +564,6 @@ namespace GIC.Battle
             outlineGo.transform.localScale = new Vector3(view._cylinderDiameter, view._cylinderDiameter, 1f);
             view._baseDiscOutline = outlineGo.transform;
 
-            view.BuildName(nameEntry);
-            view.BuildBuffRow();
             view.SetHp(hp, maxHp);
 
             return view;
@@ -575,30 +576,8 @@ namespace GIC.Battle
             _attachedElement = element;
         }
 
-        /// <summary>单位名：世界空间 TextMeshPro + TextCombiner 同物体（语言切换自动刷新）。
-        /// 挂立牌倾斜组，与立牌同平面（用户拍板 2026-09-18：头顶信息一律随立牌倾斜）</summary>
-        private void BuildName(TextEntry nameEntry)
-        {
-            var nameGo = new GameObject("NameText");
-            nameGo.transform.SetParent(_tiltGroup, false);
-            nameGo.transform.localPosition = new Vector3(0f, OverheadRowY(NameY), 0f);
-            nameGo.transform.localScale = Vector3.one * NameScale;
-
-            _nameText = nameGo.AddComponent<TextMeshPro>();
-            _nameText.font = BattleViewFactory.WorldTextFont;
-            _nameText.fontSize = NameFontSize;
-            _nameText.alignment = TextAlignmentOptions.Center;
-            _nameText.enableWordWrapping = false;
-            _nameText.color = Palette.文字米白;
-            var rect = (RectTransform)nameGo.transform;
-            rect.sizeDelta = new Vector2(40f, 14f);
-
-            _nameCombiner = nameGo.AddComponent<TextCombiner>();
-            if (nameEntry != null)
-                _nameCombiner.AddEntry(nameEntry);
-            else
-                _nameCombiner.AddStaticEntry(DisplayName);
-        }
+        // （单位名世界空间文本已随 2026-10-06 拍板「血条上不再需要显示名字，改为显示命座数字」退役
+        // ——命座徽章归 BattleOverheadBars 屏幕空间层；本地化单位名仍见技能详情/快捷面板等 UGUI 消费方）
 
         /// <summary>
         /// 应用格位 + 队形偏移（世界坐标由 BattleBoard 换算）
@@ -849,8 +828,6 @@ namespace GIC.Battle
             _avatarRenderer.color = tint;
             if (_videoMaterial != null)
                 _videoMaterial.color = tint; // 视频路径同 tint（ChromaKey _Color，同 SpriteRenderer.color 语义）
-            if (_nameText != null)
-                _nameText.color = IsCorpse ? Palette.名字尸体灰 : Palette.文字米白;
         }
 
         /// <summary>
@@ -919,113 +896,65 @@ namespace GIC.Battle
             SanityCurrent = Mathf.Clamp(SanityCurrent + delta, -300, 300);
         }
 
-        // ==================== 头顶 Buff 徽章（B2；快照权威 + 命令流增量） ====================
+        // ==================== 头顶 Buff 状态（B2；快照权威 + 命令流增量；**数据载体**） ====================
+        // 视觉归 BattleOverheadBars 屏幕空间层（2026-10-06 拍板「能量条下方显示 buff 图标，复用头像框，
+        // 图标=来源技能图标、框=来源玩家色」）；旧世界空间徽章行（立牌倾斜组 SpriteRenderer）随本批退役。
 
-        /// <summary>Buff 徽章行容器：挂立牌倾斜组，与立牌同平面同一旋转轴（2026-09-18 用户目检：
-        /// 火图标应和立牌一样倾斜，勿正对相机平放；拍板"都应当斜"→ 血条/名字/Buff 行全挂倾斜组）</summary>
-        private void BuildBuffRow()
-        {
-            var rowGo = new GameObject("BuffRow");
-            rowGo.transform.SetParent(_tiltGroup, false);
-            rowGo.transform.localPosition = new Vector3(0f, OverheadRowY(BuffRowY), 0f);
-            _buffRow = rowGo.transform;
-        }
-
-        /// <summary>快照权威同步（选择阶段头/开局）</summary>
+        /// <summary>快照权威同步（选择阶段头/开局；含来源单位/技能——图标与描环解析数据源）</summary>
         public void SetBuffs(List<BuffState> buffs)
         {
             _buffs.Clear();
             if (buffs != null)
                 foreach (var b in buffs)
-                    _buffs.Add(new BuffState { type = b.type, level = b.level, remainingTurns = b.remainingTurns });
-            RebuildBuffBadges();
+                    _buffs.Add(new BuffState
+                    {
+                        type = b.type,
+                        level = b.level,
+                        remainingTurns = b.remainingTurns,
+                        sourceUnitId = b.sourceUnitId,
+                        sourceSkillId = b.sourceSkillId,
+                    });
+            BuffRevision++;
         }
 
-        /// <summary>命令流增量：施加/刷新（同类已存在=更新回合数）</summary>
-        public void ApplyBuffBadge(int type, int turns)
+        /// <summary>命令流增量：施加/刷新（同类已存在=更新回合数与层数——命令携带 Host 合并后回填值；
+        /// **来源沿用首挂**（镜像 Host Merge 口径：existing.source/SourceSkillId 不换新），新挂带来源）</summary>
+        public void ApplyBuffBadge(int type, int turns, int level = 1, string sourceUnitId = null, int sourceSkillId = 0)
         {
             var existing = _buffs.Find(b => b.type == type);
             if (existing != null)
             {
                 existing.remainingTurns = turns;
+                if (level > 0) existing.level = level;
             }
             else
             {
-                _buffs.Add(new BuffState { type = type, level = 1, remainingTurns = turns });
+                _buffs.Add(new BuffState
+                {
+                    type = type,
+                    level = Mathf.Max(1, level),
+                    remainingTurns = turns,
+                    sourceUnitId = sourceUnitId,
+                    sourceSkillId = sourceSkillId,
+                });
             }
-            RebuildBuffBadges();
+            BuffRevision++;
         }
 
-        /// <summary>命令流增量：移除（到期/驱散）</summary>
+        /// <summary>命令流增量：移除（到期/驱散/持有者倒下）</summary>
         public void RemoveBuffBadge(int type)
         {
             _buffs.RemoveAll(b => b.type == type);
-            RebuildBuffBadges();
+            BuffRevision++;
         }
 
-        private void RebuildBuffBadges()
+        // ==================== 命座（快照权威；BattleOverheadBars 命座徽章消费） ====================
+
+        /// <summary>快照权威同步命座+层级（选择阶段头/开局；眷属无命座=徽章不显示的门控数据）</summary>
+        public void SetConstellation(int level, bool familiar)
         {
-            if (_buffRow == null) return;
-            foreach (Transform child in _buffRow)
-                Destroy(child.gameObject);
-
-            int count = _buffs.Count;
-            for (int i = 0; i < count; i++)
-            {
-                var buff = _buffs[i];
-                // 缺图兜底（2026-10-06 拍板全位点接入）：未知 Buff 类型/图标缺失=missing_image 占位徽章
-                //（"有 Buff 但没图标"照常可见——bounds 换算拉伸到标准徽章尺寸）
-                var icon = MissingImageGuard.Ensure(BuffIconOf(buff.type));
-                if (icon == null) continue; // 兜底图自身也缺失（Resources 加载失败，理论不可达）
-
-                float x = (i - (count - 1) * 0.5f) * BuffBadgeGap;
-
-                var iconGo = new GameObject($"Buff_{buff.type}");
-                iconGo.transform.SetParent(_buffRow, false);
-                iconGo.transform.localPosition = new Vector3(x, 0f, 0f);
-                var renderer = iconGo.AddComponent<SpriteRenderer>();
-                renderer.sprite = icon;
-                renderer.sortingOrder = BattleMetrics.BuffBadgeSortingOrder;
-                float worldHeight = icon.bounds.size.y;
-                if (worldHeight > 0f)
-                    iconGo.transform.localScale = Vector3.one * (BuffBadgeSize / worldHeight);
-
-                // 剩余回合角标（右下小数字；世界 TMP=工厂字体链，fontSize×scale×0.1≈原 TextMesh characterSize 同高）；
-                // 永久 Buff（remainingTurns<0，如歌声之环）不计时——无角标
-                if (buff.remainingTurns > 0)
-                {
-                    var turnsGo = new GameObject("Turns");
-                    turnsGo.transform.SetParent(iconGo.transform, false);
-                    turnsGo.transform.localPosition = new Vector3(0.14f, -0.14f, -0.01f);
-                    turnsGo.transform.localScale = Vector3.one * 0.05f;
-                    var turnsText = turnsGo.AddComponent<TextMeshPro>();
-                    turnsText.font = BattleViewFactory.WorldTextFont;
-                    turnsText.fontSize = 32;
-                    turnsText.alignment = TextAlignmentOptions.Center;
-                    turnsText.enableWordWrapping = false;
-                    ((RectTransform)turnsGo.transform).sizeDelta = new Vector3(20f, 5f);
-                    turnsText.text = buff.remainingTurns.ToString();
-                    turnsText.color = Palette.文字米白;
-                }
-            }
-        }
-
-        /// <summary>Buff 类型 → 图标（元素 Stroke 现成图；B4 反应批次按类型扩充映射）</summary>
-        private static Sprite BuffIconOf(int buffType)
-        {
-            var config = ElementFactionConfig.Instance;
-            if (config == null) return null;
-            switch ((BuffType)buffType)
-            {
-                case BuffType.Burn: return config.GetElementIconStroke(ElementType.Pyro);
-                case BuffType.Freeze: return config.GetElementIconStroke(ElementType.Cryo);
-                case BuffType.AttackUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：延奏=蒙德协奏（风）；正式图标待拍板（docs/11）
-                case BuffType.MoveSpeedUp: return config.GetElementIconStroke(ElementType.Anemo); // 占位：移速提升（风系语义）；正式图标待拍板（docs/11）
-                case BuffType.SongOfLife: return config.GetElementIconStroke(ElementType.Hydro); // 占位：歌声之环=水光环（B-3 ②）；正式图标待拍板（docs/11）
-                case BuffType.Icicle: return config.GetElementIconStroke(ElementType.Cryo); // 占位：寒冰之棱=冰（凛冽轮舞批）；正式图标待拍板（docs/11）
-                case BuffType.DefenseDown: return config.GetElementIconStroke(ElementType.Cryo); // 占位：防御减少（寒冰之棱2命）；正式图标待拍板（docs/11）
-                default: return null;
-            }
+            ConstellationLevel = level;
+            IsFamiliar = familiar;
         }
     }
 }

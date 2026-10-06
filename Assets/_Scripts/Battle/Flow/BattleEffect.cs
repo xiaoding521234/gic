@@ -229,8 +229,13 @@ namespace GIC.Battle
         /// <summary>持续回合通道（AttackUp 用=Duration 参数——工厂按此构造初始计时）</summary>
         public int DurationTurns;
 
+        /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff〔燃烧/冻结〕由
+        /// CompileElementalDamage 产出无技能语境）。消费=客户端头顶 Buff 图标（2026-10-06
+        /// 拍板「buff 图标用来源技能图标」）：随命令/快照透传，0=回落元素图标</summary>
+        public int SourceSkillId;
+
         public ApplyBuffEffect(string sourceUnitId, string targetUnitId, int buffType, int level,
-            int buffValue = 0, int stackLimit = 0, int durationTurns = 0)
+            int buffValue = 0, int stackLimit = 0, int durationTurns = 0, int sourceSkillId = 0)
         {
             SourceUnitId = sourceUnitId;
             TargetUnitId = targetUnitId;
@@ -239,6 +244,7 @@ namespace GIC.Battle
             BuffValue = buffValue;
             StackLimit = stackLimit;
             DurationTurns = durationTurns;
+            SourceSkillId = sourceSkillId;
         }
     }
 

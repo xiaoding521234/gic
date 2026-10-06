@@ -27,7 +27,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7\u88AB\u534F\u8005\u653B\u51FB\u63D0\u5347{ATKBonus}\uFF0C\u6301\u7EED{Duration}\u56DE\u5408\n\xB7\u81F3\u591A\u53E0\u52A0{StackLimit}\u5C42\uFF0C\u6301\u7EED\u65F6\u95F4\u968F\u5C42\u6570\u53E0\u52A0"
+    m_Localized: "\xB7\u88AB\u534F\u8005\u653B\u51FB\u63D0\u5347{ATKBonus}\uFF0C\u6301\u7EED\u6574\u573A\u6218\u6597\n\xB7\u81F3\u591A\u53E0\u52A0{StackLimit}\u5C42"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001

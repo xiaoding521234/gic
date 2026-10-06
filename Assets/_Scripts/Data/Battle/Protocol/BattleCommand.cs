@@ -77,7 +77,7 @@ namespace GIC.Data
     /// Damage          | 伤害量   | 元素             | 投放形态 delivery | 发射格    | —    | 命中点 | 发射时刻（投射物前摇） | —              | —
     /// Heal            | 治疗量   | —                | —                | —         | —    | —      | 应用时刻（命中类治疗） | —              | —
     /// Death           | —        | —                | —                | —         | —    | —      | —                     | —              | —
-    /// ApplyBuff       | —        | —                | —                | —         | —    | —      | —                     | 类型/级别/回合 | —
+    /// ApplyBuff       | —        | 来源技能ID（0=无——客户端 Buff 图标按来源技能解析） | — | — | — | — | — | 类型/级别/回合 | —
     /// RemoveBuff      | —        | —                | —                | —         | —    | —      | —                     | buffType       | —
     /// ElementAttach   | —        | 附着元素         | —                | —         | —    | —      | —                     | —              | —
     /// Reaction        | 反应级别 | 反应子类型       | —                | —         | —    | —      | —                     | —              | —
@@ -306,7 +306,7 @@ namespace GIC.Data
         }
 
         public static BattleCommand ApplyBuff(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
-            int buffType, int buffLevel, int buffTurns)
+            int buffType, int buffLevel, int buffTurns, int sourceSkillId = 0)
         {
             return new BattleCommand
             {
@@ -318,6 +318,7 @@ namespace GIC.Data
                 buffType = buffType,
                 buffLevel = buffLevel,
                 buffTurns = buffTurns,
+                metadata = sourceSkillId, // 复用字段：来源技能 id（0=无；客户端 Buff 图标按来源技能解析，2026-10-06）
             };
         }
 
