@@ -34,13 +34,24 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// Buff 状态条目（快照与命令流的载体：类型 + 级别 + 剩余回合）
+    /// Buff 状态条目（快照与命令流的载体：类型 + 级别 + 剩余回合 + 来源）
     /// </summary>
     [Serializable]
     public class BuffState
     {
         public int type;
         public int level;
+
+        /// <summary>级别语义按类型分家：StatBuff 族=叠层数、BurnBuff 族=级别——快照原样携带</summary>
         public int remainingTurns;
+
+        /// <summary>来源单位 id（2026-10-06 头顶 Buff 图标批：空=无来源——客户端描环按来源单位
+        /// 所属玩家色解析，与快捷面板/执行预览头像描环同口径）</summary>
+        public string sourceUnitId;
+
+        /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff〔燃烧/冻结〕无技能语境）。
+        /// 客户端头顶 Buff 图标解析消费（2026-10-06 拍板「buff 图标用来源技能图标」：&gt;0 取技能
+        /// SkillConfig.icon、0 回落元素图标）</summary>
+        public int sourceSkillId;
     }
 }

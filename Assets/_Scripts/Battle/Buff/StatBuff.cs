@@ -34,7 +34,9 @@ namespace GIC.Battle
 
         public override List<BattleEffect> OnTurnEnd() => new List<BattleEffect>(); // 纯增益：无回合结束效果，仅回合制计时
 
-        /// <summary>同类重复施加：叠层（上限内）+ 时长累加；层数变化同步重挂修改器</summary>
+        /// <summary>同类重复施加：叠层（上限内）+ 时长累加；层数变化同步重挂修改器。
+        /// 永久保护（2026-10-07 拍板「加攻/减防持续时间改为无限」）：任一方永久（RemainingTurns&lt;0）
+        /// → 合并结果恒 -1——防「永久+限时」混叠把无限 Buff 意外转回计时（-1+12=11 会复活倒计时）</summary>
         public override void Merge(BaseBuff newer)
         {
             if (newer is StatBuff incoming)
@@ -43,7 +45,9 @@ namespace GIC.Battle
                 StackLimit = incoming.StackLimit;
                 Level = StackLimit > 0 ? System.Math.Min(Level + incoming.Level, StackLimit) : Level + incoming.Level;
             }
-            RemainingTurns += newer.RemainingTurns;
+            RemainingTurns = RemainingTurns < 0 || newer.RemainingTurns < 0
+                ? -1
+                : RemainingTurns + newer.RemainingTurns;
             RefreshModifier();
         }
 

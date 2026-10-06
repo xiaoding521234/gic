@@ -96,6 +96,7 @@ namespace GIC.Battle
                             data.GetInt(atom.paramKey), data.GetInt(atom.paramKey2), data.GetInt(atom.paramKey3))
                         : BuffFactory.Create(atom.buffType, 1, unit, data.GetInt(atom.paramKey));
                     if (buff == null) continue;
+                    buff.SourceSkillId = (int)data.skillID; // 来源技能=Talent 被动本体（图标解析单源同链）
                     sim.ApplyBuff(unit, buff, unit);
                 }
             }

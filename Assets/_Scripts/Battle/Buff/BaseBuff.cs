@@ -17,6 +17,11 @@ namespace GIC.Battle
         public Unit source;
         public int value;
 
+        /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff/登场被动兜底）。
+        /// 客户端头顶 Buff 图标消费（2026-10-06 拍板「buff 图标用来源技能图标」）：随快照
+        /// BuffState.sourceSkillId 透传；Merge 不换源（沿用首挂，与 source 字段同口径）</summary>
+        public int SourceSkillId;
+
         /// <summary>所属战场门面（BattleSimState.ApplyBuff 注册时注入；回合结束效果需要战场查询的
         /// Buff 消费——如歌声之环按持有者位置枚举半径内单位。单局生命周期，勿跨对局复用）</summary>
         public BattleSimState Sim;

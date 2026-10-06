@@ -64,6 +64,11 @@ namespace GIC.Battle
         /// </summary>
         private static string GetColoredValue(SkillParam param)
         {
+            // 永久声明（Duration<0，2026-10-07 拍板「持续时间改为无限」）：占位符渲染本地化「永久」
+            // （金色）而非 -1——与参数表右侧展示同口径单源（SkillParam.LocalizedPermanentDisplay）
+            if (param.key == SkillParamKey.Duration && param.baseType == SkillBaseType.Fixed && param.value < 0)
+                return $"<color={ValueColor}>{SkillParam.LocalizedPermanentDisplay()}</color>";
+
             if (param.baseType == SkillBaseType.Fixed)
             {
                 return $"<color={ValueColor}>{param.value}</color>";

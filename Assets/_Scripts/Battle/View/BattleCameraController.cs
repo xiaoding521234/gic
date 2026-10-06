@@ -52,6 +52,9 @@ namespace GIC.Battle
         private Camera _camera;
         private float _distance = 35f;
         private float _targetDistance = 35f;   // 缩放目标距离（滚轮只改它，实际距离逐帧平滑逼近）
+        private float _initialDistance = 35f;  // 初始视轴距离（InitFromTransform 从场景摆位捕获=缩放基准；
+                                                // BattleOverheadBars 相机缩放跟随消费：放大=半速率跟随、
+                                                // 缩小=下限不缩，2026-10-06 拍板）
         private Vector2 _focus = Vector2.zero;   // 棋盘平面注视点（XZ）
         private Vector2 _grabPoint;              // 拖拽抓取点（棋盘 XZ；判定在 DragRecognizer，响应在本类）
         private Vector3? _dragFollowWorld;       // 拖动瞄准跟随目标（HUD 每帧喂金色待定格世界位；null=停）
@@ -76,6 +79,10 @@ namespace GIC.Battle
 
         /// <summary>当前视轴距离（探针/未来 UI 缩放按钮用）</summary>
         public float CurrentDistance => _distance;
+
+        /// <summary>初始视轴距离（场景默认摆位推导——InitFromTransform 捕获；战斗期恒定=头顶条
+        /// 相机缩放跟随的基准值）</summary>
+        public float InitialDistance => _initialDistance;
 
         /// <summary>
         /// 板面短位移点击（docs/24 §7.10 tap+pan 同体：Immediate 拖拽面的点击由 DragRecognizer
@@ -177,6 +184,7 @@ namespace GIC.Battle
                 Vector3.Distance(transform.position, new Vector3(_focus.x, 0f, _focus.y)),
                 _minDistance, _maxDistance);
             _targetDistance = _distance;
+            _initialDistance = _distance; // 缩放基准捕获（头顶条缩放跟随分母）
             ApplyTransform();
         }
 

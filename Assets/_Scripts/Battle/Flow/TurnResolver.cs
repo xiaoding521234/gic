@@ -599,7 +599,8 @@ namespace GIC.Battle
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
-                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns));
+                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns,
+                    applied.SourceSkillId));
             }
             foreach (var dead in newlyDead)
             {
@@ -893,6 +894,7 @@ namespace GIC.Battle
                         _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue, applyBuff.StackLimit,
                         applyBuff.DurationTurns);
                     if (buff == null) continue;
+                    buff.SourceSkillId = applyBuff.SourceSkillId; // 来源技能随 Buff 实体进注册表（快照透传）
                     _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
 
                     // 回填合并后的真实状态（同类叠加时 Level/Turns 以注册表为准）

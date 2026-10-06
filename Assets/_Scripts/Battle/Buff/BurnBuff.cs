@@ -79,7 +79,9 @@ namespace GIC.Battle
                 case BuffType.AttackUp:
                 case BuffType.MoveSpeedUp:
                 case BuffType.DefenseDown:
-                    if (turns <= 0)
+                    // 2026-10-07 拍板「持续时间改为无限」：turns<0=永久声明（IsPermanent 同歌声之环/
+                    // 寒冰之棱口径——不计时、Merge 保永久）；turns=0 才是缺参数配置错误
+                    if (turns == 0)
                     {
                         GICLog.Warn($"[BuffFactory] 参数型 Buff {type} 缺持续回合（turns={turns}）——" +
                                     "检查 ApplyBuffEffect 是否配齐 Duration 参数（paramKey3）");

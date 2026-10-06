@@ -248,7 +248,8 @@ namespace GIC.Battle
                     view.SetHp(state.hp, state.maxHp);
                     view.SetEnergy(state.energy, state.maxEnergy); // 元能（权威态；B6a）
                     view.SetSanity(state.sanity); // 理智（权威态；2026-09-30 歌声之环批）
-                    view.SetBuffs(state.buffs); // 头顶 Buff 行（权威态）
+                    view.SetConstellation(state.constellation, ResolveIsFamiliar(state)); // 命座+眷属（2026-10-06 命座徽章批）
+                    view.SetBuffs(state.buffs); // 头顶 Buff 状态（权威态；含来源——图标/描环解析数据源）
                 }
             }
 
@@ -501,8 +502,9 @@ namespace GIC.Battle
         private static readonly Dictionary<int, SkillConfig> _skillConfigCache = new Dictionary<int, SkillConfig>();
 
         /// <summary>按 skillID 约定路径加载技能配置（Resources/Configs/Skills/{SkillName}——技能独立化约定；
-        /// 缺失 Warn 一次；缓存防逐段重复加载）</summary>
-        private static SkillConfig.SkillData LoadSkillData(int skillId)
+        /// 缺失 Warn 一次；缓存防逐段重复加载。**public 单源**（2026-10-06 头顶 Buff 图标批）：
+        /// BattleOverheadBars 图标解析同链消费——来源技能 id → SkillConfig.icon</summary>
+        public static SkillConfig.SkillData LoadSkillData(int skillId)
         {
             if (_skillConfigCache.TryGetValue(skillId, out var config)) return config?.data;
             config = Resources.Load<SkillConfig>($"Configs/Skills/{(SkillName)skillId}");
@@ -767,8 +769,11 @@ namespace GIC.Battle
                         break;
 
                     case BattleCommandType.ApplyBuff:
+                        // 来源三件随命令透传（2026-10-06 头顶 Buff 图标批）：层数=buffLevel（Host 合并后
+                        // 回填值）、来源单位=actorUnitId、来源技能=metadata 复用字段——客户端图标行即时刷新
                         if (_views.TryGetValue(command.targetUnitId, out var buffed))
-                            buffed.ApplyBuffBadge(command.buffType, command.buffTurns);
+                            buffed.ApplyBuffBadge(command.buffType, command.buffTurns, command.buffLevel,
+                                command.actorUnitId, command.metadata);
                         break;
 
                     case BattleCommandType.RemoveBuff:
@@ -1228,6 +1233,10 @@ namespace GIC.Battle
             return _overheadBars;
         }
 
+        /// <summary>头顶条层访问器（BattleHud.Bind 接线用——来源玩家色解析器+相机缩放源注入；
+        /// 幂等：未建层时先建空层，OnBattleStart 再逐单位 Register）</summary>
+        public BattleOverheadBars OverheadBars => EnsureOverheadBars();
+
         private IEnumerator PlayDeathCoroutine(UnitView view, float delay)
         {
             if (delay > 0f)
@@ -1247,6 +1256,17 @@ namespace GIC.Battle
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
         }
 
+        /// <summary>层级→眷属判定（命座徽章门控数据，2026-10-06）：快照 tier 优先（0=未填回落星级换算，
+        /// 与 BattleHud.TierOfUnit 同口径——沙盒 TierOverrideStars 覆盖随快照 tier 生效）</summary>
+        private bool ResolveIsFamiliar(UnitState state)
+        {
+            if (state == null) return false;
+            if (state.tier != 0) return (UnitTier)state.tier == UnitTier.Familiar;
+            return _unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var name)
+                && _unitConfig.TryGetUnitData(name, out var d)
+                && UnitTierHelper.FromStars(d.starLevel) == UnitTier.Familiar;
+        }
+
         private void CreateView(UnitState state)
         {
             if (_views.ContainsKey(state.unitId)) return;
@@ -1255,8 +1275,6 @@ namespace GIC.Battle
 
             Sprite avatar = null;
             bool useFullBody = false;
-            string displayName = state.unitId;
-            TextEntry nameEntry = null;
             VideoClip idleVideo = null;
             var prewarmClips = new List<VideoClip>(); // 动作片预热线（决策四十五）：本单位全部技能动作视频（含 Move）
             float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放）
@@ -1267,8 +1285,7 @@ namespace GIC.Battle
                 // 全身立牌（立牌图）人物占比小，按 Inspector 倍数整体放大；缺立牌图的单位回落头像原尺寸
                 useFullBody = unitData.立牌图 != null;
                 avatar = useFullBody ? unitData.立牌图 : unitData.avatar;
-                displayName = unitName.ToString();
-                nameEntry = unitName.GetEntry(); // 单位名本地化条目（UnitName 表）
+                // （单位名世界空间文本已随 2026-10-06 命座徽章批退役——名字显示改血条上方命座数字）
                 // 立牌循环动画（B-S3 视频路线）：视频（绿幕+运行时 ChromaKey 抠色）；null=静态立牌兜底
                 // （序列帧路线已退役——2026-10-05 拍板全库移除，旧尝试遗留零单位在用）。
                 // 移动循环片=per-skill（决策四十四「尽可能统一」：Move 型技能 SkillData.动作视频，
@@ -1294,8 +1311,8 @@ namespace GIC.Battle
             var teamColor = team == TeamType.B ? Palette.敌方主色 : Palette.我方主色;
             // 血条填充=队伍色（与底座同色，2026-09-25 拍板——BattleOverheadBars 消费 TeamColor；
             // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
-            var view = UnitView.Create(_viewRoot, state.unitId, displayName, avatar, teamColor,
-                _billboardRotation, 立牌后倾角, nameEntry, state.hp, state.maxHp,
+            var view = UnitView.Create(_viewRoot, state.unitId, avatar, teamColor,
+                _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
                 (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
                 state.cylinderDiameter); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）
             view.Cell = state.position;
@@ -1304,6 +1321,7 @@ namespace GIC.Battle
             view.SetAttachedElement((ElementType)state.dyedElement); // 附着元素（建场权威态）
             view.SetEnergy(state.energy, state.maxEnergy); // 元能（建场权威态；B6a）
             view.SetSanity(state.sanity); // 理智（建场权威态；2026-09-30 歌声之环批）
+            view.SetConstellation(state.constellation, ResolveIsFamiliar(state)); // 命座+眷属（2026-10-06 命座徽章批）
             view.SetBuffs(state.buffs);
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;

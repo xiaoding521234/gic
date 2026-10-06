@@ -315,6 +315,10 @@ MonoBehaviour:
     m_Key: C1ShieldToEnergyRate
     m_Metadata:
       m_Items: []
+  - m_Id: 49768913344999424
+    m_Key: Permanent
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -49,6 +49,10 @@ namespace GIC.Data
         [Tooltip("头顶条元能填充色（BattleOverheadBars 元能条，2026-09-24；09-25 目检拍板改白色）")]
         public Color 元能条色 = new Color(0.95f, 0.95f, 0.95f);
 
+        [Header("头顶命座徽章（2026-10-06 拍板：血条上方命座数字小背景——#39444F 不透明 80%；满命彩色渐变=运行时 HSV 循环非资产色）")]
+        [Tooltip("命座徽章背景色（拍板色 #39444F，alpha=0.8）")]
+        public Color 命座背景色 = new Color(0.224f, 0.267f, 0.310f, 0.8f);
+
         [Header("伤害数字元素色（2026-10-01 网检对齐原神：数字=亮彩霓虹风、显著亮于元素主题色——图标用 ElementFactionConfig、箭矢用下方「箭矢元素色」段〔2026-10-04 起分家〕勿混——白=物理/橙=火/青=水/冰青=冰/淡紫=雷/薄荷=风/淡金=岩/黄绿=草；基准=社区原神复刻 Baity mod 实测色系）")]
         [Tooltip("物理伤害数字=纯白 #FFFFFF（原神物理数字白）")]
         public Color 伤害数字物理色 = new Color(1f, 1f, 1f);
