@@ -391,6 +391,7 @@ namespace GIC.Battle
             if (_aimRecommendedMaterial != null) Destroy(_aimRecommendedMaterial);
             if (_aimNotRecommendedMaterial != null) Destroy(_aimNotRecommendedMaterial);
             if (_aimPendingMaterial != null) Destroy(_aimPendingMaterial);
+            if (_aimHoverMaterial != null) Destroy(_aimHoverMaterial); // 悬停提亮材质（2026-10-06）
             if (_countdownOutlineMat != null) // SDF 描边实例（TopBar 分件，TMP 不自销）
             {
                 Destroy(_countdownOutlineMat);
@@ -458,6 +459,7 @@ namespace GIC.Battle
                 // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
+                if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
                 if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
                 // 2026-09-29 执行预览拍板「隐藏掉玩家之前打开的技能或手牌」：技能盘已随 DeselectUnit
                 // 收起，手牌随相位隐藏让位中下方预览（CanvasGroup 渐隐勿 SetActive——滚动壳/热区
@@ -522,15 +524,21 @@ namespace GIC.Battle
                 EventSystem.current.SetSelectedGameObject(null);
 
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
+            UpdateAimHover(); // 点击式瞄准悬停格提亮（2026-10-06 拍板；Aiming+非拖动才有悬停）
 
-            // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」）：
-            // 仅拖动会话中且有金色待定格才喂；相机侧判出/入屏并指数趋近（金格居中即入屏，入屏即停）
+            // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」
+            // +2026-10-06 三段改造）：仅拖动会话中且有金色待定格才喂；单位指向型喂 centerMode=true
+            // （选中单位恒居中、出屏瞬移——MOBA 式）；方向型 centerMode=false（出屏+1 格余量才补间居中）
             if (_camera != null)
             {
                 Vector3? followWorld = null;
+                bool followCenter = false;
                 if (_dragAiming && _pendingAimCell.HasValue && _board != null && _board.Map != null)
+                {
                     followWorld = _board.CellToWorld(_pendingAimCell.Value);
-                _camera.SetDragFollowTarget(followWorld);
+                    followCenter = IsCurrentAimUnitTargeted();
+                }
+                _camera.SetDragFollowTarget(followWorld, followCenter);
             }
 
             // 选择倒计时（docs/04 §4.2；每秒级刷新，静态数字条目）
@@ -1016,8 +1024,10 @@ namespace GIC.Battle
                         NotifySelectionBlockedOrConfirmed();
                         return;
                     }
-                    // 瞄准态点非可选格 = 退回选中态（不算"点空白取消选中"）
+                    // 瞄准态点非可选格 = 退回选中态（不算"点空白取消选中"）——取消语义：拖动跟随过的
+                    // 相机重置回瞄准开始位（2026-10-06 拍板，覆盖松手留待定后再点空白取消的路径）
                     ExitAiming();
+                    if (_camera != null) _camera.CancelDragFollow();
                     return;
 
                 case HudState.UnitSelected:
@@ -1406,6 +1416,7 @@ namespace GIC.Battle
             // 待定金格随高亮 quad 一并消失（ClearHighlights 销 quad），字段清零防陈旧提交
             _pendingAimCell = null;
             _pendingTargetUnitId = null; // 待定目标随会话收口（2026-10-05）
+            _hoverAimCell = null; // 悬停态随高亮层同清（quad 已销，残留引用无意义）
             // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
             bool wasDeployAim = _deployAimUnit != 0;
             _deployAimUnit = 0;
@@ -1879,7 +1890,10 @@ namespace GIC.Battle
             UpdateDragAimPreview(eventData); // 圆盘未收——终帧校准与拖动中同用夹取指针（屏缘一致）
             HideDragWheel(); // 手指已离键——圆盘随会话收（留待定路径也隐藏）
             if (ReleaseOverCancelButton(eventData.position) || !_pendingAimCell.HasValue)
+            {
                 ExitAiming();
+                if (_camera != null) _camera.CancelDragFollow(); // 2026-10-06 拍板「取消时重置摄像机位置为瞄准开始时」——瞬移回拖动起始位
+            }
             // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
             // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属/伙伴非势力）或已定死时
             // 立即提示「不会执行」——与点击式同判定同文案（NotifySelectionBlockedOrConfirmed 单出口）
@@ -2419,7 +2433,12 @@ namespace GIC.Battle
         private void OnCancelButtonClicked()
         {
             if (_layoutEditing) return;
-            if (_state == HudState.Aiming) ExitAiming();
+            if (_state == HudState.Aiming)
+            {
+                ExitAiming();
+                if (_camera != null)
+                    _camera.CancelDragFollow(); // 取消重置（2026-10-06 拍板）——含松手留待定后按取消钮；点击式瞄准相机未动过=幂等
+            }
         }
 
         /// <summary>顶部「完成选择」按钮（2026-09-26 拍板；同日追加拍板「确认行动后就应当定死了」）：
@@ -2443,7 +2462,11 @@ namespace GIC.Battle
                 if (snapshot == null) return;
                 var cell = _pendingAimCell.Value;
                 var enemyAtCell = FindUnitAt(snapshot, cell, UnitSide.Enemy);
-                if (SubmitAim(cell, enemyAtCell)) _actionConfirmed = true; // 防线拦截（false）不定死
+                if (SubmitAim(cell, enemyAtCell))
+                {
+                    _actionConfirmed = true; // 防线拦截（false）不定死
+                    if (_camera != null) _camera.EndDragFollowSession(); // 提交=会话正常终结（相机留位、清快照防下回合误重置）
+                }
                 return;
             }
 
@@ -2524,10 +2547,10 @@ namespace GIC.Battle
         private void SetPendingAimCell(BattleCell cell)
         {
             if (_pendingAimCell.HasValue && _pendingAimCell.Value.Equals(cell)) return;
-            RestorePendingCellMaterial();
+            var old = _pendingAimCell;
             _pendingAimCell = cell;
-            if (_aimQuadByCell.TryGetValue(cell, out var renderer) && renderer != null)
-                renderer.sharedMaterial = GetAimPendingMaterial();
+            if (old.HasValue) RefreshCellVisual(old.Value); // 旧待定格还原（悬停中则转悬停态）
+            RefreshCellVisual(cell);
         }
 
         /// <summary>清待定格并还原材质（拖动瞄准用：拖向移出有效区/无有效瞄准时调用——松手即"无待定=取消"）；
@@ -2535,8 +2558,9 @@ namespace GIC.Battle
         private void ClearPendingAimCell()
         {
             if (!_pendingAimCell.HasValue) return;
-            RestorePendingCellMaterial();
+            var old = _pendingAimCell;
             _pendingAimCell = null;
+            RefreshCellVisual(old.Value);
             if (_pendingTargetUnitId != null)
             {
                 _pendingTargetUnitId = null;
@@ -2544,17 +2568,47 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>待定格还原回推荐/不推荐共享材质（变更待定格/退出瞄准前调用）</summary>
-        private void RestorePendingCellMaterial()
+        // ==================== 瞄准格材质三态单点（2026-10-06 拍板「点击式瞄准悬停格高亮」） ====================
+        // 优先级：待定金格 > 悬停提亮 > 推荐/不推荐——任何格的材质变化（待定变更/悬停进出/还原）
+        // 一律走 RefreshCellVisual 单点重算，勿再散写 sharedMaterial 直赋
+
+        private BattleCell? _hoverAimCell;
+        private Material _aimHoverMaterial; // 悬停提亮（色=BattlePalette.瞄准悬停色）
+
+        /// <summary>点击式瞄准悬停轮询（Update 调）：Aiming 态且非拖动会话时鼠标所在可选格=悬停提亮；
+        /// 拖动会话中恒无悬停（拖动有金格/头像反馈，指针语义不同）</summary>
+        private void UpdateAimHover()
         {
-            if (!_pendingAimCell.HasValue) return;
-            if (_aimQuadByCell.TryGetValue(_pendingAimCell.Value, out var renderer) && renderer != null)
+            BattleCell? hover = null;
+            if (_state == HudState.Aiming && !_dragAiming && _camera != null && _board != null && _board.Map != null)
             {
-                var material = _aimRecommendedCells.Contains(_pendingAimCell.Value)
+                if (TryPickBoardCell(Input.mousePosition, out var cell, out bool inBounds)
+                    && inBounds && _aimCells.Contains(cell))
+                    hover = cell;
+            }
+            if (_hoverAimCell.HasValue == hover.HasValue
+                && (!hover.HasValue || _hoverAimCell.Value.Equals(hover.Value)))
+                return; // 悬停未变零操作
+            var old = _hoverAimCell;
+            _hoverAimCell = hover;
+            if (old.HasValue) RefreshCellVisual(old.Value);
+            if (hover.HasValue) RefreshCellVisual(hover.Value);
+        }
+
+        /// <summary>该格材质按三态重算（待定金 > 悬停提亮 > 推荐/不推荐；quad 缺失安全跳过）</summary>
+        private void RefreshCellVisual(BattleCell cell)
+        {
+            if (!_aimQuadByCell.TryGetValue(cell, out var renderer) || renderer == null) return;
+            Material material;
+            if (_pendingAimCell.HasValue && _pendingAimCell.Value.Equals(cell))
+                material = GetAimPendingMaterial();
+            else if (_hoverAimCell.HasValue && _hoverAimCell.Value.Equals(cell))
+                material = GetAimHoverMaterial();
+            else
+                material = _aimRecommendedCells.Contains(cell)
                     ? GetAimRecommendedMaterial()
                     : GetAimNotRecommendedMaterial();
-                renderer.sharedMaterial = material;
-            }
+            renderer.sharedMaterial = material;
         }
 
         /// <summary>待定金格材质（色=BattlePalette.瞄准已选色——原神风格金；懒建单实例，
@@ -2565,6 +2619,15 @@ namespace GIC.Battle
                 _aimPendingMaterial = BattleViewFactory.CreateAimCellMaterial(Palette.瞄准已选色);
             _aimPendingMaterial.color = Palette.瞄准已选色;
             return _aimPendingMaterial;
+        }
+
+        /// <summary>悬停提亮材质（色=BattlePalette.瞄准悬停色；懒建单实例，同生命周期）</summary>
+        private Material GetAimHoverMaterial()
+        {
+            if (_aimHoverMaterial == null)
+                _aimHoverMaterial = BattleViewFactory.CreateAimCellMaterial(Palette.瞄准悬停色);
+            _aimHoverMaterial.color = Palette.瞄准悬停色;
+            return _aimHoverMaterial;
         }
 
         private void ClearHighlights()

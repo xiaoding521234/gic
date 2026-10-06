@@ -39,11 +39,11 @@ namespace GIC.Battle
         [Tooltip("键盘平移速度 = 视轴距离 × 此系数（单位/秒）")]
         [SerializeField] private float _keyPanSpeedFactor = 0.35f;
 
-        [Header("拖动瞄准屏幕跟随（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」）")]
-        [Tooltip("跟随平滑速度（1/s，指数趋近；8≈0.3s 基本到位——丝滑）")]
-        [SerializeField] private float 拖动瞄准跟随速度 = 8f;
-        [Tooltip("金格视口安全边距（屏幕像素）——金格投影超出此边距即触发跟随，跟随目标=金格居中；40≈金格半格出屏才动，勿设大（贴边就平移会扰）")]
-        [SerializeField] private float 拖动瞄准跟随边距 = 40f;
+        [Header("拖动瞄准屏幕跟随（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」；2026-10-06 拍板三段改造：快进慢出 0.5s 补间+1 格余量+单位指向恒居中/出屏瞬移+取消重置回起始位）")]
+        [Tooltip("跟随补间时长（秒）——快进慢出（EaseOutCubic）：方向型金格出屏触发、单位指向居中同款节奏")]
+        [SerializeField] private float 拖动跟随补间时长 = 0.5f;
+        [Tooltip("方向型出屏判定余量（格）——金格距视口边缘不足此格数即视为出屏触发跟随（1=多留 1 格提前量）")]
+        [SerializeField] private float 拖动跟随余量格数 = 1f;
 
         [Header("边界")]
         [Tooltip("注视点允许范围（棋盘半宽 7.5 + 余量 2，世界单位；2026-09-30 战场 20×20→15×15 两轮缩小同步，原 12）")]
@@ -55,6 +55,13 @@ namespace GIC.Battle
         private Vector2 _focus = Vector2.zero;   // 棋盘平面注视点（XZ）
         private Vector2 _grabPoint;              // 拖拽抓取点（棋盘 XZ；判定在 DragRecognizer，响应在本类）
         private Vector3? _dragFollowWorld;       // 拖动瞄准跟随目标（HUD 每帧喂金色待定格世界位；null=停）
+        private bool _dragFollowCenter;          // 单位指向模式（2026-10-06 拍板：选中单位恒居中，MOBA 式）
+        private Vector2 _dragFollowStartFocus;   // 会话起始注视点快照（2026-10-06 拍板「取消时重置摄像机位置为瞄准开始时」）
+        private bool _hasDragFollowSnapshot;     // 快照有效（2026-10-06 返修：**喂 null 不清**——松手留待定后
+                                                 // 点空白/取消钮取消仍须可重置；仅 CancelDragFollow/EndDragFollow 清）
+        private Vector2 _followTweenFrom, _followTweenTo; // 跟随补间（快进慢出 0.5s，EaseOutCubic）
+        private float _followTweenT;
+        private bool _followTweenActive;
 
         // ── 手势层接线（docs/24 P3）──
         [Autowired] private GestureHub _gestureHub;
@@ -215,26 +222,67 @@ namespace GIC.Battle
                 _focus = ClampFocus(_focus + keyMove * (_keyPanSpeedFactor * _distance * Time.unscaledDeltaTime));
             }
 
-            // 拖动瞄准屏幕跟随（2026-09-26 拍板）：金格投影出视口安全区 → 注视点指数趋近金格 XZ
-            // （金格居中即入屏）——"丝滑移动过去"；入区即停（相机停在新位不回弹，与手拖平移一致）。
-            // 瞄准不随平移重判：HUD 拖动瞄准只在指针移动事件重算，相机平移不触发（方向位移两投影点
-            // 随平移同移、差向量不变，故方向型跟随全程稳定）
+            // 拖动瞄准屏幕跟随（2026-09-26 拍板+2026-10-06 三段改造）：方向型=金格出屏（余量 1 格）
+            // 才发起快进慢出补间把格居中、在屏内不动；单位指向=恒居中（屏内补间/出屏瞬移）；
+            // 跟随目标变化→补间 from 当前位重启（目标不变不重启防同目标反复重置进度）；
+            // 取消重置走 CancelDragFollow（HUD 喂 null 仅停跟随不重置——松手留待定=相机留位）
             if (_dragFollowWorld.HasValue)
             {
                 var p = _dragFollowWorld.Value;
                 var s = _camera.WorldToScreenPoint(p);
-                bool off = s.z <= 0f
-                    || s.x < 拖动瞄准跟随边距 || s.x > Screen.width - 拖动瞄准跟随边距
-                    || s.y < 拖动瞄准跟随边距 || s.y > Screen.height - 拖动瞄准跟随边距;
-                if (off)
+                Vector2 target = new Vector2(p.x, p.z);
+
+                if (_dragFollowCenter)
                 {
-                    var target = ClampFocus(new Vector2(p.x, p.z));
-                    _focus = Vector2.Lerp(_focus, target,
-                        1f - Mathf.Exp(-拖动瞄准跟随速度 * Time.unscaledDeltaTime));
+                    // 单位指向（MOBA 式）：基本视口内（无余量）→补间居中；出屏（含相机背后）→瞬移居中
+                    bool onScreen = s.z > 0f
+                        && s.x >= 0f && s.x <= Screen.width && s.y >= 0f && s.y <= Screen.height;
+                    if (onScreen)
+                    {
+                        BeginFollowTween(target);
+                    }
+                    else
+                    {
+                        _followTweenActive = false;
+                        _focus = ClampFocus(target);
+                        ApplyTransform();
+                    }
+                }
+                else
+                {
+                    // 方向型：金格中心距任一视口边缘不足「余量格数」的屏幕像素（按目标点实测 1 格像素
+                    // 换算——透视下各处像素尺度不同，取目标点处即可）即视为出屏→补间把格居中
+                    float cellPxX = ((Vector2)_camera.WorldToScreenPoint(p + Vector3.right) - (Vector2)s).magnitude;
+                    float cellPxZ = ((Vector2)_camera.WorldToScreenPoint(p + Vector3.forward) - (Vector2)s).magnitude;
+                    float margin = Mathf.Max(cellPxX, cellPxZ) * 拖动跟随余量格数;
+                    bool off = s.z <= 0f
+                        || s.x < margin || s.x > Screen.width - margin
+                        || s.y < margin || s.y > Screen.height - margin;
+                    if (off) BeginFollowTween(target);
+                    // 在屏内（含余量区）→不动作；进行中的补间让它跑完（中途掐断会顿挫）
                 }
             }
 
+            // 跟随补间推进（快进慢出 EaseOutCubic：快进段迅速起步、慢出段缓收）
+            if (_followTweenActive)
+            {
+                _followTweenT = Mathf.Min(1f, _followTweenT + Time.unscaledDeltaTime / Mathf.Max(0.01f, 拖动跟随补间时长));
+                float e = 1f - Mathf.Pow(1f - _followTweenT, 3f);
+                _focus = ClampFocus(Vector2.Lerp(_followTweenFrom, _followTweenTo, e));
+                if (_followTweenT >= 1f) _followTweenActive = false;
+            }
+
             ApplyTransform();
+        }
+
+        /// <summary>发起/续接跟随补间：目标变化→from 当前注视点重启 0.5s 快进慢出；同目标进行中→不重启</summary>
+        private void BeginFollowTween(Vector2 target)
+        {
+            if (_followTweenActive && _followTweenTo == target) return; // 同目标续跑（勿反复重置进度）
+            _followTweenFrom = _focus;
+            _followTweenTo = target;
+            _followTweenT = 0f;
+            _followTweenActive = true;
         }
 
         // ==================== 公共接口 ====================
@@ -261,13 +309,53 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 拖动瞄准屏幕跟随喂点（HUD Update 每帧调；null=停）：金色待定格世界位投影出视口安全区时
-        /// 注视点指数趋近其 XZ（Update 内执行，金格居中即入屏、入区即停不回弹）。
-        /// 2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」。
+        /// 拖动瞄准屏幕跟随喂点（HUD Update 每帧调；null=会话结束）。2026-10-06 三段改造：
+        /// ①方向型（centerMode=false）：金格出屏（含「拖动跟随余量格数」提前量）才发起 0.5s
+        /// 快进慢出补间把格移到屏心；在屏内则相机不动。
+        /// ②单位指向型（centerMode=true，MOBA 式）：恒把选中单位居中——在屏内→0.5s 快进慢出
+        /// 补间居中；不在屏内→直接瞬移居中。
+        /// ③取消重置走 <see cref="CancelDragFollow"/>（松手留待定=相机留位不重置）。
+        /// 首次喂点快照当前注视点=会话起始位。
         /// </summary>
-        public void SetDragFollowTarget(Vector3? worldPoint)
+        public void SetDragFollowTarget(Vector3? worldPoint, bool centerMode)
         {
             _dragFollowWorld = worldPoint;
+            _dragFollowCenter = centerMode;
+            if (worldPoint.HasValue && !_hasDragFollowSnapshot)
+            {
+                _hasDragFollowSnapshot = true;
+                _dragFollowStartFocus = _focus; // 会话首点快照（取消重置基准）——**喂 null 不清快照**
+            }
+            // 喂 null（松手留待定/提交）只停跟随；快照留存使「留待定后再取消」仍可重置（2026-10-06 返修），
+            // 提交/阶段流转由 HUD 调 EndDragFollowSession 显式清（相机留位语义）
+        }
+
+        /// <summary>拖动瞄准取消（2026-10-06 拍板「取消时，重置摄像机位置为瞄准开始时」）：
+        /// 瞬移回会话起始注视点并清态。无快照（点击式瞄准/未拖过）幂等无操作。
+        /// 覆盖全部取消路径：松手无待定/取消钮上松手/点空白退出瞄准/瞄准中点取消钮/换选中。
+        /// 2026-10-06 二返：**必须同时清 _dragFollowWorld**——取消回调与 HUD 每帧喂点同帧竞争时
+        /// （喂点先于取消），旧目标残留会让同帧相机 Update 重新发起补间；之后 HUD 喂 null 已晚
+        /// （进行中的补间只看 _followTweenActive），0.5s 把已瞬移回的相机再拉回旧格——即
+        /// 「瞬移回原位又被拉过去」报障根因</summary>
+        public void CancelDragFollow()
+        {
+            if (!_hasDragFollowSnapshot) return;
+            _focus = _dragFollowStartFocus;
+            _hasDragFollowSnapshot = false;
+            _followTweenActive = false;
+            _dragFollowWorld = null;
+            ApplyTransform();
+        }
+
+        /// <summary>拖动跟随会话正常终结（提交成功/阶段流转后 HUD 调）：清快照**不重置**——相机留在
+        /// 拖到的位置（提交后看执行演出/阶段推进相机保持）；防下回合新拖动误用旧快照。
+        /// 2026-10-06 二返：同 CancelDragFollow 清 _dragFollowWorld——提交帧存在同款喂点先于终结的
+        /// 竞态窗口，残留目标会把留位相机拉走（同族隐患一并收口）</summary>
+        public void EndDragFollowSession()
+        {
+            _hasDragFollowSnapshot = false;
+            _followTweenActive = false;
+            _dragFollowWorld = null;
         }
 
         /// <summary>世界点→屏幕位（HUD 拖动圆盘指向锁定用；z≤0=相机背后=不可投影返回 false）</summary>

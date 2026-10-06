@@ -1,4 +1,5 @@
 using UnityEngine;
+using GIC.Framework;
 
 namespace GIC.Pet
 {
@@ -34,7 +35,7 @@ namespace GIC.Pet
         [InspectorName("窗口控制器")]
         [SerializeField] private PetHostBase winController;
         [InspectorName("相机")]
-        [Tooltip("空 = Camera.main")] [SerializeField] private Camera mainCamera;
+        [Tooltip("空 = CameraContext.Resolve()")] [SerializeField] private Camera mainCamera;
 
         [Header("跟随范围")]
         [Tooltip("光标偏屏幕中心多少像素时顶满最大偏转角（全屏线性跟随的标尺）")]
@@ -111,7 +112,7 @@ namespace GIC.Pet
 
         void Start()
         {
-            if (mainCamera == null) mainCamera = Camera.main;
+            if (mainCamera == null) mainCamera = CameraContext.Resolve();
             CacheBoneRefs();
             if (_headBone == null)
             {

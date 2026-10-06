@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using GIC.Framework;
 
 namespace GIC.Pet
 {
@@ -24,7 +25,7 @@ namespace GIC.Pet
         [InspectorName("影子渲染器")]
         [SerializeField] private SkinnedMeshRenderer shadowRenderer; // _DropShadow（缺省按名找）
         [InspectorName("主相机")]
-        [SerializeField] private Camera mainCam;                  // 缺省 Camera.main
+        [SerializeField] private Camera mainCam;                  // 缺省 CameraContext.Resolve()
         [InspectorName("模糊材质")]
         [SerializeField] private Material blurTemplate;              // PaimonShadowBlur.mat（模板，运行时克隆后改参）
         [InspectorName("合成材质")]
@@ -65,7 +66,7 @@ namespace GIC.Pet
                 shellRenderers = new[] { (Renderer)shadowRenderer };
             else
                 shellRenderers = null;
-            if (mainCam == null) mainCam = Camera.main;
+            if (mainCam == null) mainCam = CameraContext.Resolve();
             shadowLayer = LayerMask.NameToLayer(ShadowLayerName);
 
             if (shellRenderers == null || shellRenderers.Length == 0 || mainCam == null || shadowLayer < 0 || blurTemplate == null || compositeTemplate == null)

@@ -568,6 +568,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 819200691}
   m_CullTransparentMesh: 1
+--- !u!115 &867544850
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: CameraContextAnchor
+  m_Namespace: GIC.Framework
+  m_AssemblyName: Assembly-CSharp
 --- !u!1 &937096204
 GameObject:
   m_ObjectHideFlags: 0
@@ -1850,6 +1865,8 @@ GameObject:
   - component: {fileID: 1990878230}
   - component: {fileID: 1990878229}
   - component: {fileID: 1990878231}
+  - component: {fileID: 1990878232}
+  - component: {fileID: 1990878233}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: MapCamera
@@ -1941,10 +1958,36 @@ MonoBehaviour:
   minSize: 8
   maxSize: 15
   scrollStep: 0.925
+  zoomSmoothTau: 0.06
   defaultViewSize: 8
   enterDuration: 0.2
-  clickMoveThreshold: 12
   anchorRayMaxDist: 500
+  glideDamping: 3
+  glideMinSpeed: 1.5
+--- !u!114 &1990878232
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1990878227}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 2145978279}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1990878233
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1990878227}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 867544850}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2060948897
 GameObject:
   m_ObjectHideFlags: 0
@@ -2102,6 +2145,21 @@ MonoBehaviour:
   references:
     version: 2
     RefIds: []
+--- !u!115 &2145978279
+MonoScript:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  serializedVersion: 7
+  m_DefaultReferences: {}
+  m_Icon: {fileID: 0}
+  m_Type: 0
+  m_ExecutionOrder: 0
+  m_ClassName: CameraContextAnchor
+  m_Namespace: GIC.Framework
+  m_AssemblyName: Assembly-CSharp
 --- !u!1 &2147421543
 GameObject:
   m_ObjectHideFlags: 0

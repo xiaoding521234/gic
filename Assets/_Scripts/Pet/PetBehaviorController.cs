@@ -1,4 +1,5 @@
 using UnityEngine;
+using GIC.Framework;
 
 namespace GIC.Pet
 {
@@ -30,7 +31,7 @@ namespace GIC.Pet
         [InspectorName("拎起动作名")]
         [Tooltip("被拎起时播的专用动作（Drag01 垂落姿势：四肢常量垂落+躯干保留待机微动，loop 播放；四肢摆动由拖拽物理跟拍弹簧叠加）")] [SerializeField] private string liftAnimName = "Ani_NPC_Kanban_Paimon_Drag01";
         [InspectorName("相机")]
-        [Tooltip("空 = Camera.main")] [SerializeField] private Camera mainCamera;
+        [Tooltip("空 = CameraContext.Resolve()")] [SerializeField] private Camera mainCamera;
         [InspectorName("蒙皮渲染器")]
         [Tooltip("空 = 自动找非影子壳的蒙皮渲染器（用包围盒做接近判定）")] [SerializeField] private SkinnedMeshRenderer bodyRenderer;
 
@@ -144,7 +145,7 @@ namespace GIC.Pet
 
         void Start()
         {
-            if (mainCamera == null) mainCamera = Camera.main;
+            if (mainCamera == null) mainCamera = CameraContext.Resolve();
             if (bodyRenderer == null)
                 bodyRenderer = PetHostBase.FindBodyRenderer(transform); // 本体蒙皮过滤（排除影子壳/PaimonShadow 层——宿主基类同款）
             _nextIdleAnimAt = Time.time + Random.Range(randomAnimIntervalSec.x, randomAnimIntervalSec.y);

@@ -1818,3 +1818,17 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因**：**Unity 透明渲染序=SortingLayer → SortingOrder → renderQueue → 距离**（order 支配 queue；像素回读实验实锤：A=queue3000/order-1/红 vs B=queue2999/order0/绿 共面叠放→渲染结果纯绿）。焊接水面 MeshRenderer sortingOrder=0（默认）> 盘 sortingOrder=-1 → **水面后画、整片盖在盘上**（含波峰高光），盘被水冲刷=「沉水」观感。旧认知「盘 queue3000>水 2999 故盘画于水面之上」（UnitView/§92 注释遗留）从排序规则上就不成立——此前无人察觉只因极少有单位真正站上水格（飞行跨水=决策三十九后才常见）。
 **修法**：焊接水面 `meshRenderer.sortingOrder = -2`（BattleBoard.BuildWaterSurface）——水面恒为最低透明层（画于盘 -1 之下、瞄准贴片 0/立牌 10/箭矢 12 之上），显式实现 2999 队列的本意；勿"修"回 0。
 **判据**：①**凡跨 renderer 排透明序一律显式用 sortingOrder 排，勿依赖 renderQueue 相对大小**（queue 只在 order 相同时才参与比较——本实验把 3000 vs 2999 的"先后"直觉直接推翻）；②「贴片沉到水面下」类报障先分层：几何高度（视觉表面含波峰带 §89）vs 画家序（order 对比）——两者都可独立致"沉水"观感；③共面双 quad+像素回读=排序规则的最小定裁实验（勿凭文档/记忆断言排序规则）。
+
+## 124. exec_editor_script 同帧「OpenScene 真重开+AddComponent+SaveScene」静默丢组件——挂载与保存必须拆两次脚本调用（2026-10-06 CameraContextAnchor 三场景挂载实证）
+
+**现象**：编辑器脚本循环处理三场景（OpenScene(Single)→主相机 AddComponent→MarkSceneDirty→SaveScene），三个场景全部报保存成功（SaveScene 返回 True、保存后内存里组件在），但重开 MainHall/MapScreen 组件消失；唯 BattleScreen 存住——它当时是编辑器活动场景，OpenScene(同路径) 实为 no-op（场景未真重载）。
+**根因**：团结引擎 1.9.3 下 **OpenScene 真重开后、同一脚本调用内 AddComponent 的组件未进场景序列化集**：AddComponent 后 `scene.isDirty=False`（组件添加不自动标脏），MarkSceneDirty+SaveScene 虽返回 True 但写盘内容不含该组件（单场景最小复现：挂→存→重读 count=0 实锤）。活动场景（no-op 重开）路径正常——场景处于稳定加载态时 AddComponent 可正常序列化。
+**修法**：**挂载与保存拆成两次 exec_editor_script 调用（跨帧）**——第一次：OpenScene+AddComponent（组件留在内存场景，不保存）；第二次：EditorUtility.SetDirty(组件)+MarkSceneDirty+SaveScene+重开断言。三场景（MainHall/BattleScreen/MapScreen 挂 CameraContextAnchor）两轮全部 PASS。
+**判据**：①编辑器脚本给「真重开的场景」AddComponent 后必须**重开断言**落盘（SaveScene 返回 True ≠ 组件已写盘）；②AddComponent 后 `scene.isDirty` 读到 False 即中此坑（正常应自动标脏）；③对活动场景（OpenScene no-op）同帧挂存不受影响——同批三场景一成一败两丢的指纹即此差异；④prefab 实例身份不是本案因素（三相机均非 prefab 实例仍复现）——勿先往 prefab override 方向排查。
+
+## 125. 「每帧恒喂点」系统的取消竞态：取消必须清目标位而非只停动画——进行中的补间不再看喂点，只看激活位（2026-10-06 拖动瞄准取消后相机「瞬移回原位又被拉过去」报障根因）
+
+**现象**：拖动瞄准中取消技能，相机可见地瞬移回瞄准开始位，随后又被平滑拉回取消前的目标位（用户初判「协程没清理干净」——实际是 Update 状态机+补间残留，病灶同族）。
+**根因**：喂点方（HUD.Update）**每帧恒调 `SetDragFollowTarget`**（拖动中喂金格、退出后喂 null——「退出后喂 null」看似天然收口）；取消方（onEndDrag/onClick 回调）调 `CancelDragFollow` 瞬移+停补间 `_followTweenActive=false`，**但没清喂点目标 `_dragFollowWorld`**。当取消回调与同帧 HUD 喂点竞争（喂点先于取消）：取消后相机 Update 的跟随块读到的目标仍是本帧喂的旧格 → 重新发起补间（`BeginFollowTween`；同目标续跑守卫挡不住——active 已被取消清掉）；下一帧 HUD 喂 null 时，**进行中的补间只看 `_followTweenActive` 不看目标位**，完整跑完 0.5s 把相机拉回旧格。
+**修法**：`CancelDragFollow`/`EndDragFollowSession` 均加 `_dragFollowWorld = null`——取消/终结=**目标位+补间双清**（End 同族隐患一并收口：提交帧同款竞态会把留位相机拉走）。
+**判据**：①「取消重置」类功能在「每帧恒喂点」系统里，取消动作必须**清喂点目标**（消除同帧竞争窗口），不能只停动画位、指望下一帧喂 null 兜底；②进行中补间/动画**只看激活位**——喂点方喂 null 停不了已激活的补间，收口责任必须在取消侧一次做全；③症状指纹「重置生效了（瞬移可见）→又被持续力拉回去」=重置动作与残留驱动并存——先查哪个状态位还在驱动（目标位/激活位逐个对账），勿只查协程。

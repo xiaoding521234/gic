@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using GIC.Framework;
 using GIC.Data;
 
 namespace GIC.Battle
@@ -158,7 +159,7 @@ namespace GIC.Battle
 
             yield return BattleViewTween.Over(total, t =>
             {
-                var cam = _camera != null ? _camera : Camera.main;
+                var cam = _camera != null ? _camera : CameraContext.Resolve();
                 if (cam == null) return;
 
                 // 缩放（先算——边缘夹取要用当前帧尺寸）：伤害=首帧爆裂 easeOut 收缩回停留尺寸；

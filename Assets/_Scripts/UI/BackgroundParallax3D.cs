@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using GIC.Framework;
 namespace GIC.UI
 {
 
@@ -34,7 +35,7 @@ namespace GIC.UI
         private void Awake()
         {
             _sr = GetComponent<SpriteRenderer>();
-            _camera = Camera.main;
+            _camera = CameraContext.Resolve();
             _startPos = transform.position;
             FitToScreen();
             CalculateBounds();

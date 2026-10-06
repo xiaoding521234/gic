@@ -1,4 +1,5 @@
 using UnityEngine;
+using GIC.Framework;
 
 namespace GIC.Pet
 {
@@ -76,7 +77,7 @@ namespace GIC.Pet
             _blink = GetComponent<PetBlinkController>();
             _emotion = GetComponent<PetEmotionController>();
             _anim = GetComponent<Animation>();
-            _cam = Camera.main;
+            _cam = CameraContext.Resolve();
             if (_cam != null) _camMaskBackup = _cam.cullingMask;
 
             EnterPhase(0);
