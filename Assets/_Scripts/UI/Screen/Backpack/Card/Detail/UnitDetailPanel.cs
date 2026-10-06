@@ -27,6 +27,12 @@ namespace GIC.UI
         [Header("标签芯片")]
         [SerializeField] private GameObject tagChipPrefab;
 
+        [Header("数据面板")]
+        [SerializeField] private UnitStatBriefPanel 数据小面板;
+        public UnitStatsPanel 全部数据面板; // 宿主界面接线（BackpackScreen 内为两处实例覆写；未接线的宿主点击小面板无效果）
+
+        private UnitConfig.UnitData _lastRaw;
+
         // 公用字段引用（由 CardDetailView 注入）
         private Image _top;
         private Image _bottomImage;
@@ -49,6 +55,29 @@ namespace GIC.UI
             _description = description;
         }
 
+        private void Awake()
+        {
+            if (数据小面板 != null && 数据小面板.点击按钮 != null)
+                数据小面板.点击按钮.onClick.AddListener(OpenFullStatsPanel);
+        }
+
+        /// <summary>点击小数据面板 → 打开全部数据面板（未接线宿主为空操作）；诊断日志用于点击链定位（2026-10-07 报障排查）</summary>
+        public void OpenFullStatsPanel()
+        {
+            if (_lastRaw == null)
+            {
+                GICLog.Warn("[UnitDetailPanel] 点击小数据面板但 _lastRaw 为空，忽略");
+                return;
+            }
+            if (全部数据面板 == null)
+            {
+                GICLog.Warn("[UnitDetailPanel] 点击小数据面板但 全部数据面板 未接线（该宿主不支持），忽略");
+                return;
+            }
+            GICLog.Info("[UnitDetailPanel] 打开全部数据面板: " + _lastRaw.unitName);
+            全部数据面板.Open(_lastRaw);
+        }
+
         public void Init(Card card)
         {
             var raw = CardConfigResolver.Instance?.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
@@ -65,6 +94,7 @@ namespace GIC.UI
 
         private void InitInternal(UnitConfig.UnitData raw, SaveCardData data, Transform tagContainerFromCard)
         {
+            _lastRaw = raw;
             _top.color = StarVisualConfig.GetStarColor(raw.starLevel);
             _bottomImage.color = StarVisualConfig.GetStarColor(raw.starLevel);
             MissingImageGuard.Assign(nameCard, raw.nameCard); // 名片缺失兜底（调用点显式）
@@ -103,6 +133,13 @@ namespace GIC.UI
             // 技能面板
             RefreshSkillsPanel(raw);
 
+            // 小数据面板（技能区块之下、介绍区块之上的属性摘要；默认隐藏，仅角色卡激活）
+            if (数据小面板 != null)
+            {
+                数据小面板.gameObject.SetActive(true);
+                数据小面板.Init(raw);
+            }
+
             // 描述
             _description.ClearAllEntries();
             _description.AddEntry(raw.GetDescriptionEntry());
@@ -113,6 +150,8 @@ namespace GIC.UI
             gameObject.SetActive(active);
             if (skillsPanel != null)
                 skillsPanel.SetActive(active);
+            if (数据小面板 != null)
+                数据小面板.gameObject.SetActive(active);
         }
 
         public void SetUsable(IUsable usable, SaveCardData data)
