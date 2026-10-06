@@ -608,6 +608,10 @@ namespace GIC.Battle
                 _handTextCombiner.AddStaticEntry(" ×" + myRes.handCardCount);
             RebuildHandCards(myRes);
 
+            // 快捷面板（2026-10-06 拍板：左侧竖条，每行=头像+爆发+势力技能，点击=选中+相机居中）：
+            // 成员/存亡变化重建行、元能水位/置暗/选中高亮就地刷新
+            RefreshQuickPanel(snapshot);
+
             // 选中单位若已从快照消失（被移除/对局结束清场）清选中；尸体不清——2026-10-06 追拍
             // 「尸体也能点选查看」（旧防线会把刚选中的尸体在下次快照刷新时清掉）；尸体选中态
             // 技能盘照常刷新（查看语义：技能键/详情开放，提交防线+Host 权威校验兜底同敌方查看态）
@@ -1363,6 +1367,7 @@ namespace GIC.Battle
             RefreshSkillButtons();
             ShowSelectMarker(unitId);
             RefreshOutlines(); // 选中描边（2026-10-05 拍板：立牌描边=队伍色；ExitAiming 已随收口刷过一次）
+            UpdateQuickSelectionHighlight(); // 快捷面板行高亮随选中即时刷新（2026-10-06）
             SetTip("Battle_TipUnitSelected");
         }
 
@@ -1374,6 +1379,7 @@ namespace GIC.Battle
             HideSelectMarker();
             ApplyStateVisibility();
             RefreshOutlines(); // 选中/目标描边随选中一并清（2026-10-05）
+            UpdateQuickSelectionHighlight(); // 快捷面板行高亮随取消选中即时清（2026-10-06）
             SetTip("Battle_TipSelect");
         }
 
@@ -2742,7 +2748,9 @@ namespace GIC.Battle
         ///   玩家域键（己方魔神全键/己方伙伴势力键）=interactable 拦截+**整键变暗**（图标/底板/圆环
         ///   统一乘暗系数——2026-10-04 拍板「不止图标」）；**己方眷属/伙伴的 AI 域键同样整键置暗**
         ///   （AI 当前也用不了=信息层，不拦 interactable 保持可查看）——与 45% 半透明同键叠加；
-        ///   查看态（敌方单位）无消耗语义不灰（拍板不变）</summary>
+        ///   查看态（敌方单位）无消耗语义不灰（拍板不变）；
+        /// ③「资源进度」底面填充（2026-10-06 拍板）——元能/摩拉/物品消耗键底面按 min(持有/需求)
+        ///   自下而上填色、体力不参与（SkillResourceProgress），敌方查看态恒满填（同②口径）</summary>
         private void ApplySkillButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null) return;
@@ -2771,6 +2779,9 @@ namespace GIC.Battle
 
             def.view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
             def.view.SetConditionDimmed(conditionDimmed, 资源不足变暗系数); // 须在 InitWithData 后（基准色随刷新重写入）
+            // 底面进度填充（2026-10-06 拍板「从下至上按百分比填色」）：元能/摩拉/物品消耗按
+            // min(持有/需求) 填色（体力不参与）；敌方查看态恒满填（查看态无消耗语义，同置灰拍板口径）
+            def.view.SetResourceProgress(IsSelectedOwnUnit() ? SkillResourceProgress(data) : 1f);
 
             if (def.nameText != null)
             {
@@ -2806,9 +2817,16 @@ namespace GIC.Battle
         /// 读原星会让沙盒的层级覆盖在客户端门控失效=战技被误拦「伙伴技能自主」）；0=未填回落原星级换算</summary>
         private UnitTier SelectedUnitTier()
         {
-            var sel = _session?.Player?.LatestSnapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-            if (sel != null && sel.tier != 0) return (UnitTier)sel.tier;
-            var data = GetSelectedUnitData();
+            var snapshot = _session?.Player?.LatestSnapshot;
+            return TierOfUnit(snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId));
+        }
+
+        /// <summary>单位层级单源（快照 tier 优先——TierOverrideStars 覆盖经快照同源；0=未填回落
+        /// UnitConfig 星级换算；null/无配置=眷属档保守值）——技能盘选中口径与快捷面板行共用</summary>
+        private UnitTier TierOfUnit(UnitState unitState)
+        {
+            if (unitState != null && unitState.tier != 0) return (UnitTier)unitState.tier;
+            var data = unitState != null ? TryGetUnitData(unitState.unitName) : null;
             return data != null ? UnitTierHelper.FromStars(data.starLevel) : UnitTier.Familiar;
         }
 
@@ -2849,84 +2867,116 @@ namespace GIC.Battle
         /// **C-2 起消耗全量迁移完成：costs 空=免费技能**（无消耗语义，数据即事实）；
         /// 体力条目按**选中单位层级换算**镜像（D 批次操控分层 docs/active/32 §5.2——实际扣值=施法者
         /// 层级表 眷属0/伙伴5/魔神10，声明值=基准/校验值；与 ResourceGate.StaminaAmountOf 同口径）；
+        /// 非体力条目持有量走 HeldResourceAmount 单源（与底面进度填充 SkillResourceProgress 共用）；
         /// 旧 EnergyCost 参数/体力类型分档双查已退役</summary>
         private bool HasSkillResources(SkillConfig.SkillData skillData)
         {
             if (skillData == null || !skillData.HasCosts) return true; // 免费技能/空数据
-            var snapshot = _session?.Player?.LatestSnapshot;
             var selUnitData = GetSelectedUnitData();
             foreach (var cost in skillData.costs)
             {
                 if (cost == null || cost.amount <= 0) continue;
-                switch (cost.kind)
+                if (cost.kind == CostKind.Stamina)
                 {
-                    case CostKind.Energy:
-                        var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-                        if (sel == null || sel.energy < cost.amount) return false;
-                        break;
-                    case CostKind.Stamina:
-                    {
-                        int amount = selUnitData != null
-                            ? UnitTierHelper.StaminaCostOf(SelectedUnitTier())
-                            : cost.amount; // 无配置兜底按声明值（理论不可达）
-                        if (amount > 0 && _myStamina < amount) return false;
-                        break;
-                    }
-                    case CostKind.Mora:
-                        if (_myMora < cost.amount) return false;
-                        break;
-                    case CostKind.Item:
-                        if (!HasHandItem(cost.item, cost.amount)) return false;
-                        break;
-                    case CostKind.AnyItem:
-                        if (!HasHandAnyItem(cost.subType, cost.amount)) return false;
-                        break;
-                    default:
-                        // 镜像安全网（批7②）：与 Host ResourceGate.Has 同款——新增 CostKind 时此处若漏接
-                        // 路由会静默按可支付置灰（镜像偏乐观），Warn 提示补路由；ResourceGate 为权威
-                        GICLog.Warn($"[BattleHud] HasSkillResources 未接路由的消耗种类 {cost.kind}——按可支付处理（请补镜像路由）");
-                        break;
+                    int amount = selUnitData != null
+                        ? UnitTierHelper.StaminaCostOf(SelectedUnitTier())
+                        : cost.amount; // 无配置兜底按声明值（理论不可达）
+                    if (amount > 0 && _myStamina < amount) return false;
+                    continue;
                 }
+                if (HeldResourceAmount(cost) < cost.amount) return false;
             }
             return true;
         }
 
-        /// <summary>本地手牌镜像是否持有足量物品（C-1 客户端镜像=LatestSnapshot.resources.handCards 条目；
-        /// 物品牌条目 count=局内真源，与 Host LoseCard 判定同源——快照权威）</summary>
-        private bool HasHandItem(ItemName item, int amount)
+        /// <summary>非体力消耗条目的持有量读取单源（门槛 HasSkillResources 与底面进度填充
+        /// SkillResourceProgress 共用——两消费方同源勿散抄）：元能=选中单位快照 energy /
+        /// 摩拉=本端缓存 / 物品=手牌镜像条目计数（同 Host ResourceGate 口径）</summary>
+        private int HeldResourceAmount(SkillCostEntry cost)
+        {
+            if (cost.kind == CostKind.Energy)
+            {
+                var snapshot = _session?.Player?.LatestSnapshot;
+                var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+                return sel?.energy ?? 0;
+            }
+            return HeldPoolAmount(cost);
+        }
+
+        /// <summary>玩家池资源持有量（摩拉/物品/同类任意——元能与体力除外）：选中键与快捷面板行
+        /// （UnitHeldAmount）两路径共用单源；含未接路由消耗种类的镜像安全网 Warn（批7②——
+        /// Host ResourceGate 为权威，漏接路由按可支付乐观口径并提示补镜像）</summary>
+        private int HeldPoolAmount(SkillCostEntry cost)
+        {
+            switch (cost.kind)
+            {
+                case CostKind.Mora:
+                    return _myMora;
+                case CostKind.Item:
+                    return CountHandItem(cost.item);
+                case CostKind.AnyItem:
+                    return CountHandAnyItem(cost.subType);
+                default:
+                    GICLog.Warn($"[BattleHud] HeldPoolAmount 未接路由的消耗种类 {cost.kind}——按可支付处理（请补镜像路由）");
+                    return int.MaxValue;
+            }
+        }
+
+        /// <summary>技能资源进度（2026-10-06 拍板「消耗键底面按百分比自下而上填色——爆发/延奏/契约等
+        /// 让玩家一眼看出进度」）：非体力消耗逐条取 min(持有/需求)、钳 0~1——多条目取最紧一环
+        /// （如 元能50+摩拉200 双耗时水位=两者较小者）；**体力不参与**（拍板排除——按层级换算
+        /// 的玩家资源无「攒进度」观感语义，移动/战技键恒满填）；无非体力消耗=1（满填视觉恒等旧版）</summary>
+        private float SkillResourceProgress(SkillConfig.SkillData skillData)
+        {
+            if (skillData == null || !skillData.HasCosts) return 1f;
+            float progress = 1f;
+            bool any = false;
+            foreach (var cost in skillData.costs)
+            {
+                if (cost == null || cost.amount <= 0 || cost.kind == CostKind.Stamina) continue;
+                any = true;
+                progress = Mathf.Min(progress, HeldResourceAmount(cost) / (float)cost.amount);
+            }
+            return any ? Mathf.Clamp01(progress) : 1f;
+        }
+
+        /// <summary>本地手牌镜像指定物品持有数（C-1 客户端镜像=LatestSnapshot.resources.handCards 条目；
+        /// 物品牌条目 count=局内真源，与 Host LoseCard 判定同源——快照权威；资源门槛与底面进度两消费方共用）</summary>
+        private int CountHandItem(ItemName item)
         {
             var snapshot = _session?.Player?.LatestSnapshot;
-            if (snapshot == null) return false;
+            if (snapshot == null) return 0;
             PlayerResourceState myRes = null;
             foreach (var r in snapshot.resources)
             {
                 if (r.playerId == _myPlayerId) { myRes = r; break; }
             }
-            if (myRes == null) return false;
+            if (myRes == null) return 0;
+            int total = 0;
             foreach (var entry in myRes.handCards)
             {
                 if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item)
-                    return entry.count >= amount;
+                    total += entry.count;
             }
-            return false;
+            return total;
         }
 
-        /// <summary>本地手牌镜像是否持有足量**任意同类**物品（C-1 AnyItem 客户端镜像——镜像
+        /// <summary>本地手牌镜像**任意同类**物品合计持有数（C-1 AnyItem 客户端镜像——镜像
         /// ResourceGate.CountAnyItems 同口径：跨同类条目聚合、货币卡不可匹配；ItemConfig 走
-        /// CardConfigResolver 与 RebuildHandCards 同链）</summary>
-        private bool HasHandAnyItem(ItemSubType subType, int amount)
+        /// CardConfigResolver 与 RebuildHandCards 同链；资源门槛与底面进度两消费方共用）</summary>
+        private int CountHandAnyItem(ItemSubType subType)
         {
             var snapshot = _session?.Player?.LatestSnapshot;
-            if (snapshot == null) return false;
+            if (snapshot == null) return 0;
             PlayerResourceState myRes = null;
             foreach (var r in snapshot.resources)
             {
                 if (r.playerId == _myPlayerId) { myRes = r; break; }
             }
-            if (myRes == null) return false;
+            if (myRes == null) return 0;
             var itemConfig = CardConfigResolver.Instance?.ItemConfig;
-            if (itemConfig == null) return false;
-            if (subType == ItemSubType.Currency) return false; // 货币=账户资源不经物品消耗链（Host 同口径）
+            if (itemConfig == null) return 0;
+            if (subType == ItemSubType.Currency) return 0; // 货币=账户资源不经物品消耗链（Host 同口径）
             int total = 0;
             foreach (var entry in myRes.handCards)
             {
@@ -2937,7 +2987,7 @@ namespace GIC.Battle
                 if (data != null && data.subType == subType)
                     total += entry.count;
             }
-            return total >= amount;
+            return total;
         }
 
         /// <summary>移动按钮刷新（特殊技能）：数据链走 skills[Move]（InitWithData 染角色元素色底+主动环；
@@ -3002,6 +3052,9 @@ namespace GIC.Battle
             }
             // 移动键染色在方法头部已刷新（InitWithData 在 gating 前）——置暗/恢复在此收口
             def.view.SetConditionDimmed(conditionDimmed, 资源不足变暗系数);
+            // 底面进度填充（2026-10-06 拍板）：移动消耗=体力（拍板排除）常态恒满填；
+            // 无 Move 条目单位同样满填（本帧未走 InitWithData，防残留上一单位的进度）
+            def.view.SetResourceProgress(IsSelectedOwnUnit() && move != null ? SkillResourceProgress(move) : 1f);
         }
 
         /// <summary>提示条文案切换（UIText 战斗段键；null/空 = 清空）</summary>

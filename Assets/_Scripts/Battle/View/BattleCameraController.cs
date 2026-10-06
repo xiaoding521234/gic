@@ -358,6 +358,16 @@ namespace GIC.Battle
             _dragFollowWorld = null;
         }
 
+        /// <summary>快捷面板跳转聚焦（2026-10-06 拍板「点击该行则选中该角色并丝滑移动相机使其居中」）：
+        /// 0.5s 快进慢出（EaseOutCubic）把注视点补间到目标位——复用拖动瞄准 BeginFollowTween 同款
+        /// 机件（目标变化 from 当前位重启）；**非拖动会话**——无快照/无取消重置语义，玩家随后可自由
+        /// 平移缩放；与拖动跟随并存的窗口=瞄准中点快捷行：SelectUnit 先 ExitAiming（HUD 下帧喂 null
+        /// 只停跟随不掐补间），本补间继续跑完</summary>
+        public void FocusWorldPoint(Vector3 worldPoint)
+        {
+            BeginFollowTween(new Vector2(worldPoint.x, worldPoint.z));
+        }
+
         /// <summary>世界点→屏幕位（HUD 拖动圆盘指向锁定用；z≤0=相机背后=不可投影返回 false）</summary>
         public bool TryProjectToScreen(Vector3 worldPos, out Vector2 screenPos)
         {
