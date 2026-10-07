@@ -69,11 +69,14 @@ namespace GIC.Battle
         /// preview=执行预览（2026-10-04 下移贴底批接入：执行阶段无行不可见——布局编辑模式由
         /// _executionPreview.ShowLayoutPlaceholder 建占位行显形，可拖可缩同其它件）；
         /// quick=快捷面板（2026-10-06 拍板：左侧竖条，己方魔神/伙伴每行=头像+爆发+势力技能，
-        /// 点击行=选中该角色+相机丝滑居中；常驻战斗全程不走 ApplyStateVisibility——存量方案缺条目自然回落默认位）</summary>
+        /// 点击行=选中该角色+相机丝滑居中；常驻战斗全程不走 ApplyStateVisibility——存量方案缺条目自然回落默认位）；
+        /// passive=被动技能盘（2026-10-07 拍板：选中单位的变奏/天赋等被动图标列——尺寸=主动键 70%
+        /// 基准 154 随槽缩放；显隐随选中态同技能盘成组；编辑模式无选中单位时由
+        /// ShowPassiveLayoutPlaceholder 建占位显形，可拖可缩同其它件）</summary>
         private static readonly string[] AllLayoutKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "settings",
-            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick",
+            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick", "passive",
         };
 
         /// <summary>
@@ -196,6 +199,7 @@ namespace GIC.Battle
             foreach (var key in SkillDiscKeys)
                 SetLayoutWidgetActive(key, acting);
             SetLayoutWidgetActive("move", acting);
+            SetLayoutWidgetActive("passive", acting); // 被动技能盘（2026-10-07）：随技能盘成组显隐
             SetLayoutWidgetActive("hand", !acting);
             SetLayoutWidgetActive("cancel", _state == HudState.Aiming);
         }
@@ -214,6 +218,7 @@ namespace GIC.Battle
             _layoutEditing = true; // 先立旗：随后的显隐调用经编辑态强制全显
             ExitAiming();
             DeselectUnit(); // → Idle（编辑前清瞄准/选中）
+            CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：编辑期全件强制可见，拖中卡须归位）
             ClosePopup();
             if (_session != null && _session.Flow != null)
                 _session.Flow.SelectTimerPaused = true; // 编辑期冻结选择倒计时（拍板 D1）
@@ -221,6 +226,7 @@ namespace GIC.Battle
             foreach (var def in _layoutWidgets)
                 def.plate.SetActive(true);
             _executionPreview?.ShowLayoutPlaceholder(); // 预览无行时建占位行（否则编辑态不可见无从拖）；真实行在场则跳过
+            ShowPassiveLayoutPlaceholder();             // 被动技能盘同款占位（无选中单位时空盘不可见无从拖，2026-10-07）
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(true); // prefab 烘焙工具栏，编辑态激活
             SelectWidget(null);
             SetTip("Battle_LayoutHint");
@@ -234,6 +240,7 @@ namespace GIC.Battle
                 _session.Flow.SelectTimerPaused = false;
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(false); // 隐藏回烘焙态（引用保留，重进即用）
             _executionPreview?.HideLayoutPlaceholder(); // 清编辑占位行（真实行在场不受影响——ShowLayoutPlaceholder 早退未建）
+            HidePassiveLayoutPlaceholder();              // 清被动盘占位（真图标/占位互斥，2026-10-07）
             foreach (var def in _layoutWidgets)
             {
                 def.plate.SetActive(false);

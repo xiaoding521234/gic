@@ -351,27 +351,14 @@ namespace GIC.Battle
             return BuffElementIconOf(buff.type);
         }
 
-        /// <summary>专属图标缓存（Resources.Load 结果含 null 一并缓存——缺失文件不逐次打盘）</summary>
-        private static readonly Dictionary<BuffType, Sprite> _dedicatedIconCache = new Dictionary<BuffType, Sprite>();
-
-        /// <summary>per-type 专属图标覆盖（2026-10-07 用户指定源图：歌声之环=Skill_S_Barbara_01〔芭芭拉
-        /// 战技〕、通用减防=UI_Talent_S_Lisa_06〔丽莎 6 命〕；落地=Resources/UI/Battle/Buff_*.png
-        /// 256² alpha 已修）。新增专属图标=此处加 case；null（未指定/文件缺失）回落来源技能→元素图标</summary>
+        /// <summary>per-type 专属图标覆盖（2026-10-07 Buff 配置化 docs/active/39：图标=BuffConfig 资产
+        ///〔专属图标〕字段引用，2026-10-07 用户指定源图——歌声之环=Skill_S_Barbara_01〔芭芭拉战技〕、
+        /// 通用减防=UI_Talent_S_Lisa_06〔丽莎 6 命〕，256² alpha 已修）。**新增专属图标=在
+        /// Buff_* 资产 Inspector 挂图，零代码**；null（未指定/缺资产）回落来源技能→元素图标
+        /// （决策五十回落链）</summary>
         private static Sprite DedicatedBuffIcon(BuffType type)
         {
-            string path;
-            switch (type)
-            {
-                case BuffType.SongOfLife: path = "UI/Battle/Buff_SongOfLife"; break;
-                case BuffType.DefenseDown: path = "UI/Battle/Buff_DefenseDown"; break;
-                default: return null;
-            }
-            if (_dedicatedIconCache.TryGetValue(type, out var cached)) return cached;
-            var sprite = Resources.Load<Sprite>(path);
-            if (sprite == null)
-                Debug.LogWarning($"[BattleOverheadBars] 专属 Buff 图标缺失：Resources/{path}（回落来源技能/元素图标）");
-            _dedicatedIconCache[type] = sprite;
-            return sprite;
+            return GIC.Data.BuffConfig.OfType(type)?.专属图标;
         }
 
         /// <summary>元素图标回退（原 UnitView.BuffIconOf 映射随命座徽章批迁移至此——元素 Stroke 现成图）</summary>

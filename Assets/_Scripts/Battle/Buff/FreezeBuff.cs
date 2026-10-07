@@ -6,21 +6,23 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 冻结（docs/06：水 + 冰 → 冰冻 2 × 级别 回合，重复冰冻取时间更长者）。
+    /// 冻结（docs/06：水 + 冰 → 冰冻〔Buff_Freeze.asset 每级持续回合〕× 级别 回合，重复冰冻取时间更长者
+    /// ——数值单源=BuffConfig 资产，docs/active/39）。
     /// 硬控：挂载即写入 UnitStatus.Frozen（不可行动，docs/05 §5.5），到期解除。
     /// 冻结反应本身不是元素伤害（docs/06 §6.3"不涉及附着"），命中伤害正常结算。
     /// 韧性交互（超载-5 韧性 → 受控时间+1）B4 只做冻结本体，韧性管线随超载反应批次接。
     /// </summary>
     public class FreezeBuff : BaseBuff
     {
-        public const int TurnsPerLevel = 2; // docs/06：冰冻 2 × 级别 回合
+        private FreezeBuffConfig Cfg => (FreezeBuffConfig)Config;
 
         public override BuffType Type => BuffType.Freeze;
 
-        public FreezeBuff(int level = 1)
+        public FreezeBuff(FreezeBuffConfig config, int level = 1)
         {
+            Config = config;
             Level = Mathf.Max(1, level);
-            RemainingTurns = TurnsPerLevel * Level;
+            RemainingTurns = Cfg.每级持续回合 * Level;
         }
 
         public override List<BattleEffect> OnTurnEnd()

@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61770b1685f93b44583923bcfe5d7c4d, type: 3}
+  m_Name: Buff_SongOfLife
+  m_EditorClassIdentifier: 
+  buffType: 5
+  "\u4E13\u5C5E\u56FE\u6807": {fileID: 21300000, guid: 655cf550a20fa8e45b1059d1739168b2, type: 3}
+  "\u5173\u8054\u540D": "\u6B4C\u58F0\u4E4B\u73AF"
+  "\u6BCF\u56DE\u5408\u4F24\u5BB3\u767E\u5206\u6BD4": 10
+  "\u6BCF\u56DE\u5408\u6CBB\u7597\u767E\u5206\u6BD4": 5
+  "\u57FA\u7840\u5143\u80FD\u83B7\u53D6": 5
+  "\u6BCF\u56DE\u5408\u7406\u667A\u6062\u590D": 1
+  "\u4F5C\u7528\u534A\u5F84": 1

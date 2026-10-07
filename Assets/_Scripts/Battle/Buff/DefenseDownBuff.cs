@@ -10,7 +10,7 @@ namespace GIC.Battle
     /// （2026-10-01 复测拍板「可以叠加10层，持续12回合，持续时间随层数叠加」——与攻击提升/
     /// 移速提升完全同构）；易伤乘区消费（DamagePipeline 100/(100+防御)——减防=增伤）。
     /// 数值单源=施加者命座技能参数 C2DefenseReduce（经 ApplyBuffEffect 参数通道注入）；
-    /// 上限/时长=IcicleBuff.DefDownStackLimit/DefDownDurationTurns（tick 施加方收口）。
+    /// 上限/时长=Buff_Icicle 资产〔减防叠层上限/减防持续回合〕（tick 施加方收口，docs/active/39）。
     /// </summary>
     public class DefenseDownBuff : StatBuff
     {

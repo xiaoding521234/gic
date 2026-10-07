@@ -17,6 +17,12 @@ namespace GIC.Battle
         public Unit source;
         public int value;
 
+        /// <summary>类型配置资产（BuffFactory 构造时注入=BuffConfig.OfType(Type) 单源，docs/active/39
+        /// 「遵循大厂的做法」：行为族数值（Burn 每回合伤害/歌声之环光环百分比/冰棱碎裂阈值等）与
+        /// 专属图标、AI 感知半径全部读此资产——**数值单源归 BuffConfig，勿在子类硬编码**；
+        /// StatBuff 族（加攻/加速/减防）数值仍由技能参数经工厂 ctor 注入优先）</summary>
+        public GIC.Data.BuffConfig Config;
+
         /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff/登场被动兜底）。
         /// 客户端头顶 Buff 图标消费（2026-10-06 拍板「buff 图标用来源技能图标」）：随快照
         /// BuffState.sourceSkillId 透传；Merge 不换源（沿用首挂，与 source 字段同口径）</summary>

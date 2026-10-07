@@ -39,6 +39,7 @@ namespace GIC.Battle
             ResolveSkillButtons(); // 技能盘四键（SkillIconView/点击转发/名称条）
             ResolveMiscWidgets();   // 手牌/提示/取消/布局入口/编辑工具栏
             ResolveQuickPanel();   // 快捷面板（QuickPanel 分件：滚动壳寻址+底板活色，2026-10-06）
+            ResolvePassivePanel(); // 被动技能盘（PassivePanel 分件：槽寻址，图标运行时建，2026-10-07）
             ResolveSkillPopup();   // 技能详情面板（prefab 嵌套实例接线）
 
             // 初始 = 手牌态（件显隐统一走 ApplyStateVisibility；方案应用在 Bind 尾按存档激活槽执行）

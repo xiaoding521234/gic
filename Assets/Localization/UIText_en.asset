@@ -1112,6 +1112,11 @@ MonoBehaviour:
     m_Localized: Combat Stats
     m_Metadata:
       m_Items: []
+  - m_Id: 12037
+    m_Localized: "Constellation upgrade ready \u2014 press Confirm to commit, drag
+      the card back or tap empty space to cancel"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
