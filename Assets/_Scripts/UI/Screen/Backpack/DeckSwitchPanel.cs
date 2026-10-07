@@ -12,10 +12,13 @@ using GIC.Tool;
 namespace GIC.UI
 {
     /// <summary>
-    /// 卡组管理面板（王者荣耀式，v3）：背包长条卡组按钮点击后弹出。
+    /// 卡组管理面板（王者荣耀式，v4）：背包长条卡组按钮点击后弹出。
     /// · 行由 rowPrefab 运行时实例化（卡组数量动态：1~30），ScrollView 支持滚动；打开时行逐个淡入上滑（同背包卡片节奏）；
     /// · 点行切换当前卡组（面板保持打开）、点名称改名、拖把手排序——拖动中的行挂到 dragLayer（面板最顶层、不受滚动/遮罩影响），
     ///   位置全程跟随指针（屏幕位移→画布单位换算），指针接近列表边缘自动滚动；
+    /// · 商业级实时让位（v4）：拖拽期间禁用行布局并快照基准槽位——目标插入位按"指针越过基准槽中心"判定（不随让位动画
+    ///   振荡），其余行指数趋近"插入后自己所在槽"的布局位平滑让出/回填；松手后拖动行留在 dragLayer 平滑飞向目标槽
+    ///   （不受视口裁剪、保持拖拽浮层），到位后回容器精确落槽并提交——全程零跳变；拖拽中关闭面板=取消回原位不提交；
     /// · 复制/粘贴卡组、导出密语到剪贴板分享、输入密语一键配置当前卡组（剪贴板已有密语时自动预填）、新增/删除卡组；
     /// · 预览为完整卡牌（共享 CardPool 实例化 Card 预制体，OnlyDisplay 缩放 0.6，同编辑卡组小卡）。
     /// 关闭路径：关闭按钮 / 点遮罩 / ESC（IClosable 栈，优先于背包界面自身关闭）。
@@ -59,6 +62,11 @@ namespace GIC.UI
         [SerializeField] private float dragAutoScrollSpeed = 900f;
         [InspectorName("自动滚动触发边距（屏幕像素）")]
         [SerializeField] private float dragAutoScrollMargin = 90f;
+        [InspectorName("其他行让位动画速度（越大跟手越快）")]
+        [Tooltip("指数趋近系数：每秒剩余距离衰减到 e^-速度；14≈0.05s 走一半、0.15s 内基本到位")]
+        [SerializeField] private float reorderEaseSpeed = 14f;
+        [InspectorName("松手落位动画时长（秒）")]
+        [SerializeField] private float dropInDuration = 0.16f;
 
         [Autowired] private CardManager cardManager;
         [Autowired] private SaveManager saveManager;
@@ -79,7 +87,7 @@ namespace GIC.UI
         private List<CardId> _clipboardCards;
         private bool _hasClipboard;
 
-        // 拖拽排序：拖动行挂 dragLayer 跟随指针；目标位实时按"中心在指针之上的其他行数"计算，松手才提交
+        // 拖拽排序：拖动行挂 dragLayer 跟随指针；目标位实时计算，松手才提交
         private DeckRowView _dragRow;
         private RectTransform _dragRowRt;
         private int _dragFromPos = -1;
@@ -87,6 +95,20 @@ namespace GIC.UI
         private Vector2 _dragStartPointer;
         private Vector2 _dragStartAnchoredPos;
         private float _suppressClickUntil; // 拖拽中/刚结束：抑制行内按钮误触
+
+        // 实时让位（商业级重排）：拖拽期间禁用行布局组件，其他行由 Update 驱动指数趋近"拖动行插到目标位后
+        // 自己所在槽"的基准布局位；目标插入位按指针越过基准槽中心判定（不用实时位置，防让位中振荡）。
+        // 松手后拖动行留在 dragLayer 平滑飞向目标槽，到位才回容器落槽提交——全程零跳变
+        private bool _reorderActive;
+        private RectTransform _rowsRt;
+        private VerticalLayoutGroup _rowsLayout;
+        private ContentSizeFitter _rowsCsf;  // 拖拽期与 VLG 一并禁用：单独禁 VLG 会让 CSF 高度坍缩触发滚动跳顶
+        private Vector2[] _baseAnchoredPos;  // 拖拽起始各显示位的基准布局位（rowsRoot 坐标）
+        private Vector2 _rowsAnchorRef;     // 行 anchor 参考点在 rowsRoot 局部空间的位置（拖拽期恒定）
+        private readonly Dictionary<DeckRowView, Vector2> _letThroughTargets = new(); // 其他行让位目标
+        private DeckRowView _dropInRow;     // 松手落位飞行中的行
+        private int _dropInTarget = -1;
+        private Coroutine _dropInCoroutine;
 
         // 行入场动画快照（拖拽/关闭时立即收尾复位用）
         private readonly List<(DeckRowView row, RectTransform rt, CanvasGroup cg, Vector2 target)> _entranceStates = new();
@@ -125,6 +147,20 @@ namespace GIC.UI
             addDeckButton?.onClick.RemoveAllListeners();
         }
 
+        private void Update()
+        {
+            // 拖拽实时让位：其他行指数趋近各自让位目标（拖动行由指针/落位协程驱动，不在此列）
+            if (!_reorderActive || _letThroughTargets.Count == 0) return;
+            float k = 1f - Mathf.Exp(-Time.unscaledDeltaTime * reorderEaseSpeed);
+            foreach (var kv in _letThroughTargets)
+            {
+                var r = kv.Key;
+                if (r == null || r == _dragRow) continue;
+                ((RectTransform)r.transform).anchoredPosition =
+                    Vector2.Lerp(((RectTransform)r.transform).anchoredPosition, kv.Value, k);
+            }
+        }
+
         // ==================== 开 / 关 ====================
 
         public void Open()
@@ -152,6 +188,7 @@ namespace GIC.UI
             if (!_open) return;
             _open = false;
 
+            SettleDragOnClose(); // 拖拽/落位飞行中关闭：收口防行残留在 dragLayer（下次打开错位）
             StopEntrance();
 
             inputManager?.UnregisterClosable(this);
@@ -392,11 +429,19 @@ namespace GIC.UI
             RefreshAllRows();
         }
 
-        // ── 拖拽排序（拖动行挂 dragLayer：不受遮罩/滚动影响、永远置顶；松手才提交换位） ──
+        // ── 拖拽排序（实时让位：拖动行挂 dragLayer 置顶跟随指针，其他行按目标插入位平滑让出/回填，松手飞行落位） ──
 
         public void OnRowBeginDrag(DeckRowView row, Vector2 pointerPos)
         {
             StopEntrance(); // 入场动画与手动拖拽互斥：立即收尾复位
+
+            // 上一行还在落位飞行中（连续快速操作）：瞬移完成它，再开始新一轮拖拽
+            if (_dropInCoroutine != null)
+            {
+                StopCoroutine(_dropInCoroutine);
+                _dropInCoroutine = null;
+                FinishDropIn(_dropInRow, _dropInTarget);
+            }
 
             _dragFromPos = row.DisplayIndex; // 脱离容器前捕获原始显示位
             _dragTargetPos = _dragFromPos;
@@ -404,6 +449,9 @@ namespace GIC.UI
 
             _dragRow = row;
             _dragRowRt = (RectTransform)row.transform;
+
+            // 实时让位接管布局：先快照基准布局位再禁用行布局（快照须在行挂 dragLayer 前，拖动行也要有基准槽）
+            BeginReorderLayout();
 
             // 挂到拖拽层（保持世界位置）：拖动行脱离滚动内容/遮罩——置顶显示与位置换算都不受滚动影响
             if (dragLayer != null)
@@ -414,7 +462,7 @@ namespace GIC.UI
             _dragStartAnchoredPos = _dragRowRt.anchoredPosition;
         }
 
-        /// <summary>拖拽中：行位置跟随指针（屏幕像素→画布单位），目标位实时计算，近边缘自动滚动</summary>
+        /// <summary>拖拽中：行位置跟随指针（屏幕像素→画布单位）；目标插入位按基准槽中心判定，其他行实时让位，近边缘自动滚动</summary>
         public void OnRowDrag(DeckRowView row, Vector2 pointerPos)
         {
             if (_dragRow == null || row != _dragRow) return;
@@ -424,15 +472,26 @@ namespace GIC.UI
             float dy = (pointerPos.y - _dragStartPointer.y) / scaleFactor;
             _dragRowRt.anchoredPosition = new Vector2(_dragStartAnchoredPos.x, _dragStartAnchoredPos.y + dy);
 
-            // 目标位 = 中心在指针之上的其他行数（其他行仍在滚动内容里，随自动滚动实时变化）
+            // 目标位 = 基准槽中心在指针之上的其他行数。刻意用拖拽起始快照而非实时位置：
+            // 其他行正在让位中，用实时位置会让判定随动画来回振荡；指针换算到 rowsRoot 局部则天然感知列表滚动。
+            // 行序用 _rows 列表索引（拖动行挂 dragLayer 后其余行 siblingIndex 前移，DisplayIndex 与快照索引错位）
             int target = 0;
-            foreach (var other in _rows)
+            if (_baseAnchoredPos != null &&
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(_rowsRt, pointerPos, _uiCamera, out var pointerLocal))
             {
-                if (other == row) continue;
-                Vector2 center = RectTransformUtility.WorldToScreenPoint(_uiCamera, other.transform.position);
-                if (center.y > pointerPos.y) target++;
+                foreach (var other in _rows)
+                {
+                    if (other == row) continue;
+                    int p = _rows.IndexOf(other);
+                    if (p < 0 || p >= _baseAnchoredPos.Length) continue;
+                    if (_rowsAnchorRef.y + _baseAnchoredPos[p].y > pointerLocal.y) target++;
+                }
             }
-            _dragTargetPos = target;
+            if (target != _dragTargetPos)
+            {
+                _dragTargetPos = target;
+                UpdateLetThroughTargets();
+            }
 
             AutoScrollWhileDrag(pointerPos);
         }
@@ -446,18 +505,158 @@ namespace GIC.UI
                 return;
             }
 
-            // 回到行容器：直接落进目标槽位，由布局接管位置
-            if (rowsRoot != null)
-            {
-                row.transform.SetParent(rowsRoot, false);
-                row.transform.SetSiblingIndex(Mathf.Clamp(_dragTargetPos, 0, Mathf.Max(0, _rows.Count - 1)));
-            }
-            row.SetDragState(false);
-
-            CommitDragOrder(row, _dragTargetPos);
-
             _dragRow = null;
             _dragRowRt = null;
+            _suppressClickUntil = Time.unscaledTime + 0.25f; // 飞行期行还在 dragLayer（DisplayIndex 失真），先挡行点击与按钮误触
+
+            // 松手不直接落容器：留在 dragLayer 平滑飞向目标槽（顶层不受视口裁剪、保持拖拽浮层），到位才回容器提交
+            int target = Mathf.Clamp(_dragTargetPos, 0, Mathf.Max(0, _rows.Count - 1));
+            _dropInRow = row;
+            _dropInTarget = target;
+            if (_dropInCoroutine != null) StopCoroutine(_dropInCoroutine);
+            _dropInCoroutine = StartCoroutine(DropInCoroutine(row, target));
+        }
+
+        /// <summary>实时让位布局接管：快照各显示位基准布局位与行 anchor 参考点，再禁用行布局组件（行位置改由让位动画驱动）</summary>
+        private void BeginReorderLayout()
+        {
+            if (_reorderActive) return;
+
+            _rowsRt = (RectTransform)rowsRoot;
+            if (_rowsRt == null) return;
+            if (_rowsLayout == null) _rowsLayout = _rowsRt.GetComponent<VerticalLayoutGroup>();
+
+            _baseAnchoredPos = new Vector2[_rows.Count];
+            foreach (var r in _rows)
+            {
+                int p = _rows.IndexOf(r); // 列表序=快照序（拖拽中恒定）；勿用 DisplayIndex——挂 dragLayer 后会前移
+                if (p >= 0 && p < _baseAnchoredPos.Length)
+                    _baseAnchoredPos[p] = ((RectTransform)r.transform).anchoredPosition;
+            }
+
+            // 行 anchor 参考点在 rowsRoot 局部空间的位置。必须用拖动行的实际 anchor 计算：
+            // 实测运行时行 anchor 与 rowPrefab 资产可能不一致（场景实例字段覆写等），按资产算参考点会整体错位
+            // （本批实测错位 (半宽,-半高) → 目标判定恒 0 无让位 + 落位飞向右下角）
+            if (_dragRow != null)
+                _rowsAnchorRef = CalcAnchorRefLocal((RectTransform)_dragRow.transform);
+
+            _letThroughTargets.Clear();
+            foreach (var r in _rows)
+                if (r != _dragRow)
+                    _letThroughTargets[r] = ((RectTransform)r.transform).anchoredPosition;
+
+            if (_rowsLayout != null) _rowsLayout.enabled = false;
+            // CSF 必须一并禁用：VLG 禁用后 CSF 的 PreferredSize 高度来源消失，content 高度会坍缩为 0——
+            // ScrollRect 检测 content 尺寸骤变把滚动位置钳回顶=「拖底行瞬间跳顶」根因（2026-10-07 实测报障）
+            if (_rowsCsf == null) _rowsCsf = _rowsRt.GetComponent<ContentSizeFitter>();
+            if (_rowsCsf != null) _rowsCsf.enabled = false;
+            _reorderActive = true;
+        }
+
+        /// <summary>行 anchor 参考点在 rowsRoot 局部空间的位置（局部空间以 pivot 为原点，与 anchoredPosition 同基准）</summary>
+        private Vector2 CalcAnchorRefLocal(RectTransform rowRt)
+        {
+            Rect parent = _rowsRt.rect;
+            Vector2 aMin = new Vector2(
+                Mathf.Lerp(parent.xMin, parent.xMax, rowRt.anchorMin.x),
+                Mathf.Lerp(parent.yMin, parent.yMax, rowRt.anchorMin.y));
+            Vector2 aMax = new Vector2(
+                Mathf.Lerp(parent.xMin, parent.xMax, rowRt.anchorMax.x),
+                Mathf.Lerp(parent.yMin, parent.yMax, rowRt.anchorMax.y));
+            return (aMin + aMax) * 0.5f;
+        }
+
+        /// <summary>按当前目标插入位刷新其他行的让位目标：每行移动到"拖动行插到目标位后"自己所在槽的基准布局位</summary>
+        private void UpdateLetThroughTargets()
+        {
+            if (!_reorderActive || _dragRow == null || _baseAnchoredPos == null) return;
+            int from = _dragFromPos, to = _dragTargetPos;
+            foreach (var other in _rows)
+            {
+                if (other == _dragRow) continue;
+                int p = _rows.IndexOf(other); // 列表序=快照序，与判定同源（DisplayIndex 挂 dragLayer 后错位）
+                if (p < 0 || p >= _baseAnchoredPos.Length) continue;
+                int after = p - (p > from ? 1 : 0);     // 先移除拖动行后的序
+                int slot = after + (after >= to ? 1 : 0); // 再在目标位插回后的序 = 该行应让到的槽
+                if (slot >= 0 && slot < _baseAnchoredPos.Length)
+                    _letThroughTargets[other] = _baseAnchoredPos[slot];
+            }
+        }
+
+        /// <summary>松手落位飞行：从当前位置 EaseOutCubic 飞向目标槽世界位（快出慢收），到位回调 FinishDropIn</summary>
+        private IEnumerator DropInCoroutine(DeckRowView row, int target)
+        {
+            var rt = (RectTransform)row.transform;
+            Vector3 from = rt.position;
+            Vector3 to = _rowsRt != null && _baseAnchoredPos != null && target < _baseAnchoredPos.Length
+                ? _rowsRt.TransformPoint((Vector3)(_rowsAnchorRef + _baseAnchoredPos[target]))
+                : from;
+            float t = 0f;
+            while (t < dropInDuration)
+            {
+                t += Time.unscaledDeltaTime;
+                float x = Mathf.Clamp01(t / dropInDuration);
+                float ease = 1f - (1f - x) * (1f - x) * (1f - x); // EaseOutCubic
+                rt.position = Vector3.LerpUnclamped(from, to, ease);
+                yield return null;
+            }
+            _dropInCoroutine = null;
+            FinishDropIn(row, target);
+        }
+
+        /// <summary>落位收尾：行回容器精确落槽（与飞行终点零跳变）→ 恢复行布局 → 提交顺序并刷新</summary>
+        private void FinishDropIn(DeckRowView row, int target)
+        {
+            if (row == null) return;
+            target = Mathf.Clamp(target, 0, Mathf.Max(0, _rows.Count - 1));
+
+            row.transform.SetParent(rowsRoot, false);
+            if (_baseAnchoredPos != null && target < _baseAnchoredPos.Length)
+                ((RectTransform)row.transform).anchoredPosition = _baseAnchoredPos[target];
+            row.transform.SetSiblingIndex(target);
+            row.SetDragState(false);
+
+            _dropInRow = null;
+            _dropInTarget = -1;
+
+            RestoreReorderLayout();
+            CommitDragOrder(row, target);
+        }
+
+        /// <summary>恢复行布局组件并清让位状态（恢复后布局重排结果与让位终点一致，零跳变）</summary>
+        private void RestoreReorderLayout()
+        {
+            if (_rowsLayout != null) _rowsLayout.enabled = true;
+            if (_rowsCsf != null) _rowsCsf.enabled = true;
+            _reorderActive = false;
+            _letThroughTargets.Clear();
+            _baseAnchoredPos = null;
+        }
+
+        /// <summary>面板关闭时收口进行中的拖拽：飞行中的行瞬移完成提交；拖拽中的行取消回原位（ESC=取消，不提交换位）</summary>
+        private void SettleDragOnClose()
+        {
+            if (_dropInCoroutine != null)
+            {
+                StopCoroutine(_dropInCoroutine);
+                _dropInCoroutine = null;
+                FinishDropIn(_dropInRow, _dropInTarget); // 用户已松手=意图已定：瞬移落位并提交
+            }
+            else if (_dragRow != null)
+            {
+                var row = _dragRow;
+                _dragRow = null;
+                _dragRowRt = null;
+                int from = Mathf.Clamp(_dragFromPos, 0, Mathf.Max(0, _rows.Count - 1));
+                row.transform.SetParent(rowsRoot, false);
+                if (_baseAnchoredPos != null && from < _baseAnchoredPos.Length)
+                    ((RectTransform)row.transform).anchoredPosition = _baseAnchoredPos[from];
+                row.transform.SetSiblingIndex(from);
+                row.SetDragState(false);
+                RestoreReorderLayout(); // 不提交 MoveDeckOrder：行序原样
+                _dragFromPos = -1;
+                _dragTargetPos = -1;
+            }
         }
 
         private void CommitDragOrder(DeckRowView row, int toPos)
