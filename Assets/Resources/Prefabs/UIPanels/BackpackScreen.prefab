@@ -9323,6 +9323,9 @@ MonoBehaviour:
   rowEntranceOffsetY: 30
   dragAutoScrollSpeed: 900
   dragAutoScrollMargin: 90
+  reorderEaseSpeed: 14
+  dropInDuration: 0.16
+  highlightSwitchDuration: 0.3
 --- !u!1 &5085901016860455094
 GameObject:
   m_ObjectHideFlags: 0

@@ -41,5 +41,17 @@ namespace GIC.Data
             }
             return null;
         }
+
+        /// <summary>占位符数值基准（与技能参数 baseType 同构——%与基底名随数值整体金色高亮，2026-10-07 返修四）</summary>
+        public override SkillBaseType? RelatedPlaceholderBaseType(string key)
+        {
+            switch (key)
+            {
+                case KeyAuraDamagePercent: return SkillBaseType.BasedOnAttack;
+                case KeyShatterHealPercent: return SkillBaseType.BasedOnAttack;
+                case KeyShatterEnergyThreshold: return SkillBaseType.Percent; // 上下文百分比（持有者元能上限）——渲染 N% 无基底名
+            }
+            return null;
+        }
     }
 }

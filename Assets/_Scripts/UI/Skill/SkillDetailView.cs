@@ -188,7 +188,12 @@ namespace GIC.UI
             relatedName.ClearAllEntries();
             relatedName.AddEntry(new LocalizedString(TableName.RelatedName.ToString(), id));
 
-            relatedDescription.textProcessor = null;
+            // 关联描述模板替换（2026-10-07 决策五十六）：数值=来源技能参数（延奏类 buff）或
+            // BuffConfig 资产（行为族——按关联名反查）统一金色高亮，与技能描述同链同观感
+            var buffConfig = GIC.Data.BuffConfig.ByRelatedName(id);
+            var sourceParams = skillData != null ? skillData.customParams : null;
+            relatedDescription.textProcessor = (text) =>
+                SkillDescriptionBuilder.BuildRelated(text, sourceParams, buffConfig);
             relatedDescription.ClearAllEntries();
             relatedDescription.AddEntry(new LocalizedString(TableName.RelatedDescription.ToString(), id));
 

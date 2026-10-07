@@ -27,8 +27,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7Increase coordinated ally's ATK by {ATKBonus} for the entire
-      battle\n\xB7Stacks up to {StackLimit} times"
+    m_Localized: "\xB7The coordinated ally gains <color=#FFD700><u><link=\"Buff:\u767E\u53D1\u767E\u4E2D\">Sharpshooter</link></u></color>"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
@@ -78,9 +77,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002003
-    m_Localized: "\xB7Increase coordinated ally's Move SPD by {MoveSpeedBonus} for
-      {Duration} turns\n\xB7Stacks up to {StackLimit} times, duration extends with
-      each stack"
+    m_Localized: "\xB7The coordinated ally gains <color=#FFD700><u><link=\"Buff:\u9690\u85CF\u7684\u5B9E\u529B\">Hidden
+      Strength</link></u></color>"
     m_Metadata:
       m_Items: []
   - m_Id: 3002004

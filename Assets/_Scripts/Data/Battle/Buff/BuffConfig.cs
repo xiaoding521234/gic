@@ -45,18 +45,31 @@ namespace GIC.Data
         public const string KeyShatterEnergyThreshold = "ShatterEnergyThreshold";
         /// <summary>基础叠层上限（寒冰之棱）</summary>
         public const string KeyBaseStackLimit = "BaseStackLimit";
+        /// <summary>每层加成（StatBuff 族——延奏类 buff 数值单源，2026-10-07 返修三「技能资产剥离 buff 配置」）</summary>
+        public const string KeyStatBonus = "BonusPerStack";
+        /// <summary>叠层上限（StatBuff 族）</summary>
+        public const string KeyStatStackLimit = "StackLimit";
+        /// <summary>持续回合（StatBuff 族；&lt;0 渲染本地化「永久」）</summary>
+        public const string KeyStatDurationTurns = "DurationTurns";
 
         /// <summary>全部占位符键（SkillDescriptionBuilder.BuildRelated 遍历集——单源防拼写漂移）</summary>
         public static readonly string[] RelatedPlaceholderKeys =
         {
             KeyAuraDamagePercent, KeyAuraHealPercent, KeyAuraEnergyGain, KeyAuraSanityGain,
             KeyAuraRadius, KeyShatterHealPercent, KeyShatterEnergyThreshold, KeyBaseStackLimit,
+            KeyStatBonus, KeyStatStackLimit, KeyStatDurationTurns,
         };
 
         /// <summary>关联描述占位符解析（家族覆写：键→资产数值；null=未识别键，构建层保留原文便于排查）。
         /// StatBuff 族不覆写——其数值由来源技能参数经 ApplyBuffEffect 通道单源（延奏类 buff 描述占位符
         /// 直接用 SkillParamKey，同技能描述全链）</summary>
         public virtual int? ResolveRelatedPlaceholder(string key) => null;
+
+        /// <summary>关联描述占位符的数值基准（家族覆写：键→SkillBaseType；null=纯数字）。
+        /// 与技能参数通道**同构**（value+baseType 二元组——渲染时 % 与基底名随数值**整体金色高亮**，
+        /// 与技能描述「100%攻击力全金」观感一致；2026-10-07 返修四：此前占位符只回纯数字、
+        /// 模板自带 %/基底名当普通文本导致观感分裂）</summary>
+        public virtual SkillBaseType? RelatedPlaceholderBaseType(string key) => null;
 
         /// <summary>按类型查配置资产（注册表单源：BuffFactory 注入 / 客户端图标解析 / AI 光环半径感知共用）。
         /// 首次访问惰性加载 Assets/Resources/Configs/Buffs 全目录；重复 buffType=Warn 取首项（配置防呆，
