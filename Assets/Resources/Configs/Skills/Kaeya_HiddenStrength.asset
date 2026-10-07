@@ -17,34 +17,33 @@ MonoBehaviour:
     icon: {fileID: 21300000, guid: cc894c695492e654fa6bc8f236aefb1f, type: 3}
     skillType: 6
     customParams:
-    - key: 30
-      value: 10
-      baseType: 0
     - key: 9
       value: 10
       baseType: 0
-    - key: 12
-      value: 3
-      baseType: 0
-    - key: 37
-      value: 5
-      baseType: 0
     timeline: {fileID: 0}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
     effects:
     - trigger: 0
       kind: 3
       targetFilter: 0
-      paramKey: 30
-      paramKey2: 37
-      paramKey3: 12
+      condition: 0
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
       radiusKey: 0
       value: 0
       element: 0
       buffType: 4
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     - trigger: 0
       kind: 5
       targetFilter: 2
+      condition: 0
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
@@ -53,9 +52,12 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     - trigger: 0
       kind: 5
       targetFilter: 3
+      condition: 0
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
@@ -64,9 +66,12 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     - trigger: 0
       kind: 6
       targetFilter: 2
+      condition: 0
       paramKey: 0
       paramKey2: 0
       paramKey3: 0
@@ -75,6 +80,8 @@ MonoBehaviour:
       element: 0
       buffType: 1
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
     costs:
     - kind: 1
       item: 0

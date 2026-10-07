@@ -46,6 +46,14 @@ MonoBehaviour:
     m_Localized: Rain Sword
     m_Metadata:
       m_Items: []
+  - m_Id: 37301091964628992
+    m_Localized: Sharpshooter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37301092044320768
+    m_Localized: Hidden Strength
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

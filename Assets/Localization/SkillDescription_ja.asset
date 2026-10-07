@@ -27,7 +27,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001004
-    m_Localized: "\xB7\u9023\u643A\u5148\u306E\u653B\u6483\u529B\u3092{ATKBonus}\u4E0A\u6607\u3055\u305B\u308B\u3002\u6226\u95D8\u7D42\u4E86\u307E\u3067\u6301\u7D9A\n\xB7\u6700\u5927{StackLimit}\u5C64\u307E\u3067\u91CD\u306D\u639B\u3051\u53EF\u80FD"
+    m_Localized: "\xB7\u9023\u643A\u5148\u304C<color=#FFD700><u><link=\"Buff:\u767E\u53D1\u767E\u4E2D\">\u767E\u767A\u767E\u4E2D</link></u></color>\u3092\u7372\u5F97\u3059\u308B"
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
@@ -63,7 +63,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002003
-    m_Localized: "\xB7\u9023\u643A\u5148\u306E\u79FB\u52D5\u901F\u5EA6\u3092{MoveSpeedBonus}\u4E0A\u6607\u3055\u305B\u3001{Duration}\u30BF\u30FC\u30F3\u6301\u7D9A\n\xB7\u6700\u5927{StackLimit}\u5C64\u307E\u3067\u91CD\u306D\u639B\u3051\u53EF\u80FD\u3001\u6301\u7D9A\u6642\u9593\u3082\u5C64\u6570\u306B\u5FDC\u3058\u3066\u52A0\u7B97"
+    m_Localized: "\xB7\u9023\u643A\u5148\u304C<color=#FFD700><u><link=\"Buff:\u9690\u85CF\u7684\u5B9E\u529B\">\u96A0\u3055\u308C\u305F\u5B9F\u529B</link></u></color>\u3092\u7372\u5F97\u3059\u308B"
     m_Metadata:
       m_Items: []
   - m_Id: 3002004

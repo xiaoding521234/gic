@@ -54,10 +54,12 @@ namespace GIC.Battle
     /// <summary>
     /// Buff 工厂（单一 switch 分发，2026-10-02 执行阶段复审收口：原双 Create 重载合一——
     /// 封闭枚举 switch 即定式，不再挂「扩为注册表」的旧承诺）。
-    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（如 AttackUp 的每层
-    /// ATKBonus、寒冰之棱的初始层数），与技能参数表同源、勿在各 Buff 内硬编码默认值以外的取值来源。
-    /// 参数型 Buff（AttackUp 族三件套）必须配齐 turns——缺持续回合=Warn+null 防御（与原三参重载
-    /// 对参数型类型的 default 分支同语义；正常配置必带 Duration 参数）。
+    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（寒冰之棱的初始层数、
+    /// 冰棱2命减防的 C2DefenseReduce），与技能配置同源、勿在各 Buff 内硬编码默认值以外的取值来源。
+    /// 参数型 Buff（StatBuff 族，2026-10-07 返修三 决策五十六「技能资产剥离 buff 配置」）：
+    /// 数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续回合）——零注入（延奏 ApplyBuff
+    /// paramKey 已剥离）合法走资产默认；注入通道非零仍覆写（命座参数流「技能实参＞模板」保留）；
+    /// 注入与资产双零才 Warn+null。
     /// 2026-10-07 Buff 配置化（docs/active/39）：构造前统一查 BuffConfig 注册表注入 Config——
     /// 缺资产/家族不符=Warn+null 防御（反应类无技能语境，资产即真源；StatBuff 族数值仍由
     /// 技能参数经 ctor 注入优先，config 只装元数据）。
@@ -94,19 +96,26 @@ namespace GIC.Battle
                 case BuffType.AttackUp:
                 case BuffType.MoveSpeedUp:
                 case BuffType.DefenseDown:
-                    // 2026-10-07 拍板「持续时间改为无限」：turns<0=永久声明（IsPermanent 同歌声之环/
-                    // 寒冰之棱口径——不计时、Merge 保永久）；turns=0 才是缺参数配置错误
-                    if (turns == 0)
+                    // 2026-10-07 返修三（决策五十六「技能资产剥离 buff 配置」）：StatBuff 族数值单源=
+                    // StatBuffConfig 资产（每层加成/叠层上限/持续回合）——延奏 ApplyBuff 零注入
+                    // （paramKey 已剥离）走资产默认；注入通道非零仍覆写优先（冰棱2命 C2DefenseReduce
+                    // 命座参数流——「技能实参＞模板」决策五十四语义保留）；-1=永久声明（决策五十），
+                    // 注入与资产双零才是配置错误
+                    if (cfg is not StatBuffConfig statCfg) return FamilyMismatch(type, cfg);
+                    int bonusPerStack = value != 0 ? value : statCfg.每层加成;
+                    int stackLimitResolved = stackLimit != 0 ? stackLimit : statCfg.叠层上限;
+                    int turnsResolved = turns != 0 ? turns : statCfg.持续回合;
+                    if (turnsResolved == 0)
                     {
-                        GICLog.Warn($"[BuffFactory] 参数型 Buff {type} 缺持续回合（turns={turns}）——" +
-                                    "检查 ApplyBuffEffect 是否配齐 Duration 参数（paramKey3）");
+                        GICLog.Warn($"[BuffFactory] 参数型 Buff {type} 持续回合未配置" +
+                                    "（注入通道与 StatBuffConfig 持续回合均为 0）");
                         return null;
                     }
                     if (type == BuffType.AttackUp)
-                        return new AttackUpBuff(level, value, stackLimit, turns) { source = source, Config = cfg };
+                        return new AttackUpBuff(level, bonusPerStack, stackLimitResolved, turnsResolved) { source = source, Config = cfg };
                     if (type == BuffType.MoveSpeedUp)
-                        return new MoveSpeedBuff(level, value, stackLimit, turns) { source = source, Config = cfg };
-                    return new DefenseDownBuff(level, value, stackLimit, turns) { source = source, Config = cfg };
+                        return new MoveSpeedBuff(level, bonusPerStack, stackLimitResolved, turnsResolved) { source = source, Config = cfg };
+                    return new DefenseDownBuff(level, bonusPerStack, stackLimitResolved, turnsResolved) { source = source, Config = cfg };
                 default:
                     GICLog.Warn($"[BuffFactory] 未实现的 Buff 类型 {type}");
                     return null;

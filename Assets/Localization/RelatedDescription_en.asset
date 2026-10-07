@@ -29,16 +29,18 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 26802933513924608
-    m_Localized: Stacks up to 2. At each turn end, deals 20% ATK Cryo DMG to enemies
-      within 1 tile of the holder. When the holder's Energy exceeds 50%, each shard
-      shatters and heals the holder for 30% ATK. Persists even if the holder is downed.
+    m_Localized: "\xB7Stacks up to {BaseStackLimit}\n\xB7At each turn end, deals
+      {AuraDamagePercent} Cryo DMG to enemies within {AuraRadius} tile of the holder\n\xB7Shatters
+      when the holder's Energy exceeds {ShatterEnergyThreshold}, healing the holder
+      for {ShatterHealPercent} per shard\n\xB7Persists even if the holder is downed"
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256256
-    m_Localized: Single stack. At each turn end, grants the holder 5 Energy; deals
-      10% ATK Hydro DMG to enemies within 1 tile of the holder; heals allies within
-      1 tile for 5% of the applier's Max HP, restores 1 Sanity and applies Hydro
-      to them. Vanishes when the holder is downed.
+    m_Localized: "\xB7Single stack\n\xB7At each turn end, deals {AuraDamagePercent}
+      Hydro DMG to enemies within {AuraRadius} tile of the holder\n\xB7At each turn
+      end, heals allies within {AuraRadius} tile for {AuraHealPercent} of the applier,
+      grants them {AuraEnergyGain} Energy, restores {AuraSanityGain} Sanity and applies
+      Hydro to them\n\xB7Vanishes when the holder is downed"
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256257
@@ -59,6 +61,17 @@ MonoBehaviour:
     m_Localized: Up to 3 swords. When an allied character deals Skill DMG, consumes
       1 Rain Sword to deal 40% ATK Hydro DMG to the target (coordinated DMG). Cleared
       when the holder is downed.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37301200798429184
+    m_Localized: "\xB7The holder's ATK is increased by {BonusPerStack}\n\xB7Stacks
+      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37301200819400704
+    m_Localized: "\xB7The holder's Move SPD is increased by {BonusPerStack}\n\xB7Stacks
+      up to {StackLimit} times, duration extends with each stack\n\xB7Lasts {DurationTurns}
+      turns"
     m_Metadata:
       m_Items: []
   references:

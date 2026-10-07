@@ -17,17 +17,8 @@ MonoBehaviour:
     icon: {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
     skillType: 6
     customParams:
-    - key: 8
-      value: 10
-      baseType: 0
     - key: 9
       value: 20
-      baseType: 0
-    - key: 12
-      value: -1
-      baseType: 0
-    - key: 37
-      value: 5
       baseType: 0
     timeline: {fileID: 0}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
@@ -39,9 +30,9 @@ MonoBehaviour:
       kind: 3
       targetFilter: 0
       condition: 0
-      paramKey: 8
-      paramKey2: 37
-      paramKey3: 12
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
       radiusKey: 0
       value: 0
       element: 0
