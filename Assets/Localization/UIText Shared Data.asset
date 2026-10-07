@@ -1091,6 +1091,10 @@ MonoBehaviour:
     m_Key: StatPanel_Battle
     m_Metadata:
       m_Items: []
+  - m_Id: 12037
+    m_Key: Battle_TipAimUpgrade
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

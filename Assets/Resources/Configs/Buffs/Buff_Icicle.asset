@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c308a135e21fc134080faef826c9db7e, type: 3}
+  m_Name: Buff_Icicle
+  m_EditorClassIdentifier: 
+  buffType: 6
+  "\u4E13\u5C5E\u56FE\u6807": {fileID: 0}
+  "\u5173\u8054\u540D": "\u5BD2\u51B0\u4E4B\u68F1"
+  "\u6BCF\u56DE\u5408\u4F24\u5BB3\u767E\u5206\u6BD4": 20
+  "\u788E\u88C2\u6CBB\u7597\u767E\u5206\u6BD4": 30
+  "\u788E\u88C2\u5143\u80FD\u9608\u503C\u767E\u5206\u6BD4": 50
+  "\u4F5C\u7528\u534A\u5F84": 1
+  "\u57FA\u7840\u53E0\u5C42\u4E0A\u9650": 2
+  "\u51CF\u9632\u53E0\u5C42\u4E0A\u9650": 10
+  "\u51CF\u9632\u6301\u7EED\u56DE\u5408": -1

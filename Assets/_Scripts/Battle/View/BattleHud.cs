@@ -485,6 +485,7 @@ namespace GIC.Battle
                 // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
+                CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：卡瞬回原槽防悬空在拖拽层）
                 if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
                 if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
                 // 2026-09-29 执行预览拍板「隐藏掉玩家之前打开的技能或手牌」：技能盘已随 DeselectUnit
@@ -551,6 +552,7 @@ namespace GIC.Battle
 
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
             UpdateAimHover(); // 点击式瞄准悬停格提亮（2026-10-06 拍板；Aiming+非拖动才有悬停）
+            UpdateHandCardDrag(); // 手牌拖拽手感主循环（决策五十四：跟随/抖动/让位/出牌区蒙层）
 
             // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」
             // +2026-10-06 三段改造）：仅拖动会话中且有金色待定格才喂；单位指向型喂 centerMode=true
@@ -686,16 +688,42 @@ namespace GIC.Battle
             if (signature == _handSignature) return;
             _handSignature = signature;
 
+            SettleHandCardsOnRebuild(); // 拖拽/飞行/打出态收口（决策五十四：重建将销毁全部 wrapper）
+
             foreach (var btn in _handCardButtons)
                 if (btn != null) Destroy(btn.gameObject);
             _handCardButtons.Clear();
+            _handCardSlots.Clear(); // 手牌拖拽分件：槽列表随重建重铺（显示序=列表序）
             _moraHandCard = null;
             _staminaHandCard = null;
             _handItemCards.Clear();
             if (_handScroll != null) _handScroll.normalizedPosition = Vector2.zero;
             if (myRes == null) return;
 
-            int count = myRes.handCards.Count;
+            // 显示序（决策五十四拖拽重排缓存）：纯本地显示层——协议 handCards 顺序不动；
+            // 缓存命中的键按缓存序在前，新获得条目按协议序殿后
+            var orderedEntries = OrderHandEntriesForDisplay(myRes.handCards);
+            // 无配置条目前置滤除（原循环内跳过改前置——决策五十四拖拽槽位公式要求 count=实铺数，
+            // 循环内跳过会让重建摆位与拖拽让位两套 count 错位；循环内同名校验保留作防御）
+            for (int i = orderedEntries.Count - 1; i >= 0; i--)
+            {
+                var h = orderedEntries[i];
+                var id = h.AsCardId();
+                if (h.IsUnit)
+                {
+                    if (_unitConfig?.GetUnitData(id.AsUnitName()) == null)
+                    {
+                        GICLog.Warn($"[BattleHud] 手牌卡 {id} 无 UnitConfig 配置，跳过");
+                        orderedEntries.RemoveAt(i);
+                    }
+                }
+                else if (CardConfigResolver.Instance?.ItemConfig?.GetItemData(id.AsItemName()) == null)
+                {
+                    GICLog.Warn($"[BattleHud] 手牌卡 {id} 无 ItemConfig 配置，跳过");
+                    orderedEntries.RemoveAt(i);
+                }
+            }
+            int count = orderedEntries.Count;
 
             if (_handCardPrefab == null)
                 _handCardPrefab = Resources.Load<GameObject>("Prefabs/Backpack/Card");
@@ -707,17 +735,18 @@ namespace GIC.Battle
 
             // 单位配置=[Autowired] 注入（Y10），不再 Resources.Load
             // 手牌规格=Card.prefab 原生 160×240（保持收藏卡原比例，与背包同款）
-            float cardWidth = 160f, gap = 18f;
+            float cardWidth = 手牌卡宽, gap = 手牌卡间距; // 规格常量归手牌拖拽分件单源（决策五十四）
             float rowWidth = count * cardWidth + (count - 1) * gap;
             // content 宽恒=行宽+左右边距 60（**勿夹到视口宽**——窄于视口才有 Elastic 拖程，
             // "1 张卡也能滑动"；宽于视口=正常滚动），卡排相对 content 中心对称排
             _handContent.sizeDelta = new Vector2(rowWidth + 120f, 260f);
+            int builtIndex = 0; // 实铺序（无配置条目跳过不留洞——拖拽槽位公式同源，决策五十四）
             for (int i = 0; i < count; i++)
             {
                 // 手牌条目（2026-09-25 拍板「获得卡片」统一）：卡+持有数量一等属性——
                 // 普通/角色卡 count=局内真源（开局=备战数）；货币物品牌 count=资源池镜像
                 // （发放/消耗经资源命令链即刷角标，RefreshHandCurrencyCards）
-                var handEntry = myRes.handCards[i];
+                var handEntry = orderedEntries[i];
                 var cardId = handEntry.AsCardId();
                 bool isUnit = handEntry.IsUnit;
                 bool isCurrency = handEntry.IsCurrency;
@@ -750,7 +779,7 @@ namespace GIC.Battle
                 var wrapperRt = wrapperGo.AddComponent<RectTransform>();
                 wrapperRt.pivot = new Vector2(0.5f, 1f);
                 wrapperRt.anchorMin = wrapperRt.anchorMax = new Vector2(0.5f, 1f);
-                wrapperRt.anchoredPosition = new Vector2((i - (count - 1) * 0.5f) * (cardWidth + gap), -10f);
+                wrapperRt.anchoredPosition = new Vector2(HandSlotX(builtIndex, count), -10f);
                 wrapperRt.sizeDelta = new Vector2(cardWidth, 240f);
                 // 命中层（透明 Image）：wrapper 需 raycast 目标才可点击/拖动（卡内 raycast 已全关防拦截）
                 var hit = wrapperGo.AddComponent<UnityEngine.UI.Image>();
@@ -808,20 +837,24 @@ namespace GIC.Battle
 
                 var btn = wrapperGo.AddComponent<UnityEngine.UI.Button>();
                 btn.targetGraphic = hit;
-                var captured = cardId;
-                btn.onClick.AddListener(() =>
-                {
-                    if (captured.cardType == CardType.Unit) TryDeployOrUpgrade(captured.value);
-                    else SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入，不进部署链（货币物品牌同款）
-                });
+                // 打出=拖拽专属（决策五十四，拍板「当前只是点一下就算打出，非常low」）：点击仅余
+                // 弹跳反馈示意可拖；物品/货币卡点击顺带沿用「后续版本接入」提示（分件 OnHandCardClicked）
+                var capturedKey = handEntry.cardType + ":" + handEntry.value;
+                btn.onClick.AddListener(() => OnHandCardClicked(capturedKey));
                 _handCardButtons.Add(btn);
+                AttachHandCardInteraction(wrapperGo, capturedKey, isUnit, handEntry.value);
+                builtIndex++;
             }
+            WriteBackHandDisplayOrder(); // 显示序缓存=本次实铺序（剪除已不存在的键；拖拽重排经此跨重建保持）
         }
 
         /// <summary>出战/升命路由（B8 命座批，docs/05 §5.2+docs/09）：3★+ 同名已在场（含尸体）→
         /// 重复出战=提升命座——直接上交免落点瞄准（不生成新单位）；否则走部署瞄准（1~2★ 重复出战=
-        /// 加单位、首战=选格落地，均不变）。满命上交被 Host 拒绝，本端先行轻提示省一次落空。</summary>
-        private void TryDeployOrUpgrade(int unitNameValue)
+        /// 加单位、首战=选格落地，均不变）。满命上交被 Host 拒绝，本端先行轻提示省一次落空。
+        /// 决策五十五起唯一入口=拖拽打出（slot=打出卡上下文）：满命拦截=弹回手牌槽、
+        /// 升命卡=EnterUpgradePending 待确认态（2026-10-07 返拍「拖入出牌区，不应该直接上交」——
+        /// 卡悬浮待「完成选择」确认上交，拖回/点空白/取消钮=反悔弹回）、部署=登记打出态进瞄准</summary>
+        private void TryDeployOrUpgrade(int unitNameValue, HandCardSlot slot)
         {
             if (IsConstellationUpgrade(unitNameValue))
             {
@@ -829,21 +862,15 @@ namespace GIC.Battle
                 {
                     ShowBattleToast("Battle_ConstellationMax");
                     GICLog.Info($"[BattleHud] {(UnitName)unitNameValue} 已满命，升命拦截");
+                    if (slot != null)
+                        FlyHandCardToSlot(slot, slot.baseScale,
+                            HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
                     return;
                 }
-                var action = new ActionData
-                {
-                    playerId = _myPlayerId,
-                    actionType = ActionType.DeployUnit,
-                    deployUnitName = unitNameValue,
-                };
-                _session.SubmitAction(action);
-                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：升命 {(UnitName)unitNameValue}");
-                _actionConfirmed = true; // 确认即定死（与 SubmitAim 部署同款——Host 已交忽略双保险）
-                SetTip("Battle_TipSubmitted");
-                DeselectUnit();
+                EnterUpgradePending(unitNameValue, slot); // 返拍：不直接上交——待确认态（完成选择=确认）
                 return;
             }
+            if (slot != null) SetPlayedHandCard(slot); // 打出态：卡留在松手位悬浮（部署瞄准期随取随拖）
             EnterDeployAim(unitNameValue);
         }
 
@@ -1442,6 +1469,7 @@ namespace GIC.Battle
         {
             if (_state != HudState.Aiming) return;
             _dragAiming = false; // 拖动会话统一收口（松手取消/确认提交/超时/阶段切换同一处清零）
+            _upgradePending = false; // 升命待确认态随会话收口（决策五十五返拍）
             HideDragWheel();      // 圆盘随会话收口（EndDrag 已隐藏，此处=外部退出安全网，幂等）
             ClosePopup();         // 详情面板随会话收口（2026-09-27 点击循环：详情模式=瞄准+面板并开，
                                   // 任何瞄准退出路径——点非可选格/取消钮/确认提交/阶段切换——面板一并收）
@@ -1461,6 +1489,16 @@ namespace GIC.Battle
                 ClearHighlights();
                 ApplyStateVisibility();
                 RefreshOutlines(); // 目标描边随会话收口（2026-10-05；部署路径无选中=全灭）
+                // 打出卡飞回手牌槽（2026-10-07 返拍「不应该把我的卡销毁」：卡不消耗可重复出战——
+                // 提交成功/拖回反悔/取消钮/超时/阶段切换全部同一收口飞回，无消耗销毁路径）
+                if (_playedHandCard != null)
+                {
+                    var played = _playedHandCard;
+                    int playedIdx = _handCardSlots.IndexOf(played);
+                    if (playedIdx >= 0)
+                        FlyHandCardToSlot(played, played.baseScale, HandSlotX(playedIdx, _handCardSlots.Count));
+                    else _playedHandCard = null;
+                }
                 SetTip("Battle_TipSelect");
                 return;
             }
@@ -1691,7 +1729,7 @@ namespace GIC.Battle
                 };
                 _session.SubmitAction(deployAction);
                 GICLog.Info($"[BattleHud] {_myPlayerId} 上交：出战 {(UnitName)_deployAimUnit} @ {cell}");
-                ExitAiming();
+                ExitAiming(); // 打出卡经 ExitAiming 统一飞回手牌槽（卡不消耗可重复出战——2026-10-07 返拍「不应该把我的卡销毁」）
                 return true;
             }
 
@@ -2335,21 +2373,29 @@ namespace GIC.Battle
             _skillDetailView.OpenPanel();
         }
 
-        /// <summary>详情面板自适应摆位（2026-09-27 拍板「弹出的详情面板应当出现在该技能的旁边——
-        /// 不得遮挡该技能按钮、不得超出屏幕、需要灵活的自适应位置」）：候选=键四侧（上下左右按键位
-        /// 定偏好序：键在下半=上侧优先、在右半=左侧优先）×三种横轴对齐（键心/键近缘/键远缘），
-        /// 逐候选夹进画布 → 源键交叠=硬否决（键必须保持可点——点击循环依赖它）、其余可见件
-        /// （技能键/取消/完成选择）计软交叠；取零交叠的偏好序最早候选，全候选取软交叠最少者，
-        /// 再无则键位夹画布兜底。落位=面板中心位移（对锚点体系无关，RepositionPanel 同步滑入目标，
-        /// RelatedPanel 为面板子件随动无需另摆）</summary>
+        /// <summary>详情面板自适应摆位（技能键入口——键矩形版核心 PositionSkillPopupBesideKey 共用，
+        /// 被动图标详情同链，2026-10-07）</summary>
         private void PositionSkillPopupBesideButton(SkillButtonDef def)
+        {
+            if (def == null || def.rect == null) return;
+            PositionSkillPopupBesideKey(def.rect);
+        }
+
+        /// <summary>详情面板自适应摆位核心（2026-09-27 拍板「弹出的详情面板应当出现在该技能的旁边——
+        /// 不得遮挡该技能按钮、不得超出屏幕、需要灵活的自适应位置」；2026-10-07 抽出键矩形版：
+        /// 主动技能键/被动图标两入口共用）：候选=键四侧（上下左右按键位定偏好序：键在下半=上侧优先、
+        /// 在右半=左侧优先）×三种横轴对齐（键心/键近缘/键远缘），逐候选夹进画布 → 源键交叠=硬否决
+        /// （键必须保持可点——点击循环依赖它）、其余可见件（技能键/被动图标/取消/完成选择）计软交叠；
+        /// 取零交叠的偏好序最早候选，全候选取软交叠最少者，再无则键位夹画布兜底。落位=面板中心位移
+        /// （对锚点体系无关，RepositionPanel 同步滑入目标，RelatedPanel 为面板子件随动无需另摆）</summary>
+        private void PositionSkillPopupBesideKey(RectTransform keyRect)
         {
             var canvasRt = CanvasRect;
             var panelRect = _skillDetailView != null && _skillDetailView.skillDetailPanel != null
                 ? _skillDetailView.skillDetailPanel.GetComponent<RectTransform>()
                 : null;
-            if (canvasRt == null || panelRect == null || def == null || def.rect == null) return;
-            if (!RectToCanvasAabb(def.rect, out var keyMin, out var keyMax)) return;
+            if (canvasRt == null || panelRect == null || keyRect == null) return;
+            if (!RectToCanvasAabb(keyRect, out var keyMin, out var keyMax)) return;
             if (!RectToCanvasAabb(panelRect, out var panelMin, out var panelMax)) return;
 
             var rect = canvasRt.rect;
@@ -2357,12 +2403,17 @@ namespace GIC.Battle
             Vector2 half = (panelMax - panelMin) * 0.5f;
             Vector2 panelCenter = (panelMin + panelMax) * 0.5f;
 
-            // 软避让件：其余可见技能键+取消钮+完成选择（能躲则躲，躲不开允许盖；源键=硬避让）
+            // 软避让件：其余可见技能键+被动图标+取消钮+完成选择（能躲则躲，躲不开允许盖；源键=硬避让）
             var softRects = new List<(Vector2 min, Vector2 max)>();
             foreach (var b in _skillButtons)
             {
-                if (b == def || b.rect == null || !b.rect.gameObject.activeInHierarchy) continue;
+                if (b.rect == keyRect || b.rect == null || !b.rect.gameObject.activeInHierarchy) continue;
                 if (RectToCanvasAabb(b.rect, out var bMin, out var bMax)) softRects.Add((bMin, bMax));
+            }
+            foreach (var p in _passiveIcons)
+            {
+                if (p.rt == keyRect || p.rt == null || !p.rt.gameObject.activeInHierarchy) continue;
+                if (RectToCanvasAabb(p.rt, out var pMin, out var pMax)) softRects.Add((pMin, pMax));
             }
             if (_cancelButton != null && _cancelButton.gameObject.activeInHierarchy
                 && RectToCanvasAabb(_cancelButton, out var cMin, out var cMax))
@@ -2486,6 +2537,14 @@ namespace GIC.Battle
             if (_session == null || _session.Flow == null) return;
             if (_session.Flow.Phase != BattlePhase.Selecting) return;
             if (_actionConfirmed) return; // 已定死（按钮置灰，本条=超时自动按下的同款守卫）
+
+            // 升命待确认（决策五十五返拍「拖入出牌区，不应该直接上交」）：升命卡打出=卡悬浮待确认态，
+            // 「完成选择」=确认上交（超时自动按下同链路=自动确认升命，与部署金格待定同语义）
+            if (_state == HudState.Aiming && _upgradePending)
+            {
+                SubmitPlayedUpgrade();
+                return;
+            }
 
             // 瞄准待定确认：提交待定格上的行动（部署/移动/直线/单位指向全在 SubmitAim 单出口）
             if (_state == HudState.Aiming && _pendingAimCell.HasValue)
@@ -2753,6 +2812,7 @@ namespace GIC.Battle
             {
                 foreach (var def in _skillButtons)
                     if (def.view != null) def.view.gameObject.SetActive(false);
+                RefreshPassivePanel(unitData); // 建筑=纯查看拍板：被动图标同样清空（空盘不可见）
                 return;
             }
 
@@ -2761,6 +2821,7 @@ namespace GIC.Battle
                 if (def.IsMove) ApplyMoveButton(def, unitData);
                 else ApplySkillButton(def, unitData);
             }
+            RefreshPassivePanel(unitData); // 被动技能盘（2026-10-07）：签名比对防抖，选中单位变化才重建
         }
 
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+

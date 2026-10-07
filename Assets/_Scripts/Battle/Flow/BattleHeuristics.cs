@@ -544,29 +544,31 @@ namespace GIC.Battle
         /// <summary>单位光环半径（G-1 光环位置价值，docs/active/35：持有「半径型 tick 光环」Buff
         /// 的有效作用半径——光环挂水/挂冰引擎的贴敌驱动力来源）。现役白名单=SongOfLife/Icicle
         ///（**新光环类落地时在 is-pattern 补一行**——BaseBuff 无通用 Radius 基座，白名单是显式
-        /// 扩展点非硬编码）；无光环=0（天然不消费）。**静态基础值口径**：Radius 是 Buff 静态成员、
-        /// 命座加成（如歌声之环 2命 +C2Radius=2）在 Buff 类内部结算——本原语取基础值=保守感知
-        ///（命座单位感知半径略小于实际，贴敌判定不越界）。注意「发放」语义（2026-10-03 用户勘正）：
+        /// 扩展点非硬编码）；无光环=0（天然不消费）。**静态基础值口径**：读取=BuffConfig 资产
+        ///〔作用半径〕（docs/active/39 Buff 配置化——AI 感知与运行时结算同源），命座加成（如歌声之环
+        /// 2命 +C2Radius=2）在 Buff 类内部结算——本原语取基础值=保守感知（命座单位感知半径略小于
+        /// 实际，贴敌判定不越界）。注意「发放」语义（2026-10-03 用户勘正）：
         /// 闪耀奇迹=发放非转移——施加只给目标挂新实例，施法者持有不消失，光环在谁身上谁带贴敌驱动力</summary>
         public static int AuraRadiusOf(Unit unit)
         {
             if (unit?.Buffs == null) return 0;
             foreach (var buff in unit.Buffs)
             {
-                if (buff is SongOfLifeBuff) return SongOfLifeBuff.Radius;
-                if (buff is IcicleBuff) return IcicleBuff.Radius;
+                if (buff is SongOfLifeBuff) return ((SongOfLifeBuffConfig)buff.Config).作用半径;
+                if (buff is IcicleBuff) return ((IcicleBuffConfig)buff.Config).作用半径;
             }
             return 0;
         }
 
         /// <summary>J-2 光环 Buff 半径按 BuffType 直查（自施放爆发**施放前**预判用——Buff 尚未
-        /// 上身，AuraRadiusOf 查不到；白名单与 AuraRadiusOf 同源，新光环类落地时同步补一行）</summary>
+        /// 上身，AuraRadiusOf 查不到；白名单与 AuraRadiusOf 同源，新光环类落地时同步补一行。
+        /// 读取=BuffConfig 注册表〔作用半径〕——与运行时结算同源）</summary>
         public static int AuraRadiusOfBuffType(BuffType type)
         {
             switch (type)
             {
-                case BuffType.SongOfLife: return SongOfLifeBuff.Radius;
-                case BuffType.Icicle: return IcicleBuff.Radius;
+                case BuffType.SongOfLife: return (BuffConfig.OfType(type) as SongOfLifeBuffConfig)?.作用半径 ?? 0;
+                case BuffType.Icicle: return (BuffConfig.OfType(type) as IcicleBuffConfig)?.作用半径 ?? 0;
                 default: return 0;
             }
         }

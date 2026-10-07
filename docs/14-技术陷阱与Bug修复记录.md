@@ -1898,3 +1898,19 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 - **可靠路径=Game View MP4 录制（bridge record_game_view，引擎渲染真值）→ ffmpeg 抽帧 → python/PIL 逐帧像素统计**（金色判据 r>120 && r-b>40，按 y 行带聚合找目标区域）；
 - **注意 Overlay canvas 的世界坐标≠屏幕像素坐标**（本实证中行世界 y=-372~-160 负值、屏幕 y=世界+720）——`WorldToScreenPoint(null,…)` 与 `ScreenPointToLocalPointInRectangle` 恒等往返自洽（相对判定/拖拽不受影响），但**绝对像素 rect 换算会差半屏偏移**——像素分析先用「已知可见元素的对照带」自校验坐标映射（docs/14 §127③ 同族教训）；
 - 分层排查顺序实证有效：①unity_shader.preview（Edit Mode 直接渲染材质，is_error_pink+逐帧 props override——本次靠它实锤「满格输出全透明」）②AB 对照（同材质不同挂载方式同帧同录）③MP4 像素分析。
+
+## §131 Buff 配置化批三陷阱：ScriptableObject 子类必须同名文件 / 桥脚本元组循环赋值不落盘 / Resources 清单延迟+注册表静态缓存（2026-10-07 BuffConfig 批实证）
+
+**① ScriptableObject 子类必须各自同名文件（硬规则）**：多个 `BuffConfig` 派生类写在同一 `.cs` 文件里时，只有「文件名==类名」的基类拿到脚本资产关联——其余子类 `AssetDatabase.CreateAsset` 时报 `No script asset for XXXConfig. Check that the definition is in a file of the same name`，落盘的 `.asset` 里 **m_Script 断链**（fileID 0），域重载后 `LoadAssetAtPath<子类>` 返回 null=资产死文件。本批 BuffConfig 基类+四个子类（Burn/Freeze/SongOfLife/IcicleBuffConfig）首版共文件全部炸，拆五个同名文件后全绿。**How to apply：新建 ScriptableObject 派生配置类一律一文件一类**；桥脚本见到该 Warn 即拆文件重建资产（断链资产删了重造，SaveAssets 救不回）。
+
+**② exec_editor_script 的 foreach 元组数组循环内赋值不落盘（机制未定位，规避即可）**：同一段桥脚本里，显式块写的四张资产字段全部正确落盘，而 `foreach (var pair in new[] { ("名", 枚举值), … }) { cfg.字段 = pair.Item2; EditorUtility.SetDirty(cfg); }` 循环写的三张资产**字段落盘恒为默认值 0**（内存读回正常、SaveAssets 后磁盘 YAML 仍是 0）。机制未深挖（疑与脚本宿主对 ValueTuple 元素求值/闭包有关），实证两次。**How to apply：桥脚本批量建资产用逐资产显式块**，勿用元组数组 foreach 做字段写入；写完落盘后 `Get-Content` 磁盘 YAML 对账字段值（勿只信内存读回——同域内存对象读回会掩盖落盘失败）。
+
+**③ Resources.LoadAll 清单延迟 + 注册表静态缓存跨脚本调用残留（编辑器侧验证陷阱）**：`Resources.LoadAll<T>` 在编辑器里走 Resources 清单，**AssetDatabase.SaveAssets 写盘 ≠ 清单即时更新**（表现为同域内前一脚本 LoadAll 缺刚保存的资产、隔一脚本又能查到=debounced refresh 时序）；而自定义静态注册表（`_loaded` 单次守卫）会把第一次（可能残缺）的结果**缓存在整个域会话里**——后续所有脚本调用都复用脏表，域重载才重建。症状指纹：`OfType(X)` 恒 MISSING 但直接 `LoadAssetAtPath` 正常、`LoadAll` 直查又能见。**How to apply：编辑器侧验证「注册表类静态缓存」时，每次断言前先 refresh（域重载清静态）再跑断言脚本；运行时（真机/构建）无此问题——启动即新域新清单。**
+
+## §132 关联面板 RuleMode 天生布局塌陷：VLG childControlHeight 接管无 ILayoutElement 子级=恒 0 高 / 暂停态无布局 pass / 同 UI 三拷贝两种形态（2026-10-07 决策五十六 buff link 首开实锤）
+
+**症状**：技能描述点 Buff link → 关联面板只有「相关效果」标题+名字，描述区不可见、整体塌陷（用户报障「没有详情介绍，布局也是乱的」）。文案/本地化全绿（TMP 已拿到正确文本）——纯布局问题。
+**根因①（天生缺陷）**：RuleModeContainer 挂 VerticalLayoutGroup `childControlHeight=1`+ContentSizeFitter(Preferred)，而描述区 Scroll View 只有 ScrollRect **没有任何 ILayoutElement** → `LayoutUtility.GetPreferredHeight`=0 → VLG 分 0 高（**prefab 序列化的 769 高被 VLG 接管压 0**）；容器 CSF 又按子级 preferred 收缩 → 整链塌到 ~94px。修法=容器 CSF→**Unconstrained**（锚点已拉伸=拉满面板）+ 描述区补 **LayoutElement(minH=240, flexibleHeight=1)** 弹性吃满剩余 + 分隔线 LE prefH=4。
+**根因②（暴露盲区）**：该容器 `m_IsActive=0` 常驻关闭——**从未被真实点开过**，链接系统上线多日无人撞上；决策五十六 buff link 首个真实用例才暴露。**How to apply：「常驻 inactive 的 UI 分支」=结构性审查盲区，link/弹窗类 UI 交付必附「每个分支真点一遍」目检项。**
+**取证坑三件**：①**暂停态游戏没有逐帧布局 pass**——单次 `ForceRebuildLayoutImmediate` 会留中间态（Name/Content 高度归 0），须 TMP `SetLayoutDirty`+多轮重建才收敛；运行态一帧自愈，暂停态取证勿把中间态当新 bug。②**停用 CSF 不清它写过的补偿 sizeDelta**（Preferred 时代写入的负偏移留在 RectTransform）——停用后须手动复位 `sizeDelta=0` 才真拉满。③**同 UI 三处拷贝两种形态**：BackpackScreen 内嵌 SkillDetailPanel=**链接实例**（源 prefab 手术自动继承，0 变更属正常）；BattleHud 内嵌=**烘焙副本**（须逐份手术）——批量手术脚本按「值不符才写」幂等跑三处即可兼容两种。
+**附**：RelatedDescription 模板化后数值金色高亮走 `SkillDescriptionBuilder.BuildRelated` 双通道（延奏类=技能参数/行为族=BuffConfig.关联名反查资产——docs/18 决策五十六）；「数值藏在文案里 baked」与「配置单源」冲突的场合照此模板化。
