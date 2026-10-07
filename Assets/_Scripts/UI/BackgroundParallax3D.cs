@@ -14,6 +14,10 @@ namespace GIC.UI
         [Range(0f, 1f)] public float parallaxIntensity = 1f;
         [Range(0.01f, 0.2f)] public float smoothTime = 0.15f;
 
+        [Header("界面打开时")]
+        [Tooltip("任一界面在 UIManager 栈时视差强度的倍率（0.2=移动速度 20%）")]
+        [Range(0f, 1f)] [SerializeField] private float openScreenIntensityScale = 0.2f;
+
         [Header("边界控制")]
         public bool clampToBounds = true;
 
@@ -108,8 +112,12 @@ namespace GIC.UI
                 );
             }
 
-            float targetX = _maxOffsetX * input.x * parallaxIntensity;
-            float targetY = _maxOffsetY * input.y * parallaxIntensity;
+            // 任一界面打开时视差移动速度降为 20%（界面挡住大厅时背景应基本静止）
+            bool anyScreenOpen = UIManager.Instance != null && UIManager.Instance.StackCount > 0;
+            float effectiveIntensity = parallaxIntensity * (anyScreenOpen ? openScreenIntensityScale : 1f);
+
+            float targetX = _maxOffsetX * input.x * effectiveIntensity;
+            float targetY = _maxOffsetY * input.y * effectiveIntensity;
 
             if (clampToBounds)
             {

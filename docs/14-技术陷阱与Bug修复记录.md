@@ -1854,3 +1854,21 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 ③**像素测量必须 Y 翻转**：世界坐标 Y 向上、截图 Y 向下，canvasY→captureY=(H−Y)×scale——漏翻转=全程量镜像区域，本坑排查曾因此连环误诊一小时（把 Mask 子级隐形误判为「渲染序反转/父遮罩吞子树」并做了多轮无效现场修复）；
 ④识图 VLM 对录屏的结构描述不可靠（同一录像既报「有全屏暗遮罩」又漏报 15 行列表）——内容判定以受控像素测量+用户目检为准；
 ⑤exec_runtime_script 会**自动恢复暂停中的 Play**（与 exec_editor_script 退出 Play 相对）——暂停态取证后游戏处于运行态，后续录屏对的是移动靶；取证前先向用户声明后果。
+
+## §128 背包数据面板美化批三陷阱：入场动画快照时机 / UGUI 点击冒泡 / 程序化渐变方向（2026-10-07 会话 AW 实证）
+
+**①入场动画快照 VLG 子级布局位前必须强制排布局**
+症状：全部数据面板首次打开 15 行全部叠死在同一位置（用户报「排版非常不正常」）。
+根因：`SetActive(true)` 同帧内入场协程快照 `anchoredPosition`——VerticalLayoutGroup 本帧还没跑，快照抓到的是 prefab 序列化位（全 (0,0)）；动画收尾 `FinishEntrance` 把行「复位」到快照目标=全叠死。
+修法：快照前 `LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)scrollRect.content)`。
+参照物：DeckSwitchPanel 无此坑全靠其刷新链尾部 `SyncScrollbarSize` 内置的强制布局——**移植别处的动画模式必须连它的布局前置一起搬**，只搬协程必踩。
+
+**②UGUI 点击沿 transform 向上冒泡——「点数据块之外关闭」的根 Button 会接住块内点击**
+症状：面板根 Button 与遮罩 Image 同体做「点外关闭」，点击数据行也触发关闭。
+根因：想当然认为「行 Image 拦住射线=父级按钮不触发」——实际 ExecuteEvents.ExecuteHierarchy 自命中对象**向上冒泡到首个 IPointerClickHandler**，根 Button 正是那个处理器。
+修法：新通用组件 `UI/Common/PointerClickEater`（空 IPointerClickHandler）挂 ScrollView——块内点击（行/行间/标题）在 ScrollView 层被消费，根 Button 只接块外遮罩点击。**凡「点外关闭+根 Button」结构必配挡板**；或像 DeckSwitchPanel 用独立 backdrop 子物体（非内容区祖先）。
+
+**③程序化生成贴图方向必须像素回读验证，勿按构造想当然**
+症状：panel_fade 垂直渐变「上暗下浅」交付后实际上面更浅。
+根因：生成循环按 y=0 当「顶行」写最暗——**Unity Texture2D 原点在左下角，y=0 是底部**。
+修法：翻转重生成（底→顶），并加 ImageConversion.LoadImage 读首行/末行 alpha 断言方向。**教训与 §127③同族：一切含空间/方向语义的程序化产物，验证必须落像素回读，「我按 X 顺序写的」不是证据。**
