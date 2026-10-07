@@ -1886,3 +1886,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 根因：`anchorRef`（行 anchor 参考点在父局部空间的位置，anchoredPosition↔局部坐标换算的基准）按 `rowPrefab` 资产的 anchor=(0.5,0.5) 计算，而**运行时行实例 anchor 实测=(0,1)**（左上参考）——Instantiate 后立即读仍是资产值 (0.5,0.5)、漂移发生在其后某环节（真凶未定位，两轮活体取证确认漂移事实），参考点整体错位 (半宽,-半高)：目标插入位判定恒 0（无让位）+落位飞行终点指向右下（飞右下角）+FinishDropIn 按恒 0 的 target 落回原槽（瞬移回原位）。
 修法：**换算基准按拖动行实例的实时 anchor 快照**（`CalcAnchorRefLocal(dragRow.transform)`），勿按 prefab 资产假设。活体验证指纹：`anchorRef+basePos[i]` 应逐位还原每行 pivot 的局部坐标（`InverseTransformPoint`），全行 match=基准正确。
 连带（同批）：拖动行挂 dragLayer 后其余兄弟 siblingIndex 前移，用 `DisplayIndex`（=GetSiblingIndex）做判定/让位索引会与基准位快照错位——改用列表序（`_rows.IndexOf`，拖拽中恒定）。
+
+## §130 UGUI 自定义 shader 材质渲染不上屏：_MainTex 无绑定采样恒黑压平全部输出（2026-10-07 切卡组高亮 shader 实证）
+
+**症状**：给 UGUI 元素（Image/Graphic）换上自定义 shader 材质后，元素渲染**恒透明/完全不上屏**（shader 编译 0 错、材质参数正确、数据层正常驱动），而同元素用内置 UI/Default 材质+tint 时渲染正常。
+根因：**UGUI 自定义材质不自动绑定 _MainTex**（无 sprite 的 Image 不绑；CanvasRenderer 对自定义材质也无内置白纹理兜底）——shader 里 `tex2D(_MainTex, uv)` 采样恒黑、`tex.a=0`，若 fragment 把 alpha 乘上 tex 采样值（如 `alpha *= tex.a` 或 `baseAlpha = mask * tex.a`），**一切输出被压成全透明**。数据层（材质 SetFloat 轨迹）完全正常，纯渲染静默失败，极难从日志发现。
+修法：**自定义 UI shader 的 fragment 勿采样 _MainTex/勿让 alpha 依赖纹理采样**（纯色/程序化特效矩形无 sprite 形状诉求）——先例 CardLightBand（UI/CardLightBand）的 frag 正是如此不采 mainTex 所以工作。若确需 sprite 形状：给 Image 赋一个确定存在的 sprite（如 `Sprite.Create(Texture2D.whiteTexture,…)`）保证 _MainTex 有绑定。
+**更强替代**：直接**用自绘 Graphic 替代 Image**（`class X : Graphic` 手动 OnPopulateMesh 四顶点 UV 0,0→1,1，先例=CardLightBandEffect 的 LightBandGraphic，作者注释「不依赖 Sprite」）——本实证中「Image 换 shader 材质」不出金而「同材质挂自绘 Graphic」出金（A/B 像素对照）。配套组件=Assets/_Scripts/UI/Screen/Backpack/DeckRowHighlightGraphic.cs。
+**验证方法论沉淀（URP+ScreenSpaceOverlay 下 UI 动画的客观取证）**：
+- `Texture2D.ReadPixels(backbuffer)` 在 URP+Overlay 下**不可靠**（读空/读错帧）——像素取证勿用；
+- **可靠路径=Game View MP4 录制（bridge record_game_view，引擎渲染真值）→ ffmpeg 抽帧 → python/PIL 逐帧像素统计**（金色判据 r>120 && r-b>40，按 y 行带聚合找目标区域）；
+- **注意 Overlay canvas 的世界坐标≠屏幕像素坐标**（本实证中行世界 y=-372~-160 负值、屏幕 y=世界+720）——`WorldToScreenPoint(null,…)` 与 `ScreenPointToLocalPointInRectangle` 恒等往返自洽（相对判定/拖拽不受影响），但**绝对像素 rect 换算会差半屏偏移**——像素分析先用「已知可见元素的对照带」自校验坐标映射（docs/14 §127③ 同族教训）；
+- 分层排查顺序实证有效：①unity_shader.preview（Edit Mode 直接渲染材质，is_error_pink+逐帧 props override——本次靠它实锤「满格输出全透明」）②AB 对照（同材质不同挂载方式同帧同录）③MP4 像素分析。

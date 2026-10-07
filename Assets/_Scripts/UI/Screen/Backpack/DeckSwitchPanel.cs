@@ -68,6 +68,11 @@ namespace GIC.UI
         [InspectorName("松手落位动画时长（秒）")]
         [SerializeField] private float dropInDuration = 0.16f;
 
+        [Header("高亮切换")]
+        [InspectorName("切换卡组高亮过渡时长（秒）")]
+        [Tooltip("新行金色从左往右填充、旧行金色从左往右退去的时长（shader 噪声边界+扫光，docs/18 决策五十二）")]
+        [SerializeField] private float highlightSwitchDuration = 0.3f;
+
         [Autowired] private CardManager cardManager;
         [Autowired] private SaveManager saveManager;
         [Autowired] private InputManager inputManager;
@@ -419,14 +424,26 @@ namespace GIC.UI
 
         // ==================== 行事件（行视图/把手转发） ====================
 
-        /// <summary>行背景点击：切换当前卡组（面板保持打开便于继续管理）</summary>
+        /// <summary>行背景点击：切换当前卡组（面板保持打开便于继续管理）；高亮走 shader 过渡动画（新行填金/旧行退金）</summary>
         public void OnRowSelected(DeckRowView row)
         {
             if (Time.unscaledTime < _suppressClickUntil) return;
             int deckId = DeckIdOfRow(row);
             if (deckId < 0) return;
+
+            // 切换前捕获旧高亮行（点已选中的卡组=无变化不播动画）
+            DeckRowView prevRow = null;
+            foreach (var r in _rows)
+                if (r != row && r.IsCurrentHighlight) prevRow = r;
+
             screen?.SwitchDeck(deckId);
-            RefreshAllRows();
+            RefreshAllRows(); // 瞬时 SetCurrent（同帧内被动画起点覆盖，渲染前生效无闪烁）
+
+            if (prevRow != null)
+            {
+                row.PlayHighlightFill(highlightSwitchDuration);       // 新行：金色从左往右填充
+                prevRow.PlayHighlightRetreat(highlightSwitchDuration); // 旧行：金色从左往右退去
+            }
         }
 
         // ── 拖拽排序（实时让位：拖动行挂 dragLayer 置顶跟随指针，其他行按目标插入位平滑让出/回填，松手飞行落位） ──
