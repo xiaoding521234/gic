@@ -1872,3 +1872,17 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 症状：panel_fade 垂直渐变「上暗下浅」交付后实际上面更浅。
 根因：生成循环按 y=0 当「顶行」写最暗——**Unity Texture2D 原点在左下角，y=0 是底部**。
 修法：翻转重生成（底→顶），并加 ImageConversion.LoadImage 读首行/末行 alpha 断言方向。**教训与 §127③同族：一切含空间/方向语义的程序化产物，验证必须落像素回读，「我按 X 顺序写的」不是证据。**
+
+## §129 DeckSwitchPanel 拖拽实时让位两陷阱：禁布局组件须连 CSF 一并冻结 / 运行时 anchor 勿按 prefab 资产假设（2026-10-07 切卡组面板拖拽重排实证）
+
+**①禁用 LayoutGroup 期间同对象上的 ContentSizeFitter 必须一并禁用——否则 content 高度坍缩**
+症状：拖拽重排（让位动画接管行布局，临时 `VLG.enabled=false`）后，把列表滚到中下部再拖最底行，列表「瞬间滚动到最顶上」；未滚动状态下拖任意行无异常。
+根因：`Rows` 上是 VLG+ContentSizeFitter（verticalFit=PreferredSize）组合——**CSF 的高度来源正是 VLG（ILayoutGroup 的子项 preferred 总高）**。VLG 被禁用后 CSF 在下一次布局周期拿不到尺寸来源，把 content 高度坍缩为 0；ScrollRect 检测 content 尺寸骤变，把 `verticalNormalizedPosition` 钳回顶（列表在未滚动态时 normalized 本=顶，塌缩无视觉变化——所以只在「滚下去再拖」时显形，极易漏测）。
+修法：接管布局时**双禁**（VLG+CSF 同禁=content 高度冻结、rect 不重算，行 anchoredPosition 由动画驱动不受 rect 影响），恢复时双恢复；恢复后布局重排结果与让位终点一致零跳变。活体断言：拖底行 content 高度 Δ=0、滚动位 Δ=0。
+通则：**凡运行时禁用布局组件做手动接管，同对象上的尺寸适配器（CSF）必须一并冻结**——两组件是「排布+量高」一体链，禁一留一必产连锁。
+
+**②运行时 RectTransform 的 anchor 可能与 prefab 资产值不一致——换算基准必须按实例实读**
+症状：拖拽让位首版三症状同源：拖到两卡组之间无让位、松手行飞向屏幕右下角、随后瞬移回原位。
+根因：`anchorRef`（行 anchor 参考点在父局部空间的位置，anchoredPosition↔局部坐标换算的基准）按 `rowPrefab` 资产的 anchor=(0.5,0.5) 计算，而**运行时行实例 anchor 实测=(0,1)**（左上参考）——Instantiate 后立即读仍是资产值 (0.5,0.5)、漂移发生在其后某环节（真凶未定位，两轮活体取证确认漂移事实），参考点整体错位 (半宽,-半高)：目标插入位判定恒 0（无让位）+落位飞行终点指向右下（飞右下角）+FinishDropIn 按恒 0 的 target 落回原槽（瞬移回原位）。
+修法：**换算基准按拖动行实例的实时 anchor 快照**（`CalcAnchorRefLocal(dragRow.transform)`），勿按 prefab 资产假设。活体验证指纹：`anchorRef+basePos[i]` 应逐位还原每行 pivot 的局部坐标（`InverseTransformPoint`），全行 match=基准正确。
+连带（同批）：拖动行挂 dragLayer 后其余兄弟 siblingIndex 前移，用 `DisplayIndex`（=GetSiblingIndex）做判定/让位索引会与基准位快照错位——改用列表序（`_rows.IndexOf`，拖拽中恒定）。
