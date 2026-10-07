@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 495887423884027165}
   - component: {fileID: 5641053640230693201}
-  - component: {fileID: 8881872422203598224}
+  - component: {fileID: 4250275578757923753}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: CurrentHighlight
@@ -46,7 +46,7 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 624435846074403897}
   m_CullTransparentMesh: 1
---- !u!114 &8881872422203598224
+--- !u!114 &4250275578757923753
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -55,27 +55,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 624435846074403897}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Script: {fileID: 11500000, guid: 4b003ca3f5fe29c4ab354d031241a2a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0.75, g: 0.62, b: 0.32, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &646360084060121238
 GameObject:
   m_ObjectHideFlags: 0
@@ -2009,7 +1995,7 @@ MonoBehaviour:
   nameText: {fileID: 5361241416743439689}
   nameButton: {fileID: 3039493575828083652}
   rowBackground: {fileID: 3277411584788113716}
-  currentHighlight: {fileID: 8881872422203598224}
+  currentHighlight: {fileID: 4250275578757923753}
   dragOverlay: {fileID: 2065973320851427890}
   dragHandle: {fileID: 3717745383447002858}
   previewRoot: {fileID: 552678363698167689}
@@ -2017,6 +2003,7 @@ MonoBehaviour:
   pasteButton: {fileID: 5364183869348287172}
   exportButton: {fileID: 7882396414728314507}
   deleteButton: {fileID: 869232169192736506}
+  highlightMaterial: {fileID: 2100000, guid: 96fac6a5403e61c458f2d4aeb65e1eba, type: 2}
 --- !u!1 &8917933559159583919
 GameObject:
   m_ObjectHideFlags: 0
