@@ -14,7 +14,7 @@ namespace GIC.Battle
     /// 永久不计时（RemainingTurns=-1），**持有者倒下仍生效**（RemoveOnHolderDeath=false——
     /// docs/05 §5.4 被动失效通则的技能级例外；碎裂判定要求存活，倒下期间只 tick 不碎裂）。
     /// 数值单源=Buff_Icicle.asset（docs/active/39 Buff 配置化——tick 伤害/碎裂治疗/碎裂阈值/半径/
-    /// 基础叠层/2命内嵌减防三参数全在资产，调平衡改 Inspector 零代码）；命座成长仍走施加者 Talent
+    /// 基础叠层全在资产，调平衡改 Inspector 零代码）；命座成长仍走施加者 Talent
     /// 技能参数（SourceConstellation 单出口，与资产正交）。
     /// 碎裂（2026-10-01 复测拍板「元能&gt;50% 时立刻触发，而非回合结束才判定」）：**每笔元能增益
     /// 落地后即时判定**（TurnResolver 元能增益段调 TryShatter——含溢出转移接收方），持有者存活且
@@ -25,8 +25,9 @@ namespace GIC.Battle
     /// **走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01 现场取证返修：平直值口径致
     /// C2 减防对 tick 无效报障〕、不经反应预览=不触发反应/不附着）。
     /// 命座参数：叠层上限〔基础叠层上限=2〕（2命 +C2StackLimit、3命 +C3StackLimit）；
-    /// 2命起 tick 命中敌人额外施加防御减少 Buff（-C2DefenseReduce，〔减防叠层上限=10〕层上限、
-    /// 〔减防持续回合=-1〕**永久不计时**〔2026-10-07 拍板「持续时间改为无限」，同 StatBuff 永久保护〕）。
+    /// 2命起 tick 命中敌人额外施加**冰棱减防**（Buff_DefenseDown 资产具名 buff——每层加成/叠层上限
+    /// /持续全在该资产单源，C2DefenseReduce 注入通道 2026-10-08 决策五十七退役；永久不计时
+    /// 〔2026-10-07 拍板「持续时间改为无限」，同 StatBuff 永久保护〕，逐层各施加）。
     /// 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者——BurnBuff 归属同款兜底）。
     /// </summary>
     public class IcicleBuff : BaseBuff
@@ -74,7 +75,7 @@ namespace GIC.Battle
             // 碎裂不在此判定（复测拍板①「元能>50% 立刻触发」——移除后本回合末自然无 tick）
             var (cLevel, talent) = SourceConstellation();
             int radius = Cfg.作用半径 + (cLevel >= 3 ? (talent != null ? talent.GetInt(SkillParamKey.C3Radius, 1) : 1) : 0);
-            int defReduce = cLevel >= 2 ? (talent != null ? talent.GetInt(SkillParamKey.C2DefenseReduce, 5) : 5) : 0;
+            bool applyDefDown = cLevel >= 2; // 2命起 tick 命中附带冰棱减防（是否施加=命座开关；数值全在 Buff_DefenseDown 资产单源）
             int layers = Mathf.Max(1, Level);
 
             foreach (var kv in Sim.Units)
@@ -99,9 +100,12 @@ namespace GIC.Battle
                             Element = (int)ElementType.Cryo,
                             AttackPercent = Cfg.每回合伤害百分比,
                         }, BattleMetrics.LayerBeatSeconds(layer)));
-                    if (defReduce > 0)
+                    if (applyDefDown)
+                        // 2命：冰棱减防（决策五十七具名 buff）——**零注入**：每层加成/叠层上限/持续
+                        // 全=Buff_DefenseDown 资产单源（C2DefenseReduce 命座参数流 2026-10-08 退役，
+                        // 数值改资产+关联面板同链）；buffKey=资产名=具名身份（同族异名共存基础）
                         effects.Add(new ApplyBuffEffect(attackerId, kv.Key, (int)BuffType.DefenseDown, 1,
-                            defReduce, Cfg.减防叠层上限, Cfg.减防持续回合)); // 2命：防御减少——资产配叠层上限/永久时长（2026-10-07 拍板，逐层各施加）
+                            buffKey: "Buff_DefenseDown")); // 逐层各施加（2026-10-01 拍板）
                 }
             }
             return effects;

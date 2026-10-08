@@ -314,7 +314,12 @@ namespace GIC.Battle
                     HitSeconds = hitSeconds, // 客户端到点清附着图标（反应消耗可见）
                 });
                 if (outcome.BuffType >= 0)
-                    effects.Add(new ApplyBuffEffect(attackerId, targetUnitId, outcome.BuffType, outcome.Level));
+                {
+                    // 反应类 Buff（燃烧/冻结）key=族首资产名（决策五十七：身份链全量携带，客户端解析统一）
+                    var reactCfg = BuffConfig.OfType((BuffType)outcome.BuffType);
+                    effects.Add(new ApplyBuffEffect(attackerId, targetUnitId, outcome.BuffType, outcome.Level,
+                        buffKey: reactCfg?.name));
+                }
             }
             return outcome.HasReaction;
         }
@@ -395,9 +400,13 @@ namespace GIC.Battle
                     int duration = atom.paramKey3 != SkillParamKey.None ? skillData.GetInt(atom.paramKey3) : 0;
                     // SourceSkillId=本技能（2026-10-06 头顶 Buff 图标批：延奏 AttackUp/凯亚加速/凛冽轮舞
                     // 寒冰之棱/闪耀奇迹歌声之环全经此原子——客户端按来源技能图标渲染）；
-                    // TriggerSkill 链（延奏→变奏）按实际施加技能的 skillData 编译=来源随链归属正确
-                    effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, (int)atom.buffType, 1,
-                        buffValue, stackLimit, duration, (int)skillData.skillID));
+                    // TriggerSkill 链（延奏→变奏）按实际施加技能的 skillData 编译=来源随链归属正确。
+                    // 决策五十七「资产即身份」：buffAsset 引用优先（具名 buff=资产名作 key，同资产叠层/
+                    // 异资产同族共存）；null 回落 buffType（存量配置兼容——工厂按族找首资产）
+                    var resolvedBuffType = atom.buffAsset != null ? atom.buffAsset.buffType : atom.buffType;
+                    string buffKey = atom.buffAsset != null ? atom.buffAsset.name : null;
+                    effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, (int)resolvedBuffType, 1,
+                        buffValue, stackLimit, duration, (int)skillData.skillID, buffKey));
                     break;
                 }
 

@@ -214,6 +214,11 @@ namespace GIC.Battle
     {
         public string SourceUnitId;
         public int BuffType;
+
+        /// <summary>具名身份键（=BuffConfig 资产名，决策五十七「资产即身份」——同资产叠层/异资产共存；
+        /// 空旧回放路径=BuffFactory 按 BuffType 回落查首个同族资产）</summary>
+        public string BuffKey;
+
         public int Level;
 
         /// <summary>应用/合并后的剩余回合数（命令流用；由 Host 在应用后回填）</summary>
@@ -235,11 +240,13 @@ namespace GIC.Battle
         public int SourceSkillId;
 
         public ApplyBuffEffect(string sourceUnitId, string targetUnitId, int buffType, int level,
-            int buffValue = 0, int stackLimit = 0, int durationTurns = 0, int sourceSkillId = 0)
+            int buffValue = 0, int stackLimit = 0, int durationTurns = 0, int sourceSkillId = 0,
+            string buffKey = null)
         {
             SourceUnitId = sourceUnitId;
             TargetUnitId = targetUnitId;
             BuffType = buffType;
+            BuffKey = buffKey;
             Level = level;
             BuffValue = buffValue;
             StackLimit = stackLimit;

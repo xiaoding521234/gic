@@ -37,6 +37,7 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 4
+      buffAsset: {fileID: 11400000, guid: ad46880f9823cf24ea26f25fcd917623, type: 2}
       targetSkillType: 7
       statType: 0
       minConstellation: 0
@@ -51,6 +52,7 @@ MonoBehaviour:
       value: 10
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0
@@ -65,6 +67,7 @@ MonoBehaviour:
       value: 20
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0
@@ -79,6 +82,7 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0

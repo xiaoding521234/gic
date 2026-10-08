@@ -614,8 +614,10 @@ namespace GIC.Battle
         // ==================== Buff（B2） ====================
 
         /// <summary>
-        /// 施加 Buff：同类已存在 → 合并（默认时长累加+级别取大，docs/06 燃烧延长同构）；
-        /// 新施加 → 记入全局注册表（回合结束效果按注册序，docs/22 §2）→ OnApplied 生命周期回调
+        /// 施加 Buff：**同具名 buff（Config 资产相同）已存在 → 合并**（叠层+时长累加，docs/06 燃烧
+        /// 延长同构）；**异资产同族共存**（决策五十七「资产即身份」——安柏加攻+班尼特加攻可同时
+        /// 存在，用户拍板「不同名即可叠加」）；新施加 → 记入全局注册表（回合结束效果按注册序，
+        /// docs/22 §2）→ OnApplied 生命周期回调
         /// </summary>
         public void ApplyBuff(Unit target, BaseBuff buff, Unit source = null)
         {
@@ -623,7 +625,10 @@ namespace GIC.Battle
             buff.source = source;
             buff.Sim = this; // 战场门面注入（回合结束效果需战场查询的 Buff 消费——如歌声之环半径枚举）
 
-            var existing = target.Buffs.Find(b => b.Type == buff.Type);
+            // 身份键=Config 资产引用（决策五十七）；Config 双缺防御回落按类型（理论不可达——工厂全注入）
+            var existing = buff.Config != null
+                ? target.Buffs.Find(b => b.Config == buff.Config)
+                : target.Buffs.Find(b => b.Type == buff.Type);
             if (existing != null)
             {
                 existing.Merge(buff);
@@ -722,6 +727,7 @@ namespace GIC.Battle
                 state.buffs.Add(new BuffState
                 {
                     type = (int)buff.Type,
+                    buffKey = buff.Config != null ? buff.Config.name : "", // 具名身份（决策五十七——客户端徽章匹配/图标解析按 key）
                     level = buff.Level,
                     remainingTurns = buff.RemainingTurns,
                     // 来源（2026-10-06 头顶 Buff 图标批）：来源单位 id（客户端描环按其玩家色）+

@@ -50,7 +50,8 @@ namespace GIC.Battle
                         healKeys.Add($"{command.actorUnitId}->{command.targetUnitId}");
                         break;
                     case BattleCommandType.ApplyBuff:
-                        applyBuffKeys.Add($"{command.targetUnitId}:{command.buffType}");
+                        // 具名身份对账（决策五十七：key 优先——同族异名各一条命令；命令侧缺省空回落 buffType）
+                        applyBuffKeys.Add($"{command.targetUnitId}:{command.buffKey ?? command.buffType.ToString()}");
                         break;
                     case BattleCommandType.ElementAttach:
                         attachKeys.Add(command.targetUnitId);
@@ -175,7 +176,8 @@ namespace GIC.Battle
             {
                 foreach (var applied in appliedBuffs)
                 {
-                    if (!applyBuffKeys.Contains($"{applied.TargetUnitId}:{applied.BuffType}"))
+                    // 具名身份对账（决策五十七——与 MergeAppliedBuffs 同键口径，防同族异名误报漏发）
+                    if (!applyBuffKeys.Contains($"{applied.TargetUnitId}:{applied.BuffKey ?? applied.BuffType.ToString()}"))
                         Report(context, applied, BattleCommandType.ApplyBuff);
                 }
             }

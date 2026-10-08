@@ -86,15 +86,26 @@ namespace GIC.Battle
                     if (atom == null || atom.trigger != SkillEffectTrigger.OnDeploy) continue;
                     if (atom.kind != SkillEffectKind.ApplyBuff) continue;
                     if (level < atom.minConstellation) continue;
-                    // 同类已存在不重挂（幂等防御口径）
+                    // 同具名 buff 已存在不重挂（幂等防御口径——决策五十七：buffAsset 引用优先按身份判重，
+                    // null 回落按 type 与 EffectCompiler 同口径）
                     bool exists = false;
-                    foreach (var b in unit.Buffs)
-                        if (b != null && b.Type == atom.buffType) { exists = true; break; }
+                    if (atom.buffAsset != null)
+                    {
+                        foreach (var b in unit.Buffs)
+                            if (b != null && b.Config == atom.buffAsset) { exists = true; break; }
+                    }
+                    else
+                    {
+                        foreach (var b in unit.Buffs)
+                            if (b != null && b.Type == atom.buffType) { exists = true; break; }
+                    }
                     if (exists) continue;
                     var buff = atom.paramKey3 != SkillParamKey.None
                         ? BuffFactory.Create(atom.buffType, 1, unit,
-                            data.GetInt(atom.paramKey), data.GetInt(atom.paramKey2), data.GetInt(atom.paramKey3))
-                        : BuffFactory.Create(atom.buffType, 1, unit, data.GetInt(atom.paramKey));
+                            data.GetInt(atom.paramKey), data.GetInt(atom.paramKey2), data.GetInt(atom.paramKey3),
+                            atom.buffAsset != null ? atom.buffAsset.name : null)
+                        : BuffFactory.Create(atom.buffType, 1, unit, data.GetInt(atom.paramKey),
+                            buffKey: atom.buffAsset != null ? atom.buffAsset.name : null);
                     if (buff == null) continue;
                     buff.SourceSkillId = (int)data.skillID; // 来源技能=Talent 被动本体（图标解析单源同链）
                     sim.ApplyBuff(unit, buff, unit);

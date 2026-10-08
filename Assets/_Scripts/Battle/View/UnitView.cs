@@ -900,7 +900,7 @@ namespace GIC.Battle
         // 视觉归 BattleOverheadBars 屏幕空间层（2026-10-06 拍板「能量条下方显示 buff 图标，复用头像框，
         // 图标=来源技能图标、框=来源玩家色」）；旧世界空间徽章行（立牌倾斜组 SpriteRenderer）随本批退役。
 
-        /// <summary>快照权威同步（选择阶段头/开局；含来源单位/技能——图标与描环解析数据源）</summary>
+        /// <summary>快照权威同步（选择阶段头/开局；含来源单位/技能/具名 key——图标与描环解析数据源）</summary>
         public void SetBuffs(List<BuffState> buffs)
         {
             _buffs.Clear();
@@ -909,6 +909,7 @@ namespace GIC.Battle
                     _buffs.Add(new BuffState
                     {
                         type = b.type,
+                        buffKey = b.buffKey,
                         level = b.level,
                         remainingTurns = b.remainingTurns,
                         sourceUnitId = b.sourceUnitId,
@@ -917,11 +918,15 @@ namespace GIC.Battle
             BuffRevision++;
         }
 
-        /// <summary>命令流增量：施加/刷新（同类已存在=更新回合数与层数——命令携带 Host 合并后回填值；
-        /// **来源沿用首挂**（镜像 Host Merge 口径：existing.source/SourceSkillId 不换新），新挂带来源）</summary>
-        public void ApplyBuffBadge(int type, int turns, int level = 1, string sourceUnitId = null, int sourceSkillId = 0)
+        /// <summary>命令流增量：施加/刷新（同具名 buff 已存在=更新回合数与层数——命令携带 Host 合并后
+        /// 回填值；**来源沿用首挂**（镜像 Host Merge 口径：existing.source/SourceSkillId 不换新），新挂带来源）。
+        /// 匹配键=buffKey（决策五十七「资产即身份」：同族异名共存各一枚徽章）；key 空=旧回放按 type 匹配</summary>
+        public void ApplyBuffBadge(int type, int turns, int level = 1, string sourceUnitId = null,
+            int sourceSkillId = 0, string buffKey = null)
         {
-            var existing = _buffs.Find(b => b.type == type);
+            var existing = !string.IsNullOrEmpty(buffKey)
+                ? _buffs.Find(b => b.buffKey == buffKey)
+                : _buffs.Find(b => b.type == type && string.IsNullOrEmpty(b.buffKey));
             if (existing != null)
             {
                 existing.remainingTurns = turns;
@@ -932,6 +937,7 @@ namespace GIC.Battle
                 _buffs.Add(new BuffState
                 {
                     type = type,
+                    buffKey = buffKey,
                     level = Mathf.Max(1, level),
                     remainingTurns = turns,
                     sourceUnitId = sourceUnitId,
@@ -941,10 +947,14 @@ namespace GIC.Battle
             BuffRevision++;
         }
 
-        /// <summary>命令流增量：移除（到期/驱散/持有者倒下）</summary>
-        public void RemoveBuffBadge(int type)
+        /// <summary>命令流增量：移除（到期/驱散/持有者倒下）——按具名 key 匹配（决策五十七：
+        /// 同族异名共存时只移除命令指定的那枚；key 空=旧回放按 type 全移除）</summary>
+        public void RemoveBuffBadge(int type, string buffKey = null)
         {
-            _buffs.RemoveAll(b => b.type == type);
+            if (!string.IsNullOrEmpty(buffKey))
+                _buffs.RemoveAll(b => b.buffKey == buffKey);
+            else
+                _buffs.RemoveAll(b => b.type == type && string.IsNullOrEmpty(b.buffKey));
             BuffRevision++;
         }
 

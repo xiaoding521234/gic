@@ -688,12 +688,14 @@ namespace GIC.Battle
             // 施加=叠层=有增益（旧「已持有即排除」漏此候选）；无活体分支增益原子（纯复苏技能）
             // 且无尸体=不占行动
             int grantBuffType = -1;
+            SkillEffectConfig grantAtom = null; // 具名原子引用（决策五十七：满层判定按 buffAsset 身份）
             if (data.effects != null)
                 foreach (var atom in data.effects)
                     if (atom.kind == SkillEffectKind.ApplyBuff
                         && atom.condition == SkillEffectCondition.TargetIsAlive)
                     {
-                        grantBuffType = (int)atom.buffType;
+                        grantAtom = atom;
+                        grantBuffType = (int)(atom.buffAsset != null ? atom.buffAsset.buffType : atom.buffType);
                         break;
                     }
             if (grantBuffType < 0) return false;
@@ -707,7 +709,9 @@ namespace GIC.Battle
             {
                 if ((TeamType)u.team != team || u.isCorpse != 0) continue;
                 var live = sim.GetUnit(u.unitId);
-                var existingBuff = live?.Buffs.Find(b => b != null && b.Type == (BuffType)grantBuffType);
+                // 满层判定按具名身份（决策五十七：buffAsset 引用优先；null 回落 type——与编译/工厂同口径）
+                var existingBuff = live?.Buffs.Find(b => b != null && (grantAtom != null && grantAtom.buffAsset != null
+                    ? b.Config == grantAtom.buffAsset : b.Type == (BuffType)grantBuffType));
                 if (existingBuff != null && existingBuff.IsAtStackCap()) continue; // 已满层：重施加无增益
                 if (u.maxHp <= 0) continue;
                 int ratio = u.hp * 10000 / u.maxHp;
@@ -750,9 +754,12 @@ namespace GIC.Battle
             {
                 if (atom == null || atom.trigger != SkillEffectTrigger.OnCast) continue;
                 if (atom.kind != SkillEffectKind.ApplyBuff || atom.targetFilter != SkillEffectTargetFilter.Caster) continue;
-                var existing = unit.Buffs.Find(b => b != null && b.Type == atom.buffType);
+                // 具名感知（决策五十七）：buffAsset 引用优先按身份判已持有/光环半径；null 回落 buffType
+                var sensedBuffType = atom.buffAsset != null ? atom.buffAsset.buffType : atom.buffType;
+                var existing = unit.Buffs.Find(b => b != null && (atom.buffAsset != null
+                    ? b.Config == atom.buffAsset : b.Type == atom.buffType));
                 if (existing != null && existing.IsAtStackCap()) return false; // 已满层：重施加无增益不占行动
-                int auraRadiusJ2 = BattleHeuristics.AuraRadiusOfBuffType(atom.buffType);
+                int auraRadiusJ2 = BattleHeuristics.AuraRadiusOfBuffType(sensedBuffType);
                 int enemiesInAuraJ2 = 0;
                 if (auraRadiusJ2 > 0)
                 {
