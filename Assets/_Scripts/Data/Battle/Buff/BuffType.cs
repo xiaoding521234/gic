@@ -6,6 +6,9 @@ namespace GIC.Data
 
     /// <summary>
     /// Buff 类型（协议标识；命令流/快照载体）。B2 首批=燃烧；后续按 B4 元素反应批次扩充（激化/冻结/超载…）。
+    /// 2026-10-08 决策五十七「资产即身份」：本枚举降级为**族分类**（StatBuff 子类族/行为族——
+    /// 协议 type 字段与客户端渲染族用）；具名 buff 身份=BuffConfig 资产（buffKey 字段）——
+    /// 新增同类 buff（如第二个加攻来源）=新建 Buff_* 资产，**不再加枚举值**。
     /// </summary>
     public enum BuffType
     {
@@ -40,6 +43,12 @@ namespace GIC.Data
     public class BuffState
     {
         public int type;
+
+        /// <summary>具名身份键（=BuffConfig 资产名，决策五十七「资产即身份」：同资产叠层合并、
+        /// 异资产同族共存——安柏加攻+班尼特加攻可同时存在）。旧回放 JSON 缺省空=客户端按 type
+        /// 回落匹配（crit/arrowHeightY 同款向后兼容）</summary>
+        public string buffKey;
+
         public int level;
 
         /// <summary>级别语义按类型分家：StatBuff 族=叠层数、BurnBuff 族=级别——快照原样携带</summary>

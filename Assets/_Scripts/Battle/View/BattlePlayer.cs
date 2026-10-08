@@ -770,16 +770,17 @@ namespace GIC.Battle
 
                     case BattleCommandType.ApplyBuff:
                         // 来源三件随命令透传（2026-10-06 头顶 Buff 图标批）：层数=buffLevel（Host 合并后
-                        // 回填值）、来源单位=actorUnitId、来源技能=metadata 复用字段——客户端图标行即时刷新
+                        // 回填值）、来源单位=actorUnitId、来源技能=metadata 复用字段——客户端图标行即时刷新。
+                        // buffKey=具名身份（决策五十七——同族异名共存各一枚徽章；旧回放缺省空按 type 匹配）
                         if (_views.TryGetValue(command.targetUnitId, out var buffed))
                             buffed.ApplyBuffBadge(command.buffType, command.buffTurns, command.buffLevel,
-                                command.actorUnitId, command.metadata);
+                                command.actorUnitId, command.metadata, command.buffKey);
                         break;
 
                     case BattleCommandType.RemoveBuff:
                         if (_views.TryGetValue(command.targetUnitId, out var unbuffed))
                         {
-                            unbuffed.RemoveBuffBadge(command.buffType);
+                            unbuffed.RemoveBuffBadge(command.buffType, command.buffKey);
                             // 冻结到期即时退冰色（与 Reaction(Freeze) 即时上色对称；其它视觉仍随快照）
                             if (command.buffType == (int)BuffType.Freeze)
                                 unbuffed.SetFrozenVisual(false);

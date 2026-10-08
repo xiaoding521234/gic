@@ -1930,3 +1930,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **根因②（暴露盲区）**：该容器 `m_IsActive=0` 常驻关闭——**从未被真实点开过**，链接系统上线多日无人撞上；决策五十六 buff link 首个真实用例才暴露。**How to apply：「常驻 inactive 的 UI 分支」=结构性审查盲区，link/弹窗类 UI 交付必附「每个分支真点一遍」目检项。**
 **取证坑三件**：①**暂停态游戏没有逐帧布局 pass**——单次 `ForceRebuildLayoutImmediate` 会留中间态（Name/Content 高度归 0），须 TMP `SetLayoutDirty`+多轮重建才收敛；运行态一帧自愈，暂停态取证勿把中间态当新 bug。②**停用 CSF 不清它写过的补偿 sizeDelta**（Preferred 时代写入的负偏移留在 RectTransform）——停用后须手动复位 `sizeDelta=0` 才真拉满。③**同 UI 三处拷贝两种形态**：BackpackScreen 内嵌 SkillDetailPanel=**链接实例**（源 prefab 手术自动继承，0 变更属正常）；BattleHud 内嵌=**烘焙副本**（须逐份手术）——批量手术脚本按「值不符才写」幂等跑三处即可兼容两种。
 **附**：RelatedDescription 模板化后数值金色高亮走 `SkillDescriptionBuilder.BuildRelated` 双通道（延奏类=技能参数/行为族=BuffConfig.关联名反查资产——docs/18 决策五十六）；「数值藏在文案里 baked」与「配置单源」冲突的场合照此模板化。
+
+## §133 Unity Localization AddEntry 新键单标脏=内存假写入：域重载后条目+key 注册全丢（2026-10-08 决策五十七「凯亚的减防显示未本地化」报障实锤）
+
+**症状**：本地化桥脚本 15 项 `table.AddEntry(key, value)`（RelatedName/RelatedDescription 冰棱减防五语言）逐条报 SET 成功、同域回读/冒烟/CSV 导出全读到值——但用户实战点 link 显示**原始键名**（「未本地化」）；refresh 域重载后 `GetEntry` 五语言全 MISSING，rg 表资产+SharedData 双零命中。
+**根因**：`AddEntry` 新键会同时改两处——表资产 `m_TableData`（m_Id+m_Localized 值条目）与 **`SharedTableData.m_Keys`**（m_Id+m_Key 注册）。只 `SetDirty(table)` 不标 SharedData 时，本次实证 **SaveAssets 连表资产也没写出**（两处磁盘全无变化）——写入纯存内存，域重载即丢；同域的一切验证（冒烟/回读/CSV 导出）都被内存值骗过。对照：**UPDATE 既有条目**（`GetEntry(key).Value=`）单 `SetDirty(table)` 落盘正常（同批 SkillDescription 五语言 UPDATE 全活）。
+**修法与判据**：①新键=**双标脏** `EditorUtility.SetDirty(table)`+`EditorUtility.SetDirty(table.SharedData)` 后 SaveAssets；②**真落盘判据=refresh 域重载后再 `GetEntry` 复验**（同域读回不算数）；③磁盘文本层可提前验：正确落盘形态=SharedData 有「m_Id+m_Key」+表资产有「m_Id+m_Localized」**双处**（rg 按 KeyId 或转义码搜）。
+**How to apply**：一切本地化加键桥脚本按「AddEntry→双标脏→SaveAssets→rg 磁盘双处→refresh→GetEntry 复验」五步走；gic-localization skill 既有「AddKey(key,id)+AddEntry(id,value) 两步式」路径若配了双标脏则不受此坑（本坑实证的是 key 版 `table.AddEntry(key,value)` 单标脏路径）。同日三件套： Localization 三表各存 1 条**空 key 坏条目**（历史 key 丢失、值=安柏简介等——遍历 `table.Values` 对空 key 调 GetEntry 炸 `FindEntry: key 为 null`，导出/遍历须跳过）；CSV 多行值转义=整值双引号包裹+内部 `"`→`""`+换行原样（勿 `Replace("\n","\"\n\"")`）。

@@ -223,9 +223,11 @@ namespace GIC.Battle
 
                     case SkillEffectKind.ApplyBuff:
                     {
-                        // 增益：目标该类 Buff 已满层=零价值，否则=BuffValue+行动溢价
+                        // 增益：目标该具名 Buff 已满层=零价值，否则=BuffValue+行动溢价
+                        // （决策五十七：buffAsset 引用优先按身份判满层；null 回落 type——与编译同口径）
                         int stackLimit = atom.paramKey2 != SkillParamKey.None ? data.GetInt(atom.paramKey2, 0) : 0;
-                        var existing = ally.Buffs.Find(b => b.Type == (BuffType)atom.buffType);
+                        var existing = ally.Buffs.Find(b => b != null && (atom.buffAsset != null
+                            ? b.Config == atom.buffAsset : b.Type == atom.buffType));
                         if (existing != null && stackLimit > 0 && existing.Level >= stackLimit) break;
                         int buffValue = atom.paramKey != SkillParamKey.None ? data.GetInt(atom.paramKey, 0) : atom.value;
                         value += buffValue + EnsoBuffActionScore;

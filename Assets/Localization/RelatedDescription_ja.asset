@@ -54,6 +54,14 @@ MonoBehaviour:
     m_Localized: "\xB7\u4FDD\u6301\u8005\u306E\u79FB\u52D5\u901F\u5EA6\u304C{BonusPerStack}\u4E0A\u6607\u3059\u308B\n\xB7\u6700\u5927{StackLimit}\u5C64\u307E\u3067\u91CD\u306D\u3089\u308C\u3001\u6301\u7D9A\u6642\u9593\u3082\u5C64\u6570\u306B\u5FDC\u3058\u3066\u52A0\u7B97\u3055\u308C\u308B\n\xB7\u6301\u7D9A\uFF1A{DurationTurns}\u30BF\u30FC\u30F3"
     m_Metadata:
       m_Items: []
+  - m_Id: 37631287712362496
+    m_Localized: "\xB7\u4FDD\u6301\u8005\u306E\u9632\u5FA1\u529B\u304C{BonusPerStack}\u4F4E\u4E0B\u3059\u308B\n\xB7\u6700\u5927{StackLimit}\u5C64\u307E\u3067\u91CD\u306D\u3089\u308C\u308B\n\xB7\u6301\u7D9A{DurationTurns}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37633262277439488
+    m_Localized: "\xB7\u4FDD\u6301\u8005\u306E\u9632\u5FA1\u529B\u304C{BonusPerStack}\u4F4E\u4E0B\u3059\u308B\n\xB7\u6700\u5927{StackLimit}\u5C64\u307E\u3067\u91CD\u306D\u3089\u308C\u308B\n\xB7\u6301\u7D9A{DurationTurns}"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

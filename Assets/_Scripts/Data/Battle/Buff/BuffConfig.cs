@@ -6,14 +6,14 @@ namespace GIC.Data
 
     /// <summary>
     /// Buff 配置资产基类（2026-10-07 拍板「遵循大厂的做法」——Buff 与技能/单位同等待遇，建独立配置资产。
-    /// docs/active/39；业界对照=EGamePlay StatusConfig 形态：**每 BuffType 一个 ScriptableObject**，
-    /// 技能施加时经 ApplyBuffEffect 参数通道**覆盖**（技能实参 &gt; 本资产默认——反应类无技能语境时本资产即真源）。
+    /// docs/active/39；业界对照=EGamePlay StatusConfig 形态。**2026-10-08 决策五十七「资产即身份」**：
+    /// 每个具名 buff=一个资产（buffKey=资产名）——同资产叠层合并、**异资产同族共存**（安柏加攻
+    /// 「百发百中」与班尼特加攻可同时存在，用户拍板「不同名即可叠加」）；BuffType 枚举降级为族分类。
+    /// 施加方经 SkillEffectConfig.buffAsset 引用（或效应 BuffKey）指定具名 buff；新增同类 buff=
+    /// 新建 Buff_* 资产+关联名/图标/数值，零代码。
     /// 行为留 C# 类（BaseBuff 子类，编译期展开定式）——**本资产只装数据不装过程**。
-    /// 资产路径约定：Assets/Resources/Configs/Buffs/Buff_{BuffType 名}.asset；
-    /// 注册表=OfType(BuffType) 静态查表（Resources.LoadAll 惰性加载，首次访问初始化——域重载安全）。
-    /// StatBuff 族（加攻/加速/减防）数值由技能参数注入，直接用基类资产（buffType+专属图标即可）；
     /// 行为族子类（BurnBuffConfig 等四件）**必须各自同名文件**——Unity 脚本资产关联按文件名匹配，
-    /// 多类共文件=m_Script 丢失资产重载即死（本批实证）。
+    /// 多类共文件=m_Script 丢失资产重载即死（决策五十四批实证）。
     /// </summary>
     [CreateAssetMenu(fileName = "BuffConfig", menuName = "Game/BuffConfig 通用（加攻/加速/减防）")]
     public class BuffConfig : ScriptableObject
@@ -24,7 +24,7 @@ namespace GIC.Data
         [Header("专属图标（可空：客户端解析优先级=专属图标＞来源技能图标＞元素图标，决策五十回落链）")]
         public Sprite 专属图标;
 
-        [Header("关联名（RelatedName 表键=link id——行为族填〔歌声之环/寒冰之棱〕供关联描述占位符反查；StatBuff 族留空=数值走来源技能参数通道）")]
+        [Header("关联名（RelatedName 表键=link id——每个具名 buff 必填〔百发百中/隐藏的实力/冰棱减防〕：关联描述占位符反查+关联面板显示名；决策五十七：具名 buff 一律填，旧「StatBuff 族留空」口径作废）")]
         public string 关联名;
 
         // ==================== 关联描述占位符（2026-10-07 决策五十六：Buff 描述 {Key} 数值=BuffConfig 单源金色高亮） ====================
@@ -71,35 +71,49 @@ namespace GIC.Data
         /// 模板自带 %/基底名当普通文本导致观感分裂）</summary>
         public virtual SkillBaseType? RelatedPlaceholderBaseType(string key) => null;
 
-        /// <summary>按类型查配置资产（注册表单源：BuffFactory 注入 / 客户端图标解析 / AI 光环半径感知共用）。
-        /// 首次访问惰性加载 Assets/Resources/Configs/Buffs 全目录；重复 buffType=Warn 取首项（配置防呆，
-        /// 批8「配置重复键防线」同款口径）；缺资产=null 由调用方防御（工厂 Warn+null）</summary>
+        /// <summary>按类型查**首个**配置资产（决策五十七「资产即身份」后本查询仅作旧路径回落：
+        /// 无 buffKey 的效应/旧回放按族找默认资产。具名路径一律 ByKey(buffKey)）。首次访问惰性加载
+        /// Assets/Resources/Configs/Buffs 全目录；同族多资产共存合法（第二个加攻来源等）；
+        /// 缺资产=null 由调用方防御（工厂 Warn+null）</summary>
         public static BuffConfig OfType(BuffType type)
         {
             EnsureLoaded();
-            return _table.TryGetValue(type, out var cfg) ? cfg : null;
+            foreach (var cfg in _all)
+                if (cfg.buffType == type) return cfg;
+            return null;
         }
 
-        /// <summary>按关联名反查（link id=RelatedName 表键〔中文名〕→ 行为族配置资产；StatBuff 族关联名
-        /// 留空=查不到返回 null——其描述数值走技能参数通道，勿给 StatBuff 资产填关联名）。
+        /// <summary>按具名身份键查配置资产（决策五十七「资产即身份」：buffKey=资产名。
+        /// 注册表单源：BuffFactory 具名构造 / 客户端图标解析共用；缺键=null 调用方回落 OfType）</summary>
+        public static BuffConfig ByKey(string buffKey)
+        {
+            EnsureLoaded();
+            if (string.IsNullOrEmpty(buffKey)) return null;
+            foreach (var cfg in _all)
+                if (cfg.name == buffKey) return cfg;
+            return null;
+        }
+
+        /// <summary>按关联名反查（link id=RelatedName 表键〔中文名〕→ 配置资产——关联面板描述占位符
+        /// 解析与显示名单源；具名 buff 关联名必填=反查恒命中）。
         /// 消费方=SkillDetailView.ShowRuleMode（Buff 类 link 的描述模板数值解析）</summary>
         public static BuffConfig ByRelatedName(string relatedName)
         {
             EnsureLoaded();
             if (string.IsNullOrEmpty(relatedName)) return null;
-            foreach (var cfg in _table.Values)
+            foreach (var cfg in _all)
                 if (cfg.关联名 == relatedName) return cfg;
             return null;
         }
 
-        private static Dictionary<BuffType, BuffConfig> _table;
+        private static List<BuffConfig> _all;
         private static bool _loaded;
 
         private static void EnsureLoaded()
         {
             if (_loaded) return;
             _loaded = true;
-            _table = new Dictionary<BuffType, BuffConfig>();
+            _all = new List<BuffConfig>();
             var all = Resources.LoadAll<BuffConfig>("Configs/Buffs");
             foreach (var cfg in all)
             {
@@ -108,12 +122,7 @@ namespace GIC.Data
                     GIC.Framework.GICLog.Warn($"[BuffConfig] 资产 {cfg?.name} 缺 buffType 配置——检查 Buffs 目录漏填");
                     continue;
                 }
-                if (_table.ContainsKey(cfg.buffType))
-                {
-                    GIC.Framework.GICLog.Warn($"[BuffConfig] BuffType.{cfg.buffType} 配置资产重复（{_table[cfg.buffType].name} / {cfg.name}）——取首项");
-                    continue;
-                }
-                _table.Add(cfg.buffType, cfg);
+                _all.Add(cfg);
             }
         }
     }

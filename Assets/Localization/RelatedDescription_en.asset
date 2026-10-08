@@ -74,6 +74,16 @@ MonoBehaviour:
       turns"
     m_Metadata:
       m_Items: []
+  - m_Id: 37631287712362496
+    m_Localized: "\xB7The holder's DEF is decreased by {BonusPerStack}\n\xB7Stacks
+      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 37633262277439488
+    m_Localized: "\xB7The holder's DEF is decreased by {BonusPerStack}\n\xB7Stacks
+      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

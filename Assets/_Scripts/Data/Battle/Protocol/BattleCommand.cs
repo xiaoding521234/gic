@@ -130,6 +130,11 @@ namespace GIC.Data
 
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
+
+        /// <summary>具名身份键（=BuffConfig 资产名，决策五十七「资产即身份」——同资产叠层/异资产同族
+        /// 共存；客户端按 key 匹配徽章。旧回放 JSON 缺省空=按 buffType 回落匹配，crit/arrowHeightY
+        /// 同款向后兼容）</summary>
+        public string buffKey;
         public int buffLevel;
         public int buffTurns;
 
@@ -306,7 +311,7 @@ namespace GIC.Data
         }
 
         public static BattleCommand ApplyBuff(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
-            int buffType, int buffLevel, int buffTurns, int sourceSkillId = 0)
+            int buffType, int buffLevel, int buffTurns, int sourceSkillId = 0, string buffKey = null)
         {
             return new BattleCommand
             {
@@ -316,13 +321,15 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 buffType = buffType,
+                buffKey = buffKey,
                 buffLevel = buffLevel,
                 buffTurns = buffTurns,
                 metadata = sourceSkillId, // 复用字段：来源技能 id（0=无；客户端 Buff 图标按来源技能解析，2026-10-06）
             };
         }
 
-        public static BattleCommand RemoveBuff(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice, int buffType)
+        public static BattleCommand RemoveBuff(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
+            int buffType, string buffKey = null)
         {
             return new BattleCommand
             {
@@ -332,6 +339,7 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 buffType = buffType,
+                buffKey = buffKey,
             };
         }
 

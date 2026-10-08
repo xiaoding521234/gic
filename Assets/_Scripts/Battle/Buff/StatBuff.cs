@@ -8,8 +8,10 @@ namespace GIC.Battle
     /// 属性增益 Buff 基类（2026-09-25 三轮审查 S7 提取：AttackUp/MoveSpeedUp 此前 100% 同构复制——
     /// 加第三个属性 Buff 勿再复制一份，子类=3 行声明注入 StatType+BuffType 即成）。
     /// 生效载体=UnitStats 修改器（BaseFlat 区，与面板属性同乘区基底）；叠层（上限内）+时长累加，
-    /// 层数变化时 Remove+Add 重挂修改器。数值单源=技能参数经 ApplyBuffEffect 参数通道
-    /// （BuffValue/StackLimit/DurationTurns）由工厂注入，勿在子类硬编码。
+    /// 层数变化时 Remove+Add 重挂修改器。数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续
+    /// 回合——决策五十六返修三+五十七；注入通道非零仍覆写，「技能实参＞模板」保留）。
+    /// **具名共存（决策五十七「资产即身份」）**：同资产实例由 Host 判重合并（BattleSimState.ApplyBuff
+    /// 按 Config 引用）；异资产同族（如两个加攻来源）各持实例并存——修改器多条天然叠加。
     /// 注意：BaseBuff.Level 此处语义=当前**层数**（非 BurnBuff 的级别）——同名二字，快照消费时勿混。
     /// </summary>
     public abstract class StatBuff : BaseBuff

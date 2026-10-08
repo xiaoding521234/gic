@@ -111,8 +111,15 @@ namespace GIC.Data
         /// <summary>元素（Damage/AttachElement 用；0=Physical=施法者自身元素——非物理伤害天然取施法者元素）</summary>
         public ElementType element = ElementType.Physical;
 
-        /// <summary>Buff 类型（ApplyBuff 用）</summary>
+        /// <summary>Buff 族类型（ApplyBuff 用；=BuffConfig.buffType 的镜像——具名 buff 身份=下方
+        /// buffAsset 资产引用，此字段仅作缺引用时的回落与 Inspector 展示）</summary>
         public BuffType buffType = BuffType.Burn;
+
+        /// <summary>具名 Buff 资产引用（ApplyBuff 用，决策五十七「资产即身份」）：拖 Buff_* 资产=
+        /// 该原子施加这个具名 buff（同资产叠层/异资产同族共存——安柏加攻与班尼特加攻可同时存在）；
+        /// 数值单源=资产（每层加成/叠层上限/持续回合）。null=回落 buffType 按同族首个资产（旧配置兼容）。
+        /// 新增同类 buff（第二个加攻来源等）=新建 Buff_* 资产+此处拖引用，零代码</summary>
+        public BuffConfig buffAsset;
 
         /// <summary>触发的目标技能类型（TriggerSkill 用：查目标该型技能并结算——延奏→Henka 变奏）</summary>
         public SkillType targetSkillType = SkillType.Henka;

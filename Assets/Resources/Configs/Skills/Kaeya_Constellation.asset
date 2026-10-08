@@ -26,9 +26,6 @@ MonoBehaviour:
     - key: 26
       value: 1
       baseType: 0
-    - key: 27
-      value: 5
-      baseType: 0
     - key: 28
       value: 1
       baseType: 0
@@ -36,6 +33,10 @@ MonoBehaviour:
       value: 1
       baseType: 0
     timeline: {fileID: 0}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
     effects:
     - trigger: 3
       kind: 9
@@ -48,6 +49,7 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 14
       minConstellation: 1
@@ -62,6 +64,7 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 13
       minConstellation: 1

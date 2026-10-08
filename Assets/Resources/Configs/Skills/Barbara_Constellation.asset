@@ -27,6 +27,10 @@ MonoBehaviour:
       value: 1
       baseType: 0
     timeline: {fileID: 0}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
     effects:
     - trigger: 3
       kind: 3
@@ -39,6 +43,7 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 5
+      buffAsset: {fileID: 11400000, guid: a8b007a906853054db7032d97fd82850, type: 2}
       targetSkillType: 7
       statType: 0
       minConstellation: 0

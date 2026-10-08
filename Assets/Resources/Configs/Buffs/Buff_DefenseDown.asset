@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   buffType: 7
   "\u4E13\u5C5E\u56FE\u6807": {fileID: 21300000, guid: afd3afc9d974013479b3c7581ac3ac11, type: 3}
-  "\u5173\u8054\u540D": 
+  "\u5173\u8054\u540D": "\u51B0\u68F1\u51CF\u9632"
   "\u6BCF\u5C42\u52A0\u6210": 5
   "\u53E0\u5C42\u4E0A\u9650": 10
   "\u6301\u7EED\u56DE\u5408": -1

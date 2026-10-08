@@ -22,12 +22,6 @@ namespace GIC.Data
         [Header("基础叠层上限（2命起 +C2StackLimit、3命再 +C3StackLimit）")]
         public int 基础叠层上限 = 2;
 
-        [Header("2命 tick 命中附带减防 Buff 叠层上限")]
-        public int 减防叠层上限 = 10;
-
-        [Header("2命 tick 命中附带减防 Buff 持续回合（-1=永久，2026-10-07 拍板）")]
-        public int 减防持续回合 = -1;
-
         /// <summary>关联描述占位符解析（{AuraDamagePercent} 等——数值=本资产字段单源，金色高亮由构建层统一）</summary>
         public override int? ResolveRelatedPlaceholder(string key)
         {

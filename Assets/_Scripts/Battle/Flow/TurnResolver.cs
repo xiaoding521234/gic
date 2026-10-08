@@ -593,14 +593,14 @@ namespace GIC.Battle
                 foreach (var s in shattered)
                 {
                     segment.commands.Add(BattleCommand.RemoveBuff(s.sourceId, s.holderId,
-                        sliceIndex, indexInSlice++, (int)s.buff.Type));
+                        sliceIndex, indexInSlice++, (int)s.buff.Type, s.buff.Config?.name)); // 具名 key（决策五十七）
                 }
             }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
                 segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
                     sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns,
-                    applied.SourceSkillId));
+                    applied.SourceSkillId, applied.BuffKey)); // 具名 key（决策五十七——异资产同族各一条命令）
             }
             foreach (var dead in newlyDead)
             {
@@ -619,7 +619,7 @@ namespace GIC.Battle
                     _sim.RemoveBuff(dead, diedBuff);
                     if (hasId)
                         segment.commands.Add(BattleCommand.RemoveBuff(buffSourceId, deadId,
-                            sliceIndex, indexInSlice++, (int)diedBuff.Type));
+                            sliceIndex, indexInSlice++, (int)diedBuff.Type, diedBuff.Config?.name)); // 具名 key（决策五十七）
                 }
             }
 
@@ -633,7 +633,8 @@ namespace GIC.Battle
                         string sourceId = targetId;
                         if (buff.source != null && _sim.TryGetUnitId(buff.source, out var sid))
                             sourceId = sid;
-                        segment.commands.Add(BattleCommand.RemoveBuff(sourceId, targetId, sliceIndex, indexInSlice++, (int)buff.Type));
+                        segment.commands.Add(BattleCommand.RemoveBuff(sourceId, targetId, sliceIndex, indexInSlice++,
+                            (int)buff.Type, buff.Config?.name)); // 具名 key（决策五十七）
                     }
                     _sim.RemoveBuff(buff.owner, buff);
                 }
@@ -888,17 +889,21 @@ namespace GIC.Battle
                 }
                 else if (effect is ApplyBuffEffect applyBuff)
                 {
-                    // 带参数通道的 Buff（B-S1b：AttackUp 等——value/stackLimit/turns 全由技能参数单源注入；
-                    // 工厂 2026-10-02 收口单一 Create：参数型类型缺 turns=Warn+null 防御，恒等于原双分支）
+                    // 带参数通道的 Buff（B-S1b：value/stackLimit/turns 全由技能参数单源注入；
+                    // 工厂 2026-10-02 收口单一 Create：参数型类型缺 turns=Warn+null 防御，恒等于原双分支）。
+                    // 决策五十七「资产即身份」：buffKey 优先（具名 buff 构造+同族异名共存）；空=族首资产回落
                     BaseBuff buff = BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
                         _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue, applyBuff.StackLimit,
-                        applyBuff.DurationTurns);
+                        applyBuff.DurationTurns, applyBuff.BuffKey);
                     if (buff == null) continue;
                     buff.SourceSkillId = applyBuff.SourceSkillId; // 来源技能随 Buff 实体进注册表（快照透传）
                     _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
 
-                    // 回填合并后的真实状态（同类叠加时 Level/Turns 以注册表为准）
-                    var state = target.Buffs.Find(b => b.Type == (BuffType)applyBuff.BuffType);
+                    // 回填合并后的真实状态（同身份叠层时 Level/Turns 以注册表为准——按 buffKey 匹配
+                    // 应用到的实例；key 空（防御）回落 type 匹配）
+                    var state = !string.IsNullOrEmpty(applyBuff.BuffKey)
+                        ? target.Buffs.Find(b => b.Config != null && b.Config.name == applyBuff.BuffKey)
+                        : target.Buffs.Find(b => b.Type == (BuffType)applyBuff.BuffType);
                     applyBuff.Level = state != null ? state.Level : applyBuff.Level;
                     applyBuff.Turns = state != null ? state.RemainingTurns : 0;
                     appliedBuffs.Add(applyBuff);
@@ -1004,7 +1009,8 @@ namespace GIC.Battle
             var result = new List<ApplyBuffEffect>();
             foreach (var buff in applied)
             {
-                string key = $"{buff.TargetUnitId}:{buff.BuffType}";
+                // 合并键=目标+具名身份（决策五十七：异资产同族各成一条命令；key 空回落 type=旧路径）
+                string key = $"{buff.TargetUnitId}:{buff.BuffKey ?? buff.BuffType.ToString()}";
                 if (!merged.ContainsKey(key))
                 {
                     merged[key] = buff;

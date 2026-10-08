@@ -336,12 +336,13 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>Buff 图标解析（拍板「图标用来源技能图标」）：专属图标（per-type 覆盖，如歌声之环/减防）
-        /// &gt; 来源技能图标（SkillConfig.icon——延奏 AttackUp=延奏图标、凛冽轮舞寒冰之棱=爆发图标）
+        /// <summary>Buff 图标解析（拍板「图标用来源技能图标」）：专属图标（**按具名 buffKey 查资产**
+        /// ——决策五十七「资产即身份」：同族异名各自资产各自图标，如百发百中/冰棱减防）
+        /// &gt; 来源技能图标（SkillConfig.icon——延奏无专属图时=延奏图标）
         /// &gt; 元素图标回退（反应类 Buff〔燃烧/冻结〕无技能语境）</summary>
         private static Sprite ResolveBuffIcon(BuffState buff)
         {
-            var dedicated = DedicatedBuffIcon((BuffType)buff.type);
+            var dedicated = DedicatedBuffIcon(buff);
             if (dedicated != null) return dedicated;
             if (buff.sourceSkillId > 0)
             {
@@ -351,14 +352,18 @@ namespace GIC.Battle
             return BuffElementIconOf(buff.type);
         }
 
-        /// <summary>per-type 专属图标覆盖（2026-10-07 Buff 配置化 docs/active/39：图标=BuffConfig 资产
+        /// <summary>专属图标解析（2026-10-07 Buff 配置化 docs/active/39：图标=BuffConfig 资产
         ///〔专属图标〕字段引用，2026-10-07 用户指定源图——歌声之环=Skill_S_Barbara_01〔芭芭拉战技〕、
-        /// 通用减防=UI_Talent_S_Lisa_06〔丽莎 6 命〕，256² alpha 已修）。**新增专属图标=在
+        /// 冰棱减防=UI_Talent_S_Lisa_06〔丽莎 6 命〕，256² alpha 已修）。**按具名 key 查资产**
+        /// （决策五十七：同族异名各自图标）；key 空（旧回放）=按族首资产回落。**新增专属图标=在
         /// Buff_* 资产 Inspector 挂图，零代码**；null（未指定/缺资产）回落来源技能→元素图标
         /// （决策五十回落链）</summary>
-        private static Sprite DedicatedBuffIcon(BuffType type)
+        private static Sprite DedicatedBuffIcon(BuffState buff)
         {
-            return GIC.Data.BuffConfig.OfType(type)?.专属图标;
+            var cfg = !string.IsNullOrEmpty(buff.buffKey)
+                ? GIC.Data.BuffConfig.ByKey(buff.buffKey)
+                : GIC.Data.BuffConfig.OfType((BuffType)buff.type);
+            return cfg?.专属图标;
         }
 
         /// <summary>元素图标回退（原 UnitView.BuffIconOf 映射随命座徽章批迁移至此——元素 Stroke 现成图）</summary>
