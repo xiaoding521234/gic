@@ -19,7 +19,7 @@ namespace GIC.Editor
 {
     /// <summary>
     /// 派蒙知识库烘焙器（docs/19 §6.5.9）：ETL 三段——
-    /// Read（UnitConfig.asset + zh-Hans 本地化表 + docs/19-派蒙知识库FAQ.md）
+    /// Read（UnitConfig.asset + zh-Hans 本地化表 + docs/19b-派蒙知识库FAQ.md）
     /// → Transform（技能描述 {ParamKey} 代入纯文本值、TMP 富文本剥离、别名/关键词组装）
     /// → Write（Assets/StreamingAssets/pet_knowledge.json——随任意 Player 构建打包，桌宠独立进程
     /// 与游戏内形态共用同一份知识；运行时检索=PetKnowledgeIndex 词法打分）。
@@ -29,7 +29,7 @@ namespace GIC.Editor
     public static class PetKnowledgeBaker
     {
         private const string OutputPath = "Assets/StreamingAssets/pet_knowledge.json";
-        private const string FaqSourcePath = "docs/19-派蒙知识库FAQ.md";
+        private const string FaqSourcePath = "docs/19b-派蒙知识库FAQ.md";
 
         [MenuItem("Tools/桌宠/烘焙派蒙知识库")]
         public static void BakeMenu() => Bake();
@@ -208,7 +208,7 @@ namespace GIC.Editor
 
         // ==================== Read/Transform：FAQ 条目（玩家向 markdown 源） ====================
 
-        /// <summary>解析 docs/19-派蒙知识库FAQ.md：`## 标题 [别名1,别名2]` 起一条，正文到下一 ## 止；
+        /// <summary>解析 docs/19b-派蒙知识库FAQ.md：`## 标题 [别名1,别名2]` 起一条，正文到下一 ## 止；
         /// 一级标题与引言块（首个 ## 前）忽略。源文件不存在只警告不烘焙（角色条目不受影响）</summary>
         static int BakeFaq(List<PetKnowledgeIndex.Entry> entries)
         {
