@@ -15,7 +15,7 @@ namespace GIC.Battle
     /// <summary>
     /// 最小战斗播放器（客户端侧；Host 显示侧同构复用）。
     /// Snapshot 建场 → Segment 驱动动画 → 片播放完成回 ack。
-    /// 片开始时刻 =（全场最高攻速 − 本片攻速）÷ 10 秒（docs/active/22 §1）；
+    /// 片开始时刻 =（全场最高攻速 − 本片攻速）÷ 10 秒（docs/22 §1）；
     /// 表现层时序与逻辑层解耦：逻辑即时结算，本类只管"何时播"。
     /// </summary>
     public class BattlePlayer : MonoBehaviour
@@ -93,7 +93,7 @@ namespace GIC.Battle
         /// 快照权威兜底）</summary>
         public event Action<string, int, int> OnResourceDelta;
 
-        /// <summary>手牌物品牌消耗（统一消耗模型 C-1，docs/active/30）：技能吃物品（如酒/苹果）的
+        /// <summary>手牌物品牌消耗（统一消耗模型 C-1，docs/30）：技能吃物品（如酒/苹果）的
         /// ItemConsume 命令消费点——参数=玩家ID / 物品名（ItemName）/ 消耗量。本类先扣本地快照
         /// handCards 镜像（减尽移除条目），HUD 订阅刷新对应卡角标；快照权威兜底</summary>
         public event Action<string, int, int> OnItemConsumed;
@@ -123,7 +123,7 @@ namespace GIC.Battle
         [Autowired] private UnitConfig _unitConfig;
         private TurnFlowController _flow;
 
-        /// <summary>当前立牌布局态：true=散开（选择阶段展开布局）/ false=收拢（执行阶段重叠格心）——两态模型（docs/active/22 §11）</summary>
+        /// <summary>当前立牌布局态：true=散开（选择阶段展开布局）/ false=收拢（执行阶段重叠格心）——两态模型（docs/22 §11）</summary>
         private bool _spreadFormations;
 
         private const float MoveStepSeconds = BattleMetrics.MoveStepSeconds;
@@ -170,7 +170,7 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>绑定回合状态机：两态模型由阶段切换驱动（选择阶段散开 / 执行阶段收拢，docs/active/22 §11）</summary>
+        /// <summary>绑定回合状态机：两态模型由阶段切换驱动（选择阶段散开 / 执行阶段收拢，docs/22 §11）</summary>
         public void BindFlow(TurnFlowController flow)
         {
             if (_flow != null) _flow.OnPhaseChanged -= OnPhaseChangedForFormations;
@@ -297,7 +297,7 @@ namespace GIC.Battle
         private int _meaningfulActionInFlight;
 
         /// <summary>
-        /// 直线投射物：箭矢从发射格飞至**命中点**（Host 接触判定千分定点下发，docs/active/22 §11——
+        /// 直线投射物：箭矢从发射格飞至**命中点**（Host 接触判定千分定点下发，docs/22 §11——
         /// 移动中目标命中点=中途接触位置，所见即所得），到达后接伤害表现。
         /// B4 的"飞向目标当前位置"近似已废弃；无命中点数据时兜底旧行为。
         /// </summary>
@@ -1331,7 +1331,7 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 同格立牌布局（两态模型，docs/active/22 §11）：spread=true 散开展示（1 居中/2 并排/3 三角展开布局，
+        /// 同格立牌布局（两态模型，docs/22 §11）：spread=true 散开展示（1 居中/2 并排/3 三角展开布局，
         /// 选择阶段）/ false 收拢重叠格心（执行阶段，特效锚格心=锚全部单位）；占据数变化实时重排
         /// </summary>
         private void RefreshAllFormations(bool spread)

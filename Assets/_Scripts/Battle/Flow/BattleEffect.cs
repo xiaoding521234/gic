@@ -30,7 +30,7 @@ namespace GIC.Battle
         public BattleCell FromCell;
 
         /// <summary>命中点连续格心坐标（Delivery=1 投射物有效；格心坐标系：格 c 的心=c+0.5）。
-        /// Host 接触判定得出、命令下发时千分定点化（hitX/hitY）——勿由双端各自推算（docs/active/22 §11）</summary>
+        /// Host 接触判定得出、命令下发时千分定点化（hitX/hitY）——勿由双端各自推算（docs/22 §11）</summary>
         public float HitPointX;
         public float HitPointY;
 
@@ -410,7 +410,7 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 摩拉消耗效应（统一消耗模型 C-1，docs/active/30 §2.3——技能声明 Mora cost 用；玩家级）：
+    /// 摩拉消耗效应（统一消耗模型 C-1，docs/30 §2.3——技能声明 Mora cost 用；玩家级）：
     /// TargetUnitId=玩家 ID（同 StaminaEffect 约定）。应用=TrySpendMora 池写；
     /// 命令=StatChange(StatKindMora)（客户端 §78 玩家资源分流已备）。
     /// 部署扣费/回合发放维持直产命令先例（决策七）不走本效应——本效应仅技能消耗链。
@@ -432,7 +432,7 @@ namespace GIC.Battle
     }
 
     /// <summary>
-    /// 物品消耗效应（统一消耗模型 C-1，docs/active/30 §2.3——技能声明 Item/AnyItem cost 用，如酒/苹果/食物）：
+    /// 物品消耗效应（统一消耗模型 C-1，docs/30 §2.3——技能声明 Item/AnyItem cost 用，如酒/苹果/食物）：
     /// TargetUnitId=玩家 ID。**双模式**：AnyOfSubType=false=指定物品（Item 字段有效）；
     /// AnyOfSubType=true=同类任意（SubType 字段有效，如「任意饮品」——应用时按手牌列表序
     /// 确定性逐条扣、跨条目凑足、原子性失败不扣分毫；货币卡不可被匹配，见 ResourceGate）。

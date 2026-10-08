@@ -17,7 +17,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// 一场对局的组合根：Host（逻辑）与 Client（表现）同进程装配（B1-B6 本地模式）。
-    /// B7 LAN 时仅传输实现换 Mirror，两侧路由/消息不变（docs/active/22 §4）。
+    /// B7 LAN 时仅传输实现换 Mirror，两侧路由/消息不变（docs/22 §4）。
     /// 铁律：战斗逻辑不走 EventBusHub，一切消息经 IBattleTransport 专用通道。
     /// </summary>
     public class BattleSession
@@ -76,7 +76,7 @@ namespace GIC.Battle
             transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
 
             player.Bind(transport, sim.Map);
-            player.BindFlow(flow); // 两态模型：立牌布局随回合阶段切换（散开/收拢，docs/active/22 §11）
+            player.BindFlow(flow); // 两态模型：立牌布局随回合阶段切换（散开/收拢，docs/22 §11）
             return session;
         }
 

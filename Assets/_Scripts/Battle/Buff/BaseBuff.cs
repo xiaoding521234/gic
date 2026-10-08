@@ -6,10 +6,10 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// Buff 基类（B2 实体化，docs/active/22 §10）。
+    /// Buff 基类（B2 实体化，docs/22 §10）。
     /// 回合制计时（docs/04 §4.4）：只在每次回合结束时计数减一，上 buff 的当回合结束即减——
     /// 现实秒计时（连携窗等）只走执行阶段时轴，与本类无关。
-    /// 回合结束效果按**注册序**结算（docs/active/22 §2）：ApplicationIndex 由 BattleSimState 分配。
+    /// 回合结束效果按**注册序**结算（docs/22 §2）：ApplicationIndex 由 BattleSimState 分配。
     /// </summary>
     public abstract class BaseBuff
     {

@@ -17,7 +17,7 @@ namespace GIC.Battle
 
         private SkillType skillType = SkillType.Normal;
 
-        // 消耗类数值不走独立字段——运行时消耗单源=SkillData.costs（统一消耗模型 C-2，docs/active/30；
+        // 消耗类数值不走独立字段——运行时消耗单源=SkillData.costs（统一消耗模型 C-2，docs/30；
         // EnergyCost 参数仅描述渲染），勿在此另设字段防双源（2026-09-23 审查 Y7 清理原则延续）
         public Sprite icon;
 

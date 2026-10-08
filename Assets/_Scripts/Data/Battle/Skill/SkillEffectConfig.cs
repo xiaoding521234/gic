@@ -5,7 +5,7 @@ namespace GIC.Data
 
 
     /// <summary>
-    /// 效果原子触发时机（docs/active/29 §3；对照 EGamePlay FireType 的回合制退化）
+    /// 效果原子触发时机（docs/29 §3；对照 EGamePlay FireType 的回合制退化）
     /// </summary>
     public enum SkillEffectTrigger
     {
@@ -66,7 +66,7 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// 效果原子配置（B-1，docs/active/29 §3）——union 平铺载荷（决策九 D1 拍板：BattleCommand/
+    /// 效果原子配置（B-1，docs/29 §3）——union 平铺载荷（决策九 D1 拍板：BattleCommand/
     /// SkillTimelineClip 同款风格，编辑器按 kind 显字段）；**原子只做效果产出声明（WHAT）**，
     /// 编译期由 EffectCompiler 展开成 BattleEffect——应用/合并/对账/命令发射全链零改动。
     /// 分工三真源：时轮=时间与判定规格（WHERE/WHEN）；参数表=数值（HOW MUCH，paramKey 引用防双源）；

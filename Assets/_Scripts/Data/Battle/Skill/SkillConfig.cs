@@ -54,11 +54,11 @@ namespace GIC.Data
             [Tooltip("动作片位置微调（世界单位=格；X=水平、Y=垂直，相对待机 quad 基准位）：校准宽幅动作片构图主体与待机片主体视觉重合（观感统一）；播放期间偏移、播完/被打断随 RestoreIdleVideoSurface 恢复基准位。时轮编辑器「动作片校准」区实时预览所见即所得")]
             public Vector2 动作片位置偏移;
 
-            [Header("效果原子列表（B-1，docs/active/29：空=走旧技能类兜底；非空=数据驱动管线——")]
+            [Header("效果原子列表（B-1，docs/29：空=走旧技能类兜底；非空=数据驱动管线——")]
             [Header("加/改效果=编辑此列表零代码；无注册类且非空→ConfiguredSkill 通用类，docs/18 决策九 D5）")]
             public System.Collections.Generic.List<SkillEffectConfig> effects;
 
-            [Header("消耗声明（统一消耗模型，docs/active/30：技能消耗=数据驱动 (资源,数量) 列表——")]
+            [Header("消耗声明（统一消耗模型，docs/30：技能消耗=数据驱动 (资源,数量) 列表——")]
             [Header("C-2 存量迁移完成：消耗运行时唯一真源=本列表，**空=免费技能**；EnergyCost 参数仅描述渲染")]
             public System.Collections.Generic.List<SkillCostEntry> costs;
 

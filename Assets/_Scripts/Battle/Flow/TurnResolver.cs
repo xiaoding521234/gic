@@ -9,7 +9,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 执行阶段片循环（docs/active/22 §2 分步流式演算）：
+    /// 执行阶段片循环（docs/22 §2 分步流式演算）：
     /// 攻速分桶 → 片内快照结算（瞬发读片前快照）→ 移动同步逐步结算 → 效应统一应用
     /// → 产出片命令块 → 推送并等待 ack（超时快进）→ 片边界 poll 即时行动队列。
     ///
@@ -178,7 +178,7 @@ namespace GIC.Battle
                 effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
 
             // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整路径，
-            // docs/active/22 §11——命中点/消散点随命令千分定点下发）
+            // docs/22 §11——命中点/消散点随命令千分定点下发）
             var vanishes = new List<BattleCommand>();
             ProjectileResolver.Resolve(_sim, snapshot, effects, movers, vanishes);
             _sim.EndCompileDyeView(); // 命中编译全部完成（此后效应应用/命令发射不再读附着）
@@ -243,7 +243,7 @@ namespace GIC.Battle
         /// <summary>
         /// 回合结束段（B2 + B6d 经济闭环）：①每玩家发放 5摩拉+5体力（docs/04 §4.3——发放直产命令
         /// 不走效应链，资源变更非单位效应，同部署扣费先例；发放恒有内容，段必推送）→
-        /// ②Buff 回合结束效果按注册序结算（docs/active/22 §2）→ ③计时减一（上 buff 当回合结束即减，
+        /// ②Buff 回合结束效果按注册序结算（docs/22 §2）→ ③计时减一（上 buff 当回合结束即减，
         /// docs/04 §4.4）→ 到期移除 → 产出 turnEnd 段。
         /// </summary>
         private Segment ResolveTurnEnd(int turnNumber, int sliceIndex, int maxSpeed)
@@ -1070,7 +1070,7 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 同片同 (来源,目标,命中时刻) 的多次治疗合并为一条命令（docs/active/22 §7.4：同片多伤害/治疗数值合并；
+        /// 同片同 (来源,目标,命中时刻) 的多次治疗合并为一条命令（docs/22 §7.4：同片多伤害/治疗数值合并；
         /// 片内/即时段治疗命令发射——此前仅回合结束段发射，片内治疗对客户端不可见致双端血量背离）。
         /// 合并键含命中毫秒（2026-09-25 三轮审查 S4，对齐 MergeDamageEffects 键含 LaunchMs）：
         /// 同施法者同片同目标 OnCast(0=立即)+OnHit(延迟) 双治疗不再并成一条——并条时刻取首条会让

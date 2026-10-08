@@ -14,7 +14,7 @@ using GIC.UI;
 namespace GIC.Battle
 {
     /// <summary>
-    /// 正式战斗 HUD（B6 提前启动；docs/18 决策六 + docs/active/22 §13 + docs/designs/battle-hud-v1.html）。
+    /// 正式战斗 HUD（B6 提前启动；docs/18 决策六 + docs/22 §13 + docs/designs/battle-hud-v1.html）。
     /// 2026-09-22 全项目统一批次：结构装配=Resources/Prefabs/Battle/BattleHud.prefab（编辑器维护，
     /// 一次性迁移工具 BattleHudPrefabMigration 从旧程序化构建烘焙）；运行时按契约名寻址+接线+Palette 活色。
     /// partial 分件：本文件=字段/数据回调/状态机/瞄准/技能按钮交互/数据链/高亮；
@@ -2948,7 +2948,7 @@ namespace GIC.Battle
             return sel != null && sel.playerId == _myPlayerId;
         }
 
-        /// <summary>技能资源门槛单源（统一消耗模型，docs/active/30 §2.3——预判/结算同形纪律）：
+        /// <summary>技能资源门槛单源（统一消耗模型，docs/30 §2.3——预判/结算同形纪律）：
         /// 逐条镜像 ResourceGate.Has（元能=选中单位快照 energy / 体力·摩拉=本端缓存 /
         /// 物品=本地手牌镜像条目 count——Host 侧 HasAll 同口径）。
         /// **C-2 起消耗全量迁移完成：costs 空=免费技能**（无消耗语义，数据即事实）；

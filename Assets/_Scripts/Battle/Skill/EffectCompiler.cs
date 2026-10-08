@@ -8,7 +8,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 效果原子编译器（B-1，docs/active/29 + docs/18 决策九）：把 SkillData.effects 效果原子声明
+    /// 效果原子编译器（B-1，docs/29 + docs/18 决策九）：把 SkillData.effects 效果原子声明
     /// 编译成 BattleEffect——**只做声明展开，应用/合并/对账/命令发射全链零改动**（回合制片内快照
     /// 结算不需要 EGamePlay 式运行时效果实体，编译期展开即确定性等价）。
     /// 分工三真源：时轮=时间与判定规格（WHERE/WHEN）；参数表=数值（HOW MUCH）；本类消费效果原子=WHAT。
@@ -454,7 +454,7 @@ namespace GIC.Battle
 
                 case SkillEffectKind.TriggerSkill:
                 {
-                    // 技能链（块内因果序——延奏→变奏串行展开，docs/active/22 §1）：目标该型技能的
+                    // 技能链（块内因果序——延奏→变奏串行展开，docs/22 §1）：目标该型技能的
                     // 结算产出并入本行动块；变奏未实装=ConfiguredSkill 空产出/UnimplementedSkill 空产出。
                     // 防环守卫（2026-09-25 三轮审查 S2）：TriggerSkill 数据驱动可递归再入 CompileSkill——
                     // 配置失误形成 A→B→A 循环会栈溢出炸 Host，深度超限 Warn 截断（数据错误须炸得优雅）

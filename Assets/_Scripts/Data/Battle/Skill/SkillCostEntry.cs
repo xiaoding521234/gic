@@ -5,7 +5,7 @@ namespace GIC.Data
 
 
     /// <summary>
-    /// 消耗资源种类（统一消耗模型 C-1，docs/active/30 §2.1）
+    /// 消耗资源种类（统一消耗模型 C-1，docs/30 §2.1）
     /// </summary>
     public enum CostKind
     {
@@ -17,7 +17,7 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// 技能消耗声明条目（统一消耗模型 C-1，docs/active/30）：技能/行动消耗=数据驱动的
+    /// 技能消耗声明条目（统一消耗模型 C-1，docs/30）：技能/行动消耗=数据驱动的
     /// (资源, 数量) 列表——SkillData.costs 挂接；**加消耗=配条目零代码**。
     /// 门槛语义（docs/18 决策十五）：不足=行动落空且不扣；先全查后全扣；
     /// 低级单位豁免玩家资源消耗（体力/Mora/Item/AnyItem——元能为单位自身资源不豁免）。

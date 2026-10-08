@@ -6,7 +6,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 统一消耗门（统一消耗模型，docs/active/30 §2.2——StaminaGate 的泛化收编；
+    /// 统一消耗门（统一消耗模型，docs/30 §2.2——StaminaGate 的泛化收编；
     /// **C-2 存量迁移完成（2026-09-28）：StaminaGate/GetStaminaCost/GetEnergyCost 已退役删除，
     /// 本门为消耗检查/登记唯一出口**——移动走 MoveExecutor.GetMoveCosts（无 Move 条目单位常量兜底）。
     /// 资源路由（docs/18 决策十五）：

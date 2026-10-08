@@ -717,7 +717,7 @@ namespace GIC.Editor
             skillEditorScroll.Add(pingBtn);
         }
 
-        // ==================== 效果原子编辑（B-2，docs/active/29 §5） ====================
+        // ==================== 效果原子编辑（B-2，docs/29 §5） ====================
 
         private ListView effectsList;
         private VisualElement effectAtomCard;

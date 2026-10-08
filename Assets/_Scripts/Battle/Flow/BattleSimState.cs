@@ -7,7 +7,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// Host 侧战场状态访问门面（快照生成 / 效应应用 / unitId 注册 / 地形查询）。
-    /// 逻辑 Unit = 现有 MonoBehaviour 组件容器（Host 场景实例化，docs/active/22 §4）。
+    /// 逻辑 Unit = 现有 MonoBehaviour 组件容器（Host 场景实例化，docs/22 §4）。
     /// </summary>
     public class BattleSimState
     {
@@ -39,7 +39,7 @@ namespace GIC.Battle
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
 
-        /// <summary>Buff 注册表（全局注册序：回合结束效果按注册序结算，docs/active/22 §2）</summary>
+        /// <summary>Buff 注册表（全局注册序：回合结束效果按注册序结算，docs/22 §2）</summary>
         private readonly List<BaseBuff> _activeBuffs = new List<BaseBuff>();
         private int _buffSequence;
 
@@ -615,7 +615,7 @@ namespace GIC.Battle
 
         /// <summary>
         /// 施加 Buff：同类已存在 → 合并（默认时长累加+级别取大，docs/06 燃烧延长同构）；
-        /// 新施加 → 记入全局注册表（回合结束效果按注册序，docs/active/22 §2）→ OnApplied 生命周期回调
+        /// 新施加 → 记入全局注册表（回合结束效果按注册序，docs/22 §2）→ OnApplied 生命周期回调
         /// </summary>
         public void ApplyBuff(Unit target, BaseBuff buff, Unit source = null)
         {

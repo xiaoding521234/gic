@@ -15,7 +15,7 @@ namespace GIC.Editor
 
 
     /// <summary>
-    /// 时轮编辑器（B-S2，docs/active/28 §7）：多轨道技能时间轴可视化编辑窗。
+    /// 时轮编辑器（B-S2，docs/28 §7）：多轨道技能时间轴可视化编辑窗。
     /// 入口 Tools/TG/时轮编辑器；选中 SkillTimelineAsset 打开自动载入（也可顶部 ObjectField 切换）。
     ///
     /// 结构：资产栏（选择/新建/接线 UnitConfig/保存）→ 头部（totalTime/aimMode）→
@@ -24,7 +24,7 @@ namespace GIC.Editor
     ///
     /// 编辑语义（gic-editor-tool 规范）：修改直写 C# 对象 + Undo.RecordObject（Ctrl+Z 可撤销），
     /// 「保存到磁盘」=SetDirty+SaveAssets；时刻吸附 0.05s；BuildUI 幂等（重入先 Clear）。
-    /// 分工铁律提示（docs/active/28 §3）：时间与规格归时轮，数值归 SkillParamKey——
+    /// 分工铁律提示（docs/28 §3）：时间与规格归时轮，数值归 SkillParamKey——
     /// 判定轨不存伤害数值（伤害%/发数/消耗在技能参数表），编辑器只管何时发生与投射物规格。
     /// </summary>
     public class SkillTimelineEditor : EditorWindow
@@ -331,7 +331,7 @@ namespace GIC.Editor
             root.Add(_validationLabel);
 
             root.Add(ConfigEditorUITK.CreateFooterBar(
-                "编辑即写入内存（Ctrl+Z 可撤销）；时间/规格归时轮、数值归 SkillParamKey（docs/active/28 §3）",
+                "编辑即写入内存（Ctrl+Z 可撤销）；时间/规格归时轮、数值归 SkillParamKey（docs/28 §3）",
                 SaveToDisk));
 
             RefreshAll();
@@ -951,7 +951,7 @@ namespace GIC.Editor
                 .GroupBy(c => c.kind).Where(g => g.Count() > 1))
                 issues.Add($"判定轨「{(SkillJudgmentKind)group.Key}」有 {group.Count()} 个 clip——技能侧会逐 clip × 发数放大发射量（消费模型=单 clip 承载连发），多 clip 语义未定义");
             if (_asset.totalTime <= 0f)
-                issues.Add("总时长为 0（移动类动态时长约定除外，docs/active/28 §10）");
+                issues.Add("总时长为 0（移动类动态时长约定除外，docs/28 §10）");
             _validationLabel.text = issues.Count > 0 ? "⚠ " + string.Join("；", issues) : "✓ 校验通过";
         }
 
