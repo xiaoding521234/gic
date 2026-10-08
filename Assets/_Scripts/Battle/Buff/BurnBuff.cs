@@ -54,8 +54,8 @@ namespace GIC.Battle
     /// <summary>
     /// Buff 工厂（单一 switch 分发，2026-10-02 执行阶段复审收口：原双 Create 重载合一——
     /// 封闭枚举 switch 即定式，不再挂「扩为注册表」的旧承诺）。
-    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（寒冰之棱的初始层数、
-    /// 冰棱2命减防的 C2DefenseReduce），与技能配置同源、勿在各 Buff 内硬编码默认值以外的取值来源。
+    /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（寒冰之棱的初始层数），
+    /// 与技能配置同源、勿在各 Buff 内硬编码默认值以外的取值来源。
     /// 参数型 Buff（StatBuff 族，2026-10-07 返修三 决策五十六「技能资产剥离 buff 配置」）：
     /// 数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续回合）——零注入（延奏 ApplyBuff
     /// paramKey 已剥离；冰棱减防 2026-10-08 同步剥离）合法走资产默认；注入通道非零仍覆写
@@ -96,8 +96,12 @@ namespace GIC.Battle
                 case BuffType.Icicle:
                     // 寒冰之棱（凛冽轮舞批）：value 通道=初始层数（ShardCount 经 paramKey 注入——
                     // 工厂按 Buff 类型解释 value 的既有先例同款，AttackUp=每层加成/寒冰之棱=初始层数）
+                    // + 施加者命座召唤增补（2026-10-08 拍板 2命/3命各+1——source 赋值后调用：
+                    // 首次注册与 Merge 的 newer 两路都已带上增补，叠层按次入账）
                     if (cfg is not IcicleBuffConfig icicleCfg) return FamilyMismatch(type, cfg);
-                    return new IcicleBuff(icicleCfg, Mathf.Max(1, value)) { source = source };
+                    var shardBuff = new IcicleBuff(icicleCfg, Mathf.Max(1, value)) { source = source };
+                    shardBuff.ApplyConstellationSummonBonus();
+                    return shardBuff;
                 case BuffType.AttackUp:
                 case BuffType.MoveSpeedUp:
                 case BuffType.DefenseDown:

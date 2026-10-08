@@ -319,6 +319,14 @@ MonoBehaviour:
     m_Key: Permanent
     m_Metadata:
       m_Items: []
+  - m_Id: 76
+    m_Key: C2ShardBonus
+    m_Metadata:
+      m_Items: []
+  - m_Id: 77
+    m_Key: C3ShardBonus
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

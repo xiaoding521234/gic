@@ -15,8 +15,8 @@ namespace GIC.Battle
     /// 含 55° 后仰偏移）投影为屏幕位置——相机缩放/相机平移/队形位移时条条都贴住单位头顶。
     /// 结构（自上往下，2026-10-06 命座徽章+Buff 图标批）：
     /// **命座徽章**（血条正上方贴齐：小背景 #39444F 80% + 黑描边数字原神白；眷属/0命不显示；
-    /// 满命〔MaxConstellation〕数字与背景 HSV 循环彩色渐变——拍板「血条上不再需要显示名字，改为显示
-    /// 命座数字」，世界空间单位名随之退役）→ 血条（**填充色=队伍色**+圆角黑边底图+原神量子刻度）→
+    /// 满命〔MaxConstellation〕仅背景 HSV 循环彩色渐变（数字保持原神白——2026-10-08 拍板
+    /// 「命座数字不用变彩」）——拍板「血条上不再需要显示名字，改为显示命座数字」，世界空间单位名随之退役）→ 血条（**填充色=队伍色**+圆角黑边底图+原神量子刻度）→
     /// 元能条（白色+圆角黑边+分隔量子 10）→ **Buff 图标行**（能量条下方：**复用 QueueSlot 头像牌**
     /// 〔Plate/AvatarMask/Avatar/Ring〕——Avatar=Buff 来源技能图标〔延奏 AttackUp→延奏图标、寒冰之棱→
     /// 凛冽轮舞爆发图标…；专属图标优先、无来源技能回落元素图标〕、Ring=来源单位所属玩家色、
@@ -45,7 +45,7 @@ namespace GIC.Battle
         [SerializeField] private float 命座徽章高 = 26f;
         [Tooltip("徽章内边距（数字与背景边缘的水平余量）")]
         [SerializeField] private float 命座徽章内边距 = 8f;
-        [Tooltip("满命彩色渐变速度（色相环/秒——0.22≈4.5 秒一圈；数字与背景同步渐变）")]
+        [Tooltip("满命彩色渐变速度（色相环/秒——0.22≈4.5 秒一圈；仅背景渐变，数字保持静态色）")]
         [SerializeField] private float 满命渐变速度 = 0.22f;
 
         [Header("Buff 图标行（2026-10-06 拍板：能量条下方，复用头像牌+来源技能图标）")]
@@ -228,7 +228,7 @@ namespace GIC.Battle
         // ==================== 命座徽章（2026-10-06 拍板「血条上不再显示名字，改为显示命座数字」） ====================
 
         /// <summary>命座徽章逐帧驱动：显隐（眷属无命座/0命不显示）+ 数字文本（变更才写）+
-        /// 满命彩色渐变（数字与背景 HSV 循环同步；退出渐变态还原静态配色）</summary>
+        /// 满命彩色渐变（仅背景 HSV 循环——数字保持静态色；退出渐变态还原静态背景）</summary>
         private void UpdateConstellationBadge(Item item)
         {
             int level = item.View.ConstellationLevel;
@@ -245,19 +245,18 @@ namespace GIC.Battle
 
             if (level >= ConstellationApplier.MaxConstellation)
             {
-                // 满命=彩色持续变化（拍板：数字与背景都渐变）——unscaled 驱动（暂停时仍流转，纯观感）
+                // 满命=彩色持续变化（2026-10-08 拍板：仅背景渐变，命座数字保持静态色）——
+                // unscaled 驱动（暂停时仍流转，纯观感）
                 float h = Mathf.Repeat(Time.unscaledTime * 满命渐变速度, 1f);
                 item.ConstRainbow = true;
-                item.ConstText.color = Color.HSVToRGB(h, 0.55f, 1f);
                 var bg = Color.HSVToRGB(h, 0.5f, 0.85f);
                 bg.a = 命座背景不透明度;
                 item.ConstBg.color = bg;
             }
             else if (item.ConstRainbow)
             {
-                // 退出满命态（新对局复用防御——局内命座只增不会到此）：还原静态配色
+                // 退出满命态（新对局复用防御——局内命座只增不会到此）：还原静态背景
                 item.ConstRainbow = false;
-                item.ConstText.color = Palette != null ? Palette.文字米白 : Color.white;
                 item.ConstBg.color = Palette != null ? Palette.命座背景色
                     : new Color(0.224f, 0.267f, 0.310f, 命座背景不透明度);
             }

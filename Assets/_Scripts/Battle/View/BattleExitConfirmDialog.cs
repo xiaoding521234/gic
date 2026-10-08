@@ -11,7 +11,8 @@ namespace GIC.Battle
     /// 退出战斗确认弹窗（2026-09-12 用户拍板：右键/ESC 不应直接退出，须确认）。
     /// 2026-09-22 全项目统一批次转正 + prefab 化：结构=Resources/Prefabs/Battle/BattleExitConfirmDialog.prefab
     /// （一次性迁移工具烘焙；文案=TextCombiner 本地化键 Battle_ExitConfirmMsg/Confirm/Continue、
-    /// 配色=BattlePalette 收口——docs/11 登记项收口）；运行时只实例化+注册+活色。
+    /// 配色=BattlePalette 收口——docs/11 登记项收口）；运行时只实例化+注册+接线+活色
+    /// （**onClick 不在 prefab 内**——迁移烘焙不含事件接线，Init 运行时补，2026-10-08 修复）。
     /// 挂 IClosable（注册后位于 closable 栈顶）：弹窗打开期间 ESC/右键 = 取消弹窗（不退出战斗）；
     /// 打开期间压 BattleExitConfirm 输入锁（冻结相机与棋盘交互）。
     /// </summary>
@@ -46,13 +47,21 @@ namespace GIC.Battle
             return dialog;
         }
 
-        /// <summary>运行时注册（注入/可关闭栈/输入锁）+ Palette 活色（烘焙色仅兜底）；与结构装配分离</summary>
+        /// <summary>运行时注册（注入/可关闭栈/输入锁）+ 按钮接线 + Palette 活色（烘焙色仅兜底）；与结构装配分离</summary>
         private void Init(Action onConfirm)
         {
             _onConfirm = onConfirm;
             Wargame.Instance?.Context?.Inject(this);
             _inputManager?.RegisterClosable(this);
             InputLocks.Push(this, InputLockReason.BattleExitConfirm);
+
+            // 按钮接线（2026-10-08 报障修复：2026-09-22 prefab 化迁移只烘焙结构、onClick 持久调用为空
+            // ——迁移件的事件接线必须在运行时注册层补齐；死链症状=弹窗开着点确认无反应、
+            // 全屏 Dim 吞掉后续一切点击，现场实例临时接线后才恢复可退）
+            var confirmBtn = transform.Find("Canvas/Panel/Buttons/Btn_Confirm")?.GetComponent<Button>();
+            if (confirmBtn != null) confirmBtn.onClick.AddListener(ConfirmAndExit);
+            var continueBtn = transform.Find("Canvas/Panel/Buttons/Btn_Continue")?.GetComponent<Button>();
+            if (continueBtn != null) continueBtn.onClick.AddListener(Close);
 
             // Palette 活色（改资产随下次弹出生效）
             var panel = transform.Find("Canvas/Panel")?.GetComponent<Image>();

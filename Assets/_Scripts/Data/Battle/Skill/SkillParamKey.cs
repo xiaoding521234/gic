@@ -258,6 +258,13 @@ namespace GIC.Data
         // 凯亚战技（文档有、早期落地遗漏）
         [InspectorName("掠夺摩拉")]
         MoraPlunder = 75,
+
+        // 凯亚命座（2026-10-08 寒冰之棱重构：上限常驻 4，命座改召唤数量增补）
+        [InspectorName("2命召唤数量")]
+        C2ShardBonus = 76,
+
+        [InspectorName("3命召唤数量")]
+        C3ShardBonus = 77,
     }
 
     /// <summary>
