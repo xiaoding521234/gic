@@ -87,10 +87,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3002005
     m_Localized: "\xB7[C1] Healing efficiency +{C1HealEfficiency}, Life steal +{C1LifeSteal}\n\xB7[C2]
-      <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>
-      stack limit +{C2StackLimit}, hits also inflict <color=#FFD700><u><link=\"Buff:\u51B0\u68F1\u51CF\u9632\">Frost
-      Defense Down</link></u></color>\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
-      Shard</link></u></color> stack limit +{C3StackLimit}, radius +{C3Radius}"
+      Glacial Waltz summons +{C2ShardBonus} <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
+      Shard</link></u></color>, hits also inflict <color=#FFD700><u><link=\"Buff:\u51B0\u68F1\u51CF\u9632\">Frost
+      Defense Down</link></u></color>\n\xB7[C3] Glacial Waltz summons +{C3ShardBonus}
+      <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>"
     m_Metadata:
       m_Items: []
   - m_Id: 3003001

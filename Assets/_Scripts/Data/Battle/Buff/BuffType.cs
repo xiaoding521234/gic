@@ -33,7 +33,7 @@ namespace GIC.Data
         Icicle = 6, // 凛冽轮舞批（2026-10-01 凯亚爆发=自施放 Buff，拍板「实际并不是召唤，与歌声之环类似」）：永久光环——回合末半径内敌冰伤、持有者元能超50%碎裂回血；持有者倒下仍生效（docs/units/蒙德/凯亚.md）
 
         [InspectorName("防御减少")]
-        DefenseDown = 7, // 寒冰之棱2命（C2DefenseReduce）：命中敌人防御-5，永久单层不叠（StatBuff 族负值修改器）
+        DefenseDown = 7, // 防御降低（StatBuff 族负值修改器=减防即增伤；具名资产 Buff_DefenseDown「冰棱减防」——凯亚2命 tick 命中施加，数值全在资产单源）
     }
 
     /// <summary>

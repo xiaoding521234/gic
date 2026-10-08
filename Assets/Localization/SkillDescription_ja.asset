@@ -71,7 +71,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002005
-    m_Localized: "\xB7\u30101\u547D\u3011\u6CBB\u7642\u52B9\u7387+{C1HealEfficiency}\u3001\u30E9\u30A4\u30D5\u30B9\u30C6\u30A3\u30FC\u30EB+{C1LifeSteal}\n\xB7\u30102\u547D\u3011<color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u6C37\u306E\u5203</link></u></color>\u306E\u30B9\u30BF\u30C3\u30AF\u4E0A\u9650+{C2StackLimit}\u3001\u547D\u4E2D\u6642\u306E\u6575\u306B<color=#FFD700><u><link=\"Buff:\u51B0\u68F1\u51CF\u9632\">\u6C37\u306E\u5203\u306E\u9632\u5FA1\u4F4E\u4E0B</link></u></color>\u3092\u4ED8\u4E0E\u3059\u308B\n\xB7\u30103\u547D\u3011<color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u6C37\u306E\u5203</link></u></color>\u306E\u30B9\u30BF\u30C3\u30AF\u4E0A\u9650+{C3StackLimit}\u3001\u7BC4\u56F2+{C3Radius}"
+    m_Localized: "\xB7\u30101\u547D\u3011\u6CBB\u7642\u52B9\u7387+{C1HealEfficiency}\u3001\u30E9\u30A4\u30D5\u30B9\u30C6\u30A3\u30FC\u30EB+{C1LifeSteal}\n\xB7\u30102\u547D\u3011\u51DC\u51BD\u306E\u8F2A\u821E\u304C\u53EC\u559A\u3059\u308B<color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u6C37\u306E\u5203</link></u></color>\u306E\u6570+{C2ShardBonus}\u3001\u547D\u4E2D\u6642\u306E\u6575\u306B<color=#FFD700><u><link=\"Buff:\u51B0\u68F1\u51CF\u9632\">\u6C37\u306E\u5203\u306E\u9632\u5FA1\u4F4E\u4E0B</link></u></color>\u3092\u4ED8\u4E0E\u3059\u308B\n\xB7\u30103\u547D\u3011\u51DC\u51BD\u306E\u8F2A\u821E\u304C\u53EC\u559A\u3059\u308B<color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">\u6C37\u306E\u5203</link></u></color>\u306E\u6570+{C3ShardBonus}"
     m_Metadata:
       m_Items: []
   - m_Id: 3003001

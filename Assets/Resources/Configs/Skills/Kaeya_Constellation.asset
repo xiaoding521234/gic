@@ -23,13 +23,10 @@ MonoBehaviour:
     - key: 25
       value: 50
       baseType: 11
-    - key: 26
+    - key: 76
       value: 1
       baseType: 0
-    - key: 28
-      value: 1
-      baseType: 0
-    - key: 29
+    - key: 77
       value: 1
       baseType: 0
     timeline: {fileID: 0}

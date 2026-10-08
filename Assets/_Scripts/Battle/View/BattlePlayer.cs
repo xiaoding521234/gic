@@ -756,8 +756,11 @@ namespace GIC.Battle
 
                     case BattleCommandType.UpgradeConstellation:
                         // 命座提升（B8 批，docs/09）：3★+ 同名重复出战升命。被动属性/环参数由 Host 结算、
-                        // 快照权威自愈；此处轻提示反馈（数值随快照跳变；等级可视化显示待 UI 批）
+                        // 快照权威自愈；徽章数字随命令即时更新（value=新等级——2026-10-08 报障返修：原只弹
+                        // toast、数字等下回合选择阶段快照才跳变，与部署段最先结算矛盾）
                         GICLog.Info($"[BattlePlayer] 命座提升：{command.targetUnitId} → C{command.value}");
+                        if (_views.TryGetValue(command.targetUnitId, out var constellationUpgraded))
+                            constellationUpgraded.SetConstellation(command.value, constellationUpgraded.IsFamiliar);
                         if (PopupManager.Instance != null)
                             PopupManager.Instance.ShowToast(
                                 new LocalizedString(TableName.PopupText.ToString(), "Battle_ConstellationUp"));
