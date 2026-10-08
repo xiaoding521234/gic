@@ -4,7 +4,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 战斗判定常量收口（B5 连续判定体系，docs/active/22 §11）：
+    /// 战斗判定常量收口（B5 连续判定体系，docs/22 §11）：
     /// Host 演算（ProjectileResolver）与客户端播放（BattlePlayer）共用同一速度/尺寸常量，
     /// 保证"所见即所得"——命中时刻由 Host 判定后随命令下发，客户端按同源常量播放自然对齐。
     /// 阈值类常量一律收口于此，勿散写（先例=手势层 GestureMetrics）。

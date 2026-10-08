@@ -112,7 +112,7 @@ namespace GIC.Data
         public BattleCell cell;
         public List<BattleCell> path = new List<BattleCell>();
 
-        [Header("命中点（Damage 投射物有效；千分定点连续格心坐标×1000，docs/active/22 §11）")]
+        [Header("命中点（Damage 投射物有效；千分定点连续格心坐标×1000，docs/22 §11）")]
         public int hitX;
         public int hitY;
 
@@ -387,7 +387,7 @@ namespace GIC.Data
             };
         }
 
-        /// <summary>物品消耗命令工厂（统一消耗模型 C-1，docs/active/30）：技能消耗手牌物品牌（如酒/苹果）
+        /// <summary>物品消耗命令工厂（统一消耗模型 C-1，docs/30）：技能消耗手牌物品牌（如酒/苹果）
         /// ——targetUnitId=归属玩家、metadata=物品名（ItemName 枚举值）、value=消耗数量。
         /// 客户端应用=本地 handCards 镜像条目扣减（减尽移除）+手牌角标即时刷新（不等下回合快照）</summary>
         public static BattleCommand ItemConsume(string playerId, int sliceIndex, int indexInSlice,

@@ -48,7 +48,7 @@ namespace GIC.Battle
             return 3; // 无移动技能条目=旧默认回落
         }
 
-        /// <summary>移动消耗声明（统一消耗模型 C-2，docs/active/30）：移动技能条目的 costs（C-2 起全移动
+        /// <summary>移动消耗声明（统一消耗模型 C-2，docs/30）：移动技能条目的 costs（C-2 起全移动
         /// 技能资产已配 Stamina 条目）——**无移动技能条目单位走常量兜底**（配额行动 10 体力，规则真源
         /// =BattleMetrics.StaminaCostPerAction；2026-09-28 盘点 21/34 单位无 Move 条目=兜底是主路径非边角）。
         /// 返回共享只读实例（HasAll/ChargeAll 只读消费，调用方勿改）。
@@ -110,7 +110,7 @@ namespace GIC.Battle
             }
 
             // ==================== 消耗段（统一消耗模型 C-2：全量迁移完成，双轨回落退役）====================
-            // 消耗单源=SkillData.costs（docs/active/30）：先全查后全扣（多 cost 防「扣了体力才发现苹果不够」
+            // 消耗单源=SkillData.costs（docs/30）：先全查后全扣（多 cost 防「扣了体力才发现苹果不够」
             // ——任一不足=行动落空且不登记任何消耗）；**costs 空=免费技能**（无消耗语义，数据即事实）
             if (!ResourceGate.HasAll(sim, attacker, action.playerId, skill.RawData?.costs, out var missing))
             {

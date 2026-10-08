@@ -6,7 +6,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 投射物连续命中判定（B5 连续判定体系，docs/active/22 §11 + docs/18 决策二）：
+    /// 投射物连续命中判定（B5 连续判定体系，docs/22 §11 + docs/18 决策二）：
     /// 命中 = 投射物轨迹接触首个敌方立牌**圆柱**之时，读**命中时刻的连续插值位置**（移动中可被中途命中，
     /// 所见即所得）；命中点/命中格由 Host 判定后随命令下发（千分定点），勿由双端各自推算。
     ///
@@ -122,7 +122,7 @@ namespace GIC.Battle
                 var hitPoint = fromCenter + dir * (speed * (hitT - launch));
 
                 // 格 AoE：命中时刻全体敌方连续位置所在格 == 命中者所在格（接触判定与效果作用域解耦，
-                // docs/active/22 §11；堆叠同心下与旧"格内全中"结果一致，向后兼容）
+                // docs/22 §11；堆叠同心下与旧"格内全中"结果一致，向后兼容）
                 var hitState = FindState(enemies, hitUnitId);
                 var hitCell = CellOf(PositionAt(hitState, moverPaths, hitT));
                 var members = new List<UnitState>();
