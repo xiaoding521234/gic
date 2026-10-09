@@ -64,22 +64,19 @@ namespace GIC.Battle
             BattleTimeMinutes = (BattleTimeMinutes + BattleClockMinutesPerTurn) % (24 * 60);
         }
 
-        // ==================== 选择时限（docs/04 §4.2，B6 落地） ====================
-        // 第 1 回合 25 秒；2~6 回合 16 秒；第 7 回合起每回合 -0.5 秒，下限 8 秒（第 22 回合触底）。
+        // ==================== 选择时限（docs/04 §4.2，B6 落地；2026-10-09 拍板改档） ====================
+        // 表驱动：第 1 回合 30 秒；第 2~3 回合 15 秒；第 4 回合 10 秒；第 5 回合 8 秒；第 6 回合起恒 7 秒。
         // 超时行为已拍板（2026-09-26，docs/18 决策六）：先触发 OnSelectTimerExpired（HUD 无条件复用
         // 完成选择按钮链路=待定金格自动确认），未交玩家再自动上交 Pass（空过）。
 
-        public const float FirstTurnSelectSeconds = 25f;
-        public const float BaseSelectSeconds = 16f;
-        public const float SelectShrinkPerTurn = 0.5f;
-        public const float MinSelectSeconds = 8f;
+        /// <summary>选择时限表（索引=回合数-1；越界取末档，即第 6 回合起恒 7 秒）</summary>
+        private static readonly float[] SelectSecondsByTurn = { 30f, 15f, 15f, 10f, 8f, 7f };
 
-        /// <summary>第 N 回合选择阶段时限（秒），公式 docs/04 §4.2</summary>
+        /// <summary>第 N 回合选择阶段时限（秒），档表 docs/04 §4.2</summary>
         public static float GetSelectLimitSeconds(int turn)
         {
-            if (turn <= 1) return FirstTurnSelectSeconds;
-            if (turn <= 6) return BaseSelectSeconds;
-            return Mathf.Max(MinSelectSeconds, BaseSelectSeconds - (turn - 6) * SelectShrinkPerTurn);
+            var index = Mathf.Clamp(turn - 1, 0, SelectSecondsByTurn.Length - 1);
+            return SelectSecondsByTurn[index];
         }
 
         /// <summary>选择阶段剩余秒数（供 HUD 轮询；-1 = 非选择阶段）</summary>
