@@ -35,6 +35,7 @@ namespace GIC.UI
         private ICardDetailPanel _activePanel;
         private ICardViewStrategy _strategy;
         private SaveCardData _saveData;
+        private ScrollRect _scroll;
 
         /// <summary>
         /// 只读模式：隐藏所有可交互按钮（皮肤切换、使用按钮等），用于关联面板
@@ -64,6 +65,7 @@ namespace GIC.UI
 
             RefreshSkinDisplay();
             RebuildLayout();
+            ResetScrollToTop();
         }
 
         /// <summary>
@@ -85,6 +87,7 @@ namespace GIC.UI
             if (skinButton != null) skinButton.gameObject.SetActive(false);
 
             RebuildLayout();
+            ResetScrollToTop();
         }
 
         private void EnsureInjected()
@@ -165,6 +168,13 @@ namespace GIC.UI
         public void RebuildLayout()
         {
             LayoutRebuilder.ForceRebuildLayoutImmediate(descriptionContent);
+        }
+
+        /// <summary>换卡/重开面板时滚动区归顶——名称栏以外的全部内容都在滚动区，归顶保证头部（立绘/星级）可见</summary>
+        private void ResetScrollToTop()
+        {
+            if (_scroll == null) _scroll = GetComponentInChildren<ScrollRect>(true);
+            if (_scroll != null) _scroll.verticalNormalizedPosition = 1f;
         }
     }
 
