@@ -31,6 +31,11 @@ namespace GIC.UI
         [SerializeField] private UnitStatBriefPanel 数据小面板;
         public UnitStatsPanel 全部数据面板; // 宿主界面接线（BackpackScreen 内为两处实例覆写；未接线的宿主点击小面板无效果）
 
+        /// <summary>标签芯片容器宿主回填（只读模式用）：Init(Card) 路径标签容器随 Card 自带，
+        /// Init(SaveCardData) 只读路径拿不到 Card——由 CardDetailView.Init(SaveCardData) 把自身
+        /// tagContainer 注入此处（2026-10-10 战斗手牌详情接入；关联面板卡模式同路径受益）</summary>
+        public Transform TagContainer { private get; set; }
+
         private UnitConfig.UnitData _lastRaw;
 
         // 公用字段引用（由 CardDetailView 注入）
@@ -82,17 +87,17 @@ namespace GIC.UI
         {
             var raw = CardConfigResolver.Instance?.UnitConfig?.GetUnitData(card.saveCardData.id.AsUnitName());
             if (raw == null) return;
-            InitInternal(raw, card.saveCardData, card?.cardDetailView?.tagContainer);
+            InitInternal(raw, card.saveCardData, card?.cardDetailView?.tagContainer, false);
         }
 
         public void Init(SaveCardData data, bool isReadOnly = false)
         {
             var raw = CardConfigResolver.Instance?.UnitConfig?.GetUnitData(data.id.AsUnitName());
             if (raw == null) return;
-            InitInternal(raw, data, null);
+            InitInternal(raw, data, TagContainer, isReadOnly);
         }
 
-        private void InitInternal(UnitConfig.UnitData raw, SaveCardData data, Transform tagContainerFromCard)
+        private void InitInternal(UnitConfig.UnitData raw, SaveCardData data, Transform tagContainerFromCard, bool isReadOnly)
         {
             _lastRaw = raw;
             _top.color = StarVisualConfig.GetStarColor(raw.starLevel);
@@ -130,8 +135,9 @@ namespace GIC.UI
             // 标签
             RefreshTagChips(raw, tagContainerFromCard);
 
-            // 技能面板
-            RefreshSkillsPanel(raw);
+            // 技能面板（只读模式=纯展示：宿主（战斗 HUD）常无 skillDetailView 接线——Display 态
+            // 点选会空引用开面板，OnlyDisplay 关闭点选语义，2026-10-10 战斗手牌详情接入）
+            RefreshSkillsPanel(raw, isReadOnly);
 
             // 小数据面板（技能区块之下、介绍区块之上的属性摘要；默认隐藏，仅角色卡激活）
             if (数据小面板 != null)
@@ -190,7 +196,7 @@ namespace GIC.UI
                 _stars.transform.GetChild(i).gameObject.SetActive(i < starLevel);
         }
 
-        private void RefreshSkillsPanel(UnitConfig.UnitData unitData)
+        private void RefreshSkillsPanel(UnitConfig.UnitData unitData, bool isReadOnly = false)
         {
             if (skillsPanel == null) return;
             for (int i = 0; i < skillsPanel.transform.childCount; i++)
@@ -207,7 +213,8 @@ namespace GIC.UI
                 SkillIconView skillIconView = skillViewObj.GetComponent<SkillIconView>();
                 if (skillIconView != null)
                 {
-                    skillIconView.InitWithData(skillData, unitData, ViewType.Display, skillDetailView);
+                    skillIconView.InitWithData(skillData, unitData,
+                        isReadOnly ? ViewType.OnlyDisplay : ViewType.Display, skillDetailView);
                     if (skillIconView.selectButton != null && selectionGroup != null)
                         skillIconView.selectButton.Group = selectionGroup;
                 }

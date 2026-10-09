@@ -62,10 +62,6 @@ namespace GIC.Battle
         [SerializeField] private float 手牌拖拽滚动速度 = 900f;
         [Tooltip("自动滚动触发余量（屏幕像素）")]
         [SerializeField] private float 手牌拖拽滚动余量 = 60f;
-        [Tooltip("点击卡的弹跳反馈缩放（打出=拖拽专属；点击仅余反馈）")]
-        [SerializeField] private float 手牌点击弹跳缩放 = 1.05f;
-        [Tooltip("点击弹跳时长")]
-        [SerializeField] private float 手牌点击弹跳时长 = 0.16f;
 
         // ==================== 数据结构 ====================
 
@@ -132,9 +128,10 @@ namespace GIC.Battle
         private UnityEngine.UI.Image _handPlayZoneImage;
         private UnityEngine.UI.Image _handPlayZoneLineImage; // 下界线
         private float _handPlayZoneAlpha;             // 当前蒙层 alpha（平滑趋近）
+        private GIC.UI.CardDetailView _handCardDetailView; // 手牌卡详情面板（懒加载实例，2026-10-10 点击手牌开详情）
+        private HandCardSlot _handCardDetailSource;   // 详情面板当前展示的手牌槽（同卡再点=收起）
         private Coroutine _handFlyRoutine;            // 回槽飞行（同刻至多一段）
         private HandCardSlot _handFlySlot;            // 飞行中的卡（rebuild/打断收口用）
-        private Coroutine _handBounceRoutine;          // 点击弹跳反馈
 
         /// <summary>手牌卡规格（与 RebuildHandCards 同源；卡宽/间距改动两处一起动）</summary>
         private const float 手牌卡宽 = 160f;
@@ -201,7 +198,8 @@ namespace GIC.Battle
             if (wrapperGo.GetComponent<CanvasGroup>() == null) wrapperGo.AddComponent<CanvasGroup>();
         }
 
-        /// <summary>点击卡（打出=拖拽专属，点击仅余反馈）：弹跳示意「可拖拽」；物品/货币卡顺带沿用提示</summary>
+        /// <summary>点击卡（2026-10-10 拍板「点击手牌时，应当弹出卡牌详情面板」——原点击弹跳反馈随
+        /// 语义换代退役）：同卡再点=收起、异卡=换内容；打出仍=拖拽专属（决策五十五）</summary>
         private void OnHandCardClicked(string key)
         {
             if (Time.unscaledTime < _handSuppressClickUntil) return; // 拖拽/松手尾巴点击吞掉
@@ -209,28 +207,57 @@ namespace GIC.Battle
             foreach (var s in _handCardSlots)
                 if (s.key == key) { slot = s; break; }
             if (slot == null || slot.rt == null) return;
-            if (_handBounceRoutine != null) StopCoroutine(_handBounceRoutine);
-            _handBounceRoutine = StartCoroutine(BounceHandCardRoutine(slot));
-            if (!slot.isUnit) SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入（原点击口径保留）
+            if (HandCardDetailOpen && _handCardDetailSource == slot) { CloseHandCardDetail(); return; }
+            OpenHandCardDetail(slot);
         }
 
-        /// <summary>点击弹跳：缩放脉冲一圈（sin 曲线），示意可抓取拖拽</summary>
-        private IEnumerator BounceHandCardRoutine(HandCardSlot slot)
+        /// <summary>卡牌详情面板是否开着（OnBoardTap 点外收口用）</summary>
+        private bool HandCardDetailOpen => _handCardDetailView != null && _handCardDetailView.gameObject.activeSelf;
+
+        /// <summary>手牌详情面板懒加载（Resources/Prefabs/Battle/BattleCardDetailPanel——
+        /// BackpackScreen 主实例（含 UDP/IDP/TagContainer 实例覆写全套）的快照资产，由
+        /// Tools/TG/BattleCardDetailSnapshot 烘焙；摆位/尺寸烤在 prefab，Inspector 可调）</summary>
+        private GIC.UI.CardDetailView EnsureHandCardDetail()
         {
-            var rt = slot.rt;
-            if (rt == null) yield break;
-            var baseScale = slot.baseScale;
-            float t = 0f;
-            while (t < 手牌点击弹跳时长 && rt != null)
+            if (_handCardDetailView != null) return _handCardDetailView;
+            var prefab = Resources.Load<GameObject>("Prefabs/Battle/BattleCardDetailPanel");
+            if (prefab == null)
             {
-                t += Time.unscaledDeltaTime;
-                float x = Mathf.Clamp01(t / 手牌点击弹跳时长);
-                float pulse = Mathf.Sin(x * Mathf.PI); // 0→1→0
-                rt.localScale = baseScale * (1f + (手牌点击弹跳缩放 - 1f) * pulse);
-                yield return null;
+                GICLog.Warn("[BattleHud] BattleCardDetailPanel.prefab 未找到（Resources/Prefabs/Battle/）——点手牌无详情");
+                return null;
             }
-            if (rt != null) rt.localScale = baseScale;
-            _handBounceRoutine = null;
+            var canvasRt = (RectTransform)_canvas.transform;
+            var inst = Instantiate(prefab, canvasRt, false);
+            inst.name = "BattleCardDetail";
+            var rt = (RectTransform)inst.transform;
+            // 拖拽层恒在详情面板之上（先有拖拽层则插其下；否则画布最顶）
+            if (_handDragLayer != null) rt.SetSiblingIndex(_handDragLayer.GetSiblingIndex());
+            else rt.SetAsLastSibling();
+            inst.SetActive(false);
+            _handCardDetailView = inst.GetComponent<GIC.UI.CardDetailView>();
+            return _handCardDetailView;
+        }
+
+        /// <summary>开手牌卡详情（只读模式——手牌协议条目无 Card 组件，同关联面板卡模式口径；
+        /// 角色卡 count=1 惯例、物品卡走配置数据，详情面内容=配置真源不受影响）</summary>
+        private void OpenHandCardDetail(HandCardSlot slot)
+        {
+            var view = EnsureHandCardDetail();
+            if (view == null) return;
+            var saveData = new GIC.Framework.SaveCardData();
+            if (slot.isUnit) saveData.SaveUnit((UnitName)slot.unitValue, 1);
+            else saveData.SaveItem((ItemName)slot.unitValue, 1);
+            _handCardDetailSource = slot;
+            view.gameObject.SetActive(true);
+            view.Init(saveData);
+        }
+
+        /// <summary>收手牌卡详情（点棋盘/拖起卡/进瞄准/阶段流转/进布局编辑统一收口；幂等）</summary>
+        private void CloseHandCardDetail()
+        {
+            _handCardDetailSource = null;
+            if (_handCardDetailView != null && _handCardDetailView.gameObject.activeSelf)
+                _handCardDetailView.gameObject.SetActive(false);
         }
 
         // ==================== 浮层与出牌区（运行时懒建，画布子级随画布销毁） ====================
@@ -410,12 +437,12 @@ namespace GIC.Battle
             st.liftTime = Time.unscaledTime;
             st.insertIndex = st.fromIndex;
             st.inPlayZone = PointerInPlayZone(pointer);
+            CloseHandCardDetail(); // 拖起即收详情（详情悬浮在棋盘上方，让位打出流程视线）
             ShowHandPlayZone(true);
-            if (_handBounceRoutine != null) { StopCoroutine(_handBounceRoutine); _handBounceRoutine = null; }
             if (_handScroll != null) _handScroll.StopMovement(); // 提起即断惯性（滚动壳不再处理本手势）
         }
 
-        /// <summary>松手：滚动转交=收滚动；未提起=无操作（点击弹跳走 onClick）；提起=按区分派
+        /// <summary>松手：滚动转交=收滚动；未提起=无操作（点击开详情走 onClick）；提起=按区分派
         /// （出牌区=打出/手牌区=插位落牌；regrab 手牌区=反悔取消、出牌区=卡挪到新松手位）</summary>
         private void OnHandCardEndDrag(HandCardSlot slot, PointerEventData e)
         {
@@ -668,6 +695,7 @@ namespace GIC.Battle
             _aimDef = null;
             _pendingAimCell = null; // 新会话待定清零（防陈旧提交）
             ClosePopup();
+            CloseHandCardDetail(); // 待确认期棋盘视线让位（点非可选格=反悔弹回）
             _aimCells.Clear();
             _aimRecommendedCells.Clear();
             ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏（打出卡在拖拽层不受影响）
@@ -707,11 +735,11 @@ namespace GIC.Battle
                 rt.localScale = st.baseScale;
                 rt.localRotation = Quaternion.identity;
             }
-            if (_handBounceRoutine != null) { StopCoroutine(_handBounceRoutine); _handBounceRoutine = null; }
         }
 
         /// <summary>rebuild 前收口（RebuildHandCards 顶部调——重建即将销毁全部 wrapper）：
-        /// 拖拽中断；回槽飞行中止（wrapper 仍在按钮列表，重建循环随销——引用清空防悬空）；打出态引用清空</summary>
+        /// 拖拽中断；回槽飞行中止（wrapper 仍在按钮列表，重建循环随销——引用清空防悬空）；打出态引用清空；
+        /// 详情面板收起（wrapper 随重建销毁，源槽引用即悬空——展示内容随收口防陈旧）</summary>
         private void SettleHandCardsOnRebuild()
         {
             CancelHandCardDrag();
@@ -721,6 +749,7 @@ namespace GIC.Battle
                 _handFlyRoutine = null;
                 _handFlySlot = null;
             }
+            CloseHandCardDetail();
             _playedHandCard = null; // 打出悬浮卡随重建销毁（仅相位流转语境会出现，销毁即视觉收场）
         }
     }
