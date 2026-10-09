@@ -486,6 +486,7 @@ namespace GIC.Battle
                 ExitAiming();
                 DeselectUnit();
                 CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：卡瞬回原槽防悬空在拖拽层）
+                CloseHandCardDetail(); // 手牌卡详情随阶段收口（执行阶段棋盘视线让位给预览）
                 if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
                 if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
                 // 2026-09-29 执行预览拍板「隐藏掉玩家之前打开的技能或手牌」：技能盘已随 DeselectUnit
@@ -837,8 +838,8 @@ namespace GIC.Battle
 
                 var btn = wrapperGo.AddComponent<UnityEngine.UI.Button>();
                 btn.targetGraphic = hit;
-                // 打出=拖拽专属（决策五十四，拍板「当前只是点一下就算打出，非常low」）：点击仅余
-                // 弹跳反馈示意可拖；物品/货币卡点击顺带沿用「后续版本接入」提示（分件 OnHandCardClicked）
+                // 打出=拖拽专属（决策五十四，拍板「当前只是点一下就算打出，非常low」）：点击=开卡牌详情
+                // 面板（2026-10-10 拍板「点击手牌时，应当弹出卡牌详情面板」，分件 OnHandCardClicked）
                 var capturedKey = handEntry.cardType + ":" + handEntry.value;
                 btn.onClick.AddListener(() => OnHandCardClicked(capturedKey));
                 _handCardButtons.Add(btn);
@@ -999,8 +1000,9 @@ namespace GIC.Battle
             _deployAimUnit = unitNameValue;
             _state = HudState.Aiming;
             _aimDef = null;
-            _pendingAimCell = null; // 新瞄准会话待定清零（高亮 quad 重建，材质无残留）
+            _pendingAimCell = null; // 新会话待定清零（高亮 quad 重建，材质无残留）
             ClosePopup();
+            CloseHandCardDetail(); // 部署瞄准视线让位（点非可选格/拖回=反悔弹回）
 
             _aimCells.Clear();
             _aimRecommendedCells.Clear();
@@ -1048,6 +1050,8 @@ namespace GIC.Battle
             if (_layoutEditing) return; // 布局编辑期棋盘交互全静默
             if (_session == null || _session.Flow.Phase != BattlePhase.Selecting) return;
             if (_camera == null || _board == null || _board.Map == null) return;
+            if (HandCardDetailOpen) { CloseHandCardDetail(); return; } // 点棋盘=收卡牌详情（同技能详情面板点外收口口径）
+
             if (!TryPickBoardCell(screenPos, out var cell, out bool inBounds)) return;
 
             var snapshot = _session.Player.LatestSnapshot;
@@ -1445,6 +1449,7 @@ namespace GIC.Battle
             _pendingTargetUnitId = null; // 待定目标随会话清零（2026-10-05 指定单位型轮换）
             SetAimSelectRing(def, true);
             ClosePopup();
+            CloseHandCardDetail(); // 手牌卡详情让位瞄准视线
             ComputeAimCells();
             ShowAimHighlights();
             ApplyStateVisibility(); // Aiming 态：技能盘+移动+取消可见、手牌藏
@@ -2476,6 +2481,39 @@ namespace GIC.Battle
             var worldDelta = canvasRt.TransformVector((Vector3)(target - panelCenter));
             var parentDelta = (Vector2)panelRect.parent.InverseTransformVector(worldDelta);
             _skillDetailView.RepositionPanel(panelRect.anchoredPosition + parentDelta);
+        }
+
+        /// <summary>关联面板摆位（2026-10-10 关联面板半遮主面板修复——SkillDetailView.onRelatedPanelOpening
+        /// 宿主回调，link 命中即将滑入时调）：候选=技能面板左侧（同高轴对齐、留按钮间距）；左侧出画布→
+        /// 右侧；画布两侧都放不下→夹画布兜底（窄屏允许与面板交叠但保完整可见）。烘焙位（-55 偏移）仅
+        /// 兜底，战斗内每次开关联面板都按当前面板实际位重摆——面板本身是自适应摆键旁的，关联面板必须
+        /// 跟着面板走。中心位移换算与 PositionSkillPopupBesideKey 收尾同法（父子级两跳 TransformVector）</summary>
+        private void PositionRelatedPanelBesideSkillPanel()
+        {
+            if (_skillDetailView == null) return;
+            var canvasRt = CanvasRect;
+            var panelRect = _skillDetailView.skillDetailPanel != null
+                ? _skillDetailView.skillDetailPanel.GetComponent<RectTransform>() : null;
+            var relatedRect = _skillDetailView.relatedPanel != null
+                ? _skillDetailView.relatedPanel.GetComponent<RectTransform>() : null;
+            if (canvasRt == null || panelRect == null || relatedRect == null) return;
+            if (!RectToCanvasAabb(panelRect, out var pMin, out var pMax)) return;
+            if (!RectToCanvasAabb(relatedRect, out var rMin, out var rMax)) return;
+
+            var rect = canvasRt.rect;
+            Vector2 rHalf = (rMax - rMin) * 0.5f;
+            Vector2 rCenter = (rMin + rMax) * 0.5f;
+            Vector2 pCenter = (pMin + pMax) * 0.5f;
+
+            // 左侧候选：右缘贴面板左缘-间距；左缘出画布边距 → 换右侧；再夹画布（两侧都窄=允许交叠保可见）
+            Vector2 target = new Vector2(pMin.x - 详情面板与按钮间距 - rHalf.x, pCenter.y);
+            if (target.x - rHalf.x < rect.xMin + 详情面板屏幕边距)
+                target = new Vector2(pMax.x + 详情面板与按钮间距 + rHalf.x, pCenter.y);
+            target = ClampPanelCenter(target, rHalf, rect);
+
+            var worldDelta = canvasRt.TransformVector((Vector3)(target - rCenter));
+            var parentDelta = (Vector2)relatedRect.parent.InverseTransformVector(worldDelta);
+            _skillDetailView.RepositionRelatedPanel(relatedRect.anchoredPosition + parentDelta);
         }
 
         /// <summary>面板中心夹进画布（留屏幕边距；画布装不下整面板的轴回退画布中心）</summary>

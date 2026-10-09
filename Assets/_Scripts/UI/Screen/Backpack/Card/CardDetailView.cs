@@ -80,6 +80,9 @@ namespace GIC.UI
             _strategy = CardViewStrategyFactory.Get(cardType);
 
             EnsureInjected();
+            // 只读模式标签容器回填：Init(Card) 路径容器随 Card 的详情视图自带，本路径拿不到——
+            // 把自身 tagContainer 注给角色子面板（无则角色卡不显示标签芯片，2026-10-10 战斗手牌详情接入）
+            if (unitDetailPanel != null) unitDetailPanel.TagContainer = tagContainer;
             SwitchPanel(cardType);
             _activePanel?.Init(data, true);
 

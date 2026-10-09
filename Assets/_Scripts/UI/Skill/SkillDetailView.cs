@@ -54,6 +54,11 @@ namespace GIC.UI
         [Tooltip("面板外按下自动关闭（默认开）。跨场景复用方（如战斗 HUD）应关闭：点外关闭与按钮点击同帧竞态——按下帧关面板会抢跑抬起帧才派发的 PointerClick，让「再点同键进瞄准」永远走重开分支（docs/14 §64b）；战斗的点外收面板由 BattleHud.OnBoardTap 承接")]
         public bool 点外关闭 = true;
 
+        /// <summary>关联面板即将滑入的宿主回调（SetActive 之后、滑入协程之前调用——宿主在此
+        /// RepositionRelatedPanel 重摆即可同步滑入目标；战斗 HUD 用它把关联面板贴技能面板旁
+        /// 并夹画布，2026-10-10 关联面板半遮主面板修复；背包等固定摆位宿主不订阅恒走烘焙位）</summary>
+        public Action onRelatedPanelOpening;
+
         private void Awake()
         {
             if (skillDetailPanel != null)
@@ -268,6 +273,10 @@ namespace GIC.UI
         private void ShowRelatedPanel()
         {
             relatedPanel.SetActive(true);
+
+            // 宿主重摆回调须在滑入协程启动前：滑入目标=target 字段调用时刻值，先重摆再启动
+            // 才能把新位带进滑入动画（2026-10-10 战斗 HUD 关联面板贴面板旁修复）
+            onRelatedPanelOpening?.Invoke();
 
             if (relatedSlideCoroutine != null)
                 StopCoroutine(relatedSlideCoroutine);
