@@ -192,7 +192,12 @@ namespace GIC.Battle
             // 贴到技能面板左/右不重叠、出画布夹回——烘焙位只是兜底，战斗内实际位由该回调每次重摆
             _skillDetailView.onRelatedPanelOpening = PositionRelatedPanelBesideSkillPanel;
 
+            // 面板打开回调（2026-10-10 追拍「和背包里一样可以点击」）：卡牌详情内点技能图标开的
+            // 详情面板须抬升到卡详情之上（卡详情=运行时实例挂画布最顶、烘焙面板默认在其下）
+            _skillDetailView.onPanelOpened = OnSkillPopupOpened;
+
             var rect = _skillDetailView.skillDetailPanel.GetComponent<RectTransform>();
+            _skillPopupDockedPos = rect.anchoredPosition; // 烘焙停泊位（右侧）：非摆位开面板的确定性落点
             _skillDetailView.RepositionPanel(rect.anchoredPosition);
             if (_skillDetailView.relatedPanel != null)
             {

@@ -220,7 +220,7 @@ namespace GIC.Battle
             DeselectUnit(); // → Idle（编辑前清瞄准/选中）
             CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：编辑期全件强制可见，拖中卡须归位）
             ClosePopup();
-            CloseHandCardDetail(); // 手牌卡详情随编辑态收口（编辑期全件强制可见的口径一致性）
+            CloseHandCardDetail(); // 手牌卡详情随编辑态收口（统计面板随卡详情联动收——全屏遮罩让位编辑 UI）
             if (_session != null && _session.Flow != null)
                 _session.Flow.SelectTimerPaused = true; // 编辑期冻结选择倒计时（拍板 D1）
 
