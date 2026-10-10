@@ -8134,7 +8134,7 @@ MonoBehaviour:
   - animNameFrag: SitLoop
     emotionName: 
   emotionCtrl: {fileID: 6511879956086342942}
-  animTransitionSec: 0.6
+  animTransitionSec: 0.3
   inertializer: {fileID: 7479904176408885991}
   prewarmOnStart: 1
 --- !u!114 &6511879956086342942
