@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6070952779796571069}
   - component: {fileID: 8329387321480208734}
   - component: {fileID: 1960667626012754945}
+  - component: {fileID: 2693986836932574200}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: ScrollView
@@ -81,6 +82,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7acd18d8deb58ee4585b7fede4d959ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &2693986836932574200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 141781737768203228}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47c56c219b6ec4d4695fbbab283ec8dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u542F\u7528": 1
+  "\u6E10\u9690\u8272": {r: 0.03137255, g: 0.05490196, b: 0.078431375, a: 1}
+  "\u6E10\u9690\u9AD8\u5EA6": 48
+  "\u6700\u5927\u4E0D\u900F\u660E\u5EA6": 0.9
+  "\u9876\u90E8\u6E10\u9690": 0
+  "\u5E95\u90E8\u6E10\u9690": 1
+  "\u6A2A\u5411\u6E10\u9690": 0
 --- !u!1 &1308725583490673806
 GameObject:
   m_ObjectHideFlags: 0
