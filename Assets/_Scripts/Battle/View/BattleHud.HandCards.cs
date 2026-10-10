@@ -209,7 +209,12 @@ namespace GIC.Battle
         /// 语义换代退役）：同卡再点=收起、异卡=换内容；打出仍=拖拽专属（决策五十五）</summary>
         private void OnHandCardClicked(string key)
         {
-            if (Time.unscaledTime < _handSuppressClickUntil) return; // 拖拽/松手尾巴点击吞掉
+            // 拖拽会话仍在=本手势的松手尾巴点击，吞掉。UGUI pointer up 先派发 click 后派发 endDrag
+            // （StandaloneInputModule.ProcessPointerUp 源码实证），click 跑在 OnEndDrag 设时间戳之前、
+            // _handDrag 尚未被清空——会话旗是唯一可靠防线（同 §103 技能键 _dragAiming 修法）；
+            // 漏吞实测症状：打出区再拖悬浮卡（regrab 挪位）/拖回反悔/手牌区内换位，松手全被误判单点弹详情
+            if (_handDrag != null) return;
+            if (Time.unscaledTime < _handSuppressClickUntil) return; // 历史手势尾巴/会话中断的兜底防线
             if (PopupOpen) ClosePopup(); // 卡详情内点技能图标开的技能详情随换卡/收卡收口（手牌态弹窗只可能来自该路径）
             HandCardSlot slot = null;
             foreach (var s in _handCardSlots)
@@ -422,6 +427,8 @@ namespace GIC.Battle
                 st.lastTarget = st.followTarget;
                 st.liftTime = Time.unscaledTime;
                 ShowHandPlayZone(true);
+                CloseHandCardDetail(); // 抓起悬浮卡=收详情（同 LiftHandCard「拖起即收」——先点了悬浮卡开详情再抓起拖动的组合）
+                if (PopupOpen) ClosePopup(); // 卡详情内开的技能详情一并收口，让位瞄准视线
             }
         }
 

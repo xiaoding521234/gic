@@ -2018,3 +2018,14 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法（已落地，编译 0 错）**：捕获时通道未激活则显式清零该通道——位置 else 清 `_posX0/_posV0`、旋转 else 清 `_rotX0/_rotV0`，`QuinticDecay(0,0,tf,t)≡0` 幽灵消失；已激活通道照常。**v0 必须一起清**：x0=0 而 v0≠0 时多项式 x'(0)=v0 仍产生虚假偏移行程（auto-narrow 对 x0=0 不触发）。
 
 **通则**：**多通道系数数组复用型代码，「本次未激活」必须显式清零/失效该通道——数组残留旧值 + 输出层无条件求值 = 跨捕获状态泄漏**。帧级探针的「系数数组逐捕获快照对比」通道是这类 bug 的直证手段（值跨捕获不变+active=陈旧铁证）。
+
+## §142 UGUI pointer up 先派发 click 后派发 endDrag：拖拽尾巴点击吞不全——时间戳设在 OnEndDrag 永远护不到当帧，会话旗才是可靠防线（2026-10-11 手牌「打出区再拖被误判单点弹详情」报障实锤）
+
+**症状**：升命卡拖入出牌区（EnterUpgradePending 待确认态）→ 点完成选择前再拖悬浮卡、仍在出牌区松手（regrab 挪位）→ 被误判单点弹出卡片详情。同根因姊妹漏洞：regrab 拖回手牌区反悔（ExitAiming 无收详情调用）、手牌区内拖卡换位（DropHandCardIntoHand 同样不收）——凡 lifted 拖拽松手，尾巴点击全会漏进 OnHandCardClicked 开详情。
+
+**根因（源码级）**：`StandaloneInputModule.ProcessPointerUp`（本机 PackageCache com.unity.ugui@1.0.0）——pointerClick（L415）先于 endDragHandler（L429）派发，ReleaseMouse 通道同序（L192→L205）。即松手瞬间 `OnHandCardClicked` 先跑、`OnHandCardEndDrag` 后跑——吞尾巴点击的 `_handSuppressClickUntil` 时间戳在 OnEndDrag 里才设置，**永远护不到本帧这次点击**（只能吞 0.3s 内的下一次点击）。首打不显症状纯属侥幸：click 弹出详情后同帧 EnterUpgradePending/EnterDeployAim 内部 `CloseHandCardDetail()` 又把它关掉=开而不可见；regrab 挪位路径无任何收详情调用 → 详情留在屏上。§103 技能键当年靠 `_dragAiming` 会话旗修好，手牌这里只抄了时间戳没抄旗，故而翻车。
+
+**修法（已落地，编译 0 错）**：`OnHandCardClicked` 前置 `_handDrag != null` 会话旗吞点击——click 派发时会话尚未被 OnEndDrag 清空，旗=唯一可靠防线（时间戳保留作历史兜底=双保险）；regrab 抓起悬浮卡补收详情+技能详情弹窗（对齐 LiftHandCard「拖起即收」）。
+
+**通则**：**「拖拽手势的松手尾巴点击」防线必须用「进行中会话」旗，勿只靠时间戳——UGUI 的 pointerClick 派发在 endDrag 之前，OnEndDrag 里写的任何防御都晚于当帧点击执行**。卡跟手拖拽（指针恒在卡上、pointerClick 按下时捕获）松手必产尾巴点击；凡「拖拽 X 松手又弹 Y 面板」类症状先查此顺序勿先怀疑手势仲裁。取证路径：直接读 `Library/PackageCache/com.unity.ugui@*/Runtime/EventSystem/InputModules/StandaloneInputModule.cs` 核派发序，勿凭直觉猜事件顺序（本条两次翻车均源于此直觉）。
+
