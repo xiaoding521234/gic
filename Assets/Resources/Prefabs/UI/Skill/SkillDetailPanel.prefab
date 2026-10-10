@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5754131710615028850}
   - component: {fileID: 3180648643081284554}
   - component: {fileID: 6282814919425766113}
+  - component: {fileID: 5795854577775424655}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Scroll View
@@ -108,6 +109,25 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &5795854577775424655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 384908419576944459}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47c56c219b6ec4d4695fbbab283ec8dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u542F\u7528": 1
+  "\u6E10\u9690\u8272": {r: 0.14509805, g: 0.21960784, b: 0.28235295, a: 1}
+  "\u6E10\u9690\u9AD8\u5EA6": 48
+  "\u6700\u5927\u4E0D\u900F\u660E\u5EA6": 0.9
+  "\u9876\u90E8\u6E10\u9690": 0
+  "\u5E95\u90E8\u6E10\u9690": 1
+  "\u6A2A\u5411\u6E10\u9690": 0
 --- !u!1 &385539045115870526
 GameObject:
   m_ObjectHideFlags: 0
@@ -1889,6 +1909,7 @@ GameObject:
   - component: {fileID: 9111751278000771376}
   - component: {fileID: 140257577059165450}
   - component: {fileID: 8162969947522767197}
+  - component: {fileID: 5175327108288910923}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Scroll View
@@ -1975,6 +1996,25 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: 1
   m_LayoutPriority: 1
+--- !u!114 &5175327108288910923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7084151633785933346}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47c56c219b6ec4d4695fbbab283ec8dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u542F\u7528": 1
+  "\u6E10\u9690\u8272": {r: 0.14509805, g: 0.21960784, b: 0.28235295, a: 1}
+  "\u6E10\u9690\u9AD8\u5EA6": 48
+  "\u6700\u5927\u4E0D\u900F\u660E\u5EA6": 0.9
+  "\u9876\u90E8\u6E10\u9690": 0
+  "\u5E95\u90E8\u6E10\u9690": 1
+  "\u6A2A\u5411\u6E10\u9690": 0
 --- !u!1 &7283877709900206485
 GameObject:
   m_ObjectHideFlags: 0

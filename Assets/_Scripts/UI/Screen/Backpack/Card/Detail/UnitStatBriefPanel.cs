@@ -19,9 +19,12 @@ namespace GIC.UI
         // 行图标（原神官方属性图标，StatRowView.LoadStatIcon 加载）；null=槽位留空
         private static readonly string[] 行图标 = { "stat_hp", "stat_attack", "stat_defense", "stat_energy", "stat_mastery", "stat_luck", "stat_sanity" };
 
-        [Header("行底斑马纹（元素主题色）")]
-        [SerializeField, Range(0f, 1f)] private float 主题明条不透明度 = 0.55f;
-        [SerializeField, Range(0f, 1f)] private float 主题暗条不透明度 = 0.25f;
+        // 行底=「元素主题色 × 暗化系数」的深色条：浅底配白字对比度实测仅 1.70:1，
+        // 暗化后 ≈8:1（与全部数据面板同为「深底白字」口径）
+        [Header("行底斑马纹（元素主题色暗化）")]
+        [SerializeField, Range(0.05f, 1f)] private float 元素色暗化系数 = 0.40f;
+        [SerializeField, Range(0f, 1f)] private float 主题明条不透明度 = 0.85f;
+        [SerializeField, Range(0f, 1f)] private float 主题暗条不透明度 = 0.55f;
 
         public void Init(UnitConfig.UnitData raw)
         {
@@ -35,11 +38,12 @@ namespace GIC.UI
             行列表[5].SetValue($"{raw.GetEffectiveLuck():N0}"); // 幸运/理智=平值（非百分比）
             行列表[6].SetValue($"{raw.GetEffectiveSanity():N0}");
 
-            // 行图标=原神官方属性图标；行底=元素主题色明暗相间斑马纹（大背景退役后条底承主题色）
+            // 行图标=原神官方属性图标；行底=元素主题色暗化后的深色条（明暗相间斑马纹）——浅底白字不可读，须暗化
             var config = ElementFactionConfig.Instance;
             var elementColor = config != null
                 ? config.GetElementColor(raw.selfElement)
                 : new Color(0.31f, 0.63f, 0.94f);
+            elementColor = new Color(elementColor.r, elementColor.g, elementColor.b) * 元素色暗化系数;
             for (int i = 0; i < 行列表.Length; i++)
             {
                 行列表[i].SetIcon(i < 行图标.Length ? StatRowView.LoadStatIcon(行图标[i]) : null);
