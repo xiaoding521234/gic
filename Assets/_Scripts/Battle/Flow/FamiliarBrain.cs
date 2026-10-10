@@ -69,6 +69,8 @@ namespace GIC.Battle
         /// 单源——某敌贴身已到/不可达即换下一个目标，被挡由 MovementResolver 结算截回——被挡也算
         /// 已使用，眷属无体力配额=层级表 0 档）；
         /// ④无敌人/全场敌都无逼近步 → 缺席。
+        /// v8（2026-10-10 拍板「可达性预判」）：移动档先算逼近步再判视野/距离——不可达敌（水上/
+        /// 虚空/被围）直接跳过，避免「追一个永远打不到的目标，却忘了攻城」的傻站行为。
         /// E-1 对手建模复用（docs/active/33 §2.1）：public 即预测器入口——启发式纯函数（同快照
         /// 恒同输出），配额脑对敌方眷属的预测=本方法原样直跑（「行为可被玩家轻易预测」决策三十一
         /// 特性的 AI 侧对偶——AI 玩家同样按可预测模型推演敌方眷属）
@@ -119,15 +121,17 @@ namespace GIC.Battle
 
                 foreach (var target in enemies)
                 {
+                    // 可达性预判（2026-10-10 拍板）：先算逼近步，不可达（水上/虚空/被围）直接跳过——
+                    // 避免「追一个永远打不到的目标，却忘了攻城」的傻站行为。核心也走同一口（防御性统一）。
+                    var steps = BattleHeuristics.FindApproachStraightSteps(sim, unit, sim.GetPosition(target), moveSteps, out var moveDirection);
+                    if (steps <= 0) continue; // 打不到也走不近：换下一个目标（最终会轮到核心）
+
                     if (target != core)
                     {
                         int targetDist = selfPos.ChebyshevTo(sim.GetPosition(target));
                         if (targetDist > attackVision) continue; // 攻击视野外：不关心（CR 式感知）
                         if (targetDist >= coreDist) continue;   // 不严格近于核心：不追（同距核心优先）
                     }
-
-                    var steps = BattleHeuristics.FindApproachStraightSteps(sim, unit, sim.GetPosition(target), moveSteps, out var moveDirection);
-                    if (steps <= 0) continue; // 该敌打不了也走不近：换下一个目标
 
                     return new ActionData
                     {
