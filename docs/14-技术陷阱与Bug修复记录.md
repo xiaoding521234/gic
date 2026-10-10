@@ -1970,3 +1970,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **④涉局期文件操作分级（用户 Play 中报障时）**：prefab/资产 YAML 的磁盘修改**安全**（重导入不杀 Play、池化实例=内存克隆不受影响；修复重启 Play 后才对新实例生效）；**.cs 改动危险**（编辑器焦点触发重编译会杀/冻结运行时会话，代码类修复等退出 Play）；exec_editor_script（自动退 Play）/exec_runtime_script（自动恢复暂停）均不可用——涉局取证与修复唯一安全路径=纯文件操作（rg/read_file/replace/Node 脚本），refresh 终验推迟到用户退出 Play。
 
 **⑤遗留认知（勿当 bug 修）**：背包主详情实例仍挂决策六十一前的「加组件覆写」本地 UnitDetailPanel（与源内烘焙的重复、静默死重：无 Init 恒 _lastRaw 空，仅多挂一次同参点击监听）+实例 `m_RemovedGameObjects` 悬空条目（目标 fileID 在源内已不存在，加载即忽略）——均无害保留。
+
+## §137 exec_editor_script 桥三坑：中文面值必炸 / GetField-by-name 连续 NRE / 并行会话内存接线未落盘（2026-10-10 箭雨接入批实证）
+
+**①脚本源码含中文字符串字面量必炸**：GetField("动作片播放速度") 类调用经桥传输后恒 null → 链式 `.GetValue` 直接 NRE。规避=字段定位走「GetFields 枚举+类型签名过滤」（VideoClip/float/Vector2 消歧，double_shot 的 1.29/1.002/(0.054,-0.01) 值型可互证）或码位 dump 后以 `\uXXXX` 拼装（码位取自运行时观测勿凭记忆——2026-10-01 规则）；中文出现在**输出侧**（打印 f.Name）安全无碍。
+
+**②GetField-by-name 连 ASCII 字面量也炸（根因未定案勿再押）**："totalTime"/"clips" 两脚本 NRE、判空守卫齐全仍炸（同会话 GetField(so,"data") 又正常——成功/失败分界不在字面量种类）；SerializedObject.FindProperty/FindPropertyRelative 与 GetFields 枚举两路径同批全过。**时轮/资产写值正解二选一**：A=YAML 手术（时轮资产字段全 ASCII：totalTime/clips/trackType(int 枚举)/startTime/endTime/cueName——replace 定点六处+refresh 重导入+域重载 FindProperty 终验，2026-10-10 一次成）；B=SerializedProperty。反射 GetField-by-name 路径在 SkillTimelineAsset 上勿再用。
+
+**③并行会话内存接线未落盘**：运行时反射读到 SkillData.动作视频已接线、但磁盘 YAML 与 git status 均无——并行会话编辑器脚本 SetDirty 后未 SaveAssets（域重载扛得过、**编辑器重启即丢**）。发现态三不一致判据=「运行时有值 / 磁盘无引用 / 资产不在 git modified」；修法=load→SetDirty→SaveAssets 纯 flush 脚本（零字段访问=零桥雷）+磁盘 grep 验证；真值口径=运行时解析路径（meta 侧 guid 密文勿用文本比对，资产侧 guid 明文可 grep）。

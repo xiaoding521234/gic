@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c6533f0ad4c87bb418d72e2737dbec72, type: 3}
   m_Name: Amber_ArrowRain
   m_EditorClassIdentifier: 
-  totalTime: 1.25
+  totalTime: 2.04
   aimMode: 0
   clips:
   - trackType: 1
     startTime: 0
-    endTime: 0.3
+    endTime: 0.9
     kind: 0
     hitInterval: 0
     projectileSpeed: 0
@@ -25,8 +25,8 @@ MonoBehaviour:
     maxRange: 0
     cueName: draw_bow
   - trackType: 2
-    startTime: 0.3
-    endTime: 0.3
+    startTime: 1.1
+    endTime: 1.1
     kind: 2
     hitInterval: 0.15
     projectileSpeed: 0
@@ -34,8 +34,8 @@ MonoBehaviour:
     maxRange: 0
     cueName: 
   - trackType: 4
-    startTime: 0.3
-    endTime: 0.3
+    startTime: 0.9
+    endTime: 0.9
     kind: 0
     hitInterval: 0
     projectileSpeed: 0
@@ -43,8 +43,8 @@ MonoBehaviour:
     maxRange: 0
     cueName: arrow_rain_release
   - trackType: 1
-    startTime: 0.75
-    endTime: 1.25
+    startTime: 1.55
+    endTime: 2.04
     kind: 0
     hitInterval: 0
     projectileSpeed: 0
@@ -52,8 +52,8 @@ MonoBehaviour:
     maxRange: 0
     cueName: recover
   - trackType: 3
-    startTime: 0.3
-    endTime: 0.75
+    startTime: 1.1
+    endTime: 1.55
     kind: 0
     hitInterval: 0
     projectileSpeed: 0
