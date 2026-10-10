@@ -12,15 +12,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c6533f0ad4c87bb418d72e2737dbec72, type: 3}
   m_Name: Kaeya_Frostgnaw
   m_EditorClassIdentifier: 
-  totalTime: 0.5
+  totalTime: 1.54
   aimMode: 0
   clips:
   - trackType: 2
-    startTime: 0
-    endTime: 0.5
+    startTime: 0.4
+    endTime: 0.4
     kind: 2
     hitInterval: 0
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 2
+    projectileHeight: 0
     cueName: 
+  - trackType: 1
+    startTime: 0
+    endTime: 0.4
+    kind: 0
+    hitInterval: 0
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    projectileHeight: 0
+    cueName: thrust
+  - trackType: 1
+    startTime: 1
+    endTime: 1.54
+    kind: 0
+    hitInterval: 0
+    projectileSpeed: 0
+    hitDiameter: 0
+    maxRange: 0
+    projectileHeight: 0
+    cueName: recover

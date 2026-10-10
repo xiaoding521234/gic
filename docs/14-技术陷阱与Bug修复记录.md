@@ -1978,3 +1978,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **②GetField-by-name 连 ASCII 字面量也炸（根因未定案勿再押）**："totalTime"/"clips" 两脚本 NRE、判空守卫齐全仍炸（同会话 GetField(so,"data") 又正常——成功/失败分界不在字面量种类）；SerializedObject.FindProperty/FindPropertyRelative 与 GetFields 枚举两路径同批全过。**时轮/资产写值正解二选一**：A=YAML 手术（时轮资产字段全 ASCII：totalTime/clips/trackType(int 枚举)/startTime/endTime/cueName——replace 定点六处+refresh 重导入+域重载 FindProperty 终验，2026-10-10 一次成）；B=SerializedProperty。反射 GetField-by-name 路径在 SkillTimelineAsset 上勿再用。
 
 **③并行会话内存接线未落盘**：运行时反射读到 SkillData.动作视频已接线、但磁盘 YAML 与 git status 均无——并行会话编辑器脚本 SetDirty 后未 SaveAssets（域重载扛得过、**编辑器重启即丢**）。发现态三不一致判据=「运行时有值 / 磁盘无引用 / 资产不在 git modified」；修法=load→SetDirty→SaveAssets 纯 flush 脚本（零字段访问=零桥雷）+磁盘 grep 验证；真值口径=运行时解析路径（meta 侧 guid 密文勿用文本比对，资产侧 guid 明文可 grep）。
+
+## §138 动作片稳定化批五坑：钉位 by construction 判据 / 质心锚相位偏置 / NCC 反馈门 / 填幕采样 / 画布异高缩放补偿公式（2026-10-11 凯亚霜袭动作片接入批实证）
+
+**①「稳定化是否达标」的判据=钉位 by construction，外观后验只作旁证**：探针口径恒定即钉位恒定——被钉物理点在探针坐标里逐帧恒等是构造性事实（v3 全片 124 帧零丢失）；NCC/外观模板对 f0 的位移残差只在姿态≈f0 时可测（plateau 姿态分 0.14-0.2=不可测≠钉错），低分帧残差是模板偏差非位置误差。v2 被否三病灶=只平 x（y 从未抵消）+整数量化+smoothstep 形状先验替实测（收腿段人为滑脚）——「钉死」语义下三者全违规，实测 stab2 脚位 x spread 270px / y spread 66px。
+
+**②追踪锚=团整数左下角，勿用质心/条带精化**：质心随团内容变化产生相位偏置——待机双脚并拢段 vs 弓步单脚段质心语义漂 8-12px（f98-99 NCC 高分 0.85 仍残 11-12px 实锤）；v3.5 条带/中位数精化版把斜靴条带读偏 6-13px、y 相位直接烧掉。团宽≥20px 过滤排剑尖/披风碎片（12-16px 瞬态物）。
+
+**③NCC 残差反馈必须高分门**：0.35/0.5 门把运动模糊帧的任意峰回灌=注入真误差（两轮 pass2 均值 5.25→6.2/7.6 均劣于 pass1 的 1.6-2.4 实证）；0.6 高分门单遍只收高置信帧（f98-99 落地段 12px 真错位实修）。落地/踮跟帧探针暗色底沿≠真踩地点=物理模糊区，高分 NCC 是该区唯一可信修正源。
+
+**④画布四向填幕=采样真背景绿中位数**：行均值延伸会因顶缘发色行把顶 pad 填出暗条（content bbox 顶到画布缘 T=0 假告警+keyed alpha 恒实体）——采样纯绿区（左缘列中位数）一次修复。
+
+**⑤缩放补偿公式画布异高必须归一**：SkillConfig tooltip 的裸像素比（idle 主体高/动作片主体高，安柏 554/430=1.29）只在两片**画布同高**（安柏 768/768）时成立；竖幅 idle 循环片（768×1086，R3b 配方后新角色全为此形态）+宽幅动作片（1520×816）必须用 (idle主体/idle画布高)÷(动作片主体/动作片画布高)——凯亚 =(1058/1086)/(426/816)=1.866（裸比 2.47 会大 33%）。位置偏移对齐基准=「钉死脚跟角」对 idle 片右脚角（bbox 中心被剑/披风偏置 3-8px）；播放速度=片长铺满 totalTime（1.5417/1.54≈1.001）。全案工具链与配方=gic-paperdoll skill 稳定化节。
