@@ -36,6 +36,8 @@ namespace GIC.UI
 
         private void Apply()
         {
+            // OnRectTransformDimensionsChange 可在 Awake 之前触发（Instantiate 期间引擎重建 RectTransform）
+            if (_rt == null) _rt = (RectTransform)transform;
             var parent = _rt.parent as RectTransform;
             if (parent == null) return;
             float parentH = parent.rect.height;

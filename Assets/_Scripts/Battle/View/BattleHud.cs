@@ -155,6 +155,12 @@ namespace GIC.Battle
         // 技能详情（现有体系复用：Resources/Prefabs/UI/Skill/SkillDetailPanel.prefab）
         private SkillDetailView _skillDetailView;
 
+        /// <summary>技能详情面板烘焙停泊位（右侧，ResolveSkillPopup 读回）：非摆位开面板
+        /// （卡牌详情内点技能图标——SkillIconView 直连 OpenPanel 无摆位链）的确定性落点，
+        /// ClosePopup 收口复位——技能键/被动盘路径每次开面板都显式重摆不受影响
+        /// （2026-10-10 追拍「和背包里一样可以点击」）</summary>
+        private Vector2 _skillPopupDockedPos;
+
         // 行动区（技能盘三键/移动/手牌/取消均为布局件——显隐走 ApplyStateVisibility，_skillZone 容器 2026-09-21 退役）
         private RectTransform _handZone;
         private RectTransform _cancelButton;
@@ -486,7 +492,7 @@ namespace GIC.Battle
                 ExitAiming();
                 DeselectUnit();
                 CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：卡瞬回原槽防悬空在拖拽层）
-                CloseHandCardDetail(); // 手牌卡详情随阶段收口（执行阶段棋盘视线让位给预览）
+                CloseHandCardDetail(); // 手牌卡详情随阶段收口（执行阶段棋盘视线让位给预览；统计面板随卡详情联动收）
                 if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
                 if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
                 // 2026-09-29 执行预览拍板「隐藏掉玩家之前打开的技能或手牌」：技能盘已随 DeselectUnit
@@ -1050,7 +1056,14 @@ namespace GIC.Battle
             if (_layoutEditing) return; // 布局编辑期棋盘交互全静默
             if (_session == null || _session.Flow.Phase != BattlePhase.Selecting) return;
             if (_camera == null || _board == null || _board.Map == null) return;
-            if (HandCardDetailOpen) { CloseHandCardDetail(); return; } // 点棋盘=收卡牌详情（同技能详情面板点外收口口径）
+            if (HandCardDetailOpen)
+            {
+                // 点棋盘=按层收顶（同技能详情面板点外收口口径）：先收卡详情内点技能图标开的
+                // 技能详情（叠在上层），再点才收卡牌详情——逐层退栈
+                if (PopupOpen) { ClosePopup(); return; }
+                CloseHandCardDetail();
+                return;
+            }
 
             if (!TryPickBoardCell(screenPos, out var cell, out bool inBounds)) return;
 
@@ -2547,8 +2560,23 @@ namespace GIC.Battle
 
         private void ClosePopup()
         {
-            if (_skillDetailView != null)
-                _skillDetailView.ClosePanel();
+            if (_skillDetailView == null) return;
+            _skillDetailView.ClosePanel();
+            // 收口复位停泊位：非摆位开面板（卡详情点技能图标）下次仍落确定性停泊位；
+            // 技能键/被动盘路径开面板前必显式重摆，复位对其零影响（面板收态不可见，写位无副作用）
+            _skillDetailView.RepositionPanel(_skillPopupDockedPos);
+        }
+
+        /// <summary>技能详情面板打开回调（onPanelOpened 订阅，Build 分件接线）：卡牌详情内点
+        /// 技能图标开的详情面板须抬到卡详情之上——BattleCardDetail 为运行时实例挂画布最顶、
+        /// 烘焙的 BattleSkillDetail 默认 sibling 在其下，不抬升面板会被卡详情盖住半边
+        /// （2026-10-10 追拍「应当和背包里一样可以点击」）；技能键/被动盘路径卡详情必已收，
+        /// 抬升为无害空操作</summary>
+        private void OnSkillPopupOpened()
+        {
+            if (!HandCardDetailOpen) return;
+            if (_skillDetailView != null && _skillDetailView.skillDetailPanel != null)
+                _skillDetailView.skillDetailPanel.transform.SetAsLastSibling();
         }
 
         private void OnCancelButtonClicked()

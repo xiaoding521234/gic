@@ -1944,3 +1944,29 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **取证链（活体探针一发定位）**：①反射读 `BattleScreen._exitDialog`=存在且 `IsOpen=True`（**弹窗其实开着**）+`isClosing=False`（确认回调从未执行过）；②`EventSystem.RaycastAll` 全屏各点首命中=弹窗 Canvas（sortingOrder=100）的 `Dim`/`Panel`——全屏 Dim raycastTarget=True 把后续一切点击吞掉；③纯读磁盘 prefab 实锤根因：`BattleExitConfirmDialog.prefab` 两按钮 `m_OnClick.m_PersistentCalls.m_Calls: []`（**全文件 m_MethodName 零命中**=持久调用为空），`Init()` 运行时注册层也没补——按钮零监听=死链。**2026-09-22 prefab 化迁移工具只烘焙结构（节点/组件/文案/配色），事件接线不随资产走**；此前版本运行时建 UI 时代码接线在 Show 内，迁移后接线代码没跟到 Init=断链两周无察觉（中途退出战斗走此弹窗的场景罕用，平时多由 BattleOver 收尾）。Dim<Panel 兄弟序正确（按钮区域 Panel 在上可点），唯一病灶就是接线缺失。
 **修法**：①永久=运行时注册层补接（`Init()` 内 `Btn_Confirm.onClick.AddListener(ConfirmAndExit)`/`Btn_Continue→Close`——与注入/可关闭栈/活色同层，先例=BattleHud 全部按钮运行时 AddListener）；②现场救活=对已打开实例同款 AddListener（用户当场点确认退出回大厅，对局不丢）。
 **How to apply**：**prefab 化/迁移件审计清单加一条「事件接线归属」**——把运行时构建的 UI 烘焙成 prefab 时，onClick/拖拽回调等事件一律不进资产，必须在运行时注册层（Show/Init/Bind）重接；同类迁移件（一次性工具烘焙的 prefab）排查法=rg 资产文件 `m_MethodName` 零命中+运行时注册层无 AddListener=死链。「点击无反应」且弹窗类症状先查：目标实例是否已打开（IsOpen/activeInHierarchy）+onClick 实际监听数+RaycastAll 首命中归属——三者一发定位，勿先怀疑 InputLock/EventSystem（本案锁/ES 全正常）。另：**暂停中点击必然无响应**（编辑器 Pause 停摆 PlayerLoop，EventSystem 不再派发）——用户报「暂停时点也没反应」属预期，勿并入病灶。
+
+## §135 Tuanjie 编辑态脚本五连崩族：prefab 手术 API 全图鉴（2026-10-10 源自含化迁移批五轮 SIGSEGV 实证；dump×5 长存=.codely-cli/tmp/crash-1010-unloadcontents/）
+
+**症状**：2026-10-10 架构收口批（CardDetailPanel 源 prefab 自含化）连续五轮编辑器 SIGSEGV 静默退出（桥报 "Unity TCP socket ended"），每轮崩点不同、全部发生于编辑态脚本 prefab 手术。
+**五崩法（同一夜实证，各配 dump）**：
+- **崩法一（UnloadPrefabContents）**：`LoadPrefabContents` 隔离场景内做 SaveAsPrefabAsset+InstantiatePrefab+ApplyPrefabInstance 复合手术后 `UnloadPrefabContents→ClosePreviewScene` 拆除必 SIGSEGV（纯 load→save→unload 只读管线安全——快照工具数百次实证）；
+- **崩法二（ApplyPrefabInstance）**：场景工作台（InstantiatePrefab→`UnpackPrefabInstance(OutermostRoot)`）对嵌套实例 `ApplyPrefabInstance` 必 SIGSEGV；
+- **崩法三（场景收场）**：场景工作台结构手术后（含异常收场路径）`OpenScene` 恢复必 SIGSEGV（无异常的纯读场景收场安全）；
+- **崩法四（DestroyImmediate）**：编辑态脚本 `DestroyImmediate` 删除 Canvas 层级必 SIGSEGV——崩前恒现 `Transform has 'gCanvasRendererTransformGlobalTRSChangeSystem|gCanvasRendererSiblingHierarchyChangeSystem' change interests present when destroying the hierarchy` 警告（CanvasRenderer 变更兴趣系统未注销即销毁层级=原生崩）；
+- **崩法五（SetActive(false)）**：同族——编辑态脚本对 Canvas 层级 `SetActive(false)` 同必 SIGSEGV（随后 `Found a CanvasRenderer component that is not assigned to a GameObject. dangling Component deleted` + `SerializedObject target has been destroyed` 异常链）。
+**附实证**：SaveAsPrefabAsset 落盘后立即 LoadAssetAtPath 可空引用（用返回值勿再 Load）；嵌套实例在外层实例内时 `HasPrefabInstanceAnyOverrides(…, includeDefaultOverrides:false)` 恒 false（真覆写被归入 default 类）；插值字符串孔内三元 `?:` 的冒号被解析为格式分隔符（CS1003，包括号或字符串拼接）。
+**How to apply**：**编辑态 prefab 手术纪律**——①「实例覆写烘焙进源」用 `SaveAsPrefabAsset(实例根→源路径)` 展平烘焙（快照管线同型=全项目唯一实证安全路径），勿用 ApplyPrefabInstance；②隔离场景内只做只读管线（load→save→unload），零 Instantiate/零 Apply/零 Destroy/零 SetActive；③删 Canvas 层级=脚本禁手（Destroy/SetActive 全崩）——需要删=留在场内由 YAML 文本级摘除，或接受「不删」重设计；④结构手术排任何存盘之前（崩=磁盘零改动可重跑）、外层存盘排 Unload 之前（崩=磁盘已完整重启即成）；⑤重启编辑器后回读校验 fileID 存活（SaveAsPrefabAsset 展平会漂移源内 fileID——实例既有覆写脱落：值与新源冗余=无害，仅存覆写位〔宿主引用〕须重打）。
+
+## §136 决策六十一复测三连修：RectTransform 尺寸回调早于 Awake / 实例新增行残留双行 / 模板与清空容器同体（2026-10-10 用户游玩报障三案；含 prefab YAML 手术配方与涉局期文件操作分级）
+
+**①预热空引用刷屏**：`OnRectTransformDimensionsChange` 可在 **Awake 之前**触发（Instantiate 期间引擎重建 RectTransform），组件在 Awake 缓存的字段（如 `_rt`）走该钩子路径时是 null——OnEnable 的空守卫护不到它（OnEnable 恒在 Awake 后，本钩子不受此保护）。症状=UIManager.PrewarmLoop 实例化池化面板时连刷 NRE（BackdropMinHeight.Apply 实证 5 连）。修=该钩子链路的消费入口做惰性兜底（字段为 null 时现场重取）；后续新组件凡带此钩子一律同款守卫。
+
+**②背包卡牌详情双行元能上限**：时间线=10-07 在背包烘焙节点上加 Energy 行 → 10-08 四副本转源活实例时源只有 6 行、该行匹配不上→残留「实例新增 GameObject 覆写」+行列表覆写（Array.size=7 / data[3]=新增行 / data[4][5][6] 平移）→ 10-10 自含化烘焙把新增行吸收进源（源自此有自己的 Energy 行）→ 实例同时显示自己的新增行（真值）+ 源行（0）。修=BackpackScreen.prefab YAML 摘除：23 个本地对象文档 + 5 条行列表覆写（数组整体回落源默认）+ 1 条加对象条目；保留 tagContainer 加对象条目/宿主加组件/悬空 removed 残留（见④）。
+**YAML 手术配方（复用流程）**：编辑器脚本层级 dump 取证全部 lid（GO/RT/组件）→ `rg --no-ignore` 词边界全引用闭包扫描 → Node 脚本删行（备份先行+每步断言+删后零残留检查，断言不过不落盘）→ refresh 重导入查 0 错 → 编辑器侧结构复验。
+**嵌套实例 YAML 形态（本引擎实测）**：prefab 资产内嵌套实例文档头=`--- !u!1001 &<lid>`（Prefab 类，**不是场景里的 1003**——rg "^--- !u!1003" 零命中勿误判无实例）；`m_AddedGameObjects` 条目按新增对象的 **RectTransform lid** 登记（addedObject，非 GO lid——按 GO lid 扫登记会漏）；加组件覆写序列化为**完整本地组件文档**（字段引用实例对象走本地 remap lid）由 m_AddedComponents 登记；`AssetDatabase.TryGetGUIDAndLocalFileIdentifier` 对实例对象返回**外层文件 guid+本地 remap lid**（不是源侧 lid——源侧 lid 一律读源文件 doc 锚点验证）。
+
+**③手牌/卡牌详情二次打开 MissingReferenceException**：自含化烘焙把 skillViewPrefab 模板（嵌套 Skill 实例）烘进 **skillsPanel 子级**，而 RefreshSkillsPanel 先清空 skillsPanel 全部子级再 Instantiate 模板——Destroy 延迟到帧末使第一次 Init 成功、**缓存复用的实例第二次 Init 必炸**（战斗手牌详情必现、背包连点第二张卡潜伏同雷）。修=skillViewPrefab 改直引 **Skill.prefab 资产本体**（同组件 tagChipPrefab 引用先例；源 CardDetailPanel+BackpackScreen 宿主加组件两文件各一行）——资产永不被运行时销毁，清空循环永远碰不到它；源内遗留的几个 Skill 实例变成无害死重（首次刷新即被清）。**通则：凡「清空容器再 Instantiate 模板」模式，模板引用一律指 prefab 资产本体，不得指容器内实例对象。**
+
+**④涉局期文件操作分级（用户 Play 中报障时）**：prefab/资产 YAML 的磁盘修改**安全**（重导入不杀 Play、池化实例=内存克隆不受影响；修复重启 Play 后才对新实例生效）；**.cs 改动危险**（编辑器焦点触发重编译会杀/冻结运行时会话，代码类修复等退出 Play）；exec_editor_script（自动退 Play）/exec_runtime_script（自动恢复暂停）均不可用——涉局取证与修复唯一安全路径=纯文件操作（rg/read_file/replace/Node 脚本），refresh 终验推迟到用户退出 Play。
+
+**⑤遗留认知（勿当 bug 修）**：背包主详情实例仍挂决策六十一前的「加组件覆写」本地 UnitDetailPanel（与源内烘焙的重复、静默死重：无 Init 恒 _lastRaw 空，仅多挂一次同参点击监听）+实例 `m_RemovedGameObjects` 悬空条目（目标 fileID 在源内已不存在，加载即忽略）——均无害保留。

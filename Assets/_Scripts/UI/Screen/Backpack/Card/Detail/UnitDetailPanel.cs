@@ -135,9 +135,10 @@ namespace GIC.UI
             // 标签
             RefreshTagChips(raw, tagContainerFromCard);
 
-            // 技能面板（只读模式=纯展示：宿主（战斗 HUD）常无 skillDetailView 接线——Display 态
-            // 点选会空引用开面板，OnlyDisplay 关闭点选语义，2026-10-10 战斗手牌详情接入）
-            RefreshSkillsPanel(raw, isReadOnly);
+            // 技能面板（只读模式看宿主接线：已接 skillDetailView（如战斗手牌详情，2026-10-10 追拍
+            // 「应当和背包里一样可以点击」）=Display 可点选开详情同背包；未接宿主=OnlyDisplay 纯展示
+            // ——Display 态点选会空引用开面板，无接线宿主必须降级防 NPE）
+            RefreshSkillsPanel(raw, isReadOnly && skillDetailView == null);
 
             // 小数据面板（技能区块之下、介绍区块之上的属性摘要；默认隐藏，仅角色卡激活）
             if (数据小面板 != null)

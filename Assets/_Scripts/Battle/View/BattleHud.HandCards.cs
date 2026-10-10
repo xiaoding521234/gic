@@ -63,6 +63,12 @@ namespace GIC.Battle
         [Tooltip("自动滚动触发余量（屏幕像素）")]
         [SerializeField] private float 手牌拖拽滚动余量 = 60f;
 
+        [Header("手牌卡详情弹窗（2026-10-10 决策六十+架构收口批：直接实例化源 CardDetailPanel.prefab，宿主持摆位）")]
+        [Tooltip("卡牌详情面板中心位（画布坐标，相对画布中心）")]
+        [SerializeField] private Vector2 卡牌详情摆位 = new Vector2(0f, 70f);
+        [Tooltip("卡牌详情面板尺寸（画布单位）")]
+        [SerializeField] private Vector2 卡牌详情尺寸 = new Vector2(680.23145f, 900f);
+
         // ==================== 数据结构 ====================
 
         /// <summary>手牌卡槽条目（重建时随 RebuildHandCards 全量重建；列表序=显示序）</summary>
@@ -130,6 +136,7 @@ namespace GIC.Battle
         private float _handPlayZoneAlpha;             // 当前蒙层 alpha（平滑趋近）
         private GIC.UI.CardDetailView _handCardDetailView; // 手牌卡详情面板（懒加载实例，2026-10-10 点击手牌开详情）
         private HandCardSlot _handCardDetailSource;   // 详情面板当前展示的手牌槽（同卡再点=收起）
+        private GIC.UI.UnitStatsPanel _handStatsPanel;  // 手牌卡详情的统计面板快照实例（懒加载，2026-10-10 追拍点小数据面板可开）
         private Coroutine _handFlyRoutine;            // 回槽飞行（同刻至多一段）
         private HandCardSlot _handFlySlot;            // 飞行中的卡（rebuild/打断收口用）
 
@@ -203,6 +210,7 @@ namespace GIC.Battle
         private void OnHandCardClicked(string key)
         {
             if (Time.unscaledTime < _handSuppressClickUntil) return; // 拖拽/松手尾巴点击吞掉
+            if (PopupOpen) ClosePopup(); // 卡详情内点技能图标开的技能详情随换卡/收卡收口（手牌态弹窗只可能来自该路径）
             HandCardSlot slot = null;
             foreach (var s in _handCardSlots)
                 if (s.key == key) { slot = s; break; }
@@ -214,28 +222,65 @@ namespace GIC.Battle
         /// <summary>卡牌详情面板是否开着（OnBoardTap 点外收口用）</summary>
         private bool HandCardDetailOpen => _handCardDetailView != null && _handCardDetailView.gameObject.activeSelf;
 
-        /// <summary>手牌详情面板懒加载（Resources/Prefabs/Battle/BattleCardDetailPanel——
-        /// BackpackScreen 主实例（含 UDP/IDP/TagContainer 实例覆写全套）的快照资产，由
-        /// Tools/TG/BattleCardDetailSnapshot 烘焙；摆位/尺寸烤在 prefab，Inspector 可调）</summary>
+        /// <summary>手牌详情面板懒加载（2026-10-10 架构收口批：直接实例化**源** CardDetailPanel.prefab
+        /// ——源自含化后（Tools/TG/BackpackPanelSourceMigration 一次性迁移，UDP/IDP/TagContainer 已烘焙
+        /// 进源）源改动自动传播、快照资产退役；宿主持有摆位与宿主引用，Inspector 可调）</summary>
         private GIC.UI.CardDetailView EnsureHandCardDetail()
         {
             if (_handCardDetailView != null) return _handCardDetailView;
-            var prefab = Resources.Load<GameObject>("Prefabs/Battle/BattleCardDetailPanel");
+            var prefab = Resources.Load<GameObject>("Prefabs/Backpack/CardDetailPanel");
             if (prefab == null)
             {
-                GICLog.Warn("[BattleHud] BattleCardDetailPanel.prefab 未找到（Resources/Prefabs/Battle/）——点手牌无详情");
+                GICLog.Warn("[BattleHud] CardDetailPanel.prefab 未找到（Resources/Prefabs/Backpack/）——点手牌无详情");
                 return null;
             }
             var canvasRt = (RectTransform)_canvas.transform;
             var inst = Instantiate(prefab, canvasRt, false);
             inst.name = "BattleCardDetail";
             var rt = (RectTransform)inst.transform;
+            // 宿主摆位（源 root=背包右侧停靠锚，战斗改居中弹出——Inspector「手牌卡详情弹窗」段可调）
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = 卡牌详情摆位;
+            rt.sizeDelta = 卡牌详情尺寸;
             // 拖拽层恒在详情面板之上（先有拖拽层则插其下；否则画布最顶）
             if (_handDragLayer != null) rt.SetSiblingIndex(_handDragLayer.GetSiblingIndex());
             else rt.SetAsLastSibling();
             inst.SetActive(false);
             _handCardDetailView = inst.GetComponent<GIC.UI.CardDetailView>();
+
+            // 宿主接线（2026-10-10 追拍「应当和背包里一样可以点击」）：角色子面板接战斗技能详情
+            // 面板（点技能图标开详情同背包——UnitDetailPanel 只读分支按本接线自动回 Display 可点态）
+            // +全部数据面板接共享统计面板实例（点小数据面板开全屏统计）；两宿主字段在源内为空、
+            // 由宿主在实例化后回填
+            var udp = inst.GetComponentInChildren<GIC.UI.UnitDetailPanel>(true);
+            if (udp != null)
+            {
+                udp.skillDetailView = _skillDetailView;
+                udp.全部数据面板 = EnsureHandStatsPanel();
+            }
+            else GICLog.Warn("[BattleHud] CardDetailPanel 源缺 UnitDetailPanel（源自含化未生效？）——技能图标/数据面板不可点");
             return _handCardDetailView;
+        }
+
+        /// <summary>统计面板懒加载（Resources/Prefabs/UI/UnitStatsPanel——背包/战斗双端共享的独立
+        /// prefab，2026-10-10 架构收口批从 BackpackScreen 抽出：全屏遮罩件，组件宿主无关，只依赖
+        /// Wargame 注入的 InputManager〔IClosable 栈〕与 InputLocks——战斗语境即插即用，
+        /// 点外/右键/ESC 三路关闭自带；激活态由 Open/Close 自管理，实例化后保持烘焙隐藏态）</summary>
+        private GIC.UI.UnitStatsPanel EnsureHandStatsPanel()
+        {
+            if (_handStatsPanel != null) return _handStatsPanel;
+            var prefab = Resources.Load<GameObject>("Prefabs/UI/UnitStatsPanel");
+            if (prefab == null)
+            {
+                GICLog.Warn("[BattleHud] UnitStatsPanel.prefab 未找到（Resources/Prefabs/UI/）——点小数据面板无反应");
+                return null;
+            }
+            var canvasRt = (RectTransform)_canvas.transform;
+            var inst = Instantiate(prefab, canvasRt, false);
+            inst.name = "BattleStatsPanel";
+            ((RectTransform)inst.transform).SetAsLastSibling(); // 全屏遮罩件恒在卡详情之上（其后开的技能详情经 onPanelOpened 自行抬升）
+            _handStatsPanel = inst.GetComponent<GIC.UI.UnitStatsPanel>();
+            return _handStatsPanel;
         }
 
         /// <summary>开手牌卡详情（只读模式——手牌协议条目无 Card 组件，同关联面板卡模式口径；
@@ -252,12 +297,14 @@ namespace GIC.Battle
             view.Init(saveData);
         }
 
-        /// <summary>收手牌卡详情（点棋盘/拖起卡/进瞄准/阶段流转/进布局编辑统一收口；幂等）</summary>
+        /// <summary>收手牌卡详情（点棋盘/拖起卡/进瞄准/阶段流转/进布局编辑/rebuild 统一收口；幂等）：
+        /// 统计面板（点小数据面板开的）随卡详情一并收——它是从卡详情内打开的下层弹窗，宿主关闭须联动</summary>
         private void CloseHandCardDetail()
         {
             _handCardDetailSource = null;
             if (_handCardDetailView != null && _handCardDetailView.gameObject.activeSelf)
                 _handCardDetailView.gameObject.SetActive(false);
+            _handStatsPanel?.Close(); // 幂等（未开时 Close 早退；淡出协程由面板自理收尾）
         }
 
         // ==================== 浮层与出牌区（运行时懒建，画布子级随画布销毁） ====================
@@ -438,6 +485,7 @@ namespace GIC.Battle
             st.insertIndex = st.fromIndex;
             st.inPlayZone = PointerInPlayZone(pointer);
             CloseHandCardDetail(); // 拖起即收详情（详情悬浮在棋盘上方，让位打出流程视线）
+            if (PopupOpen) ClosePopup(); // 卡详情内点技能图标开的技能详情一并收口（悬浮面板让位拖拽视线）
             ShowHandPlayZone(true);
             if (_handScroll != null) _handScroll.StopMovement(); // 提起即断惯性（滚动壳不再处理本手势）
         }

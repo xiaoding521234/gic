@@ -59,6 +59,12 @@ namespace GIC.UI
         /// 并夹画布，2026-10-10 关联面板半遮主面板修复；背包等固定摆位宿主不订阅恒走烘焙位）</summary>
         public Action onRelatedPanelOpening;
 
+        /// <summary>详情面板打开的宿主回调（OpenPanel 内 SetActive 后调用）：战斗 HUD 用它在
+        /// 「卡牌详情内点技能图标」场景把面板抬到卡详情之上（卡详情=运行时实例挂画布最顶、烘焙的
+        /// BattleSkillDetail 默认在其下，不抬升会被盖住，2026-10-10 追拍「和背包里一样可以点击」）；
+        /// 背包等固定摆位宿主不订阅零回归</summary>
+        public Action onPanelOpened;
+
         private void Awake()
         {
             if (skillDetailPanel != null)
@@ -240,6 +246,8 @@ namespace GIC.UI
         {
             skillDetailPanel.SetActive(true);
             relatedPanel.SetActive(false);
+
+            onPanelOpened?.Invoke(); // 宿主回调（战斗 HUD：卡详情内开的详情面板须抬升到卡详情之上）
 
             if (slideCoroutine != null)
                 StopCoroutine(slideCoroutine);
