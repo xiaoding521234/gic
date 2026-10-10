@@ -81,6 +81,9 @@ namespace GIC.Pet
         [Tooltip("随机小动作的间隔范围（秒）")]
         [InspectorName("小动作间隔秒")]
         [SerializeField] private Vector2 randomAnimIntervalSec = new Vector2(25f, 55f);
+        [Tooltip("回待机保护秒：单次动作/拖拽反应播完切回待机后，这段时间内不触发随机小动作——防「播完→闪一帧待机→立即又切走」的双切换竞速（第二次惯性化捕获吃到第一次切换的瞬态输出速度，围巾/披风骨被甩出=「播完抽搐一下」根因，2026-10-11 帧级探针实锤捕获 v0=1649°/s）")]
+        [InspectorName("回待机保护秒")]
+        [SerializeField] private float idleProtectSec = 3f;
 
         [Header("出场/退场")]
         [Tooltip("进程启动后播的出场动画（完整 clip 名，空=直接待机）——首帧在 PetAnimSwapper 预热完成后播放，播完回待机")]
@@ -97,6 +100,7 @@ namespace GIC.Pet
         private float _proximityTimer;
         private float _lastGreetTime = -999f;
         private float _nextIdleAnimAt;
+        private float _idleProtectUntil;   // 回待机保护到期时刻（单次动作/拖拽反应播完回待机后 idleProtectSec 秒）
         private readonly Vector3[] _boundsCorners = new Vector3[8];
         private bool _appearPending = true;      // 首帧播出场动画（所有 Start 完成后=预热已回待机）
         private bool _exiting;                // 退场动画进行中：屏蔽一切行为触发
@@ -226,7 +230,7 @@ namespace GIC.Pet
             // 随机小动作：光标不在旁边且无物理交互（拖拽/收尾）时才轮换——在旁时留给打招呼/
             // 视线跟随；物理交互期（拎起/收尾）不叠新动作，保持拖拽体验纯粹（2026-08-26）；
             // 边坐掉落中/坐定中同样压制（空中别穿插单次动作；坐下就纯坐——2026-08-27 拍板）
-            if (enableRandomAnim && !proximity && !edgeSitFalling && !IsSeated && !host.PhysicsBusy && randomAnims.Length > 0 && Time.time >= _nextIdleAnimAt)
+            if (enableRandomAnim && !proximity && !edgeSitFalling && !IsSeated && !host.PhysicsBusy && randomAnims.Length > 0 && Time.time >= _nextIdleAnimAt && Time.time >= _idleProtectUntil)
             {
                 PlayOneShot(randomAnims[Random.Range(0, randomAnims.Length)]);
                 _nextIdleAnimAt = Time.time + Random.Range(randomAnimIntervalSec.x, randomAnimIntervalSec.y);
@@ -287,6 +291,7 @@ namespace GIC.Pet
                 // （坐定中=已接管播了坐姿）；原代码这里按 `宿主 is PetInGameHostController` 空跳过，
                 // 游戏内松手后 Drag01 循环永不切回=保持被拖拽姿势（2026-08-28 用户报障根因，已合一）
                 animPlayer.Play(currentIdleAnim);
+                _idleProtectUntil = Time.time + idleProtectSec; // 同 oneShotFrame：短拖无反应直接回待机也起保护（同款竞速窗口）
             }
         }
 
@@ -337,6 +342,7 @@ namespace GIC.Pet
                     else blinkCtrl?.SetSilence(false);
                     host.PauseHitBaking = false;
                     animPlayer.Play(currentIdleAnim);
+                    _idleProtectUntil = Time.time + idleProtectSec; // 回待机保护起表：反应播完的下一帧随机小动作不得立即抢切（双切换竞速=播完抽搐，见 回待机保护秒 注释）
                 }
             }
         }

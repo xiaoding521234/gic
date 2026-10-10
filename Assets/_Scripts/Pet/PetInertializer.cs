@@ -200,6 +200,7 @@ namespace GIC.Pet
                     _posV0[i] = vCap - x0 * (pullCoef / tf);
                     _active[i] = true;
                 }
+                else { _posX0[i] = 0f; _posV0[i] = 0f; } // 通道未激活必须清零（x0 与 v0 都要）：输出层对 active 骨两通道都求值，残留旧捕获系数=幽灵位置跳变（2026-10-11 陈旧系数抽搐案根因）
 
                 // 旋转：偏移=curr·target⁻¹ 轴角，v0=单帧实际增量 dq 在偏移轴上的投影−拉引
                 Quaternion q0 = currRot * Quaternion.Inverse(targetRot);
@@ -248,6 +249,15 @@ namespace GIC.Pet
                         if (v0 > 0f) diag_reverse++;       // 捕获速度仍朝远离目标方向（起步先反向走）
                         if (Mathf.Abs(v0 - pullV) < 0.05f) diag_center++;
                     }
+                }
+                else
+                {
+                    // 旋转通道未激活必须清零（位置通道激活时输出层仍求值本通道）：残留上一次捕获的
+                    // _rotX0/_rotAxes 会让 AngleAxis(旧x0,旧轴)·target 产生幽灵旋转——Shy/Anger 播完回待机时
+                    // 躯干链/围巾骨被旧系数甩 10-34° 再衰减回来=「播完抽搐一下」根因（2026-10-11 探针实锤：
+                    // Shy→Standby 捕获时 Spine/Spine1/Neck 全挂上一捕获的 23.4/33.8/22.3° 旧值）
+                    _rotX0[i] = 0f;
+                    _rotV0[i] = 0f;
                 }
             }
 

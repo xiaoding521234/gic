@@ -51,7 +51,7 @@ namespace GIC.Pet
         [Header("过渡")]
         [Tooltip("动作切换过渡时长（秒）——惯性化模式=偏移衰减时长；CrossFade 兜底模式=线性混合窗口（过渡期双 clip 双采样，过长则混合开销放大顿挫）")]
         [InspectorName("动作过渡秒")]
-        [SerializeField] private float animTransitionSec = 0.6f;
+        [SerializeField] private float animTransitionSec = 0.3f;
         [Tooltip("惯性化层（Gears of War 4 式切换：硬切+当前姿势/速度 C2 衰减归零）。空/禁用=回退 CrossFade 线性混合")]
         [InspectorName("惯性化器")]
         [SerializeField] private PetInertializer inertializer;
