@@ -297,9 +297,13 @@ namespace GIC.Battle
                     sign * _avatarVideoFlipBaseScale.y * aspect * scaleCompensation,
                     _avatarVideoFlipBaseScale.y * scaleCompensation,
                     _avatarVideoFlipBaseScale.z);
-                // 位置微调（B-S4c 校准）：播放期间偏移基准位，播完/被打断经 RestoreIdleVideoSurface 恢复
+                // 位置微调（B-S4c 校准）：播放期间偏移基准位，播完/被打断经 RestoreIdleVideoSurface 恢复。
+                // x 分量随朝向 sign（2026-10-11 凯亚霜袭向左刺报障）：宽幅动作片画布内主体常不居中，
+                // 位置偏移本质=把画布内偏置的主体拉回单位锚点——镜像（localScale.x 翻负）沿画布中心轴
+                // 翻转，主体偏置随之换侧，补偿方向必须同步翻转；安柏画布主体近居中（偏 57px≈0.2 格）
+                // 未暴露，凯亚稳定化画布主体偏 301px→朝左刺偏右 ~1.4 格实锤
                 _avatarVideoFlip.localPosition = new Vector3(
-                    _avatarVideoFlipBasePosition.x + 位置偏移.x,
+                    _avatarVideoFlipBasePosition.x + sign * 位置偏移.x,
                     _avatarVideoFlipBasePosition.y + 位置偏移.y,
                     _avatarVideoFlipBasePosition.z);
             }
@@ -350,7 +354,7 @@ namespace GIC.Battle
 
         /// <summary>回待机循环常态（2026-10-05 决策四十四抽提两路共用：一次性动作片播完回切 +
         /// 移动循环态结束 SetMoveAnimation(false)）：主 RT 回接+quad 原比例与基准位（RestoreIdleVideoSurface）+
-        /// 回放速度归 1+待机片随机相位续播；冻结/尸体态 Pause 停摆</summary>
+        /// 回放速度归 1+待机片 t=0 起播；冻结/尸体态 Pause 停摆</summary>
         private void SwitchToIdleLoop(VideoPlayer source)
         {
             var idle = _idleVideoClip;
@@ -359,8 +363,10 @@ namespace GIC.Battle
             source.playbackSpeed = 1f;
             source.isLooping = true;
             source.clip = idle;
-            if (idle.length > 0.0)
-                source.time = UnityEngine.Random.Range(0f, (float)idle.length);
+            // 回切固定 t=0 起播（2026-10-11 用户拍板 A：随机相位起播在「动作片收势→待机」瞬间可见跳变；
+            // 固定起点=姿态衔接可预测。建场相位仍随机（Create 处多枚错开保留）——回切后各自循环
+            // 时间独立，相位随播放自然分岔，不叠加）
+            source.time = 0f;
             if (IsCorpse || IsFrozen)
             {
                 if (source.isPlaying) { source.Pause(); _videoHalted = true; }
