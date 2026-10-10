@@ -80,7 +80,7 @@ namespace GIC.Pet
         };
         [Tooltip("随机小动作的间隔范围（秒）")]
         [InspectorName("小动作间隔秒")]
-        [SerializeField] private Vector2 randomAnimIntervalSec = new Vector2(25f, 55f);
+        [SerializeField] private Vector2 randomAnimIntervalSec = new Vector2(15f, 20f);
         [Tooltip("回待机保护秒：单次动作/拖拽反应播完切回待机后，这段时间内不触发随机小动作——防「播完→闪一帧待机→立即又切走」的双切换竞速（第二次惯性化捕获吃到第一次切换的瞬态输出速度，围巾/披风骨被甩出=「播完抽搐一下」根因，2026-10-11 帧级探针实锤捕获 v0=1649°/s）")]
         [InspectorName("回待机保护秒")]
         [SerializeField] private float idleProtectSec = 3f;
