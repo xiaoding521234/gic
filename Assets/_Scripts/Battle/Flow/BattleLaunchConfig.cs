@@ -7,7 +7,8 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 开局玩家配置（B1：真人/AI 补位；B7 LAN 时经网络下发同一结构）
+    /// 开局玩家配置（房间名册 → 战斗场景的传递载体；2026-10-11 联机批带队伍/颜色/出生点——
+    /// 房间选择真实进局内）。
     /// </summary>
     [Serializable]
     public class BattlePlayerSetup
@@ -15,6 +16,15 @@ namespace GIC.Battle
         public string PlayerId;
         public string DisplayName;
         public bool IsAI;
+
+        /// <summary>队伍（房间小队=局内阵营：同队友军/异队敌对，引擎原生语义）</summary>
+        public TeamType Team = TeamType.A;
+
+        /// <summary>玩家颜色（房间选色=局内玩家色：HUD 队营色/预览标记等）</summary>
+        public PlayerColor Color = PlayerColor.Red;
+
+        /// <summary>出生位置（Random=开局按序自动分配未占用出生区；否则=地图出生区序号）</summary>
+        public SpawnPositionType SpawnPosition = SpawnPositionType.Random;
     }
 
     /// <summary>
@@ -29,6 +39,11 @@ namespace GIC.Battle
         public string MapConfigName = DefaultMapName;
         public List<BattlePlayerSetup> Players = new List<BattlePlayerSetup>();
 
+        /// <summary>LAN 对局标记（B7，2026-10-11 联机批）：true=经 StartBattleEvent 广播而来——
+        /// 各端据此选装配形态（host=CreateHosted / 客户端=CreateClient），且开局转场不拆网络连接；
+        /// 本地直开（调试/沙盒/纯 AI 对战）false=CreateLocal 旧链路</summary>
+        public bool IsNetworked;
+
         /// <summary>试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A 方=正在编辑时轮的持有单位
         /// （层级覆盖 5★魔神档=玩家全手操全部技能）；B 方=木桩空座（IsAI=false：配额脑不挂=木桩纯站桩，
         /// 选择阶段经 Sim.SandboxAutoPassPlayerId 即时自动 Pass 不拖节奏）；阵容走沙盒 spawn
@@ -39,7 +54,7 @@ namespace GIC.Battle
 
         /// <summary>战斗种子（2026-10-02 幸运暴击批）：模拟核心概率事件唯一随机源的初始化种子
         /// （Host 端 BattleSimState 按 seed 建 System.Random，同 seed+同命令序列=同战局——回放/复现/
-        /// 联机防漂移；客户端零 roll 不消费）。BuildSinglePlayer 自动随机生成；测试/复现可显式注入；
+        /// 联机防漂移；客户端零 roll 不消费）。BuildFromRoster 自动随机生成；测试/复现可显式注入；
         /// 未经本工厂直接 new 的配置 Seed=0=确定性种子（合法，仅同输入对局暴击序列一致）。
         /// B7 LAN：Host 广播本配置即双端同 seed</summary>
         public int Seed;
@@ -74,38 +89,31 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 单人开局配置（真人 + AI 补位对手；当前即可开一把；B7 换真人入座）。
-        /// 只构造不触发加载——预载路径（CoopScreen 预载+激活）用 Prepare 写入后再激活场景。
+        /// 从房间名册构建开局配置（2026-10-11 联机批唯一正式工厂；BuildSinglePlayer/AI 自动补位已退役——
+        /// 单人开局=房间内手动「增加AI玩家」）。只构造不触发加载——CoopScreen 开局转场用 Prepare 写入。
         /// </summary>
-        public static BattleLaunchConfig BuildSinglePlayer(string mapConfigName)
+        public static BattleLaunchConfig BuildFromRoster(string mapConfigName, IEnumerable<PlayerInfo> players)
         {
-            return new BattleLaunchConfig
+            var config = new BattleLaunchConfig
             {
                 MapConfigName = string.IsNullOrEmpty(mapConfigName) ? DefaultMapName : mapConfigName,
                 // 种子用表现层 UnityEngine.Random 生成（开局壳层，不入模拟流；模拟核心禁该随机源）
                 Seed = UnityEngine.Random.Range(0, int.MaxValue),
-                Players = new List<BattlePlayerSetup>
-                {
-                    new BattlePlayerSetup
-                    {
-                        PlayerId = BattleDebugPlayerIds.P1,
-                        DisplayName = "玩家",
-                        IsAI = false,
-                    },
-                    new BattlePlayerSetup
-                    {
-                        PlayerId = BattleDebugPlayerIds.P2,
-                        DisplayName = "AI 玩家",
-                        IsAI = true,
-                    },
-                },
+                Players = new List<BattlePlayerSetup>(),
             };
-        }
-
-        /// <summary>以指定配置开战（同步启动加载协程）</summary>
-        public static void LaunchSinglePlayer(string mapConfigName)
-        {
-            Launch(BuildSinglePlayer(mapConfigName));
+            foreach (var p in players)
+            {
+                config.Players.Add(new BattlePlayerSetup
+                {
+                    PlayerId = p.PlayerID,
+                    DisplayName = p.PlayerName,
+                    IsAI = p.IsAI,
+                    Team = p.Team,
+                    Color = p.Color,
+                    SpawnPosition = p.SpawnPosition,
+                });
+            }
+            return config;
         }
 
         /// <summary>试招沙盒开局配置（时轮编辑器「开一把试招」入口，2026-10-05）：P1 真人手操试探单位、

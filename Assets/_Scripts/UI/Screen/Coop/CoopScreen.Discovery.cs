@@ -139,12 +139,22 @@ namespace GIC.UI
 
         /// <summary>
         /// 地图下拉填充为真实可用的战场清单（Resources/Configs 下的 BattleMapConfig）。
-        /// B1 仅一张地图；后续新增地图 asset 自动进下拉。
+        /// 2026-10-11 联机批：选图权威化——下拉仅 host 可操作，变更经 SetMapRequestEvent 上报服务器、
+        /// 广播 UpdateRoomInfoEvent 全端同步（各端下拉只读镜像权威状态）；GetSelectedMapConfig 一律
+        /// 按 RoomManager.RoomMapConfigName 解析（下拉本地索引仅为显示）。
         /// </summary>
         void InitBoardDropdown()
         {
             if (boardDropdown == null) return;
-            boardDropdown.onValueChanged.AddListener(_ => UpdateRoomPanel());
+            // host：选图上报权威；客户端：无监听（下拉不可交互，仅同步显示）
+            boardDropdown.onValueChanged.AddListener(index =>
+            {
+                if (_currentState != RoomState.Host || _roomManager == null) return;
+                var map = MapAt(index);
+                if (map != null)
+                    EventBusHub.Instance.Send(new SetMapRequestEvent { MapConfigName = map.name });
+                UpdateRoomPanel();
+            });
             boardDropdown.ClearOptions();
 
             _battleMaps = new List<BattleMapConfig>(Resources.LoadAll<BattleMapConfig>("Configs"));
@@ -165,24 +175,58 @@ namespace GIC.UI
             boardDropdown.RefreshShownValue();
         }
 
+        /// <summary>按下拉索引取地图资产（越界 null）</summary>
+        internal BattleMapConfig MapAt(int index)
+        {
+            if (_battleMaps == null || index < 0 || index >= _battleMaps.Count) return null;
+            return _battleMaps[index];
+        }
+
         /// <summary>
-        /// 当前选中的地图配置（下拉索引 ↔ _battleMaps 顺序）；空表返回 null
+        /// 当前选中的地图配置（**权威解析**=RoomManager.RoomMapConfigName 按名匹配本地清单；
+        /// 权威名缺失/未匹配回落下拉索引——纯本机兜底，2026-10-11 联机批）
         /// </summary>
         internal BattleMapConfig GetSelectedMapConfig()
         {
             if (_battleMaps == null || _battleMaps.Count == 0) return null;
+            string authoritative = _roomManager != null ? _roomManager.RoomMapConfigName : null;
+            if (!string.IsNullOrEmpty(authoritative))
+            {
+                foreach (var map in _battleMaps)
+                    if (map.name == authoritative) return map;
+            }
             int index = boardDropdown != null ? boardDropdown.value : 0;
             if (index < 0 || index >= _battleMaps.Count) index = 0;
             return _battleMaps[index];
         }
 
         /// <summary>
-        /// 当前选中的地图资产名（下拉索引 ↔ _battleMaps 顺序）
+        /// 当前选中的地图资产名（权威名直出；权威缺失回落下拉索引资产名）
         /// </summary>
         internal string GetSelectedMapConfigName()
         {
             var map = GetSelectedMapConfig();
             return map != null ? map.name : BattleLaunchConfig.DefaultMapName;
+        }
+
+        /// <summary>下拉选中同步到权威地图名（进房间/权威变化时；无通知防回环）</summary>
+        internal void SyncBoardDropdownToAuthority()
+        {
+            if (boardDropdown == null || _battleMaps == null) return;
+            string authoritative = _roomManager != null ? _roomManager.RoomMapConfigName : null;
+            if (string.IsNullOrEmpty(authoritative))
+            {
+                if (boardDropdown.value != 0) boardDropdown.SetValueWithoutNotify(0);
+                return;
+            }
+            for (int i = 0; i < _battleMaps.Count; i++)
+            {
+                if (_battleMaps[i].name == authoritative)
+                {
+                    if (boardDropdown.value != i) boardDropdown.SetValueWithoutNotify(i);
+                    return;
+                }
+            }
         }
 
         #endregion

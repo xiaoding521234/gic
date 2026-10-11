@@ -11,6 +11,20 @@ namespace GIC.Battle
     /// </summary>
     public static class BattlePlayerColors
     {
+        /// <summary>
+        /// 会话级解析单出口（2026-10-11 联机批）：房间选色=局内玩家色——Roster（房间名册投影）
+        /// 命中即用房间色（LAN 客户端无 Sim 也成立）；无 Roster 条目（调试直开/异常回落）走旧
+        /// BattlePalette 两表口径。全部消费方（HUD 头像描环/快捷面板/执行预览/头顶 Buff 源描环）
+        /// 统一改走本重载，勿直调 Sim 版。
+        /// </summary>
+        public static Color Resolve(BattleSession session, string myPlayerId, string playerId)
+        {
+            if (session != null && !string.IsNullOrEmpty(playerId)
+                && session.TryGetRosterColor(playerId, out var roomColor))
+                return roomColor;
+            return Resolve(session?.Sim, myPlayerId, playerId);
+        }
+
         public static Color Resolve(BattleSimState sim, string myPlayerId, string playerId)
         {
             var palette = BattlePalette.Instance;

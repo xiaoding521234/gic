@@ -70,14 +70,15 @@ namespace GIC.Battle
             public Coroutine tweenRoutine;                        // 槽位补间协程（新补间前先停）
         }
 
-        /// <summary>装配（Bind 链调用；自注入后订阅三事件，OnDestroy 对称退订。幂等守卫防二次 Init 双订阅）</summary>
+        /// <summary>装配（Bind 链调用；自注入后订阅三事件，OnDestroy 对称退订。幂等守卫防二次 Init 双订阅）
+        /// 2026-10-11 联机批：相位订阅改走 BattleSession 门面（LAN 客户端 Flow=null，消息派生同构）</summary>
         public void Init(BattleSession session, string myPlayerId)
         {
             if (_session != null) return;
             _session = session;
             _myPlayerId = myPlayerId;
             Wargame.Instance?.Context?.Inject(this); // [Autowired] UnitConfig（BattlePlayer.Bind 同模式）
-            _session.Flow.OnPhaseChanged += OnPhaseChanged;
+            _session.OnPhaseChanged += OnPhaseChanged;
             _session.Player.TurnPlanUpdated += OnTurnPlan;
             _session.Player.OnSegmentPlaying += OnSegmentPlaying;
         }
@@ -85,7 +86,7 @@ namespace GIC.Battle
         private void OnDestroy()
         {
             if (_session == null) return;
-            if (_session.Flow != null) _session.Flow.OnPhaseChanged -= OnPhaseChanged;
+            _session.OnPhaseChanged -= OnPhaseChanged;
             if (_session.Player != null)
             {
                 _session.Player.TurnPlanUpdated -= OnTurnPlan;
@@ -105,8 +106,8 @@ namespace GIC.Battle
         /// <summary>行动预告到达（执行阶段开始）：按攻速 10 点区间建行 + 入场</summary>
         private void OnTurnPlan(TurnPlanMessage message)
         {
-            if (_session == null || _session.Flow == null) return;
-            if (_session.Flow.Phase != BattlePhase.Resolving) return; // 相位先行、预告后到（Host 下发序）
+            if (_session == null) return;
+            if (_session.Phase != BattlePhase.Resolving) return; // 相位先行、预告后到（Host 下发序）
             if (行预制体 == null || 条目预制体 == null || 行容器 == null)
             {
                 GICLog.Warn("[ExecutionPreview] prefab 引用缺失（行/条目/容器）——执行预览不显示");
@@ -196,7 +197,7 @@ namespace GIC.Battle
             if (icon != null) MissingImageGuard.Assign(icon, ResolveSkillIcon(data, e));
             if (ring != null)
             {
-                var baseColor = BattlePlayerColors.Resolve(_session.Sim, _myPlayerId, e.playerId);
+                var baseColor = BattlePlayerColors.Resolve(_session, _myPlayerId, e.playerId);
                 ring.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.8f);
             }
             return true;

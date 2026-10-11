@@ -1,4 +1,4 @@
-// ==================== CoopScreen.PlayerList.cs（玩家行列表刷新 + 房间信息面板） ====================
+// ==================== CoopScreen.PlayerList.cs（玩家行列表刷新 + 房间信息面板 + 地图预览联动） ====================
 using UnityEngine;
 using UnityEngine.Localization;
 using GIC.Framework;
@@ -12,7 +12,10 @@ namespace GIC.UI
     {
         #region PlayerManager evt
 
-        void OnPlayerCountChanged(int count) { if (_currentState != RoomState.DisconnectedClient) RefreshPlayerList(); }
+        void OnPlayerCountChanged(int count)
+        {
+            if (_currentState != RoomState.DisconnectedClient) RefreshRoomVisuals();
+        }
 
         void OnPlayerInfoUpdated(string playerID, PlayerInfo updatedInfo)
         {
@@ -21,9 +24,10 @@ namespace GIC.UI
             {
                 var rowUI = playerListContent.GetChild(i).GetComponent<PlayerRowView>();
                 if (rowUI != null && rowUI.PlayerID == playerID)
-                { rowUI.RefreshFromPlayerInfo(updatedInfo); return; }
+                { rowUI.RefreshFromPlayerInfo(updatedInfo); break; }
             }
-            RefreshPlayerList();
+            // 出生点/颜色变化 → 地图预览标记同步（轻刷新——纹理/标记零重建）
+            mapPreview?.RefreshPlayersOnly(_playerManager?.GetAllPlayers());
         }
 
         #endregion
@@ -53,16 +57,32 @@ namespace GIC.UI
             }
         }
 
+        /// <summary>房间可视件全量刷新（名册行+地图预览）——状态切换/地图变化/名册增删统一入口
+        /// （2026-10-11 联机批：行出生点选项数与预览标记都吃当前权威地图）</summary>
+        internal void RefreshRoomVisuals()
+        {
+            RefreshPlayerList();
+            mapPreview?.Refresh(GetSelectedMapConfig(), _playerManager?.GetAllPlayers());
+        }
+
         void RefreshPlayerList()
         {
             ClearPlayerList();
             if (_playerManager == null) return;
+            int zoneCount = CurrentSpawnZoneCount();
             foreach (var player in _playerManager.GetAllPlayers())
             {
                 var row = Instantiate(playerRowPrefab, playerListContent);
                 var rowUI = row.GetComponent<PlayerRowView>();
-                if (rowUI) rowUI.Setup(player);
+                if (rowUI) rowUI.Setup(player, zoneCount);
             }
+        }
+
+        /// <summary>当前权威地图出生区数（出生下拉选项源；空图兜底 8=枚举上限）</summary>
+        internal int CurrentSpawnZoneCount()
+        {
+            var map = GetSelectedMapConfig();
+            return map != null && map.spawnZones != null ? map.spawnZones.Count : 8;
         }
 
         void ClearPlayerList()

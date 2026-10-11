@@ -1117,6 +1117,14 @@ MonoBehaviour:
       the card back or tap empty space to cancel"
     m_Metadata:
       m_Items: []
+  - m_Id: 2006
+    m_Localized: Add AI Player
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2007
+    m_Localized: Remove
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

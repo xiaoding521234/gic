@@ -102,6 +102,45 @@ namespace GIC.Battle
         /// 结算画面=B8）</summary>
         public event Action<BattleOverMessage> BattleOver;
 
+        // ===== B7 LAN 客户端相位派生（2026-10-11 联机批；_flow==null 的端=LAN 客户端） =====
+        // 客户端无 TurnFlowController——阶段/倒计时从消息流派生（Snapshot→Selecting、Segment→Resolving、
+        // BattleOver→Finished）；host/本地端 _flow!=null 恒走 Flow 权威相位，本派生段零生效（各入口守卫）。
+
+        /// <summary>客户端派生相位变化（BattleSession 相位门面转发，HUD 订阅单源）</summary>
+        public event Action<BattlePhase, int> ClientPhaseChanged;
+
+        /// <summary>客户端本地选择倒数归零（host 仍权威超时兜底；双端重复提交由 host 忽略）</summary>
+        public event Action<int> ClientSelectTimerExpired;
+
+        public BattlePhase ClientPhase => _clientPhase;
+        public float ClientSelectRemainingSeconds => _clientSelectRemaining;
+
+        /// <summary>布局编辑期冻结本地倒数（host 端=Flow.SelectTimerPaused 真暂停；客户端仅冻本地显示）</summary>
+        public bool ClientPhasePaused { get; set; }
+
+        private BattlePhase _clientPhase = BattlePhase.Idle;
+        private int _clientTurn;
+        private float _clientSelectRemaining = -1f;
+        private bool _clientExpiredFired;
+
+        /// <summary>消息流派生相位（客户端专用；phase 变化或换回合时广播+驱动两态立牌模型）</summary>
+        private void DeriveClientPhase(BattlePhase phase, int turn, int selectLimitSeconds = -1)
+        {
+            bool turnChanged = turn != _clientTurn;
+            _clientTurn = turn;
+
+            if (phase == BattlePhase.Selecting)
+            {
+                _clientSelectRemaining = selectLimitSeconds > 0 ? selectLimitSeconds : -1f;
+                _clientExpiredFired = false;
+            }
+
+            if (_clientPhase == phase && !turnChanged) return;
+            _clientPhase = phase;
+            OnPhaseChangedForFormations(phase, turn); // 两态模型：客户端本地派生驱动散开/收拢
+            ClientPhaseChanged?.Invoke(phase, turn);
+        }
+
         private IBattleTransport _transport;
         private Transform _viewRoot;
         private BattleDamageNumbers _damageNumbers;
@@ -207,6 +246,19 @@ namespace GIC.Battle
                 if (forward.sqrMagnitude > 0.001f)
                     _billboardRotation = Quaternion.LookRotation(forward, Vector3.up);
             }
+
+            // B7 LAN 客户端本地选择倒数（_flow==null 的端；host 端 Flow 权威计时零生效）
+            if (_flow == null && _clientPhase == BattlePhase.Selecting
+                && _clientSelectRemaining > 0f && !ClientPhasePaused)
+            {
+                _clientSelectRemaining -= Time.deltaTime;
+                if (_clientSelectRemaining <= 0f && !_clientExpiredFired)
+                {
+                    _clientExpiredFired = true;
+                    _clientSelectRemaining = 0f;
+                    ClientSelectTimerExpired?.Invoke(_clientTurn);
+                }
+            }
         }
 
         // ==================== 消息处理（客户端侧） ====================
@@ -237,6 +289,9 @@ namespace GIC.Battle
         {
             LatestSnapshot = message.snapshot;
 
+            if (_flow == null) // B7 LAN 客户端：快照=选择阶段头（相位派生+本地倒数源）
+                DeriveClientPhase(BattlePhase.Selecting, message.snapshot.turnNumber, message.selectLimitSeconds);
+
             // 尸体态 + 头顶血量 + 冻结可视同步（快照为准）
             foreach (var state in message.snapshot.units)
             {
@@ -258,6 +313,8 @@ namespace GIC.Battle
 
         public void OnSegment(SegmentMessage message)
         {
+            if (_flow == null && _clientPhase == BattlePhase.Selecting) // B7 LAN 客户端：首片=执行阶段开始
+                DeriveClientPhase(BattlePhase.Resolving, message.segment.turnNumber);
             StartCoroutine(PlaySegmentCoroutine(message.segment));
         }
 
@@ -277,6 +334,8 @@ namespace GIC.Battle
         public void OnBattleOver(BattleOverMessage message)
         {
             GICLog.Info($"[BattlePlayer] 战斗结束：胜方队伍 {(TeamType)message.winnerTeam}");
+            if (_flow == null) // B7 LAN 客户端：终局相位派生
+                DeriveClientPhase(BattlePhase.Finished, _clientTurn);
             BattleOver?.Invoke(message);
         }
 
@@ -882,7 +941,7 @@ namespace GIC.Battle
                             // 时长≈时轮 totalTime）、播完自动回待机循环（UnitView.PlayActionVideo 双 RT+缩放补偿
                             // ——宽幅 16:9 动作片原生尺寸独立 RT 渲染+主体视觉大小恒等补偿）；null=待机照播
                             var skillData = LoadSkillData(command.value);
-                            var actionClip = skillData?.动作视频;
+                            var actionClip = skillData?.当前动作片;
                             if (actionClip != null)
                             {
                                 // B-S4c 校准批次：播放速度=战斗回放速度×技能校准倍率（0/负=按 1，非法回落原速）
@@ -1301,8 +1360,8 @@ namespace GIC.Battle
                     foreach (var s in unitData.skills)
                     {
                         var d = s != null ? s.data : null;
-                        if (d != null && d.动作视频 != null && !prewarmClips.Contains(d.动作视频))
-                            prewarmClips.Add(d.动作视频);
+                        if (d != null && d.当前动作片 != null && !prewarmClips.Contains(d.当前动作片))
+                            prewarmClips.Add(d.当前动作片);
                     }
                 unitScale = unitData.额外缩放;
                 hoverHeight = unitData.离地高度;

@@ -400,7 +400,7 @@ namespace GIC.Battle
         private void OnHandCardBeginDrag(HandCardSlot slot, PointerEventData e)
         {
             if (_layoutEditing) return;
-            if (_session == null || _session.Flow == null || _session.Flow.Phase != BattlePhase.Selecting) return;
+            if (_session == null || _session.Phase != BattlePhase.Selecting) return;
             if (_handDrag != null) return; // 一次只能拖一张（多点触控守卫，拍板「一次只能打出一张」）
             bool regrab = _state == HudState.Aiming && _playedHandCard == slot;
             if (!regrab && _state != HudState.Idle) return; // 手牌仅手牌态可拖

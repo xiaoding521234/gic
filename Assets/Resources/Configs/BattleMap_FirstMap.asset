@@ -19,9 +19,9 @@ MonoBehaviour:
   height: 15
   rows:
   - GGGGGGGGGGGGGGG
-  - GSSSGGGGGGGGGGG
-  - GSSSGGGGGGGGGGG
-  - GSSSGGWWWGGGGGG
+  - GSSSGGGGGGGSSSG
+  - GSSSGGGGGGGSSSG
+  - GSSSGGWWWGGSSSG
   - GGGGGWWWWWGGGGG
   - GGGGWWWWWWWGGGG
   - GGGWWWDDDWWWGGG
@@ -29,16 +29,24 @@ MonoBehaviour:
   - GGGWWWDDDWWWGGG
   - GGGGWWWWWWWGGGG
   - GGGGGWWWWWGGGGG
-  - GGGGGGWWWGGSSSG
-  - GGGGGGGGGGGSSSG
-  - GGGGGGGGGGGSSSG
+  - GSSSGGWWWGGSSSG
+  - GSSSGGGGGGGSSSG
+  - GSSSGGGGGGGSSSG
   - GGGGGGGGGGGGGGG
   spawnZones:
-  - playerId: P1
+  - zoneIndex: 1
     center:
       x: 2
       y: 2
-  - playerId: P2
+  - zoneIndex: 2
+    center:
+      x: 12
+      y: 2
+  - zoneIndex: 3
+    center:
+      x: 2
+      y: 12
+  - zoneIndex: 4
     center:
       x: 12
       y: 12

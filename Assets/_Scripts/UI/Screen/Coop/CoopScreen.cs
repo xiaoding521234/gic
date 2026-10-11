@@ -28,6 +28,12 @@ namespace GIC.UI
         public Button startButton;
         public Button createRoomButton;
 
+        [Header("房间正式化（2026-10-11 联机批）")]
+        [Tooltip("地图预览（房间右上角，RA2 式地形小图+出生点标记）")]
+        public BattleMapPreviewUI mapPreview;
+        [Tooltip("增加AI玩家按钮（仅 host 可见；点击登记一名 AI 玩家）")]
+        public Button addAIPlayerButton;
+
         [Header("房间列表")]
         public GameObject serverListPanel;
         public GameObject serverButtonPrefab;
@@ -51,6 +57,10 @@ namespace GIC.UI
         private TextCombiner _leaveRoomText;
         private TextCombiner _createRoomText;
         private TextCombiner _startGameText;
+        private TextCombiner _addAIText;
+
+        // 开战广播接收（host 回环+客户端统一入口；2026-10-11 联机批）
+        private StartBattleEventHandler _startBattleHandler;
 
         // ── IClosable 实现 ──
         public override void Close() => OnLeaveRoomClick();
@@ -80,6 +90,12 @@ namespace GIC.UI
                 var tmp = startButton.GetComponentInChildren<TextMeshProUGUI>();
                 if (tmp != null) _startGameText = EnsureTC(tmp);
             }
+
+            if (_addAIText == null && addAIPlayerButton != null)
+            {
+                var tmp = addAIPlayerButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null) _addAIText = EnsureTC(tmp);
+            }
         }
 
         private static TextCombiner EnsureTC(TextMeshProUGUI tmp)
@@ -105,6 +121,7 @@ namespace GIC.UI
             _createRoomText?.SetSingleEntry(new LocalizedString("UIText", "CreateRoom"));
             _startGameText?.SetSingleEntry(new LocalizedString("UIText", "StartGame"));
             _leaveRoomText?.SetSingleEntry(new LocalizedString("UIText", "Back"));
+            _addAIText?.SetSingleEntry(new LocalizedString("UIText", "Coop_AddAIPlayer"));
             // 动画目标位缓存由面板上的 GlassPanelAnimator 在自身 Awake 自动完成（§39）
         }
 
@@ -120,6 +137,7 @@ namespace GIC.UI
         {
             BindButtonEvents();
             InitBoardDropdown();
+            _startBattleHandler = new StartBattleEventHandler(this);
         }
 
         /// <summary>
@@ -142,6 +160,7 @@ namespace GIC.UI
             BindDiscoveryEvents();
             BindPlayerEvents();
             BindNetworkEvents();
+            BindRoomEvents();
 
             Invoke(nameof(InitializeDiscovery), 0.5f);
 
@@ -159,6 +178,7 @@ namespace GIC.UI
             UnbindDiscoveryEvents();   // 停广播+停扫描（面板关闭路径均自 DisconnectedClient 态，即空闲态）
             UnbindPlayerEvents();
             UnbindNetworkEvents();
+            UnbindRoomEvents();
             base.OnDisable();          // 出栈注销+可关闭注销+PopAll 锁保险丝
         }
 
@@ -172,6 +192,7 @@ namespace GIC.UI
         {
             UnbindPlayerEvents();
             UnbindNetworkEvents();
+            UnbindRoomEvents();
             UnbindDiscoveryEvents();
             CancelInvoke();
 
@@ -186,6 +207,7 @@ namespace GIC.UI
             if (leaveRoomButton) leaveRoomButton.onClick.AddListener(OnLeaveRoomClick);
             if (startButton) startButton.onClick.AddListener(OnStartClick);
             if (createRoomButton) createRoomButton.onClick.AddListener(OnCreateRoomClick);
+            if (addAIPlayerButton) addAIPlayerButton.onClick.AddListener(OnAddAIPlayerClick);
         }
 
         private void BindDiscoveryEvents()
@@ -204,6 +226,55 @@ namespace GIC.UI
             if (_roomManager != null)
             {
                 _roomManager.OnKickedFromRoom += OnKickedFromRoom;
+            }
+        }
+
+        /// <summary>房间正式化事件（2026-10-11 联机批）：开战广播（host 回环+客户端统一转场入口）+
+        /// 权威地图变化（下拉同步+预览刷新）——可见期订阅、OnDisable 对称解绑</summary>
+        private void BindRoomEvents()
+        {
+            if (_startBattleHandler != null)
+                EventBusHub.Instance.Subscribe<StartBattleEvent>(_startBattleHandler, this);
+            if (_roomManager != null)
+                _roomManager.OnRoomMapChanged += OnRoomMapChangedHandler;
+        }
+
+        private void UnbindRoomEvents()
+        {
+            if (_startBattleHandler != null)
+                EventBusHub.Instance?.Unsubscribe<StartBattleEvent>(_startBattleHandler);
+            if (_roomManager != null)
+                _roomManager.OnRoomMapChanged -= OnRoomMapChangedHandler;
+        }
+
+        /// <summary>增加 AI 玩家按钮（仅 host 可见可点）：登记空连接 AI 玩家（服务器侧分配
+        /// ID/颜色/队伍，恒就绪）；点击 AI 行名字=移除（Kick 链既有守卫）</summary>
+        private void OnAddAIPlayerClick()
+        {
+            if (_currentState != RoomState.Host) return;
+            EventBusHub.Instance.Send(new AddAIPlayerRequestEvent());
+        }
+
+        /// <summary>权威地图变化：同步下拉选中（无通知防回环）→ 房间信息/预览/玩家行（出生点
+        /// 选项数随图变）全量刷新</summary>
+        private void OnRoomMapChangedHandler(string mapConfigName)
+        {
+            if (boardDropdown != null && _battleMaps != null)
+            {
+                for (int i = 0; i < _battleMaps.Count; i++)
+                {
+                    if (_battleMaps[i].name == mapConfigName)
+                    {
+                        if (boardDropdown.value != i)
+                            boardDropdown.SetValueWithoutNotify(i);
+                        break;
+                    }
+                }
+            }
+            if (_currentState != RoomState.DisconnectedClient)
+            {
+                UpdateRoomPanel();
+                RefreshRoomVisuals();
             }
         }
 
@@ -243,5 +314,17 @@ namespace GIC.UI
         }
 
         #endregion
+
+        // ==================== 嵌套事件处理器 ====================
+
+        /// <summary>开战广播接收（host 回环+客户端到达双路径，Source==Network 统一成立）：
+        /// 路由到 RoomFlow.OnStartBattleReceived——全端统一转场入口（2026-10-11 联机批）</summary>
+        private class StartBattleEventHandler : IEventHandler<StartBattleEvent>
+        {
+            private readonly CoopScreen _screen;
+            public StartBattleEventHandler(CoopScreen screen) => _screen = screen;
+            public bool CanHandle(StartBattleEvent e) => e.Source == EventSource.Network;
+            public void Handle(StartBattleEvent e) => _screen.OnStartBattleReceived(e);
+        }
     }
 }

@@ -43,6 +43,12 @@ namespace GIC.Data
     public class SnapshotMessage
     {
         public BattleSnapshot snapshot;
+
+        /// <summary>本选择阶段时限秒（B7 LAN 批）：host 在选择阶段头随快照下发——
+        /// 客户端无 TurnFlowController，凭此值本地倒数（倒计时显示+归零自动完成选择；
+        /// host 侧仍以自己的计时为准并超时兜底 Pass，双端重复提交由 host 忽略）。
+        /// -1=无时限信息（调试直开/回放等场景，客户端不显示倒计时）</summary>
+        public int selectLimitSeconds = -1;
     }
 
     [Serializable]

@@ -141,9 +141,11 @@ namespace GIC.Battle
         private string _myPlayerId;
 
         /// <summary>本端玩家队伍（2026-09-25 三轮审查 C2：敌我判定统一 TeamType 口径——
-        /// 操控权/资源归属=playerId，阵营判定=TeamType，两个语义勿再混用）</summary>
-        private TeamType MyTeam => _session != null && _session.Sim != null
-            ? _session.Sim.GetTeamOf(_myPlayerId)
+        /// 操控权/资源归属=playerId，阵营判定=TeamType，两个语义勿再混用）。
+        /// 2026-10-11 联机批：改走 BattleSession 门面（Roster 优先——LAN 客户端无 Sim 也成立；
+        /// 调试直开无 Roster 回落 Sim）</summary>
+        private TeamType MyTeam => _session != null
+            ? _session.GetTeamOf(_myPlayerId)
             : TeamType.A;
 
         private Canvas _canvas;
@@ -332,7 +334,9 @@ namespace GIC.Battle
             _board = board;
             _camera = camera;
             _onCloseBattle = onCloseBattle;
-            _myPlayerId = BattleDebugPlayerIds.P1; // 本地双开：真人 P1（B7 联机换本机玩家 id）
+            // 本端玩家身份（2026-10-11 联机批）：联机=房间分配的 PlayerID（connectionId）；
+            // 本地双开/调试直开（无房间名册）回落 P1
+            _myPlayerId = ResolveLocalPlayerId();
 
             ResolveHudReferences(); // prefab 寻址接线（结构=BattleHud.prefab，2026-09-22 prefab 化）
 
@@ -341,13 +345,16 @@ namespace GIC.Battle
             Wargame.Instance.Context.Inject(this);
             InitMyResourceChipIcons(); // B6d：chip 图标走 [Autowired] ItemConfig——必须在注入后初始化（寻址阶段为 null）
             ApplySavedLayoutOnStart();
+            _myPlayerId = ResolveLocalPlayerId(); // 注入后再解析一次（SelfPlayerID 经容器可达；两次同值幂等）
 
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
-            _session.Flow.OnPhaseChanged += OnPhaseChanged;
-            _session.Flow.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
+            // 相位/计时经 BattleSession 门面（2026-10-11 联机批）：host/本地=TurnFlowController、
+            // LAN client=消息派生——HUD 不再直接触 Flow（客户端 Flow=null）
+            _session.OnPhaseChanged += OnPhaseChanged;
+            _session.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
 
             // 头顶 Buff 图标批（2026-10-06）接线：来源玩家色解析器（本端视角单源）+ 相机缩放源
             // （放大=半速率跟随、缩小=下限不缩）——层侧每帧/重建时消费；Bind 先于建场亦安全（懒取值）
@@ -372,6 +379,17 @@ namespace GIC.Battle
         /// <summary>输入系统快捷键派发（[Autowired] 注入；Bind 注入后订阅，docs/14 §78 寻址/注入分离）</summary>
         [Autowired] private InputManager _inputManager;
 
+        /// <summary>本端玩家身份解析（2026-10-11 联机批）：联机对局=房间分配的 PlayerID
+        /// （PlayerManager.SelfPlayerID——connectionId/AI 恒不指向真人本机）；本地双开/调试直开
+        /// （未连房间=Offline）回落 P1。Bind 注入前后各解析一次（首次兜注入序）</summary>
+        private string ResolveLocalPlayerId()
+        {
+            var pm = Wargame.Instance?.Context?.Get<PlayerManager>();
+            var id = pm?.SelfPlayerID;
+            if (!string.IsNullOrEmpty(id) && id != PlayerID.Offline) return id;
+            return BattleDebugPlayerIds.P1;
+        }
+
         /// <summary>头顶 Buff 图标描环=来源单位所属玩家色（2026-10-06 拍板「框的颜色采用来源单位所属
         /// 玩家色」）：unitId→快照 playerId→BattlePlayerColors 本端视角解析——与快捷面板/执行预览
         /// 头像描环同口径单源；来源单位不在快照（理论不可达）回落敌方主色（Resolve 空参语义）</summary>
@@ -386,7 +404,7 @@ namespace GIC.Battle
                     if (u != null && u.unitId == unitId) { playerId = u.playerId; break; }
                 }
             }
-            return BattlePlayerColors.Resolve(_session?.Sim, _myPlayerId, playerId);
+            return BattlePlayerColors.Resolve(_session, _myPlayerId, playerId);
         }
 
         /// <summary>快捷键动作（2026-09-26 拍板「按下空格=快速按下完成选择按钮」）：
@@ -408,11 +426,8 @@ namespace GIC.Battle
                     _session.Player.OnItemConsumed -= OnItemConsumedHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
                 }
-                if (_session.Flow != null)
-                {
-                    _session.Flow.OnPhaseChanged -= OnPhaseChanged;
-                    _session.Flow.OnSelectTimerExpired -= OnSelectTimerExpiredHandler;
-                }
+                _session.OnPhaseChanged -= OnPhaseChanged;
+                _session.OnSelectTimerExpired -= OnSelectTimerExpiredHandler;
             }
             if (_camera != null)
                 _camera.OnBoardTap -= OnBoardTap;
@@ -577,8 +592,9 @@ namespace GIC.Battle
             }
 
             // 选择倒计时（docs/04 §4.2；每秒级刷新，静态数字条目）
-            if (_session == null || _session.Flow == null || _countdownText == null) return;
-            var flow = _session.Flow;
+            // 2026-10-11 联机批：改走 BattleSession 相位门面（host=Flow 权威；LAN client=消息派生本地倒数）
+            if (_session == null || _countdownText == null) return;
+            var flow = _session;
             bool selecting = flow.Phase == BattlePhase.Selecting;
             bool show = selecting && flow.SelectRemainingSeconds >= 0f;
             SetLayoutWidgetActive("countdown", show); // 编辑态强制可见由统一口处理（数字冻结展示）
@@ -621,12 +637,12 @@ namespace GIC.Battle
             _turnPhaseCombiner.ClearAllEntries();
             _turnPhaseCombiner.AddEntry(new LocalizedString("UIText", "Battle_Turn"));
             _turnPhaseCombiner.AddStaticEntry(" " + snapshot.turnNumber + " · ");
-            string phaseKey = PhaseKey(_session.Flow.Phase);
+            string phaseKey = PhaseKey(_session.Phase);
             if (phaseKey != null)
                 _turnPhaseCombiner.AddEntry(new LocalizedString("UIText", phaseKey));
 
-            // 战斗时钟（独立时钟，TurnFlowController）
-            int minutes = _session.Flow.BattleTimeMinutes;
+            // 战斗时钟（独立时钟；host=TurnFlowController 权威、LAN client=按快照回合推导——session 门面）
+            int minutes = _session.BattleTimeMinutes;
             _clockCombiner.SetSingleEntry($"{minutes / 60:D2}:{minutes % 60:D2}");
 
             // 我方资源 chips（左上角摩拉/体力物品牌计数，B6d；敌方资源不显示——2026-09-25 拍板）
@@ -1054,7 +1070,7 @@ namespace GIC.Battle
         private void OnBoardTap(Vector2 screenPos)
         {
             if (_layoutEditing) return; // 布局编辑期棋盘交互全静默
-            if (_session == null || _session.Flow.Phase != BattlePhase.Selecting) return;
+            if (_session == null || _session.Phase != BattlePhase.Selecting) return;
             if (_camera == null || _board == null || _board.Map == null) return;
             if (HandCardDetailOpen)
             {
@@ -1936,8 +1952,8 @@ namespace GIC.Battle
         private void OnSkillButtonDragBegin(SkillButtonDef def, PointerEventData eventData)
         {
             if (def == null || _layoutEditing) return;
-            if (_session == null || _session.Flow == null) return;
-            if (_session.Flow.Phase != BattlePhase.Selecting) return;
+            if (_session == null) return;
+            if (_session.Phase != BattlePhase.Selecting) return;
             if (_deployAimUnit != 0) return;
             // 置灰防线收口在处理端（拖拽转发件不受 interactable 拦截——Button.interactable 只拦
             // Selectable 自身处理器，转发件须手动检查，docs/14 §63）
@@ -2285,7 +2301,7 @@ namespace GIC.Battle
                 }
                 if (ring != null) // 描环=归属玩家色（执行预览同款：直观看出这个单位是谁的）
                 {
-                    var pc = BattlePlayerColors.Resolve(_session.Sim, _myPlayerId, u.playerId);
+                    var pc = BattlePlayerColors.Resolve(_session, _myPlayerId, u.playerId);
                     ring.color = new Color(pc.r, pc.g, pc.b, 0.8f);
                 }
                 _dragAvatarRects.Add(rt);
@@ -2600,8 +2616,8 @@ namespace GIC.Battle
         private void OnConfirmButtonClicked()
         {
             if (_layoutEditing) return;
-            if (_session == null || _session.Flow == null) return;
-            if (_session.Flow.Phase != BattlePhase.Selecting) return;
+            if (_session == null) return;
+            if (_session.Phase != BattlePhase.Selecting) return;
             if (_actionConfirmed) return; // 已定死（按钮置灰，本条=超时自动按下的同款守卫）
 
             // 升命待确认（决策五十五返拍「拖入出牌区，不应该直接上交」）：升命卡打出=卡悬浮待确认态，

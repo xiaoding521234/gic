@@ -70,6 +70,7 @@ namespace GIC.UI
             SnapAllPanelsToRest();
 
             if (startButton) startButton.gameObject.SetActive(isHost);
+            if (addAIPlayerButton) addAIPlayerButton.gameObject.SetActive(isHost); // 增AI仅房主（2026-10-11 联机批）
             if (leaveRoomButton && _leaveRoomText != null)
             {
                 if (isDisconnected)
@@ -78,6 +79,9 @@ namespace GIC.UI
                     _leaveRoomText.SetSingleEntry(new LocalizedString("UIText", "LeaveRoom"));
             }
             if (createRoomButton) createRoomButton.gameObject.SetActive(isDisconnected);
+
+            // 地图下拉权威化（2026-10-11 联机批）：仅 host 可选图；下拉选中同步权威名
+            if (boardDropdown) boardDropdown.interactable = isHost;
 
             if (_roomTitle != null)
             {
@@ -88,8 +92,9 @@ namespace GIC.UI
 
             if (!isDisconnected)
             {
+                SyncBoardDropdownToAuthority();
                 UpdateRoomPanel();
-                RefreshPlayerList();
+                RefreshRoomVisuals();
             }
         }
 
@@ -187,14 +192,80 @@ namespace GIC.UI
 
             if (!ValidateStartConditions()) return; // 未通过：轻提示已弹原因
 
-            StartCoroutine(StartGameTransition());
+            var players = _playerManager.GetAllPlayers().ToList();
+            bool hasRemote = players.Any(p => _roomManager != null && _roomManager.IsRemoteHuman(p.PlayerID));
+
+            if (hasRemote)
+            {
+                // LAN 开战（B7，2026-10-11）：清交换台账 → 广播 StartBattleEvent——各端（含 host 自己，
+                // 经 OnlyHost/All 事件本地回环）统一走 OnStartBattleReceived 转场；网络连接贯穿战斗不拆线
+                _roomManager.ResetBattleExchange();
+                EventBusHub.Instance.Send(new StartBattleEvent
+                {
+                    MapConfigName = GetSelectedMapConfigName(),
+                    // 种子用表现层随机（开局壳层，不入模拟流；模拟核心禁该随机源）
+                    Seed = UnityEngine.Random.Range(0, int.MaxValue),
+                    Players = players,
+                });
+            }
+            else
+            {
+                // 纯本机开局（host + 房间 AI 玩家）：拆线后本地 Prepare（AI 自动补位已退役——
+                // 单人须先「增加AI玩家」，开局门 Coop_NeedTwoTeams 拦空房）
+                var config = BattleLaunchConfig.BuildFromRoster(GetSelectedMapConfigName(), players);
+                StartCoroutine(StartGameTransition(config, stopNetwork: true));
+            }
         }
 
         /// <summary>
-        /// 开局就绪校验（B7 LAN 全员就绪门扩展，2026-09-13 用户拍板加轻提示）：
-        /// 人数超地图出生区上限 / 出生点冲突（Random 不参与，运行期落位不算冲突） /
-        /// 颜色冲突 / 有玩家未准备——任一未过弹 PopupText 轻提示说明原因。
-        /// 校验序=结构性问题（容量→出生点→颜色）先于状态问题（准备）。
+        /// 开战广播接收（host 回环 + 各客户端统一入口）：由 StartBattleEvent 驱动——
+        /// 客户端先回卡组上报（host 据此为该端建手牌），随后全端同一转场加载战斗场景。
+        /// 名册（队伍/颜色/出生点/AI 标记）随配置进局内真实生效（2026-10-11 联机批拍板）。
+        /// </summary>
+        private void OnStartBattleReceived(StartBattleEvent evt)
+        {
+            if (isClosing) return;
+            if (_currentState == RoomState.DisconnectedClient) return; // 不在房间（防御）
+
+            var config = new BattleLaunchConfig
+            {
+                MapConfigName = evt.MapConfigName,
+                Seed = evt.Seed,
+                IsNetworked = true,
+                Players = evt.Players != null
+                    ? evt.Players.Select(p => new BattlePlayerSetup
+                    {
+                        PlayerId = p.PlayerID,
+                        DisplayName = p.PlayerName,
+                        IsAI = p.IsAI,
+                        Team = p.Team,
+                        Color = p.Color,
+                        SpawnPosition = p.SpawnPosition,
+                    }).ToList()
+                    : new List<BattlePlayerSetup>(),
+            };
+
+            // 客户端先回卡组（本机存档当前卡组——与 BattleScreen 手牌构建同源），再转场
+            if (!NetworkServer.active)
+            {
+                var saveManager = Wargame.Instance?.Context?.Get<GIC.Framework.SaveManager>();
+                var cardManager = Wargame.Instance?.Context?.Get<GIC.Framework.CardManager>();
+                EventBusHub.Instance.Send(new ClientDeckEvent
+                {
+                    PlayerID = _playerManager.SelfPlayerID,
+                    Entries = BattleDeckBuilder.BuildCurrentDeck(saveManager, cardManager),
+                });
+            }
+
+            StartCoroutine(StartGameTransition(config, stopNetwork: false));
+        }
+
+        /// <summary>
+        /// 开局就绪校验（2026-10-11 联机批重写；B7 LAN 全员就绪门扩展，2026-09-13 用户拍板加轻提示）：
+        /// 人数超地图出生区上限 / 出生点冲突（Random 不参与，运行期落位不算冲突） / 颜色冲突 /
+        /// **至少两名不同队伍的玩家**（1 人不能开局；队伍下拉仅 A/B，>2 队防御性拦） /
+        /// 有真人未准备（AI 恒就绪）——任一未过弹 PopupText 轻提示说明原因。
+        /// 校验序=结构性问题（容量→出生点→颜色→队伍）先于状态问题（准备）。
         /// </summary>
         private bool ValidateStartConditions()
         {
@@ -220,6 +291,20 @@ namespace GIC.UI
                 return false;
             }
 
+            // 至少两个不在一队的玩家（2026-10-11 用户拍板「1个人的时候不能开局，需要至少两个
+            // 不在一队的玩家」——单人开局先加 AI）；>2 队防御拦（队伍下拉仅 A/B，正常不可达）
+            var teams = players.Select(p => p.Team).Distinct().ToList();
+            if (teams.Count < 2)
+            {
+                ShowStartBlockedToast("Coop_NeedTwoTeams");
+                return false;
+            }
+            if (teams.Count > 2)
+            {
+                ShowStartBlockedToast("Coop_TeamLimit");
+                return false;
+            }
+
             if (players.Any(p => !p.IsReady))
             {
                 ShowStartBlockedToast("Coop_NotAllReady");
@@ -233,18 +318,19 @@ namespace GIC.UI
             => PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText.ToString(), key));
 
         /// <summary>
-        /// 开局转场（B1 单人开局：真人 + AI 补位对手，docs/22 §5；B7 LAN 时改为广播开战配置，
-        /// 各端加载同一战斗场景，Host 权威，docs/18 决策一）：
+        /// 开局转场（host 本机局与 LAN 广播局共用；stopNetwork 区分拆线语义）：
         /// 加载页盖住 StopHost 拆除尖峰（0.2s 淡入，按所选地图换势力徽标+随机词条）→
         /// **Additive 根切换**（GameScene.SwitchRootScene：新根 Additive 加载+旧根 UnloadAsync 分帧
         /// 卸载，2026-09-13 用户拍板"Additive 卸载拆分"——激活帧卸载风暴根治，加载页动画全程流畅）→
         /// BattleScreen.Start 装配协程完毕 Reveal 揭幕。
+        /// LAN 对局（stopNetwork=false）连接贯穿战斗——房间→局内的 Mirror 通道（BattleNetMessage）
+        /// 与卡组/就绪交换全靠它；战后回大厅由 CoopScreen.OnShow 统一拆线（v1=房间解散拍板）。
         /// isClosing 同时拦下 StopHost 断连回调触发的切换动画（转场无需面板动画）。
         /// 锁与标志随根切换清栈入池的 OnDisable PopAll / 下次 RaiseShow 自清；
         /// 本协程宿主（本面板）会在清栈时被禁用——末行之后不得再有依赖代码
         /// （yield return 的嵌套协程宿主=GameScene，不受本面板禁用影响）。
         /// </summary>
-        private IEnumerator StartGameTransition()
+        private IEnumerator StartGameTransition(BattleLaunchConfig config, bool stopNetwork)
         {
             isClosing = true;
             InputLocks.Push(this, InputLockReason.Closing);
@@ -255,9 +341,10 @@ namespace GIC.UI
             SceneFadeOverlay.Cover(GetSelectedMapConfig(), 0.2f);
             yield return new WaitForSeconds(0.2f); // 等加载页铺满再拆网络
 
-            StopCurrentConnection();
+            if (stopNetwork)
+                StopCurrentConnection();
             // 只写开局配置（不触发加载）；BattleScreen.Start 激活后 Take() 消费
-            BattleLaunchConfig.Prepare(BattleLaunchConfig.BuildSinglePlayer(GetSelectedMapConfigName()));
+            BattleLaunchConfig.Prepare(config);
 
             // 主动释放 Closing 防 OnDisable 保险丝走"泄漏锁警告"噪音路径；
             // SwitchRootScene 首行同步压入 SceneTransition 锁（本行同帧执行）→ 无缝接管。

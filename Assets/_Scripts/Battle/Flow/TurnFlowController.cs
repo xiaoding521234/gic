@@ -142,8 +142,8 @@ namespace GIC.Battle
 
         private Coroutine _resolveCoroutine;
 
-        // ack 门控状态（Host 永不跑在客户端前面）
-        private readonly HashSet<string> _ackedKeys = new HashSet<string>();
+        // ack 门控状态（Host 永不跑在客户端前面）——按发送方计数版见底部 ack 门控区
+        // （key→发送方集合；B7 LAN 多客户端全员 ack 才放行）
 
         public void Bind(BattleSimState sim, IBattleTransport transport)
         {
@@ -174,13 +174,15 @@ namespace GIC.Battle
             // 玩家选择期间看不见其行动内容，docs/04 §4.1；D-6 已随术语迁移改名 FamiliarBrain）
             _familiarUnitActions = FamiliarBrain.DecideAll(_sim, TurnNumber);
 
+            // 选择时限先定再发快照（B7 LAN：客户端无本控制器，凭快照时限本地倒数）
+            SelectRemainingSeconds = GetSelectLimitSeconds(TurnNumber);
             _transport.HostSend(BattleMessageType.Snapshot, new SnapshotMessage
             {
                 snapshot = _sim.TakeSnapshot(TurnNumber),
+                selectLimitSeconds = (int)SelectRemainingSeconds,
             });
 
             // 选择时限计时（收齐提前开演时由阶段推进作废；docs/04 §4.2）
-            SelectRemainingSeconds = GetSelectLimitSeconds(TurnNumber);
             if (_selectTimerCoroutine != null) StopCoroutine(_selectTimerCoroutine);
             _selectTimerCoroutine = StartCoroutine(SelectTimerRoutine(TurnNumber));
 
@@ -418,26 +420,40 @@ namespace GIC.Battle
             OnPhaseChanged?.Invoke(Phase, TurnNumber);
         }
 
-        // ==================== ack 门控 ====================
+        // ==================== ack 门控（B7 LAN：按发送方计数——多客户端须全员 ack 才放行下一片，
+        // 单客户端/超时快进语义不变；本地模式期望值恒 1=host 本机视图） ====================
+
+        // key(turn:slice) → 已 ack 的发送方集合（"local"=host 本机视图直投；远端=connectionId）
+        private readonly Dictionary<string, HashSet<string>> _ackedKeys = new Dictionary<string, HashSet<string>>();
+
+        /// <summary>期望 ack 方数（host 本机视图 1 + 远端连接数；由 BattleSession 按传输模式注入，
+        /// 本地默认恒 1——TurnFlowController 保持 Mirror 零依赖）</summary>
+        public Func<int> ExpectedAckerCount { get; set; } = () => 1;
 
         public void NotifySegmentPushed(int turnNumber, int sliceIndex)
         {
-            // 同键复推防御：先清旧 ack（正常流片号单调递增不撞键；超时快进后亦不重推同片）——
-            // 2026-09-27 复审清理：残字段 _pendingAckKey 无外部读者，就地局部化
+            // 同键复推防御：先清旧 ack（正常流片号单调递增不撞键；超时快进后亦不重推同片）
             _ackedKeys.Remove(AckKey(turnNumber, sliceIndex));
         }
 
         public bool HasSegmentAck(int turnNumber, int sliceIndex)
         {
-            return _ackedKeys.Contains(AckKey(turnNumber, sliceIndex));
+            return _ackedKeys.TryGetValue(AckKey(turnNumber, sliceIndex), out var ackers)
+                && ackers.Count >= ExpectedAckerCount();
         }
 
         /// <summary>
-        /// 客户端片播放完成确认（SegmentAck 到达）
+        /// 客户端片播放完成确认（SegmentAck 到达；sender="local"/connectionId——null 兼容旧调用按 local 计）
         /// </summary>
-        public void OnSegmentAck(int turnNumber, int sliceIndex)
+        public void OnSegmentAck(int turnNumber, int sliceIndex, string sender = "local")
         {
-            _ackedKeys.Add(AckKey(turnNumber, sliceIndex));
+            var key = AckKey(turnNumber, sliceIndex);
+            if (!_ackedKeys.TryGetValue(key, out var ackers))
+            {
+                ackers = new HashSet<string>();
+                _ackedKeys[key] = ackers;
+            }
+            ackers.Add(string.IsNullOrEmpty(sender) ? "local" : sender);
         }
 
         private static string AckKey(int turnNumber, int sliceIndex) => $"{turnNumber}:{sliceIndex}";

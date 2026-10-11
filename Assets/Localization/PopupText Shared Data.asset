@@ -119,6 +119,18 @@ MonoBehaviour:
     m_Key: Battle_ConstellationMax
     m_Metadata:
       m_Items: []
+  - m_Id: 34736311475187713
+    m_Key: Coop_NeedTwoTeams
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34736311475187714
+    m_Key: Coop_TeamLimit
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34736311475187715
+    m_Key: Coop_HostDisconnected
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

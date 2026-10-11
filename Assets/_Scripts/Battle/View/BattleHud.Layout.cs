@@ -221,8 +221,7 @@ namespace GIC.Battle
             CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：编辑期全件强制可见，拖中卡须归位）
             ClosePopup();
             CloseHandCardDetail(); // 手牌卡详情随编辑态收口（统计面板随卡详情联动收——全屏遮罩让位编辑 UI）
-            if (_session != null && _session.Flow != null)
-                _session.Flow.SelectTimerPaused = true; // 编辑期冻结选择倒计时（拍板 D1）
+            _session.SelectTimerPaused = true; // 编辑期冻结选择倒计时（拍板 D1；session 门面=host 真停/client 冻本地倒数）
 
             foreach (var def in _layoutWidgets)
                 def.plate.SetActive(true);
@@ -237,8 +236,7 @@ namespace GIC.Battle
         {
             if (!_layoutEditing) return;
             _layoutEditing = false;
-            if (_session != null && _session.Flow != null)
-                _session.Flow.SelectTimerPaused = false;
+            _session.SelectTimerPaused = false;
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(false); // 隐藏回烘焙态（引用保留，重进即用）
             _executionPreview?.HideLayoutPlaceholder(); // 清编辑占位行（真实行在场不受影响——ShowLayoutPlaceholder 早退未建）
             HidePassiveLayoutPlaceholder();              // 清被动盘占位（真图标/占位互斥，2026-10-07）

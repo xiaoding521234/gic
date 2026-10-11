@@ -7,13 +7,15 @@ namespace GIC.Data
 
 
     /// <summary>
-    /// 玩家出生区（3x3 石路区域）
+    /// 玩家出生区（3x3 石路区域）。2026-10-11 联机房间正式化批重键：
+    /// zoneIndex=出生区序号（1 起，列表序即序号）——房间内「出生位置」下拉按此序选点（RA2 式），
+    /// 退役旧 playerId 字符串匹配键（P1/P2 写死两方，无法承载多点与 N 玩家）。
     /// </summary>
     [Serializable]
     public class SpawnZone
     {
-        [InspectorName("玩家ID")]
-        public string playerId;
+        [InspectorName("出生区序号")]
+        public int zoneIndex;
 
         [InspectorName("区域中心格")]
         public BattleCell center;

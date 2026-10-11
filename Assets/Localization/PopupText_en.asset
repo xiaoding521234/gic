@@ -126,6 +126,18 @@ MonoBehaviour:
     m_Localized: Constellation maxed out
     m_Metadata:
       m_Items: []
+  - m_Id: 34736311475187713
+    m_Localized: Need at least two players on different teams
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34736311475187714
+    m_Localized: Only two teams (A/B) are supported
+    m_Metadata:
+      m_Items: []
+  - m_Id: 34736311475187715
+    m_Localized: Lost connection to the host
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

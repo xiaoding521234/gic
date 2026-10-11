@@ -287,6 +287,23 @@ namespace GIC.Framework
             GICLog.Info($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID ?? "未设置"}");
             GICLog.Info($"[MyNetworkManager] ========================================");
 
+            // B7 LAN（2026-10-11 联机批）：战斗场景中与 Host 失联（Host 掉线/断网/Host 先退房）——
+            // 对局失去权威端无以为继，客户端直接退回大厅（战斗音乐随场景卸载 OnBattleDestroy 停链；
+            // 勿加载页遮盖——MainHall 无 Reveal 收尾，Cover 会黑屏 15s 等安全网）
+            if (!NetworkServer.active
+                && GameScene.Instance != null
+                && GameScene.Instance.CurrentScene == SceneType.BattleScreen)
+            {
+                GICLog.Warn("[MyNetworkManager] 战斗中与 Host 失联，退回大厅");
+                try
+                {
+                    GIC.UI.PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(
+                        GIC.Data.TableName.PopupText.ToString(), "Coop_HostDisconnected"));
+                }
+                catch (Exception) { /* 弹层初始化异常不阻断退场 */ }
+                GIC.Data.SceneType.MainHall.Load();
+            }
+
             // 只清名册，不退订事件：Handler 常驻订阅（CanHandle 有 NetworkServer.active / Source==Network 守卫），
             // 若此处调 RoomManager.Cleanup() 会在首次断线后杀掉全部 Handler，同会话重连/再建房时名册不再同步
             _playerManager?.ClearPlayers();

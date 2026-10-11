@@ -1,5 +1,6 @@
 // RoomManager.cs - 房间管理器（连接/断开流程 + 房间网络事件处理 + 颜色分配）
 using System;
+using System.Collections.Generic;
 using Mirror;
 using GIC.Battle;
 using GIC.Data;
@@ -37,6 +38,15 @@ namespace GIC.Framework
         /// <summary>本端被踢出房间（收到服务器 KickedFromRoomEvent 时触发）</summary>
         public event Action OnKickedFromRoom;
 
+        /// <summary>房间权威地图变化（服务器记录+广播 UpdateRoomInfoEvent 后触发；UI 同步下拉/预览）</summary>
+        public event Action<string> OnRoomMapChanged;
+
+        // ==================== 房间状态（服务器权威，2026-10-11 联机批） ====================
+
+        /// <summary>房间当前权威地图资产名（host 下拉选图经 SetMapRequestEvent 写入；各端经
+        /// UpdateRoomInfoEvent 同步）。初始=默认图。</summary>
+        public string RoomMapConfigName { get; private set; } = BattleLaunchConfig.DefaultMapName;
+
         // ==================== Handler 引用（用于取消订阅） ====================
 
         private SetTeamHandler _setTeamHandler;
@@ -50,6 +60,11 @@ namespace GIC.Framework
         private KickedFromRoomHandler _kickedFromRoomHandler;
         private SetSelfPlayerHandler _setSelfPlayerHandler;
         private SetPlayerNameHandler _setPlayerNameHandler;
+        private AddAIPlayerHandler _addAIPlayerHandler;
+        private SetMapHandler _setMapHandler;
+        private UpdateRoomInfoHandler _updateRoomInfoHandler;
+        private ClientDeckHandler _clientDeckHandler;
+        private ClientBattleReadyHandler _clientBattleReadyHandler;
 
         [PostConstruct]
         public void Init()
@@ -76,6 +91,11 @@ namespace GIC.Framework
             _kickedFromRoomHandler = new KickedFromRoomHandler(this);
             _setSelfPlayerHandler = new SetSelfPlayerHandler(this);
             _setPlayerNameHandler = new SetPlayerNameHandler(this);
+            _addAIPlayerHandler = new AddAIPlayerHandler(this);
+            _setMapHandler = new SetMapHandler(this);
+            _updateRoomInfoHandler = new UpdateRoomInfoHandler(this);
+            _clientDeckHandler = new ClientDeckHandler(this);
+            _clientBattleReadyHandler = new ClientBattleReadyHandler(this);
         }
 
         private void SubscribeEvents()
@@ -86,6 +106,10 @@ namespace GIC.Framework
             EventBusHub.Instance.Subscribe<SetSpawnRequestEvent>(_setSpawnHandler, this);
             EventBusHub.Instance.Subscribe<ToggleReadyRequestEvent>(_toggleReadyHandler, this);
             EventBusHub.Instance.Subscribe<KickPlayerRequestEvent>(_kickPlayerHandler, this);
+            EventBusHub.Instance.Subscribe<AddAIPlayerRequestEvent>(_addAIPlayerHandler, this);
+            EventBusHub.Instance.Subscribe<SetMapRequestEvent>(_setMapHandler, this);
+            EventBusHub.Instance.Subscribe<ClientDeckEvent>(_clientDeckHandler, this);
+            EventBusHub.Instance.Subscribe<ClientBattleReadyEvent>(_clientBattleReadyHandler, this);
 
             // 订阅网络事件（所有客户端收到）
             EventBusHub.Instance.Subscribe<AddPlayerEvent>(_addPlayerHandler, this);
@@ -94,6 +118,7 @@ namespace GIC.Framework
             EventBusHub.Instance.Subscribe<KickedFromRoomEvent>(_kickedFromRoomHandler, this);
             EventBusHub.Instance.Subscribe<SetSelfPlayerEvent>(_setSelfPlayerHandler, this);
             EventBusHub.Instance.Subscribe<SetPlayerNameRequestEvent>(_setPlayerNameHandler, this);
+            EventBusHub.Instance.Subscribe<UpdateRoomInfoEvent>(_updateRoomInfoHandler, this);
         }
 
         // ==================== 连接流程 ====================
@@ -110,8 +135,8 @@ namespace GIC.Framework
                 ? (saveManager?.CurrentSave?.playerName ?? "旅行者")
                 : ("玩家" + conn.connectionId);
 
-            playerManager.RegisterPlayer(playerID, playerName, TeamType.A,
-                          GetNextAvailableColor(), isHost, conn.address, conn);
+            playerManager.RegisterPlayer(playerID, playerName, GetBalancedTeam(),
+                          GetNextAvailableColor(), isHost, conn.address, conn: conn);
 
             // 1. 告诉新客户端它自己的 PlayerID
             EventBusHub.Instance.PublishToPlayer(playerID, new SetSelfPlayerEvent { TargetPlayerID = playerID });
@@ -126,7 +151,12 @@ namespace GIC.Framework
                     EventBusHub.Instance.PublishToPlayer(playerID, new AddPlayerEvent { PlayerInfo = player });
             }
 
-            // 3. 广播新玩家加入
+            // 3. 同步房间权威地图（加入即知当前选图——下拉/预览就位，2026-10-11 联机批；
+            //    老端不掉线重连时也拿得到）
+            EventBusHub.Instance.PublishToPlayer(playerID,
+                new UpdateRoomInfoEvent { MapConfigName = RoomMapConfigName });
+
+            // 4. 广播新玩家加入
             var newPlayerInfo = playerManager.GetPlayerInfo(playerID);
             if (newPlayerInfo != null)
                 EventBusHub.Instance.Send(new AddPlayerEvent { PlayerInfo = newPlayerInfo });
@@ -142,15 +172,89 @@ namespace GIC.Framework
             EventBusHub.Instance.Send(new RemovePlayerEvent { TargetPlayerID = playerID });
         }
 
-        // ==================== 颜色分配 ====================
+        // ==================== 颜色/队伍分配（2026-10-11 联机批改良） ====================
 
+        /// <summary>首个未占用颜色（旧按人数取模在玩家换色后必撞色；全满回落取模兜底）</summary>
         private PlayerColor GetNextAvailableColor()
         {
-            int usedCount = playerManager.GetPlayerCount();
+            var used = playerManager.GetUsedColors();
             var colors = (PlayerColor[])Enum.GetValues(typeof(PlayerColor));
-            var color = colors[usedCount % colors.Length];
-            GICLog.Info($"[RoomManager] 分配颜色: {color} (第 {usedCount + 1} 位玩家)");
-            return color;
+            foreach (var c in colors)
+            {
+                if (!used.Contains(c))
+                {
+                    GICLog.Info($"[RoomManager] 分配颜色: {c}");
+                    return c;
+                }
+            }
+            var fallback = colors[playerManager.GetPlayerCount() % colors.Length];
+            GICLog.Info($"[RoomManager] 颜色全占用，回落取模: {fallback}");
+            return fallback;
+        }
+
+        /// <summary>人数较少的队伍（新人/新 AI 默认落位；同数取 A）——host 在 A 时第二人自动落 B，
+        /// 满足开局门「至少两个不同队伍」无需手动改队</summary>
+        private TeamType GetBalancedTeam()
+        {
+            int a = playerManager.GetPlayersInTeam(TeamType.A).Count;
+            int b = playerManager.GetPlayersInTeam(TeamType.B).Count;
+            return a <= b ? TeamType.A : TeamType.B;
+        }
+
+        // ==================== AI 玩家（2026-10-11 联机批） ====================
+
+        /// <summary>
+        /// 登记一名 AI 玩家（服务器侧；host 经 AddAIPlayerRequestEvent 触发）：
+        /// 空连接玩家——ID=AI_N（与 connectionId 数字串天然不撞）、队伍=自动平衡落位（host 可改）、
+        /// 恒就绪；移除=KickPlayerRequestEvent（KickPlayerHandler 对 null 连接已有守卫，走同一路径）。
+        /// </summary>
+        private void AddAIPlayer()
+        {
+            int n = 1;
+            while (playerManager.GetPlayerInfo("AI_" + n) != null) n++;
+            string id = "AI_" + n;
+
+            playerManager.RegisterPlayer(id, "AI 玩家" + n, GetBalancedTeam(),
+                GetNextAvailableColor(), isHost: false, ipAddress: "AI", isAI: true);
+
+            var info = playerManager.GetPlayerInfo(id);
+            if (info != null)
+                EventBusHub.Instance.Send(new AddPlayerEvent { PlayerInfo = info });
+        }
+
+        // ==================== 客户端卡组上报存储（B7 LAN 批） ====================
+
+        // 各真人玩家上报的卡组（ClientDeckEvent 收存；BattleScreen 为远端玩家构建手牌时消费）
+        private readonly Dictionary<string, List<HandCard>> _uploadedDecks
+            = new Dictionary<string, List<HandCard>>();
+
+        // 战斗就绪握手（ClientBattleReadyEvent 收存；host 开局广播前等齐判据）
+        private readonly HashSet<string> _battleReadyPlayers = new HashSet<string>();
+
+        /// <summary>玩家是否已上报卡组（host 开局装配等待判据）</summary>
+        public bool HasUploadedDeck(string playerID) => _uploadedDecks.ContainsKey(playerID);
+
+        /// <summary>取玩家上报卡组（无上报返回 null——调用方回落 host 卡组）</summary>
+        public List<HandCard> GetUploadedDeck(string playerID)
+            => _uploadedDecks.TryGetValue(playerID, out var deck) ? deck : null;
+
+        /// <summary>玩家是否已发战斗就绪握手（host 开局等待判据）</summary>
+        public bool IsBattleReady(string playerID) => _battleReadyPlayers.Contains(playerID);
+
+        /// <summary>是否远端真人（host 视角：非 AI、有活动网络连接且非本机连接）——就绪/卡组等待名单用</summary>
+        public bool IsRemoteHuman(string playerID)
+        {
+            var info = playerManager.GetPlayerInfo(playerID);
+            return info != null && !info.IsAI
+                && info.connectionToClient != null
+                && !(info.connectionToClient is Mirror.LocalConnectionToClient);
+        }
+
+        /// <summary>清空卡组上报+就绪握手（host 每次开局前调用，防跨局残留）</summary>
+        public void ResetBattleExchange()
+        {
+            _uploadedDecks.Clear();
+            _battleReadyPlayers.Clear();
         }
 
         // ==================== 清理 ====================
@@ -314,6 +418,73 @@ namespace GIC.Framework
                 var info = _room.playerManager.GetPlayerInfo(pid);
                 if (info != null)
                     EventBusHub.Instance.Send(new UpdatePlayerInfoEvent { UpdatedInfo = info });
+            }
+        }
+
+        /// <summary>增加 AI 玩家请求（服务器侧登记空连接玩家并广播）</summary>
+        private class AddAIPlayerHandler : IEventHandler<AddAIPlayerRequestEvent>
+        {
+            private readonly RoomManager _room;
+            public AddAIPlayerHandler(RoomManager m) => _room = m;
+            public bool CanHandle(AddAIPlayerRequestEvent e) => NetworkServer.active;
+            public void Handle(AddAIPlayerRequestEvent e) => _room.AddAIPlayer();
+        }
+
+        /// <summary>设置房间地图请求（服务器记录权威地图并广播 UpdateRoomInfoEvent）</summary>
+        private class SetMapHandler : IEventHandler<SetMapRequestEvent>
+        {
+            private readonly RoomManager _room;
+            public SetMapHandler(RoomManager m) => _room = m;
+            public bool CanHandle(SetMapRequestEvent e) => NetworkServer.active;
+            public void Handle(SetMapRequestEvent e)
+            {
+                if (string.IsNullOrEmpty(e.MapConfigName)) return;
+                EventBusHub.Instance.Send(new UpdateRoomInfoEvent { MapConfigName = e.MapConfigName });
+            }
+        }
+
+        /// <summary>房间信息更新（各端收）：同步权威地图名并通知 UI（下拉选中+地图预览刷新）</summary>
+        private class UpdateRoomInfoHandler : IEventHandler<UpdateRoomInfoEvent>
+        {
+            private readonly RoomManager _room;
+            public UpdateRoomInfoHandler(RoomManager m) => _room = m;
+            public bool CanHandle(UpdateRoomInfoEvent e) => e.Source == EventSource.Network;
+            public void Handle(UpdateRoomInfoEvent e)
+            {
+                _room.RoomMapConfigName = e.MapConfigName;
+                _room.OnRoomMapChanged?.Invoke(e.MapConfigName);
+            }
+        }
+
+        /// <summary>客户端卡组上报（host 收存，BattleScreen 为远端玩家建手牌时消费）</summary>
+        private class ClientDeckHandler : IEventHandler<ClientDeckEvent>
+        {
+            private readonly RoomManager _room;
+            public ClientDeckHandler(RoomManager m) => _room = m;
+            public bool CanHandle(ClientDeckEvent e) => NetworkServer.active;
+            public void Handle(ClientDeckEvent e)
+            {
+                string pid = e.SourcePlayerID;
+                if (string.IsNullOrEmpty(pid) || pid == PlayerID.Unknown) pid = _room.playerManager.SelfPlayerID;
+                if (string.IsNullOrEmpty(pid)) return;
+                _room._uploadedDecks[pid] = e.Entries ?? new List<HandCard>();
+                GICLog.Info($"[RoomManager] 收到玩家 {pid} 卡组上报: {e.Entries?.Count ?? 0} 条");
+            }
+        }
+
+        /// <summary>客户端战斗就绪握手（host 收存，开局广播前等齐判据）</summary>
+        private class ClientBattleReadyHandler : IEventHandler<ClientBattleReadyEvent>
+        {
+            private readonly RoomManager _room;
+            public ClientBattleReadyHandler(RoomManager m) => _room = m;
+            public bool CanHandle(ClientBattleReadyEvent e) => NetworkServer.active;
+            public void Handle(ClientBattleReadyEvent e)
+            {
+                string pid = e.SourcePlayerID;
+                if (string.IsNullOrEmpty(pid) || pid == PlayerID.Unknown) pid = _room.playerManager.SelfPlayerID;
+                if (string.IsNullOrEmpty(pid)) return;
+                _room._battleReadyPlayers.Add(pid);
+                GICLog.Info($"[RoomManager] 玩家 {pid} 战斗就绪握手到达");
             }
         }
     }

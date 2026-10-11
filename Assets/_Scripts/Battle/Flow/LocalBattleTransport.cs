@@ -18,8 +18,9 @@ namespace GIC.Battle
         /// <summary>客户端 → Host</summary>
         void ClientSend(BattleMessageType type, object message);
 
-        /// <summary>注册 Host 侧收包回调（客户端上行消息）</summary>
-        void RegisterHostHandler(Action<BattleMessageType, string> handler);
+        /// <summary>注册 Host 侧收包回调（客户端上行消息；senderId="local"=同进程/Mirror connectionId，
+        /// B7 LAN SegmentAck 按连接计数门控用）</summary>
+        void RegisterHostHandler(Action<BattleMessageType, string, string> handler);
 
         /// <summary>注册客户端收包回调（Host 下行消息）</summary>
         void RegisterClientHandler(Action<BattleMessageType, string> handler);
@@ -33,7 +34,7 @@ namespace GIC.Battle
     public class LocalBattleTransport : IBattleTransport
     {
         private readonly IBattleSerializer _serializer;
-        private Action<BattleMessageType, string> _hostHandler;
+        private Action<BattleMessageType, string, string> _hostHandler;
         private Action<BattleMessageType, string> _clientHandler;
 
         public LocalBattleTransport(IBattleSerializer serializer = null)
@@ -41,7 +42,7 @@ namespace GIC.Battle
             _serializer = serializer ?? BattleJsonSerializer.Instance;
         }
 
-        public void RegisterHostHandler(Action<BattleMessageType, string> handler) => _hostHandler = handler;
+        public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) => _hostHandler = handler;
         public void RegisterClientHandler(Action<BattleMessageType, string> handler) => _clientHandler = handler;
 
         public void HostSend(BattleMessageType type, object message)
@@ -66,7 +67,7 @@ namespace GIC.Battle
                 json = _serializer.Serialize(message),
             };
             _serializer.Serialize(envelope); // 序列化验证保留、Log 删（同 HostSend）
-            _hostHandler?.Invoke(envelope.messageType, envelope.json);
+            _hostHandler?.Invoke(envelope.messageType, envelope.json, "local");
         }
     }
 

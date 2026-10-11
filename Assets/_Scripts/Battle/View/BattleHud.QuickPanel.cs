@@ -212,9 +212,9 @@ namespace GIC.Battle
                     MissingImageGuard.Assign(row.avatar, data.avatar); // 头像缺失兜底（2026-10-06 全位点接入）
                     row.avatar.color = dead ? Palette.立牌尸体灰 : Color.white; // 尸体灰染（拖动头像盘同款）
                 }
-                if (row.ring != null) // 描环=归属玩家色（执行预览/拖动头像盘同口径）
+                if (row.ring != null) // 描环=归属玩家色（执行预览/拖动头像盘同口径；session 门面=Roster 房间色优先）
                 {
-                    var pc = BattlePlayerColors.Resolve(_session.Sim, _myPlayerId, u.playerId);
+                    var pc = BattlePlayerColors.Resolve(_session, _myPlayerId, u.playerId);
                     row.ring.color = new Color(pc.r, pc.g, pc.b, 0.8f);
                 }
                 var burst = FindQuickSkill(data, SkillType.Burst);

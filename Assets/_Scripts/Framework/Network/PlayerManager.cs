@@ -71,10 +71,11 @@ namespace GIC.Framework
         }
 
         /// <summary>
-        /// 注册玩家（由 RoomManager 的连接流程与 AddPlayerHandler 调用）
+        /// 注册玩家（由 RoomManager 的连接流程与 AddPlayerHandler 调用；isAI=true=房间 AI 玩家）
         /// </summary>
         public void RegisterPlayer(string playerID, string playerName, TeamType team, PlayerColor color,
-                                  bool isHost, string ipAddress, NetworkConnectionToClient conn = null)
+                                  bool isHost, string ipAddress, bool isAI = false,
+                                  NetworkConnectionToClient conn = null)
         {
             if (_allPlayers.ContainsKey(playerID))
             {
@@ -91,8 +92,9 @@ namespace GIC.Framework
                 SpawnPosition = SpawnPositionType.Random,
                 IPAddress = ipAddress,
                 IsHost = isHost,
-                IsReady = false,
-                IsConnected = true,
+                IsReady = isAI, // AI 恒就绪（不占开局就绪门；host 增删即生效）
+                IsConnected = !isAI, // AI 无网络连接
+                IsAI = isAI,
                 connectionToClient = conn
             };
 
@@ -267,6 +269,15 @@ namespace GIC.Framework
         {
             var info = GetPlayerInfo(playerID);
             return info?.Color.ToColor() ?? Color.white;
+        }
+
+        /// <summary>已占用颜色集合（AI 玩家自动分配/开局校验用，2026-10-11 联机批）</summary>
+        public HashSet<PlayerColor> GetUsedColors()
+        {
+            var used = new HashSet<PlayerColor>();
+            foreach (var kvp in _allPlayers)
+                used.Add(kvp.Value.Color);
+            return used;
         }
 
         // ==================== 调试 ====================

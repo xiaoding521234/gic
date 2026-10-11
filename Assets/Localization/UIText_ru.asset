@@ -1221,6 +1221,14 @@ MonoBehaviour:
       \u043E\u0442\u043C\u0435\u043D\u044B"
     m_Metadata:
       m_Items: []
+  - m_Id: 2006
+    m_Localized: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0418\u0418-\u0438\u0433\u0440\u043E\u043A\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2007
+    m_Localized: "\u0423\u0431\u0440\u0430\u0442\u044C"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

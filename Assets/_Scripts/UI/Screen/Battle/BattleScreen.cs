@@ -14,7 +14,8 @@ namespace GIC.UI
     /// <summary>
     /// 战斗场景控制器（独立根场景，Single 加载）：
     /// 消费 BattleLaunchConfig（联机界面开局）或进入双开调试模式（config 为 null 的调试直开）；
-    /// 装配本地 BattleSession（Host 逻辑 + Client 播放器同进程），AI 玩家自动上交行动。
+    /// 三形态装配（2026-10-11 联机批）：本地（Host 逻辑 + Client 播放器同进程）/ LAN host（Sim+AI 脑，
+    /// 广播开战）/ LAN 客户端（纯表现层，消息驱动建盘）；AI 玩家自动上交行动。
     /// ESC/右键/结束按钮 → 退出确认弹窗（2026-09-12 用户拍板：不应直接退出）。
     /// 五阶段完整回合流程与正式 HUD 在 B5/B6 落地。
     /// </summary>
@@ -36,6 +37,9 @@ namespace GIC.UI
         [Autowired] private GIC.Framework.SaveManager _saveManager;
         [Autowired] private GIC.Framework.CardManager _cardManager;
 
+        // 联机批（2026-10-11）：卡组上报/战斗就绪交换走 RoomManager（B7 LAN）
+        [Autowired] private GIC.Framework.RoomManager _roomManager;
+
         /// <summary>当前对局（调试/测试访问口）</summary>
         public BattleSession Session => _session;
 
@@ -54,6 +58,13 @@ namespace GIC.UI
         /// 建盘/立牌/面板等同步装配原为一帧 1.1s+ 尖峰（实测），加载页动画整帧冻结——
         /// 重活之间插帧，把单帧尖峰摊薄到多帧；Reveal 收尾不变（装配完毕才揭幕）。
         /// 中途异常协程中断 → SceneFadeOverlay 15s 安全兜底自动揭幕，不会卡死加载页。
+        ///
+        /// 2026-10-11 联机批改造：三形态装配——
+        /// ①本地（调试直开/沙盒）：Host+Client 同进程（CreateLocal，旧 B1-B6 链路）；
+        /// ②LAN host：CreateHosted（Sim/Flow/AI 脑），开局前等远端「战斗就绪」握手再 StartBattle 广播；
+        /// ③LAN 客户端：CreateClient（仅表现层），发就绪握手 → 等 BattleStart 建盘后揭幕。
+        /// 名册消费：房间队伍=局内阵营、房间选色=Roster（HUD/描环单源）、出生位置=地图出生区序号
+        /// 落位（Random=按序自动分配未占用区）。开局只立协议核心（测试军 2026-10-11 退役）。
         /// </summary>
         private IEnumerator AssembleRoutine()
         {
@@ -68,28 +79,10 @@ namespace GIC.UI
                     new BattlePlayerSetup { PlayerId = BattleDebugPlayerIds.P2, DisplayName = "玩家P2", IsAI = false },
                 };
             }
-            if (playerSetups.Count > 2)
-            {
-                GICLog.Warn("[BattleScreen] B1 只支持 2 方对局，多余玩家忽略");
-                playerSetups = playerSetups.Take(2).ToList();
-            }
-            if (playerSetups.Count < 2)
-            {
-                // 单玩家配置守卫（2026-09-23 审查 Y11）：装配链按双玩家假定（队伍对位 A/B、
-                // SpawnDebugUnitsRoutine 双方各一），不足即 AI 补位——同 LaunchSinglePlayer 语义。
-                // B7 LAN 网络下发配置可能只带 1 人，届时此守卫兜底。
-                GICLog.Warn("[BattleScreen] 玩家数 <2，AI 补位");
-                playerSetups.Add(new BattlePlayerSetup
-                {
-                    PlayerId = playerSetups.Count > 0 && playerSetups[0].PlayerId == BattleDebugPlayerIds.P2
-                        ? BattleDebugPlayerIds.P1
-                        : BattleDebugPlayerIds.P2,
-                    DisplayName = "AI 玩家",
-                    IsAI = true,
-                });
-            }
+            // LAN 客户端形态判据（配置带网络标记且本机非服务器端）
+            bool isLanClient = launchConfig != null && launchConfig.IsNetworked && !Mirror.NetworkServer.active;
 
-            // 地图：联机入口按配置名加载；调试直开用默认地图
+            // 地图：联机入口按配置名加载；调试直开用默认地图（各端资产本地同构）
             var mapConfig = Resources.Load<BattleMapConfig>("Configs/" +
                 (launchConfig != null ? launchConfig.MapConfigName : BattleLaunchConfig.DefaultMapName));
             if (mapConfig == null)
@@ -110,7 +103,7 @@ namespace GIC.UI
 
             // 组件兜底（场景装配缺失时补挂，便于直接打开场景调试）
             if (_player == null) _player = gameObject.AddComponent<BattlePlayer>();
-            if (_flow == null) _flow = gameObject.AddComponent<TurnFlowController>();
+            if (_flow == null && !isLanClient) _flow = gameObject.AddComponent<TurnFlowController>(); // 客户端无回合状态机
             if (_board == null)
             {
                 _board = GetComponentInChildren<BattleBoard>();
@@ -140,41 +133,72 @@ namespace GIC.UI
 
             yield return null; // ── 分帧：兜底/建会话分开（单帧 304ms 实测拆半，2026-09-13） ──
 
+            if (isLanClient)
+            {
+                // ==================== ③ LAN 客户端装配（B7）：仅表现层 ====================
+                // Sim/Flow 全 null——建盘/快照/片全部经消息驱动；HUD 即可绑定（板面组件先就位，
+                // BattleStart 消息到达时 BattlePlayer.Build 建盘）；就绪握手在 HUD 绑定后发出
+                // （Host 收齐就绪才 StartBattle，保证 BattleStart 不早到——传输层早到队列双保险）。
+                // 场景可能序列化 TurnFlowController 引用——客户端作废置空（未绑定 Sim 的控制器
+                // 是死物，相位门面会误读其 Idle 态）
+                _flow = null;
+                _session = BattleSession.CreateClient(_player, playerSetups);
+                GICLog.Info($"[BattleScreen] LAN 客户端装配：等待 Host 广播开局（名册 {playerSetups.Count} 人）");
+                yield return StartCoroutine(BindHudAndAwaitStart(mapConfig));
+                yield break;
+            }
+
+            // ==================== ①本地 / ②LAN host 装配 ====================
             // 逻辑单位隐藏根（Host 侧逻辑对象；表现层为 UnitView）
             var logicGo = new GameObject("LogicUnits");
             logicGo.transform.SetParent(transform, false);
 
             // 战斗种子（2026-10-02 幸运暴击批）：配置带种用配置（联机/复现），调试直开随机生成
             int battleSeed = launchConfig != null ? launchConfig.Seed : UnityEngine.Random.Range(0, int.MaxValue);
-            _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform, battleSeed);
-            _session.Sim.LogicRoot = logicGo.transform; // 部署等运行时生成单位挂同根（B6c）
-            for (int i = 0; i < playerSetups.Count; i++)
+
+            if (launchConfig != null && launchConfig.IsNetworked)
             {
-                var setup = playerSetups[i];
+                // LAN host：Mirror 传输（逐远端下发+本机直投）+ 期望 ack 方数注入
+                _session = BattleSession.CreateHosted(map, _player, _flow, logicGo.transform, battleSeed, playerSetups);
+                GICLog.Info("[BattleScreen] LAN host 装配：等待远端卡组+就绪握手…");
+            }
+            else
+            {
+                _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform, battleSeed,
+                    launchConfig?.Players); // 调试直开 Players=null（无房间名册——色/队回落旧口径）
+            }
+            _session.Sim.LogicRoot = logicGo.transform; // 部署等运行时生成单位挂同根（B6c）
+
+            // 名册注册：房间队伍=局内阵营（同队友军/异队敌对，引擎原生语义；2026-10-11 联机批——
+            // 旧「按索引硬派 A/B」退役）
+            foreach (var setup in playerSetups)
+            {
                 _session.RegisterDebugPlayer(setup.PlayerId);
-                // 队伍：双端对位 A/B（B6c 部署阵营判定用；B7 联机按房主分配重定）
-                _session.Sim.SetPlayerTeam(setup.PlayerId, i == 0 ? TeamType.A : TeamType.B);
+                _session.Sim.SetPlayerTeam(setup.PlayerId, setup.Team);
             }
 
             yield return null; // ── 分帧：会话就绪/立牌是重活起点 ──
 
-            // 协议核心（2026-09-29 拍板 Unit 化——第一个建筑，也是玩家基地）：每玩家一枚立于出生区
-            // 中心格=胜负判据锚点（docs/02 §2：核心摧毁=战败）；SpawnDebugUnit=UnitFactory 真实链，
-            // 注册期 BattleSimState 登记核心、快照/客户端立牌自动成立；分帧同测试军
+            // 出生区分配（2026-10-11 联机批）：指定出生点按区落位、Random 按序自动分配未占用区
+            var spawnCells = ResolveSpawnCells(mapConfig, playerSetups);
+
+            // 协议核心（2026-09-29 拍板 Unit 化——第一个建筑，也是玩家基地）：每玩家一枚立于
+            // 出生区中心格=胜负判据锚点（docs/02 §2：核心摧毁=战败）；SpawnDebugUnit=UnitFactory
+            // 真实链，注册期 BattleSimState 登记核心、快照/客户端立牌自动成立；分帧立牌。
+            // 开局仅立协议核心（测试军 2026-10-11 退役：正式出战走手牌部署 B6c）
             foreach (var setup in playerSetups)
             {
                 _session.SpawnDebugUnit(UnitName.ProtocolCore, setup.PlayerId,
-                    _session.Sim.GetTeamOf(setup.PlayerId),
-                    FindSpawnCenter(mapConfig, setup.PlayerId, new BattleCell(2, 2)));
+                    _session.Sim.GetTeamOf(setup.PlayerId), spawnCells[setup.PlayerId]);
                 yield return null;
             }
 
-            // 试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A=编辑单位（层级覆盖 5★魔神档全手操）、
-            // B=木桩空座（即时自动 Pass，站桩挨打）；否则走 B1 固定测试军
+            // 试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A=编辑单位（层级覆盖 5★ 魔神档全手操）、
+            // B=木桩空座（即时自动 Pass，站桩挨打）
             if (launchConfig != null && launchConfig.IsSandbox)
             {
                 _session.Sim.SandboxAutoPassPlayerId = playerSetups[1].PlayerId; // 空座回合即时 Pass（TurnFlow 消费）
-                var allyCenter = FindSpawnCenter(mapConfig, playerSetups[0].PlayerId, new BattleCell(2, 2));
+                var allyCenter = spawnCells[playerSetups[0].PlayerId];
                 // 试探单位：出生中心东 1 格（中心格已让位协议核心）；木桩同行再东 5 格=十字射程内同屏
                 _session.SpawnSandboxUnit(launchConfig.SandboxAllyUnit, playerSetups[0].PlayerId, TeamType.A,
                     allyCenter + new BattleCell(1, 0));
@@ -182,20 +206,18 @@ namespace GIC.UI
                 _session.SpawnDebugUnit(launchConfig.SandboxDummyUnit, playerSetups[1].PlayerId, TeamType.B,
                     allyCenter + new BattleCell(6, 0));
             }
-            else
-            {
-                // B1 固定测试军逐个立牌（prefab 实例化+依赖资产首载的尖峰摊薄到每单位一帧）
-                yield return StartCoroutine(SpawnDebugUnitsRoutine(mapConfig, playerSetups));
-            }
 
             // 局内手牌（2026-09-25 拍板「获得卡片=手牌构建唯一入口，获得/失去对称」）：
             // 空表起步→初始卡组按顺序逐张获得（数量=备战数）→开局送初始资源 200 摩拉+60 体力
-            // （编没编货币卡都送，落在牌上）。双方同用玩家存档当前卡组（对称测试；
-            // AI 出战决策后续接 AI 脑）；卡不消耗可重复出战
+            // （编没编货币卡都送，落在牌上）。2026-10-11 联机批：各玩家卡组来源——
+            // 本机真人=本机存档卡组；LAN 远端真人=开战时上报的卡组（5s 等待超时回落 host 卡组）；
+            // AI 玩家=host 当前卡组（拍板）。卡不消耗可重复出战。
+            if (launchConfig != null && launchConfig.IsNetworked)
+                yield return StartCoroutine(WaitForUploadedDecks(playerSetups));
             foreach (var setup in playerSetups)
             {
                 _session.Sim.RegisterHand(setup.PlayerId, new List<HandCard>());
-                foreach (var handCard in BuildHandFromCurrentDeck())
+                foreach (var handCard in BuildHandForPlayer(setup))
                     _session.Sim.GainCard(setup.PlayerId, handCard.AsCardId(), handCard.count);
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Mora), BattleMetrics.InitialMora);
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
@@ -216,6 +238,57 @@ namespace GIC.UI
             yield return null; // ── 分帧：HUD 绑定/开局前让渲染喘一口气 ──
 
             // 正式战斗 HUD（B6 提前启动，docs/18 决策六；2026-09-22 prefab 化——结构=BattleHud.prefab 编辑器维护）
+            var cameraCtrl = GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>();
+            BindHud(cameraCtrl);
+
+            // 正式进入战斗地图：启动音乐轮换链（2026-09-14 用户拍板，揭幕同时起曲）
+            StartBattleMusic(mapConfig);
+
+            if (launchConfig != null && launchConfig.IsNetworked)
+            {
+                // LAN host：等远端「战斗就绪」握手（HUD 绑定完成=可收片）再广播开局——
+                // Host 永不跑在客户端前面（超时兜底快进，防慢端卡全局）
+                yield return StartCoroutine(WaitForRemoteBattleReady(playerSetups));
+            }
+
+            _session.StartBattle();
+
+            // 联机入口开局经加载页转场而来（SceneFadeOverlay.Cover）：装配尖峰已分帧摊薄，
+            // 装配完毕揭幕；调试直开无黑场时为纯 no-op
+            SceneFadeOverlay.Reveal(0.2f);
+        }
+
+        /// <summary>
+        /// LAN 客户端收尾装配：HUD 绑定 → 发就绪握手 → 等 BattleStart 建盘（LatestSnapshot 到达）
+        /// → 揭幕；音乐随本端地图配置起链。超时兜底（30s）硬揭幕防卡死（外层还有 15s 安全网）
+        /// </summary>
+        private IEnumerator BindHudAndAwaitStart(BattleMapConfig mapConfig)
+        {
+            var cameraCtrl = GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>();
+            BindHud(cameraCtrl);
+            StartBattleMusic(mapConfig);
+
+            // 就绪握手：HUD 已绑定=BattleStart 消息可安全消费（Host 收齐才广播开局）
+            EventBusHub.Instance.Send(new ClientBattleReadyEvent());
+            GICLog.Info("[BattleScreen] 客户端就绪握手已发出，等待 Host 开局…");
+
+            float timeout = 30f;
+            while (_session?.Player?.LatestSnapshot == null && timeout > 0f)
+            {
+                timeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (_session?.Player?.LatestSnapshot == null)
+                GICLog.Error("[BattleScreen] 等待 Host 开局超时——揭幕空场（Host 掉线/网络异常）");
+
+            SceneFadeOverlay.Reveal(0.2f);
+        }
+
+        /// <summary>
+        /// HUD 装配单出口（两形态共用）：prefab 兜底实例化 + 相机守卫（批9 复审②）+ Bind
+        /// </summary>
+        private void BindHud(BattleCameraController cameraCtrl)
+        {
             if (_hud == null)
             {
                 var hudPrefab = Resources.Load<GameObject>("Prefabs/Battle/BattleHud");
@@ -223,31 +296,149 @@ namespace GIC.UI
                 {
                     GICLog.Error("[BattleScreen] BattleHud.prefab 未找到，HUD 不可用");
                     DoClose();
-                    yield break;
+                    return;
                 }
                 var hudGo = Instantiate(hudPrefab, transform, false);
                 hudGo.name = "BattleHud";
                 _hud = hudGo.GetComponent<BattleHud>();
             }
-            // 批9 复审②：相机守卫补全——原 null 时静默传 HUD.Bind，板面点击/拖动跟随全链静默死；
-            // 守卫链（EventSystem/Board/HUD prefab 缺失都 Error+DoClose）唯独相机漏，同款补齐
-            var cameraCtrl = GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>();
+            // 批9 复审②：相机守卫补全——原 null 时静默传 HUD.Bind，板面点击/拖动跟随全链静默死
             if (cameraCtrl == null)
             {
                 GICLog.Error("[BattleScreen] 场景缺少 BattleCamera/BattleCameraController，HUD 板面交互链不可用——无法开战");
                 DoClose();
-                yield break;
+                return;
             }
             _hud.Bind(_session, _board, cameraCtrl, Close);
+        }
 
-            _session.StartBattle();
+        // ==================== 出生区分配（2026-10-11 联机批） ====================
 
-            // 正式进入战斗地图：启动音乐轮换链（2026-09-14 用户拍板，揭幕同时起曲）
-            StartBattleMusic(mapConfig);
+        /// <summary>
+        /// 名册→出生区中心格解析：指定出生点（Zone1..N）按区落位；Random 自动分配「离已占区最远」
+        /// 的空区（对角开局惯例）。同区冲突由房间开局门校验拦截。地图无出生区时
+        /// 回落对角双角（调试直开兜底）。
+        /// </summary>
+        private static Dictionary<string, BattleCell> ResolveSpawnCells(BattleMapConfig config,
+            List<BattlePlayerSetup> playerSetups)
+        {
+            var result = new Dictionary<string, BattleCell>();
+            int zoneCount = config.spawnZones != null ? config.spawnZones.Count : 0;
 
-            // 联机入口开局经加载页转场而来（SceneFadeOverlay.Cover）：装配尖峰已分帧摊薄，
-            // 装配完毕揭幕；调试直开无黑场时为纯 no-op
-            SceneFadeOverlay.Reveal(0.2f);
+            if (zoneCount == 0)
+            {
+                // 无出生区地图（不应出现——开局门容量校验拦）：对角双角按序兜底
+                for (int i = 0; i < playerSetups.Count; i++)
+                    result[playerSetups[i].PlayerId] = i % 2 == 0 ? new BattleCell(2, 2) : new BattleCell(12, 12);
+                return result;
+            }
+
+            // 先收全部指定占位（Random 不占）；再逐名册序为 Random 分配「离已占区最远」的空区
+            // （RTS 惯例对角开局：两人=对角、四人=四角；同距取小序号）
+            var used = new HashSet<int>();
+            var usedCells = new List<BattleCell>();
+            foreach (var s in playerSetups)
+            {
+                int z = (int)s.SpawnPosition;
+                if (z > 0 && z <= zoneCount)
+                {
+                    used.Add(z);
+                    usedCells.Add(config.spawnZones[z - 1].center);
+                }
+            }
+            foreach (var setup in playerSetups)
+            {
+                int zone = (int)setup.SpawnPosition;
+                if (zone <= 0 || zone > zoneCount)
+                {
+                    zone = PickFarthestFreeZone(config, used, usedCells);
+                    used.Add(zone);
+                    usedCells.Add(config.spawnZones[zone - 1].center);
+                }
+                result[setup.PlayerId] = config.spawnZones[zone - 1].center;
+            }
+            return result;
+        }
+
+        /// <summary>「离已占出生区最远」的空区（切比雪夫距离取最小值最大化；无参照=1 号区；
+        /// 全占回落 1——容量门应拦此态）</summary>
+        private static int PickFarthestFreeZone(BattleMapConfig config, HashSet<int> used, List<BattleCell> usedCells)
+        {
+            int zoneCount = config.spawnZones.Count;
+            int best = 1; int bestDist = -1;
+            for (int z = 1; z <= zoneCount; z++)
+            {
+                if (used.Contains(z)) continue;
+                if (usedCells.Count == 0) return z; // 空场=首空区（1 号）
+                int minDist = int.MaxValue;
+                foreach (var c in usedCells)
+                {
+                    int d = Mathf.Max(Mathf.Abs(config.spawnZones[z - 1].center.x - c.x),
+                                      Mathf.Abs(config.spawnZones[z - 1].center.y - c.y));
+                    if (d < minDist) minDist = d;
+                }
+                if (minDist > bestDist) { bestDist = minDist; best = z; }
+            }
+            if (bestDist < 0) return 1; // 全占兜底
+            return best;
+        }
+
+        // ==================== 卡组来源（2026-10-11 联机批） ====================
+
+        /// <summary>等远端真人卡组上报（ClientDeckEvent）——LAN host 装配期；超时回落 host 卡组。
+        /// 等待名单只含远端真人（IsRemoteHuman——本机/AI 的手牌走本机存档即取，不空等）</summary>
+        private IEnumerator WaitForUploadedDecks(List<BattlePlayerSetup> playerSetups)
+        {
+            var pending = playerSetups
+                .Where(s => _roomManager.IsRemoteHuman(s.PlayerId) && !_roomManager.HasUploadedDeck(s.PlayerId))
+                .ToList();
+            if (pending.Count == 0) yield break;
+
+            const float limit = 5f; // 上报在开战瞬间发出，正常毫秒级到齐
+            float elapsed = 0f;
+            while (elapsed < limit)
+            {
+                pending.RemoveAll(s => _roomManager.HasUploadedDeck(s.PlayerId));
+                if (pending.Count == 0) yield break;
+                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+            }
+            foreach (var s in pending)
+                GICLog.Warn($"[BattleScreen] 玩家 {s.PlayerId} 卡组上报超时，回落 host 当前卡组（对称测试口径）");
+        }
+
+        /// <summary>等远端真人「战斗就绪」握手（ClientBattleReadyEvent）——LAN host 开局广播前；
+        /// 超时快进（15s，慢端不卡全局——传输层早到队列双保险兜底接收）</summary>
+        private IEnumerator WaitForRemoteBattleReady(List<BattlePlayerSetup> playerSetups)
+        {
+            var pending = playerSetups.Where(s => !s.IsAI).Select(s => s.PlayerId).ToList();
+            pending.RemoveAll(pid => !_roomManager.IsRemoteHuman(pid)); // 本机/AI 不等
+            if (pending.Count == 0) yield break;
+
+            const float limit = 15f;
+            float elapsed = 0f;
+            while (elapsed < limit)
+            {
+                pending.RemoveAll(pid => _roomManager.IsBattleReady(pid));
+                if (pending.Count == 0) yield break;
+                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+            }
+            if (pending.Count > 0)
+                GICLog.Warn($"[BattleScreen] 远端就绪握手超时（{string.Join(",", pending)}），快进开局");
+        }
+
+        /// <summary>
+        /// 玩家手牌来源：LAN 远端真人=上报卡组；本机真人/AI/未上报=host 当前卡组（AI 卡组拍板=host 卡组）
+        /// </summary>
+        private List<HandCard> BuildHandForPlayer(BattlePlayerSetup setup)
+        {
+            if (!setup.IsAI && _roomManager != null && _roomManager.HasUploadedDeck(setup.PlayerId))
+            {
+                var deck = _roomManager.GetUploadedDeck(setup.PlayerId);
+                if (deck != null && deck.Count > 0) return new List<HandCard>(deck);
+            }
+            return BuildHandFromCurrentDeck();
         }
 
         // ==================== 战斗地图音乐（轮换链，参考大厅位置曲模式） ====================
@@ -374,97 +565,11 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 固定测试军（2026-09-25 用户指令「双方场上各 1 个芭芭拉、安柏、凯亚、丘丘人」+2026-09-29
-        /// D 批次操控分层补 5★ 魔神）：双方**对称镜像阵容**——各 1 安柏/凯亚/芭芭拉（3★ 伙伴=
-        /// 评分制自主决策实测对象）+1 丘丘人（1★ 眷属=启发式脑实测对象）+1 温迪（5★ 魔神=玩家
-        /// 全手操/层级体力 10 档实测对象——D 批次 docs/active/32 §10 验收「魔神：全手操、不操站桩」，
-        /// 无 5★ 则魔神路径不可测；温迪零技能→UnitConfig 借用安柏技能组=测试军临时装配，正式技能
-        /// 随温迪实装批替换）；丽莎移出测试军。
-        /// 落点=出生区**环形偏移位**（3×3 出生区 8 环格取 5——中心格已让位协议核心，2026-09-29 拍板；
-        /// 先手 (+1,0)/(0,+1)/(+1,+1)/(+1,-1)/(0,-1)、后手全部取反镜像，点位对称保证双方接敌距离一致）。
-        /// 出生点来自地图配置的玩家出生区；正式出战队列 B6c 已落地（卡组手牌仍可部署，测试军=预铺场）。
-        /// 分帧协程：逐单位 yield（单帧 1.1s 立牌尖峰摊薄，2026-09-13）。
-        /// </summary>
-        private IEnumerator SpawnDebugUnitsRoutine(BattleMapConfig mapConfig, List<BattlePlayerSetup> playerSetups)
-        {
-            var first = playerSetups[0];
-            var second = playerSetups[1];
-
-            var firstCenter = FindSpawnCenter(mapConfig, first.PlayerId, new BattleCell(2, 2));
-            var secondCenter = FindSpawnCenter(mapConfig, second.PlayerId, new BattleCell(12, 12));
-
-            _session.SpawnDebugUnit(UnitName.Amber, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 0));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Kaeya, first.PlayerId, TeamType.A, firstCenter + new BattleCell(0, 1));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Barbara, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, 1));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Hilichurl, first.PlayerId, TeamType.A, firstCenter + new BattleCell(1, -1));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Venti, first.PlayerId, TeamType.A, firstCenter + new BattleCell(0, -1));
-            yield return null;
-
-            _session.SpawnDebugUnit(UnitName.Amber, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 0));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Kaeya, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, -1));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Barbara, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, -1));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Hilichurl, second.PlayerId, TeamType.B, secondCenter + new BattleCell(-1, 1));
-            yield return null;
-            _session.SpawnDebugUnit(UnitName.Venti, second.PlayerId, TeamType.B, secondCenter + new BattleCell(0, 1));
-        }
-
-        private static BattleCell FindSpawnCenter(BattleMapConfig config, string playerId, BattleCell fallback)
-        {
-            if (config.spawnZones != null)
-            {
-                foreach (var zone in config.spawnZones)
-                    if (zone.playerId == playerId) return zone.center;
-            }
-            return fallback;
-        }
-
-        /// <summary>
-        /// 从玩家存档当前卡组构建初始手牌获得清单（2026-09-25 拍板：初始卡组按顺序经 GainCard 获得）：
-        /// 每卡携带获得数量（角色=1、物品=备战数 min(存档持有, maxPrepareCount 备战上限)——
-        /// 如背包 100 体力牌、备战上限 60 → 获得 60）；**货币物品牌（摩拉/体力）编入=开局增量**
-        /// （2026-09-29 拍板 A，勘正旧「编没编都送勿双发」——货币牌此前可编入却零效果=死构筑位；
-        /// 现编入量并入开局资源池，统一赠送 200/60 照送，卡位换开局经济=真实构筑选择）；
-        /// 空卡组回退丘丘人×2。
-        /// 走 CardManager 卡组视图=与收藏卡组界面同源同排序（角色前物品后、SortOrder、星级）。
+        /// 从玩家存档当前卡组构建初始手牌获得清单（2026-10-11 联机批：逻辑抽入 BattleDeckBuilder
+        /// 单源——CoopScreen 的 LAN 客户端卡组上报同链；本方法保留为 host 侧便捷入口）
         /// </summary>
         private List<HandCard> BuildHandFromCurrentDeck()
-        {
-            var result = new List<HandCard>();
-            var save = _saveManager?.CurrentSave;
-            if (save != null)
-            {
-                int currentDeck = save.progress.currentDeck;
-                var decks = _cardManager?.decks;
-                if (decks != null && currentDeck >= 0 && currentDeck < decks.Length)
-                {
-                    foreach (var card in decks[currentDeck].Cards)
-                    {
-                        int count = 1;
-                        if (card.id.cardType == CardType.Item)
-                        {
-                            var itemData = CardConfigResolver.Instance?.ItemConfig?.GetItemData(card.id.AsItemName());
-                            count = Mathf.Min(
-                                _saveManager?.CurrentSave?.GetItemCount(card.id.AsItemName()) ?? 0,
-                                itemData?.maxPrepareCount ?? 0);
-                        }
-                        result.Add(new HandCard(card.id, count));
-                    }
-                }
-            }
-            if (result.Count == 0)
-            {
-                result.Add(new HandCard(new CardId(UnitName.Hilichurl), 1));
-                result.Add(new HandCard(new CardId(UnitName.Hilichurl), 1));
-            }
-            return result;
-        }
+            => BattleDeckBuilder.BuildCurrentDeck(_saveManager, _cardManager);
 
         /// <summary>
         /// 关闭请求（ESC/右键/结束战斗按钮）→ 退出确认弹窗，确认后才真正退出
