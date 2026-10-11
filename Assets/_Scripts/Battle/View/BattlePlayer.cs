@@ -68,7 +68,8 @@ namespace GIC.Battle
         [SerializeField, Range(0f, 1f)] private float 箭雨落地淡出 = 0.18f;
 
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 _teamAColor/_teamBColor 场景序列化值
-        // 与代码默认一致，迁移零损失——队伍色与 HUD 队列框/accent 同源对齐）
+        // 与代码默认一致，迁移零损失——2026-10-12 拍板起单位显示色=归属玩家色〔HUD 注入解析器〕，
+        // Palette 我方/敌方主色仅作 HUD 未绑时的兜底口径）
         private static BattlePalette Palette => BattlePalette.Instance;
 
         /// <summary>最新快照（HUD/血条刷新用；客户端不持逻辑状态）</summary>
@@ -161,6 +162,16 @@ namespace GIC.Battle
         /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
         [Autowired] private UnitConfig _unitConfig;
         private TurnFlowController _flow;
+
+        /// <summary>单位显示色解析器（2026-10-12 用户拍板「单位显示的颜色应当是玩家色，本游戏没有
+        /// 队伍色，否则无法区分哪些单位是自己的，哪些是队友的」）：HUD Bind 注入 playerId→Color
+        /// （BattlePlayerColors.Resolve=房间玩家色单源，roster 命中=房间选色、无 roster 回落两表口径
+        /// ——同队队友与我天然异色〔房间开局门颜色冲突校验保证〕）；null=HUD 未绑兜底（旧队伍主色口径）。
+        /// 消费=CreateView 立牌底座/描边/血条填充全链（底座即判定的视觉语义不变）</summary>
+        private Func<string, Color> _playerColorOf;
+
+        /// <summary>注入单位显示色解析器（HUD Bind 调用——先于 BattleStart 建场）</summary>
+        public void SetPlayerColorOf(Func<string, Color> resolver) => _playerColorOf = resolver;
 
         /// <summary>当前立牌布局态：true=散开（选择阶段展开布局）/ false=收拢（执行阶段重叠格心）——两态模型（docs/22 §11）</summary>
         private bool _spreadFormations;
@@ -1371,10 +1382,12 @@ namespace GIC.Battle
             }
 
             var team = (TeamType)state.team;
-            var teamColor = team == TeamType.B ? Palette.敌方主色 : Palette.我方主色;
-            // 血条填充=队伍色（与底座同色，2026-09-25 拍板——BattleOverheadBars 消费 TeamColor；
-            // B7 联机按 viewer 归属重定时属屏幕空间层议题，Palette.血条我方绿/敌方红 字段保留备用）
-            var view = UnitView.Create(_viewRoot, state.unitId, avatar, teamColor,
+            // 单位显示色=归属玩家色（2026-10-12 拍板取代旧「队伍主色」口径——2v2 同队无法区分彼此单位；
+            // 底座圆盘/选中描边/血条填充全链同源；HUD 未绑解析器时回落旧队伍主色兜底）
+            var unitColor = _playerColorOf != null
+                ? _playerColorOf(state.playerId)
+                : (team == TeamType.B ? Palette.敌方主色 : Palette.我方主色);
+            var view = UnitView.Create(_viewRoot, state.unitId, avatar, unitColor,
                 _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
                 (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
                 state.cylinderDiameter); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）

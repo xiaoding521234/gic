@@ -46,8 +46,10 @@ namespace GIC.Battle
         /// <summary>眷属（UnitTier.Familiar——命座徽章不显示的层级门控；快照 tier 0=未填回落星级换算）</summary>
         public bool IsFamiliar { get; private set; }
 
-        /// <summary>队伍色（底座圆盘同源；2026-09-25 目检拍板：血条填充=玩家所选队伍色）</summary>
-        public Color TeamColor => _baseColor;
+        /// <summary>归属玩家色（底座圆盘/选中描边/血条填充三链同源；2026-10-12 用户拍板「单位显示的
+        /// 颜色应当是玩家色，本游戏没有队伍色」——取代旧 TeamColor 队伍色口径：2v2 同队队友单位与
+        /// 自己异色=可辨识归属；色源=BattlePlayerColors.Resolve〔房间玩家色单源〕）</summary>
+        public Color OwnerColor => _baseColor;
 
         /// <summary>当前血量/上限（BattleOverheadBars 每帧拉取）</summary>
         public int Hp => _hp;
@@ -451,7 +453,7 @@ namespace GIC.Battle
         /// <param name="hoverHeight">立牌离地高度（世界单位=格；UnitData.离地高度，2026-09-27 拍板新增）：
         /// 纸片人整体上浮——飞行/悬浮单位；底座圆盘留地面（受击圆柱可视化=视觉即判定不随浮空）；
         /// 头顶条锚点挂倾斜组随浮空同步抬高</param>
-        public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color teamColor,
+        public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color ownerColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, VideoClip idleVideo = null,
             float hoverHeight = 0f, float cylinderDiameter = 0f)
@@ -549,14 +551,14 @@ namespace GIC.Battle
             // 水面 order 0 时整片盖盘=「圆盘沉水」报障根因，水面已改 -2 收口，docs/14 §123）；
             // 深度上盘=视觉表面（水格含波峰带）+0.02 恒高出波峰——盘沉水观感恒=排序问题非几何
             view._cylinderDiameter = cylinderDiameter > 0f ? cylinderDiameter : BattleMetrics.UnitCylinderDiameter;
-            view._baseDiscMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(WithDiscAlpha(teamColor));
+            view._baseDiscMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(WithDiscAlpha(ownerColor));
             var baseGo = BattleViewFactory.CreateDisc(root.transform, "BaseDisc", view._baseDiscMaterial);
             baseGo.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             baseGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             baseGo.transform.localScale = new Vector3(view._cylinderDiameter, view._cylinderDiameter, 1f);
             baseGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.BaseDiscSortingOrder;
             view._baseDisc = baseGo.transform;
-            view._baseColor = teamColor;
+            view._baseColor = ownerColor;
 
             // 不透明黑描边环（2026-10-06 拍板「底部圆盘加不透明黑色描边」；同日追拍「太粗了，砍一半」
             // =外露 7%→3.5%）：垫在盘缘正下方 0.001——环内半（46.5%~50%）被半透明盘压暗成自然过渡、
@@ -710,7 +712,7 @@ namespace GIC.Battle
         // ==================== 选中描边（2026-10-05 拍板「选中时立牌加描边，颜色=所属玩家色」） ====================
         // 双路径同源：视频路径=per-unit ChromaKey 材质直写；sprite 路径=换装共享 FrozenSprite 材质
         // （_FrozenAmount=0 直通渲染与默认 sprite 材质恒等——§92 已验证，描边复用免新 shader）+
-        // MPB 写描边参数（全单位共享单材质零实例化，同霜化模式）。描边色=底座圆盘同源队伍色；
+        // MPB 写描边参数（全单位共享单材质零实例化，同霜化模式）。描边色=底座圆盘同源玩家色；
         // 调用方=BattleHud.RefreshOutlines 统一收口（选中单位+指定单位型瞄准的待定目标两槽）。
         // 幂等守卫：状态不变直通（全量遍历刷新的重复调用零开销）
 
@@ -728,7 +730,7 @@ namespace GIC.Battle
         /// （图集 sprite 用 textureRect 高——atlas 空间一致），钳 3~12 texel</summary>
         private void ApplyOutlineParams()
         {
-            var color = _baseColor; // 队伍色（与底座圆盘同源）
+            var color = _baseColor; // 归属玩家色（与底座圆盘同源）
             if (_videoMaterial != null)
             {
                 _videoMaterial.SetFloat(OutlineEnabledId, _outlineOn ? 1f : 0f);

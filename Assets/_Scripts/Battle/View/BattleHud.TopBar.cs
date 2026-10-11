@@ -76,7 +76,8 @@ namespace GIC.Battle
             _clockCombiner = FindSlotCombiner("clock", "ClockText");
             RecolorText(_clockCombiner, Palette.文字米白);
 
-            // 我方信息块（左上角）：队营色 chrome 保留，体力/摩拉换物品牌计数 chip（B6d——
+            // 我方信息块（左上角）：accent=我的玩家色（2026-10-12 拍板「单位显示的颜色应当是玩家色」
+            // 同批口径——roster 命中=房间选色、调试直开回落我方玩家色[0]），体力/摩拉换物品牌计数 chip（B6d——
             // 结构契约=槽内 MoraChip/StaminaChip 两枚 ItemCounterChip；**图标初始化挪到 Bind 注入后**——
             // ResolveHudReferences 先于 Wargame.Context.Inject 跑，此处 _itemConfig 尚为 null，
             // 注入前 InitItem 图标为空（首版实测"只有数字"的根因；2026-10-06 缺图兜底批起
@@ -85,7 +86,7 @@ namespace GIC.Battle
             // prefab myinfo 槽 Emblem 节点同批删除）
             if (_layoutByKey.TryGetValue("myinfo", out var myinfo))
             {
-                ResolveBlockChrome(myinfo.content, Palette.我方主色);
+                ResolveBlockChrome(myinfo.content, BattlePlayerColors.Resolve(_session, _myPlayerId, _myPlayerId));
                 _myMoraChip = FindChip(myinfo.content, "MoraChip");
                 _myStaminaChip = FindChip(myinfo.content, "StaminaChip");
             }

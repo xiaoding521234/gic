@@ -25,7 +25,7 @@ namespace GIC.Battle
     /// 单位选择交互（2026-09-18 拍板）：点立牌选中 → 技能盘现+手牌藏（选中态/手牌态互斥），
     /// 点空白取消选中；技能瞄准 = 可选格推荐分色高亮（推荐/不推荐=BattlePalette 瞄准推荐色/瞄准
     /// 不推荐色，色相勿写死在此处——2026-09-23 拍板分色、09-24 白改金；推荐=该方向能命中敌人/
-    /// 该格实际能走到；不可选=无提示）+ 右上取消按钮 + 选中单位脚下金色标记与两束队伍色环绕光束。
+    /// 该格实际能走到；不可选=无提示）+ 右上取消按钮 + 选中单位脚下金色标记与两束归属玩家色环绕光束。
     /// 选中/瞄准提示特效（2026-09-27 拍板）：技能按钮瞄准态=两束元素色光环绕飞行（旧打钩图
     /// skillSelect 退役不再点亮）；立牌选中=底座圆盘两束队伍主色光环绕（OrbitBeams.cs 两驱动）。
     /// 瞄准提交制（2026-09-26 拍板）：点可选格=金色待定（BattlePalette.瞄准已选色，可点其它格变更、
@@ -351,6 +351,10 @@ namespace GIC.Battle
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
+            // 单位显示色解析器注入（2026-10-12 拍板「单位显示的颜色应当是玩家色」）：立牌底座/选中描边/
+            // 血条填充全链改走房间玩家色单源（roster 命中=房间选色——同队队友异色可辨识归属；
+            // 无 roster 调试直开回落 BattlePalette 两表口径）——先于 BattleStart 建场注入
+            _session.Player.SetPlayerColorOf(pid => BattlePlayerColors.Resolve(_session, _myPlayerId, pid));
             // 相位/计时经 BattleSession 门面（2026-10-11 联机批）：host/本地=TurnFlowController、
             // LAN client=消息派生——HUD 不再直接触 Flow（客户端 Flow=null）
             _session.OnPhaseChanged += OnPhaseChanged;
@@ -1452,7 +1456,7 @@ namespace GIC.Battle
             ApplyStateVisibility(); // 先态显隐、后数据刷新——无数据技能键的隐藏由 RefreshSkillButtons 终态定
             RefreshSkillButtons();
             ShowSelectMarker(unitId);
-            RefreshOutlines(); // 选中描边（2026-10-05 拍板：立牌描边=队伍色；ExitAiming 已随收口刷过一次）
+            RefreshOutlines(); // 选中描边（2026-10-05 拍板：立牌描边=归属玩家色；ExitAiming 已随收口刷过一次）
             UpdateQuickSelectionHighlight(); // 快捷面板行高亮随选中即时刷新（2026-10-06）
             SetTip("Battle_TipUnitSelected");
         }
@@ -2811,9 +2815,10 @@ namespace GIC.Battle
             _aimQuadByCell.Clear();
         }
 
-        /// <summary>选中单位脚下两束队伍色环绕彗尾弧光（2026-09-27 拍板「底座圆盘也要」；
+        /// <summary>选中单位脚下两束归属玩家色环绕彗尾弧光（2026-09-27 拍板「底座圆盘也要」；
         /// 同日验证后追加拍板：金盘退役——底座圆盘本体不替换，选中仅额外加弧光。
-        /// 选中态/瞄准态常显，色=该单位所属玩家队伍主色（与底座圆盘同源 BattlePlayer 口径）</summary>
+        /// 选中态/瞄准态常显，色=该单位归属玩家色（2026-10-12 拍板取代旧队伍主色口径——与底座圆盘
+        /// 同源 BattlePlayerColors 单源，同队队友异色）</summary>
         private void ShowSelectMarker(string unitId)
         {
             var snapshot = _session.Player.LatestSnapshot;
@@ -2821,14 +2826,14 @@ namespace GIC.Battle
             if (unit == null) { HideSelectMarker(); return; }
 
             var cellWorld = _board.CellToWorld(unit.position);
-            // 环绕光束：贴片高度略高于瞄准格（波峰带之上同链），色=队伍主色（TeamType.A=我方/B=敌方）
+            // 环绕光束：贴片高度略高于瞄准格（波峰带之上同链），色=归属玩家色（与底座圆盘同源）
             if (_discOrbit == null && _highlightRoot != null)
                 _discOrbit = OrbitBeamsWorld.Create(_highlightRoot);
             if (_discOrbit != null)
             {
                 _discOrbit.Setup(
                     new Vector3(cellWorld.x, _board.GetDecalHeight(unit.position, 0.045f), cellWorld.z),
-                    (TeamType)unit.team == TeamType.B ? Palette.敌方主色 : Palette.我方主色,
+                    BattlePlayerColors.Resolve(_session, _myPlayerId, unit.playerId),
                     unit.cylinderDiameter); // per-unit 盘径贴紧（协议核心批：0.8 大盘弧光同步外扩）
                 _discOrbit.gameObject.SetActive(true); // 复用件重显（2026-09-27 报障返修：件缓存战斗期复用，
                                                        // HideSelectMarker 收起后再次选中须重激活——原版漏此行，
