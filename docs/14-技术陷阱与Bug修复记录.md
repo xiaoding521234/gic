@@ -2077,3 +2077,14 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **取证与纪律**：编辑模式 RT 渲染探针+PIL 曲线（2048×1024 白底/灰底双验）——0.153 设计→0.075 实测与公式预测逐位吻合；**UI 透明浓度调参一律像素实测校准，勿按设计值目估**；渲染探针法（临时场景+WorldSpace Canvas+正交相机 Camera.Render→RT→ReadPixels→PIL）可复用于任何 UI 表现量化验收。
 
+## §147 AssetDatabase.CreateAsset 全灭「Unable to import」＝悬空 StartAssetEditing 计数器卡死会话——批量块内 API 抛异常无 finally 收尾即全局楔死（2026-10-11 SkillTag 建表批实证）
+
+**症状链**：①`LocalizationEditorSettings.CreateStringTableCollection` 首建在 `StartAssetEditing` 块内 `CreateAsset`（SharedTableData）抛异常（「Creating asset failed」+「Unable to import newly created asset」，项目类/包类全中——非 Localization 特有，任何 CreateAsset 同炸）；②坏状态上再调 `StopAssetEditing` 刷延后导入队列→内部**陈旧 temp→target 搬移**（目标已被外部删除）逐个弹「Moving file failed」模态框堵主线程（unity_dialog 只能逐框点，无尽头）。
+
+**根因**：包源码 `CreateCollection` 的 `StartAssetEditing()`（L377）与 `StopAssetEditing()`（L423）之间无 try/finally——**异常路径跳过 Stop→悬空批量状态**：此后本会话一切 AssetDatabase 导入走延后队列、CreateAsset 即时导入全部失败；且延后队列里的 temp 搬移在下次 Stop/flush 时才集中爆雷。
+
+**修法与恢复**：①唯一可靠恢复=**杀编辑器进程重启**（WMI 验 CommandLine 含 `Editor\Tuanjie.exe -projectpath` 择 PID；重启后队列清空、CreateAsset 复活——探针实证）；②建表续命配方=**try/finally 兜底**（CreateCollection 调用 finally 里显式 `StopAssetEditing` 规范化计数器；成功路径它自闭环、finally 多余的 Stop 只报无害错「invoked without a call to StartAssetEditing」）；③重建半成品=先删磁盘残留（SharedData.asset+meta）**并 refresh 同步编辑器认知**再重试（外部删除不 refresh=编辑器仍认为资产存在，CreateAsset 二连炸）。
+
+**纪律**：凡 `StartAssetEditing` 包内 API 可能抛异常的调用（CreateCollection/CreateAsset 批量等），必须 try/finally 显式收尾；会话内 CreateAsset 突然全灭先查悬空计数器（此前是否有批量块异常未收尾），勿在坏状态上叠操作；**勿外部删目标目录再触发队列 flush**（连环炸框即此）。新建本地化表集合全流程（API 重载/枚举对齐/CSV）=gic-localization skill「新建表集合」节。
+
+

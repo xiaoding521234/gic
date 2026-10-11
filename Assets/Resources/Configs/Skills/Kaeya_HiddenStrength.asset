@@ -16,12 +16,14 @@ MonoBehaviour:
     skillID: 3002003
     icon: {fileID: 21300000, guid: cc894c695492e654fa6bc8f236aefb1f, type: 3}
     skillType: 6
+    "\u6280\u80FD\u6807\u7B7E": 2002
     customParams:
     - key: 9
       value: 10
       baseType: 0
     timeline: {fileID: 0}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
     "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}

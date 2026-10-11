@@ -16,6 +16,7 @@ MonoBehaviour:
     skillID: 4001003
     icon: {fileID: 21300000, guid: 09f633e4fc72fcd46878a839b79ee026, type: 3}
     skillType: 8
+    "\u6280\u80FD\u6807\u7B7E": 5003
     customParams:
     - key: 40
       value: 50
@@ -36,3 +37,10 @@ MonoBehaviour:
       value: 20
       baseType: 0
     timeline: {fileID: 0}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
+    effects: []
+    costs: []

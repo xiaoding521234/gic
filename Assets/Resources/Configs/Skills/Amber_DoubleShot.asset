@@ -16,6 +16,7 @@ MonoBehaviour:
     skillID: 3001002
     icon: {fileID: 21300000, guid: 077a9ba1a9d595e40951208fac980c5b, type: 3}
     skillType: 2
+    "\u6280\u80FD\u6807\u7B7E": 1001
     customParams:
     - key: 1
       value: 40
@@ -25,6 +26,7 @@ MonoBehaviour:
       baseType: 0
     timeline: {fileID: 11400000, guid: ec9aa34604b44244abe5726fc44f37dd, type: 2}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 32900000, guid: 8184c16a7c7260b49a58e7e7581d841d, type: 3}
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1.29
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1.002
     "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0.054, y: -0.01}
@@ -40,6 +42,7 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0
@@ -54,6 +57,7 @@ MonoBehaviour:
       value: 0
       element: 1
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0
@@ -68,6 +72,7 @@ MonoBehaviour:
       value: 10
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0

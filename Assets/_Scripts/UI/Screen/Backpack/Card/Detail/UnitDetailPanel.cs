@@ -38,6 +38,14 @@ namespace GIC.UI
 
         private UnitConfig.UnitData _lastRaw;
 
+        // ===== 技能行 tag 标签规格（2026-10-11 决策六十四「卡片详情里也需要显示」）=====
+        // SkillPanel 行内 Skill 实例=115×115（烘焙基准）——标签为战斗被动盘 154 基准的同比例缩放
+        //（被动字号 42×115/154≈31；宽 180×0.747≈134、高 27×0.747≈20、底距 38×0.747≈28）
+        private const float 详情标签宽 = 134f;
+        private const float 详情标签高 = 20f;
+        private const float 详情标签底距 = 28f;
+        private const float 详情标签字号 = 31f;
+
         // 公用字段引用（由 CardDetailView 注入）
         private Image _top;
         private Image _bottomImage;
@@ -219,6 +227,10 @@ namespace GIC.UI
                     if (skillIconView.selectButton != null && selectionGroup != null)
                         skillIconView.selectButton.Group = selectionGroup;
                 }
+                // 2026-10-11 决策六十四追拍「卡片详情里也需要显示」：技能行图标挂技能 tag 标签
+                // （战斗被动盘同款共享建件；None=回落技能名；字体走项目 TMP 默认 zh-cn SDF）
+                SkillTagLabelBuilder.Build(skillViewObj.transform, skillData,
+                    详情标签宽, 详情标签高, 详情标签底距, 详情标签字号);
             }
         }
     }

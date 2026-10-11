@@ -16,15 +16,22 @@ MonoBehaviour:
     skillID: 3002004
     icon: {fileID: 21300000, guid: 22f63d14e3df3074382cf859230fa72c, type: 3}
     skillType: 7
+    "\u6280\u80FD\u6807\u7B7E": 3001
     customParams:
     - key: 3
       value: 50
       baseType: 1
     timeline: {fileID: 0}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
     effects:
     - trigger: 0
       kind: 2
       targetFilter: 1
+      condition: 0
       paramKey: 3
       paramKey2: 0
       paramKey3: 0
@@ -32,4 +39,8 @@ MonoBehaviour:
       value: 0
       element: 0
       buffType: 1
+      buffAsset: {fileID: 0}
       targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+    costs: []

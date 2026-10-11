@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5be51871efa6c3e4eae1703925c8f5ac, type: 3}
+  m_Name: SkillTag
+  m_EditorClassIdentifier: 
+  m_SharedTableData: {fileID: 11400000, guid: 7ec106e3a40fe8441a4fe3d47eb949a4, type: 2}
+  m_Tables:
+  - {fileID: 11400000, guid: 3a88ba29370aa3c44a880e10f6a1a01f, type: 2}
+  - {fileID: 11400000, guid: 00b44684248f7f3479598b521fbcf235, type: 2}
+  - {fileID: 11400000, guid: 6b3c122a2c3b0974080234b76829569b, type: 2}
+  - {fileID: 11400000, guid: 6fa631909edb2804fb555a816a6a52a2, type: 2}
+  - {fileID: 11400000, guid: c27b2d596d5a81d4c890798333f6d1c4, type: 2}
+  m_Extensions: []
+  m_Group: String Table
+  references:
+    version: 2
+    RefIds: []

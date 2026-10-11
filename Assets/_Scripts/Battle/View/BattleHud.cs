@@ -2939,7 +2939,8 @@ namespace GIC.Battle
             if (def.nameText != null)
             {
                 def.nameText.ClearAllEntries();
-                def.nameText.AddEntry(data.skillID.GetEntry());
+                // 2026-10-11 决策六十四：按钮文本显示技能 tag（无 tag 回落技能名——未配置/占位技能保持旧行为）
+                def.nameText.AddEntry(data.技能标签 != SkillTag.None ? data.GetTagEntry() : data.skillID.GetEntry());
             }
         }
 
@@ -3144,8 +3145,9 @@ namespace GIC.Battle
         }
 
         /// <summary>移动按钮刷新（特殊技能）：数据链走 skills[Move]（InitWithData 染角色元素色底+主动环；
-        /// 无 Move 条目单位不隐藏——移动人人可用，仅跳过染色）。图标+名称随单位常态切换
-        /// （walk/fly/amphibious → 步行/飞行/两栖，docs/18 决策六"随单位切换与否"待拍板项的数据驱动落地）</summary>
+        /// 无 Move 条目单位不隐藏——移动人人可用，仅跳过染色）。图标+按钮标签随单位常态切换
+        /// （walk/fly/amphibious → 步行/飞行/两栖 tag，docs/18 决策六"随单位切换与否"待拍板项的数据驱动落地；
+        /// 2026-10-11 决策六十四起标签文本=tag，同口径由 normalMoveType 驱动）</summary>
         private void ApplyMoveButton(SkillButtonDef def, UnitConfig.UnitData unitData)
         {
             if (def?.view == null || unitData == null) return;
@@ -3154,17 +3156,15 @@ namespace GIC.Battle
             if (move != null)
                 def.view.InitWithData(move, unitData, ViewType.OnlyDisplay, null);
 
-            // 图标+名称随常态切换（InitWithData 已填配置的 walk.png，飞行/两栖覆盖为对应图）
-            SkillName nameId = SkillName.Common_Walk;
+            // 图标随常态切换（InitWithData 已填配置的 walk.png，飞行/两栖覆盖为对应图；
+            // 名称已随 2026-10-11 决策六十四改显 tag，走下方 normalMoveType 派生分支）
             string iconPath = "UI/Skills/walk";
             if (unitData.normalMoveType == ForceType.Fly)
             {
-                nameId = SkillName.Common_Fly;
                 iconPath = "UI/Skills/fly";
             }
             else if (unitData.normalMoveType == ForceType.Amphibious)
             {
-                nameId = SkillName.Common_Amphibious;
                 iconPath = "UI/Skills/amphibious";
             }
             if (def.view.skillIcon != null)
@@ -3172,7 +3172,16 @@ namespace GIC.Battle
             if (def.nameText != null)
             {
                 def.nameText.ClearAllEntries();
-                def.nameText.AddEntry(nameId.GetEntry());
+                // 2026-10-11 决策六十四：移动键标签显示 tag；同日追拍「优先以特色当tag」——
+                // 移动技能资产标签优先（安柏移动=采集这类特色语义），无标签（占位/通用 Common_Walk）
+                // 才回落 normalMoveType 派生（步行/飞行/两栖，与图标同口径兜底）
+                SkillTag moveTag = SkillTag.None;
+                if (move != null && move.技能标签 != SkillTag.None) moveTag = move.技能标签;
+                if (moveTag == SkillTag.None)
+                    moveTag = unitData.normalMoveType == ForceType.Fly ? SkillTag.Flight
+                        : unitData.normalMoveType == ForceType.Amphibious ? SkillTag.Amphibious
+                        : SkillTag.Walk;
+                def.nameText.AddEntry(moveTag.GetEntry());
             }
 
             // 置灰两源（同 ApplySkillButton D-5 单源口径+2026-10-04 整键变暗扩展）：层级门控（眷属/伙伴的

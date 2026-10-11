@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using TMPro;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
@@ -44,6 +45,16 @@ namespace GIC.Battle
         private const float 被动图标尺寸 = 154f;
         /// <summary>被动图标横向间距（画布单位；行居中铺开，两端对称）</summary>
         private const float 被动图标间距 = 12f;
+
+        /// <summary>被动图标 tag 标签宽（画布单位；2026-10-11 决策六十四：被动图标也显示技能 tag——
+        /// 主动键 Name 同款观感的 70% 比例：260×0.7=180）</summary>
+        private const float 被动标签宽 = 180f;
+        /// <summary>被动图标 tag 标签高（Name 38×0.7）</summary>
+        private const float 被动标签高 = 27f;
+        /// <summary>被动图标 tag 标签底距（图标底边上方；Name +54×0.7——标签上半段盖住图标下缘，同「盖按钮下半」拍板口径）</summary>
+        private const float 被动标签底距 = 38f;
+        /// <summary>被动图标 tag 标签字号（2026-10-11 追拍「文本太小了，加大一倍」：21×2=42——Name 比例 30×0.7 再加倍）</summary>
+        private const float 被动标签字号 = 42f;
 
         /// <summary>passive 槽寻址（Build 分件 ResolveHudReferences 调；图标运行时建——容器无需壳层组件）</summary>
         private void ResolvePassivePanel()
@@ -111,6 +122,11 @@ namespace GIC.Battle
 
                 var view = inst.GetComponent<SkillIconView>();
                 view.InitWithData(data, unitData, ViewType.OnlyDisplay, _skillDetailView);
+                // 2026-10-11 决策六十四：被动图标显示技能 tag（共享建件=卡片详情技能列表同款；
+                // 字号 42=追拍「加大一倍」、深墨字色=追拍「文本颜色和图标色太接近」（走建件缺省）；
+                // None=回落技能名）
+                SkillTagLabelBuilder.Build(inst.transform, data, 被动标签宽, 被动标签高, 被动标签底距, 被动标签字号,
+                    BattleViewFactory.WorldTextFont, null);
                 var icon = new PassiveSkillIcon { data = data, rt = rt, view = view };
                 if (view.selectButton != null)
                 {

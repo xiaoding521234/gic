@@ -71,6 +71,9 @@ namespace GIC.Data
         [InspectorName("关联描述表")]
         RelatedDescription = 21,
 
+        [InspectorName("技能标签表")]
+        SkillTag = 22,
+
     }
 }
 

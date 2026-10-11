@@ -33,6 +33,9 @@ namespace GIC.Data
             [Header("技能类型")]
             public SkillType skillType = SkillType.Normal;
 
+            [Header("技能标签（2026-10-11 决策六十四：技能盘按钮显示的功能标签——战斗 HUD 四键与被动盘显示此标签而非技能名；None=回落技能名；调标签改此下拉零代码）")]
+            public SkillTag 技能标签 = SkillTag.None;
+
             [Header("自定义参数")]
             [SerializeField] public SkillParam[] customParams;
 
@@ -44,6 +47,12 @@ namespace GIC.Data
             [Header("SkillCast 片头从头播、播完自动回待机循环。Move 型=循环态：SkillCast 登记+Move 命令片起止，")]
             [Header("行走期间循环、片末回待机、速度乘回放速度（快进不脚滑）。null=无动作视频=待机照播）")]
             public VideoClip 动作视频;
+
+            [Tooltip("手机端动作视频（可选回退片；null=直接用 动作视频）：高分辨率动作片（如超分 4K 级）在安卓硬解启动慢，视频钟会落后于伤害事件钟（2026-10-11 实测凯亚霜袭=伤害先于动画到点）；手机端回退轻量片，画布比例须与 动作视频 一致（校准三值共用，零额外配置）")]
+            public VideoClip 手机端动作视频;
+
+            /// <summary>当前平台实际播放的动作片（预热与播放共用单源）：手机端配置了回退片则用回退片</summary>
+            public VideoClip 当前动作片 => Application.isMobilePlatform && 手机端动作视频 != null ? 手机端动作视频 : 动作视频;
 
             [Tooltip("动作片缩放补偿（1=不补偿；=idle 片主体高/动作片主体高——宽幅 16:9 动作片构图主体小，播放放大回 idle 主体视觉大小，UnitView.PlayActionVideo 内乘 quad scale；安柏宽幅构图实测=1.29（idle 主体 554px/动作片主体 430px））")]
             public float 动作片缩放补偿 = 1f;
@@ -144,6 +153,15 @@ namespace GIC.Data
             public TextEntry GetNameEntry()
             {
                 return skillID.GetEntry();
+            }
+
+            /// <summary>
+            /// 获取技能标签的 Entry（用于 TextCombiner；技能盘按钮显示用，2026-10-11 决策六十四。
+            /// None 由调用方判空回落技能名——本方法不做回落）
+            /// </summary>
+            public TextEntry GetTagEntry()
+            {
+                return 技能标签.GetEntry();
             }
 
             /// <summary>

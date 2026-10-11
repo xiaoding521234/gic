@@ -1,0 +1,104 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: SkillTag Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: SkillTag
+  m_TableCollectionNameGuidString: 7ec106e3a40fe8441a4fe3d47eb949a4
+  m_Entries:
+  - m_Id: 1001
+    m_Key: Damage
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1002
+    m_Key: Control
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2001
+    m_Key: AttackUp
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2002
+    m_Key: MoveSpeedUp
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2003
+    m_Key: Vision
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2004
+    m_Key: Shield
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2005
+    m_Key: Lifesteal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Key: Heal
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3002
+    m_Key: Revive
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Key: Walk
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Key: Flight
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Key: Amphibious
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Key: Teleport
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5001
+    m_Key: Constellation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5002
+    m_Key: Mark
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5003
+    m_Key: Contract
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5004
+    m_Key: Resource
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5005
+    m_Key: Charge
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5006
+    m_Key: Gathering
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 2594356221206331392
+  references:
+    version: 2
+    RefIds:
+    - rid: 2594356221206331392
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1791723381281
