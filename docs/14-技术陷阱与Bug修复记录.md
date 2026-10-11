@@ -2087,4 +2087,14 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **纪律**：凡 `StartAssetEditing` 包内 API 可能抛异常的调用（CreateCollection/CreateAsset 批量等），必须 try/finally 显式收尾；会话内 CreateAsset 突然全灭先查悬空计数器（此前是否有批量块异常未收尾），勿在坏状态上叠操作；**勿外部删目标目录再触发队列 flush**（连环炸框即此）。新建本地化表集合全流程（API 重载/枚举对齐/CSV）=gic-localization skill「新建表集合」节。
 
+## §148 背包标签对位线首开停行尾：激活期「初始选中」自选在 OnShow 前遗留滑线协程，对位 snap 不杀在途协程被逐帧回写覆盖（2026-10-11 报障「首次进背包，选择线在最后一个，实际初始选中第一个」全链实证）
+
+**症状**：打开背包，内容与选中视觉=角色页（第一个）正确，标签对位线却停在行尾（货币/任务位）；点任一标签后恢复。首开/每次开都复现。
+
+**根因链（双缺陷合谋）**：①**prefab 数据**——BackpackScreen.prefab 两个标签钮（货币 tab6、任务 tab7，恰为最后两个）SelectButton「初始选中」误存 1：预热泵在 Splash 期**实例化后激活两帧**（§38 渲栏态预热窗口），未选中者 OnEnable 自我选中→OnBackpackCategoryChangedEvent→`SetCategory(tab, isInit:false)`→**SlideSelectLineTo 启动 0.2s 滑线协程**；预热瀑布里任务后选把货币顶掉，标签行布局也在该窗口内跑完。首开 OnEnable 瀑布里货币（已被顶掉）再自选，其滑线协程捕获的正是**布局后的行尾真位**——协程在 OnShow 之后仍在跑。②**代码**——OnShow 的 `SnapSelectLineTo` 对位后**不取消 `_lineCoroutine`**：滑线协程每帧 `SetLineWorldX` 回写，把刚对好的位逐帧拖回行尾。附注：标签行=HorizontalLayoutGroup+ContentSizeFitter 排布、按钮 authored 全 (0,0) 堆在容器锚点——冷打开（预热未跑）路径下 OnShow 早于首帧布局，对位会读到位行中点，须强制布局。
+
+**修法**：①两个「初始选中」归 0（YAML 直改，值级零重序列化；源 InventoryCategoryButton.prefab 本就 0 未动）——初始选中权归 OnShow `SetCategory(isInit:true)`+SyncEvent 单源，管理态按钮不得留激活自选位；②`SnapSelectLineTo` 前置取消 `_lineCoroutine`+`LayoutRebuilder.ForceRebuildLayoutImmediate(tabContainer)`（§128 同款），对位成为权威写。
+
+**纪律**：**snap 型对位/复位写入必须先取消同目标的在途动画协程**——协程逐帧回写会在 snap 之后覆盖它，且其捕获的终点在 snap 时已成陈旧意图；「选中态由 Screen 单源管理」的按钮组，prefab 严禁残留「初始选中=1」——它在每次激活的 OnEnable 瀑布里自选并触发全链事件（预热窗口与首开瀑布都吃到，池化 `_selected` 跨开关存活使每次开屏的「最后自选者」不同、症状位漂移）。
+
 

@@ -1250,7 +1250,7 @@ MonoBehaviour:
       m_Calls: []
   "\u9009\u4E2D\u6A21\u5F0F": 2
   "\u70B9\u6309\u6539\u53D8\u9009\u4E2D": 1
-  "\u521D\u59CB\u9009\u4E2D": 1
+  "\u521D\u59CB\u9009\u4E2D": 0
   "\u6240\u5C5E\u9009\u4E2D\u7EC4": {fileID: 6896578770760372973}
   _onSelectedChanged:
     m_PersistentCalls:
@@ -3078,7 +3078,7 @@ MonoBehaviour:
       m_Calls: []
   "\u9009\u4E2D\u6A21\u5F0F": 2
   "\u70B9\u6309\u6539\u53D8\u9009\u4E2D": 1
-  "\u521D\u59CB\u9009\u4E2D": 1
+  "\u521D\u59CB\u9009\u4E2D": 0
   "\u6240\u5C5E\u9009\u4E2D\u7EC4": {fileID: 6896578770760372973}
   _onSelectedChanged:
     m_PersistentCalls:

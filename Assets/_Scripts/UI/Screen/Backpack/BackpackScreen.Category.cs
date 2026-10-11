@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using GIC.Data.Event;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.Localization;
 using GIC.Framework;
 using GIC.Data;
@@ -79,9 +80,20 @@ namespace GIC.UI
             sharedSelectLine.anchoredPosition = new Vector2(ap.x, localY);
         }
 
+        /// <summary>对位即权威写：先取消在途滑线协程（激活期 初始选中 自选事件可能在 OnShow 前
+        /// 遗留一条仍在跑的滑线，协程每帧回写会把对位覆盖掉），并强制标签行布局就绪
+        /// （未预热冷打开路径 OnShow 早于首帧布局，标签仍堆在容器锚点，§128 同款）。</summary>
         private void SnapSelectLineTo(BackpackTab tab)
         {
             if (sharedSelectLine == null) return;
+
+            if (_lineCoroutine != null)
+            {
+                StopCoroutine(_lineCoroutine);
+                _lineCoroutine = null;
+            }
+            if (tabContainer != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)tabContainer);
 
             ItemCategoryView target = null;
             foreach (var view in _tabViews)
