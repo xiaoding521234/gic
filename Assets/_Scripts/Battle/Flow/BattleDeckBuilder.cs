@@ -11,6 +11,23 @@ namespace GIC.Battle
     public static class BattleDeckBuilder
     {
         /// <summary>
+        /// AI 玩家默认卡组（2026-10-12 用户拍板「AI 玩家暂时都用 安柏，凯亚，芭芭拉，体力，摩拉
+        /// 这套卡组」）：三伙伴角色各 1+体力/摩拉货币牌（数量=开局资源常量同源）。卡不消耗可
+        /// 重复出战——角色阵亡后可再部署；出牌逻辑=PlayerQuotaBrain 部署分支（TryBuildDeploy）。
+        /// </summary>
+        public static List<HandCard> BuildAIDefaultDeck()
+        {
+            return new List<HandCard>
+            {
+                new HandCard(new CardId(UnitName.Amber), 1),
+                new HandCard(new CardId(UnitName.Kaeya), 1),
+                new HandCard(new CardId(UnitName.Barbara), 1),
+                new HandCard(new CardId(ItemName.Stamina), BattleMetrics.InitialStamina),
+                new HandCard(new CardId(ItemName.Mora), BattleMetrics.InitialMora),
+            };
+        }
+
+        /// <summary>
         /// 玩家存档当前卡组 → 初始手牌获得清单（2026-09-25 拍板：初始卡组按顺序经 GainCard 获得）：
         /// 每卡携带获得数量（角色=1、物品=备战数 min(存档持有, maxPrepareCount 备战上限)——
         /// 如背包 100 体力牌、备战上限 60 → 获得 60）；货币物品牌（摩拉/体力）编入=开局增量

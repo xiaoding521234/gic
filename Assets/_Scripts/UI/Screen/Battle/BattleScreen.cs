@@ -429,11 +429,15 @@ namespace GIC.UI
         }
 
         /// <summary>
-        /// 玩家手牌来源：LAN 远端真人=上报卡组；本机真人/AI/未上报=host 当前卡组（AI 卡组拍板=host 卡组）
+        /// 玩家手牌来源：AI 玩家=固定默认卡组（2026-10-12 拍板「安柏/凯亚/芭芭拉/体力/摩拉」——
+        /// BattleDeckBuilder.BuildAIDefaultDeck 单源，取代旧「AI=host 当前卡组」口径）；
+        /// LAN 远端真人=上报卡组；本机真人/未上报=host 当前存档卡组
         /// </summary>
         private List<HandCard> BuildHandForPlayer(BattlePlayerSetup setup)
         {
-            if (!setup.IsAI && _roomManager != null && _roomManager.HasUploadedDeck(setup.PlayerId))
+            if (setup.IsAI)
+                return BattleDeckBuilder.BuildAIDefaultDeck();
+            if (_roomManager != null && _roomManager.HasUploadedDeck(setup.PlayerId))
             {
                 var deck = _roomManager.GetUploadedDeck(setup.PlayerId);
                 if (deck != null && deck.Count > 0) return new List<HandCard>(deck);

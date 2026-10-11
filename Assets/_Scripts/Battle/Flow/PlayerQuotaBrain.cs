@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using GIC.Framework;
 using GIC.Data;
 namespace GIC.Battle
 {
@@ -11,8 +12,9 @@ namespace GIC.Battle
     /// AI 玩家配额脑（B6b 起；D 批次操控分层 docs/active/32 §6 收窄+2026-09-29 术语迁移改名
     /// AIDebugBrain→PlayerQuotaBrain：原 v2 评分制的**单位级评估搬迁为伙伴自主脑（CompanionBrain）**，
     /// 本脑只管玩家 1 配额的用途——①号令（上交势力技能延奏/契约，施法者=己方眷属/伙伴/魔神均可）
-    /// ②操魔神（5 星单位行动=CompanionBrain 共享评分骨架复用为候选打分器）③部署/升命/购买/物品
-    /// （后续批次接线）④无候选=Pass 空过放权自主军团。与真人玩家对等：配额同样可用于号令/魔神
+    /// ②操魔神（5 星单位行动=CompanionBrain 共享评分骨架复用为候选打分器）③部署（2026-10-12
+    /// AI 固定卡组批接线：手牌角色卡出战=TryBuildDeploy 部署优先；升命/购买/物品仍后续批次）
+    /// ④无候选=Pass 空过放权自主军团。与真人玩家对等：配额同样可用于号令/魔神/部署
     /// （§10 验收「AI 玩家对等」）。
     /// AI 决策由 Host 生成（docs/18 决策一）——直接读 BattleSimState/BattleSnapshot，不走传输通道；
     /// 选择阶段开始后延迟提交（给玩家看清回合切换）。
@@ -84,12 +86,22 @@ namespace GIC.Battle
         // ==================== 配额评分制决策（号令/操魔神/空过） ====================
 
         /// <summary>
+        /// 配额评分制决策（部署/号令/操魔神/空过）。
         /// 候选枚举序（确定性）：己方存活魔神 unitId 升序 × 技能 skillIndex 升序 × 十字向枚举序 ×
         /// 号令施法者/目标 unitId 升序；严格大于替换（同分先到先得）。Pass=0 分兜底。
+        /// 2026-10-12 部署分支（用户拍板「AI 玩家暂时用 安柏/凯亚/芭芭拉/体力/摩拉 固定卡组并打出手牌」）：
+        /// 部署优先于号令/操魔神——先铺场后指挥（三伙伴上场后归位常规评分流）。
         /// </summary>
         private ActionData Decide(int turn)
         {
             var sim = _session.Sim;
+
+            // ⓪ 部署：手牌角色卡+核心半径内有合法落点+摩拉够 → 出战（DeployUnitExecutor 校验链同源；
+            //    同名单位在场〔含尸体〕=该卡暂不出战——规避升命语义烧配额〔docs/05 §5.4 尸体仅升命〕；
+            //    三伙伴全上场后本分支自然空手，归位号令/操魔神评分流）
+            var deploy = TryBuildDeploy(sim, turn);
+            if (deploy != null) return deploy;
+
             // 决策快照（纯读，与选择阶段广播同源状态）——预判/目标评估的唯一状态源
             var snapshot = sim.TakeSnapshot(turn);
             var tracker = new CompanionBrain.CandidateTracker();
@@ -111,6 +123,87 @@ namespace GIC.Battle
                 EvaluateEnsoSkills(sim, entry.Value, turn, tracker, threat);
 
             return tracker.Best ?? Pass(turn);
+        }
+
+        // ==================== 部署分支（2026-10-12 AI 固定卡组批） ====================
+
+        /// <summary>
+        /// 部署候选（确定性）：手牌角色卡按 unitName 升序 × 落点由近及远（核心半径 1 环→2 环、
+        /// 行优先）→ 首个「合法落点+摩拉够+无同名存活」组合出战。
+        /// 落点合法性=DeployUnitExecutor.IsDeployCellValid 单源（核心半径 2+地形+碰撞共享原语）；
+        /// 摩拉=GetEffectiveDeployCost 同源；同名存活守卫=规避升命语义重复烧配额（卡不消耗，
+        /// 阵亡后同名卡自然重新可出战）。
+        /// </summary>
+        private ActionData TryBuildDeploy(BattleSimState sim, int turn)
+        {
+            var hand = sim.GetHand(_playerId);
+            if (hand == null || hand.Count == 0) return null;
+            var config = Wargame.Instance?.Context?.Get<UnitConfig>();
+            if (config == null) return null;
+
+            // 手牌角色卡收集（升序遍历；同卡多张去重=一次只出一张；物品/货币卡不可部署）
+            var candidates = new List<(int unitName, UnitConfig.UnitData data)>();
+            foreach (var card in hand)
+            {
+                if (!card.IsUnit) continue;
+                if (candidates.Exists(c => c.unitName == card.value)) continue;
+                var data = config.GetUnitData((UnitName)card.value);
+                if (data == null) continue;
+                if (sim.GetMora(_playerId) < data.GetEffectiveDeployCost()) continue; // 摩拉不足先攒
+                candidates.Add((card.value, data));
+            }
+            if (candidates.Count == 0) return null;
+            candidates.Sort((a, b) => a.unitName.CompareTo(b.unitName));
+
+            foreach (var candidate in candidates)
+            {
+                if (OwnUnitOnField(sim, (UnitName)candidate.unitName)) continue; // 同名在场（含尸体）=暂不出战
+                var cell = FindDeployCell(sim, candidate.data);
+                if (cell == null) continue;
+                return new ActionData
+                {
+                    playerId = _playerId,
+                    actionType = ActionType.DeployUnit,
+                    deployUnitName = candidate.unitName,
+                    deployCell = cell.Value,
+                    turnNumber = turn,
+                };
+            }
+            return null;
+        }
+
+        /// <summary>己方同名单位在场判定（**含尸体**——口径=DeployUnitExecutor.FindOwnUnitByName/升命
+        /// 分支同构：docs/05 §5.4 尸体也仅升命不复苏。同名在场（含尸体）时再打出该卡=给尸体升命
+        /// 烧配额，AI 守卫跳过；卡不消耗，若无同名单位（未部署过）则可出战）</summary>
+        private bool OwnUnitOnField(BattleSimState sim, UnitName unitName)
+        {
+            foreach (var kv in sim.Units)
+            {
+                var identity = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.OwnerPlayerID != _playerId) continue;
+                if (identity.UnitName == unitName) return true;
+            }
+            return false;
+        }
+
+        /// <summary>核心附近首个合法部署落点（由近及远：半径 1 环→2 环、行优先列序；确定性枚举）</summary>
+        private BattleCell? FindDeployCell(BattleSimState sim, UnitConfig.UnitData deployData)
+        {
+            var core = sim.GetCorePosition(_playerId);
+            for (int radius = 1; radius <= DeployUnitExecutor.DeployRadiusFromCore; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != radius) continue; // 只遍历当前环
+                        var cell = new BattleCell(core.x + dx, core.y + dy);
+                        if (DeployUnitExecutor.IsDeployCellValid(sim, _playerId, cell, deployData))
+                            return cell;
+                    }
+                }
+            }
+            return null;
         }
 
         /// <summary>己方存活魔神（5★，玩家域单位行动——配额脑唯一可操单位档）。

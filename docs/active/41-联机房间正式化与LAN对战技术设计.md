@@ -45,7 +45,7 @@
 - 各端（含 host 本机回环）统一 `CoopScreen.OnStartBattleReceived`：客户端先回 `ClientDeckEvent`（本机存档当前卡组，`BattleDeckBuilder.BuildCurrentDeck` 与 BattleScreen 手牌构建同源）→ 全端同一转场（Cover→SwitchRootScene(BattleScreen)）。
 - **BattleScreen 三形态装配**：①本地（调试直开/沙盒/host+纯 AI）=`CreateLocal`（旧链路）；②LAN host=`CreateHosted`（Sim/Flow/AI 脑+Mirror 传输+期望 ack 方数注入）；③LAN 客户端=**`CreateClient`（仅 BattlePlayer 表现层，Sim/Flow=null**，场景序列化的 TurnFlowController 引用作废置空——防相位门面误读死物）。判据=`launchConfig.IsNetworked && !NetworkServer.active`。
 - **就绪握手**（Host 永不跑在客户端前面）：客户端 HUD 绑定完成 → `ClientBattleReadyEvent`(OnlyHost) → host `WaitForRemoteBattleReady` 收齐（15s 超时快进）才 `StartBattle()` 广播 BattleStart。
-- **卡组来源**：本机真人=本机存档；LAN 远端真人=上报卡组（5s 等待超时回落 host 卡组）；AI=host 当前卡组（拍板）。
+- **卡组来源**（2026-10-12 追记拍板「AI 玩家暂时都用 安柏，凯亚，芭芭拉，体力，摩拉」）：本机真人=本机存档；LAN 远端真人=上报卡组（5s 等待超时回落 host 卡组）；**AI 玩家=固定默认卡组**（`BattleDeckBuilder.BuildAIDefaultDeck`：三伙伴各 1+体力/摩拉——取代旧「AI=host 当前卡组」口径）。**AI 出牌**=配额脑部署分支（`PlayerQuotaBrain.TryBuildDeploy` 部署优先于号令/操魔神：合法落点单源 `IsDeployCellValid`+摩拉够 `GetEffectiveDeployCost`+**同名不在场〔含尸体——升命语义守卫，docs/05 §5.4〕**→出战；三伙伴全上场后归位号令/Pass）。
 
 ### 5.3 客户端无 Flow 的表现适配
 - `SnapshotMessage` 增 `selectLimitSeconds`（host 选择阶段头随快照下发）。
