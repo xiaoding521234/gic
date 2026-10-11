@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics; // Player 变体编译需要：进程段被 #if STANDALONE_WIN 包住，编辑器域不编译故 refresh 不报
+using System.IO;
 using GIC.Framework;
 using UnityEngine;
 

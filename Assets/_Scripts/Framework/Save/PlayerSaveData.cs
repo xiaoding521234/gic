@@ -339,7 +339,9 @@ namespace GIC.Framework
         // ========== 显示设置 ==========
         public int languageIndex = 0;           // 语言索引
         public int resolutionIndex = 0;         // 0=全屏（当前桌面分辨率）, 1=3840x2160, 2=2560x1440, 3=1920x1080, 4=1280x720
-        public int frameRate = 165;              // 帧率
+        // 手机端初始档 60（2026-10-11 拍板）：MediaCodec 首帧+高刷耗电，60 档覆盖满帧感；
+        // 桌面维持 165。存档重建（InitDefault/EnsureValid）都走本初始化器，真档读值不受影响。
+        public int frameRate = Application.isMobilePlatform ? 60 : 165;   // 帧率
 
         // ========== 按键绑定 ==========
         public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();

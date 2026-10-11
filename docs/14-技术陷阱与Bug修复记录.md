@@ -2029,3 +2029,41 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **通则**：**「拖拽手势的松手尾巴点击」防线必须用「进行中会话」旗，勿只靠时间戳——UGUI 的 pointerClick 派发在 endDrag 之前，OnEndDrag 里写的任何防御都晚于当帧点击执行**。卡跟手拖拽（指针恒在卡上、pointerClick 按下时捕获）松手必产尾巴点击；凡「拖拽 X 松手又弹 Y 面板」类症状先查此顺序勿先怀疑手势仲裁。取证路径：直接读 `Library/PackageCache/com.unity.ugui@*/Runtime/EventSystem/InputModules/StandaloneInputModule.cs` 核派发序，勿凭直觉猜事件顺序（本条两次翻车均源于此直觉）。
 
+## §143 手机端进大厅背景视频先黑后播：Preload 只读资产不碰解码器——Splash 期解码预热（2026-10-11 方案 A；决策四十五同根因在大厅侧的复刻）
+
+**症状**：手机端进大厅背景视频黑屏 0.3~1s 后才正常播放；桌面无感。
+
+**根因**：AssetCache.Preload 只把 VideoClip 资产读进内存，**预热不了解码器**（决策四十五已实锤的机制）；MainHallScreen.UpdateVideoBackground 立即隐藏静态图渲染器+激活视频物体，回调里 EnsureVideoRT 新建黑 RT→Play()（场景 VideoPlayer 配 WaitForFirstFrame=1），首帧解码落 RT 前恒黑——Windows WMF ~100-300ms 不可见，Android MediaCodec 0.3~1s+ 可见。战斗立牌首开黑屏同根因，但 PrewarmActionClips 修复此前只覆盖战斗单位。
+
+**修法（方案 A，照抄 PrewarmClipRoutine 模式）**：①SplashScreen.PrewarmHallBackgroundVideo 协程——等 IsCached→LoadAsync 取 clip（缓存命中=同步回调，Release 配对归还）→临时 VideoPlayer Prepare→Play 判 **frame≥1**（比固定等两帧稳 Android）→首帧渲入 RT→HallBackgroundPrewarm.Deposit 静态槽跨场景交接；②MainHallScreen.EnsureVideoRT(+address 参数) TakeIfMatch 认领——首帧已在 RT 里，开播前 quad 即有画面；地址/尺寸不符当场销毁陈旧零泄漏；③全程超时兜底回落「现建 RT」旧行为=预热失败零回归。手机端存档初始帧率 60 同批拍板（SaveSettings.frameRate 初始化器 isMobilePlatform?60:165，桌面 165 不变）。
+
+**陷阱**：①协程被 StopAllCoroutines（跳过 Splash）/场景卸载杀时 **finally 不可靠**——未移交 RT+LoadAsync 引用计数必须 MonoBehaviour.OnDestroy 兜底清理（ScreenBase.OnDestroy 是 protected virtual，override 须 base.OnDestroy()）；②已知边界：战斗→返回大厅的再进路径仍是旧行为（现建 RT+解码，被转场淡入部分盖住）——手机上若可感再加「大厅 OnDestroy 时 RT 归还静态槽」约 6 行复用末帧。
+
+## §144 手机端大厅背景糊：VideoClipImporter Android 平台转码降尺寸（2026-10-11 现场取证实锤）
+
+**症状**：手机端大厅背景明显糊；编辑器切 Android 目标同样糊；PC 一直清晰。
+
+**取证（运行态探针一发定位）**：`clip dims=800x500`、`RT=800x500`——磁盘文件明明 3200×2000。**判据：「运行时 clip.width ≠ 磁盘文件分辨率」=导入器转码在搞鬼**——排障先读活体 VideoPlayer.clip.width/targetTexture 尺寸，勿先怀疑解码器/URP/RT/预热链。
+
+**根因**：mp4 .meta 的 VideoClipImporter `targetSettings` 平台键 **7（Android）enableTranscoding=1+resizeFormat=2**——3200×2000 被导入转码成 800×500（1/4 边长）；PC 平台无条目=导入原始。手机包与 Android 目标编辑器都吃到 800×500，再双线性拉伸 4×4 铺屏=糊。
+
+**修法**：两 meta enableTranscoding 1→0（Android/PC 统一原始 3200×2000）；其余 mp4 全库扫描无 targetSettings=干净（战斗片校准链零影响）。**资产纪律：大分辨率视频素材勿开 Unity 导入转码**——源已是 H.264 时转码只会重压缩+隐式降质；确需移动端减载走显式方案（同分辨率重编码 30fps 落 L5.1/HEVC，或 SkillConfig.手机端动作视频 式显式变体+校准三值共存），勿用导入器隐式降尺寸。
+
+**工具坑**：①rg 扫 .asset 转义字段名（`"\u624B\u673A…"`）**必须 -F 固定字符串**——`\uXXXX` 进正则会被解析回汉字导致漏扫；②Tuanjie .meta 的 guid 行是密文（文本反查零命中≠引用不存在，判定走 AssetDatabase.GUIDToAssetPath）；③targetSettings 文本直编安全。
+
+**遗留观察（勿当 bug 修）**：转码关闭后手机直接解 L5.2 原流（3200×2000@60 AVC）——设备若解不动（无画面/卡顿），正解=同分辨率重编码 60→30fps（等级落 L5.1，中端机硬解全覆盖）或转 HEVC，**勿回开导入转码**。
+
+## §145 PC 导出 8 条 CS0103/CS0246：#if 守护段裸符号缺 using——编辑器域 refresh 恒 0 错，仅 Player 构建暴露（2026-10-11；2026-10-09 gic-rts 同族坑本仓坐实）
+
+**症状**：PC 导出失败——PetLocalCommands.cs/PetProcessLauncher.cs 共 8 条 CS0103/CS0246（Process/ProcessStartInfo/Path 不存在）→ "Failed to compile player scripts" → Addressables content build failure → Build Failed。
+
+**根因**：两文件的裸 `Process`/`ProcessStartInfo`/`Path` 全在 `#if UNITY_STANDALONE_WIN && !UNITY_EDITOR` 守护段内——**编辑器域永不编译该段故 refresh 恒 0 错**；Android 构建同样不编译（STANDALONE_WIN=false）故 APK 一直正常——只有 Windows Player 构建编译这段，故长期潜伏。using 疑似 2026-09-19 文件头模板清理批按编辑器域口径误删（#if 豁免审查漏了这两文件）。**gic-rts 仓为克隆产物同缺陷仍在——恢复 RTS 开发时须同步补两 using**。
+
+**修法**：两文件补 `using System.Diagnostics;`（PetLocalCommands 另需 `System.IO`——Path 裸引用；PetProcessLauncher 的 Path 是全限定无需）。
+
+**验证法（同链忠实复现）**：GUI 编辑器**静态**调 `AddressableAssetSettings.BuildPlayerContent(out result)`（静态方法勿实例调用；GUI 下 DefaultObject.Settings 正常，批处理模式才需反射填坑）——修复后 11.5s 全绿 1314 locations，与用户导出失败同一条链（AddressablesPlayerBuildProcessor.PrepareForBuild 前置钩子即触发 Player 脚本编译）。
+
+**防护扫描法**：rg 扫带 `#if (UNITY_STANDALONE_WIN|!UNITY_EDITOR|UNITY_ANDROID)` 守护段的运行时文件 × 裸 IO/Diagnostics 符号（`(?<![\w.])X[.(]`）× 全文件无对应 using；命中须人工核（kernel32 P/Invoke 别名/全限定调用/注释=三类误报先例）。**编译报错清单一次编译遍即全集**，可作权威判据。
+
+**通则**：**编辑器域编译 0 错 ≠ Player 变体可编译；using 清理/审计凡涉 #if 守护段文件必须按 Player 变体口径复核**；「导出失败但编辑器全绿」先查守护段裸符号。
+

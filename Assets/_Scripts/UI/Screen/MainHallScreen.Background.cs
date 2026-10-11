@@ -118,7 +118,7 @@ namespace GIC.UI
                     _lastVideoAddress = address;
 
                     // 按视频原始分辨率创建/重建 RenderTexture，保持原画质
-                    EnsureVideoRT((int)clip.width, (int)clip.height);
+                    EnsureVideoRT((int)clip.width, (int)clip.height, address);
 
                     if (oldAddress != null && oldAddress != address)
                         _assetCache?.Release(oldAddress);
@@ -163,15 +163,28 @@ namespace GIC.UI
         /// <summary>
         /// 按视频原始分辨率创建RenderTexture并绑定到VideoPlayer和材质。
         /// 分辨率变化时（切换不同分辨率的视频）重建RT。
+        /// Splash 期预热 RT 优先认领（2026-10-11 方案 A）：首帧已在 RT 里，开播前 quad 即有画面，
+        /// 盖掉手机端 MediaCodec 首帧解码黑窗；认领失败（预热超时/时段地址已变）回落现建 RT 旧行为。
         /// </summary>
-        private void EnsureVideoRT(int width, int height)
+        private void EnsureVideoRT(int width, int height, string address)
         {
-            if (_bgVideoRT != null && _bgVideoRT.width == width && _bgVideoRT.height == height) return;
+            var prewarmed = HallBackgroundPrewarm.TakeIfMatch(address, width, height);
+            if (prewarmed != null)
+            {
+                if (_bgVideoRT != null) _bgVideoRT.Release();
+                _bgVideoRT = prewarmed;
+                GICLog.Info($"[BackgroundVideo] 认领预热 RT（首帧已就绪）: {address}");
+            }
+            else
+            {
+                if (_bgVideoRT != null && _bgVideoRT.width == width && _bgVideoRT.height == height) return;
 
-            if (_bgVideoRT != null)
-                _bgVideoRT.Release();
+                if (_bgVideoRT != null)
+                    _bgVideoRT.Release();
 
-            _bgVideoRT = new RenderTexture(width, height, 0);
+                _bgVideoRT = new RenderTexture(width, height, 0);
+            }
+
             backgroundVideoPlayer.targetTexture = _bgVideoRT;
 
             // 材质：URP 项目用 URP/Unlit，纹理属性是 _BaseMap（非 _MainTex）
