@@ -1000,6 +1000,7 @@ GameObject:
   - component: {fileID: 2095077201452126960}
   - component: {fileID: 4604988160822486145}
   - component: {fileID: 328576782515896804}
+  - component: {fileID: 5485896969668667864}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: SkinButton
@@ -1110,6 +1111,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &5485896969668667864
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2864781082472094182}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1 &2975304852138422439
 GameObject:
   m_ObjectHideFlags: 0

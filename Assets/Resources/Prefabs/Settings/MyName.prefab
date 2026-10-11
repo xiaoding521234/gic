@@ -1,17 +1,18 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!1 &3031360829274900476
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 5587249180670449438}
   - component: {fileID: 6608833767640313574}
   - component: {fileID: 7631846325410768200}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -81,13 +82,14 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 3549231629829913877}
   - component: {fileID: 9114345909635463463}
   - component: {fileID: 2709713454616389812}
   - component: {fileID: 6533790663202875278}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: Text (TMP)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -142,6 +144,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: Button
+  m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
   m_sharedMaterial: {fileID: -4192194038158232135, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
@@ -226,6 +229,7 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  textComponent: {fileID: 0}
   references:
     version: 2
     RefIds: []
@@ -235,13 +239,14 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 7962712740285547889}
   - component: {fileID: 7552441661328904149}
   - component: {fileID: 5571232905483576089}
   - component: {fileID: 4703916348504012133}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: Text
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -296,6 +301,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: "\u540D\u79F0"
+  m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
   m_sharedMaterial: {fileID: -4192194038158232135, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
@@ -380,6 +386,7 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  textComponent: {fileID: 0}
   references:
     version: 2
     RefIds: []
@@ -389,13 +396,15 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 8692208377162514395}
   - component: {fileID: 6014650761683623435}
   - component: {fileID: 5556252734165660915}
   - component: {fileID: 8610105552643226243}
+  - component: {fileID: 6406238006141536899}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: Button
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -504,17 +513,35 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &6406238006141536899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6329763762572930899}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1 &8291446956719166872
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 7269027023425021860}
   - component: {fileID: 7171144796835094095}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: MyName
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -1,18 +1,20 @@
 %YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
+%TAG !u! tag:yousandi.cn,2023:
 --- !u!1 &6047280967345478021
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
+  serializedVersion: 7
   m_Component:
   - component: {fileID: 6508212539198864104}
   - component: {fileID: 4063005082903527584}
   - component: {fileID: 5445349825421246704}
   - component: {fileID: 7546774749328825681}
+  - component: {fileID: 4568719083619033471}
   m_Layer: 5
+  m_HasEditorInfo: 1
   m_Name: NormalButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -121,6 +123,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &4568719083619033471
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6047280967345478021}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1001 &5788699115668260808
 PrefabInstance:
   m_ObjectHideFlags: 0

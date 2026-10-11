@@ -332,6 +332,7 @@ GameObject:
   - component: {fileID: 616712834140933135}
   - component: {fileID: 6125411031847043227}
   - component: {fileID: 5485574523227217044}
+  - component: {fileID: 9091036787214409032}
   m_Layer: 5
   m_HasEditorInfo: 1
   m_Name: Skill
@@ -468,3 +469,20 @@ MonoBehaviour:
   _onSelectedChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &9091036787214409032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7495448033152760185}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1

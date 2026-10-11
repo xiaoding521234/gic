@@ -74,6 +74,7 @@ GameObject:
   - component: {fileID: 9092450250387450271}
   - component: {fileID: 2810204530728103583}
   - component: {fileID: 4098649166360074401}
+  - component: {fileID: 7251844973108709904}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: CopyButton
@@ -184,6 +185,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7251844973108709904
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 646360084060121238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1 &663371442205111941
 GameObject:
   m_ObjectHideFlags: 0
@@ -232,6 +250,7 @@ GameObject:
   - component: {fileID: 4782600347384442750}
   - component: {fileID: 6961761035408265443}
   - component: {fileID: 7882396414728314507}
+  - component: {fileID: 1467715281048833940}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: ExportButton
@@ -342,6 +361,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &1467715281048833940
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1393694170367430141}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1 &1963548227605784925
 GameObject:
   m_ObjectHideFlags: 0
@@ -446,6 +482,7 @@ GameObject:
   - component: {fileID: 9094965600386052863}
   - component: {fileID: 3674062558410546023}
   - component: {fileID: 869232169192736506}
+  - component: {fileID: 6991228194909242726}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: DeleteButton
@@ -556,6 +593,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &6991228194909242726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2101875318145856531}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1 &2190417871003063930
 GameObject:
   m_ObjectHideFlags: 0
@@ -1530,6 +1584,7 @@ GameObject:
   - component: {fileID: 4746400236311142532}
   - component: {fileID: 6947974141686587011}
   - component: {fileID: 5364183869348287172}
+  - component: {fileID: 7805704285337956193}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: PasteButton
@@ -1640,6 +1695,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7805704285337956193
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6994552752127016615}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c34b928d4fdbb7d429f1324a31bd16b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  "\u9634\u5F71\u989C\u8272": {r: 0, g: 0, b: 0, a: 0.22}
+  "\u504F\u79FB": {x: 0, y: -2.5}
+  "\u6A21\u7CCA\u534A\u5F84": 4
+  "\u6A21\u7CCA\u5C42\u6570": 8
+  "\u4E58\u56FE\u5F62Alpha": 1
 --- !u!1 &7439258643850198516
 GameObject:
   m_ObjectHideFlags: 0
