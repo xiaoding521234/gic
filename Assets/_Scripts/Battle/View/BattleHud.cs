@@ -2914,6 +2914,15 @@ namespace GIC.Battle
                 ?? unitData.skills.FirstOrDefault(s => s != null)?.data;
         }
 
+        /// <summary>SkillType 直取版：按类型精确分拣、不做首技能 fallback——
+        /// 无该类型条目返回 null 让调用方走常量兜底（与 ApplyMoveButton 的 move 解析同口径；
+        /// def 版的首技能 fallback 语义不适用于按类型直取）</summary>
+        private SkillConfig.SkillData GetSelectedSkillData(SkillType type)
+        {
+            var unitData = GetSelectedUnitData();
+            return unitData?.skills?.FirstOrDefault(s => s != null && s.data.skillType == type)?.data;
+        }
+
         /// <summary>选中单位时刷新技能盘：表驱动全键统一（移动走 ApplyMoveButton，其余走 ApplySkillButton）；
         /// 图标/元素色环/主动被动色全走 SkillIconView.InitWithData 现有链。
         /// 建筑例外（协议核心批 2026-09-29 拍板「选中=纯查看」）：建筑无任何行动——全部键隐藏
