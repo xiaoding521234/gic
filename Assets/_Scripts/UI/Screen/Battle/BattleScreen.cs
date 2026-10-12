@@ -224,15 +224,22 @@ namespace GIC.UI
             }
 
             // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/active/32 §6；
-            // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）
+            // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
+            // 2026-10-12 选择器批：房间 AI 行点选的难度/人格经名册透传——建脑时注入（先于 Bind 登记）；
+            // 人格按名换资产（缺资产=脑内回落默认 Persona_经济家，见 PlayerQuotaBrain.Persona）
             foreach (var setup in playerSetups)
             {
                 if (!setup.IsAI) continue;
 
                 var brainGo = new GameObject($"AIBrain_{setup.PlayerId}");
                 brainGo.transform.SetParent(transform, false);
-                brainGo.AddComponent<PlayerQuotaBrain>().Bind(_session, setup.PlayerId);
-                GICLog.Info($"[BattleScreen] AI 玩家就位：{setup.PlayerId}（{setup.DisplayName}）");
+                var brain = brainGo.AddComponent<PlayerQuotaBrain>();
+                brain.难度 = setup.AIDifficulty;
+                if (!string.IsNullOrEmpty(setup.AIPersona))
+                    brain.人格原型 = Resources.Load<PersonaPack>($"Configs/AI/Persona_{setup.AIPersona}");
+                brain.Bind(_session, setup.PlayerId);
+                GICLog.Info($"[BattleScreen] AI 玩家就位：{setup.PlayerId}（{setup.DisplayName}，" +
+                    $"难度={setup.AIDifficulty} 人格={setup.AIPersona}）");
             }
 
             yield return null; // ── 分帧：HUD 绑定/开局前让渲染喘一口气 ──

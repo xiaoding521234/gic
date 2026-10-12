@@ -1,34 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
+using GIC.Data;
 namespace GIC.Battle
 {
 
-
-    /// <summary>
-    /// AI 玩家难度档（docs/active/42 §9.2「难度＝决策质量阶梯，零资源作弊」）。
-    /// 档位只开/关既有决策件——任何档不注入资源、不给信息特权、不改规则。
-    /// 默认档=棋圣（现行全件开启——AI-2 验证基线零回归；房间 AI 难度选择器=后续 UI 批，届时拍板默认）。
-    /// </summary>
-    public enum AIDifficulty
-    {
-        [InspectorName("学徒")]
-        Apprentice = 0,
-
-        [InspectorName("劲敌")]
-        Rival = 1,
-
-        [InspectorName("棋圣")]
-        Grandmaster = 2,
-
-        [InspectorName("天理")]
-        Providence = 3,
-    }
 
     /// <summary>
     /// AI 玩家注册表（AI-4 批，docs/active/42 §9.2/§11）：per AI 玩家的难度档存取——
     /// 配额脑（Bind 时登记）与伙伴脑（DecideAll 按单位归属查询）的消费单源。
     /// 真人玩家不注册 → 门控恒全开（其自主军团=全件质量，难度只属 AI 玩家）。
     /// 生命周期：static+按玩家 ID 键控（Bind 每局重写=跨局自愈；未参战玩家残留条目无人查询=无害）。
+    /// AIDifficulty 枚举=GIC.Data（房间名册/PlayerInfo 序列化层消费——SpawnPositionType 同款先例，
+    /// 2026-10-12 选择器批上移）。
     /// </summary>
     public static class AIPlayerConfig
     {

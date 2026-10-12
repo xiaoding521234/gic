@@ -238,6 +238,8 @@ namespace GIC.UI
                         PlayerId = p.PlayerID,
                         DisplayName = p.PlayerName,
                         IsAI = p.IsAI,
+                        AIDifficulty = p.AIDifficulty,
+                        AIPersona = p.AIPersona,
                         Team = p.Team,
                         Color = p.Color,
                         SpawnPosition = p.SpawnPosition,

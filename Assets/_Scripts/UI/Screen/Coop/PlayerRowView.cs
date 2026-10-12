@@ -107,17 +107,25 @@ namespace GIC.UI
             {
                 if (_player.IsAI)
                 {
-                    // AI 行（2026-10-11 联机批）：点名字=移除（Kick 链对空连接已有守卫，走同一路径）
+                    // AI 行（2026-10-11 联机批）：名字下拉=AI 配置选择器（2026-10-12 选择器批扩）——
+                    // 选项 0=名字（恒显示）、1..4=难度四档、5..12=八人格、13=移除（Kick 链对空连接已有守卫）。
+                    // 文案为运行时内容串（「AI 玩家N」命名同款先例——难度/人格词的本地化挂 docs/11）
                     var removeText = GetLocalizedString("Coop_RemoveAI");
                     var nameOptions = new List<TextEntry>
                     {
-                        new TextEntry(null, _player.PlayerName),
-                        new TextEntry(null, removeText),
+                        // 标题=名字+当前配置（行内即时可见；RefreshFromPlayerInfo 广播回刷）
+                        new TextEntry(null, $"{_player.PlayerName}（{AIDifficultyNames[(int)_player.AIDifficulty]}·{_player.AIPersona}）"),
                     };
+                    for (int d = 0; d < AIDifficultyNames.Length; d++)
+                        nameOptions.Add(new TextEntry(null, "难度: " + AIDifficultyNames[d]));
+                    for (int p = 0; p < AIPersonaNames.Length; p++)
+                        nameOptions.Add(new TextEntry(null, "人格: " + AIPersonaNames[p]));
+                    nameOptions.Add(new TextEntry(null, removeText));
+
                     nameDropdown.SetOptionsFromEntries(nameOptions);
                     nameDropdown.SetInteractable(true);
                     nameDropdown.AddListener(OnNameActionSelected);
-                    _kickActionIndex = ACTION_REMOVE_AI; // AI 行只有移除项（无提醒）
+                    _kickActionIndex = ACTION_REMOVE_AI;
                 }
                 else
                 {
@@ -149,9 +157,20 @@ namespace GIC.UI
             nameDropdown.SetValueWithoutNotify(0);
         }
 
-        // 点名字行动项索引（真人行=2 踢出；AI 行=1 移除——2026-10-11 联机批）
+        // 点名字行动项索引（真人行=2 踢出；AI 行=13 移除——2026-10-12 选择器批：AI 行下拉扩为配置选择器）
         private int _kickActionIndex = ACTION_KICK;
-        private const int ACTION_REMOVE_AI = 1;
+        private const int ACTION_REMOVE_AI = 13;
+
+        // AI 配置选择器选项区（2026-10-12 选择器批）：0=名字 | 1..4 难度 | 5..12 人格 | 13 移除
+        private const int AI_DIFF_BASE = 1;
+        private const int AI_PERSONA_BASE = 5;
+
+        /// <summary>难度档显示名（与 AIDifficulty 枚举值序对齐）</summary>
+        private static readonly string[] AIDifficultyNames = { "学徒", "劲敌", "棋圣", "天理" };
+
+        /// <summary>人格原型名序（与 Resources/Configs/AI/Persona_{名} 资产对应；改人格资产集=同步此表+选项区索引）</summary>
+        private static readonly string[] AIPersonaNames =
+            { "狂战士", "守城者", "经济家", "指挥官", "赌徒", "交涉家", "背叛者", "侦察家" };
 
         void InitSpawnDropdown()
         {
@@ -211,7 +230,24 @@ namespace GIC.UI
         {
             if (_isInitializing) return;
 
-            if (index == ACTION_REMIND && _kickActionIndex == ACTION_KICK)
+            if (_player.IsAI && index >= AI_DIFF_BASE && index < AI_PERSONA_BASE + AIPersonaNames.Length)
+            {
+                // AI 配置选择（2026-10-12 选择器批）：难度 1..4 / 人格 5..12 → 服务器改档广播，
+                // 未选维保持当前值（AI 行两类配置一次只动一个）
+                var difficulty = _player.AIDifficulty;
+                var persona = _player.AIPersona;
+                if (index >= AI_DIFF_BASE && index < AI_DIFF_BASE + AIDifficultyNames.Length)
+                    difficulty = (AIDifficulty)(index - AI_DIFF_BASE);
+                else if (index >= AI_PERSONA_BASE)
+                    persona = AIPersonaNames[index - AI_PERSONA_BASE];
+                EventBusHub.Instance.Send(new SetAIConfigRequestEvent
+                {
+                    TargetPlayerID = _player.PlayerID,
+                    AIDifficulty = difficulty,
+                    AIPersona = persona,
+                });
+            }
+            else if (index == ACTION_REMIND && _kickActionIndex == ACTION_KICK)
             {
                 GICLog.Info($"提醒玩家: {_player.PlayerName}");
             }

@@ -199,6 +199,24 @@ namespace GIC.Framework
             }
         }
 
+        /// <summary>设置 AI 玩家配置（2026-10-12 选择器批）：仅对 IsAI 玩家生效——
+        /// 真人行误发恒拒（难度/人格是 AI 玩家专属属性）</summary>
+        public void SetAIConfig(string playerID, AIDifficulty difficulty, string persona)
+        {
+            if (!_allPlayers.TryGetValue(playerID, out var info)) return;
+            if (!info.IsAI)
+            {
+                GICLog.Warn($"[PlayerManager] 玩家 {playerID} 非 AI，忽略 AI 配置请求");
+                return;
+            }
+            if (string.IsNullOrEmpty(persona)) persona = "经济家"; // 空名回落默认人格
+            info.AIDifficulty = difficulty;
+            info.AIPersona = persona;
+            _allPlayers[playerID] = info;
+            GICLog.Info($"[PlayerManager] AI {playerID} 配置: 难度={difficulty} 人格={persona}");
+            OnPlayerInfoUpdated?.Invoke(playerID, info);
+        }
+
         public void SetPlayerColor(string playerID, PlayerColor color)
         {
             if (_allPlayers.TryGetValue(playerID, out var info))

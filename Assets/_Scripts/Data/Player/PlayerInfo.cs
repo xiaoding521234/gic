@@ -25,6 +25,14 @@ namespace GIC.Data
         /// 无 NetworkConnection——踢出/移除链对 null 连接已有守卫；进局内由 Host 侧配额脑驱动）</summary>
         public bool IsAI;
 
+        /// <summary>AI 玩家难度档（2026-10-12 选择器批，AI-4：房间 AI 行可选、JsonUtility 按 int 序列化；
+        /// 真人玩家本字段无意义恒默认）</summary>
+        public AIDifficulty AIDifficulty = AIDifficulty.Grandmaster;
+
+        /// <summary>AI 玩家人格原型名（Resources/Configs/AI/Persona_{名}——SO 引用不走 JsonUtility 存名，
+        /// 进局内 BattleScreen 按名换资产；默认=经济家）</summary>
+        public string AIPersona = "经济家";
+
         // 网络连接引用（服务器端使用）
         [NonSerialized]
         public NetworkConnectionToClient connectionToClient;

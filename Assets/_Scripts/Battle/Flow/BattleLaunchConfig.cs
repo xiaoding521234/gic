@@ -17,6 +17,12 @@ namespace GIC.Battle
         public string DisplayName;
         public bool IsAI;
 
+        /// <summary>AI 玩家难度档（2026-10-12 选择器批：房间 AI 行点选→PlayerInfo→BuildFromRoster 透传）</summary>
+        public AIDifficulty AIDifficulty = AIDifficulty.Grandmaster;
+
+        /// <summary>AI 玩家人格原型名（Resources/Configs/AI/Persona_{名}——BattleScreen 按名换资产）</summary>
+        public string AIPersona = "经济家";
+
         /// <summary>队伍（房间小队=局内阵营：同队友军/异队敌对，引擎原生语义）</summary>
         public TeamType Team = TeamType.A;
 
@@ -108,6 +114,8 @@ namespace GIC.Battle
                     PlayerId = p.PlayerID,
                     DisplayName = p.PlayerName,
                     IsAI = p.IsAI,
+                    AIDifficulty = p.AIDifficulty,
+                    AIPersona = p.AIPersona,
                     Team = p.Team,
                     Color = p.Color,
                     SpawnPosition = p.SpawnPosition,

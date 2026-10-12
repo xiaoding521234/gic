@@ -180,6 +180,23 @@ namespace GIC.Data
     }
 
     /// <summary>
+    /// 设置 AI 玩家配置请求（2026-10-12 选择器批：host 在 AI 行下拉点选难度/人格 ->
+    /// 服务器改 PlayerInfo -> 广播 UpdatePlayerInfoEvent；仅对 IsAI 玩家生效）
+    /// </summary>
+    public class SetAIConfigRequestEvent : BaseEvent
+    {
+        public string TargetPlayerID;
+        public GIC.Data.AIDifficulty AIDifficulty;
+        public string AIPersona;
+
+        public SetAIConfigRequestEvent()
+        {
+            Type = GIC.Framework.EventType.OnlyHost;
+            Immediate = true;
+        }
+    }
+
+    /// <summary>
     /// 设置房间地图请求（host 下拉选图 -> 服务器记录 -> 广播 UpdateRoomInfoEvent）
     /// </summary>
     public class SetMapRequestEvent : BaseEvent

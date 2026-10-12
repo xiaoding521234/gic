@@ -61,6 +61,7 @@ namespace GIC.Framework
         private SetSelfPlayerHandler _setSelfPlayerHandler;
         private SetPlayerNameHandler _setPlayerNameHandler;
         private AddAIPlayerHandler _addAIPlayerHandler;
+        private SetAIConfigHandler _setAIConfigHandler;
         private SetMapHandler _setMapHandler;
         private UpdateRoomInfoHandler _updateRoomInfoHandler;
         private ClientDeckHandler _clientDeckHandler;
@@ -92,6 +93,7 @@ namespace GIC.Framework
             _setSelfPlayerHandler = new SetSelfPlayerHandler(this);
             _setPlayerNameHandler = new SetPlayerNameHandler(this);
             _addAIPlayerHandler = new AddAIPlayerHandler(this);
+            _setAIConfigHandler = new SetAIConfigHandler(this);
             _setMapHandler = new SetMapHandler(this);
             _updateRoomInfoHandler = new UpdateRoomInfoHandler(this);
             _clientDeckHandler = new ClientDeckHandler(this);
@@ -107,6 +109,7 @@ namespace GIC.Framework
             EventBusHub.Instance.Subscribe<ToggleReadyRequestEvent>(_toggleReadyHandler, this);
             EventBusHub.Instance.Subscribe<KickPlayerRequestEvent>(_kickPlayerHandler, this);
             EventBusHub.Instance.Subscribe<AddAIPlayerRequestEvent>(_addAIPlayerHandler, this);
+            EventBusHub.Instance.Subscribe<SetAIConfigRequestEvent>(_setAIConfigHandler, this);
             EventBusHub.Instance.Subscribe<SetMapRequestEvent>(_setMapHandler, this);
             EventBusHub.Instance.Subscribe<ClientDeckEvent>(_clientDeckHandler, this);
             EventBusHub.Instance.Subscribe<ClientBattleReadyEvent>(_clientBattleReadyHandler, this);
@@ -364,7 +367,8 @@ namespace GIC.Framework
                 if (_room.playerManager.GetPlayerInfo(e.PlayerInfo.PlayerID) != null) return;
                 _room.playerManager.RegisterPlayer(e.PlayerInfo.PlayerID, e.PlayerInfo.PlayerName,
                                    e.PlayerInfo.Team, e.PlayerInfo.Color,
-                                   e.PlayerInfo.IsHost, e.PlayerInfo.IPAddress);
+                                   e.PlayerInfo.IsHost, e.PlayerInfo.IPAddress,
+                                   e.PlayerInfo.IsAI); // AI 身份随入册广播同步（2026-10-12 选择器批补——原漏传=客户端行丢 AI 身份）
             }
         }
 
@@ -428,6 +432,16 @@ namespace GIC.Framework
             public AddAIPlayerHandler(RoomManager m) => _room = m;
             public bool CanHandle(AddAIPlayerRequestEvent e) => NetworkServer.active;
             public void Handle(AddAIPlayerRequestEvent e) => _room.AddAIPlayer();
+        }
+
+        /// <summary>AI 玩家配置请求（2026-10-12 选择器批）：host 在 AI 行点选难度/人格——
+        /// 沿 PlayerInfoUpdateRequestHandler 家族（改 PlayerInfo→广播 UpdatePlayerInfoEvent）</summary>
+        private class SetAIConfigHandler : PlayerInfoUpdateRequestHandler<SetAIConfigRequestEvent>
+        {
+            public SetAIConfigHandler(RoomManager m) : base(m) { }
+            protected override string GetPlayerID(SetAIConfigRequestEvent e) => e.TargetPlayerID;
+            protected override void ApplyChange(SetAIConfigRequestEvent e, string pid)
+                => _room.playerManager.SetAIConfig(pid, e.AIDifficulty, e.AIPersona);
         }
 
         /// <summary>设置房间地图请求（服务器记录权威地图并广播 UpdateRoomInfoEvent）</summary>
