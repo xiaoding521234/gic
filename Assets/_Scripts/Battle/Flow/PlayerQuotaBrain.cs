@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using GIC.Framework;
 using GIC.Data;
@@ -20,6 +21,8 @@ namespace GIC.Battle
     /// 与真人玩家对等：配额同样可用于号令/魔神/部署/直接操控伙伴。
     /// AI 决策由 Host 生成（docs/18 决策一）——直接读 BattleSimState/BattleSnapshot，不走传输通道；
     /// 选择阶段开始后延迟提交（给玩家看清回合切换）。
+    /// AI-4 批（docs/active/42 §9）：人格原型乘子（军备桶=操魔神/激进度=操控边际/契约桶=号令/
+    /// 升命桶=投资——PersonaPack 资产零代码换人格）＋难度档（学徒=失误注入轮转法+对手预测器关闭件）。
     /// 体力感知：配额行动 costs 门槛镜像（ResourceGate.HasAll 同源——体力按施法者层级换算，
     /// 直接操控伙伴传 isPlayerDirectControl=true 与真人同口径）；
     /// 决策时不足的候选不生成（上交也会落空浪费配额，先攒体力）。
@@ -61,11 +64,41 @@ namespace GIC.Battle
         // 救命分已上提共享单源（F-3，docs/active/34）：CompanionBrain.RescueScore=30——配额脑号令
         // 与伙伴脑预治疗两处同口径防漂移；本脑消费点直接引用（原 private EnsoRescueScore 退役）
 
+        // ==================== AI 玩家配置（AI-4 批，docs/active/42 §9——Inspector/harness 可调） ====================
+
+        /// <summary>难度档（Bind 时登记 AIPlayerConfig；对局中改档走 AIPlayerConfig.SetDifficulty
+        /// 即时生效——§9.2 决策质量阶梯，学徒=失误注入+关闭预测器/反应预期/意图板）</summary>
+        [Header("AI 玩家配置（AI-4）")]
+        public AIDifficulty 难度 = AIDifficulty.Grandmaster;
+
+        /// <summary>人格原型包（§9.1 八原型资产 Resources/Configs/AI/Persona_*；null=回落默认
+        /// Persona_经济家，资产缺失=中性 1.0——房间 AI 人格选择器=后续 UI 批）</summary>
+        public PersonaPack 人格原型;
+
+        private PersonaPack _persona;
+
+        /// <summary>人格解析（懒加载一次；缺资产=中性）</summary>
+        private PersonaPack Persona
+        {
+            get
+            {
+                if (_persona == null)
+                    _persona = 人格原型 != null ? 人格原型 : Resources.Load<PersonaPack>("Configs/AI/Persona_经济家");
+                return _persona;
+            }
+        }
+
+        private float 军备桶 => Persona != null ? Persona.军备桶权重 : 1f;
+        private float 契约桶 => Persona != null ? Persona.契约桶权重 : 1f;
+        private float 升命桶 => Persona != null ? Persona.升命桶权重 : 1f;
+        private float 激进度乘子 => Persona != null ? Persona.激进度 : 1f;
+
         public void Bind(BattleSession session, string playerId)
         {
             _session = session;
             _playerId = playerId;
             session.Flow.OnPhaseChanged += OnPhaseChanged;
+            AIPlayerConfig.SetDifficulty(playerId, 难度); // AI-4：难度登记（伙伴脑按归属查门）
         }
 
         private void OnDestroy()
@@ -123,12 +156,19 @@ namespace GIC.Battle
             //    中性档案；实池判定无虚拟预留——配额行动本脑独占，伙伴决策在其后自适应）。
             //    E-1 对手建模（docs/active/33 §2）：威胁图传骨架——魔神攻击候选吃反威胁分、移动
             //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）。
-            //    isPlayerDirectControl=true=配额直接操控口径（StaminaAmountOf 层级门=仅 Companion 减免，
-            //    魔神计价不变——语义统一「配额操控=玩家操控」，提交路径会重打同旗标）
-            var threat = OpponentThreatModel.Build(sim, snapshot, MyTeam, turn);
+            //    AI-4：per-unit tracker＋人格军备桶乘子；学徒=对手预测器关闭件（威胁图不建）
+            var difficulty = AIPlayerConfig.DifficultyOf(_playerId);
+            var threat = AIPlayerConfig.QuotaThreatEnabled(difficulty)
+                ? OpponentThreatModel.Build(sim, snapshot, MyTeam, turn)
+                : null;
             foreach (var entry in CollectArchons(sim))
+            {
+                var unitTracker = new CompanionBrain.CandidateTracker();
                 CompanionBrain.ScoreUnitCandidates(sim, snapshot, entry.Value, _playerId, MyTeam,
-                    turn, tracker, null, null, threat, null, true);
+                    turn, unitTracker, null, null, threat, null, true);
+                if (unitTracker.Best == null) continue;
+                tracker.Offer(Mathf.RoundToInt(unitTracker.BestScore * 军备桶), unitTracker.Best);
+            }
 
             // ①b 直接操控伙伴（AI-1 批，2026-10-12 拍板「AI 玩家操控严格对齐真人玩家」）：
             //    己方 3-4★ 伙伴候选与操魔神同池竞争——门槛镜像 isPlayerDirectControl=true（体力减免 5
@@ -154,7 +194,8 @@ namespace GIC.Battle
                 CompanionBrain.ScoreUnitCandidates(sim, snapshot, unit, _playerId, MyTeam,
                     turn, unitTracker, null, profile, threat, null, true);
                 if (unitTracker.Best == null) continue;
-                int marginal = unitTracker.BestScore - baseline;
+                // AI-4：人格激进度乘子（狂战士更爱操控攻击/守城者更放权）
+                int marginal = Mathf.RoundToInt((unitTracker.BestScore - baseline) * 激进度乘子);
                 if (marginal <= 0) continue; // 威胁感知不优于自主=放权更好
                 tracker.Offer(marginal, unitTracker.Best);
             }
@@ -170,25 +211,39 @@ namespace GIC.Battle
             //    升命（执行器既有链复用；deployCell 升命分支不消费）。评分入池与号令/操控竞争
             EvaluateUpgrades(sim, turn, tracker);
 
+            // 学徒失误注入轮转法（§9.2——确定性次优而非随机 roll：评分榜取第 (turn mod N)+1 名，
+            // 有「人味错误」但同种子可复现，零 roll 铁律不破）
+            ActionData chosen = tracker.Best;
+            int chosenScore = tracker.BestScore;
+            if (AIPlayerConfig.MistakeInjectionEnabled(difficulty) && tracker.All.Count > 0)
+            {
+                // OrderByDescending 稳定排序=平局保持枚举序（枚举序铁律）；榜取第 (turn mod N)+1 名 ∈ [1..N]
+                var ranked = tracker.All.OrderByDescending(c => c.score).ToList();
+                int rank = (turn % ranked.Count) + 1;
+                chosen = ranked[rank - 1].action;
+                chosenScore = ranked[rank - 1].score;
+                GICLog.Info($"[配额脑] {_playerId} T{turn} 学徒失误注入：榜 {ranked.Count} 候选取第 {rank} 名" +
+                    $"（最优 {tracker.BestScore}→选中 {chosenScore}）");
+            }
+
             // 决策日志（docs/active/42 §10 可调试性：落选可审计——升命/号令常年不入选时
             // 从「配额=分」行归因分数构成，勿盲调常量）
-            if (tracker.Best != null)
+            if (chosen != null)
             {
-                var chosen = tracker.Best;
                 GICLog.Info($"[配额脑] {_playerId} T{turn} 配额={chosen.actionType}" +
                     (chosen.actionType == ActionType.Skill
                         ? $" 技能{chosen.skillIndex} 单位={chosen.unitId} 目标={chosen.targetUnitId}"
                         : chosen.actionType == ActionType.DeployUnit
                             ? $" 出战/升命={(UnitName)chosen.deployUnitName}@{chosen.deployCell}"
                             : "") +
-                    $" 分={tracker.BestScore}");
+                    $" 分={chosenScore}");
             }
             else
             {
                 GICLog.Info($"[配额脑] {_playerId} T{turn} 配额=空过放权");
             }
 
-            return tracker.Best ?? Pass(turn);
+            return chosen ?? Pass(turn);
         }
 
         // ==================== 部署分支（2026-10-12 AI 固定卡组批） ====================
@@ -280,10 +335,12 @@ namespace GIC.Battle
                 if (BattleSimState.IsDead(existing)) continue; // 尸体升命=烧配额（复苏前置投资后置批次）
                 if (existing.ConstellationLevel >= ConstellationApplier.MaxConstellation) continue; // 已满命
                 if (sim.GetMora(_playerId) < candidate.data.GetEffectiveDeployCost()) continue; // 摩拉不足先攒
+                // AI-4：人格升命桶乘子（经济家/守城者更爱投资）
+                int upgradeScore = Mathf.RoundToInt(UpgradeConstellationScore * 升命桶);
                 GICLog.Info($"[配额脑] {_playerId} T{turn} 升命候选 {(UnitName)candidate.unitName}" +
                     $" C{existing.ConstellationLevel}→C{existing.ConstellationLevel + 1}" +
-                    $" 分={UpgradeConstellationScore}（当前最优 {tracker.BestScore}）");
-                tracker.Offer(UpgradeConstellationScore, new ActionData
+                    $" 分={upgradeScore}（当前最优 {tracker.BestScore}）");
+                tracker.Offer(upgradeScore, new ActionData
                 {
                     playerId = _playerId,
                     actionType = ActionType.DeployUnit,
@@ -389,12 +446,16 @@ namespace GIC.Battle
                 if (!skill.CanCast(caster)) continue;
                 if (!ResourceGate.HasAll(sim, caster, _playerId, data.costs, out _)) continue; // 消耗门槛（C-2 costs 单源）
 
-                // 候选目标：我军存活单位（含自身）unitId 升序——延奏目标域=阵营口径
-                // （2026-09-25 三轮审查 C2：2v2 可协奏队友单位）；行动者归属=playerId 保留
+                // 候选目标：我军存活**角色**（含自身）unitId 升序——延奏目标域=阵营口径
+                // （2026-09-25 三轮审查 C2：2v2 可协奏队友单位）；行动者归属=playerId 保留。
+                // 建筑排除（AI-4 观察局实锤返修）：docs/07 蒙德「我方**角色**」——协议核心是建筑
+                // 非角色，buff/变奏/元能对核心零收益（治疗核心归伙伴治疗技能域），混入候选
+                // 只会污染评分榜（交涉家契约桶 ×1.6 放大后显形——学徒失误注入选中过给核心的延奏）
                 var allies = new List<(string unitId, Unit unit)>();
                 foreach (var kv in sim.Units)
                 {
                     if (BattleSimState.IsDead(kv.Value)) continue;
+                    if (BattleHeuristics.IsBuilding(kv.Value)) continue;
                     var id = kv.Value.GetUnitComponent<UnitIdentity>();
                     if (id == null || id.Team != MyTeam) continue;
                     allies.Add((kv.Key, kv.Value));
@@ -406,7 +467,8 @@ namespace GIC.Battle
                     bool mondOrSelf = BattleHeuristics.IsMondstadtOrSelfUnit(caster, ally.unit);
                     int value = EvaluateEnsoTarget(data, caster, ally.unit, ally.unitId, threat, mondOrSelf);
                     if (value <= 0) continue;
-                    tracker.Offer(value, Skill(caster, i, Direction2D.Right, turn, ally.unitId));
+                    // AI-4：人格契约桶乘子（交涉家/指挥官更爱号令）
+                    tracker.Offer(Mathf.RoundToInt(value * 契约桶), Skill(caster, i, Direction2D.Right, turn, ally.unitId));
                 }
             }
         }

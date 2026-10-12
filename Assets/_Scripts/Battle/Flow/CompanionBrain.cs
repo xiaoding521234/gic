@@ -307,10 +307,10 @@ namespace GIC.Battle
             // 威胁图接伙伴脑（AI-2 批消费点扩展，docs/active/42 §11）：**全伙伴**（输出型+支援型）
             // 走位避险接线——移动落点避火线 −12（ThreatPenaltyAt 既有原语）+攻击反威胁分
             // （ThreatResponseBonus——拆威胁源优先）。**每在场队伍一张图**（Build 按队伍视角——
-            // 替代 F-1「首支援型单图全队共享」的跨队视角缺陷：双队各有支援型时旧版第二队消费
-            // 的是对方视角图）；E-1 拍板 #4「威胁图暂只接配额脑」就此由 AI 批设计蓝图全面取代
-            // （F-1 的支援型先行接入=本批的前身，范围=支援型 docs/active/34 §5.2）。
-            // 构建成本=每队 ms 级（§14 性能预算；有伙伴在场才建=无伙伴零成本）
+            // 替代 F-1「首支援型单图全队共享」的跨队视角缺陷）。
+            // AI-4 难度门（§9.2）：走位避险=棋圣档开启件——仅当该队存在 ThreatFeed 开启的归属玩家
+            // 才建图（学徒/劲敌 AI 队伍零成本跳过；真人玩家不注册=门恒全开=全件质量）；
+            // E-1 拍板 #4「威胁图暂只接配额脑」由 AI 批设计蓝图全面取代（F-1 支援型先行=前身）。
             var threatByTeam = new Dictionary<TeamType, OpponentThreatModel.ThreatMap>();
             foreach (var kv0 in sim.Units)
             {
@@ -318,7 +318,17 @@ namespace GIC.Battle
                 if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
                 var id0 = u0.GetUnitComponent<UnitIdentity>();
                 if (id0 == null || threatByTeam.ContainsKey(id0.Team)) continue;
-                threatByTeam[id0.Team] = OpponentThreatModel.Build(sim, snapshot, id0.Team, turnNumber);
+                bool anyFeed = false;
+                foreach (var kv1 in sim.Units)
+                {
+                    var u1 = kv1.Value;
+                    if (!BattleHeuristics.IsCompanion(u1) || BattleSimState.IsDead(u1)) continue;
+                    var id1 = u1.GetUnitComponent<UnitIdentity>();
+                    if (id1 == null || id1.Team != id0.Team) continue;
+                    if (AIPlayerConfig.GatesFor(id1.OwnerPlayerID).ThreatFeed) { anyFeed = true; break; }
+                }
+                if (anyFeed)
+                    threatByTeam[id0.Team] = OpponentThreatModel.Build(sim, snapshot, id0.Team, turnNumber);
             }
 
             // I-A 申报遍（docs/active/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分
@@ -370,10 +380,15 @@ namespace GIC.Battle
                             ? Math.Max(0, sim.GetStamina(identity.OwnerPlayerID) - r2)
                             : (int?)null;
                         var tracker = new CandidateTracker();
-                        // AI-2：全伙伴消费本队威胁图（输出型+支援型同口径——走位避险/反威胁）
-                        var unitThreat = threatByTeam.TryGetValue(identity.Team, out var tMap) ? tMap : null;
+                        // AI-4 难度门（§9.2）：按归属玩家——学徒=关威胁图/意图板/反应预期分；
+                        // 真人不注册=门恒全开（其自主军团全件质量），棋圣=AI-2 全件基线
+                        var gates = AIPlayerConfig.GatesFor(identity.OwnerPlayerID);
+                        var unitThreat = gates.ThreatFeed && threatByTeam.TryGetValue(identity.Team, out var tMap)
+                            ? tMap
+                            : null;
                         ScoreUnitCandidates(sim, snapshot, unit, identity.OwnerPlayerID, identity.Team,
-                            turnNumber, tracker, pool, profile, unitThreat, bidBoard);
+                            turnNumber, tracker, pool, profile, unitThreat,
+                            gates.IntentBoard ? bidBoard : null, false, gates.ReactionPreview);
                         if (tracker.Best == null) continue; // 无候选=不占名额
                         bids.Add(new CompanionBid
                         {
@@ -436,10 +451,14 @@ namespace GIC.Battle
                     : (int?)null;
                 var tracker = new CandidateTracker();
                 var profile = g.unit.RawData?.行为档案;
-                // AI-2：全伙伴消费本队威胁图（执行遍同申报遍口径）
-                var unitThreat = threatByTeam.TryGetValue(g.team, out var tMap2) ? tMap2 : null;
+                // AI-4 难度门（执行遍同申报遍口径）：按归属玩家门控威胁图/意图板/反应预期分
+                var gates2 = AIPlayerConfig.GatesFor(g.owner);
+                var unitThreat = gates2.ThreatFeed && threatByTeam.TryGetValue(g.team, out var tMap2)
+                    ? tMap2
+                    : null;
                 ScoreUnitCandidates(sim, snapshot, g.unit, g.owner, g.team, turnNumber,
-                    tracker, pool, profile, unitThreat, board);
+                    tracker, pool, profile, unitThreat, gates2.IntentBoard ? board : null,
+                    false, gates2.ReactionPreview);
                 if (tracker.Best == null) continue;
                 DeclareIntent(sim, snapshot, g.unit, g.team, tracker.Best, board); // E-2：意图入板
                 actions.Add(tracker.Best);
@@ -531,19 +550,21 @@ namespace GIC.Battle
         /// isPlayerDirectControl（AI-1 批，2026-10-12 拍板「AI 玩家操控严格对齐真人」）：玩家配额直接
         /// 操控的候选门槛镜像——true 时体力减免 5 与真人 HUD 同口径（StaminaAmountOf 层级门=仅
         /// Companion 生效，魔神档传 true 计价不变）；伙伴脑自主路径=false 维持不减免。
+        /// reactionPreview（AI-4 批难度门，docs/active/42 §9.2）：E-3 反应预期分（增伤反应预判）——
+        /// 学徒档关闭件；默认 true=全件。
         /// </summary>
         public static void ScoreUnitCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile,
             OpponentThreatModel.ThreatMap threat = null, TeamIntentBoard board = null,
-            bool isPlayerDirectControl = false)
+            bool isPlayerDirectControl = false, bool reactionPreview = true)
         {
             if (unit == null || tracker == null) return;
             profile ??= NeutralProfile;
             // 攻击档先跑并回报「本单位是否有攻击/增益候选」（2026-10-02 挂机修复：驻位判定用
             // per-unit 候选存在性——配额脑共享 tracker，勿用 tracker.Best 判定〔那是全场最优〕）
             bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
-                tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl);
+                tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl, reactionPreview);
             ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
                 profile, hasActionCandidate, threat, board, isPlayerDirectControl);
         }
@@ -555,7 +576,8 @@ namespace GIC.Battle
         private static bool ScoreAttackCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile,
-            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board, bool isPlayerDirectControl)
+            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board,
+            bool isPlayerDirectControl, bool reactionPreview)
         {
             var skills = unit.Skills;
             var from = sim.GetPosition(unit);
@@ -640,9 +662,11 @@ namespace GIC.Battle
                             // E-3 反应预期分：快照附着×技能元素经 ElementReactionResolver.Preview 单源
                             // 预判——增伤反应（蒸发/融化 1 级 +50% 伤害乘区）按折减伤害一半计；冻结
                             // 控制反应无增伤乘区不计分。跨单位连招基础：凯亚挂冰→安柏跟火自动蒸发
+                            // AI-4 难度门：reactionPreview=false（学徒关闭件）=零反应预期分
                             var reaction = ElementReactionResolver.Preview(
                                 (ElementType)target.dyedElement, skillElement);
-                            if (reaction.HasReaction
+                            if (reactionPreview
+                                && reaction.HasReaction
                                 && reaction.DamageBonusDelta + reaction.VulnerabilityBonus > 0)
                                 score += effPerTarget / 2;
                             // J-1 冻结协同分（2026-10-04 拍板）：冻结控制反应无增伤乘区（旧口径恒 0 分）
@@ -2111,18 +2135,25 @@ namespace GIC.Battle
 
         /// <summary>候选追踪：严格大于替换（同分先到先得——枚举序即决策确定性）。
         /// 配额脑（PlayerQuotaBrain）跨单位共享一个实例取全场最优；伙伴脑每单位一个实例取该单位最优。
-        /// I-A 申报遍消费 BestScore（装包价值排序输入）。</summary>
+        /// I-A 申报遍消费 BestScore（装包价值排序输入）。
+        /// All=全候选清单（AI-4 失误注入轮转法消费——学徒档评分榜取第 (turn mod N)+1 名；
+        /// 伙伴脑 per-unit 实例同样记录=量小随用随弃，仅 score>0 入榜与 Best 口径一致）</summary>
         public sealed class CandidateTracker
         {
             public ActionData Best { get; private set; }
             private int _bestScore;
+
+            /// <summary>全候选清单（分数，行动）——Offer 即录（含落选者）</summary>
+            public readonly List<(int score, ActionData action)> All = new List<(int, ActionData)>();
 
             /// <summary>当前最优候选分数（无候选=0——I-A 申报用；执行遍勿消费）</summary>
             public int BestScore => _bestScore;
 
             public void Offer(int score, ActionData action)
             {
-                if (action == null || score <= _bestScore) return;
+                if (action == null || score <= 0) return; // 零/负分不入池不入榜
+                All.Add((score, action));
+                if (score <= _bestScore) return;
                 _bestScore = score;
                 Best = action;
             }
