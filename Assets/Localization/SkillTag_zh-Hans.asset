@@ -94,6 +94,10 @@ MonoBehaviour:
     m_Localized: "\u91C7\u96C6"
     m_Metadata:
       m_Items: []
+  - m_Id: 5007
+    m_Localized: "\u63A0\u593A"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

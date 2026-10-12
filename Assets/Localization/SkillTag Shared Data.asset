@@ -91,6 +91,10 @@ MonoBehaviour:
     m_Key: Gathering
     m_Metadata:
       m_Items: []
+  - m_Id: 5007
+    m_Key: Ransom
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -94,6 +94,10 @@ MonoBehaviour:
     m_Localized: Gathering
     m_Metadata:
       m_Items: []
+  - m_Id: 5007
+    m_Localized: Plunder
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

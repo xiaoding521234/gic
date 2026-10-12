@@ -83,6 +83,9 @@ namespace GIC.Data
 
         [InspectorName("采集")]
         Gathering = 5006,
+
+        [InspectorName("掠夺")]
+        Ransom = 5007,
         #endregion
     }
 

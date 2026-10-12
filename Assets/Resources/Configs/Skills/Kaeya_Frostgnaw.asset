@@ -16,7 +16,7 @@ MonoBehaviour:
     skillID: 3002001
     icon: {fileID: 21300000, guid: f0b71a61a19af9244942d928d64fc78f, type: 3}
     skillType: 2
-    "\u6280\u80FD\u6807\u7B7E": 1001
+    "\u6280\u80FD\u6807\u7B7E": 5007
     customParams:
     - key: 1
       value: 100
