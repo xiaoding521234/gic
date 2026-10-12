@@ -381,14 +381,16 @@ namespace GIC.Battle
                             : (int?)null;
                         var tracker = new CandidateTracker();
                         // AI-4 难度门（§9.2）：按归属玩家——学徒=关威胁图/意图板/反应预期分；
-                        // 真人不注册=门恒全开（其自主军团全件质量），棋圣=AI-2 全件基线
+                        // 真人不注册=门恒全开（其自主军团全件质量），棋圣=AI-2 全件基线。
+                        // AI-5 军团软系数：按归属玩家的军团倾向（回防=斩杀加成下调）
                         var gates = AIPlayerConfig.GatesFor(identity.OwnerPlayerID);
                         var unitThreat = gates.ThreatFeed && threatByTeam.TryGetValue(identity.Team, out var tMap)
                             ? tMap
                             : null;
                         ScoreUnitCandidates(sim, snapshot, unit, identity.OwnerPlayerID, identity.Team,
                             turnNumber, tracker, pool, profile, unitThreat,
-                            gates.IntentBoard ? bidBoard : null, false, gates.ReactionPreview);
+                            gates.IntentBoard ? bidBoard : null, false, gates.ReactionPreview,
+                            AIStrategist.LegionAggressionOf(identity.OwnerPlayerID));
                         if (tracker.Best == null) continue; // 无候选=不占名额
                         bids.Add(new CompanionBid
                         {
@@ -451,14 +453,15 @@ namespace GIC.Battle
                     : (int?)null;
                 var tracker = new CandidateTracker();
                 var profile = g.unit.RawData?.行为档案;
-                // AI-4 难度门（执行遍同申报遍口径）：按归属玩家门控威胁图/意图板/反应预期分
+                // AI-4 难度门（执行遍同申报遍口径）：按归属玩家门控威胁图/意图板/反应预期分。
+                // AI-5 军团软系数：按归属玩家（回防=斩杀加成下调）
                 var gates2 = AIPlayerConfig.GatesFor(g.owner);
                 var unitThreat = gates2.ThreatFeed && threatByTeam.TryGetValue(g.team, out var tMap2)
                     ? tMap2
                     : null;
                 ScoreUnitCandidates(sim, snapshot, g.unit, g.owner, g.team, turnNumber,
                     tracker, pool, profile, unitThreat, gates2.IntentBoard ? board : null,
-                    false, gates2.ReactionPreview);
+                    false, gates2.ReactionPreview, AIStrategist.LegionAggressionOf(g.owner));
                 if (tracker.Best == null) continue;
                 DeclareIntent(sim, snapshot, g.unit, g.team, tracker.Best, board); // E-2：意图入板
                 actions.Add(tracker.Best);
@@ -552,19 +555,23 @@ namespace GIC.Battle
         /// Companion 生效，魔神档传 true 计价不变）；伙伴脑自主路径=false 维持不减免。
         /// reactionPreview（AI-4 批难度门，docs/active/42 §9.2）：E-3 反应预期分（增伤反应预判）——
         /// 学徒档关闭件；默认 true=全件。
+        /// legionAggression（AI-5 批军团软系数，docs/active/42 §3 协作机制 2）：回防态=
+        /// AIStrategist.RegroupAggressionMul（0.7——斩杀加成下调=「激进度下调」的伙伴侧软注入）；
+        /// 推进/默认=1；权重注入不直接指定行动。
         /// </summary>
         public static void ScoreUnitCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile,
             OpponentThreatModel.ThreatMap threat = null, TeamIntentBoard board = null,
-            bool isPlayerDirectControl = false, bool reactionPreview = true)
+            bool isPlayerDirectControl = false, bool reactionPreview = true, float legionAggression = 1f)
         {
             if (unit == null || tracker == null) return;
             profile ??= NeutralProfile;
             // 攻击档先跑并回报「本单位是否有攻击/增益候选」（2026-10-02 挂机修复：驻位判定用
             // per-unit 候选存在性——配额脑共享 tracker，勿用 tracker.Best 判定〔那是全场最优〕）
             bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
-                tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl, reactionPreview);
+                tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl, reactionPreview,
+                legionAggression);
             ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
                 profile, hasActionCandidate, threat, board, isPlayerDirectControl);
         }
@@ -577,7 +584,7 @@ namespace GIC.Battle
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile,
             OpponentThreatModel.ThreatMap threat, TeamIntentBoard board,
-            bool isPlayerDirectControl, bool reactionPreview)
+            bool isPlayerDirectControl, bool reactionPreview, float legionAggression)
         {
             var skills = unit.Skills;
             var from = sim.GetPosition(unit);
@@ -658,7 +665,8 @@ namespace GIC.Battle
                             int effPerTarget = MitigatedDamage(perTarget, target.defense);
                             score += Math.Min(effPerTarget, remaining); // 过杀截断（E-2 剩余口径+E-3 折减口径）
                             if (effPerTarget >= remaining)
-                                score += Mathf.RoundToInt(KillBonusScore * profile.激进度);
+                                // AI-5 军团软系数：回防态斩杀加成 ×0.7（激进度下调——§3 协作机制 2）
+                                score += Mathf.RoundToInt(KillBonusScore * profile.激进度 * legionAggression);
                             // E-3 反应预期分：快照附着×技能元素经 ElementReactionResolver.Preview 单源
                             // 预判——增伤反应（蒸发/融化 1 级 +50% 伤害乘区）按折减伤害一半计；冻结
                             // 控制反应无增伤乘区不计分。跨单位连招基础：凯亚挂冰→安柏跟火自动蒸发

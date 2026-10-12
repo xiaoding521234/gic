@@ -65,5 +65,10 @@ namespace GIC.Battle
         /// <summary>失误注入轮转法门（§9.2 学徒专属——评分榜取第 (turn mod N)+1 名=确定性次优）</summary>
         public static bool MistakeInjectionEnabled(AIDifficulty difficulty)
             => difficulty == AIDifficulty.Apprentice;
+
+        /// <summary>战略层门（§9.2 学徒开启件「战略层仅发育态」——AIStrategist 态势机不走、
+        /// 恒发育乘子；三账本红线/体力保底=硬保底语义非决策质量件、全档生效）</summary>
+        public static bool StrategistDevelopOnly(AIDifficulty difficulty)
+            => difficulty == AIDifficulty.Apprentice;
     }
 }
