@@ -2098,3 +2098,14 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **纪律**：**snap 型对位/复位写入必须先取消同目标的在途动画协程**——协程逐帧回写会在 snap 之后覆盖它，且其捕获的终点在 snap 时已成陈旧意图；「选中态由 Screen 单源管理」的按钮组，prefab 严禁残留「初始选中=1」——它在每次激活的 OnEnable 瀑布里自选并触发全链事件（预热窗口与首开瀑布都吃到，池化 `_selected` 跨开关存活使每次开屏的「最后自选者」不同、症状位漂移）。
 
 
+## §149 3D 顶点波 shader 复用到 UI 的相位坑 + UI 深度测试范式 + 组件动画协程非播放态守卫（2026-10-13 房间地图预览升级批实证）
+
+**症状**：战斗水面 shader（GIC/Battle/WaterFlow，顶点 sin 波+波峰高光项）复用到房间预览 UI 的 RawImage 后，水面每格四角出现固定亮度斑块。
+
+**根因**：①shader 波相位取自**顶点世界坐标**（`worldPos.x/z` 参与 sin）——UI 顶点坐标=像素级大数（数百~数千），`sin(像素级大数)` 逐顶点=随机相位且空间相位主导、随时间近似冻结 → 每格四角亮度梯度恒定=斑块。0.02 幅度的顶点位移在 UI 上≈0.03px 不可见（无害）。②shader 缺省 `ZTest LEqual` 在 UI 画布上有深度不确定性——本项目自定义 UI shader 范式=**`ZTest [unity_GUIZTestMode]`**（DeckRowHighlight 先例）：非渲染上下文该宏=LEqual（与缺省一致=3D 侧零变化）、overlay=Always。
+
+**修法**：①3D 波/高光 shader 上 UI：关波峰高光项（`_Highlight=0`），保留纯 UV 流动（UV 滚动相位与空间坐标无关，UI 安全）；②自定义 shader 上 UI 一律补 `ZTest [unity_GUIZTestMode]`（BattleWaterFlow.shader 已补，变体编译验证过、战斗水面零变化）；③`MonoBehaviour.StartCoroutine` 非播放态炸——动画入口加 `Application.isPlaying` 守卫（编辑器冒烟/工具调用回落满尺寸终态，本批 StartWave 同款）。
+
+**同批附带通则**：①「运行时改写锚点的组件」须在 Awake 一次性捕获序列化原锚点（FitSquareAspect 会把标记层锚点改写为居中方形，事后不可再取）；②方形适配类组件按「预留区可用高宽」取边，勿取整面板短边——旧实现取整面板短边导致方形顶部 53px 顶进「地图名」标题条（隐性重叠 bug，随本批修复）；③`LoadPrefabContents→改值→SaveAsPrefabAsset` 的纯值写入 diff 干净（本批 12 行），不触发整份重序列化（对比 SerializedObject+SaveAssets 路径的 §Prefab 重序列化教训）。
+
+

@@ -24,6 +24,11 @@ namespace GIC.Data
         [Tooltip("圆石顶面")]
         public Material[] 圆石顶面变体;
 
+        [Header("水面材质（UI 预览取用）")]
+        [Tooltip("水面材质（GIC/Battle/WaterFlow）：房间地图预览等 UI 侧运行时渲染水面用（Resources 可达）；"
+                 + "战斗侧水面仍由水地块 prefab 材质槽 1 携带——两处应指向同一资产，改水面材质时同步此引用")]
+        public Material 水面材质;
+
         [Header("草簇装饰（立牌式面向玩家，随机铺满草地格；材质=GIC/Battle/GrassSway 顶点摆动）")]
         [Tooltip("草簇材质变体（各挂不同草簇贴图；空=不铺草簇）")]
         public Material[] 草簇材质变体;

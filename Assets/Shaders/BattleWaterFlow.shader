@@ -32,6 +32,9 @@ Shader "GIC/Battle/WaterFlow"
 
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
+        // UI 深度测试范式（DeckRowHighlight 同款）：房间地图预览复用本 shader 渲染水面——
+        // 非渲染上下文 unity_GUIZTestMode=LEqual（与本行缺省行为一致，战斗水面零变化）；overlay UI=Always
+        ZTest [unity_GUIZTestMode]
 
         Pass
         {

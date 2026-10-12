@@ -267,8 +267,9 @@ namespace GIC.Battle
             renderer.sharedMaterials = mats;
         }
 
-        /// <summary>格坐标确定性哈希 → [0, count) 变体序号</summary>
-        private static int CellVariantIndex(int x, int y, int count)
+        /// <summary>格坐标确定性哈希 → [0, count) 变体序号（internal：房间地图预览复用同哈希——
+        /// 预览逐格变体与战场建盘完全一致，所见即所得；确定性=重建稳定）</summary>
+        internal static int CellVariantIndex(int x, int y, int count)
         {
             unchecked
             {
