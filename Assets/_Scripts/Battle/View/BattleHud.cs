@@ -1113,8 +1113,8 @@ namespace GIC.Battle
                     if (targetInBounds && _aimCells.Contains(targetCell))
                     {
                         HandleAimTap(targetCell, precise, snapshot);
-                        // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属/伙伴非势力）或
-                        // 已定死时立即提示「不会执行」，防玩家选了却不知为何没被执行；金格照常显示
+                        // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属）、已定死或资源
+                        // 不足时立即提示「不会执行」，防玩家选了却不知为何没被执行；金格照常显示
                         NotifySelectionBlockedOrConfirmed();
                         return;
                     }
@@ -1889,10 +1889,12 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>待定格产生时刻轻提示（2026-09-29 追拍：玩家不可操作的技能（敌方/眷属/伙伴非势力）
-        /// 与已确认定死时，点可选格/拖拽松手落格即提示——不再等到按「完成选择」才弹，防玩家不知道
-        /// 自己选了但为何后面没执行。防线提示优先于定死提示（不可操作更根本）；金格照常显示
-        /// （视觉选择反馈保留）；提交侧防线不变=双保险。部署瞄准=玩家级行动无防线、仅定死提示</summary>
+        /// <summary>待定格产生时刻轻提示（2026-09-29 追拍：玩家不可操作的技能（敌方/眷属）与已确认
+        /// 定死时，点可选格/拖拽松手落格即提示——不再等到按「完成选择」才弹，防玩家不知道自己选了
+        /// 但为何后面没执行；2026-10-12 追拍「点格时就提醒，而不是行动提交了才提醒」：**资源不足**
+        /// （元能/体力/摩拉/物品——技能键始终可点击进瞄准的代价）同判定同文案提前提示。提示序=
+        /// 防线（不可操作最根本）>定死>资源不足；金格照常显示（视觉选择反馈保留）；提交侧防线
+        /// 不变=双保险。部署瞄准=玩家级行动无防线、仅定死提示</summary>
         private void NotifySelectionBlockedOrConfirmed()
         {
             if (_deployAimUnit != 0)
@@ -1905,7 +1907,25 @@ namespace GIC.Battle
             if (sel == null) return;
             var blockKey = GetSelectionBlockToastKey(sel);
             if (blockKey != null) { ShowBattleToast(blockKey); return; }
-            if (_actionConfirmed) ShowBattleToast("Battle_ActionConfirmed");
+            if (_actionConfirmed) { ShowBattleToast("Battle_ActionConfirmed"); return; }
+            // 资源不足提前提示：与 SubmitAim 提交侧拦截同判定同文案（镜像移动 costs/常量兜底两分支）
+            if (_aimDef == null) return;
+            if (_aimDef.IsMove)
+            {
+                var moveSkill = GetSelectedSkillData(SkillType.Move);
+                bool moveResourcesOk = moveSkill != null
+                    ? HasSkillResources(moveSkill)
+                    : _myStamina >= (SelectedUnitTier() == UnitTier.Companion
+                        ? UnitTierHelper.StaminaCostOf(UnitTier.Companion) - 5
+                        : UnitTierHelper.StaminaCostOf(SelectedUnitTier()));
+                if (!moveResourcesOk) ShowBattleToast("Battle_NotEnoughResources");
+            }
+            else
+            {
+                var skillData = GetSelectedSkillData(_aimDef);
+                if (skillData != null && !HasSkillResources(skillData))
+                    ShowBattleToast("Battle_NotEnoughResources");
+            }
         }
 
         /// <summary>格差归一到十字方向（|dx|≥|dy| 取横轴，否则取纵轴；0,0 防御回 Right）</summary>
@@ -2031,7 +2051,7 @@ namespace GIC.Battle
                 if (_camera != null) _camera.CancelDragFollow(); // 2026-10-06 拍板「取消时重置摄像机位置为瞄准开始时」——瞬移回拖动起始位
             }
             // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
-            // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属/伙伴非势力）或已定死时
+            // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属）、已定死或资源不足时
             // 立即提示「不会执行」——与点击式同判定同文案（NotifySelectionBlockedOrConfirmed 单出口）
             else
                 NotifySelectionBlockedOrConfirmed();
