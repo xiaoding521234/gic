@@ -77,8 +77,9 @@ namespace GIC.Data
         public BattleCell deployCell;
 
         /// <summary>玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——玩家通过配额直接操控伙伴
-        /// 移动/战技/爆发时标记 true，ResourceGate 体力换算据此减免 5（可减免为负数=获得体力）；
-        /// AI 伙伴自主行动/号令通道=false 不减免。默认 false 序列化兼容旧存档</summary>
+        /// 行动时标记 true（真人/AI 提交路径同标，AI-1 批起含势力技能号令），ResourceGate 体力换算
+        /// 据此减免 5（可减免为负数=获得体力）；SkillExecutor 对伙伴施法者的延奏/契约号令发津贴 +5
+        /// （拍板口径「延奏号令 0→−5」）；AI 伙伴自主行动=false 不减免。默认 false 序列化兼容旧存档</summary>
         public bool isPlayerDirectControl;
 
         public override string ToString()

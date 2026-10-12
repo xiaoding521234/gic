@@ -127,6 +127,18 @@ namespace GIC.Battle
             ResourceGate.ChargeAll(sim, attacker, action.playerId, skill.RawData?.costs, effects,
                 isPlayerDirectControl: action.isPlayerDirectControl);
 
+            // 号令体力津贴（AI-1 批接线，2026-10-12 拍板口径「玩家操控伙伴势力技能＝0→−5 获得体力」）：
+            // 势力技能基 0 体力（docs/07-00「号令不消耗体力」）＋玩家直接操控伙伴减免 5（负值=获得）
+            // → 伙伴施法者的延奏/契约号令＝玩家净得 5 体力（StaminaEffect 正值=获得，与减免负值同构）。
+            // 旗标由提交路径统一打（TurnFlowController 对 Companion 层级整体标记——真人/AI 共享同一路径
+            // 自动对齐）；魔神施法者无伙伴减免（StaminaAmountOf 层级门）＝无津贴。
+            // 延奏/契约资产无体力条目＝ChargeAll 恒空转，津贴为唯一体力效果（无双扣）。
+            if (action.isPlayerDirectControl
+                && BattleHeuristics.TierOf(attacker) == UnitTier.Companion
+                && skill.RawData != null
+                && (skill.RawData.skillType == SkillType.Enso || skill.RawData.skillType == SkillType.Contract))
+                effects.Add(new StaminaEffect(action.playerId, 5));
+
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
 
             // 时轮施放事件（B-S1）：施放者片初位置=发射格/朝向参考（sliceIndex/indexInSlice 由发射出口回填）；
@@ -308,8 +320,9 @@ namespace GIC.Battle
         }
 
         /// <summary>玩家场上同名单位（含尸体——升命对尸体同样生效〔docs/05 §5.4 仅升命不复苏〕；
-        /// 3★+ 同名在场即升命，1~2★ 不适用〔眷属重复出战=加单位〕）</summary>
-        private static Unit FindOwnUnitByName(BattleSimState sim, string playerId, UnitName unitName)
+        /// 3★+ 同名在场即升命，1~2★ 不适用〔眷属重复出战=加单位〕）。
+        /// AI 配额脑部署/升命候选同读此单源（AI-1 批公开——防两处手写同构漂移）</summary>
+        public static Unit FindOwnUnitByName(BattleSimState sim, string playerId, UnitName unitName)
         {
             foreach (var kv in sim.Units)
             {

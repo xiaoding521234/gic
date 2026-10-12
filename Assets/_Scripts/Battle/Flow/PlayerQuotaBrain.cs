@@ -13,12 +13,15 @@ namespace GIC.Battle
     /// AIDebugBrain→PlayerQuotaBrain：原 v2 评分制的**单位级评估搬迁为伙伴自主脑（CompanionBrain）**，
     /// 本脑只管玩家 1 配额的用途——①号令（上交势力技能延奏/契约，施法者=己方眷属/伙伴/魔神均可）
     /// ②操魔神（5 星单位行动=CompanionBrain 共享评分骨架复用为候选打分器）③部署（2026-10-12
-    /// AI 固定卡组批接线：手牌角色卡出战=TryBuildDeploy 部署优先；升命/购买/物品仍后续批次）
-    /// ④无候选=Pass 空过放权自主军团。与真人玩家对等：配额同样可用于号令/魔神/部署
-    /// （§10 验收「AI 玩家对等」）。
+    /// AI 固定卡组批接线：手牌角色卡出战=TryBuildDeploy 部署优先）④**直接操控伙伴（AI-1 批，
+    /// docs/active/42 §11：CompanionBrain 共享骨架对己方 3-4★ 伙伴产候选——严格对齐真人，
+    /// 门槛镜像 isPlayerDirectControl=true 减免 5）**⑤**升命候选（AI-1 批：同名存活+命座未满+
+    /// 摩拉够→DeployUnit 同名路径升命，评分入池竞争）**⑥无候选=Pass 空过放权自主军团。
+    /// 与真人玩家对等：配额同样可用于号令/魔神/部署/直接操控伙伴。
     /// AI 决策由 Host 生成（docs/18 决策一）——直接读 BattleSimState/BattleSnapshot，不走传输通道；
     /// 选择阶段开始后延迟提交（给玩家看清回合切换）。
-    /// 体力感知：配额行动 costs 门槛镜像（ResourceGate.HasAll 同源——体力按施法者层级换算）；
+    /// 体力感知：配额行动 costs 门槛镜像（ResourceGate.HasAll 同源——体力按施法者层级换算，
+    /// 直接操控伙伴传 isPlayerDirectControl=true 与真人同口径）；
     /// 决策时不足的候选不生成（上交也会落空浪费配额，先攒体力）。
     /// 确定性：unitId 升序/skillIndex 升序/十字向枚举序遍历，严格大于替换（同分先到先得）。
     /// </summary>
@@ -44,8 +47,16 @@ namespace GIC.Battle
         /// <summary>被协者已实装变奏（TriggerSkill 链）的评分</summary>
         private const int EnsoTriggerChainScore = 12;
 
-        /// <summary>协奏元能转移（+10/+20）的评分</summary>
+        /// <summary>协奏元能转移（+10/+20）的评分——蒙德/自身目标=+10 档基分；非蒙德目标 +20 档=双倍
+        /// （AI-1 批传输档：非蒙德目标元能翻倍但不触发变奏——docs/07-势力机制/蒙德.md）</summary>
         private const int EnsoEnergyTransferScore = 4;
+
+        /// <summary>升命候选评分（AI-1 批，docs/active/42 §11；2026-10-12 观察局二轮标定）：
+        /// 永驻命座被动的投资档——**高于延奏号令增益档（~30-45）与威胁边际档（0-25）**、低于
+        /// 斩杀边际（50~80+）与救命治疗（RescueScore 30+有效治疗≈50-60）；首版 25 在边际修正后
+        /// 仍被延奏常态压制（观察局 T4~T12 实锤升命 30 回合仅中 4），50=「该救命/该斩杀的回合让位、
+        /// 平时投资优先」的拍板位——实际数值随三账本批（AI-5）按摩拉水位重标定</summary>
+        private const int UpgradeConstellationScore = 50;
 
         // 救命分已上提共享单源（F-3，docs/active/34）：CompanionBrain.RescueScore=30——配额脑号令
         // 与伙伴脑预治疗两处同口径防漂移；本脑消费点直接引用（原 private EnsoRescueScore 退役）
@@ -86,11 +97,13 @@ namespace GIC.Battle
         // ==================== 配额评分制决策（号令/操魔神/空过） ====================
 
         /// <summary>
-        /// 配额评分制决策（部署/号令/操魔神/空过）。
-        /// 候选枚举序（确定性）：己方存活魔神 unitId 升序 × 技能 skillIndex 升序 × 十字向枚举序 ×
-        /// 号令施法者/目标 unitId 升序；严格大于替换（同分先到先得）。Pass=0 分兜底。
+        /// 配额评分制决策（部署/直接操控伙伴/号令/操魔神/升命/空过）。
+        /// 候选枚举序（确定性）：己方存活单位 unitId 升序 × 技能 skillIndex 升序 × 十字向枚举序 ×
+        /// 号令施法者/目标 unitId 升序 × 升命卡 unitName 升序；严格大于替换（同分先到先得）。
+        /// Pass=0 分兜底。
         /// 2026-10-12 部署分支（用户拍板「AI 玩家暂时用 安柏/凯亚/芭芭拉/体力/摩拉 固定卡组并打出手牌」）：
-        /// 部署优先于号令/操魔神——先铺场后指挥（三伙伴上场后归位常规评分流）。
+        /// 部署优先于号令/操魔神——先铺场后指挥（三伙伴上场后本分支自然空手，归位常规评分流）。
+        /// AI-1 批（docs/active/42 §11）：直接操控伙伴（对齐真人减免口径）+升命+延奏传输档入池。
         /// </summary>
         private ActionData Decide(int turn)
         {
@@ -109,11 +122,42 @@ namespace GIC.Battle
             // ① 操魔神：己方魔神（5★）单位行动——共享评分骨架（CompanionBrain.ScoreUnitCandidates，
             //    中性档案；实池判定无虚拟预留——配额行动本脑独占，伙伴决策在其后自适应）。
             //    E-1 对手建模（docs/active/33 §2）：威胁图传骨架——魔神攻击候选吃反威胁分、移动
-            //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）
+            //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）。
+            //    isPlayerDirectControl=true=配额直接操控口径（StaminaAmountOf 层级门=仅 Companion 减免，
+            //    魔神计价不变——语义统一「配额操控=玩家操控」，提交路径会重打同旗标）
             var threat = OpponentThreatModel.Build(sim, snapshot, MyTeam, turn);
             foreach (var entry in CollectArchons(sim))
                 CompanionBrain.ScoreUnitCandidates(sim, snapshot, entry.Value, _playerId, MyTeam,
-                    turn, tracker, null, null, threat);
+                    turn, tracker, null, null, threat, null, true);
+
+            // ①b 直接操控伙伴（AI-1 批，2026-10-12 拍板「AI 玩家操控严格对齐真人玩家」）：
+            //    己方 3-4★ 伙伴候选与操魔神同池竞争——门槛镜像 isPlayerDirectControl=true（体力减免 5
+            //    与真人同口径）；档案=单位自身行为档案（评分保真：伙伴擅长维度权重照常生效）。
+            //    **机会成本口径（2026-10-12 观察局诊断后落地，docs/active/42 §7「伙伴自主本来就会
+            //    做的事操控分低」）**：被操控伙伴不操控也会自主行动——操控的边际价值＝威胁感知候选分
+            //    −自主期望分（基线 pass：同骨架 threat=null=伙伴脑现行感知口径）。原始分直接入池会以
+            //    35~284 的伤害分常态饿死升命（25）与号令（~30-45）——观察局 T4~T12 实锤（升命 30 回合
+            //    仅赢 4 回合）。边际≤0=放权更好不入池；被操控伙伴跳过自主决策（commanded 集）。
+            //    基线成本口径=isPlayerDirectControl=false（自主付费 5；体力枯竭回合自主无线、操控有
+            //    线→操控解锁行动=真实边际，docs/05 §5.1「体力吃紧时直接操控本身是账本收益」）
+            foreach (var entry in CollectCompanions(sim))
+            {
+                var unit = entry.Value;
+                var profile = unit.RawData?.行为档案;
+                // 基线 pass：自主近似（无威胁图、成本不减免）
+                var baselineTracker = new CompanionBrain.CandidateTracker();
+                CompanionBrain.ScoreUnitCandidates(sim, snapshot, unit, _playerId, MyTeam,
+                    turn, baselineTracker, null, profile, null, null, false);
+                int baseline = baselineTracker.BestScore;
+                // 候选 pass：威胁感知（与操魔神档同感知）
+                var unitTracker = new CompanionBrain.CandidateTracker();
+                CompanionBrain.ScoreUnitCandidates(sim, snapshot, unit, _playerId, MyTeam,
+                    turn, unitTracker, null, profile, threat, null, true);
+                if (unitTracker.Best == null) continue;
+                int marginal = unitTracker.BestScore - baseline;
+                if (marginal <= 0) continue; // 威胁感知不优于自主=放权更好
+                tracker.Offer(marginal, unitTracker.Best);
+            }
 
             // ② 号令：势力技能（延奏/契约）候选——施法者=己方存活单位（眷属/伙伴/魔神均可，
             //    眷属技能表本无势力技能条目=天然只有伙伴/魔神当施法者）；对伙伴施法者=本回合号令
@@ -122,6 +166,28 @@ namespace GIC.Battle
             foreach (var entry in CollectFactionCasters(sim))
                 EvaluateEnsoSkills(sim, entry.Value, turn, tracker, threat);
 
+            // ③ 升命候选（AI-1 批）：手牌角色卡同名存活在场+命座未满+摩拉够 → DeployUnit 同名路径
+            //    升命（执行器既有链复用；deployCell 升命分支不消费）。评分入池与号令/操控竞争
+            EvaluateUpgrades(sim, turn, tracker);
+
+            // 决策日志（docs/active/42 §10 可调试性：落选可审计——升命/号令常年不入选时
+            // 从「配额=分」行归因分数构成，勿盲调常量）
+            if (tracker.Best != null)
+            {
+                var chosen = tracker.Best;
+                GICLog.Info($"[配额脑] {_playerId} T{turn} 配额={chosen.actionType}" +
+                    (chosen.actionType == ActionType.Skill
+                        ? $" 技能{chosen.skillIndex} 单位={chosen.unitId} 目标={chosen.targetUnitId}"
+                        : chosen.actionType == ActionType.DeployUnit
+                            ? $" 出战/升命={(UnitName)chosen.deployUnitName}@{chosen.deployCell}"
+                            : "") +
+                    $" 分={tracker.BestScore}");
+            }
+            else
+            {
+                GICLog.Info($"[配额脑] {_playerId} T{turn} 配额=空过放权");
+            }
+
             return tracker.Best ?? Pass(turn);
         }
 
@@ -129,7 +195,7 @@ namespace GIC.Battle
 
         /// <summary>
         /// 部署候选（确定性）：手牌角色卡按 unitName 升序 × 落点由近及远（核心半径 1 环→2 环、
-        /// 行优先）→ 首个「合法落点+摩拉够+无同名存活」组合出战。
+        /// 行优先）→ 首个「合法落点+摩拉够+无同名在场（含尸体）」组合出战（AI-1 批起升命另走评分池）。
         /// 落点合法性=DeployUnitExecutor.IsDeployCellValid 单源（核心半径 2+地形+碰撞共享原语）；
         /// 摩拉=GetEffectiveDeployCost 同源；同名存活守卫=规避升命语义重复烧配额（卡不消耗，
         /// 阵亡后同名卡自然重新可出战）。
@@ -172,18 +238,60 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>己方同名单位在场判定（**含尸体**——口径=DeployUnitExecutor.FindOwnUnitByName/升命
-        /// 分支同构：docs/05 §5.4 尸体也仅升命不复苏。同名在场（含尸体）时再打出该卡=给尸体升命
-        /// 烧配额，AI 守卫跳过；卡不消耗，若无同名单位（未部署过）则可出战）</summary>
+        /// <summary>己方同名单位在场判定（**含尸体**——单源=DeployUnitExecutor.FindOwnUnitByName，
+        /// docs/05 §5.4 尸体也仅升命不复苏：同名在场（含尸体）时再打出该卡=给尸体升命烧配额，
+        /// 部署分支守卫跳过〔升命候选另走 EvaluateUpgrades 存活口径〕；卡不消耗）</summary>
         private bool OwnUnitOnField(BattleSimState sim, UnitName unitName)
+            => DeployUnitExecutor.FindOwnUnitByName(sim, _playerId, unitName) != null;
+
+        // ==================== 升命候选（AI-1 批，2026-10-12 docs/active/42 §11） ====================
+
+        /// <summary>
+        /// 升命候选（确定性）：手牌 3★+ 角色卡 unitName 升序（同卡多张去重）→ 同名**存活**单位在场
+        /// 且 ConstellationLevel&lt;MaxConstellation 且摩拉够 → DeployUnit 同名路径升命候选
+        /// （评分=UpgradeConstellationScore 入池与号令/操控竞争，非部署式无条件优先）。
+        /// 校验口径全镜像 DeployUnitExecutor.TryResolve 升命分支（starLevel≥3/满命/GetEffectiveDeployCost）；
+        /// 尸体不升（复苏前置投资=后续批次；现行「给尸体升命」判定为烧配额维持跳过）；
+        /// deployCell 升命分支不消费（执行器升命先于落点校验），填核心位保语义。
+        /// </summary>
+        private void EvaluateUpgrades(BattleSimState sim, int turn, CompanionBrain.CandidateTracker tracker)
         {
-            foreach (var kv in sim.Units)
+            var hand = sim.GetHand(_playerId);
+            if (hand == null || hand.Count == 0) return;
+            var config = Wargame.Instance?.Context?.Get<UnitConfig>();
+            if (config == null) return;
+
+            var candidates = new List<(int unitName, UnitConfig.UnitData data)>();
+            foreach (var card in hand)
             {
-                var identity = kv.Value.GetUnitComponent<UnitIdentity>();
-                if (identity == null || identity.OwnerPlayerID != _playerId) continue;
-                if (identity.UnitName == unitName) return true;
+                if (!card.IsUnit) continue;
+                if (candidates.Exists(c => c.unitName == card.value)) continue; // 同卡去重=一次只评一级
+                var data = config.GetUnitData((UnitName)card.value);
+                if (data == null || data.starLevel < 3) continue; // 升命语义=3★+（执行器同口径）
+                candidates.Add((card.value, data));
             }
-            return false;
+            if (candidates.Count == 0) return;
+            candidates.Sort((a, b) => a.unitName.CompareTo(b.unitName)); // unitName 升序（枚举序铁律）
+
+            foreach (var candidate in candidates)
+            {
+                var existing = DeployUnitExecutor.FindOwnUnitByName(sim, _playerId, (UnitName)candidate.unitName);
+                if (existing == null) continue; // 未出战：归 TryBuildDeploy 部署分支（⓪ 优先），此处不辖
+                if (BattleSimState.IsDead(existing)) continue; // 尸体升命=烧配额（复苏前置投资后置批次）
+                if (existing.ConstellationLevel >= ConstellationApplier.MaxConstellation) continue; // 已满命
+                if (sim.GetMora(_playerId) < candidate.data.GetEffectiveDeployCost()) continue; // 摩拉不足先攒
+                GICLog.Info($"[配额脑] {_playerId} T{turn} 升命候选 {(UnitName)candidate.unitName}" +
+                    $" C{existing.ConstellationLevel}→C{existing.ConstellationLevel + 1}" +
+                    $" 分={UpgradeConstellationScore}（当前最优 {tracker.BestScore}）");
+                tracker.Offer(UpgradeConstellationScore, new ActionData
+                {
+                    playerId = _playerId,
+                    actionType = ActionType.DeployUnit,
+                    deployUnitName = candidate.unitName,
+                    deployCell = sim.GetCorePosition(_playerId),
+                    turnNumber = turn,
+                });
+            }
         }
 
         /// <summary>核心附近首个合法部署落点（由近及远：半径 1 环→2 环、行优先列序；确定性枚举）</summary>
@@ -206,8 +314,8 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>己方存活魔神（5★，玩家域单位行动——配额脑唯一可操单位档）。
-        /// 建筑排除（协议核心批 2026-09-29）：协议核心是 5★ 勿被当魔神操——建筑不参与任何行动</summary>
+        /// <summary>己方存活魔神（5★，配额脑可操档之一）。建筑排除（协议核心批 2026-09-29）：
+        /// 协议核心是 5★ 勿被当魔神操——建筑不参与任何行动</summary>
         private List<KeyValuePair<string, Unit>> CollectArchons(BattleSimState sim)
         {
             var archons = new List<KeyValuePair<string, Unit>>();
@@ -222,6 +330,25 @@ namespace GIC.Battle
             }
             archons.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key)); // unitId 升序（枚举序铁律）
             return archons;
+        }
+
+        /// <summary>己方存活伙伴（3-4★，AI-1 批直接操控候选域——玩家配额可直接操控，与真人对等）。
+        /// 建筑排除同 CollectArchons；被操控伙伴由 CompanionBrain commanded 集（玩家已提交单位）跳过
+        /// 自主决策，无双行动</summary>
+        private List<KeyValuePair<string, Unit>> CollectCompanions(BattleSimState sim)
+        {
+            var companions = new List<KeyValuePair<string, Unit>>();
+            foreach (var kv in sim.Units)
+            {
+                if (BattleHeuristics.IsBuilding(kv.Value)) continue; // 建筑不参与任何行动
+                if (!BattleHeuristics.IsCompanion(kv.Value)) continue;
+                if (BattleSimState.IsDead(kv.Value) || !BattleSimState.CanAct(kv.Value)) continue;
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || id.OwnerPlayerID != _playerId) continue;
+                companions.Add(kv);
+            }
+            companions.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key)); // unitId 升序（枚举序铁律）
+            return companions;
         }
 
         /// <summary>己方存活单位全集（号令施法者候选域——含眷属：其技能表无势力技能条目则天然空集）。
@@ -243,8 +370,11 @@ namespace GIC.Battle
 
         /// <summary>
         /// 号令候选（势力技能=玩家对自主军团的指挥通道，docs/active/32 §4）：占玩家 1 配额、
-        /// 势力技能自身 0 体力（docs/07-00 口径）；目标=蒙德或自身（非蒙德效果原子空产出）；
-        /// 估值=治疗缺口+增益未满层+变奏链+协奏元能（OnCast 效果原子逐个粗估，与 EffectCompiler 产出同语义）
+        /// 势力技能自身 0 体力（docs/07-00 口径）；目标域=我军存活单位（含自身）unitId 升序——
+        /// 延奏目标域=阵营口径（2026-09-25 三轮审查 C2：2v2 可协奏队友单位）；行动者归属=playerId 保留；
+        /// 估值=治疗缺口+增益未满层+变奏链+协奏元能（OnCast 效果原子逐个粗估，与 EffectCompiler 产出同语义）。
+        /// AI-1 批传输档：非蒙德目标不再滤除（docs/07-势力机制/蒙德.md——+20 元能不触发变奏，
+        /// 延奏自身 buff/治疗对任何目标照常生效；当前固定卡组全蒙德=传输档待混搭卡组激活）
         /// </summary>
         private void EvaluateEnsoSkills(BattleSimState sim,
             Unit caster, int turn, CompanionBrain.CandidateTracker tracker,
@@ -273,8 +403,8 @@ namespace GIC.Battle
 
                 foreach (var ally in allies)
                 {
-                    if (!BattleHeuristics.IsMondstadtOrSelfUnit(caster, ally.unit)) continue;
-                    int value = EvaluateEnsoTarget(data, caster, ally.unit, ally.unitId, threat);
+                    bool mondOrSelf = BattleHeuristics.IsMondstadtOrSelfUnit(caster, ally.unit);
+                    int value = EvaluateEnsoTarget(data, caster, ally.unit, ally.unitId, threat, mondOrSelf);
                     if (value <= 0) continue;
                     tracker.Offer(value, Skill(caster, i, Direction2D.Right, turn, ally.unitId));
                 }
@@ -282,9 +412,11 @@ namespace GIC.Battle
         }
 
         /// <summary>延奏对某目标的估值：按 OnCast 效果原子逐个粗估（与 EffectCompiler 产出同语义）。
+        /// mondOrSelf=蒙德角色或施法者自身（AI-1 批传输档参数）：true→变奏链+元能 +10 档；
+        /// false→无变奏、元能 +20 档双倍评分（延奏自身 buff/治疗对任何目标照常生效）。
         /// E-1：threat=威胁图（治疗救命档消费；null=无威胁上下文零加成）</summary>
         private int EvaluateEnsoTarget(SkillConfig.SkillData data, Unit caster, Unit ally,
-            string allyUnitId, OpponentThreatModel.ThreatMap threat)
+            string allyUnitId, OpponentThreatModel.ThreatMap threat, bool mondOrSelf)
         {
             if (data.effects == null) return 0;
             var allyStats = ally.GetUnitComponent<UnitStats>();
@@ -330,14 +462,16 @@ namespace GIC.Battle
                     case SkillEffectKind.TriggerSkill:
                     {
                         // 变奏链：被协者该型技能已实装（effects 非空）才有产出（UnimplementedSkill 空产出）
-                        if (HasImplementedSkillOfType(ally, atom.targetSkillType))
+                        // ——仅蒙德角色/施法者自身触发变奏（非蒙德=纯传输档无变奏链，AI-1 批）
+                        if (mondOrSelf && HasImplementedSkillOfType(ally, atom.targetSkillType))
                             value += EnsoTriggerChainScore;
                         break;
                     }
 
                     case SkillEffectKind.EnergyGain:
-                        // 协奏元能 +10/+20（蒙德/非蒙德分支；AI 只选蒙德或自身目标=恒 +10 档）
-                        value += EnsoEnergyTransferScore;
+                        // 协奏元能：蒙德/自身 +10 档=基分；非蒙德 +20 档=双倍（docs/07-势力机制/蒙德.md；
+                        // 延奏技能资产 EnergyGain 原子按目标档产出，估值同构镜像）
+                        value += mondOrSelf ? EnsoEnergyTransferScore : EnsoEnergyTransferScore * 2;
                         break;
                 }
             }

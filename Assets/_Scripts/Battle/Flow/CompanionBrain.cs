@@ -522,20 +522,24 @@ namespace GIC.Battle
         /// 支援型骨架多一个候选类别：技能携带治疗原子时估有效治疗并入评分（估「奶谁」而非只「打谁」）。
         /// E-1 对手建模（docs/active/33 §2.3）：threat=威胁图（配额脑操魔神档传——攻击候选吃反威胁分、
         /// 移动候选落点吃避险扣分；伙伴脑不传=null 零行为变化——拍板 #4 威胁图暂只接配额脑）。
+        /// isPlayerDirectControl（AI-1 批，2026-10-12 拍板「AI 玩家操控严格对齐真人」）：玩家配额直接
+        /// 操控的候选门槛镜像——true 时体力减免 5 与真人 HUD 同口径（StaminaAmountOf 层级门=仅
+        /// Companion 生效，魔神档传 true 计价不变）；伙伴脑自主路径=false 维持不减免。
         /// </summary>
         public static void ScoreUnitCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile,
-            OpponentThreatModel.ThreatMap threat = null, TeamIntentBoard board = null)
+            OpponentThreatModel.ThreatMap threat = null, TeamIntentBoard board = null,
+            bool isPlayerDirectControl = false)
         {
             if (unit == null || tracker == null) return;
             profile ??= NeutralProfile;
             // 攻击档先跑并回报「本单位是否有攻击/增益候选」（2026-10-02 挂机修复：驻位判定用
             // per-unit 候选存在性——配额脑共享 tracker，勿用 tracker.Best 判定〔那是全场最优〕）
             bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
-                tracker, staminaPoolOverride, profile, threat, board);
+                tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl);
             ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
-                profile, hasActionCandidate, threat, board);
+                profile, hasActionCandidate, threat, board, isPlayerDirectControl);
         }
 
         /// <summary>①攻击技能候选（战技/爆发）：预判与结算形态同源（WouldHitEnemyInDirection）；评分=逐目标
@@ -545,7 +549,7 @@ namespace GIC.Battle
         private static bool ScoreAttackCandidates(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile,
-            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board)
+            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board, bool isPlayerDirectControl)
         {
             var skills = unit.Skills;
             var from = sim.GetPosition(unit);
@@ -563,8 +567,9 @@ namespace GIC.Battle
                 if (!skill.CanCast(unit)) continue; // 占位技能跳过——凛冽轮舞/闪耀奇迹未实装不可施放
 
                 // 消耗门槛（统一消耗模型 C-2）：costs 全条目镜像 Host 判定（体力按施法者层级换算；
-                // 决策期虚拟池透传——伙伴决策不超额承诺）
-                if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _, staminaPoolOverride)) continue;
+                // 决策期虚拟池透传——伙伴决策不超额承诺；isPlayerDirectControl=配额直接操控减免口径）
+                if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _, staminaPoolOverride,
+                        isPlayerDirectControl)) continue;
 
                 // 单位指向型爆发（B-3 ② 首个=芭芭拉闪耀奇迹）：无方向域——目标估值档（复苏优先/增益次之）
                 if (data.IsUnitTargeted())
@@ -799,11 +804,13 @@ namespace GIC.Battle
         private static void ScoreMoveCandidate(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker,
             int? staminaPoolOverride, UnitConfig.CompanionProfile profile, bool hasActionCandidate,
-            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board = null)
+            OpponentThreatModel.ThreatMap threat, TeamIntentBoard board = null,
+            bool isPlayerDirectControl = false)
         {
-            if (!ResourceGate.HasAll(sim, unit, playerId, MoveExecutor.GetMoveCosts(unit), out _, staminaPoolOverride))
+            if (!ResourceGate.HasAll(sim, unit, playerId, MoveExecutor.GetMoveCosts(unit), out _, staminaPoolOverride,
+                    isPlayerDirectControl))
             {
-                return; // 移动消耗（C-2 costs 单源；体力按层级换算+虚拟池）
+                return; // 移动消耗（C-2 costs 单源；体力按层级换算+虚拟池+直接操控减免口径）
             }
 
             var from = sim.GetPosition(unit);

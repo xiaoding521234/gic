@@ -279,17 +279,18 @@ namespace GIC.Battle
 
             // 单位级行动域校验（D 批次操控分层，docs/active/32 §1/§4；2026-10-12 拍板伙伴技能解锁）：
             // 眷属=AI 域（启发式脑自主，不占配额不走玩家通道）；**伙伴=玩家可直接操控**（移动/战技/爆发
-            // 上交标记 isPlayerDirectControl=true，体力减免 5；势力技能号令通道维持不变）；
-            // 魔神=玩家全手操（现行行为）。UI 侧技能盘层级门控（D-5）为第一道，此处 Host 权威
-            // 兜底（B7 LAN 客户端可凭空上交，双保险）
+            // 上交标记 isPlayerDirectControl=true，体力减免 5）；**势力技能号令同标（AI-1 批接线，
+            // 2026-10-12 拍板口径「延奏号令 0→−5 获得体力」——延奏/契约资产无体力条目，计价侧零变化；
+            // SkillExecutor 伙伴势力技能津贴消费此旗标）**；魔神=玩家全手操（现行行为）。
+            // UI 侧技能盘层级门控（D-5）为第一道，此处 Host 权威兜底（B7 LAN 客户端可凭空上交，双保险）
             var tier = BattleHeuristics.TierOf(unit);
             if (tier == UnitTier.Familiar)
             {
                 GICLog.Warn($"[TurnFlow] 眷属 {action.unitId} 不接受玩家上交行动（启发式脑自主决策），忽略");
                 return;
             }
-            // 伙伴技能已解锁（2026-10-12）：玩家可直接操控伙伴移动/战技/爆发，标记 isPlayerDirectControl
-            if (tier == UnitTier.Companion && !IsFactionSkillAction(unit, action))
+            // 伙伴技能已解锁（2026-10-12）：玩家可直接操控伙伴全部行动（含势力技能号令），标记 isPlayerDirectControl
+            if (tier == UnitTier.Companion)
                 action.isPlayerDirectControl = true;
 
             // 每玩家每回合 1 个行动：首份定稿（重复上交已在入口忽略——完成选择定死拍板）
@@ -318,18 +319,6 @@ namespace GIC.Battle
 
             if (_resolveCoroutine != null) StopCoroutine(_resolveCoroutine);
             _resolveCoroutine = StartCoroutine(ResolveTurnRoutine(actions));
-        }
-
-        /// <summary>行动是否为势力技能（号令通道，docs/active/32 §4）：Skill 类型且技能槽为
-        /// Enso/Contract——眷属技能表本无势力技能条目=天然无眷属号令，无需额外防线</summary>
-        private static bool IsFactionSkillAction(Unit unit, ActionData action)
-        {
-            if (action.actionType != ActionType.Skill) return false;
-            var skill = action.skillIndex >= 0 && action.skillIndex < unit.Skills.Count
-                ? unit.Skills[action.skillIndex]
-                : null;
-            var skillType = skill?.RawData?.skillType ?? SkillType.Talent;
-            return skillType == SkillType.Enso || skillType == SkillType.Contract;
         }
 
         private IEnumerator ResolveTurnRoutine(List<ActionData> actions)

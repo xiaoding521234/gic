@@ -146,7 +146,9 @@ namespace GIC.Battle
         /// <summary>Stamina 条目实际扣值（层级换算唯一出口，docs/active/32 §5.2）：声明值=基准/校验值
         /// （全技能资产按魔神基准 10 声明，编辑器校验行防漂移），实际扣值=施法者层级表
         /// （眷属 0/伙伴 5/魔神 10）。**玩家直接操控伙伴时减免 5（2026-10-12 拍板）**——可减免为负数
-        /// （负值=获得体力）；AI 自主/号令不减免。HUD 置灰镜像（BattleHud.HasSkillResources）与 AI 脑门槛同读此口径。</summary>
+        /// （负值=获得体力）；AI 伙伴自主不减免。伙伴势力技能号令同带旗标（AI-1 批）——延奏/契约
+        /// 资产无体力条目=本函数恒不触，其「0→−5 获得体力」由 SkillExecutor 号令津贴实现。
+        /// HUD 置灰镜像（BattleHud.HasSkillResources）与 AI 脑门槛同读此口径。</summary>
         private static int StaminaAmountOf(Unit actor, int declaredAmount, bool isPlayerDirectControl = false)
         {
             if (actor == null) return declaredAmount; // 无行动单位（理论不可达）：按声明值
