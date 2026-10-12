@@ -300,19 +300,25 @@ namespace GIC.Battle
                 }
             }
 
-            // F-1 威胁图接伙伴脑（兑现 E 批拍板 #4，范围=支援型，docs/active/34 §5.2）：检出支援型
-            // 在场才构建（每回合至多一次——无支援型零成本；输出型 threat=null 路径恒不变=复测基线）。
-            // 支援型消费=既有 E-1 评分点自动生效（移动落点避火线/攻击反威胁）——Ellie 站位哲学的
-            // 「不站刀口」维度（Gears Tactics WorldState 同语义的伙伴侧补全）
-            OpponentThreatModel.ThreatMap threat = null;
+            // 对手档案采集（AI-2 批，docs/active/42 §4/§11）：各玩家已提交配额行动 → 攻击性占比
+            // 样本（已交选择=非隐私，信息红线①合规；消费侧随 AI-3 外交层激活）
+            OpponentProfiler.ObserveTurnActions(sim, playerActions, turnNumber);
+
+            // 威胁图接伙伴脑（AI-2 批消费点扩展，docs/active/42 §11）：**全伙伴**（输出型+支援型）
+            // 走位避险接线——移动落点避火线 −12（ThreatPenaltyAt 既有原语）+攻击反威胁分
+            // （ThreatResponseBonus——拆威胁源优先）。**每在场队伍一张图**（Build 按队伍视角——
+            // 替代 F-1「首支援型单图全队共享」的跨队视角缺陷：双队各有支援型时旧版第二队消费
+            // 的是对方视角图）；E-1 拍板 #4「威胁图暂只接配额脑」就此由 AI 批设计蓝图全面取代
+            // （F-1 的支援型先行接入=本批的前身，范围=支援型 docs/active/34 §5.2）。
+            // 构建成本=每队 ms 级（§14 性能预算；有伙伴在场才建=无伙伴零成本）
+            var threatByTeam = new Dictionary<TeamType, OpponentThreatModel.ThreatMap>();
             foreach (var kv0 in sim.Units)
             {
                 var u0 = kv0.Value;
                 if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
-                if (u0.RawData?.行为档案?.候选类别 != UnitConfig.CompanionRole.Support) continue;
-                threat = OpponentThreatModel.Build(sim, snapshot, sim.GetTeamOf(
-                    u0.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID), turnNumber);
-                break; // 支援型威胁图为全队共享（Build 不分我方玩家——敌方威胁对我队全体一致）
+                var id0 = u0.GetUnitComponent<UnitIdentity>();
+                if (id0 == null || threatByTeam.ContainsKey(id0.Team)) continue;
+                threatByTeam[id0.Team] = OpponentThreatModel.Build(sim, snapshot, id0.Team, turnNumber);
             }
 
             // I-A 申报遍（docs/active/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分
@@ -364,7 +370,8 @@ namespace GIC.Battle
                             ? Math.Max(0, sim.GetStamina(identity.OwnerPlayerID) - r2)
                             : (int?)null;
                         var tracker = new CandidateTracker();
-                        var unitThreat = isSupport ? threat : null;
+                        // AI-2：全伙伴消费本队威胁图（输出型+支援型同口径——走位避险/反威胁）
+                        var unitThreat = threatByTeam.TryGetValue(identity.Team, out var tMap) ? tMap : null;
                         ScoreUnitCandidates(sim, snapshot, unit, identity.OwnerPlayerID, identity.Team,
                             turnNumber, tracker, pool, profile, unitThreat, bidBoard);
                         if (tracker.Best == null) continue; // 无候选=不占名额
@@ -429,9 +436,8 @@ namespace GIC.Battle
                     : (int?)null;
                 var tracker = new CandidateTracker();
                 var profile = g.unit.RawData?.行为档案;
-                var unitThreat = profile != null && profile.候选类别 == UnitConfig.CompanionRole.Support
-                    ? threat
-                    : null;
+                // AI-2：全伙伴消费本队威胁图（执行遍同申报遍口径）
+                var unitThreat = threatByTeam.TryGetValue(g.team, out var tMap2) ? tMap2 : null;
                 ScoreUnitCandidates(sim, snapshot, g.unit, g.owner, g.team, turnNumber,
                     tracker, pool, profile, unitThreat, board);
                 if (tracker.Best == null) continue;

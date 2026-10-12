@@ -1154,6 +1154,9 @@ namespace GIC.Battle
         private IEnumerator PushSegmentAndWaitAck(Segment segment)
         {
             _flow.NotifySegmentPushed(segment.turnNumber, segment.sliceIndex);
+            // 对手档案采集（AI-2 批，docs/active/42 §4）：段命令流观察——Damage→元素习惯/最爱
+            // 目标/交战距离，Death(建筑)→核心摧毁事件账本（公开信息=全体客户端广播态，红线①合规）
+            OpponentProfiler.ObserveCommands(_sim, segment.commands, segment.turnNumber);
             _transport.HostSend(BattleMessageType.Segment, new SegmentMessage { segment = segment });
 
             // 等全体客户端 ack 或超时快进（本地单客户端）
