@@ -317,6 +317,9 @@ namespace GIC.UI
                 return;
             }
             _hud.Bind(_session, _board, cameraCtrl, Close);
+            // N0 浏览暂停（2026-10-13 决策六十七）：战斗内「设置/退出」确认弹窗由本屏持有（每次 Show 新实例、
+            // 关闭即自毁），开态经回调供 HUD 聚合——关闭路径多（确认/取消/ESC/点外）由 IsOpen 统一判定
+            _hud.RegisterExternalBrowseSource(() => _exitDialog != null && _exitDialog.IsOpen);
         }
 
         // ==================== 出生区分配（2026-10-11 联机批） ====================

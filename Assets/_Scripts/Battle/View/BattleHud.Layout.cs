@@ -15,7 +15,8 @@ namespace GIC.Battle
     /// - 槽寻址：布局槽=BattleHud.prefab 内画布下 Slots/{key}（槽内首子级=控件；加可拖件=prefab 加槽节点+AllLayoutKeys 加一行）
     /// - LayoutSlot：归一锚点 (u,v)、anchoredPosition=0、pivot 中心——拖拽=改锚、缩放=slot.localScale；
     ///   归一锚点跨视口比例不漂（比例锚点方案，docs/17 §7）；默认布局=槽上编辑器摆的锚点（解析时捕获）
-    /// - 编辑模式：_layoutEditing 门控全交互；倒计时冻结（TurnFlowController.SelectTimerPaused）；
+    /// - 编辑模式：_layoutEditing 门控全交互；倒计时冻结=N0 浏览暂停聚合通道（Update 轮询
+    ///   BrowseUiOpen→session.SelectTimerPaused，决策六十七——编辑开态即冻结源之一，多人局门控在 session 侧）；
     ///   拖拽/点选/缩放滑条 + 底部方案工具栏（恢复默认/方案一~三 保存+应用/完成；prefab 烘焙默认隐藏）
     /// - 持久化：SaveSettings.hudLayoutPresets（主存档 settings 分区，纯新增字段不升版）；
     ///   战斗启动按 activeHudLayout 应用激活方案
@@ -221,7 +222,8 @@ namespace GIC.Battle
             CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：编辑期全件强制可见，拖中卡须归位）
             ClosePopup();
             CloseHandCardDetail(); // 手牌卡详情随编辑态收口（统计面板随卡详情联动收——全屏遮罩让位编辑 UI）
-            _session.SelectTimerPaused = true; // 编辑期冻结选择倒计时（拍板 D1；session 门面=host 真停/client 冻本地倒数）
+            // 编辑期倒计时冻结不再直写：_layoutEditing 已入 BrowseUiOpen 聚合源，Update 每帧保持
+            // （N0 自动暂停通道，决策六十七——单人局真停/多人局不冻全场的门控在 BattleSession 侧）
 
             foreach (var def in _layoutWidgets)
                 def.plate.SetActive(true);
@@ -236,7 +238,6 @@ namespace GIC.Battle
         {
             if (!_layoutEditing) return;
             _layoutEditing = false;
-            _session.SelectTimerPaused = false;
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(false); // 隐藏回烘焙态（引用保留，重进即用）
             _executionPreview?.HideLayoutPlaceholder(); // 清编辑占位行（真实行在场不受影响——ShowLayoutPlaceholder 早退未建）
             HidePassiveLayoutPlaceholder();              // 清被动盘占位（真图标/占位互斥，2026-10-07）

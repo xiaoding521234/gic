@@ -325,6 +325,23 @@ namespace GIC.Battle
         private bool PopupOpen => _skillDetailView != null && _skillDetailView.skillDetailPanel != null
             && _skillDetailView.skillDetailPanel.activeSelf;
 
+        // ==================== N0 单人局浏览 UI 自动暂停（2026-10-13 决策六十七，docs/active/43 §10）====================
+
+        // 宿主（BattleScreen）登记的外部浏览源——战斗内「设置/退出」确认弹窗由宿主持有实例，开态经回调供本件聚合
+        private Func<bool> _externalBrowseOpen;
+
+        /// <summary>登记宿主侧浏览源开态（BattleScreen.BindHud 接线：退出确认弹窗）</summary>
+        internal void RegisterExternalBrowseSource(Func<bool> isOpen) => _externalBrowseOpen = isOpen;
+
+        /// <summary>浏览型 UI 聚合开态（自动暂停源）：布局编辑/退出确认（设置）/手牌卡详情（含全部
+        /// 数据面板）/技能详情弹窗——Update 每帧重估写入 session.SelectTimerPaused，打开期间持续保持
+        /// （跨阶段边界自洽：设置开着进选择阶段=倒计时冻结不偷跑）；单人局门控在 BattleSession 侧</summary>
+        private bool BrowseUiOpen => _layoutEditing
+            || HandCardDetailOpen
+            || (_handStatsPanel != null && _handStatsPanel.gameObject.activeInHierarchy)
+            || PopupOpen
+            || (_externalBrowseOpen != null && _externalBrowseOpen());
+
         // ==================== 绑定 ====================
 
         public void Bind(BattleSession session, BattleBoard board, BattleCameraController camera, Action onCloseBattle)
@@ -575,6 +592,12 @@ namespace GIC.Battle
             // 战斗 HUD 无键盘导航、选中态无用途，每帧清空（2026-09-26 空格快捷键接线）
             if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
                 EventSystem.current.SetSelectedGameObject(null);
+
+            // N0 单人局浏览 UI 自动暂停（决策六十七）：每帧重估写入（浏览源开着即保持；单人局门控在
+            // BattleSession.SelectTimerPaused——host 权威计时仅单人局真停，多人局打开不冻全场；
+            // 客户端本地显示冻结语义不变）
+            if (_session != null)
+                _session.SelectTimerPaused = BrowseUiOpen;
 
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
             UpdateAimHover(); // 点击式瞄准悬停格提亮（2026-10-06 拍板；Aiming+非拖动才有悬停）

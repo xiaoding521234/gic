@@ -65,12 +65,38 @@ namespace GIC.Battle
             : TurnFlowController.BattleClockStartMinutes
               + (TurnFlowController.BattleClockMinutesPerTurn * Mathf.Max(0, (Player?.LatestSnapshot?.turnNumber ?? 1) - 1));
 
-        /// <summary>布局编辑期冻结倒计时（host=真暂停；client=本地倒数冻结，host 计时不随之停）</summary>
+        /// <summary>需人工提交行动的玩家数（决策六十七 N0 自动暂停判据单源，docs/active/43 §10）：
+        /// Roster 非 AI 计数（Roster 空缺=本地调试双开 P1/P2 按 2 计）−沙盒空座（SandboxAutoPassPlayerId
+        /// 即时自动 Pass 无人操作）。==1=单人局（本地/LAN 单真人+AI/试招沙盒）——浏览 UI 打开即真停
+        /// 选择倒计时（冻结只影响 AI，无真人受损）。</summary>
+        public int HumanActorCount
+        {
+            get
+            {
+                int count = 0;
+                if (Roster != null)
+                {
+                    foreach (var s in Roster)
+                        if (!s.IsAI) count++;
+                }
+                else count = 2; // 调试直开（无名册）=双端双座
+                if (Sim != null && Sim.SandboxAutoPassPlayerId != null) count--;
+                return count;
+            }
+        }
+
+        /// <summary>单人局判据（浏览 UI 自动暂停生效口径，==需人工提交的玩家数为 1）</summary>
+        public bool IsSoloHumanGame => HumanActorCount == 1;
+
+        /// <summary>浏览 UI 冻结倒计时（N0 起兼作自动暂停通道，2026-10-13 决策六十七）：host=真暂停、
+        /// client=本地倒数冻结（host 计时不随之停）。**host 权威计时仅单人局冻结**（多人局打开浏览 UI
+        /// 不冻全场——倒计时照跑各端自担）；打开期间由 BattleHud.Update 每帧重估保持（跨阶段边界自洽）。
+        /// LAN 单真人=host 本人（房主恒真人）→单人局真停天然落在 host 侧。</summary>
         public bool SelectTimerPaused
         {
             set
             {
-                if (Flow != null) Flow.SelectTimerPaused = value;
+                if (Flow != null) Flow.SelectTimerPaused = value && IsSoloHumanGame;
                 if (Player != null) Player.ClientPhasePaused = value;
             }
         }
