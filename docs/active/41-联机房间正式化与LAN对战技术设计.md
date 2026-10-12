@@ -72,6 +72,8 @@
 
 UIText 2006 `Coop_AddAIPlayer`（增加AI玩家）/2007 `Coop_RemoveAI`（移除）；PopupText `Coop_NeedTwoTeams`/`Coop_TeamLimit`/`Coop_HostDisconnected`（自动大 id 续排）。五语言+域重载复验+CSV 重导（列序=既有表头：UIText=zh-Hans,en,ja,zh-TW,ru；PopupText=zh-Hans,zh-TW,en,ja,ru）。
 
+**AI 难度/人格词本地化（2026-10-13 挂账销案——选择器批 ×12+2 前缀标签）**：UIText 2008~2011 `AI_Difficulty_Apprentice/Rival/Grandmaster/Providence`（学徒/劲敌/棋圣/天理）+ 2012~2019 `AI_Persona_狂战士/守城者/经济家/指挥官/赌徒/交涉家/背叛者/侦察家`（**人格键=资产名=数据身份零漂移**——新人格=加资产+同键名加表项零代码）+ 2020/2021 `AI_Difficulty_Label`/`AI_Persona_Label`（难度/人格下拉前缀——超出 ×12 口径补齐：不本地化前缀则非中文玩家看到混合语言）。显示接线=PlayerRowView.LocalizeDifficulty/LocalizePersona（**表缺键回落中文兜底；人格数组=数据身份不再是显示文案**；「AI 玩家N」玩家名仍=运行时内容串先例不本地化）。五语言+域重载复验+zh-TW/ja 码位核验全过（ja 済=6E08 与 zh-TW 濟=6FDF、ja 渉=6E89 与 涉=6D89 两处易错字形分野正确）+CSV 重导（286 行）。
+
 ## 8. 复测清单（用户执行）
 
 见 docs/18 决策六十五条目尾。

@@ -109,17 +109,21 @@ namespace GIC.UI
                 {
                     // AI 行（2026-10-11 联机批）：名字下拉=AI 配置选择器（2026-10-12 选择器批扩）——
                     // 选项 0=名字（恒显示）、1..4=难度四档、5..12=八人格、13=移除（Kick 链对空连接已有守卫）。
-                    // 文案为运行时内容串（「AI 玩家N」命名同款先例——难度/人格词的本地化挂 docs/11）
+                    // 难度/人格词/前缀标签=UIText 本地化（AI_Difficulty_*/AI_Persona_* 2020/2021，Id 2008~2021；
+                    // 玩家名「AI 玩家N」仍=运行时内容串先例不本地化；人格数据身份=资产名中文名不动，
+                    // 显示名按 AI_Persona_{资产名} 查表）
                     var removeText = GetLocalizedString("Coop_RemoveAI");
+                    var difficultyLabel = GetLocalizedString("AI_Difficulty_Label");
+                    var personaLabel = GetLocalizedString("AI_Persona_Label");
                     var nameOptions = new List<TextEntry>
                     {
                         // 标题=名字+当前配置（行内即时可见；RefreshFromPlayerInfo 广播回刷）
-                        new TextEntry(null, $"{_player.PlayerName}（{AIDifficultyNames[(int)_player.AIDifficulty]}·{_player.AIPersona}）"),
+                        new TextEntry(null, $"{_player.PlayerName}（{LocalizeDifficulty(_player.AIDifficulty)}·{LocalizePersona(_player.AIPersona)}）"),
                     };
                     for (int d = 0; d < AIDifficultyNames.Length; d++)
-                        nameOptions.Add(new TextEntry(null, "难度: " + AIDifficultyNames[d]));
+                        nameOptions.Add(new TextEntry(null, difficultyLabel + ": " + LocalizeDifficulty((AIDifficulty)d)));
                     for (int p = 0; p < AIPersonaNames.Length; p++)
-                        nameOptions.Add(new TextEntry(null, "人格: " + AIPersonaNames[p]));
+                        nameOptions.Add(new TextEntry(null, personaLabel + ": " + LocalizePersona(AIPersonaNames[p])));
                     nameOptions.Add(new TextEntry(null, removeText));
 
                     nameDropdown.SetOptionsFromEntries(nameOptions);
@@ -165,12 +169,29 @@ namespace GIC.UI
         private const int AI_DIFF_BASE = 1;
         private const int AI_PERSONA_BASE = 5;
 
-        /// <summary>难度档显示名（与 AIDifficulty 枚举值序对齐）</summary>
+        /// <summary>难度档显示名（zh-Hans 兜底值；AIDifficulty 枚举值序对齐）</summary>
         private static readonly string[] AIDifficultyNames = { "学徒", "劲敌", "棋圣", "天理" };
 
-        /// <summary>人格原型名序（与 Resources/Configs/AI/Persona_{名} 资产对应；改人格资产集=同步此表+选项区索引）</summary>
+        /// <summary>人格原型名序（**数据身份**=与 Resources/Configs/AI/Persona_{名} 资产对应；
+        /// OnNameActionSelected 直接发此名经网络事件；改人格资产集=同步此表+选项区索引。
+        /// 显示名走本地化 LocalizePersona，此数组不再是显示文案）</summary>
         private static readonly string[] AIPersonaNames =
             { "狂战士", "守城者", "经济家", "指挥官", "赌徒", "交涉家", "背叛者", "侦察家" };
+
+        /// <summary>难度档显示名（UIText AI_Difficulty_{枚举名}，Id 2008~2011；表缺键回落中文兜底）</summary>
+        private string LocalizeDifficulty(AIDifficulty d)
+        {
+            var s = GetLocalizedString("AI_Difficulty_" + d);
+            return string.IsNullOrEmpty(s) ? AIDifficultyNames[(int)d] : s;
+        }
+
+        /// <summary>人格显示名（UIText AI_Persona_{资产名}，Id 2012~2019——键源=数据身份零漂移，
+        /// 新人格=加资产+同键名加表项即可；表缺键回落资产名=zh-Hans 同值）</summary>
+        private string LocalizePersona(string personaAssetName)
+        {
+            var s = GetLocalizedString("AI_Persona_" + personaAssetName);
+            return string.IsNullOrEmpty(s) ? personaAssetName : s;
+        }
 
         void InitSpawnDropdown()
         {

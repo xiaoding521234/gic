@@ -1103,6 +1103,62 @@ MonoBehaviour:
     m_Key: Coop_RemoveAI
     m_Metadata:
       m_Items: []
+  - m_Id: 2008
+    m_Key: AI_Difficulty_Apprentice
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2009
+    m_Key: AI_Difficulty_Rival
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2010
+    m_Key: AI_Difficulty_Grandmaster
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2011
+    m_Key: AI_Difficulty_Providence
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2012
+    m_Key: "AI_Persona_\u72C2\u6218\u58EB"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2013
+    m_Key: "AI_Persona_\u5B88\u57CE\u8005"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2014
+    m_Key: "AI_Persona_\u7ECF\u6D4E\u5BB6"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2015
+    m_Key: "AI_Persona_\u6307\u6325\u5B98"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2016
+    m_Key: "AI_Persona_\u8D4C\u5F92"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2017
+    m_Key: "AI_Persona_\u4EA4\u6D89\u5BB6"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2018
+    m_Key: "AI_Persona_\u80CC\u53DB\u8005"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2019
+    m_Key: "AI_Persona_\u4FA6\u5BDF\u5BB6"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2020
+    m_Key: AI_Difficulty_Label
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2021
+    m_Key: AI_Persona_Label
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

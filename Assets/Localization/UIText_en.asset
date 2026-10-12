@@ -1125,6 +1125,62 @@ MonoBehaviour:
     m_Localized: Remove
     m_Metadata:
       m_Items: []
+  - m_Id: 2008
+    m_Localized: Apprentice
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2009
+    m_Localized: Rival
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2010
+    m_Localized: Grandmaster
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2011
+    m_Localized: Providence
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2012
+    m_Localized: Berserker
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2013
+    m_Localized: Defender
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2014
+    m_Localized: Economist
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2015
+    m_Localized: Commander
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2016
+    m_Localized: Gambler
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2017
+    m_Localized: Negotiator
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2018
+    m_Localized: Traitor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2019
+    m_Localized: Scout
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2020
+    m_Localized: Difficulty
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2021
+    m_Localized: Persona
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
