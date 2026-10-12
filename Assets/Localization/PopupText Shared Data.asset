@@ -131,6 +131,10 @@ MonoBehaviour:
     m_Key: Coop_HostDisconnected
     m_Metadata:
       m_Items: []
+  - m_Id: 34736311475187716
+    m_Key: Battle_NotEnoughResources
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

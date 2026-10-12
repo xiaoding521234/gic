@@ -280,7 +280,8 @@ namespace GIC.Battle
         // ==================== 按单位的资源判定（面板行口径——与选中键口径同形不同源） ====================
 
         /// <summary>指定单位对该技能的资源门槛（与 HasSkillResources 同形——元能=该单位快照值、
-        /// 体力=该单位层级换算、摩拉/物品=本端缓存；面板行就地判各自单位）</summary>
+        /// 体力=该单位层级换算、摩拉/物品=本端缓存；面板行就地判各自单位）；
+        /// 2026-10-12 拍板伙伴技能解锁：玩家操控伙伴=体力减免 5（可减免为负数=获得体力），减免后 ≤0=门槛恒过</summary>
         private bool UnitHasSkillResources(SkillConfig.SkillData skillData, UnitState unit)
         {
             if (skillData == null || !skillData.HasCosts) return true;
@@ -289,9 +290,12 @@ namespace GIC.Battle
                 if (cost == null || cost.amount <= 0) continue;
                 if (cost.kind == CostKind.Stamina)
                 {
+                    var tier = TierOfUnit(unit);
                     int amount = unit != null
-                        ? UnitTierHelper.StaminaCostOf(TierOfUnit(unit))
+                        ? UnitTierHelper.StaminaCostOf(tier)
                         : cost.amount; // 无状态兜底按声明值（理论不可达）
+                    // 玩家操控伙伴=体力减免 5（2026-10-12 拍板，可减免为负数=获得体力）
+                    if (tier == UnitTier.Companion) amount -= 5;
                     if (amount > 0 && _myStamina < amount) return false;
                     continue;
                 }

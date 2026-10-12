@@ -1790,6 +1790,35 @@ namespace GIC.Battle
                 return false;
             }
 
+            // 资源不足拦截（2026-10-12 拍板：技能键始终可点击进瞄准，资源不足在落地时拦截）——
+            // 玩家域键（魔神/伙伴）资源不足时弹 toast 并阻止提交；AI 域键（眷属）已被上行防线拦截
+            if (!isMove && _aimDef != null)
+            {
+                var skillData = GetSelectedSkillData(_aimDef);
+                if (skillData != null && !HasSkillResources(skillData))
+                {
+                    GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 技能资源不足");
+                    ShowBattleToast("Battle_NotEnoughResources");
+                    return false;
+                }
+            }
+            else if (isMove)
+            {
+                // 移动消耗=移动技能 costs 或常量兜底（与 ApplyMoveButton 同口径）
+                var moveSkill = GetSelectedSkillData(SkillType.Move);
+                bool moveResourcesOk = moveSkill != null
+                    ? HasSkillResources(moveSkill)
+                    : _myStamina >= (SelectedUnitTier() == UnitTier.Companion
+                        ? UnitTierHelper.StaminaCostOf(UnitTier.Companion) - 5
+                        : UnitTierHelper.StaminaCostOf(SelectedUnitTier()));
+                if (!moveResourcesOk)
+                {
+                    GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 移动体力不足");
+                    ShowBattleToast("Battle_NotEnoughResources");
+                    return false;
+                }
+            }
+
             var action = new ActionData
             {
                 playerId = _myPlayerId,
@@ -1845,10 +1874,10 @@ namespace GIC.Battle
             return true;
         }
 
-        /// <summary>操控防线判定单出口（2026-09-29 追拍：点格/拖拽落格/提交三触点同判定同文案）：
-        /// 返回 null=玩家可操作上交（己方魔神全键/己方伙伴势力技能键=号令入口）；否则返回拦截
-        /// toast 键——敌方（含队友）Battle_NotYourUnit / 眷属 Battle_MinorUnit / 伙伴非势力技能
-        /// Battle_Autonomous（键均在 PopupText 表）</summary>
+        /// <summary>操控防线判定单出口（2026-09-29 追拍：点格/拖拽落格/提交三触点同判定同文案；
+        /// 2026-10-12 拍板伙伴技能解锁——伙伴不再拦截）：
+        /// 返回 null=玩家可操作上交（己方魔神全键/己方伙伴全键/己方伙伴势力技能键=号令入口）；否则返回拦截
+        /// toast 键——敌方（含队友）Battle_NotYourUnit / 眷属 Battle_MinorUnit（键均在 PopupText 表）</summary>
         private string GetSelectionBlockToastKey(UnitState sel)
         {
             if (sel.playerId != _myPlayerId) return "Battle_NotYourUnit";
@@ -1857,7 +1886,6 @@ namespace GIC.Battle
             var selTier = sel.tier != 0 ? (UnitTier)sel.tier
                 : UnitTierHelper.FromStars(TryGetUnitData(sel.unitName)?.starLevel ?? 1);
             if (selTier == UnitTier.Familiar) return "Battle_MinorUnit";
-            if (selTier == UnitTier.Companion && (_aimDef == null || !_aimDef.IsFaction)) return "Battle_Autonomous";
             return null;
         }
 
@@ -2919,8 +2947,9 @@ namespace GIC.Battle
         ///   瞄准格直观看到技能范围、可留待定金格；操控权拦截在提交时轻弹窗=SubmitAim 防线，
         ///   2026-09-29 拍板）；
         /// ②「资源不足」（HasSkillResources 门槛，元能/体力=消耗值随快照刷新，体力按层级换算镜像）——
-        ///   玩家域键（己方魔神全键/己方伙伴势力键）=interactable 拦截+**整键变暗**（图标/底板/圆环
-        ///   统一乘暗系数——2026-10-04 拍板「不止图标」）；**己方眷属/伙伴的 AI 域键同样整键置暗**
+        ///   玩家域键（己方魔神全键/己方伙伴全键）=**interactable 保持 true**（2026-10-12 拍板：即便技能
+        ///   未满足释放条件也允许点击，只在落地时拦截——与 AI 域键交互模式统一）+**整键变暗**（图标/底板/圆环
+        ///   统一乘暗系数——2026-10-04 拍板「不止图标」）；**己方眷属的 AI 域键同样整键置暗**
         ///   （AI 当前也用不了=信息层，不拦 interactable 保持可查看）——与 45% 半透明同键叠加；
         ///   查看态（敌方单位）无消耗语义不灰（拍板不变）；
         /// ③「资源进度」底面填充（2026-10-06 拍板）——元能/摩拉/物品消耗键底面按 min(持有/需求)
@@ -2945,7 +2974,9 @@ namespace GIC.Battle
                 {
                     bool playerDomain = IsSelectedPlayerDomain(def.type);
                     bool resourcesOk = !playerDomain || HasSkillResources(data);
-                    selectButton.interactable = data != null && resourcesOk;
+                    // 2026-10-12 拍板：即便技能未满足释放条件也允许点击（进瞄准查看范围），
+                    // 只在落地时拦截——与 AI 域键交互模式统一
+                    selectButton.interactable = data != null;
                     conditionDimmed = data != null && !resourcesOk;
                 }
             }
@@ -2965,13 +2996,14 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>该技能键是否受层级门控（D-5，docs/active/32 §8）：眷属/伙伴的 移动/战技/爆发 键=
-        /// AI 域（置灰+角标）；势力技能键（延奏/契约）豁免=号令入口对伙伴开放；魔神选中恒不门控（全亮）</summary>
+        /// <summary>该技能键是否受层级门控（D-5，docs/active/32 §8；2026-10-12 拍板伙伴技能解锁）：
+        /// 眷属的 移动/战技/爆发 键=AI 域（置灰）；**伙伴不再置灰**（玩家可直接操控，体力减免 5）；
+        /// 势力技能键（延奏/契约）豁免=号令入口对伙伴开放；魔神选中恒不门控（全亮）</summary>
         private bool IsTierGatedButton(SkillButtonDef def)
         {
             if (def == null || def.IsFaction) return false;
             var tier = SelectedUnitTier();
-            return tier == UnitTier.Familiar || tier == UnitTier.Companion;
+            return tier == UnitTier.Familiar;
         }
 
         /// <summary>层级门控视觉：半透明置灰（懒建 CanvasGroup；不透明度 45%——2026-10-04 拍板
@@ -3042,20 +3074,25 @@ namespace GIC.Battle
         /// **C-2 起消耗全量迁移完成：costs 空=免费技能**（无消耗语义，数据即事实）；
         /// 体力条目按**选中单位层级换算**镜像（D 批次操控分层 docs/active/32 §5.2——实际扣值=施法者
         /// 层级表 眷属0/伙伴5/魔神10，声明值=基准/校验值；与 ResourceGate.StaminaAmountOf 同口径）；
+        /// **2026-10-12 拍板伙伴技能解锁：玩家操控伙伴=体力减免 5（可减免为负数=获得体力），
+        /// 减免后 ≤0=门槛恒过**；
         /// 非体力条目持有量走 HeldResourceAmount 单源（与底面进度填充 SkillResourceProgress 共用）；
         /// 旧 EnergyCost 参数/体力类型分档双查已退役</summary>
         private bool HasSkillResources(SkillConfig.SkillData skillData)
         {
             if (skillData == null || !skillData.HasCosts) return true; // 免费技能/空数据
             var selUnitData = GetSelectedUnitData();
+            var selTier = SelectedUnitTier();
             foreach (var cost in skillData.costs)
             {
                 if (cost == null || cost.amount <= 0) continue;
                 if (cost.kind == CostKind.Stamina)
                 {
                     int amount = selUnitData != null
-                        ? UnitTierHelper.StaminaCostOf(SelectedUnitTier())
+                        ? UnitTierHelper.StaminaCostOf(selTier)
                         : cost.amount; // 无配置兜底按声明值（理论不可达）
+                    // 玩家操控伙伴=体力减免 5（2026-10-12 拍板，可减免为负数=获得体力）
+                    if (selTier == UnitTier.Companion) amount -= 5;
                     if (amount > 0 && _myStamina < amount) return false;
                     continue;
                 }
@@ -3205,20 +3242,25 @@ namespace GIC.Battle
                 def.nameText.AddEntry(moveTag.GetEntry());
             }
 
-            // 置灰两源（同 ApplySkillButton D-5 单源口径+2026-10-04 整键变暗扩展）：层级门控（眷属/伙伴的
-            // 移动=AI 域——45% 半透明、interactable 保持 true，点击/拖拽照常进瞄准查看——拦截在提交时轻弹窗）；
+            // 置灰两源（同 ApplySkillButton D-5 单源口径+2026-10-04 整键变暗扩展）：层级门控（眷属的
+            // 移动=AI 域——45% 半透明、interactable 保持 true，点击/拖拽照常进瞄准查看——拦截在提交时轻弹窗；
+            // 2026-10-12 拍板伙伴技能解锁——伙伴不再置灰）；
             // 资源门槛（移动消耗走移动技能 costs 镜像 HasSkillResources，无 Move 条目单位=常量兜底
-            // Host MoveExecutor.GetMoveCosts 同口径，体力按选中单位层级换算镜像 眷属0/伙伴5/魔神10）——
-            // 玩家域（己方魔神）拦截+整键变暗；己方眷属/伙伴的 AI 域键资源不足同置暗（可叠加）
+            // Host MoveExecutor.GetMoveCosts 同口径，体力按选中单位层级换算镜像 眷属0/伙伴5/魔神10；
+            // 伙伴玩家操控减免 5）——
+            // 玩家域（己方魔神+己方伙伴）拦截+整键变暗；己方眷属的 AI 域键资源不足同置暗（可叠加）
             bool tierGated = IsTierGatedButton(def);
             ApplyTierGateVisual(def, tierGated);
             bool conditionDimmed = false;
             if (def.view.selectButton != null)
             {
                 var selUnitDataFallback = GetSelectedUnitData();
+                var selTierFallback = SelectedUnitTier();
                 int fallbackStamina = selUnitDataFallback != null
-                    ? UnitTierHelper.StaminaCostOf(SelectedUnitTier())
+                    ? UnitTierHelper.StaminaCostOf(selTierFallback)
                     : BattleMetrics.StaminaCostPerAction;
+                // 玩家操控伙伴=体力减免 5（2026-10-12 拍板，可减免为负数=获得体力）
+                if (selTierFallback == UnitTier.Companion) fallbackStamina -= 5;
                 bool resourcesOk = move != null ? HasSkillResources(move)
                     : _myStamina >= fallbackStamina;
                 if (tierGated)
@@ -3229,7 +3271,9 @@ namespace GIC.Battle
                 else
                 {
                     bool playerDomain = IsSelectedPlayerDomain(SkillType.Move);
-                    def.view.selectButton.interactable = !playerDomain || resourcesOk;
+                    // 2026-10-12 拍板：即便技能未满足释放条件也允许点击（进瞄准查看范围），
+                    // 只在落地时拦截——与 AI 域键交互模式统一
+                    def.view.selectButton.interactable = true;
                     conditionDimmed = playerDomain && !resourcesOk;
                 }
             }

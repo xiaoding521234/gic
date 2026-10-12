@@ -138,6 +138,10 @@ MonoBehaviour:
     m_Localized: Lost connection to the host
     m_Metadata:
       m_Items: []
+  - m_Id: 34736311475187716
+    m_Localized: "Not enough resources"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

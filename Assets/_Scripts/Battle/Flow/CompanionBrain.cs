@@ -1979,7 +1979,8 @@ namespace GIC.Battle
         // ==================== 足迹与工具 ====================
 
         /// <summary>单位级行动的体力层级消耗（伙伴体力预留口径）：Move=移动技能 costs；
-        /// Skill=技能 costs；Stamina 条目按施法者层级换算（眷属 0/伙伴 5/魔神 10）</summary>
+        /// Skill=技能 costs；Stamina 条目按施法者层级换算（眷属 0/伙伴 5/魔神 10）；
+        /// 2026-10-12 拍板伙伴技能解锁：玩家直接操控伙伴=体力减免 5（可减免为负数=获得体力）</summary>
         private static int ActionStaminaCost(BattleSimState sim, ActionData action, Unit actor)
         {
             List<SkillCostEntry> costs = null;
@@ -1998,7 +1999,14 @@ namespace GIC.Battle
             foreach (var cost in costs)
             {
                 if (cost != null && cost.kind == CostKind.Stamina && cost.amount > 0)
-                    return UnitTierHelper.StaminaCostOf(BattleHeuristics.TierOf(actor));
+                {
+                    var tier = BattleHeuristics.TierOf(actor);
+                    int tierCost = UnitTierHelper.StaminaCostOf(tier);
+                    // 玩家直接操控伙伴=体力减免 5（2026-10-12 拍板，可减免为负数=获得体力）
+                    if (action.isPlayerDirectControl && tier == UnitTier.Companion)
+                        return tierCost - 5;
+                    return tierCost;
+                }
             }
             return 0;
         }

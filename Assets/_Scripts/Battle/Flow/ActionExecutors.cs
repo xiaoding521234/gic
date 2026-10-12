@@ -112,7 +112,8 @@ namespace GIC.Battle
             // ==================== 消耗段（统一消耗模型 C-2：全量迁移完成，双轨回落退役）====================
             // 消耗单源=SkillData.costs（docs/30）：先全查后全扣（多 cost 防「扣了体力才发现苹果不够」
             // ——任一不足=行动落空且不登记任何消耗）；**costs 空=免费技能**（无消耗语义，数据即事实）
-            if (!ResourceGate.HasAll(sim, attacker, action.playerId, skill.RawData?.costs, out var missing))
+            if (!ResourceGate.HasAll(sim, attacker, action.playerId, skill.RawData?.costs, out var missing,
+                    isPlayerDirectControl: action.isPlayerDirectControl))
             {
                 string missingDesc = missing.kind == CostKind.Item
                     ? missing.item.ToString()
@@ -123,7 +124,8 @@ namespace GIC.Battle
                             $"（{missingDesc}×{missing.amount}），行动落空");
                 return effects;
             }
-            ResourceGate.ChargeAll(sim, attacker, action.playerId, skill.RawData?.costs, effects);
+            ResourceGate.ChargeAll(sim, attacker, action.playerId, skill.RawData?.costs, effects,
+                isPlayerDirectControl: action.isPlayerDirectControl);
 
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
 

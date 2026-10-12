@@ -146,12 +146,14 @@ namespace GIC.Battle
                         // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
                         // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
                         var moveCosts = MoveExecutor.GetMoveCosts(unit);
-                        if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _))
+                        if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _,
+                                isPlayerDirectControl: action.isPlayerDirectControl))
                         {
                             GICLog.Info($"[TurnResolver] 单位 {action.unitId} 移动消耗不足，移动落空");
                             break;
                         }
-                        ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects);
+                        ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects,
+                            isPlayerDirectControl: action.isPlayerDirectControl);
                         movers.Add(mover);
                         AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
                         break;
@@ -371,12 +373,14 @@ namespace GIC.Battle
                     // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
                     // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
                     var moveCosts = MoveExecutor.GetMoveCosts(unit);
-                    if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _))
+                    if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _,
+                            isPlayerDirectControl: action.isPlayerDirectControl))
                     {
                         GICLog.Info($"[TurnResolver] 单位 {action.unitId} 移动消耗不足，移动落空");
                         break;
                     }
-                    ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects);
+                    ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects,
+                        isPlayerDirectControl: action.isPlayerDirectControl);
                     moverList.Add(mover);
                     MovementResolver.Resolve(_sim, moverList);
 

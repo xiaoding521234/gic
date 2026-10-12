@@ -277,10 +277,10 @@ namespace GIC.Battle
                 return;
             }
 
-            // 单位级行动域校验（D 批次操控分层，docs/active/32 §1/§4）：眷属=AI 域（启发式脑自主，
-            // 不占配额不走玩家通道）；伙伴=AI 域——玩家仅可**号令**（势力技能 Enso/Contract，占 1 配额），
-            // 移动/战技/爆发上交会与伙伴自主决策同单位双行动（双 mover 并发推进=移动翻倍/写回互踩），
-            // 拒绝；魔神=玩家全手操（现行行为）。UI 侧技能盘层级门控（D-5）为第一道，此处 Host 权威
+            // 单位级行动域校验（D 批次操控分层，docs/active/32 §1/§4；2026-10-12 拍板伙伴技能解锁）：
+            // 眷属=AI 域（启发式脑自主，不占配额不走玩家通道）；**伙伴=玩家可直接操控**（移动/战技/爆发
+            // 上交标记 isPlayerDirectControl=true，体力减免 5；势力技能号令通道维持不变）；
+            // 魔神=玩家全手操（现行行为）。UI 侧技能盘层级门控（D-5）为第一道，此处 Host 权威
             // 兜底（B7 LAN 客户端可凭空上交，双保险）
             var tier = BattleHeuristics.TierOf(unit);
             if (tier == UnitTier.Familiar)
@@ -288,11 +288,9 @@ namespace GIC.Battle
                 GICLog.Warn($"[TurnFlow] 眷属 {action.unitId} 不接受玩家上交行动（启发式脑自主决策），忽略");
                 return;
             }
+            // 伙伴技能已解锁（2026-10-12）：玩家可直接操控伙伴移动/战技/爆发，标记 isPlayerDirectControl
             if (tier == UnitTier.Companion && !IsFactionSkillAction(unit, action))
-            {
-                GICLog.Warn($"[TurnFlow] 伙伴 {action.unitId} 仅接受势力技能号令（评分制脑自主决策），忽略 {action.actionType}");
-                return;
-            }
+                action.isPlayerDirectControl = true;
 
             // 每玩家每回合 1 个行动：首份定稿（重复上交已在入口忽略——完成选择定死拍板）
             _pendingActions[action.playerId] = action;

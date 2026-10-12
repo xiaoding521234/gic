@@ -34,8 +34,10 @@ namespace GIC.Battle
         /// <param name="staminaPoolOverride">决策期虚拟体力池（可选；null=读 sim 实池）——
         /// CompanionBrain 预留口径：伙伴决策时按「实池−己方已提交行动消耗−先前已定伙伴消耗」判定，
         /// 防多伙伴对同一池超额承诺致后手落空（docs/active/32 §5.2「不出现选了落空」）</param>
+        /// <param name="isPlayerDirectControl">玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——
+        /// 玩家通过配额直接操控伙伴时体力减免 5，可减免为负数=获得体力；AI 自主/号令=false 不减免）</param>
         public static bool Has(BattleSimState sim, Unit actor, string playerId, SkillCostEntry cost,
-            int? staminaPoolOverride = null)
+            int? staminaPoolOverride = null, bool isPlayerDirectControl = false)
         {
             if (cost == null || cost.amount <= 0) return true;
             switch (cost.kind)
@@ -44,8 +46,8 @@ namespace GIC.Battle
                     return BattleSimState.HasEnoughEnergy(actor, cost.amount);
                 case CostKind.Stamina:
                 {
-                    int amount = StaminaAmountOf(actor, cost.amount);
-                    if (amount <= 0) return true; // 眷属 0=门槛恒过（层级表自然表达，豁免特判退役）
+                    int amount = StaminaAmountOf(actor, cost.amount, isPlayerDirectControl);
+                    if (amount <= 0) return true; // 眷属 0=门槛恒过；玩家操控伙伴减免后 ≤0=门槛恒过
                     if (staminaPoolOverride.HasValue) return staminaPoolOverride.Value >= amount;
                     return sim.HasEnoughStamina(playerId, amount);
                 }
@@ -74,10 +76,12 @@ namespace GIC.Battle
 
         /// <summary>
         /// 消耗登记（门槛已过）：向 effects 追加对应消耗效应（随片统一应用→命令产出→对账）。
-        /// Stamina 按层级换算后的实际值登记（眷属 0=跳过）。
+        /// Stamina 按层级换算后的实际值登记（眷属 0=跳过；玩家操控伙伴减免后 ≤0=跳过/负值=获得体力）。
         /// </summary>
+        /// <param name="isPlayerDirectControl">玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——
+        /// 玩家通过配额直接操控伙伴时体力减免 5，可减免为负数=获得体力；AI 自主/号令=false 不减免）</param>
         public static void Charge(BattleSimState sim, Unit actor, string playerId, SkillCostEntry cost,
-            List<BattleEffect> effects)
+            List<BattleEffect> effects, bool isPlayerDirectControl = false)
         {
             if (cost == null || cost.amount <= 0) return;
             switch (cost.kind)
@@ -88,9 +92,11 @@ namespace GIC.Battle
                     break;
                 case CostKind.Stamina:
                 {
-                    int amount = StaminaAmountOf(actor, cost.amount);
+                    int amount = StaminaAmountOf(actor, cost.amount, isPlayerDirectControl);
                     if (amount > 0)
                         effects.Add(new StaminaEffect(playerId, -amount));
+                    else if (amount < 0)
+                        effects.Add(new StaminaEffect(playerId, -amount)); // 负值=获得体力（2026-10-12 玩家操控伙伴减免）
                     break;
                 }
                 case CostKind.Mora:
@@ -114,13 +120,13 @@ namespace GIC.Battle
         /// </summary>
         public static bool HasAll(BattleSimState sim, Unit actor, string playerId,
             System.Collections.Generic.List<SkillCostEntry> costs, out SkillCostEntry missing,
-            int? staminaPoolOverride = null)
+            int? staminaPoolOverride = null, bool isPlayerDirectControl = false)
         {
             missing = null;
             if (costs == null) return true;
             foreach (var cost in costs)
             {
-                if (Has(sim, actor, playerId, cost, staminaPoolOverride)) continue;
+                if (Has(sim, actor, playerId, cost, staminaPoolOverride, isPlayerDirectControl)) continue;
                 missing = cost;
                 return false;
             }
@@ -129,20 +135,27 @@ namespace GIC.Battle
 
         /// <summary>costs 全条目消耗登记（第二段：门槛全过后调用）</summary>
         public static void ChargeAll(BattleSimState sim, Unit actor, string playerId,
-            System.Collections.Generic.List<SkillCostEntry> costs, List<BattleEffect> effects)
+            System.Collections.Generic.List<SkillCostEntry> costs, List<BattleEffect> effects,
+            bool isPlayerDirectControl = false)
         {
             if (costs == null) return;
             foreach (var cost in costs)
-                Charge(sim, actor, playerId, cost, effects);
+                Charge(sim, actor, playerId, cost, effects, isPlayerDirectControl);
         }
 
         /// <summary>Stamina 条目实际扣值（层级换算唯一出口，docs/active/32 §5.2）：声明值=基准/校验值
         /// （全技能资产按魔神基准 10 声明，编辑器校验行防漂移），实际扣值=施法者层级表
-        /// （眷属 0/伙伴 5/魔神 10）。HUD 置灰镜像（BattleHud.HasSkillResources）与 AI 脑门槛同读此口径。</summary>
-        private static int StaminaAmountOf(Unit actor, int declaredAmount)
+        /// （眷属 0/伙伴 5/魔神 10）。**玩家直接操控伙伴时减免 5（2026-10-12 拍板）**——可减免为负数
+        /// （负值=获得体力）；AI 自主/号令不减免。HUD 置灰镜像（BattleHud.HasSkillResources）与 AI 脑门槛同读此口径。</summary>
+        private static int StaminaAmountOf(Unit actor, int declaredAmount, bool isPlayerDirectControl = false)
         {
             if (actor == null) return declaredAmount; // 无行动单位（理论不可达）：按声明值
-            return UnitTierHelper.StaminaCostOf(BattleHeuristics.TierOf(actor));
+            var tier = BattleHeuristics.TierOf(actor);
+            int tierCost = UnitTierHelper.StaminaCostOf(tier);
+            // 玩家直接操控伙伴=体力减免 5（2026-10-12 拍板，可减免为负数=获得体力）
+            if (isPlayerDirectControl && tier == UnitTier.Companion)
+                return tierCost - 5;
+            return tierCost;
         }
 
         // ==================== AnyItem 匹配原语（Host 判定与效应应用共用） ====================

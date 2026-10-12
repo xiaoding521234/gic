@@ -76,6 +76,11 @@ namespace GIC.Data
         /// <summary>部署落点</summary>
         public BattleCell deployCell;
 
+        /// <summary>玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——玩家通过配额直接操控伙伴
+        /// 移动/战技/爆发时标记 true，ResourceGate 体力换算据此减免 5（可减免为负数=获得体力）；
+        /// AI 伙伴自主行动/号令通道=false 不减免。默认 false 序列化兼容旧存档</summary>
+        public bool isPlayerDirectControl;
+
         public override string ToString()
         {
             return $"[ActionData {playerId}/{unitId} {actionType} turn={turnNumber}" +
