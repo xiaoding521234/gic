@@ -25,6 +25,13 @@ namespace GIC.Tool
         public string globalSuffix = "";
         public bool skipEmpty = true;
 
+        [Header("左右最大宽度限制")]
+        [Tooltip("0=不限制；>0 时文本超宽按比例缩小字号（单行语义——TMP 自带 Auto Size 的宽度收敛在折行分支内，不折行时超宽不缩字，勿改用）")]
+        public float 最大宽度 = 0f;
+        [Tooltip("缩字下限=基准字号×此倍率；到达下限仍超宽则照常溢出")]
+        public float 最小字号倍率 = 0.5f;
+        private float _基准字号 = -1f;
+
         public TMP_Text textComponent;
         private Dictionary<string, string> resolvedValues = new Dictionary<string, string>();
         private List<LocalizedString.ChangeHandler> _activeHandlers = new();
@@ -338,6 +345,21 @@ namespace GIC.Tool
                 finalText = textProcessor(finalText);
 
             textComponent.text = finalText;
+            if (最大宽度 > 0f) ApplyWidthLimit();
+        }
+
+        /// <summary>单行左右最大宽度限制（2026-10-13 决策六十四追拍）：以首次生效时的字号为基准，
+        /// preferredWidth 超过 最大宽度 即按比例缩字（下限=基准×最小字号倍率，仍超宽则照常溢出）。
+        /// 勿改用 TMP 自带 Auto Size——其宽度收敛位于折行分支（TMPro_UGUI_Private.GenerateTextMesh），
+        /// 不折行模式下超宽不触发任何缩字。</summary>
+        private void ApplyWidthLimit()
+        {
+            if (textComponent == null) return;
+            if (_基准字号 < 0f) _基准字号 = textComponent.fontSize;
+            textComponent.fontSize = _基准字号;
+            float w = textComponent.preferredWidth;
+            if (w > 最大宽度)
+                textComponent.fontSize = Mathf.Max(_基准字号 * 最小字号倍率, _基准字号 * 最大宽度 / w);
         }
 
         void OnDestroy()

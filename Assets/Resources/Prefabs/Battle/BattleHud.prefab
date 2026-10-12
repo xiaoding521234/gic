@@ -163,6 +163,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -756,6 +758,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -923,6 +927,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -1090,6 +1096,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -1286,6 +1294,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 3168699698934328933}
   references:
     version: 2
@@ -1632,6 +1642,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -2338,6 +2350,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -2413,7 +2427,7 @@ MonoBehaviour:
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
-  m_sharedMaterial: {fileID: 2100000, guid: b3c6d821b9d5a4449b2ba1a9071ef983, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 91b3f561bfd51d9498ca299d43a63960, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -2505,6 +2519,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 260
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -2863,6 +2879,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -3096,6 +3114,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -4075,6 +4095,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -4150,7 +4172,7 @@ MonoBehaviour:
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
-  m_sharedMaterial: {fileID: 2100000, guid: b3c6d821b9d5a4449b2ba1a9071ef983, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 91b3f561bfd51d9498ca299d43a63960, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4242,6 +4264,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 260
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -4409,6 +4433,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -4790,6 +4816,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -6080,6 +6108,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -6683,6 +6713,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -7396,6 +7428,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -7677,6 +7711,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -7920,6 +7956,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -8383,6 +8421,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -9248,6 +9288,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -11154,6 +11196,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -11747,6 +11791,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -12201,6 +12247,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -12397,6 +12445,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -12630,6 +12680,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -13117,7 +13169,7 @@ MonoBehaviour:
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
-  m_sharedMaterial: {fileID: 2100000, guid: b3c6d821b9d5a4449b2ba1a9071ef983, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 91b3f561bfd51d9498ca299d43a63960, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -13209,6 +13261,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 260
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -14994,6 +15048,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -15893,6 +15949,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -16402,6 +16460,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -16914,7 +16974,7 @@ MonoBehaviour:
   m_enableAdvanceTextProcess: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ae92b2313842dac4c9b23dbc8ea48d8e, type: 2}
-  m_sharedMaterial: {fileID: 2100000, guid: b3c6d821b9d5a4449b2ba1a9071ef983, type: 2}
+  m_sharedMaterial: {fileID: 2100000, guid: 91b3f561bfd51d9498ca299d43a63960, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -17006,6 +17066,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 260
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -17578,6 +17640,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -19205,6 +19269,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
