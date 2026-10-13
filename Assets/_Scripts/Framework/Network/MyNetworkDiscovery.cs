@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using UnityEngine;
 using Mirror;
@@ -61,10 +62,33 @@ namespace GIC.Framework
 
         public void StartBroadcast()
         {
-            if (NetworkServer.active)
+            if (!NetworkServer.active)
+            {
+                GICLog.Warn("[MyNetworkDiscovery] StartBroadcast 跳过：NetworkServer 未激活（房间对发现客户端不可见）");
+                return;
+            }
+
+            try
             {
                 AdvertiseServer();
                 GICLog.Info("[MyNetworkDiscovery] 开始广播房间信息");
+            }
+            catch (Exception ex)
+            {
+                // 47777 绑定失败此前会炸断 StartHost 整链（TryStartHostOnPort 吞掉后端口连跳），
+                // 而 ServerListenAsync 又静默吞错——结果=房间建起来了但发现服务死亡，外部全搜不到且零日志。
+                // 自愈：清掉残留监听再试一次；仍失败则记日志保命（房间可用，仅不可发现）。
+                GICLog.Error($"[MyNetworkDiscovery] 发现服务绑定失败: {ex.Message}——清残留后重试");
+                try { serverUdpClient?.Close(); } catch (Exception) { }
+                try
+                {
+                    AdvertiseServer();
+                    GICLog.Info("[MyNetworkDiscovery] 重试后开始广播房间信息");
+                }
+                catch (Exception ex2)
+                {
+                    GICLog.Error($"[MyNetworkDiscovery] 发现服务重试仍失败（房间将不可被发现）: {ex2.Message}");
+                }
             }
         }
 
@@ -100,36 +124,80 @@ namespace GIC.Framework
         }
 
         /// <summary>
-    /// 获取所有可能的局域网IP（IPv4 + 非回环）
+    /// 获取本机可扫描的局域网 IPv4（2026-10-13 LAN 双机复测修复：手机开热点+蜂窝时笔记本建房
+    /// 手机搜不到——根因=旧 Dns.GetHostEntry(Dns.GetHostName()) 在 Android 上不可靠，常只回
+    /// 127.0.0.1 或蜂窝内网 IP（10.x）或直接抛异常→手机扫错网段/零扫描，笔记本收不到任何发现请求）。
+    /// 改用 NetworkInterface 枚举：up+IPv4+非回环，排除蜂窝/VPN/虚拟网卡（接口名与描述匹配
+    /// rmnet/ccmni/clat/tun/ppp/dummy/vmware/wsl 等——Windows 系统无此类名零影响；Android
+    /// 热点接口 ap0/swlan0/wlan1 与 STA wlan0 天然保留），全空时回落全量非回环 IPv4 保底再
+    /// 回落 Dns 法。热点主机与 STA 两形态同源覆盖。
     /// </summary>
     public List<string> GetAllLocalIPs()
     {
-        List<string> ips = new List<string>();
-        
+        List<string> lanIps = new List<string>();
+        List<string> allIps = new List<string>();
+
         try
         {
-            var host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (var ip in host.AddressList)
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
+                if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                // 排除蜂窝/VPN/虚拟网卡（Android 蜂窝=rmnet/联发科=ccmni/clat/VPN=tun/ppp；
+                // PC 虚拟网卡=VMware/WSL/Hyper-V/VirtualBox——扫它们纯属浪费且可能扫蜂窝计费网段）
+                string nameLower = (nic.Name + " " + nic.Description).ToLowerInvariant();
+                bool excluded = nameLower.Contains("rmnet") || nameLower.Contains("ccmni")
+                    || nameLower.Contains("clat") || nameLower.Contains("tun")
+                    || nameLower.Contains("ppp") || nameLower.Contains("dummy")
+                    || nameLower.Contains("vmware") || nameLower.Contains("wsl")
+                    || nameLower.Contains("vethernet") || nameLower.Contains("hyper")
+                    || nameLower.Contains("virtualbox") || nameLower.Contains("bluetooth");
+
+                foreach (var addr in nic.GetIPProperties().UnicastAddresses)
                 {
-                    ips.Add(ip.ToString());
+                    if (addr.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+                    if (IPAddress.IsLoopback(addr.Address)) continue;
+
+                    string ip = addr.Address.ToString();
+                    if (!allIps.Contains(ip)) allIps.Add(ip);
+                    if (!excluded && !lanIps.Contains(ip)) lanIps.Add(ip);
                 }
             }
         }
         catch (Exception ex)
         {
-            GICLog.Error($"[MyNetworkDiscovery] 获取IP失败: {ex.Message}");
+            GICLog.Error($"[MyNetworkDiscovery] NetworkInterface 枚举失败: {ex.Message}");
         }
-        
-        // 兜底
-        if (ips.Count == 0)
+
+        // 选结果：局域网候选优先 → 全量保底 → Dns 兜底
+        List<string> result = lanIps.Count > 0 ? lanIps : allIps;
+        if (result.Count == 0)
         {
-            ips.Add("127.0.0.1");
+            try
+            {
+                var host = Dns.GetHostEntry(Dns.GetHostName());
+                foreach (var ip in host.AddressList)
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
+                        result.Add(ip.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                GICLog.Error($"[MyNetworkDiscovery] 获取IP失败: {ex.Message}");
+            }
         }
-        
-        GICLog.Info($"[MyNetworkDiscovery] 本机所有局域网IP: [{string.Join(", ", ips)}]");
-        return ips;
+
+        // 终极兜底（保持旧契约：非空列表，UI 显示与扫描守卫依赖）
+        if (result.Count == 0)
+        {
+            result.Add("127.0.0.1");
+        }
+
+        GICLog.Info($"[MyNetworkDiscovery] 本机局域网IP: [{string.Join(", ", result)}]"
+            + (result != lanIps && allIps.Count > 0 ? $"（局域网候选为空，回落全量: [{string.Join(", ", allIps)}]）" : ""));
+        return result;
     }
 
     /// <summary>
@@ -205,19 +273,12 @@ namespace GIC.Framework
     }
 
         /// <summary>
-        /// 获取本机局域网 IP
+        /// 获取本机局域网 IP（建房后 UI 显示给玩家抄 IP 用）——复用 GetAllLocalIPs 单源：
+        /// 旧 Dns 法在 Android 上可能显示蜂窝 IP，别人照抄连不上（同取址修复，2026-10-13）
         /// </summary>
         public string GetLocalIPAddress()
         {
-            var host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (var ip in host.AddressList)
-            {
-                if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip))
-                {
-                    return ip.ToString();
-                }
-            }
-            return "127.0.0.1";
+            return GetAllLocalIPs()[0];
         }
 
         /// <summary>
@@ -283,6 +344,13 @@ namespace GIC.Framework
             catch (NotImplementedException)
             {
                 GICLog.Error($"Transport {transport} 不支持网络发现");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // 2026-10-13：上游 ServerListenAsync 只吞不记——这里不记的话，响应链任何异常
+                // 都表现为「房间静默不可见」（手机端实测整段零日志），排障无从下手。
+                GICLog.Error($"[MyNetworkDiscovery] 处理发现请求异常（本条不回包，继续监听）: {ex}");
                 throw;
             }
         }

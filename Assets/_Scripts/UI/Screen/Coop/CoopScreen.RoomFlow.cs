@@ -22,6 +22,14 @@ namespace GIC.UI
         // 建房中标志（防重复点击+锁退出；唯一写点=SetCreatingUI，池化复位在 OnShow）
         private bool _startingHost;
 
+        // 加入中标志（2026-10-13 联机修复批）：中央「正在加入」反馈+失败自动重试——
+        // 此前加入点击零反馈且 kcp 握手丢失时静默失败，用户只见「秒退」而无从判断
+        internal bool _joining;
+        private int _joinRetries;
+        private const int MAX_JOIN_RETRIES = 2;
+        private string _joinIp;
+        private int _joinPort;
+
         #region connManage
 
         private void StopCurrentConnection()
@@ -104,9 +112,92 @@ namespace GIC.UI
 
         void OnCreateRoomClick()
         {
-            if (_currentState == RoomState.Host || _startingHost) return;
+            if (_currentState == RoomState.Host || _startingHost || _joining) return;
             StartCoroutine(CreateRoomWithFeedback());
         }
+
+        #region joinFlow
+
+        /// <summary>
+        /// 加入流程入口（2026-10-13 联机修复批）：列表页转等待态（隐藏列表+中央「正在加入房间…」+
+        /// 禁建房；返回钮保留可点=取消加入）→ JoinRoom。失败（kcp 握手超时/丢失）经
+        /// OnClientDisconnected 自动重试 MAX_JOIN_RETRIES 次，仍败回列表+Coop_JoinFailed 提示。
+        /// 注意 _joining 在 JoinRoom 同步段之后再置位——JoinRoom 内 StopHost 的清场断连回调
+        /// 会同步触发 OnClientDisconnected，提前置位会被误判为加入失败。
+        /// </summary>
+        internal void StartJoinFlow(string ip, int port)
+        {
+            if (_startingHost || _joining || isClosing) return;
+            if (_currentState != RoomState.DisconnectedClient) return;
+
+            _joinIp = ip;
+            _joinPort = port;
+            StartCoroutine(JoinRoomWithFeedback());
+        }
+
+        private IEnumerator JoinRoomWithFeedback()
+        {
+            SetJoiningUI(true);
+            yield return null; // 先让反馈渲染一帧，再吃连接尖峰
+
+            _joining = true;
+            GIC.Framework.LanDebugFileLog.WriteLine($"[JoinFlow] 加入开始 → {_joinIp}:{_joinPort}（第 {_joinRetries + 1} 次尝试）");
+            _network.JoinRoom(_joinIp, _joinPort);
+
+            // 超时保险（2026-10-14 LAN 批：TCP 连接僵死/断开事件丢失时「正在加入」会永久卡死——
+            // OnClientDisconnected 驱动的重试链只在断开事件到达时才转，事件丢失=无出口）。
+            // 正常 TCP 连接 <1s、15s 仍未连接完成=本次尝试判失败走重试/失败路径
+            float deadline = Time.unscaledTime + JOIN_TIMEOUT_SECONDS;
+            while (_joining && !isClosing)
+            {
+                if (NetworkClient.isConnected) yield break; // 已连接：后续交给 OnClientConnected 流程
+                if (Time.unscaledTime >= deadline)
+                {
+                    GIC.Framework.LanDebugFileLog.WriteLine($"[JoinFlow] 超时（{JOIN_TIMEOUT_SECONDS}s）未连接：isConnected={NetworkClient.isConnected}——走失败路径");
+                    OnClientDisconnected(); // 复用断开失败路径（重试/toast），驱动一致性
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
+        private const float JOIN_TIMEOUT_SECONDS = 15f;
+
+        /// <summary>加入等待态 UI（镜像 SetCreatingUI 框架；返回钮保持可点——点击=取消加入，
+        /// 最坏等待≈(1+重试次数)×握手超时，不可无出口）。提示键归 _joining 专用 Coop_JoiningRoom，
+        /// 勿动 SetCreatingUI 的 _startingHost 语义</summary>
+        private void SetJoiningUI(bool joining)
+        {
+            var scroll = ServerListScrollView;
+            if (scroll != null) scroll.SetActive(!joining);
+            if (createRoomButton != null) createRoomButton.interactable = !joining;
+            if (leaveRoomButton != null) leaveRoomButton.interactable = true; // 加入中可点=取消
+
+            if (emptyRoomHintObj == null || _emptyRoomHint == null) return;
+            emptyRoomHintObj.gameObject.SetActive(true);
+            _emptyRoomHint.SetSingleEntry(new LocalizedString("UIText",
+                joining ? "Coop_JoiningRoom" : "SearchingServers"));
+        }
+
+        private void CancelJoin()
+        {
+            _joining = false;
+            CancelInvoke(nameof(RetryJoin));
+            // 用 LeaveRoom 全量拆线而非 DisconnectClient：后者只断「已连接」态，
+            // 未认证在途的握手（kcp 客户端）会在后台继续——成功后误把已取消的用户拉进房间
+            _network.LeaveRoom();
+            SetJoiningUI(false);
+            RefreshServers();
+        }
+
+        private void RetryJoin()
+        {
+            if (_startingHost || _joining || isClosing) return;
+            if (_currentState != RoomState.DisconnectedClient) return;
+            StartCoroutine(JoinRoomWithFeedback());
+        }
+
+        #endregion
 
         /// <summary>
         /// 建房流程（带中央反馈）：列表页转等待态（隐藏房间列表+中央显示「正在创建房间…」+锁退出）→
@@ -365,7 +456,7 @@ namespace GIC.UI
             switch (_currentState)
             {
                 case RoomState.DisconnectedClient:
-                    // 标准关闭模板：防重入 + Closing 锁 + 音乐恢复 + 退场动画 + PopToPrevious 收尾
+                    if (_joining) { CancelJoin(); break; } // 加入中返回=取消加入，不关界面
                     CloseScreen(PlayExitAnimation);
                     break;
                 case RoomState.Host:
@@ -385,6 +476,14 @@ namespace GIC.UI
 
         void OnClientConnected()
         {
+            if (_joining)
+            {
+                _joining = false;
+                _joinRetries = 0;
+                CancelInvoke(nameof(RetryJoin));
+                SetJoiningUI(false);
+            }
+
             if (!NetworkServer.active)
             {
                 SetRoomState(RoomState.ConnectedClient);
@@ -394,6 +493,28 @@ namespace GIC.UI
 
         void OnClientDisconnected()
         {
+            // 加入期断开（kcp 握手超时/丢失，实测手机端典型为 10s 握手超时静默断开）：
+            // 自动重试兜间歇性握手丢失（重启两端后一次成功的先例），仍败回列表+失败提示
+            if (_joining)
+            {
+                _joining = false;
+                if (_joinRetries < MAX_JOIN_RETRIES)
+                {
+                    _joinRetries++;
+                    GICLog.Warn($"[CoopScreen] 加入房间失败，1s 后自动重试（第 {_joinRetries}/{MAX_JOIN_RETRIES} 次）");
+                    SetJoiningUI(false);
+                    Invoke(nameof(RetryJoin), 1f);
+                    return;
+                }
+
+                GICLog.Error("[CoopScreen] 加入房间失败（重试耗尽），已返回房间列表");
+                SetJoiningUI(false);
+                RefreshServers();
+                PopupManager.Instance.ShowToast(new LocalizedString(
+                    GIC.Data.TableName.PopupText.ToString(), "Coop_JoinFailed"));
+                return;
+            }
+
             if (_currentState != RoomState.DisconnectedClient)
                 ReturnToDiscovery();
         }

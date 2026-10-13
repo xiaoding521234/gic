@@ -1,7 +1,6 @@
 ﻿// MyNetworkManager.cs - 网络管理器（用 connectionId 标识玩家）
 using UnityEngine;
 using Mirror;
-using kcp2k;
 using System;
 using GIC.Data;
 using GIC.Pet;
@@ -21,7 +20,10 @@ namespace GIC.Framework
         private bool _isIntentionalDisconnect = false;
 
         public MyNetworkDiscovery discovery;
-        private KcpTransport _kcpTransport;
+        // 传输端口访问统一走 PortTransport 接口（Telepathy TCP / Kcp UDP 均实现该接口）——
+        // 2026-10-13 LAN 批：局域网联机改用 Mirror 内建 Telepathy TCP 传输（Minecraft Java 同款哲学：
+        // TCP 三次握手对状态型中间盒天然友好，根治「服务端回包被手机侧状态拦截」类单向丢包，docs/14 §151）
+        private PortTransport _portTransport;
 
         // 自定义事件
         public event System.Action OnClientConnectedEvent;
@@ -42,15 +44,16 @@ namespace GIC.Framework
             base.Awake();
             gameObject.SetActive(true);
 
-            _kcpTransport = transport as KcpTransport;
-            if (_kcpTransport == null)
+            _portTransport = transport as PortTransport;
+            if (_portTransport == null)
             {
-                GICLog.Error("[MyNetworkManager] 传输组件不是 KcpTransport，请检查 NetworkManager 配置");
+                GICLog.Error("[MyNetworkManager] 传输组件未实现 PortTransport 接口（Telepathy/Kcp 均实现），请检查 NetworkManager 配置");
             }
 
             if (discovery == null)
                 discovery = GetComponent<MyNetworkDiscovery>();
 
+            LanDebugFileLog.InstallGlobalHook(); // vivo Android 16 锁 logcat——全局异常落盘为唯一取证通道
             Wargame.Instance.Context.Inject(this);
             _roomManager?.SetNetworkManager(this);
 
@@ -133,6 +136,7 @@ namespace GIC.Framework
 
             networkAddress = ip;
             SetPort(port);
+            LanDebugFileLog.WriteLine($"[JoinRoom] StartClient → {ip}:{port}（传输={transport?.GetType().Name}）");
             StartClient();
             GICLog.Info($"[MyNetworkManager] 正在加入房间: {ip}:{port}");
         }
@@ -144,17 +148,17 @@ namespace GIC.Framework
 
         private void SetPort(int port)
         {
-            if (_kcpTransport != null)
+            if (_portTransport != null)
             {
-                _kcpTransport.Port = (ushort)port;
+                _portTransport.Port = (ushort)port;
             }
         }
 
         public int GetCurrentPort()
         {
-            if (_kcpTransport != null)
+            if (_portTransport != null)
             {
-                return _kcpTransport.Port;
+                return _portTransport.Port;
             }
             return CurrentPort;
         }
@@ -199,11 +203,11 @@ namespace GIC.Framework
         {
             base.OnStartClient();
 
-            if (discovery != null)
-            {
-                discovery.StartDiscovering();
-            }
-
+            // 2026-10-13 修复：StartHost 时本回调在 OnStartServer 之后触发（本地客户端），
+            // StartDiscovering 内的 StopDiscovery 会把刚绑定的发现服务端套接字
+            // 关掉（此前全靠 WaitForHostStart 0.5s 后二次 StartBroadcast 复活，链路脆弱：
+            // 手机端实测房间对发现客户端完全不可见）。加入中的客户端也不该扫描——房间列表自己管理发现生命周期。
+            LanDebugFileLog.WriteLine($"[OnStartClient] active={Transport.active?.GetType().Name} addr={networkAddress}:{GetCurrentPort()} isConnected={NetworkClient.isConnected}");
             GICLog.Info("[MyNetworkManager] 客户端启动，正在连接...");
             GICLog.Info($"[MyNetworkManager]   目标地址: {networkAddress}:{GetCurrentPort()}");
         }
@@ -246,6 +250,7 @@ namespace GIC.Framework
         public override void OnClientConnect()
         {
             base.OnClientConnect();
+            LanDebugFileLog.WriteLine($"[OnClientConnect] 触发！服务器={NetworkServer.active}");
 
             // 提前注册 NetworkEventMessage handler，防止服务器在 OnStartClient 之前发消息
             NetworkClient.ReplaceHandler<NetworkEventMessage>(OnClientReceiveNetworkEvent);
@@ -280,6 +285,7 @@ namespace GIC.Framework
 
         public override void OnClientDisconnect()
         {
+            LanDebugFileLog.WriteLine($"[OnClientDisconnect] 触发！主动断开={_isIntentionalDisconnect} 被踢={_isKicked} 服务器={NetworkServer.active} 场景={GameScene.Instance?.CurrentScene}");
             GICLog.Info($"[MyNetworkManager] ========================================");
             GICLog.Info($"[MyNetworkManager] 与服务器断开连接");
             GICLog.Info($"[MyNetworkManager]   主动断开: {_isIntentionalDisconnect}");
