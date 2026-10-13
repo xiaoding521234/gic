@@ -135,7 +135,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 11001
-    m_Localized: Obtained from Wishes
+    m_Localized: Auto-placed at battle start
     m_Metadata:
       m_Items: []
   - m_Id: 11002
@@ -188,6 +188,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 10002
     m_Localized: Obtained from Wishes
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3012
+    m_Localized: Not yet obtainable
     m_Metadata:
       m_Items: []
   references:

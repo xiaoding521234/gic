@@ -1038,9 +1038,9 @@ namespace GIC.Battle
             }
             // J-4 伙伴推核心（2026-10-04 拍板「伙伴应当去推核心，攻击视野内没有其它敌人时」）：
             // 自身攻击视野内（GetEffectiveAttackVision 回落 5，眷属 v7 同口径）无普通敌单位（建筑不算
-            // 「其它敌人」）→ 敌协议核心（IsBuilding——现役唯一建筑=双方核心，眷属 v7 同识别）插队
-            // 锚序首直奔推进；视野内有普通敌=原最近敌锚序零变化。核心插在 lock 之后=无视野敌时推核心
-            // 优先于上回合锁定。
+            // 「其它敌人」）→ 敌方核心（IsCore tag 化 2026-10-13——协议核心/未来世界树同识别，
+            // 眷属 v7 同识别）插队锚序首直奔推进；视野内有普通敌=原最近敌锚序零变化。
+            // 核心插在 lock 之后=无视野敌时推核心优先于上回合锁定。
             int attackVisionJ4 = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;
             bool anyVisionEnemyJ4 = false;
             foreach (var e in enemyAnchors)
@@ -1052,7 +1052,7 @@ namespace GIC.Battle
             {
                 for (int ci = 0; ci < enemyAnchors.Count; ci++)
                 {
-                    if (!BattleHeuristics.IsBuilding(enemyAnchors[ci])) continue;
+                    if (!BattleHeuristics.IsCore(enemyAnchors[ci])) continue;
                     var coreJ4 = enemyAnchors[ci];
                     enemyAnchors.RemoveAt(ci);
                     enemyAnchors.Insert(0, coreJ4);

@@ -1159,6 +1159,10 @@ MonoBehaviour:
     m_Key: AI_Persona_Label
     m_Metadata:
       m_Items: []
+  - m_Id: 2022
+    m_Key: Coop_JoiningRoom
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

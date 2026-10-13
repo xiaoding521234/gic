@@ -115,10 +115,13 @@ namespace GIC.UI
             // 星级
             RefreshStars(raw.starLevel);
 
-            // 名称
+            // 名称（建筑无称号——2026-10-13 拍板「建筑不需要称号」，只显示名称，unitType 单一判据同口径）
             _cardName.ClearAllEntries();
-            _cardName.AddEntry(raw.GetTitleEntry());
-            _cardName.AddStaticEntry("·");
+            if (raw.unitType != UnitType.Building)
+            {
+                _cardName.AddEntry(raw.GetTitleEntry());
+                _cardName.AddStaticEntry("·");
+            }
             _cardName.AddEntry(raw.GetNameEntry());
 
             // 势力
@@ -130,15 +133,24 @@ namespace GIC.UI
             element.ClearAllEntries();
             element.AddEntry(raw.selfElement.GetEntry());
 
-            // 武器
-            weapon.ClearAllEntries();
-            weapon.AddEntry(raw.weaponType.GetEntry());
+            // 武器/移动行：建筑隐藏（2026-10-13 拍板「也隐藏」）；势力/元素行保留——
+            // 建筑可有势力（如西风大教堂=蒙德），协议核心无势力自然留空
+            bool isBuilding = raw.unitType == UnitType.Building;
+            if (weapon != null) weapon.gameObject.SetActive(!isBuilding);
+            if (move != null) move.gameObject.SetActive(!isBuilding);
 
-            // 移动
-            move.ClearAllEntries();
-            move.AddEntry(raw.normalMoveType.GetEntry());
-            move.AddEntry(new TextEntry(null, "："));
-            move.AddEntry(new TextEntry(null, raw.GetEffectiveMoveSpeed().ToString()));
+            if (!isBuilding)
+            {
+                // 武器
+                weapon.ClearAllEntries();
+                weapon.AddEntry(raw.weaponType.GetEntry());
+
+                // 移动
+                move.ClearAllEntries();
+                move.AddEntry(raw.normalMoveType.GetEntry());
+                move.AddEntry(new TextEntry(null, "："));
+                move.AddEntry(new TextEntry(null, raw.GetEffectiveMoveSpeed().ToString()));
+            }
 
             // 标签
             RefreshTagChips(raw, tagContainerFromCard);

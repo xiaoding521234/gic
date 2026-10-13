@@ -1353,6 +1353,7 @@ namespace GIC.Battle
             var prewarmClips = new List<VideoClip>(); // 动作片预热线（决策四十五）：本单位全部技能动作视频（含 Move）
             float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放）
             float hoverHeight = 0f; // UnitData.离地高度（2026-09-27 拍板：飞行/悬浮单位纸片人整体上浮）
+            float standForward = 0f; // UnitData.立牌前移（2026-10-14 拍板：俯视立牌视觉重心补偿，0=不移动）
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
                 _unitConfig.TryGetUnitData(unitName, out var unitData))
             {
@@ -1376,6 +1377,7 @@ namespace GIC.Battle
                     }
                 unitScale = unitData.额外缩放;
                 hoverHeight = unitData.离地高度;
+                standForward = unitData.立牌前移;
                 if (unitData.专属弹射物 != null) // per-unit 专属弹射物登记（2026-10-05 拍板；命中/消散/箭雨三路消费）
                     _customProjectiles[state.unitId] = (unitData.专属弹射物,
                         unitData.专属弹射物缩放 > 0f ? unitData.专属弹射物缩放 : 1f);
@@ -1390,7 +1392,7 @@ namespace GIC.Battle
             var view = UnitView.Create(_viewRoot, state.unitId, avatar, unitColor,
                 _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
                 (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
-                state.cylinderDiameter); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）
+                state.cylinderDiameter, standForward); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);

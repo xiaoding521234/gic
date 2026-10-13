@@ -135,6 +135,14 @@ MonoBehaviour:
     m_Key: Battle_NotEnoughResources
     m_Metadata:
       m_Items: []
+  - m_Id: 39536498689257472
+    m_Key: Coop_JoinFailed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39566126329966592
+    m_Key: Deck_BuildingNotAllowed
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

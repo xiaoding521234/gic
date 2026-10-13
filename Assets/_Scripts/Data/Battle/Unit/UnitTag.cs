@@ -107,6 +107,11 @@ namespace GIC.Data
         FastEnso = 5001,
         #endregion
 
+        #region system
+        [InspectorName("核心")]
+        Core = 7001,
+        #endregion
+
         #region difficulty
         [InspectorName("入门")]
         DifficultyBeginner = 6001,

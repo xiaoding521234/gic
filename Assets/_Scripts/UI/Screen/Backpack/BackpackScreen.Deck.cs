@@ -199,6 +199,14 @@ namespace GIC.UI
             }
             else
             {
+                // 建筑防线（协议核心批勘正 2026-10-13）：拍板=「不可加入卡组」而非背包隐藏——
+                // 背包可见后此入口失去隐藏挡板，显式拦截建筑卡入组（判据与 BattleHeuristics.IsBuilding 同口径）
+                if (IsBuildingCard(cardData))
+                {
+                    PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Deck_BuildingNotAllowed"));
+                    return;
+                }
+
                 if (GetCurrentDeckCount() < CardManager.MaxDeckSize)
                 {
                     saveManager.Modify(_ => cardData.AddToDeck(currentDeckId));
@@ -231,6 +239,14 @@ namespace GIC.UI
             var clip = unitData.voices.onGoWar.GetRandomClip();
             if (clip != null)
                 AudioManager.Instance?.PlayVoiceExclusive(clip);
+        }
+
+        /// <summary>是否建筑卡（不可入卡组防线：unitType 单一判据，与 BattleHeuristics.IsBuilding 同口径）</summary>
+        private bool IsBuildingCard(SaveCardData card)
+        {
+            if (card == null || card.id.cardType != Data.CardType.Unit) return false;
+            var unitData = unitConfig.GetUnitData(card.id.AsUnitName());
+            return unitData != null && unitData.unitType == UnitType.Building;
         }
 
         private void RefreshDeckPanel()

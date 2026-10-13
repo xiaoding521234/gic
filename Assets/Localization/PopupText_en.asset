@@ -139,7 +139,15 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 34736311475187716
-    m_Localized: "Not enough resources"
+    m_Localized: Not enough resources
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39536498689257472
+    m_Localized: Failed to join the room. Check the connection and try again
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39566126329966592
+    m_Localized: Buildings cannot be added to decks
     m_Metadata:
       m_Items: []
   references:

@@ -208,7 +208,8 @@ namespace GIC.Battle
             state.StaminaFloor = companionCount * 5 * 2;
 
             // ── 终局多玩家判据数据（§5.1「仅剩一个敌对玩家」）：核心存活的玩家数（队伍败北=全队
-            // 核心被摧毁，docs/07-00）——1v1 恒 1 敌对=走敌方核心濒破分支 ──
+            // 核心全灭，docs/07-00）——1v1 恒 1 敌对=走敌方核心濒破分支；核心身份=Core tag
+            // （2026-10-13 tag 化：每玩家按「全部核心存活」计，多核心时代语义自洽） ──
             int totalCoreOwners = 0, enemyCoreOwners = 0;
             {
                 var seen = new HashSet<string>();
@@ -216,7 +217,7 @@ namespace GIC.Battle
                 {
                     var unit = kv.Value;
                     var id = unit.GetUnitComponent<UnitIdentity>();
-                    if (id == null || unit.RawData == null || unit.RawData.unitType != UnitType.Building) continue;
+                    if (id == null || !BattleHeuristics.IsCore(unit)) continue;
                     if (BattleSimState.IsDead(unit) || !seen.Add(id.OwnerPlayerID)) continue;
                     totalCoreOwners++;
                     if (id.Team != team) enemyCoreOwners++;

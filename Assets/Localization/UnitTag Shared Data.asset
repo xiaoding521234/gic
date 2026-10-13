@@ -151,6 +151,10 @@ MonoBehaviour:
     m_Key: DifficultyExpert
     m_Metadata:
       m_Items: []
+  - m_Id: 7001
+    m_Key: Core
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

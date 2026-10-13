@@ -32,10 +32,6 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _units = new Dictionary<string, Unit>();
         private int _nextUnitId = 1;
 
-        /// <summary>协议核心登记（playerId → 核心 unitId；2026-09-29 拍板核心 Unit 化——
-        /// RegisterUnit 时按 UnitName 识别登记，胜负判据/部署基准/片末检查全走此单一登记）</summary>
-        private readonly Dictionary<string, string> _coreUnitIds = new Dictionary<string, string>();
-
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
 
@@ -286,13 +282,13 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>玩家核心位置（B6c 部署落点判定基准）。协议核心 Unit 化（2026-09-29 拍板）：
-        /// 真源=该玩家核心单位位置（核心免疫强制位移、永不移动，与出生区中心坐标恒等——换的是
-        /// 数据源正确性，未来核心位类技能/多地图不再依赖注册序）；无核心（装配异常防御）回落
-        /// 出生区中心代理（spawnCenters 与 PlayerIds 注册序同序）</summary>
+        /// <summary>玩家核心位置（B6c 部署落点判定基准）。核心 tag 化（2026-10-13）：真源=该玩家
+        /// 存活的核心单位位置（多核心取 unitId 升序首个；核心免疫强制位移、永不移动）；
+        /// 全部核心被击倒（战败已成立）或无核心（装配异常防御）回落出生区中心代理
+        /// （spawnCenters 与 PlayerIds 注册序同序）</summary>
         public BattleCell GetCorePosition(string playerId)
         {
-            var core = GetCoreUnit(playerId);
+            var core = GetLivingCore(playerId);
             if (core != null) return GetPosition(core);
             int index = _playerIds.IndexOf(playerId);
             if (index >= 0 && Map.spawnCenters != null && index < Map.spawnCenters.Count)
@@ -324,9 +320,9 @@ namespace GIC.Battle
             unit.GetUnitComponent<UnitIdentity>()?.SetIdentity(unitId, playerId, team);
             unit.GetUnitComponent<UnitGridPosition>()?.SetPosition(BoardType.MainWorld, position.ToVector2Int());
             _units[unitId] = unit;
-            // 协议核心登记（同玩家重复注册=后者覆盖——对局装配每玩家恰一枚，防御性取最新）
-            if (unit.RawData != null && unit.RawData.unitName == UnitName.ProtocolCore)
-                _coreUnitIds[playerId] = unitId;
+            // 核心身份已 tag 化（2026-10-13 拍板「所有持 核心 标签的单位全部被击倒才判战败」）——
+            // 胜负族改动态查询 Core tag，无注册表：未来世界树等新核心单位=UnitConfig 配 [核心] tag
+            // 零代码加入（旧 UnitName.ProtocolCore 单核心登记表已退役）
             // 命座登场 Buff 授予（B8 批：0命固有被动的 Buff 形态——芭芭拉「获得歌声之环」，
             // OnDeploy[ApplyBuff] 原子；随后的 BuildUnitState 携带 buffs，客户端零额外命令）
             ConstellationApplier.ApplyDeployBuffs(this, unit);
@@ -370,49 +366,112 @@ namespace GIC.Battle
             return false;
         }
 
-        // ==================== 协议核心（2026-09-29 拍板 Unit 化：HP/胜负判据/部署基准） ====================
+        // ==================== 核心（2026-09-29 Unit 化 → 2026-10-13 拍板 tag 化：所有持 核心 标签
+        // 的单位=胜负判据单位——同一玩家全部核心被击倒才判战败；动态查询无注册表，
+        // 未来世界树等新核心单位=UnitConfig 配 [核心] tag 零代码加入） ====================
 
-        /// <summary>玩家的核心单位（未登记返回 null）</summary>
-        public Unit GetCoreUnit(string playerId)
+        /// <summary>该玩家的全部核心单位（含尸体；按 unitId 升序稳定枚举）</summary>
+        public List<Unit> GetCoreUnits(string playerId)
         {
-            return _coreUnitIds.TryGetValue(playerId, out var unitId) ? GetUnit(unitId) : null;
+            var result = new List<Unit>();
+            foreach (var kv in _units)
+            {
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || id.OwnerPlayerID != playerId) continue;
+                if (BattleHeuristics.IsCore(kv.Value)) result.Add(kv.Value);
+            }
+            return result;
         }
 
-        /// <summary>该玩家的协议核心是否存活（未登记=视作存活，避免装配异常秒判负）</summary>
+        /// <summary>玩家的存活核心（无存活核心返回 null；多核心取 unitId 升序首个——
+        /// 与 GetCorePosition 同源语义：核心全灭后部署基准回落出生区中心代理）</summary>
+        public Unit GetLivingCore(string playerId)
+        {
+            Unit first = null;
+            string firstId = null;
+            foreach (var kv in _units)
+            {
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || id.OwnerPlayerID != playerId) continue;
+                if (!BattleHeuristics.IsCore(kv.Value) || IsDead(kv.Value)) continue;
+                if (first == null || string.Compare(kv.Key, firstId, StringComparison.Ordinal) < 0)
+                {
+                    first = kv.Value;
+                    firstId = kv.Key;
+                }
+            }
+            return first;
+        }
+
+        /// <summary>该玩家是否仍有存活核心（无任何核心单位=视作存活，避免装配异常秒判负）</summary>
         public bool HasLivingCore(string playerId)
         {
-            var core = GetCoreUnit(playerId);
-            return core == null || !IsDead(core);
-        }
-
-        /// <summary>全对局是否有任一已登记核心（装配异常判定：无核心对局回落旧全灭口径）</summary>
-        public bool HasAnyRegisteredCore() => _coreUnitIds.Count > 0;
-
-        /// <summary>任一已登记核心已被摧毁（片末检查：核心死→中断剩余片结算，胜负广播由
-        /// TurnFlowController 既有 CheckBattleOver 位置接住——docs/18 协议核心决策条）</summary>
-        public bool AnyCoreDestroyed()
-        {
-            foreach (var kv in _coreUnitIds)
+            foreach (var kv in _units)
             {
-                var core = GetUnit(kv.Value);
-                if (core != null && IsDead(core)) return true;
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || id.OwnerPlayerID != playerId) continue;
+                if (BattleHeuristics.IsCore(kv.Value) && !IsDead(kv.Value)) return true;
             }
             return false;
         }
 
-        /// <summary>队伍是否仍有存活的协议核心（多人：队内任一玩家的核心存活=该队未败；
-        /// 队内无已登记核心=视作未败——防御口径）</summary>
+        /// <summary>该玩家是否战败成立（2026-10-13 拍板「所有持 核心 标签的单位全部被击倒才判
+        /// 战败」）：曾注册核心单位 且 当前无存活核心；从未有核心=未败（装配异常防御口径）</summary>
+        public bool IsPlayerDefeated(string playerId)
+        {
+            bool anyCore = false;
+            foreach (var kv in _units)
+            {
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || id.OwnerPlayerID != playerId) continue;
+                if (!BattleHeuristics.IsCore(kv.Value)) continue;
+                anyCore = true;
+                if (!IsDead(kv.Value)) return false; // 仍有存活核心=未败
+            }
+            return anyCore; // 有过核心且无存活=败；从未有核心=未败
+        }
+
+        /// <summary>全对局是否存在任何核心单位（装配异常判定：无核心对局回落旧全灭口径）</summary>
+        public bool HasAnyRegisteredCore()
+        {
+            foreach (var kv in _units)
+                if (BattleHeuristics.IsCore(kv.Value)) return true;
+            return false;
+        }
+
+        /// <summary>任一玩家战败成立（片末检查：最后一枚核心被击倒的那一片末中断剩余片结算，
+        /// 胜负广播由 TurnFlowController 既有 CheckBattleOver 位置接住——单核心时代与旧
+        /// 「任一核心死即中断」逐点等价：每玩家恰一枚核心时全灭=该枚死）</summary>
+        public bool AnyCoreDestroyed()
+        {
+            var seen = new HashSet<string>();
+            foreach (var kv in _units)
+            {
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || !seen.Add(id.OwnerPlayerID)) continue;
+                if (IsPlayerDefeated(id.OwnerPlayerID)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>队伍是否仍有存活的核心（多人：队内任一玩家的核心存活=该队未败；
+        /// 队内无任何核心单位=视作未败——防御口径；队败=该队全部玩家的核心全灭）</summary>
         public bool TeamHasLivingCore(TeamType team)
         {
-            bool anyRegistered = false;
-            foreach (var kv in _coreUnitIds)
+            var seen = new HashSet<string>();
+            bool anyCore = false;
+            foreach (var kv in _units)
             {
-                if (GetTeamOf(kv.Key) != team) continue;
-                anyRegistered = true;
-                var core = GetUnit(kv.Value);
-                if (core != null && !IsDead(core)) return true;
+                var id = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (id == null || id.Team != team || !BattleHeuristics.IsCore(kv.Value)) continue;
+                if (seen.Add(id.OwnerPlayerID))
+                {
+                    anyCore = true;
+                    if (!IsDead(kv.Value)) return true; // 队内任一玩家有存活核心=未败
+                }
+                else if (!IsDead(kv.Value)) return true;
             }
-            return !anyRegistered;
+            return !anyCore;
         }
 
         // ==================== 位置查询 ====================

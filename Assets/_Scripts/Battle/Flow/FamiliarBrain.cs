@@ -114,7 +114,7 @@ namespace GIC.Battle
                 var enemies = BattleHeuristics.FindEnemiesByDistance(sim, unit);
                 Unit core = null;
                 foreach (var e in enemies)
-                    if (BattleHeuristics.IsBuilding(e)) { core = e; break; } // 现役唯一建筑=双方协议核心
+                    if (BattleHeuristics.IsCore(e)) { core = e; break; } // 敌方核心=tag 化（2026-10-13）：核心标签即永恒目标（协议核心/未来世界树同识别）
                 var selfPos = sim.GetPosition(unit);
                 int coreDist = core != null ? selfPos.ChebyshevTo(sim.GetPosition(core)) : int.MaxValue;
                 int attackVision = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;

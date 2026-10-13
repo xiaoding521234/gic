@@ -224,10 +224,10 @@ namespace GIC.Battle
                         case BattleCommandType.Death:
                         {
                             // 事件账本：核心摧毁=永久标记不衰减（§4「记仇是可依赖的长期行为」；
-                            // 归因=同段最近攻击者——建筑（协议核心族）死亡即记账）
+                            // 归因=同段最近攻击者——核心单位（Core tag，2026-10-13 tag 化：
+                            // 协议核心/未来世界树同记账）死亡即记账）
                             var victim = sim.GetUnit(cmd.targetUnitId);
-                            if (victim == null || victim.RawData == null
-                                || victim.RawData.unitType != UnitType.Building) break;
+                            if (victim == null || !BattleHeuristics.IsCore(victim)) break;
                             if (!lastDamageAttackerByVictim.TryGetValue(cmd.targetUnitId, out var killerId)) break;
                             var killerOwner = OwnerOf(sim, killerId);
                             var victimIdentity = victim.GetUnitComponent<UnitIdentity>();

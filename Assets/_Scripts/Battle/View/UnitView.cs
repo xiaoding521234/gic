@@ -453,10 +453,13 @@ namespace GIC.Battle
         /// <param name="hoverHeight">立牌离地高度（世界单位=格；UnitData.离地高度，2026-09-27 拍板新增）：
         /// 纸片人整体上浮——飞行/悬浮单位；底座圆盘留地面（受击圆柱可视化=视觉即判定不随浮空）；
         /// 头顶条锚点挂倾斜组随浮空同步抬高</param>
+        /// <param name="standForward">立牌前移（格；UnitData.立牌前移，2026-10-14 拍板新增）：倾斜组沿
+        /// billboard local -z（朝相机方向）平移——俯视视角立牌（协议核心塔）画面重心偏画布上部，
+        /// 格心摆放时俯角观察视觉偏格深处，正值拉近相机补偿；底座圆盘/判定恒留格心不动</param>
         public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color ownerColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, VideoClip idleVideo = null,
-            float hoverHeight = 0f, float cylinderDiameter = 0f)
+            float hoverHeight = 0f, float cylinderDiameter = 0f, float standForward = 0f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -472,9 +475,11 @@ namespace GIC.Battle
             // 血条/名字/Buff 行同挂此倾斜组（用户拍板：头顶信息随立牌同平面后仰）。
             // 离地高度（2026-09-27 拍板）：倾斜组整体上浮 hoverHeight——飞行/悬浮单位（安柏=0.5），
             // 底座圆盘是 root 子级不随浮空（受击圆柱可视化=视觉即判定，判定恒在地面格）
+            // 立牌前移（2026-10-14 拍板）：倾斜组沿 billboard local -z（朝相机）平移 standForward——
+            // 只动立牌体与头顶行，底座圆盘（受击圆柱可视化）恒留格心
             var avatarGo = new GameObject("AvatarTilt");
             avatarGo.transform.SetParent(root.transform, false);
-            avatarGo.transform.localPosition = new Vector3(0f, hoverHeight, 0f);
+            avatarGo.transform.localPosition = new Vector3(0f, hoverHeight, -standForward);
             avatarGo.transform.localRotation = Quaternion.Euler(tiltDegrees, 0f, 0f);
             view._tiltGroup = avatarGo.transform;
 

@@ -186,6 +186,10 @@ MonoBehaviour:
     m_Localized: Expert
     m_Metadata:
       m_Items: []
+  - m_Id: 7001
+    m_Localized: Core
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

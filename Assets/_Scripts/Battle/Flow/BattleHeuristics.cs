@@ -53,6 +53,14 @@ namespace GIC.Battle
         public static bool IsBuilding(Unit unit)
             => unit != null && unit.RawData != null && unit.RawData.unitType == UnitType.Building;
 
+        /// <summary>是否核心（2026-10-13 拍板「核心身份 tag 化」：所有持 核心 标签的单位=胜负判据
+        /// 单位——**同一玩家全部核心单位被击倒才判战败**；眷属/伙伴攻城目标、AI 守护与终局判据、
+        /// 核心摧毁记账全按此识别——未来世界树等新核心单位=UnitConfig 配 [核心] tag 零代码加入；
+        /// 与「建筑不参与行动」的 IsBuilding 判据正交（核心必是建筑、建筑未必是核心）</summary>
+        public static bool IsCore(Unit unit)
+            => unit?.RawData?.tags != null
+               && System.Array.IndexOf(unit.RawData.tags, GIC.Data.UnitTag.Core) >= 0;
+
         // ==================== 敌人查找 ====================
 
         /// <summary>

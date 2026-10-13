@@ -1181,6 +1181,10 @@ MonoBehaviour:
     m_Localized: Persona
     m_Metadata:
       m_Items: []
+  - m_Id: 2022
+    m_Localized: "Joining room\u2026"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

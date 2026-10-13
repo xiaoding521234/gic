@@ -1166,6 +1166,10 @@ MonoBehaviour:
     m_Localized: "\u4EBA\u683C"
     m_Metadata:
       m_Items: []
+  - m_Id: 2022
+    m_Localized: "\u30EB\u30FC\u30E0\u306B\u53C2\u52A0\u4E2D\u2026"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

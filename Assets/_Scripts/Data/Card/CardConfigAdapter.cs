@@ -41,6 +41,9 @@ namespace GIC.Data
         public BackpackTab GetBackpackTab() => _d?.unitType switch
         {
             UnitType.Creation => BackpackTab.Creation,
+            // 协议核心批勘正（2026-10-13）：拍板=「不可入卡组」而非背包隐藏——建筑归位「建筑」页签
+            // （该页签此前无任何来源映射恒空）
+            UnitType.Building => BackpackTab.Building,
             _ => BackpackTab.Character,
         };
 
