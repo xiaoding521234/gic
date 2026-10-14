@@ -40,6 +40,22 @@ namespace GIC.Framework
         {
             if (PetMode.Enabled) return; // 桌宠进程无 Wargame 上下文，跳过网络初始化（对象随场景切换销毁）
 
+#if UNITY_EDITOR
+            // 2026-10-15 LAN 第十二批（终极根因）：Mirror 构建期 [PostProcessScene] 会把「场景路径哈希」
+            // 打进场景物体 sceneId 高 32 位再烤进包（实测 gic01a APK 内 NEB sceneId=0xB97EAECEC3AF1A49）；
+            // 本机 Tuanjie 编辑器进 Play 不执行该步（探针实锤 live 高位恒 0）——编辑器 host 的 spawn 消息
+            // 携带无哈希 sceneId，构建客户端按「带哈希」键索引 → 永远 Spawn scene object not found →
+            // NEB 失活 → 客户端→服务器事件全 NRE（上游同型问题=Mirror issue #2519：编辑器↔独立端互连必炸）。
+            // 编辑器侧 Boot 加载时补打同一哈希（同函数同路径输入=确定一致、幂等）；构建内已烤好正确值
+            // 勿动（#if 隔离）。必须在 base.Awake() 之前——DDOL 会把子物体移出 Boot 场景、scene.path 失效。
+            foreach (var ni in FindObjectsOfType<Mirror.NetworkIdentity>(true))
+                if (Mirror.Utils.IsSceneObject(ni))
+                {
+                    ni.SetSceneIdSceneHashPartInternal();
+                    GICLog.Info($"[MyNetworkManager] 编辑器场景哈希补打: {ni.name} sceneId=0x{ni.sceneId:X}");
+                }
+#endif
+
             gameObject.SetActive(true);
             base.Awake();
             gameObject.SetActive(true);
@@ -247,10 +263,41 @@ namespace GIC.Framework
             base.OnServerDisconnect(conn);
         }
 
+        // 2026-10-15 LAN 第十四批终案：本 override（就绪即 RebuildObservers 补发）整体移除。
+        // ①占位玩家（第十三批）已让 Mirror 原生 replay 生效：AddPlayerForConnection→SetClientReady
+        //   →SpawnObserversForConnection 以「ObjectSpawnStarted→逐物体 spawn→ObjectSpawnFinished」
+        //   正确时序补发（ObjectSpawnStarted 先行触发客户端 PrepareToSpawnSceneObjects 建字典）。
+        // ②本 override 的 RebuildObservers→AddObserver→ShowForConnection 会**抢先**直发场景物体
+        //   （不带 ObjectSpawnStarted 前置包）——客户端此刻字典未建立→Spawn scene object not found；
+        //   且 AddObserver 已把连接抢注进 observers→原生 replay 循环到该物体时幂等 return 不再重发
+        //   →物体的 spawn 消息只发过一次（死在字典建立前）→NEB 永不激活。两批修复互相踩踏的实证：
+        //   01:22 会话 [SceneCensus] spawnableObjects.Count=0 + NEB 全部过滤条件通过却不在字典。
+
+        /// <summary>占位玩家对象（2026-10-15 LAN 第十三批）：本作无玩家棋子，但 Mirror 的标准生命周期
+        /// （SetClientReady 的 identity 门 → AddPlayerForConnection → 原生场景物体 replay）全部围绕
+        /// 「连接有玩家对象」设计（上游 issue #4083 佐证）——autoCreatePlayer=1 + 空 NetworkPlayer 占位
+        /// prefab（无渲染无逻辑不可见）让全链走 Mirror 原生流程，结构性绕开无玩家对象缺口。
+        /// 占位对象 DDOL：房间→战斗场景切换时不被卸载，避免 conn.identity 悬空。</summary>
+        public override void OnServerAddPlayer(NetworkConnectionToClient conn)
+        {
+            base.OnServerAddPlayer(conn);
+            if (conn.identity != null)
+                DontDestroyOnLoad(conn.identity.gameObject);
+        }
+
         public override void OnClientConnect()
         {
+            // 2026-10-15 LAN 第十一批勘正（真根因）：无玩家客户端的就绪上报其实由 base.OnClientConnect
+            // 完成——本作无 onlineScene → clientLoadedScene=false → base 自调 NetworkClient.Ready()。
+            // 但 Mirror 的 static NetworkClient.ready 跨会话残留不复位（同进程当过 host 后再 join、
+            // 断线重连均不清零——实测都会让 base 跳过上报 → 服务器 isReady 永假 → OnServerReady 补发
+            // 也进不去），故 base 前强制清零；原先 base 之后的显式 Ready() 是重复调用（报 already ready），移除。
+            if (!NetworkServer.active && NetworkClient.ready)
+                NetworkClient.ready = false;
+
             base.OnClientConnect();
-            LanDebugFileLog.WriteLine($"[OnClientConnect] 触发！服务器={NetworkServer.active}");
+
+            LanDebugFileLog.WriteLine($"[OnClientConnect] 触发！服务器={NetworkServer.active} ready={NetworkClient.ready}");
 
             // 提前注册 NetworkEventMessage handler，防止服务器在 OnStartClient 之前发消息
             NetworkClient.ReplaceHandler<NetworkEventMessage>(OnClientReceiveNetworkEvent);
@@ -273,14 +320,20 @@ namespace GIC.Framework
             _isKicked = false;
             _isIntentionalDisconnect = false;
 
-            // 客户端连接后发送自己的名称给服务器
-            if (!NetworkServer.active)
-            {
-                string myName = _saveManager?.CurrentSave?.playerName ?? "旅行者";
-                EventBusHub.Instance.Send(new SetPlayerNameRequestEvent { PlayerName = myName });
-            }
-
             OnClientConnectedEvent?.Invoke();
+        }
+
+        /// <summary>
+        /// 客户端场景网络物体激活完成（NetworkEventBus.OnStartClient 回调）——
+        /// 此时 netIdentity 已就绪，是客户端首发网络事件的最早安全点（名字上报）。
+        /// </summary>
+        public void OnNetworkSceneObjectsReady()
+        {
+            if (NetworkServer.active) return; // host 自己就是服务器，无需上报
+
+            LanDebugFileLog.WriteLine("[OnNetworkSceneObjectsReady] 场景网络物体已激活，上报玩家名");
+            string myName = _saveManager?.CurrentSave?.playerName ?? "旅行者";
+            EventBusHub.Instance.Send(new SetPlayerNameRequestEvent { PlayerName = myName });
         }
 
         public override void OnClientDisconnect()

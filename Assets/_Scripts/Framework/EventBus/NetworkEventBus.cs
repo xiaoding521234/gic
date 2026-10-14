@@ -48,6 +48,12 @@ namespace GIC.Framework
         {
             // client handler 统一在 MyNetworkManager.OnClientConnect 中注册
             // 此处不再重复注册，避免三重注册竞争
+
+            // 2026-10-14 LAN 终案：Mirror 构建期将场景 NetworkIdentity 物体失活（NetworkScenePostProcess），
+            // 纯客户端经 Ready→服务端 spawn 消息激活后才走到本回调——这是 netIdentity 就绪的最早点，
+            // 客户端的名字上报等首发网络事件须从这里触发（OnClientConnect 时点物体仍失活、必 NRE）
+            if (Mirror.NetworkManager.singleton is MyNetworkManager mnm)
+                mnm.OnNetworkSceneObjectsReady();
         }
 
         /// <summary>
