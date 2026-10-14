@@ -2162,3 +2162,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **修法**（BattleMapPreviewUI.Refresh）：①mapChanged 不再直接 RebuildTiles，改走**构建链** `BuildTilesWhenReadyRoutine`——逐帧 `FitSquareAspect` 等布局就绪（至多 4 帧）再 `RebuildTiles`+波纹；**布局已就绪时协程首段无 yield=同帧同步建成，常规路径行为不变**（切换地图/正常进房零差异）。②`TilesMissing()`（地图有格但格子层空）作为自愈判据：构建失败/协程被关面板腰斩后，同图刷新也会重进构建链。③`StartWave` 补 `!isActiveAndEnabled` 守卫（Snap 满尺寸返回）——顺带收口 LAN 第七批已知遗留「面板未激活仍 StartWave → Coroutine couldn't be started」（预览面板不可见时无波纹，下次可见+Refresh 自会重播）。
 
 **通用教训**：①**「动画接管初始态」的运行时建件（创建即 scale 0/alpha 0 类）+无兜底早退=静默缺失**——失败零痕迹（无日志无灰块），报障只能靠活体取证反推唯一退出路径；②**构建型缓存（_tileItems）必须带「缺失自愈」判据**，不能只认 mapChanged——一次性失败会被缓存判据永久固化；③涉局报障先跑只读探针再推理：`_map ok + 零格 + _side 事后有效` 的签名比读十遍代码快。
+
+## §154 战斗瞄准预览批三坑：部署瞄准立牌截胡分流 + IsLineSkill 未排 Move 潜伏缺陷 + ViewportPointToRay/ScreenPointToRay 单位混淆（2026-10-15 瞄准预览批实证）
+
+**① 部署瞄准立牌截胡（用户报障「部署点协议核心上面格子，悬停高亮上面格、点击却变成核心格」）**：OnBoardTap 的 PickPaperdollUnit 屏幕面片命中**优先于板面取格**（决策四十六「点立牌也能选中」）把点击目标重定向到**立牌单位所在格**——协议核心等高立牌画面伸入上方格，点上方格被截胡成核心格；而部署瞄准的**悬停高亮走板面取格**（UpdateAimHover 只用 TryPickBoardCell）→ 悬停/点击两口径不一致。修=部署态（`_deployAimUnit≠0`）点击一律板面取格（悬停同口径）；技能瞄准保留立牌优先（方向/移动=点敌立牌选该向同向无害、单位指向=点立牌直选、复苏=点尸体立牌直选）。**通则：立牌命中重定向是「选中/指定单位」语义的捷径，瞄准形态的语义是「选格」时（部署/未来落点类技能）重定向必须按形态关闭——同一点击入口跨形态复用时先问「这个形态下格与单位谁是语义主体」。**
+
+**② IsLineSkill 未排除 Move 的潜伏缺陷（箭头显示批自查踩中）**：`IsLineSkill(def)` 按**数据形态**判（`skillType≠Interact ∧ !IsUnitTargeted ∧ !IsSelfCast`）——`SkillType.Move=1` 三个条件全过！旧消费点全有 IsMove 前置（SetTip 三元的 def.IsMove 分支在前、SubmitAim 的外层 isMove if、拖动解析的 `IsMove||`）从未暴露；瞄准箭头显示批新消费点（ShowAimHighlights/RefreshAimArrowStates/UpdateAimHitPreview 直接吃 IsLineSkill）接入即把**移动瞄准也误判成直线技能**→移动会显示箭头而非逐格（拍板「移动保留不变」被破）。修=IsLineSkill 头部 `def==null || def.IsMove` 恒 false。**通则：按数据形态分类的谓词接新消费点前，必须核对该形态枚举全表（Move/Interact 这类「非战斗技能」型是否落在谓词域内）——旧消费点的隐式前置不是谓词本身的一部分。**
+
+**③ ViewportPointToRay vs ScreenPointToRay 单位混淆（相机视域钳制批自查抓）**：相机视域求取把 0~1 **视口**角坐标传进了 `TryGetPlanePoint`（内部 `ScreenPointToRay`=**像素**语义）→ 四个"角"全落在屏幕左下 1 像素区，钳制公式全盘失真。修=直接 `_camera.ViewportPointToRay(uv)`+平面求交。**通则（机器级）：Unity 两套 ray API 输入域不同（视口 0~1 vs 像素），复用既有 helper 前先核输入单位——helper 的参数名（screenPos）不等于输入语义（可能要视口坐标）。**
+
+附：本批相机视域钳制的可见范围公式——55° 俯视透视下视域对注视点**非对称**（近缘=屏幕下缘方向纵深小、远缘=上缘纵深大），四角射线交地面取 min/max 比三角函数推导稳（画幅/fov 变化零维护）；全界放不下（拉远）时回落把棋盘居中而非钳死（`minF>maxF` 倒挂=视域宽于棋盘+余量，任何注视点都越界，居中=屏幕利用率最优）。
+
+**④ 同序透明件的「包围盒中心距相机」排序=贴地长件的方向依赖翻车（2026-10-15 四轮拍板「渲染顺序问题统一解」）**：用户报障「安柏爆发下方向三角箭头渲染低于红色带」——带与头同为 sortingOrder 0 时，同序透明件按**渲染器包围盒中心到相机的距离**远→近排序：下方向带（长条，中心整体在 −Z）比第一格的头**更靠近相机**（相机在 −Z 侧）→ 带画在头之上；上/左/右方向带中心更远故不翻车=纯方向依赖。0.001 世界单位微抬敌不过整段长带的中心偏移（差 3 个数量级）。**统一解=项目既有「跨 renderer 透明序显式 sortingOrder」纪律（§123）的补全：贴地叠加件（叠在同平面长件上的小件）必须互异分层入 BattleMetrics 层表（AimOverlaySortingOrder=0 瞄准带与格/AimOverlayTopSortingOrder=2 箭头头），微抬/微缩类几何补丁一律不可靠**——「同序+几何微差」是隐性依赖相机方位的排序赌博。判定口诀：**「同平面上 A 该盖 B 却时有时无/分方向翻车」=同序距离排序病，先查 A/B 的 sortingOrder 是否相同**。

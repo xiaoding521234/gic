@@ -1290,6 +1290,22 @@ MonoBehaviour:
       \u043A \u043A\u043E\u043C\u043D\u0430\u0442\u0435\u2026"
     m_Metadata:
       m_Items: []
+  - m_Id: 9096
+    m_Localized: "\u0411\u043E\u0439"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9097
+    m_Localized: "\u0426\u0432\u0435\u0442 \u043F\u043E\u043B\u043E\u0441\u044B HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9098
+    m_Localized: "\u0426\u0432\u0435\u0442 \u0438\u0433\u0440\u043E\u043A\u0430"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9099
+    m_Localized: "\u0422\u0440\u0438 \u0446\u0432\u0435\u0442\u0430"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

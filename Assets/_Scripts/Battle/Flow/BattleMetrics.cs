@@ -77,6 +77,15 @@ namespace GIC.Battle
         /// <summary>底座环绕弧光（选中特效；瞄准贴片之上、立牌之下）</summary>
         public const int DiscOrbitSortingOrder = 1;
 
+        /// <summary>瞄准层：方向箭头带/瞄准格贴片（2026-10-15 四轮拍板显式化——旧默认 0）</summary>
+        public const int AimOverlaySortingOrder = 0;
+
+        /// <summary>瞄准层叠加件：方向箭头头（2026-10-15 四轮拍板「渲染顺序统一解」：同序透明件按
+        /// 包围盒中心距相机远近排序——贴地长带与叠加件同序时**方向依赖必翻车**〔下方向带中心比
+        /// 第一格的头更近相机=头被带盖住，0.001 微抬敌不过整段长带的中心偏移〕；**贴地叠加件一律
+        /// 显式分层排序号**，头恒在带之上〔槽位 2=弧光 1 与立牌 10 之间全层互异，零距离排序依赖〕）</summary>
+        public const int AimOverlayTopSortingOrder = 2;
+
         /// <summary>单位立牌（sprite 与视频 quad 同序——跨单位立牌遮挡排序语义一致）</summary>
         public const int AvatarSortingOrder = 10;
 

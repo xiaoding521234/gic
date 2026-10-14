@@ -124,6 +124,12 @@ namespace GIC.Battle
         private readonly List<Item> _items = new List<Item>();
         private readonly List<Item> _sortBuffer = new List<Item>();   // 深度排序复用（零逐帧分配）
 
+        /// <summary>血条填色解析器（2026-10-15 血条三色批，BattlePlayer 透传注入——HUD Bind 提供：
+        /// 读设置模式〔玩家色/三色〕+本端身份判定；null=未注入回落归属玩家色现行口径）。
+        /// **只消费血条填充色**——本层其余彩色件（命座徽章/Buff 描环/附着图标）与底座圆盘链路不动</summary>
+        private System.Func<UnitView, Color> _hpBarColorOf;
+        public void SetHpBarColorOf(System.Func<UnitView, Color> resolver) => _hpBarColorOf = resolver;
+
         /// <summary>初始化（确保画布+相机；幂等——重复调用不重建）</summary>
         public void Init(Camera cam)
         {
@@ -491,10 +497,11 @@ namespace GIC.Battle
 
             float totalH = 血条高 + 条间距 + 元能条高;
 
-            // 血条（容器 y=0 中线；填充色=归属玩家色——2026-10-12 拍板取代旧「队伍色」口径：
-            // 与底座同色链不变，2v2 同队队友单位异色可辨识）
+            // 血条（容器 y=0 中线；填充色=血条色解析器〔2026-10-15 三色批：玩家色模式=归属玩家色
+            // ——2026-10-12 拍板口径；三色模式（默认）=自己绿/队友蓝/敌红，参照王者荣耀〕；
+            /// 未注入（调试直开）回落归属玩家色现行口径——底座圆盘/描边/弧光链路不受本解析器影响）
             var hpBar = NewBar("HpBar", rootRect, new Vector2(0f, 0f), 血条宽, 血条高,
-                Palette.血条底, view.OwnerColor,
+                Palette.血条底, _hpBarColorOf != null ? _hpBarColorOf(view) : view.OwnerColor,
                 out var hpFill);
 
             // 元能条（血条下方；白色——2026-09-25 目检拍板）

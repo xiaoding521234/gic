@@ -46,7 +46,7 @@ namespace GIC.Battle
         [SerializeField] private float 拖动跟随余量格数 = 1f;
 
         [Header("边界")]
-        [Tooltip("注视点允许范围（棋盘半宽 7.5 + 余量 2，世界单位；2026-09-30 战场 20×20→15×15 两轮缩小同步，原 12）")]
+        [Tooltip("视域边界（世界单位；棋盘半宽 7.5 + 余量 2 格，2026-09-30 战场 15×15 同步值）。2026-10-15 拍板「自动居中加地图边界钳制」起语义=视野边缘允许到达的最远线：自动居中/拖动跟随的目标注视点按当前视域钳制，视野不越此线（视域宽于全界〔拉远看全景〕时回落把棋盘居中）；手动平移仍按注视点中心钳制（±此值）")]
         [SerializeField] private float _focusBounds = 9.5f;
 
         private Camera _camera;
@@ -252,7 +252,7 @@ namespace GIC.Battle
                     else
                     {
                         _followTweenActive = false;
-                        _focus = ClampFocus(target);
+                        _focus = ViewClampFocus(target); // 单位指向瞬移居中同过视域钳制（2026-10-15）
                         ApplyTransform();
                     }
                 }
@@ -283,9 +283,12 @@ namespace GIC.Battle
             ApplyTransform();
         }
 
-        /// <summary>发起/续接跟随补间：目标变化→from 当前注视点重启 0.5s 快进慢出；同目标进行中→不重启</summary>
+        /// <summary>发起/续接跟随补间：目标变化→from 当前注视点重启 0.5s 快进慢出；同目标进行中→不重启。
+        /// 目标先经 <see cref="ViewClampFocus"/> 视域钳制（2026-10-15 拍板「自动居中加地图边界钳制，
+        /// 留 2 格余量」：跟随角落单位时视野不再大半越出棋盘成虚空）</summary>
         private void BeginFollowTween(Vector2 target)
         {
+            target = ViewClampFocus(target);
             if (_followTweenActive && _followTweenTo == target) return; // 同目标续跑（勿反复重置进度）
             _followTweenFrom = _focus;
             _followTweenTo = target;
@@ -404,6 +407,61 @@ namespace GIC.Battle
         {
             focus.x = Mathf.Clamp(focus.x, -_focusBounds, _focusBounds);
             focus.y = Mathf.Clamp(focus.y, -_focusBounds, _focusBounds);
+            return focus;
+        }
+
+        // ==================== 视域边界钳制（2026-10-15 拍板「自动居中加地图边界钳制，可留 2 格余量」） ====================
+        // 旧 ClampFocus 只钳注视点中心（±9.5）——跟随/居中一个角落单位时中心虽在界内，视野却大半
+        // 越出棋盘成虚空（报障原话「屏幕大半都是虚空，没利用起来」）。新口径：按当前视轴距离实时求
+        // 视野在地面上的可见矩形（四角视线交 y=0 平面——55° 俯视透视下近缘/远缘非对称），把注视点
+        // 钳到「视野边缘不越 ±_focusBounds」；视域整条宽于全界（拉远到整盘入画）时无解，回落把
+        // 棋盘居中（视野对称罩满棋盘=屏幕利用率最优）。仅用于自动居中/拖动跟随目标——手动平移
+        // （拖拽/键盘）维持旧中心钳制自由探索。
+
+        private static readonly Vector3[] _viewCornerUVs =
+        {
+            new Vector3(0f, 0f), new Vector3(1f, 0f), new Vector3(1f, 1f), new Vector3(0f, 1f),
+        };
+
+        /// <summary>当前视野在地面（y=0 平面）上的可见范围：halfX=横向半宽（相对注视点，对称）；
+        /// nearExt/farExt=注视点到视域近缘（靠相机侧）/远缘的纵深（俯视透视下非对称）。
+        /// 视域形状只随视轴距离/俯角/画幅变化（平移不变），对任意注视点恒成立——按当前姿态一次求取即可。
+        /// false=任一角射线不与地面相交（理论不发生，兜底）</summary>
+        private bool TryGetViewGroundExtents(out float halfX, out float nearExt, out float farExt)
+        {
+            halfX = nearExt = farExt = 0f;
+            if (_camera == null) return false;
+            float minX = float.MaxValue, maxX = float.MinValue;
+            float minZ = float.MaxValue, maxZ = float.MinValue;
+            var plane = new Plane(Vector3.up, Vector3.zero);
+            for (int i = 0; i < _viewCornerUVs.Length; i++)
+            {
+                // 视口角（0~1）→ 射线（ViewportPointToRay——非像素坐标，勿走 TryGetPlanePoint/ScreenPointToRay）
+                var ray = _camera.ViewportPointToRay(_viewCornerUVs[i]);
+                if (!plane.Raycast(ray, out float enter) || enter <= 0f) return false;
+                var p = ray.GetPoint(enter);
+                minX = Mathf.Min(minX, p.x); maxX = Mathf.Max(maxX, p.x);
+                minZ = Mathf.Min(minZ, p.z); maxZ = Mathf.Max(maxZ, p.z);
+            }
+            halfX = (maxX - minX) * 0.5f;
+            nearExt = _focus.y - minZ; // 注视点→视域近缘（屏幕下缘一侧）
+            farExt = maxZ - _focus.y;  // 注视点→视域远缘（屏幕上缘一侧）
+            return true;
+        }
+
+        /// <summary>自动居中目标的视域钳制：视野边缘不越 ±_focusBounds（棋盘边界+余量 2 格）；
+        /// 某轴视域宽于全界（2×_focusBounds）时该轴无解，回落把棋盘居中（横轴=0，纵轴按近/远
+        /// 非对称取中——视野矩形对称罩住棋盘中线）。射线求取失败兜底旧中心钳制</summary>
+        private Vector2 ViewClampFocus(Vector2 focus)
+        {
+            if (!TryGetViewGroundExtents(out float halfX, out float nearExt, out float farExt))
+                return ClampFocus(focus);
+            float minX = -_focusBounds + halfX, maxX = _focusBounds - halfX;
+            focus.x = minX <= maxX ? Mathf.Clamp(focus.x, minX, maxX) : 0f;
+            float minZ = -_focusBounds + nearExt, maxZ = _focusBounds - farExt;
+            focus.y = minZ <= maxZ
+                ? Mathf.Clamp(focus.y, minZ, maxZ)
+                : (nearExt - farExt) * 0.5f; // 全界放不下：视野中点对齐棋盘中心
             return focus;
         }
 

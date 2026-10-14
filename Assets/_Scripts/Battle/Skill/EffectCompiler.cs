@@ -613,6 +613,21 @@ namespace GIC.Battle
 
         // ==================== 预判工厂（决策九 D5：预判/结算同形由 kind 强制） ====================
 
+        /// <summary>直线技能方向射程单源（格）：LineProjectile clip 优先（maxRange 0=回落
+        /// ProjectileRule.MaxRange），否则 LineBurst clip，再回落默认——与 <see cref="WouldHitEnemyInDirection"/>
+        /// 两分支的射程解析同式。消费方=HUD 直线瞄准臂长/箭头长度（2026-10-15 拍板「瞄准显示的距离
+        /// 应当和射出飞行物距离一致」：安柏双箭/箭雨 24、芭芭拉水球 5、凯亚霜袭 2、丘丘人挥棒 1）</summary>
+        public static int DirectionRangeOf(SkillTimelineAsset timeline)
+        {
+            var projClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile);
+            if (projClips.Count > 0)
+                return projClips[0].maxRange > 0 ? projClips[0].maxRange : ProjectileRule.MaxRange;
+            var burstClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst);
+            if (burstClips.Count > 0 && burstClips[0].maxRange > 0)
+                return burstClips[0].maxRange;
+            return ProjectileRule.MaxRange;
+        }
+
         /// <summary>方向命中预判按判定 kind 派发：LineProjectile=投射物圆柱接触静态形态、
         /// LineBurst/无轨=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）。
         /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2：casterTeam=施法者队伍，2v2 不再误伤判定队友）</summary>
@@ -623,10 +638,70 @@ namespace GIC.Battle
             if (projClips.Count > 0)
                 return WouldHitProjectile(map, snapshot, casterTeam, from, direction, projClips[0]);
 
-            var burstClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst);
-            int maxRange = burstClips.Count > 0 && burstClips[0].maxRange > 0
-                ? burstClips[0].maxRange : ProjectileRule.MaxRange;
-            return WouldHitLineSegments(map, snapshot, casterTeam, from, direction, maxRange);
+            return WouldHitLineSegments(map, snapshot, casterTeam, from, direction, DirectionRangeOf(timeline));
+        }
+
+        /// <summary>方向预计命中单位枚举（2026-10-15 瞄准预览批）：与 <see cref="WouldHitEnemyInDirection"/>
+        /// 同形派发——LineProjectile=弹道穿过的全部敌方受击圆柱（含尸体，Host 同语义）；LineBurst=射程内
+        /// 逐格全部敌方。into 先清后填（调用方复用防逐帧分配）；静态快照预判，Host 结算权威</summary>
+        public static void PredictDirectionHits(SkillTimelineAsset timeline, BattleMapData map,
+            BattleSnapshot snapshot, TeamType casterTeam, BattleCell from, Direction2D direction,
+            List<UnitState> into)
+        {
+            into.Clear();
+            if (timeline == null) return;
+            var projClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile);
+            if (projClips.Count > 0)
+            {
+                PredictProjectileHits(map, snapshot, casterTeam, from, direction, projClips[0], into);
+                return;
+            }
+            PredictLineSegmentHits(map, snapshot, casterTeam, from, direction, DirectionRangeOf(timeline), into);
+        }
+
+        /// <summary>投射物圆柱接触预判的命中单位枚举版（弹道+maxDist 与 WouldHitProjectile 同式）</summary>
+        private static void PredictProjectileHits(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
+            BattleCell from, Direction2D direction, SkillTimelineClip clip, List<UnitState> into)
+        {
+            var delta = SkillHitResolver.DirectionToDelta(direction);
+            bool skillOverride = clip != null && clip.hitDiameter > 0f;
+            int maxRange = clip != null && clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
+
+            float maxDist = maxRange + 0.5f;
+            for (int k = 1; k <= maxRange; k++)
+            {
+                if (map.HasTile(from.x + delta.x * k, from.y + delta.y * k)) continue;
+                maxDist = k - 0.5f; // 首个虚空格近边界=弹道截断
+                break;
+            }
+
+            var dir = new Vector2(delta.x, delta.y).normalized;
+            var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
+            foreach (var enemy in snapshot.units)
+            {
+                if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
+                float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
+                var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
+                if (rel.sqrMagnitude <= radius * radius) { into.Add(enemy); continue; } // 发射即贴脸（同格堆叠）
+                float along = Vector2.Dot(rel, dir);
+                float perpSq = rel.sqrMagnitude - along * along;
+                if (perpSq > radius * radius) continue; // 弹道不穿该圆柱
+                float entry = along - Mathf.Sqrt(radius * radius - perpSq);
+                if (entry >= 0f && entry <= maxDist) into.Add(enemy);
+            }
+        }
+
+        /// <summary>整线/距离段预判的命中单位枚举版（射程内逐格与 WouldHitLineSegments 同式）</summary>
+        private static void PredictLineSegmentHits(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
+            BattleCell from, Direction2D direction, int maxRange, List<UnitState> into)
+        {
+            var delta = SkillHitResolver.DirectionToDelta(direction);
+            for (int step = 1; step <= maxRange; step++)
+            {
+                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
+                if (!map.HasTile(cell.x, cell.y)) break;
+                into.AddRange(SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell));
+            }
         }
 
         /// <summary>投射物圆柱接触预判（原安柏战技覆写泛化）：距离空间版 Host maxT/VoidBoundary 同口径；

@@ -92,12 +92,29 @@ namespace GIC.Battle
             }
             else GICLog.Warn("[BattleHud] 布局槽缺失：myinfo");
 
-            // 设置/退出（走 BattleExitConfirmDialog 确认；布局编辑期点击让位——入口钮接管编辑开关）
-            if (_layoutByKey.TryGetValue("settings", out var settings))
+            // 退出钮（2026-10-15 拍板「原战斗内设置入口改为退出按钮」——槽键 settings→exit：
+            // 图标换 close_button，点击链不变=BattleExitConfirmDialog 确认；布局编辑期点击让位——入口钮接管编辑开关）
+            if (_layoutByKey.TryGetValue("exit", out var exit))
             {
-                var button = settings.content.GetComponent<Button>();
+                var button = exit.content.GetComponent<Button>();
                 if (button != null)
                     button.onClick.AddListener(() => { if (!_layoutEditing) _onCloseBattle?.Invoke(); });
+            }
+            else GICLog.Warn("[BattleHud] 布局槽缺失：exit");
+
+            // 设置钮（2026-10-15 拍板「战斗内顶部右上角加上设置按钮」——开真设置界面
+            // （UIManager 池化面板，跨场景存活可战斗内打开）；ESC/右键走 IClosable 栈顶=
+            // 设置开着先关设置；打开态经 BrowseUiOpen 聚合=单人局浏览自动暂停（N0）同口径）
+            if (_layoutByKey.TryGetValue("settings", out var gear))
+            {
+                var button = gear.content.GetComponent<Button>();
+                if (button != null)
+                    button.onClick.AddListener(() =>
+                    {
+                        if (_layoutEditing) return;
+                        if (UIManager.Instance != null && UIManager.Instance.IsOpen(Screens.Settings)) return; // 幂等（Open 已防重入，双保险）
+                        UIManager.Instance?.Open(Screens.Settings);
+                    });
             }
             else GICLog.Warn("[BattleHud] 布局槽缺失：settings");
         }

@@ -103,6 +103,20 @@ namespace GIC.Battle
         [Tooltip("使用条件不足（资源不够等）时整键置暗系数——图标/底板/色环基准色统一乘该值（RGB 乘、alpha 不动=变暗非变透明）；与 AI 自主键 45% 半透明为正交机制，同键命中时视觉叠加")]
         [SerializeField, Range(0f, 1f)] private float 资源不足变暗系数 = 0.6f; // 首版 0.45 目检「太暗」调亮（2026-10-04）
 
+        [Header("瞄准预览增强（2026-10-15 拍板：预计命中单位描边+每命中单位一条玩家色竖线+方向技能箭头显示；同日二轮拍板：箭头铺满整格加黑描边、竖线逐命中单位各一条）")]
+        [Tooltip("预计命中竖线显示总开关——2026-10-15 四轮拍板「暂时移除竖线（不删除）」：false=不建竖线（链路/材质/重建逻辑全保留，勾选即复原）")]
+        [SerializeField] private bool 显示命中竖线 = false;
+        [Tooltip("预计命中竖线宽度（世界单位）——每个预判命中单位各一条的软渐变竖线（实心亮芯+光肩，非生硬直线）")]
+        [SerializeField] private float 命中竖线宽度 = 0.2f;
+        [Tooltip("预计命中竖线高度（世界单位）——高出立牌顶让标记从单位头上读得出")]
+        [SerializeField] private float 命中竖线高度 = 1.8f;
+        [Tooltip("命中竖线亮度呼吸频率（次/秒）")]
+        [SerializeField] private float 命中竖线脉动频率 = 1.2f;
+        [Tooltip("方向技能箭头带宽（世界单位；2026-10-15 二轮拍板「铺满整个格子」=与逐格高亮同足印；纹理设计面 1 格×1 格、tiling=(带长,1)）")]
+        [SerializeField] private float 瞄准箭头带宽 = 0.92f;
+        [Tooltip("箭头 chevron 滚动速度（格/秒）——悬停或已落地（金色待定）方向持续循环滚动")]
+        [SerializeField] private float 瞄准箭头滚动速度 = 1.1f;
+
         /// <summary>disc.png 实心盘可见缘只占纹理半宽 0.830（四周透明边距大）——纹理放大 0.998/0.830≈1.202
         /// 补偿：小圆盘可见缘贴齐名义半径。2026-09-28 大盘圆角矩形化改版后**仅小圆盘消费本常量**
         /// （大盘=DragWheelFill/DragWheelRing 裁剪到内容框的圆角矩形素材，补偿恒 1.0）</summary>
@@ -117,8 +131,9 @@ namespace GIC.Battle
         private const float 大盘填充内缩比例 = 11f / 340f;
 
         // 瞄准常量（运行时计算用）
-        private const int 方向瞄准显示距离 = 8; // 十字瞄准高亮格数（Host 投射物实际扫描 24 格）
         // 移动步数上限不再用常量——数据驱动=移动技能 MoveDistance 参数（B-S1b），缺参数回落 3
+        // 直线技能瞄准臂长不再用常量——数据驱动=EffectCompiler.DirectionRangeOf 单源
+        // （2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离一致」，旧常量 8 对全员失真）
 
         /// <summary>移动瞄准步数上限=移动技能 MoveDistance 按基准换算（「拼接后为10%移速」2026-09-23
         /// 用户拍板：BasedOnMoveSpeed=10%×移速——安柏 50→5 格、凯亚 30→3 格；读快照 moveSpeed 与 Host 同源）；
@@ -252,6 +267,37 @@ namespace GIC.Battle
         /// 能命中敌人 / 移动该格实际能走到 / 单位指向全推荐 / 部署=碰撞判定链镜像（2026-09-25 拍板）</summary>
         private readonly HashSet<BattleCell> _aimRecommendedCells = new HashSet<BattleCell>();
 
+        // ==================== 瞄准预览增强（2026-10-15 拍板：预计命中单位描边+落点玩家色光柱+方向技能箭头） ====================
+
+        /// <summary>直线技能四方向预判推荐（箭头着色单源；ComputeAimCells 直线分支填充）</summary>
+        private readonly bool[] _aimDirRecommended = new bool[4];
+
+        /// <summary>直线技能瞄准射程（EffectCompiler.DirectionRangeOf 单源——臂长/箭头长度共用，
+        /// 2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离一致」）</summary>
+        private int _aimLineRange;
+
+        /// <summary>预计命中竖线（2026-10-15 二轮拍板「每个预计命中单位各一条竖线」取代首版单条落点
+        /// 光柱）：每命中单位一条软渐变竖光，色=该单位归属玩家色（与描边成对同色）；
+        /// 集合变化时重建（RebuildAimHitLines）、ClearHighlights 销毁</summary>
+        private readonly List<GameObject> _aimHitLines = new List<GameObject>();
+        private readonly Dictionary<string, Material> _aimHitLineMats = new Dictionary<string, Material>(); // 按单位归属 playerId 缓存（OnDestroy 释放）
+
+        /// <summary>方向技能四方向箭头（chevron 滚动带+箭头头；BuildAimArrows 建/ClearHighlights 销）</summary>
+        private readonly GameObject[] _aimArrowBands = new GameObject[4];
+        private readonly GameObject[] _aimArrowHeads = new GameObject[4];
+        private readonly Material[] _aimArrowBandMats = new Material[4]; // per 方向实例（tiling/滚动独立；OnDestroy 释放）
+        private readonly Material[] _aimArrowHeadMats = new Material[4];
+        private readonly float[] _aimArrowScrollPhase = new float[4];
+        private readonly bool[] _aimArrowScroll = new bool[4];          // 悬停/待定方向滚动开关
+
+        /// <summary>预计命中单位集（直线技能活动方向预判——描边刷新数据源；空集=无预览）</summary>
+        private readonly HashSet<string> _aimHitUnitIds = new HashSet<string>();
+        private readonly List<UnitState> _aimHitScratch = new List<UnitState>(); // 预判复用缓冲（免逐帧分配）
+
+        /// <summary>方向预判技能实例缓存（按 SkillData 引用失效重建——拖动逐帧调用免分配）</summary>
+        private BaseSkill _aimPreviewSkill;
+        private SkillConfig.SkillData _aimPreviewSkillData;
+
         /// <summary>瞄准待定格（2026-09-26 拍板：点可选格不再立即提交——格子变金待定、
         /// 可点其它可选格变更、点空白=取消技能回选中态；确认提交=顶部「完成选择」按钮）。
         /// null=无待定</summary>
@@ -333,13 +379,15 @@ namespace GIC.Battle
         /// <summary>登记宿主侧浏览源开态（BattleScreen.BindHud 接线：退出确认弹窗）</summary>
         internal void RegisterExternalBrowseSource(Func<bool> isOpen) => _externalBrowseOpen = isOpen;
 
-        /// <summary>浏览型 UI 聚合开态（自动暂停源）：布局编辑/退出确认（设置）/手牌卡详情（含全部
+        /// <summary>浏览型 UI 聚合开态（自动暂停源）：布局编辑/退出确认（退出）/设置界面（2026-10-15
+        /// 战斗内设置钮批——UIManager 池化面板开态）/手牌卡详情（含全部
         /// 数据面板）/技能详情弹窗——Update 每帧重估写入 session.SelectTimerPaused，打开期间持续保持
         /// （跨阶段边界自洽：设置开着进选择阶段=倒计时冻结不偷跑）；单人局门控在 BattleSession 侧</summary>
         private bool BrowseUiOpen => _layoutEditing
             || HandCardDetailOpen
             || (_handStatsPanel != null && _handStatsPanel.gameObject.activeInHierarchy)
             || PopupOpen
+            || (UIManager.Instance != null && UIManager.Instance.IsOpen(Screens.Settings))
             || (_externalBrowseOpen != null && _externalBrowseOpen());
 
         // ==================== 绑定 ====================
@@ -372,6 +420,9 @@ namespace GIC.Battle
             // 血条填充全链改走房间玩家色单源（roster 命中=房间选色——同队队友异色可辨识归属；
             // 无 roster 调试直开回落 BattlePalette 两表口径）——先于 BattleStart 建场注入
             _session.Player.SetPlayerColorOf(pid => BattlePlayerColors.Resolve(_session, _myPlayerId, pid));
+            // 血条填色解析器注入（2026-10-15 拍板「设置·战斗·血条颜色」玩家色/三色双模式——**只影响血条
+            // 填充色**，底座/描边/弧光链路不动）：先于建场注入（OverheadBars 懒建时透传）
+            _session.Player.SetHpBarColorOf(HpBarColorOf);
             // 相位/计时经 BattleSession 门面（2026-10-11 联机批）：host/本地=TurnFlowController、
             // LAN client=消息派生——HUD 不再直接触 Flow（客户端 Flow=null）
             _session.OnPhaseChanged += OnPhaseChanged;
@@ -409,6 +460,21 @@ namespace GIC.Battle
             var id = pm?.SelfPlayerID;
             if (!string.IsNullOrEmpty(id) && id != PlayerID.Offline) return id;
             return BattleDebugPlayerIds.P1;
+        }
+
+        /// <summary>血条填色解析（2026-10-15 拍板「设置·战斗·血条颜色」双模式——**只影响血条填充色**，
+        /// 底座圆盘/选中描边/弧光等其余玩家色链路不动）：玩家色=归属玩家色（2026-10-12 现行口径）；
+        /// 三色（默认，参照王者荣耀）=自己的单位绿/队友全蓝/敌人全红——玩家不用记忆哪些颜色是队友。
+        /// 模式真源=SaveSettings.hpBarColorMode（设置界面战斗栏）；设置界面不可在战斗中打开
+        /// （战斗内设置入口=退出确认弹窗），改动下一场生效；存档缺读=回落默认三色档</summary>
+        private Color HpBarColorOf(UnitView view)
+        {
+            int mode = _saveManager != null && _saveManager.CurrentSave != null
+                ? _saveManager.CurrentSave.settings.hpBarColorMode
+                : (int)HpBarColorMode.ThreeColor;
+            if (mode == (int)HpBarColorMode.PlayerColor) return view.OwnerColor;
+            if (view.OwnerPlayerId == _myPlayerId) return Palette.血条三色_自己;
+            return view.OwnerTeam == MyTeam ? Palette.血条三色_队友 : Palette.血条三色_敌方;
         }
 
         /// <summary>头顶 Buff 图标描环=来源单位所属玩家色（2026-10-06 拍板「框的颜色采用来源单位所属
@@ -460,6 +526,14 @@ namespace GIC.Battle
             if (_aimNotRecommendedMaterial != null) Destroy(_aimNotRecommendedMaterial);
             if (_aimPendingMaterial != null) Destroy(_aimPendingMaterial);
             if (_aimHoverMaterial != null) Destroy(_aimHoverMaterial); // 悬停提亮材质（2026-10-06）
+            foreach (var kv in _aimHitLineMats)                        // 命中竖线材质（2026-10-15 二轮；单光柱方案已废随字段删除）
+                if (kv.Value != null) Destroy(kv.Value);
+            _aimHitLineMats.Clear();
+            for (int dir = 0; dir < 4; dir++)                          // 方向箭头材质×8（2026-10-15）
+            {
+                if (_aimArrowBandMats[dir] != null) Destroy(_aimArrowBandMats[dir]);
+                if (_aimArrowHeadMats[dir] != null) Destroy(_aimArrowHeadMats[dir]);
+            }
             if (_countdownOutlineMat != null) // SDF 描边实例（TopBar 分件，TMP 不自销）
             {
                 Destroy(_countdownOutlineMat);
@@ -601,6 +675,7 @@ namespace GIC.Battle
 
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
             UpdateAimHover(); // 点击式瞄准悬停格提亮（2026-10-06 拍板；Aiming+非拖动才有悬停）
+            UpdateAimFxAnimation(); // 瞄准增强动画推进（2026-10-15：箭头 chevron 滚动+光柱呼吸）
             UpdateHandCardDrag(); // 手牌拖拽手感主循环（决策五十四：跟随/抖动/让位/出牌区蒙层）
 
             // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」
@@ -1124,9 +1199,15 @@ namespace GIC.Battle
             // 瞄准态 precise 由 HandleAimTap 候选域校验收编（复苏型爆发含尸体、延奏/契约域外 precise
             // 视同未点）
             var paperdollUnit = PickPaperdollUnit(screenPos, snapshot);
-            var precise = paperdollUnit;
-            var targetCell = paperdollUnit != null ? paperdollUnit.position : cell;
-            bool targetInBounds = paperdollUnit != null || inBounds;
+            // 部署瞄准=纯选格语义（2026-10-15 报障修复「部署点协议核心上面格子却被判成核心格」）：
+            // 部署的悬停高亮走板面取格，点击若被立牌命中截胡重定向到立牌单位所在格（协议核心等高立牌
+            // 画面伸入上方格），悬停与点击两口径不一致=点上面格落成核心格；部署格上立牌无选择语义，
+            // 一律按板面取格。技能瞄准保留立牌优先（方向/移动=点敌立牌选该向同向无害、
+            // 单位指向=点立牌直选、复苏=点尸体立牌直选）。
+            bool deployPickByBoard = _state == HudState.Aiming && _deployAimUnit != 0;
+            var precise = deployPickByBoard ? null : paperdollUnit;
+            var targetCell = !deployPickByBoard && paperdollUnit != null ? paperdollUnit.position : cell;
+            bool targetInBounds = (!deployPickByBoard && paperdollUnit != null) || inBounds;
 
             switch (_state)
             {
@@ -1405,9 +1486,11 @@ namespace GIC.Battle
 
         // ==================== 选中/待定目标描边（2026-10-05 拍板「选中时立牌加描边，颜色=所属玩家色」） ====================
 
-        /// <summary>描边统一收口（全量遍历按幂等开关写，≤70 单位低频调用）：两个槽各至多一单位——
+        /// <summary>描边统一收口（全量遍历按幂等开关写，≤70 单位低频调用）：三个槽各至多一组——
         /// ① 选中单位（瞄准态选中仍在=描边保持）；② 指定单位型瞄准的待定目标（点击轮换/头像盘悬停
-        /// 的目标反馈）。色=队伍主色（与底座圆盘/弧光同源 BattlePlayer 建盘口径）</summary>
+        /// 的目标反馈）；③ 直线技能活动方向的预计命中单位（2026-10-15 拍板「对预计有效单位高亮
+        /// 描边，复用现有描边」——数据源=_aimHitUnitIds，UpdateAimHitPreview 单点维护）。
+        /// 色=归属玩家色（与底座圆盘/弧光同源 BattlePlayer 建盘口径）</summary>
         private void RefreshOutlines()
         {
             var views = _session?.Player?.Views;
@@ -1416,11 +1499,13 @@ namespace GIC.Battle
             string target = _state == HudState.Aiming && !string.IsNullOrEmpty(_pendingTargetUnitId)
                 ? _pendingTargetUnitId
                 : null;
+            bool hitPreview = _state == HudState.Aiming && _aimHitUnitIds.Count > 0;
             foreach (var kv in views)
             {
                 var view = kv.Value;
                 if (view == null) continue;
-                view.SetSelectedOutline(kv.Key == selected || kv.Key == target);
+                view.SetSelectedOutline(kv.Key == selected || kv.Key == target
+                    || (hitPreview && _aimHitUnitIds.Contains(kv.Key)));
             }
         }
 
@@ -1516,9 +1601,13 @@ namespace GIC.Battle
         }
 
         /// <summary>该按钮技能是否直线型（战技/爆发=十字方向瞄准；延奏/契约/单位指向型爆发=单位指向；
-        /// 无目标自施放爆发〔aimMode=None，凛冽轮舞〕=自身格瞄准非直线）</summary>
+        /// 无目标自施放爆发〔aimMode=None，凛冽轮舞〕=自身格瞄准非直线）。
+        /// **移动恒 false**（2026-10-15 箭头显示批勘正：移动=具体格瞄准〔拍板「保留不变」〕，
+        /// SkillType.Move 数据过三条件——旧消费点全有 IsMove 前置从未暴露，箭头显示批新消费点
+        /// 须防移动误入；null〔部署〕恒 false）</summary>
         private bool IsLineSkill(SkillButtonDef def)
         {
+            if (def == null || def.IsMove) return false;
             var data = GetSelectedSkillData(def);
             return data != null
                 && data.skillType != SkillType.Interact
@@ -1611,6 +1700,7 @@ namespace GIC.Battle
         {
             _aimCells.Clear();
             _aimRecommendedCells.Clear();
+            Array.Clear(_aimDirRecommended, 0, _aimDirRecommended.Length); // 非直线分支无方向推荐（防御清）
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
@@ -1682,6 +1772,10 @@ namespace GIC.Battle
             // 推荐=该方向能命中敌人（含尸体，Host 同语义）：预判走技能实例 WouldHitEnemyInDirection
             // （SkillFactory 按 skillID 建实例，判定形态与各技能 Host 结算同源）
             var previewSkill = SkillFactory.CreateWithData(skillData);
+            // 瞄准臂长=该技能投射物实际射程单源（2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离
+            // 一致」）：EffectCompiler.DirectionRangeOf 与 Host 判定同源——安柏双箭/箭雨 24（旧常量 8
+            // 明显偏短）、芭芭拉水球 5/凯亚霜袭 2/丘丘人挥棒 1（旧 8 偏长，全员一并修正）
+            _aimLineRange = EffectCompiler.DirectionRangeOf(skillData.timeline);
             for (int dir = 0; dir < 4; dir++)
             {
                 int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
@@ -1690,7 +1784,8 @@ namespace GIC.Battle
                     : dir == 2 ? Direction2D.Up : Direction2D.Down;
                 bool recommended = previewSkill.WouldHitEnemyInDirection(
                     _board.Map, snapshot, (TeamType)sel.team, sel.position, direction);
-                for (int step = 1; step <= 方向瞄准显示距离; step++)
+                _aimDirRecommended[dir] = recommended; // 箭头着色单源（2026-10-15 箭头显示批）
+                for (int step = 1; step <= _aimLineRange; step++)
                 {
                     var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
                     if (!_board.Map.HasTile(c.x, c.y)) break;
@@ -2749,22 +2844,320 @@ namespace GIC.Battle
             ClearHighlights();
             if (_highlightRoot == null) return;
 
-            foreach (var cell in _aimCells)
+            if (IsLineSkill(_aimDef))
             {
-                // 分色（2026-09-23 拍板）：推荐/不推荐（推荐集差集；色值=BattlePalette 两字段）
-                var material = _aimRecommendedCells.Contains(cell)
-                    ? GetAimRecommendedMaterial()
-                    : GetAimNotRecommendedMaterial();
-                var quad = BattleViewFactory.CreateQuad(_highlightRoot,
-                    $"AimHighlight_{cell.x}_{cell.y}", material);
-                quad.transform.position = new Vector3(
-                    _board.CellToWorld(cell).x,
-                    _board.GetDecalHeight(cell, 0.03f), // 水格含波峰带防高亮被波峰盖过（docs/14 §89 第四轮）
-                    _board.CellToWorld(cell).z);
-                quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-                quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
-                _highlightQuads.Add(quad);
-                _aimQuadByCell[cell] = quad.GetComponent<MeshRenderer>(); // 待定金格材质换装索引
+                // 直线技能（战技/爆发）=方向箭头显示（2026-10-15 拍板「只需要选择方向的不应显示
+                // 单独每个格子，应当显示箭头，并且悬停或落地后箭头持续循环滚动」）：不再逐格铺贴片，
+                // 每方向=chevron 滚动带+箭头头，长度=技能实际射程；点击/拖拽解析不变
+                // （_aimCells 仍为命中域——箭头纯视觉换代）
+                BuildAimArrows();
+            }
+            else
+            {
+                foreach (var cell in _aimCells)
+                {
+                    // 分色（2026-09-23 拍板）：推荐/不推荐（推荐集差集；色值=BattlePalette 两字段）
+                    var material = _aimRecommendedCells.Contains(cell)
+                        ? GetAimRecommendedMaterial()
+                        : GetAimNotRecommendedMaterial();
+                    var quad = BattleViewFactory.CreateQuad(_highlightRoot,
+                        $"AimHighlight_{cell.x}_{cell.y}", material);
+                    quad.transform.position = new Vector3(
+                        _board.CellToWorld(cell).x,
+                        _board.GetDecalHeight(cell, 0.03f), // 水格含波峰带防高亮被波峰盖过（docs/14 §89 第四轮）
+                        _board.CellToWorld(cell).z);
+                    quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
+                    // 瞄准层显式化（2026-10-15 四轮拍板：层号入 BattleMetrics 单源，消费方勿写字面量）
+                    quad.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder;
+                    _highlightQuads.Add(quad);
+                    _aimQuadByCell[cell] = quad.GetComponent<MeshRenderer>(); // 待定金格材质换装索引
+                }
+            }
+            UpdateAimPreviewFx(); // 会话初始态：光柱隐、预计命中描边清、箭头基色（悬停/待定起再驱动）
+        }
+
+        // ==================== 方向箭头（直线技能瞄准显示，2026-10-15 拍板） ====================
+
+        /// <summary>建四方向箭头：每方向=chevron 滚动带（起点=施法者格缘，终点=射程内最远格远缘，
+        /// 板面虚空截断）+箭头头；四态着色由 RefreshAimArrowStates 单点重算（待定金>悬停白>
+        /// 推荐青/不推荐红——与逐格显示同语言）。臂方向无格（贴边）跳过不建</summary>
+        private void BuildAimArrows()
+        {
+            var snapshot = _session.Player.LatestSnapshot;
+            var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel == null) return;
+            var origin = _board.CellToWorld(sel.position);
+            float y = _board.TileTopHeight + 0.03f; // 与瞄准格贴片同高（草顶上方恒高于水面波峰）
+            for (int dir = 0; dir < 4; dir++)
+            {
+                _aimArrowBands[dir] = null;
+                _aimArrowHeads[dir] = null;
+                int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
+                int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+                int armLen = 0; // 板面截断后的实际臂长（<=_aimLineRange）
+                while (armLen < _aimLineRange
+                       && _board.Map.HasTile(sel.position.x + dx * (armLen + 1), sel.position.y + dy * (armLen + 1)))
+                    armLen++;
+                if (armLen == 0) continue; // 该方向贴边无臂
+                float yaw = Mathf.Atan2(-dy, dx) * Mathf.Rad2Deg; // 局部 +X（纹理 U 前进向）对准 (dx,dy)
+                var rot = Quaternion.Euler(90f, 0f, 0f) * Quaternion.Euler(0f, 0f, -yaw); // 平铺后绕法线旋（90°X 平铺坐标系）
+                float end = armLen + 0.5f;            // 最远格远缘
+                const float bandStart = 0.5f;         // 施法者格缘起（=格边——宽度 0.92 时十字双臂恰好不相接，无角点 z-fight）
+                float bandLen = end - bandStart;      // 滚动带全程铺到最远格（2026-10-15 三轮拍板「最后一格不要用箭头，改用滚动带」）
+                float mid = (bandStart + end) * 0.5f;
+                var bandMat = GetAimArrowBandMaterial(dir);
+                // 纹理设计面=1 格×1 格：tiling=(带长,1)——1 节 chevron/格、V 向黑描边随带宽等比
+                bandMat.mainTextureScale = new Vector2(bandLen, 1f);
+                var band = BattleViewFactory.CreateQuad(_highlightRoot, $"AimArrowBand_{dir}", bandMat);
+                band.transform.position = new Vector3(origin.x + dx * mid, y, origin.z + dy * mid);
+                band.transform.rotation = rot;
+                band.transform.localScale = new Vector3(bandLen, 瞄准箭头带宽, 1f);
+                band.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder; // 瞄准层（=格子贴片同层）
+                _aimArrowBands[dir] = band;
+                // 箭头头=叠加在第一格上（2026-10-15 三轮拍板「把箭头叠加在第一格上」——取代旧最远端收头：
+                // 箭头贴施法者脚下直指方向、滚动带铺完全程）。**四轮拍板：与带分显式层**——同序透明件按
+                // 包围盒中心距相机排序=下方向带中心更近相机恒把头盖住（方向依赖翻车，0.001 微抬敌不过
+                // 整段长带的中心偏移已删）；头=叠加层恒在带上（BattleMetrics.AimOverlayTopSortingOrder 单源）
+                var head = BattleViewFactory.CreateQuad(_highlightRoot, $"AimArrowHead_{dir}",
+                    GetAimArrowHeadMaterial(dir));
+                head.transform.position = new Vector3(origin.x + dx, y, origin.z + dy); // 第一格中心
+                head.transform.rotation = rot;
+                head.transform.localScale = new Vector3(0.92f, 瞄准箭头带宽, 1f);
+                head.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlayTopSortingOrder;
+                _aimArrowHeads[dir] = head;
+            }
+        }
+
+        /// <summary>箭头四态重算（待定金 > 悬停白 > 推荐青/不推荐红——与逐格三态同语言）+
+        /// 滚动开关（待定/悬停方向 chevron 持续滚动）。调用点=UpdateAimPreviewFx 单点</summary>
+        private void RefreshAimArrowStates()
+        {
+            if (!IsLineSkill(_aimDef)) return;
+            int hoverDir = _dragAiming ? -1 : ActiveAimDirection(_hoverAimCell);
+            int pendingDir = ActiveAimDirection(_pendingAimCell);
+            for (int dir = 0; dir < 4; dir++)
+            {
+                _aimArrowScroll[dir] = false;
+                var bandMat = _aimArrowBandMats[dir];
+                if (bandMat == null || _aimArrowBands[dir] == null) continue; // 该方向无臂
+                bool pending = dir == pendingDir;
+                bool hover = !pending && dir == hoverDir;
+                Color c = pending ? Palette.瞄准已选色
+                    : hover ? Palette.瞄准悬停色
+                    : _aimDirRecommended[dir] ? Palette.瞄准推荐色 : Palette.瞄准不推荐色;
+                bandMat.color = c;
+                _aimArrowHeadMats[dir].color = c;
+                _aimArrowScroll[dir] = pending || hover;
+            }
+        }
+
+        private Material GetAimArrowBandMaterial(int dir)
+        {
+            if (_aimArrowBandMats[dir] == null)
+            {
+                _aimArrowBandMats[dir] = BattleViewFactory.CreateTransparentUnlitMaterial(Color.white);
+                _aimArrowBandMats[dir].mainTexture = BattleViewFactory.AimArrowBandTexture;
+            }
+            return _aimArrowBandMats[dir];
+        }
+
+        private Material GetAimArrowHeadMaterial(int dir)
+        {
+            if (_aimArrowHeadMats[dir] == null)
+            {
+                _aimArrowHeadMats[dir] = BattleViewFactory.CreateTransparentUnlitMaterial(Color.white);
+                _aimArrowHeadMats[dir].mainTexture = BattleViewFactory.AimArrowHeadTexture;
+            }
+            return _aimArrowHeadMats[dir];
+        }
+
+        // ==================== 瞄准预览增强（光柱+预计命中描边，2026-10-15 拍板） ====================
+
+        /// <summary>活动瞄准格：拖动会话=金色待定格；点击式=悬停格优先（无悬停回落待定格）。
+        /// 光柱与预计命中预览的驱动真值（拍板「悬停时就应该显示」「点击或拖拽两种瞄准都需要」）</summary>
+        private BattleCell? ActiveAimCell()
+        {
+            if (_state != HudState.Aiming) return null;
+            return _dragAiming ? _pendingAimCell : (_hoverAimCell ?? _pendingAimCell);
+        }
+
+        /// <summary>该格在选中单位十字臂上的方向索引（0=右 1=左 2=上 3=下；不在臂上=-1）</summary>
+        private int ActiveAimDirection(BattleCell? cell)
+        {
+            if (!cell.HasValue || _selectedUnitId == null) return -1;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            var sel = snapshot != null
+                ? snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
+            if (sel == null) return -1;
+            int dx = cell.Value.x - sel.position.x, dy = cell.Value.y - sel.position.y;
+            if (dy == 0 && dx > 0) return 0;
+            if (dy == 0 && dx < 0) return 1;
+            if (dx == 0 && dy > 0) return 2;
+            if (dx == 0 && dy < 0) return 3;
+            return -1;
+        }
+
+        /// <summary>瞄准预览总刷新（悬停/待定变化单点调）：预计命中单位描边+逐单位竖线+箭头四态。
+        /// 直线技能=方向预判命中单位；其余瞄准形态（部署/移动/指向/自施放）无命中预览（2026-10-15
+        /// 二轮拍板：竖线=每个预计命中单位各一条，落点单光柱方案已废）</summary>
+        private void UpdateAimPreviewFx()
+        {
+            if (_session == null) return;
+            UpdateAimHitPreview();
+            RefreshAimArrowStates();
+        }
+
+        /// <summary>预计命中竖线材质（按单位归属 playerId 缓存——同玩家多单位共享一实例；
+        /// OnDestroy 释放）</summary>
+        private Material GetAimHitLineMaterial(string playerId)
+        {
+            if (!_aimHitLineMats.TryGetValue(playerId, out var m) || m == null)
+            {
+                var color = BattlePlayerColors.Resolve(_session, _myPlayerId, playerId); // 与描边同源归属玩家色
+                color.a = 1f;
+                m = BattleViewFactory.CreateTransparentUnlitMaterial(color);
+                m.mainTexture = BattleViewFactory.AimMarkerTexture;
+                _aimHitLineMats[playerId] = m;
+            }
+            return m;
+        }
+
+        /// <summary>重建预计命中竖线（每命中单位一条，集合变化时调）。**2026-10-15 三轮拍板「光柱
+        /// 应当和立牌面平行，而不是垂直地面」**：竖线姿态/底边锚/面内向上全部取单位立牌倾斜组
+        /// （UnitView.TiltGroup=立牌面真源——billboard yaw+55° 后倾+悬浮离地+立牌前移全继承，
+        /// 竖线躺进立牌平面像贴着单位的光带）；倾斜组缺失（理论不可达）回落垂直地面+格心</summary>
+        private void RebuildAimHitLines()
+        {
+            foreach (var line in _aimHitLines)
+                if (line != null) Destroy(line);
+            _aimHitLines.Clear();
+            if (!显示命中竖线) return; // 2026-10-15 四轮拍板「暂时移除竖线（不删除）」——链路全保留，勾选即复原
+            if (_highlightRoot == null || _aimHitUnitIds.Count == 0) return;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot == null || _board == null || _board.Map == null) return;
+            var views = _session.Player.Views;
+            foreach (var unitId in _aimHitUnitIds)
+            {
+                UnitState u = null;
+                foreach (var s in snapshot.units)
+                    if (s.unitId == unitId) { u = s; break; }
+                if (u == null) continue;
+                var line = BattleViewFactory.CreateQuad(_highlightRoot, $"AimHitLine_{unitId}",
+                    GetAimHitLineMaterial(u.playerId));
+                var view = views != null && views.TryGetValue(unitId, out var v) && v != null ? v : null;
+                var tilt = view != null ? view.TiltGroup : null;
+                if (tilt != null)
+                {
+                    // 立牌面平行：竖线=倾斜组同姿态，底边=立牌底边（含悬浮/前移），向上=面内向上
+                    line.transform.rotation = tilt.rotation;
+                    line.transform.position = tilt.position + tilt.up * (命中竖线高度 * 0.5f);
+                }
+                else
+                {
+                    // 回落：垂直地面+格心（视图缺失理论不可达）
+                    var w = _board.CellToWorld(u.position);
+                    line.transform.position = new Vector3(w.x,
+                        _board.GetDecalHeight(u.position, 0.04f) + 命中竖线高度 * 0.5f, w.z);
+                    line.transform.rotation = AimFxBillboardRotation();
+                }
+                line.transform.localScale = new Vector3(命中竖线宽度, 命中竖线高度, 1f);
+                // 立牌(10)之上、投射物(12)之下——竖线恒可见不被立牌吞（首版看不见的主因之一）
+                line.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.BuffBadgeSortingOrder;
+                _aimHitLines.Add(line);
+            }
+        }
+
+        /// <summary>增强件布告板朝向（与立牌同口径：相机前向压平）——竖线竖直面朝相机（yaw 恒 0，按相机实算防漂移）</summary>
+        private Quaternion AimFxBillboardRotation()
+        {
+            var cam = _camera != null ? _camera.GetComponent<Camera>() : null;
+            if (cam == null) return Quaternion.identity;
+            var forward = cam.transform.forward;
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.001f ? Quaternion.LookRotation(forward, Vector3.up) : Quaternion.identity;
+        }
+
+        /// <summary>预计命中单位描边预览（拍板「对预计有效单位高亮描边（复用现有高亮描边）」）：
+        /// 仅直线技能——活动瞄准格所在方向的静态预判命中单位（EffectCompiler.PredictDirectionHits
+        /// 与 Host 判定同形，含尸体=完全算判定同口径）；集合无变化零刷新（拖动逐帧防抖）。
+        /// 非直线技能/无方向=清空</summary>
+        private void UpdateAimHitPreview()
+        {
+            _aimHitScratch.Clear();
+            if (IsLineSkill(_aimDef))
+            {
+                var snapshot = _session?.Player?.LatestSnapshot;
+                var sel = snapshot != null
+                    ? snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
+                int dir = sel != null ? ActiveAimDirection(ActiveAimCell()) : -1;
+                if (dir >= 0 && _board != null && _board.Map != null)
+                {
+                    var skill = AimPreviewSkill();
+                    if (skill != null)
+                    {
+                        var direction = dir == 0 ? Direction2D.Right : dir == 1 ? Direction2D.Left
+                            : dir == 2 ? Direction2D.Up : Direction2D.Down;
+                        EffectCompiler.PredictDirectionHits(skill.Timeline, _board.Map, snapshot,
+                            (TeamType)sel.team, sel.position, direction, _aimHitScratch);
+                    }
+                }
+            }
+            bool changed = _aimHitScratch.Count != _aimHitUnitIds.Count;
+            if (!changed)
+                for (int i = 0; i < _aimHitScratch.Count; i++)
+                    if (!_aimHitUnitIds.Contains(_aimHitScratch[i].unitId)) { changed = true; break; }
+            if (changed)
+            {
+                _aimHitUnitIds.Clear();
+                for (int i = 0; i < _aimHitScratch.Count; i++) _aimHitUnitIds.Add(_aimHitScratch[i].unitId);
+                RebuildAimHitLines(); // 每命中单位一条竖线随集合重建（2026-10-15 二轮拍板）
+                RefreshOutlines();
+            }
+        }
+
+        /// <summary>方向预判技能实例缓存（按 SkillData 引用失效重建——拖动逐帧调用免分配）</summary>
+        private BaseSkill AimPreviewSkill()
+        {
+            var data = GetSelectedSkillData(_aimDef);
+            if (data == null)
+            {
+                _aimPreviewSkill = null;
+                _aimPreviewSkillData = null;
+                return null;
+            }
+            if (_aimPreviewSkill == null || _aimPreviewSkillData != data)
+            {
+                _aimPreviewSkill = SkillFactory.CreateWithData(data);
+                _aimPreviewSkillData = data;
+            }
+            return _aimPreviewSkill;
+        }
+
+        /// <summary>瞄准增强动画推进（Update 每帧，Aiming 态）：悬停/待定方向 chevron 持续循环滚动
+        /// +命中竖线亮度呼吸</summary>
+        private void UpdateAimFxAnimation()
+        {
+            if (_state != HudState.Aiming) return;
+            float dt = Time.deltaTime;
+            for (int dir = 0; dir < 4; dir++)
+            {
+                if (!_aimArrowScroll[dir]) continue;
+                var m = _aimArrowBandMats[dir];
+                if (m == null) continue;
+                _aimArrowScrollPhase[dir] += dt * 瞄准箭头滚动速度;
+                m.mainTextureOffset = new Vector2(-_aimArrowScrollPhase[dir], 0f); // 负向=沿箭头方向流出
+            }
+            if (_aimHitLines.Count > 0)
+            {
+                float pulse = 0.8f + 0.2f * (0.5f - 0.5f * Mathf.Cos(Mathf.PI * 2f * 命中竖线脉动频率 * Time.time));
+                foreach (var kv in _aimHitLineMats)
+                {
+                    if (kv.Value == null) continue;
+                    var c = kv.Value.color; // rgb=归属玩家色不动，呼吸只改 a
+                    c.a = pulse;
+                    kv.Value.color = c;
+                }
             }
         }
 
@@ -2799,6 +3192,7 @@ namespace GIC.Battle
             _pendingAimCell = cell;
             if (old.HasValue) RefreshCellVisual(old.Value); // 旧待定格还原（悬停中则转悬停态）
             RefreshCellVisual(cell);
+            UpdateAimPreviewFx(); // 待定变化驱动光柱/预计命中描边/箭头态（2026-10-15；同格幂等早退不进此）
         }
 
         /// <summary>清待定格并还原材质（拖动瞄准用：拖向移出有效区/无有效瞄准时调用——松手即"无待定=取消"）；
@@ -2814,6 +3208,7 @@ namespace GIC.Battle
                 _pendingTargetUnitId = null;
                 RefreshOutlines();
             }
+            UpdateAimPreviewFx(); // 待定清零回落悬停驱动（2026-10-15 瞄准预览批；拖动无悬停=光柱随清）
         }
 
         // ==================== 瞄准格材质三态单点（2026-10-06 拍板「点击式瞄准悬停格高亮」） ====================
@@ -2841,6 +3236,7 @@ namespace GIC.Battle
             _hoverAimCell = hover;
             if (old.HasValue) RefreshCellVisual(old.Value);
             if (hover.HasValue) RefreshCellVisual(hover.Value);
+            UpdateAimPreviewFx(); // 悬停变化驱动光柱/预计命中描边/箭头态（2026-10-15 瞄准预览批）
         }
 
         /// <summary>该格材质按三态重算（待定金 > 悬停提亮 > 推荐/不推荐；quad 缺失安全跳过）</summary>
@@ -2884,6 +3280,21 @@ namespace GIC.Battle
                 if (quad != null) Destroy(quad);
             _highlightQuads.Clear();
             _aimQuadByCell.Clear();
+            // 瞄准增强件随会话收口（2026-10-15）：箭头销毁、命中竖线销毁、预计命中描边清
+            for (int dir = 0; dir < 4; dir++)
+            {
+                if (_aimArrowBands[dir] != null) { Destroy(_aimArrowBands[dir]); _aimArrowBands[dir] = null; }
+                if (_aimArrowHeads[dir] != null) { Destroy(_aimArrowHeads[dir]); _aimArrowHeads[dir] = null; }
+                _aimArrowScroll[dir] = false;
+            }
+            foreach (var line in _aimHitLines)
+                if (line != null) Destroy(line);
+            _aimHitLines.Clear();
+            if (_aimHitUnitIds.Count > 0)
+            {
+                _aimHitUnitIds.Clear();
+                RefreshOutlines(); // 预计命中描边随收口即时熄灭（ExitAiming 后续自调幂等）
+            }
         }
 
         /// <summary>选中单位脚下两束归属玩家色环绕彗尾弧光（2026-09-27 拍板「底座圆盘也要」；

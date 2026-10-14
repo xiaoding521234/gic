@@ -40,6 +40,8 @@ namespace GIC.UI
         public TextCombiner accountButtonText;
         public Button petButton;
         public TextCombiner petButtonText;
+        public Button battleButton;
+        public TextCombiner battleButtonText;
         public Button otherButton;
         public TextCombiner otherButtonText;
 
@@ -83,6 +85,10 @@ namespace GIC.UI
         public ButtonSettingItem voiceCloudVoiceIdSetting; // 云端音色 ID（空=默认预置）
         public SliderSettingItem petVoiceVolumeSetting;     // 语音音量（起播直读，下一句生效；命名避让声音区 voiceVolumeSetting）
 
+        [Header("战斗设置（2026-10-15 拍板「设置界面新类别战斗：血条颜色」——战斗内表现类偏好）")]
+        public GameObject battleSettings;
+        public DropdownSettingItem hpBarColorSetting;
+
         [Header("其它设置")]
         public GameObject otherSettings;
 
@@ -106,12 +112,13 @@ namespace GIC.UI
         /// </summary>
         protected override void OnInit()
         {
-            // 收集所有设置面板（与导航按钮顺序一致：派蒙=第 5 栏，其它=第 6 栏）
+            // 收集所有设置面板（与导航按钮顺序一致：派蒙=第 5 栏，战斗=第 6 栏〔2026-10-15 新增〕，其它=第 7 栏）
             settingPanels.Add(displaySettings);
             settingPanels.Add(soundSettings);
             settingPanels.Add(controlSettings);
             settingPanels.Add(accountSettings);
             settingPanels.Add(petSettings);
+            settingPanels.Add(battleSettings);
             settingPanels.Add(otherSettings);
 
             // 收集所有导航按钮
@@ -120,6 +127,7 @@ namespace GIC.UI
             navButtons.Add(controlButton);
             navButtons.Add(accountButton);
             navButtons.Add(petButton);
+            navButtons.Add(battleButton);
             navButtons.Add(otherButton);
 
             // 收集所有导航文本
@@ -128,6 +136,7 @@ namespace GIC.UI
             navTexts.Add(controlButtonText);
             navTexts.Add(accountButtonText);
             navTexts.Add(petButtonText);
+            navTexts.Add(battleButtonText);
             navTexts.Add(otherButtonText);
 
             // 收集所有导航按钮的 RectTransform
@@ -136,6 +145,7 @@ namespace GIC.UI
             navRects.Add(controlButton.GetComponent<RectTransform>());
             navRects.Add(accountButton.GetComponent<RectTransform>());
             navRects.Add(petButton.GetComponent<RectTransform>());
+            navRects.Add(battleButton.GetComponent<RectTransform>());
             navRects.Add(otherButton.GetComponent<RectTransform>());
 
             // 绑定导航按钮
@@ -144,7 +154,8 @@ namespace GIC.UI
             controlButton.onClick.AddListener(() => SwitchPanel(2));
             accountButton.onClick.AddListener(() => SwitchPanel(3));
             petButton.onClick.AddListener(() => SwitchPanel(4));
-            otherButton.onClick.AddListener(() => SwitchPanel(5));
+            battleButton.onClick.AddListener(() => SwitchPanel(5));
+            otherButton.onClick.AddListener(() => SwitchPanel(6));
 
             // 绑定关闭按钮
             closeButton.onClick.AddListener(Close);
@@ -158,6 +169,7 @@ namespace GIC.UI
             InitControlSettings();
             InitAccountSettings();
             InitPetSettings();
+            InitBattleSettings();
             // "其它"栏 2026-08-27 起暂无条目（petClose 挪入派蒙栏）——面板保留占位
         }
 
@@ -186,6 +198,7 @@ namespace GIC.UI
             controlButtonText.SetSingleEntry(new LocalizedString("UIText", "Control"));
             accountButtonText.SetSingleEntry(new LocalizedString("UIText", "Account"));
             petButtonText.SetSingleEntry(new LocalizedString("UIText", "Paimon"));
+            battleButtonText.SetSingleEntry(new LocalizedString("UIText", "Battle"));
             otherButtonText.SetSingleEntry(new LocalizedString("UIText", "Other"));
         }
 

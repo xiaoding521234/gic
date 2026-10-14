@@ -131,6 +131,177 @@ namespace GIC.Battle
             return material;
         }
 
+        // ==================== 瞄准增强程序纹理（2026-10-15 瞄准预览批；与 AimCellTexture 同族——
+        // 指示器类程序生成免资产文件，rgb 恒白由材质 tint 承色，alpha 承形状/渐变） ====================
+
+        private static Texture2D _aimArrowBandTexture;
+
+        /// <summary>方向箭头带纹理（256×256 单节 chevron 平铺，Repeat+Bilinear；设计面=1 格×1 格，
+        /// tiling=(带长,1)）。2026-10-15 二轮拍板「箭头非常不明显——应当和之前的格子一样铺满整个格子，
+        /// 参考格子高亮加黑色描边」：上下长边 24px（9.4%=AimCellTexture 边框同比例）纯黑描边环 +
+        /// 实心车道底（rgb 195 略暗于 chevron=滚动有对比）+ 粗亮 chevron（rgb 255 全亮、笔画 σ10 加粗）
+        /// ——U 向=前进向，offset 滚动 chevron 流动、V 向黑边恒定不动（U 滚动不动 V 边=单 quad 承载
+        /// 「实心车道+描边+滚动箭羽」三层视觉）</summary>
+        public static Texture2D AimArrowBandTexture
+        {
+            get
+            {
+                if (_aimArrowBandTexture != null) return _aimArrowBandTexture;
+                const int s = 256;
+                var tex = new Texture2D(s, s, TextureFormat.RGBA32, false)
+                {
+                    name = "BattleAimArrowBandTexture",
+                    wrapMode = TextureWrapMode.Repeat,
+                    filterMode = FilterMode.Bilinear,
+                };
+                var pixels = new Color32[s * s];
+                const int border = 24;                    // 长边黑描边宽（9.4%=格子高亮同比例）
+                float apexX = s * 0.68f, baseX = s * 0.30f, midY = s * 0.5f;
+                float chevronSigma2 = 2f * 10f * 10f;    // chevron 笔画高斯（二轮加粗 5.5→10）
+                const byte laneV = 195;                   // 车道底亮度（略暗于 chevron=对比滚动）
+                for (int y = 0; y < s; y++)
+                {
+                    for (int x = 0; x < s; x++)
+                    {
+                        byte v, a;
+                        if (y < border || y >= s - border)
+                        {
+                            v = 0; a = 255;               // 长边黑描边（rgb 0 乘任意 tint 恒黑=格子高亮同语言）
+                        }
+                        else
+                        {
+                            // 实心车道底 + 粗亮 chevron（臂起止=描边内缘，贴边画满整格宽）
+                            float d = Mathf.Min(
+                                DistToSegment(x, y, baseX, border, apexX, midY),
+                                DistToSegment(x, y, baseX, s - border, apexX, midY));
+                            float chev = Mathf.Exp(-d * d / chevronSigma2);
+                            v = chev > 0.5f ? (byte)255 : laneV;
+                            a = 255;
+                        }
+                        pixels[y * s + x] = new Color32(v, v, v, a);
+                    }
+                }
+                tex.SetPixels32(pixels);
+                tex.Apply(false, true);
+                _aimArrowBandTexture = tex;
+                return tex;
+            }
+        }
+
+        private static Texture2D _aimArrowHeadTexture;
+
+        /// <summary>方向箭头头部纹理（256×256 实心三角指向 +U，Clamp+Bilinear；设计面=1 格×1 格）。
+        /// 2026-10-15 二轮拍板同批加黑描边：三角内缘 8px 纯黑描边环（格子高亮同语言）+ 白芯 +
+        /// 边外 8px 白羽化软边（不生硬）。非滚动——悬停/待定只滚 chevron 带，箭头静止指向前方</summary>
+        public static Texture2D AimArrowHeadTexture
+        {
+            get
+            {
+                if (_aimArrowHeadTexture != null) return _aimArrowHeadTexture;
+                const int s = 256;
+                var tex = new Texture2D(s, s, TextureFormat.RGBA32, false)
+                {
+                    name = "BattleAimArrowHeadTexture",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                var pixels = new Color32[s * s];
+                float apexX = 236f, tailX = 28f, midY = 128f, halfH = 104f;
+                const float rim = 8f;                     // 内缘黑描边宽
+                float halo2 = 2f * 6f * 6f;               // 边外羽化
+                for (int y = 0; y < s; y++)
+                {
+                    for (int x = 0; x < s; x++)
+                    {
+                        float d = DistToTriangleInterior(x, y, tailX, midY - halfH, apexX, midY, tailX, midY + halfH);
+                        byte r, g, b, a;
+                        if (d <= -rim) { r = g = b = 255; a = 255; }   // 白芯
+                        else if (d <= 0f) { r = g = b = 0; a = 255; }  // 内缘黑描边
+                        else                                                    // 边外白羽化
+                        {
+                            r = g = b = 255;
+                            a = (byte)Mathf.RoundToInt(Mathf.Exp(-d * d / halo2) * 255f);
+                        }
+                        pixels[y * s + x] = new Color32(r, g, b, a);
+                    }
+                }
+                tex.SetPixels32(pixels);
+                tex.Apply(false, true);
+                _aimArrowHeadTexture = tex;
+                return tex;
+            }
+        }
+
+        private static Texture2D _aimMarkerTexture;
+
+        /// <summary>预计命中竖线纹理（96×256 竖向，Clamp+Bilinear）：横向=实心亮芯（|dx|≤18px 全亮
+        /// 平台）+ 光肩平滑淡出（18→46px）——2026-10-15 二轮拍板「只看见描边未看见光柱」加亮加宽
+        /// （首版 64px 细高斯淡到看不见）；纵向=底亮顶淡幂次渐变（pow 1.2），软边非生硬直线。
+        /// v=0=柱底（全亮）→ v=1=柱顶（淡出）</summary>
+        public static Texture2D AimMarkerTexture
+        {
+            get
+            {
+                if (_aimMarkerTexture != null) return _aimMarkerTexture;
+                const int w = 96, h = 256;
+                var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+                {
+                    name = "BattleAimMarkerTexture",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                var pixels = new Color32[w * h];
+                float center = (w - 1) * 0.5f;
+                for (int y = 0; y < h; y++)
+                {
+                    float v = y / (float)(h - 1);
+                    float vertical = Mathf.Pow(1f - v, 1.2f); // 底亮顶淡（缓于首版 1.45）
+                    for (int x = 0; x < w; x++)
+                    {
+                        // 实心亮芯平台 + 光肩（SmoothStep 18→46px）——软边非硬线但芯恒亮
+                        float t = Mathf.Clamp01((Mathf.Abs(x - center) - 18f) / 28f);
+                        float horizontal = 1f - t * t * (3f - 2f * t);
+                        float a = horizontal * vertical;
+                        pixels[y * w + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+                    }
+                }
+                tex.SetPixels32(pixels);
+                tex.Apply(false, true);
+                _aimMarkerTexture = tex;
+                return tex;
+            }
+        }
+
+        /// <summary>点到线段距离（箭头 chevron 高斯距离场用）</summary>
+        private static float DistToSegment(float px, float py, float ax, float ay, float bx, float by)
+        {
+            float abx = bx - ax, aby = by - ay;
+            float lenSq = abx * abx + aby * aby;
+            float t = lenSq > 0f ? Mathf.Clamp(((px - ax) * abx + (py - ay) * aby) / lenSq, 0f, 1f) : 0f;
+            float dx = px - (ax + abx * t), dy = py - (ay + aby * t);
+            return Mathf.Sqrt(dx * dx + dy * dy);
+        }
+
+        /// <summary>点到三角形三边的最小距离（形内=0——软边只作用边缘；箭头头部用）</summary>
+        private static float DistToTriangleInterior(float px, float py,
+            float ax, float ay, float bx, float by, float cx, float cy)
+        {
+            bool inside = SameSide(px, py, ax, ay, bx, by, cx, cy)
+                && SameSide(px, py, bx, by, cx, cy, ax, ay)
+                && SameSide(px, py, cx, cy, ax, ay, bx, by);
+            if (inside) return 0f;
+            return Mathf.Min(
+                Mathf.Min(DistToSegment(px, py, ax, ay, bx, by), DistToSegment(px, py, bx, by, cx, cy)),
+                DistToSegment(px, py, cx, cy, ax, ay));
+        }
+
+        private static bool SameSide(float px, float py, float ax, float ay, float bx, float by, float cx, float cy)
+        {
+            float d1 = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+            float d2 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+            return d1 * d2 >= 0f;
+        }
+
         /// <summary>世界层纯色 Quad（基元 + 去 Collider + 挂材质；姿态/缩放由调用方补——既有调用点世界系/本地系两种用法）</summary>
         public static GameObject CreateQuad(Transform parent, string name, Material sharedMaterial)
         {

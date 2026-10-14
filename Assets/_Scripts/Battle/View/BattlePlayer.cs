@@ -149,6 +149,12 @@ namespace GIC.Battle
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
 
+        /// <summary>血条填色解析器（2026-10-15 血条三色批，HUD Bind 注入——先于 BattleStart 建场：
+        /// 玩家色模式=归属玩家色、三色模式=自己绿/队友蓝/敌红；未注入回落 view.OwnerColor 现行口径）。
+        /// 同 SetPlayerColorOf 注入先例：设置只影响血条填充色，底座圆盘/描边/弧光链路不动</summary>
+        private Func<UnitView, Color> _hpBarColorOf;
+        public void SetHpBarColorOf(Func<UnitView, Color> resolver) => _hpBarColorOf = resolver;
+
         /// <summary>单位立牌视图表（unitId → UnitView；HUD 点击拾取/选中描边消费，2026-10-05 拍板）</summary>
         public IReadOnlyDictionary<string, UnitView> Views => _views;
 
@@ -1303,6 +1309,8 @@ namespace GIC.Battle
                 go.transform.SetParent(transform, false);
                 _overheadBars = go.AddComponent<BattleOverheadBars>();
                 _overheadBars.Init(_viewCamera != null ? _viewCamera : CameraContext.Resolve());
+                if (_hpBarColorOf != null)
+                    _overheadBars.SetHpBarColorOf(_hpBarColorOf); // 血条色解析器透传（2026-10-15 三色批；Bind 先于此注入）
             }
             return _overheadBars;
         }
@@ -1393,6 +1401,8 @@ namespace GIC.Battle
                 _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
                 (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
                 state.cylinderDiameter, standForward); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）
+            view.OwnerPlayerId = state.playerId; // 归属身份（2026-10-15 血条三色批：三色模式按自己/队友/敌分档判定）
+            view.OwnerTeam = (TeamType)state.team;
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);

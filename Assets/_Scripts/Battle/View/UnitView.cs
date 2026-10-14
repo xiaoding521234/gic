@@ -51,6 +51,11 @@ namespace GIC.Battle
         /// 自己异色=可辨识归属；色源=BattlePlayerColors.Resolve〔房间玩家色单源〕）</summary>
         public Color OwnerColor => _baseColor;
 
+        /// <summary>归属玩家 Id / 队伍（2026-10-15 血条三色批：血条颜色「三色模式」需按
+        /// 自己/队友/敌三档分色——本端视角判定需单位身份；CreateView 建场时由 BattlePlayer 填写）</summary>
+        public string OwnerPlayerId;
+        public TeamType OwnerTeam;
+
         /// <summary>当前血量/上限（BattleOverheadBars 每帧拉取）</summary>
         public int Hp => _hp;
         public int MaxHp => _maxHp;
@@ -730,6 +735,11 @@ namespace GIC.Battle
             _outlineOn = on;
             ApplyOutlineParams();
         }
+
+        /// <summary>立牌倾斜组（AvatarTilt）——立牌面平面真源（billboard yaw+后倾+悬浮+立牌前移全在此层）。
+        /// 消费方=预计命中竖线（2026-10-15 三轮拍板「光柱应当和立牌面平行，而不是垂直地面」）：
+        /// 竖线姿态/底边锚点/面内向上都取本组（rotation/up/position），勿自行算倾斜</summary>
+        public Transform TiltGroup => _tiltGroup;
 
         /// <summary>描边参数落地（视频材质直写 / sprite MPB 写入）。描边宽=图元像素高的 1.2%
         /// （图集 sprite 用 textureRect 高——atlas 空间一致），钳 3~12 texel</summary>

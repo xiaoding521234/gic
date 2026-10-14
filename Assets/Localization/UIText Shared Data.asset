@@ -1163,6 +1163,22 @@ MonoBehaviour:
     m_Key: Coop_JoiningRoom
     m_Metadata:
       m_Items: []
+  - m_Id: 9096
+    m_Key: Battle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9097
+    m_Key: HpBarColor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9098
+    m_Key: HpBarColorPlayerColor
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9099
+    m_Key: HpBarColorTriColor
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

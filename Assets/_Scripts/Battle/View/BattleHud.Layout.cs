@@ -73,10 +73,15 @@ namespace GIC.Battle
         /// 点击行=选中该角色+相机丝滑居中；常驻战斗全程不走 ApplyStateVisibility——存量方案缺条目自然回落默认位）；
         /// passive=被动技能盘（2026-10-07 拍板：选中单位的变奏/天赋等被动图标列——尺寸=主动键 70%
         /// 基准 154 随槽缩放；显隐随选中态同技能盘成组；编辑模式无选中单位时由
-        /// ShowPassiveLayoutPlaceholder 建占位显形，可拖可缩同其它件）</summary>
+        /// ShowPassiveLayoutPlaceholder 建占位显形，可拖可缩同其它件）；
+        /// exit=退出钮（2026-10-15 拍板「战斗内设置入口改为退出按钮」——原 settings 槽改名，图标换
+        /// close_button；点击=退出确认弹窗链 _onCloseBattle 不变）；settings=设置钮（同批新增：
+        /// 齿轮图标紧邻退出钮左侧，点击=UIManager.Open(Screens.Settings) 真设置界面；
+        /// 快速迭代期存档每次启动重建=改名零成本；迭代结束后存量方案的旧 settings 锚点会落到
+        /// 新设置钮上=同角同尺寸观感无损，未知键自然跳过纪律兜底）</summary>
         private static readonly string[] AllLayoutKeys =
         {
-            "burst", "skill", "enso", "move", "cancel", "settings",
+            "burst", "skill", "enso", "move", "cancel", "exit", "settings",
             "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick", "passive",
         };
 

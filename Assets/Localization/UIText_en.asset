@@ -1185,6 +1185,22 @@ MonoBehaviour:
     m_Localized: "Joining room\u2026"
     m_Metadata:
       m_Items: []
+  - m_Id: 9096
+    m_Localized: Battle
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9097
+    m_Localized: HP Bar Color
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9098
+    m_Localized: Player Color
+    m_Metadata:
+      m_Items: []
+  - m_Id: 9099
+    m_Localized: Three-Color
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

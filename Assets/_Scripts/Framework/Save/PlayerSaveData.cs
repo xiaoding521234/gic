@@ -343,6 +343,13 @@ namespace GIC.Framework
         // 桌面维持 165。存档重建（InitDefault/EnsureValid）都走本初始化器，真档读值不受影响。
         public int frameRate = Application.isMobilePlatform ? 60 : 165;   // 帧率
 
+        // ========== 战斗设置（2026-10-15 拍板「设置界面新类别战斗：血条颜色双选项」） ==========
+        /// <summary>血条颜色模式（HpBarColorMode 枚举 int：0=三色〔默认——参照王者荣耀自己绿/队友蓝/敌红，
+        /// 免记颜色；JsonUtility 缺字段反序列化为 0=老档自动落默认档〕，1=玩家色〔归属玩家色=现行口径〕）。
+        /// 仅影响 BattleOverheadBars 血条填充色——底座圆盘/描边/弧光等其余单位显示色链路不动；
+        /// 设置界面不可在战斗中打开（战斗内设置入口=退出确认弹窗），改动下一场战斗生效</summary>
+        public int hpBarColorMode = 0;
+
         // ========== 按键绑定 ==========
         public List<KeyBindingEntry> keyBindings = new List<KeyBindingEntry>();
 

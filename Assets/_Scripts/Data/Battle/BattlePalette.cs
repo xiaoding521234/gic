@@ -4,6 +4,19 @@ using UnityEngine;
 namespace GIC.Data
 {
     /// <summary>
+    /// 血条颜色模式（2026-10-15 拍板「设置界面新类别战斗：血条颜色双选项」）：
+    /// 三色=默认（参照王者荣耀：自己的单位绿/队友全蓝/敌人全红——玩家不用记忆哪些颜色是队友）；
+    /// 玩家色=归属玩家色（2026-10-12 现行口径）。**仅影响血条填充色**（BattleOverheadBars）——
+    /// 底座圆盘/选中描边/弧光等其余单位显示色链路不动。存档存 int（SaveSettings.hpBarColorMode，
+    /// 缺字段反序列化为 0=老档自动落默认三色档）
+    /// </summary>
+    public enum HpBarColorMode
+    {
+        [InspectorName("三色（默认）")] ThreeColor = 0,
+        [InspectorName("玩家色")] PlayerColor = 1,
+    }
+
+    /// <summary>
     /// 战斗视觉统一配色（2026-09-18 统一化批次建立，收口前配色字面量散落 BattleHud/BattlePlayer/UnitView 三文件且同语义不同值）。
     /// 队伍色（底座/队列框/accent）与血条色分列——同单位「阵营红底盘 + 血红条」是两套语义非漂移；
     /// 改战斗观感基调一律改本资产，勿在代码里写新字面量（docs/14 §63）。
@@ -15,6 +28,12 @@ namespace GIC.Data
         [Header("队伍主色（立牌底座 / HUD 队列框 / 信息块 accent 同源）")]
         public Color 我方主色 = new Color(0.25f, 0.55f, 1f);
         public Color 敌方主色 = new Color(1f, 0.35f, 0.3f);
+
+        [Header("血条三色（2026-10-15 拍板「设置·战斗·血条颜色=三色档（默认）」参照王者荣耀：自己绿/队友蓝/敌红"
+                + "——仅血条填充消费（设置三色模式时），与玩家色/队伍色两套语义勿混用勿互改）")]
+        public Color 血条三色_自己 = new Color(0.32f, 0.82f, 0.30f, 1f);   // 绿
+        public Color 血条三色_队友 = new Color(0.25f, 0.55f, 1f, 1f);      // 蓝
+        public Color 血条三色_敌方 = new Color(1f, 0.30f, 0.28f, 1f);      // 红
 
         [Header("玩家配色（2026-09-29 执行预览拍板：头像描环按「归属玩家」染色——本端视角我=蓝、我队"
                 + "队友=绿、敌队玩家按序=红/紫…；数组式可扩 3v3。只新预览消费，队伍色口径（立牌底座等）不动）")]
@@ -109,8 +128,8 @@ namespace GIC.Data
         public Color 瞄准不推荐色 = new Color(1f, 0.3f, 0.25f, 0.8f);
         [Tooltip("瞄准待定金格（2026-09-26 拍板：点可选格不立即提交——变金待定、完成选择按钮确认；原神风格金色）")]
         public Color 瞄准已选色 = new Color(0.96f, 0.79f, 0.27f, 0.85f);
-        [Tooltip("瞄准悬停格（2026-10-06 拍板：点击式瞄准鼠标停留可选格=该格提亮预览；金格优先于悬停）")]
-        public Color 瞄准悬停色 = new Color(1f, 1f, 1f, 0.45f);
+        [Tooltip("瞄准悬停格（2026-10-06 拍板：点击式瞄准鼠标停留可选格=该格提亮预览；金格优先于悬停。2026-10-15 四轮拍板「单个格子颜色变化对齐方向带」：45%→85% 不透明度——45% 淡奶洗在格子上读不出「变白」（带上靠 chevron 反差才显），提到与已选金同档让悬停白在格子/方向带两处一致清晰）")]
+        public Color 瞄准悬停色 = new Color(1f, 1f, 1f, 0.85f);
 
         [Header("立牌状态")]
         public Color 冻结冰色 = new Color(0.62f, 0.83f, 0.96f);
