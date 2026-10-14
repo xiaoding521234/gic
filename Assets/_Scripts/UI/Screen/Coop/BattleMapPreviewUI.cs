@@ -12,6 +12,7 @@ using UnityEngine.UI;
 using TMPro;
 using GIC.Data;
 using GIC.Battle;
+using GIC.Framework;
 namespace GIC.UI
 {
 
@@ -62,6 +63,7 @@ namespace GIC.UI
         private Vector2 _regionMin, _regionMax;                   // 预览区锚点（Awake 一次性捕获序列化原值）
         private bool _waveOnEnable;                               // OnEnable 后下一次 Refresh 重播波纹（重进房间）
         private Coroutine _waveRoutine;
+        private Coroutine _buildRoutine;                          // 格子构建链（等布局就绪再建，见 BuildTilesWhenReadyRoutine）
 
         // 波纹注册表（地块与标记分列：名册刷新只改色、不动缩放）
         private readonly List<RectTransform> _tileItems = new List<RectTransform>();
@@ -99,8 +101,9 @@ namespace GIC.UI
         private void OnEnable() => _waveOnEnable = true; // 重进房间：下一次 Refresh 重播入场波纹
 
         /// <summary>
-        /// 刷新预览（单入口）：方形适配 → 地图变化时重建地形格+标记 → 入场波纹（地图变化或重进房间时）→
-        /// 名册染色。同图刷新（名册增删）零重建零动画，只改标记色。
+        /// 刷新预览（单入口）：方形适配 → 地图变化时重建标记+走格子构建链（布局未就绪时等待后建、
+        /// 缺失自愈，见 BuildTilesWhenReadyRoutine）→ 入场波纹 → 名册染色。
+        /// 同图刷新（名册增删）零重建零动画，只改标记色。
         /// players=null/空=只显示地形与空闲出生点。
         /// </summary>
         public void Refresh(BattleMapConfig config, IEnumerable<PlayerInfo> players)
@@ -118,9 +121,28 @@ namespace GIC.UI
             {
                 _map = config.BuildData();
                 RebuildMarkers(config);
-                RebuildTiles();
             }
-            if (playWave) StartWave();
+
+            // 格子构建链（2026-10-15 报障修复）：进房间态时 RefreshUI 在 roomPanel 激活同帧执行，
+            // 布局未跑 → FitSquareAspect 静默失败（_side=0）→ 直接建格子层=零格且同图刷新永不重建
+            // （只显出生点标记）。改为等布局就绪再建；TilesMissing 让构建失败/协程被关面板腰斩后
+            // 同图刷新也能自愈。建成后波纹随链起播；布局已就绪的常规路径协程首段无 yield=同帧建成（行为不变）。
+            if (mapChanged || TilesMissing())
+            {
+                playWave = false; // 波纹由构建链末端起播
+                if (Application.isPlaying && isActiveAndEnabled)
+                {
+                    if (_buildRoutine != null) StopCoroutine(_buildRoutine);
+                    _buildRoutine = StartCoroutine(BuildTilesWhenReadyRoutine());
+                }
+                else
+                {
+                    FitSquareAspect();
+                    RebuildTiles();
+                    SnapWaveItems();
+                }
+            }
+            if (playWave) StartWave(); // 同图重进（格子已在）：仅重播波纹
             ApplyPlayerMarks(config, players);
         }
 
@@ -239,6 +261,36 @@ namespace GIC.UI
                                     + WaveJitter(x, y));
                 }
             }
+        }
+
+        /// <summary>格子是否缺失（地图有格但格子层为空）——构建失败/协程被腰斩后，同图刷新的自愈判据</summary>
+        private bool TilesMissing()
+            => _map != null && _tileItems.Count == 0 && MapHasAnyTile();
+
+        private bool MapHasAnyTile()
+        {
+            for (int y = 0; y < _map.height; y++)
+                for (int x = 0; x < _map.width; x++)
+                    if (_map.HasTile(x, y)) return true;
+            return false;
+        }
+
+        /// <summary>格子构建链：等布局就绪再建（激活帧布局未跑时 _side=0，直接建会静默零格——
+        /// 2026-10-15 报障根因）。就绪当帧同步建成（协程首段无 yield，行为同旧）；未就绪逐帧重试。</summary>
+        private IEnumerator BuildTilesWhenReadyRoutine()
+        {
+            const int maxWaitFrames = 4;
+            for (int i = 0; i < maxWaitFrames && _side < 1f; i++)
+            {
+                FitSquareAspect();
+                if (_side >= 1f) break;
+                yield return null;
+            }
+            if (_side < 1f)
+                GICLog.Warn($"[BattleMapPreviewUI] 布局 {maxWaitFrames} 帧仍未就绪（_side={_side}），格子层本次跳过");
+            RebuildTiles();
+            StartWave();
+            _buildRoutine = null;
         }
 
         private static void AddFallbackCell(GameObject go, Color32 color)
@@ -430,10 +482,11 @@ namespace GIC.UI
         /// <summary>波纹起播（同图重进房间=缩位重置后重播；地图变化=重建件已归零）</summary>
         private void StartWave()
         {
-            if (单格生长时长秒 <= 0f || !Application.isPlaying)
+            if (单格生长时长秒 <= 0f || !Application.isPlaying || !isActiveAndEnabled)
             {
                 SnapWaveItems();
-                return; // 非播放态（编辑器工具/冒烟调用，StartCoroutine 不可用）或时长归零=直接满尺寸
+                return; // 非播放态/时长归零/面板未激活（协程不可用——LAN 批「Coroutine couldn't be
+                        // started」遗留就此收口）=直接满尺寸；面板下次可见+Refresh 时波纹自会重播
             }
             if (_waveRoutine != null) StopCoroutine(_waveRoutine);
             _waveRoutine = StartCoroutine(WaveRoutine());

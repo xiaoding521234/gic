@@ -2150,3 +2150,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **通用判读陷阱（全实证）**：编辑器 -logFile 惰性 flush（mtime 滞后≠静默，验活性=主动写一行再查）；编辑器与 PC 构建同 persistentDataPath 混写 lan_debug.log；PC 构建 Player.log 被 [Conditional] 剥光+惰性 flush（退出时刻认 ##utp 泄漏报告 time 字段）；编辑器↔构建资产值比对=UnityPy 字节级（typetree 失败按低 4 字节小端搜+读后 4 位兜底）；进程身份=Time.time+WMI CreationDate+Get-NetTCPConnection OwningProcess；vivo 划后台≠杀进程；api.github.com 代理限流时直连通。
 
 **修复后形态（勿当 bug 修）**：每连接一个不可见占位玩家（DDOL、断线自动销毁）；NEB 激活链=Ready+AddPlayer（base 自动）→原生 replay→ObjectSpawnStarted 建字典→spawn 必中→激活→名字上报；进 Play Console 必现「编辑器场景哈希补打: NetworkEventBus sceneId=0xB97EAECEC3AF1A49」行（消失=修复失效先查本节）。**Mirror 内嵌补丁清单 +1：NetworkClient.SpawnSceneObject 的 [SceneCensus] 普查（gitignored 换机即丢，全清单=docs/31 §3）。**
+
+## §153 房间地图预览只显出生点：激活帧布局未跑 → RebuildTiles 静默零格且同图刷新永不自愈（2026-10-15 活体取证实锤）
+
+**症状**（2026-10-15 用户 Play 中报障）：房间右上地图预览只有出生点编号圆点，地形格全无。
+
+**根因链**：进房间态时 `SetRoomState → SwitchPanelRoutine(from, to, RefreshUI)` 的 `applyState()` 在 `roomPanel.SetActive(true)` **同帧**执行（CoopScreen.Animation.cs），布局尚未跑 → `BattleMapPreviewUI.FitSquareAspect` 读不到有效 parent rect **静默早退** → `_side=0` → `RebuildTiles` 走 `_map==null || _side<1f` 早退=**零格**（地形格创建即 `localScale=0` 全靠波纹接管，此早退无任何兜底/日志）；而 `RebuildMarkers` 用 240×240 兜底+归一化锚点照常建出并随波纹弹出 → 只见出生点。之后名册事件的同图 Refresh 会把 `_side` 修好（实测 520），但 **`mapChanged=false` 时 RebuildTiles 永不重跑** → 一旦漏建永久缺失，重启 Play 才复现。与 §128 冷打开时序族同源（变体：非布局驱动锚定 rect 也中招——ForceRebuildLayoutImmediate 不保证同步刷新这类 rect，等待式构建链更稳）。
+
+**取证签名（活体探针一发锁定）**：`_map=ok + _tileItems.Count=0 + 标记 scale=1 + _side 当前=520` —— RebuildTiles 以「_map 非空却零格」退出的**唯一**路径就是 `_side<1f`，配合 `_side` 事后有效即钉死「激活帧失败、后续不重建」。
+
+**修法**（BattleMapPreviewUI.Refresh）：①mapChanged 不再直接 RebuildTiles，改走**构建链** `BuildTilesWhenReadyRoutine`——逐帧 `FitSquareAspect` 等布局就绪（至多 4 帧）再 `RebuildTiles`+波纹；**布局已就绪时协程首段无 yield=同帧同步建成，常规路径行为不变**（切换地图/正常进房零差异）。②`TilesMissing()`（地图有格但格子层空）作为自愈判据：构建失败/协程被关面板腰斩后，同图刷新也会重进构建链。③`StartWave` 补 `!isActiveAndEnabled` 守卫（Snap 满尺寸返回）——顺带收口 LAN 第七批已知遗留「面板未激活仍 StartWave → Coroutine couldn't be started」（预览面板不可见时无波纹，下次可见+Refresh 自会重播）。
+
+**通用教训**：①**「动画接管初始态」的运行时建件（创建即 scale 0/alpha 0 类）+无兜底早退=静默缺失**——失败零痕迹（无日志无灰块），报障只能靠活体取证反推唯一退出路径；②**构建型缓存（_tileItems）必须带「缺失自愈」判据**，不能只认 mapChanged——一次性失败会被缓存判据永久固化；③涉局报障先跑只读探针再推理：`_map ok + 零格 + _side 事后有效` 的签名比读十遍代码快。
