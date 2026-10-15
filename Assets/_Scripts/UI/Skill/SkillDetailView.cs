@@ -251,7 +251,42 @@ namespace GIC.UI
 
             if (slideCoroutine != null)
                 StopCoroutine(slideCoroutine);
-            slideCoroutine = StartCoroutine(SlideInAnimation(panelRect, panelTargetPosition));
+            // 入场动画完成与 link 自动打开包进同一协程链（2026-10-15 拍板「入场动画播放完后自动
+            // 打开首个 buff/介绍 link」）：ClosePanel/再次 OpenPanel 停掉 slideCoroutine 时链随之中断，
+            // 不会对已收起/已换技能的面板补发关联面板
+            slideCoroutine = StartCoroutine(SlideInThenAutoOpenLink());
+        }
+
+        /// <summary>滑入 → 自动打开首个 buff/介绍类 link 的链式协程（2026-10-15）</summary>
+        private IEnumerator SlideInThenAutoOpenLink()
+        {
+            yield return SlideInAnimation(panelRect, panelTargetPosition);
+            AutoOpenFirstInfoLink();
+        }
+
+        /// <summary>扫描技能描述，自动打开首个 buff/介绍类 link（2026-10-15 拍板）：只认 Buff:/Concept:
+        /// （均走 RuleMode 关联面板=buff 描述/概念介绍）；Unit:/Item: 卡牌跳转类与无 link 描述不自动
+        /// 打开。链接序=文本出现序，取首个命中；打开走 OnLinkClicked 既有链（宿主 onRelatedPanelOpening
+        /// 重摆/滑入动画/RuleMode 数值解析全复用）。</summary>
+        private void AutoOpenFirstInfoLink()
+        {
+            if (skillDescription == null) return;
+            var tmpText = skillDescription.GetComponent<TextMeshProUGUI>();
+            if (tmpText == null) return;
+
+            // 面板刚激活的首个生成周期可能尚未跑完，确保 linkInfo 属于本次描述而非上一技能残留
+            tmpText.ForceMeshUpdate();
+            var textInfo = tmpText.textInfo;
+            for (int i = 0; i < textInfo.linkCount; i++)
+            {
+                string linkId = textInfo.linkInfo[i].GetLinkID();
+                var (type, _) = LinkParser.Parse(linkId);
+                if (type == "Buff" || type == "Concept")
+                {
+                    OnLinkClicked(linkId);
+                    return;
+                }
+            }
         }
 
         /// <summary>
