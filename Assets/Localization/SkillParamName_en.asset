@@ -19,11 +19,11 @@ MonoBehaviour:
     m_Items: []
   m_TableData:
   - m_Id: 33
-    m_Localized: C2 Radius
+    m_Localized: C1 Radius
     m_Metadata:
       m_Items: []
   - m_Id: 32
-    m_Localized: C1 Energy Gain
+    m_Localized: C2 Energy Gain
     m_Metadata:
       m_Items: []
   - m_Id: 2
@@ -328,6 +328,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 77
     m_Localized: C3 Summon Count
+    m_Metadata:
+      m_Items: []
+  - m_Id: 78
+    m_Localized: C3 Energy Limit
     m_Metadata:
       m_Items: []
   references:

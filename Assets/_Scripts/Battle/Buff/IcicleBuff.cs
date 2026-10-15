@@ -16,8 +16,10 @@ namespace GIC.Battle
     /// 永久不计时（RemainingTurns=-1），**持有者倒下仍生效**（RemoveOnHolderDeath=false——
     /// docs/05 §5.4 被动失效通则的技能级例外；碎裂判定要求存活，倒下期间只 tick 不碎裂）。
     /// 数值单源=Buff_Icicle.asset（docs/active/39 Buff 配置化——tick 伤害/碎裂治疗/碎裂阈值/半径/
-    /// 叠层上限全在资产，调平衡改 Inspector 零代码）；**叠层上限与作用半径均不随命座**（2026-10-08
-    /// 重构：旧 C2/C3StackLimit、C3Radius 命座参数通道退役，参数通道枚举值/本地化键保留=ATKBonus 先例）；
+    /// 叠层上限全在资产，调平衡改 Inspector 零代码）；**叠层上限不随命座（2026-10-08 重构拍板）；
+    /// 作用半径 3命起 +C3Radius**（2026-10-15 决策七十二「3命=召唤数量+1 之外，额外加寒冰之棱
+    /// 半径+1、元能上限+60」复活通道；旧 C2/C3StackLimit 通道仍退役，参数枚举值/本地化键保留=
+    /// ATKBonus 先例）；
     /// **2命起 tick 命中敌人额外施加冰棱减防**（Buff_DefenseDown 资产具名 buff——数值全在该资产单源，
     /// 永久不计时〔2026-10-07 拍板「持续时间改为无限」，同 StatBuff 永久保护〕，逐层各施加；
     /// 2026-10-08 晚返拍「减防仍然留在2命」——重构批首版曾误整体退役，当晚恢复）。
@@ -84,8 +86,10 @@ namespace GIC.Battle
             // 结算、错峰纯表现层）。每层对半径内敌方 % 施加者攻冰伤（含尸体——鞭尸同 Burn/歌声之环
             // 先例）；2命起每层命中额外施加冰棱减防（逐层各一次——2026-10-08 晚返拍「减防仍然留在2命」）。
             // 碎裂不在此判定（复测拍板①「元能>50% 立刻触发」——移除后本回合末自然无 tick）
-            var (cLevel, _) = SourceConstellation();
-            int radius = Cfg.作用半径; // 常驻资产值（2026-10-08 重构：C3Radius 命座通道退役）
+            var (cLevel, talent) = SourceConstellation();
+            int radius = Cfg.作用半径 + (cLevel >= 3 // 3命：作用半径+C3Radius（2026-10-15 决策七十二「3命额外加半径+1/元能上限+60」复活通道——2026-10-08 曾随重构退役）
+                ? (talent != null ? talent.GetInt(SkillParamKey.C3Radius, 1) : 1)
+                : 0);
             bool applyDefDown = cLevel >= 2; // 2命起 tick 命中附带冰棱减防（是否施加=命座开关；数值全在 Buff_DefenseDown 资产单源）
             int layers = Mathf.Max(1, Level);
 

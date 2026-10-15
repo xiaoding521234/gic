@@ -30,6 +30,12 @@ MonoBehaviour:
     - key: 77
       value: 1
       baseType: 0
+    - key: 29
+      value: 1
+      baseType: 0
+    - key: 78
+      value: 60
+      baseType: 0
     timeline: {fileID: 0}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
     "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
@@ -67,4 +73,19 @@ MonoBehaviour:
       targetSkillType: 7
       statType: 13
       minConstellation: 1
+    - trigger: 3
+      kind: 9
+      targetFilter: 0
+      condition: 0
+      paramKey: 78
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 15
+      minConstellation: 3
     costs: []

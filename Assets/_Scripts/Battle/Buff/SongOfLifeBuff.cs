@@ -13,13 +13,13 @@ namespace GIC.Battle
     /// 全在资产，调平衡改 Inspector 零代码）；命座成长仍走施加者 Talent 技能参数（正交）。
     /// 每回合结束：①为**半径内我方存活单位（含持有者）**增加元能（0命=〔基础元能获取〕〔2026-09-30
     /// 用户拍板「0命就可以每回合加5元能」；**2026-10-07 描述勘正拍板：受益人=半径内我方单位非持有者
-    /// 独享——OnTurnEnd 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，1命起=C1EnergyGain
-    /// 参数=+10——参数载体=施加者命座技能）；②对持有者切比雪夫
-    /// 〔作用半径〕（2命起 +C2Radius=2）内敌人造成〔每回合伤害百分比〕施加者攻击力水伤
+    /// 独享——OnTurnEnd 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，2命起=C1EnergyGain
+    /// 参数=+10——参数载体=施加者命座技能〔2026-10-15 决策七十二调换：原1命件，调换后2命生效〕）；②对持有者切比雪夫
+    /// 〔作用半径〕（1命起 +C2Radius=2〔原2命件，调换后1命生效〕）内敌人造成〔每回合伤害百分比〕施加者攻击力水伤
     /// （含尸体——鞭尸同 Burn 先例；**走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01 拍板
     /// 「这些伤害都应该统一」——与寒冰之棱 tick 同口径；不经反应预览=不触发反应〕）；③对半径内
     /// 我方**存活**单位（含持有者）治疗**施加者〔每回合治疗百分比〕最大生命值**、恢复〔每回合理智恢复〕
-    /// 理智并附着水元素（**2命起不再附着**；2026-09-30 拍板：平值 10 无法成长改比例；基准=施加者
+    /// 理智并附着水元素（**1命起不再附着**〔原2命件，2026-10-15 决策七十二调换前移〕；2026-09-30 拍板：平值 10 无法成长改比例；基准=施加者
     /// 芭芭拉自身最大生命〔非各自〕，末点截断后×层数）。
     /// 叠层上限 1（**3命起 +C3StackLimit=2**——Level=层数；
     /// **多层=逐层各弹一次**（2026-10-01 拍板④「2层相当于有两个此buff，应当各弹一次」——伤害/治疗/
@@ -64,16 +64,18 @@ namespace GIC.Battle
             var holderTeam = holderIdentity.Team;
             var ownerId = holderIdentity.UnitID;
 
-            // 命座参数（施加者视角——数值随施法者命座成长；source 亡佚回落持有者=基础值）
+            // 命座参数（施加者视角——数值随施法者命座成长；source 亡佚回落持有者=基础值）。
+            // 2026-10-15 决策七十二「2命和1命效果调换」：原1命=元能提升至10/2命=半径+1+免附着 →
+            // 现1命=半径+C2Radius+免附着（原2命件整体前移）、2命=元能提升至 C1EnergyGain（原1命件）
             var (cLevel, talent) = SourceConstellation();
             int stacks = Mathf.Max(1, Level);
-            int energyGainPerLayer = (cLevel >= 1
+            int energyGainPerLayer = (cLevel >= 2
                 ? (talent != null ? talent.GetInt(SkillParamKey.C1EnergyGain, Cfg.基础元能获取 * 2) : Cfg.基础元能获取 * 2)
                 : Cfg.基础元能获取);
-            int radius = Cfg.作用半径 + (cLevel >= 2
+            int radius = Cfg.作用半径 + (cLevel >= 1
                 ? (talent != null ? talent.GetInt(SkillParamKey.C2Radius, 1) : 1)
                 : 0);
-            bool attachAllies = cLevel < 2; // 2命起：不再为我方角色附着元素
+            bool attachAllies = cLevel < 1; // 1命起：不再为我方角色附着元素（原2命件随调换前移）
 
             // 数值基准=施加者（施放闪耀奇迹的芭芭拉）；无施加者回落持有者——AttackerOf/AttackerIdOf 单源
             var attacker = AttackerOf();

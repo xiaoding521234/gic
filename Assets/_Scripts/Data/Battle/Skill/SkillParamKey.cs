@@ -265,6 +265,10 @@ namespace GIC.Data
 
         [InspectorName("3命召唤数量")]
         C3ShardBonus = 77,
+
+        // 凯亚命座（2026-10-15 决策七十二「3命额外加元能上限+60」；半径通道复用 C3Radius=29）
+        [InspectorName("3命元能上限增加")]
+        C3EnergyLimit = 78,
     }
 
     /// <summary>

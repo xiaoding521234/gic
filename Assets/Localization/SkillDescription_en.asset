@@ -90,7 +90,8 @@ MonoBehaviour:
       Glacial Waltz summons +{C2ShardBonus} <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost
       Shard</link></u></color>, hits also inflict <color=#FFD700><u><link=\"Buff:\u51B0\u68F1\u51CF\u9632\">Frost
       Defense Down</link></u></color>\n\xB7[C3] Glacial Waltz summons +{C3ShardBonus}
-      <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>"
+      <color=#FFD700><u><link=\"Buff:\u5BD2\u51B0\u4E4B\u68F1\">Frost Shard</link></u></color>, radius
+      +{C3Radius}, Energy limit +{C3EnergyLimit}"
     m_Metadata:
       m_Items: []
   - m_Id: 3003001
@@ -108,10 +109,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3003005
     m_Localized: "\xB7[C0] Summon <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
-      Ring</link></u></color>\n\xB7[C1] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
-      Ring</link></u></color> per-turn Energy gain increased to {C1EnergyGain}\n\xB7[C2]
+      Ring</link></u></color>\n\xB7[C1]
       <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>
-      radius +{C2Radius}, no longer applies elements to allies\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      radius +{C2Radius}, no longer applies elements to allies\n\xB7[C2] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      Ring</link></u></color> per-turn Energy gain increased to {C1EnergyGain}\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color> stack limit +{C3StackLimit}"
     m_Metadata:
       m_Items: []

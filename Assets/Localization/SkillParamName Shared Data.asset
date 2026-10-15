@@ -327,6 +327,10 @@ MonoBehaviour:
     m_Key: C3ShardBonus
     m_Metadata:
       m_Items: []
+  - m_Id: 78
+    m_Key: C3EnergyLimit
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
