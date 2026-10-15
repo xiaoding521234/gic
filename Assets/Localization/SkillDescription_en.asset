@@ -112,7 +112,7 @@ MonoBehaviour:
       Ring</link></u></color>\n\xB7[C1]
       <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>
       radius +{C1Radius}, no longer applies elements to allies\n\xB7[C2] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
-      Ring</link></u></color> per-turn Energy gain increased to {C1EnergyGain}\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      Ring</link></u></color> per-turn Energy gain increased to {C2EnergyGain}\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color> stack limit +{C3StackLimit}"
     m_Metadata:
       m_Items: []

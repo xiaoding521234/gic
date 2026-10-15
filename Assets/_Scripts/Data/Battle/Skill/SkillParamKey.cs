@@ -117,9 +117,10 @@ namespace GIC.Data
         [InspectorName("伤害距离")]
         DamageDistance = 31,
 
-        // 芭芭拉命座（2026-10-15 决策七十二调换+二次返修：C1Radius=1命生效半径〔原 C2Radius 改名——
-        // 键名随生效层，枚举值 33 不变零资产迁移〕、C1EnergyGain=2命生效——保留原名：C2EnergyGain
-        // 已被丽莎（=55「2命元能增加」）占用，改名撞枚举成员唯一约束；显示层已标注真实层级）
+        // 芭芭拉命座（2026-10-15 决策七十二调换+二/三次返修：C1Radius=1命生效半径〔原 C2Radius 改名——
+        // 键名随生效层，枚举值 33 不变零资产迁移〕；C1EnergyGain=32 退役占位（原名保留=ATKBonus 先例）
+        // ——2命元能改用丽莎 C2EnergyGain=55 复用（三次返修拍板「枚举只和显示名对应，两个名称
+        // 刚好一样」——键对应显示名「2命元能增加」，两角色同名共用））
         [InspectorName("2命获取元能")]
         C1EnergyGain = 32,
 
@@ -196,7 +197,7 @@ namespace GIC.Data
         C1NeedleCount = 54,
 
         [InspectorName("2命元能增加")]
-        C2EnergyGain = 55,
+        C2EnergyGain = 55, // 丽莎+芭芭拉共用（2026-10-15 决策七十二三次返修：芭芭拉2命元能复用同键——键只对应显示名，两角色语义同名）
 
         [InspectorName("2命闪电触发上限")]
         C2TriggerLimit = 56,

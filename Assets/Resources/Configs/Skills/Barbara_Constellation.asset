@@ -21,7 +21,7 @@ MonoBehaviour:
     - key: 33
       value: 1
       baseType: 0
-    - key: 32
+    - key: 55
       value: 10
       baseType: 0
     - key: 28
