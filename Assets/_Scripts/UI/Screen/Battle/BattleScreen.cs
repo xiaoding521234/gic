@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Battle;
@@ -214,14 +215,25 @@ namespace GIC.UI
             // AI 玩家=host 当前卡组（拍板）。卡不消耗可重复出战。
             if (launchConfig != null && launchConfig.IsNetworked)
                 yield return StartCoroutine(WaitForUploadedDecks(playerSetups));
+            // 待机片卡组预热池（2026-10-16 部署黑窗根治批）：本局全部玩家手牌的角色并集——部署可能
+            // ⊆ 手牌 ⊆ 卡组，开局一次暖全并集（手牌抽取不增角色，无需增量）。池=首帧模板库，部署
+            // 时 Blit 拷贝零黑窗；池外角色（LAN 客户端不可见的敌方人类卡组）走静态立牌过渡兜底。
+            IdleClipPrewarmPool.Clear(); // 上一局残留清空（模板 RT 释放）
+            var prewarmUnits = new HashSet<GIC.Data.UnitName>();
             foreach (var setup in playerSetups)
             {
                 _session.Sim.RegisterHand(setup.PlayerId, new List<HandCard>());
                 foreach (var handCard in BuildHandForPlayer(setup))
-                    _session.Sim.GainCard(setup.PlayerId, handCard.AsCardId(), handCard.count);
+                {
+                    var card = handCard.AsCardId();
+                    _session.Sim.GainCard(setup.PlayerId, card, handCard.count);
+                    if (card.cardType == CardType.Unit)
+                        prewarmUnits.Add((UnitName)card.value);
+                }
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Mora), BattleMetrics.InitialMora);
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
             }
+            IdleClipPrewarmPool.Prewarm(this, CollectIdleClips(prewarmUnits));
 
             // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/active/32 §6；
             // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
@@ -453,6 +465,19 @@ namespace GIC.UI
                 if (deck != null && deck.Count > 0) return new List<HandCard>(deck);
             }
             return BuildHandFromCurrentDeck();
+        }
+
+        /// <summary>待机片卡组预热池收集（2026-10-16 部署黑窗根治批）：角色并集 → 各自 立牌动画视频
+        /// （null/缺配置跳过=该角色部署走池外静态立牌过渡兜底）</summary>
+        private List<VideoClip> CollectIdleClips(HashSet<UnitName> units)
+        {
+            var unitConfig = Wargame.Instance?.Context?.Get<UnitConfig>();
+            var result = new List<VideoClip>();
+            if (unitConfig == null) return result;
+            foreach (var unitName in units)
+                if (unitConfig.TryGetUnitData(unitName, out var unitData) && unitData.立牌动画视频 != null)
+                    result.Add(unitData.立牌动画视频);
+            return result;
         }
 
         // ==================== 战斗地图音乐（轮换链，参考大厅位置曲模式） ====================

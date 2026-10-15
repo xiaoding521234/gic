@@ -1561,6 +1561,7 @@ namespace GIC.Battle
             _views.Clear();
             _customProjectiles.Clear(); // per-unit 专属弹射物随场同清（与 _views 同生命周期）
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
+            ResidentVideoBudget.ClearAll(); // 常驻解码器注册表随清场清空（2026-10-16 常驻批——单位 OnDestroy 已逐个拆，此处双保险）
         }
 
         /// <summary>层级→眷属判定（命座徽章门控数据，2026-10-06）：快照 tier 优先（0=未填回落星级换算，

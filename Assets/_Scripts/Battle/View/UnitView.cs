@@ -120,11 +120,17 @@ namespace GIC.Battle
         private Material _videoMaterial; // ChromaKey 材质（本组件持有，OnDestroy 释放——docs/14 §63①）
         private bool _videoFailed;
         private bool _videoHalted;
+        private bool _residentHalted; // 常驻动作播放器冻结/尸体停摆标志（解冻恢复用，2026-10-16 常驻批）
         // 动作片 RT 池（2026-10-05 决策四十五：per-clip 池化+建场预热首帧——「首次施放/移动黑屏」根因=
         // 新分配 RT 恒黑 + VideoPlayer 首开解码 ~100-300ms 才落首帧；PrewarmActionClips 建场预解码首帧
         // 入池，PlayActionVideo 按片取 RT：预热命中=已带首帧零黑屏、未命中=现建回落旧行为兜底。
         // 池化顺带消除旧单槽 RT 的换片重建（move 768² 与战技 1344×768 交替播曾每次重建））
         private readonly Dictionary<VideoClip, RenderTexture> _actionRts = new Dictionary<VideoClip, RenderTexture>();
+        // 常驻播放器池（2026-10-16 施放延迟根治批）：per-clip 解码器 Pause 留 warm——施放≈0 启动
+        // （治 MediaCodec/WMF 换片重开 0.1~1s）；安卓全局预算 LRU 淘汰（ResidentVideoBudget），
+        // 淘汰片回落现行主播放器换片路径。施放期间主播放器 Pause 防双解码负载，片末回待机时恢复。
+        private readonly Dictionary<VideoClip, VideoPlayer> _residentPlayers = new Dictionary<VideoClip, VideoPlayer>();
+        private VideoClip _activeResidentClip; // 当前在显的动作片（常驻路径，2026-10-16 常驻批——回切守卫：仅它的播完才回待机，防止「施放中再施放」时旧片播完误切材质）
         private VideoClip _idleVideoClip; // 待机片=回切目标（B-S4a 移动态接线，2026-09-29）
         // 移动循环片（2026-10-05 决策四十四「尽可能统一」：per-skill——Move 型技能 SkillData.动作视频 经
         // SkillCast 登记（SetMoveVideo），Move 命令片起止 SetMoveAnimation 消费；走与一次性动作片同款
@@ -157,11 +163,22 @@ namespace GIC.Battle
                 if (IsCorpse || IsFrozen)
                 {
                     if (_videoPlayer.isPlaying) { _videoPlayer.Pause(); _videoHalted = true; }
+                    // 常驻动作播放器同停摆（冻结/尸体时不得继续渲 RT）
+                    foreach (var rp in _residentPlayers.Values)
+                        if (rp != null && rp.isPlaying) { rp.Pause(); _residentHalted = true; }
                 }
                 else if (_videoHalted && !_videoFailed)
                 {
                     _videoPlayer.Play(); // 解冻自动恢复（尸体永不复苏=永不恢复）
                     _videoHalted = false;
+                    if (_residentHalted)
+                    {
+                        // 常驻播放器解冻恢复：在播态的回 Play（未在播=本就 Pause 留 warm 不动）
+                        foreach (var rp in _residentPlayers.Values)
+                            if (rp != null && !rp.isLooping && rp.frame > 0 && !IsCorpse)
+                                rp.Play(); // 一次性动作片中途冻结→解冻续播到回切；循环态常驻=移动循环（SetMoveAnimation 管理）不在此列
+                        _residentHalted = false;
+                    }
                 }
                 return;
             }
@@ -180,6 +197,23 @@ namespace GIC.Battle
             if (_avatarRenderer != null) _avatarRenderer.enabled = true;
         }
 
+        /// <summary>池外/预热未完成的部署过渡（2026-10-16 部署黑窗根治批兜底路）：MeshRenderer 禁、
+        /// 静态立牌显示，主播放器首帧落地（frame>=1）再开渲染器+禁 sprite——部署瞬间显示静态立牌
+        /// 而非黑块，首帧就绪无感切换；8s 超时兜底（解码挂死=维持静态立牌，不悬空协程）</summary>
+        private IEnumerator WaitForFirstFrameThenShow(GameObject videoGo)
+        {
+            var mr = videoGo.GetComponent<MeshRenderer>();
+            float deadline = Time.unscaledTime + 8f;
+            while ((_videoPlayer == null || _videoPlayer.frame < 1) && Time.unscaledTime < deadline)
+                yield return null;
+            if (_videoPlayer != null && _videoPlayer.frame >= 1)
+            {
+                if (mr != null) mr.enabled = true; // 渲染器启用（勿动 GameObject 激活态——播放器同物体）
+                if (_avatarRenderer != null) _avatarRenderer.enabled = false; // 无感切换（与 OnVideoError 兜底语义互补）
+            }
+            // 超时：维持静态立牌（渲染器留禁）——黑窗已免，宁立牌不黑块
+        }
+
         // ==================== 移动态动画切换（B-S4a 移动态接线，2026-09-29 拍板「正式化安柏待机+移动动画」） ====================
 
         /// <summary>动作片建场预热（2026-10-05 决策四十五，BattlePlayer.CreateView 建场后调）：为单位
@@ -187,7 +221,12 @@ namespace GIC.Battle
         /// 首次施放/移动时素材面即有画（预热首帧），解码器随后接上，消除「首次使用黑屏」
         /// （根因=RT 新分配恒黑+VideoPlayer 首开解码 ~100-300ms 才落首帧；视频资产随 Config 常驻、
         /// 黑的只是解码器首开——AssetCache/Addressables 管不到解码器，预热走视频路径本机件）。
-        /// 幂等（已预热片直通）；无视频路径/解码失败单位早退（动作片本就走主视频机）</summary>
+        /// 幂等（已预热片直通）；无视频路径/解码失败单位早退（动作片本就走主视频机）。
+        /// **常驻播放器改造（2026-10-16 部署黑窗+施放延迟根治批）**：预热不再拆临时播放器——
+        /// per-clip 常驻播放器 Prepare→首帧渲入池 RT→**Pause 留 warm**（解码器保持已初始化：
+        /// 治「施放=主播放器换片=MediaCodec/WMF 重开 0.1~1s」的手机施放延迟——施放时常驻播放器
+        /// 直接 Play=启动≈0，只剩 seek）。安卓预算制（常驻解码器全局上限，超限 LRU 淘汰回落
+        /// 现行换片行为=有延迟但不黑屏）；桌面/编辑器全量常驻（ResidentVideoBudget）。</summary>
         public void PrewarmActionClips(List<VideoClip> clips)
         {
             if (_videoPlayer == null || _videoFailed || clips == null) return;
@@ -198,37 +237,48 @@ namespace GIC.Battle
                 var rt = new RenderTexture((int)clip.width, (int)clip.height, 0,
                     RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 _actionRts[clip] = rt;
-                StartCoroutine(PrewarmClipRoutine(clip, rt));
-            }
-        }
-
-        /// <summary>单片预热协程：临时 VideoPlayer Prepare→首帧渲入 RT→拆临时播放器（RT 留存首帧）。
-        /// 5s 超时兜底（挂死的准备不滞留协程与临时对象——预热失败仅回落「现建 RT 黑帧」旧行为不炸建场）</summary>
-        private IEnumerator PrewarmClipRoutine(VideoClip clip, RenderTexture rt)
-        {
-            var host = new GameObject("ActionPrewarm");
-            host.transform.SetParent(transform, false);
-            var vp = host.AddComponent<VideoPlayer>();
-            try
-            {
+                var go = new GameObject("ActionResident_" + clip.name);
+                go.transform.SetParent(transform, false);
+                var vp = go.AddComponent<VideoPlayer>();
                 vp.playOnAwake = false;
                 vp.clip = clip;
                 vp.renderMode = VideoRenderMode.RenderTexture;
                 vp.targetTexture = rt;
                 vp.audioOutputMode = VideoAudioOutputMode.None;
-                vp.Prepare();
-                float deadline = Time.unscaledTime + 5f;
-                while (!vp.isPrepared && Time.unscaledTime < deadline) yield return null;
-                if (!vp.isPrepared) yield break; // 超时：RT 留黑=旧行为兜底
-                vp.Play();
-                yield return null;
-                yield return null; // 两帧确保 WMF 完成一次渲染入 RT
-                vp.Pause();
+                vp.loopPointReached += OnActionVideoFinished; // 常驻播放器播完回待机（source=常驻→Pause 回零留 warm+主播放器恢复）
+                _residentPlayers[clip] = vp;
+                ResidentVideoBudget.Register(this, vp);
+                StartCoroutine(PrewarmClipRoutine(vp, rt));
             }
-            finally
+        }
+
+        /// <summary>常驻播放器预热：Prepare→首帧渲入池 RT→Pause 留 warm（解码器不销毁）。
+        /// 超时兜底=RT 留黑+播放器保留（下次施放自然起播，不再挂起）</summary>
+        private IEnumerator PrewarmClipRoutine(VideoPlayer vp, RenderTexture rt)
+        {
+            vp.Prepare();
+            float deadline = Time.unscaledTime + 5f;
+            while (!vp.isPrepared && Time.unscaledTime < deadline) yield return null;
+            if (!vp.isPrepared) yield break; // 超时：RT 留黑=旧行为兜底
+            vp.Play();
+            yield return null;
+            yield return null; // 两帧确保 WMF 完成一次渲染入 RT
+            vp.Pause(); // 留 warm：解码器保持已初始化（常驻核心语义）
+        }
+
+        /// <summary>预算淘汰回调（ResidentVideoBudget LRU 淘汰时调）：拆除该常驻播放器——
+        /// 该片回落现行主播放器换片路径（有首开延迟但不黑屏：池 RT 首帧仍在）</summary>
+        public void EvictResidentPlayer(VideoClip clip)
+        {
+            if (clip != null && _residentPlayers.TryGetValue(clip, out var vp))
             {
-                if (vp != null) { vp.Stop(); vp.clip = null; }
-                if (host != null) Destroy(host);
+                _residentPlayers.Remove(clip);
+                if (vp != null)
+                {
+                    vp.Stop();
+                    vp.clip = null;
+                    Destroy(vp.gameObject);
+                }
             }
         }
 
@@ -264,6 +314,11 @@ namespace GIC.Battle
             }
             if (!_moveLoopActive) return;
             _moveLoopActive = false;
+            _activeResidentClip = null; // 移动片常驻登记清（移动态结束=无在显动作片）
+            // 常驻批：移动循环片若走常驻播放器（loop 态不停播），移动结束时显式停它（Pause 留 warm）
+            // ——否则解码器空转渲染不显示的 RT
+            if (_moveClip != null && _residentPlayers.TryGetValue(_moveClip, out var rmove) && rmove != null && rmove.isPlaying)
+                rmove.Pause();
             SwitchToIdleLoop(vp);
         }
 
@@ -291,10 +346,51 @@ namespace GIC.Battle
                     RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 _actionRts[clip] = actionRt;
             }
-            vp.isLooping = loop; // loop 通道（决策四十四）：一次性动作片 false（播完回待机）/移动循环片 true（不自动回切）
-            vp.playbackSpeed = Mathf.Max(0.1f, playbackSpeed); // =战斗回放速度×技能校准倍率（移动循环片同口径——行走 tween 同按回放速度缩放，快进不脚滑）
-            vp.clip = clip;
-            vp.targetTexture = actionRt;
+            // 播放源选择（2026-10-16 常驻批）：常驻播放器命中=直接 Play（解码器已开=启动≈0，治手机施放
+            // 延迟）；未命中（预算淘汰/未预热）=现行主播放器换片路径（有首开延迟但兜底可用）。
+            // 常驻路径主播放器 Pause（防双解码负载），片末 SwitchToIdleLoop 恢复。
+            bool resident = _residentPlayers.TryGetValue(clip, out var rvp) && rvp != null && rvp.isPrepared;
+            if (resident)
+            {
+                ResidentVideoBudget.Touch(rvp);
+                if (vp.isPlaying) vp.Pause(); // 主播放器让位（待机解码器暂挂——回待机时恢复，无需关停）
+                _activeResidentClip = clip; // 在显片登记（回切守卫）
+            }
+            var active = resident ? rvp : vp; // 播放参数统一写 active；loopPointReached 两路共用 OnActionVideoFinished
+            active.isLooping = loop; // loop 通道（决策四十四）：一次性动作片 false（播完回待机）/移动循环片 true（不自动回切）
+            active.playbackSpeed = Mathf.Max(0.1f, playbackSpeed); // =战斗回放速度×技能校准倍率（移动循环片同口径——行走 tween 同按回放速度缩放，快进不脚滑）
+            if (resident)
+            {
+                // 常驻路径：seek 回 0 再 Play（Tuanjie 末帧怪态「播完态 Play 续播」——先归零再放）
+                rvp.frame = 0;
+                rvp.Play();
+                if (IsCorpse || IsFrozen)
+                {
+                    if (rvp.isPlaying) { rvp.Pause(); _residentHalted = true; }
+                }
+                else
+                {
+                    _residentHalted = false;
+                }
+            }
+            else
+            {
+                // 非驻留换片路径（预算淘汰/未预热片）：顶替清场——停掉可能在播的常驻片（防其播完误回切），
+                // 清在显登记（本片走主播放器，播完回切由 source==_videoPlayer 分支负责）
+                _activeResidentClip = null;
+                foreach (var rp in _residentPlayers.Values)
+                    if (rp != null && rp.isPlaying) rp.Pause();
+                active.clip = clip;
+                active.targetTexture = actionRt;
+                if (IsCorpse || IsFrozen)
+                {
+                    if (active.isPlaying) { active.Pause(); _videoHalted = true; }
+                }
+                else
+                {
+                    active.Play();
+                }
+            }
             _videoMaterial.mainTexture = actionRt;
             // Alpha 打包模式开关（2026-10-16 离线抠绿批）：打包片直读 alpha 区跳过运行时抠色；
             // 材质是 per-unit 单实例，按片置位/回待机归零（RestoreIdleVideoSurface）
@@ -322,17 +418,10 @@ namespace GIC.Battle
                     _avatarVideoFlipBasePosition.y + 位置偏移.y,
                     _avatarVideoFlipBasePosition.z);
             }
-            vp.time = loop && clip.length > 0.0
-                ? UnityEngine.Random.Range(0f, (float)clip.length) // 循环态=随机相位（多枚同款单位错开扇翼，B-S3 同语义）
-                : 0.0; // 一次性动作片=从头播（起手动作从第一帧）
-            if (IsCorpse || IsFrozen)
-            {
-                if (vp.isPlaying) { vp.Pause(); _videoHalted = true; }
-            }
-            else
-            {
-                vp.Play();
-            }
+            // 起始相位：循环态=随机相位（多枚同款单位错开扇翼，B-S3 同语义）；一次性=从头播。
+            // 非驻留换片路径在此对 active 设 time；常驻路径已在上方 frame=0 归零
+            if (!resident && loop && clip.length > 0.0)
+                active.time = UnityEngine.Random.Range(0f, (float)clip.length);
         }
 
         /// <summary>视频路径回待机/移动常态：主 RT 回接+quad 恢复原比例与基准位（OnActionVideoFinished 回切与
@@ -364,36 +453,59 @@ namespace GIC.Battle
 
         /// <summary>一次性动作片播完回待机（loopPointReached 仅 isLooping=false 的动作片走到这里——
         /// isLooping=true 的循环片〔待机/移动 loop 态〕每次循环点也触发本事件，直接 return 无操作）；
-        /// 回待机常态=SwitchToIdleLoop（与移动循环态结束两路共用）</summary>
+        /// **常驻批**：source=常驻播放器（换片路径终将迁常驻）→常驻只 Pause 回零留 warm、主播放器恢复待机；
+        /// source=主播放器（现行换片路径）→SwitchToIdleLoop 原逻辑</summary>
         private void OnActionVideoFinished(VideoPlayer source)
         {
             if (source.isLooping) return;
+            if (source != _videoPlayer)
+            {
+                // 常驻播放器播完：Pause 回零留 warm（clip 不动=解码器温备下次施放≈0 启动）
+                source.Pause();
+                source.frame = 0;
+                // 回切守卫（三重）：①非当前在显片（被后续施放顶替的旧片）播完=只静默停，不切材质；
+                // ②移动循环态在播（SetMoveAnimation 接管中）=等移动结束统一收口；③否则回待机
+                if (_activeResidentClip == null || source.clip != _activeResidentClip) return;
+                _activeResidentClip = null;
+                if (_moveLoopActive) return;
+                SwitchToIdleLoop(_videoPlayer);
+                return;
+            }
+            if (_moveLoopActive) return; // 同守卫（现行换片路径同场景）
             SwitchToIdleLoop(source);
         }
 
         /// <summary>回待机循环常态（2026-10-05 决策四十四抽提两路共用：一次性动作片播完回切 +
         /// 移动循环态结束 SetMoveAnimation(false)）：主 RT 回接+quad 原比例与基准位（RestoreIdleVideoSurface）+
-        /// 回放速度归 1+待机片 t=0 起播；冻结/尸体态 Pause 停摆</summary>
+        /// 回放速度归 1+待机片 t=0 起播；冻结/尸体态 Pause 停摆。**常驻批**：只驱动主播放器
+        /// （常驻播放器由 PlayActionVideo/SwitchToIdleLoop 前置 Pause 让位，此处不触碰）</summary>
         private void SwitchToIdleLoop(VideoPlayer source)
         {
             var idle = _idleVideoClip;
             if (idle == null || _videoFailed) return;
-            RestoreIdleVideoSurface();
-            source.playbackSpeed = 1f;
-            source.isLooping = true;
-            source.clip = idle;
-            // 回切固定 t=0 起播（2026-10-11 用户拍板 A：随机相位起播在「动作片收势→待机」瞬间可见跳变；
-            // 固定起点=姿态衔接可预测。建场相位仍随机（Create 处多枚错开保留）——回切后各自循环
-            // 时间独立，相位随播放自然分岔，不叠加）
-            source.time = 0f;
+            // 常驻路径施放时主播放器被 Pause 让位——回待机时恢复（解码器未拆，恢复即时）
+            if (!_videoPlayer.isPlaying && _videoPlayer.clip == idle && !_videoHalted && !IsCorpse && !IsFrozen)
+                _videoPlayer.Play();
+            if (source == _videoPlayer && _videoPlayer.clip != idle)
+            {
+                // 现行换片路径：主播放器换回待机片
+                _videoPlayer.playbackSpeed = 1f;
+                _videoPlayer.isLooping = true;
+                _videoPlayer.clip = idle;
+                // 回切固定 t=0 起播（2026-10-11 用户拍板 A：随机相位起播在「动作片收势→待机」瞬间可见跳变；
+                // 固定起点=姿态衔接可预测。建场相位仍随机（Create 处多枚错开保留）——回切后各自循环
+                // 时间独立，相位随播放自然分岔，不叠加）
+                _videoPlayer.time = 0f;
+            }
             if (IsCorpse || IsFrozen)
             {
-                if (source.isPlaying) { source.Pause(); _videoHalted = true; }
+                if (_videoPlayer.isPlaying) { _videoPlayer.Pause(); _videoHalted = true; }
             }
-            else
+            else if (!_videoPlayer.isPlaying && _videoPlayer.clip == idle)
             {
-                source.Play();
+                _videoPlayer.Play();
             }
+            RestoreIdleVideoSurface();
         }
 
         // ==================== 立牌朝向（拍板③：方向镜像） ====================
@@ -445,6 +557,11 @@ namespace GIC.Battle
 
         private void OnDestroy()
         {
+            // 常驻预算注销（先清注册表再拆播放器——EvictResidentPlayer 遍历时序安全）
+            foreach (var rp in _residentPlayers.Values)
+                if (rp != null) { rp.Stop(); rp.clip = null; Destroy(rp.gameObject); }
+            _residentPlayers.Clear();
+            Destroyed?.Invoke(this);
             if (_baseDiscMaterial != null) Destroy(_baseDiscMaterial);
             if (_videoMaterial != null) Destroy(_videoMaterial); // ChromaKey 材质（调用方持有纪律，docs/14 §63①）
             if (_videoRt != null) { _videoRt.Release(); Destroy(_videoRt); } // RT 随单位释放（视频路线显存恒定的收口）
@@ -452,6 +569,9 @@ namespace GIC.Battle
                 if (rt != null) { rt.Release(); Destroy(rt); }
             _actionRts.Clear();
         }
+
+        /// <summary>单位销毁通知（ResidentVideoBudget 注销挂载用，2026-10-16 常驻批）</summary>
+        public event Action<UnitView> Destroyed;
 
         /// <summary>
         /// 创建立牌（头像 SpriteRenderer + 阵营色底座；头顶条/命座徽章/Buff 图标归屏幕空间层 BattleOverheadBars）
@@ -534,6 +654,10 @@ namespace GIC.Battle
                 float videoAspect = idleVideo.height > 0 ? idleVideo.width / (float)idleVideo.height : 1f;
                 view._videoRt = new RenderTexture((int)idleVideo.width, (int)idleVideo.height, 0,
                     RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                // 待机片预热池消费（2026-10-16 部署黑窗根治）：命中=Blit 模板首帧进单位 RT=quad 即显
+                // 待机首帧零黑窗（解码器随后无缝接管同 RT）；未命中（池外角色/预热未完成）=静态立牌过渡
+                // ——sprite 保持显示、quad 藏，主播放器首帧落地再切换（SpriteCoroutine）
+                bool prewarmed = IdleClipPrewarmPool.TryCopyFirstFrame(idleVideo, view._videoRt);
                 view._videoMaterial = BattleViewFactory.CreateChromaKeyMaterial();
                 view._videoMaterial.mainTexture = view._videoRt;
 
@@ -542,10 +666,13 @@ namespace GIC.Battle
                 videoGo.transform.localPosition = new Vector3(0f, videoDisplayHeight * 0.5f, 0f);
                 videoGo.transform.localScale = new Vector3(videoDisplayHeight * videoAspect, videoDisplayHeight, 1f);
                 videoGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AvatarSortingOrder; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
-                // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（视频 quad 依赖 shader Cull Off）
+                // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（视频 shader Cull Off）
                 view._avatarVideoFlip = videoGo.transform;
                 view._avatarVideoFlipBaseScale = videoGo.transform.localScale;
                 view._avatarVideoFlipBasePosition = videoGo.transform.localPosition; // 基准位（动作片位置偏移回退锚点）
+                // 池外/预热未完：MeshRenderer 先禁（勿 SetActive(false)——VideoPlayer 挂同物体，
+                // 对象失活=播放器停摆 frame 永不推进，兜底协程必超时）；首帧落地协程再启用
+                videoGo.GetComponent<MeshRenderer>().enabled = prewarmed;
 
                 var vp = videoGo.AddComponent<VideoPlayer>();
                 vp.playOnAwake = false;
@@ -562,6 +689,8 @@ namespace GIC.Battle
                 vp.Play();
                 view._videoPlayer = vp;
                 view._idleVideoClip = idleVideo; // 待机/回切目标片（B-S4a 移动态接线；移动片=per-skill SetMoveVideo 登记，决策四十四）
+                if (!prewarmed)
+                    view.StartCoroutine(view.WaitForFirstFrameThenShow(videoGo));
             }
 
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=该单位受击圆柱直径
