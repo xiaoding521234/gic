@@ -40,6 +40,7 @@ namespace GIC.Battle
             var itemConsumeKeys = new HashSet<string>();
             var reviveKeys = new HashSet<string>();
             var removeBuffKeys = new HashSet<string>(); // RemoveBuff 命令目标索引（冻结层归零解冻对账用，决策七十四）
+            var terrainKeys = new HashSet<string>(); // 地形变化命令格索引（元素×地形对账用，决策七十六）
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -78,6 +79,9 @@ namespace GIC.Battle
                         break;
                     case BattleCommandType.RemoveBuff:
                         removeBuffKeys.Add(command.targetUnitId);
+                        break;
+                    case BattleCommandType.TerrainChange:
+                        terrainKeys.Add($"{command.cell.x}:{command.cell.y}");
                         break;
                 }
             }
@@ -171,6 +175,13 @@ namespace GIC.Battle
                     // 归零（Depleted）=RemoveBuff 命令（客户端徽章+霜化即时退场）
                     if (consumeFreeze.Depleted && !removeBuffKeys.Contains(consumeFreeze.TargetUnitId))
                         Report(context, effect, BattleCommandType.RemoveBuff);
+                }
+                else if (effect is TerrainChangeEffect terrain)
+                {
+                    // 元素×地形（决策七十六）：每效应一条 TerrainChange 命令（同格重复效应各一条、
+                    // 幂等无害——按 (x:y) 键查存在性）
+                    if (!terrainKeys.Contains($"{terrain.Cell.x}:{terrain.Cell.y}"))
+                        Report(context, effect, BattleCommandType.TerrainChange);
                 }
                 else if (effect is ApplyBuffEffect)
                 {

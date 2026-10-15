@@ -67,6 +67,20 @@ namespace GIC.Battle
         [Tooltip("滞留后的淡出时长（秒）")]
         [SerializeField, Range(0f, 1f)] private float 箭雨落地淡出 = 0.18f;
 
+        [Header("箭矢落地（决策七十六元素×地形批：消散箭/箭雨落箭共用的沉水与插地摇晃参数）")]
+        [Tooltip("插地箭尾部弹性摇晃时长（秒；正弦衰减，两三个来回即收敛；0=不摇）")]
+        [SerializeField, Min(0f)] private float 箭落摇晃时长 = 0.8f;
+        [Tooltip("摇晃初始摆角（度；绕埋入尖屏幕面内摆动）")]
+        [SerializeField, Range(0f, 30f)] private float 箭落摇晃幅度 = 10f;
+        [Tooltip("落水沉入深度（格；箭贴水面下潜后淡出=「沉入水下」）")]
+        [SerializeField, Min(0f)] private float 箭落沉水深度 = 0.28f;
+        [Tooltip("落水沉没时长（秒；下潜+淡出同程）")]
+        [SerializeField, Range(0.05f, 2f)] private float 箭落沉水时长 = 0.5f;
+        [Tooltip("消散箭插地角（度；箭身从水平飞行姿态绕尖摆到插地姿态——负=尖端朝下）")]
+        [SerializeField, Range(-89f, 0f)] private float 箭落插地角 = -70f;
+        [Tooltip("消散箭坠地时长（秒；尖自空中落至表面点+摆正到插地角）")]
+        [SerializeField, Range(0.02f, 1f)] private float 箭落坠地时长 = 0.12f;
+
         // 配色统一走 BattlePalette 配置资产（2026-09-18 统一化批次；原 _teamAColor/_teamBColor 场景序列化值
         // 与代码默认一致，迁移零损失——2026-10-12 拍板起单位显示色=归属玩家色〔HUD 注入解析器〕，
         // Palette 我方/敌方主色仅作 HUD 未绑时的兜底口径）
@@ -478,12 +492,132 @@ namespace GIC.Battle
                 float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
                 yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
 
-                Destroy(arrowGo);
+                // 落地表现（决策七十六「箭矢落在水面上应当表现为沉入水下，落在其它表面上插入地面
+                // 尾部弹性摇晃」）：消散箭不再凭空消失——fire-and-forget（落地=已结算装饰尾巴，
+                // 不阻下一片空等跳过，雨箭同口径）
+                StartCoroutine(PlayVanishArrowLandingCoroutine(arrowGo, command));
             }
             finally
             {
                 _meaningfulActionInFlight--;
             }
+        }
+
+        /// <summary>消散箭落地表现（决策七十六）：落点格水面/沼泽=保持水平姿态坠至水面→沉入水下
+        /// （下潜+淡出）；实面（地面/薄冰）=尖自空中落至表面+绕尖摆到插地角+沿轴压入+尾部弹性摇晃
+        /// +滞留淡出（参数与箭雨落地同族）；虚空边缘无表面=无落地直接消失（旧行为）。
+        /// 落点格=千分定点向下取整（连续格心系 c+0.5）；无定点方向兜底路径按 cell+方向×value 算终点格</summary>
+        private IEnumerator PlayVanishArrowLandingCoroutine(GameObject arrowGo, BattleCommand command)
+        {
+            if (arrowGo == null) yield break;
+            BattleCell cell;
+            if (command.hitX != 0 || command.hitY != 0)
+                cell = new BattleCell(Mathf.FloorToInt(command.hitX / 1000f), Mathf.FloorToInt(command.hitY / 1000f));
+            else
+            {
+                var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
+                cell = new BattleCell(command.cell.x + delta.x * command.value,
+                    command.cell.y + delta.y * command.value);
+            }
+            if (_board == null || _board.Map == null || !_board.Map.HasTile(cell.x, cell.y))
+            {
+                Destroy(arrowGo); // 虚空边缘（无表面）：无落地——现状消失
+                yield break;
+            }
+
+            var tile = _board.Map.GetTile(cell.x, cell.y);
+            var surfaceY = _board.GetVisualSurfaceHeight(cell);
+            var renderer = arrowGo.GetComponent<SpriteRenderer>();
+            float halfLen = renderer != null ? renderer.bounds.size.x * 0.5f : 0f;
+            var baseRot = arrowGo.transform.rotation;
+
+            if (tile == TileType.Water || tile == TileType.Swamp)
+            {
+                // 落水：坠至水面（保持水平姿态）→沉入水下+淡出（「沉入水下」，无插土无摇晃）
+                var dropFrom = arrowGo.transform.position;
+                var dropTo = new Vector3(dropFrom.x, surfaceY, dropFrom.z);
+                yield return BattleViewTween.Over(箭落坠地时长 / _playbackSpeed, t =>
+                {
+                    if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(dropFrom, dropTo, t);
+                });
+                var sinkColor = renderer != null ? renderer.color : Color.white;
+                var sinkFrom = dropTo;
+                yield return BattleViewTween.Over(箭落沉水时长 / _playbackSpeed, t =>
+                {
+                    if (arrowGo != null)
+                        arrowGo.transform.position = sinkFrom + new Vector3(0f, -箭落沉水深度 * t, 0f);
+                    if (renderer != null) { var c = sinkColor; c.a = sinkColor.a * (1f - t); renderer.color = c; }
+                });
+                if (arrowGo != null) Destroy(arrowGo);
+                yield break;
+            }
+
+            // 实面（地面/薄冰）：尖自空中落至表面+绕尖摆到插地角（绕移动尖旋转=坠地+摆正一段完成）
+            var tipArrival = arrowGo.transform.position + arrowGo.transform.right * halfLen;
+            var tipGround = new Vector3(tipArrival.x, surfaceY + 0.02f, tipArrival.z);
+            var plantRot = baseRot * Quaternion.Euler(0f, 0f, 箭落插地角);
+            yield return BattleViewTween.Over(箭落坠地时长 / _playbackSpeed, t =>
+            {
+                if (arrowGo == null) return;
+                arrowGo.transform.rotation = Quaternion.Slerp(baseRot, plantRot, t);
+                var tip = Vector3.Lerp(tipArrival, tipGround, t);
+                arrowGo.transform.position = tip - arrowGo.transform.right * halfLen; // 绕尖旋转的位姿补偿
+            });
+            if (arrowGo == null) yield break;
+            var plantPos = arrowGo.transform.position;
+            var plantRotFinal = arrowGo.transform.rotation;
+
+            // 沿轴压入（箭雨插土同语言：尖入表面、尾翘起）
+            if (箭雨入土深度 > 0f)
+            {
+                var stuckTo = plantPos + plantRotFinal * Vector3.right * 箭雨入土深度;
+                var stuckFrom = plantPos;
+                yield return BattleViewTween.Over(箭雨入土时长 / _playbackSpeed, t =>
+                {
+                    if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(stuckFrom, stuckTo, t);
+                });
+            }
+
+            // 尾部弹性摇晃（绕埋入尖屏幕面内正弦衰减）
+            yield return PlayArrowTailWobbleCoroutine(arrowGo, plantRotFinal * Vector3.forward);
+
+            // 滞留+淡出（箭雨落地参数同族：拍板「插地箭摇晃衰减后滞留 3 秒淡出」）
+            if (箭雨落地滞留 > 0f)
+                yield return new WaitForSeconds(箭雨落地滞留 / _playbackSpeed);
+            if (renderer != null && 箭雨落地淡出 > 0f)
+            {
+                var color = renderer.color;
+                yield return BattleViewTween.Over(箭雨落地淡出 / _playbackSpeed, t =>
+                {
+                    if (renderer != null) { var c = color; c.a = color.a * (1f - t); renderer.color = c; }
+                });
+            }
+            if (arrowGo != null) Destroy(arrowGo);
+        }
+
+        /// <summary>插地箭尾部弹性摇晃（决策七十六「插入地面时，尾部有弹性摇晃」）：绕埋入尖
+        /// （position+right×半长）绕布告板法线正弦衰减摆动，两三个来回即收敛；纯代码动画零素材。
+        /// axis=摆动轴（布告板法线=baseRot*forward，屏幕面内摆动与箭矢朝向构建同族）</summary>
+        private IEnumerator PlayArrowTailWobbleCoroutine(GameObject arrowGo, Vector3 axis)
+        {
+            if (arrowGo == null || 箭落摇晃时长 <= 0f || 箭落摇晃幅度 <= 0f) yield break;
+            var renderer = arrowGo.GetComponent<SpriteRenderer>();
+            float halfLen = renderer != null ? renderer.bounds.size.x * 0.5f : 0f;
+            var pivot = arrowGo.transform.position + arrowGo.transform.right * halfLen; // 埋入尖=摆动枢轴
+            var baseRot = arrowGo.transform.rotation;
+            var centerOffset = arrowGo.transform.position - pivot;
+            float elapsed = 0f;
+            while (elapsed < 箭落摇晃时长 && arrowGo != null)
+            {
+                elapsed += Time.deltaTime / _playbackSpeed;
+                float theta = 箭落摇晃幅度 * Mathf.Sin(9f * elapsed) * Mathf.Exp(-5.5f * elapsed);
+                arrowGo.transform.rotation = baseRot * Quaternion.Euler(0f, 0f, theta);
+                arrowGo.transform.position = pivot + Quaternion.AngleAxis(theta, axis) * centerOffset;
+                yield return null;
+            }
+            if (arrowGo == null) yield break;
+            arrowGo.transform.rotation = baseRot; // 摇晃收尾：回正姿态
+            arrowGo.transform.position = pivot + centerOffset;
         }
 
         /// <summary>正式箭矢 sprite（Resources/UI/Battle/ArrowBolt——AI 生成白色箭矢，运行时元素色染色；
@@ -694,14 +828,42 @@ namespace GIC.Battle
                 _meaningfulActionInFlight--; // 落地/中断都结算——插土滞留淡出段不阻下一片空等跳过
             }
 
+            // 落地分支（决策七十六「箭矢落在水面上应当表现为沉入水下」）：水面/沼泽=沉入水下
+            //（下潜+淡出，无插土无滞留）；实面（地面/薄冰）=现行插土+新增尾部弹性摇晃
+            var landTile = _board.Map != null && _board.Map.HasTile(cell.x, cell.y)
+                ? _board.Map.GetTile(cell.x, cell.y) : TileType.None;
+            if (landTile == TileType.Water || landTile == TileType.Swamp)
+            {
+                var sinkRenderer = arrowGo != null ? arrowGo.GetComponent<SpriteRenderer>() : null;
+                var sinkFrom = arrowGo != null ? arrowGo.transform.position : to;
+                var sinkColor = sinkRenderer != null ? sinkRenderer.color : Color.white;
+                yield return BattleViewTween.Over(箭落沉水时长 / _playbackSpeed, t =>
+                {
+                    if (arrowGo != null)
+                        arrowGo.transform.position = sinkFrom + new Vector3(0f, -箭落沉水深度 * t, 0f);
+                    if (sinkRenderer != null)
+                    {
+                        var c = sinkColor;
+                        c.a = sinkColor.a * (1f - t);
+                        sinkRenderer.color = c;
+                    }
+                });
+                if (arrowGo != null) Destroy(arrowGo);
+                yield break;
+            }
+
             // 落地插土：沿箭轴向落点内压入「箭雨入土深度」——屏幕平面布告板，入土段被地形深度裁掉
-            //（尖插表面、尾翘起；水面格插在波浪表面，透明水体不裁=透水可见属预期）
+            //（尖插表面、尾翘起；薄冰格=实面同地面插土不沉，决策七十六）
             if (arrowGo != null && 箭雨入土深度 > 0f)
             {
                 var stuckTo = to + arrowGo.transform.right * 箭雨入土深度; // transform.right=屏面内飞行方向（尖朝前）
                 yield return BattleViewTween.Over(箭雨入土时长 / _playbackSpeed,
                     t => { if (arrowGo != null) arrowGo.transform.position = Vector3.Lerp(to, stuckTo, t); });
             }
+
+            // 尾部弹性摇晃（决策七十六「插入地面时，尾部有弹性摇晃」）：绕埋入尖屏幕面内正弦衰减
+            if (arrowGo != null)
+                yield return PlayArrowTailWobbleCoroutine(arrowGo, arrowGo.transform.forward);
 
             if (箭雨落地滞留 > 0f)
                 yield return new WaitForSeconds(箭雨落地滞留 / _playbackSpeed);
@@ -850,10 +1012,30 @@ namespace GIC.Battle
                     case BattleCommandType.ApplyBuff:
                         // 来源三件随命令透传（2026-10-06 头顶 Buff 图标批）：层数=buffLevel（Host 合并后
                         // 回填值）、来源单位=actorUnitId、来源技能=metadata 复用字段——客户端图标行即时刷新。
-                        // buffKey=具名身份（决策五十七——同族异名共存各一枚徽章；旧回放缺省空按 type 匹配）
+                        // buffKey=具名身份（决策五十七——同族异名共存各一枚徽章；旧回放 key 空按 type 匹配）
+                        // **命中时刻到点应用（决策七十六复测返修 WYSIWYG）**：箭在飞时目标不提前结冰/
+                        // 挂减防徽章——launchMs>0 延迟到点（合并取首条时刻=徽章首现拍），0=立即
                         if (_views.TryGetValue(command.targetUnitId, out var buffed))
-                            buffed.ApplyBuffBadge(command.buffType, command.buffTurns, command.buffLevel,
-                                command.actorUnitId, command.metadata, command.buffKey);
+                        {
+                            var buffedView = buffed;
+                            var buffType = command.buffType;
+                            var buffTurns = command.buffTurns;
+                            var buffLevel = command.buffLevel;
+                            var buffActor = command.actorUnitId;
+                            var buffSourceSkill = command.metadata;
+                            var buffKey = command.buffKey;
+                            if (command.launchMs > 0)
+                                playbacks.Add(StartCoroutine(PlayDelayedStateApply(LaunchDelayOf(command),
+                                    () =>
+                                    {
+                                        if (buffedView != null)
+                                            buffedView.ApplyBuffBadge(buffType, buffTurns, buffLevel,
+                                                buffActor, buffSourceSkill, buffKey);
+                                    })));
+                            else
+                                buffedView.ApplyBuffBadge(buffType, buffTurns, buffLevel,
+                                    buffActor, buffSourceSkill, buffKey);
+                        }
                         break;
 
                     case BattleCommandType.RemoveBuff:
@@ -867,9 +1049,36 @@ namespace GIC.Battle
                         break;
 
                     case BattleCommandType.ElementAttach:
-                        // 附着即时刷新（2026-09-22 接线：此前靠下回合快照自愈，反应当片不可见）
+                        // 附着即时刷新（2026-09-22 接线：此前靠下回合快照自愈，反应当片不可见）；
+                        // **命中时刻到点应用（决策七十六复测返修 WYSIWYG）**：箭在飞时目标不提前挂
+                        // 附着图标——launchMs>0 延迟到点（投射物/整线段时刻），0=立即（OnCast/回合末）
                         if (_views.TryGetValue(command.targetUnitId, out var attached))
-                            attached.SetAttachedElement((ElementType)command.metadata);
+                        {
+                            var attachedView = attached;
+                            var attachElement = (ElementType)command.metadata;
+                            if (command.launchMs > 0)
+                                playbacks.Add(StartCoroutine(PlayDelayedStateApply(LaunchDelayOf(command),
+                                    () => { if (attachedView != null) attachedView.SetAttachedElement(attachElement); })));
+                            else
+                                attachedView.SetAttachedElement(attachElement);
+                        }
+                        break;
+
+                    case BattleCommandType.TerrainChange:
+                        // 元素×地形（决策七十六）：本地 map 真值+薄冰面板刷新——后续瞄准预览/箭落
+                        // 判地形即时正确（移动 BFS 客户端侧不跑、只 HUD 预览读图）；
+                        // **命中时刻到点应用（决策七十六复测返修 WYSIWYG「箭矢还未飞到薄冰就融化」）**：
+                        // launchMs>0 延迟到点（箭雨多波按波融化），0=立即（冰棱回合末冻结/泡湿类）
+                        if (_board != null)
+                        {
+                            var terrainCell = command.cell;
+                            var terrainTile = (TileType)command.value;
+                            if (command.launchMs > 0)
+                                playbacks.Add(StartCoroutine(PlayDelayedStateApply(LaunchDelayOf(command),
+                                    () => { if (_board != null) _board.ApplyTerrainChange(terrainCell, terrainTile); })));
+                            else
+                                _board.ApplyTerrainChange(terrainCell, terrainTile);
+                        }
                         break;
 
                     case BattleCommandType.Reaction:
@@ -1114,6 +1323,17 @@ namespace GIC.Battle
                 yield return new WaitForSeconds(delay);
             if (view != null)
                 view.SetAttachedElement(ElementType.Physical);
+        }
+
+        /// <summary>带命中时刻的状态命令到点应用（决策七十六复测返修 WYSIWYG「应当始终遵循所见即所得」）：
+        /// 地形变化/附着图标/Buff 徽章类状态命令的通用延迟壳——箭在飞时冰不提前融/目标不提前结冰；
+        /// 挂 playbacks=段完成门控（下一片不早于到点应用，瞄准/预判读图不读到旧态）。
+        /// apply 内部自守卫（view/board 可能已销毁——场景切换/单位移除）</summary>
+        private IEnumerator PlayDelayedStateApply(float delay, System.Action apply)
+        {
+            if (delay > 0f)
+                yield return new WaitForSeconds(delay);
+            apply();
         }
 
         /// <summary>伤害数字配色（2026-10-01 拍板+二次拍板「原神里反应都有自己的颜色」）：

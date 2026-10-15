@@ -286,6 +286,24 @@ namespace GIC.Battle
             ResolveAuraHits(effects);
             var expired = _sim.CollectExpiredBuffs();
 
+            // 泡湿附着（决策七十六拍板②「在水面上，且不为飞行或两栖移动的单位，每个回合结束时
+            // 附着 1 层水」）：地形判据=WaterTerrain 标签（水面/沼泽；**薄冰不带该标签=站薄冰不挂**），
+            // 豁免=移动类型飞行/两栖，存活单位才附着（尸体不挂——复活不带附着语义接近）。
+            // 覆盖语义=挂 1 层水覆盖旧附着（泡在水里火挂不住）；放 tick/到期之后=回合末收尾。
+            // 元素联动：泡湿单位天然带水附着——凯亚冰打=冻结反应、安柏火箭=蒸发（战术意义自洽）
+            foreach (var kv in _sim.Units)
+            {
+                var unit = kv.Value;
+                if (unit == null || BattleSimState.IsDead(unit)) continue;
+                var moveable = unit.GetUnitComponent<UnitMoveable>();
+                var moveType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
+                if (moveType == ForceType.Fly || moveType == ForceType.Amphibious) continue;
+                var pos = _sim.GetPosition(unit);
+                if (!_sim.Map.HasTile(pos.x, pos.y)) continue;
+                if (_sim.Map.GetTile(pos.x, pos.y).HasTag(TileTag.WaterTerrain))
+                    effects.Add(new AttachElementEffect(kv.Key, kv.Key, (int)ElementType.Hydro, 1));
+            }
+
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
@@ -331,6 +349,19 @@ namespace GIC.Battle
             _sim.BeginCompileDyeView(); // 共享视图：初值回落活态=回合末开始态；交错序列全程接力
             foreach (var hit in hits)
             {
+                // 元素×地形（决策七十六泛化拍板）：火元素 tick（燃烧 DoT 等）命中站在薄冰上的单位
+                // →其格融化为水面——与 CompileOnHit 出口同口径（一切火元素伤害命中薄冰上单位即融）；
+                // 纯附着事件（Request=null）非伤害不融；HitSeconds=拍时刻（逐拍到点融化）
+                if (hit.Element == ElementType.Pyro && hit.Request != null && hit.Target != null)
+                {
+                    var hitPos = _sim.GetPosition(hit.Target);
+                    if (_sim.Map.GetTile(hitPos.x, hitPos.y) == TileType.ThinIce)
+                        effects.Add(new TerrainChangeEffect(hitPos, (int)TileType.Water)
+                        {
+                            HitSeconds = hit.BeatSeconds,
+                        });
+                }
+
                 // 统一出口（Request=null=纯附着事件只过反应预判）；返回=来袭已被处置（反应消耗/
                 // 0层/剩余层附着，决策七十四）——该层**不再附着**；无反应层才附着（覆盖，带层数）
                 bool consumed = EffectCompiler.CompileElementalDamage(_sim, hit.AttackerUnitId, hit.TargetUnitId, null,
@@ -339,7 +370,10 @@ namespace GIC.Battle
                 if (hit.Attach && !consumed)
                 {
                     effects.Add(new AttachElementEffect(hit.AttackerUnitId, hit.TargetUnitId, (int)hit.Element,
-                        Mathf.Max(1, hit.Layers)));
+                        Mathf.Max(1, hit.Layers))
+                    {
+                        HitSeconds = hit.BeatSeconds, // 逐拍到点挂附着图标（WYSIWYG，决策七十六复测返修）
+                    });
                     _sim.SetCompileDye(hit.TargetUnitId, hit.Element, Mathf.Max(1, hit.Layers));
                 }
             }
@@ -499,8 +533,11 @@ namespace GIC.Battle
 
             foreach (var effect in EnumerateEffects<AttachElementEffect>(effects))
             {
-                segment.commands.Add(BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
-                    sliceIndex, indexInSlice++, effect.Element));
+                var attachCommand = BattleCommand.ElementAttach(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.Element);
+                // 命中时刻到点挂图标（决策七十六复测返修 WYSIWYG：箭在飞时目标不提前显示附着）
+                ApplyHitMs(attachCommand, effect.HitSeconds);
+                segment.commands.Add(attachCommand);
             }
             foreach (var effect in EnumerateEffects<ReactionEffect>(effects))
             {
@@ -610,11 +647,25 @@ namespace GIC.Battle
                 segment.commands.Add(BattleCommand.RemoveBuff(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, (int)BuffType.Freeze, effect.AppliedKey)); // 具名 key（决策五十七）
             }
+            // 地形变化（决策七十六元素×地形）：每格一条 TerrainChange——客户端本地 map SetTile+刷新该格
+            foreach (var effect in EnumerateEffects<TerrainChangeEffect>(effects))
+            {
+                var terrainCommand = BattleCommand.TerrainChange(effect.TargetUnitId, effect.Cell,
+                    sliceIndex, indexInSlice++, effect.NewTile); // actorUnitId=触发单位（归因/调试）
+                // 命中时刻到点应用（决策七十六复测返修 WYSIWYG——「箭矢还未飞到薄冰就融化」根因：
+                // 命令此前无时刻、片头即刷=箭在飞冰先化；箭雨多波=每波到点融化）
+                ApplyHitMs(terrainCommand, effect.HitSeconds);
+                segment.commands.Add(terrainCommand);
+            }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
-                segment.commands.Add(BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
+                var applyBuffCommand = BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
                     sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns,
-                    applied.SourceSkillId, applied.BuffKey)); // 具名 key（决策五十七——异资产同族各一条命令）
+                    applied.SourceSkillId, applied.BuffKey); // 具名 key（决策五十七——异资产同族各一条命令）
+                // 命中时刻到点挂徽章（决策七十六复测返修 WYSIWYG：箭在飞时目标不提前结冰/挂减防；
+                // 合并取首条时刻=徽章首现拍；OnCast 施放/回合末光环 BeatSeconds 语义不变）
+                ApplyHitMs(applyBuffCommand, applied.HitSeconds);
+                segment.commands.Add(applyBuffCommand);
             }
             foreach (var dead in newlyDead)
             {
@@ -839,6 +890,18 @@ namespace GIC.Battle
                     {
                         itemConsume.AppliedAmount = itemConsume.Amount;
                     }
+                    continue;
+                }
+
+                // 元素×地形（决策七十六）：地形效应**无单位载荷**——必须在单位解析守卫之前处理
+                //（TargetUnitId=null 会被下方 `target==null → continue` 静默跳过=Host 地图突变
+                // 不生效、只剩客户端命令自改本地图的「半生效」态：冰面板可见、Host 移动仍判水面
+                // 不可入——2026-10-15 报障「无法走到薄冰上」根因）。同体力/摩拉类玩家级效应先例位。
+                if (effect is TerrainChangeEffect terrain)
+                {
+                    // Host 真值突变——移动 BFS/AI 预判/部署/瞄准全链经 GetTile/IsPassable 自动感知；
+                    // 命令层 TerrainChange 在 EmitSliceCommands 发射（客户端本地 map 同步+刷冰面板）
+                    _sim.Map.SetTile(terrain.Cell.x, terrain.Cell.y, (TileType)terrain.NewTile);
                     continue;
                 }
 

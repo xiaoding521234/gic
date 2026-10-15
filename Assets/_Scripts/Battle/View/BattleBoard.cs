@@ -35,6 +35,18 @@ namespace GIC.Battle
         [InspectorName("水面细分")]
         [SerializeField] private int _waterSurfaceSubdiv = 4;
 
+        [Header("薄冰（决策七十六：冰元素冻结水面——半透明冰面板叠水面，水下流动仍隐约可见）")]
+        [Tooltip("薄冰主色（运行时克隆水面材质改 tint——波场公式同源=冰面随下方波浪起伏恒贴水面）")]
+        [SerializeField] private Color 薄冰色 = new Color(0.78f, 0.90f, 0.96f, 0.80f);
+        [Tooltip("薄冰深色（shader _DeepColor——冰下水的暗部）")]
+        [SerializeField] private Color 薄冰深色 = new Color(0.30f, 0.44f, 0.55f, 1f);
+        [Tooltip("薄冰流动速度（低于水面=冰下缓流感；0=静止）")]
+        [SerializeField] private float 薄冰流动速度 = 0.012f;
+        [Tooltip("薄冰波峰高光（低=哑光冰面）")]
+        [SerializeField, Range(0f, 1f)] private float 薄冰高光 = 0.10f;
+        [Tooltip("薄冰面板相对水面的高度余量（同波场同相位=恒定间隙不穿插）")]
+        [SerializeField] private float 薄冰抬升 = 0.006f;
+
         public BattleMapData Map { get; private set; }
 
         /// <summary>地面格顶面高度（板面点击拾取的视差修正初判平面高度，docs/14 §86）</summary>
@@ -46,11 +58,18 @@ namespace GIC.Battle
         /// Destroy 物体不销 mesh，§63① mesh 条款，2026-09-28 批6）</summary>
         private readonly List<Mesh> _runtimeMeshes = new List<Mesh>();
 
+        /// <summary>薄冰面板运行时件（mesh/材质实例/物体——元素×地形变化重建、OnDestroy 释放，
+        /// 决策七十六）</summary>
+        private GameObject _thinIceSurface;
+        private Mesh _thinIceMesh;
+        private Material _thinIceMaterial;
+
         private void OnDestroy()
         {
             foreach (var mesh in _runtimeMeshes)
                 if (mesh != null) Destroy(mesh);
             _runtimeMeshes.Clear();
+            if (_thinIceMaterial != null) Destroy(_thinIceMaterial);
         }
 
         /// <summary>
@@ -92,6 +111,121 @@ namespace GIC.Battle
             }
 
             BuildWaterSurface(map);
+            RebuildThinIceSurface(); // 幂等（初始地图无薄冰=空面板；防御性支持已含薄冰的重建）
+        }
+
+        /// <summary>地形变化应用（决策七十六元素×地形，TerrainChange 命令客户端入口）：
+        /// 本地 map 真值写入（移动瞄准/箭矢落地判地形等消费方即时正确）+薄冰面板全量重建
+        /// （变化低频、面板格数少=全量重建最简且天然幂等；水面焊接面不动——薄冰格**保留**下方
+        /// 流动水面=拍板「半透明冰面板叠水面」）</summary>
+        public void ApplyTerrainChange(BattleCell cell, TileType newTile)
+        {
+            if (Map == null) return;
+            Map.SetTile(cell.x, cell.y, newTile);
+            RebuildThinIceSurface();
+        }
+
+        /// <summary>
+        /// 薄冰面板重建（全部 ThinIce 格合并为单 Mesh——与水面焊接面同构：同波场同相位顶点起伏
+        /// =冰面恒贴下方波浪，格界零缝）。材质=运行时克隆水面材质改 tint/流速/高光（Inspector 四参
+        /// 可调）；无薄冰格=面板移除。
+        /// </summary>
+        private void RebuildThinIceSurface()
+        {
+            if (_thinIceSurface != null)
+            {
+                Destroy(_thinIceSurface);
+                _thinIceSurface = null;
+            }
+            if (_thinIceMesh != null)
+            {
+                _runtimeMeshes.Remove(_thinIceMesh);
+                Destroy(_thinIceMesh);
+                _thinIceMesh = null;
+            }
+            if (Map == null) return;
+
+            var cells = new List<BattleCell>();
+            for (int y = 0; y < Map.height; y++)
+            for (int x = 0; x < Map.width; x++)
+                if (Map.GetTile(x, y) == TileType.ThinIce)
+                    cells.Add(new BattleCell(x, y));
+            if (cells.Count == 0) return;
+
+            var waterMat = GetWaterSurfaceMaterial();
+            if (waterMat == null)
+            {
+                GIC.Framework.GICLog.Warn("[BattleBoard] 薄冰面板缺少水面材质源（水地块 prefab 材质槽 1）——本次跳过");
+                return;
+            }
+            if (_thinIceMaterial == null)
+            {
+                _thinIceMaterial = new Material(waterMat); // 运行时实例（OnDestroy 释放；波场参数与水面同源）
+                if (_thinIceMaterial.HasProperty("_BaseColor")) _thinIceMaterial.SetColor("_BaseColor", 薄冰色);
+                if (_thinIceMaterial.HasProperty("_DeepColor")) _thinIceMaterial.SetColor("_DeepColor", 薄冰深色);
+                if (_thinIceMaterial.HasProperty("_FlowSpeed")) _thinIceMaterial.SetFloat("_FlowSpeed", 薄冰流动速度);
+                if (_thinIceMaterial.HasProperty("_Highlight")) _thinIceMaterial.SetFloat("_Highlight", 薄冰高光);
+            }
+            else
+            {
+                // 实例已建（Inspector 参数热改后重建面板沿用新值——一次性 tint 需重写）
+                if (_thinIceMaterial.HasProperty("_BaseColor")) _thinIceMaterial.SetColor("_BaseColor", 薄冰色);
+                if (_thinIceMaterial.HasProperty("_DeepColor")) _thinIceMaterial.SetColor("_DeepColor", 薄冰深色);
+                if (_thinIceMaterial.HasProperty("_FlowSpeed")) _thinIceMaterial.SetFloat("_FlowSpeed", 薄冰流动速度);
+                if (_thinIceMaterial.HasProperty("_Highlight")) _thinIceMaterial.SetFloat("_Highlight", 薄冰高光);
+            }
+
+            _thinIceMesh = BuildSurfaceMesh(cells, "BattleThinIceSurface", _waterSurfaceHeight + 薄冰抬升);
+            _runtimeMeshes.Add(_thinIceMesh);
+            _thinIceSurface = new GameObject("ThinIceSurface");
+            _thinIceSurface.transform.SetParent(_tilesRoot, false);
+            var meshFilter = _thinIceSurface.AddComponent<MeshFilter>();
+            meshFilter.sharedMesh = _thinIceMesh;
+            var meshRenderer = _thinIceSurface.AddComponent<MeshRenderer>();
+            meshRenderer.sharedMaterial = _thinIceMaterial;
+            // 同水面（-2）：薄冰面板恒为最低透明层（其下水面同序-2=同序按距离，冰面恒在水面上方
+            // 由高度差+半透明混合保证；瞄准贴片 0/立牌 10/箭矢 12 全在其上）
+            meshRenderer.sortingOrder = -2;
+            meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+        }
+
+        /// <summary>焊接面 mesh 构建（水面/薄冰面板共用——相邻格共享角点焊接、细分加密波浪平滑；
+        /// height=面片基准高度〔水面=_waterSurfaceHeight、薄冰=+抬升——波场位移由 shader 同公式
+        /// 施加，与基准高度无关〕）</summary>
+        private Mesh BuildSurfaceMesh(List<BattleCell> cells, string meshName, float height)
+        {
+            int subdiv = Mathf.Max(1, _waterSurfaceSubdiv);
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            var cornerIndex = new Dictionary<long, int>();
+
+            foreach (var cell in cells)
+            {
+                int baseSubX = cell.x * subdiv;
+                int baseSubY = cell.y * subdiv;
+                for (int j = 0; j < subdiv; j++)
+                {
+                    for (int i = 0; i < subdiv; i++)
+                    {
+                        int a = GetWaterCorner(cornerIndex, verts, uvs, Map, baseSubX + i, baseSubY + j, subdiv, height);
+                        int b = GetWaterCorner(cornerIndex, verts, uvs, Map, baseSubX + i + 1, baseSubY + j, subdiv, height);
+                        int c = GetWaterCorner(cornerIndex, verts, uvs, Map, baseSubX + i + 1, baseSubY + j + 1, subdiv, height);
+                        int d = GetWaterCorner(cornerIndex, verts, uvs, Map, baseSubX + i, baseSubY + j + 1, subdiv, height);
+                        // 绕向与旧格顶面一致（法线朝上）
+                        tris.AddRange(new[] { d, c, b, d, b, a });
+                    }
+                }
+            }
+
+            var mesh = new Mesh { name = meshName };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         /// <summary>
@@ -115,39 +249,11 @@ namespace GIC.Battle
             }
             if (cells.Count == 0 || _waterTilePrefab == null) return;
 
-            int subdiv = Mathf.Max(1, _waterSurfaceSubdiv);
-            var verts = new List<Vector3>();
-            var uvs = new List<Vector2>();
-            var tris = new List<int>();
-            var cornerIndex = new Dictionary<long, int>();
-
-            foreach (var cell in cells)
-            {
-                int baseSubX = cell.x * subdiv;
-                int baseSubY = cell.y * subdiv;
-                for (int j = 0; j < subdiv; j++)
-                {
-                    for (int i = 0; i < subdiv; i++)
-                    {
-                        int a = GetWaterCorner(cornerIndex, verts, uvs, map, baseSubX + i, baseSubY + j, subdiv);
-                        int b = GetWaterCorner(cornerIndex, verts, uvs, map, baseSubX + i + 1, baseSubY + j, subdiv);
-                        int c = GetWaterCorner(cornerIndex, verts, uvs, map, baseSubX + i + 1, baseSubY + j + 1, subdiv);
-                        int d = GetWaterCorner(cornerIndex, verts, uvs, map, baseSubX + i, baseSubY + j + 1, subdiv);
-                        // 绕向与旧格顶面一致（法线朝上）
-                        tris.AddRange(new[] { d, c, b, d, b, a });
-                    }
-                }
-            }
+            var surfaceMesh = BuildSurfaceMesh(cells, "BattleWaterSurface", _waterSurfaceHeight);
+            _runtimeMeshes.Add(surfaceMesh); // 运行时 mesh 登记（Build 重建/OnDestroy 显式销毁，§63①）
 
             var surfaceGo = new GameObject("WaterSurface");
             surfaceGo.transform.SetParent(_tilesRoot, false);
-            var surfaceMesh = new Mesh { name = "BattleWaterSurface" };
-            _runtimeMeshes.Add(surfaceMesh); // 运行时 mesh 登记（Build 重建/OnDestroy 显式销毁，§63①）
-            surfaceMesh.SetVertices(verts);
-            surfaceMesh.SetUVs(0, uvs);
-            surfaceMesh.SetTriangles(tris, 0);
-            surfaceMesh.RecalculateNormals();
-            surfaceMesh.RecalculateBounds();
             var meshFilter = surfaceGo.AddComponent<MeshFilter>();
             meshFilter.sharedMesh = surfaceMesh;
             var meshRenderer = surfaceGo.AddComponent<MeshRenderer>();
@@ -164,14 +270,14 @@ namespace GIC.Battle
         /// <summary>
         /// 水面细分角点（焊接：同角点复用同顶点，波浪位移天然连续）。
         /// subX/subY=细分网格坐标（格坐标×细分）；UV=角点世界坐标（贴图 Repeat 每格重复一次，
-        /// 与旧每格 0..1 同密度，图案跨格连续）
+        /// 与旧每格 0..1 同密度，图案跨格连续）；height=面片基准高度（水面/薄冰抬升共用）
         /// </summary>
         private int GetWaterCorner(Dictionary<long, int> cornerIndex, List<Vector3> verts, List<Vector2> uvs,
-            BattleMapData map, int subX, int subY, int subdiv)
+            BattleMapData map, int subX, int subY, int subdiv, float height)
         {
             long key = ((long)subX << 32) | (uint)subY;
             if (cornerIndex.TryGetValue(key, out int index)) return index;
-            var pos = new Vector3((float)subX / subdiv - map.width / 2f, _waterSurfaceHeight, (float)subY / subdiv - map.height / 2f);
+            var pos = new Vector3((float)subX / subdiv - map.width / 2f, height, (float)subY / subdiv - map.height / 2f);
             cornerIndex[key] = verts.Count;
             verts.Add(pos);
             uvs.Add(new Vector2(pos.x, pos.z));
@@ -214,14 +320,15 @@ namespace GIC.Battle
 
         /// <summary>视觉表面高度（世界层视觉件站位单出口）：水/沼格=名义表面+波峰带+贴面余量——
         /// 单位立牌/底座圆盘/投射物路径/贴片等贴水视觉件抬过波峰带，防波浪穿模（2026-09-26 拍板
-        /// 「底座圆盘也改」）；拾取（GetSurfaceHeight）与 Host 判定仍用名义表面，波峰带纯视觉</summary>
+        /// 「底座圆盘也改」）；薄冰格同口径（冰面同波场起伏=冰上件须同过波峰带，决策七十六）；
+        /// 拾取（GetSurfaceHeight）与 Host 判定仍用名义表面，波峰带纯视觉</summary>
         public float GetVisualSurfaceHeight(BattleCell cell)
         {
             float wave = 0f;
             if (Map != null && Map.HasTile(cell.x, cell.y))
             {
                 var tile = Map.GetTile(cell.x, cell.y);
-                if (tile == TileType.Water || tile == TileType.Swamp)
+                if (tile == TileType.Water || tile == TileType.Swamp || tile == TileType.ThinIce)
                     wave = GetWaterWaveMaxHeight() + 0.01f; // 贴面余量：极端双峰同相波峰不贴片
             }
             return GetSurfaceHeight(cell) + wave;
@@ -239,6 +346,7 @@ namespace GIC.Battle
                     return _grassTilePrefab;
                 case TileType.Water:
                 case TileType.Swamp:
+                case TileType.ThinIce: // 薄冰=水面体+顶面冰面板（决策七十六；初始地图不使用，防御性支持重建）
                     return _waterTilePrefab;
                 case TileType.StonePath:
                     return _stoneTilePrefab;

@@ -126,10 +126,27 @@ namespace GIC.Battle
                         }, BattleMetrics.LayerBeatSeconds(layer)));
                     if (applyDefDown)
                         // 2命：冰棱减防（决策五十七具名 buff）——**零注入**：每层加成/叠层上限/持续
-                        // 全=Buff_DefenseDown 资产单源；buffKey=资产名=具名身份（同族异名共存基础）
+                        // 全=Buff_DefenseDown 资产单源；buffKey=资产名=具名身份（同族异名共存基础）；
+                        // HitSeconds=该层拍时刻（与同层命中同拍挂徽章，WYSIWYG 决策七十六复测返修）
                         effects.Add(new ApplyBuffEffect(attackerId, kv.Key, (int)BuffType.DefenseDown, 1,
-                            buffKey: "Buff_DefenseDown")); // 逐层各施加（2026-10-01 拍板）
+                            buffKey: "Buff_DefenseDown") // 逐层各施加（2026-10-01 拍板）
+                        {
+                            HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
+                        });
                 }
+            }
+
+            // 元素×地形（决策七十六「凯亚的寒冰之棱同样影响」）：作用半径内全部**水面/沼泽格**→薄冰
+            // （含无单位格；每 tick 维持——格已是薄冰自动跳过幂等；冰棱碎裂后已冻薄冰不回水=无寿命
+            // 拍板③）。范围与伤害半径同源（上方 ChebyshevTo 判定同值 radius）——光环持续冻结脚下水域
+            for (int dx = -radius; dx <= radius; dx++)
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                int tx = holderPos.x + dx, ty = holderPos.y + dy;
+                if (!Sim.Map.HasTile(tx, ty)) continue;
+                var tile = Sim.Map.GetTile(tx, ty);
+                if (tile == TileType.Water || tile == TileType.Swamp)
+                    effects.Add(new TerrainChangeEffect(new BattleCell(tx, ty), (int)TileType.ThinIce));
             }
             return effects;
         }

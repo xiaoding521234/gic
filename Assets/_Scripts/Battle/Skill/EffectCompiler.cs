@@ -142,16 +142,34 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>整线迸发单段：线上全目标各编译一次 OnHit（虚空=线终止；无截停——投放形态=整线天降）</summary>
+        /// <summary>整线迸发单段：线上全目标各编译一次 OnHit（虚空=线终止；无截停——投放形态=整线天降）。
+        /// **元素×地形交互（决策七十六）**：线上每格按技能元素突变——冰=水面格→薄冰（霜袭冻结，
+        /// 含无单位格）、火=薄冰格→水面（箭雨天降语义=线域直接融、无需单位——与直线箭矢「命中单位才融」
+        /// 的区分正落在形状分支上）；段内同格天然去重（每格至多产一条）</summary>
         private static void CompileLineBurstSegment(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
             SkillConfig.SkillData skillData, BattleCell from, Vector2Int delta, int attackPercent,
             float launchSeconds, int clipMaxRange, List<BattleEffect> effects)
         {
             int maxRange = clipMaxRange > 0 ? clipMaxRange : ProjectileRule.MaxRange;
+            var skillElement = SkillHitResolver.SkillElementOf(sim.GetUnit(action.unitId), skillData);
             for (int step = 1; step <= maxRange; step++)
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!sim.Map.HasTile(cell.x, cell.y)) break;
+
+                // 元素×地形（线格突变——冰冻/火融；物理及其它元素不触发）；HitSeconds=波次段时刻
+                // （箭雨多段融冰按波到点融化——WYSIWYG）
+                if (skillElement == ElementType.Cryo)
+                {
+                    var tile = sim.Map.GetTile(cell.x, cell.y);
+                    if ((tile == TileType.Water || tile == TileType.Swamp))
+                        effects.Add(new TerrainChangeEffect(cell, (int)TileType.ThinIce) { HitSeconds = launchSeconds });
+                }
+                else if (skillElement == ElementType.Pyro)
+                {
+                    if (sim.Map.GetTile(cell.x, cell.y) == TileType.ThinIce)
+                        effects.Add(new TerrainChangeEffect(cell, (int)TileType.Water) { HitSeconds = launchSeconds });
+                }
 
                 foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, sim.GetTeamOf(action.playerId), cell))
                     effects.AddRange(CompileOnHit(sim, action, snapshot, skillData, enemy.unitId,
@@ -215,6 +233,21 @@ namespace GIC.Battle
             var effects = new List<BattleEffect>();
             var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
             if (casterState == null) return effects;
+
+            // 元素×地形（决策七十六泛化拍板：「一切火元素伤害命中薄冰上的单位→其格融化为水面」——
+            // 投射物直线箭矢命中/箭雨命中单位/将来火技能全经此口；tick 类火伤经 ResolveAuraHits 同判定。
+            // 整线迸发（箭雨）已在线格层融过——敌人恰在薄冰上时此处重复产效应，SetTile/命令幂等无害。
+            // HitSeconds=命中时刻——箭到才融〔WYSIWYG〕）
+            if (SkillHitResolver.SkillElementOf(sim.GetUnit(action.unitId), skillData) == ElementType.Pyro)
+            {
+                var targetState = SkillHitResolver.FindUnitState(sliceSnapshot, targetUnitId);
+                if (targetState != null
+                    && sim.Map.GetTile(targetState.position.x, targetState.position.y) == TileType.ThinIce)
+                    effects.Add(new TerrainChangeEffect(targetState.position, (int)TileType.Water)
+                    {
+                        HitSeconds = hitSeconds,
+                    });
+            }
 
             // 反应命中登记（决策二十五：反应双方 1:1 全消耗、等层零残留——**反应命中的来袭元素
             // 不附着**；本技能 AttachElement 原子对已反应目标跳过，无反应命中才附着〔覆盖〕）
@@ -360,18 +393,25 @@ namespace GIC.Battle
                 });
                 if (outcome.BuffType >= 0)
                 {
-                    // 反应类 Buff 具名身份（决策五十七+七十四）：超导减防走具名资产（outcome.BuffKey=
+                    // 反应类 Buff 具名身份（决策五十七+七十六）：超导减防走具名资产（outcome.BuffKey=
                     // Buff_Superconduct，与冰棱减防异资产同族共存）；冻结维持族首资产回落
+                    // HitSeconds=命中时刻——冻结/超导徽章随箭到才挂（WYSIWYG，决策七十六复测返修）
                     var reactCfg = BuffConfig.OfType((BuffType)outcome.BuffType);
                     effects.Add(new ApplyBuffEffect(attackerId, targetUnitId, outcome.BuffType, outcome.Level,
-                        buffKey: outcome.BuffKey ?? reactCfg?.name));
+                        buffKey: outcome.BuffKey ?? reactCfg?.name)
+                    {
+                        HitSeconds = hitSeconds,
+                    });
                 }
                 // 多余的来袭层仍附着（docs/06 §6.3 双向：等层=不附着〔决策二十五〕；2层火 vs 1层冰=
                 // 1级融化+剩1层火附着；2层火 vs 2回合冻结=2级融化清零全耗）
                 int incomingLeft = incomingLayers - outcome.Level;
                 if (incomingLeft > 0)
                 {
-                    effects.Add(new AttachElementEffect(attackerId, targetUnitId, (int)element, incomingLeft));
+                    effects.Add(new AttachElementEffect(attackerId, targetUnitId, (int)element, incomingLeft)
+                    {
+                        HitSeconds = hitSeconds, // 箭到才附着（WYSIWYG，决策七十六复测返修）
+                    });
                     sim.SetCompileDye(targetUnitId, element, incomingLeft);
                 }
             }
@@ -458,10 +498,15 @@ namespace GIC.Battle
                     // TriggerSkill 链（延奏→变奏）按实际施加技能的 skillData 编译=来源随链归属正确。
                     // 决策五十七「资产即身份」：buffAsset 引用优先（具名 buff=资产名作 key，同资产叠层/
                     // 异资产同族共存）；null 回落 buffType（存量配置兼容——工厂按族找首资产）
+                    // HitSeconds=命中时刻（OnCast 施放=0 立即；OnHit 命中类=箭到才挂徽章〔WYSIWYG，
+                    // 决策七十六复测返修〕）
                     var resolvedBuffType = atom.buffAsset != null ? atom.buffAsset.buffType : atom.buffType;
                     string buffKey = atom.buffAsset != null ? atom.buffAsset.name : null;
                     effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, (int)resolvedBuffType, 1,
-                        buffValue, stackLimit, duration, (int)skillData.skillID, buffKey));
+                        buffValue, stackLimit, duration, (int)skillData.skillID, buffKey)
+                    {
+                        HitSeconds = hitSeconds,
+                    });
                     break;
                 }
 
@@ -472,7 +517,10 @@ namespace GIC.Battle
                     if (element != ElementType.Physical) // 物理不附着（docs/06）
                     {
                         int layers = Mathf.Max(1, atom.elementLayers); // 附着原子层=0 视为 1（0层语义属 Damage 原子）
-                        effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element, layers));
+                        effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element, layers)
+                        {
+                            HitSeconds = hitSeconds, // 箭到才挂附着图标（WYSIWYG，决策七十六复测返修）
+                        });
                         sim.SetCompileDye(targetUnitId, element, layers); // 覆盖语义对片内后续命中可见（双蒸发修复）
                     }
                     break;

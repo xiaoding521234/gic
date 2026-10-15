@@ -63,6 +63,9 @@ namespace GIC.Data
 
         [InspectorName("命座提升")]
         UpgradeConstellation = 17,
+
+        [InspectorName("地形变化")]
+        TerrainChange = 18, // 决策七十六（2026-10-15）：元素×地形交互——冰冻水面→薄冰/火融薄冰→水；B8 预留增量命令钩子正式启用（BattleMapData 注释「地形变化 B8 走增量命令」）
     }
 
     /// <summary>
@@ -88,6 +91,7 @@ namespace GIC.Data
     /// ItemConsume     | 消耗数量 | 物品名 ItemName  | —                | —         | —    | —      | —                     | —              | —（targetUnitId=玩家）
     /// Revive          | 复苏治疗量 | —              | —                | —         | —    | —      | —                     | —              | —（B-3 ② 复苏+治疗单命令）
     /// UpgradeConstellation | 新命座层 | —            | —                | —         | —    | —      | —                     | —              | —（B8 命座批；targetUnitId=升命单位）
+    /// TerrainChange   | 新地形 TileType int | —     | —                | 目标格 cell | —    | —      | —                     | —              | —（决策七十六元素×地形；客户端=本地 map SetTile+BattleBoard 刷新该格）
     /// Pause/Resume/UI | —        | —                | —                | —         | —    | —      | —                     | —              | —
     /// </remarks>
     [Serializable]
@@ -357,6 +361,25 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 metadata = element,
+            };
+        }
+
+        /// <summary>地形变化命令工厂（决策七十六元素×地形交互）。cell=目标格、value=新地形 TileType int
+        /// （水面→薄冰=冻结/薄冰→水面=融化；沼泽同冻）。客户端=本地 BattleMapData.SetTile+BattleBoard
+        /// 刷新该格视觉（水面实例↔薄冰贴片）；地图只在开局全量下发一次、后续全走本命令（B8 钩子）。
+        /// actorUnitId=触发单位（表现层归因/调试用）</summary>
+        public static BattleCommand TerrainChange(string actorUnitId, BattleCell cell, int sliceIndex, int indexInSlice,
+            int newTile)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.TerrainChange,
+                actorUnitId = actorUnitId,
+                targetUnitId = actorUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                cell = cell,
+                value = newTile,
             };
         }
 

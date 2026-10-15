@@ -239,10 +239,15 @@ namespace GIC.Battle
         /// <summary>持续回合通道（AttackUp 用=Duration 参数——工厂按此构造初始计时）</summary>
         public int DurationTurns;
 
-        /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff〔燃烧/冻结〕由
+        /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff〔燃烧/冻结/超导减防〕由
         /// CompileElementalDamage 产出无技能语境）。消费=客户端头顶 Buff 图标（2026-10-06
         /// 拍板「buff 图标用来源技能图标」）：随命令/快照透传，0=回落元素图标</summary>
         public int SourceSkillId;
+
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即）——WYSIWYG（决策七十六复测返修：
+        /// 箭矢飞行中目标不提前挂 Buff 徽章〔冻结/超导减防〕；OnCast 施放类/回合末光环逐层
+        /// BeatSeconds 错峰维持；合并命令取首条时刻=徽章首现拍）。Host 状态即时结算架构常态不变</summary>
+        public float HitSeconds;
 
         public ApplyBuffEffect(string sourceUnitId, string targetUnitId, int buffType, int level,
             int buffValue = 0, int stackLimit = 0, int durationTurns = 0, int sourceSkillId = 0,
@@ -345,6 +350,10 @@ namespace GIC.Battle
 
         /// <summary>附着层数（默认 1——docs/06 §6.2；0=编译层已保证不产本效应）</summary>
         public int Layers = 1;
+
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即）——WYSIWYG（决策七十六复测返修：
+        /// 箭矢飞行中目标不提前挂附着图标；OnCast 施放/回合末泡湿类=0 立即）</summary>
+        public float HitSeconds;
 
         public AttachElementEffect(string sourceUnitId, string targetUnitId, int element, int layers = 1)
         {
@@ -531,6 +540,33 @@ namespace GIC.Battle
             SourceUnitId = sourceUnitId;
             TargetUnitId = targetUnitId;
             Turns = turns;
+        }
+    }
+
+    /// <summary>
+    /// 地形变化效应（决策七十六「元素系统与地形交互」）：Host 编译层产（冰线/冰棱半径=水面→薄冰；
+    /// 火天降线域/火命中薄冰上单位/火 tick 命中=薄冰→水面），应用层 sim.Map.SetTile 真值突变
+    /// （移动 BFS/AI 预判/部署校验/瞄准预览全链自动感知——全部经 GetTile/IsPassable 单源读图），
+    /// 命令层发 TerrainChange（客户端本地 map 同步+BattleBoard 刷新该格）。
+    /// 段内同格去重由编译点各自维护（同来源线/半径天然互异；跨来源重复无害、命令幂等）。
+    /// </summary>
+    public class TerrainChangeEffect : BattleEffect
+    {
+        /// <summary>目标格</summary>
+        public BattleCell Cell;
+
+        /// <summary>新地形（TileType int——ThinIce=冻结/Water=融化）</summary>
+        public int NewTile;
+
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即）——WYSIWYG（决策七十六复测返修
+        /// 「箭矢还未飞到薄冰就融化」：Host 状态即时结算维持架构常态，客户端经命令 launchMs 到点
+        /// 应用；回合末光环冻结/泡湿类无命中时刻语义=0 立即）</summary>
+        public float HitSeconds;
+
+        public TerrainChangeEffect(BattleCell cell, int newTile)
+        {
+            Cell = cell;
+            NewTile = newTile;
         }
     }
 
