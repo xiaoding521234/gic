@@ -1179,12 +1179,14 @@ namespace GIC.Battle
                                     // Move 命令片起止 SetMoveAnimation 消费；速度同一次性动作片口径乘回放速度
                                     // （行走 tween 同按回放速度缩放，快进不脚滑）
                                     caster.SetMoveVideo(actionClip, _playbackSpeed * 校准速度,
-                                        skillData.动作片缩放补偿, skillData.动作片位置偏移);
+                                        skillData.动作片缩放补偿, skillData.动作片位置偏移,
+                                        skillData.当前动作片Alpha打包); // 打包标志随片（2026-10-16 离线抠绿批）
                                 }
                                 else
                                 {
                                     caster.PlayActionVideo(actionClip, _playbackSpeed * 校准速度,
-                                        skillData.动作片缩放补偿, skillData.动作片位置偏移);
+                                        skillData.动作片缩放补偿, skillData.动作片位置偏移,
+                                        packedAlpha: skillData.当前动作片Alpha打包); // 打包片直读 alpha 区跳过运行时抠色
                                 }
                             }
                         }

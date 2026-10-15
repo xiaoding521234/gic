@@ -51,8 +51,17 @@ namespace GIC.Data
             [Tooltip("手机端动作视频（可选回退片；null=直接用 动作视频）：高分辨率动作片（如超分 4K 级）在安卓硬解启动慢，视频钟会落后于伤害事件钟（2026-10-11 实测凯亚霜袭=伤害先于动画到点）；手机端回退轻量片，画布比例须与 动作视频 一致（校准三值共用，零额外配置）")]
             public VideoClip 手机端动作视频;
 
+            [Tooltip("动作片Alpha打包（2026-10-16 离线抠绿批）：勾选=动作视频 为离线抠好的打包片（上下分区：色彩区占打包高 2/3、alpha 区下半灰度 ½ 分辨率）——运行时跳过抠色直读 alpha（边缘质量免再量化漂移+转码降档免疫）；打包管线=gic-paperdoll skill 离线抠绿节。未勾=绿幕运行时抠色")]
+            public bool 动作片Alpha打包;
+
+            [Tooltip("手机端动作片Alpha打包：同 动作片Alpha打包，作用于 手机端动作视频 回退片")]
+            public bool 手机端动作片Alpha打包;
+
             /// <summary>当前平台实际播放的动作片（预热与播放共用单源）：手机端配置了回退片则用回退片</summary>
             public VideoClip 当前动作片 => Application.isMobilePlatform && 手机端动作视频 != null ? 手机端动作视频 : 动作视频;
+
+            /// <summary>当前平台动作片是否为 Alpha 打包格式（与 当前动作片 同源分派）</summary>
+            public bool 当前动作片Alpha打包 => Application.isMobilePlatform && 手机端动作视频 != null ? 手机端动作片Alpha打包 : 动作片Alpha打包;
 
             [Tooltip("动作片缩放补偿（1=不补偿；=idle 片主体高/动作片主体高——宽幅 16:9 动作片构图主体小，播放放大回 idle 主体视觉大小，UnitView.PlayActionVideo 内乘 quad scale；安柏宽幅构图实测=1.29（idle 主体 554px/动作片主体 430px））")]
             public float 动作片缩放补偿 = 1f;

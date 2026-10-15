@@ -134,6 +134,7 @@ namespace GIC.Battle
         private float _moveSpeed = 1f;     // 登记时已乘战斗回放速度（与一次性动作片口径一致）
         private float _moveScaleComp = 1f; // 缩放补偿（idle 主体高/移动片主体高）
         private Vector2 _moveOffset;       // 位置偏移
+        private bool _movePacked;           // 移动片 Alpha 打包标志（2026-10-16 离线抠绿批——SetMoveAnimation 透传 PlayActionVideo）
         private bool _moveLoopActive;      // 移动循环态在播（SetMoveAnimation(false) 精确归位，防无谓相位跳）
 
         // ==================== 立牌朝向（B-S4a 方向镜像，2026-09-29 拍板③：素材统一朝右单份复用） ====================
@@ -235,12 +236,13 @@ namespace GIC.Battle
         /// SkillData.动作视频=循环态移动片——BattlePlayer SkillCast 分支按 skillType==Move 调此登记，
         /// Move 命令片起止由 SetMoveAnimation 消费。三校准参数与一次性动作片同款（速度=战斗回放速度×
         /// 技能校准倍率、缩放补偿、位置偏移）；片规格与待机片不同也不变形（双 RT 路线同构）</summary>
-        public void SetMoveVideo(VideoClip clip, float playbackSpeed, float scaleCompensation, Vector2 位置偏移)
+        public void SetMoveVideo(VideoClip clip, float playbackSpeed, float scaleCompensation, Vector2 位置偏移, bool packedAlpha = false)
         {
             _moveClip = clip;
             _moveSpeed = playbackSpeed;
             _moveScaleComp = scaleCompensation;
             _moveOffset = 位置偏移;
+            _movePacked = packedAlpha; // Alpha 打包标志随片登记（2026-10-16 离线抠绿批）
             // 正处于移动循环态时登记更新=下次起播生效（段间行走由片末统一回待机，无中途换片场景）
         }
 
@@ -256,7 +258,7 @@ namespace GIC.Battle
             if (moving)
             {
                 if (_moveClip == null) return; // 无登记移动片=待机照播（旧行为）
-                PlayActionVideo(_moveClip, _moveSpeed, _moveScaleComp, _moveOffset, loop: true);
+                PlayActionVideo(_moveClip, _moveSpeed, _moveScaleComp, _moveOffset, loop: true, packedAlpha: _movePacked);
                 _moveLoopActive = true;
                 return;
             }
@@ -276,7 +278,7 @@ namespace GIC.Battle
         /// 四十四「尽可能统一」）**：loop=true=循环态移动片——同机件仅循环+随机相位+播完不自动回切
         /// （OnActionVideoFinished 的 isLooping 守卫天然放行）。冻结/尸体态 Pause 由 Update 停摆逻辑接管、
         /// 解冻续播到回切</summary>
-        public void PlayActionVideo(VideoClip clip, float playbackSpeed, float scaleCompensation, Vector2 位置偏移, bool loop = false)
+        public void PlayActionVideo(VideoClip clip, float playbackSpeed, float scaleCompensation, Vector2 位置偏移, bool loop = false, bool packedAlpha = false)
         {
             var vp = _videoPlayer;
             if (vp == null || _videoFailed || clip == null || clip.width <= 0 || clip.height <= 0) return;
@@ -294,12 +296,18 @@ namespace GIC.Battle
             vp.clip = clip;
             vp.targetTexture = actionRt;
             _videoMaterial.mainTexture = actionRt;
+            // Alpha 打包模式开关（2026-10-16 离线抠绿批）：打包片直读 alpha 区跳过运行时抠色；
+            // 材质是 per-unit 单实例，按片置位/回待机归零（RestoreIdleVideoSurface）
+            if (_videoMaterial.HasProperty("_PackedAlpha"))
+                _videoMaterial.SetFloat("_PackedAlpha", packedAlpha ? 1f : 0f);
             // quad 缩放补偿：动作片全幅按 comp×基准高显示（主体视觉高=idle 主体视觉高）；宽=片宽高比×同高；
             // x 分量乘朝向 sign（B-S4c 校准批次修复：旧版覆盖 localScale 丢 sign——向左施放时动作片恒朝右）
             if (_avatarVideoFlip != null)
             {
                 float sign = _faceLeft ? -1f : 1f;
+                // 打包片 aspect 修正：clip 含上下两区（打包高=1.5×色彩区高）——色彩区才对 quad 宽负责
                 float aspect = clip.width / (float)clip.height;
+                if (packedAlpha) aspect *= 1.5f;
                 _avatarVideoFlip.localScale = new Vector3(
                     sign * _avatarVideoFlipBaseScale.y * aspect * scaleCompensation,
                     _avatarVideoFlipBaseScale.y * scaleCompensation,
@@ -337,6 +345,10 @@ namespace GIC.Battle
                 vp.targetTexture = _videoRt;
             if (_videoMaterial != null && _videoMaterial.mainTexture != _videoRt)
                 _videoMaterial.mainTexture = _videoRt;
+            // 待机片恒绿幕运行时抠色（2026-10-16 离线抠绿批：待机不迁打包）——回待机必归零打包开关，
+            // 否则动作片播完回待机时 shader 仍按打包布局采样绿幕画面=整幅错乱
+            if (_videoMaterial != null && _videoMaterial.HasProperty("_PackedAlpha"))
+                _videoMaterial.SetFloat("_PackedAlpha", 0f);
             if (_avatarVideoFlip != null)
             {
                 var facingScale = new Vector3(

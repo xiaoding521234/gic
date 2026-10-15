@@ -221,6 +221,7 @@ namespace GIC.Editor
         private RenderTexture _actionRawRt, _actionKeyedRt;   // 原始帧→ChromaKey 抠色帧
         private RenderTexture _idleRawRt, _idleKeyedRt;
         private Material _previewChromaMat;       // GIC/Battle/ChromaKeyVideo（编辑器 Shader.Find 可得）
+        private bool _previewPacked;             // 动作片为 Alpha 打包格式（2026-10-16 离线抠绿批——预览 blit 置位）
         private SkillConfig _previewSkillConfig;  // 校准参数写回目标（Undo/SetDirty 宿主资产）
         private SkillConfig.SkillData _previewSkillData;
         private UnitConfig.UnitData _previewUnitData;
@@ -1096,6 +1097,7 @@ namespace GIC.Editor
             _previewUnitData = unitData;
             _previewActionClip = _previewSkillData?.动作视频;
             _previewIdleClip = _previewUnitData?.立牌动画视频;
+            _previewPacked = _previewSkillData != null && _previewSkillData.动作片Alpha打包; // 编辑器预览=桌面口径（动作视频+其打包标志）
 
             bool hasData = _previewSkillData != null;
             bool full = hasData && _previewActionClip != null;
@@ -1547,7 +1549,7 @@ namespace GIC.Editor
                         // 不 Pause 的话下次 Play 是 no-op=第二次播放无反应）+标记停止+末帧补一次+按钮回「播放」
                         _previewPlaying = false;
                         if (_actionPlayer.isPlaying) _actionPlayer.Pause();
-                        BlitPreview(_actionRawRt, _actionKeyedRt);
+                        BlitPreview(_actionRawRt, _actionKeyedRt, _previewPacked);
                         SyncCalibPlayBtn();
                     }
                 }
@@ -1555,7 +1557,7 @@ namespace GIC.Editor
                 {
                     if (_actionPlayer.frame != _lastActionFrame || _actionBlitDirty)
                     {
-                        BlitPreview(_actionRawRt, _actionKeyedRt);
+                        BlitPreview(_actionRawRt, _actionKeyedRt, _previewPacked);
                         _lastActionFrame = _actionPlayer.frame;
                         _actionBlitDirty = false;
                         needRepaint = true;
@@ -1576,7 +1578,7 @@ namespace GIC.Editor
                 Repaint(); // EditorWindow 级重绘（Tuanjie IMGUIContainer 无 Repaint——窗口重绘连带画布刷新）
         }
 
-        private void BlitPreview(RenderTexture src, RenderTexture dst)
+        private void BlitPreview(RenderTexture src, RenderTexture dst, bool packedAlpha = false)
         {
             if (src == null || dst == null) return;
             // ChromaKey 材质带 Blend SrcAlpha OneMinusSrcAlpha（透明队列 shader）——直接 Blit 时源帧按
@@ -1587,7 +1589,14 @@ namespace GIC.Editor
             RenderTexture.active = dst;
             GL.Clear(false, true, Color.clear);
             RenderTexture.active = prev;
-            if (_previewChromaMat != null) Graphics.Blit(src, dst, _previewChromaMat);
+            if (_previewChromaMat != null)
+            {
+                // Alpha 打包模式（2026-10-16 离线抠绿批）：动作片为打包格式时置位——同一材质实例
+                // 双路复用（待机 blit 恒传 false=绿幕运行时抠色，动作 blit 按片标志）
+                if (_previewChromaMat.HasProperty("_PackedAlpha"))
+                    _previewChromaMat.SetFloat("_PackedAlpha", packedAlpha ? 1f : 0f);
+                Graphics.Blit(src, dst, _previewChromaMat);
+            }
             else Graphics.Blit(src, dst); // shader 缺失兜底：绿幕直显（聊胜于无）
         }
 
@@ -1640,6 +1649,7 @@ namespace GIC.Editor
             if (_actionKeyedRt != null)
             {
                 float actionAspect = _actionKeyedRt.width / (float)_actionKeyedRt.height;
+                if (_previewPacked) actionAspect *= 1.5f; // 打包片色彩区 aspect（与运行时 PlayActionVideo 同构——画布含 alpha 区不对 quad 宽负责）
                 float actionH = idleH * comp;
                 float actionW = actionH * actionAspect;
                 float bottom = groundY - (0.55f + offset.y - 0.55f * comp) * pxPerWorld; // 帧底=中心锚定同构

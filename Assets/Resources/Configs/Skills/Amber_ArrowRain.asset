@@ -30,6 +30,8 @@ MonoBehaviour:
     timeline: {fileID: 11400000, guid: a5e89d01e9b99c24883eff8ce08afc29, type: 2}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 32900000, guid: dcb86961520b52549b050646f7627b83, type: 3}
     "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247Alpha\u6253\u5305": 1
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1.1421875
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1.002
     "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0.34777734, y: 0.0195625}
