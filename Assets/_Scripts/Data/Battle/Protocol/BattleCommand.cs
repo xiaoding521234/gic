@@ -145,6 +145,7 @@ namespace GIC.Data
         public const int ReactionKindMelt = 1;      // 融化（火+冰）
         public const int ReactionKindFreeze = 2;     // 冻结（水+冰）
         public const int ReactionKindVaporize = 3;  // 蒸发（火+水；2026-09-22 补全，docs/06 §反应表）
+        public const int ReactionKindSuperconduct = 4; // 超导（冰+雷，决策七十四实装——减防 Buff；含冻结层路径）
 
         [Header("属性子类型（StatChange 命令 metadata）")]
         public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；客户端 UnitView 缓存即时增量，B6a）

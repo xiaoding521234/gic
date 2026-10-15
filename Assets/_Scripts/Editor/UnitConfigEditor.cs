@@ -830,9 +830,10 @@ namespace GIC.Editor
             var paramKey3Field = new PropertyField(el.FindPropertyRelative("paramKey3"), "第三参数键(持续回合)");
             var valueField = new PropertyField(el.FindPropertyRelative("value"), "直读值(机制常量)");
             var elementField = new PropertyField(el.FindPropertyRelative("element"), "元素(物理=施法者元素)");
+            var elementLayersField = new PropertyField(el.FindPropertyRelative("elementLayers"), "元素层数(0=纯伤害不反应不附着)");
             var buffTypeField = new PropertyField(el.FindPropertyRelative("buffType"), "Buff 类型");
             var targetSkillTypeField = new PropertyField(el.FindPropertyRelative("targetSkillType"), "触发技能类型");
-            foreach (var f in new[] { paramKeyField, paramKey2Field, paramKey3Field, valueField, elementField, buffTypeField, targetSkillTypeField })
+            foreach (var f in new[] { paramKeyField, paramKey2Field, paramKey3Field, valueField, elementField, elementLayersField, buffTypeField, targetSkillTypeField })
                 effectAtomCard.Add(f);
 
             void ApplyVisibility()
@@ -859,6 +860,9 @@ namespace GIC.Editor
                     SkillEffectKind.Heal or SkillEffectKind.EnergyGain or SkillEffectKind.ApplyBuff
                         => DisplayStyle.Flex, _ => DisplayStyle.None };
                 elementField.style.display = kind is SkillEffectKind.Damage or SkillEffectKind.AttachElement
+                    ? DisplayStyle.Flex : DisplayStyle.None;
+                // 层数（决策七十四铺路）：Damage=来袭层数 / AttachElement=附着层数——同 element 两 kind 显示
+                elementLayersField.style.display = kind is SkillEffectKind.Damage or SkillEffectKind.AttachElement
                     ? DisplayStyle.Flex : DisplayStyle.None;
                 buffTypeField.style.display = kind == SkillEffectKind.ApplyBuff ? DisplayStyle.Flex : DisplayStyle.None;
                 targetSkillTypeField.style.display = kind == SkillEffectKind.TriggerSkill ? DisplayStyle.Flex : DisplayStyle.None;

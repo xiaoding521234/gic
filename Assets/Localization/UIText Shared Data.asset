@@ -1179,6 +1179,10 @@ MonoBehaviour:
     m_Key: HpBarColorTriColor
     m_Metadata:
       m_Items: []
+  - m_Id: 12038
+    m_Key: Battle_ReactionSuperconduct
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

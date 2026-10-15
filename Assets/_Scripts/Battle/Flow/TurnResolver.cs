@@ -331,14 +331,16 @@ namespace GIC.Battle
             _sim.BeginCompileDyeView(); // 共享视图：初值回落活态=回合末开始态；交错序列全程接力
             foreach (var hit in hits)
             {
-                // 统一出口（Request=null=纯附着事件只过反应预判）；返回=是否反应——
-                // 反应双方 1:1 全消耗（决策二十五）：该层**不附着**，无反应层才附着（覆盖）
-                bool reacted = EffectCompiler.CompileElementalDamage(_sim, hit.AttackerUnitId, hit.TargetUnitId, null,
-                    hit.Element, hit.Request, hit.BeatSeconds, hit.BeatSeconds, effects);
-                if (hit.Attach && !reacted)
+                // 统一出口（Request=null=纯附着事件只过反应预判）；返回=来袭已被处置（反应消耗/
+                // 0层/剩余层附着，决策七十四）——该层**不再附着**；无反应层才附着（覆盖，带层数）
+                bool consumed = EffectCompiler.CompileElementalDamage(_sim, hit.AttackerUnitId, hit.TargetUnitId, null,
+                    hit.Element, hit.Request, hit.BeatSeconds, hit.BeatSeconds, effects,
+                    incomingLayers: hit.Layers);
+                if (hit.Attach && !consumed)
                 {
-                    effects.Add(new AttachElementEffect(hit.AttackerUnitId, hit.TargetUnitId, (int)hit.Element));
-                    _sim.SetCompileDye(hit.TargetUnitId, hit.Element);
+                    effects.Add(new AttachElementEffect(hit.AttackerUnitId, hit.TargetUnitId, (int)hit.Element,
+                        Mathf.Max(1, hit.Layers)));
+                    _sim.SetCompileDye(hit.TargetUnitId, hit.Element, Mathf.Max(1, hit.Layers));
                 }
             }
             _sim.EndCompileDyeView();
@@ -599,6 +601,14 @@ namespace GIC.Battle
                     segment.commands.Add(BattleCommand.RemoveBuff(s.sourceId, s.holderId,
                         sliceIndex, indexInSlice++, (int)s.buff.Type, s.buff.Config?.name)); // 具名 key（决策五十七）
                 }
+            }
+            // 冻结层消耗归零（决策七十四「消耗到 0 立即解冻」）：RemoveBuff 命令（客户端徽章+霜化
+            // 即时退场，随碎裂先例立即应用）；未归零=零命令（冻结徽章回合数下回合快照自愈）
+            foreach (var effect in EnumerateEffects<ConsumeFreezeEffect>(effects))
+            {
+                if (!effect.Depleted) continue;
+                segment.commands.Add(BattleCommand.RemoveBuff(effect.SourceUnitId, effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, (int)BuffType.Freeze, effect.AppliedKey)); // 具名 key（决策五十七）
             }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
@@ -969,13 +979,41 @@ namespace GIC.Battle
                 }
                 else if (effect is AttachElementEffect attach)
                 {
-                    _sim.AttachElement(target, (ElementType)attach.Element); // 覆盖=消耗被反应附着（docs/06）
+                    // 覆盖=消耗被反应附着（docs/06）；层数经 Layers（决策七十四多层铺路——
+                    // 反应消耗后的剩余层/多层附着原子落此）
+                    _sim.AttachElement(target, (ElementType)attach.Element, attach.Layers);
                 }
-                else if (effect is ReactionEffect)
+                else if (effect is ReactionEffect reaction)
                 {
                     // 反应消耗的真实状态落点（决策二十五：反应 1:1 双方全消耗、等层零残留——
                     // 被反应附着清除；此前靠「附着覆盖」近似消耗，反应命中不再附着后必须显式清）
-                    _sim.ClearDye(target);
+                    // 决策七十四按层消耗：多层剩余层仍附着（ConsumeDyeLayers 内置等层=清）；
+                    // 冻结层路径 ConsumedLayers=0 且附着本空 → Physical 守卫 no-op
+                    _sim.ConsumeDyeLayers(target, reaction.ConsumedLayers);
+                }
+                else if (effect is ConsumeFreezeEffect consumeFreeze)
+                {
+                    // 冻结层消耗（决策七十四「冻结 Buff 可作为冰元素参与反应」——每个回合相当于 1 层冰）：
+                    // 融化/超导按反应级别消耗冻结回合；**归零立即解冻**（拍板：_sim.RemoveBuff 注销+清
+                    // Frozen 状态〔OnRemoved〕→命令层发 RemoveBuff=霜化即时退场）；未归零=零命令
+                    //（冻结徽章回合数靠下回合快照自愈，Frost 表现由 Frozen 状态驱动仍正确）
+                    var freeze = _sim.GetFreezeBuff(consumeFreeze.TargetUnitId);
+                    if (freeze == null)
+                    {
+                        consumeFreeze.AppliedTurns = 0; // 编译后冻结已被外部移除的防御路径（零命令零动作）
+                    }
+                    else
+                    {
+                        consumeFreeze.AppliedTurns = Mathf.Min(consumeFreeze.Turns,
+                            Mathf.Max(0, freeze.RemainingTurns));
+                        freeze.RemainingTurns -= consumeFreeze.AppliedTurns;
+                        if (freeze.RemainingTurns <= 0)
+                        {
+                            consumeFreeze.AppliedKey = freeze.Config?.name; // 具名身份（决策五十七）——RemoveBuff 命令载荷
+                            _sim.RemoveBuff(target, freeze); // OnRemoved 清 Frozen 状态=归零即解冻
+                            consumeFreeze.Depleted = true;
+                        }
+                    }
                 }
             }
 

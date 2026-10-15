@@ -39,6 +39,7 @@ namespace GIC.Battle
             var moraKeys = new HashSet<string>();
             var itemConsumeKeys = new HashSet<string>();
             var reviveKeys = new HashSet<string>();
+            var removeBuffKeys = new HashSet<string>(); // RemoveBuff 命令目标索引（冻结层归零解冻对账用，决策七十四）
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -74,6 +75,9 @@ namespace GIC.Battle
                         break;
                     case BattleCommandType.Revive:
                         reviveKeys.Add(command.targetUnitId);
+                        break;
+                    case BattleCommandType.RemoveBuff:
+                        removeBuffKeys.Add(command.targetUnitId);
                         break;
                 }
             }
@@ -159,6 +163,14 @@ namespace GIC.Battle
                     // B-3 ② 复苏：Applied=false（活体防御性 no-op）零命令=非漏发；有产出=Revive 命令
                     if (revive.Applied && !reviveKeys.Contains(revive.TargetUnitId))
                         Report(context, effect, BattleCommandType.Revive);
+                }
+                else if (effect is ConsumeFreezeEffect consumeFreeze)
+                {
+                    // 冻结层消耗（决策七十四）：未归零=零命令非漏发（冻结徽章回合数下回合快照自愈）；
+                    // AppliedTurns=0（编译后冻结被外部移除的防御路径）同零命令非漏发；
+                    // 归零（Depleted）=RemoveBuff 命令（客户端徽章+霜化即时退场）
+                    if (consumeFreeze.Depleted && !removeBuffKeys.Contains(consumeFreeze.TargetUnitId))
+                        Report(context, effect, BattleCommandType.RemoveBuff);
                 }
                 else if (effect is ApplyBuffEffect)
                 {

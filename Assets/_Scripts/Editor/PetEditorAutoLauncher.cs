@@ -89,6 +89,14 @@ namespace GIC.Editor
         {
             if (!AutoLaunch) return;
 
+            // 平台守卫：拉起 Windows 桌宠 exe 属桌面联调行为——安卓目标模式下 Play（测手机端）
+            // 不应弹出桌面进程；非 Windows 桌面目标一律跳过（跳过留日志行便于归因）
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.StandaloneWindows64)
+            {
+                GICLog.Info($"[PetMode][Editor] 当前构建目标={EditorUserBuildSettings.activeBuildTarget}（非 Windows 桌面目标），本次 Play 不拉派蒙");
+                return;
+            }
+
             // 与生产 PetProcessLauncher 相同的防重探测：桌面已有派蒙（含手动从构建目录启动的）则跳过
             if (GIC.Pet.PetSingleInstance.Probe())
             {

@@ -668,11 +668,24 @@ namespace GIC.Battle
                                 // AI-5 军团软系数：回防态斩杀加成 ×0.7（激进度下调——§3 协作机制 2）
                                 score += Mathf.RoundToInt(KillBonusScore * profile.激进度 * legionAggression);
                             // E-3 反应预期分：快照附着×技能元素经 ElementReactionResolver.Preview 单源
-                            // 预判——增伤反应（蒸发/融化 1 级 +50% 伤害乘区）按折减伤害一半计；冻结
+                            // 预判——增伤反应（蒸发/融化 级别×50% 乘区）按折减伤害一半计；冻结
                             // 控制反应无增伤乘区不计分。跨单位连招基础：凯亚挂冰→安柏跟火自动蒸发
-                            // AI-4 难度门：reactionPreview=false（学徒关闭件）=零反应预期分
+                            // **冻结层兜底（决策七十四拍板「AI 一并接入」）**：附着为空且目标冻结时
+                            // 冻结 Buff=第二冰源——火技能预判到融化（每回合=1层、同片逐发消耗）：
+                            // 芭芭拉挂水→凯亚冻结→安柏跟火=融化收益可估（超导减防属间接收益不接，
+                            // J-1 冻结协同分既有）
                             var reaction = ElementReactionResolver.Preview(
-                                (ElementType)target.dyedElement, skillElement);
+                                (ElementType)target.dyedElement, target.dyedLayers, skillElement, 1);
+                            if (!reaction.HasReaction
+                                && (ElementType)target.dyedElement == ElementType.Physical
+                                && target.isFrozen == 1)
+                            {
+                                int freezeTurns = 0;
+                                foreach (var b in target.buffs)
+                                    if (b.type == (int)BuffType.Freeze) freezeTurns = b.remainingTurns;
+                                if (freezeTurns > 0)
+                                    reaction = ElementReactionResolver.PreviewFreezeLayer(skillElement, 1, freezeTurns);
+                            }
                             if (reactionPreview
                                 && reaction.HasReaction
                                 && reaction.DamageBonusDelta + reaction.VulnerabilityBonus > 0)

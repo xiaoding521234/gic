@@ -1089,13 +1089,15 @@ namespace GIC.Battle
         }
 
         /// <summary>反应子类型 → 本地化反应名（短命数字对象直接求值当前语言，不挂 TextCombiner）。
-        /// 三反应全带名（2026-10-01 三次拍板「反应名都应该加上」——冻结不再例外；本地化键 Battle_ReactionFreeze=12035）</summary>
+        /// 三反应全带名（2026-10-01 三次拍板「反应名都应该加上」——冻结不再例外；本地化键 Battle_ReactionFreeze=12035）；
+        /// 超导带名（决策七十四实装——Battle_ReactionSuperconduct）</summary>
         private static string ReactionNameOf(int reactionKind)
         {
             string key = null;
             if (reactionKind == BattleCommand.ReactionKindMelt) key = "Battle_ReactionMelt";
             else if (reactionKind == BattleCommand.ReactionKindVaporize) key = "Battle_ReactionVaporize";
             else if (reactionKind == BattleCommand.ReactionKindFreeze) key = "Battle_ReactionFreeze";
+            else if (reactionKind == BattleCommand.ReactionKindSuperconduct) key = "Battle_ReactionSuperconduct";
             if (key == null) return null;
             return new LocalizedString("UIText", key).GetLocalizedString();
         }
@@ -1130,6 +1132,7 @@ namespace GIC.Battle
                     case BattleCommand.ReactionKindMelt: return palette.反应融化色;
                     case BattleCommand.ReactionKindVaporize: return palette.反应蒸发色;
                     case BattleCommand.ReactionKindFreeze: return palette.反应冻结色;
+                    case BattleCommand.ReactionKindSuperconduct: return palette.反应超导色;
                 }
                 switch ((ElementType)element)
                 {

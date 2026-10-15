@@ -111,6 +111,12 @@ namespace GIC.Data
         /// <summary>元素（Damage/AttachElement 用；0=Physical=施法者自身元素——非物理伤害天然取施法者元素）</summary>
         public ElementType element = ElementType.Physical;
 
+        /// <summary>元素层数（Damage=来袭层数/AttachElement=附着层数，docs/06 §6.2「大部分附着为1层」
+        /// 铺路字段，决策七十四）：默认 1=常规附着；0=纯伤害不反应不附着（燃烧 DoT 同语义）；
+        /// N&gt;1=多层——反应级别=min(双方层数)强化、1:1 消耗、多余层仍附着（docs/06 §6.3）。
+        /// 冻结 Buff 作为第二冰源参与反应时同样吃本值（2层火打2回合冻结=2级融化清零）</summary>
+        public int elementLayers = 1;
+
         /// <summary>Buff 族类型（ApplyBuff 用；=BuffConfig.buffType 的镜像——具名 buff 身份=下方
         /// buffAsset 资产引用，此字段仅作缺引用时的回落与 Inspector 展示）</summary>
         public BuffType buffType = BuffType.Burn;

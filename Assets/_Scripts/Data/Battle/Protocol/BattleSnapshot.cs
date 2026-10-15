@@ -24,6 +24,10 @@ namespace GIC.Data
         /// <summary>移速（2026-09-23：移动距离=10%×移速换算的基准值——HUD 瞄准与 Host 同源）</summary>
         public int moveSpeed;
         public int dyedElement;
+
+        /// <summary>染色层数（docs/06 §6.2 多层附着，决策七十四铺路；旧回放/旧端缺省 0——消费方按
+        /// 「dyedElement≠Physical 且层数≤0 → 归一为 1」兼容）</summary>
+        public int dyedLayers;
         public int isCorpse;
         public int isFrozen;
 

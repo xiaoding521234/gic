@@ -105,8 +105,12 @@ namespace GIC.Battle
         /// <summary>该层命中后附着来袭元素（默认 true；纯附着事件也走此位）</summary>
         public bool Attach = true;
 
+        /// <summary>来袭元素层数（决策七十四 docs/06 §6.2：默认 1=常规附着反应；0=纯伤害不反应
+        /// 不附着——燃烧 DoT 回归 0 层终点语义〔修订决策二十三〕，反应级别= min(双方层数)）</summary>
+        public int Layers = 1;
+
         public PendingAuraHit(string attackerUnitId, string targetUnitId, Unit attacker, Unit target,
-            ElementType element, DamageRequest request, float beatSeconds, bool attach = true)
+            ElementType element, DamageRequest request, float beatSeconds, bool attach = true, int layers = 1)
         {
             AttackerUnitId = attackerUnitId;
             TargetUnitId = targetUnitId;
@@ -116,6 +120,7 @@ namespace GIC.Battle
             Request = request;
             BeatSeconds = beatSeconds;
             Attach = attach;
+            Layers = layers;
         }
     }
 
@@ -329,18 +334,24 @@ namespace GIC.Battle
 
     /// <summary>
     /// 元素附着效应（B4）：反应消耗语义已由 ElementReactionResolver 在结算时定夺，
-    /// 本效应=效应应用阶段直接 Dye 目标为 incoming 元素（覆盖旧附着=消耗）
+    /// 本效应=效应应用阶段直接 Dye 目标为 incoming 元素（覆盖旧附着=消耗）。
+    /// Layers=附着层数（docs/06 §6.2 铺路，决策七十四：默认 1；编译期多层消耗后的
+    /// 「多余层仍附着」落此——如 2 层火 vs 1 层冰融化后剩 1 层火）
     /// </summary>
     public class AttachElementEffect : BattleEffect
     {
         public string SourceUnitId;
         public int Element;
 
-        public AttachElementEffect(string sourceUnitId, string targetUnitId, int element)
+        /// <summary>附着层数（默认 1——docs/06 §6.2；0=编译层已保证不产本效应）</summary>
+        public int Layers = 1;
+
+        public AttachElementEffect(string sourceUnitId, string targetUnitId, int element, int layers = 1)
         {
             SourceUnitId = sourceUnitId;
             TargetUnitId = targetUnitId;
             Element = element;
+            Layers = layers;
         }
     }
 
@@ -352,15 +363,19 @@ namespace GIC.Battle
     {
         public string SourceUnitId;
 
-        /// <summary>反应类型（BattleCommand.ReactionKindMelt / ReactionKindFreeze）</summary>
+        /// <summary>反应类型（BattleCommand.ReactionKindMelt / ReactionKindFreeze / ReactionKindSuperconduct）</summary>
         public int ReactionType;
 
-        /// <summary>反应级别（B4 层数简化恒 1）</summary>
+        /// <summary>反应级别（决策七十四：=min(双方层数)——2层火+2层冰=2级融化）</summary>
         public int Level;
 
         /// <summary>命中时刻（秒，相对片播放起点；0=立即）——反应命令 launchMs 载荷（客户端到点
         /// 清附着图标：反应 1:1 消耗双方、等层零残留，docs/06 §6.3 / docs/18 决策二十五）</summary>
         public float HitSeconds;
+
+        /// <summary>从附着侧消耗的层数（决策七十四：应用层按此减层——剩余层仍附着；
+        /// 等层=清附着〔决策二十五零残留〕；默认 1=存量单层行为不变）</summary>
+        public int ConsumedLayers = 1;
 
         public ReactionEffect(string sourceUnitId, string targetUnitId, int reactionType, int level)
         {
@@ -483,6 +498,39 @@ namespace GIC.Battle
             SubType = (int)subType;
             AnyOfSubType = true;
             Amount = amount;
+        }
+    }
+
+    /// <summary>
+    /// 冻结层消耗效应（决策七十四「冻结 Buff 可作为冰元素参与反应」）：附着为空时冻结 Buff 作为
+    /// 第二冰源参与融化/超导——每个回合相当于 1 层冰，反应消耗 FreezeConsumed 回合。
+    /// 应用=FreezeBuff.RemainingTurns -= AppliedTurns；**归零立即解冻**（拍板「消耗到 0 立即解冻」：
+    /// _sim.RemoveBuff 注销+清 Frozen 状态+Depleted=true→命令层发 RemoveBuff〔霜化即时退场——
+    /// 随寒冰之棱碎裂先例立即应用，勿当延迟 bug〕）。AppliedTurns&gt;0 且未归零=零命令（冻结徽章
+    /// 回合数靠下回合快照自愈——Frost 表现由 Frozen 状态驱动、仍冻结中故不受影响）；无冻结 Buff
+    /// （编译后状态被外部移除的防御路径）=AppliedTurns=0 零命令零动作。
+    /// </summary>
+    public class ConsumeFreezeEffect : BattleEffect
+    {
+        public string SourceUnitId;
+
+        /// <summary>申请消耗回合数（=反应级别）</summary>
+        public int Turns;
+
+        /// <summary>实际消耗回合数（应用回填；0=无冻结 Buff 防御路径）</summary>
+        public int AppliedTurns;
+
+        /// <summary>归零即解冻（应用回填；true=已移除冻结 Buff，命令层发 RemoveBuff）</summary>
+        public bool Depleted;
+
+        /// <summary>被移除的冻结 Buff 具名身份（应用回填=Config 资产名——RemoveBuff 命令载荷）</summary>
+        public string AppliedKey;
+
+        public ConsumeFreezeEffect(string sourceUnitId, string targetUnitId, int turns)
+        {
+            SourceUnitId = sourceUnitId;
+            TargetUnitId = targetUnitId;
+            Turns = turns;
         }
     }
 

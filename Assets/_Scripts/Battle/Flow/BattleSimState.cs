@@ -708,10 +708,38 @@ namespace GIC.Battle
             _activeBuffs.Remove(buff);
         }
 
-        /// <summary>元素附着（效应应用阶段执行；覆盖=消耗被反应附着，docs/06）</summary>
+        /// <summary>元素附着（效应应用阶段执行；覆盖=消耗被反应附着，docs/06）——层数默认 1</summary>
         public void AttachElement(Unit target, ElementType element)
         {
-            target?.GetUnitComponent<UnitElement>()?.Dye(element);
+            AttachElement(target, element, 1);
+        }
+
+        /// <summary>元素附着（带层数——docs/06 §6.2 多层附着，决策七十四铺路；反应消耗后的
+        /// 「多余层仍附着」经此落状态）</summary>
+        public void AttachElement(Unit target, ElementType element, int layers)
+        {
+            target?.GetUnitComponent<UnitElement>()?.Dye(element, layers);
+        }
+
+        /// <summary>附着侧反应消耗（决策七十四：按层消耗——剩余层仍附着，等层=清附着零残留）</summary>
+        public void ConsumeDyeLayers(Unit target, int consumedLayers)
+        {
+            var unitElement = target?.GetUnitComponent<UnitElement>();
+            if (unitElement == null) return;
+            if (unitElement.DyedElement == ElementType.Physical) return; // 无附着（防御）
+            int left = unitElement.DyedLayers - consumedLayers;
+            if (left > 0) unitElement.Dye(unitElement.DyedElement, left);
+            else unitElement.ClearDye();
+        }
+
+        /// <summary>查冻结 Buff 实例（无=null——冻结层消耗/回合读取共用；冻结判重保证单实例）</summary>
+        public FreezeBuff GetFreezeBuff(string unitId)
+        {
+            var unit = GetUnit(unitId);
+            if (unit == null) return null;
+            foreach (var buff in unit.Buffs)
+                if (buff is FreezeBuff freeze) return freeze;
+            return null;
         }
 
         /// <summary>清除附着（反应消耗的真实状态落点——决策二十五：反应 1:1 双方全消耗、等层
@@ -772,6 +800,7 @@ namespace GIC.Battle
                 attackSpeed = stats?.AttackSpeed ?? 0,
                 moveSpeed = stats?.MoveSpeed ?? 0,
                 dyedElement = (int)(element?.DyedElement ?? ElementType.Physical),
+                dyedLayers = element?.DyedLayers ?? 0, // 多层附着（决策七十四铺路——客户端暂不消费，Host 编译视图初值用）
                 isCorpse = status != null && status.IsDead ? 1 : 0,
                 isFrozen = status != null && status.IsFrozen ? 1 : 0,
                 volume = unit.Volume,
@@ -839,22 +868,37 @@ namespace GIC.Battle
         // 视图=编译期工作副本：初值回落快照，反应消耗/新附着随编译序即时推进；TurnResolver
         // 片/即时段编译期以 Begin/End 包裹（命中编译全部走这两处）。真实状态仍由
         // AttachElementEffect 统一应用写入——视图只服务反应预判，不落任何持久状态。
+        // 2026-10-15 决策七十四扩两维：①附着层数（多层 1:1 消耗/剩余层仍附着——值扩 (元素,层数)）；
+        // ②冻结回合视图（冻结 Buff 第二冰源——同片多命中逐发消耗冻结回合，ArrowRain 4 发 vs
+        // 2 回合冻结=发1融2→1/发2融1→0，与双蒸发修复同机制防一发吃穿全部）。
 
-        /// <summary>片内附着编译视图（unitId → 当前附着；null=未开启，读取回落快照=旧行为）</summary>
-        private Dictionary<string, ElementType> _compileDyeView;
+        /// <summary>片内附着编译视图（unitId → (附着元素, 层数)；null=未开启，读取回落快照=旧行为）</summary>
+        private Dictionary<string, (ElementType element, int layers)> _compileDyeView;
+
+        /// <summary>片内冻结回合消耗视图（unitId → 已消耗回合累计；真实剩余=活态冻结回合−累计。
+        /// 只记消耗不记全量：编译期冻结回合无其它写入点〔回合递减在回合结束段〕，活态即初值）</summary>
+        private Dictionary<string, int> _compileFreezeView;
 
         /// <summary>开启编译视图（片/即时段编译期入口调用，紧跟 TakeSnapshot 之后）</summary>
-        public void BeginCompileDyeView() => _compileDyeView = new Dictionary<string, ElementType>();
+        public void BeginCompileDyeView()
+        {
+            _compileDyeView = new Dictionary<string, (ElementType, int)>();
+            _compileFreezeView = new Dictionary<string, int>();
+        }
 
         /// <summary>关闭编译视图（片内全部命中编译完成后调用）</summary>
-        public void EndCompileDyeView() => _compileDyeView = null;
+        public void EndCompileDyeView()
+        {
+            _compileDyeView = null;
+            _compileFreezeView = null;
+        }
 
         /// <summary>编译期附着读取：视图优先，未命中回退片前快照态；无快照（回合结束段 tick——
         /// 2026-10-01 tick 统一拍板）回退**活态**（染色写入仍走效应统一应用，活态在该编译时点=段初真值）</summary>
         public ElementType GetCompileDye(string unitId, UnitState snapshotState)
         {
             if (_compileDyeView != null && _compileDyeView.TryGetValue(unitId, out var dye))
-                return dye;
+                return dye.element;
             if (snapshotState != null) return (ElementType)snapshotState.dyedElement;
             var unit = GetUnit(unitId);
             return unit != null
@@ -862,10 +906,57 @@ namespace GIC.Battle
                 : ElementType.Physical;
         }
 
-        /// <summary>编译期附着推进：反应消耗=Physical（docs/06 §6.3）；AttachElement 覆盖=来袭元素</summary>
+        /// <summary>编译期附着层数读取（决策七十四：与 GetCompileDye 同回退链——视图→快照→活态；
+        /// 快照旧端/旧回放缺省 0 且元素非 Physical 时归一为 1〔docs/06 §6.2「大部分附着为1层」〕）</summary>
+        public int GetCompileDyeLayers(string unitId, UnitState snapshotState)
+        {
+            if (_compileDyeView != null && _compileDyeView.TryGetValue(unitId, out var dye))
+                return dye.layers;
+            if (snapshotState != null)
+                return NormalizeLayers((ElementType)snapshotState.dyedElement, snapshotState.dyedLayers);
+            var unit = GetUnit(unitId);
+            if (unit == null) return 0;
+            var unitElement = unit.GetUnitComponent<UnitElement>();
+            return unitElement == null ? 0
+                : NormalizeLayers(unitElement.DyedElement, unitElement.DyedLayers);
+        }
+
+        private static int NormalizeLayers(ElementType element, int layers)
+            => element == ElementType.Physical ? 0 : (layers <= 0 ? 1 : layers);
+
+        /// <summary>编译期附着推进：反应消耗=Physical（等层零残留，docs/06 §6.3）；
+        /// AttachElement 覆盖=来袭元素（带剩余层——多层消耗后「多余的元素仍然附着」）</summary>
         public void SetCompileDye(string unitId, ElementType element)
         {
-            if (_compileDyeView != null) _compileDyeView[unitId] = element;
+            SetCompileDye(unitId, element, element == ElementType.Physical ? 0 : 1);
+        }
+
+        /// <summary>编译期附着推进（带层数）</summary>
+        public void SetCompileDye(string unitId, ElementType element, int layers)
+        {
+            if (_compileDyeView != null)
+                _compileDyeView[unitId] = (element, element == ElementType.Physical ? 0 : UnityEngine.Mathf.Max(1, layers));
+        }
+
+        // ==================== 冻结回合编译视图（决策七十四「冻结层=第二冰源」） ====================
+
+        /// <summary>编译期冻结剩余回合读取：活态冻结 Buff 回合 − 本片已消耗累计（视图未开启=活态直读，
+        /// 回合结束段 tick 亦然）；无冻结 Buff=0</summary>
+        public int GetCompileFreezeTurns(string unitId)
+        {
+            var freeze = GetFreezeBuff(unitId);
+            int turns = freeze != null ? freeze.RemainingTurns : 0;
+            if (_compileFreezeView != null && _compileFreezeView.TryGetValue(unitId, out var consumed))
+                turns -= consumed;
+            return UnityEngine.Mathf.Max(0, turns);
+        }
+
+        /// <summary>编译期冻结回合消耗推进（同片后续命中见已扣减的冻结回合）</summary>
+        public void ConsumeCompileFreeze(string unitId, int turns)
+        {
+            if (_compileFreezeView == null || turns <= 0) return;
+            _compileFreezeView.TryGetValue(unitId, out var consumed);
+            _compileFreezeView[unitId] = consumed + turns;
         }
     }
 }

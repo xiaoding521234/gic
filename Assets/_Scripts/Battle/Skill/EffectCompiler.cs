@@ -269,27 +269,59 @@ namespace GIC.Battle
 
         // ==================== 元素伤害统一出口（2026-10-01 拍板「与正常伤害一致，全部统一」=docs/18 决策二十三） ====================
 
-        /// <summary>元素伤害统一编译出口：反应预判（附着读片内编译视图，融化=易伤/蒸发=增伤/冻结=控制，
-        /// docs/06）→ DamagePipeline 全乘区（防御/易伤/增伤；Request=null 纯附着事件跳过伤害）→ 反应事实+
-        /// 冻结 Buff+1:1 消耗（视图即时推进）。**返回=是否发生反应**——调用方据此跳过附着：反应双方
-        /// 1:1 全消耗、等层零残留（docs/06 §6.3 / docs/18 决策二十五——反应命中的来袭元素不附着；
-        /// 无反应命中才附着〔覆盖〕）。正常命中（CompileAtom Damage 原子）、光环 tick（歌声之环/
-        /// 寒冰之棱）、反应 DoT（燃烧）、纯附着（环附着我方）共用——废除「tick 平直值不反应不附着」旁路。</summary>
+        /// <summary>元素伤害统一编译出口：反应预判（附着读片内编译视图，融化=易伤/蒸发=增伤/冻结=控制/
+        /// 超导=减防 Buff，docs/06）→ DamagePipeline 全乘区（防御/易伤/增伤；Request=null 纯附着事件跳过伤害）
+        /// → 反应事实+冻结 Buff+1:1 消耗（视图即时推进）。**返回=来袭元素已被本出口处置完毕**——调用方
+        /// 据此跳过自带附着：①发生反应（双方 1:1 全消耗、等层零残留，决策二十五）②0 层（纯伤害不反应
+        /// 不附着——燃烧 DoT 终点语义，决策七十四修订决策二十三）③剩余层已在本出口内附着（docs/06 §6.3
+        /// 「多余的元素仍然附着」）。无反应命中才由调用方附着〔覆盖〕。正常命中（CompileAtom Damage 原子）、
+        /// 光环 tick（歌声之环/寒冰之棱）、反应 DoT（燃烧）、纯附着（环附着我方）共用。
+        /// **冻结层兜底（决策七十四「冻结 Buff 可作为冰元素参与反应」）**：附着为空且目标冻结时，
+        /// 冻结 Buff=第二冰源参与融化（火）/超导（雷）——每回合=1 层、消耗=min(层数, 冻结回合)回合、
+        /// 归零立即解冻；水不与冻结层反应（平衡拍板「唯独冰水不反应，正常附着」）。
+        /// 级别公式= min(双方层数)（docs/06 §6.3 多层消耗强化反应级别——2层火+2层冰=2级融化）</summary>
         public static bool CompileElementalDamage(BattleSimState sim, string attackerId, string targetUnitId,
             UnitState targetState, ElementType element, DamageRequest request,
             float launchSeconds, float hitSeconds, List<BattleEffect> effects,
-            int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f)
+            int delivery = 0, BattleCell fromCell = default, float hitPointX = 0f, float hitPointY = 0f,
+            int incomingLayers = 1)
         {
+            // 0 层=纯伤害不反应不附着（决策七十四修订决策二十三：燃烧 DoT 回归 0 层终点语义——
+            // 仍视为火伤吃防御/易伤/增伤/暴击与「造成火伤」类触发器，但不参与反应预判、不附着）
+            bool zeroLayer = incomingLayers <= 0;
+
             // 附着读片内编译视图（2026-10-01 双蒸发修复）：快照只是初值，同段前序命中的反应消耗/
             // 新附着随编译序对后续命中可见（安柏双箭打一层水=第一发蒸发消耗、第二发见空平直）
-            var outcome = ElementReactionResolver.Preview(sim.GetCompileDye(targetUnitId, targetState), element);
+            var dyed = sim.GetCompileDye(targetUnitId, targetState);
+            var dyedLayers = sim.GetCompileDyeLayers(targetUnitId, targetState);
+            ReactionOutcome outcome = zeroLayer
+                ? new ReactionOutcome()
+                : ElementReactionResolver.Preview(dyed, dyedLayers, element, incomingLayers);
+
+            // 冻结层兜底（决策七十四）：附着为空（含被前序命中反应消耗后）且目标处于冻结时，
+            // 冻结 Buff 作为第二冰源参与反应——同片多命中逐发消耗（编译视图推进，双蒸发同机制）
+            bool viaFreeze = false;
+            if (!zeroLayer && !outcome.HasReaction && dyed == ElementType.Physical)
+            {
+                int freezeTurns = sim.GetCompileFreezeTurns(targetUnitId);
+                if (freezeTurns > 0)
+                {
+                    var freezeOutcome = ElementReactionResolver.PreviewFreezeLayer(element, incomingLayers, freezeTurns);
+                    if (freezeOutcome.HasReaction)
+                    {
+                        outcome = freezeOutcome;
+                        viaFreeze = true;
+                    }
+                }
+            }
+
             if (request != null)
             {
                 // 暴击判定（2026-10-02 幸运暴击批，docs/18 决策二十七）：幸运=暴击率（20 点=20%、
                 // 负值恒不暴、默认 0=无暴击）——roll 走 sim 种子 RNG 单出口（BattleSimState.RollChance，
                 // 回放/联机确定性）；理智=暴击效果（默认 50=×1.5）经 CritBonus 注入独立乘区。
                 // 本方法=全伤害唯一编译出口（正常命中/光环 tick/DoT 全经此），判定收拢于此=所有伤害
-                // 都可暴击（docs/05 §5.6）
+                // 都可暴击（docs/05 §5.6）；0 层伤害（燃烧）同经此=照常可暴
                 var attackerStats = request.Attacker?.GetUnitComponent<UnitStats>();
                 bool isCrit = attackerStats != null && sim.RollChance(attackerStats.Luck);
                 if (isCrit) request.CritBonus = attackerStats.Sanity / 100f;
@@ -305,23 +337,45 @@ namespace GIC.Battle
             }
             if (outcome.HasReaction)
             {
-                // 反应 1:1 消耗被反应附着（docs/06 §6.3）——段内后续命中/tick 不再见旧附着；
-                // 来袭元素同被消耗（等层零残留，决策二十五）——不附着，由返回值告知调用方
-                sim.SetCompileDye(targetUnitId, ElementType.Physical);
-                // 反应事实载体 + 冻结控制 Buff（融化伤害已并入 DamageEffect）
+                if (viaFreeze)
+                {
+                    // 冻结层消耗（决策七十四）：消耗=级别回合；归零立即解冻（应用层 ConsumeFreezeEffect）
+                    effects.Add(new ConsumeFreezeEffect(attackerId, targetUnitId, outcome.FreezeConsumed));
+                    sim.ConsumeCompileFreeze(targetUnitId, outcome.FreezeConsumed); // 后续命中见已扣减的冻结回合
+                }
+                else
+                {
+                    // 反应 1:1 消耗被反应附着（docs/06 §6.3）——段内后续命中/tick 不再见旧附着；
+                    // 多层剩余层仍附着（「多余的元素仍然附着」）；等层零残留=Physical（决策二十五）
+                    int dyedLeft = dyedLayers - outcome.DyedConsumed;
+                    if (dyedLeft > 0) sim.SetCompileDye(targetUnitId, dyed, dyedLeft);
+                    else sim.SetCompileDye(targetUnitId, ElementType.Physical);
+                }
+                // 反应事实载体（两路统一产出——冻结层路径附着本就为空，客户端清附着=无害 no-op；
+                // 融化伤害已并入 DamageEffect；ConsumedLayers=应用层按层减附着，viaFreeze=0 无消耗）
                 effects.Add(new ReactionEffect(attackerId, targetUnitId, outcome.ReactionType, outcome.Level)
                 {
                     HitSeconds = hitSeconds, // 客户端到点清附着图标（反应消耗可见）
+                    ConsumedLayers = viaFreeze ? 0 : outcome.DyedConsumed,
                 });
                 if (outcome.BuffType >= 0)
                 {
-                    // 反应类 Buff（燃烧/冻结）key=族首资产名（决策五十七：身份链全量携带，客户端解析统一）
+                    // 反应类 Buff 具名身份（决策五十七+七十四）：超导减防走具名资产（outcome.BuffKey=
+                    // Buff_Superconduct，与冰棱减防异资产同族共存）；冻结维持族首资产回落
                     var reactCfg = BuffConfig.OfType((BuffType)outcome.BuffType);
                     effects.Add(new ApplyBuffEffect(attackerId, targetUnitId, outcome.BuffType, outcome.Level,
-                        buffKey: reactCfg?.name));
+                        buffKey: outcome.BuffKey ?? reactCfg?.name));
+                }
+                // 多余的来袭层仍附着（docs/06 §6.3 双向：等层=不附着〔决策二十五〕；2层火 vs 1层冰=
+                // 1级融化+剩1层火附着；2层火 vs 2回合冻结=2级融化清零全耗）
+                int incomingLeft = incomingLayers - outcome.Level;
+                if (incomingLeft > 0)
+                {
+                    effects.Add(new AttachElementEffect(attackerId, targetUnitId, (int)element, incomingLeft));
+                    sim.SetCompileDye(targetUnitId, element, incomingLeft);
                 }
             }
-            return outcome.HasReaction;
+            return zeroLayer || outcome.HasReaction; // 0层/反应=来袭已被处置，调用方跳过自带附着
         }
 
         // ==================== 单原子编译（OnCast/OnHit 共用） ====================
@@ -375,10 +429,11 @@ namespace GIC.Battle
                         request.AttackPercent = attackPercent;
                     }
                     // 统一元素伤害出口（2026-10-01 拍板「全部统一」=docs/18 决策二十三）：正常命中/光环
-                    // tick/反应 DoT 共用反应预判+全乘区链；返回=是否反应——反应双方 1:1 全消耗（等层
-                    // 零残留，决策二十五），CompileOnHit 据此跳过本技能 AttachElement 原子（无反应才附着）
+                    // tick/反应 DoT 共用反应预判+全乘区链；返回=来袭已被处置（反应消耗/0层/剩余层附着）
+                    // ——CompileOnHit 据此跳过本技能 AttachElement 原子（无反应才附着）
                     return CompileElementalDamage(sim, action.unitId, targetUnitId, targetState, element, request,
-                        launchSeconds, hitSeconds, effects, delivery, fromCell, hitPointX, hitPointY);
+                        launchSeconds, hitSeconds, effects, delivery, fromCell, hitPointX, hitPointY,
+                        atom.elementLayers); // 层数（决策七十四铺路：0=纯伤害/1=默认/N=多层强化级别）
                 }
 
                 case SkillEffectKind.Heal:
@@ -416,8 +471,9 @@ namespace GIC.Battle
                     var element = atom.element != ElementType.Physical ? atom.element : attackerElement;
                     if (element != ElementType.Physical) // 物理不附着（docs/06）
                     {
-                        effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element));
-                        sim.SetCompileDye(targetUnitId, element); // 覆盖语义对片内后续命中可见（双蒸发修复）
+                        int layers = Mathf.Max(1, atom.elementLayers); // 附着原子层=0 视为 1（0层语义属 Damage 原子）
+                        effects.Add(new AttachElementEffect(action.unitId, targetUnitId, (int)element, layers));
+                        sim.SetCompileDye(targetUnitId, element, layers); // 覆盖语义对片内后续命中可见（双蒸发修复）
                     }
                     break;
                 }
