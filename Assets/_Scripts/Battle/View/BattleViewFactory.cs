@@ -272,6 +272,52 @@ namespace GIC.Battle
             }
         }
 
+        private static readonly System.Collections.Generic.Dictionary<int, Texture2D> _aimRadiusBlockTextures
+            = new System.Collections.Generic.Dictionary<int, Texture2D>();
+
+        /// <summary>范围提示整块纹理（按半径缓存；Clamp+Bilinear；设计面=(2R+1)格×(2R+1)格、每格 128px
+        /// ——AimCellTexture 同密度）。2026-10-15 拍板「范围提示……不是复用现有的单格高亮，而是完整
+        /// 的一块，可以参考滚动带」：实心白底（材质 tint 承色=格子高亮同语言）+ **整块外缘**黑描边环
+        /// （12px=9.4% 单格宽——AimCellTexture 内嵌黑边同比例；块中间无格线=完整一块）。
+        /// 复用族=自施放光环瞄准（寒冰之棱半径提示）+未来「选格降闪电攻击半径内敌人」类技能的范围
+        /// 提示（提示中心跟随待定格）</summary>
+        public static Texture2D AimRadiusBlockTexture(int radius)
+        {
+            int n = radius * 2 + 1;
+            if (_aimRadiusBlockTextures.TryGetValue(radius, out var cached) && cached != null) return cached;
+            const int cell = 128, border = 12;          // 每格 128px；描边 12px=AimCellTexture 边框同比例
+            int s = cell * n;
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false)
+            {
+                name = $"BattleAimRadiusBlockTexture_{n}x{n}",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            var pixels = new Color32[s * s];
+            for (int y = 0; y < s; y++)
+            {
+                for (int x = 0; x < s; x++)
+                {
+                    bool edge = x < border || y < border || x >= s - border || y >= s - border;
+                    // 黑描边 rgb 0（乘任意 tint 恒黑）+ 白芯 rgb 255（材质 tint 承色）——alpha 恒满
+                    byte v = edge ? (byte)0 : (byte)255;
+                    pixels[y * s + x] = new Color32(v, v, v, 255);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+            _aimRadiusBlockTextures[radius] = tex;
+            return tex;
+        }
+
+        /// <summary>范围提示整块材质（白底纹理+调色 tint——CreateAimCellMaterial 同族）</summary>
+        public static Material CreateAimRadiusBlockMaterial(Color color, int radius)
+        {
+            var material = CreateTransparentUnlitMaterial(color);
+            material.mainTexture = AimRadiusBlockTexture(radius);
+            return material;
+        }
+
         /// <summary>点到线段距离（箭头 chevron 高斯距离场用）</summary>
         private static float DistToSegment(float px, float py, float ax, float ay, float bx, float by)
         {

@@ -32,7 +32,9 @@ MonoBehaviour:
     m_Localized: "\xB7Stacks up to {BaseStackLimit}\n\xB7At each turn end, deals
       {AuraDamagePercent} Cryo DMG to enemies within {AuraRadius} tile of the holder\n\xB7Shatters
       when the holder's Energy exceeds {ShatterEnergyThreshold}, healing the holder
-      for {ShatterHealPercent} per shard\n\xB7Persists even if the holder is downed"
+      for {ShatterHealPercent} per shard\n\xB7When recast at max stacks, overflowing
+      shards shatter immediately, healing the holder for {ShatterHealPercent} each\n\xB7Persists
+      even if the holder is downed; shattering while downed grants no healing"
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256256

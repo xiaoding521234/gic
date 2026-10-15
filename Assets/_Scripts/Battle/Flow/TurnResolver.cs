@@ -731,6 +731,8 @@ namespace GIC.Battle
         /// shatters=寒冰之棱碎裂记录（2026-10-01 复测拍板「元能&gt;50% 立刻触发」）：每笔元能增益
         /// 落地后即时判定（IcicleBuff.TryShatter 内联应用治疗+移除），事实经本列表传给命令出口
         /// 补发 RemoveBuff——由调用方创建传入（片/回合结束/即时段三处各自持有）。
+        /// 2026-10-15 追加：元能消耗落地后同拍判定（拍板「施放冰棱若立刻过阈应当立刻破碎」——
+        /// 3命满能施放残留 60 > 50% 时刚挂上的冰棱立即碎裂，勿等下一笔获能）。
         /// </summary>
         private List<ApplyBuffEffect> ApplyEffects(List<BattleEffect> effects,
             List<(string holderId, string sourceId, BaseBuff buff)> shatters)
@@ -741,6 +743,9 @@ namespace GIC.Battle
             // 直改 ApplyHeal，效应主循环后并入 effects=命令发射载体（同溢出转移先例：主循环 foreach
             // 中 List.Add 会炸枚举器，故先收后并）；客户端随伤害 +N 绿字弹出）
             var lifestealHeals = new List<HealEffect>();
+            // 寒冰之棱溢出碎裂治疗收集（2026-10-15 拍板「溢出的层数立刻破碎」）：主循环 ApplyBuff 分支
+            // 收集，循环后并入 effects=命令发射载体（同吸血先例防炸枚举器）
+            var overflowShatters = new List<HealEffect>();
             foreach (var effect in effects)
             {
                 // 体力效应（B6d）：TargetUnitId=玩家 ID 非 Unit——先于单位解析处理（GetUnit(玩家ID)=null 会被跳过）
@@ -901,6 +906,18 @@ namespace GIC.Battle
                         applyBuff.DurationTurns, applyBuff.BuffKey);
                     if (buff == null) continue;
                     buff.SourceSkillId = applyBuff.SourceSkillId; // 来源技能随 Buff 实体进注册表（快照透传）
+
+                    // 寒冰之棱溢出层预采集（2026-10-15 拍板「溢出的层数立刻破碎」）：满层再施放时
+                    // Merge 钳上限吸收不了的召唤层不再静默消失，按碎裂口径逐枚弹治疗（30% 施加者攻
+                    // ——碎裂治疗同口径）。施放前快照在场层数，吸收数=施加后−施加前
+                    int icicleIncoming = 0, icicleBefore = 0;
+                    if (buff is IcicleBuff)
+                    {
+                        icicleIncoming = buff.Level; // 工厂产出含命座召唤增补（0命 2/2命 3/3命 4）
+                        var existingIcicle = target.Buffs.Find(b => b is IcicleBuff);
+                        icicleBefore = existingIcicle != null ? existingIcicle.Level : 0;
+                    }
+
                     _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
 
                     // 回填合并后的真实状态（同身份叠层时 Level/Turns 以注册表为准——按 buffKey 匹配
@@ -911,6 +928,39 @@ namespace GIC.Battle
                     applyBuff.Level = state != null ? state.Level : applyBuff.Level;
                     applyBuff.Turns = state != null ? state.RemainingTurns : 0;
                     appliedBuffs.Add(applyBuff);
+
+                    // 溢出层立即碎裂：未吸收层逐枚弹治疗（LayerBeatSeconds 错峰同碎裂路径）；
+                    // 状态=总值内联应用（HealEffect 仅命令载体，主循环后并入防炸枚举器——同吸血先例）；
+                    // 倒下守卫=防御性（死者无行动不能施放，理论不可达——与 TryShatter 倒下同判新
+                    // 口径不冲突：溢出碎裂主体=施放者本人必存活）；全新施加（在场 0 层）恒无溢出零回归
+                    if (icicleIncoming > 0 && state is IcicleBuff && !BattleSimState.IsDead(target))
+                    {
+                        int absorbed = Mathf.Max(0, state.Level - icicleBefore);
+                        int overflow = icicleIncoming - absorbed;
+                        if (overflow > 0 && state.Config is IcicleBuffConfig icicleCfg)
+                        {
+                            var shatterSource = _sim.GetUnit(applyBuff.SourceUnitId);
+                            var attackerStats = shatterSource != null
+                                ? shatterSource.GetUnitComponent<UnitStats>() : null;
+                            int attack = attackerStats != null ? attackerStats.Attack : 0;
+                            int healPerShard = EffectCompiler.ApplyHealEfficiency(shatterSource, target,
+                                Mathf.FloorToInt(attack * icicleCfg.碎裂治疗百分比 / 100f));
+                            if (healPerShard > 0)
+                            {
+                                _sim.ApplyHeal(target, healPerShard * overflow);
+                                string holderId = target.GetUnitComponent<UnitIdentity>()?.UnitID
+                                    ?? applyBuff.TargetUnitId;
+                                for (int layer = 0; layer < overflow; layer++)
+                                    overflowShatters.Add(new HealEffect(applyBuff.SourceUnitId, holderId,
+                                        healPerShard)
+                                    {
+                                        HitSeconds = BattleMetrics.LayerBeatSeconds(layer), // 逐层错峰单源
+                                    });
+                                GICLog.Info($"[IcicleBuff] {holderId} 寒冰之棱溢出碎裂（满层施放，" +
+                                    $"{overflow} 枚各治疗 {healPerShard}）——合计 {healPerShard * overflow}");
+                            }
+                        }
+                    }
                 }
                 else if (effect is SanityEffect sanity)
                 {
@@ -932,6 +982,7 @@ namespace GIC.Battle
             // 吸血治疗效应并入（状态已在主循环内联应用——此处仅为命令发射载体，同溢出转移先例；
             // 主循环 foreach 内直接 Add 会炸枚举器，故先收后并）
             effects.AddRange(lifestealHeals);
+            effects.AddRange(overflowShatters); // 寒冰之棱溢出碎裂治疗（状态已内联，同上仅命令载体）
 
             // 元能第二阶段：先扣除后获取（与命令发射序 MergeEnergyEffects 同语义，2026-09-25 用户拍板「先扣除，再加」
             // ——获取先到会被 baseEnergy 上限钳位吞掉：30+10 钳 30 再 −20=10 ≠ 期望 20）。
@@ -940,7 +991,9 @@ namespace GIC.Battle
             // 寒冰之棱碎裂收集（复测拍板①「元能>50% 立刻触发」）：治疗/移除由 TryShatter 内联应用；
             // **逐层各一枚 HealEffect**（拍板「碎裂回血等效果各弹一次」——第 i 层 HitSeconds=i×
             // BuffLayerStaggerSeconds 错峰，客户端 launchMs 到点各弹 +N；状态=总值已应用，效应=
-            // 命令发射载体同溢出转移先例）+碎裂事实（RemoveBuff 命令）；倒下/无 Buff/未过阈值零动作
+            // 命令发射载体同溢出转移先例）+碎裂事实（RemoveBuff 命令）；无 Buff/未过阈值零动作；
+            // 倒下过阈同碎（2026-10-15 拍板「凯亚尸体的寒冰之棱会因此碎裂」——healPerShard=0
+            // 自动零治疗命令，仅 RemoveBuff=尸体停止 tick）
             void CollectIcicleShatter(Unit unit)
             {
                 if (unit == null) return;
@@ -967,6 +1020,10 @@ namespace GIC.Battle
                     {
                         if (!appliedEnergy.Add(cost.MergeKey())) continue;
                         _sim.ApplyEnergy(_sim.GetUnit(cost.TargetUnitId), cost.Delta);
+                        // 消耗落地同拍碎裂判定（2026-10-15 拍板「施放冰棱若立刻过阈应当立刻破碎」）：
+                        // 扣除后仍严格过阈（3命满能施放：100−40=60 > 50%）→ 本段刚挂上的冰棱立刻碎裂；
+                        // 扣除后回落阈值下（≤90 施放→残留 ≤50）零动作——与获能路径共用 TryShatter 单源
+                        CollectIcicleShatter(_sim.GetUnit(cost.TargetUnitId));
                     }
                 if (energyGains != null)
                     foreach (var gain in energyGains)

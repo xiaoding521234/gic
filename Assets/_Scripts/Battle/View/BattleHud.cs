@@ -294,6 +294,15 @@ namespace GIC.Battle
         private readonly HashSet<string> _aimHitUnitIds = new HashSet<string>();
         private readonly List<UnitState> _aimHitScratch = new List<UnitState>(); // 预判复用缓冲（免逐帧分配）
 
+        /// <summary>瞄准范围提示整块（2026-10-15 拍板「额外加上范围提示……完整的一块，可以参考
+        /// 滚动带」）：自施放光环技能瞄准时以自身为中心铺 (2R+1)² 格单 quad（纹理=BattleViewFactory
+        /// 按半径程序生成缓存，实心底+整块外缘黑描边——格子高亮同语言）；层=AimRadiusBlock(-1)
+        /// 恒在待定金格贴片(0)之下、盘面之上。**复用原语**：未来「选格降闪电攻击半径内敌人」类技能
+        /// 的范围提示走同 ShowAimRadiusBlock(cell, radius)——提示中心跟随待定格；半径智能随命座
+        /// （寒冰之棱 3命 +C3Radius）</summary>
+        private GameObject _aimRadiusBlock;
+        private Material _aimRadiusBlockMaterial; // 单实例复用（半径变=换纹理；OnDestroy 释放）
+
         /// <summary>方向预判技能实例缓存（按 SkillData 引用失效重建——拖动逐帧调用免分配）</summary>
         private BaseSkill _aimPreviewSkill;
         private SkillConfig.SkillData _aimPreviewSkillData;
@@ -534,6 +543,8 @@ namespace GIC.Battle
                 if (_aimArrowBandMats[dir] != null) Destroy(_aimArrowBandMats[dir]);
                 if (_aimArrowHeadMats[dir] != null) Destroy(_aimArrowHeadMats[dir]);
             }
+            if (_aimRadiusBlockMaterial != null)                       // 范围提示整块材质（2026-10-15）
+                Destroy(_aimRadiusBlockMaterial);
             if (_countdownOutlineMat != null) // SDF 描边实例（TopBar 分件，TMP 不自销）
             {
                 Destroy(_countdownOutlineMat);
@@ -2207,9 +2218,24 @@ namespace GIC.Battle
             }
             else
             {
-                cell = directionSkill
-                    ? ComputeDragAimCellFromWheel(_dragDiscLocal)
-                    : FindNearestAimCellByWheelDirection(_dragDiscLocal); // 自施放单格锁定（方向型走盘距解析）
+                // 自施放（2026-10-15 拍板「对于凯亚爆发这样的无需任何瞄准，应当不管拖到矩形盘哪都算，
+                // 除了中心那块（已经有）视为取消」）：盘心死区外任意位置=锁定自身格；死区内=null
+                // （松手取消走既有链）。取代旧指向锥角锁定——单格候选+锥角语义对自施放别扭
+                var selfCastData = _aimDef != null ? GetSelectedSkillData(_aimDef) : null;
+                if (selfCastData != null && selfCastData.IsSelfCast())
+                {
+                    Vector2 d = _dragDiscLocal - _dragWheelCenterLocal;
+                    // 自施放瞄准域恒=自身单格（ComputeAimCells 自施放分支），First() 确定性
+                    cell = d.sqrMagnitude >= 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径 && _aimCells.Count > 0
+                        ? (BattleCell?)_aimCells.First()
+                        : null;
+                }
+                else
+                {
+                    cell = directionSkill
+                        ? ComputeDragAimCellFromWheel(_dragDiscLocal)
+                        : FindNearestAimCellByWheelDirection(_dragDiscLocal); // 方向型走盘距解析（锥角=非方向非指向形态兜底）
+                }
             }
             if (cell.HasValue) SetPendingAimCellWithTarget(cell.Value, targetUnit);
             else ClearPendingAimCell();
@@ -2263,9 +2289,11 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>指向型拖动锁定：候选目标格的屏幕方向（相对**盘心**——与拖向同基准）与
+        /// <summary>指向锥角锁定（兜底保留）：候选目标格的屏幕方向（相对**盘心**——与拖向同基准）与
         /// 「盘心→小盘」拖向夹角最小者锁定，夹角须≤「拖动瞄准指向锥角」（默认 60°）；
-        /// 精确选择仍可点击式点格。无匹配=无锁定（松手取消）</summary>
+        /// 无匹配=无锁定（松手取消）。**自施放已改直锁**（2026-10-15 拍板「不管拖到矩形盘哪都算
+        /// 除中心死区」——UpdateDragAimPreview 自施放分支不进此）；现役消费=非方向非指向形态兜底
+        /// （Interact 类/未来瞄准形态），预留勿删</summary>
         private BattleCell? FindNearestAimCellByWheelDirection(Vector2 discLocal)
         {
             var canvasRt = CanvasRect;
@@ -2873,8 +2901,78 @@ namespace GIC.Battle
                     _highlightQuads.Add(quad);
                     _aimQuadByCell[cell] = quad.GetComponent<MeshRenderer>(); // 待定金格材质换装索引
                 }
+
+                // 自施放光环范围提示（2026-10-15 拍板「额外加上范围提示……不是复用现有的单格高亮，
+                // 而是完整的一块」）：技能施加带作用半径的行为族 Buff（寒冰之棱）时，以自身为中心
+                // 整块提示 (2R+1)² 格——半径智能随命座（3命 +C3Radius：0命 3×3/3命 5×5）
+                var selfCastData = _aimDef != null ? GetSelectedSkillData(_aimDef) : null;
+                if (selfCastData != null && selfCastData.IsSelfCast() && _aimCells.Count > 0)
+                {
+                    var snap = _session?.Player?.LatestSnapshot;
+                    var selState = snap != null
+                        ? snap.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
+                    int auraRadius = SelfCastAuraRadiusOf(selfCastData, selState);
+                    if (auraRadius > 0) ShowAimRadiusBlock(_aimCells.First(), auraRadius);
+                }
             }
             UpdateAimPreviewFx(); // 会话初始态：光柱隐、预计命中描边清、箭头基色（悬停/待定起再驱动）
+        }
+
+        // ==================== 自施放光环范围提示（2026-10-15 拍板「额外加上范围提示……完整的一块，
+        // 可以参考滚动带」——寒冰之棱半径提示；复用原语供未来「选格降闪电攻击半径内敌人」类技能） ====================
+
+        /// <summary>自施放技能的光环提示半径：技能 effects 中 ApplyBuff 的 buff 资产若为带作用半径的
+        /// 行为族（寒冰之棱 IcicleBuffConfig），返回 作用半径+命座加成（3命 +C3Radius——与
+        /// IcicleBuff.OnTurnEnd 服务端同口径，客户端按快照 constellation 预估：0命 3×3/3命 5×5）；
+        /// 无光环 buff=0 不显示。命座参数载体=该单位 Talent 技能（SourceConstellation 客户端镜像）</summary>
+        private int SelfCastAuraRadiusOf(SkillConfig.SkillData skillData, UnitState sel)
+        {
+            if (skillData == null || !skillData.HasEffects || sel == null) return 0;
+            SkillConfig.SkillData talent = null;
+            var unitData = TryGetUnitData(sel.unitName);
+            if (unitData != null)
+                foreach (var s in unitData.skills)
+                    if (s != null && s.data != null && s.data.skillType == SkillType.Talent) { talent = s.data; break; }
+            foreach (var eff in skillData.effects)
+            {
+                if (eff == null || eff.kind != SkillEffectKind.ApplyBuff) continue;
+                var cfg = eff.buffAsset != null ? eff.buffAsset : BuffConfig.OfType(eff.buffType);
+                if (cfg is not IcicleBuffConfig icl) continue;
+                int r = icl.作用半径;
+                if (sel.constellation >= 3 && talent != null)
+                    r += talent.GetInt(SkillParamKey.C3Radius, 1); // 3命：作用半径 +C3Radius（智能变化）
+                return r;
+            }
+            return 0;
+        }
+
+        /// <summary>显示范围提示整块：以 centerCell 为中心铺 (2R+1)² 格单 quad（实心白底+整块外缘
+        /// 黑描边——格子高亮同语言，色=瞄准推荐色与推荐格一致；层=BattleMetrics.AimRadiusBlockSortingOrder
+        /// 恒在待定金格贴片之下）。**复用原语**——未来「选格降闪电」类技能瞄准时以待定格为中心调
+        /// 本方法（提示中心随待定更新=重复调用幂等重建）</summary>
+        private void ShowAimRadiusBlock(BattleCell centerCell, int radius)
+        {
+            HideAimRadiusBlock();
+            if (radius <= 0 || _highlightRoot == null) return;
+            if (_aimRadiusBlockMaterial == null)
+                _aimRadiusBlockMaterial = BattleViewFactory.CreateAimRadiusBlockMaterial(Palette.瞄准推荐色, radius);
+            _aimRadiusBlockMaterial.mainTexture = BattleViewFactory.AimRadiusBlockTexture(radius); // 半径变=换纹理
+            _aimRadiusBlockMaterial.color = Palette.瞄准推荐色;
+            var quad = BattleViewFactory.CreateQuad(_highlightRoot, "AimRadiusBlock", _aimRadiusBlockMaterial);
+            var world = _board.CellToWorld(centerCell);
+            quad.transform.position = new Vector3(world.x, _board.GetDecalHeight(centerCell, 0.03f), world.z);
+            quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            // 整块边到边略内缩 0.08（两侧各 0.04=格子高亮 0.92 足印同语言）；块心=中心格
+            float span = radius * 2 + 1 - 0.08f;
+            quad.transform.localScale = new Vector3(span, span, 1f);
+            quad.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimRadiusBlockSortingOrder;
+            _aimRadiusBlock = quad;
+        }
+
+        /// <summary>收掉范围提示整块（ClearHighlights/重建前调用——quad 销毁材质单实例保留复用）</summary>
+        private void HideAimRadiusBlock()
+        {
+            if (_aimRadiusBlock != null) { Destroy(_aimRadiusBlock); _aimRadiusBlock = null; }
         }
 
         // ==================== 方向箭头（直线技能瞄准显示，2026-10-15 拍板） ====================
@@ -3280,6 +3378,7 @@ namespace GIC.Battle
                 if (quad != null) Destroy(quad);
             _highlightQuads.Clear();
             _aimQuadByCell.Clear();
+            HideAimRadiusBlock(); // 范围提示整块随会话收口（2026-10-15）
             // 瞄准增强件随会话收口（2026-10-15）：箭头销毁、命中竖线销毁、预计命中描边清
             for (int dir = 0; dir < 4; dir++)
             {

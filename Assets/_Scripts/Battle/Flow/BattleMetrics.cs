@@ -86,6 +86,13 @@ namespace GIC.Battle
         /// 显式分层排序号**，头恒在带之上〔槽位 2=弧光 1 与立牌 10 之间全层互异，零距离排序依赖〕）</summary>
         public const int AimOverlayTopSortingOrder = 2;
 
+        /// <summary>瞄准范围提示整块（2026-10-15 拍板「额外加上范围提示……完整的一块」：自施放光环
+        /// 瞄准时 (2R+1)² 格单 quad）。**层值=-1 与底座盘同序**：块面=贴片平面（高 0.03）恒高于盘面
+        /// （0.02），同序按相机距离排序时块恒先画盘后画（俯角恒为正、相机永不越地平线=顺序稳定，
+        /// 与 §154④ 的「不同中心同序」方向依赖翻车不同——此处同中心+Y 差恒定）；块又恒在待定金格
+        /// 贴片（0）之下=中心格待定金恒可见</summary>
+        public const int AimRadiusBlockSortingOrder = -1;
+
         /// <summary>单位立牌（sprite 与视频 quad 同序——跨单位立牌遮挡排序语义一致）</summary>
         public const int AvatarSortingOrder = 10;
 

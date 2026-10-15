@@ -14,7 +14,8 @@ namespace GIC.Battle
     /// 2命/3命各+1 召唤增补——2026-10-08 拍板「寒冰之棱上限改为4（不再依靠命座），2命 3命
     /// 的效果改为增加爆发召唤数量各为1」：上限常驻资产值、命座只改每次施放的召唤量），
     /// 永久不计时（RemainingTurns=-1），**持有者倒下仍生效**（RemoveOnHolderDeath=false——
-    /// docs/05 §5.4 被动失效通则的技能级例外；碎裂判定要求存活，倒下期间只 tick 不碎裂）。
+    /// docs/05 §5.4 被动失效通则的技能级例外；倒下期间可被外部喂能〔歌声之环喂倒下单位——
+    /// 2026-10-15 拍板「尸体可以获得元能」〕过阈即碎，无喂能则只 tick）。
     /// 数值单源=Buff_Icicle.asset（docs/active/39 Buff 配置化——tick 伤害/碎裂治疗/碎裂阈值/半径/
     /// 叠层上限全在资产，调平衡改 Inspector 零代码）；**叠层上限不随命座（2026-10-08 重构拍板）；
     /// 作用半径 3命起 +C3Radius**（2026-10-15 决策七十二「3命=召唤数量+1 之外，额外加寒冰之棱
@@ -24,13 +25,19 @@ namespace GIC.Battle
     /// 永久不计时〔2026-10-07 拍板「持续时间改为无限」，同 StatBuff 永久保护〕，逐层各施加；
     /// 2026-10-08 晚返拍「减防仍然留在2命」——重构批首版曾误整体退役，当晚恢复）。
     /// 碎裂（2026-10-01 复测拍板「元能&gt;50% 时立刻触发，而非回合结束才判定」）：**每笔元能增益
-    /// 落地后即时判定**（TurnResolver 元能增益段调 TryShatter——含溢出转移接收方），持有者存活且
-    /// 元能严格大于〔碎裂元能阈值百分比〕上限 → 每层治疗〔碎裂治疗百分比〕施加者攻击力并移除
-    /// （碎裂后当回合末自然不再 tick）。
+    /// 落地后即时判定**（TurnResolver 元能增益段调 TryShatter——含溢出转移接收方）；**元能消耗
+    /// 落地后同拍判定**（2026-10-15 拍板「施放冰棱若立刻过阈应当立刻破碎」——3命满能施放扣除 40
+    /// 残留 60 仍 >50% 上限，刚挂上的冰棱立即碎裂勿等下一笔获能），持有者元能严格大于
+    /// 〔碎裂元能阈值百分比〕上限 → 每层治疗〔碎裂治疗百分比〕施加者攻击力并移除
+    /// （碎裂后当回合末自然不再 tick）；**倒下同判**（2026-10-15 拍板「凯亚尸体的寒冰之棱会因此
+    /// 碎裂」——倒下碎裂不治疗 healPerShard=0〔血量恒 0 铁律〕，仅移除=尸体停止 tick）。
     /// tick：每回合结束对持有者切比雪夫〔作用半径〕内敌人造成〔每回合伤害百分比〕施加者攻击力
     /// 冰伤（含尸体——鞭尸同 Burn/歌声之环先例；**走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01
     /// 现场取证返修：平直值口径致减防乘区对 tick 无效报障〕、不经反应预览=不触发反应/不附着）。
     /// 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者——BurnBuff 归属同款兜底）。
+    /// **溢出层碎裂（2026-10-15 拍板「溢出的层数立刻破碎」）**：满层再施放时未被上限吸收的召唤层
+    /// 立即碎裂——逐枚治疗〔碎裂治疗百分比〕施加者攻击力（TurnResolver ApplyBuff 分支收口，
+    /// 错峰拍同碎裂路径；场上限内的层保留继续 tick）。
     /// </summary>
     public class IcicleBuff : BaseBuff
     {
@@ -58,7 +65,9 @@ namespace GIC.Battle
             if (bonus > 0) Level += bonus;
         }
 
-        /// <summary>同类重复施加：叠层（钳资产常驻上限）+刷新施加者（数值基准随之更新）</summary>
+        /// <summary>同类重复施加：叠层（钳资产常驻上限）+刷新施加者（数值基准随之更新）。
+        /// 溢出层（超上限吸收不了的召唤层）不再静默消失——TurnResolver ApplyBuff 分支按碎裂口径
+        /// 逐枚弹治疗（2026-10-15 拍板「溢出的层数立刻破碎」；状态与命令均在应用点收口）</summary>
         public override void Merge(BaseBuff newer)
         {
             if (newer is IcicleBuff)
@@ -134,14 +143,17 @@ namespace GIC.Battle
 
         // ==================== 碎裂（2026-10-01 复测拍板：元能>50% 立刻触发，非回合末延迟） ====================
 
-        /// <summary>碎裂判定+状态应用：每笔元能增益落地后由 TurnResolver 元能增益段调用（含溢出转移
-        /// 接收方——其元能在 ApplyEnergy 内联写入）。持有者存活且元能**严格大于**〔碎裂元能阈值百分比〕
+        /// <summary>碎裂判定+状态应用：每笔元能增益落地后由 TurnResolver 元能段调用（含溢出转移
+        /// 接收方——其元能在 ApplyEnergy 内联写入）；元能消耗落地后同拍调用（2026-10-15 拍板
+        /// 「施放冰棱若立刻过阈应当立刻破碎」——扣除后仍过阈即碎，勿等下一笔获能）。持有者元能**严格大于**〔碎裂元能阈值百分比〕
         /// 上限 → **逐层**治疗〔碎裂治疗百分比〕施加者攻击力（2026-10-01 拍板「包括碎裂回血等效果
         /// 各弹一次」——每层一枚 HealEffect 由调用方按 BuffLayerStaggerSeconds 错峰追加，状态=总值
         /// 内联应用 ApplyHeal）+移除 Buff（注册表注销）；out healPerShard=单层治疗量、sourceUnit/buff
-        /// 供命令发射（同溢出转移先例——效应=命令发射载体，状态已应用不二次结算）。倒下不碎裂（复活后
-        /// 下一笔元能获取自然触发）；无 Buff/未过阈值返回 false 零动作。阈值/治疗百分比读取=该 Buff
-        /// 实例的 Config 资产（Buff_Icicle.asset 单源）。</summary>
+        /// 供命令发射（同溢出转移先例——效应=命令发射载体，状态已应用不二次结算）。**倒下同判碎裂**
+        /// （2026-10-15 拍板「凯亚尸体的寒冰之棱会因此碎裂」——尸体可经歌声之环等获能，过阈即碎；
+        /// 倒下碎裂不治疗 healPerShard=0〔血量恒 0 铁律 docs/05 §5.4〕，调用方 healPerShard>0 门
+        /// 自动不发治疗命令，仅 RemoveBuff=徽章消失+尸体停止 tick）；无 Buff/未过阈值返回 false
+        /// 零动作。阈值/治疗百分比读取=该 Buff 实例的 Config 资产（Buff_Icicle.asset 单源）。</summary>
         public static bool TryShatter(BattleSimState sim, Unit holder, out int healPerShard, out Unit sourceUnit, out IcicleBuff buff)
         {
             healPerShard = 0;
@@ -151,7 +163,6 @@ namespace GIC.Battle
             buff = holder.Buffs.Find(b => b != null && b.Type == BuffType.Icicle) as IcicleBuff;
             if (buff == null) return false;
             if (buff.Config is not IcicleBuffConfig cfg) return false;
-            if (BattleSimState.IsDead(holder)) return false; // 倒下不碎裂（只 tick；复活后下一笔元能获取触发）
 
             var stats = holder.GetUnitComponent<UnitStats>();
             if (stats == null) return false;
@@ -159,21 +170,27 @@ namespace GIC.Battle
             if (energy.Max <= 0 || energy.Value <= energy.Max * cfg.碎裂元能阈值百分比 / 100f)
                 return false; // 未过阈值（「超过50%」=严格大于）
 
-            sourceUnit = buff.AttackerOf(); // 施加者优先、亡佚回落持有者（BaseBuff 单源）
-            var attackerStats = sourceUnit.GetUnitComponent<UnitStats>();
-            int attack = attackerStats?.Attack ?? 0;
+            bool holderDead = BattleSimState.IsDead(holder); // 倒下同判（2026-10-15 拍板）——尸体可获能过阈即碎
             int layers = Mathf.Max(1, buff.Level);
-            // 治疗效率双乘区（2026-10-01 拍板「发起治疗者也应当乘治疗效率；自己治疗自己不乘两次」
-            // ——施法者=施加者、受疗者=持有者；自施放同单位=单次〔1命凯亚 ×150% 一次，非 225%〕，
-            // ApplyHealEfficiency 单出口）
-            healPerShard = EffectCompiler.ApplyHealEfficiency(sourceUnit, holder,
-                Mathf.FloorToInt(attack * cfg.碎裂治疗百分比 / 100f));
+            sourceUnit = buff.AttackerOf(); // 施加者优先、亡佚回落持有者（BaseBuff 单源）
+            if (!holderDead)
+            {
+                var attackerStats = sourceUnit.GetUnitComponent<UnitStats>();
+                int attack = attackerStats?.Attack ?? 0;
+                // 治疗效率双乘区（2026-10-01 拍板「发起治疗者也应当乘治疗效率；自己治疗自己不乘两次」
+                // ——施法者=施加者、受疗者=持有者；自施放同单位=单次〔1命凯亚 ×150% 一次，非 225%〕，
+                // ApplyHealEfficiency 单出口）
+                healPerShard = EffectCompiler.ApplyHealEfficiency(sourceUnit, holder,
+                    Mathf.FloorToInt(attack * cfg.碎裂治疗百分比 / 100f));
 
-            sim.ApplyHeal(holder, healPerShard * layers); // 状态=总值即时（Host 不做层间延迟——错峰纯表现层）
+                sim.ApplyHeal(holder, healPerShard * layers); // 状态=总值即时（Host 不做层间延迟——错峰纯表现层）
+            }
+            // 倒下：healPerShard=0 不治疗（血量恒 0 铁律）——调用方 healPerShard>0 门自动零治疗命令
+
             sim.RemoveBuff(holder, buff);
             GICLog.Info($"[IcicleBuff] {holder.GetUnitComponent<UnitIdentity>()?.UnitID} 寒冰之棱碎裂" +
                         $"（元能 {energy.Value}/{energy.Max} > {cfg.碎裂元能阈值百分比}%，{layers} 枚" +
-                        $"各治疗 {healPerShard}）——合计 {healPerShard * layers}");
+                        $"{(holderDead ? "持有者倒下不治疗" : $"各治疗 {healPerShard}——合计 {healPerShard * layers}")}）");
             return true;
         }
     }

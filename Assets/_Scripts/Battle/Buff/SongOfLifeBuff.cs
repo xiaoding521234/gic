@@ -11,7 +11,9 @@ namespace GIC.Battle
     /// 永久光环（不计时，持有者倒下消失——RemoveOnHolderDeath 覆写 true），叠层上限随施加者命座成长。
     /// 数值单源=Buff_SongOfLife.asset（docs/active/39 Buff 配置化——光环百分比/基础元能/理智/半径
     /// 全在资产，调平衡改 Inspector 零代码）；命座成长仍走施加者 Talent 技能参数（正交）。
-    /// 每回合结束：①为**半径内我方存活单位（含持有者）**增加元能（0命=〔基础元能获取〕〔2026-09-30
+    /// 每回合结束：①为**半径内我方单位（含持有者，存活与倒下均可获元能——2026-10-15 拍板「尸体
+    /// 可以获得元能」：倒下凯亚的寒冰之棱因此过阈碎裂；倒下获能不治疗/不恢复理智/不附着）**增加元能
+    /// （0命=〔基础元能获取〕〔2026-09-30
     /// 用户拍板「0命就可以每回合加5元能」；**2026-10-07 描述勘正拍板：受益人=半径内我方单位非持有者
     /// 独享——OnTurnEnd 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，2命起=C2EnergyGain
     /// 参数=+10——复用丽莎同键（2026-10-15 决策七十二三次返修拍板「枚举只和显示名对应，两个名称
@@ -118,7 +120,15 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    // 我方存活（含持有者）：治疗/元能/理智逐层各弹一次+附着逐层声明
+                    // 我方单位（含持有者）：元能=存活与倒下均喂（2026-10-15 拍板「尸体可以获得元能」——
+                    // 倒下凯亚的寒冰之棱因此过阈碎裂；喂能对无冰棱尸体无害=能量留存到复活）
+                    if (energyGainPerLayer > 0)
+                        for (int layer = 0; layer < stacks; layer++)
+                            effects.Add(new EnergyEffect(kv.Key, energyGainPerLayer, EnergyEffect.CategoryBuffTickGain)
+                            {
+                                HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
+                            });
+                    // 我方存活（含持有者）：治疗/理智逐层各弹一次+附着逐层声明
                     // （尸体不治疗——血量恒 0 铁律 docs/05 §5.4；理智恢复与治疗同拍结算）
                     if (BattleSimState.IsDead(unit)) continue;
                     // 治疗效率双乘区（2026-10-01 拍板「发起治疗者也应当乘治疗效率；自己治疗自己
@@ -129,12 +139,6 @@ namespace GIC.Battle
                     if (healForTarget > 0)
                         for (int layer = 0; layer < stacks; layer++)
                             effects.Add(new HealEffect(attackerId, kv.Key, healForTarget)
-                            {
-                                HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
-                            });
-                    if (energyGainPerLayer > 0)
-                        for (int layer = 0; layer < stacks; layer++)
-                            effects.Add(new EnergyEffect(kv.Key, energyGainPerLayer, EnergyEffect.CategoryBuffTickGain)
                             {
                                 HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
                             });
