@@ -152,7 +152,7 @@ namespace GIC.Battle
             // 黑板乘子→红线；配额脑消费=乘子合成（人格基线×态势乘子，乘法于消费点）+体力保底门
             var strat = AIStrategist.UpdateForTurn(sim, snapshot, _playerId, MyTeam, turn);
             GICLog.Info($"[战略层] {_playerId} T{turn} 态势={strat.Stance} 军团={strat.Legion}" +
-                $" 比值={strat.PowerRatio:F2} 乘子[军{strat.军备乘子:F2}/契{strat.契约乘子:F2}/升{strat.升命乘子:F2}]" +
+                $" 比值={strat.PowerRatio:F2} 乘子[军{strat.armyMul:F2}/契{strat.contractMul:F2}/升{strat.upgradeMul:F2}]" +
                 $" 意图=[{string.Join("，", strat.Intents)}]");
 
             // ⓪ 部署：手牌角色卡+核心半径内有合法落点+摩拉够 → 出战（DeployUnitExecutor 校验链同源；
@@ -173,7 +173,7 @@ namespace GIC.Battle
             var threat = AIPlayerConfig.QuotaThreatEnabled(difficulty)
                 ? OpponentThreatModel.Build(sim, snapshot, MyTeam, turn)
                 : null;
-            float armMul = 军备桶 * strat.军备乘子;
+            float armMul = 军备桶 * strat.armyMul;
             foreach (var entry in CollectArchons(sim))
             {
                 var unitTracker = new CompanionBrain.CandidateTracker();
@@ -212,7 +212,7 @@ namespace GIC.Battle
                     turn, unitTracker, null, profile, threat, null, true, true, legion);
                 if (unitTracker.Best == null) continue;
                 // AI-4：人格激进度乘子（狂战士更爱操控攻击/守城者更放权）；AI-5：态势军备乘子
-                int marginal = Mathf.RoundToInt((unitTracker.BestScore - baseline) * 激进度乘子 * strat.军备乘子);
+                int marginal = Mathf.RoundToInt((unitTracker.BestScore - baseline) * 激进度乘子 * strat.armyMul);
                 if (marginal <= 0) continue; // 威胁感知不优于自主=放权更好
                 tracker.Offer(marginal, unitTracker.Best);
             }
@@ -222,11 +222,11 @@ namespace GIC.Battle
             //    （CompanionBrain 跳过其自主决策），对魔神施法者=直接操控。
             //    E-1：威胁图传号令估值（治疗救命档消费 DoomedAllies，docs/active/33 §2.3）
             foreach (var entry in CollectFactionCasters(sim))
-                EvaluateEnsoSkills(sim, entry.Value, turn, tracker, threat, 契约桶 * strat.契约乘子);
+                EvaluateEnsoSkills(sim, entry.Value, turn, tracker, threat, 契约桶 * strat.contractMul);
 
             // ③ 升命候选（AI-1 批）：手牌角色卡同名存活在场+命座未满+摩拉够 → DeployUnit 同名路径
             //    升命（执行器既有链复用；deployCell 升命分支不消费）。评分入池与号令/操控竞争
-            EvaluateUpgrades(sim, turn, tracker, 升命桶 * strat.升命乘子);
+            EvaluateUpgrades(sim, turn, tracker, 升命桶 * strat.upgradeMul);
 
             // 学徒失误注入轮转法（§9.2——确定性次优而非随机 roll：评分榜取第 (turn mod N)+1 名，
             // 有「人味错误」但同种子可复现，零 roll 铁律不破）
@@ -326,7 +326,7 @@ namespace GIC.Battle
         /// 尸体不升（复苏前置投资=后续批次；现行「给尸体升命」判定为烧配额维持跳过）；
         /// deployCell 升命分支不消费（执行器升命先于落点校验），填核心位保语义。
         /// upgradeMul（AI-4/5 批）：人格升命桶×态势升命乘子（调用点合成——body 只乘一次防双乘；
-        /// 摩拉红线腰斩在战略层 ApplyRedLines 已乘入 strat.升命乘子）
+        /// 摩拉红线腰斩在战略层 ApplyRedLines 已乘入 strat.upgradeMul）
         /// </summary>
         private void EvaluateUpgrades(BattleSimState sim, int turn, CompanionBrain.CandidateTracker tracker,
             float upgradeMul = 1f)

@@ -15,8 +15,8 @@ namespace GIC.Battle
     /// I-B 拍板「阶段三本就感知」同口径，DecideAll 传入）；②命令流（Segment 全量=对全体客户端
     /// 广播的公开态）。不读敌方未交选择/手牌/内部决策中间产物。
     /// 确定性：全链纯确定性采集（提交与命令流均按结算序），零随机。
-    /// 生命周期：进程级 static＋新战斗自清（回合 1 重入检测——CompanionBrain._lastMoveAnchors
-    /// 同款先例：StartBattle 恒从回合 1 起，无需 BattleSession 接线）。
+    /// 生命周期：进程级 static＋新战斗自清（sim 实例号判据——2026-10-15 审查修正；StartBattle
+    /// 恒新 BattleSimState，无需 BattleSession 接线）。
     /// </summary>
     public static class OpponentProfiler
     {
@@ -121,7 +121,8 @@ namespace GIC.Battle
         // ==================== 状态（进程级＋新战斗自清） ====================
 
         private static readonly Dictionary<string, OpponentProfile> _profiles = new();
-        private static int _lastObservedTurn = -1;
+        private static int _lastObservedTurn = -1; // 回合推进衰减游标（同回合多次观察只衰减一次）
+        private static int _lastSimInstance;       // 新战斗自清判据=对局实例号（2026-10-15 审查修正）
 
         /// <summary>全量档案只读视图（harness/调试 dump 用）</summary>
         public static IReadOnlyDictionary<string, OpponentProfile> AllProfiles => _profiles;
@@ -156,7 +157,7 @@ namespace GIC.Battle
             // 死锁回合流（TryBeginResolve 无兜底）——档案为辅助数据，绝不具备杀死对局的能力
             try
             {
-                EnsureFresh(turnNumber);
+                EnsureFresh(sim, turnNumber);
 
                 var attackCount = new Dictionary<string, int>();
                 var totalCount = new Dictionary<string, int>();
@@ -198,7 +199,7 @@ namespace GIC.Battle
             // 采集侧防御（同 ObserveTurnActions）：段广播主链上的观察点——异常绝不阻塞推段
             try
             {
-                EnsureFresh(turnNumber);
+                EnsureFresh(sim, turnNumber);
 
                 var lastDamageAttackerByVictim = new Dictionary<string, string>();
                 foreach (var cmd in commands)
@@ -256,10 +257,19 @@ namespace GIC.Battle
         }
 
         /// <summary>新战斗自清＋回合推进衰减（双观察点共用；同回合多次观察只衰减一次）。
-        /// 自清判据=回合 1 重入（上一观察回合≠1 而本回合=1 即新战斗——StartBattle 恒从回合 1 起）</summary>
-        private static void EnsureFresh(int turnNumber)
+        /// 自清判据=sim 实例号（2026-10-15 审查修正——每局新 BattleSimState 恒新值；旧「T1 重入」
+        /// 判据对「上局仅观测到回合 1」的秒弃调试局失效〔T1==T1 不触发〕→陈旧画像跨局泄漏；
+        /// sim 为 null 的防御观察点回落旧回合判据）</summary>
+        private static void EnsureFresh(BattleSimState sim, int turnNumber)
         {
-            if (turnNumber <= 1 && _lastObservedTurn != 1)
+            if (sim != null && sim.InstanceId != _lastSimInstance)
+            {
+                _profiles.Clear();
+                _lastSimInstance = sim.InstanceId;
+                _lastObservedTurn = turnNumber;
+                return;
+            }
+            if (sim == null && turnNumber <= 1 && _lastObservedTurn != 1)
             {
                 _profiles.Clear();
                 _lastObservedTurn = 1;

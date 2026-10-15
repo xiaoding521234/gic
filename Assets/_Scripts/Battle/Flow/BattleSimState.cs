@@ -32,6 +32,13 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _units = new Dictionary<string, Unit>();
         private int _nextUnitId = 1;
 
+        /// <summary>对局实例号（静态计数器自增——每局新 BattleSimState 恒新值；进程级静态 AI 注册表
+        /// （AIStrategist/OpponentProfiler）的新战斗自清判据（2026-10-15 审查修正）：比「T1 重入」回合
+        /// 判据可靠——上局仅观测到回合 1 的秒弃调试局会让回合判据失效（T1==T1 不触发）泄漏跨局陈旧态；
+        /// 实例号恒新局必变、同局恒同，两种调用形态全覆盖。域重载随全部 static 一并归零=无跨重载歧义</summary>
+        public readonly int InstanceId = ++_instanceCounter;
+        private static int _instanceCounter;
+
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
 

@@ -13,7 +13,7 @@ namespace GIC.Battle
     /// 三账本预算器（硬保底/红线）＋军团倾向三态＋ResourceDigest 报告链。
     /// 协作机制（§3）：**权重注入而非指令下达**——战略层只调战役层效用乘子与军团软系数，
     /// 不直接指定行动；战术不盲从战略（斩杀分恒赢=设计意图）。
-    /// 生命周期：进程级 static＋新战斗自清（回合 1 重入检测——OpponentProfiler 同款先例）。
+    /// 生命周期：进程级 static＋新战斗自清（sim 实例号判据——2026-10-15 审查修正，OpponentProfiler 同款）。
     /// 确定性：全链纯确定性推演（快照/单位表直读，零随机）。
     /// v1 标定注记：五态阈值=§5.1 示例值（待实测标定）；态势**每回合重估**（§5 报告链的
     /// 「每 3 回合例行重估」=成本优化预留——驻留+滞回已保稳，每回合重估等价且更简）；
@@ -88,18 +88,20 @@ namespace GIC.Battle
             /// <summary>三账本（§5.3——v1 消费面：体力硬保底门+摩拉/体力红线乘子；元能账=dormant）</summary>
             public int StaminaFloor;     // 当前伙伴数×5×2（自主军团 2 回合运转量——配额体力支出硬保底）
 
-            /// <summary>指挥黑板（§5.2 态势派生桶乘子——1=中性；意图清单随战略层日志输出）</summary>
-            public float 军备乘子 = 1f;
-            public float 契约乘子 = 1f;
-            public float 升命乘子 = 1f;
-            public float 科技乘子 = 1f;
+            /// <summary>指挥黑板（§5.2 态势派生桶乘子——1=中性；意图清单随战略层日志输出）。
+            /// 英文名=纯逻辑标识符规范（docs/20 §1.1——中文直名例外仅限 Inspector 序列化字段，
+            /// 2026-10-15 审查拍板改英文）；语义对应 PersonaPack 四桶权重（军备/契约/升命/科技）</summary>
+            public float armyMul = 1f;
+            public float contractMul = 1f;
+            public float upgradeMul = 1f;
+            public float techMul = 1f;
 
             /// <summary>意图清单（态势派生——随日志输出；目标定向加成随 AI-3）</summary>
             public readonly List<string> Intents = new List<string>();
         }
 
         private static readonly Dictionary<string, StrategistState> _states = new();
-        private static int _lastObservedTurn = -1;
+        private static int _lastSimInstance; // 新战斗自清判据=对局实例号（见 UpdateForTurn 头部）
 
         /// <summary>态势只读查询（伙伴脑/调试）</summary>
         public static AIStance StanceOf(string playerId)
@@ -123,17 +125,13 @@ namespace GIC.Battle
         public static StrategistState UpdateForTurn(BattleSimState sim, BattleSnapshot snapshot,
             string playerId, TeamType team, int turnNumber)
         {
-            // 新战斗自清：T1 重入（常规路径——Decide 头部调保证 T1 可观测）＋回合数回退（防御：
-            // 任何未来调用点形态（如部署早退跳过 T1-3）下跨局陈旧态都不泄漏——回合数局内单调递增，
-            // 回退只可能是新战斗；观察局 Match A 实证旧判据在部署早退形态下永不触发）
-            if ((turnNumber <= 1 && _lastObservedTurn != 1) || turnNumber < _lastObservedTurn)
+            // 新战斗自清：sim 实例号（2026-10-15 审查修正——每局新 BattleSimState 恒新值；旧「T1 重入＋
+            // 回合回退」双判据在部署早退形态下靠回合回退兜底，但对「上局仅观测到回合 1」的秒弃调试局
+            // 失效〔T1==T1 不触发〕→陈旧战略态跨局泄漏；实例号判据恒新局必变、同局恒同，两种形态全覆盖）
+            if (sim.InstanceId != _lastSimInstance)
             {
                 _states.Clear();
-                _lastObservedTurn = turnNumber;
-            }
-            else if (turnNumber > _lastObservedTurn)
-            {
-                _lastObservedTurn = turnNumber;
+                _lastSimInstance = sim.InstanceId;
             }
 
             var state = GetOrCreate(playerId);
@@ -207,20 +205,21 @@ namespace GIC.Battle
             }
             state.StaminaFloor = companionCount * 5 * 2;
 
-            // ── 终局多玩家判据数据（§5.1「仅剩一个敌对玩家」）：核心存活的玩家数（队伍败北=全队
-            // 核心全灭，docs/07-00）——1v1 恒 1 敌对=走敌方核心濒破分支；核心身份=Core tag
-            // （2026-10-13 tag 化：每玩家按「全部核心存活」计，多核心时代语义自洽） ──
-            int totalCoreOwners = 0, enemyCoreOwners = 0;
+            // ── 终局多玩家判据数据（§5.1「核心存活的敌对玩家仅剩一队」→ 2026-10-15 审查修正：按**队伍**
+            // 聚合——按玩家计数在 2v2+AI 房间击倒一名敌对玩家即全队误入终局〔敌队仍有满编玩家，军备×1.6
+            // 全转火为时过早〕；1v1/2v2 恒 2 队=本分支天然不触发〔终局信号=敌方核心濒破分支〕，3+ 队形态
+            // （FFA/未来多队）才触发；核心身份=Core tag（每队按「任一存活核心」计，tag 化语义自洽） ──
+            int totalCoreTeams = 0, enemyCoreTeams = 0;
             {
-                var seen = new HashSet<string>();
+                var seenTeams = new HashSet<TeamType>();
                 foreach (var kv in sim.Units)
                 {
                     var unit = kv.Value;
                     var id = unit.GetUnitComponent<UnitIdentity>();
                     if (id == null || !BattleHeuristics.IsCore(unit)) continue;
-                    if (BattleSimState.IsDead(unit) || !seen.Add(id.OwnerPlayerID)) continue;
-                    totalCoreOwners++;
-                    if (id.Team != team) enemyCoreOwners++;
+                    if (BattleSimState.IsDead(unit) || !seenTeams.Add(id.Team)) continue;
+                    totalCoreTeams++;
+                    if (id.Team != team) enemyCoreTeams++;
                 }
             }
 
@@ -233,7 +232,7 @@ namespace GIC.Battle
                 ApplyRedLines(state);
                 return state;
             }
-            UpdateStance(state, turnNumber, enemyCoreOwners, totalCoreOwners);
+            UpdateStance(state, turnNumber, enemyCoreTeams, totalCoreTeams);
 
             // ── 军团倾向（§3 协作机制 2）──
             state.Legion = state.Stance switch
@@ -266,12 +265,13 @@ namespace GIC.Battle
 
         /// <summary>五态机：终局＞守势＞压制＞发育（回合≤3）＞相持；战力比迁移带滞回＋最小驻留。
         /// 终局/守势=硬判据（保命优先于防抖，不受驻留限制）；1v1 终局=敌方核心濒破，
-        /// 多玩家终局=核心存活的敌对玩家仅剩一队</summary>
-        private static void UpdateStance(StrategistState state, int turnNumber, int enemyCoreOwners, int totalCoreOwners)
+        /// 多玩家终局=核心存活的敌对**队伍**仅剩一队（2026-10-15 审查修正：队伍聚合防 2v2 提前触发）</summary>
+        private static void UpdateStance(StrategistState state, int turnNumber, int enemyCoreTeams, int totalCoreTeams)
         {
-            // 硬判据 1：终局（多玩家=敌对核心玩家≤1 且总数＞2；1v1=敌方核心濒破）。终局不回退（败北即结算）
+            // 硬判据 1：终局（多玩家=核心存活的敌对队伍≤1 且总队伍＞2——3+ 队形态才触发；1v1/2v2=敌方
+            // 核心濒破分支）。终局不回退（败北即结算）
             bool endgame = state.EnemyCoreHpRatio < EndgameCoreHpRatio
-                || (totalCoreOwners > 2 && enemyCoreOwners <= 1);
+                || (totalCoreTeams > 2 && enemyCoreTeams <= 1);
             if (endgame && state.Stance != AIStance.Endgame)
             {
                 SwitchStance(state, AIStance.Endgame, turnNumber);
@@ -323,23 +323,23 @@ namespace GIC.Battle
             switch (state.Stance)
             {
                 case AIStance.Develop:
-                    state.军备乘子 = 0.8f; state.契约乘子 = 0.9f; state.升命乘子 = 1.2f; state.科技乘子 = 1.0f;
+                    state.armyMul = 0.8f; state.contractMul = 0.9f; state.upgradeMul = 1.2f; state.techMul = 1.0f;
                     state.Intents.Add("攒资源×1.2"); state.Intents.Add("保核心×1.1");
                     break;
                 case AIStance.Stalemate:
-                    state.军备乘子 = 1.0f; state.契约乘子 = 1.0f; state.升命乘子 = 1.1f; state.科技乘子 = 1.0f;
+                    state.armyMul = 1.0f; state.contractMul = 1.0f; state.upgradeMul = 1.1f; state.techMul = 1.0f;
                     state.Intents.Add("升命投资×1.1"); state.Intents.Add("保核心×1.1");
                     break;
                 case AIStance.Push:
-                    state.军备乘子 = 1.3f; state.契约乘子 = 0.8f; state.升命乘子 = 0.7f; state.科技乘子 = 0.8f;
+                    state.armyMul = 1.3f; state.contractMul = 0.8f; state.upgradeMul = 0.7f; state.techMul = 0.8f;
                     state.Intents.Add("集火推进×1.2"); state.Intents.Add("清除入侵者×1.2");
                     break;
                 case AIStance.Defend:
-                    state.军备乘子 = 0.7f; state.契约乘子 = 1.2f; state.升命乘子 = 1.0f; state.科技乘子 = 0.9f;
+                    state.armyMul = 0.7f; state.contractMul = 1.2f; state.upgradeMul = 1.0f; state.techMul = 0.9f;
                     state.Intents.Add("保核心×1.4"); state.Intents.Add("救援伤员×1.2");
                     break;
                 case AIStance.Endgame:
-                    state.军备乘子 = 1.6f; state.契约乘子 = 0.4f; state.升命乘子 = 0.5f; state.科技乘子 = 0.3f;
+                    state.armyMul = 1.6f; state.contractMul = 0.4f; state.upgradeMul = 0.5f; state.techMul = 0.3f;
                     state.Intents.Add("全员转火×1.5");
                     break;
             }
@@ -348,8 +348,8 @@ namespace GIC.Battle
         /// <summary>经济红线（§5.3 三条）：摩拉&lt;50 升命腰斩（保部署）；体力&lt;15 进攻腰斩（防打空）</summary>
         private static void ApplyRedLines(StrategistState state)
         {
-            if (state.Mora < MoraRedLine) state.升命乘子 *= 0.5f;
-            if (state.Stamina < StaminaRedLine) state.军备乘子 *= 0.5f;
+            if (state.Mora < MoraRedLine) state.upgradeMul *= 0.5f;
+            if (state.Stamina < StaminaRedLine) state.armyMul *= 0.5f;
         }
     }
 }
