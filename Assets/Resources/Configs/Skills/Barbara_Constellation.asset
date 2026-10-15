@@ -18,11 +18,11 @@ MonoBehaviour:
     skillType: 4
     "\u6280\u80FD\u6807\u7B7E": 5001
     customParams:
-    - key: 32
-      value: 10
-      baseType: 0
     - key: 33
       value: 1
+      baseType: 0
+    - key: 32
+      value: 10
       baseType: 0
     - key: 28
       value: 1
