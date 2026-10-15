@@ -13,13 +13,13 @@ namespace GIC.Data
         [Header("每回合对半径内我方的治疗（% 施加者最大生命值/层——基准=芭芭拉自身）")]
         public int 每回合治疗百分比 = 5;
 
-        [Header("基础元能获取（0命；1命起=C1EnergyGain 命座技能参数取代）")]
+        [Header("基础元能获取（0命；2命起=C1EnergyGain 命座技能参数取代——决策七十二调换后元能档后移）")]
         public int 基础元能获取 = 5;
 
         [Header("每回合理智恢复（每层一枚，命令按目标合并总值）")]
         public int 每回合理智恢复 = 1;
 
-        [Header("作用半径（切比雪夫，格；2命起 +C2Radius 命座技能参数）")]
+        [Header("作用半径（切比雪夫，格；1命起 +C1Radius 命座技能参数——决策七十二调换+键名随生效层改）")]
         public int 作用半径 = 1;
 
         /// <summary>关联描述占位符解析（{AuraDamagePercent} 等——数值=本资产字段单源，金色高亮由构建层统一）</summary>

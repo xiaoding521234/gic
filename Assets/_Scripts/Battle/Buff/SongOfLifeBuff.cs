@@ -15,7 +15,7 @@ namespace GIC.Battle
     /// 用户拍板「0命就可以每回合加5元能」；**2026-10-07 描述勘正拍板：受益人=半径内我方单位非持有者
     /// 独享——OnTurnEnd 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，2命起=C1EnergyGain
     /// 参数=+10——参数载体=施加者命座技能〔2026-10-15 决策七十二调换：原1命件，调换后2命生效〕）；②对持有者切比雪夫
-    /// 〔作用半径〕（1命起 +C2Radius=2〔原2命件，调换后1命生效〕）内敌人造成〔每回合伤害百分比〕施加者攻击力水伤
+    /// 〔作用半径〕（1命起 +C1Radius=2〔原2命件，调换后1命生效；键名随生效层改 C2Radius→C1Radius——决策七十二二次返修〕）内敌人造成〔每回合伤害百分比〕施加者攻击力水伤
     /// （含尸体——鞭尸同 Burn 先例；**走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01 拍板
     /// 「这些伤害都应该统一」——与寒冰之棱 tick 同口径；不经反应预览=不触发反应〕）；③对半径内
     /// 我方**存活**单位（含持有者）治疗**施加者〔每回合治疗百分比〕最大生命值**、恢复〔每回合理智恢复〕
@@ -66,14 +66,14 @@ namespace GIC.Battle
 
             // 命座参数（施加者视角——数值随施法者命座成长；source 亡佚回落持有者=基础值）。
             // 2026-10-15 决策七十二「2命和1命效果调换」：原1命=元能提升至10/2命=半径+1+免附着 →
-            // 现1命=半径+C2Radius+免附着（原2命件整体前移）、2命=元能提升至 C1EnergyGain（原1命件）
+            // 现1命=半径+C1Radius+免附着（原2命件整体前移）、2命=元能提升至 C1EnergyGain（原1命件）
             var (cLevel, talent) = SourceConstellation();
             int stacks = Mathf.Max(1, Level);
             int energyGainPerLayer = (cLevel >= 2
                 ? (talent != null ? talent.GetInt(SkillParamKey.C1EnergyGain, Cfg.基础元能获取 * 2) : Cfg.基础元能获取 * 2)
                 : Cfg.基础元能获取);
             int radius = Cfg.作用半径 + (cLevel >= 1
-                ? (talent != null ? talent.GetInt(SkillParamKey.C2Radius, 1) : 1)
+                ? (talent != null ? talent.GetInt(SkillParamKey.C1Radius, 1) : 1)
                 : 0);
             bool attachAllies = cLevel < 1; // 1命起：不再为我方角色附着元素（原2命件随调换前移）
 

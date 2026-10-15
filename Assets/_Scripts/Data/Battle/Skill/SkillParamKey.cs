@@ -117,13 +117,14 @@ namespace GIC.Data
         [InspectorName("伤害距离")]
         DamageDistance = 31,
 
-        // 芭芭拉命座（2026-10-15 决策七十二调换：C2Radius=1命生效半径、C1EnergyGain=2命生效——
-        // 键名/枚举值不动〔牵连代码/资产/本地化键〕，InspectorName 随实际生效层更新）
+        // 芭芭拉命座（2026-10-15 决策七十二调换+二次返修：C1Radius=1命生效半径〔原 C2Radius 改名——
+        // 键名随生效层，枚举值 33 不变零资产迁移〕、C1EnergyGain=2命生效——保留原名：C2EnergyGain
+        // 已被丽莎（=55「2命元能增加」）占用，改名撞枚举成员唯一约束；显示层已标注真实层级）
         [InspectorName("2命获取元能")]
         C1EnergyGain = 32,
 
         [InspectorName("1命生效半径")]
-        C2Radius = 33,
+        C1Radius = 33,
 
         // 安柏采集
         [InspectorName("采集元能获取")]
