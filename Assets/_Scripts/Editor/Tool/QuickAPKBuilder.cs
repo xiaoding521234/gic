@@ -19,13 +19,13 @@ namespace GIC.Editor
         [MenuItem(MENU_BASE + "快速导出 (Mono/ARMv7 测试)", priority = -70)]
         public static void BuildTestAPK()
         {
-            BuildAPK(testBuild: true);
+            BuildWithAutoRetry(testBuild: true, finalSilent: false);
         }
 
         [MenuItem(MENU_BASE + "正式导出 (IL2CPP/ARM64 发布)", priority = -69)]
         public static void BuildReleaseAPK()
         {
-            BuildAPK(testBuild: false);
+            BuildWithAutoRetry(testBuild: false, finalSilent: false);
         }
 
         [MenuItem(MENU_BASE + "设置导出路径", priority = -68)]
@@ -55,7 +55,7 @@ namespace GIC.Editor
                 _releaseQueued = false;
                 try
                 {
-                    var ok = BuildAPK(testBuild: false, silent: true);
+                    var ok = BuildWithAutoRetry(testBuild: false, finalSilent: true);
                     GICLog.Info(ok ? "[QuickBuild] RESULT OK" : "[QuickBuild] RESULT FAIL");
                 }
                 catch (System.Exception ex)
@@ -70,6 +70,39 @@ namespace GIC.Editor
             EditorApplication.CallbackFunction cb = null;
             cb = () => { EditorApplication.update -= cb; 动作(); };
             EditorApplication.update += cb;
+        }
+
+        // ==================== SDK 停摆自愈重试（2026-10-17，三例 CDN 间歇病固化） ====================
+
+        private const int SDK停摆自动重试上限 = 2;   // 首次尝试之外最多再试 2 次（三例实证杀后重试一把过，留一次余量）
+
+        /// <summary>带 SDK 停摆自愈的构建主入口：QuickBuildWatchdog 盯「Detecting Android SDK」步的
+        /// sdkmanager java，CPU 冻结即击杀并自动点掉引擎「Build failure」弹窗；BuildPlayer 返回失败后此处自动重试。
+        /// 中间尝试一律静默（silent=true），只有最后一次尝试按 finalSilent 决定是否弹结果框。
+        /// 菜单路径同步执行（编辑器预期冻结）、调度路径异步执行——重试语义两者一致。</summary>
+        private static bool BuildWithAutoRetry(bool testBuild, bool finalSilent)
+        {
+            QuickBuildWatchdog.Begin();
+            try
+            {
+                var ok = BuildAPK(testBuild, finalSilent);
+                var retry = 0;
+                while (!ok && QuickBuildWatchdog.KilledThisAttempt && retry < SDK停摆自动重试上限)
+                {
+                    retry++;
+                    var isLast = retry >= SDK停摆自动重试上限;
+                    GICLog.Warn($"[QuickBuild] Detecting Android SDK 停摆已被看门狗击杀——自动重试 {retry}/{SDK停摆自动重试上限}");
+                    QuickBuildWatchdog.EndAttempt();   // 清击杀旗标+重快照 java 基线，继续盯下一次尝试
+                    ok = BuildAPK(testBuild, silent: isLast ? finalSilent : true);
+                }
+                if (retry > 0)
+                    GICLog.Info(ok ? $"[QuickBuild] 自动重试成功（重试 {retry} 次）" : $"[QuickBuild] 自动重试 {retry} 次后仍失败——放弃");
+                return ok;
+            }
+            finally
+            {
+                QuickBuildWatchdog.Stop();
+            }
         }
 
         private static bool BuildAPK(bool testBuild, bool silent = false)
