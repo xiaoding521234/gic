@@ -361,14 +361,18 @@ namespace GIC.Battle
                 return false;
             }
 
-            // 手牌持有校验（Host 权威，同 DeployUnit 先例——B7 LAN 防凭空上交）
+            // 手牌持有校验（Host 权威，同 DeployUnit 先例——B7 LAN 防凭空上交）。
+            // 2026-10-16 报障修复「打出后数量没扣减」：匹配口径与 LoseCard/FindHandEntry 完全同源
+            //（cardType==Item + value）——旧校验只比 value 不比 cardType，手牌条目形态异常
+            //（cardType 既非 Item 也非 Unit）时「校验通过而扣减失败」分裂=效果生效+数量不扣的
+            // 半生效态（日志实锤：两次「未足额回滚零命令」）；同口径后校验直接拒绝+手牌 dump 定位
             var hand = sim.GetHand(action.playerId);
             bool inHand = false;
             if (hand != null)
             {
                 foreach (var card in hand)
                 {
-                    if (card.IsUnit) continue;
+                    if ((CardType)card.cardType != CardType.Item) continue;
                     if (card.value == (int)itemName && card.count >= 1)
                     {
                         inHand = true;
@@ -378,7 +382,7 @@ namespace GIC.Battle
             }
             if (!inHand)
             {
-                GICLog.Warn($"[UseItem] {action.playerId} 手牌无 {itemName}，使用拒绝");
+                GICLog.Warn($"[UseItem] {action.playerId} 手牌无 {itemName}，使用拒绝（手牌形态：{DumpHand(sim, action.playerId)}）");
                 return false;
             }
 
@@ -397,6 +401,14 @@ namespace GIC.Battle
                 return false;
             }
 
+            // 建筑不可饮用（2026-10-16 用户拍板「不可为建筑单位」）：给建筑喂物品无意义（治疗对
+            // 协议核心吃治疗效率但物品定位是单位饮用）；客户端域已排除，Host 权威同口径兜底
+            if (drinker.RawData != null && drinker.RawData.unitType == UnitType.Building)
+            {
+                GICLog.Warn($"[UseItem] {action.playerId} 使用 {itemName} 目标为建筑（{action.targetUnitId}），使用落空");
+                return false;
+            }
+
             // 消耗 1 张（指定物品模式 ItemConsumeEffect——Consumed 明细→ItemConsume 命令客户端镜像扣）
             effects.Add(new ItemConsumeEffect(action.playerId, itemName, 1));
 
@@ -405,6 +417,20 @@ namespace GIC.Battle
 
             GICLog.Info($"[UseItem] {action.playerId} 使用 {itemName} → 饮用者 {action.targetUnitId}");
             return true;
+        }
+
+        /// <summary>手牌条目形态 dump（诊断日志用：cardType:value:count 逐条——扣减失败定位）</summary>
+        private static string DumpHand(BattleSimState sim, string playerId)
+        {
+            var hand = sim.GetHand(playerId);
+            if (hand == null) return "手牌未注册";
+            var sb = new System.Text.StringBuilder();
+            foreach (var card in hand)
+            {
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append($"[{card.cardType}:{card.value}x{card.count}]");
+            }
+            return sb.Length == 0 ? "空手牌" : sb.ToString();
         }
     }
 }

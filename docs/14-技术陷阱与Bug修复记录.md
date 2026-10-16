@@ -2198,3 +2198,10 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 8. **SetActive(false) 停摆同物体 VideoPlayer**：池外兜底藏 quad 改用 MeshRenderer.enabled——对象失活=播放器停摆 frame 永不推进、等首帧协程必超时。
 9. **编码三件套**：PNG/帧序列编码必须 format=yuv420p（EINVAL 0 字节坑）；**bframes=0**（B 帧 mp4 edit list=「First video frame not zero」首帧偏移——Unity import Warning 实证）；全标签补全（colorprim/transfer/colormatrix VUI+容器双写——primaries 缺标=WMF「Color primaries 0」色偏 Error）。
 10. **打包格式收益塌缩复盘**：三卖点（边缘上限/转码免疫/绿色系保险）执行中逐个失效=净收益为负即回滚——「格式迁移类」决策先算执行后的实际兑现路径，勿按理论卖点推进；绿色系自抠风险新防线=该角色生成时换蓝幕/品红幕（运行时 g-dominance 判据天然不抠，届时 shader 加幕色判据小改）。
+
+
+## §157 物品打出双 bug 修复三坑：指定模式漏减 remaining=恒回滚 + SubmitAction 同步清零日志陷阱 + 复测 dump 先行定位法（2026-10-16 物品打出批复测实证；决策七十八）
+
+1. **ItemConsumeEffect 指定物品模式漏减 remaining=「扣了又还+零命令」地雷（C-1 批既有缺陷，首个指定模式消费者 UseItemExecutor 暴露）**：ApplyEffects 消耗分支双模式——AnyItem（同类任意）循环扣减正确 `remaining -= take`，**指定物品模式 else 分支 LoseCard 成功后没减 remaining** → `remaining>0` 恒真 → 原子回滚把刚扣的 GainCard 还回+Consumed.Clear+AppliedAmount=0 → ItemConsume 零命令+Host 侧也还原=双侧都不扣（治疗等其它效果照常=「效果生效+数量不扣」半生效态）。**修法一行**：else 分支成功后 `remaining = 0`；ResourceGate 技能 Item cost 同走此分支自动受益。**排查教训链**：首日日志只见「未足额回滚（差 1）」+手牌校验通过，纯读码穷尽 LoseCard/FindHandEntry/CardId/HandCard 全链无误——离线复现（真实存档→sim 手牌→LoseCard 原语）成功反而误导（见第 3 条）；**复测轮在回滚 Warn 加手牌形态 dump（[cardType:value:count]）后**，dump 显示 `[0:5001x5]` 完全正常=形态异常假设全灭，把排查面逼到「应用层回滚逻辑」才逐字复核出漏减。
+2. **上交日志必须先于 SubmitAction 打印（单机局同步链清零陷阱）**：单机局 `_session.SubmitAction` 会**同步**触发阶段流转→OnPhaseChanged→ExitAiming 清空会话字段——日志写在 SubmitAction **之后**把变量读成 None/0（部署分支「出战 0」/物品分支「使用 None」全中招，Host 侧 action 本身正确但 HUD 日志误导排查方向——本批首日「使用 None」曾引发重复提交假设浪费一轮）。**修复**：部署+物品两分支日志已移到 SubmitAction 之前。**通则**：GIC 一切 `SubmitAction/SubmitInstantAction` 调用点的日志（含后续新打出/新行动类型）一律先打后交。
+3. **「原语复现成功 ≠ 运行链无 bug」——复现必须覆盖应用层编排而非只验证原语**：离线复现 GainCard/LoseCard 原语正确不等于应用层（ApplyEffects 的 remaining 编排）正确——本次复现成功一度推出「运行时形态异常」的死胡同。**先加诊断 dump 再交用户复测**=高杠杆姿势：一次复测的日志直接给出内存真值（形态/数量/条目），比纯静态推演快数倍；暂停态/涉局期不能跑编辑器工具，纯日志（%LOCALAPPDATA%\Tuanjie\Editor\Editor.log，编辑器未带 -logFile 时标准位置）rg 关键标记行即为唯一安全取证通道。

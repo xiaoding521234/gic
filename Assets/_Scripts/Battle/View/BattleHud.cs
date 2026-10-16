@@ -1165,9 +1165,12 @@ namespace GIC.Battle
         }
 
         /// <summary>进入使用物品瞄准（拖出可打出物品牌，2026-10-16 首个可打出物品批）：可选格=我方
-        /// 存活单位所在格（TeamType 口径同延奏域与 Host UseItemExecutor 校验——2v2 含队友单位、
-        /// 尸体不可饮用）——交互模型同部署瞄准：点格=待定金格、「完成选择」=确认提交（SubmitAim
-        /// 物品分支单出口）、拖回手牌区/点非可选格/取消钮/阶段切换=反悔弹回（ExitAiming 统一收口）。</summary>
+        /// 存活**非建筑**单位所在格（TeamType 口径同延奏域与 Host UseItemExecutor 校验——2v2 含队友
+        /// 单位、尸体不可饮用、建筑不可饮用——2026-10-16 报障修复「不可为建筑单位」；同格建筑+角色
+        /// 共存时该格仍可选，域按单位收非按格收）。交互复用延奏精确选人（IsCurrentAimUnitTargeted
+        /// 物品分支）：点格=同格多候选轮换+precise 立牌直选、待定目标描边、「完成选择」=确认提交
+        /// （SubmitAim 物品分支单出口）、拖回手牌区/点非可选格/取消钮/阶段切换=反悔弹回（ExitAiming
+        /// 统一收口）。</summary>
         private void EnterItemUseAim(int itemNameValue)
         {
             if (_state != HudState.Idle) return; // 仅手牌态可起（同部署）
@@ -1183,14 +1186,15 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             if (snapshot != null)
             {
-                foreach (var u in snapshot.units)
+                // 目标域与 CollectAimTargets 物品分支同口径（单源语义：我方存活非建筑单位所在格）
+                var candidates = new List<UnitState>();
+                CollectAimTargets(snapshot, null, candidates);
+                var seen = new HashSet<BattleCell>();
+                foreach (var u in candidates)
                 {
-                    if (u.isCorpse != 0) continue; // 尸体不可饮用（Host 校验同口径）
-                    if ((TeamType)u.team != MyTeam) continue; // TeamType 口径（同延奏域）
-                    var c = new BattleCell(u.position.x, u.position.y);
-                    if (!_board.Map.HasTile(c.x, c.y)) continue;
-                    _aimCells.Add(c);
-                    _aimRecommendedCells.Add(c); // 单位指向域全推荐（目标格即语义本身，延奏同口径）
+                    if (!seen.Add(u.position)) continue; // 同格多单位去重
+                    _aimCells.Add(u.position);
+                    _aimRecommendedCells.Add(u.position); // 单位指向域全推荐（目标格即语义本身，延奏同口径）
                 }
             }
             ShowAimHighlights();
@@ -1404,10 +1408,13 @@ namespace GIC.Battle
 
         // ==================== 指定单位型瞄准目标（2026-10-05 拍板：同格多候选重复点击轮换+拖动瞄准头像盘） ====================
 
-        /// <summary>当前瞄准是否指定单位型（延奏/契约/单位指向型爆发——IsUnitTargeted 单源）；
-        /// 部署瞄准（_aimDef=null）与方向型/自施放恒 false</summary>
+        /// <summary>当前瞄准是否指定单位型（延奏/契约/单位指向型爆发——IsUnitTargeted 单源；
+        /// 使用物品会话=同构精确选人——2026-10-16 报障修复「打出物品需要和延奏一样精确的选择某个
+        /// 角色」：同格多候选点击轮换+立牌 precise 直选+待定目标描边全链复用，域=CollectAimTargets
+        /// 物品分支）；部署瞄准（_aimDef=null 且 _itemUseAimItem=0）与方向型/自施放恒 false</summary>
         private bool IsCurrentAimUnitTargeted()
         {
+            if (_itemUseAimItem != 0) return true; // 使用物品=指定单位型（延奏同构精确选人）
             if (_aimDef == null) return false;
             var data = GetSelectedSkillData(_aimDef);
             return data != null && data.IsUnitTargeted();
@@ -1419,6 +1426,23 @@ namespace GIC.Battle
         /// cell=null 全域（头像盘/高亮格生成）；非空=该格候选（点格轮换）。序=快照序（轮换确定性）</summary>
         private void CollectAimTargets(BattleSnapshot snapshot, BattleCell? cell, List<UnitState> into)
         {
+            // 使用物品分支（2026-10-16 报障修复）：目标域=我方存活**非建筑**单位（用户拍板「不可为
+            // 建筑单位」——给建筑喂物品无意义；TeamType 口径同延奏域——2v2 含队友单位；尸体不可饮用）。
+            // 独立于下方技能 caster 域（物品无施法者）。precise 域校验随域自动排除建筑——点建筑立牌
+            // 视同未点，同延奏点尸体立牌先例。
+            if (_itemUseAimItem != 0)
+            {
+                foreach (var u in snapshot.units)
+                {
+                    if (u.isCorpse != 0) continue;
+                    if ((TeamType)u.team != MyTeam) continue;
+                    if (IsBuildingUnitState(u)) continue;
+                    if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
+                    if (!_board.Map.HasTile(u.position.x, u.position.y)) continue;
+                    into.Add(u);
+                }
+                return;
+            }
             var skillData = _aimDef != null ? GetSelectedSkillData(_aimDef) : null;
             if (skillData == null || !skillData.IsUnitTargeted()) return;
             var sel = snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
@@ -1857,6 +1881,13 @@ namespace GIC.Battle
                 : null;
         }
 
+        /// <summary>快照单位是否建筑（物品饮用域排除用——UnitConfig.unitType 单源；建筑含协议核心）</summary>
+        private bool IsBuildingUnitState(UnitState u)
+        {
+            var data = u == null ? null : TryGetUnitData(u.unitName);
+            return data != null && data.unitType == UnitType.Building;
+        }
+
         /// <summary>移动推荐预判的单格进入判定（镜像 MovementResolver.CanEnter 判定链的客户端静态版）：
         /// 地形层（IsPassable 按 ForceType——步行不可入水/沼泽）→ 体积绝对层（格内体积+自身体积≤3）
         /// → 阻挡规则层（blockAllies/blockEnemies/blockedByEnemies 配置值——运行时 Buff 修改不可见）。
@@ -1936,22 +1967,29 @@ namespace GIC.Battle
                     deployUnitName = _deployAimUnit,
                     deployCell = cell,
                 };
-                _session.SubmitAction(deployAction);
+                // 日志先于 SubmitAction（单机局 SubmitAction 同步触发阶段流转→OnPhaseChanged→ExitAiming
+                // 清空会话字段——后打印会把出战单位读成 None，2026-10-16 日志取证勘正）
                 GICLog.Info($"[BattleHud] {_myPlayerId} 上交：出战 {(UnitName)_deployAimUnit} @ {cell}");
+                _session.SubmitAction(deployAction);
                 ExitAiming(); // 打出卡经 ExitAiming 统一飞回手牌槽（卡不消耗可重复出战——2026-10-07 返拍「不应该把我的卡销毁」）
                 return true;
             }
 
-            // 使用物品分支（2026-10-16 首个可打出物品批）：点我方单位格=使用上交（玩家级行动占配额、
-            // 不耗体力——docs/05 §5.0；目标=格上我方存活单位；Host UseItemExecutor 手牌持有/目标校验兜底）
+            // 使用物品分支（2026-10-16 首个可打出物品批；报障修复精确选人）：点我方单位格=使用上交
+            //（玩家级行动占配额、不耗体力——docs/05 §5.0）；目标=延奏同构精确选择——ResolvePendingTarget
+            //（点格轮换/precise 立牌直选的待定目标）优先，FindUnitAt 按域找仅作残留回落；建筑不可饮用
+            //（兜底防线——域已排除，回落残留态再拦一次）；Host UseItemExecutor 手牌持有/目标/建筑校验兜底
             if (_itemUseAimItem != 0)
             {
                 var itemSnapshot = _session.Player.LatestSnapshot;
-                var drinker = FindUnitAt(itemSnapshot, cell, UnitSide.MyTeam); // 存活我方（TeamType 口径；尸体默认排除）
+                var drinker = ResolvePendingTarget(itemSnapshot, cell)
+                    ?? FindUnitAt(itemSnapshot, cell, UnitSide.MyTeam); // 存活我方（TeamType 口径；尸体默认排除）
+                if (drinker != null && IsBuildingUnitState(drinker))
+                    drinker = null; // 建筑防线（域已排除，防回落残留态）
                 if (drinker == null)
                 {
-                    // 待定格在确认时已失效（同回合先手被杀）——不提交保持瞄准态，换格/取消
-                    GICLog.Info($"[BattleHud] 使用物品目标格 {cell} 无我方存活单位，未提交");
+                    // 待定格在确认时已失效（同回合先手被杀/残留目标已离开）——不提交保持瞄准态，换格/取消
+                    GICLog.Info($"[BattleHud] 使用物品目标格 {cell} 无我方存活可饮用单位，未提交");
                     return false;
                 }
                 var useAction = new ActionData
@@ -1961,8 +1999,9 @@ namespace GIC.Battle
                     useItemId = _itemUseAimItem,
                     targetUnitId = drinker.unitId,
                 };
-                _session.SubmitAction(useAction);
+                // 日志先于 SubmitAction（同部署分支勘正——ExitAiming 同步清零会把物品读成 None）
                 GICLog.Info($"[BattleHud] {_myPlayerId} 上交：使用 {(ItemName)_itemUseAimItem} → {drinker.unitId}");
+                _session.SubmitAction(useAction);
                 ExitAiming(); // 打出卡经 ExitAiming 统一飞回手牌槽（数量扣减由 ItemConsume 命令镜像）
                 return true;
             }

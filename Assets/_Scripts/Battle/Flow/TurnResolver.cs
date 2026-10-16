@@ -924,7 +924,13 @@ namespace GIC.Battle
                     {
                         if (_sim.LoseCard(itemConsume.TargetUnitId,
                                 new CardId((ItemName)itemConsume.Item), itemConsume.Amount))
+                        {
                             itemConsume.Consumed.Add((itemConsume.Item, itemConsume.Amount));
+                            remaining = 0; // 指定模式成功即足额——2026-10-16 复测 dump 实锤根因：此处漏减
+                                           // remaining → 「remaining>0 恒真」→ 原子回滚把刚扣的还回+零命令
+                                           // =「打出后数量不扣」；C-1 批既有地雷，AnyItem 分支正确、
+                                           // UseItemExecutor 是指定模式首个消费者而暴露
+                        }
                     }
 
                     if (remaining > 0)
@@ -934,9 +940,24 @@ namespace GIC.Battle
                             _sim.GainCard(itemConsume.TargetUnitId, new CardId((ItemName)spent.item), spent.count);
                         itemConsume.Consumed.Clear();
                         itemConsume.AppliedAmount = 0;
+                        // 防御路径诊断（2026-10-16 报障「打出物品数量没扣减」曾在此 dump 实锤指定模式
+                        // 漏减 remaining 根因已修；dump 保留——再触发即真实不足额（count 不足/形态漂移），
+                        // [cardType:value:count] 逐条手牌形态可直接定位）
+                        var dumpHand = new System.Text.StringBuilder();
+                        var dumpList = _sim.GetHand(itemConsume.TargetUnitId);
+                        if (dumpList == null) dumpHand.Append("手牌未注册");
+                        else
+                        {
+                            foreach (var hc in dumpList)
+                            {
+                                if (dumpHand.Length > 0) dumpHand.Append(", ");
+                                dumpHand.Append($"[{hc.cardType}:{hc.value}x{hc.count}]");
+                            }
+                            if (dumpHand.Length == 0) dumpHand.Append("空手牌");
+                        }
                         GICLog.Warn($"[TurnResolver] 物品消耗效应未足额（{itemConsume.TargetUnitId} " +
                                     $"{(itemConsume.AnyOfSubType ? ((ItemSubType)itemConsume.SubType).ToString() : ((ItemName)itemConsume.Item).ToString())}" +
-                                    $"×{itemConsume.Amount}，差 {remaining}）——原子回滚零命令（防御路径，理论不可达）");
+                                    $"×{itemConsume.Amount}，差 {remaining}）——原子回滚零命令（手牌形态：{dumpHand}）");
                     }
                     else
                     {
