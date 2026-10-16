@@ -98,9 +98,15 @@ namespace GIC.UI
             maxPrepareCount.AddStaticEntry("：");
             maxPrepareCount.AddStaticEntry(raw.maxPrepareCount.ToString());
 
-            // 描述
+            // 描述（2026-10-16 首个可打出物品批·描述对齐返修：{Key} 占位符渲染——customParams
+            // 单源、技能描述同模式（SkillDescriptionBuilder.BuildItem）；表未加载/无模板=回落
+            // 本地化异步链兜底）
             _description.ClearAllEntries();
-            _description.AddEntry(raw.GetDescriptionEntry());
+            var template = GetItemDescriptionTemplate(raw);
+            if (template == null)
+                _description.AddEntry(raw.GetDescriptionEntry());
+            else
+                _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(template, raw.customParams));
 
             // 使用按钮（只读模式下隐藏）
             if (isReadOnly)
@@ -111,6 +117,14 @@ namespace GIC.UI
                 SetUsable(usable, data);
             else
                 SetUsable(null, null);
+        }
+
+        /// <summary>物品描述模板同步读取（当前语言；表未加载/无条目=null——调用方回落本地化异步链）</summary>
+        private string GetItemDescriptionTemplate(ItemConfig.ItemData raw)
+        {
+            var table = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(TableName.ItemDescription.ToString());
+            return table?.GetEntry(raw.itemID.ToString())?.Value;
         }
 
         public void SetActive(bool active)

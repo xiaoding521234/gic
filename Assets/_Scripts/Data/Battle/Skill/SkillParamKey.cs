@@ -273,6 +273,15 @@ namespace GIC.Data
         // 凯亚命座（2026-10-15 决策七十二「3命额外加元能上限+60」；半径通道复用 C3Radius=29）
         [InspectorName("3命元能上限增加")]
         C3EnergyLimit = 78,
+
+        // 物品参数（2026-10-16 首个可打出物品批·描述对齐返修：物品 customParams 字符串键=枚举名同构
+        // ——描述占位符/参数表显示/效果值三方单源；消耗类键=绝对量正数存储、消费侧取负——
+        // SkillCostEntry 消耗语义先例；首个消费方=蒲公英酒）
+        [InspectorName("理智消耗")]
+        SanityCost = 79,
+
+        [InspectorName("治疗量")]
+        HealAmount = 80,
     }
 
     /// <summary>

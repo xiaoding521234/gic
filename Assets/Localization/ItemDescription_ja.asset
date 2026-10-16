@@ -127,7 +127,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 5001
-    m_Localized: "\xB7\u98F2\u3080\u3068\u7406\u6027\u309210\u5931\u3044\u3001HP\u309240\u56DE\u5FA9\u3059\u308B\n\xB7\u9152\u98F2\u307F\u30E6\u30CB\u30C3\u30C8\u306F\u7406\u6027\u3092\u5931\u308F\u306A\u3044"
+    m_Localized: "\xB7\u98F2\u3080\u3068\u7406\u6027\u3092{SanityCost}\u5931\u3044\u3001HP\u3092{HealAmount}\u56DE\u5FA9\u3059\u308B\n\xB7\u9152\u98F2\u307F\u30E6\u30CB\u30C3\u30C8\u306F\u7406\u6027\u3092\u5931\u308F\u306A\u3044"
     m_Metadata:
       m_Items: []
   references:

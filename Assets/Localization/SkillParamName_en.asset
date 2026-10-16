@@ -334,6 +334,14 @@ MonoBehaviour:
     m_Localized: C3 Energy Limit
     m_Metadata:
       m_Items: []
+  - m_Id: 79
+    m_Localized: Sanity Cost
+    m_Metadata:
+      m_Items: []
+  - m_Id: 80
+    m_Localized: Heal Amount
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -331,6 +331,14 @@ MonoBehaviour:
     m_Key: C3EnergyLimit
     m_Metadata:
       m_Items: []
+  - m_Id: 79
+    m_Key: SanityCost
+    m_Metadata:
+      m_Items: []
+  - m_Id: 80
+    m_Key: HealAmount
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

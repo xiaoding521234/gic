@@ -95,9 +95,10 @@ namespace GIC.Battle
 
         /// <summary>物品使用效果编译单出口（UseItemExecutor 手动打出 / UseHandItem 原子嵌套饮用共用）：
         /// 目标=饮用者经 ResolveCastTargets 解析（Target/Caster 同指饮用者；AllAllies=将来群体物品
-        /// 自然生效）；物品原子约定 trigger=OnCast、paramKey=None（物品数值=value 直读/描述文本域，
-        /// 与技能参数表分离——paramKey≠None 的原子 Warn 跳过防误读技能参数表；UseHandItem 原子
-        /// Warn 跳过防嵌套饮用递归）；施法者=饮用者（Heal 基准换算/治疗效率乘区按饮用者口径）。</summary>
+        /// 自然生效）；物品原子约定 trigger=OnCast、数值单源=paramKey 引用 customParams（键名=枚举名
+        /// 同构——描述占位符/参数表显示/效果值三方单源，2026-10-16 描述对齐返修；paramKey=None 时
+        /// value 直读 Fixed 兜底；UseHandItem 原子 Warn 跳过防嵌套饮用递归）；施法者=饮用者（Heal
+        /// 基准换算/治疗效率乘区按饮用者口径）。</summary>
         internal static void CompileItemUse(BattleSimState sim, string playerId, Unit drinker,
             BattleSnapshot snapshot, ItemConfig.ItemData itemData, List<BattleEffect> effects)
         {
@@ -110,22 +111,69 @@ namespace GIC.Battle
             foreach (var atom in itemData.effects)
             {
                 if (atom == null || atom.trigger != SkillEffectTrigger.OnCast) continue;
-                if (atom.paramKey != SkillParamKey.None)
-                {
-                    GICLog.Warn($"[EffectCompiler] 物品 {itemData.itemID} 原子配了 paramKey={atom.paramKey}——" +
-                                $"物品数值走 value 直读（技能参数表键不适用物品），跳过该原子");
-                    continue;
-                }
                 if (atom.kind == SkillEffectKind.UseHandItem)
                 {
                     GICLog.Warn($"[EffectCompiler] 物品 {itemData.itemID} 效果配了 UseHandItem——" +
                                 $"嵌套饮用无语义（防递归），跳过该原子");
                     continue;
                 }
-                foreach (var target in ResolveCastTargets(atom, useAction, snapshot, sim, drinkerState, drinkerState))
-                    CompileAtom(sim, useAction, snapshot, null, atom, target.unitId, drinkerState,
+                // 数值单源预解析（2026-10-16 描述对齐返修）：paramKey≠None → 从 customParams 查值
+                // 重写拷贝原子（paramKey→None+value→解析值——资产原子勿运行时改写故拷贝，CompileAtom
+                // 通用 case 零改动；paramKey=None 原样返回=value 直读 Fixed 兜底）
+                var compiled = ResolveItemAtom(itemData, atom);
+                if (compiled == null) continue;
+                foreach (var target in ResolveCastTargets(compiled, useAction, snapshot, sim, drinkerState, drinkerState))
+                    CompileAtom(sim, useAction, snapshot, null, compiled, target.unitId, drinkerState,
                         0, 0, BattleCell.zero, 0f, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
             }
+        }
+
+        /// <summary>物品原子数值预解析（CompileItemUse 用）：paramKey≠None 时从 customParams 按
+        /// paramKey.ToString() 查值（键名=枚举名同构——描述占位符/参数表显示/效果值三方单源，技能
+        /// 参数表同构模式）并重写**拷贝**原子（资产原子勿运行时改写；拷贝后 paramKey→None、value→
+        /// 解析值）；**SanityCost 键=理智消耗绝对量（正数存储、SanityChange 原子 delta 取负——
+        /// SkillCostEntry 消耗语义先例）**；customParams 无对应键=Warn 返回 null（配置错误暴露非静默）。</summary>
+        private static SkillEffectConfig ResolveItemAtom(ItemConfig.ItemData itemData, SkillEffectConfig atom)
+        {
+            if (atom.paramKey == SkillParamKey.None) return atom;
+            string keyName = atom.paramKey.ToString();
+            int value = 0;
+            bool found = false;
+            if (itemData.customParams != null)
+            {
+                foreach (var p in itemData.customParams)
+                {
+                    if (p != null && p.key == keyName) { value = p.value; found = true; break; }
+                }
+            }
+            if (!found)
+            {
+                GICLog.Warn($"[EffectCompiler] 物品 {itemData.itemID} 原子 paramKey={keyName} 在 customParams" +
+                            $" 无对应条目，跳过该原子（物品数值单源=customParams，请补参数）");
+                return null;
+            }
+            return new SkillEffectConfig
+            {
+                trigger = atom.trigger,
+                kind = atom.kind,
+                targetFilter = atom.targetFilter,
+                condition = atom.condition,
+                paramKey = SkillParamKey.None,
+                paramKey2 = SkillParamKey.None,
+                paramKey3 = SkillParamKey.None,
+                radiusKey = SkillParamKey.None,
+                value = atom.kind == SkillEffectKind.SanityChange && atom.paramKey == SkillParamKey.SanityCost
+                    ? -value : value, // 理智消耗键=绝对量正数存储、原子 delta 取负（消耗语义约定）
+                element = atom.element,
+                elementLayers = atom.elementLayers,
+                buffType = atom.buffType,
+                buffAsset = atom.buffAsset,
+                targetSkillType = atom.targetSkillType,
+                statType = atom.statType,
+                minConstellation = atom.minConstellation,
+                requiredTag = atom.requiredTag,
+                subType = atom.subType,
+            };
         }
 
         // ==================== 判定轨编译（发射声明/整线段） ====================

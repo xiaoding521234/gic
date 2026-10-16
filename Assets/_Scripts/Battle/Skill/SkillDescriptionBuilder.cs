@@ -100,6 +100,31 @@ namespace GIC.Battle
             return sb.ToString();
         }
 
+        /// <summary>物品描述构建（2026-10-16 首个可打出物品批·描述对齐返修）：物品 customParams
+        ///（ItemParam 字符串键）占位符替换——{Key}→金色数值（物品参数全 Fixed 语义纯数字，与技能
+        /// 描述同观感；键名=SkillParamKey 枚举名同构，customParams=描述占位符/参数表显示/效果值
+        /// 三方单源）。调用方=ItemDetailPanel（背包+战斗卡详情共链 CardDetailView）。</summary>
+        public static string BuildItem(string template, ItemConfig.ItemParam[] customParams)
+        {
+            if (string.IsNullOrEmpty(template)) return template;
+            if (customParams == null || customParams.Length == 0) return template;
+
+            var paramMap = new Dictionary<string, string>();
+            foreach (var param in customParams)
+            {
+                if (param == null || string.IsNullOrEmpty(param.key)) continue;
+                var placeholder = "{" + param.key + "}";
+                if (template.Contains(placeholder))
+                    paramMap[placeholder] = $"<color={ValueColor}>{param.value}</color>";
+            }
+            if (paramMap.Count == 0) return template;
+
+            var sb = new StringBuilder(template);
+            foreach (var kvp in paramMap)
+                sb.Replace(kvp.Key, kvp.Value);
+            return sb.ToString();
+        }
+
         /// <summary>
         /// 获取单个参数的带颜色展示值
         /// 固定值 → "4" → "<color=#FFD700>4</color>"
