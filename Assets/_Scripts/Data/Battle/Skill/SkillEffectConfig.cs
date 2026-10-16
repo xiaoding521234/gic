@@ -37,6 +37,9 @@ namespace GIC.Data
         [InspectorName("属性提升")] StatBoost = 9,        // B8 命座批（2026-09-30）：OnDeploy 被动属性——statType+paramKey/value（Fixed=BaseFlat/Percent=BasePercent 修改器；容量型属性〔Energy〕=直接扩上限）；minConstellation=生效命座层
 
         [InspectorName("元能溢出转移")] EnergyOverflowTransfer = 10, // B8 命座批：OnDeploy 被动旗标——本命座层起，获得元能溢出部分转移给最近未满我方（安柏1命；ApplyEnergy 消费）
+
+        [InspectorName("理智变化")] SanityChange = 11,  // 理智原子（2026-10-16 首个可打出物品批）：paramKey=None 时 value 直读（负=减少）；产出 SanityEffect 单效应（钳 -300~300，StatChange(StatKindSanity) 命令链复用歌声之环批）；首个消费方=蒲公英酒「减少10点理智」（配 condition=TargetNotHasTag(Drunkard) 表达「酒鬼角色不减少理智」）
+        [InspectorName("使用手牌物品")] UseHandItem = 12, // 手牌持有 subType 子类型物品则消耗 1 个并结算其效果（目标=施放者；无持有=空产出不阻断其他原子——「如果持有」条件语义）；首个消费方=凯亚变奏冷血之剑「持有饮品会饮用1瓶」（subType=Drink）
     }
 
     /// <summary>
@@ -49,6 +52,11 @@ namespace GIC.Data
         [InspectorName("无条件")] None = 0,
         [InspectorName("目标已倒下")] TargetIsCorpse = 1,
         [InspectorName("目标未倒下")] TargetIsAlive = 2,
+
+        // tag 条件（2026-10-16 首个可打出物品批）：按目标 UnitTag 过滤——UnitTag 的首个效果条件消费
+        //（此前 tags 运行时唯一逻辑消费=Core 核心判定）。载荷=原子 requiredTag 字段。
+        [InspectorName("目标持有标签")] TargetHasTag = 3,
+        [InspectorName("目标无标签")] TargetNotHasTag = 4,
     }
 
     /// <summary>
@@ -137,5 +145,15 @@ namespace GIC.Data
         /// <summary>生效命座层（0=固有被动〔登场即有，docs/09「0命」〕；1~3=需升命到该层才生效——
         /// ConstellationApplier 按当前命座层幂等重算，层数只增故重算=全撤后重挂）</summary>
         public int minConstellation = 0;
+
+        [Header("条件与物品载荷（2026-10-16 首个可打出物品批）")]
+        /// <summary>tag 条件载荷（condition=TargetHasTag/TargetNotHasTag 用）：目标单位 tags 含/
+        /// 不含该 tag 才生效——首个消费方=蒲公英酒理智原子 condition=TargetNotHasTag + Drunkard
+        ///（「酒鬼角色不减少理智」——tag 即条件的数据驱动表达，勿在原子 kind 内硬编码 tag 语义）</summary>
+        public UnitTag requiredTag = UnitTag.None;
+
+        /// <summary>手牌物品子类型载荷（UseHandItem 用）：消耗该子类型 1 个并结算其效果（subType=Drink=
+        /// 饮用；货币 Currency 恒不可匹配——ResourceGate AnyItem 语义同源）；复用 SkillCostEntry.subType 口径</summary>
+        public ItemSubType subType = ItemSubType.Material;
     }
 }

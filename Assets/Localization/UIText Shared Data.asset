@@ -1183,6 +1183,10 @@ MonoBehaviour:
     m_Key: Battle_ReactionSuperconduct
     m_Metadata:
       m_Items: []
+  - m_Id: 12039
+    m_Key: Battle_TipAimItemUse
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

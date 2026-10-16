@@ -78,7 +78,7 @@ namespace GIC.Battle
             public RectTransform rt;  // wrapper（点击/拖拽接收层）
             public UnityEngine.UI.Button btn;
             public bool isUnit;
-            public int unitValue;     // UnitName 枚举值（isUnit 时有效）
+            public int unitValue;     // 卡枚举值：isUnit=UnitName；物品卡=ItemName（2026-10-16 可打出物品批——打出路由消费）
             public Vector3 baseScale; // 手牌壳内原始 localScale（回槽还原用——壳 0.7×槽缩放）
         }
 
@@ -658,7 +658,16 @@ namespace GIC.Battle
             }
             if (!slot.isUnit)
             {
-                SetTip("Battle_TipItemCardPending"); // 物品卡使用后续批次接入（原点击口径）
+                // 可打出物品（2026-10-16 首个可打出物品批）：配了使用效果（ItemData.HasEffects 单源）
+                // → 进饮用瞄准（选我方存活单位——部署瞄准同构交互）；无效果物品（货币/素材）弹回提示
+                var itemData = _itemConfig?.GetItemData((ItemName)slot.unitValue);
+                if (itemData != null && itemData.HasEffects)
+                {
+                    SetPlayedHandCard(slot); // 打出态：卡悬浮松手位（饮用瞄准期随取随拖）
+                    EnterItemUseAim(slot.unitValue);
+                    return;
+                }
+                SetTip("Battle_TipItemCardPending"); // 无使用效果物品不可打出（原占位键沿用）
                 FlyHandCardToSlot(slot, slot.baseScale, HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
                 return;
             }

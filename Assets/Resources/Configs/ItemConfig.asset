@@ -197,3 +197,38 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects:
+    - trigger: 0
+      kind: 11
+      targetFilter: 0
+      condition: 4
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: -10
+      element: 0
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 8001
+      subType: 5
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      condition: 0
+      paramKey: 0
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 40
+      element: 0
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5

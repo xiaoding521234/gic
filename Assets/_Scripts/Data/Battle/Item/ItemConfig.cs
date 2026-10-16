@@ -52,6 +52,16 @@ namespace GIC.Data
             [Header("自定义参数")]
             [SerializeField] public ItemParam[] customParams;
 
+            [Header("战斗效果（2026-10-16 首个可打出物品批）")]
+            /// <summary>使用效果原子（可打出物品判定单源：非空=可经 UseItem 行动打出手牌，目标=点选的
+            /// 我方存活单位〔饮用者〕；原子=技能效果原子同款，物品侧约定 trigger 恒 OnCast、paramKey 恒
+            /// None〔物品数值走 value 直读 Fixed 语义〕、数值与描述文本双源点登记 docs/11）。
+            /// 首个物品=蒲公英酒（SanityChange -10 + Heal 40，酒鬼条件在原子上配）。</summary>
+            public List<SkillEffectConfig> effects;
+
+            /// <summary>是否配有使用效果（=可打出判定单源：货币卡/素材无 effects 恒不可打出）</summary>
+            public bool HasEffects => effects != null && effects.Count > 0;
+
             // 删除 description 字段，改用本地化
 
             /// <summary>

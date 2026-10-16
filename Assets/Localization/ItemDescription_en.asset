@@ -149,6 +149,10 @@ MonoBehaviour:
       by the stone's glimmer, the fated will meet under the stars.
     m_Metadata:
       m_Items: []
+  - m_Id: 5001
+    m_Localized: "\xB7Drink to lose 10 Sanity and restore 40 HP\n\xB7Drunkard units do not lose Sanity"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

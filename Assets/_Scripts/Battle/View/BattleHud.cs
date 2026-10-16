@@ -228,6 +228,10 @@ namespace GIC.Battle
         /// <summary>部署瞄准中的角色（UnitName 枚举值；0=非部署瞄准态）</summary>
         private int _deployAimUnit;
 
+        /// <summary>使用物品瞄准会话载体（ItemName 枚举值；0=非会话）——2026-10-16 首个可打出物品批，
+        /// 部署会话同构（打出态悬浮+待定金格+完成选择确认；ExitAiming 统一收口飞回打出卡）</summary>
+        private int _itemUseAimItem;
+
         /// <summary>手牌卡按钮容器（hand 布局件内；RebuildHandCards 重建。
         /// 2026-09-23 审查 R1：滚动壳四层结构上移 prefab hand 槽，代码只寻址 _handScroll/_handContent+建卡条目）</summary>
         private readonly List<UnityEngine.UI.Button> _handCardButtons = new List<UnityEngine.UI.Button>();
@@ -1160,6 +1164,40 @@ namespace GIC.Battle
             SetTip("Battle_TipAimDeploy"); // 部署专属提示（批7⑥：原复用方向瞄准键语义不符）
         }
 
+        /// <summary>进入使用物品瞄准（拖出可打出物品牌，2026-10-16 首个可打出物品批）：可选格=我方
+        /// 存活单位所在格（TeamType 口径同延奏域与 Host UseItemExecutor 校验——2v2 含队友单位、
+        /// 尸体不可饮用）——交互模型同部署瞄准：点格=待定金格、「完成选择」=确认提交（SubmitAim
+        /// 物品分支单出口）、拖回手牌区/点非可选格/取消钮/阶段切换=反悔弹回（ExitAiming 统一收口）。</summary>
+        private void EnterItemUseAim(int itemNameValue)
+        {
+            if (_state != HudState.Idle) return; // 仅手牌态可起（同部署）
+            _itemUseAimItem = itemNameValue;
+            _state = HudState.Aiming;
+            _aimDef = null; // 玩家级会话（无技能按钮定义——同部署/升命）
+            _pendingAimCell = null; // 新会话待定清零（防陈旧提交）
+            ClosePopup();
+            CloseHandCardDetail(); // 瞄准视线让位（点非可选格/拖回=反悔弹回）
+
+            _aimCells.Clear();
+            _aimRecommendedCells.Clear();
+            var snapshot = _session.Player.LatestSnapshot;
+            if (snapshot != null)
+            {
+                foreach (var u in snapshot.units)
+                {
+                    if (u.isCorpse != 0) continue; // 尸体不可饮用（Host 校验同口径）
+                    if ((TeamType)u.team != MyTeam) continue; // TeamType 口径（同延奏域）
+                    var c = new BattleCell(u.position.x, u.position.y);
+                    if (!_board.Map.HasTile(c.x, c.y)) continue;
+                    _aimCells.Add(c);
+                    _aimRecommendedCells.Add(c); // 单位指向域全推荐（目标格即语义本身，延奏同口径）
+                }
+            }
+            ShowAimHighlights();
+            ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
+            SetTip("Battle_TipAimItemUse"); // 饮用瞄准专属提示
+        }
+
         /// <summary>我方核心位置（部署半径圆心）。协议核心 Unit 化（2026-09-29 拍板）：真源=快照里的
         /// 我方核心单位位置（与 Host GetCorePosition 同源语义）；防御回落=出生区中心代理→我方任一单位位</summary>
         private BattleCell FindMyCorePosition(BattleSnapshot snapshot)
@@ -1638,10 +1676,14 @@ namespace GIC.Battle
             _pendingAimCell = null;
             _pendingTargetUnitId = null; // 待定目标随会话收口（2026-10-05）
             _hoverAimCell = null; // 悬停态随高亮层同清（quad 已销，残留引用无意义）
-            // 部署瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）
+            // 部署/使用物品瞄准：回手牌态（无选中单位；_aimDef=null 时 SetAimSelectRing 安全跳过）——
+            // 物品会话同构收口（2026-10-16 首个可打出物品批：提交成功/反悔弹回后，数量扣减由
+            // ItemConsume 命令镜像驱动——卡本体恒飞回不销毁）
             bool wasDeployAim = _deployAimUnit != 0;
+            bool wasItemUseAim = _itemUseAimItem != 0;
             _deployAimUnit = 0;
-            if (wasDeployAim)
+            _itemUseAimItem = 0;
+            if (wasDeployAim || wasItemUseAim)
             {
                 _state = HudState.Idle;
                 _aimDef = null;
@@ -1897,6 +1939,31 @@ namespace GIC.Battle
                 _session.SubmitAction(deployAction);
                 GICLog.Info($"[BattleHud] {_myPlayerId} 上交：出战 {(UnitName)_deployAimUnit} @ {cell}");
                 ExitAiming(); // 打出卡经 ExitAiming 统一飞回手牌槽（卡不消耗可重复出战——2026-10-07 返拍「不应该把我的卡销毁」）
+                return true;
+            }
+
+            // 使用物品分支（2026-10-16 首个可打出物品批）：点我方单位格=使用上交（玩家级行动占配额、
+            // 不耗体力——docs/05 §5.0；目标=格上我方存活单位；Host UseItemExecutor 手牌持有/目标校验兜底）
+            if (_itemUseAimItem != 0)
+            {
+                var itemSnapshot = _session.Player.LatestSnapshot;
+                var drinker = FindUnitAt(itemSnapshot, cell, UnitSide.MyTeam); // 存活我方（TeamType 口径；尸体默认排除）
+                if (drinker == null)
+                {
+                    // 待定格在确认时已失效（同回合先手被杀）——不提交保持瞄准态，换格/取消
+                    GICLog.Info($"[BattleHud] 使用物品目标格 {cell} 无我方存活单位，未提交");
+                    return false;
+                }
+                var useAction = new ActionData
+                {
+                    playerId = _myPlayerId,
+                    actionType = ActionType.UseItem,
+                    useItemId = _itemUseAimItem,
+                    targetUnitId = drinker.unitId,
+                };
+                _session.SubmitAction(useAction);
+                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：使用 {(ItemName)_itemUseAimItem} → {drinker.unitId}");
+                ExitAiming(); // 打出卡经 ExitAiming 统一飞回手牌槽（数量扣减由 ItemConsume 命令镜像）
                 return true;
             }
 

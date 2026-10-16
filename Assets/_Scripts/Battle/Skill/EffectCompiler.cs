@@ -91,6 +91,43 @@ namespace GIC.Battle
             return effects;
         }
 
+        // ==================== 物品效果编译（2026-10-16 首个可打出物品批） ====================
+
+        /// <summary>物品使用效果编译单出口（UseItemExecutor 手动打出 / UseHandItem 原子嵌套饮用共用）：
+        /// 目标=饮用者经 ResolveCastTargets 解析（Target/Caster 同指饮用者；AllAllies=将来群体物品
+        /// 自然生效）；物品原子约定 trigger=OnCast、paramKey=None（物品数值=value 直读/描述文本域，
+        /// 与技能参数表分离——paramKey≠None 的原子 Warn 跳过防误读技能参数表；UseHandItem 原子
+        /// Warn 跳过防嵌套饮用递归）；施法者=饮用者（Heal 基准换算/治疗效率乘区按饮用者口径）。</summary>
+        internal static void CompileItemUse(BattleSimState sim, string playerId, Unit drinker,
+            BattleSnapshot snapshot, ItemConfig.ItemData itemData, List<BattleEffect> effects)
+        {
+            if (itemData == null || !itemData.HasEffects) return;
+            if (drinker == null || !sim.TryGetUnitId(drinker, out var drinkerId)) return;
+            var drinkerState = SkillHitResolver.FindUnitState(snapshot, drinkerId);
+            if (drinkerState == null) return;
+            // 合成使用行动（施法者=饮用者；playerId=物品归属玩家——UseHandItem 嵌套链随施放行动者）
+            var useAction = new ActionData { playerId = playerId, unitId = drinkerId };
+            foreach (var atom in itemData.effects)
+            {
+                if (atom == null || atom.trigger != SkillEffectTrigger.OnCast) continue;
+                if (atom.paramKey != SkillParamKey.None)
+                {
+                    GICLog.Warn($"[EffectCompiler] 物品 {itemData.itemID} 原子配了 paramKey={atom.paramKey}——" +
+                                $"物品数值走 value 直读（技能参数表键不适用物品），跳过该原子");
+                    continue;
+                }
+                if (atom.kind == SkillEffectKind.UseHandItem)
+                {
+                    GICLog.Warn($"[EffectCompiler] 物品 {itemData.itemID} 效果配了 UseHandItem——" +
+                                $"嵌套饮用无语义（防递归），跳过该原子");
+                    continue;
+                }
+                foreach (var target in ResolveCastTargets(atom, useAction, snapshot, sim, drinkerState, drinkerState))
+                    CompileAtom(sim, useAction, snapshot, null, atom, target.unitId, drinkerState,
+                        0, 0, BattleCell.zero, 0f, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
+            }
+        }
+
         // ==================== 判定轨编译（发射声明/整线段） ====================
 
         /// <summary>判定轨→产出声明：LineProjectile=逐发 ProjectileEffect（ProjectileResolver 求交）；
@@ -434,8 +471,10 @@ namespace GIC.Battle
             if (targetState == null) return false; // 快照中不存在（瞬发读片初状态）
 
             // 作用条件（B-3 ② 单点收口——OnCast 指向/OnHit 命中/施法者分支全过此闸）：
-            // 按目标存活态过滤（复苏/增益分支分叉声明）；None=无条件（存量原子零行为变化）
-            if (!PassesCondition(atom, targetState)) return false;
+            // 按目标存活态过滤（复苏/增益分支分叉声明）/ tag 条件（TargetHasTag/TargetNotHasTag——
+            // 目标 UnitTag 载荷过滤，首个消费方=蒲公英酒「酒鬼角色不减少理智」）；
+            // None=无条件（存量原子零行为变化）
+            if (!PassesCondition(atom, targetState, target)) return false;
 
             switch (atom.kind)
             {
@@ -502,8 +541,9 @@ namespace GIC.Battle
                     // 决策七十六复测返修〕）
                     var resolvedBuffType = atom.buffAsset != null ? atom.buffAsset.buffType : atom.buffType;
                     string buffKey = atom.buffAsset != null ? atom.buffAsset.name : null;
+                    int sourceSkillId = skillData != null ? (int)skillData.skillID : 0; // 物品原子（skillData=null）来源=0 无技能
                     effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, (int)resolvedBuffType, 1,
-                        buffValue, stackLimit, duration, (int)skillData.skillID, buffKey)
+                        buffValue, stackLimit, duration, sourceSkillId, buffKey)
                     {
                         HitSeconds = hitSeconds,
                     });
@@ -604,6 +644,36 @@ namespace GIC.Battle
                     break;
                 }
 
+                case SkillEffectKind.SanityChange:
+                {
+                    // 理智原子（2026-10-16 首个可打出物品批）：paramKey=None 时 value 直读（负=减少）；
+                    // 产出 SanityEffect 单效应（应用层 ApplySanity 钳 -300~300 + StatChange(StatKindSanity)
+                    // 命令链=歌声之环批既有链零新协议）；物品/技能/Buff 通用
+                    int delta = atom.paramKey != SkillParamKey.None && skillData != null
+                        ? skillData.GetInt(atom.paramKey) : atom.value;
+                    effects.Add(new SanityEffect(targetUnitId, delta) { HitSeconds = hitSeconds });
+                    break;
+                }
+
+                case SkillEffectKind.UseHandItem:
+                {
+                    // 使用手牌物品（2026-10-16 首个可打出物品批）：施放者玩家手牌持有 subType 子类型物品
+                    // 则消耗 1 个并结算其效果（目标=本原子目标=饮用者）；无持有=空产出不阻断其他原子
+                    //（「如果持有」条件语义——首个消费方=凯亚变奏冷血之剑「持有饮品会饮用1瓶」）。
+                    // 消耗走 AnyItem 模式 ItemConsumeEffect（手牌列表序确定性扣减+客户端逐条镜像，
+                    // 与 ResourceGate.Charge 同源效应）；物品效果编译=CompileItemUse 单出口（防递归：
+                    // 物品效果原子不接 UseHandItem——嵌套饮用无语义，Warn 跳过）
+                    var entries = ResourceGate.CollectAnyItems(sim, action.playerId, atom.subType);
+                    if (entries.Count == 0) break; // 未持有=空产出（条件原子语义，非阻断）
+                    var itemName = entries[0].item; // 手牌列表序首个（确定性，零随机）
+                    effects.Add(new ItemConsumeEffect(action.playerId, atom.subType, 1));
+                    var itemConfig = Wargame.Instance?.Context?.Get<ItemConfig>();
+                    var itemData = itemConfig?.GetItemData(itemName);
+                    if (itemData != null && itemData.HasEffects)
+                        CompileItemUse(sim, action.playerId, target, snapshot, itemData, effects);
+                    break;
+                }
+
                 default:
                     // 2026-09-27 复审修复（对齐 BattleEffectCommandAudit 哲学）：未接编译的原子 kind
                     // 此前静默 no-op——新 kind 忘接编译器/配置误填=效果无声丢失，Warn 暴露
@@ -615,15 +685,29 @@ namespace GIC.Battle
         }
 
         /// <summary>效果原子作用条件（B-3 ②，docs/11「IfCorpse 条件原子」）：按目标存活态过滤——
-        /// TargetIsCorpse/TargetIsAlive（复苏与增益分支同技能分叉声明）；None=无条件。</summary>
-        private static bool PassesCondition(SkillEffectConfig atom, UnitState targetState)
+        /// TargetIsCorpse/TargetIsAlive（复苏与增益分支同技能分叉声明）；tag 条件（2026-10-16 首个可
+        /// 打出物品批）TargetHasTag/TargetNotHasTag=目标 UnitTag 载荷过滤（UnitTag 的首个效果条件
+        /// 消费——此前 tags 运行时唯一逻辑消费=Core 核心判定）；None=无条件。</summary>
+        private static bool PassesCondition(SkillEffectConfig atom, UnitState targetState, Unit target)
         {
             switch (atom.condition)
             {
                 case SkillEffectCondition.TargetIsCorpse: return targetState.isCorpse != 0;
                 case SkillEffectCondition.TargetIsAlive: return targetState.isCorpse == 0;
+                case SkillEffectCondition.TargetHasTag: return HasTag(target, atom.requiredTag);
+                case SkillEffectCondition.TargetNotHasTag: return !HasTag(target, atom.requiredTag);
                 default: return true;
             }
+        }
+
+        /// <summary>目标单位 tag 判定（tag 条件原子用）：requiredTag=None=恒过（载荷缺配置防御）；
+        /// 无 RawData/无 tags=不含（协议核心等代码生成单位天然不过 HasTag 档）</summary>
+        private static bool HasTag(Unit unit, UnitTag tag)
+        {
+            if (tag == UnitTag.None) return true;
+            var tags = unit?.RawData?.tags;
+            if (tags == null) return false;
+            return System.Array.IndexOf(tags, tag) >= 0;
         }
 
         /// <summary>治疗量换算（docs/20 §5.1 基准纪律）：Fixed=value、BasedOnMaxHealth=百分比×**施法者**
@@ -709,7 +793,7 @@ namespace GIC.Battle
 
         private static SkillParam FindParam(SkillConfig.SkillData skillData, SkillParamKey key)
         {
-            if (skillData.customParams == null || key == SkillParamKey.None) return null;
+            if (skillData == null || skillData.customParams == null || key == SkillParamKey.None) return null;
             foreach (var p in skillData.customParams)
                 if (p.key == key) return p;
             return null;

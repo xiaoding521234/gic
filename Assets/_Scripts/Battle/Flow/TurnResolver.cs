@@ -47,6 +47,18 @@ namespace GIC.Battle
                 if (_sim.AnyCoreDestroyed()) yield break; // 核心片末检查（协议核心批）：防御性同口径
             }
 
+            // 使用物品段（2026-10-16 首个可打出物品批）：玩家级行动（unitId 留空）不进攻速分桶——
+            // 先行摘出独立段结算（部署段之后：刚出战的单位当回合可被喂酒；首个消费方=蒲公英酒）
+            var useItems = actions.FindAll(a => a.actionType == ActionType.UseItem);
+            bool hasUseItemSegment = useItems.Count > 0;
+            if (hasUseItemSegment)
+            {
+                actions.RemoveAll(a => a.actionType == ActionType.UseItem);
+                int useItemSlice = hasDeploySegment ? 1 : 0; // 紧随部署段占号
+                yield return PushSegmentAndWaitAck(ResolveUseItemSegment(turnNumber, useItemSlice, useItems));
+                if (_sim.AnyCoreDestroyed()) yield break; // 防御性同口径（物品效果理论上可含伤害）
+            }
+
             // 玩家级 Pass（空 unitId：超时自动空过/AI 无单位 Pass）无单位归属——分桶前静默剔除，
             // 勿落进 BucketByAttackSpeed 的「行动引用了不存在的单位」Warn（2026-09-25 审查 S4）
             actions.RemoveAll(a => a.actionType == ActionType.Pass && string.IsNullOrEmpty(a.unitId));
@@ -63,7 +75,7 @@ namespace GIC.Battle
             // 分区间成行，HUD 侧归组——Host 仍按精确攻速分片结算，两套分组互不干扰）
             SendTurnPlan(turnNumber, actions);
 
-            int sliceIndex = hasDeploySegment ? 1 : 0; // 部署段占 0 号（ack 键 turn:slice 唯一性）
+            int sliceIndex = (hasDeploySegment ? 1 : 0) + (hasUseItemSegment ? 1 : 0); // 部署/使用物品段占前置号（ack 键 turn:slice 唯一性）
             foreach (var bucket in buckets)
             {
                 var segment = ResolveSlice(turnNumber, sliceIndex, bucket.speed, maxSpeed, bucket.actions);
@@ -239,6 +251,46 @@ namespace GIC.Battle
             }
 
             GICLog.Info($"[TurnResolver] 部署段 {segment}");
+            return segment;
+        }
+
+        /// <summary>
+        /// 使用物品段（2026-10-16 首个可打出物品批）：回合前部署段之后的玩家级即时段——不进攻速
+        /// 分桶（UseItem 无单位归属，同部署段口径）。快照→逐行动校验+效果编译（UseItemExecutor：
+        /// 手牌持有/目标我方存活/消耗 1 张）→效应统一应用→死亡判定→命令发射（Heal/
+        /// StatChange(Sanity)/ItemConsume 命令全链复用既有协议，零新命令类型）。
+        /// 凯亚变奏嵌套饮用（UseHandItem 原子）走 SkillExecutor 效应链，不经本段。
+        /// </summary>
+        private Segment ResolveUseItemSegment(int turnNumber, int sliceIndex, List<ActionData> useItems)
+        {
+            var segment = new Segment
+            {
+                turnNumber = turnNumber,
+                sliceIndex = sliceIndex,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
+                insertedInstantAction = 0,
+            };
+
+            var snapshot = _sim.TakeSnapshot(turnNumber);
+            var effects = new List<BattleEffect>();
+            foreach (var action in useItems)
+            {
+                // 校验失败（无配置/无手牌/目标无效）=零效果零消耗，不影响同段其他玩家的使用
+                UseItemExecutor.TryResolve(_sim, action, snapshot, effects);
+            }
+
+            // 效应统一应用（治疗/理智/物品消耗——ItemConsumeEffect 应用=手牌扣减+Consumed 明细）+ 碎裂记录
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = ApplyEffects(effects, shatters);
+            var damagedUnits = CollectDamagedTargets(effects);
+            var newlyDead = _sim.ResolveDeaths(damagedUnits);
+
+            EmitSliceCommands($"回合{turnNumber}片{sliceIndex}", segment, sliceIndex,
+                effects, appliedBuffs, movers: null, vanishes: null, newlyDead, expired: null, skillCasts: null,
+                shattered: shatters);
+
+            GICLog.Info($"[TurnResolver] 使用物品段 {segment}");
             return segment;
         }
 

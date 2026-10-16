@@ -330,6 +330,11 @@ namespace GIC.Battle
     {
         public int Delta;
 
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即）——全库 WYSIWYG 命中时刻语义对齐
+        ///（2026-10-16 首个可打出物品批随 SanityChange 原子补字段：物品使用/OnCast 恒 0 立即；
+        /// 预留 OnHit 理智类原子的到点应用——命令层 StatChange(Sanity) 暂不带时刻=快照自愈）</summary>
+        public float HitSeconds;
+
         public SanityEffect(string targetUnitId, int delta)
         {
             TargetUnitId = targetUnitId;

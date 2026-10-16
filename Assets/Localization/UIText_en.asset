@@ -1012,7 +1012,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12030
-    m_Localized: Item card use will be added in a later update
+    m_Localized: This item cannot be used
     m_Metadata:
       m_Items: []
   - m_Id: 12031
@@ -1203,6 +1203,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 12038
     m_Localized: Superconduct
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12039
+    m_Localized: Choose an allied unit to drink this item
     m_Metadata:
       m_Items: []
   references:
