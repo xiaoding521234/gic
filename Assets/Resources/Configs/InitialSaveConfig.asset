@@ -81,9 +81,55 @@ MonoBehaviour:
     count: 10
     decks: 
   devTestItems:
-  - item: 1002
+  - item: 1001
+    count: 10
+  - item: 1003
     count: 10
   - item: 1004
+    count: 10
+  - item: 1005
+    count: 10
+  - item: 1006
+    count: 10
+  - item: 2001
+    count: 10
+  - item: 2002
+    count: 10
+  - item: 2003
+    count: 10
+  - item: 3001
+    count: 10
+  - item: 4001
+    count: 10
+  - item: 4002
+    count: 10
+  - item: 4003
+    count: 10
+  - item: 4004
+    count: 10
+  - item: 4005
+    count: 10
+  - item: 5001
+    count: 10
+  - item: 5002
+    count: 10
+  - item: 6001
+    count: 10
+  - item: 6002
+    count: 10
+  - item: 6003
+    count: 10
+  - item: 6004
+    count: 10
+  - item: 6005
+    count: 10
+  - item: 6006
+    count: 10
+  - item: 6007
+    count: 10
+  - item: 7001
+    count: 10
+  - item: 7002
     count: 10
   defaultDeck: 0
   initialDeckNames:
