@@ -74,6 +74,9 @@ namespace GIC.Data
         [InspectorName("技能标签表")]
         SkillTag = 22,
 
+        [InspectorName("物品效果描述表")]
+        ItemEffectDescription = 23,
+
     }
 }
 

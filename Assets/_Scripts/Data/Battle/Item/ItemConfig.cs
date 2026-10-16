@@ -106,6 +106,17 @@ namespace GIC.Data
             }
 
             /// <summary>
+            /// 获取物品效果描述的 Entry（用于 TextCombiner；2026-10-16 分表重构批——风味/效果分表，
+            /// 对齐单位系统「UnitDescription 纯风味/效果在技能描述表」的分表惯例；效果行·\n 分行+
+            /// {Key} 占位符渲染由消费方走 SkillDescriptionBuilder.BuildItem）
+            /// </summary>
+            public TextEntry GetEffectDescriptionEntry()
+            {
+                var localizedString = new LocalizedString(TableName.ItemEffectDescription.ToString(), itemID.ToString());
+                return new TextEntry(localizedString, "");
+            }
+
+            /// <summary>
             /// 获取物品子类型的 Entry（用于 TextCombiner）
             /// </summary>
             public TextEntry GetCategoryEntry()

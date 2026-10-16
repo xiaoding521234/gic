@@ -98,15 +98,22 @@ namespace GIC.UI
             maxPrepareCount.AddStaticEntry("：");
             maxPrepareCount.AddStaticEntry(raw.maxPrepareCount.ToString());
 
-            // 描述（2026-10-16 首个可打出物品批·描述对齐返修：{Key} 占位符渲染——customParams
-            // 单源、技能描述同模式（SkillDescriptionBuilder.BuildItem）；表未加载/无模板=回落
-            // 本地化异步链兜底）
+            // 描述（2026-10-16 分表重构批：风味 ItemDescription+效果 ItemEffectDescription 两段渲染
+            // ——对齐单位系统「UnitDescription 纯风味/效果在技能描述表」的分表惯例；效果段走 {Key}
+            // 占位符渲染（customParams 单源、技能描述同模式 SkillDescriptionBuilder.BuildItem）；
+            // 无效果条目（素材卡）=只显示风味；表未加载=回落本地化异步链）
             _description.ClearAllEntries();
-            var template = GetItemDescriptionTemplate(raw);
-            if (template == null)
+            var flavorTemplate = GetItemTableTemplate(TableName.ItemDescription, raw);
+            if (flavorTemplate == null)
                 _description.AddEntry(raw.GetDescriptionEntry());
             else
-                _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(template, raw.customParams));
+                _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(flavorTemplate, raw.customParams));
+            var effectTemplate = GetItemTableTemplate(TableName.ItemEffectDescription, raw);
+            if (effectTemplate != null)
+            {
+                _description.AddStaticEntry("\n\n"); // 空行分隔（风味/效果）
+                _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(effectTemplate, raw.customParams));
+            }
 
             // 使用按钮（只读模式下隐藏）
             if (isReadOnly)
@@ -119,12 +126,13 @@ namespace GIC.UI
                 SetUsable(null, null);
         }
 
-        /// <summary>物品描述模板同步读取（当前语言；表未加载/无条目=null——调用方回落本地化异步链）</summary>
-        private string GetItemDescriptionTemplate(ItemConfig.ItemData raw)
+        /// <summary>物品描述表模板同步读取（当前语言；表未加载/无条目=null——调用方回落本地化异步链；
+        /// 分表重构批泛化：ItemDescription=风味段 / ItemEffectDescription=效果段，两表共用单出口）</summary>
+        private string GetItemTableTemplate(TableName table, ItemConfig.ItemData raw)
         {
-            var table = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
-                .GetTable(TableName.ItemDescription.ToString());
-            return table?.GetEntry(raw.itemID.ToString())?.Value;
+            var stringTable = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(table.ToString());
+            return stringTable?.GetEntry(raw.itemID.ToString())?.Value;
         }
 
         public void SetActive(bool active)

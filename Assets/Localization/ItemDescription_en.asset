@@ -60,7 +60,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 5001
-    m_Localized: "Mondstadt's signature vintage, brewed from dandelion seeds with a refreshing aroma.\n\n\xB7Drink to lose {SanityCost} Sanity and restore {HealAmount} HP\n\xB7Drunkard units do not lose Sanity"
+    m_Localized: "Mondstadt's signature vintage, brewed from dandelion seeds with a refreshing aroma."
     m_Metadata:
       m_Items: []
   - m_Id: 5002
