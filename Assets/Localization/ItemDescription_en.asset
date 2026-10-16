@@ -60,8 +60,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 5001
-    m_Localized: Mondstadt's signature vintage, brewed from dandelion seeds with
-      a refreshing aroma.
+    m_Localized: "Mondstadt's signature vintage, brewed from dandelion seeds with a refreshing aroma.\n\n\xB7Drink to lose {SanityCost} Sanity and restore {HealAmount} HP\n\xB7Drunkard units do not lose Sanity"
     m_Metadata:
       m_Items: []
   - m_Id: 5002
@@ -147,10 +146,6 @@ MonoBehaviour:
   - m_Id: 1004
     m_Localized: A seed that lights up the night. No matter the distance apart, guided
       by the stone's glimmer, the fated will meet under the stars.
-    m_Metadata:
-      m_Items: []
-  - m_Id: 5001
-    m_Localized: "\xB7Drink to lose {SanityCost} Sanity and restore {HealAmount} HP\n\xB7Drunkard units do not lose Sanity"
     m_Metadata:
       m_Items: []
   references:
