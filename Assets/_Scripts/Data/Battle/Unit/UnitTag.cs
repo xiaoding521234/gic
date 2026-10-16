@@ -77,6 +77,9 @@ namespace GIC.Data
 
         [InspectorName("推力")]
         Push = 3009,
+
+        [InspectorName("先锋")]
+        Vanguard = 3010,
         #endregion
 
         #region featureSpec
@@ -127,6 +130,11 @@ namespace GIC.Data
 
         [InspectorName("专家")]
         DifficultyExpert = 6005,
+        #endregion
+
+        #region characterTrait
+        [InspectorName("酒鬼")]
+        Drunkard = 8001,
         #endregion
     }
 

@@ -190,6 +190,14 @@ MonoBehaviour:
     m_Localized: Core
     m_Metadata:
       m_Items: []
+  - m_Id: 3010
+    m_Localized: Vanguard
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8001
+    m_Localized: Drunkard
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

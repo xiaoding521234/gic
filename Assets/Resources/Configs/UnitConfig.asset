@@ -545,7 +545,7 @@ MonoBehaviour:
     selfElement: 5
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u8FF7\u96FE\u89C6\u91CE": -64
-    tags: 71170000eb030000be0b000089130000
+    tags: 71170000eb030000c20b000089130000411f0000
     skills:
     - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
     - {fileID: 11400000, guid: 11730c209a3be904d9511af87b531a45, type: 2}
@@ -972,7 +972,7 @@ MonoBehaviour:
     selfElement: 3
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u8FF7\u96FE\u89C6\u91CE": -64
-    tags: 
+    tags: 411f0000
     skills:
     - {fileID: 11400000, guid: 8eaea0381581b5948b39b95386f6cc6d, type: 2}
     - {fileID: 11400000, guid: b5c65a7a11938d84db1bccf6aa23573b, type: 2}
