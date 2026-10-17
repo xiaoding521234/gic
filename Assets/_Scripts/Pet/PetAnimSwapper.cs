@@ -49,7 +49,7 @@ namespace GIC.Pet
         [SerializeField, InspectorName("情绪控制器")] private PetEmotionController emotionCtrl; // 情绪层（可空=无表情）
 
         [Header("过渡")]
-        [Tooltip("动作切换过渡时长（秒）——惯性化模式=偏移衰减时长；CrossFade 兜底模式=线性混合窗口（过渡期双 clip 双采样，过长则混合开销放大顿挫）")]
+        [Tooltip("动作切换过渡时长（秒）——惯性化模式=偏移衰减时长；CrossFade（尾段混合/兜底模式）=线性混合窗口（过渡期双 clip 双采样，过长则混合开销放大顿挫）")]
         [InspectorName("动作过渡秒")]
         [SerializeField] private float animTransitionSec = 0.3f;
         [Tooltip("惯性化层（Gears of War 4 式切换：硬切+当前姿势/速度 C2 衰减归零）。空/禁用=回退 CrossFade 线性混合")]
@@ -91,13 +91,22 @@ namespace GIC.Pet
 
         public void Play(string clipName)
         {
-            play(clipName, WrapMode.Loop);
+            play(clipName, WrapMode.Loop, false);
         }
 
         /// <summary>单次播放（播完停住，回什么由调用方决定）——行为层打招呼/随机小动作用</summary>
         public void PlayOnce(string clipName)
         {
-            play(clipName, WrapMode.Once);
+            play(clipName, WrapMode.Once, false);
+        }
+
+        /// <summary>预知切换（尾段混合，2026-10-17 拍板「预知下一个动作是什么时，就采用尾段混合」）：
+        /// 已知下一个动作、且上一动作近自然结尾时（行为层在剩余≈过渡秒时调用）——CrossFade 混合窗口
+        /// 与上一动作尾部重叠，收尾在混合中完成。随机打断（拖拽/反应/UI 按钮）不走此路，
+        /// 仍走 Play/PlayOnce=硬切+惯性化（打断点不可预知，惯性化任意切点无缝）。</summary>
+        public void PlayBlended(string clipName)
+        {
+            play(clipName, WrapMode.Loop, true);
         }
 
         /// <summary>clip 是否正在播放（单次动作结束判定用）</summary>
@@ -117,8 +126,9 @@ namespace GIC.Pet
         /// <summary>当前过渡时长（行为层尾段提前过渡用）</summary>
         public float TransitionSeconds => animTransitionSec;
 
-        /// <summary>惯性化路径是否激活（行为层据此关闭尾段截尾——惯性化下速度承接使任意切点
-        /// 无缝，动作播到自然结尾再切保留作者收尾，截尾反而丢动作且 0.6s 窗口下截断明显）</summary>
+        /// <summary>惯性化路径是否激活（诊断/A-B 检查用）。切换方式已由调用方显式声明：
+        /// PlayBlended=尾段混合（预知下一动作）；Play/PlayOnce=硬切+惯性化（惯性化关=CrossFade 兜底）。
+        /// 2026-10-17 前「行为层据此关闭尾段截尾」的分工已被尾段混合拍板取代，行为层不再消费此属性。</summary>
         public bool IsInertializationOn => inertializer != null && inertializer.IsInertializationOn;
 
         /// <summary>单次动作剩余秒数（-1=未注册/未播；0=已播完）。行为层在剩余≈过渡秒时
@@ -132,7 +142,7 @@ namespace GIC.Pet
             return Mathf.Max(0f, state.clip.length - state.time);
         }
 
-        void play(string clipName, WrapMode loopMode)
+        void play(string clipName, WrapMode loopMode, bool blend)
         {
             if (targetAnimation == null) return;
             var state = targetAnimation[clipName];
@@ -141,7 +151,14 @@ namespace GIC.Pet
             if (PetMode.Enabled) // 切换诊断只在桌宠进程打（2026-08-28：游戏内派蒙形态下同一组件跑在主游戏进程，每次切换刷主游戏控制台）
                 Debug.Log($"[PetAnim] 切换 {_lastPlayedName} → {clipName}"); // 切换诊断（2026-08-27，与 PetInertia 捕获行对齐）
             _lastPlayedName = clipName;
-            if (inertializer != null && inertializer.IsInertializationOn)
+            if (blend)
+            {
+                // 尾段混合（2026-10-17 拍板「预知下一个动作时采用尾段混合」）：CrossFade 线性混合与
+                // 上一动作尾部重叠，收尾帧在混合中淡出——不触发惯性化（惯性化层维持被动跟踪，
+                // 混合中若被随机打断，Trigger 从混合姿态重捕获仍无缝）
+                targetAnimation.CrossFade(clipName, animTransitionSec);
+            }
+            else if (inertializer != null && inertializer.IsInertializationOn)
             {
                 // 惯性化切换（2026-08-27，GoW4 技术）：硬切新 clip——单 clip 求值无双采样开销，
                 // 姿态连续性由惯性化层后处理保证（当前姿势+速度 C2 连续衰减归零，

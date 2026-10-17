@@ -323,25 +323,27 @@ namespace GIC.Pet
             return null;
         }
 
-        /// <summary>单次动作收尾帧：播完（或 CrossFade 路径的尾段提前过渡）→ 解除静默/烘焙暂停，
-        /// 回当前待机动作。</summary>
+        /// <summary>单次动作收尾帧：尾段混合回待机（或播完硬切兜底）→ 解除静默/烘焙暂停，回当前待机动作。</summary>
         void oneShotFrame()
         {
             if (Time.time - _oneShotStart > 0.25f)
             {
                 bool finished = !animPlayer.IsPlaying(_currentOneShotName);
-                // 尾段提前过渡（2026-08-25）：仅 CrossFade 路径需要（消除"播完定格→再淡入"）。
-                // 惯性化路径（2026-08-27）不截尾：速度承接使任意切点无缝，完整播完保留作者收尾
-                //（0.6s 过渡下截尾窗口 0.54s，截断动作会读成"没收尾就切走"）。
                 float rem = animPlayer.RemainingSeconds(_currentOneShotName);
-                bool tailBlend = !animPlayer.IsInertializationOn && !finished && !_ceremonySilent && rem > 0f && rem <= animPlayer.TransitionSeconds * 0.9f;
+                // 尾段混合（2026-10-17 拍板「预知下一个动作是什么时，就采用尾段混合」）：单次动作→待机是
+                // 唯一预知下一动作的切点——剩余≈过渡秒时提前切，CrossFade 混合窗口与动作尾部重叠
+                // （消除"播完定格→再淡入"；取代 2026-08-27「惯性化路径不截尾」口径）。
+                // 随机打断（拖拽/反应/UI 按钮）不经此路径，仍硬切+惯性化。仪式动作（出场）不混合——
+                // 落定拍点不被待机稀释（2026-08-25 先例保留），完整播完走 finished 分支。
+                bool tailBlend = !finished && !_ceremonySilent && rem > 0f && rem <= animPlayer.TransitionSeconds * 0.9f;
                 if (finished || tailBlend)
                 {
                     _oneShotPlaying = false;
                     if (_ceremonySilent) setCeremonySilent(false); // 仪式（出场）静默解除；普通单次动作本来就没静默视线
                     else blinkCtrl?.SetSilence(false);
                     host.PauseHitBaking = false;
-                    animPlayer.Play(currentIdleAnim);
+                    if (tailBlend) animPlayer.PlayBlended(currentIdleAnim); // 预知切点：尾段混合（2026-10-17）
+                    else animPlayer.Play(currentIdleAnim); // 播完/仪式：硬切+惯性化
                     _idleProtectUntil = Time.time + idleProtectSec; // 回待机保护起表：反应播完的下一帧随机小动作不得立即抢切（双切换竞速=播完抽搐，见 回待机保护秒 注释）
                 }
             }
