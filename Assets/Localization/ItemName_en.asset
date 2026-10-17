@@ -126,6 +126,10 @@ MonoBehaviour:
     m_Localized: Acquaint Fate
     m_Metadata:
       m_Items: []
+  - m_Id: 1007
+    m_Localized: Genesis Crystal
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

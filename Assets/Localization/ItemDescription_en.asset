@@ -60,7 +60,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 5001
-    m_Localized: "Mondstadt's signature vintage, brewed from dandelion seeds with a refreshing aroma."
+    m_Localized: Mondstadt's signature vintage, brewed from dandelion seeds with
+      a refreshing aroma.
     m_Metadata:
       m_Items: []
   - m_Id: 5002
@@ -146,6 +147,11 @@ MonoBehaviour:
   - m_Id: 1004
     m_Localized: A seed that lights up the night. No matter the distance apart, guided
       by the stone's glimmer, the fated will meet under the stars.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1007
+    m_Localized: A primordial crystal condensed from the power of creation, holding
+      infinite possibilities beyond this world. Can be exchanged for Primogems.
     m_Metadata:
       m_Items: []
   references:

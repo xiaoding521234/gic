@@ -19,6 +19,26 @@ MonoBehaviour:
     m_Key: DandelionWine
     m_Metadata:
       m_Items: []
+  - m_Id: 4001
+    m_Key: Apple
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Key: RawMeat
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Key: Egg
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Key: Wheat
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Key: Radish
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

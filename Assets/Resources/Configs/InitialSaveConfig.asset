@@ -131,6 +131,8 @@ MonoBehaviour:
     count: 10
   - item: 7002
     count: 10
+  - item: 1007
+    count: 10
   defaultDeck: 0
   initialDeckNames:
   - deckId: 0

@@ -19,7 +19,28 @@ MonoBehaviour:
     m_Items: []
   m_TableData:
   - m_Id: 5001
-    m_Localized: "\xB7Drink to lose {SanityCost} Sanity and restore {HealAmount} HP\n\xB7Drunkard units do not lose Sanity"
+    m_Localized: "\xB7Drink to lose {SanityCost} Sanity and restore {HealAmount}
+      HP\n\xB7Drunkard units do not lose Sanity"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Localized: "\xB7Eat to restore {HealAmount} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Localized: "\xB7Eat to lose {SanityCost} Sanity and restore {HealAmount} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Localized: "\xB7Eat to lose {SanityCost} Sanity and restore {HealAmount} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Localized: "\xB7Eat to restore {HealAmount} HP"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Localized: "\xB7Eat to restore {HealAmount} HP"
     m_Metadata:
       m_Items: []
   references:

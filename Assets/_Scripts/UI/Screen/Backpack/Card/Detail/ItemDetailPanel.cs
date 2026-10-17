@@ -102,18 +102,23 @@ namespace GIC.UI
             // ——对齐单位系统「UnitDescription 纯风味/效果在技能描述表」的分表惯例；效果段走 {Key}
             // 占位符渲染（customParams 单源、技能描述同模式 SkillDescriptionBuilder.BuildItem）；
             // 无效果条目（素材卡）=只显示风味；表未加载=回落本地化异步链）
+            // 2026-10-17 拍板「效果描述在前」：效果段先渲染、风味段在后。
             _description.ClearAllEntries();
+            var effectTemplate = GetItemTableTemplate(TableName.ItemEffectDescription, raw);
             var flavorTemplate = GetItemTableTemplate(TableName.ItemDescription, raw);
-            if (flavorTemplate == null)
+            if (effectTemplate != null)
+            {
+                _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(effectTemplate, raw.customParams));
+                _description.AddStaticEntry("\n\n"); // 空行分隔（效果/风味）
+                if (flavorTemplate != null)
+                    _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(flavorTemplate, raw.customParams));
+                else
+                    _description.AddEntry(raw.GetDescriptionEntry());
+            }
+            else if (flavorTemplate == null)
                 _description.AddEntry(raw.GetDescriptionEntry());
             else
                 _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(flavorTemplate, raw.customParams));
-            var effectTemplate = GetItemTableTemplate(TableName.ItemEffectDescription, raw);
-            if (effectTemplate != null)
-            {
-                _description.AddStaticEntry("\n\n"); // 空行分隔（风味/效果）
-                _description.AddStaticEntry(SkillDescriptionBuilder.BuildItem(effectTemplate, raw.customParams));
-            }
 
             // 使用按钮（只读模式下隐藏）
             if (isReadOnly)

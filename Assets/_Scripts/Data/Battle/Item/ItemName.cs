@@ -33,6 +33,9 @@ namespace GIC.Data
         [InspectorName("星辉")]
         Starglitter = 1006,
 
+        [InspectorName("创世结晶")]
+        GenesisCrystal = 1007,
+
         #endregion
 
         #region weapon

@@ -19,7 +19,27 @@ MonoBehaviour:
     m_Items: []
   m_TableData:
   - m_Id: 5001
-    m_Localized: "\xB7\u98F2\u7528\u5F8E\uFF0C\u6E1B\u5C11{SanityCost}\u9EDE\u7406\u667A\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\n\xB7\u9152\u9B3C\u89D2\u8272\u4E0D\u6E1B\u5C11\u7406\u667A"
+    m_Localized: "\xB7\u98F2\u7528\u5F8C\uFF0C\u6E1B\u5C11{SanityCost}\u9EDE\u7406\u667A\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C\n\xB7\u9152\u9B3C\u89D2\u8272\u4E0D\u6E1B\u5C11\u7406\u667A"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4001
+    m_Localized: "\xB7\u98DF\u7528\u5F8C\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4002
+    m_Localized: "\xB7\u98DF\u7528\u5F8C\uFF0C\u6E1B\u5C11{SanityCost}\u9EDE\u7406\u667A\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4003
+    m_Localized: "\xB7\u98DF\u7528\u5F8C\uFF0C\u6E1B\u5C11{SanityCost}\u9EDE\u7406\u667A\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4004
+    m_Localized: "\xB7\u98DF\u7528\u5F8C\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 4005
+    m_Localized: "\xB7\u98DF\u7528\u5F8C\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C"
     m_Metadata:
       m_Items: []
   references:

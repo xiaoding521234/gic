@@ -16,7 +16,7 @@ MonoBehaviour:
   - itemID: 1005
     icon:
     - {fileID: 21300000, guid: 62f43eb11ab365d4f8b5dc555ee7175d, type: 3}
-    starLevel: 5
+    starLevel: 4
     elements:
     - elementType: 8
       stacks: 1
@@ -27,6 +27,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects: []
   - itemID: 1002
     icon:
     - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
@@ -41,6 +42,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects: []
   - itemID: 1004
     icon:
     - {fileID: 21300000, guid: d32f1a0fe4e84f88969dc7cccae5122e, type: 3}
@@ -55,6 +57,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects: []
   - itemID: 1003
     icon:
     - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
@@ -69,6 +72,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects: []
   - itemID: 1006
     icon:
     - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
@@ -83,6 +87,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects: []
   - itemID: 1001
     icon:
     - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
@@ -97,6 +102,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 60
     customParams: []
+    effects: []
   - itemID: 3001
     icon:
     - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
@@ -111,6 +117,7 @@ MonoBehaviour:
     recycleAfterBattle: 1
     recycleLossCount: 0
     customParams: []
+    effects: []
   - itemID: 4001
     icon:
     - {fileID: 21300000, guid: 9af9caa073664874787b3310147653e9, type: 3}
@@ -124,7 +131,29 @@ MonoBehaviour:
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
-    customParams: []
+    customParams:
+    - key: HealAmount
+      displayName: "\u6CBB\u7597\u91CF"
+      value: 15
+    effects:
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      condition: 0
+      paramKey: 80
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
   - itemID: 4002
     icon:
     - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
@@ -138,7 +167,50 @@ MonoBehaviour:
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
-    customParams: []
+    customParams:
+    - key: SanityCost
+      displayName: "\u7406\u667A\u6D88\u8017"
+      value: 20
+    - key: HealAmount
+      displayName: "\u6CBB\u7597\u91CF"
+      value: 30
+    effects:
+    - trigger: 0
+      kind: 11
+      targetFilter: 0
+      condition: 0
+      paramKey: 79
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      condition: 0
+      paramKey: 80
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
   - itemID: 4003
     icon:
     - {fileID: 21300000, guid: 4f97dfa0394017848b683bb6d38591f9, type: 3}
@@ -152,7 +224,50 @@ MonoBehaviour:
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
-    customParams: []
+    customParams:
+    - key: SanityCost
+      displayName: "\u7406\u667A\u6D88\u8017"
+      value: 10
+    - key: HealAmount
+      displayName: "\u6CBB\u7597\u91CF"
+      value: 10
+    effects:
+    - trigger: 0
+      kind: 11
+      targetFilter: 0
+      condition: 0
+      paramKey: 79
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      condition: 0
+      paramKey: 80
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
   - itemID: 4004
     icon:
     - {fileID: 21300000, guid: 4eaca57f760d8864ab50b40d6d5d65bb, type: 3}
@@ -166,7 +281,29 @@ MonoBehaviour:
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
-    customParams: []
+    customParams:
+    - key: HealAmount
+      displayName: "\u6CBB\u7597\u91CF"
+      value: 5
+    effects:
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      condition: 0
+      paramKey: 80
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
   - itemID: 4005
     icon:
     - {fileID: 21300000, guid: 32d5c04fc5004494888bc64d1adceffe, type: 3}
@@ -180,7 +317,29 @@ MonoBehaviour:
     countPerServing: 1
     recycleAfterBattle: 1
     recycleLossCount: 0
-    customParams: []
+    customParams:
+    - key: HealAmount
+      displayName: "\u6CBB\u7597\u91CF"
+      value: 15
+    effects:
+    - trigger: 0
+      kind: 2
+      targetFilter: 0
+      condition: 0
+      paramKey: 80
+      paramKey2: 0
+      paramKey3: 0
+      radiusKey: 0
+      value: 0
+      element: 0
+      elementLayers: 1
+      buffType: 1
+      buffAsset: {fileID: 0}
+      targetSkillType: 7
+      statType: 0
+      minConstellation: 0
+      requiredTag: 0
+      subType: 5
   - itemID: 5001
     icon:
     - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
@@ -214,6 +373,7 @@ MonoBehaviour:
       radiusKey: 0
       value: 0
       element: 0
+      elementLayers: 1
       buffType: 1
       buffAsset: {fileID: 0}
       targetSkillType: 7
@@ -231,6 +391,7 @@ MonoBehaviour:
       radiusKey: 0
       value: 0
       element: 0
+      elementLayers: 1
       buffType: 1
       buffAsset: {fileID: 0}
       targetSkillType: 7
@@ -238,3 +399,18 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+  - itemID: 1007
+    icon:
+    - {fileID: 21300000, guid: 3b2b82954f2e9274486fbe4c689015a0, type: 3}
+    starLevel: 5
+    elements:
+    - elementType: 4
+      stacks: 1
+    subType: 0
+    maxStack: 99999
+    maxPrepareCount: 100
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams: []
+    effects: []

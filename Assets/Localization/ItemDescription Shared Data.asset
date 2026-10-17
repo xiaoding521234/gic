@@ -123,6 +123,10 @@ MonoBehaviour:
     m_Key: AcquaintFate
     m_Metadata:
       m_Items: []
+  - m_Id: 1007
+    m_Key: GenesisCrystal
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

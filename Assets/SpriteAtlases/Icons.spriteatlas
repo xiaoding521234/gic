@@ -62,6 +62,7 @@ SpriteAtlas:
     - 5ef5069407237b24ca3420f0fa7d98f7: 21300000
     - 09f633e4fc72fcd46878a839b79ee026: 21300000
     - d72ecd35e6924114b95f51402007f837: 21300000
+    - 3b2b82954f2e9274486fbe4c689015a0: 21300000
     - bcd88e26649e3fc4cbe3cbceac56cbb0: 21300000
     - d5775896f3014e047a7ad89f3b17b3fc: 21300000
     - a47534b6fe0888444b82db899e95683d: 21300000
@@ -122,6 +123,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 5ef5069407237b24ca3420f0fa7d98f7, type: 3}
   - {fileID: 21300000, guid: 09f633e4fc72fcd46878a839b79ee026, type: 3}
   - {fileID: 21300000, guid: d72ecd35e6924114b95f51402007f837, type: 3}
+  - {fileID: 21300000, guid: 3b2b82954f2e9274486fbe4c689015a0, type: 3}
   - {fileID: 21300000, guid: bcd88e26649e3fc4cbe3cbceac56cbb0, type: 3}
   - {fileID: 21300000, guid: d5775896f3014e047a7ad89f3b17b3fc, type: 3}
   - {fileID: 21300000, guid: a47534b6fe0888444b82db899e95683d, type: 3}
@@ -181,6 +183,7 @@ SpriteAtlas:
   - barbara_heartfelt_devotion
   - xingqiu_raindeep_gate
   - select
+  - genesis_crystal
   - sharpshooter
   - hilichurl_swing
   - teleport
