@@ -103,7 +103,7 @@ namespace GIC.Editor
                     .Append("，移速").Append(u.GetEffectiveMoveSpeed())
                     .Append("，元能").Append(u.GetEffectiveEnergy())
                     .Append("，攻击视野").Append(u.GetEffectiveAttackVision())
-                    .Append("，迷雾视野").Append(u.GetEffectiveFogVision())
+                    .Append("，探索视野").Append(u.GetEffectiveExploreVision())
                     .Append("。");
 
                 if (u.skills != null && u.skills.Count > 0)

@@ -71,6 +71,7 @@ namespace GIC.Data
         [InspectorName("非蒙德")] NotMondstadt = 3,       // 蒙德协奏规则（非蒙德目标分支）
         [InspectorName("我方全体")] AllAllies = 4,        // OnCast 群体：我方全部存活单位各编译一次（元气迸发）
         [InspectorName("施法者半径内我方")] CasterRadiusAllies = 5, // OnHit 群体：以施法者为中心 radiusKey 格内我方存活（水之浅唱治疗）
+        [InspectorName("施法者半径内敌方")] CasterRadiusEnemies = 6, // OnCast 群体：以施法者为中心 radiusKey 格内敌方存活各编译一次（安柏变奏「全面侦查」视野暴露，2026-10-17 追拍七）
     }
 
     /// <summary>

@@ -185,6 +185,11 @@ namespace GIC.Battle
             {
                 if (item.View == null || item.Go == null) continue; // view 被销毁时容错（正常路径 ClearAll 先行）
 
+                // 迷雾批（2026-10-17）：所在格未探索的敌方单位——头顶条整簇随立牌隐藏（条=屏幕空间件
+                // 不随渲染器禁用自隐；Go 纯 UI 对象 SetActive 安全，同值幂等直写）
+                if (item.Go.activeSelf == item.View.IsFogHidden)
+                    item.Go.SetActive(!item.View.IsFogHidden);
+
                 // 智能整体抬高（2026-10-07 拍板「下面加了 buff 图标后，应当智能整体抬高，避免遮挡到
                 // 角色立牌」）：有 Buff 图标时整簇上移「锚点以下悬垂深度」——图标底缘回到锚点（立牌顶）
                 // 即整簇悬空不压立牌；无 Buff 零位移。指数平滑（0.08s 时间常数）——Buff 出现/消失时

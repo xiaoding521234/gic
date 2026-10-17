@@ -47,6 +47,18 @@ namespace GIC.Battle
         [Tooltip("薄冰面板相对水面的高度余量（同波场同相位=恒定间隙不穿插）")]
         [SerializeField] private float 薄冰抬升 = 0.006f;
 
+        [Header("迷雾（2026-10-17 迷雾批，docs/active/44：对战=半透明雾面盖未探索格 / 任务=不透明混沌盖替换地形）")]
+        [Tooltip("对战迷雾色（半透明暗雾——RA2 式：地形完整可见，雾面只作「没去过」标记）")]
+        [SerializeField] private Color 对战迷雾色 = new Color(0.031f, 0.055f, 0.110f, 0.52f);
+        [Tooltip("雾面抬升（世界单位——雾面悬在地形视觉表面之上防 z-fight；水格视觉表面已含波峰带）")]
+        [SerializeField] private float 迷雾面抬升 = 0.012f;
+        [Tooltip("任务迷雾混沌盖顶面高度（盖体自 y=0 全包围真地块；顶面略高于地块顶 0.5）")]
+        [SerializeField] private float 混沌盖高 = 0.505f;
+        [Tooltip("混沌盖边界外扩（世界单位——盖侧越过格界盖住邻格地块侧面：防真地形缝隙泄露、避共面 z-fight）")]
+        [SerializeField] private float 混沌盖外扩 = 0.005f;
+        [Tooltip("任务迷雾混沌盖材质（null=运行时 Resources/UI/Battle/ChaosFog 贴图自建 Unlit 材质；再缺=深暗纯色兜底）")]
+        [SerializeField] private Material 混沌盖材质;
+
         public BattleMapData Map { get; private set; }
 
         /// <summary>地面格顶面高度（板面点击拾取的视差修正初判平面高度，docs/14 §86）</summary>
@@ -63,6 +75,15 @@ namespace GIC.Battle
         private GameObject _thinIceSurface;
         private Mesh _thinIceMesh;
         private Material _thinIceMaterial;
+
+        /// <summary>迷雾面/混沌盖运行时件（探索态变化重建、OnDestroy 释放，迷雾批 2026-10-17）</summary>
+        private GameObject _fogOverlayGo;
+        private Mesh _fogOverlayMesh;
+        private Material _fogOverlayMaterial; // 对战雾面（半透明实例）或混沌盖（贴图/纯色实例）
+        private static Texture2D _chaosFogTexture; // 混沌贴图静态缓存（Resources/UI/Battle/ChaosFog）
+
+        /// <summary>草簇装饰层引用（迷雾批：探索态过滤重建用——未探索格不生成草簇防草尖穿混沌盖）</summary>
+        private BattleGrassDecor _grassDecor;
 
         private void OnDestroy()
         {
@@ -125,6 +146,147 @@ namespace GIC.Battle
             RebuildThinIceSurface();
         }
 
+        // ==================== 迷雾（2026-10-17 迷雾批，docs/active/44） ====================
+
+        /// <summary>清迷雾面/混沌盖（探索满格=无雾；ClearAll/重建前调用）</summary>
+        public void ClearFogOverlay()
+        {
+            if (_fogOverlayGo != null) { Destroy(_fogOverlayGo); _fogOverlayGo = null; }
+            if (_fogOverlayMesh != null) { _runtimeMeshes.Remove(_fogOverlayMesh); Destroy(_fogOverlayMesh); _fogOverlayMesh = null; }
+        }
+
+        /// <summary>对战迷雾面重建（cells=未探索格）：合并单 Mesh 半透明暗雾，每格按**视觉表面高度**
+        /// +抬升（水/沼/薄冰格已含波峰带）——地形完整可见、雾面只作「没去过」标记（docs/03 §3.6
+        /// RA2 式）。虚空格不盖（对战迷雾下虚空豁口正常可见——拍板 D6）。层=-2：水面/冰面（-3）之上、
+        /// 底座盘（-1，仅出现在已探索格）之下。</summary>
+        public void RebuildSkirmishFog(List<BattleCell> cells)
+        {
+            ClearFogOverlay();
+            if (Map == null || cells == null || cells.Count == 0) return;
+
+            var verts = new List<Vector3>(cells.Count * 4);
+            var uvs = new List<Vector2>(cells.Count * 4);
+            var tris = new List<int>(cells.Count * 6);
+            float halfW = Map.width / 2f, halfH = Map.height / 2f;
+            foreach (var cell in cells)
+            {
+                if (!Map.HasTile(cell.x, cell.y)) continue; // 虚空格不盖
+                float h = GetVisualSurfaceHeight(cell) + 迷雾面抬升;
+                // 与水面同锚（角点=格界；a=(x0,z0) b=(x1,z0) c=(x1,z1) d=(x0,z1)，绕向法线朝上）
+                float x0 = cell.x - halfW, x1 = cell.x + 1f - halfW;
+                float z0 = cell.y - halfH, z1 = cell.y + 1f - halfH;
+                int a = verts.Count; verts.Add(new Vector3(x0, h, z0));
+                int b = verts.Count; verts.Add(new Vector3(x1, h, z0));
+                int c = verts.Count; verts.Add(new Vector3(x1, h, z1));
+                int d = verts.Count; verts.Add(new Vector3(x0, h, z1));
+                uvs.Add(new Vector2(0f, 0f)); uvs.Add(new Vector2(1f, 0f));
+                uvs.Add(new Vector2(1f, 1f)); uvs.Add(new Vector2(0f, 1f));
+                tris.AddRange(new[] { d, c, b, d, b, a });
+            }
+            if (verts.Count == 0) return;
+
+            if (_fogOverlayMaterial == null)
+                _fogOverlayMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(对战迷雾色);
+            else
+                _fogOverlayMaterial.color = 对战迷雾色; // Inspector 热改后重建沿用新值
+
+            _fogOverlayMesh = new Mesh { name = "BattleFogOverlay" };
+            _fogOverlayMesh.SetVertices(verts);
+            _fogOverlayMesh.SetUVs(0, uvs);
+            _fogOverlayMesh.SetTriangles(tris, 0);
+            _fogOverlayMesh.RecalculateBounds();
+            _runtimeMeshes.Add(_fogOverlayMesh);
+            _fogOverlayGo = new GameObject("FogOverlay");
+            _fogOverlayGo.transform.SetParent(_tilesRoot, false);
+            _fogOverlayGo.AddComponent<MeshFilter>().sharedMesh = _fogOverlayMesh;
+            var mr = _fogOverlayGo.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = _fogOverlayMaterial;
+            mr.sortingOrder = BattleMetrics.FogOverlaySortingOrder;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+        }
+
+        /// <summary>任务迷雾混沌盖重建（cells=未探索格，**含虚空格**——整片未知区域浑然一体不泄露
+        /// 地图轮廓，拍板 D6）：合并单 Mesh 不透明箱盖（顶+四侧，y 0→混沌盖高），边界外扩越过格界
+        /// ——真地块全部暴露面（顶/四侧/水面/薄冰）被罩住=地形类型零泄露；外扩同时避免与邻格地块
+        /// 侧面共面 z-fight（盖侧在邻侧面前 5mm 恒遮挡）。不透明+深度写=与透明件排序体系正交。
+        /// 每面独立 4 顶点（UV 0..1 全幅——侧面不与顶面共享顶点防贴图压扁）。</summary>
+        public void RebuildMissionFog(List<BattleCell> cells)
+        {
+            ClearFogOverlay();
+            if (Map == null || cells == null || cells.Count == 0) return;
+
+            var verts = new List<Vector3>(cells.Count * 20);
+            var uvs = new List<Vector2>(cells.Count * 20);
+            var tris = new List<int>(cells.Count * 30);
+            float halfW = Map.width / 2f, halfH = Map.height / 2f;
+            foreach (var cell in cells)
+            {
+                if (!Map.InBounds(cell.x, cell.y)) continue;
+                float x0 = cell.x - halfW - 混沌盖外扩, x1 = cell.x + 1f - halfW + 混沌盖外扩;
+                float z0 = cell.y - halfH - 混沌盖外扩, z1 = cell.y + 1f - halfH + 混沌盖外扩;
+                float y0 = 0f, y1 = 混沌盖高;
+                // 顶面（法线 +Y 朝上）
+                AddFogQuad(verts, uvs, tris,
+                    new Vector3(x0, y1, z0), new Vector3(x1, y1, z0), new Vector3(x1, y1, z1), new Vector3(x0, y1, z1));
+                // 四侧面（法线朝外；a=左下 b=右下 c=右上 d=左上，绕向 a→c→b / a→d→c）
+                AddFogQuad(verts, uvs, tris,
+                    new Vector3(x0, y0, z0), new Vector3(x1, y0, z0), new Vector3(x1, y1, z0), new Vector3(x0, y1, z0)); // -Z
+                AddFogQuad(verts, uvs, tris,
+                    new Vector3(x1, y0, z1), new Vector3(x0, y0, z1), new Vector3(x0, y1, z1), new Vector3(x1, y1, z1)); // +Z
+                AddFogQuad(verts, uvs, tris,
+                    new Vector3(x0, y0, z1), new Vector3(x0, y0, z0), new Vector3(x0, y1, z0), new Vector3(x0, y1, z1)); // -X
+                AddFogQuad(verts, uvs, tris,
+                    new Vector3(x1, y0, z0), new Vector3(x1, y0, z1), new Vector3(x1, y1, z1), new Vector3(x1, y1, z0)); // +X
+            }
+            if (verts.Count == 0) return;
+
+            var mat = EnsureChaosFogMaterial();
+            if (mat == null) return;
+
+            _fogOverlayMesh = new Mesh { name = "BattleFogLids" };
+            _fogOverlayMesh.SetVertices(verts);
+            _fogOverlayMesh.SetUVs(0, uvs);
+            _fogOverlayMesh.SetTriangles(tris, 0);
+            _fogOverlayMesh.RecalculateBounds();
+            _runtimeMeshes.Add(_fogOverlayMesh);
+            _fogOverlayGo = new GameObject("FogLids");
+            _fogOverlayGo.transform.SetParent(_tilesRoot, false);
+            _fogOverlayGo.AddComponent<MeshFilter>().sharedMesh = _fogOverlayMesh;
+            var mr = _fogOverlayGo.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+        }
+
+        /// <summary>混沌盖单面追加（a=左下 b=右下 c=右上 d=左上；绕向 a→c→b / a→d→c=法线朝观察者
+        /// 正对面的外侧——Unity 法线=Cross(B−A,C−A)，与水面/圆盘先例同约定；UV 0..1 全幅）</summary>
+        private static void AddFogQuad(List<Vector3> verts, List<Vector2> uvs, List<int> tris,
+            Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+        {
+            int i0 = verts.Count;
+            verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+            uvs.Add(new Vector2(0f, 0f)); uvs.Add(new Vector2(1f, 0f));
+            uvs.Add(new Vector2(1f, 1f)); uvs.Add(new Vector2(0f, 1f));
+            tris.AddRange(new[] { i0, i0 + 2, i0 + 1, i0, i0 + 3, i0 + 2 });
+        }
+
+        /// <summary>混沌盖材质（不透明 Unlit+贴图）：Inspector 指定资产优先；否则 Resources/UI/Battle/
+        /// ChaosFog 贴图运行时自建（静态缓存贴图、材质随板释放）；贴图也缺=深暗纯色兜底（Warning）</summary>
+        private Material EnsureChaosFogMaterial()
+        {
+            if (混沌盖材质 != null) return 混沌盖材质;
+            if (_fogOverlayMaterial == null)
+            {
+                if (_chaosFogTexture == null) _chaosFogTexture = Resources.Load<Texture2D>("UI/Battle/ChaosFog");
+                if (_chaosFogTexture == null)
+                    GIC.Framework.GICLog.Warn("[BattleBoard] 混沌贴图缺失（Resources/UI/Battle/ChaosFog）——混沌盖用深暗纯色兜底");
+                _fogOverlayMaterial = BattleViewFactory.CreateUnlitTexturedMaterial(_chaosFogTexture,
+                    new Color(0.85f, 0.85f, 0.95f, 1f)); // tint 偏暗防贴图过亮；纯色兜底=暗紫黑
+            }
+            return _fogOverlayMaterial;
+        }
+
         /// <summary>
         /// 薄冰面板重建（全部 ThinIce 格合并为单 Mesh——与水面焊接面同构：同波场同相位顶点起伏
         /// =冰面恒贴下方波浪，格界零缝）。材质=运行时克隆水面材质改 tint/流速/高光（Inspector 四参
@@ -183,9 +345,9 @@ namespace GIC.Battle
             meshFilter.sharedMesh = _thinIceMesh;
             var meshRenderer = _thinIceSurface.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterial = _thinIceMaterial;
-            // 同水面（-2）：薄冰面板恒为最低透明层（其下水面同序-2=同序按距离，冰面恒在水面上方
-            // 由高度差+半透明混合保证；瞄准贴片 0/立牌 10/箭矢 12 全在其上）
-            meshRenderer.sortingOrder = -2;
+            // 同水面（迷雾批起 -3）：薄冰面板恒为最低透明层（其下水面同序-3=同序按距离，冰面恒在水面
+            // 上方由高度差+半透明混合保证；雾面 -2 在其上、瞄准贴片 0/立牌 10/箭矢 12 全在其上）
+            meshRenderer.sortingOrder = BattleMetrics.WaterSurfaceSortingOrder;
             meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
             meshRenderer.receiveShadows = false;
         }
@@ -260,9 +422,9 @@ namespace GIC.Battle
             meshRenderer.sharedMaterial = GetWaterSurfaceMaterial();
             // 透明排序实证（2026-10-06 像素回读定裁）：sortingOrder 支配 renderQueue——水面若留
             // order 0 会整片画在底座圆盘（-1）之上=「圆盘沉到水面下」报障根因（旧认知「盘 queue3000
-            // > 水 2999 故盘在水面之上」被推翻）。-2=水面恒为最低透明层（画于盘 -1 之下、瞄准贴片 0/
-            // 立牌 10/箭矢 12 等一切之上），显式实现 2999 队列的本意。勿"修"回 0
-            meshRenderer.sortingOrder = -2;
+            // > 水 2999 故盘在水面之上」被推翻）。2026-10-17 迷雾批自 -2 下移至 -3（BattleMetrics 常量）：
+            // 迷雾面（-2）恒罩水面/冰面（未探索水格被雾压暗）、又在底座盘（-1，仅出现在已探索格）之下。勿"修"回 0
+            meshRenderer.sortingOrder = BattleMetrics.WaterSurfaceSortingOrder;
             meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
             meshRenderer.receiveShadows = false;
         }
@@ -392,7 +554,17 @@ namespace GIC.Battle
         /// </summary>
         public void BuildGrassDecor(Camera cam)
         {
-            BattleGrassDecor.Build(_tilesRoot, Map, this, _tileVisuals, cam);
+            if (_grassDecor != null) { Destroy(_grassDecor.gameObject); _grassDecor = null; }
+            _grassDecor = BattleGrassDecor.Build(_tilesRoot, Map, this, _tileVisuals, cam);
+        }
+
+        /// <summary>草簇探索态过滤重建（迷雾批 2026-10-17）：includeCell=false 的格不生成草簇——
+        /// 未探索草地格的草尖会穿出混沌盖泄露地形。固定种子=已探索格草簇布局跨重建稳定
+        /// （rng 按全图迭代恒消耗，include 只裁产出不裁消耗——见 BattleGrassDecor.Build）。</summary>
+        public void RebuildGrassDecor(System.Func<int, int, bool> includeCell, Camera cam)
+        {
+            if (_grassDecor != null) { Destroy(_grassDecor.gameObject); _grassDecor = null; }
+            _grassDecor = BattleGrassDecor.Build(_tilesRoot, Map, this, _tileVisuals, cam, includeCell);
         }
 
         /// <summary>

@@ -24,12 +24,13 @@ namespace GIC.Battle
             if (_mesh != null) Destroy(_mesh);
         }
 
-        /// <summary>
-        /// 构建草簇层（挂 Tiles 根下；建盘 Build 清空重建时随 Tiles 一并销毁=幂等）。
+        /// <summary>构建草簇层（挂 Tiles 根下；建盘 Build 清空重建时随 Tiles 一并销毁=幂等）。
         /// cam=null 时朝向兜底正北（编辑器侧建盘断言无相机的场景）。
-        /// </summary>
+        /// includeCell（迷雾批 2026-10-17）：null=全图；返回 false 的格不产出草簇（任务迷雾未探索格
+        /// ——草尖穿混沌盖漏地形）。**固定种子+rng 恒消耗**：随机数按全图逐格逐簇固定序消耗、
+        /// include 只裁产出不裁消耗——任意探索态重建下已探索格的草簇布局逐位稳定（揭一格其余草不挪窝）。</summary>
         public static BattleGrassDecor Build(Transform parent, BattleMapData map, BattleBoard board,
-            TileVisualsConfig config, Camera cam)
+            TileVisualsConfig config, Camera cam, System.Func<int, int, bool> includeCell = null)
         {
             if (config == null || map == null || board == null) return null;
 
@@ -70,7 +71,9 @@ namespace GIC.Battle
                 aspects[v] = tex != null && tex.height > 0 ? (float)tex.width / tex.height : 1f;
             }
 
-            var rng = new System.Random();
+            // 固定种子（迷雾批 2026-10-17）：重建确定性——探索态过滤重建（RebuildGrassDecor）下
+            // 已探索格草簇布局稳定；代价=全图草簇布局相对旧版（无种子）变化一次，纯装饰可接受
+            var rng = new System.Random(20260927);
             var verts = new List<Vector3>();
             var uvs = new List<Vector2>();
             var tris = new List<int>[tuftMats.Count];
@@ -85,18 +88,24 @@ namespace GIC.Battle
 
                     float surfaceY = board.GetSurfaceHeight(new BattleCell(x, y)) + 0.008f; // 根部微抬防与格面 z-fight
                     int count = minCount >= maxCount ? minCount : rng.Next(minCount, maxCount + 1);
+                    // 迷雾批：rng 恒消耗（count 与逐簇参数含 yaw 照常抽取）、include 只裁产出——
+                    // 探索态重建不挪已探索格的草窝；includeCell=null（无雾/对战迷雾）=全产出
+                    bool emit = includeCell == null || includeCell(x, y);
                     for (int i = 0; i < count; i++)
                     {
+                        // —— rng 消耗段（顺序固定，emit 不裁）——
                         int variant = rng.Next(tuftMats.Count);
                         float ox = (float)(rng.NextDouble()) * (1f - 2f * margin) + margin; // 格内留白随机落点（相对格左下角）
                         float oz = (float)(rng.NextDouble()) * (1f - 2f * margin) + margin;
-                        var root = new Vector3(x + ox - halfWidth, surfaceY, y + oz - halfHeight);
-
                         float h = hMin + (hMax - hMin) * (float)rng.NextDouble();
+                        float yaw = (float)(rng.NextDouble() * 2.0 - 1.0) * jitter * Mathf.Deg2Rad;
+                        if (!emit) continue;
+
+                        // —— 产出段（几何，零 rng）——
+                        var root = new Vector3(x + ox - halfWidth, surfaceY, y + oz - halfHeight);
                         float w = h * aspects[variant];
 
                         // 朝向：立牌同款（billboard yaw + 小随机抖动 + 绕底边后倾）
-                        float yaw = (float)(rng.NextDouble() * 2.0 - 1.0) * jitter * Mathf.Deg2Rad;
                         float cosY = Mathf.Cos(yaw), sinY = Mathf.Sin(yaw);
                         // 绕竖直轴旋转 camForward（XZ 平面内）
                         var fwd = new Vector3(camForward.x * cosY - camForward.z * sinY, 0f,

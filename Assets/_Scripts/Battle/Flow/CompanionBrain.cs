@@ -828,6 +828,7 @@ namespace GIC.Battle
                             var eid = e.GetUnitComponent<UnitIdentity>();
                             if (eid == null || eid.Team == selfIdJ2.Team) continue;
                             if (BattleSimState.IsDead(e)) continue;
+                            if (!sim.IsUnitVisibleTo(selfIdJ2.Team, e)) continue; // AI 雾限（追拍三）
                             if (sim.GetPosition(e).ChebyshevTo(selfPosJ2) <= auraRadiusJ2) enemiesInAuraJ2++;
                         }
                 }
@@ -1517,6 +1518,7 @@ namespace GIC.Battle
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue;
                 if (BattleSimState.IsDead(enemy)) continue;
+                if (!sim.IsUnitVisibleTo(team, enemy)) continue; // AI 雾限（追拍三）
                 var pos = sim.GetPosition(enemy);
                 int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
                 if (dist < nearest) nearest = dist;
@@ -1751,6 +1753,7 @@ namespace GIC.Battle
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue; // 敌我=TeamType 口径
                 if (BattleSimState.IsDead(enemy)) continue; // 尸体不构成贴脸威胁
+                if (!sim.IsUnitVisibleTo(team, enemy)) continue; // AI 雾限（追拍三）：雾内敌不触发自保
                 var pos = sim.GetPosition(enemy);
                 if (Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y)) < SupportDangerRadius)
                     return Mathf.RoundToInt(SupportSelfPreserveScore * profile.自保权重)
@@ -1881,6 +1884,7 @@ namespace GIC.Battle
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue;
                 if (BattleSimState.IsDead(enemy)) continue;
+                if (!sim.IsUnitVisibleTo(team, enemy)) continue; // AI 雾限（追拍三）
                 var pos = sim.GetPosition(enemy);
                 int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
                 if (dist <= auraRadius) count++;
@@ -1903,6 +1907,7 @@ namespace GIC.Battle
                 var identity = enemy.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team == myTeam) continue;
                 if (BattleSimState.IsDead(enemy)) continue;
+                if (!sim.IsUnitVisibleTo(myTeam, enemy)) continue; // AI 雾限（追拍三）：雾内敌不在视野敌集
                 var pos = sim.GetPosition(enemy);
                 if (Math.Max(Math.Abs(pos.x - vp.x), Math.Abs(pos.y - vp.y)) <= vision)
                     result.Add(kv.Key);

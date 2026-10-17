@@ -29,6 +29,38 @@ namespace GIC.Battle
         private SpriteRenderer _avatarRenderer;
         private Transform _baseDisc;
         private Transform _baseDiscOutline; // 底座盘不透明黑描边环（2026-10-06 拍板；尸体压扁随盘同步）
+
+        // 迷雾批（2026-10-17）：渲染器引用缓存 + **意图态**——迷雾隐藏是覆盖层（intent && !IsFogHidden）
+        private MeshRenderer _videoRenderer;
+        private MeshRenderer _baseDiscRenderer;
+        private MeshRenderer _baseDiscOutlineRenderer;
+        private bool _spriteVisible = true; // 兜底静态立牌意图态（视频路径建立=假；解码失败回落=真）
+        private bool _videoVisible;         // 视频 quad 意图态（建时=预热命中；首帧落地=真；解码失败=假）
+
+        /// <summary>迷雾隐藏态（迷雾批 2026-10-17）：所在格未探索的敌方单位=渲染件全禁
+        /// （立牌 sprite/视频 quad/底座盘/描边环——MeshRenderer.enabled 先例=部署过渡，**勿动
+        /// GameObject 激活态**防 VideoPlayer 停摆）；头顶条/选中标记等屏幕件由消费方按本态自隐。
+        /// 我方/队友单位恒不隐藏。隐藏期间视频/动画照常播（只是不画），走进已探索区无感现身。</summary>
+        public bool IsFogHidden { get; private set; }
+
+        /// <summary>迷雾隐藏开关（幂等；状态不变直通）</summary>
+        public void SetFogHidden(bool hidden)
+        {
+            if (IsFogHidden == hidden) return;
+            IsFogHidden = hidden;
+            ApplyRenderables();
+        }
+
+        /// <summary>渲染件统一落地单出口（迷雾批）：sprite/视频按意图态、盘/环恒意图真——全部
+        /// 「&& !IsFogHidden」迷雾覆盖。迷雾隐藏期间各路径照常更新意图（视频首帧落地/解码失败
+        /// 回落），unhide 恢复到**当下**正确态而非快照旧态（盲开全部会错：视频路径下 sprite 本应禁）</summary>
+        private void ApplyRenderables()
+        {
+            if (_avatarRenderer != null) _avatarRenderer.enabled = _spriteVisible && !IsFogHidden;
+            if (_videoRenderer != null) _videoRenderer.enabled = _videoVisible && !IsFogHidden;
+            if (_baseDiscRenderer != null) _baseDiscRenderer.enabled = !IsFogHidden;
+            if (_baseDiscOutlineRenderer != null) _baseDiscOutlineRenderer.enabled = !IsFogHidden;
+        }
         private Color _baseColor = Color.white;
 
         /// <summary>受击圆柱直径（协议核心批 2026-09-29：per-unit 受击体——Create 传入，0=回落全局 0.42；
@@ -194,7 +226,10 @@ namespace GIC.Battle
             Debug.LogWarning($"[UnitView] 立牌动画视频播放失败，回落静态立牌：{message}");
             source.Stop();
             source.gameObject.SetActive(false);
-            if (_avatarRenderer != null) _avatarRenderer.enabled = true;
+            // 意图态切换：视频关、兜底 sprite 开（迷雾隐藏中=落地层拦住不泄，unhide 即恢复正确态）
+            _videoVisible = false;
+            _spriteVisible = true;
+            ApplyRenderables();
         }
 
         /// <summary>池外/预热未完成的部署过渡（2026-10-16 部署黑窗根治批兜底路）：MeshRenderer 禁、
@@ -202,16 +237,18 @@ namespace GIC.Battle
         /// 而非黑块，首帧就绪无感切换；8s 超时兜底（解码挂死=维持静态立牌，不悬空协程）</summary>
         private IEnumerator WaitForFirstFrameThenShow(GameObject videoGo)
         {
-            var mr = videoGo.GetComponent<MeshRenderer>();
             float deadline = Time.unscaledTime + 8f;
             while ((_videoPlayer == null || _videoPlayer.frame < 1) && Time.unscaledTime < deadline)
                 yield return null;
             if (_videoPlayer != null && _videoPlayer.frame >= 1)
             {
-                if (mr != null) mr.enabled = true; // 渲染器启用（勿动 GameObject 激活态——播放器同物体）
-                if (_avatarRenderer != null) _avatarRenderer.enabled = false; // 无感切换（与 OnVideoError 兜底语义互补）
+                // 渲染器意图开（勿动 GameObject 激活态——播放器同物体）；sprite 无感切换意图关
+                //（与 OnVideoError 兜底语义互补；意图态经 ApplyRenderables 落地——迷雾隐藏中不泄）
+                _videoVisible = true;
+                _spriteVisible = false;
+                ApplyRenderables();
             }
-            // 超时：维持静态立牌（渲染器留禁）——黑窗已免，宁立牌不黑块
+            // 超时：维持静态立牌（视频意图留关）——黑窗已免，宁立牌不黑块
         }
 
         // ==================== 移动态动画切换（B-S4a 移动态接线，2026-09-29 拍板「正式化安柏待机+移动动画」） ====================
@@ -649,7 +686,7 @@ namespace GIC.Battle
             // shader 缺失（构建剥离防线）时整块跳过=自然回落静态立牌
             if (idleVideo != null && BattleViewFactory.ChromaKeyShader != null)
             {
-                view._avatarRenderer.enabled = false;
+                view._spriteVisible = false; // 视频路径建立：兜底 sprite 意图关（意图态，迷雾批单出口落地）
                 float videoDisplayHeight = AvatarHeight * avatarScale;
                 float videoAspect = idleVideo.height > 0 ? idleVideo.width / (float)idleVideo.height : 1f;
                 view._videoRt = new RenderTexture((int)idleVideo.width, (int)idleVideo.height, 0,
@@ -665,14 +702,16 @@ namespace GIC.Battle
                 // 与 sprite 路径同基准：全画布高=displayHeight、中心悬于半高处（底边贴地）
                 videoGo.transform.localPosition = new Vector3(0f, videoDisplayHeight * 0.5f, 0f);
                 videoGo.transform.localScale = new Vector3(videoDisplayHeight * videoAspect, videoDisplayHeight, 1f);
-                videoGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AvatarSortingOrder; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
+                view._videoRenderer = videoGo.GetComponent<MeshRenderer>();
+                view._videoRenderer.sortingOrder = BattleMetrics.AvatarSortingOrder; // 与立牌 sprite 同序（跨单位立牌遮挡排序语义一致）
                 // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（视频 shader Cull Off）
                 view._avatarVideoFlip = videoGo.transform;
                 view._avatarVideoFlipBaseScale = videoGo.transform.localScale;
                 view._avatarVideoFlipBasePosition = videoGo.transform.localPosition; // 基准位（动作片位置偏移回退锚点）
-                // 池外/预热未完：MeshRenderer 先禁（勿 SetActive(false)——VideoPlayer 挂同物体，
-                // 对象失活=播放器停摆 frame 永不推进，兜底协程必超时）；首帧落地协程再启用
-                videoGo.GetComponent<MeshRenderer>().enabled = prewarmed;
+                // 池外/预热未完：视频 quad 意图关（勿 SetActive(false)——VideoPlayer 挂同物体，
+                // 对象失活=播放器停摆 frame 永不推进，兜底协程必超时）；首帧落地协程再开
+                view._videoVisible = prewarmed;
+                view.ApplyRenderables();
 
                 var vp = videoGo.AddComponent<VideoPlayer>();
                 vp.playOnAwake = false;
@@ -709,6 +748,7 @@ namespace GIC.Battle
             baseGo.transform.localScale = new Vector3(view._cylinderDiameter, view._cylinderDiameter, 1f);
             baseGo.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.BaseDiscSortingOrder;
             view._baseDisc = baseGo.transform;
+            view._baseDiscRenderer = baseGo.GetComponent<MeshRenderer>(); // 迷雾批：渲染器缓存（SetFogHidden）
             view._baseColor = ownerColor;
 
             // 不透明黑描边环（2026-10-06 拍板「底部圆盘加不透明黑色描边」；同日追拍「太粗了，砍一半」
@@ -722,6 +762,7 @@ namespace GIC.Battle
             outlineGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             outlineGo.transform.localScale = new Vector3(view._cylinderDiameter, view._cylinderDiameter, 1f);
             view._baseDiscOutline = outlineGo.transform;
+            view._baseDiscOutlineRenderer = outlineGo.GetComponent<MeshRenderer>(); // 迷雾批：渲染器缓存
 
             view.SetHp(hp, maxHp);
 

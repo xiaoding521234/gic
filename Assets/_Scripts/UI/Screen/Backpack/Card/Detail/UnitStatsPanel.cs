@@ -16,7 +16,7 @@ namespace GIC.UI
     public class UnitStatsPanel : MonoBehaviour, IClosable
     {
         public ScrollRect 滚动区;
-        public StatRowView[] 行列表; // 15 行：基础（生命/攻击/防御/元能上限/精通/幸运/理智）+ 进阶（攻速/移速/韧性/治疗效率/吸血）+ 战斗（部署消耗/攻击视野/迷雾视野）
+        public StatRowView[] 行列表; // 15 行：基础（生命/攻击/防御/元能上限/精通/幸运/理智）+ 进阶（攻速/移速/韧性/治疗效率/吸血）+ 战斗（部署消耗/攻击视野/探索视野——2026-10-17 迷雾批改名，行名=本地化键 Stat_FogVision 烘焙不变）
 
         // 行图标（原神官方属性图标，2026-10-07 用户指定映射）；无官方对应项=null 槽位留空
         private static readonly string[] 行图标 =
@@ -228,7 +228,7 @@ namespace GIC.UI
             行列表[11].SetValue($"{_raw.GetEffectiveLifeSteal():N0}%");
             行列表[12].SetValue($"{_raw.GetEffectiveDeployCost():N0}");
             行列表[13].SetValue($"{_raw.GetEffectiveAttackVision():N0}");
-            行列表[14].SetValue($"{_raw.GetEffectiveFogVision():N0}");
+            行列表[14].SetValue($"{_raw.GetEffectiveExploreVision():N0}");
 
             // 行图标=原神官方属性图标；行底圆角条明暗相间（斑马纹）
             for (int i = 0; i < 行列表.Length; i++)

@@ -43,7 +43,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: "\xB7{EffectRadius}\u30DE\u30B9\u7BC4\u56F2\u306E\u9727\u3092\u6674\u3089\u3059\n\xB7\u7BC4\u56F2\u5185\u306E\u6575\u306E\u8996\u91CE\u3092{VisionDuration}\u30BF\u30FC\u30F3\u66B4\u9732\u3059\u308B"
+    m_Localized: "\xB7\u5354\u594F\u3055\u308C\u305F\u6642\uFF1A{EffectRadius}\u30DE\u30B9\u5185\u306E\u6575\u306B<color=#FFD700><u><link=\"Buff:\u89C6\u91CE\u66B4\u9732\">\u8996\u91CE\u9732\u51FA</link></u></color>\u3092\u4ED8\u4E0E"
     m_Metadata:
       m_Items: []
   - m_Id: 24651732772147200

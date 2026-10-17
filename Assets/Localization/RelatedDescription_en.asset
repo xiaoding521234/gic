@@ -91,6 +91,11 @@ MonoBehaviour:
       up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
     m_Metadata:
       m_Items: []
+  - m_Id: 40904311723077632
+    m_Localized: "\xB7Removes and prevents stealth\n\xB7Fog on its tile is broken
+      for the applier's side only\n\xB7Lasts {DurationTurns} turns"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

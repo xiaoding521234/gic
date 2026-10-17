@@ -38,7 +38,7 @@ namespace GIC.Data
         [InspectorName("穿透")]
         Penetration,
 
-        [InspectorName("视野范围")]
+        [InspectorName("探索视野")]
         VisionRange,
 
         [InspectorName("免伤")]

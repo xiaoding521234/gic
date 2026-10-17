@@ -41,6 +41,16 @@ namespace GIC.Battle
             return material;
         }
 
+        /// <summary>新建 Unlit 贴图材质（不透明——迷雾批任务迷雾混沌盖消费：贴图可空=纯色兜底；
+        /// 调用方负责持有与 OnDestroy 释放）</summary>
+        public static Material CreateUnlitTexturedMaterial(Texture2D texture, Color tint)
+        {
+            var material = new Material(UnlitShader);
+            if (texture != null) material.mainTexture = texture;
+            material.color = tint;
+            return material;
+        }
+
         /// <summary>新建 Unlit 半透明材质（URP Unlit 透明态全套写入——等价编辑器 Surface=Transparent 的
         /// ShaderGUI 落值；不设 _Surface 时 OutputAlpha 把 alpha 强制成 1，半透明失效。
         /// 首个消费者=瞄准高亮推荐/不推荐分色，2026-09-23。调用方负责持有与 OnDestroy 释放）</summary>

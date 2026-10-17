@@ -164,6 +164,12 @@ namespace GIC.Battle
 
                 foreach (var e in g)
                 {
+                    // 迷雾批（2026-10-17，拍板 D4 单位类零泄露）：迷雾内敌方的行动预告不显示
+                    //（头像+技能图标=单位存在与意图泄露；快照查无此单位=数据异常保留防误吞己方行）
+                    var planUnit = _session.Player.LatestSnapshot?.units.FirstOrDefault(u => u.unitId == e.unitId);
+                    if (planUnit != null && _session.Player.Fog != null
+                        && !_session.Player.Fog.IsUnitVisible(planUnit))
+                        continue;
                     if (CreateEntry(rt, e)) row.entryCount++;
                 }
                 if (row.entryCount == 0) { Destroy(rowGo); continue; } // 空行不建（条目全失败）

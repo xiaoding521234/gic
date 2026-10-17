@@ -170,6 +170,10 @@ namespace GIC.Battle
             _pendingActions.Clear();
             _ackedKeys.Clear();
 
+            // 迷雾账本揭雾（2026-10-17 追拍三「AI 也受雾限」，docs/active/44 §5b）：全量幂等同步——
+            // WEGO 全行动先提交后结算=回合边界同步即覆盖本阶段全部 AI 决策时态；FogMode=None 零开销直通
+            _sim.RevealFog();
+
             // 阶段一：眷属决策（1-2★ 启发式脑——先于玩家选择完成、只决策不结算，快照广播时即定，
             // 玩家选择期间看不见其行动内容，docs/04 §4.1；D-6 已随术语迁移改名 FamiliarBrain）
             _familiarUnitActions = FamiliarBrain.DecideAll(_sim, TurnNumber);

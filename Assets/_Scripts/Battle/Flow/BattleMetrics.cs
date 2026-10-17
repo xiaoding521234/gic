@@ -66,10 +66,19 @@ namespace GIC.Battle
         public const int StaminaCostPerAction = 10;
 
         // ==================== 世界/画布 sortingOrder 层级表（2026-09-28 批6 收口：8 处散布字面量单源） ====================
-        // 完整层序自下而上：底座盘 -1 → 瞄准贴片 0（隐式默认，无显式设置点）→ 底座弧光 1 → 立牌 10 →
-        // Buff 徽章 11 → 箭矢 12 →〔水面走 shader renderQueue 2999，另一体系（docs/14 §89⑥）〕→
-        // 头顶条 Overlay 画布 38 → 伤害数字 Overlay 画布 39 → 战斗 HUD 画布 40（BattleHud.prefab 序列化值）。
+        // 完整层序自下而上：水面/薄冰 -3（2026-10-17 迷雾批自 -2 下移）→ 迷雾面 -2（迷雾批新增）→ 底座盘 -1 →
+        // 瞄准贴片 0（隐式默认，无显式设置点）→ 底座弧光 1 → 立牌 10 → Buff 徽章 11 → 箭矢 12 →
+        // 〔水面走 shader renderQueue 2999，另一体系（docs/14 §89⑥）〕→ 头顶条 Overlay 画布 38 →
+        // 伤害数字 Overlay 画布 39 → 战斗 HUD 画布 40（BattleHud.prefab 序列化值）。
         // 插新层只改这里；消费方引用常量勿再写字面量。
+
+        /// <summary>焊接水面/薄冰面板（透明最低层——迷雾批 2026-10-17 自 -2 下移一格：雾面（-2）须恒罩
+        /// 水面/冰面（未探索水格被雾压暗），雾面又在底座盘（-1，仅出现在已探索格）之下；盘与雾面
+        /// 同格互斥（单位所在格恒已探索）不同格屏幕不叠=层序安全）</summary>
+        public const int WaterSurfaceSortingOrder = -3;
+
+        /// <summary>对战迷雾面（2026-10-17 迷雾批：半透明暗雾盖未探索格——水面 -3 之上、底座盘 -1 之下）</summary>
+        public const int FogOverlaySortingOrder = -2;
 
         /// <summary>单位底座圆盘（恒先画于一切透明件——透明盘投影感，2026-09-27 拍板）</summary>
         public const int BaseDiscSortingOrder = -1;

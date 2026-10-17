@@ -91,6 +91,31 @@ namespace GIC.Battle
         public float PlaybackSpeed => _playbackSpeed;
         public BattleBoard Board => _board;
 
+        /// <summary>战场相机（迷雾批 2026-10-17：草簇探索态重建需相机朝向——与建盘同源；
+        /// 序列化槽空时按 CameraContext 兜底，L272 同口径）</summary>
+        public Camera ViewCamera => _viewCamera != null ? _viewCamera : CameraContext.Resolve();
+
+        /// <summary>迷雾控制器（迷雾批 2026-10-17，docs/active/44；模式 None 时 EnsureFog 不建件——
+        /// BattleScreen.ConfigureFog 注入；消费方=HUD 瞄准/预判/预览过滤单出口）</summary>
+        public BattleFog Fog => _fog;
+
+        private BattleFog _fog;
+
+        /// <summary>迷雾模式注入（BattleScreen 装配期调用，建盘前）：None=零开销直通（不建件）；
+        /// 身份解析器惰性求值（session 在 ConfigureFog 之后才创建——lambda 捕获字段延后取值）</summary>
+        public void ConfigureFog(BattleFogMode mode,
+            System.Func<string> localPlayerIdResolver, System.Func<string, TeamType> teamOfResolver)
+        {
+            if (mode == BattleFogMode.None) { if (_fog != null) { Destroy(_fog); _fog = null; } return; }
+            if (_fog == null)
+            {
+                var go = new GameObject("BattleFog");
+                go.transform.SetParent(transform, false);
+                _fog = go.AddComponent<BattleFog>();
+            }
+            _fog.Init(mode, _board, this, localPlayerIdResolver, teamOfResolver);
+        }
+
         /// <summary>快照更新通知（选择阶段头 + 开局）</summary>
         public event Action<BattleSnapshot> SnapshotUpdated;
 
@@ -313,6 +338,7 @@ namespace GIC.Battle
             RefreshAllFormations(_spreadFormations);
             LatestSnapshot = message.initialSnapshot;
             SnapshotUpdated?.Invoke(LatestSnapshot);
+            _fog?.OnBattleBuilt(); // 迷雾批 2026-10-17：新战斗探索集归零+初始揭雾（模式 None 时 _fog=null 直通）
             GICLog.Info($"[BattlePlayer] 建盘完成：{_views.Count} 个单位立牌");
         }
 
@@ -434,7 +460,7 @@ namespace GIC.Battle
 
                 Destroy(arrowGo);
                 yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind,
-                    command.metadata, isCrit: command.crit == 1);
+                    command.metadata, isCrit: command.crit == 1, actorUnitId: command.actorUnitId);
             }
             finally
             {
@@ -704,6 +730,12 @@ namespace GIC.Battle
                 renderer.sprite = ProjectileSprite;
                 renderer.color = Palette.箭矢占位色;
             }
+            // 迷雾批追拍二（2026-10-17 用户报「敌方安柏射出的箭矢我能直接看到」）：全箭矢工厂单点注册
+            // 迷雾门控——敌方施放的箭矢（飞行/消散/天降/落地滞留）逐帧按当前位置所在格探索态显隐，
+            // 飞到已探索格才显示；我方特效不注册恒显（施法者视图查无=按我方处理防误吞）
+            if (_fog != null && _fog.Active && actorUnitId != null
+                && _views.TryGetValue(actorUnitId, out var actorView) && actorView != null)
+                _fog.RegisterProjectileVisual(arrowGo, actorView.OwnerTeam);
             return arrowGo;
         }
 
@@ -769,6 +801,12 @@ namespace GIC.Battle
             }
             if (cells.Count == 0) yield break;
 
+            // 安柏 2命「爆发破雾」客户端表现（docs/active/44 §9-②，与 Host CompileBurstFogBreak 同口径
+            // 线域+同首段时刻）：我方/队友施放且快照命座≥2 → 首段命中时刻到点揭雾（WYSIWYG 箭到雾开；
+            // fire-and-forget 不 gate 片 ack——与单箭同口径）
+            if (_fog != null && _fog.ShouldRevealBurstFog(command.actorUnitId))
+                StartCoroutine(RevealFogDelayedCoroutine(cells, Mathf.Max(0f, clip.startTime) / _playbackSpeed));
+
             var tint = ResolveArrowTint(command.reactionKind);
             float prevSpawn = 0f;
             for (int wave = 0; wave < waves; wave++)
@@ -786,6 +824,14 @@ namespace GIC.Battle
                             UnityEngine.Random.Range(0f, 箭雨逐箭散布延迟))); // 单箭 fire-and-forget（不 gate ack）
                 }
             }
+        }
+
+        /// <summary>延迟揭雾（安柏 2命破雾表现）：等首段命中时刻到点揭——「箭矢还未飞到薄冰就融」
+        /// 同款 WYSIWYG 纪律（雾随箭落地揭开，非施放即揭）</summary>
+        private IEnumerator RevealFogDelayedCoroutine(List<BattleCell> cells, float delaySeconds)
+        {
+            if (delaySeconds > 0f) yield return new WaitForSeconds(delaySeconds);
+            _fog?.RevealCells(cells);
         }
 
         /// <summary>单支落箭：延迟起飞→斜落（落向沿安柏射向「箭雨落下倾斜角」）→落地沿箭轴压入插土
@@ -953,7 +999,8 @@ namespace GIC.Battle
                                     beats.beats.Add(dmgDelay);
                                 }
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
-                                    command.reactionKind, command.metadata, isCrit: command.crit == 1)));
+                                    command.reactionKind, command.metadata, isCrit: command.crit == 1,
+                                    actorUnitId: command.actorUnitId)));
                             }
                         }
                         break;
@@ -977,7 +1024,8 @@ namespace GIC.Battle
                             else
                                 healDelay = stagger;
                             playbacks.Add(StartCoroutine(PlayDamageCoroutine(healed, command.value, healDelay, true,
-                                lifestealPrefix: command.metadata == BattleCommand.HealKindLifesteal)));
+                                lifestealPrefix: command.metadata == BattleCommand.HealKindLifesteal,
+                                actorUnitId: command.actorUnitId)));
                         }
                         break;
 
@@ -988,7 +1036,8 @@ namespace GIC.Battle
                         if (_views.TryGetValue(command.targetUnitId, out var revived))
                         {
                             revived.SetCorpseVisual(false);
-                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(revived, command.value, stagger, true)));
+                            playbacks.Add(StartCoroutine(PlayDamageCoroutine(revived, command.value, stagger, true,
+                                actorUnitId: command.actorUnitId)));
                         }
                         break;
 
@@ -1149,6 +1198,9 @@ namespace GIC.Battle
                             if (_views.TryGetValue(command.summonUnit.unitId, out var summoned))
                                 summoned.ApplyPosition(_board.CellToWorld(command.summonUnit.position));
                             RefreshAllFormations(_spreadFormations);
+                            // 迷雾追拍七：视野缓存预热（召唤单位不在当前快照——防部署先揭回落半径）
+                            // +敌方立即隐藏（不等下一帧评估——「闪一下才隐藏」报障根因）
+                            _fog?.OnUnitSummoned(command.summonUnit);
                         }
                         break;
 
@@ -1400,7 +1452,8 @@ namespace GIC.Battle
         }
 
         private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal,
-            int reactionKind = 0, int element = 0, bool lifestealPrefix = false, bool isCrit = false)
+            int reactionKind = 0, int element = 0, bool lifestealPrefix = false, bool isCrit = false,
+            string actorUnitId = null)
         {
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
@@ -1435,6 +1488,10 @@ namespace GIC.Battle
             var randomOffset = new Vector3(
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
+            // 迷雾批追拍二（2026-10-17 拍板「我方特效不用隐藏，比如我方安柏的箭矢，命中后的伤害数字等」）
+            // ——修订首版 D4 的目标侧抑制为**归属方**口径：我方命中的伤害数字恒显（即便目标在迷雾内）；
+            // 仅敌方施放且目标隐藏（敌方自奶/自增益类反馈）才抑制
+            if (view.IsFogHidden && _fog != null && _fog.IsEnemyActor(actorUnitId)) yield break;
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
                 numberColor, value, _playbackSpeed, isHeal, isCrit);
         }
@@ -1469,6 +1526,7 @@ namespace GIC.Battle
         {
             if (!元能获取弹数字) return; // 拍板「暂时决定不弹」——实现与调用链全保留，恢复只改本开关
             if (delta <= 0 || view == null) return;
+            if (view.IsFogHidden) return; // 迷雾批（2026-10-17 拍板 D4）：迷雾内敌方不弹数字
             var randomOffset = new Vector3(
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
@@ -1562,6 +1620,7 @@ namespace GIC.Battle
             _customProjectiles.Clear(); // per-unit 专属弹射物随场同清（与 _views 同生命周期）
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
             ResidentVideoBudget.ClearAll(); // 常驻解码器注册表随清场清空（2026-10-16 常驻批——单位 OnDestroy 已逐个拆，此处双保险）
+            _fog?.Clear(); // 迷雾批 2026-10-17：探索集/雾面/隐藏态随场同清
         }
 
         /// <summary>层级→眷属判定（命座徽章门控数据，2026-10-06）：快照 tier 优先（0=未填回落星级换算，

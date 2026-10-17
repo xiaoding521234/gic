@@ -66,6 +66,10 @@ MonoBehaviour:
     m_Localized: Superconduct DEF Down
     m_Metadata:
       m_Items: []
+  - m_Id: 40904202885083136
+    m_Localized: Exposure
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

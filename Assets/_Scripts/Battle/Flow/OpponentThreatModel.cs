@@ -63,6 +63,7 @@ namespace GIC.Battle
                 var identity = enemy.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team == myTeam) continue; // 敌我=TeamType 口径
                 if (BattleSimState.IsDead(enemy) || !BattleSimState.CanAct(enemy)) continue;
+                if (!sim.IsUnitVisibleTo(myTeam, enemy)) continue; // AI 雾限（追拍三）：雾内敌不产威胁（不可见=不设防）
 
                 var action = PredictAction(sim, snapshot, kv.Key, enemy, identity, turn);
                 if (action == null || action.actionType != ActionType.Skill) continue;

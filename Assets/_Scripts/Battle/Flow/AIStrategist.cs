@@ -150,9 +150,10 @@ namespace GIC.Battle
                 if (unit.RawData.unitType == UnitType.Building)
                 {
                     if (mine) myCore = unit;
-                    else enemyCores.Add(unit);
+                    else enemyCores.Add(unit); // 敌方核心恒计入（AI 自带核心透视——追拍三拍板）
                     continue; // 建筑（协议核心）不入战力值——战力=机动兵力
                 }
+                if (!mine && !sim.IsUnitVisibleTo(team, unit)) continue; // AI 雾限（追拍三）：雾内敌不入战力比
                 int value = unit.RawData.GetEffectiveDeployCost();
                 if (mine) myValue += value;
                 else enemyValue += value;

@@ -290,6 +290,9 @@ namespace GIC.Battle
         public const int CategoryBuffTickGain = 5;
         /// <summary>来源类别：元能溢出转移（B8 批，安柏1命被动——转移增量独立成类防与本体获能合并键互吞）</summary>
         public const int CategoryOverflowTransfer = 6;
+        /// <summary>来源类别：破雾获能（2026-10-17 迷雾批追拍六，安柏2命「爆发破除迷雾，每破除
+        /// C2FogEnergyThreshold 格获得 C2FogEnergyGain 元能」——独立类别防与其它来源合并键互吞）</summary>
+        public const int CategoryFogBreakGain = 7;
 
         public int Delta;
 

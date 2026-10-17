@@ -316,6 +316,162 @@ namespace GIC.Battle
             return _playerTeams.TryGetValue(playerId, out var team) ? team : TeamType.A;
         }
 
+        // ==================== 迷雾账本（2026-10-17 追拍三「AI 也受雾限」，docs/active/44 §5b） ====================
+        // Host 权威探索集：按队伍记已探索格——**仅 AI 三脑/威胁图消费**（玩家侧迷雾=客户端表现层
+        // BattleFog 独立计算，两端同源口径=config 探索视野基值）；结算真值（EffectCompiler/执行器）**永不
+        // 消费**——雾只限 AI 决策输入，不改变命中/移动结算。
+
+        /// <summary>迷雾模式（装配期注入，BattleScreen：房间对战=Skirmish/任务=Mission/调试直开与沙盒
+        /// =None）。None=AI 不受雾限（全知，观察局/沙盒零回归）</summary>
+        public BattleFogMode FogMode { get; set; } = BattleFogMode.None;
+
+        private Dictionary<TeamType, bool[]> _fogExplored;
+
+        /// <summary>全量幂等揭雾（单调有进无出）：**每选择阶段开始（BeginSelectPhase）AI 决策前**调——
+        /// 各队伍以存活单位（含协议核心等建筑；尸体不探索）为心、探索视野
+        /// （UnitStats.VisionRange 终值=config 基值+1命 StatBoost，与快照 exploreVision 同源——追拍六
+        /// 「两侧统一升档」；stats 缺失回落 RawData 基值）
+        /// 切比雪夫揭雾。WEGO 全行动先提交后结算=回合边界全量同步即覆盖决策时态，无需逐命令挂钩</summary>
+        public void RevealFog()
+        {
+            if (FogMode == BattleFogMode.None || Map == null) return;
+            if (_fogExplored == null) _fogExplored = new Dictionary<TeamType, bool[]>();
+            foreach (var kv in _units)
+            {
+                var unit = kv.Value;
+                var identity = unit?.GetUnitComponent<UnitIdentity>();
+                if (identity == null || IsDead(unit)) continue;
+                if (!_fogExplored.TryGetValue(identity.Team, out var explored))
+                {
+                    explored = new bool[Map.width * Map.height];
+                    _fogExplored[identity.Team] = explored;
+                }
+                // 探索视野真源=UnitStats.VisionRange 终值（config 基值+1命 StatBoost——与快照 exploreVision
+                // 同源，追拍六「两侧统一升档」）；stats 缺失回落 RawData 基值
+                var stats = unit.GetUnitComponent<UnitStats>();
+                int radius = stats != null ? stats.VisionRange
+                    : (unit.RawData != null ? unit.RawData.GetEffectiveExploreVision() : 1);
+                if (radius <= 0) continue;
+                var pos = GetPosition(unit);
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    int y = pos.y + dy;
+                    if (y < 0 || y >= Map.height) continue;
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        int x = pos.x + dx;
+                        if (x < 0 || x >= Map.width) continue;
+                        explored[y * Map.width + x] = true;
+                    }
+                }
+            }
+
+            // 视野暴露（安柏变奏「全面侦查」，追拍七）：持有者所在格揭给施加者阵营（**非全队公开**
+            // ——与客户端 BattleFog 随行揭雾同口径；BeginSelectPhase 全量同步已覆盖决策时点）
+            foreach (var kv in _units)
+            {
+                var unit = kv.Value;
+                if (unit == null || IsDead(unit)) continue;
+                foreach (var b in unit.Buffs)
+                {
+                    if (b == null || b.Type != BuffType.VisionExposed) continue;
+                    var srcIdentity = b.source?.GetUnitComponent<UnitIdentity>();
+                    if (srcIdentity == null) continue;
+                    var cell = GetPosition(unit);
+                    if (!_fogExplored.TryGetValue(srcIdentity.Team, out var explored))
+                    {
+                        explored = new bool[Map.width * Map.height];
+                        _fogExplored[srcIdentity.Team] = explored;
+                    }
+                    if (Map.InBounds(cell.x, cell.y))
+                        explored[cell.y * Map.width + cell.x] = true;
+                    break;
+                }
+            }
+        }
+
+        /// <summary>该格是否已被该队伍探索（None 恒 true；越界恒 true——边角格不参与雾语义）</summary>
+        public bool IsFogExplored(TeamType team, BattleCell cell)
+        {
+            if (FogMode == BattleFogMode.None || Map == null) return true;
+            if (!Map.InBounds(cell.x, cell.y)) return true;
+            return _fogExplored != null && _fogExplored.TryGetValue(team, out var explored)
+                && explored[cell.y * Map.width + cell.x];
+        }
+
+        /// <summary>按队伍批量揭雾（安柏 2命「爆发破雾」Host 消费，docs/active/44 §9-②）：把格集并入
+        /// 该队探索账本（AI 雾限同享），返回**新探索格数**（供破雾计元能——每 C2FogEnergyThreshold 格
+        /// +C2FogEnergyGain）；单调有进无出、幂等，与 RevealFog 同账本。None/越界直通返回 0</summary>
+        public int RevealFogCells(TeamType team, List<BattleCell> cells)
+        {
+            if (FogMode == BattleFogMode.None || Map == null || cells == null || cells.Count == 0) return 0;
+            if (_fogExplored == null) _fogExplored = new Dictionary<TeamType, bool[]>();
+            if (!_fogExplored.TryGetValue(team, out var explored))
+            {
+                explored = new bool[Map.width * Map.height];
+                _fogExplored[team] = explored;
+            }
+            int added = 0;
+            foreach (var c in cells)
+            {
+                if (!Map.InBounds(c.x, c.y)) continue;
+                int idx = c.y * Map.width + c.x;
+                if (explored[idx]) continue;
+                explored[idx] = true;
+                added++;
+            }
+            return added;
+        }
+
+        /// <summary>AI 迷雾可见性单出口（追拍三拍板「AI 也受雾限，但自带透视协议核心的位置，否则无法
+        /// 自主攻城」）：同队恒可见；**敌方核心（Core tag）恒可见**（攻城锚/终局判据/战力核心 HP 全靠它
+        /// ——眷属 v7 核心锚定零回归）；其余敌方=所在格已被该队探索。消费方=AI 三脑/威胁图/战略层；
+        /// 结算真值勿调（雾限决策不限结算）</summary>
+        public bool IsUnitVisibleTo(TeamType viewerTeam, Unit enemy)
+        {
+            if (enemy == null || FogMode == BattleFogMode.None) return true;
+            var identity = enemy.GetUnitComponent<UnitIdentity>();
+            if (identity == null || identity.Team == viewerTeam) return true;
+            if (BattleHeuristics.IsCore(enemy)) return true; // 核心透视（拍板）
+            if (IsExposed(enemy)) return true; // 视野暴露（追拍七；追拍八改口径）：解除隐身=**所有人可见**
+            return IsFogExplored(viewerTeam, GetPosition(enemy));
+        }
+
+        /// <summary>AI 迷雾可见性（快照态重载——PreviewLineTargets 等 UnitState 域消费）：
+        /// 同队/None/核心（经 unitId 反查活体）恒可见；其余=所在格已探索</summary>
+        public bool IsEnemyStateVisibleTo(TeamType viewerTeam, UnitState enemyState)
+        {
+            if (enemyState == null || FogMode == BattleFogMode.None) return true;
+            if ((TeamType)enemyState.team == viewerTeam) return true;
+            var unit = GetUnit(enemyState.unitId);
+            if (unit != null && BattleHeuristics.IsCore(unit)) return true; // 核心透视（拍板）
+            if (IsExposedState(enemyState)) return true; // 视野暴露（追拍八）：所有人可见
+            return IsFogExplored(viewerTeam, enemyState.position);
+        }
+
+        /// <summary>该单位是否处于视野暴露（安柏变奏「全面侦查」，追拍七）：解除隐身并无法隐身——
+        /// **追拍八拍板「解除隐身应当是清除掉这个buff，因此是所有人可见」**：隐匿态清除=对全部队伍
+        /// 可见（不按施加者阵营过滤；将来实装真·隐身 Buff 时 OnApplied 顺手驱散之——数据钩子注记）；
+        /// 尸体持有者同判（Buff 族 RemoveOnHolderDeath=false，暴露不因倒下消失）。
+        /// 所在格揭雾仍=施加者阵营独享（RevealFog 暴露段，非本判定）</summary>
+        public static bool IsExposed(Unit unit)
+        {
+            if (unit == null || unit.Buffs == null) return false;
+            foreach (var b in unit.Buffs)
+                if (b != null && b.Type == BuffType.VisionExposed) return true;
+            return false;
+        }
+
+        /// <summary>快照态视野暴露判定（IsEnemyStateVisibleTo 用）：BuffState.type 携带即真（追拍八：
+        /// 所有人可见——不查 source 阵营）</summary>
+        private static bool IsExposedState(UnitState state)
+        {
+            if (state == null || state.buffs == null) return false;
+            foreach (var b in state.buffs)
+                if (b != null && b.type == (int)BuffType.VisionExposed) return true;
+            return false;
+        }
+
         // ==================== 单位注册 ====================
 
         /// <summary>
@@ -817,6 +973,7 @@ namespace GIC.Battle
                 cylinderDiameter = unit.RawData?.受击圆柱直径 ?? 0f,
                 constellation = unit.ConstellationLevel, // 命座（B8 批：展示/升命门控真源）
                 tier = (int)BattleHeuristics.TierOf(unit), // 操控层级单源（TierOverrideStars 覆盖随此进快照——客户端门控同源）
+                exploreVision = stats?.VisionRange ?? 0, // 探索视野真源（迷雾批追拍六：stats 终值=config 基值+1命 StatBoost；0=未填→客户端回落 config 链）
             };
             foreach (var buff in unit.Buffs)
                 state.buffs.Add(new BuffState

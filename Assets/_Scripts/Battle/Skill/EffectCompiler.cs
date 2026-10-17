@@ -122,7 +122,7 @@ namespace GIC.Battle
                 // 通用 case 零改动；paramKey=None 原样返回=value 直读 Fixed 兜底）
                 var compiled = ResolveItemAtom(itemData, atom);
                 if (compiled == null) continue;
-                foreach (var target in ResolveCastTargets(compiled, useAction, snapshot, sim, drinkerState, drinkerState))
+                foreach (var target in ResolveCastTargets(compiled, useAction, snapshot, sim, drinkerState, drinkerState, null))
                     CompileAtom(sim, useAction, snapshot, null, compiled, target.unitId, drinkerState,
                         0, 0, BattleCell.zero, 0f, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
             }
@@ -200,11 +200,14 @@ namespace GIC.Battle
                         for (int i = 0; i < damageCount; i++)
                             CompileLineBurstSegment(sim, action, snapshot, skillData, from, delta,
                                 damagePercent, clip.startTime + clip.hitInterval * i, clip.maxRange, effects);
+                    CompileBurstFogBreak(sim, action, skillData, from, delta,
+                        burstClips[0].startTime, burstClips[0].maxRange, effects); // 2命破雾（一次/施放——段循环外）
                 }
                 else
                 {
                     CompileLineBurstSegment(sim, action, snapshot, skillData, from, delta,
                         damagePercent * damageCount, 0f, 0, effects); // 无时轮兜底：合并单段
+                    CompileBurstFogBreak(sim, action, skillData, from, delta, 0f, 0, effects);
                 }
                 return;
             }
@@ -225,6 +228,51 @@ namespace GIC.Battle
                 effects.Add(new ProjectileEffect(action.unitId, action, damagePercent * damageCount,
                     from, delta.x, delta.y)); // 无时轮兜底：合并单发
             }
+        }
+
+        /// <summary>安柏 2命「爆发可以破除迷雾，每破除 C2FogEnergyThreshold 格迷雾获得 C2FogEnergyGain
+        /// 元能」实装（docs/active/44 §9-②，2026-10-17 迷雾批追拍六；**每施放一次**——挂在段循环外）：
+        /// Burst 整线迸发把线域格并入施法者队伍的 Host 探索账本（AI 雾限同享）+按**新探索格数**产元能
+        /// 效应（HitSeconds=首段命中时刻——客户端到点跳变，WYSIWYG）。数据驱动门：施法者 Talent 命座
+        /// 技能配了 C2Fog 两参数且命座≥2 才生效（安柏专属参数族，未配单位零消费）；FogMode=None=无迷雾
+        /// 可破=零元能（沙盒/观察局零回归）。客户端表现层揭雾=BattleFog.RevealCells（PlayArrowRainCoroutine
+        /// 同口径线域+同首段时刻）——表现层与 Host 各算各的账本，两端同口径恒一致</summary>
+        private static void CompileBurstFogBreak(BattleSimState sim, ActionData action,
+            SkillConfig.SkillData skillData, BattleCell from, Vector2Int delta,
+            float firstHitSeconds, int clipMaxRange, List<BattleEffect> effects)
+        {
+            if (skillData.skillType != SkillType.Burst) return; // 玩家版口径「爆发」限定（霜袭等 Normal 线技不触发）
+            if (sim.FogMode == BattleFogMode.None) return;      // 无迷雾=无破雾无元能
+            var caster = sim.GetUnit(action.unitId);
+            if (caster == null || caster.ConstellationLevel < 2) return; // 2命起
+            var talent = FindTalentData(caster);
+            int threshold = talent != null ? talent.GetInt(SkillParamKey.C2FogEnergyThreshold, 0) : 0;
+            int gain = talent != null ? talent.GetInt(SkillParamKey.C2FogEnergyGain, 0) : 0;
+            if (threshold <= 0 || gain <= 0) return; // 未配参数=无此被动（数据驱动门）
+
+            int maxRange = clipMaxRange > 0 ? clipMaxRange : ProjectileRule.MaxRange;
+            var cells = new List<BattleCell>(); // 线域格集（CompileLineBurstSegment 同口径）
+            for (int step = 1; step <= maxRange; step++)
+            {
+                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
+                if (!sim.Map.HasTile(cell.x, cell.y)) break;
+                cells.Add(cell);
+            }
+            int newCells = sim.RevealFogCells(sim.GetTeamOf(action.playerId), cells);
+            if (newCells > 0)
+                effects.Add(new EnergyEffect(action.unitId, gain * (newCells / threshold),
+                    EnergyEffect.CategoryFogBreakGain) { HitSeconds = firstHitSeconds });
+        }
+
+        /// <summary>施法者 Talent 命座技能数据（ConstellationApplier 同口径遍历；null=无 Talent 技能）</summary>
+        private static SkillConfig.SkillData FindTalentData(Unit caster)
+        {
+            foreach (var skill in caster.Skills)
+            {
+                var d = skill?.RawData;
+                if (d != null && d.skillType == SkillType.Talent) return d;
+            }
+            return null;
         }
 
         /// <summary>整线迸发单段：线上全目标各编译一次 OnHit（虚空=线终止；无截停——投放形态=整线天降）。
@@ -270,21 +318,38 @@ namespace GIC.Battle
             foreach (var atom in skillData.effects)
             {
                 if (atom.trigger != SkillEffectTrigger.OnCast) continue;
-                foreach (var target in ResolveCastTargets(atom, action, snapshot, sim, casterState, directTarget))
+                foreach (var target in ResolveCastTargets(atom, action, snapshot, sim, casterState, directTarget, skillData))
                     CompileAtom(sim, action, snapshot, skillData, atom, target.unitId, casterState,
                         0, 0, BattleCell.zero, 0f, 0f, 0f, 0f, effects, EnergyEffect.CategoryEnsoGain);
             }
         }
 
-        /// <summary>OnCast 目标解析（群体筛选=多目标；filter 不满足返回空=跳过该原子；势力筛选=蒙德协奏规则 docs/07）</summary>
+        /// <summary>OnCast 目标解析（群体筛选=多目标；filter 不满足返回空=跳过该原子；势力筛选=蒙德协奏规则 docs/07）。
+        /// skillData=null（物品路径）时 CasterRadiusEnemies 半径不可解析=空产出（物品暂无此档）</summary>
         private static IEnumerable<UnitState> ResolveCastTargets(SkillEffectConfig atom, ActionData action,
-            BattleSnapshot snapshot, BattleSimState sim, UnitState casterState, UnitState directTarget)
+            BattleSnapshot snapshot, BattleSimState sim, UnitState casterState, UnitState directTarget,
+            SkillConfig.SkillData skillData)
         {
             switch (atom.targetFilter)
             {
                 case SkillEffectTargetFilter.Caster:
                     yield return casterState;
                     break;
+                case SkillEffectTargetFilter.CasterRadiusEnemies:
+                {
+                    // 变奏「全面侦查」（2026-10-17 追拍七）：以施法者（被协奏的安柏）为中心 radiusKey 格内
+                    // 敌方存活各编译一次（切比雪夫；尸体不施加；半径=参数表 radiusKey 单源——EffectRadius）
+                    int radius = skillData != null && atom.radiusKey != SkillParamKey.None
+                        ? skillData.GetInt(atom.radiusKey) : 0;
+                    if (radius <= 0) break;
+                    var casterTeam = sim.GetTeamOf(action.playerId);
+                    foreach (var u in snapshot.units)
+                        if ((TeamType)u.team != casterTeam && u.isCorpse == 0
+                            && Math.Max(Math.Abs(u.position.x - casterState.position.x),
+                                        Math.Abs(u.position.y - casterState.position.y)) <= radius)
+                            yield return u;
+                    break;
+                }
                 case SkillEffectTargetFilter.AllAllies:
                     // 我方全体存活（元气迸发——群体治疗各按目标自身 maxHp 换算）；
                     // 我军=TeamType 口径（2026-09-25 三轮审查 C2：2v2 含队友单位）

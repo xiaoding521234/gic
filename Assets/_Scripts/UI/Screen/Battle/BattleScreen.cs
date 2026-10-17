@@ -104,6 +104,19 @@ namespace GIC.UI
 
             // 组件兜底（场景装配缺失时补挂，便于直接打开场景调试）
             if (_player == null) _player = gameObject.AddComponent<BattlePlayer>();
+            // 迷雾批（2026-10-17，docs/active/44）：开局配置透传迷雾模式（房间对战=Skirmish/任务=Mission/
+            // 调试直开/沙盒=None）——建盘前注入 BattlePlayer（BattleStart 时装配迷雾控制器）。
+            // 身份解析器与 BattleHud.ResolveLocalPlayerId 同口径（SelfPlayerID→Offline/P1 回落）；
+            // 队伍经 session 门面（lambda 捕获 _session 字段——ConfigureFog 早于 session 创建，惰性求值）
+            _player.ConfigureFog(
+                launchConfig?.FogMode ?? BattleFogMode.None,
+                () =>
+                {
+                    var pm = Wargame.Instance?.Context?.Get<PlayerManager>();
+                    var id = pm?.SelfPlayerID;
+                    return !string.IsNullOrEmpty(id) && id != PlayerID.Offline ? id : BattleDebugPlayerIds.P1;
+                },
+                pid => _session != null ? _session.GetTeamOf(pid) : TeamType.A);
             if (_flow == null && !isLanClient) _flow = gameObject.AddComponent<TurnFlowController>(); // 客户端无回合状态机
             if (_board == null)
             {
@@ -169,6 +182,9 @@ namespace GIC.UI
                     launchConfig?.Players); // 调试直开 Players=null（无房间名册——色/队回落旧口径）
             }
             _session.Sim.LogicRoot = logicGo.transform; // 部署等运行时生成单位挂同根（B6c）
+            // 迷雾账本模式注入（2026-10-17 追拍三「AI 也受雾限」）：Host 侧 AI 探索集与表现层同模式
+            //（房间对战=Skirmish/任务=Mission/调试直开=None=AI 不受限）；LAN 客户端无 Sim 零消费
+            _session.Sim.FogMode = launchConfig?.FogMode ?? BattleFogMode.None;
 
             // 名册注册：房间队伍=局内阵营（同队友军/异队敌对，引擎原生语义；2026-10-11 联机批——
             // 旧「按索引硬派 A/B」退役）

@@ -230,12 +230,16 @@ namespace GIC.Data
     /// 开战广播（服务器 -> 所有客户端）：host 校验通过后下发同一份开局配置（地图名/种子/名册），
     /// 各端转场加载同一战斗场景（docs/18 决策一：Host 权威；同 seed+同命令序列=同战局）。
     /// 名册 PlayerInfo 含 IsAI/Team/Color/SpawnPosition——颜色/队伍/出生点真实进局内。
+    /// FogMode=迷雾模式（2026-10-17 迷雾批）：host 按 BuildFromRoster 口径置 Skirmish 透传。
     /// </summary>
     public class StartBattleEvent : BaseEvent
     {
         public string MapConfigName;
         public int Seed;
         public List<PlayerInfo> Players = new List<PlayerInfo>();
+
+        /// <summary>迷雾模式（BattleFogMode 的 int 值——事件层枚举一律 int 载荷，JsonUtility 零容错）</summary>
+        public int FogMode = (int)BattleFogMode.Skirmish;
 
         public StartBattleEvent()
         {

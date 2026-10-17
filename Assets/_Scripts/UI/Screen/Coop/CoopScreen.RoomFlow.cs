@@ -296,6 +296,8 @@ namespace GIC.UI
                     MapConfigName = GetSelectedMapConfigName(),
                     // 种子用表现层随机（开局壳层，不入模拟流；模拟核心禁该随机源）
                     Seed = UnityEngine.Random.Range(0, int.MaxValue),
+                    // 迷雾批（2026-10-17）：LAN 对战同步默认对战迷雾（与 BuildFromRoster 口径一致）
+                    FogMode = (int)BattleFogMode.Skirmish,
                     Players = players,
                 });
             }
@@ -323,6 +325,8 @@ namespace GIC.UI
                 MapConfigName = evt.MapConfigName,
                 Seed = evt.Seed,
                 IsNetworked = true,
+                // 迷雾批（2026-10-17）：随开战广播透传，LAN 各端同模式
+                FogMode = (BattleFogMode)evt.FogMode,
                 Players = evt.Players != null
                     ? evt.Players.Select(p => new BattlePlayerSetup
                     {

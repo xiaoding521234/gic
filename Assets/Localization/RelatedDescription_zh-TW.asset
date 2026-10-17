@@ -66,6 +66,10 @@ MonoBehaviour:
     m_Localized: "\xB7\u6301\u6709\u8005\u9632\u79A6\u964D\u4F4E{BonusPerStack}\n\xB7\u81F3\u591A\u758A\u52A0{StackLimit}\u5C64\n\xB7\u6301\u7E8C{DurationTurns}"
     m_Metadata:
       m_Items: []
+  - m_Id: 40904311723077632
+    m_Localized: "\xB7\u89E3\u9664\u96B1\u8EAB\u4E26\u7121\u6CD5\u96B1\u8EAB\n\xB7\u6240\u5728\u683C\u8FF7\u9727\u88AB\u65BD\u52A0\u8005\u4E00\u65B9\u7834\u9664\n\xB7\u6301\u7E8C{DurationTurns}\u56DE\u5408"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

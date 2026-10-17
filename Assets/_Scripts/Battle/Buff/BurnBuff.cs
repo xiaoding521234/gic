@@ -105,6 +105,16 @@ namespace GIC.Battle
                     var shardBuff = new IcicleBuff(icicleCfg, Mathf.Max(1, value)) { source = source };
                     shardBuff.ApplyConstellationSummonBonus();
                     return shardBuff;
+                case BuffType.VisionExposed:
+                    // 视野暴露（安柏变奏「全面侦查」，追拍七）：标记型——持续=资产单源
+                    //（value/stackLimit 参数通道不适用）；0=配置错误 Warn+null
+                    if (cfg is not VisionExposureBuffConfig exposureCfg) return FamilyMismatch(type, cfg);
+                    if (exposureCfg.持续回合 == 0)
+                    {
+                        GICLog.Warn($"[BuffFactory] 视野暴露 {cfg.name} 持续回合未配置（0）");
+                        return null;
+                    }
+                    return new VisionExposureBuff(exposureCfg) { source = source };
                 case BuffType.AttackUp:
                 case BuffType.MoveSpeedUp:
                 case BuffType.DefenseDown:

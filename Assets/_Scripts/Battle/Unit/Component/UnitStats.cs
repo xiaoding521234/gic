@@ -98,9 +98,10 @@ namespace GIC.Battle
                 SetBaseValue(StatType.Sanity, rawData.GetEffectiveSanity());
                 // HP: value=max=baseHP（满血登场）
                 SetCapacityValue(StatType.HP, rawData.GetEffectiveHP());
-                // VisionRange 基值=迷雾视野（2026-10-03 视野拆分：迷雾视野=破雾半径=战争迷雾批消费方；
-                // 安柏 1命「视野提升」休眠数据位挂此管线。攻击视野不入 Stats——眷属 AI 直读 config 预留）
-                SetBaseValue(StatType.VisionRange, rawData.GetEffectiveFogVision());
+                // VisionRange 基值=探索视野（2026-10-03 视野拆分、2026-10-17 迷雾批改名：探索视野=破雾半径
+                //=迷雾系统揭雾半径（docs/active/44）；安柏 1命「视野提升」休眠数据位挂此管线。
+                // 攻击视野不入 Stats——眷属 AI 直读 config 预留）
+                SetBaseValue(StatType.VisionRange, rawData.GetEffectiveExploreVision());
                 SetBaseValue(StatType.LifeSteal, rawData.GetEffectiveLifeSteal());
                 SetBaseValue(StatType.HealEfficiency, rawData.GetEffectiveHealEfficiency());
                 // Energy: max=baseEnergy, value=0（空蓝登场）

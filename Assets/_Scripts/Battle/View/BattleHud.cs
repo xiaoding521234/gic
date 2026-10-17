@@ -692,6 +692,7 @@ namespace GIC.Battle
             UpdateAimHover(); // 点击式瞄准悬停格提亮（2026-10-06 拍板；Aiming+非拖动才有悬停）
             UpdateAimFxAnimation(); // 瞄准增强动画推进（2026-10-15：箭头 chevron 滚动+光柱呼吸）
             UpdateHandCardDrag(); // 手牌拖拽手感主循环（决策五十四：跟随/抖动/让位/出牌区蒙层）
+            UpdateSelectMarkerFog(); // 迷雾批 2026-10-17：选中的敌方单位走进迷雾——选中弧光随隐
 
             // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」
             // +2026-10-06 三段改造）：仅拖动会话中且有金色待定格才喂；单位指向型喂 centerMode=true
@@ -1148,6 +1149,9 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             var deployData = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
             var core = FindMyCorePosition(snapshot);
+            // 迷雾批（2026-10-17 拍板 D4）：部署碰撞预判吃迷雾滤后快照——迷雾内敌方按不存在
+            //（红格不得泄露隐藏敌人占位；地形不可行仍如实=允许泄露）
+            var fogSnapshot = FogFilteredSnapshot(snapshot);
             for (int dx = -DeployUnitExecutor.DeployRadiusFromCore; dx <= DeployUnitExecutor.DeployRadiusFromCore; dx++)
             for (int dy = -DeployUnitExecutor.DeployRadiusFromCore; dy <= DeployUnitExecutor.DeployRadiusFromCore; dy++)
             {
@@ -1156,7 +1160,7 @@ namespace GIC.Battle
                 _aimCells.Add(c);
                 // 部署推荐分色（2026-09-25 拍板「根据碰撞决定」）：镜像 Host 碰撞判定链——
                 // 不推荐格仍可点击（Host 校验兜底，同移动瞄准「水面红格仍可点」语义）
-                if (CanDeployEnterPreview(c, deployData, snapshot))
+                if (CanDeployEnterPreview(c, deployData, fogSnapshot))
                     _aimRecommendedCells.Add(c);
             }
             ShowAimHighlights();
@@ -1394,13 +1398,17 @@ namespace GIC.Battle
                     bool pick = side == UnitSide.Mine ? u.playerId == _myPlayerId
                         : side == UnitSide.MyTeam ? ((TeamType)u.team == MyTeam && u.playerId != _myPlayerId)
                         : (TeamType)u.team != MyTeam;
-                    if (pick) result.Add(u);
+                    if (!pick) continue;
+                    // 迷雾批（2026-10-17）：同格查看列表滤迷雾内敌方（立牌已隐，点格不应还能翻到）
+                    if (!FogVisible(u)) continue;
+                    result.Add(u);
                 }
             }
             foreach (var u in snapshot.units) // 尸体垫底段（不分敌我——查看语义无优先级需求）
             {
                 if (u.isCorpse == 0) continue;
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
+                if (!FogVisible(u)) continue;
                 result.Add(u);
             }
             return result;
@@ -1461,6 +1469,8 @@ namespace GIC.Battle
                 {
                     if (!contract) continue;    // 延奏/爆发只我方侧
                     if (u.isCorpse != 0) continue; // 契约只活体
+                    // 迷雾批（2026-10-17，拍板 D4 单位类零泄露）：契约目标域=敌队——迷雾内敌方不可选
+                    if (!FogVisible(u)) continue;
                 }
                 if (!_board.Map.HasTile(u.position.x, u.position.y)) continue;
                 into.Add(u);
@@ -1622,6 +1632,9 @@ namespace GIC.Battle
                 else if (side == UnitSide.MyTeam) pick = (TeamType)u.team == MyTeam;  // 我军（2v2 含队友单位）
                 else pick = (TeamType)u.team != MyTeam;                               // 敌军
                 if (!pick) continue;
+                // 迷雾批（2026-10-17，拍板 D4 单位类零泄露）：点格选敌——迷雾内敌方不可中
+                //（渲染器已禁=立牌 precise 直选天然失效，此处补点格路径）
+                if (!FogVisible(u)) continue;
                 return u;
             }
             return null;
@@ -1788,8 +1801,11 @@ namespace GIC.Battle
                 // 首版误做成米字 8 向；上限=移动技能 MoveDistance 参数——移动是特殊技能、距离数据驱动，
                 // B-S1b；客户端只做地块粗筛，体积/阻挡由 Host 结算兜底）
                 // 推荐=步进可达（如凯亚步行不可入水——水面及其后全不推荐，Host 同款停在格前）
+                // 迷雾批（2026-10-17 拍板 D4）：占用预判吃迷雾滤后快照——迷雾内敌方按不存在
+                //（「不推荐」不得泄露隐藏敌人占位；地形不可行仍如实显示=允许泄露）
                 int maxSteps = 移动技能步数上限();
                 var selfData = GetSelectedUnitData();
+                var fogSnapshot = FogFilteredSnapshot(snapshot);
                 for (int dir = 0; dir < 4; dir++)
                 {
                     int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
@@ -1800,7 +1816,7 @@ namespace GIC.Battle
                         var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
                         if (!_board.Map.HasTile(c.x, c.y)) break; // 虚空=可选区截止（不可选无提示）
                         _aimCells.Add(c);
-                        if (reachable && CanMoveEnterPreview(c, sel, selfData, snapshot))
+                        if (reachable && CanMoveEnterPreview(c, sel, selfData, fogSnapshot))
                             _aimRecommendedCells.Add(c);
                         else
                             reachable = false;
@@ -1848,7 +1864,10 @@ namespace GIC.Battle
             // 直线型（战技/爆发）：十字 4 方向瞄准格（点方向格提交 direction；投射物路径 Host 即定）。
             // 推荐=该方向能命中敌人（含尸体，Host 同语义）：预判走技能实例 WouldHitEnemyInDirection
             // （SkillFactory 按 skillID 建实例，判定形态与各技能 Host 结算同源）
+            // 迷雾批（2026-10-17 拍板 D4 原话案例）：推荐预判吃迷雾滤后快照——「变为推荐色」不得
+            // 泄露该方向迷雾里有敌人
             var previewSkill = SkillFactory.CreateWithData(skillData);
+            var fogSnapshotForLine = FogFilteredSnapshot(snapshot);
             // 瞄准臂长=该技能投射物实际射程单源（2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离
             // 一致」）：EffectCompiler.DirectionRangeOf 与 Host 判定同源——安柏双箭/箭雨 24（旧常量 8
             // 明显偏短）、芭芭拉水球 5/凯亚霜袭 2/丘丘人挥棒 1（旧 8 偏长，全员一并修正）
@@ -1860,7 +1879,7 @@ namespace GIC.Battle
                 var direction = dir == 0 ? Direction2D.Right : dir == 1 ? Direction2D.Left
                     : dir == 2 ? Direction2D.Up : Direction2D.Down;
                 bool recommended = previewSkill.WouldHitEnemyInDirection(
-                    _board.Map, snapshot, (TeamType)sel.team, sel.position, direction);
+                    _board.Map, fogSnapshotForLine, (TeamType)sel.team, sel.position, direction);
                 _aimDirRecommended[dir] = recommended; // 箭头着色单源（2026-10-15 箭头显示批）
                 for (int step = 1; step <= _aimLineRange; step++)
                 {
@@ -3304,6 +3323,11 @@ namespace GIC.Battle
                             : dir == 2 ? Direction2D.Up : Direction2D.Down;
                         EffectCompiler.PredictDirectionHits(skill.Timeline, _board.Map, snapshot,
                             (TeamType)sel.team, sel.position, direction, _aimHitScratch);
+                        // 迷雾批（2026-10-17，拍板 D4 原话案例）：迷雾内敌方不进预判集合——预计命中
+                        // 描边/命中竖线/方向带推荐色三消费方同源于此，一处后滤全链零泄露
+                        for (int i = _aimHitScratch.Count - 1; i >= 0; i--)
+                            if (!FogVisible(_aimHitScratch[i]))
+                                _aimHitScratch.RemoveAt(i);
                     }
                 }
             }
@@ -3531,6 +3555,44 @@ namespace GIC.Battle
         private void HideSelectMarker()
         {
             if (_discOrbit != null) _discOrbit.gameObject.SetActive(false);
+        }
+
+        /// <summary>迷雾选中弧光巡检（迷雾批 2026-10-17，Update 每帧）：选中单位为迷雾内敌方
+        /// （我方/队友恒可见勿扰）→ 弧光随隐。重新可见不强推重显——重新选中自然恢复</summary>
+        private void UpdateSelectMarkerFog()
+        {
+            if (_discOrbit == null || !_discOrbit.gameObject.activeSelf) return;
+            if (string.IsNullOrEmpty(_selectedUnitId)) return;
+            var fog = _session?.Player?.Fog;
+            if (fog == null || !fog.Active) return;
+            var snapshot = _session.Player.LatestSnapshot;
+            var unit = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (unit != null && !fog.IsUnitVisible(unit)) HideSelectMarker();
+        }
+
+        /// <summary>迷雾单位可见性（迷雾批 2026-10-17，拍板 D4「单位类零泄露」单出口）：敌方单位
+        /// 所在格未探索=不可见——不可瞄准/不进预判/不进同格查看列表。地形类信息（移动路径绕行/
+        /// 部署落点合法性）允许泄露不在本口径。迷雾未激活恒 true（零回归）</summary>
+        private bool FogVisible(UnitState u) => _session?.Player?.Fog?.IsUnitVisible(u) ?? true;
+
+        /// <summary>迷雾滤后快照（迷雾批 2026-10-17，拍板 D4）：迷雾内敌方按「不存在」处理——
+        /// 移动/部署占用预判（CanMove/CanDeployEnterPreview）与方向推荐（WouldHitEnemyInDirection）
+        /// 等一切单位类预览消费此视图（否则「不推荐格」泄露隐藏敌人占位）。迷雾未激活/无隐藏=原样
+        /// 直通零分配</summary>
+        private BattleSnapshot FogFilteredSnapshot(BattleSnapshot src)
+        {
+            if (src?.units == null) return src;
+            var fog = _session?.Player?.Fog;
+            if (fog == null || !fog.Active) return src;
+            bool anyHidden = false;
+            foreach (var u in src.units)
+                if (u != null && !fog.IsUnitVisible(u)) { anyHidden = true; break; }
+            if (!anyHidden) return src;
+            var filtered = new BattleSnapshot { turnNumber = src.turnNumber, resources = src.resources };
+            foreach (var u in src.units)
+                if (u != null && fog.IsUnitVisible(u))
+                    filtered.units.Add(u);
+            return filtered;
         }
 
         // ==================== 技能数据链（现有体系：UnitConfig.skills → SkillData；2026-09-18 复用拍板） ====================

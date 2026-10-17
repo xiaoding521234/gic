@@ -34,6 +34,9 @@ namespace GIC.Data
 
         [InspectorName("防御减少")]
         DefenseDown = 7, // 防御降低（StatBuff 族负值修改器=减防即增伤；具名资产 Buff_DefenseDown「冰棱减防」——凯亚2命 tick 命中施加，数值全在资产单源）
+
+        [InspectorName("视野暴露")]
+        VisionExposed = 8, // 安柏变奏「全面侦查」（2026-10-17 迷雾批追拍七实装）：标记型状态——对施加者阵营解除隐身并无法隐身+所在格迷雾被施加者阵营破除（**非全队公开**，docs/18 决策七十九追记七；持续=Buff_VisionExposure 资产）
     }
 
     /// <summary>

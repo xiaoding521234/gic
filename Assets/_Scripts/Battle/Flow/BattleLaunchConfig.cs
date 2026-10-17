@@ -65,6 +65,12 @@ namespace GIC.Battle
         /// B7 LAN：Host 广播本配置即双端同 seed</summary>
         public int Seed;
 
+        /// <summary>迷雾模式（2026-10-17 迷雾批，docs/active/44）：对局级表现层配置——
+        /// Skirmish=对战迷雾（房间对战默认）、Mission=任务迷雾（混沌盖）、None=沙盒/观察局。
+        /// 默认 None：直接 new（观察 harness/调试）不开雾；BuildFromRoster 置 Skirmish；
+        /// 任务系统（后续批）置 Mission；LAN 经 StartBattleEvent.FogMode 双端同模式</summary>
+        public BattleFogMode FogMode = BattleFogMode.None;
+
         public static BattleLaunchConfig Current { get; private set; }
 
         /// <summary>
@@ -105,6 +111,8 @@ namespace GIC.Battle
                 MapConfigName = string.IsNullOrEmpty(mapConfigName) ? DefaultMapName : mapConfigName,
                 // 种子用表现层 UnityEngine.Random 生成（开局壳层，不入模拟流；模拟核心禁该随机源）
                 Seed = UnityEngine.Random.Range(0, int.MaxValue),
+                // 迷雾批（2026-10-17）：房间对战默认对战迷雾（用户拍板「开房间对战时，不用记忆地图」）
+                FogMode = BattleFogMode.Skirmish,
                 Players = new List<BattlePlayerSetup>(),
             };
             foreach (var p in players)

@@ -54,6 +54,12 @@ namespace GIC.Data
         /// （2026-10-05「开一把试招」：覆盖不进快照则客户端按原星判 3★=伙伴档，战技被门控置灰拦截）；
         /// 0=未填（旧快照/异常）——消费方回落 UnitConfig 星级换算）</summary>
         public int tier;
+
+        /// <summary>探索视野（2026-10-17 迷雾批追拍六「1命视野真源化」）：Host 从 UnitStats.VisionRange
+        /// 终值填充（=config 基值+命座 StatBoost——安柏 1命 +C1Vision 随此进快照，docs/active/44 §9-③）；
+        /// 客户端 BattleFog 首选直读（零配置解析链）。0=未填（旧端/手工构造态）——消费方回落 config 基值链</summary>
+        public int exploreVision;
+
         public List<BuffState> buffs = new List<BuffState>();
     }
 

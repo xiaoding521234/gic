@@ -112,7 +112,7 @@ namespace GIC.Data
             [Header("元素")]
             public ElementType selfElement = ElementType.Physical;
 
-            [Header("视野（2026-10-03 拍板拆分：攻击视野=AI 追击感知半径 / 迷雾视野=破雾半径）")]
+            [Header("视野（2026-10-03 拍板拆分：攻击视野=AI 追击感知半径 / 探索视野=破雾半径；2026-10-17 迷雾批改名迷雾视野→探索视野）")]
             /// <summary>攻击视野（2026-10-03 拍板「眷属总是向协议核心进攻，除非攻击视野内有其它敌人」）：
             /// 眷属 AI 追击**非核心**敌人的感知半径（切比雪夫，格）——视野外的敌不关心（皇室战争式）；
             /// 协议核心无视野门槛恒为目标，非核心敌还须严格近于核心（同距核心优先）。
@@ -120,10 +120,13 @@ namespace GIC.Data
             /// 对现役单位恒成立）。未来 Buff 要改它时再入 StatType（预留勿提前造）。</summary>
             public int 攻击视野 = Unspecified;
 
-            /// <summary>迷雾视野（战争迷雾系统预留，2026-10-03 拍板）：可自动破除迷雾的范围（切比雪夫，格）。
-            /// Unspecified=回落 2；现行消费方=StatType.VisionRange 基值（安柏 1命「视野提升」休眠数据位
-            /// 挂此管线——迷雾批落地时接线）。</summary>
-            public int 迷雾视野 = Unspecified;
+            /// <summary>探索视野（原「迷雾视野」，2026-10-17 迷雾批改名）：可自动破除迷雾的范围（切比雪夫，格）
+            /// ——迷雾系统（docs/active/44）真消费方=BattleFog 揭雾半径。**Unspecified=回落 1**（2026-10-17
+            /// 迷雾批追拍「探索视野都改为 1，且默认值改为 1」——取代决策三十一的回落 2；安柏/协议核心=2 已写资产）；
+            /// StatType.VisionRange 基值管线（安柏 1命「视野提升」休眠数据位挂此管线）。
+            /// 序列化兼容：FormerlySerializedAs 保旧资产「迷雾视野」字段值零迁移。</summary>
+            [UnityEngine.Serialization.FormerlySerializedAs("迷雾视野")]
+            public int 探索视野 = Unspecified;
 
             [Header("标签")]
             public UnitTag[] tags;
@@ -186,7 +189,7 @@ namespace GIC.Data
             public int GetEffectiveSanity() => IsSpecified(baseSanity) ? baseSanity : 50;
             public int GetEffectiveHP() => IsSpecified(baseHP) ? baseHP : GetHPByStarLevel();
             public int GetEffectiveAttackVision() => IsSpecified(攻击视野) ? 攻击视野 : 5;
-            public int GetEffectiveFogVision() => IsSpecified(迷雾视野) ? 迷雾视野 : 2;
+            public int GetEffectiveExploreVision() => IsSpecified(探索视野) ? 探索视野 : 1;
             public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
             public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
             public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;

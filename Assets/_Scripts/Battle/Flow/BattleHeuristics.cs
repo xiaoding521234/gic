@@ -75,7 +75,10 @@ namespace GIC.Battle
 
         /// <summary>全部存活敌方单位按切比雪夫距离升序（等距平局 unitId 升序=枚举序铁律）——
         /// 低级单位换目标巡逻用（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标巡逻」：
-        /// 逐敌试逼近步，贴身打不了/不可达的自动换下一个）；纯读不改状态</summary>
+        /// 逐敌试逼近步，贴身打不了/不可达的自动换下一个）；纯读不改状态。
+        /// **AI 迷雾收口（2026-10-17 追拍三「AI 也受雾限」）**：雾内敌方不入列（敌方核心恒可见=
+        /// 攻城锚零回归，sim.IsUnitVisibleTo 单出口）——眷属目标序/伙伴敌锚/FindNearestEnemy
+        /// 三消费方一处收口；结算域勿走此口</summary>
         public static List<Unit> FindEnemiesByDistance(BattleSimState sim, Unit self)
         {
             var selfId = self.GetUnitComponent<UnitIdentity>();
@@ -89,6 +92,7 @@ namespace GIC.Battle
                 var id = unit.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.Team == selfId.Team) continue; // 敌我=TeamType 口径（2026-09-25 三轮审查 C2）
                 if (BattleSimState.IsDead(unit)) continue;
+                if (!sim.IsUnitVisibleTo(selfId.Team, unit)) continue; // AI 雾限（追拍三）：雾内敌方不可见
                 result.Add(unit);
             }
             var distOf = new Dictionary<Unit, int>();
@@ -352,7 +356,10 @@ namespace GIC.Battle
         /// 该方向上技能将实际命中的存活敌方（评分/预判共用的目标清单）——镜像 EffectCompiler
         /// 判定两分支同口径：LineProjectile=投射物首停格（含尸体截停=Host 同语义）该格存活敌全中；
         /// LineBurst/无时轮=射程（clip.maxRange，缺省 24）内整线存活敌全中。纯尸体线返回空表
-        /// （伤害打尸体=浪费，评分口径按存活目标计）
+        /// （伤害打尸体=浪费，评分口径按存活目标计）。
+        /// **AI 迷雾收口（2026-10-17 追拍三）**：雾内敌方不入目标清单（核心恒可见）——眷属
+        /// FindAttackDirection（WouldHit 预检的超集无碍：雾内敌不产开火方向）/伙伴评分/威胁图
+        /// 三消费方一处收口；**结算域（EffectCompiler）勿走此口**（雾限决策不限结算）
         /// </summary>
         public static List<UnitState> PreviewLineTargets(BattleSimState sim, BattleSnapshot snapshot,
             TeamType casterTeam, BattleCell from, SkillConfig.SkillData skillData, Direction2D direction)
@@ -372,7 +379,8 @@ namespace GIC.Battle
                     var enemies = SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell);
                     if (enemies.Count == 0) continue;
                     foreach (var enemy in enemies)
-                        if (enemy.isCorpse == 0) result.Add(enemy);
+                        if (enemy.isCorpse == 0 && sim.IsEnemyStateVisibleTo(casterTeam, enemy))
+                            result.Add(enemy); // AI 雾限（追拍三）
                     break; // 首停
                 }
                 return result;
@@ -387,7 +395,8 @@ namespace GIC.Battle
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!sim.Map.HasTile(cell.x, cell.y)) break;
                 foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell))
-                    if (enemy.isCorpse == 0) result.Add(enemy);
+                    if (enemy.isCorpse == 0 && sim.IsEnemyStateVisibleTo(casterTeam, enemy))
+                        result.Add(enemy); // AI 雾限（追拍三）
             }
             return result;
         }
