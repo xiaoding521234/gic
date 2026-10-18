@@ -101,6 +101,10 @@ namespace GIC.Data
     /// 角色卡恒 1（卡不消耗，docs/01）；普通物品卡=备战数起（使用/装备后消耗）；
     /// 货币物品牌（摩拉/体力）持有数量=玩家资源池（PlayerResourceState.mora/stamina 即该牌堆张数，
     /// 资源池是牌堆的视图非独立系统）。
+    /// **装备实例耐久（决策八十一「舍弃堆叠数量，统一采用耐久方案」）**：装备类物品（Weapon/Accessory）
+    /// 条目按耐久分实例——同物异耐久=不同条目（掠夺物耐久不变保留、新鲜卡=配置 Durability 满值），
+    /// 条目身份=(cardType, value, durability)；非装备物品恒 0 不参与匹配。旧数据缺省 0=新鲜/非装备语义
+    /// （快速迭代期存档每次重建，无迁移负担）。
     /// </summary>
     [Serializable]
     public class HandCard
@@ -108,6 +112,9 @@ namespace GIC.Data
         public int cardType;
         public int value;
         public int count;
+
+        /// <summary>装备实例耐久（Weapon/Accessory 条目=实例身份之一；非装备恒 0）</summary>
+        public int durability;
 
         public HandCard() { }
 

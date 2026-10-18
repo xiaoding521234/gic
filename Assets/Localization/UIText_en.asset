@@ -1221,6 +1221,14 @@ MonoBehaviour:
     m_Localized: Equipment slots are full
     m_Metadata:
       m_Items: []
+  - m_Id: 12043
+    m_Localized: Equipment durability is full
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12044
+    m_Localized: Equipment stack is full
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -134,14 +134,16 @@ namespace GIC.Battle
         public event Action<string, int, int> OnResourceDelta;
 
         /// <summary>手牌物品牌消耗（统一消耗模型 C-1，docs/30）：技能吃物品（如酒/苹果）的
-        /// ItemConsume 命令消费点——参数=玩家ID / 物品名（ItemName）/ 消耗量。本类先扣本地快照
-        /// handCards 镜像（减尽移除条目），HUD 订阅刷新对应卡角标；快照权威兜底</summary>
-        public event Action<string, int, int> OnItemConsumed;
+        /// ItemConsume 命令消费点——参数=玩家ID / 物品名（ItemName）/ 消耗量 / 实例耐久（决策八十一：
+        /// 装备条目按耐久分实例，非装备恒 0）。本类先扣本地快照 handCards 镜像（减尽移除条目），
+        /// HUD 订阅刷新对应卡角标；快照权威兜底</summary>
+        public event Action<string, int, int, int> OnItemConsumed;
 
-        /// <summary>手牌物品牌获得（装备批 2026-10-18：命座授予——安柏3命兔兔伯爵）：ItemGain 命令
-        /// 消费点——参数=玩家ID / 物品名（ItemName）/ 获得量。本类先并本地快照 handCards 镜像
-        ///（有则加数量/无则加卡——GainCard 对偶），HUD 订阅重建手牌（新卡=新槽位）；快照权威兜底</summary>
-        public event Action<string, int, int> OnItemGained;
+        /// <summary>手牌物品牌获得（命座授予/死亡掠夺）：ItemGain 命令消费点——参数=玩家ID /
+        /// 物品名（ItemName）/ 获得量 / 实例耐久（决策八十一：掠夺物耐久不变保留、新鲜授予=配置满值；
+        /// 客户端按 (物品,耐久) 条目镜像）。本类先并本地快照 handCards 镜像（有则加数量/无则加卡
+        /// ——GainCard 对偶），HUD 订阅重建手牌（新实例=新槽位）；快照权威兜底</summary>
+        public event Action<string, int, int, int> OnItemGained;
 
         /// <summary>战斗结束事件（2026-09-25 三轮审查 S10 轻量全灭软停；订阅方=HUD 胜负提示，
         /// 结算画面=B8）</summary>
@@ -1191,10 +1193,11 @@ namespace GIC.Battle
                         break;
 
                     case BattleCommandType.ItemConsume:
-                        // 物品消耗（统一消耗模型 C-1）：先扣本地 handCards 镜像（减尽移除条目），再广播
-                        // HUD 刷新角标；下回合快照权威兜底（镜像偏离自愈）
-                        ApplyItemConsumeToLocalHand(command.targetUnitId, (ItemName)command.metadata, command.value);
-                        OnItemConsumed?.Invoke(command.targetUnitId, command.metadata, command.value);
+                        // 物品消耗（统一消耗模型 C-1）：先扣本地 handCards 镜像（按 (物品,实例耐久) 条目
+                        // 匹配——决策八十一；减尽移除条目），再广播 HUD 刷新角标；下回合快照权威兜底
+                        ApplyItemConsumeToLocalHand(command.targetUnitId, (ItemName)command.metadata,
+                            command.value, command.buffLevel);
+                        OnItemConsumed?.Invoke(command.targetUnitId, command.metadata, command.value, command.buffLevel);
                         break;
 
                     case BattleCommandType.EquipItem:
@@ -1206,16 +1209,18 @@ namespace GIC.Battle
                         break;
 
                     case BattleCommandType.UnequipItem:
-                        // 卸下（耐久耗尽——兔兔伯爵耗尽消失）：图标行移除该槽位
+                        // 卸下（决策八十一·死亡掠夺清槽——阵亡单位装备被击杀方掠走）：图标行移除该槽位
                         if (_views.TryGetValue(command.targetUnitId, out var unequippedView))
                             unequippedView.RemoveEquipBadge(command.metadata, command.direction);
                         break;
 
                     case BattleCommandType.ItemGain:
-                        // 获得物品卡（命座授予——安柏3命兔兔伯爵）：本地手牌镜像新增（GainCard 对偶：
-                        // 有则加数量/无则加卡）+HUD 重建手牌（新卡=新槽位）；下回合快照权威自愈
-                        ApplyItemGainToLocalHand(command.targetUnitId, (ItemName)command.metadata, command.value);
-                        OnItemGained?.Invoke(command.targetUnitId, command.metadata, command.value);
+                        // 获得物品卡（命座授予/死亡掠夺）：本地手牌镜像新增（GainCard 对偶——按 (物品,
+                        // 实例耐久) 条目合并/新建，掠夺物耐久保留）+HUD 重建手牌（新实例=新槽位）；
+                        // 下回合快照权威自愈
+                        ApplyItemGainToLocalHand(command.targetUnitId, (ItemName)command.metadata,
+                            command.value, command.buffLevel);
+                        OnItemGained?.Invoke(command.targetUnitId, command.metadata, command.value, command.buffLevel);
                         break;
 
                     case BattleCommandType.Summon:
@@ -1585,7 +1590,7 @@ namespace GIC.Battle
         /// <summary>物品消耗命令扣本地手牌镜像（统一消耗模型 C-1）：LatestSnapshot.resources 内该玩家
         /// handCards 条目数量减/减尽移除——片内即时反映（HUD 角标刷新走 OnItemConsumed 事件）；
         /// 非我方玩家命令仅镜像维护（HUD 只刷我方手牌），下回合快照权威兜底</summary>
-        private void ApplyItemConsumeToLocalHand(string playerId, ItemName item, int amount)
+        private void ApplyItemConsumeToLocalHand(string playerId, ItemName item, int amount, int durability)
         {
             var snapshot = LatestSnapshot;
             if (snapshot == null) return;
@@ -1598,11 +1603,12 @@ namespace GIC.Battle
             HandCard target = null;
             foreach (var entry in res.handCards)
             {
-                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item) { target = entry; break; }
+                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item
+                    && entry.durability == durability) { target = entry; break; }
             }
             if (target == null)
             {
-                GICLog.Warn($"[BattlePlayer] ItemConsume 镜像无条目（{playerId} {item}×{amount}）——快照权威自愈兜底");
+                GICLog.Warn($"[BattlePlayer] ItemConsume 镜像无条目（{playerId} {item}×{amount} 耐久{durability}）——快照权威自愈兜底");
                 return;
             }
             target.count -= amount;
@@ -1610,10 +1616,11 @@ namespace GIC.Battle
                 res.handCards.Remove(target);
         }
 
-        /// <summary>获得物品卡命令并本地手牌镜像（装备批 2026-10-18：命座授予——安柏3命兔兔伯爵）：
-        /// LatestSnapshot.resources 内该玩家 handCards 条目数量加/无条目则新增（GainCard 对偶——
-        /// 货币卡走资源池不在此列，授予恒普通物品）；HUD 重建走 OnItemGained 事件；下回合快照权威兜底</summary>
-        private void ApplyItemGainToLocalHand(string playerId, ItemName item, int amount)
+        /// <summary>获得物品卡命令并本地手牌镜像（命座授予/死亡掠夺）：LatestSnapshot.resources 内
+        /// 该玩家 handCards 条目按 (物品,实例耐久) 匹配——有则加数量/无则新建携带耐久条目（GainCard
+        /// 对偶——装备按耐久分实例，掠夺物耐久不变保留；货币卡走资源池不在此列）；
+        /// HUD 重建走 OnItemGained 事件；下回合快照权威兜底</summary>
+        private void ApplyItemGainToLocalHand(string playerId, ItemName item, int amount, int durability)
         {
             var snapshot = LatestSnapshot;
             if (snapshot == null) return;
@@ -1625,13 +1632,16 @@ namespace GIC.Battle
             if (res == null) return;
             foreach (var entry in res.handCards)
             {
-                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item)
+                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item
+                    && entry.durability == durability)
                 {
                     entry.count += amount;
                     return;
                 }
             }
-            res.handCards.Add(new HandCard(new CardId(item), amount));
+            var newCard = new HandCard(new CardId(item), amount);
+            newCard.durability = durability;
+            res.handCards.Add(newCard);
         }
 
         /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>

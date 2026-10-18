@@ -233,8 +233,13 @@ namespace GIC.Battle
         private int _itemUseAimItem;
 
         /// <summary>装备物品瞄准会话载体（ItemName 枚举值；0=非会话）——装备批 2026-10-18：武器/配件
-        /// 打出=使用物品同构精确选人（目标=有空槽的我方存活非建筑单位；ExitAiming 统一收口飞回）</summary>
+        /// 打出=使用物品同构精确选人（目标=有空槽∨已装备该物品且耐久未满的我方存活非建筑单位
+        /// 〔决策八十一补充耐久语义〕；ExitAiming 统一收口飞回）</summary>
         private int _equipAimItem;
+
+        /// <summary>装备瞄准会话的实例耐久（决策八十一：装备条目按耐久分实例——拖出哪张卡就消耗
+        /// 哪个实例，提交载荷 equipDurability 由此携带）</summary>
+        private int _equipAimDurability;
 
         /// <summary>手牌卡按钮容器（hand 布局件内；RebuildHandCards 重建。
         /// 2026-09-23 审查 R1：滚动壳四层结构上移 prefab hand 槽，代码只寻址 _handScroll/_handContent+建卡条目）</summary>
@@ -255,9 +260,12 @@ namespace GIC.Battle
         private Card _moraHandCard;
         private Card _staminaHandCard;
 
-        /// <summary>手牌普通物品牌卡引用（统一消耗模型 C-1：ItemName→Card——技能吃物品（酒/苹果）时
-        /// OnItemConsumed 事件即时重 Init 刷新对应卡数量角标；货币走 _moraHandCard/_staminaHandCard 既有链）</summary>
-        private readonly Dictionary<ItemName, Card> _handItemCards = new Dictionary<ItemName, Card>();
+        /// <summary>手牌普通物品牌卡引用（统一消耗模型 C-1：(ItemName,实例耐久)→Card——技能吃物品
+        ///（酒/苹果）时 OnItemConsumed 事件即时重 Init 刷新对应卡数量角标；货币走
+        /// _moraHandCard/_staminaHandCard 既有链。**键含实例耐久**（决策八十一——装备条目按耐久
+        /// 分实例，同物异耐久=不同卡）</summary>
+        private readonly Dictionary<(ItemName item, int durability), Card> _handItemCards
+            = new Dictionary<(ItemName, int), Card>();
 
         // 手牌下沉（2026-09-26 拍板：默认沉半张避让视野，鼠标接近热区才上移）：
         // 只动 HandCards.anchoredPosition（槽内件）——hand 槽锚点/布局方案数据零接触
@@ -576,11 +584,12 @@ namespace GIC.Battle
 
         /// <summary>物品消耗命令（统一消耗模型 C-1）：我方技能吃物品（酒/苹果等）——按 BattlePlayer 已扣的
         /// 本地 handCards 镜像重 Init 对应卡（数量角标即时刷新；条目减尽=下回合快照重建移除，
-        /// 本帧卡残留一回合属可接受——Host 权威镜像已在，签名比对到点自然重建）</summary>
-        private void OnItemConsumedHandler(string playerId, int itemName, int amount)
+        /// 本帧卡残留一回合属可接受——Host 权威镜像已在，签名比对到点自然重建）。
+        /// durability=装备实例耐久（决策八十一——装备条目按耐久分实例，同物异耐久=不同卡）</summary>
+        private void OnItemConsumedHandler(string playerId, int itemName, int amount, int durability)
         {
             if (playerId != _myPlayerId) return;
-            if (!_handItemCards.TryGetValue((ItemName)itemName, out var card) || card == null) return;
+            if (!_handItemCards.TryGetValue(((ItemName)itemName, durability), out var card) || card == null) return;
             // 镜像数量（BattlePlayer 已扣）：非货币物品牌 count=条目真源——从本地快照读当前值
             var snapshot = _session?.Player?.LatestSnapshot;
             PlayerResourceState myRes = null;
@@ -596,7 +605,8 @@ namespace GIC.Battle
             {
                 foreach (var entry in myRes.handCards)
                 {
-                    if ((CardType)entry.cardType == CardType.Item && entry.value == itemName)
+                    if ((CardType)entry.cardType == CardType.Item && entry.value == itemName
+                        && entry.durability == durability)
                     {
                         count = entry.count;
                         break;
@@ -606,10 +616,10 @@ namespace GIC.Battle
             RefreshCurrencyCard(card, (ItemName)itemName, count); // 复用重 Init 链（数量渲染=ItemCardViewStrategy）
         }
 
-        /// <summary>获得物品卡命令（装备批 2026-10-18：命座授予——安柏3命兔兔伯爵）：已有卡=刷数量角标
-        ///（镜像已并，同 OnItemConsumedHandler 模式读本地快照条目）；**新卡=全量重建**（卡列表签名
-        /// 已变——新槽位长出来，下回合快照自然对账）</summary>
-        private void OnItemGainedHandler(string playerId, int itemName, int amount)
+        /// <summary>获得物品卡命令（命座授予/死亡掠夺）：已有实例卡=刷数量角标（镜像已并，同
+        /// OnItemConsumedHandler 模式读本地快照条目——按 (物品,实例耐久) 匹配，掠夺物新耐久=新实例）；
+        /// **新实例=全量重建**（卡列表签名已变——新槽位长出来，下回合快照自然对账）</summary>
+        private void OnItemGainedHandler(string playerId, int itemName, int amount, int durability)
         {
             if (playerId != _myPlayerId) return;
             var snapshot = _session?.Player?.LatestSnapshot;
@@ -622,12 +632,13 @@ namespace GIC.Battle
                 }
             }
             if (myRes == null) return;
-            if (_handItemCards.TryGetValue((ItemName)itemName, out var card) && card != null)
+            if (_handItemCards.TryGetValue(((ItemName)itemName, durability), out var card) && card != null)
             {
                 int count = 0;
                 foreach (var entry in myRes.handCards)
                 {
-                    if ((CardType)entry.cardType == CardType.Item && entry.value == itemName)
+                    if ((CardType)entry.cardType == CardType.Item && entry.value == itemName
+                        && entry.durability == durability)
                     {
                         count = entry.count;
                         break;
@@ -636,7 +647,7 @@ namespace GIC.Battle
                 RefreshCurrencyCard(card, (ItemName)itemName, count);
                 return;
             }
-            RebuildHandCards(myRes); // 新卡：重建（签名变化触发；执行期手牌隐藏中也不碍——恢复期即见）
+            RebuildHandCards(myRes); // 新实例：重建（签名变化触发；执行期手牌隐藏中也不碍——恢复期即见）
         }
 
         /// <summary>战斗结束（S10 轻量全灭软停）：胜负 Tip 常驻，退出走既有设置钮确认流程；
@@ -862,9 +873,10 @@ namespace GIC.Battle
             if (_handContent == null) return; // 壳未寻到（prefab 缺 HandCards），手牌不显示
 
             // 卡列表签名比对（卡 id 列表，不含数量——货币数量每回合变化不触发重建，
-            // 角标经 RefreshHandCurrencyCards 随资源链动态刷；条目存亡变化（货币空堆移除/复活）自然反映）
+            // 角标经 RefreshHandCurrencyCards 随资源链动态刷；条目存亡变化（货币空堆移除/复活）自然反映。
+            // **键含装备实例耐久**（决策八十一）——同物异耐久条目=不同卡，掠夺新实例触发重建）
             var signature = myRes == null ? ""
-                : string.Join(",", myRes.handCards.ConvertAll(h => h.cardType + ":" + h.value));
+                : string.Join(",", myRes.handCards.ConvertAll(HandEntryKeyOf));
             if (signature == _handSignature) return;
             _handSignature = signature;
 
@@ -977,6 +989,13 @@ namespace GIC.Battle
                 foreach (var graphic in cardGo.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
                     graphic.raycastTarget = false;
                 var card = cardGo.GetComponent<Card>();
+                bool isEquipmentCard = false;
+                if (!isUnit && !isCurrency)
+                {
+                    var equipCheck = _itemConfig?.GetItemData(cardId.AsItemName());
+                    isEquipmentCard = equipCheck != null
+                        && (equipCheck.subType == ItemSubType.Weapon || equipCheck.subType == ItemSubType.Accessory);
+                }
                 if (card != null)
                 {
                     var saveData = new GIC.Framework.SaveCardData();
@@ -994,8 +1013,29 @@ namespace GIC.Battle
                     else if (!isUnit)
                     {
                         // 普通物品牌持有引用（C-1 统一消耗模型）：技能吃物品时即时刷新数量角标
-                        _handItemCards[cardId.AsItemName()] = card;
+                        //（**键含实例耐久**——决策八十一：装备条目按耐久分实例）
+                        _handItemCards[(cardId.AsItemName(), handEntry.durability)] = card;
                     }
+                }
+
+                // 装备实例耐久角标（决策八十一——手牌语义叠加层，左下；装备卡显示实例耐久
+                //（新鲜卡=配置满值/掠夺卡=保留值；无耐久概念〔纯词条武器〕0 不显）；与数量角标分立：
+                // 数量=同实例张数、耐久=实例可补充量）
+                if (isEquipmentCard && handEntry.durability > 0)
+                {
+                    var durGo = new GameObject("EquipDurability");
+                    durGo.transform.SetParent(wrapperGo.transform, false);
+                    var durRt = durGo.AddComponent<RectTransform>();
+                    durRt.anchorMin = durRt.anchorMax = new Vector2(0f, 0f);
+                    durRt.anchoredPosition = new Vector2(30f, 16f);
+                    durRt.sizeDelta = new Vector2(44f, 24f);
+                    var durText = durGo.AddComponent<TextMeshProUGUI>();
+                    durText.font = BattleViewFactory.WorldTextFont;
+                    durText.fontSize = 20;
+                    durText.alignment = TextAlignmentOptions.Center;
+                    durText.color = Palette.高亮金;
+                    durText.raycastTarget = false;
+                    durText.text = handEntry.durability.ToString();
                 }
 
                 // 部署费角标（手牌语义叠加层，右下；仅角色卡——物品卡无部署费，使用链后续批次）
@@ -1019,10 +1059,10 @@ namespace GIC.Battle
                 btn.targetGraphic = hit;
                 // 打出=拖拽专属（决策五十四，拍板「当前只是点一下就算打出，非常low」）：点击=开卡牌详情
                 // 面板（2026-10-10 拍板「点击手牌时，应当弹出卡牌详情面板」，分件 OnHandCardClicked）
-                var capturedKey = handEntry.cardType + ":" + handEntry.value;
+                var capturedKey = HandEntryKey(handEntry); // 装备条目键含实例耐久（决策八十一）
                 btn.onClick.AddListener(() => OnHandCardClicked(capturedKey));
                 _handCardButtons.Add(btn);
-                AttachHandCardInteraction(wrapperGo, capturedKey, isUnit, handEntry.value);
+                AttachHandCardInteraction(wrapperGo, capturedKey, isUnit, handEntry.value, handEntry.durability);
                 builtIndex++;
             }
             WriteBackHandDisplayOrder(); // 显示序缓存=本次实铺序（剪除已不存在的键；拖拽重排经此跨重建保持）
@@ -1246,15 +1286,18 @@ namespace GIC.Battle
         }
 
         /// <summary>进入装备物品瞄准（装备批 2026-10-18 拍板「和打出食物一样，需要精确指定」）：武器/
-        /// 配件拖出出牌区进本会话。可选格=**有空槽**的我方存活非建筑单位所在格（武器=weaponItem==0、
-        /// 配件=accessoryItems 含零位——快照槽位表单源；槽满单位不入选免无效提交，Host 槽位校验兜底）；
-        /// TeamType 口径同饮用域（2v2 含队友单位；尸体/建筑不可装备）。交互全复用饮用精确选人
-        ///（IsCurrentAimUnitTargeted 装备分支：点格=同格多候选轮换+precise 立牌直选+待定目标描边、
-        ///「完成选择」=确认提交 SubmitAim 装备分支单出口、拖回/点非可选格/取消钮/阶段切换=反悔弹回）</summary>
-        private void EnterEquipAim(int itemNameValue)
+        /// 配件拖出出牌区进本会话。可选格=**可装备**的我方存活非建筑单位所在格（**决策八十一补充耐久
+        /// 语义**：有空槽〔武器=weaponItem==0、配件=槽位表含零位〕∨ 已装备该物品且耐久未满〔补充
+        /// 耐久目标——满耐久持有者不入选〕；快照槽位表单源；TeamType 口径同饮用域〔2v2 含队友单位；
+        /// 尸体/建筑不可装备〕）。交互全复用饮用精确选人（IsCurrentAimUnitTargeted 装备分支：点格=
+        /// 同格多候选轮换+precise 立牌直选+待定目标描边、「完成选择」=确认提交 SubmitAim 装备分支
+        /// 单出口、拖回/点非可选格/取消钮/阶段切换=反悔弹回）。durability=拖出卡的实例耐久（提交
+        /// 载荷 equipDurability——决策八十一：装备条目按耐久分实例）</summary>
+        private void EnterEquipAim(int itemNameValue, int durability)
         {
             if (_state != HudState.Idle) return; // 仅手牌态可起（同部署/饮用）
             _equipAimItem = itemNameValue;
+            _equipAimDurability = durability;
             _state = HudState.Aiming;
             _aimDef = null; // 玩家级会话（无技能按钮定义——同部署/饮用/升命）
             _pendingAimCell = null; // 新会话待定清零（防陈旧提交）
@@ -1528,19 +1571,18 @@ namespace GIC.Battle
                 }
                 return;
             }
-            // 装备物品分支（装备批 2026-10-18）：目标域=**有空槽**的我方存活非建筑单位（武器=
-            // weaponItem==0；配件=accessoryItems 槽位表含零位——快照真源与 Host UnitEquipment 同构；
-            // 槽满单位不入域=不可点的空反馈，免提交后被 Host 拒）。物品种类经 _itemConfig 单源判定
+            // 装备物品分支（装备批 2026-10-18；决策八十一补充耐久域）：目标域=**可装备**的我方存活
+            // 非建筑单位——有空槽 ∨ 已装备该物品且耐久未满（补充耐久目标；同物永不双槽=持有恒走
+            // 补充路径，满耐久/持有他物槽满不入选=不可点的空反馈，免提交后被 Host 拒）。物品种类经
+            // _itemConfig 单源判定（EquipTargetQualifies 单出口）
             if (_equipAimItem != 0)
             {
-                var equipData = _itemConfig?.GetItemData((ItemName)_equipAimItem);
-                bool isWeapon = equipData != null && equipData.subType == ItemSubType.Weapon;
                 foreach (var u in snapshot.units)
                 {
                     if (u.isCorpse != 0) continue;
                     if ((TeamType)u.team != MyTeam) continue;
                     if (IsBuildingUnitState(u)) continue;
-                    if (isWeapon ? u.weaponItem != 0 : !HasFreeAccessorySlot(u)) continue;
+                    if (!EquipTargetQualifies(u, _equipAimItem)) continue;
                     if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
                     if (!_board.Map.HasTile(u.position.x, u.position.y)) continue;
                     into.Add(u);
@@ -1611,6 +1653,16 @@ namespace GIC.Battle
                     if (!sameCell) SetPendingAimCell(cell); // 金格换装（同格仅换目标——金格不动）
                     RefreshOutlines(); // 待定目标描边反馈（轮换到谁一目了然）
                     return;
+                }
+                // 装备瞄准点空域反馈（决策八十一追拍「满提示应当在打出装备并选择单位时才提示」）：
+                // 点格无候选（域外）——该格有我方存活非建筑单位且**持有该物品但已满**（耐久满/层满）
+                // → toast 提示（耐久件/堆叠件分流键）；其余空格静默（原行为）
+                if (_equipAimItem != 0)
+                {
+                    var tapped = FindUnitAt(snapshot, cell, UnitSide.MyTeam) ?? precise;
+                    if (tapped != null && !IsBuildingUnitState(tapped)
+                        && UnitHoldsItem(tapped, _equipAimItem) && !EquipTargetQualifies(tapped, _equipAimItem))
+                        ShowBattleToast(EquipFullToastKey(_equipAimItem));
                 }
             }
             SetPendingAimCell(cell); // 方向型/部署：纯方向语义待定
@@ -1818,6 +1870,7 @@ namespace GIC.Battle
             _deployAimUnit = 0;
             _itemUseAimItem = 0;
             _equipAimItem = 0;
+            _equipAimDurability = 0; // 装备实例耐久随会话清（决策八十一）
             if (wasDeployAim || wasItemUseAim || wasEquipAim)
             {
                 _state = HudState.Idle;
@@ -2015,6 +2068,61 @@ namespace GIC.Battle
             return false;
         }
 
+        /// <summary>装备目标合格判定（决策八十一补充耐久域单出口——瞄准域/提交防线两处同源）：
+        /// 未持有+有空槽 ∨ 持有该物品且槽位计数器<上限（**同物永不双槽**——持有恒走补充路径，
+        /// 满=不入选——「已经满耐久/已叠满，选择单位时要提示」由 HandleAimTap 点选域外满持有者
+        /// 给 toast；无耐久概念装备〔Durability 与 EquipStackLimit 均 0〕持有即恒满不入选）。
+        /// 上限=SlotCap 统一原语：耐久件=配置 Durability、堆叠件=配置 EquipStackLimit（互斥取大）。
+        /// 武器=weaponItem 单槽；配件=槽位表扫描（空位或该物命中即判）</summary>
+        private bool EquipTargetQualifies(UnitState u, int itemNameValue)
+        {
+            var equipData = _itemConfig?.GetItemData((ItemName)itemNameValue);
+            if (equipData == null) return false;
+            bool isWeapon = equipData.subType == ItemSubType.Weapon;
+            int cap = equipData.GetInt(nameof(SkillParamKey.Durability), 0);
+            int stack = equipData.GetInt(nameof(SkillParamKey.EquipStackLimit), 0);
+            if (stack > cap) cap = stack;
+            if (isWeapon)
+            {
+                if (u.weaponItem == 0) return true; // 未持有+武器槽恒 1（空=有空槽）
+                return u.weaponItem == itemNameValue && u.weaponDurability < cap; // 持有→补充域
+            }
+            if (u?.accessoryItems == null) return false;
+            for (int i = 0; i < u.accessoryItems.Count; i++)
+            {
+                int slot = u.accessoryItems[i];
+                if (slot == 0) return true; // 空槽
+                if (slot == itemNameValue)
+                {
+                    int counter = u.accessoryDurability != null && i < u.accessoryDurability.Count
+                        ? u.accessoryDurability[i] : 0;
+                    return counter < cap; // 持有→补充域（命中即返——同物永不双槽）
+                }
+            }
+            return false;
+        }
+
+        /// <summary>装备「已满」提示键分流（决策八十一追记——点选满持有者/提交防线共用）：
+        /// 堆叠配件=Battle_EquipStackFull（已叠满）、耐久配件=Battle_EquipDurabilityFull（耐久已满）</summary>
+        private string EquipFullToastKey(int itemNameValue)
+        {
+            var equipData = _itemConfig?.GetItemData((ItemName)itemNameValue);
+            return equipData != null && equipData.GetInt(nameof(SkillParamKey.EquipStackLimit), 0) > 0
+                ? "Battle_EquipStackFull"
+                : "Battle_EquipDurabilityFull";
+        }
+
+        /// <summary>快照单位是否持有指定物品（任意槽——武器+配件槽位表扫描；满/未满不判）</summary>
+        private static bool UnitHoldsItem(UnitState u, int itemNameValue)
+        {
+            if (u == null) return false;
+            if (u.weaponItem == itemNameValue) return true;
+            if (u.accessoryItems == null) return false;
+            foreach (var slot in u.accessoryItems)
+                if (slot == itemNameValue) return true;
+            return false;
+        }
+
         /// <summary>移动推荐预判的单格进入判定（镜像 MovementResolver.CanEnter 判定链的客户端静态版）：
         /// 地形层（IsPassable 按 ForceType——步行不可入水/沼泽）→ 体积绝对层（格内体积+自身体积≤3）
         /// → 阻挡规则层（blockAllies/blockEnemies/blockedByEnemies 配置值——运行时 Buff 修改不可见）。
@@ -2133,10 +2241,11 @@ namespace GIC.Battle
                 return true;
             }
 
-            // 装备物品分支（装备批 2026-10-18）：点有空槽的我方单位格=装备上交（玩家级行动占配额、
-            // 不耗体力——装备即消耗 docs/01）；目标=饮用同构精确选择（ResolvePendingTarget 优先，
-            // FindUnitAt 回落残留态再核槽位——槽满/建筑=拦截不提交保持瞄准态）；Host EquipItemExecutor
-            // 手牌持有/目标/槽位三重校验兜底
+            // 装备物品分支（装备批 2026-10-18；决策八十一补充耐久）：点可装备的我方单位格=装备/补充
+            // 耐久上交（玩家级行动占配额、不耗体力——装备即消耗 docs/01）；目标=饮用同构精确选择
+            //（ResolvePendingTarget 优先，FindUnitAt 回落残留态再核合格性——满耐久/槽满/建筑=拦截
+            // 不提交保持瞄准态）；**equipDurability=拖出卡的实例耐久**（装备条目按耐久分实例）；
+            // Host EquipItemExecutor 手牌实例/目标/槽位/满耐久四重校验兜底
             if (_equipAimItem != 0)
             {
                 var equipSnapshot = _session.Player.LatestSnapshot;
@@ -2144,15 +2253,19 @@ namespace GIC.Battle
                     ?? FindUnitAt(equipSnapshot, cell, UnitSide.MyTeam); // 存活我方（TeamType 口径；尸体默认排除）
                 if (equipTarget != null && IsBuildingUnitState(equipTarget))
                     equipTarget = null; // 建筑防线（域已排除，防回落残留态）
-                var equipData = _itemConfig?.GetItemData((ItemName)_equipAimItem);
-                bool equipIsWeapon = equipData != null && equipData.subType == ItemSubType.Weapon;
-                if (equipTarget != null
-                    && (equipIsWeapon ? equipTarget.weaponItem != 0 : !HasFreeAccessorySlot(equipTarget)))
-                    equipTarget = null; // 槽满防线（域已排除，防回落残留态——同回合槽位被占的极端竞态）
+                if (equipTarget != null && !EquipTargetQualifies(equipTarget, _equipAimItem))
+                {
+                    // 合格性防线（域已排除，防回落残留态——同回合竞态：先手装备把槽占满/补满耐久）。
+                    // 提示分流：持有该物品必然满耐久（未满会在合格判定入选）→「耐久已满」；否则=无空槽
+                    var rejected = equipTarget;
+                    equipTarget = null;
+                    // 提示分流：持有该物（必然满——未满会入选）→ 已满键（耐久/堆叠件分流）；否则=无空槽
+                    ShowBattleToast(UnitHoldsItem(rejected, _equipAimItem)
+                        ? EquipFullToastKey(_equipAimItem) : "Battle_EquipSlotFull");
+                }
                 if (equipTarget == null)
                 {
-                    GICLog.Info($"[BattleHud] 装备目标格 {cell} 无有空槽的我方存活单位，未提交");
-                    ShowBattleToast("Battle_EquipSlotFull");
+                    GICLog.Info($"[BattleHud] 装备目标格 {cell} 无可装备的我方存活单位，未提交");
                     return false;
                 }
                 var equipAction = new ActionData
@@ -2160,12 +2273,14 @@ namespace GIC.Battle
                     playerId = _myPlayerId,
                     actionType = ActionType.EquipItem,
                     equipItemId = _equipAimItem,
+                    equipDurability = _equipAimDurability, // 实例耐久（决策八十一——Host 按此实例消耗）
                     targetUnitId = equipTarget.unitId,
                 };
                 // 日志先于 SubmitAction（同饮用分支勘正——ExitAiming 同步清零）
-                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：装备 {(ItemName)_equipAimItem} → {equipTarget.unitId}");
+                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：装备 {(ItemName)_equipAimItem}" +
+                            $"（耐久 {_equipAimDurability}）→ {equipTarget.unitId}");
                 _session.SubmitAction(equipAction);
-                ExitAiming(); // 打出卡经 ExitAiming 统一飞回（装备段 ItemConsume 镜像扣数量+EquipItem 命令挂图标）
+                ExitAiming(); // 打出卡经 ExitAiming 统一飞回（装备段 ItemConsume 镜像扣数量+EquipItem 命令挂图标/刷角标）
                 return true;
             }
 

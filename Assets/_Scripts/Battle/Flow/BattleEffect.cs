@@ -85,7 +85,8 @@ namespace GIC.Battle
     /// 装备效应（装备批 2026-10-18）：EquipItem 行动的结算载体——应用层挂 UnitEquipment（槽位+
     /// 词条），命令层产 EquipItem 命令（客户端血条右侧图标行）。**耐久消耗刷新复用本类**：格挡发生时
     /// ApplyEffects 直接构造已回填（Applied=true）的实例并入 effects（同吸血先收后并），命令层发
-    /// EquipItem（同槽重发=角标更新）/UnequipItem（Removed=耐久耗尽）
+    /// EquipItem 同槽重发=角标更新（**决策八十一：耐久归零不再发 UnequipItem——留槽停效，图标留位
+    /// 角标隐藏**）
     /// </summary>
     public class EquipEffect : BattleEffect
     {
@@ -101,14 +102,19 @@ namespace GIC.Battle
         /// <summary>槽位序号（武器恒 0；配件 0..2——应用层回填）</summary>
         public int SlotIndex;
 
-        /// <summary>装备后剩余耐久（应用层回填；0=无耐久概念）</summary>
+        /// <summary>装备后剩余耐久（应用层回填；0=无耐久概念/归零停效态）</summary>
         public int DurabilityLeft;
 
         /// <summary>应用成功（槽位校验通过并已挂载；false=槽满/缺组件防御路径，零命令）</summary>
         public bool Applied;
 
-        /// <summary>耐久耗尽已卸下（命令层发 UnequipItem 而非 EquipItem）</summary>
-        public bool Removed;
+        /// <summary>补充耐久模式（决策八十一「当已经有某装备时，再次装备，则补充耐久」）：已装备
+        /// 同物品→ReplenishAccessory/ReplenishWeapon 既有槽位相加封顶（永不双槽）；false=新槽挂载</summary>
+        public bool Replenish;
+
+        /// <summary>本次装备/补充的实例耐久（手牌装备条目携带——掠夺物保留原耐久、新鲜卡=配置满值；
+        /// -1=配置解析〔防御默认〕）</summary>
+        public int IncomingDurability = -1;
 
         public EquipEffect(string playerId, string targetUnitId, int item)
         {
@@ -520,7 +526,9 @@ namespace GIC.Battle
     /// 确定性逐条扣、跨条目凑足、原子性失败不扣分毫；货币卡不可被匹配，见 ResourceGate）。
     /// 应用=LoseCard（条目真源扣减、减尽移除）；命令=按 Consumed 明细逐条 ItemConsume
     /// （客户端手牌镜像即时扣减+角标刷新）；对账按明细 (玩家,物品) 查存在性。
-    /// AppliedAmount 同 MoraSpend 防御性回填口径（0=零命令非漏发）。
+    /// AppliedAmount 同 MoraSpend 防御性回填口径（0=不足零命令非漏发）。
+    /// **装备实例耐久（决策八十一）**：Durability=指定模式的手牌条目实例匹配（装备条目按耐久分实例
+    /// ——掠夺物 2 ≠ 新鲜卡 3；非装备物品恒 0）。
     /// </summary>
     public class ItemConsumeEffect : BattleEffect
     {
@@ -532,15 +540,19 @@ namespace GIC.Battle
         /// <summary>true=消耗任意 SubType 同类物品（Item 忽略）；false=消耗指定 Item</summary>
         public bool AnyOfSubType;
 
+        /// <summary>指定物品模式的手牌条目实例耐久（装备条目按耐久分实例——决策八十一；非装备恒 0）</summary>
+        public int Durability;
+
         /// <summary>申请消耗量</summary>
         public int Amount;
 
         /// <summary>实际扣减总量（ApplyEffects 回填；0=不足零命令）</summary>
         public int AppliedAmount;
 
-        /// <summary>实际消耗明细（ApplyEffects 回填：(物品, 数量) 逐条——命令发射/对账遍历用；
-        /// 指定模式=单条，同类任意模式=按手牌序逐条凑量）</summary>
-        public readonly List<(int item, int count)> Consumed = new List<(int item, int count)>();
+        /// <summary>实际消耗明细（ApplyEffects 回填：(物品, 数量, 实例耐久) 逐条——命令发射/对账/
+        /// 原子回滚遍历用；指定模式=单条，同类任意模式=按手牌序逐条凑量；耐久=装备条目实例（非装备恒 0）</summary>
+        public readonly List<(int item, int count, int durability)> Consumed
+            = new List<(int item, int count, int durability)>();
 
         /// <summary>指定物品模式构造（kind=Item）</summary>
         public ItemConsumeEffect(string playerId, ItemName item, int amount)

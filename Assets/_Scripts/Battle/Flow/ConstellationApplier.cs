@@ -220,20 +220,43 @@ namespace GIC.Battle
 
                     var itemName = (ItemName)atom.value;
                     var result = new ItemGrantResult { item = atom.value };
-                    // 直接装备优先（追拍）：武器/配件且有空槽 → 挂单位身上
+                    // 直接装备优先（追拍）：武器/配件且有空槽 → 挂单位身上。
+                    // **决策八十一补充耐久语义对齐**：已装备同物品 → 授予物补充既有槽位耐久
+                    //（新鲜满值相加封顶；已满 → 手牌）；未装备 → 空槽安装
                     var itemData = itemConfig?.GetItemData(itemName);
                     if (equipment != null && itemData != null
                         && (itemData.subType == ItemSubType.Weapon || itemData.subType == ItemSubType.Accessory))
                     {
-                        if (itemData.subType == ItemSubType.Weapon && equipment.HasFreeWeaponSlot
-                            && equipment.EquipWeapon(itemName))
+                        // 单次安装量（决策八十一追记）：耐久件=配置满耐久、堆叠件=恒 1 层（「每次装备仅装备1个」）
+                        int fresh = UnitEquipment.SingleInstallCount(itemName);
+                        bool isWeapon = itemData.subType == ItemSubType.Weapon;
+                        if (equipment.HasEquipped(itemName))
+                        {
+                            // 已装备 → 补充耐久（同物永不双槽）；满耐久 → 手牌
+                            bool replenished;
+                            int rSlot = -1, rLeft = 0, weaponLeft = 0;
+                            if (isWeapon)
+                                replenished = equipment.ReplenishWeapon(itemName, fresh, out weaponLeft);
+                            else
+                                replenished = equipment.ReplenishAccessory(itemName, fresh, out rSlot,
+                                    out rLeft, out _);
+                            if (replenished)
+                            {
+                                result.equipped = true;
+                                result.replenished = true;
+                                result.slotKind = isWeapon ? BattleCommand.EquipKindWeapon : BattleCommand.EquipKindAccessory;
+                                result.slotIndex = isWeapon ? 0 : rSlot;
+                                result.durabilityLeft = isWeapon ? weaponLeft : rLeft;
+                            }
+                        }
+                        else if (isWeapon && equipment.HasFreeWeaponSlot && equipment.EquipWeapon(itemName, fresh))
                         {
                             result.equipped = true;
                             result.slotKind = BattleCommand.EquipKindWeapon;
                             result.durabilityLeft = equipment.WeaponDurability;
                         }
-                        else if (itemData.subType == ItemSubType.Accessory && equipment.HasFreeAccessorySlot
-                                 && equipment.EquipAccessory(itemName, out int slot))
+                        else if (!isWeapon && equipment.HasFreeAccessorySlot
+                                 && equipment.EquipAccessory(itemName, out int slot, fresh))
                         {
                             result.equipped = true;
                             result.slotKind = BattleCommand.EquipKindAccessory;
@@ -242,12 +265,12 @@ namespace GIC.Battle
                         }
                     }
                     if (!result.equipped)
-                        sim.GainCard(playerId, new CardId(itemName), 1); // 槽满/非装备物 → 手牌
+                        sim.GainCard(playerId, new CardId(itemName), 1); // 槽满/已满耐久/非装备物 → 手牌（新鲜满值条目）
                     granted.Add(result);
                     GICLog.Info("[Constellation] " + unit.name + " C" + newLevel + " 授予 " + itemName + " → " +
                                 (result.equipped
-                                    ? "直接装备（槽 " + result.slotKind + ":" + result.slotIndex + "，耐久 " + result.durabilityLeft + "）"
-                                    : "手牌（槽满/非装备物）"));
+                                    ? (result.replenished ? "补充耐久（槽 " : "直接装备（槽 ") + result.slotKind + ":" + result.slotIndex + "，耐久 " + result.durabilityLeft + "）"
+                                    : "手牌（槽满/已满耐久/非装备物）"));
                 }
             }
             return granted;
@@ -258,7 +281,8 @@ namespace GIC.Battle
         public struct ItemGrantResult
         {
             public int item;            // ItemName 枚举值
-            public bool equipped;       // true=已直接装备到单位
+            public bool equipped;       // true=已直接装备/补充耐久到单位
+            public bool replenished;    // true=补充既有装备耐久（非新槽安装——决策八十一同物合并）
             public int slotKind;        // BattleCommand.EquipKindWeapon/Accessory
             public int slotIndex;       // 配件槽号（武器=0）
             public int durabilityLeft;  // 装备后剩余耐久

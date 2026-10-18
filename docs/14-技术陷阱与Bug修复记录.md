@@ -2221,3 +2221,17 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 3. **正解：`AssetDatabase.GetDependencies(图集路径, false)` 反查**——直接依赖清单里搜目标 png 路径，一发实锤归属（recursive=false 够用：folder 打包也走直接依赖）。本批实锤：UICommon.spriteatlas 直接依赖 Element/Deep 全部 7 张。
 4. **收口判据（skill 陷阱 10 补遗）**：ImportAsset 后回读 `sprite.textureRect` 若仍是**旧尺寸/旧区域**（本例 801×801 区域）=Library 图集旧页仍在供旧图，必须 `SpriteAtlasUtility.PackAtlases` 重打包；打包后 textureRect 翻新为目标尺寸且各 sprite 区域互异才算闭环。附带：`sprite.packed=true` 时 `.texture`=图集页（尺寸是页尺寸），勿当源图尺寸误判。
 5. **图集重打包副作用**：PackAtlases 全图集后逐 sprite 打包压缩格式 Warning 刷屏（logo/按钮/势力图全库 sprite 皆报）=**常规既有状态非本批引入**，勿当错误追查。
+
+## §160 协议对象快照拷贝丢字段陷阱：`new` 构造器不拷新字段=「打出装备没反应」半生效态（2026-10-18/19 决策八十一装备批复测实证）
+
+**症状**：打出手牌兔兔伯爵→选安柏→提交后无任何反馈（卡飞回、无图标、无 toast）——客户端全程零异常；Host 日志实锤 `[EquipItem] 0 手牌无 BaronBunny（耐久 0）实例，装备拒绝（手牌形态：…[0:3002x1 耐3]…）`。
+
+**根因**：`BattleSimState.TakeSnapshot` 的手牌条目拷贝用 `new HandCard(entry.AsCardId(), entry.count)` 构造器重建——`HandCard(CardId, int)` 构造器**不拷本批新加的 `durability` 字段**→客户端拿到的快照条目恒 0→拖出卡 `equipDurability=0`→Host 按实例三元组 `(Item, value, durability)` 匹配失败→装备落空（客户端已 ExitAiming 飞回=「没反应」）。**Host 真源正确、客户端镜像全 0、零报错**——典型半生效态（对账也查不出：命令未发=存在性检查天然通过）。
+
+**修法**：copy 后逐字段补 `copy.durability = entry.durability`（或 copy 换 MemberwiseClone）。
+
+**取证教训**：
+1. **协议对象 copy 模式新增字段时，必须逐字段核对构造器**——`new Xxx(...)` 重建不报错不告警，漏一个字段=该字段在快照/镜像层静默归零；快照层新字段的验证必须在**客户端侧读回**（Host 侧读回恒对——真源就在那）。
+2. **日志定位半生效态**：用户报「没反应」类无报错故障，先拉 `[BattleHud] 上交：…` 行看提交载荷实际值（本例「装备 BaronBunny（耐久 0）」直接暴露客户端侧 0），再对 Host 侧 Warn 行的 dump（「手牌形态：…耐3」）——两侧值对不上=中间层（快照拷贝/序列化）丢字段。
+3. **编辑器取证日志轮转命名**：Tuanjie 重启后上一会话日志轮转为 `Editor-prev.log`（**不是** Unity 惯例的 `Editor.log-prev`）；当前 Editor.log 惰性 flush 且控制台会随重启清空——报障取证先查 `Editor-prev.log`（本例 12.7MB 全量实测记录在内）。
+4. **意外正向收获**：日志顺带实证死亡掠夺链实战已通过（敌 AI 安柏升3命自动上身→被玩家击杀→`[掠夺] …耐久 3→手牌`）——报障日志常含未测链路的免费实证，排查时顺手扫。

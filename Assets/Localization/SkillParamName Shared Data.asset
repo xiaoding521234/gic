@@ -347,6 +347,18 @@ MonoBehaviour:
     m_Key: Durability
     m_Metadata:
       m_Items: []
+  - m_Id: 83
+    m_Key: ExplodePercent
+    m_Metadata:
+      m_Items: []
+  - m_Id: 84
+    m_Key: ExplodeRadius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 85
+    m_Key: EquipStackLimit
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

@@ -45,8 +45,15 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3002
     m_Localized: "\xB7When equipped, damage of {BlockThreshold} or higher is completely
-      blocked, costing 1 durability\n\xB7{Durability} durability; disappears when
-      depleted"
+      blocked, costing 1 durability\n\xB7Each time durability decreases, deals {ExplodePercent}%
+      ATK Pyro DMG to enemies within {ExplodeRadius} tile\n\xB7{Durability} durability;
+      stops working when depleted but is not destroyed; the holder recovers 1 durability
+      per collection"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001
+    m_Localized: "\xB7Accessory: equip on a unit; each equip adds only 1, stacking
+      up to {EquipStackLimit}"
     m_Metadata:
       m_Items: []
   references:

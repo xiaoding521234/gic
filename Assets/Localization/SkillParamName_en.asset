@@ -350,6 +350,18 @@ MonoBehaviour:
     m_Localized: Durability
     m_Metadata:
       m_Items: []
+  - m_Id: 83
+    m_Localized: Durability Explosion DMG
+    m_Metadata:
+      m_Items: []
+  - m_Id: 84
+    m_Localized: Durability Explosion Radius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 85
+    m_Localized: Equip Stack Limit
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -19,8 +19,11 @@ MonoBehaviour:
     m_Items: []
   m_TableData:
   - m_Id: 1
-    m_Localized: 3 Durability. When the holder takes 50 or more DMG, Baron Bunny
-      blocks it and loses 1 Durability. Vanishes when its Durability is depleted.
+    m_Localized: '{Durability} Durability. When the holder takes {BlockThreshold}
+      or more DMG, Baron Bunny blocks it, losing 1 Durability; each time Durability
+      decreases, it deals {ExplodePercent}% ATK Pyro DMG to enemies within {ExplodeRadius}
+      tile. Stops working when depleted, but is not destroyed; the holder recovers
+      1 Durability per collection.'
     m_Metadata:
       m_Items: []
   - m_Id: 11512500209799168

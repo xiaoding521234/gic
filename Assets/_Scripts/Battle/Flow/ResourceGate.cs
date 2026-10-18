@@ -192,11 +192,13 @@ namespace GIC.Battle
         }
 
         /// <summary>同类物品条目收集（AnyItem 应用用）：手牌列表序=确定性扣减顺序（零随机）。
-        /// **物化列表返回（非惰性枚举）**——扣减循环内 LoseCard 会移除手牌条目，惰性枚举=集合修改异常</summary>
-        public static List<(ItemName item, int count)> CollectAnyItems(BattleSimState sim,
+        /// **物化列表返回（非惰性枚举）**——扣减循环内 LoseCard 会移除手牌条目，惰性枚举=集合修改异常。
+        /// 三元组含实例耐久（决策八十一——装备条目按耐久分实例，LoseCard/Consumed 明细需实例匹配；
+        /// 非装备恒 0）</summary>
+        public static List<(ItemName item, int count, int durability)> CollectAnyItems(BattleSimState sim,
             string playerId, ItemSubType subType)
         {
-            var result = new List<(ItemName, int)>();
+            var result = new List<(ItemName, int, int)>();
             var hand = sim.GetHand(playerId);
             if (hand == null) return result;
             var itemConfig = Wargame.Instance?.Context?.Get<ItemConfig>();
@@ -212,7 +214,7 @@ namespace GIC.Battle
                 if (name == ItemName.Mora || name == ItemName.Stamina) continue;
                 var data = itemConfig.GetItemData(name);
                 if (data != null && data.subType == subType && entry.count > 0)
-                    result.Add((name, entry.count));
+                    result.Add((name, entry.count, entry.durability));
             }
             return result;
         }

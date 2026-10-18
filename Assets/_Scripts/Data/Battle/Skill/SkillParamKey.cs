@@ -290,6 +290,22 @@ namespace GIC.Data
 
         [InspectorName("耐久")]
         Durability = 82,
+
+        // 装备耐久爆炸参数（2026-10-18 决策八十一·兔兔伯爵增强「耐久每次减少，对半径1内敌人
+        // 造成100%攻击力火伤」）：ExplodePercent=耐久减少触发的爆炸伤害（%攻击力，0=不触发）；
+        // ExplodeRadius=爆炸半径（格，切比雪夫）——TurnResolver 格挡点编译消费
+        [InspectorName("耐久爆炸伤害")]
+        ExplodePercent = 83,
+
+        [InspectorName("耐久爆炸半径")]
+        ExplodeRadius = 84,
+
+        // 装备槽内堆叠上限（2026-10-18 决策八十一追记·勾玉回归堆叠方案：「堆叠上限为3（指的是
+        // 装备槽，而不是手牌堆叠上限），描述加上每次装备仅装备1个」）：配此参数（>0）=堆叠配件
+        // ——同槽可叠 N 枚、每张物品牌装备 +1 层、每层全效（与耐久配件〔Durability 参数〕互斥；
+        // 未来魔法箭矢类同语义）。连携勾玉=首个堆叠配件（槽内层数=连携储存数）
+        [InspectorName("装备堆叠上限")]
+        EquipStackLimit = 85,
     }
 
     /// <summary>

@@ -87,6 +87,11 @@ namespace GIC.Data
         /// 精确指定目标=打出食物同款交互〕）</summary>
         public int equipItemId;
 
+        /// <summary>装备的手牌条目实例耐久（决策八十一「舍弃堆叠数量，统一采用耐久方案」：装备条目按
+        /// 耐久分实例——客户端从拖拽的条目填充，Host 按此实例匹配消耗与安装/补充。新鲜卡=配置满值、
+        /// 掠夺物=保留耐久。默认 0 序列化兼容）</summary>
+        public int equipDurability;
+
         /// <summary>玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——玩家通过配额直接操控伙伴
         /// 行动时标记 true（真人/AI 提交路径同标，AI-1 批起含势力技能号令），ResourceGate 体力换算
         /// 据此减免 5（可减免为负数=获得体力）；SkillExecutor 对伙伴施法者的延奏/契约号令发津贴 +5

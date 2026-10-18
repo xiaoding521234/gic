@@ -60,7 +60,7 @@ MonoBehaviour:
       capacity, the excess transfers to the nearest allied character with unfilled
       energy; no effect if all are full\n\xB7[C2] Move SPD +{C2MoveSpeed}, Max Energy
       +{C2EnergyLimit}; Burst can dispel fog, gaining {C2FogEnergyGain} energy per
-      {C2FogEnergyThreshold} tiles dispelled\n\xB7[C3] Directly equips <color=#FFD700><u><link=\"Concept:BaronBunny\">Baron
+      {C2FogEnergyThreshold} tiles dispelled\n\xB7[C3] Directly equips <color=#FFD700><u><link=\"Item:BaronBunny\">Baron
       Bunny</link></u></color> (added to hand if accessory slots are full)"
     m_Metadata:
       m_Items: []

@@ -74,11 +74,12 @@ namespace GIC.Battle
         /// <summary>手牌卡槽条目（重建时随 RebuildHandCards 全量重建；列表序=显示序）</summary>
         private class HandCardSlot
         {
-            public string key;        // 条目键（cardType:value，与手牌签名同形）
+            public string key;        // 条目键（cardType:value[+装备 :耐久]，与手牌签名同形）
             public RectTransform rt;  // wrapper（点击/拖拽接收层）
             public UnityEngine.UI.Button btn;
             public bool isUnit;
             public int unitValue;     // 卡枚举值：isUnit=UnitName；物品卡=ItemName（2026-10-16 可打出物品批——打出路由消费）
+            public int durability;    // 装备实例耐久（决策八十一——装备条目按耐久分实例，打出路由/提交载荷消费；非装备 0）
             public Vector3 baseScale; // 手牌壳内原始 localScale（回槽还原用——壳 0.7×槽缩放）
         }
 
@@ -147,8 +148,21 @@ namespace GIC.Battle
         /// <summary>手牌槽位公式：卡排相对 HandContent 中心对称（i=显示位序）</summary>
         private static float HandSlotX(int i, int count) => (i - (count - 1) * 0.5f) * (手牌卡宽 + 手牌卡间距);
 
-        /// <summary>条目键（与手牌签名同形：cardType:value）</summary>
-        private static string HandEntryKey(HandCard h) => h.cardType + ":" + h.value;
+        /// <summary>条目键（与手牌签名同形：cardType:value——**装备类物品追加 :耐久**（决策八十一：
+        /// 装备条目按耐久分实例，同物异耐久=不同卡不同键；非装备零追加保持旧键形态）</summary>
+        private string HandEntryKey(HandCard h)
+        {
+            if ((CardType)h.cardType == CardType.Item)
+            {
+                var data = _itemConfig?.GetItemData((ItemName)h.value);
+                if (data != null && (data.subType == ItemSubType.Weapon || data.subType == ItemSubType.Accessory))
+                    return h.cardType + ":" + h.value + ":" + h.durability;
+            }
+            return h.cardType + ":" + h.value;
+        }
+
+        /// <summary>条目键的 ConvertAll 载体（签名构建用——实例方法包装）</summary>
+        private string HandEntryKeyOf(HandCard h) => HandEntryKey(h);
 
         // ==================== 重建接线（RebuildHandCards 消费） ====================
 
@@ -185,8 +199,10 @@ namespace GIC.Battle
             foreach (var s in _handCardSlots) _handDisplayOrder.Add(s.key);
         }
 
-        /// <summary>卡条目接线（RebuildHandCards 每张建好的 wrapper 调）：登记槽位+挂拖拽转发件+CanvasGroup</summary>
-        private void AttachHandCardInteraction(GameObject wrapperGo, string key, bool isUnit, int unitValue)
+        /// <summary>卡条目接线（RebuildHandCards 每张建好的 wrapper 调）：登记槽位+挂拖拽转发件+CanvasGroup。
+        /// durability=装备实例耐久（决策八十一——打出路由/提交载荷消费；非装备 0）</summary>
+        private void AttachHandCardInteraction(GameObject wrapperGo, string key, bool isUnit, int unitValue,
+            int durability = 0)
         {
             var slot = new HandCardSlot
             {
@@ -195,6 +211,7 @@ namespace GIC.Battle
                 btn = wrapperGo.GetComponent<UnityEngine.UI.Button>(),
                 isUnit = isUnit,
                 unitValue = unitValue,
+                durability = durability,
                 baseScale = wrapperGo.transform.localScale,
             };
             _handCardSlots.Add(slot);
@@ -658,14 +675,16 @@ namespace GIC.Battle
             }
             if (!slot.isUnit)
             {
-                // 装备物品（装备批 2026-10-18）：武器/配件 subType → 进装备瞄准（有空槽的我方存活
-                // 非建筑单位——精确指定，打出食物同款交互）；装备即消耗 docs/01
+                // 装备物品（装备批 2026-10-18；决策八十一补充耐久）：武器/配件 subType → 进装备瞄准
+                //（可装备=有空槽∨持有该物品且计数器未满——精确指定，打出食物同款交互）；装备即消耗 docs/01。
+                // **拖入不做预检**（决策八十一追拍「满提示应当在选择单位时才提示，否则怎么知道装给谁」
+                //——域外满持有者=点选时 toast，见 HandleAimTap 装备分支）
                 var equipData = _itemConfig?.GetItemData((ItemName)slot.unitValue);
                 if (equipData != null
                     && (equipData.subType == ItemSubType.Weapon || equipData.subType == ItemSubType.Accessory))
                 {
                     SetPlayedHandCard(slot); // 打出态：卡悬浮松手位（装备瞄准期随取随拖）
-                    EnterEquipAim(slot.unitValue);
+                    EnterEquipAim(slot.unitValue, slot.durability); // 实例耐久随卡（决策八十一）
                     return;
                 }
                 // 可打出物品（2026-10-16 首个可打出物品批）：配了使用效果（ItemData.HasEffects 单源）

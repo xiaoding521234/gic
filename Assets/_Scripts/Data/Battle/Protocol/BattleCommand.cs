@@ -407,8 +407,9 @@ namespace GIC.Data
 
         /// <summary>装备物品命令工厂（装备批 2026-10-18）。targetUnitId=装备单位、actorUnitId=装备玩家；
         /// value=物品名（ItemName 枚举值）、metadata=槽位种类（EquipKindWeapon=0/EquipKindAccessory=1）、
-        /// direction=槽位序号（武器恒 0；配件 0..2）、buffLevel=装备后剩余耐久（0=无耐久概念）。
-        /// **耐久消耗刷新复用本命令**（同槽重发=客户端角标更新，幂等）；耐久耗尽=UnequipItem</summary>
+        /// direction=槽位序号（武器恒 0；配件 0..2）、buffLevel=装备后剩余耐久（0=无耐久概念/归零停效态）。
+        /// **耐久消耗刷新复用本命令**（同槽重发=客户端角标更新，幂等）；**决策八十一：耐久归零不发
+        /// UnequipItem——留槽停效（图标留位角标隐藏），UnequipItem 仅掠夺清槽用**</summary>
         public static BattleCommand EquipItem(string playerId, string unitId, int sliceIndex, int indexInSlice,
             int itemName, int slotKind, int slotIndex, int durabilityLeft)
         {
@@ -426,8 +427,8 @@ namespace GIC.Data
             };
         }
 
-        /// <summary>卸下物品命令工厂（耐久耗尽——兔兔伯爵耗尽消失）。targetUnitId=装备单位；
-        /// value=物品名、metadata=槽位种类、direction=槽位序号</summary>
+        /// <summary>卸下物品命令工厂（决策八十一·死亡掠夺清槽——阵亡单位装备被击杀方掠走，客户端
+        /// 图标行移除该槽位）。targetUnitId=装备单位；value=物品名、metadata=槽位种类、direction=槽位序号</summary>
         public static BattleCommand UnequipItem(string unitId, int sliceIndex, int indexInSlice,
             int itemName, int slotKind, int slotIndex)
         {
@@ -444,11 +445,12 @@ namespace GIC.Data
             };
         }
 
-        /// <summary>获得物品卡命令工厂（命座授予——安柏3命兔兔伯爵）。actorUnitId=targetUnitId=获得玩家
-        ///（同 ItemConsume 口径）；metadata=物品名、value=数量。客户端=本地手牌镜像新增（有则加数量/
-        /// 无则加卡，GainCard 对偶）+手牌刷新（快照权威自愈）</summary>
+        /// <summary>获得物品卡命令工厂（命座授予/死亡掠夺）。actorUnitId=targetUnitId=获得玩家
+        ///（同 ItemConsume 口径）；metadata=物品名、value=数量、buffLevel=装备实例耐久（决策八十一：
+        /// 掠夺物耐久不变保留——客户端按 (物品,耐久) 条目镜像；新鲜授予 0=按配置满值建条目）。
+        /// 客户端=本地手牌镜像新增（有则加数量/无则加卡，GainCard 对偶）+手牌刷新（快照权威自愈）</summary>
         public static BattleCommand ItemGain(string playerId, int sliceIndex, int indexInSlice,
-            int itemName, int amount)
+            int itemName, int amount, int durability = 0)
         {
             return new BattleCommand
             {
@@ -459,6 +461,7 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 metadata = itemName,
                 value = amount,
+                buffLevel = durability,
             };
         }
 
@@ -499,10 +502,11 @@ namespace GIC.Data
         }
 
         /// <summary>物品消耗命令工厂（统一消耗模型 C-1，docs/30）：技能消耗手牌物品牌（如酒/苹果）
-        /// ——targetUnitId=归属玩家、metadata=物品名（ItemName 枚举值）、value=消耗数量。
+        /// ——targetUnitId=归属玩家、metadata=物品名（ItemName 枚举值）、value=消耗数量、
+        /// buffLevel=装备实例耐久（决策八十一：客户端按 (物品,耐久) 条目扣镜像；非装备恒 0）。
         /// 客户端应用=本地 handCards 镜像条目扣减（减尽移除）+手牌角标即时刷新（不等下回合快照）</summary>
         public static BattleCommand ItemConsume(string playerId, int sliceIndex, int indexInSlice,
-            int itemName, int amount)
+            int itemName, int amount, int durability = 0)
         {
             return new BattleCommand
             {
@@ -513,6 +517,7 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 metadata = itemName,
                 value = amount,
+                buffLevel = durability,
             };
         }
 

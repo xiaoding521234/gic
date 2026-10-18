@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GIC.Data;
+using GIC.Framework;
 namespace GIC.Battle
 {
 
@@ -182,15 +183,29 @@ namespace GIC.Battle
         /// 则加上这个卡」）。手牌构建/开局初始量/货币获得的统一入口——普通卡（角色/物品）数量=条目
         /// 真源；货币物品牌（摩拉/体力）数量走资源池（池即牌堆张数）。装配期调用（快照前）无需产
         /// 命令；局内获得（掠夺等）届时由调用方负责命令产出。
+        /// **装备实例耐久（决策八十一「舍弃堆叠数量，统一采用耐久方案」）**：装备类物品（Weapon/
+        /// Accessory）条目按耐久分实例——durability≥0=携带实例耐久（掠夺物保留）；-1（默认）=新鲜卡
+        /// 解析配置 Durability 满值；非装备物品恒 0。同物同耐久合并数量、异耐久分行目。
         /// </summary>
-        public void GainCard(string playerId, CardId cardId, int count)
+        public void GainCard(string playerId, CardId cardId, int count, int durability = -1)
         {
             if (string.IsNullOrEmpty(playerId) || cardId.value <= 0 || count <= 0) return;
 
-            var entry = FindHandEntry(playerId, cardId);
+            // 装备实例耐久解析：-1=新鲜（配置满值——卡组投影/命座授予共用）；≥0=掠夺携带耐久
+            int entryDurability = durability;
+            if (durability < 0 && cardId.cardType == CardType.Item)
+            {
+                entryDurability = 0;
+                var itemData = Wargame.Instance?.Context?.Get<ItemConfig>()?.GetItemData(cardId.AsItemName());
+                if (itemData != null
+                    && (itemData.subType == ItemSubType.Weapon || itemData.subType == ItemSubType.Accessory))
+                    entryDurability = itemData.GetInt(nameof(SkillParamKey.Durability), 0);
+            }
+
+            var entry = FindHandEntry(playerId, cardId, entryDurability);
             if (entry != null && !IsCurrencyCard(cardId))
             {
-                entry.count += count; // 普通卡：有则加数量
+                entry.count += count; // 普通卡：有则加数量（装备=同物同耐久实例合并）
                 return;
             }
 
@@ -204,7 +219,9 @@ namespace GIC.Battle
 
             // 普通卡：没有则加上这个卡
             var hand = HandList(playerId);
-            hand.Add(new HandCard(cardId, count));
+            var newCard = new HandCard(cardId, count);
+            newCard.durability = entryDurability;
+            hand.Add(newCard);
             if (_resources.TryGetValue(playerId, out var res))
                 res.handCardCount = hand.Count;
         }
@@ -213,8 +230,10 @@ namespace GIC.Battle
         /// 失去卡片（获得的对偶，用户拍板「失去数量时，同理」）：有则减数量、
         /// 减至零移除卡。普通卡=条目真源；货币牌=池减（空堆时条目移除，再发放经池自动复活——
         /// 与获得完全对称）。数量不足返回 false 且不改动。使用/装备消耗与掠夺由后续批次接线。
+        /// **装备实例匹配（决策八十一）**：durability 参数=手牌条目实例耐久（装备按 (物,耐久) 分条目；
+        /// 非装备恒 0——默认值兼容既有调用方）。
         /// </summary>
-        public bool LoseCard(string playerId, CardId cardId, int count)
+        public bool LoseCard(string playerId, CardId cardId, int count, int durability = 0)
         {
             if (count <= 0) return true;
 
@@ -227,7 +246,7 @@ namespace GIC.Battle
                 return true;
             }
 
-            var entry = FindHandEntry(playerId, cardId);
+            var entry = FindHandEntry(playerId, cardId, durability);
             if (entry == null || entry.count < count) return false;
             entry.count -= count;
             if (entry.count <= 0)
@@ -278,12 +297,13 @@ namespace GIC.Battle
             }
         }
 
-        private HandCard FindHandEntry(string playerId, CardId cardId)
+        private HandCard FindHandEntry(string playerId, CardId cardId, int durability = 0)
         {
             if (!_hands.TryGetValue(playerId, out var hand)) return null;
             foreach (var entry in hand)
             {
-                if ((CardType)entry.cardType == cardId.cardType && entry.value == cardId.value)
+                if ((CardType)entry.cardType == cardId.cardType && entry.value == cardId.value
+                    && entry.durability == durability)
                     return entry;
             }
             return null;
@@ -1029,6 +1049,9 @@ namespace GIC.Battle
                     foreach (var entry in hand)
                     {
                         var copy = new HandCard(entry.AsCardId(), entry.count);
+                        copy.durability = entry.durability; // 装备实例耐久（决策八十一——构造器不拷字段，
+                                                             // 上批漏拷=客户端快照条目恒 0 → equipDurability
+                                                             // 上交 0 → Host 实例匹配拒绝=「打出装备没反应」根因）
                         if (copy.IsCurrency)
                             copy.count = copy.AsItemName() == ItemName.Mora ? res.mora : res.stamina;
                         snapshotRes.handCards.Add(copy);

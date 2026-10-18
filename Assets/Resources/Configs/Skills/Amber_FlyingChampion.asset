@@ -22,7 +22,7 @@ MonoBehaviour:
       value: 10
       baseType: 9
     - key: 16
-      value: 2
+      value: 3
       baseType: 0
     - key: 34
       value: 5

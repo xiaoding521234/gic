@@ -43,6 +43,10 @@ MonoBehaviour:
     m_Key: BaronBunny
     m_Metadata:
       m_Items: []
+  - m_Id: 3001
+    m_Key: Magatama
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
