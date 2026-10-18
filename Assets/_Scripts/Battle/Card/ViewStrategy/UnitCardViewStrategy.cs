@@ -26,11 +26,19 @@ namespace GIC.Battle
             card.itemImage.gameObject.SetActive(false);
             card.countImage.gameObject.SetActive(false);
 
-            // 部署费角标（2026-10-19）：角色卡恒显白字出战摩拉；建筑=不可打出无费用语义，隐藏
+            // 部署费角标（2026-10-19）：角色卡恒显出战摩拉；建筑=不可打出无费用语义，隐藏
             bool showCost = raw != null && raw.unitType != UnitType.Building;
             card.部署费角标?.SetActive(showCost);
             if (showCost && card.部署费数字 != null)
-                card.部署费数字.text = raw.GetEffectiveDeployCost().ToString();
+            {
+                int cost = raw.GetEffectiveDeployCost();
+                card.部署费数字.text = cost.ToString();
+                // 位数自适应（同日追拍「三位数明显超出」）：prefab 基准字号=1~2 位满配（10/50）；
+                // 3 位（琴 100/温迪 300）整体缩 0.75、4 位 0.6——走 localScale 而非 fontSize：
+                // 基准恒 1 不脱钩 prefab 字号（Inspector 调基准自动跟随）、描边随缩同步
+                float shrink = cost >= 1000 ? 0.6f : cost >= 100 ? 0.75f : 1f;
+                card.部署费数字.transform.localScale = new Vector3(shrink, shrink, 1f);
+            }
 
             // 初始态：未拥有卡显示半透明遮罩（不含获取文本，仍可点击查看详情）
             SetOverlayState(card, data.count < 1, false);
