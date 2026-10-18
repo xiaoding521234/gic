@@ -8228,7 +8228,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1400, y: 250}
+  m_SizeDelta: {x: 1400, y: 300}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!1 &3348608964686698894
 GameObject:
@@ -19124,10 +19124,11 @@ MonoBehaviour:
   paramPrefab: {fileID: 266852409147904217, guid: 62d06c9809aac9847a0e390987aa4600, type: 3}
   relatedPanel: {fileID: 6809451109856078972}
   cardModeContainer: {fileID: 6207940944557413040}
-  cardDetailView: {fileID: 0}
+  cardDetailView: {fileID: 4104238395527897163}
   ruleModeContainer: {fileID: 8916709679019923125}
   relatedName: {fileID: 9147029591772908076}
   relatedDescription: {fileID: 6594414043545432016}
+  "\u5173\u8054\u6807\u9898": {fileID: 6694153943201656361}
   slideDuration: 0.15
   slideCurve:
     serializedVersion: 2
@@ -21286,6 +21287,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+--- !u!114 &4104238395527897163 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5573734228871644686, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}
+  m_PrefabInstance: {fileID: 8479379605250188869}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e578723b949b534bbd6034533f7a8b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!224 &7190229618615441389 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1613446921998954920, guid: a6e1ff40c5a3e0544b3e0875f10f8b05, type: 3}

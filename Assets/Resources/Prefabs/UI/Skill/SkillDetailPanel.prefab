@@ -378,6 +378,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -550,6 +552,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -1451,6 +1455,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -1833,6 +1839,7 @@ MonoBehaviour:
   ruleModeContainer: {fileID: 2187898325957611577}
   relatedName: {fileID: 4245757432110787125}
   relatedDescription: {fileID: 5379230012520166024}
+  "\u5173\u8054\u6807\u9898": {fileID: 5282040309092744421}
   slideDuration: 0.15
   slideCurve:
     serializedVersion: 2
@@ -2168,6 +2175,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -2643,6 +2652,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2

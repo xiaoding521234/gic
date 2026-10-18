@@ -46,6 +46,12 @@ namespace GIC.Battle
         public Image countImage;
         public Image itemImage;
 
+        [Header("部署费角标")]
+        [Tooltip("摩拉币角标节点（卡角外探展示——放 Content 下 CardMask 之外避免被卡面遮罩裁切；仅角色卡显示）")]
+        public GameObject 部署费角标;
+        [Tooltip("角标上的白色费用数字（值=出战摩拉 GetEffectiveDeployCost）")]
+        public TextMeshProUGUI 部署费数字;
+
         [Header("动画")]
         [SerializeField] private CanvasGroup canvasGroup;
         private float fadeInDuration = 0.2f;

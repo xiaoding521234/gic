@@ -145,6 +145,16 @@ namespace GIC.Battle
         private const float 手牌卡宽 = 160f;
         private const float 手牌卡间距 = 18f;
 
+        /// <summary>手牌行顶距（wrapper 顶距 HandContent 顶的 y 偏移，行 y 基准单源——2026-10-19
+        /// 复测追拍：部署费角标跨卡角外探 31px，原 −10 时角标顶被 HandViewport 裁断；窗口顶加高
+        /// 手牌窗口顶余量（卡行屏幕位不变）后行同步下移至 −60；五处行 y 字面量全归本常量）</summary>
+        private const float 手牌行顶距 = 60f;
+
+        /// <summary>手牌窗口顶余量（2026-10-19 追拍「手牌区加大显示窗口顶部」）：HandCards sizeDelta.y
+        /// 250→300（pivot(0.5,0) 顶向加高，卡底线不动）；内容高=窗口+底裕 10</summary>
+        private const float 手牌窗口高 = 300f;
+        private const float 手牌内容底裕量 = 10f;
+
         /// <summary>手牌槽位公式：卡排相对 HandContent 中心对称（i=显示位序）</summary>
         private static float HandSlotX(int i, int count) => (i - (count - 1) * 0.5f) * (手牌卡宽 + 手牌卡间距);
 
@@ -641,7 +651,7 @@ namespace GIC.Battle
                     int after = j - (j > st.fromIndex ? 1 : 0);     // 先移除拖动行后的序
                     slotIdx = after + (after >= insertIndex ? 1 : 0); // 再在插入位插回后的序
                 }
-                var target = new Vector2(HandSlotX(slotIdx, count), -10f);
+                var target = new Vector2(HandSlotX(slotIdx, count), -手牌行顶距);
                 s.rt.anchoredPosition = Vector2.Lerp(s.rt.anchoredPosition, target, rate);
             }
         }
@@ -725,7 +735,7 @@ namespace GIC.Battle
             Quaternion fromRot = rt.localRotation;
             // 槽位世界位=HandContent 局部（anchorRef+anchoredPosition）换算（DeckSwitchPanel 同法；
             // anchorRef 必须按 wrapper 实际 anchor 算——运行时与 prefab 可能不一致的错位教训）
-            Vector3 endPos = _handContent.TransformPoint((Vector3)(CalcHandCardAnchorRefLocal(rt) + new Vector2(slotX, -10f)));
+            Vector3 endPos = _handContent.TransformPoint((Vector3)(CalcHandCardAnchorRefLocal(rt) + new Vector2(slotX, -手牌行顶距)));
 
             float t = 0f;
             while (t < 手牌回槽时长 && rt != null)
@@ -744,7 +754,7 @@ namespace GIC.Battle
             if (rt == null) yield break;
             // 回槽收口：回容器+精确落槽+缩放旋转还原+显示位对齐 sibling
             rt.SetParent(_handContent, false);
-            rt.anchoredPosition = new Vector2(slotX, -10f);
+            rt.anchoredPosition = new Vector2(slotX, -手牌行顶距);
             rt.localScale = baseScale;
             rt.localRotation = Quaternion.identity;
             var group = rt.GetComponent<CanvasGroup>();
@@ -824,7 +834,7 @@ namespace GIC.Battle
             {
                 var rt = st.rt;
                 rt.SetParent(_handContent, false);
-                rt.anchoredPosition = new Vector2(HandSlotX(st.fromIndex, _handCardSlots.Count), -10f);
+                rt.anchoredPosition = new Vector2(HandSlotX(st.fromIndex, _handCardSlots.Count), -手牌行顶距);
                 rt.localScale = st.baseScale;
                 rt.localRotation = Quaternion.identity;
             }

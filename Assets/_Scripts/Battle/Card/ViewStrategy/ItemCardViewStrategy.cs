@@ -24,6 +24,9 @@ namespace GIC.Battle
 
             card.unitImage.gameObject.SetActive(false);
 
+            // 物品卡无部署费——角标隐藏（池化复用自角色卡时清除残留，2026-10-19）
+            card.部署费角标?.SetActive(false);
+
             // 初始态：物品卡不显示遮罩（池化复用自角色卡时显式清除残留）
             SetOverlayState(card, false, false);
 

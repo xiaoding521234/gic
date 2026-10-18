@@ -1214,6 +1214,14 @@ MonoBehaviour:
     m_Localized: "\u88C5\u5099\u306E\u30B9\u30BF\u30C3\u30AF\u304C\u6E80\u676F\u3067\u3059"
     m_Metadata:
       m_Items: []
+  - m_Id: 13019
+    m_Localized: "\u52B9\u679C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13020
+    m_Localized: "\u546A\u3044"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

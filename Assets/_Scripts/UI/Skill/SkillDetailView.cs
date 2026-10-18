@@ -31,6 +31,8 @@ namespace GIC.UI
         public GameObject ruleModeContainer;
         public TextCombiner relatedName;
         public TextCombiner relatedDescription;
+        [Tooltip("关联面板顶部中间标题（按 link 类型显示：Buff=效果、Concept/其它=诅咒；CardMode 标题随容器隐藏）")]
+        public TextMeshProUGUI 关联标题;
 
         [Header("动画")]
         [SerializeField] private float slideDuration = 0.15f;
@@ -48,6 +50,7 @@ namespace GIC.UI
         private RectTransform relatedPanelRect;
         private Vector2 relatedPanelTargetPosition;
         private Coroutine relatedSlideCoroutine;
+        private Image relatedBackdrop;
 
         private Camera uiCamera;
 
@@ -79,6 +82,7 @@ namespace GIC.UI
                 relatedPanelRect = relatedPanel.GetComponent<RectTransform>();
                 if (relatedPanelRect != null)
                     relatedPanelTargetPosition = relatedPanelRect.anchoredPosition;
+                relatedBackdrop = relatedPanel.GetComponent<Image>();
             }
 
             Canvas canvas = GetComponentInParent<Canvas>();
@@ -166,7 +170,7 @@ namespace GIC.UI
                     break;
                 case "Concept":
                 default:
-                    ShowRuleMode(id);
+                    ShowRuleMode(id, type);
                     break;
             }
         }
@@ -177,6 +181,9 @@ namespace GIC.UI
         {
             cardModeContainer.SetActive(true);
             ruleModeContainer.SetActive(false);
+
+            // 卡牌详情自带背景与射线遮蔽——关联面板底板隐藏保持干净（2026-10-19 拍板）
+            SetRelatedBackdrop(false);
 
             // 静态预设实例默认未激活，进入卡片模式时显式激活（旧克隆流程 Instantiate 出来即为激活态）
             cardDetailView.gameObject.SetActive(true);
@@ -191,10 +198,17 @@ namespace GIC.UI
 
         #region relatedPanel — strictMode
 
-        void ShowRuleMode(string id)
+        void ShowRuleMode(string id, string linkType)
         {
             cardModeContainer.SetActive(false);
             ruleModeContainer.SetActive(true);
+
+            // 顶部标题按 link 类型显示（2026-10-19 拍板「应当根据link类型显示」：Buff=效果、Concept/其它=诅咒
+            // ——同日追拍「规则替换为诅咒」：提瓦特的一切规则都是天理的诅咒，原神最新剧情口径）
+            bool isBuff = linkType == "Buff";
+            SetRelatedTitle(isBuff ? "RelatedPanel_Effect" : "RelatedPanel_Rule",
+                isBuff ? "效果" : "诅咒");
+            SetRelatedBackdrop(true);
 
             relatedName.ClearAllEntries();
             relatedName.AddEntry(new LocalizedString(TableName.RelatedName.ToString(), id));
@@ -209,6 +223,24 @@ namespace GIC.UI
             relatedDescription.AddEntry(new LocalizedString(TableName.RelatedDescription.ToString(), id));
 
             ShowRelatedPanel();
+        }
+
+        /// <summary>关联面板标题写值（UIText 表按当前语言取；表未加载/缺条目回落中文兜底——
+        /// GetLocalizedBaseName 同款直取模式，面板每次打开都会重新取值）</summary>
+        void SetRelatedTitle(string key, string fallback)
+        {
+            if (关联标题 == null) return;
+            var table = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(TableName.UIText.ToString());
+            关联标题.text = table?.GetEntry(key)?.Value ?? fallback;
+        }
+
+        /// <summary>关联面板背景板开关：RuleMode 显示深色底板；CardMode 隐藏——卡牌详情面板
+        /// 自带背景与射线遮蔽（隐藏后无点击穿透缺口），双层底板观感脏（2026-10-19 拍板）</summary>
+        void SetRelatedBackdrop(bool show)
+        {
+            if (relatedBackdrop != null)
+                relatedBackdrop.enabled = show;
         }
 
         #endregion

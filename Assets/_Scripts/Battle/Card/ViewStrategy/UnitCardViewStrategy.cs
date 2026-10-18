@@ -26,6 +26,12 @@ namespace GIC.Battle
             card.itemImage.gameObject.SetActive(false);
             card.countImage.gameObject.SetActive(false);
 
+            // 部署费角标（2026-10-19）：角色卡恒显白字出战摩拉；建筑=不可打出无费用语义，隐藏
+            bool showCost = raw != null && raw.unitType != UnitType.Building;
+            card.部署费角标?.SetActive(showCost);
+            if (showCost && card.部署费数字 != null)
+                card.部署费数字.text = raw.GetEffectiveDeployCost().ToString();
+
             // 初始态：未拥有卡显示半透明遮罩（不含获取文本，仍可点击查看详情）
             SetOverlayState(card, data.count < 1, false);
 

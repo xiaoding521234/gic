@@ -1229,6 +1229,14 @@ MonoBehaviour:
     m_Localized: Equipment stack is full
     m_Metadata:
       m_Items: []
+  - m_Id: 13019
+    m_Localized: Effect
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13020
+    m_Localized: Curse
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

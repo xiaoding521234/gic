@@ -930,8 +930,9 @@ namespace GIC.Battle
             float cardWidth = 手牌卡宽, gap = 手牌卡间距; // 规格常量归手牌拖拽分件单源（决策五十四）
             float rowWidth = count * cardWidth + (count - 1) * gap;
             // content 宽恒=行宽+左右边距 60（**勿夹到视口宽**——窄于视口才有 Elastic 拖程，
-            // "1 张卡也能滑动"；宽于视口=正常滚动），卡排相对 content 中心对称排
-            _handContent.sizeDelta = new Vector2(rowWidth + 120f, 260f);
+            // "1 张卡也能滑动"；宽于视口=正常滚动），卡排相对 content 中心对称排；
+            // 高=手牌窗口高+底裕（2026-10-19 窗口顶加高防裁角标，行顶距=手牌行顶距单源）
+            _handContent.sizeDelta = new Vector2(rowWidth + 120f, 手牌窗口高 + 手牌内容底裕量);
             int builtIndex = 0; // 实铺序（无配置条目跳过不留洞——拖拽槽位公式同源，决策五十四）
             for (int i = 0; i < count; i++)
             {
@@ -971,7 +972,7 @@ namespace GIC.Battle
                 var wrapperRt = wrapperGo.AddComponent<RectTransform>();
                 wrapperRt.pivot = new Vector2(0.5f, 1f);
                 wrapperRt.anchorMin = wrapperRt.anchorMax = new Vector2(0.5f, 1f);
-                wrapperRt.anchoredPosition = new Vector2(HandSlotX(builtIndex, count), -10f);
+                wrapperRt.anchoredPosition = new Vector2(HandSlotX(builtIndex, count), -手牌行顶距);
                 wrapperRt.sizeDelta = new Vector2(cardWidth, 240f);
                 // 命中层（透明 Image）：wrapper 需 raycast 目标才可点击/拖动（卡内 raycast 已全关防拦截）
                 var hit = wrapperGo.AddComponent<UnityEngine.UI.Image>();
@@ -1038,22 +1039,8 @@ namespace GIC.Battle
                     durText.text = handEntry.durability.ToString();
                 }
 
-                // 部署费角标（手牌语义叠加层，右下；仅角色卡——物品卡无部署费，使用链后续批次）
-                if (isUnit)
-                {
-                    var costGo = new GameObject("DeployCost");
-                    costGo.transform.SetParent(wrapperGo.transform, false);
-                    var costRt = costGo.AddComponent<RectTransform>();
-                    costRt.anchorMin = costRt.anchorMax = new Vector2(1f, 0f);
-                    costRt.anchoredPosition = new Vector2(-16f, 16f);
-                    costRt.sizeDelta = new Vector2(56f, 26f);
-                    var costText = costGo.AddComponent<TextMeshProUGUI>();
-                    costText.font = BattleViewFactory.WorldTextFont;
-                    costText.fontSize = 22;
-                    costText.alignment = TextAlignmentOptions.Center;
-                    costText.color = Palette.高亮金;
-                    costText.text = _unitConfig.GetUnitData(cardId.AsUnitName()).GetEffectiveDeployCost().ToString();
-                }
+                // 部署费角标已并入 Card.prefab 卡面（2026-10-19：左上角摩拉币外探+白字，
+                // UnitCardViewStrategy 统一填值——手牌不再叠加运行时右下金数字，三端观感一致）
 
                 var btn = wrapperGo.AddComponent<UnityEngine.UI.Button>();
                 btn.targetGraphic = hit;
