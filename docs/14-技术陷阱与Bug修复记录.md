@@ -2211,3 +2211,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 1. **ItemConfig.dataCache 编辑器会话内跨桥脚本存活——「条目已加、GetItemData 恒 MISS」假象**：桥脚本 typed C# 向 `cfg.itemDataList.Add(...)` 后，同一编辑器会话内后续任何脚本 `cfg.GetItemData(新物品)` 恒 null——但 `itemDataList.Count` 明明 +1、磁盘 YAML 有完整条目、同一对象改的其它字段（如 starLevel）回读正常。根因=ItemConfig.dataCache（private 非序列化 Dictionary）由 HasItem/GetItemData 首次调用触发 BuildCache 后**只在域重载时清**——无代码改动的 unity_editor.refresh 不重新编译=不触发域重载=缓存跨脚本存活，Add 不更新缓存。**修法=编辑器侧断言前反射清 dataCache 再 BuildCache**（恰=运行时 Boot 启动建缓存口径）；**运行时无此问题**（启动建缓存后资产不变）。同族=§131③ Resources.LoadAll 注册表残留（编辑器侧先 refresh 再断言）——族谱=「编辑器侧惰性缓存跨桥脚本残留，验证须强制重建或真域重载」。
 2. **AssetDatabase.GUIDToAssetPath 别包在 .Select().First() 外层（路径当 GUID→空串→NRE）**：`AssetDatabase.GUIDToAssetPath(FindAssets(...).Select(g=>GUIDToAssetPath(g)).First(谓词))`——内层已产出**路径字符串**，外层再把路径当 guid 传入恒返回空串 → `LoadAssetAtPath("")`=null。写入段若有 null 守卫会**静默 continue**（零写入零报错=「零污染假象」），验证段无守卫才 NRE 炸出——症状与真因相隔两层。**正解**=FindAssets→Select(GUIDToAssetPath)→First 一层即止；崩溃后先探明状态（本次探针证实零污染）再重跑幂等脚本，勿盲目重试。
 3. **InitialSaveConfig 两个同形嵌套类**：initialItems=`ItemEntry`、devTestItems=`DevTestItemEntry`（字段同为 item+count）——桥脚本互用即 CS0029 编译错（好在编译期拦截零副作用）。完整物品实装工作流（图标→枚举→配置→本地化→devTestItems→图集→验证）已沉淀 skill `gic-new-item`。
+
+## §159 图集归属反查两死路一正解：.spriteatlas 文本 rg 假阴性 + FindProperty(m_Packables) 恒 0 + GetDependencies 反查（2026-10-18 元素发光图标批实证）
+
+**症状**：Assets 下 PNG 内容替换（同名覆盖+ImportAsset(ForceUpdate)）后，读 `cfg.sprite.texture` 得 2048×2048（源图只有 512）——被某图集重定向；要定位是哪个图集才能 PackAtlases 收口。
+
+1. **死路一：`.spriteatlas` 文本 rg 搜路径恒零命中**——packables 条目是 **guid 引用不含路径文本**（folder/单文件均如此），rg "Element" 六图集全零命中≠「无图集打包」。与 meta guid 密文同理：**资产间引用搜路径文本不可行，反查走 AssetDatabase**。
+2. **死路二：`SerializedObject(atlas).FindProperty("m_Packables")` 读出恒 arraySize=0**——packables 不以该字段名序列化（六个图集全 0，实况 UICommon 打包了全部目标 sprite）——SerializedObject 找不到数组≠空，读法不可靠勿再用。
+3. **正解：`AssetDatabase.GetDependencies(图集路径, false)` 反查**——直接依赖清单里搜目标 png 路径，一发实锤归属（recursive=false 够用：folder 打包也走直接依赖）。本批实锤：UICommon.spriteatlas 直接依赖 Element/Deep 全部 7 张。
+4. **收口判据（skill 陷阱 10 补遗）**：ImportAsset 后回读 `sprite.textureRect` 若仍是**旧尺寸/旧区域**（本例 801×801 区域）=Library 图集旧页仍在供旧图，必须 `SpriteAtlasUtility.PackAtlases` 重打包；打包后 textureRect 翻新为目标尺寸且各 sprite 区域互异才算闭环。附带：`sprite.packed=true` 时 `.texture`=图集页（尺寸是页尺寸），勿当源图尺寸误判。
+5. **图集重打包副作用**：PackAtlases 全图集后逐 sprite 打包压缩格式 Warning 刷屏（logo/按钮/势力图全库 sprite 皆报）=**常规既有状态非本批引入**，勿当错误追查。
