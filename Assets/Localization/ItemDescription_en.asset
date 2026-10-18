@@ -154,6 +154,10 @@ MonoBehaviour:
       infinite possibilities beyond this world. Can be exchanged for Primogems.
     m_Metadata:
       m_Items: []
+  - m_Id: 3002
+    m_Localized: A bunny doll handmade by Amber. It always steps up at critical moments.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

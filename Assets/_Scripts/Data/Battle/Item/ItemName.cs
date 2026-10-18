@@ -54,6 +54,9 @@ namespace GIC.Data
         [InspectorName("勾玉")]
         Magatama = 3001,
 
+        [InspectorName("兔兔伯爵")]
+        BaronBunny = 3002,
+
         #endregion
 
         #region food

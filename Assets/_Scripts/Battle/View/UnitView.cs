@@ -107,7 +107,17 @@ namespace GIC.Battle
         /// <summary>Buff 数据版本号（每次变更递增——BattleOverheadBars 比对后重建图标行，零签名拼串）</summary>
         public int BuffRevision { get; private set; }
 
-        // 元素附着（快照权威 + ElementAttach 命令增量，2026-09-22 接线）；视觉归 BattleOverheadBars（血条左缘，
+        // 装备状态（装备批 2026-10-18：快照权威 + EquipItem/UnequipItem 命令增量——**数据载体**，
+        // 视觉归 BattleOverheadBars〔血条右侧图标行，同 Buff 图标行模式〕；EquipRevision 递增=重建触发器）
+        private readonly List<EquipBadgeState> _equips = new List<EquipBadgeState>();
+
+        /// <summary>当前装备列表（BattleOverheadBars 消费：武器在前+配件按槽序；引用勿改）</summary>
+        public IReadOnlyList<EquipBadgeState> Equips => _equips;
+
+        /// <summary>装备数据版本号（每次变更递增——BattleOverheadBars 比对后重建装备图标行）</summary>
+        public int EquipRevision { get; private set; }
+
+        // 元素附着（快照权威 + ElementAttach 命令增量，2022-09-22 接线）；视觉归 BattleOverheadBars（血条左缘，
         // 2026-09-24 随血条同改屏幕空间），此处只存状态
         private ElementType _attachedElement = ElementType.Physical;
 
@@ -1170,6 +1180,90 @@ namespace GIC.Battle
         {
             ConstellationLevel = level;
             IsFamiliar = familiar;
+        }
+
+        // ==================== 装备状态（装备批 2026-10-18：快照权威 + 命令流增量；数据载体——
+        // 视觉归 BattleOverheadBars 血条右侧图标行，同 Buff 徽章三口模式） ====================
+
+        /// <summary>快照权威同步（选择阶段头/开局）：从 UnitState 槽位表重建（武器+配件按槽序）</summary>
+        public void SetEquipment(int weaponItem, int weaponDurability, List<int> accessoryItems,
+            List<int> accessoryDurability)
+        {
+            _equips.Clear();
+            if (weaponItem != 0)
+                _equips.Add(new EquipBadgeState(BattleCommand.EquipKindWeapon, 0, weaponItem, weaponDurability));
+            if (accessoryItems != null)
+            {
+                for (int i = 0; i < accessoryItems.Count; i++)
+                {
+                    if (accessoryItems[i] == 0) continue; // 空槽不入列
+                    int durability = accessoryDurability != null && i < accessoryDurability.Count
+                        ? accessoryDurability[i] : 0;
+                    _equips.Add(new EquipBadgeState(BattleCommand.EquipKindAccessory, i, accessoryItems[i], durability));
+                }
+            }
+            EquipRevision++;
+        }
+
+        /// <summary>命令流增量：装备/耐久刷新（同槽重发=更新耐久角标——格挡消耗路径；换物品=先 Unequip
+        /// 后 Equip 两命令，本口只认 (kind,slot) 匹配项更新耐久或整体替换）</summary>
+        public void ApplyEquipBadge(int item, int slotKind, int slotIndex, int durabilityLeft)
+        {
+            for (int i = 0; i < _equips.Count; i++)
+            {
+                if (_equips[i].slotKind != slotKind || _equips[i].slotIndex != slotIndex) continue;
+                _equips[i] = new EquipBadgeState(slotKind, slotIndex, item, durabilityLeft);
+                EquipRevision++;
+                return;
+            }
+            // 新槽位：按 (kind, slot) 有序插入（武器在前、配件按槽序——与 SetEquipment 铺序一致）
+            int insertAt = _equips.Count;
+            for (int i = 0; i < _equips.Count; i++)
+            {
+                if (_equips[i].slotKind > slotKind
+                    || (_equips[i].slotKind == slotKind && _equips[i].slotIndex > slotIndex))
+                {
+                    insertAt = i;
+                    break;
+                }
+            }
+            _equips.Insert(insertAt, new EquipBadgeState(slotKind, slotIndex, item, durabilityLeft));
+            EquipRevision++;
+        }
+
+        /// <summary>命令流增量：卸下（耐久耗尽——按槽位匹配移除）</summary>
+        public void RemoveEquipBadge(int slotKind, int slotIndex)
+        {
+            for (int i = _equips.Count - 1; i >= 0; i--)
+            {
+                if (_equips[i].slotKind == slotKind && _equips[i].slotIndex == slotIndex)
+                {
+                    _equips.RemoveAt(i);
+                    EquipRevision++;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 装备图标行条目状态（装备批 2026-10-18，UnitView 数据载体——BattleOverheadBars 血条右侧图标行消费）：
+    /// item=ItemName 枚举值（图标解析 ItemConfig）、slotKind=BattleCommand.EquipKindWeapon/Accessory、
+    /// slotIndex=配件槽序、durability=剩余耐久（0=无耐久概念不显角标）
+    /// </summary>
+    [Serializable]
+    public class EquipBadgeState
+    {
+        public int slotKind;
+        public int slotIndex;
+        public int item;
+        public int durability;
+
+        public EquipBadgeState(int slotKind, int slotIndex, int item, int durability)
+        {
+            this.slotKind = slotKind;
+            this.slotIndex = slotIndex;
+            this.item = item;
+            this.durability = durability;
         }
     }
 }

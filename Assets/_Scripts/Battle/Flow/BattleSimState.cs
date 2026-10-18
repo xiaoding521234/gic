@@ -975,6 +975,20 @@ namespace GIC.Battle
                 tier = (int)BattleHeuristics.TierOf(unit), // 操控层级单源（TierOverrideStars 覆盖随此进快照——客户端门控同源）
                 exploreVision = stats?.VisionRange ?? 0, // 探索视野真源（迷雾批追拍六：stats 终值=config 基值+1命 StatBoost；0=未填→客户端回落 config 链）
             };
+            // 装备态（装备批 2026-10-18）：武器+配件槽位表（含耐久）——客户端血条右侧图标行+瞄准域
+            //「有空槽」预判的数据源；无 UnitEquipment 组件（异常）=空表
+            var equipment = unit.GetUnitComponent<UnitEquipment>();
+            if (equipment != null)
+            {
+                state.weaponItem = equipment.Weapon.HasValue ? (int)equipment.Weapon.Value : 0;
+                state.weaponDurability = equipment.WeaponDurability;
+                for (int i = 0; i < equipment.AccessorySlotCount; i++)
+                {
+                    var accessory = equipment.Accessories[i];
+                    state.accessoryItems.Add(accessory.HasValue ? (int)accessory.Value : 0);
+                    state.accessoryDurability.Add(equipment.GetAccessoryDurability(i));
+                }
+            }
             foreach (var buff in unit.Buffs)
                 state.buffs.Add(new BuffState
                 {

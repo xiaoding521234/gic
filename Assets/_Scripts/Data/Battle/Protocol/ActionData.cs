@@ -81,6 +81,12 @@ namespace GIC.Data
         /// 玩家级行动 unitId 留空〔同 DeployUnit 口径〕）</summary>
         public int useItemId;
 
+        [Header("装备物品参数（EquipItem 有效，2026-10-18 装备批）")]
+        /// <summary>装备的物品（ItemName 枚举值——subType 须为 Weapon/Accessory；装备即消耗手牌 1 张
+        /// docs/01 §卡牌性质；目标装备单位复用 targetUnitId——玩家级行动 unitId 留空〔同 UseItem 口径，
+        /// 精确指定目标=打出食物同款交互〕）</summary>
+        public int equipItemId;
+
         /// <summary>玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——玩家通过配额直接操控伙伴
         /// 行动时标记 true（真人/AI 提交路径同标，AI-1 批起含势力技能号令），ResourceGate 体力换算
         /// 据此减免 5（可减免为负数=获得体力）；SkillExecutor 对伙伴施法者的延奏/契约号令发津贴 +5

@@ -217,14 +217,16 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 执行部署：校验+扣费+生成单位。成功=true 且返回两条命令（Summon+StatChange 摩拉变化）。
+        /// 执行部署：校验+扣费+生成单位。成功=true 且返回命令（Summon+StatChange 摩拉变化；
+        /// 升命跨层授予物品时追加 ItemGain 命令列表——安柏3命兔兔伯爵，装备批）。
         /// 校验链=配置存在 → 手牌成员（Host 权威）→ 落点合法 → 摩拉够。
         /// </summary>
         public static bool TryResolve(BattleSimState sim, ActionData action, out BattleCommand summonCommand,
-            out BattleCommand moraCommand)
+            out BattleCommand moraCommand, out List<BattleCommand> itemGainCommands)
         {
             summonCommand = null;
             moraCommand = null;
+            itemGainCommands = null;
 
             var config = Wargame.Instance?.Context?.Get<UnitConfig>();
             var unitName = (UnitName)action.deployUnitName;
@@ -275,13 +277,32 @@ namespace GIC.Battle
                 }
                 existingUnit.ConstellationLevel++;
                 ConstellationApplier.ApplyPassives(existingUnit); // 幂等重算（全撤→按新层重挂）
-                if (sim.TryGetUnitId(existingUnit, out var upgradedId))
+                sim.TryGetUnitId(existingUnit, out var upgradedId);
+                if (!string.IsNullOrEmpty(upgradedId))
                 {
                     summonCommand = BattleCommand.UpgradeConstellation(action.playerId, upgradedId, 0, 0,
                         existingUnit.ConstellationLevel);
                 }
                 moraCommand = BattleCommand.StatChange(action.playerId, 0, 0,
                     BattleCommand.StatKindMora, -upgradeCost);
+                // 命座跨层物品授予（装备批 2026-10-18·安柏3命兔兔伯爵；同日追拍「直接装备优先」）：
+                // GrantItem 原子首次达到 minConstellation 层——**武器/配件直接装备到该单位**（槽满才
+                // GainCard 入手牌）；命令层 Equipped→EquipItem（客户端血条右侧图标即时出现）/
+                // 手牌→ItemGain（手牌镜像），indexInSlice 由 ResolveDeploySegment 统一回填
+                var granted = ConstellationApplier.ApplyUnlockedItemGrants(sim, existingUnit,
+                    existingUnit.ConstellationLevel - 1, existingUnit.ConstellationLevel);
+                if (granted.Count > 0)
+                {
+                    itemGainCommands = new List<BattleCommand>();
+                    foreach (var grant in granted)
+                    {
+                        if (grant.equipped && !string.IsNullOrEmpty(upgradedId))
+                            itemGainCommands.Add(BattleCommand.EquipItem(action.playerId, upgradedId, 0, 0,
+                                grant.item, grant.slotKind, grant.slotIndex, grant.durabilityLeft));
+                        else
+                            itemGainCommands.Add(BattleCommand.ItemGain(action.playerId, 0, 0, grant.item, 1));
+                    }
+                }
                 GICLog.Info($"[DeployUnit] {action.playerId} 升命 {unitName} → C{existingUnit.ConstellationLevel}（摩拉 {upgradeCost}）");
                 return true;
             }
@@ -420,6 +441,111 @@ namespace GIC.Battle
         }
 
         /// <summary>手牌条目形态 dump（诊断日志用：cardType:value:count 逐条——扣减失败定位）</summary>
+        private static string DumpHand(BattleSimState sim, string playerId)
+        {
+            var hand = sim.GetHand(playerId);
+            if (hand == null) return "手牌未注册";
+            var sb = new System.Text.StringBuilder();
+            foreach (var card in hand)
+            {
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append($"[{card.cardType}:{card.value}x{card.count}]");
+            }
+            return sb.Length == 0 ? "空手牌" : sb.ToString();
+        }
+    }
+
+    /// <summary>
+    /// 装备物品执行器（2026-10-18 装备批，docs/05 §5.2+docs/01「装备即消耗」——使用物品同构的
+    /// 玩家级行动，占配额不耗体力）：校验链=物品配置存在且 subType 为 Weapon/Accessory → 手牌持有
+    ///（Host 权威，同 UseItem/DeployUnit 先例）→ 装备目标为我方存活非建筑单位（targetUnitId，
+    /// 域=饮用同款——尸体不可装备、建筑不可装备）→ 槽位有空（武器槽恒 1 空闲/配件按层级眷属1·
+    /// 伙伴2·魔神3 有空槽）→ 消耗 1 张（ItemConsumeEffect）+ EquipEffect（应用层挂 UnitEquipment
+    /// 槽位+词条，命令层产 EquipItem 命令客户端镜像）。**槽位校验读活单位**（snapshot 目标校验后
+    /// 取 sim 单位——同段不可能有第二个装备改同一单位：装备只对己方单位、每玩家每回合 1 行动）。
+    /// </summary>
+    public static class EquipItemExecutor
+    {
+        /// <summary>校验+消耗+装备效应并入。成功=true；失败=零效果零消耗（行动已使用，占配额不退
+        /// ——同 UseItem 口径：Host 校验兜底，常规路径 HUD 只给可装备入口+槽位预判域）</summary>
+        public static bool TryResolve(BattleSimState sim, ActionData action, BattleSnapshot sliceSnapshot,
+            List<BattleEffect> effects)
+        {
+            var itemName = (ItemName)action.equipItemId;
+            var config = Wargame.Instance?.Context?.Get<ItemConfig>();
+            var data = config?.GetItemData(itemName);
+            if (data == null || (data.subType != ItemSubType.Weapon && data.subType != ItemSubType.Accessory))
+            {
+                GICLog.Warn($"[EquipItem] {action.playerId} 上交 {itemName} 无配置或非武器/配件（不可装备），装备落空");
+                return false;
+            }
+
+            // 手牌持有校验（Host 权威——口径与 UseItemExecutor/LoseCard 完全同源：cardType==Item + value）
+            var hand = sim.GetHand(action.playerId);
+            bool inHand = false;
+            if (hand != null)
+            {
+                foreach (var card in hand)
+                {
+                    if ((CardType)card.cardType != CardType.Item) continue;
+                    if (card.value == (int)itemName && card.count >= 1)
+                    {
+                        inHand = true;
+                        break;
+                    }
+                }
+            }
+            if (!inHand)
+            {
+                GICLog.Warn($"[EquipItem] {action.playerId} 手牌无 {itemName}，装备拒绝（手牌形态：{DumpHand(sim, action.playerId)}）");
+                return false;
+            }
+
+            // 装备目标校验：我方存活非建筑单位（域=饮用同款——TeamType 口径同延奏；尸体不可装备）
+            var targetState = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
+            var ownerTeam = sim.GetTeamOf(action.playerId);
+            if (targetState == null || (TeamType)targetState.team != ownerTeam || targetState.isCorpse != 0)
+            {
+                GICLog.Warn($"[EquipItem] {action.playerId} 装备 {itemName} 目标无效（{action.targetUnitId}——须为我方存活单位），装备落空");
+                return false;
+            }
+            var target = sim.GetUnit(action.targetUnitId);
+            if (target == null)
+            {
+                GICLog.Warn($"[EquipItem] {action.playerId} 装备 {itemName} 目标单位缺失（{action.targetUnitId}），装备落空");
+                return false;
+            }
+            if (target.RawData != null && target.RawData.unitType == UnitType.Building)
+            {
+                GICLog.Warn($"[EquipItem] {action.playerId} 装备 {itemName} 目标为建筑（{action.targetUnitId}），装备落空");
+                return false;
+            }
+
+            // 槽位校验（活单位——武器槽恒 1 空闲；配件=层级槽眷属1/伙伴2/魔神3 有空位）
+            var equipment = target.GetUnitComponent<UnitEquipment>();
+            if (equipment == null)
+            {
+                GICLog.Warn($"[EquipItem] 目标 {action.targetUnitId} 无 UnitEquipment 组件（Unit.prefab 未挂载？），装备落空");
+                return false;
+            }
+            bool slotFree = data.subType == ItemSubType.Weapon
+                ? equipment.HasFreeWeaponSlot
+                : equipment.HasFreeAccessorySlot;
+            if (!slotFree)
+            {
+                GICLog.Info($"[EquipItem] {action.playerId} 装备 {itemName} → {action.targetUnitId} 槽位已满，装备落空");
+                return false;
+            }
+
+            // 消耗 1 张（装备即消耗，docs/01）+ 装备效应（应用层挂槽+词条，命令层 EquipItem）
+            effects.Add(new ItemConsumeEffect(action.playerId, itemName, 1));
+            effects.Add(new EquipEffect(action.playerId, action.targetUnitId, (int)itemName));
+
+            GICLog.Info($"[EquipItem] {action.playerId} 装备 {itemName} → {action.targetUnitId}");
+            return true;
+        }
+
+        /// <summary>手牌条目形态 dump（与 UseItemExecutor 同源诊断）</summary>
         private static string DumpHand(BattleSimState sim, string playerId)
         {
             var hand = sim.GetHand(playerId);

@@ -43,6 +43,12 @@ MonoBehaviour:
     m_Localized: "\xB7Eat to restore {HealAmount} HP"
     m_Metadata:
       m_Items: []
+  - m_Id: 3002
+    m_Localized: "\xB7When equipped, damage of {BlockThreshold} or higher is completely
+      blocked, costing 1 durability\n\xB7{Durability} durability; disappears when
+      depleted"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

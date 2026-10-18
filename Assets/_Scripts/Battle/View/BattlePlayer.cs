@@ -138,6 +138,11 @@ namespace GIC.Battle
         /// handCards 镜像（减尽移除条目），HUD 订阅刷新对应卡角标；快照权威兜底</summary>
         public event Action<string, int, int> OnItemConsumed;
 
+        /// <summary>手牌物品牌获得（装备批 2026-10-18：命座授予——安柏3命兔兔伯爵）：ItemGain 命令
+        /// 消费点——参数=玩家ID / 物品名（ItemName）/ 获得量。本类先并本地快照 handCards 镜像
+        ///（有则加数量/无则加卡——GainCard 对偶），HUD 订阅重建手牌（新卡=新槽位）；快照权威兜底</summary>
+        public event Action<string, int, int> OnItemGained;
+
         /// <summary>战斗结束事件（2026-09-25 三轮审查 S10 轻量全灭软停；订阅方=HUD 胜负提示，
         /// 结算画面=B8）</summary>
         public event Action<BattleOverMessage> BattleOver;
@@ -362,6 +367,8 @@ namespace GIC.Battle
                     view.SetSanity(state.sanity); // 理智（权威态；2026-09-30 歌声之环批）
                     view.SetConstellation(state.constellation, ResolveIsFamiliar(state)); // 命座+眷属（2026-10-06 命座徽章批）
                     view.SetBuffs(state.buffs); // 头顶 Buff 状态（权威态；含来源——图标/描环解析数据源）
+                    view.SetEquipment(state.weaponItem, state.weaponDurability, state.accessoryItems,
+                        state.accessoryDurability); // 装备态（权威态；装备批 2026-10-18）
                 }
             }
 
@@ -460,7 +467,8 @@ namespace GIC.Battle
 
                 Destroy(arrowGo);
                 yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind,
-                    command.metadata, isCrit: command.crit == 1, actorUnitId: command.actorUnitId);
+                    command.metadata, isCrit: command.crit == 1, actorUnitId: command.actorUnitId,
+                    blocked: command.blocked == 1);
             }
             finally
             {
@@ -1000,7 +1008,7 @@ namespace GIC.Battle
                                 }
                                 playbacks.Add(StartCoroutine(PlayDamageCoroutine(target, -command.value, dmgDelay, false,
                                     command.reactionKind, command.metadata, isCrit: command.crit == 1,
-                                    actorUnitId: command.actorUnitId)));
+                                    actorUnitId: command.actorUnitId, blocked: command.blocked == 1)));
                             }
                         }
                         break;
@@ -1189,6 +1197,27 @@ namespace GIC.Battle
                         OnItemConsumed?.Invoke(command.targetUnitId, command.metadata, command.value);
                         break;
 
+                    case BattleCommandType.EquipItem:
+                        // 装备/耐久刷新（装备批 2026-10-18）：血条右侧图标行增改——value=物品名、
+                        // metadata=槽位种类、direction=槽位序号、buffLevel=剩余耐久；下回合快照权威自愈
+                        if (_views.TryGetValue(command.targetUnitId, out var equippedView))
+                            equippedView.ApplyEquipBadge(command.value, command.metadata, command.direction,
+                                command.buffLevel);
+                        break;
+
+                    case BattleCommandType.UnequipItem:
+                        // 卸下（耐久耗尽——兔兔伯爵耗尽消失）：图标行移除该槽位
+                        if (_views.TryGetValue(command.targetUnitId, out var unequippedView))
+                            unequippedView.RemoveEquipBadge(command.metadata, command.direction);
+                        break;
+
+                    case BattleCommandType.ItemGain:
+                        // 获得物品卡（命座授予——安柏3命兔兔伯爵）：本地手牌镜像新增（GainCard 对偶：
+                        // 有则加数量/无则加卡）+HUD 重建手牌（新卡=新槽位）；下回合快照权威自愈
+                        ApplyItemGainToLocalHand(command.targetUnitId, (ItemName)command.metadata, command.value);
+                        OnItemGained?.Invoke(command.targetUnitId, command.metadata, command.value);
+                        break;
+
                     case BattleCommandType.Summon:
                         // 部署登场（B6c）：按命令携带的全量状态即时建 view（快照权威自愈兜底）
                         if (command.summonUnit != null && !_views.ContainsKey(command.summonUnit.unitId))
@@ -1369,6 +1398,11 @@ namespace GIC.Battle
         private static string LifeStealName()
             => new LocalizedString("UIText", "Battle_LifeSteal").GetLocalizedString();
 
+        /// <summary>装备格挡名（装备批 2026-10-18·兔兔伯爵）：伤害被完全抵挡时替代伤害数字的文案
+        ///（短命数字对象直接求值当前语言，同 ReactionNameOf 模式）</summary>
+        private static string BlockName()
+            => new LocalizedString("UIText", "Battle_Block").GetLocalizedString();
+
         /// <summary>反应消耗附着图标（决策二十五：反应 1:1 双方全消耗、等层零残留——到点清；
         /// Physical=图标隐藏；与伤害数字/清附着同一时刻=反应消耗所见即所得）</summary>
         private IEnumerator PlayAttachConsumeCoroutine(UnitView view, float delay)
@@ -1453,7 +1487,7 @@ namespace GIC.Battle
 
         private IEnumerator PlayDamageCoroutine(UnitView view, int displayValue, float delay, bool isHeal,
             int reactionKind = 0, int element = 0, bool lifestealPrefix = false, bool isCrit = false,
-            string actorUnitId = null)
+            string actorUnitId = null, bool blocked = false)
         {
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
@@ -1466,7 +1500,10 @@ namespace GIC.Battle
                 view.FlashHit();
                 StartCoroutine(RestoreColorAfterFlashRoutine(view));
             }
-            view.ApplyHpDelta(displayValue); // 头顶血条即时反馈（快照权威，下个选择阶段头校正）
+            // 装备格挡（装备批 2026-10-18·兔兔伯爵）：伤害被完全抵挡——不掉血（Host 已跳过 ApplyDamage，
+            // 客户端镜像同口径），改弹「格挡」文案（尺寸随原伤害量=大攻击大反馈）；受击闪色照播
+            if (!blocked)
+                view.ApplyHpDelta(displayValue); // 头顶血条即时反馈（快照权威，下个选择阶段头校正）
 
             // 伤害/治疗数字=原神式屏幕空间层（2026-09-24 拍板「按照原神的做法」：Overlay 画布永不遮挡、
             // 尺寸随伤害对数放大；反应名前缀为 GIC 特色保留、伤害不带负号、治疗带 +；随机偏移防同点重叠。
@@ -1480,10 +1517,13 @@ namespace GIC.Battle
             string critSuffix = !isHeal && isCrit ? "!" : "";
             string text = isHeal
                 ? lifestealPrefix ? $"{LifeStealName()} +{value}" : $"+{value}"
+                : blocked ? BlockName()
                 : reactionName != null ? $"{reactionName} {value}{critSuffix}" : $"{value}{critSuffix}";
             // 配色（2026-10-01 拍板「与原神一致」）：治疗=治疗绿；伤害=ResolveDamageNumberColor
-            // （元素色/反应独特色，见该方法注释）
-            var numberColor = isHeal ? Palette.治疗绿 : ResolveDamageNumberColor(reactionKind, element);
+            // （元素色/反应独特色，见该方法注释）；格挡=原神白（被挡下的攻击无数字归属）
+            var numberColor = isHeal ? Palette.治疗绿
+                : blocked ? (Palette != null ? Palette.伤害数字物理色 : Color.white)
+                : ResolveDamageNumberColor(reactionKind, element);
             // 随机偏移防同点多数字重叠（2026-09-24 目检后用户拍板加大散布：XZ 加宽、高度带随机）
             var randomOffset = new Vector3(
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
@@ -1568,6 +1608,30 @@ namespace GIC.Battle
             target.count -= amount;
             if (target.count <= 0)
                 res.handCards.Remove(target);
+        }
+
+        /// <summary>获得物品卡命令并本地手牌镜像（装备批 2026-10-18：命座授予——安柏3命兔兔伯爵）：
+        /// LatestSnapshot.resources 内该玩家 handCards 条目数量加/无条目则新增（GainCard 对偶——
+        /// 货币卡走资源池不在此列，授予恒普通物品）；HUD 重建走 OnItemGained 事件；下回合快照权威兜底</summary>
+        private void ApplyItemGainToLocalHand(string playerId, ItemName item, int amount)
+        {
+            var snapshot = LatestSnapshot;
+            if (snapshot == null) return;
+            PlayerResourceState res = null;
+            foreach (var r in snapshot.resources)
+            {
+                if (r.playerId == playerId) { res = r; break; }
+            }
+            if (res == null) return;
+            foreach (var entry in res.handCards)
+            {
+                if ((CardType)entry.cardType == CardType.Item && entry.value == (int)item)
+                {
+                    entry.count += amount;
+                    return;
+                }
+            }
+            res.handCards.Add(new HandCard(new CardId(item), amount));
         }
 
         /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>
@@ -1696,6 +1760,8 @@ namespace GIC.Battle
             view.SetSanity(state.sanity); // 理智（建场权威态；2026-09-30 歌声之环批）
             view.SetConstellation(state.constellation, ResolveIsFamiliar(state)); // 命座+眷属（2026-10-06 命座徽章批）
             view.SetBuffs(state.buffs);
+            view.SetEquipment(state.weaponItem, state.weaponDurability, state.accessoryItems,
+                state.accessoryDurability); // 装备态（建场权威态；装备批 2026-10-18）
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;
             if (prewarmClips.Count > 0)

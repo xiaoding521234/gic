@@ -164,6 +164,12 @@ namespace GIC.Battle
                     // 由 ApplyDeployBuffs 在 RegisterUnit 尾部消费
                     break;
 
+                case SkillEffectKind.GrantItem:
+                    // 命座物品授予（装备批 2026-10-18·安柏3命兔兔伯爵）——**非幂等可重算段**：
+                    // 授予=一次性手牌变更（GainCard），全撤重挂会重复发卡——由 ApplyUnlockedItemGrants
+                    // 在升命跨层时单点结算（DeployUnitExecutor），本幂等段刻意跳过
+                    break;
+
                 default:
                     // OnDeploy 语义只承载被动原子；其它 kind 配进 OnDeploy 属配置错误——Warn 暴露
                     GICLog.Warn($"[Constellation] OnDeploy 触发器不支持 kind={atom.kind}（{data.skillID}）——" +
@@ -178,6 +184,84 @@ namespace GIC.Battle
             foreach (var p in data.customParams)
                 if (p.key == key) return p;
             return null;
+        }
+
+        /// <summary>
+        /// 命座跨层物品授予（装备批 2026-10-18·安柏3命兔兔伯爵；同日追拍「直接装备优先」）：命座层从
+        /// oldLevel 升到 newLevel 时，Talent 技能的 GrantItem 原子中 minConstellation 首次落进
+        /// (oldLevel, newLevel] 区间的——**武器/配件直接装备到该单位身上**（2026-10-18 用户拍板
+        /// 「安柏3命时，应当是直接装备上兔兔伯爵，除非槽位满了，才放入手牌」：UnitEquipment 挂槽+词条，
+        /// 命令层由调用方产 EquipItem）；**槽满/非装备物才 GainCard 入手牌**（命令层 ItemGain）。
+        /// **只在升命跨层时调用**（DeployUnitExecutor 升命分支）——ApplyPassives 幂等全撤重挂段不碰
+        /// 授予（重复发卡）；0命授予（minConstellation=0）无命令通道暂不支持（见 GrantItem 枚举注释）。
+        /// 返回授予清单（Equipped=true 时 SlotKind/SlotIndex/DurabilityLeft=EquipItem 命令载荷）</summary>
+        public static List<ItemGrantResult> ApplyUnlockedItemGrants(BattleSimState sim, Unit unit,
+            int oldLevel, int newLevel)
+        {
+            var granted = new List<ItemGrantResult>();
+            if (sim == null || unit == null || newLevel <= oldLevel) return granted;
+            var identity = unit.GetUnitComponent<UnitIdentity>();
+            string playerId = identity?.OwnerPlayerID;
+            if (string.IsNullOrEmpty(playerId)) return granted;
+
+            var itemConfig = Wargame.Instance?.Context?.Get<ItemConfig>();
+            var equipment = unit.GetUnitComponent<UnitEquipment>();
+            foreach (var skill in unit.Skills)
+            {
+                var data = skill?.RawData;
+                if (data == null || data.skillType != SkillType.Talent) continue;
+                if (data.effects == null) continue;
+                foreach (var atom in data.effects)
+                {
+                    if (atom == null || atom.trigger != SkillEffectTrigger.OnDeploy) continue;
+                    if (atom.kind != SkillEffectKind.GrantItem) continue;
+                    if (atom.value <= 0) continue; // 载荷=ItemName 枚举值（0=None 无效）
+                    if (atom.minConstellation <= oldLevel || atom.minConstellation > newLevel) continue;
+
+                    var itemName = (ItemName)atom.value;
+                    var result = new ItemGrantResult { item = atom.value };
+                    // 直接装备优先（追拍）：武器/配件且有空槽 → 挂单位身上
+                    var itemData = itemConfig?.GetItemData(itemName);
+                    if (equipment != null && itemData != null
+                        && (itemData.subType == ItemSubType.Weapon || itemData.subType == ItemSubType.Accessory))
+                    {
+                        if (itemData.subType == ItemSubType.Weapon && equipment.HasFreeWeaponSlot
+                            && equipment.EquipWeapon(itemName))
+                        {
+                            result.equipped = true;
+                            result.slotKind = BattleCommand.EquipKindWeapon;
+                            result.durabilityLeft = equipment.WeaponDurability;
+                        }
+                        else if (itemData.subType == ItemSubType.Accessory && equipment.HasFreeAccessorySlot
+                                 && equipment.EquipAccessory(itemName, out int slot))
+                        {
+                            result.equipped = true;
+                            result.slotKind = BattleCommand.EquipKindAccessory;
+                            result.slotIndex = slot;
+                            result.durabilityLeft = equipment.GetAccessoryDurability(slot);
+                        }
+                    }
+                    if (!result.equipped)
+                        sim.GainCard(playerId, new CardId(itemName), 1); // 槽满/非装备物 → 手牌
+                    granted.Add(result);
+                    GICLog.Info("[Constellation] " + unit.name + " C" + newLevel + " 授予 " + itemName + " → " +
+                                (result.equipped
+                                    ? "直接装备（槽 " + result.slotKind + ":" + result.slotIndex + "，耐久 " + result.durabilityLeft + "）"
+                                    : "手牌（槽满/非装备物）"));
+                }
+            }
+            return granted;
+        }
+
+        /// <summary>命座物品授予结果（ApplyUnlockedItemGrants 返回载体）：Equipped=true 时三项槽位载荷
+        /// 供调用方产 EquipItem 命令；false=已 GainCard 入手牌（产 ItemGain 命令）</summary>
+        public struct ItemGrantResult
+        {
+            public int item;            // ItemName 枚举值
+            public bool equipped;       // true=已直接装备到单位
+            public int slotKind;        // BattleCommand.EquipKindWeapon/Accessory
+            public int slotIndex;       // 配件槽号（武器=0）
+            public int durabilityLeft;  // 装备后剩余耐久
         }
     }
 }

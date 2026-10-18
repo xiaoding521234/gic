@@ -42,6 +42,10 @@ MonoBehaviour:
     m_Localized: "\xB7\u98DF\u7528\u540E\uFF0C\u589E\u52A0{HealAmount}\u751F\u547D\u503C"
     m_Metadata:
       m_Items: []
+  - m_Id: 3002
+    m_Localized: "\xB7\u88C5\u5907\u540E\uFF1A\u53D7\u5230{BlockThreshold}\u70B9\u53CA\u4EE5\u4E0A\u7684\u4F24\u5BB3\u65F6\uFF0C\u5B8C\u5168\u62B5\u6321\u8BE5\u4F24\u5BB3\u5E76\u6D88\u80171\u70B9\u8010\u4E45\n\xB7\u8010\u4E45{Durability}\u70B9\uFF0C\u8017\u5C3D\u540E\u6D88\u5931"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

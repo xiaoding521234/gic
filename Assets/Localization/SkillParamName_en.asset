@@ -342,6 +342,14 @@ MonoBehaviour:
     m_Localized: Heal Amount
     m_Metadata:
       m_Items: []
+  - m_Id: 81
+    m_Localized: Block Threshold
+    m_Metadata:
+      m_Items: []
+  - m_Id: 82
+    m_Localized: Durability
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

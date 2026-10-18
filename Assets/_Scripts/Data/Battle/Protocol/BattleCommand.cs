@@ -66,6 +66,15 @@ namespace GIC.Data
 
         [InspectorName("地形变化")]
         TerrainChange = 18, // 决策七十六（2026-10-15）：元素×地形交互——冰冻水面→薄冰/火融薄冰→水；B8 预留增量命令钩子正式启用（BattleMapData 注释「地形变化 B8 走增量命令」）
+
+        [InspectorName("装备物品")]
+        EquipItem = 19, // 装备批（2026-10-18）：EquipItem 行动装备成功/耐久消耗刷新——客户端装备图标行（血条右侧）增改
+
+        [InspectorName("卸下物品")]
+        UnequipItem = 20, // 装备批：耐久耗尽卸下（兔兔伯爵耗尽消失）——客户端装备图标行移除
+
+        [InspectorName("获得物品卡")]
+        ItemGain = 21, // 装备批：命座授予物品卡（安柏3命兔兔伯爵）——客户端手牌镜像新增+刷新（快照权威自愈）
     }
 
     /// <summary>
@@ -92,6 +101,9 @@ namespace GIC.Data
     /// Revive          | 复苏治疗量 | —              | —                | —         | —    | —      | —                     | —              | —（B-3 ② 复苏+治疗单命令）
     /// UpgradeConstellation | 新命座层 | —            | —                | —         | —    | —      | —                     | —              | —（B8 命座批；targetUnitId=升命单位）
     /// TerrainChange   | 新地形 TileType int | —     | —                | 目标格 cell | —    | —      | —                     | —              | —（决策七十六元素×地形；客户端=本地 map SetTile+BattleBoard 刷新该格）
+    /// EquipItem       | 物品名 ItemName | 槽位种类（0=武器/1=配件） | 槽位序号（配件 0..2） | — | — | — | — | — | —（装备批；buffLevel=装备后剩余耐久〔0=无耐久概念〕；targetUnitId=装备单位、actorUnitId=装备玩家）
+    /// UnequipItem     | 物品名 ItemName | 槽位种类 | 槽位序号 | — | — | — | — | — | —（耐久耗尽卸下；targetUnitId=装备单位）
+    /// ItemGain        | 获得数量 | 物品名 ItemName | — | — | — | — | — | — | —（命座授予；actorUnitId=targetUnitId=获得玩家，同 ItemConsume 口径）
     /// Pause/Resume/UI | —        | —                | —                | —         | —    | —      | —                     | —              | —
     /// </remarks>
     [Serializable]
@@ -129,6 +141,12 @@ namespace GIC.Data
         [Header("暴击标记（Damage 命令；1=本次命中暴击——Host 幸运 roll 结论〔暴击率=幸运/100、效果=理智乘区〕，客户端数字放大；0=未暴击。2026-10-02 幸运暴击批）")]
         public int crit;
 
+        /// <summary>装备格挡标记（Damage 命令；装备批 2026-10-18：1=本次伤害被配件完全抵挡——兔兔伯爵）。
+        /// Host 侧 HP 不扣（ApplyDamage 跳过）、吸血不触发；客户端箭矢照飞、立牌照闪受击，但不弹
+        /// 伤害数字不掉血，改弹「格挡」文案（尺寸随原伤害量）+装备耐久角标随 EquipItem 命令刷新。
+        /// 0=未格挡。旧回放 JSON 缺省 0=兼容</summary>
+        public int blocked;
+
         [Header("箭矢视觉高度（Damage 投射物/Effect 消散有效；千分=格面起算高度×1000；0=客户端回落 BattleMetrics.ArrowFlightHeight 默认——纯视觉参数对齐动画松弦位，判定圆柱与世界高度无关。2026-10-05）")]
         public int arrowHeightY;
 
@@ -144,6 +162,10 @@ namespace GIC.Data
 
         [Header("特效子类型（Effect 命令 metadata；随用随加）")]
         public const int EffectKindProjectileVanish = 1;
+
+        [Header("装备槽位种类（EquipItem/UnequipItem 命令 metadata；装备批 2026-10-18）")]
+        public const int EquipKindWeapon = 0;     // 武器槽（恒 1，docs/05 §5.2）
+        public const int EquipKindAccessory = 1;  // 配件槽（眷属 1/伙伴 2/魔神 3，2026-10-18 拍板）
 
         [Header("反应子类型（Reaction 命令 metadata；docs/06 元素反应）")]
         public const int ReactionKindMelt = 1;      // 融化（火+冰）
@@ -380,6 +402,63 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 cell = cell,
                 value = newTile,
+            };
+        }
+
+        /// <summary>装备物品命令工厂（装备批 2026-10-18）。targetUnitId=装备单位、actorUnitId=装备玩家；
+        /// value=物品名（ItemName 枚举值）、metadata=槽位种类（EquipKindWeapon=0/EquipKindAccessory=1）、
+        /// direction=槽位序号（武器恒 0；配件 0..2）、buffLevel=装备后剩余耐久（0=无耐久概念）。
+        /// **耐久消耗刷新复用本命令**（同槽重发=客户端角标更新，幂等）；耐久耗尽=UnequipItem</summary>
+        public static BattleCommand EquipItem(string playerId, string unitId, int sliceIndex, int indexInSlice,
+            int itemName, int slotKind, int slotIndex, int durabilityLeft)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.EquipItem,
+                actorUnitId = playerId,
+                targetUnitId = unitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                value = itemName,
+                metadata = slotKind,
+                direction = slotIndex,
+                buffLevel = durabilityLeft,
+            };
+        }
+
+        /// <summary>卸下物品命令工厂（耐久耗尽——兔兔伯爵耗尽消失）。targetUnitId=装备单位；
+        /// value=物品名、metadata=槽位种类、direction=槽位序号</summary>
+        public static BattleCommand UnequipItem(string unitId, int sliceIndex, int indexInSlice,
+            int itemName, int slotKind, int slotIndex)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.UnequipItem,
+                actorUnitId = unitId,
+                targetUnitId = unitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                value = itemName,
+                metadata = slotKind,
+                direction = slotIndex,
+            };
+        }
+
+        /// <summary>获得物品卡命令工厂（命座授予——安柏3命兔兔伯爵）。actorUnitId=targetUnitId=获得玩家
+        ///（同 ItemConsume 口径）；metadata=物品名、value=数量。客户端=本地手牌镜像新增（有则加数量/
+        /// 无则加卡，GainCard 对偶）+手牌刷新（快照权威自愈）</summary>
+        public static BattleCommand ItemGain(string playerId, int sliceIndex, int indexInSlice,
+            int itemName, int amount)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.ItemGain,
+                actorUnitId = playerId,
+                targetUnitId = playerId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = itemName,
+                value = amount,
             };
         }
 

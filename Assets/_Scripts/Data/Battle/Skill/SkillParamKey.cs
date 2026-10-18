@@ -282,6 +282,14 @@ namespace GIC.Data
 
         [InspectorName("治疗量")]
         HealAmount = 80,
+
+        // 装备参数（2026-10-18 装备批·兔兔伯爵）：物品 customParams 字符串键=枚举名同构（食物先例）
+        // ——描述占位符/参数表显示/格挡与耐久真源三方单源（Host UnitEquipment 读 customParams）
+        [InspectorName("伤害抵挡阈值")]
+        BlockThreshold = 81,
+
+        [InspectorName("耐久")]
+        Durability = 82,
     }
 
     /// <summary>

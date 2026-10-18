@@ -130,6 +130,10 @@ MonoBehaviour:
     m_Localized: Genesis Crystal
     m_Metadata:
       m_Items: []
+  - m_Id: 3002
+    m_Localized: Baron Bunny
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

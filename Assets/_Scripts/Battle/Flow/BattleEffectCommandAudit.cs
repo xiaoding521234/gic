@@ -41,6 +41,7 @@ namespace GIC.Battle
             var reviveKeys = new HashSet<string>();
             var removeBuffKeys = new HashSet<string>(); // RemoveBuff 命令目标索引（冻结层归零解冻对账用，决策七十四）
             var terrainKeys = new HashSet<string>(); // 地形变化命令格索引（元素×地形对账用，决策七十六）
+            var equipKeys = new HashSet<string>(); // 装备命令单位索引（装备批 2026-10-18 对账用）
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -82,6 +83,10 @@ namespace GIC.Battle
                         break;
                     case BattleCommandType.TerrainChange:
                         terrainKeys.Add($"{command.cell.x}:{command.cell.y}");
+                        break;
+                    case BattleCommandType.EquipItem:
+                    case BattleCommandType.UnequipItem:
+                        equipKeys.Add(command.targetUnitId);
                         break;
                 }
             }
@@ -182,6 +187,13 @@ namespace GIC.Battle
                     // 幂等无害——按 (x:y) 键查存在性）
                     if (!terrainKeys.Contains($"{terrain.Cell.x}:{terrain.Cell.y}"))
                         Report(context, effect, BattleCommandType.TerrainChange);
+                }
+                else if (effect is EquipEffect equip)
+                {
+                    // 装备（装备批 2026-10-18）：应用成功才有命令（槽满/缺组件防御路径零命令=非漏发）；
+                    // EquipItem（装备/耐久刷新）与 UnequipItem（耐久耗尽）按目标单位查存在性
+                    if (equip.Applied && !equipKeys.Contains(equip.TargetUnitId))
+                        Report(context, effect, BattleCommandType.EquipItem);
                 }
                 else if (effect is ApplyBuffEffect)
                 {

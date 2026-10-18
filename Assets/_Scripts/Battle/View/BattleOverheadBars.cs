@@ -23,6 +23,9 @@ namespace GIC.Battle
     /// 层数右下角+剩余回合左上角〔黑描边数字原神白；永久 Buff 不计时、单层不噪〕）→ 附着小图标在
     /// 血条左缘。底图=真实资产 Resources/UI/Battle/BarBg.png/BarFill.png（2026-09-25 拍板「不要程序化
     /// 生成」——美术出图直接覆盖文件即可）。
+    /// **装备图标行**（装备批 2026-10-18 拍板「参考 buff 图标显示方式，但是装备显示在血条右边」）：
+    /// 血条右缘外右侧横排——QueueSlot 头像牌复用（Avatar=物品图标/缺图 missing_image 兜底、
+    /// Ring=归属玩家色、耐久右下角标——UnitView.EquipRevision 驱动重建）。
     /// **相机缩放跟随**（2026-10-06 拍板）：玩家放大（视轴距离&lt;初始）时整簇按相对缩放的 50% 放大
     /// （1:1 会快速占满屏幕）；缩小（距离&gt;初始）不再缩小=下限 1.0。
     /// 无 GraphicRaycaster（勿补——会挡 HUD 点击）。
@@ -57,6 +60,16 @@ namespace GIC.Battle
         [SerializeField] private float Buff行距 = 3f;
         [Tooltip("层数/剩余回合角标字号")]
         [SerializeField] private float Buff角标字号 = 16f;
+
+        [Header("装备图标行（装备批 2026-10-18 拍板：血条右边，参考 Buff 图标方式）")]
+        [Tooltip("单个装备图标尺寸（像素，参考分辨率下——略小于 Buff 图标）")]
+        [SerializeField] private float 装备图标尺寸 = 30f;
+        [Tooltip("相邻装备图标中心距（像素）")]
+        [SerializeField] private float 装备图标间距 = 5f;
+        [Tooltip("血条右缘到首个装备图标中心的间隙（像素）")]
+        [SerializeField] private float 装备行距 = 7f;
+        [Tooltip("耐久角标字号（右下，同 Buff 层数角标位）")]
+        [SerializeField] private float 装备角标字号 = 15f;
 
         [Header("相机缩放跟随（2026-10-06 拍板：放大=整簇跟随放大取比率、缩小=下限不缩）")]
         [Tooltip("相对相机缩放的跟随比率（1=1:1 全跟；0.5=放大 2 倍时头顶条放大 1.5 倍——防快速占满屏幕）")]
@@ -115,7 +128,9 @@ namespace GIC.Battle
             public Image ConstBg;                // 徽章背景（满命彩色渐变载体）
             public TextMeshProUGUI ConstText;    // 命座数字
             public RectTransform BuffRow;        // Buff 图标行容器（重建时清子级重铺）
+            public RectTransform EquipRow;       // 装备图标行容器（血条右侧；装备批 2026-10-18）
             public int LastBuffRevision = -1;    // 上次重建对应的 UnitView.BuffRevision
+            public int LastEquipRevision = -1;   // 上次重建对应的 UnitView.EquipRevision（装备批）
             public int LastConstLevel = -1;      // 上次写文本的命座值（防逐帧 text 写入）
             public bool ConstRainbow;            // 当前处于满命彩色渐变态（退出时还原静态配色）
             public float LiftCurrent;            // 智能抬高当前位移（屏幕像素；指数平滑趋近目标）
@@ -217,12 +232,13 @@ namespace GIC.Battle
                 bool showEnergy = item.View.EnergyMax > 0;
                 if (enGo != null && enGo.activeSelf != showEnergy) enGo.SetActive(showEnergy);
 
-                var element = item.View.AttachedElement;
+                    var element = item.View.AttachedElement;
                 item.AttachIcon.gameObject.SetActive(element != ElementType.Physical);
                 if (element != ElementType.Physical)
                 {
                     var config = ElementFactionConfig.Instance;
-                    var icon = config != null ? config.GetElementIconStroke(element) : null;
+                    // 附着图标（血条左缘外）用 Deep 套（2026-10-18 拍板：随祈愿面板同换发光族）
+                    var icon = config != null ? config.GetElementIconDeep(element) : null;
                     // 缺图兜底（2026-10-06 拍板全位点接入）：附着图标缺失=missing_image 占位
                     var target = MissingImageGuard.Ensure(icon);
                     if (target != null && item.AttachIcon.sprite != target) item.AttachIcon.sprite = target;
@@ -231,6 +247,9 @@ namespace GIC.Battle
                 UpdateConstellationBadge(item);
                 if (item.View.BuffRevision != item.LastBuffRevision)
                     RebuildBuffIcons(item);
+                // 装备图标行（装备批 2026-10-18）：EquipRevision 变化触发重建（血条右侧，同 Buff 行模式）
+                if (item.View.EquipRevision != item.LastEquipRevision)
+                    RebuildEquipIcons(item);
             }
 
             SortItemsByDepth(cam);
@@ -344,6 +363,76 @@ namespace GIC.Battle
                     NewNumber(item.BuffRow, "Turns", new Vector2(x - cornerOffset, cornerOffset),
                         Buff角标字号).text = buff.remainingTurns.ToString();
             }
+        }
+
+        // ==================== 装备图标行（装备批 2026-10-18 拍板：血条右边，参考 Buff 图标方式） ====================
+
+        /// <summary>装备图标行重建（UnitView.EquipRevision 变化触发）：每件=QueueSlot 头像牌复用
+        ///（Avatar=物品图标 ItemConfig.icon[0]/缺图 missing_image 兜底、Ring=归属玩家色同 Buff 描环）
+        ///+耐久右下角标（&gt;0 才显——兔兔伯爵 3/2/1 递减；无耐久概念武器不显）。行原点=BuildItem
+        /// 摆好的血条右缘位，图标向右排开（行级重建=回合/命令粒度低频，同 Buff 行模式）</summary>
+        private void RebuildEquipIcons(Item item)
+        {
+            item.LastEquipRevision = item.View.EquipRevision;
+            for (int i = item.EquipRow.childCount - 1; i >= 0; i--)
+                Destroy(item.EquipRow.GetChild(i).gameObject);
+
+            var equips = item.View.Equips;
+            if (equips.Count == 0) return; // 空行零件（勿预制占位——装上才长出来）
+
+            if (_queueSlotPrefab == null)
+                _queueSlotPrefab = Resources.Load<GameObject>("Prefabs/Battle/QueueSlot");
+            if (_queueSlotPrefab == null)
+            {
+                Debug.LogWarning("[BattleOverheadBars] QueueSlot.prefab 未找到——装备图标行不显示");
+                return;
+            }
+
+            float pitch = 装备图标尺寸 + 装备图标间距;
+            float cornerOffset = 装备图标尺寸 * 0.34f;
+            for (int i = 0; i < equips.Count; i++)
+            {
+                var equip = equips[i];
+                float x = i * pitch; // 行原点=首个图标中心（BuildItem 摆位），向右排开
+
+                var tile = Instantiate(_queueSlotPrefab, item.EquipRow, false);
+                tile.name = $"Equip_{(ItemName)equip.item}";
+                var tileRt = (RectTransform)tile.transform;
+                tileRt.anchorMin = tileRt.anchorMax = tileRt.pivot = new Vector2(0.5f, 0.5f);
+                tileRt.anchoredPosition = new Vector2(x, 0f);
+                tileRt.localScale = Vector3.one * (装备图标尺寸 / 64f); // 64=QueueSlot 原生尺寸（描环同比）
+
+                var avatar = tileRt.Find("AvatarMask/Avatar")?.GetComponent<Image>();
+                var ring = tileRt.Find("Ring")?.GetComponent<Image>();
+                if (avatar != null)
+                {
+                    // 物品图标（ItemConfig.icon[0]；兔兔伯爵图标待用户指定——缺图=missing_image 兜底照常显示）
+                    var icon = MissingImageGuard.Ensure(EquipItemIcon(equip.item));
+                    if (icon != null) avatar.sprite = icon;
+                }
+                if (ring != null)
+                {
+                    // 描环=装备单位归属玩家色（Buff 描环同源——装备属于该单位，颜色=同一语义）
+                    var pc = PlayerColorOf != null && !string.IsNullOrEmpty(item.View.OwnerPlayerId)
+                        ? PlayerColorOf(item.View.OwnerPlayerId)
+                        : Color.white;
+                    ring.color = new Color(pc.r, pc.g, pc.b, 0.8f);
+                }
+
+                // 耐久角标=右下（行空间绝对摆位——同 Buff 层数角标位；无耐久/耗尽前恒 0 不显）
+                if (equip.durability > 0)
+                    NewNumber(item.EquipRow, "Durability", new Vector2(x + cornerOffset, -cornerOffset),
+                        装备角标字号).text = equip.durability.ToString();
+            }
+        }
+
+        /// <summary>装备物品图标解析：ItemConfig.icon[0]（物品配置首图）——查表失败（无配置/无图标）
+        /// 返回 null 由调用方 missing_image 兜底</summary>
+        private static Sprite EquipItemIcon(int itemName)
+        {
+            var config = Wargame.Instance?.Context?.Get<ItemConfig>();
+            var data = config != null ? config.GetItemData((ItemName)itemName) : null;
+            return data != null && data.icon != null && data.icon.Count > 0 ? data.icon[0] : null;
         }
 
         /// <summary>Buff 图标解析（拍板「图标用来源技能图标」）：专属图标（**按具名 buffKey 查资产**
@@ -545,6 +634,16 @@ namespace GIC.Battle
                 -(血条高 * 0.5f + 条间距 + 元能条高 + Buff行距 + Buff图标尺寸 * 0.5f));
             buffRow.sizeDelta = Vector2.zero;
 
+            // 装备图标行容器（血条右侧，装备批 2026-10-18 拍板「参考 buff 图标显示方式，但是装备
+            // 显示在血条右边」；子级由 RebuildEquipIcons 按 EquipRevision 重建）。行原点=血条右缘外
+            // 「装备行距+图标半高」处（首个图标中心），图标自此向右排开；y=血条中线同高
+            var equipRowGo = new GameObject("EquipRow", typeof(RectTransform));
+            equipRowGo.transform.SetParent(rootRect, false);
+            var equipRow = (RectTransform)equipRowGo.transform;
+            equipRow.anchorMin = equipRow.anchorMax = equipRow.pivot = new Vector2(0.5f, 0.5f);
+            equipRow.anchoredPosition = new Vector2(血条宽 * 0.5f + 装备行距 + 装备图标尺寸 * 0.5f, 0f);
+            equipRow.sizeDelta = Vector2.zero;
+
             // 附着图标（血条左缘外；Physical=隐藏由 Update 驱动）
             var iconGo = new GameObject("AttachIcon", typeof(RectTransform), typeof(Image));
             iconGo.transform.SetParent(rootRect, false);
@@ -562,6 +661,7 @@ namespace GIC.Battle
                 View = view, Go = root, Rect = rootRect,
                 HpFill = hpFill, EnFill = enFill, EnBarRoot = enBar.gameObject, AttachIcon = iconImage,
                 ConstGo = constGo, ConstBg = constBg, ConstText = constText, BuffRow = buffRow,
+                EquipRow = equipRow,
             };
         }
 

@@ -232,6 +232,10 @@ namespace GIC.Battle
         /// 部署会话同构（打出态悬浮+待定金格+完成选择确认；ExitAiming 统一收口飞回打出卡）</summary>
         private int _itemUseAimItem;
 
+        /// <summary>装备物品瞄准会话载体（ItemName 枚举值；0=非会话）——装备批 2026-10-18：武器/配件
+        /// 打出=使用物品同构精确选人（目标=有空槽的我方存活非建筑单位；ExitAiming 统一收口飞回）</summary>
+        private int _equipAimItem;
+
         /// <summary>手牌卡按钮容器（hand 布局件内；RebuildHandCards 重建。
         /// 2026-09-23 审查 R1：滚动壳四层结构上移 prefab hand 槽，代码只寻址 _handScroll/_handContent+建卡条目）</summary>
         private readonly List<UnityEngine.UI.Button> _handCardButtons = new List<UnityEngine.UI.Button>();
@@ -428,6 +432,7 @@ namespace GIC.Battle
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
+            _session.Player.OnItemGained += OnItemGainedHandler;      // 装备批：命座授予物品（兔兔伯爵）手牌即时并入
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             // 单位显示色解析器注入（2026-10-12 拍板「单位显示的颜色应当是玩家色」）：立牌底座/选中描边/
             // 血条填充全链改走房间玩家色单源（roster 命中=房间选色——同队队友异色可辨识归属；
@@ -524,6 +529,7 @@ namespace GIC.Battle
                     _session.Player.SnapshotUpdated -= OnSnapshotUpdated;
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
                     _session.Player.OnItemConsumed -= OnItemConsumedHandler;
+                    _session.Player.OnItemGained -= OnItemGainedHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
                 }
                 _session.OnPhaseChanged -= OnPhaseChanged;
@@ -598,6 +604,39 @@ namespace GIC.Battle
                 }
             }
             RefreshCurrencyCard(card, (ItemName)itemName, count); // 复用重 Init 链（数量渲染=ItemCardViewStrategy）
+        }
+
+        /// <summary>获得物品卡命令（装备批 2026-10-18：命座授予——安柏3命兔兔伯爵）：已有卡=刷数量角标
+        ///（镜像已并，同 OnItemConsumedHandler 模式读本地快照条目）；**新卡=全量重建**（卡列表签名
+        /// 已变——新槽位长出来，下回合快照自然对账）</summary>
+        private void OnItemGainedHandler(string playerId, int itemName, int amount)
+        {
+            if (playerId != _myPlayerId) return;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            PlayerResourceState myRes = null;
+            if (snapshot != null)
+            {
+                foreach (var r in snapshot.resources)
+                {
+                    if (r.playerId == _myPlayerId) { myRes = r; break; }
+                }
+            }
+            if (myRes == null) return;
+            if (_handItemCards.TryGetValue((ItemName)itemName, out var card) && card != null)
+            {
+                int count = 0;
+                foreach (var entry in myRes.handCards)
+                {
+                    if ((CardType)entry.cardType == CardType.Item && entry.value == itemName)
+                    {
+                        count = entry.count;
+                        break;
+                    }
+                }
+                RefreshCurrencyCard(card, (ItemName)itemName, count);
+                return;
+            }
+            RebuildHandCards(myRes); // 新卡：重建（签名变化触发；执行期手牌隐藏中也不碍——恢复期即见）
         }
 
         /// <summary>战斗结束（S10 轻量全灭软停）：胜负 Tip 常驻，退出走既有设置钮确认流程；
@@ -1206,6 +1245,43 @@ namespace GIC.Battle
             SetTip("Battle_TipAimItemUse"); // 饮用瞄准专属提示
         }
 
+        /// <summary>进入装备物品瞄准（装备批 2026-10-18 拍板「和打出食物一样，需要精确指定」）：武器/
+        /// 配件拖出出牌区进本会话。可选格=**有空槽**的我方存活非建筑单位所在格（武器=weaponItem==0、
+        /// 配件=accessoryItems 含零位——快照槽位表单源；槽满单位不入选免无效提交，Host 槽位校验兜底）；
+        /// TeamType 口径同饮用域（2v2 含队友单位；尸体/建筑不可装备）。交互全复用饮用精确选人
+        ///（IsCurrentAimUnitTargeted 装备分支：点格=同格多候选轮换+precise 立牌直选+待定目标描边、
+        ///「完成选择」=确认提交 SubmitAim 装备分支单出口、拖回/点非可选格/取消钮/阶段切换=反悔弹回）</summary>
+        private void EnterEquipAim(int itemNameValue)
+        {
+            if (_state != HudState.Idle) return; // 仅手牌态可起（同部署/饮用）
+            _equipAimItem = itemNameValue;
+            _state = HudState.Aiming;
+            _aimDef = null; // 玩家级会话（无技能按钮定义——同部署/饮用/升命）
+            _pendingAimCell = null; // 新会话待定清零（防陈旧提交）
+            ClosePopup();
+            CloseHandCardDetail(); // 瞄准视线让位（点非可选格/拖回=反悔弹回）
+
+            _aimCells.Clear();
+            _aimRecommendedCells.Clear();
+            var snapshot = _session.Player.LatestSnapshot;
+            if (snapshot != null)
+            {
+                // 目标域与 CollectAimTargets 装备分支同口径（单源语义：有空槽的我方存活非建筑单位）
+                var candidates = new List<UnitState>();
+                CollectAimTargets(snapshot, null, candidates);
+                var seen = new HashSet<BattleCell>();
+                foreach (var u in candidates)
+                {
+                    if (!seen.Add(u.position)) continue; // 同格多单位去重
+                    _aimCells.Add(u.position);
+                    _aimRecommendedCells.Add(u.position); // 单位指向域全推荐（目标格即语义本身，饮用同口径）
+                }
+            }
+            ShowAimHighlights();
+            ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
+            SetTip("Battle_TipAimEquip"); // 装备瞄准专属提示
+        }
+
         /// <summary>我方核心位置（部署半径圆心）。协议核心 Unit 化（2026-09-29 拍板）：真源=快照里的
         /// 我方核心单位位置（与 Host GetCorePosition 同源语义）；防御回落=出生区中心代理→我方任一单位位</summary>
         private BattleCell FindMyCorePosition(BattleSnapshot snapshot)
@@ -1423,6 +1499,7 @@ namespace GIC.Battle
         private bool IsCurrentAimUnitTargeted()
         {
             if (_itemUseAimItem != 0) return true; // 使用物品=指定单位型（延奏同构精确选人）
+            if (_equipAimItem != 0) return true;   // 装备物品=指定单位型（装备批：饮用同构精确选人）
             if (_aimDef == null) return false;
             var data = GetSelectedSkillData(_aimDef);
             return data != null && data.IsUnitTargeted();
@@ -1445,6 +1522,25 @@ namespace GIC.Battle
                     if (u.isCorpse != 0) continue;
                     if ((TeamType)u.team != MyTeam) continue;
                     if (IsBuildingUnitState(u)) continue;
+                    if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
+                    if (!_board.Map.HasTile(u.position.x, u.position.y)) continue;
+                    into.Add(u);
+                }
+                return;
+            }
+            // 装备物品分支（装备批 2026-10-18）：目标域=**有空槽**的我方存活非建筑单位（武器=
+            // weaponItem==0；配件=accessoryItems 槽位表含零位——快照真源与 Host UnitEquipment 同构；
+            // 槽满单位不入域=不可点的空反馈，免提交后被 Host 拒）。物品种类经 _itemConfig 单源判定
+            if (_equipAimItem != 0)
+            {
+                var equipData = _itemConfig?.GetItemData((ItemName)_equipAimItem);
+                bool isWeapon = equipData != null && equipData.subType == ItemSubType.Weapon;
+                foreach (var u in snapshot.units)
+                {
+                    if (u.isCorpse != 0) continue;
+                    if ((TeamType)u.team != MyTeam) continue;
+                    if (IsBuildingUnitState(u)) continue;
+                    if (isWeapon ? u.weaponItem != 0 : !HasFreeAccessorySlot(u)) continue;
                     if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
                     if (!_board.Map.HasTile(u.position.x, u.position.y)) continue;
                     into.Add(u);
@@ -1718,9 +1814,11 @@ namespace GIC.Battle
             // ItemConsume 命令镜像驱动——卡本体恒飞回不销毁）
             bool wasDeployAim = _deployAimUnit != 0;
             bool wasItemUseAim = _itemUseAimItem != 0;
+            bool wasEquipAim = _equipAimItem != 0; // 装备会话同构收口（装备批 2026-10-18）
             _deployAimUnit = 0;
             _itemUseAimItem = 0;
-            if (wasDeployAim || wasItemUseAim)
+            _equipAimItem = 0;
+            if (wasDeployAim || wasItemUseAim || wasEquipAim)
             {
                 _state = HudState.Idle;
                 _aimDef = null;
@@ -1907,6 +2005,16 @@ namespace GIC.Battle
             return data != null && data.unitType == UnitType.Building;
         }
 
+        /// <summary>快照单位是否有空配件槽（装备批 2026-10-18）：accessoryItems 槽位表（0=空槽）含零位
+        /// 即有空——与 Host UnitEquipment.HasFreeAccessorySlot 同构（快照真源，长度=层级槽位数）</summary>
+        private static bool HasFreeAccessorySlot(UnitState u)
+        {
+            if (u?.accessoryItems == null) return false;
+            foreach (var slot in u.accessoryItems)
+                if (slot == 0) return true;
+            return false;
+        }
+
         /// <summary>移动推荐预判的单格进入判定（镜像 MovementResolver.CanEnter 判定链的客户端静态版）：
         /// 地形层（IsPassable 按 ForceType——步行不可入水/沼泽）→ 体积绝对层（格内体积+自身体积≤3）
         /// → 阻挡规则层（blockAllies/blockEnemies/blockedByEnemies 配置值——运行时 Buff 修改不可见）。
@@ -2022,6 +2130,42 @@ namespace GIC.Battle
                 GICLog.Info($"[BattleHud] {_myPlayerId} 上交：使用 {(ItemName)_itemUseAimItem} → {drinker.unitId}");
                 _session.SubmitAction(useAction);
                 ExitAiming(); // 打出卡经 ExitAiming 统一飞回手牌槽（数量扣减由 ItemConsume 命令镜像）
+                return true;
+            }
+
+            // 装备物品分支（装备批 2026-10-18）：点有空槽的我方单位格=装备上交（玩家级行动占配额、
+            // 不耗体力——装备即消耗 docs/01）；目标=饮用同构精确选择（ResolvePendingTarget 优先，
+            // FindUnitAt 回落残留态再核槽位——槽满/建筑=拦截不提交保持瞄准态）；Host EquipItemExecutor
+            // 手牌持有/目标/槽位三重校验兜底
+            if (_equipAimItem != 0)
+            {
+                var equipSnapshot = _session.Player.LatestSnapshot;
+                var equipTarget = ResolvePendingTarget(equipSnapshot, cell)
+                    ?? FindUnitAt(equipSnapshot, cell, UnitSide.MyTeam); // 存活我方（TeamType 口径；尸体默认排除）
+                if (equipTarget != null && IsBuildingUnitState(equipTarget))
+                    equipTarget = null; // 建筑防线（域已排除，防回落残留态）
+                var equipData = _itemConfig?.GetItemData((ItemName)_equipAimItem);
+                bool equipIsWeapon = equipData != null && equipData.subType == ItemSubType.Weapon;
+                if (equipTarget != null
+                    && (equipIsWeapon ? equipTarget.weaponItem != 0 : !HasFreeAccessorySlot(equipTarget)))
+                    equipTarget = null; // 槽满防线（域已排除，防回落残留态——同回合槽位被占的极端竞态）
+                if (equipTarget == null)
+                {
+                    GICLog.Info($"[BattleHud] 装备目标格 {cell} 无有空槽的我方存活单位，未提交");
+                    ShowBattleToast("Battle_EquipSlotFull");
+                    return false;
+                }
+                var equipAction = new ActionData
+                {
+                    playerId = _myPlayerId,
+                    actionType = ActionType.EquipItem,
+                    equipItemId = _equipAimItem,
+                    targetUnitId = equipTarget.unitId,
+                };
+                // 日志先于 SubmitAction（同饮用分支勘正——ExitAiming 同步清零）
+                GICLog.Info($"[BattleHud] {_myPlayerId} 上交：装备 {(ItemName)_equipAimItem} → {equipTarget.unitId}");
+                _session.SubmitAction(equipAction);
+                ExitAiming(); // 打出卡经 ExitAiming 统一飞回（装备段 ItemConsume 镜像扣数量+EquipItem 命令挂图标）
                 return true;
             }
 

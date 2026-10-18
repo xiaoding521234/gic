@@ -243,19 +243,20 @@ namespace GIC.Battle
             }
 
             // B1 只支持 Move/Skill/Pass；B6c 加 DeployUnit（出战占玩家行动配额，docs/18 决策七）；
-            // 2026-10-16 首个可打出物品批加 UseItem（使用物品占玩家行动配额、不耗体力，docs/05 §5.0）
+            // 2026-10-16 首个可打出物品批加 UseItem（使用物品占玩家行动配额、不耗体力，docs/05 §5.0）；
+            // 2026-10-18 装备批加 EquipItem（装备武器/配件=同款玩家级行动，装备即消耗 docs/01）
             if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill
                 && action.actionType != ActionType.Pass && action.actionType != ActionType.DeployUnit
-                && action.actionType != ActionType.UseItem)
+                && action.actionType != ActionType.UseItem && action.actionType != ActionType.EquipItem)
             {
                 GICLog.Warn($"[TurnFlow] 不支持行动类型 {action.actionType}，忽略");
                 return;
             }
 
-            // 空过/出战/使用物品不指向行动单位（玩家级行动：超时自动 Pass / AI 无可用单位 Pass / 手牌出战同走
-            // 此路；UseItem 目标饮用单位=targetUnitId 非行动者——目标校验在 UseItemExecutor 段内收口），豁免单位校验
+            // 空过/出战/使用物品/装备物品不指向行动单位（玩家级行动：超时自动 Pass / AI 无可用单位 Pass / 手牌出战同走
+            // 此路；UseItem/EquipItem 目标单位=targetUnitId 非行动者——目标校验在各自执行器段内收口），豁免单位校验
             if (action.actionType == ActionType.Pass || action.actionType == ActionType.DeployUnit
-                || action.actionType == ActionType.UseItem)
+                || action.actionType == ActionType.UseItem || action.actionType == ActionType.EquipItem)
             {
                 _pendingActions[action.playerId] = action;
                 TryBeginResolve();

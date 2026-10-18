@@ -658,6 +658,16 @@ namespace GIC.Battle
             }
             if (!slot.isUnit)
             {
+                // 装备物品（装备批 2026-10-18）：武器/配件 subType → 进装备瞄准（有空槽的我方存活
+                // 非建筑单位——精确指定，打出食物同款交互）；装备即消耗 docs/01
+                var equipData = _itemConfig?.GetItemData((ItemName)slot.unitValue);
+                if (equipData != null
+                    && (equipData.subType == ItemSubType.Weapon || equipData.subType == ItemSubType.Accessory))
+                {
+                    SetPlayedHandCard(slot); // 打出态：卡悬浮松手位（装备瞄准期随取随拖）
+                    EnterEquipAim(slot.unitValue);
+                    return;
+                }
                 // 可打出物品（2026-10-16 首个可打出物品批）：配了使用效果（ItemData.HasEffects 单源）
                 // → 进饮用瞄准（选我方存活单位——部署瞄准同构交互）；无效果物品（货币/素材）弹回提示
                 var itemData = _itemConfig?.GetItemData((ItemName)slot.unitValue);

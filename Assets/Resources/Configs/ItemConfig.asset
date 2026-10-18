@@ -28,6 +28,7 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 1002
     icon:
     - {fileID: 21300000, guid: 2e04ac81d073d5e4b822ec722cace92c, type: 3}
@@ -43,6 +44,7 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 1004
     icon:
     - {fileID: 21300000, guid: d32f1a0fe4e84f88969dc7cccae5122e, type: 3}
@@ -58,6 +60,7 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 1003
     icon:
     - {fileID: 21300000, guid: de472ae2896b9ce4d81f66fa24f26c96, type: 3}
@@ -73,6 +76,7 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 1006
     icon:
     - {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}
@@ -88,6 +92,7 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 1001
     icon:
     - {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
@@ -103,6 +108,7 @@ MonoBehaviour:
     recycleLossCount: 60
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 3001
     icon:
     - {fileID: 21300000, guid: f1c2792a0d66dd6408864beedbfd0ec1, type: 3}
@@ -118,6 +124,7 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
   - itemID: 4001
     icon:
     - {fileID: 21300000, guid: 9af9caa073664874787b3310147653e9, type: 3}
@@ -154,6 +161,7 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+    equipStats: []
   - itemID: 4002
     icon:
     - {fileID: 21300000, guid: bdd686e661bbce84eaf3ac90bafc5c68, type: 3}
@@ -211,6 +219,7 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+    equipStats: []
   - itemID: 4003
     icon:
     - {fileID: 21300000, guid: 4f97dfa0394017848b683bb6d38591f9, type: 3}
@@ -268,6 +277,7 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+    equipStats: []
   - itemID: 4004
     icon:
     - {fileID: 21300000, guid: 4eaca57f760d8864ab50b40d6d5d65bb, type: 3}
@@ -304,6 +314,7 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+    equipStats: []
   - itemID: 4005
     icon:
     - {fileID: 21300000, guid: 32d5c04fc5004494888bc64d1adceffe, type: 3}
@@ -340,6 +351,7 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+    equipStats: []
   - itemID: 5001
     icon:
     - {fileID: 21300000, guid: 904790a7b6578e443899548661a1c8e5, type: 3}
@@ -399,6 +411,7 @@ MonoBehaviour:
       minConstellation: 0
       requiredTag: 0
       subType: 5
+    equipStats: []
   - itemID: 1007
     icon:
     - {fileID: 21300000, guid: 3b2b82954f2e9274486fbe4c689015a0, type: 3}
@@ -414,3 +427,23 @@ MonoBehaviour:
     recycleLossCount: 0
     customParams: []
     effects: []
+    equipStats: []
+  - itemID: 3002
+    icon: []
+    starLevel: 3
+    elements: []
+    subType: 2
+    maxStack: 9999
+    maxPrepareCount: 10
+    countPerServing: 1
+    recycleAfterBattle: 1
+    recycleLossCount: 0
+    customParams:
+    - key: BlockThreshold
+      displayName: "\u4F24\u5BB3\u62B5\u6321\u9608\u503C"
+      value: 50
+    - key: Durability
+      displayName: "\u8010\u4E45"
+      value: 3
+    effects: []
+    equipStats: []

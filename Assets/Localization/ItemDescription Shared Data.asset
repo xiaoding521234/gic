@@ -127,6 +127,10 @@ MonoBehaviour:
     m_Key: GenesisCrystal
     m_Metadata:
       m_Items: []
+  - m_Id: 3002
+    m_Key: BaronBunny
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

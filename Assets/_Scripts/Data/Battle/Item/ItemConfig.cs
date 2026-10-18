@@ -62,6 +62,11 @@ namespace GIC.Data
             /// <summary>是否配有使用效果（=可打出判定单源：货币卡/素材无 effects 恒不可打出）</summary>
             public bool HasEffects => effects != null && effects.Count > 0;
 
+            [Header("装备词条（2026-10-18 装备批：武器=加属性/配件=特殊效果——docs/05 §5.2）")]
+            /// <summary>装备时应用的属性修改（武器词条：铁剑=攻击等；空=无词条纯占位装备）。
+            /// 装备时经 UnitEquipment 挂 UnitStats 修改器（BaseFlat 区），配件耐久耗尽卸下时随槽撤除</summary>
+            public List<EquipStatEntry> equipStats;
+
             // 删除 description 字段，改用本地化
 
             /// <summary>
@@ -154,6 +159,28 @@ namespace GIC.Data
                 if (string.IsNullOrEmpty(key)) return null;
                 var localizedString = new LocalizedString(TableName.SkillParamName.ToString(), key);
                 return new TextEntry(localizedString, "");
+            }
+        }
+
+        /// <summary>
+        /// 装备词条（2026-10-18 装备批）：装备时挂到单位 UnitStats 的属性修改（武器=加攻击力等
+        /// 战斗属性，docs/05 §5.2「武器槽位固定 1，确保武器选择的策略性」）；配在 ItemData.equipStats
+        /// </summary>
+        [Serializable]
+        public class EquipStatEntry
+        {
+            [Tooltip("属性类型（StatType：攻击/防御/移速…）")]
+            public StatType statType = StatType.Attack;
+
+            [Tooltip("加值（正=提升/负=降低；BaseFlat 平伏加值——Percent 基准暂不支持，首个百分比武器需求时扩）")]
+            public int value;
+
+            public EquipStatEntry() { }
+
+            public EquipStatEntry(StatType statType, int value)
+            {
+                this.statType = statType;
+                this.value = value;
             }
         }
 

@@ -339,6 +339,14 @@ MonoBehaviour:
     m_Key: HealAmount
     m_Metadata:
       m_Items: []
+  - m_Id: 81
+    m_Key: BlockThreshold
+    m_Metadata:
+      m_Items: []
+  - m_Id: 82
+    m_Key: Durability
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

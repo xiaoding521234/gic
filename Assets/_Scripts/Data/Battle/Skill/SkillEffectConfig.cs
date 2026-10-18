@@ -40,6 +40,7 @@ namespace GIC.Data
 
         [InspectorName("理智变化")] SanityChange = 11,  // 理智原子（2026-10-16 首个可打出物品批）：paramKey=None 时 value 直读（负=减少）；产出 SanityEffect 单效应（钳 -300~300，StatChange(StatKindSanity) 命令链复用歌声之环批）；首个消费方=蒲公英酒「减少10点理智」（配 condition=TargetNotHasTag(Drunkard) 表达「酒鬼角色不减少理智」）
         [InspectorName("使用手牌物品")] UseHandItem = 12, // 手牌持有 subType 子类型物品则消耗 1 个并结算其效果（目标=施放者；无持有=空产出不阻断其他原子——「如果持有」条件语义）；首个消费方=凯亚变奏冷血之剑「持有饮品会饮用1瓶」（subType=Drink）
+        [InspectorName("获得物品卡")] GrantItem = 13,      // 命座授予（2026-10-18 装备批·安柏3命兔兔伯爵）：OnDeploy 被动——命座层首次达到 minConstellation 时，所属玩家手牌获得 value 张该物品（ItemName 枚举值直读）；结算点=DeployUnitExecutor 升命跨层（ConstellationApplier.ApplyUnlockedItemGrants 单源）。**0命授予（minConstellation=0）暂无命令通道**——随首个 0命授予需求在 RegisterUnit 接线
     }
 
     /// <summary>

@@ -47,15 +47,17 @@ namespace GIC.Battle
                 if (_sim.AnyCoreDestroyed()) yield break; // 核心片末检查（协议核心批）：防御性同口径
             }
 
-            // 使用物品段（2026-10-16 首个可打出物品批）：玩家级行动（unitId 留空）不进攻速分桶——
-            // 先行摘出独立段结算（部署段之后：刚出战的单位当回合可被喂酒；首个消费方=蒲公英酒）
-            var useItems = actions.FindAll(a => a.actionType == ActionType.UseItem);
-            bool hasUseItemSegment = useItems.Count > 0;
+            // 物品行动段（2026-10-16 首个可打出物品批；2026-10-18 装备批并 EquipItem）：玩家级行动
+            //（unitId 留空）不进攻速分桶——先行摘出独立段结算（部署段之后：刚出战的单位当回合可被
+            // 喂酒/装备；首个消费方=蒲公英酒，装备批加兔兔伯爵/武器）
+            var itemActions = actions.FindAll(a => a.actionType == ActionType.UseItem
+                                                   || a.actionType == ActionType.EquipItem);
+            bool hasUseItemSegment = itemActions.Count > 0;
             if (hasUseItemSegment)
             {
-                actions.RemoveAll(a => a.actionType == ActionType.UseItem);
+                actions.RemoveAll(a => a.actionType == ActionType.UseItem || a.actionType == ActionType.EquipItem);
                 int useItemSlice = hasDeploySegment ? 1 : 0; // 紧随部署段占号
-                yield return PushSegmentAndWaitAck(ResolveUseItemSegment(turnNumber, useItemSlice, useItems));
+                yield return PushSegmentAndWaitAck(ResolveItemActionsSegment(turnNumber, useItemSlice, itemActions));
                 if (_sim.AnyCoreDestroyed()) yield break; // 防御性同口径（物品效果理论上可含伤害）
             }
 
@@ -233,7 +235,8 @@ namespace GIC.Battle
             int indexInSlice = 0;
             foreach (var action in deploys)
             {
-                if (DeployUnitExecutor.TryResolve(_sim, action, out var summon, out var moraChange))
+                if (DeployUnitExecutor.TryResolve(_sim, action, out var summon, out var moraChange,
+                        out var itemGains))
                 {
                     if (summon != null)
                     {
@@ -247,6 +250,16 @@ namespace GIC.Battle
                         moraChange.indexInSlice = indexInSlice++;
                         segment.commands.Add(moraChange);
                     }
+                    // 命座跨层物品授予（装备批·安柏3命兔兔伯爵）：ItemGain 命令随升命命令之后
+                    if (itemGains != null)
+                    {
+                        foreach (var gain in itemGains)
+                        {
+                            gain.sliceIndex = sliceIndex;
+                            gain.indexInSlice = indexInSlice++;
+                            segment.commands.Add(gain);
+                        }
+                    }
                 }
             }
 
@@ -255,13 +268,14 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 使用物品段（2026-10-16 首个可打出物品批）：回合前部署段之后的玩家级即时段——不进攻速
-        /// 分桶（UseItem 无单位归属，同部署段口径）。快照→逐行动校验+效果编译（UseItemExecutor：
-        /// 手牌持有/目标我方存活/消耗 1 张）→效应统一应用→死亡判定→命令发射（Heal/
-        /// StatChange(Sanity)/ItemConsume 命令全链复用既有协议，零新命令类型）。
-        /// 凯亚变奏嵌套饮用（UseHandItem 原子）走 SkillExecutor 效应链，不经本段。
+        /// 物品行动段（2026-10-16 首个可打出物品批；2026-10-18 装备批并 EquipItem）：回合前部署段
+        /// 之后的玩家级即时段——不进攻速分桶（UseItem/EquipItem 均无单位归属，同部署段口径）。
+        /// 快照→逐行动校验+效果编译（UseItemExecutor/EquipItemExecutor：手牌持有/目标我方存活/
+        /// 消耗 1 张）→效应统一应用→死亡判定→命令发射（Heal/StatChange(Sanity)/ItemConsume/
+        /// EquipItem 命令全链复用既有协议）。凯亚变奏嵌套饮用（UseHandItem 原子）走 SkillExecutor
+        /// 效应链，不经本段。
         /// </summary>
-        private Segment ResolveUseItemSegment(int turnNumber, int sliceIndex, List<ActionData> useItems)
+        private Segment ResolveItemActionsSegment(int turnNumber, int sliceIndex, List<ActionData> itemActions)
         {
             var segment = new Segment
             {
@@ -274,13 +288,16 @@ namespace GIC.Battle
 
             var snapshot = _sim.TakeSnapshot(turnNumber);
             var effects = new List<BattleEffect>();
-            foreach (var action in useItems)
+            foreach (var action in itemActions)
             {
-                // 校验失败（无配置/无手牌/目标无效）=零效果零消耗，不影响同段其他玩家的使用
-                UseItemExecutor.TryResolve(_sim, action, snapshot, effects);
+                // 校验失败（无配置/无手牌/目标无效/槽满）=零效果零消耗，不影响同段其他玩家的行动
+                if (action.actionType == ActionType.EquipItem)
+                    EquipItemExecutor.TryResolve(_sim, action, snapshot, effects);
+                else
+                    UseItemExecutor.TryResolve(_sim, action, snapshot, effects);
             }
 
-            // 效应统一应用（治疗/理智/物品消耗——ItemConsumeEffect 应用=手牌扣减+Consumed 明细）+ 碎裂记录
+            // 效应统一应用（治疗/理智/物品消耗/装备挂槽——ItemConsumeEffect 应用=手牌扣减+Consumed 明细）+ 碎裂记录
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             var appliedBuffs = ApplyEffects(effects, shatters);
             var damagedUnits = CollectDamagedTargets(effects);
@@ -290,7 +307,7 @@ namespace GIC.Battle
                 effects, appliedBuffs, movers: null, vanishes: null, newlyDead, expired: null, skillCasts: null,
                 shattered: shatters);
 
-            GICLog.Info($"[TurnResolver] 使用物品段 {segment}");
+            GICLog.Info($"[TurnResolver] 物品行动段 {segment}");
             return segment;
         }
 
@@ -567,9 +584,12 @@ namespace GIC.Battle
                     effect.Element, effect.Delivery, effect.FromCell,
                     Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType,
                     effect.LaunchMs, effect.IsCrit ? 1 : 0);
-                // 箭矢视觉高度（2026-10-05 对齐动画松弦位）：投射物路径经发射声明透传千分下发；
+                // 箭矢视觉高度（2026-10-05 对齐动作片松弦位）：投射物路径经发射声明透传千分下发；
                 // 瞬发直击（Delivery=0）无箭矢视觉不消费
                 dmgCmd.arrowHeightY = Mathf.RoundToInt(effect.ProjectileHeightY * 1000f);
+                // 装备格挡标记（装备批 2026-10-18·兔兔伯爵）：value=原伤害量（客户端「格挡」文案尺寸），
+                // blocked=1=客户端不弹数字不掉血改弹格挡反馈（箭矢照飞——WYSIWYG 攻击发生但被抵挡）
+                dmgCmd.blocked = effect.BlockedByItem != 0 ? 1 : 0;
                 segment.commands.Add(dmgCmd);
             }
 
@@ -708,6 +728,22 @@ namespace GIC.Battle
                 // 命令此前无时刻、片头即刷=箭在飞冰先化；箭雨多波=每波到点融化）
                 ApplyHitMs(terrainCommand, effect.HitSeconds);
                 segment.commands.Add(terrainCommand);
+            }
+            // 装备效应（装备批 2026-10-18）：应用成功才发——Removed=UnequipItem（耐久耗尽卸下，
+            // 客户端图标行移除）；否则 EquipItem（首次装备/格挡耐久刷新同槽重发=角标更新幂等）
+            foreach (var effect in EnumerateEffects<EquipEffect>(effects))
+            {
+                if (!effect.Applied) continue;
+                if (effect.Removed)
+                {
+                    segment.commands.Add(BattleCommand.UnequipItem(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                        effect.Item, effect.SlotKind, effect.SlotIndex));
+                }
+                else
+                {
+                    segment.commands.Add(BattleCommand.EquipItem(effect.PlayerId, effect.TargetUnitId, sliceIndex,
+                        indexInSlice++, effect.Item, effect.SlotKind, effect.SlotIndex, effect.DurabilityLeft));
+                }
             }
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
@@ -859,6 +895,10 @@ namespace GIC.Battle
             // 寒冰之棱溢出碎裂治疗收集（2026-10-15 拍板「溢出的层数立刻破碎」）：主循环 ApplyBuff 分支
             // 收集，循环后并入 effects=命令发射载体（同吸血先例防炸枚举器）
             var overflowShatters = new List<HealEffect>();
+            // 装备格挡耐久变化收集（装备批 2026-10-18·兔兔伯爵）：DamageEffect 应用点消费 TryConsumeBlock
+            // 产出，循环后并入 effects=命令发射载体（同吸血先例）——EquipItem 同槽重发=角标更新/
+            // Removed=UnequipItem 耐久耗尽
+            var equipBlockUpdates = new List<EquipEffect>();
             foreach (var effect in effects)
             {
                 // 体力效应（B6d）：TargetUnitId=玩家 ID 非 Unit——先于单位解析处理（GetUnit(玩家ID)=null 会被跳过）
@@ -983,17 +1023,43 @@ namespace GIC.Battle
 
                 if (effect is DamageEffect damage)
                 {
-                    // 尸体 HP 恒 0，继续扣无意义但保持链路统一（属性保留）
-                    _sim.ApplyDamage(target, damage.Amount);
+                    // 装备配件格挡（装备批 2026-10-18·兔兔伯爵）：活体单位受到 ≥BlockThreshold 的伤害
+                    // 被完全抵挡——耐久-1（耗尽卸下撤词条），Amount 保留原值（命令层「格挡」文案尺寸用）
+                    // 但应用侧跳过扣血与吸血；**尸体不触发**（HP 恒 0 无可保护，鞭尸不白烧耐久）。
+                    // 耐久变化经 equipBlockUpdates 收集、循环后并入 effects（同吸血先收后并——主循环
+                    // foreach 中 List.Add 炸枚举器）→命令层发 EquipItem（同槽重发=角标更新）/UnequipItem
+                    if (damage.Amount > 0 && damage.BlockedByItem == 0 && !BattleSimState.IsDead(target))
+                    {
+                        var equipment = target.GetUnitComponent<UnitEquipment>();
+                        if (equipment != null && equipment.TryConsumeBlock(damage.Amount, out var block))
+                        {
+                            damage.BlockedByItem = block.Item;
+                            string blockOwner = target.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID
+                                                ?? effect.TargetUnitId;
+                            equipBlockUpdates.Add(new EquipEffect(blockOwner, effect.TargetUnitId, block.Item)
+                            {
+                                SlotKind = block.SlotKind,
+                                SlotIndex = block.SlotIndex,
+                                DurabilityLeft = block.DurabilityLeft,
+                                Applied = true,
+                                Removed = block.Removed,
+                            });
+                        }
+                    }
 
-                    // 吸血（2026-10-01 实装——此前 LifeSteal 只有数据位零消费，用户问「当前吸血还没
-                    // 实际生效吗」实证未生效）：攻击者存活且吸血>0 → 按实际伤害量×LifeSteal% 回血
+                    // 尸体 HP 恒 0，继续扣无意义但保持链路统一（属性保留）；格挡=跳过扣血
+                    if (damage.BlockedByItem == 0)
+                        _sim.ApplyDamage(target, damage.Amount);
+
+                    // 吸血（2026-10-01 实装——此前 LifeSteak 只有数据位零消费，用户问「当前吸血还没
+                    // 实际生效吗」实证未生效）：攻击者存活且吸血>0 → 按实际伤害量×LifeSteak% 回血
                     // （一切伤害结算点统一结算：战技/箭矢/爆发/光环 tick/燃烧；末点 FloorToInt；
                     // **治疗效率统一乘区**〔2026-10-01 拍板「治疗效率应当对所有的回血生效，无论
                     // 吸血还是被治疗」——受疗者=攻击者自身，EffectCompiler.ApplyHealEfficiency 单出口〕；
-                    // 尸体攻击者不吸）
+                    // 尸体攻击者不吸；**格挡伤害不吸**——装备批：被完全抵挡的攻击无实际伤害可吸）
                     var lifestealAttacker = _sim.GetUnit(damage.AttackerUnitId);
-                    if (lifestealAttacker != null && !BattleSimState.IsDead(lifestealAttacker))
+                    if (damage.BlockedByItem == 0
+                        && lifestealAttacker != null && !BattleSimState.IsDead(lifestealAttacker))
                     {
                         int lifestealPercent = lifestealAttacker.GetUnitComponent<UnitStats>()?.LifeSteal ?? 0;
                         if (lifestealPercent > 0 && damage.Amount > 0)
@@ -1036,6 +1102,37 @@ namespace GIC.Battle
                         _sim.ApplyHeal(target, revive.HealAmount);
                         revive.Applied = true;
                     }
+                }
+                else if (effect is EquipEffect equip)
+                {
+                    // 装备效应（装备批 2026-10-18）：执行器已过全部校验，此处挂槽+词条并回填槽位/耐久
+                    //（命令层 EquipItem 载荷）；**Applied=true 的耐久更新实例**（格挡路径构造）直接跳过
+                    // ——状态已由 TryConsumeBlock 内联变更。防御：槽满/缺组件=零命令（卡已消耗的极端
+                    // 落空——执行器槽位校验后同段无第二装备可挤占，理论不可达）
+                    if (equip.Applied) continue;
+                    var equipment = target.GetUnitComponent<UnitEquipment>();
+                    var itemData = Wargame.Instance?.Context?.Get<ItemConfig>()?.GetItemData((ItemName)equip.Item);
+                    if (equipment == null || itemData == null)
+                    {
+                        GICLog.Warn($"[TurnResolver] 装备效应落空（{effect.TargetUnitId} 缺组件或物品 {(ItemName)equip.Item} 无配置）");
+                        continue;
+                    }
+                    bool equipped;
+                    if (itemData.subType == ItemSubType.Weapon)
+                    {
+                        equipped = equipment.EquipWeapon((ItemName)equip.Item);
+                        equip.SlotKind = BattleCommand.EquipKindWeapon;
+                        equip.SlotIndex = 0;
+                        equip.DurabilityLeft = equipment.WeaponDurability;
+                    }
+                    else
+                    {
+                        equipped = equipment.EquipAccessory((ItemName)equip.Item, out int slot);
+                        equip.SlotKind = BattleCommand.EquipKindAccessory;
+                        equip.SlotIndex = slot;
+                        equip.DurabilityLeft = equipment.GetAccessoryDurability(slot);
+                    }
+                    equip.Applied = equipped;
                 }
                 else if (effect is EnergyEffect energy)
                 {
@@ -1157,6 +1254,7 @@ namespace GIC.Battle
             // 主循环 foreach 内直接 Add 会炸枚举器，故先收后并）
             effects.AddRange(lifestealHeals);
             effects.AddRange(overflowShatters); // 寒冰之棱溢出碎裂治疗（状态已内联，同上仅命令载体）
+            effects.AddRange(equipBlockUpdates); // 装备格挡耐久变化（状态已内联〔TryConsumeBlock 消耗〕，命令载体）
 
             // 元能第二阶段：先扣除后获取（与命令发射序 MergeEnergyEffects 同语义，2026-09-25 用户拍板「先扣除，再加」
             // ——获取先到会被 baseEnergy 上限钳位吞掉：30+10 钳 30 再 −20=10 ≠ 期望 20）。
@@ -1295,6 +1393,9 @@ namespace GIC.Battle
                     // 暴击合并口径（2026-10-02 幸运暴击批）：任一段暴击即标暴——Amount 已含暴击
                     // 份额，标大更近真（非首条独裁；命中点/反应标记仍取首条不变）
                     existing.IsCrit |= damage.IsCrit;
+                    // 装备格挡标记（装备批）：任一段被格挡即标——同键=同发同量伤害，段间格挡结局
+                    // 恒一致（同 launch 同目标同量 → 同阈值比较），混合态实际不可达
+                    if (damage.BlockedByItem != 0) existing.BlockedByItem = damage.BlockedByItem;
                 }
                 else
                 {
@@ -1303,6 +1404,7 @@ namespace GIC.Battle
                         damage.Element, damage.Delivery, damage.FromCell, damage.HitPointX, damage.HitPointY,
                         damage.ReactionType, damage.LaunchMs)
                     { HitSeconds = damage.HitSeconds, IsCrit = damage.IsCrit, ProjectileHeightY = damage.ProjectileHeightY }; // 吸血治疗继承用（WYSIWYG）+暴击事实+箭高透传（2026-10-05 报障「调整箭矢高度没变化」根因：副本重建漏抄=箭高恒丢回落默认）
+                    copy.BlockedByItem = damage.BlockedByItem; // 格挡标记透传（装备批）
                     merged[key] = copy;
                     result.Add(copy);
                 }

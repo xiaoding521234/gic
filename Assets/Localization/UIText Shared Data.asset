@@ -1187,6 +1187,18 @@ MonoBehaviour:
     m_Key: Battle_TipAimItemUse
     m_Metadata:
       m_Items: []
+  - m_Id: 12040
+    m_Key: Battle_TipAimEquip
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12041
+    m_Key: Battle_Block
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12042
+    m_Key: Battle_EquipSlotFull
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

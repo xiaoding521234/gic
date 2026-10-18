@@ -73,6 +73,49 @@ namespace GIC.Battle
             ReactionType = reactionType;
             LaunchMs = launchMs;
         }
+
+        /// <summary>装备格挡标记（装备批 2026-10-18：兔兔伯爵——受到 ≥BlockThreshold 的伤害被完全
+        /// 抵挡）：ApplyEffects 消费 TryConsumeBlock 置位——Amount 保留原值（命令层尺寸/对账用），
+        /// **应用侧跳过 ApplyDamage 与吸血**；命令层 Damage 命令带 blocked=1（客户端弹「格挡」不弹数字
+        /// 不掉血）。0=未格挡</summary>
+        public int BlockedByItem;
+    }
+
+    /// <summary>
+    /// 装备效应（装备批 2026-10-18）：EquipItem 行动的结算载体——应用层挂 UnitEquipment（槽位+
+    /// 词条），命令层产 EquipItem 命令（客户端血条右侧图标行）。**耐久消耗刷新复用本类**：格挡发生时
+    /// ApplyEffects 直接构造已回填（Applied=true）的实例并入 effects（同吸血先收后并），命令层发
+    /// EquipItem（同槽重发=角标更新）/UnequipItem（Removed=耐久耗尽）
+    /// </summary>
+    public class EquipEffect : BattleEffect
+    {
+        /// <summary>装备玩家（ItemConsumeEffect 同口径——玩家级归属）</summary>
+        public string PlayerId;
+
+        /// <summary>物品（ItemName 枚举值）</summary>
+        public int Item;
+
+        /// <summary>槽位种类（BattleCommand.EquipKindWeapon/EquipKindAccessory——应用层回填）</summary>
+        public int SlotKind;
+
+        /// <summary>槽位序号（武器恒 0；配件 0..2——应用层回填）</summary>
+        public int SlotIndex;
+
+        /// <summary>装备后剩余耐久（应用层回填；0=无耐久概念）</summary>
+        public int DurabilityLeft;
+
+        /// <summary>应用成功（槽位校验通过并已挂载；false=槽满/缺组件防御路径，零命令）</summary>
+        public bool Applied;
+
+        /// <summary>耐久耗尽已卸下（命令层发 UnequipItem 而非 EquipItem）</summary>
+        public bool Removed;
+
+        public EquipEffect(string playerId, string targetUnitId, int item)
+        {
+            PlayerId = playerId;
+            TargetUnitId = targetUnitId;
+            Item = item;
+        }
     }
 
     /// <summary>

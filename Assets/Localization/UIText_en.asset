@@ -1209,6 +1209,18 @@ MonoBehaviour:
     m_Localized: Choose an allied unit to drink this item
     m_Metadata:
       m_Items: []
+  - m_Id: 12040
+    m_Localized: Select a unit to equip
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12041
+    m_Localized: Blocked
+    m_Metadata:
+      m_Items: []
+  - m_Id: 12042
+    m_Localized: Equipment slots are full
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

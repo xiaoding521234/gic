@@ -60,6 +60,20 @@ namespace GIC.Data
         /// 客户端 BattleFog 首选直读（零配置解析链）。0=未填（旧端/手工构造态）——消费方回落 config 基值链</summary>
         public int exploreVision;
 
+        /// <summary>武器（装备批 2026-10-18）：ItemName 枚举值，0=空槽（武器槽恒 1，docs/05 §5.2）。
+        /// Host BuildUnitState 从 UnitEquipment 填充；客户端=血条右侧装备图标行（首个图标）+瞄准域槽位预判</summary>
+        public int weaponItem;
+
+        /// <summary>武器耐久（0=无耐久概念——装备批）</summary>
+        public int weaponDurability;
+
+        /// <summary>配件槽位表（按槽序平铺，长度=该单位配件槽上限〔眷属 1/伙伴 2/魔神 3〕；0=空槽）——
+        /// 客户端图标行按槽序渲染、瞄准域「有空槽」预判读零位存在性</summary>
+        public List<int> accessoryItems = new List<int>();
+
+        /// <summary>配件耐久表（与 accessoryItems 平行；0=空槽/无耐久概念）</summary>
+        public List<int> accessoryDurability = new List<int>();
+
         public List<BuffState> buffs = new List<BuffState>();
     }
 
