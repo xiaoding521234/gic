@@ -21,11 +21,12 @@ namespace GIC.Battle
     public static class OpponentProfiler
     {
         /// <summary>习惯计数每回合衰减系数（§4 遗忘策略「指数滑动平均」族——半衰期≈7 回合，
-        /// 与样本环「近 8 回合加倍」同节奏：允许对手变招但需持续证据）</summary>
-        private const float HabitDecayPerTurn = 0.9f;
+        /// 与样本环「近 8 回合加倍」同节奏：允许对手变招但需持续证据）——#4 审查批资产化：
+        /// 真源=AITuningConfig.习惯衰减每回合</summary>
+        private static float HabitDecayPerTurn => AITuningConfig.Instance.习惯衰减每回合;
 
-        /// <summary>习惯计数剪枝阈值（低于即移除，防长期对局长尾膨胀）</summary>
-        private const float HabitPruneThreshold = 0.05f;
+        /// <summary>习惯计数剪枝阈值（低于即移除，防长期对局长尾膨胀）——真源=AITuningConfig.习惯剪枝阈值</summary>
+        private static float HabitPruneThreshold => AITuningConfig.Instance.习惯剪枝阈值;
 
         // ==================== 画像 ====================
 
@@ -201,16 +202,15 @@ namespace GIC.Battle
             {
                 EnsureFresh(sim, turnNumber);
 
-                var lastDamageAttackerByVictim = new Dictionary<string, string>();
-                foreach (var cmd in commands)
+                for (int i = 0; i < commands.Count; i++)
                 {
+                    var cmd = commands[i];
                     switch (cmd.type)
                     {
                         case BattleCommandType.Damage:
                         {
                             var attackerOwner = OwnerOf(sim, cmd.actorUnitId);
                             if (attackerOwner == null) break; // 无主伤害（环境类）不计画像
-                            lastDamageAttackerByVictim[cmd.targetUnitId] = cmd.actorUnitId;
                             var profile = ProfileOf(attackerOwner);
                             profile.ElementHabit[cmd.metadata] =
                                 (profile.ElementHabit.TryGetValue(cmd.metadata, out var e) ? e : 0f) + 1f;
@@ -229,7 +229,12 @@ namespace GIC.Battle
                             // 协议核心/未来世界树同记账）死亡即记账）
                             var victim = sim.GetUnit(cmd.targetUnitId);
                             if (victim == null || !BattleHeuristics.IsCore(victim)) break;
-                            if (!lastDamageAttackerByVictim.TryGetValue(cmd.targetUnitId, out var killerId)) break;
+                            // 死亡归因单源（2026-10-20 审查批#7）：KillCredit.LastDamagerBefore 与装备掠夺
+                            // （TurnResolver.KillerPlayerOf）同一条「同段最近 Damage」口径——两份旧实现的
+                            // 暗差（本类原跳过无主伤害不记 vs 掠夺按最近直取）统一为决策八十一口径：
+                            // 最近 Damage 直取，归属解析后无主=不记账
+                            var killerId = KillCredit.LastDamagerBefore(commands, i, cmd.targetUnitId);
+                            if (killerId == null) break;
                             var killerOwner = OwnerOf(sim, killerId);
                             var victimIdentity = victim.GetUnitComponent<UnitIdentity>();
                             if (killerOwner == null || victimIdentity == null

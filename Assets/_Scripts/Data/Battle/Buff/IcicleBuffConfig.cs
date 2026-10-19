@@ -17,8 +17,15 @@ namespace GIC.Data
         [Header("碎裂元能阈值（% 持有者元能上限——严格大于才触发）")]
         public int 碎裂元能阈值百分比 = 50;
 
-        [Header("作用半径（切比雪夫，格——常驻，不随命座）")]
+        [Header("作用半径（切比雪夫，格；3命起 +C3Radius 命座技能参数——决策七十二复活通道）")]
         public int 作用半径 = 1;
+
+        /// <summary>光环半径单源（2026-10-20 审查批#6）：三消费方同源读</summary>
+        public override int AuraRadius => 作用半径;
+
+        /// <summary>3命起 +C3Radius（决策七十二「3命额外加半径+1」复活通道——2026-10-08 曾随重构退役）</summary>
+        public override int ConstellationAuraBonus(int constellation, SkillConfig.SkillData talent)
+            => constellation >= 3 ? (talent != null ? talent.GetInt(SkillParamKey.C3Radius, 1) : 1) : 0;
 
         [Header("叠层上限（常驻——2026-10-08 拍板不再依靠命座；旧 C2/C3StackLimit 通道退役）")]
         public int 基础叠层上限 = 4;

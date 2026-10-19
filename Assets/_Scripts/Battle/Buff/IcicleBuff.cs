@@ -96,9 +96,9 @@ namespace GIC.Battle
             // 先例）；2命起每层命中额外施加冰棱减防（逐层各一次——2026-10-08 晚返拍「减防仍然留在2命」）。
             // 碎裂不在此判定（复测拍板①「元能>50% 立刻触发」——移除后本回合末自然无 tick）
             var (cLevel, talent) = SourceConstellation();
-            int radius = Cfg.作用半径 + (cLevel >= 3 // 3命：作用半径+C3Radius（2026-10-15 决策七十二「3命额外加半径+1/元能上限+60」复活通道——2026-10-08 曾随重构退役）
-                ? (talent != null ? talent.GetInt(SkillParamKey.C3Radius, 1) : 1)
-                : 0);
+            // #6 审查批单源：半径=基础+命座加成全走 BuffConfig 虚方法（IcicleBuffConfig 覆写——
+            // 与客户端 BattleHud.SelfCastAuraRadiusOf 预估同一条口径）
+            int radius = Cfg.作用半径 + Cfg.ConstellationAuraBonus(cLevel, talent);
             bool applyDefDown = cLevel >= 2; // 2命起 tick 命中附带冰棱减防（是否施加=命座开关；数值全在 Buff_DefenseDown 资产单源）
             int layers = Mathf.Max(1, Level);
 
@@ -129,7 +129,7 @@ namespace GIC.Battle
                         // 全=Buff_DefenseDown 资产单源；buffKey=资产名=具名身份（同族异名共存基础）；
                         // HitSeconds=该层拍时刻（与同层命中同拍挂徽章，WYSIWYG 决策七十六复测返修）
                         effects.Add(new ApplyBuffEffect(attackerId, kv.Key, (int)BuffType.DefenseDown, 1,
-                            buffKey: "Buff_DefenseDown") // 逐层各施加（2026-10-01 拍板）
+                            buffKey: BuffKeys.DefenseDown) // 逐层各施加（2026-10-01 拍板；常量单源=BuffKeys，防改名静默回落）
                         {
                             HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
                         });

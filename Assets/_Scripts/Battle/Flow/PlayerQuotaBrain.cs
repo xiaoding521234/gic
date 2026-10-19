@@ -42,24 +42,25 @@ namespace GIC.Battle
         /// <summary>AI 提交延迟（秒）——模拟"思考"，同时让回合切换肉眼可辨</summary>
         private const float SubmitDelaySeconds = 0.8f;
 
-        // ==================== 评分口径（号令档内部常量，勿散写调用处） ====================
+        // ==================== 评分口径（#4 审查批资产化：数值真源=Resources/Configs/AI/AITuning.asset——
+        // 调 AI 平衡=改资产 Inspector 零代码；下列属性=代码侧访问别名，勿散写调用处） ====================
 
         /// <summary>增益 Buff 每原子的行动溢价（叠层/长效增益优于原地空过的粗估）</summary>
-        private const int EnsoBuffActionScore = 15;
+        private static int EnsoBuffActionScore => AITuningConfig.Instance.延奏增益行动分;
 
         /// <summary>被协者已实装变奏（TriggerSkill 链）的评分</summary>
-        private const int EnsoTriggerChainScore = 12;
+        private static int EnsoTriggerChainScore => AITuningConfig.Instance.延奏变奏链分;
 
         /// <summary>协奏元能转移（+10/+20）的评分——蒙德/自身目标=+10 档基分；非蒙德目标 +20 档=双倍
         /// （AI-1 批传输档：非蒙德目标元能翻倍但不触发变奏——docs/07-势力机制/蒙德.md）</summary>
-        private const int EnsoEnergyTransferScore = 4;
+        private static int EnsoEnergyTransferScore => AITuningConfig.Instance.延奏传输分;
 
         /// <summary>升命候选评分（AI-1 批，docs/active/42 §11；2026-10-12 观察局二轮标定）：
         /// 永驻命座被动的投资档——**高于延奏号令增益档（~30-45）与威胁边际档（0-25）**、低于
         /// 斩杀边际（50~80+）与救命治疗（RescueScore 30+有效治疗≈50-60）；首版 25 在边际修正后
         /// 仍被延奏常态压制（观察局 T4~T12 实锤升命 30 回合仅中 4），50=「该救命/该斩杀的回合让位、
         /// 平时投资优先」的拍板位——实际数值随三账本批（AI-5）按摩拉水位重标定</summary>
-        private const int UpgradeConstellationScore = 50;
+        private static int UpgradeConstellationScore => AITuningConfig.Instance.升命投资分;
 
         // 救命分已上提共享单源（F-3，docs/active/34）：CompanionBrain.RescueScore=30——配额脑号令
         // 与伙伴脑预治疗两处同口径防漂移；本脑消费点直接引用（原 private EnsoRescueScore 退役）
@@ -171,7 +172,7 @@ namespace GIC.Battle
             //    AI-5：人格×态势军备乘子合成+体力保底门（§5.3——保自主军团 2 回合运转量）
             var difficulty = AIPlayerConfig.DifficultyOf(_playerId);
             var threat = AIPlayerConfig.QuotaThreatEnabled(difficulty)
-                ? OpponentThreatModel.Build(sim, snapshot, MyTeam, turn)
+                ? OpponentThreatModel.BuildCached(sim, snapshot, MyTeam, turn) // #2 审查批：回合级缓存
                 : null;
             float armMul = 军备桶 * strat.armyMul;
             foreach (var entry in CollectArchons(sim))

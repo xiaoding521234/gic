@@ -64,12 +64,19 @@ namespace GIC.Battle
     /// </summary>
     public static class ElementReactionResolver
     {
-        public const float MeltVulnerabilityBonus = 0.5f; // docs/06：融化 易伤 50% × 级别
-        public const float VaporizeDamageBonus = 0.5f;   // docs/06：蒸发 增伤 50% × 级别
+        /// <summary>融化易伤加成（×级别，docs/06 §反应表）——2026-10-20 审查批#5 资产化：
+        /// 真源=ElementFactionConfig.meltVulnerabilityBonus（调反应平衡改资产零代码）；
+        /// 配置缺载回落代码基线 0.5（headless/异常时序兜底）</summary>
+        public static float MeltVulnerabilityBonus
+            => ElementFactionConfig.Instance != null ? ElementFactionConfig.Instance.meltVulnerabilityBonus : 0.5f;
+
+        /// <summary>蒸发增伤加成（×级别）——同上，真源=ElementFactionConfig.vaporizeDamageBonus</summary>
+        public static float VaporizeDamageBonus
+            => ElementFactionConfig.Instance != null ? ElementFactionConfig.Instance.vaporizeDamageBonus : 0.5f;
 
         /// <summary>超导减防具名 Buff 资产名（buffKey=资产名，决策五十七「资产即身份」——
-        /// 与冰棱减防（Buff_DefenseDown）异资产同族共存可叠加）</summary>
-        public const string SuperconductBuffKey = "Buff_Superconduct";
+        /// 与冰棱减防（Buff_DefenseDown）异资产同族共存可叠加；常量登记于 GIC.Data.BuffKeys 单源）</summary>
+        public const string SuperconductBuffKey = BuffKeys.Superconduct;
 
         /// <summary>附着侧反应预判（attachment 路径——compile 调用方从片内编译视图读实参）。
         /// 返回 outcome（HasReaction=false=无反应，无副作用）</summary>

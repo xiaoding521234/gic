@@ -27,6 +27,8 @@ namespace GIC.Battle
         private TextCombiner _turnPhaseCombiner;
         private TMP_Text _countdownText;
         private TextCombiner _countdownCombiner;
+        /// <summary>#16 审查批：倒计时整数缓存（值不变跳过 ToString+SetSingleEntry——每帧分配清理）</summary>
+        private int _lastCountdownSecond = -1;
         /// <summary>倒计时基准字号（2026-09-26 拍板 3 倍烘焙=61.2；告急脉动以它为基线，解析时捕获）</summary>
         private float _countdownBaseFontSize = 61.2f;
         /// <summary>倒计时 SDF 描边材质实例（2026-09-26 报障返修：UGUI Outline 固定像素描边在缩放视口下

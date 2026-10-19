@@ -229,8 +229,9 @@ namespace GIC.Battle
         private bool _spreadFormations;
 
         private const float MoveStepSeconds = BattleMetrics.MoveStepSeconds;
-        private const float CommandStaggerSeconds = 0.12f;
-        private const float TurnEndDelaySeconds = 0.25f; // 回合结束段固定节拍（不按攻速排程）
+        // #10 审查批：段播放 pacing 常量收口 BattleMetrics（Host/客户端契约单源——原为客户端内联字面量）
+        private const float CommandStaggerSeconds = BattleMetrics.CommandStaggerSeconds;
+        private const float TurnEndDelaySeconds = BattleMetrics.TurnEndDelaySeconds; // 回合结束段固定节拍（不按攻速排程）
         private const float BlockedBumpOutSecondsFactor = 0.75f;  // 撞墙探出时长 = 步进节奏 × 0.75（缓出）
         private const float BlockedBumpBackSecondsFactor = 0.55f; // 撞墙弹回时长 = 步进节奏 × 0.55（快出缓停）
 
@@ -467,7 +468,7 @@ namespace GIC.Battle
                 float duration = distance > 0f ? distance / (ProjectileSpeed * _playbackSpeed) : 0f;
                 yield return BattleViewTween.Over(duration, t => arrowGo.transform.position = Vector3.Lerp(from, to, t));
 
-                Destroy(arrowGo);
+                ReleaseProjectileVisual(arrowGo);
                 yield return PlayDamageCoroutine(target, -command.value, 0f, false, command.reactionKind,
                     command.metadata, isCrit: command.crit == 1, actorUnitId: command.actorUnitId,
                     blocked: command.blocked == 1);
@@ -557,7 +558,7 @@ namespace GIC.Battle
             }
             if (_board == null || _board.Map == null || !_board.Map.HasTile(cell.x, cell.y))
             {
-                Destroy(arrowGo); // 虚空边缘（无表面）：无落地——现状消失
+                ReleaseProjectileVisual(arrowGo); // 虚空边缘（无表面）：无落地——回池（现状消失同观感）
                 yield break;
             }
 
@@ -584,7 +585,7 @@ namespace GIC.Battle
                         arrowGo.transform.position = sinkFrom + new Vector3(0f, -箭落沉水深度 * t, 0f);
                     if (renderer != null) { var c = sinkColor; c.a = sinkColor.a * (1f - t); renderer.color = c; }
                 });
-                if (arrowGo != null) Destroy(arrowGo);
+                if (arrowGo != null) ReleaseProjectileVisual(arrowGo);
                 yield break;
             }
 
@@ -628,7 +629,7 @@ namespace GIC.Battle
                     if (renderer != null) { var c = color; c.a = color.a * (1f - t); renderer.color = c; }
                 });
             }
-            if (arrowGo != null) Destroy(arrowGo);
+            if (arrowGo != null) ReleaseProjectileVisual(arrowGo);
         }
 
         /// <summary>插地箭尾部弹性摇晃（决策七十六「插入地面时，尾部有弹性摇晃」）：绕埋入尖
@@ -695,9 +696,16 @@ namespace GIC.Battle
         /// 创建即就位，飞行由调用方 tween；占位兜底配色=BattlePalette「箭矢占位色」活色勿写字面量。
         /// per-unit 专属弹射物（2026-10-05 拍板）：actorUnitId 已登记=专属素材+白染（美术即最终色，
         /// 缩放乘「箭矢长度」归一化）；未登记=通用 ArrowBolt+传入 tint 元素染色</summary>
+        /// <summary>#15 审查批箭矢池：命中箭/消散箭/箭雨落箭共用（箭雨 8 格×4 波×2 箭=单次施放
+        /// 64 个 GO+渲染器的实例化尖峰——池化后复用）。失活池件挂 _viewRoot 下随场同亡；
+        /// Pop 出已销毁引用（场景重载后 Unity fake-null）自动回落新建</summary>
+        private readonly Stack<GameObject> _arrowPool = new Stack<GameObject>();
+
         private GameObject CreateProjectileVisual(Vector3 from, Vector3 to, Color tint, string actorUnitId = null)
         {
-            var arrowGo = new GameObject("Projectile");
+            var arrowGo = _arrowPool.Count > 0 ? _arrowPool.Pop() : null;
+            if (arrowGo == null) arrowGo = new GameObject("Projectile");
+            arrowGo.SetActive(true);
             arrowGo.transform.SetParent(_viewRoot, false);
             arrowGo.transform.position = from;
 
@@ -716,7 +724,9 @@ namespace GIC.Battle
                 arrowGo.transform.rotation = _billboardRotation; // 无相机/零程兜底：竖立布告板
             }
 
-            var renderer = arrowGo.AddComponent<SpriteRenderer>();
+            var renderer = arrowGo.GetComponent<SpriteRenderer>();
+            if (renderer == null) renderer = arrowGo.AddComponent<SpriteRenderer>();
+            renderer.enabled = true; // 池件复位：迷雾门控可能以 disabled 归还
             renderer.sortingOrder = BattleMetrics.ProjectileSortingOrder;
             var sprite = ArrowSprite;
             float customScale = 1f;
@@ -747,6 +757,16 @@ namespace GIC.Battle
                 && _views.TryGetValue(actorUnitId, out var actorView) && actorView != null)
                 _fog.RegisterProjectileVisual(arrowGo, actorView.OwnerTeam);
             return arrowGo;
+        }
+
+        /// <summary>箭矢回池（#15 审查批：命中/消散/箭雨三路箭协程的 Destroy 统一改此口——
+        /// 注销迷雾门控+失活回池待复用；协程被腰斩（清场/退局）时不经此口，池件随场销毁无泄漏）</summary>
+        private void ReleaseProjectileVisual(GameObject arrowGo)
+        {
+            if (arrowGo == null) return;
+            _fog?.UnregisterProjectileVisual(arrowGo);
+            arrowGo.SetActive(false);
+            _arrowPool.Push(arrowGo);
         }
 
         // ==================== 时轮表现轨（SkillCast 消费，B-S3 ②首个接线=2026-09-28 箭雨） ====================
@@ -904,7 +924,7 @@ namespace GIC.Battle
                         sinkRenderer.color = c;
                     }
                 });
-                if (arrowGo != null) Destroy(arrowGo);
+                if (arrowGo != null) ReleaseProjectileVisual(arrowGo);
                 yield break;
             }
 
@@ -938,7 +958,7 @@ namespace GIC.Battle
                     }
                 });
             }
-            if (arrowGo != null) Destroy(arrowGo);
+            if (arrowGo != null) ReleaseProjectileVisual(arrowGo);
         }
 
         private IEnumerator PlaySegmentCoroutine(Segment segment)
@@ -949,9 +969,10 @@ namespace GIC.Battle
             if (segment.turnEnd != 0)
                 delay = TurnEndDelaySeconds;
             else if (segment.insertedInstantAction != 0 || segment.deploy != 0)
-                delay = 0.15f;
+                delay = BattleMetrics.DeploySegmentBeatSeconds;
             else
-                delay = Mathf.Max(0f, (segment.turnMaxAttackSpeed - segment.sliceAttackSpeed) / 10f);
+                delay = Mathf.Max(0f, (segment.turnMaxAttackSpeed - segment.sliceAttackSpeed)
+                    / BattleMetrics.AttackSpeedSliceLeadInDivisor);
             if (delay > 0f)
             {
                 // 空等跳过（2026-09-30 拍板「凯亚行动完后芭芭拉空等 3 秒，应当跳过空等时间——只要
@@ -1694,6 +1715,7 @@ namespace GIC.Battle
             _customProjectiles.Clear(); // per-unit 专属弹射物随场同清（与 _views 同生命周期）
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
             ResidentVideoBudget.ClearAll(); // 常驻解码器注册表随清场清空（2026-10-16 常驻批——单位 OnDestroy 已逐个拆，此处双保险）
+            ActionRtPool.ClearAll(); // 动作 RT 全局池随场清（#3 审查批：共享/私有 RT 释放+租约清）
             _fog?.Clear(); // 迷雾批 2026-10-17：探索集/雾面/隐藏态随场同清
         }
 

@@ -931,20 +931,16 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>击杀方归属（同段死亡归因）：段命令流倒序找该单位最近一次 Damage 命令的
-        /// actorUnitId → 该单位所属玩家。攻击者已被击倒仍可归属（尸体归属玩家不变——掠夺归玩家）；
-        /// 无 Damage 命令/攻击者不存在/无主人=返回 null</summary>
+        /// <summary>击杀方归属（同段死亡归因——扫描已下沉 KillCredit.LastDamagerBefore 单源，
+        /// 2026-10-20 审查批#7：与 OpponentProfiler 核心摧毁记账共用同一实现）：段命令流内该单位
+        /// 最近一次 Damage 命令的 actorUnitId → 该单位所属玩家。攻击者已被击倒仍可归属（尸体归属
+        /// 玩家不变——掠夺归玩家）；无 Damage 命令/攻击者不存在/无主人=返回 null</summary>
         private string KillerPlayerOf(string deadId, Segment segment)
         {
-            for (int i = segment.commands.Count - 1; i >= 0; i--)
-            {
-                var command = segment.commands[i];
-                if (command.type != BattleCommandType.Damage) continue;
-                if (command.targetUnitId != deadId) continue;
-                var attacker = _sim.GetUnit(command.actorUnitId);
-                return attacker?.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
-            }
-            return null;
+            var damagerId = KillCredit.LastDamagerBefore(segment.commands, segment.commands.Count, deadId);
+            if (damagerId == null) return null;
+            var attacker = _sim.GetUnit(damagerId);
+            return attacker?.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
         }
 
         /// <summary>

@@ -134,10 +134,20 @@ namespace GIC.Battle
             public int LastConstLevel = -1;      // 上次写文本的命座值（防逐帧 text 写入）
             public bool ConstRainbow;            // 当前处于满命彩色渐变态（退出时还原静态配色）
             public float LiftCurrent;            // 智能抬高当前位移（屏幕像素；指数平滑趋近目标）
+            // #13 审查批静态门控缓存
+            public Vector3 LastAnchor;           // 投影锚点缓存（不变则跳过重投影）
+            public bool AnchorInit;              // 首帧强制投影一次
+            public float LastZoom = -1f;         // 已应用的整簇缩放
+            public int LastAttachElement = -1;   // 附着图标元素缓存（不变跳过配置查表）
         }
 
         private readonly List<Item> _items = new List<Item>();
         private readonly List<Item> _sortBuffer = new List<Item>();   // 深度排序复用（零逐帧分配）
+        // #13 审查批静态门控：相机位姿/缩放缓存 + 重排脏标记（相机或单位动才重排/重投影）
+        private Vector3 _lastCamPos;
+        private Quaternion _lastCamRot;
+        private float _lastZoomScale = -1f;
+        private bool _sortDirty = true;
 
         /// <summary>血条填色解析器（2026-10-15 血条三色批，BattlePlayer 透传注入——HUD Bind 提供：
         /// 读设置模式〔玩家色/三色〕+本端身份判定；null=未注入回落归属玩家色现行口径）。
@@ -175,6 +185,7 @@ namespace GIC.Battle
         {
             if (_canvas == null || view == null) return;
             _items.Add(BuildItem(view));
+            _sortDirty = true; // #13：参与者集变化强制重排
         }
 
         /// <summary>清空全部头顶条（ClearViews 同步）</summary>
@@ -183,6 +194,7 @@ namespace GIC.Battle
             foreach (var item in _items)
                 if (item.Go != null) Destroy(item.Go);
             _items.Clear();
+            _sortDirty = true; // #13：参与者集变化强制重排
         }
 
         private void Update()
@@ -196,6 +208,16 @@ namespace GIC.Battle
             // 画布单位→屏幕像素换算（智能抬高的位移量用）
             float scaleFactor = _canvas != null ? _canvas.scaleFactor : 1f;
 
+            // #13 审查批静态门控：相机位姿变化（平移/缩放）驱动「条位置重投影」与「深度重排」两类
+            // 刷新——静止局面全免（原实现每帧全量投影+全列表排序+附着图标逐帧查表）
+            var camPos = cam.transform.position;
+            var camRot = cam.transform.rotation;
+            bool camMoved = camPos != _lastCamPos || camRot != _lastCamRot;
+            if (camMoved) { _lastCamPos = camPos; _lastCamRot = camRot; }
+            bool zoomChanged = !Mathf.Approximately(zoomScale, _lastZoomScale);
+            if (zoomChanged) _lastZoomScale = zoomScale;
+            bool anyUnitMoved = _sortDirty; // 注册/清空强制重排
+
             foreach (var item in _items)
             {
                 if (item.View == null || item.Go == null) continue; // view 被销毁时容错（正常路径 ClearAll 先行）
@@ -208,18 +230,27 @@ namespace GIC.Battle
                 // 智能整体抬高（2026-10-07 拍板「下面加了 buff 图标后，应当智能整体抬高，避免遮挡到
                 // 角色立牌」）：有 Buff 图标时整簇上移「锚点以下悬垂深度」——图标底缘回到锚点（立牌顶）
                 // 即整簇悬空不压立牌；无 Buff 零位移。指数平滑（0.08s 时间常数）——Buff 出现/消失时
-                // 条簇柔和升降非瞬跳；悬垂深度随 zoomScale 同步放大
+                // 条簇柔和升降非瞬跳；悬垂深度随 zoomScale 同步放大。
+                // #13 审查批静态门控：锚点未变+相机未动+抬高已收敛+缩放未变时整块跳过
+                // （WorldToScreenPoint/位置写/平滑全免；相机跟随/缩放/单位移动期间照常逐帧，观感零损）
                 float liftTarget = item.View.Buffs.Count > 0
                     ? BuffBelowExtent() * zoomScale * scaleFactor : 0f;
-                item.LiftCurrent = Mathf.Approximately(item.LiftCurrent, liftTarget)
-                    ? liftTarget
-                    : Mathf.Lerp(item.LiftCurrent, liftTarget,
-                        1f - Mathf.Exp(-Time.unscaledDeltaTime / 0.08f));
-                var projected = cam.WorldToScreenPoint(item.View.OverheadBarAnchor);
-                item.Rect.position = new Vector3(projected.x, projected.y + item.LiftCurrent, projected.z);
+                bool liftSettled = Mathf.Approximately(item.LiftCurrent, liftTarget);
+                var anchor = item.View.OverheadBarAnchor;
+                bool anchorMoved = !item.AnchorInit || anchor != item.LastAnchor;
+                if (anchorMoved) { item.AnchorInit = true; item.LastAnchor = anchor; anyUnitMoved = true; }
+                if (anchorMoved || camMoved || !liftSettled || zoomChanged || item.LastZoom != zoomScale)
+                {
+                    item.LastZoom = zoomScale;
+                    item.LiftCurrent = liftSettled ? liftTarget
+                        : Mathf.Lerp(item.LiftCurrent, liftTarget,
+                            1f - Mathf.Exp(-Time.unscaledDeltaTime / 0.08f));
+                    var projected = cam.WorldToScreenPoint(anchor);
+                    item.Rect.position = new Vector3(projected.x, projected.y + item.LiftCurrent, projected.z);
 
-                if (item.Rect.localScale.x != zoomScale)
-                    item.Rect.localScale = Vector3.one * zoomScale;
+                    if (item.Rect.localScale.x != zoomScale)
+                        item.Rect.localScale = Vector3.one * zoomScale;
+                }
 
                 item.HpFill.fillAmount = item.View.MaxHp > 0
                     ? Mathf.Clamp01((float)item.View.Hp / item.View.MaxHp) : 0f;
@@ -233,15 +264,20 @@ namespace GIC.Battle
                 if (enGo != null && enGo.activeSelf != showEnergy) enGo.SetActive(showEnergy);
 
                     var element = item.View.AttachedElement;
-                item.AttachIcon.gameObject.SetActive(element != ElementType.Physical);
-                if (element != ElementType.Physical)
+                // #13 审查批元素缓存：元素不变跳过配置查表/兜底守卫（原实现每帧每条查一遍）
+                if ((int)element != item.LastAttachElement)
                 {
-                    var config = ElementFactionConfig.Instance;
-                    // 附着图标（血条左缘外）用 Deep 套（2026-10-18 拍板：随祈愿面板同换发光族）
-                    var icon = config != null ? config.GetElementIconDeep(element) : null;
-                    // 缺图兜底（2026-10-06 拍板全位点接入）：附着图标缺失=missing_image 占位
-                    var target = MissingImageGuard.Ensure(icon);
-                    if (target != null && item.AttachIcon.sprite != target) item.AttachIcon.sprite = target;
+                    item.LastAttachElement = (int)element;
+                    item.AttachIcon.gameObject.SetActive(element != ElementType.Physical);
+                    if (element != ElementType.Physical)
+                    {
+                        var config = ElementFactionConfig.Instance;
+                        // 附着图标（血条左缘外）用 Deep 套（2026-10-18 拍板：随祈愿面板同换发光族）
+                        var icon = config != null ? config.GetElementIconDeep(element) : null;
+                        // 缺图兜底（2026-10-06 拍板全位点接入）：附着图标缺失=missing_image 占位
+                        var target = MissingImageGuard.Ensure(icon);
+                        if (target != null && item.AttachIcon.sprite != target) item.AttachIcon.sprite = target;
+                    }
                 }
 
                 UpdateConstellationBadge(item);
@@ -252,7 +288,10 @@ namespace GIC.Battle
                     RebuildEquipIcons(item);
             }
 
-            SortItemsByDepth(cam);
+            // #13 审查批门控：相机或任一单位锚点变化（或注册/清空）才深度重排——静态局面零排序
+            if (camMoved || anyUnitMoved)
+                SortItemsByDepth(cam);
+            _sortDirty = false;
         }
 
         // ==================== 命座徽章（2026-10-06 拍板「血条上不再显示名字，改为显示命座数字」） ====================

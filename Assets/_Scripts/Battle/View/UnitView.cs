@@ -167,7 +167,9 @@ namespace GIC.Battle
         // 新分配 RT 恒黑 + VideoPlayer 首开解码 ~100-300ms 才落首帧；PrewarmActionClips 建场预解码首帧
         // 入池，PlayActionVideo 按片取 RT：预热命中=已带首帧零黑屏、未命中=现建回落旧行为兜底。
         // 池化顺带消除旧单槽 RT 的换片重建（move 768² 与战技 1344×768 交替播曾每次重建））
-        private readonly Dictionary<VideoClip, RenderTexture> _actionRts = new Dictionary<VideoClip, RenderTexture>();
+        // #3 审查批：动作片 RT 归全局池（ActionRtPool——同 clip 全场一份共享 RT+播放租约，
+        // 并发同片施放方懒建私有 RT；原 per-(单位,clip) RT 池随本批退役）
+        private VideoClip _leasedClip; // 本机当前持有租约的动作片（回待机面/换片施放/清理时释放）
         // 常驻播放器池（2026-10-16 施放延迟根治批）：per-clip 解码器 Pause 留 warm——施放≈0 启动
         // （治 MediaCodec/WMF 换片重开 0.1~1s）；安卓全局预算 LRU 淘汰（ResidentVideoBudget），
         // 淘汰片回落现行主播放器换片路径。施放期间主播放器 Pause 防双解码负载，片末回待机时恢复。
@@ -280,10 +282,11 @@ namespace GIC.Battle
             foreach (var clip in clips)
             {
                 if (clip == null || clip.width <= 0 || clip.height <= 0) continue;
-                if (_actionRts.ContainsKey(clip)) continue; // 已预热直通
-                var rt = new RenderTexture((int)clip.width, (int)clip.height, 0,
-                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-                _actionRts[clip] = rt;
+                if (_residentPlayers.ContainsKey(clip)) continue; // 已预热直通
+                // #3 审查批：全局共享 RT（同 clip 全场一份；预热期各解码器写 identical 内容无冲突，
+                // 但真实施放租约被占期间跳过首帧渲染防写花在显画面）
+                var rt = ActionRtPool.GetShared(clip);
+                if (rt == null) continue;
                 var go = new GameObject("ActionResident_" + clip.name);
                 go.transform.SetParent(transform, false);
                 var vp = go.AddComponent<VideoPlayer>();
@@ -295,18 +298,21 @@ namespace GIC.Battle
                 vp.loopPointReached += OnActionVideoFinished; // 常驻播放器播完回待机（source=常驻→Pause 回零留 warm+主播放器恢复）
                 _residentPlayers[clip] = vp;
                 ResidentVideoBudget.Register(this, vp);
-                StartCoroutine(PrewarmClipRoutine(vp, rt));
+                StartCoroutine(PrewarmClipRoutine(vp, rt, renderFirstFrame: !ActionRtPool.IsLeased(clip)));
             }
         }
 
         /// <summary>常驻播放器预热：Prepare→首帧渲入池 RT→Pause 留 warm（解码器不销毁）。
-        /// 超时兜底=RT 留黑+播放器保留（下次施放自然起播，不再挂起）</summary>
-        private IEnumerator PrewarmClipRoutine(VideoPlayer vp, RenderTexture rt)
+        /// 超时兜底=RT 留黑+播放器保留（下次施放自然起播，不再挂起）。
+        /// renderFirstFrame=false（#3 审查批：该 clip 租约被占=有人在显播放）时只 Prepare 留
+        /// 解码器温备、不写入共享 RT 防写花在显画面</summary>
+        private IEnumerator PrewarmClipRoutine(VideoPlayer vp, RenderTexture rt, bool renderFirstFrame = true)
         {
             vp.Prepare();
             float deadline = Time.unscaledTime + 5f;
             while (!vp.isPrepared && Time.unscaledTime < deadline) yield return null;
             if (!vp.isPrepared) yield break; // 超时：RT 留黑=旧行为兜底
+            if (!renderFirstFrame) yield break; // 租约被占：解码器温备即达目的（RT 内容不动）
             vp.Play();
             yield return null;
             yield return null; // 两帧确保 WMF 完成一次渲染入 RT
@@ -320,6 +326,8 @@ namespace GIC.Battle
             if (clip != null && _residentPlayers.TryGetValue(clip, out var vp))
             {
                 _residentPlayers.Remove(clip);
+                // #3 审查批：被淘汰片若恰持租约先释放（理论罕见——LRU 不淘在播片，Touch 防误淘）
+                if (_leasedClip == clip) { ActionRtPool.Release(clip, this); _leasedClip = null; }
                 if (vp != null)
                 {
                     vp.Stop();
@@ -387,12 +395,16 @@ namespace GIC.Battle
             if (scaleCompensation <= 0f) scaleCompensation = 1f;
             // 动作片独立 RT 池（决策四十五：per-clip 取用——预热池命中=带首帧零黑屏；未命中=现建
             // 〔黑→首帧解码落地=旧行为兜底〕；共用主 RT 会拉伸变形，故各片各 RT 按原生尺寸）
-            if (!_actionRts.TryGetValue(clip, out var actionRt))
+            // #3 审查批：动作片 RT 全局池租约制——先放前片租约（换片施放）、再租本片
+            //（空闲/本机=共享 RT；被他机并发播放占用=懒建私有 RT）
+            if (_leasedClip != null && _leasedClip != clip)
             {
-                actionRt = new RenderTexture((int)clip.width, (int)clip.height, 0,
-                    RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-                _actionRts[clip] = actionRt;
+                ActionRtPool.Release(_leasedClip, this);
+                _leasedClip = null;
             }
+            var actionRt = ActionRtPool.Acquire(clip, this);
+            if (actionRt == null) return;
+            _leasedClip = clip;
             // 播放源选择（2026-10-16 常驻批）：常驻播放器命中=直接 Play（解码器已开=启动≈0，治手机施放
             // 延迟）；未命中（预算淘汰/未预热）=现行主播放器换片路径（有首开延迟但兜底可用）。
             // 常驻路径主播放器 Pause（防双解码负载），片末 SwitchToIdleLoop 恢复。
@@ -400,6 +412,7 @@ namespace GIC.Battle
             if (resident)
             {
                 ResidentVideoBudget.Touch(rvp);
+                if (rvp.targetTexture != actionRt) rvp.targetTexture = actionRt; // #3：绑定租得的 RT（共享/私有；常态=共享零切换）
                 if (vp.isPlaying) vp.Pause(); // 主播放器让位（待机解码器暂挂——回待机时恢复，无需关停）
                 _activeResidentClip = clip; // 在显片登记（回切守卫）
             }
@@ -476,6 +489,12 @@ namespace GIC.Battle
         /// （B-S4c 校准批次修复：旧版直接写回 baseScale 丢 sign——动作片播完后向左单位立牌翻回朝右）</summary>
         private void RestoreIdleVideoSurface()
         {
+            // #3 审查批：回待机面=动作播放结束——释放动作 RT 租约（幂等；换片施放/清理各自前置释放）
+            if (_leasedClip != null)
+            {
+                ActionRtPool.Release(_leasedClip, this);
+                _leasedClip = null;
+            }
             var vp = _videoPlayer;
             if (vp != null && _videoRt != null && vp.targetTexture != _videoRt)
                 vp.targetTexture = _videoRt;
@@ -612,9 +631,8 @@ namespace GIC.Battle
             if (_baseDiscMaterial != null) Destroy(_baseDiscMaterial);
             if (_videoMaterial != null) Destroy(_videoMaterial); // ChromaKey 材质（调用方持有纪律，docs/14 §63①）
             if (_videoRt != null) { _videoRt.Release(); Destroy(_videoRt); } // RT 随单位释放（视频路线显存恒定的收口）
-            foreach (var rt in _actionRts.Values) // 动作片 RT 池随单位释放（B-S4c 双 RT；决策四十五池化）
-                if (rt != null) { rt.Release(); Destroy(rt); }
-            _actionRts.Clear();
+            // #3 审查批：动作 RT 归全局池——释放本机租约与私有 RT（共享 RT 由 ClearAll 清场统一释放）
+            if (_leasedClip != null) { ActionRtPool.Release(_leasedClip, this); _leasedClip = null; }
         }
 
         /// <summary>单位销毁通知（ResidentVideoBudget 注销挂载用，2026-10-16 常驻批）</summary>

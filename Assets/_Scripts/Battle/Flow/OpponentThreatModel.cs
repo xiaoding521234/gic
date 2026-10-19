@@ -84,6 +84,37 @@ namespace GIC.Battle
             return map;
         }
 
+        // ==================== 回合级构建缓存（2026-10-20 审查批#2） ====================
+        // 同一 (对局, 回合, 队伍) 的威胁图原先被 AIStrategist/PlayerQuotaBrain/CompanionBrain
+        // 各自重复构建（三处都在 TryBeginResolve 同步决策段内、其间模拟与快照零变化——本类红线
+        // 「同快照恒同预测」即缓存正确性依据）；每图 O(可见敌×技能×4向×线目标) 评分数千次，
+        // 三图重复=回合提交卡顿主源（30 单位规模估 8-40ms）。键含 sim.InstanceId（进程级静态
+        // 注册表自清判据，2026-10-15 审查定案）；回合翻新即整清（每回合内容本就重建，防累积）。
+        private static readonly Dictionary<(int, int, TeamType), ThreatMap> _buildCache
+            = new Dictionary<(int, int, TeamType), ThreatMap>();
+        private static int _cacheInstanceId;
+        private static int _cacheTurn = -1;
+
+        /// <summary>带回合缓存的构建口（三个消费方统一改走此口；缓存命中零重算，
+        /// 未命中回落 Build 首建——null 结果同样入缓存防重复探测空局）</summary>
+        public static ThreatMap BuildCached(BattleSimState sim, BattleSnapshot snapshot, TeamType myTeam, int turn)
+        {
+            if (sim == null) return null;
+            if (sim.InstanceId != _cacheInstanceId || turn != _cacheTurn)
+            {
+                _buildCache.Clear();
+                _cacheInstanceId = sim.InstanceId;
+                _cacheTurn = turn;
+            }
+            var key = (sim.InstanceId, turn, myTeam);
+            if (!_buildCache.TryGetValue(key, out var map))
+            {
+                map = Build(sim, snapshot, myTeam, turn);
+                _buildCache[key] = map;
+            }
+            return map;
+        }
+
         /// <summary>单敌预测（「对手如我」先验，确定性）：眷属=启发式脑原样复用；伙伴/魔神=共享
         /// 评分骨架中性档+敌方实池（ResourceGate 单源照查敌方玩家池）。骨架 threat=null——预测层
         /// 不递归建威胁图（被预测方不再预测我们，单层博弈——docs/active/33 §10）</summary>

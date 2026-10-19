@@ -40,31 +40,32 @@ namespace GIC.Battle
             [InspectorName("回防")] Regroup = 2,
         }
 
-        // ==================== 标定常量（v1 示例值——全部待实测标定） ====================
+        // ==================== 标定阈值（#4 审查批资产化：数值真源=Resources/Configs/AI/AITuning.asset——
+        // 调态势/红线=改资产 Inspector 零代码；下列属性=代码侧访问别名。v1 示例值仍待实测标定） ====================
 
         /// <summary>战力比进入压制阈值（>1.3=我方战力优势）；退回滞回 1.15（±0.15）</summary>
-        private const float PushRatioEnter = 1.3f;
-        private const float PushRatioStay = 1.15f;
+        private static float PushRatioEnter => AITuningConfig.Instance.压制进入战力比;
+        private static float PushRatioStay => AITuningConfig.Instance.压制保持战力比;
 
         /// <summary>战力比进入守势阈值（&lt;0.7=劣势）；退回滞回 0.85</summary>
-        private const float DefendRatioEnter = 0.7f;
-        private const float DefendRatioStay = 0.85f;
+        private static float DefendRatioEnter => AITuningConfig.Instance.守势进入战力比;
+        private static float DefendRatioStay => AITuningConfig.Instance.守势保持战力比;
 
         /// <summary>最小驻留回合数（防抖动）</summary>
-        private const int MinStanceHoldTurns = 3;
+        private static int MinStanceHoldTurns => AITuningConfig.Instance.态势最小驻留回合;
 
         /// <summary>发育期回合数（开局铺场）</summary>
-        private const int DevelopTurns = 3;
+        private static int DevelopTurns => AITuningConfig.Instance.发育期回合数;
 
         /// <summary>终局判据（1v1 形态）：敌方核心 HP 占比低于此值=全资源转火</summary>
-        private const float EndgameCoreHpRatio = 0.15f;
+        private static float EndgameCoreHpRatio => AITuningConfig.Instance.终局核心血量比;
 
         /// <summary>回防态激进度乘子（§3「激进度下调」——军团软系数作用于斩杀加成）</summary>
-        public const float RegroupAggressionMul = 0.7f;
+        public static float RegroupAggressionMul => AITuningConfig.Instance.回防激进度乘数;
 
         /// <summary>经济红线（§5.3）：摩拉&lt;50 发育桶（升命）腰斩；体力&lt;15 进攻桶（操控/魔神）腰斩</summary>
-        private const int MoraRedLine = 50;
-        private const int StaminaRedLine = 15;
+        private static int MoraRedLine => AITuningConfig.Instance.摩拉红线;
+        private static int StaminaRedLine => AITuningConfig.Instance.体力红线;
 
         // ==================== 状态 ====================
 
@@ -189,7 +190,7 @@ namespace GIC.Battle
             if (!developOnly)
             {
                 var myCoreCell = sim.GetCorePosition(playerId);
-                var threat = OpponentThreatModel.Build(sim, snapshot, team, turnNumber);
+                var threat = OpponentThreatModel.BuildCached(sim, snapshot, team, turnNumber); // #2 审查批：回合级缓存（三消费方同拍同输入）
                 if (threat != null && threat.ThreatenedCells.Contains(myCoreCell))
                     state.CoreThreatened = true;
             }

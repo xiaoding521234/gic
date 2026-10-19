@@ -29,81 +29,82 @@ namespace GIC.Battle
     /// </summary>
     public static class CompanionBrain
     {
-        // ==================== 评分口径（共享骨架常量，勿散写调用处） ====================
+        // ==================== 评分口径（#4 审查批资产化：数值真源=Resources/Configs/AI/AITuning.asset——
+        // 调 AI 平衡=改资产 Inspector 零代码；下列属性=代码侧访问别名，勿散写调用处） ====================
 
         /// <summary>斩杀加成：预估伤害 ≥ 目标当前生命（保守估值，未计反应乘区）</summary>
-        public const int KillBonusScore = 80;
+        public static int KillBonusScore => AITuningConfig.Instance.击杀斩杀加成分;
 
         /// <summary>战技命中获能 +10 的评分（B6a：向爆发攒能的行动价值）</summary>
-        public const int SkillHitEnergyScore = 12;
+        public static int SkillHitEnergyScore => AITuningConfig.Instance.战技命中获能分;
 
         /// <summary>移动兜底分（低于一切攻击/有效治疗候选）</summary>
-        public const int MoveBaseScore = 10;
+        public static int MoveBaseScore => AITuningConfig.Instance.移动兜底分;
 
         /// <summary>移动每逼近 1 格的加分</summary>
-        public const int MoveProgressScorePerCell = 2;
+        public static int MoveProgressScorePerCell => AITuningConfig.Instance.移动每格逼近分;
 
         /// <summary>近敌接敌加分上限（离最近敌越近越优先动该单位）</summary>
-        public const int MoveEngageBonusMax = 8;
+        public static int MoveEngageBonusMax => AITuningConfig.Instance.接敌加分上限;
 
         /// <summary>走位进射击线加分（移动落点即有可开火攻击线=下回合可输出）</summary>
-        public const int MoveLineUpScore = 8;
+        public static int MoveLineUpScore => AITuningConfig.Instance.射线对齐分;
 
         /// <summary>治疗候选门槛：有效治疗 ≥ 治疗量一半才值得占行动（勿为挠痒花行动）</summary>
-        public const int HealWorthRatioPercent = 50;
+        public static int HealWorthRatioPercent => AITuningConfig.Instance.治疗门槛百分比;
 
         /// <summary>单位指向型爆发：复苏候选评分（B-3 ② 芭芭拉闪耀奇迹——回一整个单位+40% 血，
         /// 价值对齐斩杀档之上：100&gt;KillBonus 80，有尸体=复苏即最优）</summary>
-        public const int UnitTargetBurstReviveScore = 100;
+        public static int UnitTargetBurstReviveScore => AITuningConfig.Instance.复苏候选分;
 
         /// <summary>单位指向型爆发：增益候选评分（歌声之环永久光环——中等偏高：低于斩杀档、
         /// 高于常规攻击均值，攒满即放勿囤积；调手感改此常量）</summary>
-        public const int UnitTargetBurstBuffScore = 45;
+        public static int UnitTargetBurstBuffScore => AITuningConfig.Instance.单位指向增益分;
 
         /// <summary>无目标自施放爆发：自身增益候选评分（aimMode=None——首个=凯亚凛冽轮舞寒冰之棱：
         /// 持续冰伤+碎裂回血复合价值，对齐单位指向增益档；攒满即放勿囤积——能量满后继续获取即浪费；
         /// 调手感改此常量）</summary>
-        public const int SelfCastBurstBuffScore = 45;
+        public static int SelfCastBurstBuffScore => AITuningConfig.Instance.自施放增益分;
 
         /// <summary>J-2 自施放爆发语境评分（2026-10-04 拍板）：即将施加的光环半径内每个存活敌的
         /// 加分——贴敌群施放=每回合 tick 逐层吃满（优先于常规攻击先放），空场施放=预载（Buff 永久
         /// 非浪费，维持基础分照常放）</summary>
-        public const int SelfCastBurstPerEnemyScore = 15;
+        public static int SelfCastBurstPerEnemyScore => AITuningConfig.Instance.自施放每敌分;
 
         /// <summary>J-1 冻结协同分（2026-10-04 拍板）：反应预览命中冻结（控制反应——目标冰冻 2 回合
         /// 跳过行动）的 flat 加分——旧口径冻结无增伤乘区恒 0 分，凯亚对「打哪个敌人」无偏好；
         /// 芭芭拉光环挂水后霜袭打水附着目标=冻结联动主链；量级低于斩杀 80、高于常规集火每档 3</summary>
-        public const int FreezeControlScore = 25;
+        public static int FreezeControlScore => AITuningConfig.Instance.冻结控制分;
 
         /// <summary>随军追逐兜底分（2026-10-04 观察局返修）：先锋伴随 BFS 追逐兜底原为裸
         /// MoveBaseScore(10)——恒输一切技能（水球≈57）=被先锋落后超过伴随半径后永远站桩施法不再
         /// 归队。托底 60=压常规单体技能（先归队再输出）、低于群奶/救命奶（75-90，途中仍救场）
         /// 与就位托底 95；调手感改此常量</summary>
-        public const int VanguardChaseFloorScore = 60;
+        public static int VanguardChaseFloorScore => AITuningConfig.Instance.追赶托底分;
 
         /// <summary>反威胁分上限（E-1 配额脑对手建模，docs/active/33 §2.3）：攻击候选目标是敌方
         /// 威胁源（威胁图 EnemyThreatScore 高者）时加分——优先拆除敌方火力核心；上限低于斩杀 80
         /// （反威胁优先于平打、不优先于斩杀）。伙伴脑 threat=null 不消费=零行为变化</summary>
-        public const int ThreatResponseScoreCap = 25;
+        public static int ThreatResponseScoreCap => AITuningConfig.Instance.反威胁分上限;
 
         /// <summary>落点受威胁扣分（E-1）：候选落点在敌方预测火线格集合内=下回合白挨打，避险
         /// 走位；与走位进射击线加分（8）同量级正负抵偿——有开火线但在火线上=平手倾向、纯避险
         /// 换位为负倾向。扣后钳 1 保底 Offer（危险落点排后不缺席——挂机防线语义）</summary>
-        public const int ThreatenedCellPenalty = 12;
+        public static int ThreatenedCellPenalty => AITuningConfig.Instance.火线格惩罚;
 
         /// <summary>集火每档加分（E-2 协调层，docs/active/33 §3）：行为档案「集火权重」1 档=+3 分——
         /// 量级低于战技获能（12）与斩杀（80）：集火倾向只影响同分域内的目标选择，不压过斩杀/反应
         /// 等强信号；权重 0（默认）=游走型不消费</summary>
-        public const int FocusFireScorePerRank = 3;
+        public static int FocusFireScorePerRank => AITuningConfig.Instance.集火每名次分;
 
         /// <summary>支援自保危险半径（F-1，docs/active/34 §5.3）：落点距最近敌的切比雪夫距离
         /// 小于此值=「站敌人刀口」——支援型自保负分生效阈值</summary>
-        public const int SupportDangerRadius = 2;
+        public static int SupportDangerRadius => AITuningConfig.Instance.支援危险半径;
 
         /// <summary>光环敌覆盖每敌加分（G-1 光环位置价值，docs/active/35）：持有半径型 tick 光环
         /// 时落点光环半径内每敌 +6——量级对齐走位线分 8（3 敌=18 显著牵引）：光环挂水/挂冰引擎
         /// 的贴敌驱动力；乘档案「光环贴敌权重」（0=默认不消费）与形态因子（保险形态归零 G-2）</summary>
-        public const int SupportAuraPerEnemy = 6;
+        public static int SupportAuraPerEnemy => AITuningConfig.Instance.光环贴敌每敌分;
 
         /// <summary>支援形态切换血线门（G-2，docs/active/35 §2）：hp% 低于此值=保险形态
         ///（贴敌分归零+自保×SupportStanceSafeFactor 后撤）——她活着=复活保险在（复苏无限程，
@@ -112,52 +113,52 @@ namespace GIC.Battle
         /// 无近敌+低血线=安全区（低血不构成危险，随军照常、光环途中自愈）；有近敌+低血线
         /// 才保险后撤（G-2 语义保持）。观察局实证：她在 (2,13) 周围 7+ 格无敌却因 49% 血
         /// 保险驻场 15+ 回合，先锋前排单打至死无奶</summary>
-        public const int SupportStanceRetreatHpPercent = 60;
+        public static int SupportStanceRetreatHpPercent => AITuningConfig.Instance.保险血线百分比;
 
         /// <summary>保险形态近敌半径（2026-10-04 W1 返修）：血线门降级判定的「威胁可及域」——
         /// 最近敌切比雪夫 ≤ 此值=有近敌（保险候选），否则=安全区（攻击视野回落 5 同口径）</summary>
-        public const int InsuranceDangerRadius = 5;
+        public static int InsuranceDangerRadius => AITuningConfig.Instance.保险近敌半径;
 
         /// <summary>支援形态切换预警门（G-2）：威胁图预期承伤 ≥ hp×此百分比=保险形态——
         /// 提前一回合后撤（不等到掉血才反应；E-1 威胁图基建复用零新感知；threat=null 时仅血线门）</summary>
-        public const int SupportStanceRetreatThreatPercent = 50;
+        public static int SupportStanceRetreatThreatPercent => AITuningConfig.Instance.保险预警承伤百分比;
 
         /// <summary>保险形态自保倍率（G-2）：自保负分 ×3=贴敌格扣 45 分——后撤位（远离敌仍在
         /// 奶程内）自然胜出</summary>
-        public const int SupportStanceSafeFactor = 3;
+        public static int SupportStanceSafeFactor => AITuningConfig.Instance.保险自保倍率;
 
         /// <summary>光环前瞻基准距离（G-5 光环前瞻梯度，docs/active/35 §2 返修——远距趋近驱动力）：
         /// 距最近敌此距离处=0 分起点，每近 1 格 +SupportAuraApproachPerStep，上限 Cap。
         /// **2026-10-03 验证局调参 8→14**：开局敌距 9~11 格、旧值 8=零牵引（她缩角到敌自己走过来）；
         /// 14 覆盖测试军地图对角开局距</summary>
-        public const int SupportAuraApproachBase = 14;
+        public static int SupportAuraApproachBase => AITuningConfig.Instance.光环前瞻基准距离;
 
         /// <summary>光环前瞻每步分（G-5）：每近敌 1 格 +3（权重 1 档）——**验证局调参 2→3**：
         /// 4 格敌距=+12 恰好对冲火线扣分 12（站位评分器内支援型火线减半后=净正 +6）、6 格=+6
         /// 净正——趋敌梯度在前线形态全程为正</summary>
-        public const int SupportAuraApproachPerStep = 3;
+        public static int SupportAuraApproachPerStep => AITuningConfig.Instance.光环前瞻每步分;
 
         /// <summary>光环前瞻上限（G-5）：+12=对齐「光环内 2 敌」满档——近身光环实分接管后前瞻失效
         ///（enemiesInAura>0 时不再叠加前瞻，防双计）</summary>
-        public const int SupportAuraApproachCap = 12;
+        public static int SupportAuraApproachCap => AITuningConfig.Instance.光环前瞻上限;
 
         /// <summary>支援站位火线扣分减半系数（G-5 验证局调参）：站位评分器内火线扣分 ×50%——
         /// 支援型前线形态「接受中等风险换贴敌挂水」（整列火线吓退支援型=缩角实证）；E-1 配额脑
         /// 原路径全额不动（输出型零回归）</summary>
-        public const float SupportThreatPenaltyScale = 0.5f;
+        public static float SupportThreatPenaltyScale => AITuningConfig.Instance.支援火线扣分系数;
 
         /// <summary>保险形态后撤梯度（G-5 验证局调参——保险形态零移动驱动返修）：远离最近敌每格
         /// +2（上限 12）——旧版保险形态贴敌归零+前瞻归零后 2~11 格区间无任何驱动=驻位挨打；
         /// 后撤梯度给她方向性（撤到我方阵内/敌方射程外）</summary>
-        public const int SupportRetreatPerStep = 2;
+        public static int SupportRetreatPerStep => AITuningConfig.Instance.保险后撤每格分;
 
         /// <summary>保险形态后撤梯度上限（G-5）</summary>
-        public const int SupportRetreatCap = 12;
+        public static int SupportRetreatCap => AITuningConfig.Instance.保险后撤分上限;
 
         /// <summary>先锋交战判定距离（H-2 交战就位，docs/active/36 §5——2026-10-04 拍板「先锋与敌人
         /// 交战时优先主动上前贴脸敌人」）：锚单位（先锋/伤员=先锋）距最近敌 ≤ 此值=交战态
         ///（对齐凯亚霜袭 2/丘丘人挥棒 1 的近战交换距离）</summary>
-        public const int VanguardEngageRange = 2;
+        public static int VanguardEngageRange => AITuningConfig.Instance.先锋交战距离;
 
         /// <summary>交战就位优先 Offer 托底分（H-2）：锚交战+未就位（当前格光环罩不到敌）+最优格
         /// 光环罩得到敌（就位可达）时，移动 Offer 分托底到恒压常规技能（水球伤害+获能+治疗、
@@ -165,33 +166,33 @@ namespace GIC.Battle
         /// 与常规技能挤同窗）：威胁图将死队友存在→救命奶让位；我方尸体在场且爆发满槽→复苏让位；
         /// 斩杀分（+80×激进度）自然 &gt;95 恒赢。双覆盖格（光环同时罩敌+先锋）=奶程 20+光环 6×敌
         /// 已是评分器天然最高分格（交集格无需专项逻辑）</summary>
-        public const int SupportAuraTakePositionScore = 95;
+        public static int SupportAuraTakePositionScore => AITuningConfig.Instance.就位接管托底分;
 
         /// <summary>伴随语境光环敌分倍率（H-3 随军优化，2026-10-04 拍板「主动跑去先锋攻击视野内的
         /// 敌，让光环尽可能覆盖多的敌人，覆盖先锋为其次」）：伴随调用（视野敌集传入）时光环内
         /// 每敌分=SupportAuraPerEnemy×此倍率——视野敌群覆盖主导选格（罩 2~3 视野敌的格压过先锋旁
         /// 单敌格）；同敌数下奶程仍区分先锋旁 vs 远格（「覆盖先锋为其次」的其次语义）。非伴随调用
         /// （伤员/光环贴敌/保险）恒 ×1=G 批基线不动</summary>
-        public const int VanguardAuraPerEnemyMult = 2;
+        public static int VanguardAuraPerEnemyMult => AITuningConfig.Instance.伴随光环每敌倍率;
 
         /// <summary>支援自保基准扣分（F-1）：量级压过移动兜底（10）+走位进射击线（8）——有更远
         /// 候选时支援型不选贴敌落点；乘档案「自保权重」（0=默认不消费，1=标准）</summary>
-        public const int SupportSelfPreserveScore = 15;
+        public static int SupportSelfPreserveScore => AITuningConfig.Instance.自保基准扣分;
 
         /// <summary>支援奶程内站位基础分（F-2 支援站位评分器，docs/active/34 §4）：落点距伤员
         /// ≤ 治疗半径=「能奶到」满档；量级对齐攻击候选均值（水球伤害 20+获能 12）——奶程内站位
         /// 优先于平打，攻击候选在站位达成后自然由 healValue 估值接手</summary>
-        public const int SupportHealReachScore = 20;
+        public static int SupportHealReachScore => AITuningConfig.Instance.奶程内站位分;
 
         /// <summary>支援奶程外每格衰减（F-2）：超出治疗半径每远 1 格 -6（约 3 格外归 0）——
         /// 「走近伤员」的连续梯度，非硬门槛</summary>
-        public const int SupportHealReachDecayPerCell = 6;
+        public static int SupportHealReachDecayPerCell => AITuningConfig.Instance.奶程外每格衰减;
 
         /// <summary>救命分（F-3 预治疗档，docs/active/34 §4——上提共享单源：配额脑号令原独立常量
         /// EnsoRescueScore 上提后两脑同口径防漂移）：治疗行动覆盖「威胁图 DoomedAllies」（敌方预测
         /// 合计承伤 ≥ 当前 hp=将被集火致死）的我方单位 → 治疗估值 +30——斩杀档（80）的对偶、
         /// 量级低于斩杀（保命优先于平奶/平打，不优先于斩杀线候选）</summary>
-        public const int RescueScore = 30;
+        public static int RescueScore => AITuningConfig.Instance.救命分;
 
         /// <summary>中性档案（无配置/魔神档兜底：全 1 权重=评分制 v2 原口径）</summary>
         private static readonly UnitConfig.CompanionProfile NeutralProfile = new UnitConfig.CompanionProfile();
@@ -328,7 +329,7 @@ namespace GIC.Battle
                     if (AIPlayerConfig.GatesFor(id1.OwnerPlayerID).ThreatFeed) { anyFeed = true; break; }
                 }
                 if (anyFeed)
-                    threatByTeam[id0.Team] = OpponentThreatModel.Build(sim, snapshot, id0.Team, turnNumber);
+                    threatByTeam[id0.Team] = OpponentThreatModel.BuildCached(sim, snapshot, id0.Team, turnNumber); // #2 审查批：回合级缓存
             }
 
             // I-A 申报遍（docs/active/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分

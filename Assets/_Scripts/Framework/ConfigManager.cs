@@ -18,6 +18,7 @@ namespace GIC.Framework
         [Bean] public StarVisualConfig GetStarVisualConfig() => LoadConfig<StarVisualConfig>("Configs/StarVisualConfig");
         [Bean] public BattlePalette GetBattlePalette() => LoadConfig<BattlePalette>("Configs/BattlePalette");
         [Bean] public InitialSaveConfig GetInitialSaveConfig() => LoadConfig<InitialSaveConfig>("Configs/InitialSaveConfig");
+        [Bean] public AITuningConfig GetAITuningConfig() => LoadConfig<AITuningConfig>("Configs/AI/AITuning");
 
         [Autowired] private UnitConfig _unitConfig;
         [Autowired] private ItemConfig _itemConfig;
@@ -33,6 +34,9 @@ namespace GIC.Framework
             ElementFactionConfig.Initialize(GetElementFactionConfig());
             // BattlePalette 静态访问兼容（战斗视图层配色，2026-09-18 统一化批次）
             BattlePalette.Initialize(GetBattlePalette());
+            // AITuningConfig 静态访问兼容（三脑评分基线，2026-10-20 审查批#4 资产化——缺资产时
+            // Instance 内部自建默认实例兜底，演算关键依赖不因配置缺失不可用）
+            AITuningConfig.Initialize(GetAITuningConfig());
             // CardConfigResolver 静态访问兼容（SaveCardData.Config / 卡牌视图策略）
             CardConfigResolver.Initialize(_cardResolver);
         }

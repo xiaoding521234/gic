@@ -44,6 +44,12 @@ namespace GIC.Data
         public Color physicalColor = new Color(0.729f, 0.729f, 0.729f); // 灰白
         public Color lightColor    = new Color(0.976f, 0.925f, 0.612f); // 光淡金
 
+        [Header("元素反应系数（2026-10-20 审查批#5 迁入：调反应平衡=改资产零代码，原 ElementReactionResolver 代码常量；docs/06 §反应表）")]
+        [Tooltip("融化易伤加成（火+冰；×级别并入易伤乘区）")]
+        public float meltVulnerabilityBonus = 0.5f;
+        [Tooltip("蒸发增伤加成（火+水；×级别并入增伤乘区）")]
+        public float vaporizeDamageBonus = 0.5f;
+
         [Header("势力图标")]
         public Sprite celestia;
         public Sprite nodkrai;

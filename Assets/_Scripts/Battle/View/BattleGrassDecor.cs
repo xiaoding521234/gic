@@ -19,6 +19,9 @@ namespace GIC.Battle
         /// <summary>本层合并 mesh（OnDestroy 显式销毁——Destroy 物体不销 mesh，§63① mesh 条款，2026-09-28 批6）</summary>
         private Mesh _mesh;
 
+        /// <summary>变体材质缓存（#1 审查批：Rebuild 复用——Build 时解析一次，材质数组不再逐次 ToArray）</summary>
+        private Material[] _mats;
+
         private void OnDestroy()
         {
             if (_mesh != null) Destroy(_mesh);
@@ -41,7 +44,78 @@ namespace GIC.Battle
                 foreach (var m in allMats)
                     if (m != null) tuftMats.Add(m);
             if (tuftMats.Count == 0) return null;
+            var mats = tuftMats.ToArray();
 
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>[mats.Length];
+            for (int v = 0; v < tris.Length; v++) tris[v] = new List<int>();
+            BuildGeometry(map, board, config, cam, mats, includeCell, verts, uvs, tris);
+            if (verts.Count == 0) return null;
+
+            var go = new GameObject("GrassDecor");
+            go.transform.SetParent(parent, false);
+            var decor = go.AddComponent<BattleGrassDecor>();
+
+            var mesh = new Mesh { name = "BattleGrassDecor" };
+            FillMesh(mesh, verts, uvs, tris, mats.Length);
+
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            decor._mesh = mesh; // 登记（OnDestroy 显式销毁，§63①）
+            decor._mats = mats;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterials = mats;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            GICLog.Info($"[BattleGrassDecor] 草簇层构建完成：{verts.Count / 4} 簇 / {mats.Length} 变体");
+            return decor;
+        }
+
+        /// <summary>探索态过滤重建（#1 审查批 mesh 复用：迷雾 ApplyFogChanges 高频调用的
+        /// BattleBoard.RebuildGrassDecor 改走本口——Clear+回填既有 mesh/材质，不再 Destroy/new
+        /// 整层；几何构建与 Build 同源同种子=已探索格布局逐位稳定）。全过滤=mesh 清空+物体失活
+        /// （再次揭格自动复活）——与旧「Build 返回 null 下次重建」观感等价</summary>
+        public void Rebuild(BattleMapData map, BattleBoard board, TileVisualsConfig config, Camera cam,
+            System.Func<int, int, bool> includeCell = null)
+        {
+            if (_mesh == null || _mats == null || _mats.Length == 0
+                || map == null || board == null || config == null) return;
+
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>[_mats.Length];
+            for (int v = 0; v < tris.Length; v++) tris[v] = new List<int>();
+            BuildGeometry(map, board, config, cam, _mats, includeCell, verts, uvs, tris);
+
+            if (verts.Count == 0)
+            {
+                _mesh.Clear();
+                gameObject.SetActive(false);
+                return;
+            }
+            gameObject.SetActive(true);
+            FillMesh(_mesh, verts, uvs, tris, _mats.Length);
+        }
+
+        /// <summary>mesh 回填（Build/Rebuild 共用：Clear+Set 全量顶点/UV/逐变体 submesh）</summary>
+        private static void FillMesh(Mesh mesh, List<Vector3> verts, List<Vector2> uvs, List<int>[] tris,
+            int variantCount)
+        {
+            mesh.Clear();
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.subMeshCount = variantCount;
+            for (int v = 0; v < variantCount; v++)
+                mesh.SetTriangles(tris[v], v);
+            mesh.RecalculateBounds();
+        }
+
+        /// <summary>几何构建（Build/Rebuild 同源）：固定种子 rng 恒消耗+include 只裁产出——
+        /// 任意探索态重建下已探索格的草簇布局逐位稳定</summary>
+        private static void BuildGeometry(BattleMapData map, BattleBoard board, TileVisualsConfig config, Camera cam,
+            Material[] tuftMats, System.Func<int, int, bool> includeCell,
+            List<Vector3> verts, List<Vector2> uvs, List<int>[] tris)
+        {
             // 相机水平朝向（与 BattlePlayer 立牌 billboard 同口径：forward 压平到 XZ 平面）
             var camForward = Vector3.forward;
             if (cam != null)
@@ -64,20 +138,16 @@ namespace GIC.Battle
             float jitter = config.草簇朝向抖动;
 
             // 草簇贴图已离线裁剪到内容框（四周无留白），宽高比=贴图宽/高
-            var aspects = new float[tuftMats.Count];
-            for (int v = 0; v < tuftMats.Count; v++)
+            var aspects = new float[tuftMats.Length];
+            for (int v = 0; v < tuftMats.Length; v++)
             {
                 var tex = tuftMats[v].mainTexture;
                 aspects[v] = tex != null && tex.height > 0 ? (float)tex.width / tex.height : 1f;
             }
 
-            // 固定种子（迷雾批 2026-10-17）：重建确定性——探索态过滤重建（RebuildGrassDecor）下
+            // 固定种子（迷雾批 2026-10-17）：重建确定性——探索态过滤重建（Rebuild）下
             // 已探索格草簇布局稳定；代价=全图草簇布局相对旧版（无种子）变化一次，纯装饰可接受
             var rng = new System.Random(20260927);
-            var verts = new List<Vector3>();
-            var uvs = new List<Vector2>();
-            var tris = new List<int>[tuftMats.Count];
-            for (int v = 0; v < tris.Length; v++) tris[v] = new List<int>();
 
             for (int y = 0; y < map.height; y++)
             {
@@ -94,7 +164,7 @@ namespace GIC.Battle
                     for (int i = 0; i < count; i++)
                     {
                         // —— rng 消耗段（顺序固定，emit 不裁）——
-                        int variant = rng.Next(tuftMats.Count);
+                        int variant = rng.Next(tuftMats.Length);
                         float ox = (float)(rng.NextDouble()) * (1f - 2f * margin) + margin; // 格内留白随机落点（相对格左下角）
                         float oz = (float)(rng.NextDouble()) * (1f - 2f * margin) + margin;
                         float h = hMin + (hMax - hMin) * (float)rng.NextDouble();
@@ -129,29 +199,6 @@ namespace GIC.Battle
                     }
                 }
             }
-
-            if (verts.Count == 0) return null;
-
-            var go = new GameObject("GrassDecor");
-            go.transform.SetParent(parent, false);
-            var decor = go.AddComponent<BattleGrassDecor>();
-
-            var mesh = new Mesh { name = "BattleGrassDecor" };
-            mesh.SetVertices(verts);
-            mesh.SetUVs(0, uvs);
-            mesh.subMeshCount = tuftMats.Count;
-            for (int v = 0; v < tuftMats.Count; v++)
-                mesh.SetTriangles(tris[v], v);
-            mesh.RecalculateBounds();
-
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            decor._mesh = mesh; // 登记（OnDestroy 显式销毁，§63①）
-            var renderer = go.AddComponent<MeshRenderer>();
-            renderer.sharedMaterials = tuftMats.ToArray();
-            renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-            GICLog.Info($"[BattleGrassDecor] 草簇层构建完成：{verts.Count / 4} 簇 / {tuftMats.Count} 变体");
-            return decor;
         }
     }
 }

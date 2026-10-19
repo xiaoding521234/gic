@@ -71,6 +71,19 @@ namespace GIC.Data
         /// 模板自带 %/基底名当普通文本导致观感分裂）</summary>
         public virtual SkillBaseType? RelatedPlaceholderBaseType(string key) => null;
 
+        /// <summary>光环作用半径（基础值；0=无光环语义）——「半径型 tick 光环」行为族子类覆写
+        /// （歌声之环/寒冰之棱）。2026-10-20 审查批#6 单源化：原「谁是光环+基础半径」散在三处
+        /// （BattleHeuristics.AuraRadiusOf is-白名单 / AuraRadiusOfBuffType switch /
+        /// BattleHud.SelfCastAuraRadiusOf 客户端预估各自硬编码），新光环族落地=子类覆写本属性
+        /// 即三处全通（勿再加白名单）</summary>
+        public virtual int AuraRadius => 0;
+
+        /// <summary>光环半径的命座加成（单源：服务端 Buff 类结算与 BattleHud 客户端预估共用——
+        /// 入参 constellation=施加者命座层、talent=施加者命座技能参数载体；talent 空回落 1 格
+        /// 与既有 Buff 类行为一致）。现役覆写：歌声之环 1命 +C1Radius、寒冰之棱 3命 +C3Radius；
+        /// 新「命座扩半径」光环落地=子类覆写，勿在消费侧散抄门槛</summary>
+        public virtual int ConstellationAuraBonus(int constellation, SkillConfig.SkillData talent) => 0;
+
         /// <summary>按类型查**首个**配置资产（决策五十七「资产即身份」后本查询仅作旧路径回落：
         /// 无 buffKey 的效应/旧回放按族找默认资产。具名路径一律 ByKey(buffKey)）。首次访问惰性加载
         /// Assets/Resources/Configs/Buffs 全目录；同族多资产共存合法（第二个加攻来源等）；

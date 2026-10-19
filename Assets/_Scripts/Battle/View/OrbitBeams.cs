@@ -32,6 +32,7 @@ namespace GIC.Battle
 
         private RectTransform _beam;
         private float _angle;
+        private float _cachedBeamSize = -1f; // #18 审查批：尺寸/位置仅随布局输入变化重写（旋转才逐帧）
 
         /// <summary>光弧贴图（Resources 共享资产；AI 生成两段对径对称白光弧段，运行时乘 tint 染色；两版组件共用）</summary>
         private static Sprite _arcSprite;
@@ -91,9 +92,14 @@ namespace GIC.Battle
             float baseSize = Mathf.Min(rect.rect.width, rect.rect.height);
             // 弧图尺寸：贴图内弧环半径=占比×半图 → 半图=环绕半径/占比 → 全图=2×环绕半径/占比
             float size = Mathf.Max(1f, 2f * baseSize * 环绕半径比例 / Mathf.Max(0.01f, 光弧半径占比));
-            _beam.anchoredPosition = Vector2.zero;   // 弧图居按钮中心
+            // #18 审查批写收敛：UGUI 写入有重建成本，尺寸/位置恒定时不应随旋转每帧重写
+            if (size != _cachedBeamSize)
+            {
+                _cachedBeamSize = size;
+                _beam.anchoredPosition = Vector2.zero;   // 弧图居按钮中心
+                _beam.sizeDelta = new Vector2(size, size);
+            }
             _beam.localEulerAngles = new Vector3(0f, 0f, _angle); // 整图旋转=弧段绕心飞行（弧与贴图同心，几何天然保圆）
-            _beam.sizeDelta = new Vector2(size, size);
         }
     }
 
@@ -113,6 +119,7 @@ namespace GIC.Battle
         private Material _material; // 本组件持有，OnDestroy 释放——Destroy 物体不销材质（docs/14 §63①）
         private float _angle;
         private float _diameterScale = 1f; // 环绕半径随受击圆柱直径等比缩放（协议核心批：基准盘=1）
+        private float _cachedBeamSize = -1f; // #18 审查批：scale/位置仅随 Setup 变化重写，旋转逐帧
 
         public static OrbitBeamsWorld Create(Transform parent)
         {
@@ -159,11 +166,16 @@ namespace GIC.Battle
         {
             float orbitRadius = 环绕半径 * _diameterScale; // per-unit 等比贴紧（协议核心批）
             float size = Mathf.Max(0.01f, 2f * orbitRadius / Mathf.Max(0.01f, 光弧半径占比));
+            // #18 审查批写收敛：scale/位置仅随 Setup 变化重写，旋转逐帧
+            if (size != _cachedBeamSize)
+            {
+                _cachedBeamSize = size;
+                _beam.localPosition = Vector3.zero;
+                _beam.localScale = new Vector3(size, size, 1f);
+            }
             // 平铺地面绕盘心飞行：quad 居盘心、整图绕竖轴旋转（Euler(90,yaw,0)=Ry(yaw)·Rx(90)——
             // Rx 平铺面朝上、Ry 绕盘心竖轴旋弧）、scale=弧图边长
-            _beam.localPosition = Vector3.zero;
             _beam.localRotation = Quaternion.Euler(90f, _angle, 0f);
-            _beam.localScale = new Vector3(size, size, 1f);
         }
 
         private void OnDestroy()

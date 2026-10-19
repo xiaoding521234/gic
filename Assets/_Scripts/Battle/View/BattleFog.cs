@@ -39,6 +39,14 @@ namespace GIC.Battle
 
         private bool[] _explored;          // 探索集（行优先 width*height；单调有进无出）
         private bool _dirty;               // 探索集变化 → 重建雾面/混沌盖/草簇
+        private float _dirtyAge;           // #1 审查批：脏龄（秒）——重建合并间隔节流用
+
+        [Tooltip("#1 审查批：探索集变化的重建合并间隔（秒）——移动期多单位交错揭格原会逐事件全量重建雾面+草簇（多单位同拍移动≈每帧重建的卡顿源），按本间隔合并；揭格随移动渐进、100ms 粒度肉眼不可辨；0=立即（旧行为）")]
+        [SerializeField] private float 迷雾重建合并间隔 = 0.1f;
+
+        /// <summary>#1 审查批：未探索格列表缓冲复用（ApplyFogChanges 每次全图扫描产物）</summary>
+        private readonly List<BattleCell> _unexploredBuffer = new List<BattleCell>();
+
         private string _myPlayerId;        // 本端玩家（SelfPlayerID→P1 回落，BattleHud 同口径）
         private GIC.Data.TeamType _myTeam = GIC.Data.TeamType.A;
         private bool _identityResolved;
@@ -126,7 +134,15 @@ namespace GIC.Battle
                 _visionByUnit.Clear();
             }
             EvaluateReveal();
-            if (_dirty) ApplyFogChanges();
+            // #1 审查批节流：探索集变化按「迷雾重建合并间隔」合并重建（移动期多单位交错揭格
+            // 原逐事件触发雾面+草簇全量重建；节流后重建频率上限 1/间隔，配合 mesh 复用消卡顿）
+            if (_dirty)
+            {
+                _dirtyAge += Time.deltaTime;
+                if (_dirtyAge >= 迷雾重建合并间隔)
+                    ApplyFogChanges();
+            }
+            else _dirtyAge = 0f;
             EvaluateUnitHiding();
             EvaluateProjectileFog();
         }
@@ -180,6 +196,17 @@ namespace GIC.Battle
                 EnemyOwned = true,
                 Hidden = false,
             });
+        }
+
+        /// <summary>移除箭矢的迷雾门控（2026-10-20 审查批#15 箭矢池化）：回池箭复用时会重新注册，
+        /// 陈旧门控须随回池注销——null 探测只清已销毁对象、不清失活池件（渲染器复位由
+        /// CreateProjectileVisual 池件出仓时重置 enabled）</summary>
+        public void UnregisterProjectileVisual(GameObject go)
+        {
+            if (go == null) return;
+            for (int i = _projectiles.Count - 1; i >= 0; i--)
+                if (_projectiles[i].Go == go)
+                    _projectiles.RemoveAt(i);
         }
 
         /// <summary>外部批量揭雾（安柏 2命「爆发破雾」客户端表现，docs/active/44 §9-②——与 Host
@@ -363,8 +390,10 @@ namespace GIC.Battle
         private void ApplyFogChanges()
         {
             _dirty = false;
+            _dirtyAge = 0f; // #1 审查批：节流脏龄归零
             var map = _board.Map;
-            var unexplored = new List<BattleCell>();
+            var unexplored = _unexploredBuffer; // 缓冲复用（#1 审查批：原每次 new List）
+            unexplored.Clear();
             for (int y = 0; y < map.height; y++)
                 for (int x = 0; x < map.width; x++)
                     if (!_explored[y * map.width + x])

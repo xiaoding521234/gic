@@ -22,6 +22,15 @@ namespace GIC.Data
         [Header("作用半径（切比雪夫，格；1命起 +C1Radius 命座技能参数——决策七十二调换+键名随生效层改）")]
         public int 作用半径 = 1;
 
+        /// <summary>光环半径单源（2026-10-20 审查批#6）：AuraRadiusOf/AuraRadiusOfBuffType/
+        /// BattleHud.SelfCastAuraRadiusOf 三消费方同源读</summary>
+        public override int AuraRadius => 作用半径;
+
+        /// <summary>1命起 +C1Radius（决策七十二调换后 1命生效）——SongOfLifeBuff.OnTurnEnd
+        /// 与客户端预估共用</summary>
+        public override int ConstellationAuraBonus(int constellation, SkillConfig.SkillData talent)
+            => constellation >= 1 ? (talent != null ? talent.GetInt(SkillParamKey.C1Radius, 1) : 1) : 0;
+
         /// <summary>关联描述占位符解析（{AuraDamagePercent} 等——数值=本资产字段单源，金色高亮由构建层统一）</summary>
         public override int? ResolveRelatedPlaceholder(string key)
         {

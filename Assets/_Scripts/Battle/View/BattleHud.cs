@@ -770,11 +770,20 @@ namespace GIC.Battle
             if (_confirmButton != null)
                 _confirmButton.interactable = !_actionConfirmed; // 已定死置灰——再按=无操作（超时自动按下同款）
             UpdateCountdownUrgency(show && flow.SelectRemainingSeconds < 倒计时告急秒数); // 告急红+脉动（早退前调保还原）
-            if (!show && !_layoutEditing) return;
+            if (!show && !_layoutEditing)
+            {
+                _lastCountdownSecond = -1; // #16 审查批：离场重置缓存（HUD 跨局复用防陈值跳过首刷）
+                return;
+            }
 
-            string seconds = Mathf.CeilToInt(Mathf.Max(0f, flow.SelectRemainingSeconds)).ToString();
-            if (_countdownCombiner.GetCombinedText() != seconds)
-                _countdownCombiner.SetSingleEntry(seconds);
+            // #16 审查批：先比对整数再格式化——旧版每帧 ToString 分配（选择阶段 60-165 次/秒），
+            // 值不变时连 GetCombinedText 比对都省
+            int secondsInt = Mathf.CeilToInt(Mathf.Max(0f, flow.SelectRemainingSeconds));
+            if (secondsInt != _lastCountdownSecond)
+            {
+                _lastCountdownSecond = secondsInt;
+                _countdownCombiner.SetSingleEntry(secondsInt.ToString());
+            }
         }
 
         /// <summary>倒计时告急态（2026-09-26 拍板「当时间小于5秒时，数字大小持续循环变化，颜色变为红色」）：
@@ -3292,10 +3301,11 @@ namespace GIC.Battle
         // ==================== 自施放光环范围提示（2026-10-15 拍板「额外加上范围提示……完整的一块，
         // 可以参考滚动带」——寒冰之棱半径提示；复用原语供未来「选格降闪电攻击半径内敌人」类技能） ====================
 
-        /// <summary>自施放技能的光环提示半径：技能 effects 中 ApplyBuff 的 buff 资产若为带作用半径的
-        /// 行为族（寒冰之棱 IcicleBuffConfig），返回 作用半径+命座加成（3命 +C3Radius——与
-        /// IcicleBuff.OnTurnEnd 服务端同口径，客户端按快照 constellation 预估：0命 3×3/3命 5×5）；
-        /// 无光环 buff=0 不显示。命座参数载体=该单位 Talent 技能（SourceConstellation 客户端镜像）</summary>
+        /// <summary>自施放技能的光环提示半径：技能 effects 中 ApplyBuff 的 buff 资产经
+        /// BuffConfig.AuraRadius/ConstellationAuraBonus 虚方法单源解析（2026-10-20 审查批#6：
+        /// 原 IcicleBuffConfig 硬编码分支退役——任何光环族自动生效），客户端按快照 constellation
+        /// 预估与 IcicleBuff.OnTurnEnd 服务端同口径（0命 3×3/3命 5×5）；无光环 buff=0 不显示。
+        /// 命座参数载体=该单位 Talent 技能（SourceConstellation 客户端镜像）</summary>
         private int SelfCastAuraRadiusOf(SkillConfig.SkillData skillData, UnitState sel)
         {
             if (skillData == null || !skillData.HasEffects || sel == null) return 0;
@@ -3308,11 +3318,8 @@ namespace GIC.Battle
             {
                 if (eff == null || eff.kind != SkillEffectKind.ApplyBuff) continue;
                 var cfg = eff.buffAsset != null ? eff.buffAsset : BuffConfig.OfType(eff.buffType);
-                if (cfg is not IcicleBuffConfig icl) continue;
-                int r = icl.作用半径;
-                if (sel.constellation >= 3 && talent != null)
-                    r += talent.GetInt(SkillParamKey.C3Radius, 1); // 3命：作用半径 +C3Radius（智能变化）
-                return r;
+                if (cfg == null || cfg.AuraRadius <= 0) continue;
+                return cfg.AuraRadius + cfg.ConstellationAuraBonus(sel.constellation, talent);
             }
             return 0;
         }

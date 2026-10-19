@@ -123,6 +123,23 @@ namespace GIC.Battle
         /// B7 LAN 前按网络余量另议）</summary>
         public const float SegmentAckTimeoutSeconds = 15f;
 
+        // ==================== 段播放 pacing 契约（2026-10-20 审查批#10 收口） ====================
+        // Host 只随 Segment 下发攻速差值等演算事实，下列节拍换算全在客户端 BattlePlayer——
+        // 常量收口此处=两端契约单源（原为客户端内联字面量，改战斗节奏时 Host 侧无从感知）
+
+        /// <summary>攻速片片头延迟换算除子：延迟=(全场最高攻速−本片攻速)÷本值 秒
+        /// （攻速每差 10 点慢 1 秒先手窗，docs/04 §4.1）</summary>
+        public const float AttackSpeedSliceLeadInDivisor = 10f;
+
+        /// <summary>部署段/即时行动块的固定短节拍（秒，不按攻速排程）</summary>
+        public const float DeploySegmentBeatSeconds = 0.15f;
+
+        /// <summary>段内命令 stagger 间隔（秒）——同段多命令逐条错峰弹出的节拍</summary>
+        public const float CommandStaggerSeconds = 0.12f;
+
+        /// <summary>回合结束段固定节拍（秒，不按攻速排程）</summary>
+        public const float TurnEndDelaySeconds = 0.25f;
+
         /// <summary>单格体积绝对层上限（docs/05 §5.3：格内现有体积+自身体积 ≤ 3——无视阻挡配置
         /// 不可绕过的最高级；移动进入/部署落点共享原语 MovementResolver.PassesVolumeLimit 同读）</summary>
         public const int MaxTileVolume = 3;

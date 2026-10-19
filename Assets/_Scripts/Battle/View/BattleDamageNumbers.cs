@@ -153,6 +153,9 @@ namespace GIC.Battle
         {
             float total = totalSeconds / speed;
             float shrink = 收缩时长 / speed;
+            // #14 审查批：文本在数字生命周期内不变——textBounds 每读强制 TMP mesh 重算，旧版逐帧读
+            // =每数字每帧一次冗余重算；首帧读一次缓存（闭包捕获；含长前缀"蒸发 99999"的实测包围）
+            Vector2 boundsHalf = default; bool boundsCached = false;
             float popScale = settleScale * 初始停留比;
             float fadeSpan = 1f - 淡出起点比例;
             float risePixels = isHeal ? 回血上浮像素 : 上浮像素;
@@ -179,11 +182,16 @@ namespace GIC.Battle
                 float viewW = Screen.width, viewH = Screen.height;
                 Vector2 p = screenPoint + Vector3.up * rise;
                 if (screenPoint.z < 0f) { p.x = viewW - p.x; p.y = viewH - p.y; }
-                var bounds = entry.Text.textBounds; // 文本实测包围（局部量；含长前缀"蒸发 99999"）
+                if (!boundsCached)
+                {
+                    boundsCached = true;
+                    var b = entry.Text.textBounds;
+                    boundsHalf = new Vector2(Mathf.Abs(b.extents.x), Mathf.Abs(b.extents.y));
+                }
                 float sf = _canvas != null ? _canvas.scaleFactor : 1f;
                 Vector2 half = new Vector2(
-                    (Mathf.Abs(bounds.extents.x) * entry.Rect.localScale.x + 屏幕边缘留白) * sf,
-                    (Mathf.Abs(bounds.extents.y) * entry.Rect.localScale.y + 屏幕边缘留白) * sf);
+                    (boundsHalf.x * entry.Rect.localScale.x + 屏幕边缘留白) * sf,
+                    (boundsHalf.y * entry.Rect.localScale.y + 屏幕边缘留白) * sf);
                 entry.Rect.position = new Vector3(
                     Mathf.Clamp(p.x, half.x, Mathf.Max(half.x, viewW - half.x)),
                     Mathf.Clamp(p.y, half.y, Mathf.Max(half.y, viewH - half.y)),

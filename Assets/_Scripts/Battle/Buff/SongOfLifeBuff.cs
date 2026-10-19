@@ -75,9 +75,7 @@ namespace GIC.Battle
             int energyGainPerLayer = (cLevel >= 2
                 ? (talent != null ? talent.GetInt(SkillParamKey.C2EnergyGain, Cfg.基础元能获取 * 2) : Cfg.基础元能获取 * 2)
                 : Cfg.基础元能获取);
-            int radius = Cfg.作用半径 + (cLevel >= 1
-                ? (talent != null ? talent.GetInt(SkillParamKey.C1Radius, 1) : 1)
-                : 0);
+            int radius = Cfg.作用半径 + Cfg.ConstellationAuraBonus(cLevel, talent); // #6 审查批单源（SongOfLifeBuffConfig 覆写）
             bool attachAllies = cLevel < 1; // 1命起：不再为我方角色附着元素（原2命件随调换前移）
 
             // 数值基准=施加者（施放闪耀奇迹的芭芭拉）；无施加者回落持有者——AttackerOf/AttackerIdOf 单源
