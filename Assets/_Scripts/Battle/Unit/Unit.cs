@@ -44,6 +44,15 @@ namespace GIC.Battle
 
         private void Awake()
         {
+            EnsureComponentsCollected();
+        }
+
+        /// <summary>组件收集（幂等）。Play 域由 Awake 完成；**编辑器域（非 Play）Instantiate prefab
+        /// 不执行 Awake**——回放回归等编辑器域工具经 InitWithData 时兜底收集（Replay harness 批
+        /// 2026-10-20 实证：跳过则 _components 空→UnitStats/UnitIdentity 全缺失→攻速 0/查找失败/技能空转）</summary>
+        public void EnsureComponentsCollected()
+        {
+            if (_components.Count > 0) return; // Play 域 Awake 已收集=幂等跳过
             foreach (var comp in GetComponents<IUnitComponent>())
             {
                 _components[comp.GetType()] = comp;
@@ -52,6 +61,7 @@ namespace GIC.Battle
 
         public void InitWithData(UnitConfig.UnitData data)
         {
+            EnsureComponentsCollected(); // 编辑器域兜底（Awake 非运行态不执行）
             RawData = data;
             foreach (var comp in _components.Values)
             {

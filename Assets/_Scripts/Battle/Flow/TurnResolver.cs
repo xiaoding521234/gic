@@ -19,13 +19,13 @@ namespace GIC.Battle
     {
         private readonly BattleSimState _sim;
         private readonly IBattleTransport _transport;
-        private readonly TurnFlowController _flow;
+        private readonly ITurnResolverHost _flow;
 
         /// <summary>ack 等待超时（秒，真实时间；超时快进）——阈值真源=BattleMetrics.SegmentAckTimeoutSeconds
         /// （2026-10-02 复审收口：协议常量入 Metrics，与其它战斗阈值同址）</summary>
         private const float AckTimeoutSeconds = BattleMetrics.SegmentAckTimeoutSeconds;
 
-        public TurnResolver(BattleSimState sim, IBattleTransport transport, TurnFlowController flow)
+        public TurnResolver(BattleSimState sim, IBattleTransport transport, ITurnResolverHost flow)
         {
             _sim = sim;
             _transport = transport;
@@ -1643,6 +1643,8 @@ namespace GIC.Battle
         private IEnumerator PushSegmentAndWaitAck(Segment segment)
         {
             _flow.NotifySegmentPushed(segment.turnNumber, segment.sliceIndex);
+            // 回放录制（2026-10-20 Replay harness 批）：命令流本体在推送前定稿——断言面单点
+            BattleRecorder.CaptureSegment(segment);
             // 对手档案采集（AI-2 批，docs/active/42 §4）：段命令流观察——Damage→元素习惯/最爱
             // 目标/交战距离，Death(建筑)→核心摧毁事件账本（公开信息=全体客户端广播态，红线①合规）
             OpponentProfiler.ObserveCommands(_sim, segment.commands, segment.turnNumber);

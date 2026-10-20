@@ -30,7 +30,7 @@ namespace GIC.Battle
     /// 「覆盖」机制不采用（玩家先选、伙伴后决策=天然无替换，伙伴决策额外获得己方玩家意图输入）；
     /// 零新协议（伙伴决策=Host 内部阶段，与眷属决策同性质；本地双开同进程语义一致，LAN 无泄露路径）。
     /// </summary>
-    public class TurnFlowController : MonoBehaviour
+    public class TurnFlowController : MonoBehaviour, ITurnResolverHost
     {
         public BattlePhase Phase { get; private set; } = BattlePhase.Idle;
         public int TurnNumber { get; private set; } = 0;
@@ -326,6 +326,9 @@ namespace GIC.Battle
             actions.AddRange(_familiarUnitActions);
             actions.AddRange(companionActions);
 
+            // 回放录制（2026-10-20 Replay harness 批）：全量行动合并定稿——回放按此直喂 TurnResolver
+            BattleRecorder.CaptureActions(TurnNumber, actions);
+
             if (_resolveCoroutine != null) StopCoroutine(_resolveCoroutine);
             _resolveCoroutine = StartCoroutine(ResolveTurnRoutine(actions));
         }
@@ -354,6 +357,7 @@ namespace GIC.Battle
                 {
                     winnerTeam = (int)overWinner.Value,
                 });
+                BattleRecorder.CaptureGameOver((int)overWinner.Value, TurnNumber); // 回放终局对照（Replay harness 批）
                 yield break; // 不再进入下一回合选择阶段
             }
 

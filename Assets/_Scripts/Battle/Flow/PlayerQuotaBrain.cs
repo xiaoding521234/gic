@@ -498,7 +498,14 @@ namespace GIC.Battle
         /// <summary>延奏对某目标的估值：按 OnCast 效果原子逐个粗估（与 EffectCompiler 产出同语义）。
         /// mondOrSelf=蒙德角色或施法者自身（AI-1 批传输档参数）：true→变奏链+元能 +10 档；
         /// false→无变奏、元能 +20 档双倍评分（延奏自身 buff/治疗对任何目标照常生效）。
-        /// E-1：threat=威胁图（治疗救命档消费；null=无威胁上下文零加成）</summary>
+        /// E-1：threat=威胁图（治疗救命档消费；null=无威胁上下文零加成）
+        /// 死水修复（2026-10-20 决策八十四，用户拍板精确语义）：目标该 buff 已满层时降权——
+        /// 限时且快到期（剩余≤延奏续航临近到期回合，断了要重新叠层）=续航分；时长充足或永久=零新收益，
+        /// 且变奏链/元能同步跳过（纯续航不构成行动理由——否则满层延奏恒压放权=自我延奏死水循环，
+        /// 双 AI 观察局 T11 起实锤）；治疗原子照常（缺口判定自带过滤）。
+        /// 未持有/未满层=全额（叠层+叠时高收益，拍板保留）。
+        /// 注：旧满层判定读技能参数 paramKey2——决策五十六 buff 参数迁资产后技能侧恒空、
+        /// 判定失效=死水分恒 32 的根因；现改 BaseBuff.IsAtStackCap（资产单源）。</summary>
         private int EvaluateEnsoTarget(SkillConfig.SkillData data, Unit caster, Unit ally,
             string allyUnitId, OpponentThreatModel.ThreatMap threat, bool mondOrSelf)
         {
@@ -506,6 +513,7 @@ namespace GIC.Battle
             var allyStats = ally.GetUnitComponent<UnitStats>();
             if (allyStats == null) return 0;
             int value = 0;
+            bool buffCappedNoGain = false; // 核心 buff 已满层且无新叠层收益（续航档门）
 
             foreach (var atom in data.effects)
             {
@@ -532,12 +540,20 @@ namespace GIC.Battle
 
                     case SkillEffectKind.ApplyBuff:
                     {
-                        // 增益：目标该具名 Buff 已满层=零价值，否则=BuffValue+行动溢价
-                        // （决策五十七：buffAsset 引用优先按身份判满层；null 回落 type——与编译同口径）
-                        int stackLimit = atom.paramKey2 != SkillParamKey.None ? data.GetInt(atom.paramKey2, 0) : 0;
+                        // 增益：满层判定走 BaseBuff.IsAtStackCap（BuffConfig 资产单源——决策五十六
+                        // buff 参数迁资产后技能参数侧恒空，旧 paramKey2 判定失效=死水根因）
                         var existing = ally.Buffs.Find(b => b != null && (atom.buffAsset != null
                             ? b.Config == atom.buffAsset : b.Type == atom.buffType));
-                        if (existing != null && stackLimit > 0 && existing.Level >= stackLimit) break;
+                        if (existing != null && existing.IsAtStackCap())
+                        {
+                            // 满层：限时且快到期=续航分（避免断档重新叠层）；时长充足/永久=零
+                            buffCappedNoGain = true;
+                            if (!existing.IsPermanent
+                                && existing.RemainingTurns <= AITuningConfig.Instance.延奏续航临近到期回合)
+                                value += AITuningConfig.Instance.延奏满层续航分;
+                            break;
+                        }
+                        // 未持有/未满层：全额（叠层+叠时高收益——用户拍板保留）
                         int buffValue = atom.paramKey != SkillParamKey.None ? data.GetInt(atom.paramKey, 0) : atom.value;
                         value += buffValue + EnsoBuffActionScore;
                         break;
@@ -545,6 +561,7 @@ namespace GIC.Battle
 
                     case SkillEffectKind.TriggerSkill:
                     {
+                        if (buffCappedNoGain) break; // 纯续航延奏不计变奏链（死水修复）
                         // 变奏链：被协者该型技能已实装（effects 非空）才有产出（UnimplementedSkill 空产出）
                         // ——仅蒙德角色/施法者自身触发变奏（非蒙德=纯传输档无变奏链，AI-1 批）
                         if (mondOrSelf && HasImplementedSkillOfType(ally, atom.targetSkillType))
@@ -553,6 +570,7 @@ namespace GIC.Battle
                     }
 
                     case SkillEffectKind.EnergyGain:
+                        if (buffCappedNoGain) break; // 纯续航延奏不计元能转移（死水修复）
                         // 协奏元能：蒙德/自身 +10 档=基分；非蒙德 +20 档=双倍（docs/07-势力机制/蒙德.md；
                         // 延奏技能资产 EnergyGain 原子按目标档产出，估值同构镜像）
                         value += mondOrSelf ? EnsoEnergyTransferScore : EnsoEnergyTransferScore * 2;

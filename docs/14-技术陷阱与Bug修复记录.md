@@ -2235,3 +2235,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 2. **日志定位半生效态**：用户报「没反应」类无报错故障，先拉 `[BattleHud] 上交：…` 行看提交载荷实际值（本例「装备 BaronBunny（耐久 0）」直接暴露客户端侧 0），再对 Host 侧 Warn 行的 dump（「手牌形态：…耐3」）——两侧值对不上=中间层（快照拷贝/序列化）丢字段。
 3. **编辑器取证日志轮转命名**：Tuanjie 重启后上一会话日志轮转为 `Editor-prev.log`（**不是** Unity 惯例的 `Editor.log-prev`）；当前 Editor.log 惰性 flush 且控制台会随重启清空——报障取证先查 `Editor-prev.log`（本例 12.7MB 全量实测记录在内）。
 4. **意外正向收获**：日志顺带实证死亡掠夺链实战已通过（敌 AI 安柏升3命自动上身→被玩家击杀→`[掠夺] …耐久 3→手牌`）——报障日志常含未测链路的免费实证，排查时顺手扫。
+
+## §161 编辑器域 sim 层工具两坑：Instantiate 不执行 Awake + 基类虚方法覆盖缺口（2026-10-20 决策八十四 Replay harness 批实证）
+
+**坑① 编辑器域（非 Play）Instantiate prefab 不执行 Awake**：ReplayRunner 编辑器域回放真局录制，首跑 FAIL（118 段 vs 80 段）——回放局全部攻速片 speed=0、技能行动零命令、`FindOwnUnitByName` 连续失败（部署变重复出战）。根因=**Unit.Awake 的 `GetComponents<IUnitComponent>()` 组件收集在编辑器域不执行**（Awake 是运行态生命周期回调，编辑器域只有 [ExecuteInEditMode]/[ExecuteAlways] 组件跑）→`_components` 空→UnitStats/UnitIdentity 全缺→攻速读 null 回落 0、按名字查找失败、技能执行链瘫痪。**修法**=`Unit.EnsureComponentsCollected()`（幂等：`_components.Count>0` 跳过），Awake 与 `InitWithData` 开头双调——Play 域零变化、编辑器域兜底。
+
+**坑② 基类虚方法仅被子类之一覆写=其余子类静默走默认**：`BaseBuff.IsAtStackCap()` 虚方法（默认 false）只有 IcicleBuff 有 override——**StatBuff 族（加攻/加速/减防）恒 false**→配额脑延奏评分与伙伴脑增益候选（两处）对 StatBuff 的满层判定全部失效→双 AI 观察局 T11 起 25 回合「自我延奏死水」（满层续 buff 分恒 32 压过放权）。**修法**=StatBuff 补 override（`StackLimit>0 && Level>=StackLimit`，StackLimit=BuffFactory 从 StatBuffConfig 资产注入）。
+
+**取证教训**：
+1. **编辑器域工具的冒烟必须含单位级交互**：Replay harness 的合成自测（双 Pass 局，回合末只有资源发放）全 PASS 但测不出坑①——真局回放（有技能/移动/属性读取）一发暴露。新编辑器域 sim 工具的自测用例要覆盖「单位组件属性读取」路径。
+2. **「虚方法默认值”语义审计**：写基类虚方法（如 IsAtStackCap）时同步 rg 全部子类的 override 覆盖率——决策八十三审查维度 J（数据驱动完备性）的对账反例：行为入口在基类、真源在子类配置时，漏 override=该族行为静默回默认。
+3. **多脑共享判定下沉单点**：满层判定修复只改 StatBuff 一处，配额脑/伙伴脑两消费方自动修复——判定原语下沉基类的收益兑现；反之若三处各写判定=三处同修。
+4. 回放回归的 FAIL 不是故障是**工作信号**：安全网抓到漂移→先定位漂移根因（本例=工具缺陷非演算缺陷）再修——修完旧录制重跑 PASS 即闭环。

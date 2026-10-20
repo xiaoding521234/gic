@@ -236,20 +236,36 @@ namespace GIC.UI
             // 时 Blit 拷贝零黑窗；池外角色（LAN 客户端不可见的敌方人类卡组）走静态立牌过渡兜底。
             IdleClipPrewarmPool.Clear(); // 上一局残留清空（模板 RT 释放）
             var prewarmUnits = new HashSet<GIC.Data.UnitName>();
+            // 回放录制（2026-10-20 Replay harness 批）：初始手牌全量收集（含初始资源卡）——
+            // 初始态终点快照式录制（卡组构建上游不录，卡组/存档变化不影响回放）
+            Dictionary<string, List<HandCard>> replayHands = BattleRecorder.Enabled
+                ? new Dictionary<string, List<HandCard>>() : null;
             foreach (var setup in playerSetups)
             {
                 _session.Sim.RegisterHand(setup.PlayerId, new List<HandCard>());
+                var recordHand = new List<HandCard>();
                 foreach (var handCard in BuildHandForPlayer(setup))
                 {
                     var card = handCard.AsCardId();
                     _session.Sim.GainCard(setup.PlayerId, card, handCard.count);
+                    recordHand.Add(handCard);
                     if (card.cardType == CardType.Unit)
                         prewarmUnits.Add((UnitName)card.value);
                 }
+                var moraCard = new HandCard(new CardId(ItemName.Mora), BattleMetrics.InitialMora);
+                var staminaCard = new HandCard(new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Mora), BattleMetrics.InitialMora);
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
+                recordHand.Add(moraCard);
+                recordHand.Add(staminaCard);
+                replayHands?.Add(setup.PlayerId, recordHand);
             }
             IdleClipPrewarmPool.Prewarm(this, CollectIdleClips(prewarmUnits));
+            // 回放录制 header（沙盒局不录——沙盒单位生成未入录制面，回放会缺单位）
+            if (launchConfig == null || !launchConfig.IsSandbox)
+                BattleRecorder.CaptureSetup(battleSeed,
+                    launchConfig != null ? launchConfig.MapConfigName : BattleLaunchConfig.DefaultMapName,
+                    (int)(launchConfig?.FogMode ?? BattleFogMode.None), playerSetups, spawnCells, replayHands);
 
             // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/active/32 §6；
             // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
@@ -616,6 +632,7 @@ namespace GIC.UI
         protected override void OnDestroy()
         {
             StopBattleMusic();
+            BattleRecorder.EndSession(); // 回放录制收笔（Replay harness 批）——中途退出/终局统一兜底
             base.OnDestroy();
         }
 
