@@ -999,6 +999,7 @@ namespace GIC.Battle
             _segmentDirectDamage.Clear(); // 段首清空（防跨段污染——吸血自疗只绑本段节拍）
             foreach (var command in segment.commands)
             {
+                int playbacksBefore = playbacks.Count;
                 switch (command.type)
                 {
                     case BattleCommandType.Move:
@@ -1328,7 +1329,12 @@ namespace GIC.Battle
                         // B4+ 接线：ElementAttach/Reaction/StatChange/Summon 等
                         break;
                 }
-                stagger += CommandStaggerSeconds / _playbackSpeed;
+                // 非播放命令不吃错峰槽（2026-10-23 拍板 B1「回合末级联膨胀」病灶）：元能/理智/
+                // 附着/RemoveBuff/发放等即时应用类命令不推进 stagger——此前 121 条命令的回合末段里
+                // 大量隐形命令把末段治疗/伤害弹字的起跳槽位推到 ~10 秒深处；只有真正产生演出
+                // playback 的命令才占槽，弹字间 0.12s 节奏与逐层各弹语义均不变
+                if (playbacks.Count > playbacksBefore)
+                    stagger += CommandStaggerSeconds / _playbackSpeed;
             }
 
             foreach (var playback in playbacks)

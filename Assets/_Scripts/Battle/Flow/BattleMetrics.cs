@@ -134,8 +134,9 @@ namespace GIC.Battle
         /// <summary>部署段/即时行动块的固定短节拍（秒，不按攻速排程）</summary>
         public const float DeploySegmentBeatSeconds = 0.15f;
 
-        /// <summary>段内命令 stagger 间隔（秒）——同段多命令逐条错峰弹出的节拍</summary>
-        public const float CommandStaggerSeconds = 0.12f;
+        /// <summary>段内命令 stagger 间隔（秒）——同段多命令逐条错峰弹出的节拍
+        /// （2026-10-23 拍板 0.12→0.05：回合末级联在 B1 出槽后仍嫌弹字拖沓，再压错峰密度）</summary>
+        public const float CommandStaggerSeconds = 0.05f;
 
         /// <summary>回合结束段固定节拍（秒，不按攻速排程）</summary>
         public const float TurnEndDelaySeconds = 0.25f;
