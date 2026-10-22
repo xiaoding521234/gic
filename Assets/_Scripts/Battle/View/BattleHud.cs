@@ -1093,7 +1093,7 @@ namespace GIC.Battle
                             HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
                     return;
                 }
-                if (!PassesBuildingLimitPreview(snapshot))
+                if (!PassesBuildingLimitPreview(deployData, snapshot))
                 {
                     ShowBattleToast("Battle_BuildingLimit");
                     GICLog.Info($"[BattleHud] 建筑部署拦截（上限）：{(UnitName)unitNameValue}");
@@ -2220,13 +2220,16 @@ namespace GIC.Battle
 
         /// <summary>建筑上限镜像（Host PassesBuildingLimit 快照同口径）：我方存活非核心建筑
         /// &lt; DeployUnitExecutor.MaxBuildingsPerPlayer(3)</summary>
-        private bool PassesBuildingLimitPreview(BattleSnapshot snapshot)
+        private bool PassesBuildingLimitPreview(UnitConfig.UnitData deployData, BattleSnapshot snapshot)
         {
+            if (deployData == null || deployData.unitType != UnitType.Building) return true;
             if (snapshot == null) return false;
             int count = 0;
+            string deployName = deployData.unitName.ToString();
             foreach (var u in snapshot.units)
             {
                 if (u.playerId != _myPlayerId || u.isCorpse != 0) continue;
+                if (u.unitName != deployName) continue; // 同种（同名）计数——拍板 #4 勘正 2026-10-22：每种上限 3
                 var data = TryGetUnitData(u.unitName);
                 if (data == null || data.unitType != UnitType.Building) continue;
                 if (data.tags != null && System.Array.IndexOf(data.tags, UnitTag.Core) >= 0) continue;
@@ -2245,7 +2248,7 @@ namespace GIC.Battle
         {
             // 建筑梯度/上限镜像（全局条件——不满足=全红格；正常流已被拖出拦截挡在进入瞄准之前）
             if (deployData != null && deployData.unitType == UnitType.Building
-                && (!PassesBuildingTechPreview(deployData, snapshot) || !PassesBuildingLimitPreview(snapshot)))
+                && (!PassesBuildingTechPreview(deployData, snapshot) || !PassesBuildingLimitPreview(deployData, snapshot)))
                 return false;
 
             var forceType = deployData != null ? deployData.normalMoveType : ForceType.Walk;

@@ -155,7 +155,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 39566126329966594
-    m_Localized: Building limit reached
+    m_Localized: Limit of this building type reached
     m_Metadata:
       m_Items: []
   - m_Id: 39566126329966595

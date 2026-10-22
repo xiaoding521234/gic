@@ -110,9 +110,9 @@ namespace GIC.Battle
                     GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被梯度前置拦截（上一梯度建筑不在场）");
                     return false;
                 }
-                if (!PassesBuildingLimit(sim, action.playerId))
+                if (!PassesBuildingLimit(sim, action.playerId, data))
                 {
-                    GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被建筑上限拦截（存活建筑 {MaxBuildingsPerPlayer} 座）");
+                    GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被建筑上限拦截（该种建筑存活 {MaxBuildingsPerPlayer} 座）");
                     return false;
                 }
             }
@@ -252,18 +252,19 @@ namespace GIC.Battle
             return false;
         }
 
-        /// <summary>建筑上限（拍板 #4）：自己存活建筑总数（UnitType.Building、非 Core tag）
-        /// &lt; MaxBuildingsPerPlayer(3)。含尸体问题不存在（消散不留尸体，IsDead 守卫兜底）；
-        /// 拆掉立即释放名额。客户端镜像=BattleHud 建筑计数（快照同口径）</summary>
-        public static bool PassesBuildingLimit(BattleSimState sim, string playerId)
+        /// <summary>每种建筑上限（拍板 #4 勘正 2026-10-22：**每种**同名建筑各自 ≤MaxBuildingsPerPlayer(3)——
+        /// 3 座旗帜+3 座餐馆同场合法；自己存活的该种（同名、UnitName 相等）非 Core tag 建筑计数；
+        /// 消散不留尸体、IsDead 守卫兜底；拆掉立即释放名额。客户端镜像=BattleHud.PassesBuildingLimitPreview
+        /// （快照同口径）</summary>
+        public static bool PassesBuildingLimit(BattleSimState sim, string playerId, UnitConfig.UnitData data)
         {
+            if (data == null || data.unitType != UnitType.Building) return true; // 非建筑不查
             int count = 0;
             foreach (var kv in sim.Units)
             {
                 var identity = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.OwnerPlayerID != playerId) continue;
-                var unitData = kv.Value.RawData;
-                if (unitData == null || unitData.unitType != UnitType.Building) continue;
+                if (identity.UnitName != data.unitName) continue; // 同种（同名）计数
                 if (BattleHeuristics.IsCore(kv.Value) || BattleSimState.IsDead(kv.Value)) continue;
                 count++;
             }
