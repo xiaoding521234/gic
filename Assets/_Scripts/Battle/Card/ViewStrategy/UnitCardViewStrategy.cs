@@ -26,8 +26,12 @@ namespace GIC.Battle
             card.itemImage.gameObject.SetActive(false);
             card.countImage.gameObject.SetActive(false);
 
-            // 部署费角标（2026-10-19）：角色卡恒显出战摩拉；建筑=不可打出无费用语义，隐藏
-            bool showCost = raw != null && raw.unitType != UnitType.Building;
+            // 部署费角标（2026-10-19；决策八十六批F 勘正：**新建筑可打出=有角标**——旧「建筑=不可打出
+            // 隐藏」收窄为「不可打出的建筑（Core tag 协议核心——开局在场）隐藏」；物品卡由
+            // ItemCardViewStrategy 自理恒隐藏）
+            bool coreBuilding = raw != null && raw.unitType == UnitType.Building && raw.tags != null
+                && System.Array.IndexOf(raw.tags, UnitTag.Core) >= 0;
+            bool showCost = raw != null && !coreBuilding;
             card.部署费角标?.SetActive(showCost);
             if (showCost && card.部署费数字 != null)
             {

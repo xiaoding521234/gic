@@ -6,29 +6,41 @@ namespace GIC.Battle
 {
     /// <summary>
     /// 出战角色执行器（B6c，docs/18 决策七 + docs/05 §5.1）：校验链=配置存在 → 手牌成员（Host 权威）→
-    /// 落点合法（核心半径 2 内 + 碰撞判定链——2026-09-25 拍板「根据碰撞决定」：体积绝对层最高级不可绕过、
-    /// 与格内单位互不阻挡才可部署、地形按常态移动类型通行，与 MovementResolver 进入判定同构）→ 摩拉够 →
-    /// 生成单位登场。卡不消耗留手牌（可重复出战）；1~2 星直接铺场，3 星+重复出战升命座（命座 B8，当前重复铺场）。
+    /// 建筑梯度前置+建筑上限（决策八十六批C，docs/active/45 §2/§3——仅建筑）→ 升命分支（**仅角色 3★+**，
+    /// 建筑一律铺场新实例）→ 落点合法（核心半径内：角色 2/建筑 3 + 碰撞判定链——2026-09-25 拍板
+    /// 「根据碰撞决定」：体积绝对层最高级不可绕过、与格内单位互不阻挡才可部署、地形按常态移动类型
+    /// 通行，与 MovementResolver 进入判定同构）→ 摩拉够 → 生成单位登场。卡不消耗留手牌（可重复出战）；
+    /// 1~2 星角色直接铺场，3 星+角色重复出战升命座（命座 B8）。
     /// 直产命令（Summon+StatChange(Mora)），不走 BattleEffect 效应链（资源/召唤不是单位效应）。
     /// </summary>
     public static class DeployUnitExecutor
     {
-        /// <summary>角色部署核心半径（docs/18 决策七拍板；建筑=核心半径 3/建筑半径 2 属 DeployBuilding 后续批次）</summary>
+        /// <summary>角色部署核心半径（docs/18 决策七拍板）</summary>
         public const int DeployRadiusFromCore = 2;
 
-        /// <summary>部署落点合法（角色）：协议核心半径 2 内（切比雪夫；核心位置代理=出生区中心，B8 换真核心）
-        /// + 地形层（按部署单位常态移动类型）+ 碰撞共享原语（体积绝对层+阻挡规则层=
-        /// MovementResolver.PassesVolumeLimit/PassesBlockingRules——与移动进入判定**同源**，
-        /// 2026-10-02 复审收口，碰撞口径改动只改原语处）：① 体积绝对层（无视阻挡配置不可绕过）；
-        /// ② 阻挡规则层（与格内任一单位互相阻挡即不可部署）。含尸体——尸体保留碰撞/体积。
-        /// 客户端镜像预判=BattleHud.CanDeployEnterPreview（快照静态口径，Host 结算兜底）</summary>
+        /// <summary>建筑部署核心半径（决策八十六拍板 #6：角色 2 格+1=3 格，docs/active/45 §3）</summary>
+        public const int DeployRadiusFromCoreBuilding = 3;
+
+        /// <summary>建筑部署数量上限（决策八十六拍板 #4：自己存活建筑总数〔不含协议核心〕；
+        /// 拆掉即释放名额可重建——消散机制保证在场必存活，docs/active/45 §2）</summary>
+        public const int MaxBuildingsPerPlayer = 3;
+
+        /// <summary>部署落点合法（角色/建筑统一）：协议核心半径内（角色 2/建筑 3，切比雪夫；
+        /// 核心位置代理=出生区中心，B8 换真核心）+ 地形层（按部署单位常态移动类型）+ 碰撞共享原语
+        /// （体积绝对层+阻挡规则层=MovementResolver.PassesVolumeLimit/PassesBlockingRules——与移动进入
+        /// 判定**同源**，2026-10-02 复审收口，碰撞口径改动只改原语处）：① 体积绝对层（无视阻挡配置
+        /// 不可绕过）；② 阻挡规则层（与格内单位互相阻挡即不可部署）。含尸体——尸体保留碰撞/体积
+        /// （消散单位已移除天然不占格）。客户端镜像预判=BattleHud.CanDeployEnterPreview（快照静态口径，
+        /// Host 结算兜底）</summary>
         public static bool IsDeployCellValid(BattleSimState sim, string playerId, BattleCell cell,
             UnitConfig.UnitData deployData)
         {
             if (!sim.Map.HasTile(cell.x, cell.y)) return false;
             var core = sim.GetCorePosition(playerId);
+            int radius = deployData != null && deployData.unitType == UnitType.Building
+                ? DeployRadiusFromCoreBuilding : DeployRadiusFromCore;
             int distance = Math.Max(Math.Abs(cell.x - core.x), Math.Abs(cell.y - core.y));
-            if (distance > DeployRadiusFromCore) return false;
+            if (distance > radius) return false;
 
             // 地形层：按部署单位常态移动类型（步行不可入水等，与移动进入判定同构）
             var forceType = deployData?.normalMoveType ?? ForceType.Walk;
@@ -88,11 +100,29 @@ namespace GIC.Battle
                 return false;
             }
 
+            // ==================== 建筑梯度/上限前置（决策八十六批C，docs/active/45 §2/§3）====================
+            // 建筑**永不升命**（拍板 #4「建筑无命座」+冲突勘正「3★+升命分支对建筑不适用」）：
+            // 重复部署=新实例，走铺场链；梯度/上限先于落点与摩拉校验（不满足=零成本拦截）
+            if (data.unitType == UnitType.Building)
+            {
+                if (!PassesBuildingTechGate(sim, action.playerId, data))
+                {
+                    GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被梯度前置拦截（上一梯度建筑不在场）");
+                    return false;
+                }
+                if (!PassesBuildingLimit(sim, action.playerId))
+                {
+                    GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被建筑上限拦截（存活建筑 {MaxBuildingsPerPlayer} 座）");
+                    return false;
+                }
+            }
+
             // ==================== 升命座分支（B8 批 2026-09-30，docs/05 §5.2+docs/09）====================
             // 3★+同名重复出战=提升命座（docs/05 §5.4：尸体也仅升命不复苏；封顶 MaxConstellation=3）——
-            // 不生成新单位、扣等同出战摩拉、占部署族配额（ActionType 仍=DeployUnit，语义由同名在场判定）
+            // 不生成新单位、扣等同出战摩拉、占部署族配额（ActionType 仍=DeployUnit，语义由同名在场判定）。
+            // **仅角色**（建筑分支已提前分流——建筑重复部署=铺场新实例）
             var existingUnit = FindOwnUnitByName(sim, action.playerId, unitName);
-            if (existingUnit != null && data.starLevel >= 3)
+            if (existingUnit != null && data.starLevel >= 3 && data.unitType != UnitType.Building)
             {
                 if (existingUnit.ConstellationLevel >= ConstellationApplier.MaxConstellation)
                 {
@@ -184,6 +214,132 @@ namespace GIC.Battle
                 if (identity.UnitName == unitName) return kv.Value;
             }
             return null;
+        }
+
+        // ==================== 建筑梯度/上限（决策八十六批C，docs/active/45 §2）====================
+
+        /// <summary>建筑部署梯度前置（拍板 #3）：低科=自己有存活的 Core tag 建筑在场（核心开局在场、
+        /// 被打掉即判负，恒满足仍显式校验）；中科=自己有存活**低科**建筑在场；高科=自己有存活
+        /// **中科**建筑在场。**不共享队友**（2v2 各算各——一律按 OwnerPlayerID 过滤不走 TeamType）；
+        /// 协议核心 5★=高科、不参与「上一梯度在场」判定（部署中科要的是低科在场，核心帮不上——
+        /// 中科必须先铺出旗帜/餐馆）。客户端镜像=BattleHud.PassesBuildingTechPreview（快照同口径）</summary>
+        public static bool PassesBuildingTechGate(BattleSimState sim, string playerId, UnitConfig.UnitData data)
+        {
+            if (data == null || data.unitType != UnitType.Building) return true; // 非建筑不查
+            var tech = BuildingTechHelper.FromStars(data.starLevel);
+            if (tech == BuildingTech.LowTech)
+            {
+                // 低科前置=自己有存活 Core tag 建筑（含协议核心——恒满足仍显式校验）
+                foreach (var kv in sim.Units)
+                {
+                    var identity = kv.Value.GetUnitComponent<UnitIdentity>();
+                    if (identity == null || identity.OwnerPlayerID != playerId) continue;
+                    if (!BattleHeuristics.IsCore(kv.Value) || BattleSimState.IsDead(kv.Value)) continue;
+                    return true;
+                }
+                return false;
+            }
+            var requiredTier = tech == BuildingTech.MidTech ? BuildingTech.LowTech : BuildingTech.MidTech;
+            foreach (var kv in sim.Units)
+            {
+                var identity = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.OwnerPlayerID != playerId) continue;
+                var unitData = kv.Value.RawData;
+                if (unitData == null || unitData.unitType != UnitType.Building) continue;
+                if (BattleHeuristics.IsCore(kv.Value) || BattleSimState.IsDead(kv.Value)) continue;
+                if (BuildingTechHelper.FromStars(unitData.starLevel) == requiredTier) return true;
+            }
+            return false;
+        }
+
+        /// <summary>建筑上限（拍板 #4）：自己存活建筑总数（UnitType.Building、非 Core tag）
+        /// &lt; MaxBuildingsPerPlayer(3)。含尸体问题不存在（消散不留尸体，IsDead 守卫兜底）；
+        /// 拆掉立即释放名额。客户端镜像=BattleHud 建筑计数（快照同口径）</summary>
+        public static bool PassesBuildingLimit(BattleSimState sim, string playerId)
+        {
+            int count = 0;
+            foreach (var kv in sim.Units)
+            {
+                var identity = kv.Value.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.OwnerPlayerID != playerId) continue;
+                var unitData = kv.Value.RawData;
+                if (unitData == null || unitData.unitType != UnitType.Building) continue;
+                if (BattleHeuristics.IsCore(kv.Value) || BattleSimState.IsDead(kv.Value)) continue;
+                count++;
+            }
+            return count < MaxBuildingsPerPlayer;
+        }
+
+        // ==================== 召唤原语（决策八十六批D，docs/active/45 §1.1 骑士团）====================
+
+        /// <summary>最近可部署格召唤（拍板 #10「自己格占满→最近可部署格顺延」）：BFS 距离场从锚点
+        /// 扩散（固定方向序=CrossDirections 枚举序、距离升序=确定性），取首个合法格（地形按召唤单位
+        /// 常态移动类型+体积+碰撞原语——与 IsDeployCellValid 的格内判定同源，**不带核心半径**：
+        /// 召唤锚=建筑格非核心）；找不到合法格=召唤落空零动作。消费方=骑士团部署即召+周期召唤。
+        /// exploreVision 揭雾预热走 Summon 命令既有链（命令携带 exploreVision）</summary>
+        public static bool TrySummonAtNearestCell(BattleSimState sim, string playerId, UnitName unitName,
+            BattleCell origin, out BattleCommand summonCommand)
+        {
+            summonCommand = null;
+            var config = Wargame.Instance?.Context?.Get<UnitConfig>();
+            var data = config?.GetUnitData(unitName);
+            if (data == null) return false;
+            if (!TryFindNearestValidCell(sim, playerId, origin, data, out var cell)) return false;
+
+            var unit = UnitFactory.CreateUnitWithData(data);
+            if (unit == null) return false;
+            if (sim.LogicRoot != null)
+                unit.transform.SetParent(sim.LogicRoot, false);
+            var unitId = sim.RegisterUnit(unit, playerId, sim.GetTeamOf(playerId), cell);
+            var state = sim.BuildUnitState(unitId, unit); // 全量 UnitState 单一出口（同部署链）
+            summonCommand = BattleCommand.Summon(playerId, 0, 0, state); // sliceIndex/indexInSlice 由调用方回填
+            GICLog.Info($"[DeployUnit] {playerId} 召唤 {unitName} @ {cell}（最近格顺延）");
+            return true;
+        }
+
+        /// <summary>BFS 距离场最近合法格（origin 自身优先；固定方向序+距离升序=确定性——
+        /// 同距平局按扩散序先到先得；与 MovementResolver 原语同源的格内合法性，无核心半径约束）</summary>
+        private static bool TryFindNearestValidCell(BattleSimState sim, string playerId, BattleCell origin,
+            UnitConfig.UnitData data, out BattleCell cell)
+        {
+            cell = default;
+            if (CellCanHost(sim, playerId, origin, data)) { cell = origin; return true; }
+            var visited = new HashSet<BattleCell> { origin };
+            var frontier = new List<BattleCell> { origin };
+            int mapWidth = sim.Map.width;   // 越界快筛（HasTile 终判）
+            int mapHeight = sim.Map.height;
+            while (frontier.Count > 0)
+            {
+                var next = new List<BattleCell>();
+                foreach (var c in frontier)
+                {
+                    foreach (var dir in BattleHeuristics.CrossDirections)
+                    {
+                        int nx = c.x + SkillHitResolver.DirectionToDelta(dir).x;
+                        int ny = c.y + SkillHitResolver.DirectionToDelta(dir).y;
+                        if (nx < 0 || ny < 0 || nx >= mapWidth || ny >= mapHeight) continue;
+                        var n = new BattleCell(nx, ny);
+                        if (!visited.Add(n)) continue;
+                        if (!CellCanHost(sim, playerId, n, data)) { next.Add(n); continue; } // 不可停仍扩散穿过
+                        cell = n;
+                        return true;
+                    }
+                }
+                frontier = next;
+            }
+            return false;
+        }
+
+        /// <summary>召唤单位可否落格（地形+体积+碰撞——与 IsDeployCellValid 格内判定同源；
+        /// 含尸体占用；无核心半径〔召唤锚=建筑格〕）</summary>
+        private static bool CellCanHost(BattleSimState sim, string playerId, BattleCell cell, UnitConfig.UnitData data)
+        {
+            if (!sim.Map.HasTile(cell.x, cell.y)) return false;
+            if (!sim.Map.IsPassable(cell.x, cell.y, data.normalMoveType)) return false;
+            var occupants = sim.GetUnitsAt(cell);
+            if (!MovementResolver.PassesVolumeLimit(occupants, data.GetVolume())) return false;
+            return MovementResolver.PassesBlockingRules(occupants, sim.GetTeamOf(playerId),
+                data.与友方互不阻挡, data.blockedByEnemies);
         }
     }
 }

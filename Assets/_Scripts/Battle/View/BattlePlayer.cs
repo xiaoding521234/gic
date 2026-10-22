@@ -145,6 +145,9 @@ namespace GIC.Battle
         /// ——GainCard 对偶），HUD 订阅重建手牌（新实例=新槽位）；快照权威兜底</summary>
         public event Action<string, int, int, int> OnItemGained;
 
+        /// <summary>获得单位卡事件（购买批 2026-10-22：购买角色/建筑卡入手牌——订阅方 HUD 重建手牌）</summary>
+        public event Action<string, int, int> OnUnitCardGained;
+
         /// <summary>战斗结束事件（2026-09-25 三轮审查 S10 轻量全灭软停；订阅方=HUD 胜负提示，
         /// 结算画面=B8）</summary>
         public event Action<BattleOverMessage> BattleOver;
@@ -380,7 +383,8 @@ namespace GIC.Battle
 
         public void OnSegment(SegmentMessage message)
         {
-            if (_flow == null && _clientPhase == BattlePhase.Selecting) // B7 LAN 客户端：首片=执行阶段开始
+            if (_flow == null && _clientPhase == BattlePhase.Selecting
+                && message.segment.insertedInstantAction == 0) // B7 LAN 客户端：首片=执行阶段开始
                 DeriveClientPhase(BattlePhase.Resolving, message.segment.turnNumber);
             StartCoroutine(PlaySegmentCoroutine(message.segment));
         }
@@ -1086,7 +1090,14 @@ namespace GIC.Battle
 
                     case BattleCommandType.Death:
                         if (_views.TryGetValue(command.actorUnitId, out var dying))
-                            playbacks.Add(StartCoroutine(PlayDeathCoroutine(dying, stagger)));
+                        {
+                            // 消散（决策八十六批B，docs/active/45 §4 拍板 #5）：建筑+眷属死亡不留尸体
+                            // ——立牌淡出+视图清理；伙伴/魔神尸体路径维持既有 SetCorpseVisual
+                            if (command.metadata == 1)
+                                playbacks.Add(StartCoroutine(PlayDissolveCoroutine(dying, stagger)));
+                            else
+                                playbacks.Add(StartCoroutine(PlayDeathCoroutine(dying, stagger)));
+                        }
                         break;
 
                     case BattleCommandType.ApplyBuff:
@@ -1237,11 +1248,18 @@ namespace GIC.Battle
 
                     case BattleCommandType.ItemGain:
                         // 获得物品卡（命座授予/死亡掠夺）：本地手牌镜像新增（GainCard 对偶——按 (物品,
-                        // 实例耐久) 条目合并/新建，掠夺物耐久保留）+HUD 重建手牌（新实例=新槽位）；
+                        // 实例耐久) 条目合并/新建，掠夺物耐久保留）；HUD 重建手牌（新实例=新槽位）；
                         // 下回合快照权威自愈
                         ApplyItemGainToLocalHand(command.targetUnitId, (ItemName)command.metadata,
                             command.value, command.buffLevel);
                         OnItemGained?.Invoke(command.targetUnitId, command.metadata, command.value, command.buffLevel);
+                        break;
+
+                    case BattleCommandType.CardGain:
+                        // 获得单位卡（购买批 2026-10-22，决策八十六：购买角色/建筑卡入手牌）：
+                        // 本地手牌镜像新增（count 合并/新建）+HUD 重建手牌；下回合快照权威自愈
+                        ApplyCardGainToLocalHand(command.targetUnitId, command.metadata, command.value);
+                        OnUnitCardGained?.Invoke(command.targetUnitId, command.metadata, command.value);
                         break;
 
                     case BattleCommandType.Summon:
@@ -1665,6 +1683,30 @@ namespace GIC.Battle
             res.handCards.Add(newCard);
         }
 
+        /// <summary>获得单位卡的本地手牌镜像（购买批 2026-10-22）：按 (Unit, value) 条目合并数量/
+        /// 新建条目（单位卡无耐久实例语义——同种角色多张合并 count）；镜像后 HUD 经 OnUnitCardGained
+        /// 重建手牌，下回合快照权威自愈</summary>
+        private void ApplyCardGainToLocalHand(string playerId, int unitName, int amount)
+        {
+            var snapshot = LatestSnapshot;
+            if (snapshot == null) return;
+            PlayerResourceState res = null;
+            foreach (var r in snapshot.resources)
+            {
+                if (r.playerId == playerId) { res = r; break; }
+            }
+            if (res == null) return;
+            foreach (var entry in res.handCards)
+            {
+                if ((CardType)entry.cardType == CardType.Unit && entry.value == unitName)
+                {
+                    entry.count += amount;
+                    return;
+                }
+            }
+            res.handCards.Add(new HandCard(new CardId((UnitName)unitName), amount));
+        }
+
         /// <summary>原神式伤害数字层懒建（随 BattleScreen 场景卸载消亡）</summary>
         private BattleDamageNumbers EnsureDamageNumbers()
         {
@@ -1702,6 +1744,32 @@ namespace GIC.Battle
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
             view.SetCorpseVisual(true);
+        }
+
+        /// <summary>消散退场协程（决策八十六批B，docs/active/45 §4）：延迟到位后驱动 UnitView 全渲染面
+        /// 淡出（素材批落地前=通用渐隐，特效随素材批替换），淡出完成清理视图——_views/头顶条/
+        /// 专属弹射物登记（UnitView.OnDestroy 自清常驻播放器/RT 租约/材质，Destroyed 事件→
+        /// ResidentVideoBudget 注销双保险）。此后该 unitId 的一切命令 TryGetValue miss=静默跳过
+        /// （Host 已同步移除=预期；快照消失路径天然自洽）。对局中途清场（ClearViews）竞态由
+        /// Unity-null 守卫吸收</summary>
+        private IEnumerator PlayDissolveCoroutine(UnitView view, float delay)
+        {
+            const float fadeSeconds = 0.45f;
+            if (delay > 0f)
+                yield return new WaitForSeconds(delay);
+            if (view == null) yield break;
+            float elapsed = 0f;
+            while (elapsed < fadeSeconds && view != null)
+            {
+                elapsed += Time.deltaTime;
+                view.SetDissolveAlpha(elapsed / fadeSeconds);
+                yield return null;
+            }
+            if (view == null) yield break;
+            _overheadBars?.Unregister(view);
+            _customProjectiles.Remove(view.UnitId);
+            _views.Remove(view.UnitId);
+            Destroy(view.gameObject);
         }
 
         // ==================== 立牌与队形 ====================

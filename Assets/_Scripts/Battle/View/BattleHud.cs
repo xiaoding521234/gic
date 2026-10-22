@@ -412,6 +412,7 @@ namespace GIC.Battle
             || HandCardDetailOpen
             || (_handStatsPanel != null && _handStatsPanel.gameObject.activeInHierarchy)
             || PopupOpen
+            || BuildingShopOpen
             || (UIManager.Instance != null && UIManager.Instance.IsOpen(Screens.Settings))
             || (_externalBrowseOpen != null && _externalBrowseOpen());
 
@@ -441,6 +442,8 @@ namespace GIC.Battle
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
             _session.Player.OnItemGained += OnItemGainedHandler;      // 装备批：命座授予物品（兔兔伯爵）手牌即时并入
+            _session.Player.OnItemGained += OnShopPurchaseRefreshHandler; // 购买批：物品卡购买后面板灰显/摩拉态刷新
+            _session.Player.OnUnitCardGained += OnShopPurchaseRefreshHandler; // 购买批：角色/建筑卡购买后面板刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             // 单位显示色解析器注入（2026-10-12 拍板「单位显示的颜色应当是玩家色」）：立牌底座/选中描边/
             // 血条填充全链改走房间玩家色单源（roster 命中=房间选色——同队队友异色可辨识归属；
@@ -538,6 +541,8 @@ namespace GIC.Battle
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
                     _session.Player.OnItemConsumed -= OnItemConsumedHandler;
                     _session.Player.OnItemGained -= OnItemGainedHandler;
+                    _session.Player.OnItemGained -= OnShopPurchaseRefreshHandler;
+                    _session.Player.OnUnitCardGained -= OnShopPurchaseRefreshHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
                 }
                 _session.OnPhaseChanged -= OnPhaseChanged;
@@ -666,6 +671,7 @@ namespace GIC.Battle
                 // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
+                CloseBuildingShop(); // 购买面板随阶段收口（选择阶段专属交互，docs/active/45 §7.4）
                 CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：卡瞬回原槽防悬空在拖拽层）
                 CloseHandCardDetail(); // 手牌卡详情随阶段收口（执行阶段棋盘视线让位给预览；统计面板随卡详情联动收）
                 if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
@@ -1069,9 +1075,34 @@ namespace GIC.Battle
         /// 加单位、首战=选格落地，均不变）。满命上交被 Host 拒绝，本端先行轻提示省一次落空。
         /// 决策五十五起唯一入口=拖拽打出（slot=打出卡上下文）：满命拦截=弹回手牌槽、
         /// 升命卡=EnterUpgradePending 待确认态（2026-10-07 返拍「拖入出牌区，不应该直接上交」——
-        /// 卡悬浮待「完成选择」确认上交，拖回/点空白/取消钮=反悔弹回）、部署=登记打出态进瞄准</summary>
+        /// 卡悬浮待「完成选择」确认上交，拖回/点空白/取消钮=反悔弹回）、部署=登记打出态进瞄准。
+        /// 建筑拦截（决策八十六批C，docs/active/45 §2）：梯度前置/上限不满足=toast+弹回手牌槽
+        ///（Host PassesBuildingTechGate/PassesBuildingLimit 权威兜底）</summary>
         private void TryDeployOrUpgrade(int unitNameValue, HandCardSlot slot)
         {
+            var deployData = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
+            if (deployData != null && deployData.unitType == UnitType.Building)
+            {
+                var snapshot = _session?.Player?.LatestSnapshot;
+                if (!PassesBuildingTechPreview(deployData, snapshot))
+                {
+                    ShowBattleToast("Battle_TechRequired");
+                    GICLog.Info($"[BattleHud] 建筑部署拦截（梯度）：{(UnitName)unitNameValue}");
+                    if (slot != null)
+                        FlyHandCardToSlot(slot, slot.baseScale,
+                            HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
+                    return;
+                }
+                if (!PassesBuildingLimitPreview(snapshot))
+                {
+                    ShowBattleToast("Battle_BuildingLimit");
+                    GICLog.Info($"[BattleHud] 建筑部署拦截（上限）：{(UnitName)unitNameValue}");
+                    if (slot != null)
+                        FlyHandCardToSlot(slot, slot.baseScale,
+                            HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
+                    return;
+                }
+            }
             if (IsConstellationUpgrade(unitNameValue))
             {
                 if (UpgradeTargetAtMax(unitNameValue))
@@ -1224,11 +1255,14 @@ namespace GIC.Battle
             var snapshot = _session.Player.LatestSnapshot;
             var deployData = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
             var core = FindMyCorePosition(snapshot);
+            // 建筑部署半径（决策八十六拍板 #6）：角色 2 格、建筑 3 格（核心为圆心同源）
+            int deployRadius = deployData != null && deployData.unitType == UnitType.Building
+                ? DeployUnitExecutor.DeployRadiusFromCoreBuilding : DeployUnitExecutor.DeployRadiusFromCore;
             // 迷雾批（2026-10-17 拍板 D4）：部署碰撞预判吃迷雾滤后快照——迷雾内敌方按不存在
             //（红格不得泄露隐藏敌人占位；地形不可行仍如实=允许泄露）
             var fogSnapshot = FogFilteredSnapshot(snapshot);
-            for (int dx = -DeployUnitExecutor.DeployRadiusFromCore; dx <= DeployUnitExecutor.DeployRadiusFromCore; dx++)
-            for (int dy = -DeployUnitExecutor.DeployRadiusFromCore; dy <= DeployUnitExecutor.DeployRadiusFromCore; dy++)
+            for (int dx = -deployRadius; dx <= deployRadius; dx++)
+            for (int dy = -deployRadius; dy <= deployRadius; dy++)
             {
                 var c = new BattleCell(core.x + dx, core.y + dy);
                 if (!_board.Map.HasTile(c.x, c.y)) continue;
@@ -1797,6 +1831,7 @@ namespace GIC.Battle
             RefreshOutlines(); // 选中描边（2026-10-05 拍板：立牌描边=归属玩家色；ExitAiming 已随收口刷过一次）
             UpdateQuickSelectionHighlight(); // 快捷面板行高亮随选中即时刷新（2026-10-06）
             SetTip("Battle_TipUnitSelected");
+            TryOpenBuildingShop(unitId); // 购买面板（决策八十六批E：我方存活建筑选中态专属面板；敌方=纯查看不弹）
         }
 
         private void DeselectUnit()
@@ -1804,6 +1839,7 @@ namespace GIC.Battle
             _selectedUnitId = null;
             _state = HudState.Idle;
             ClosePopup();
+            CloseBuildingShop(); // 购买面板随取消选中收口（换选/点空白同路，docs/active/45 §7.4）
             HideSelectMarker();
             ApplyStateVisibility();
             RefreshOutlines(); // 选中/目标描边随选中一并清（2026-10-05）
@@ -2151,13 +2187,67 @@ namespace GIC.Battle
             return true;
         }
 
+        /// <summary>建筑部署梯度前置镜像（决策八十六批C，docs/active/45 §2——Host
+        /// DeployUnitExecutor.PassesBuildingTechGate 快照同口径）：低科=我方存活 Core tag 建筑在场；
+        /// 中科=我方存活低科建筑（非核心——核心 5★=高科帮不上）；高科=我方存活中科建筑。
+        /// 不共享队友（playerId 过滤）；核心判据走 UnitConfig tags（单核心时代与 FindMyCorePosition
+        /// 等价，世界树批扩 UnitState.tags 时一并迁移）</summary>
+        private bool PassesBuildingTechPreview(UnitConfig.UnitData deployData, BattleSnapshot snapshot)
+        {
+            if (deployData == null || deployData.unitType != UnitType.Building) return true;
+            if (snapshot == null) return false;
+            var tech = BuildingTechHelper.FromStars(deployData.starLevel);
+            bool hasCoreAlive = false, hasLowTech = false, hasMidTech = false;
+            foreach (var u in snapshot.units)
+            {
+                if (u.playerId != _myPlayerId || u.isCorpse != 0) continue;
+                var data = TryGetUnitData(u.unitName);
+                if (data == null || data.unitType != UnitType.Building) continue;
+                bool isCore = data.tags != null
+                    && System.Array.IndexOf(data.tags, UnitTag.Core) >= 0;
+                if (isCore) { hasCoreAlive = true; continue; } // 核心=高科、不参与梯度判定
+                var tier = BuildingTechHelper.FromStars(data.starLevel);
+                if (tier == BuildingTech.LowTech) hasLowTech = true;
+                else if (tier == BuildingTech.MidTech) hasMidTech = true;
+            }
+            return tech switch
+            {
+                BuildingTech.LowTech => hasCoreAlive,
+                BuildingTech.MidTech => hasLowTech,
+                _ => hasMidTech,
+            };
+        }
+
+        /// <summary>建筑上限镜像（Host PassesBuildingLimit 快照同口径）：我方存活非核心建筑
+        /// &lt; DeployUnitExecutor.MaxBuildingsPerPlayer(3)</summary>
+        private bool PassesBuildingLimitPreview(BattleSnapshot snapshot)
+        {
+            if (snapshot == null) return false;
+            int count = 0;
+            foreach (var u in snapshot.units)
+            {
+                if (u.playerId != _myPlayerId || u.isCorpse != 0) continue;
+                var data = TryGetUnitData(u.unitName);
+                if (data == null || data.unitType != UnitType.Building) continue;
+                if (data.tags != null && System.Array.IndexOf(data.tags, UnitTag.Core) >= 0) continue;
+                count++;
+            }
+            return count < DeployUnitExecutor.MaxBuildingsPerPlayer;
+        }
+
         /// <summary>部署落点推荐预判（镜像 DeployUnitExecutor.IsDeployCellValid 碰撞判定链的客户端静态版，
-        /// 2026-09-25 拍板「根据碰撞决定」）：地形层（按部署单位常态移动类型）→ 体积绝对层（现有+自身 ≤3，
-        /// 最高级不可绕过）→ 阻挡规则层（与格内全部单位互不阻挡才推荐）；碰撞配置读 UnitData——运行时
-        /// Buff 修改不可见，属提示非校验，Host 结算兜底。含尸体——尸体保留碰撞。部署单位尚未登场无运行时
-        /// 组件——飞行互不阻挡豁免按 UnitData.normalMoveType 配置口径判（2026-09-26 拍板）。</summary>
+        /// 2026-09-25 拍板「根据碰撞决定」）：梯度/上限全局门（决策八十六批C——TryDeployOrUpgrade 拖出
+        /// 拦截为主 UX，此处镜像保持与 Host 校验链同口径）→ 地形层（按部署单位常态移动类型）→ 体积绝对层
+        /// （现有+自身 ≤3，最高级不可绕过）→ 阻挡规则层（与格内全部单位互不阻挡才推荐）；碰撞配置读
+        /// UnitData——运行时 Buff 修改不可见，属提示非校验，Host 结算兜底。含尸体——尸体保留碰撞。
+        /// 部署单位尚未登场无运行时组件——飞行互不阻挡豁免按 UnitData.normalMoveType 配置口径判（2026-09-26 拍板）。</summary>
         private bool CanDeployEnterPreview(BattleCell cell, UnitConfig.UnitData deployData, BattleSnapshot snapshot)
         {
+            // 建筑梯度/上限镜像（全局条件——不满足=全红格；正常流已被拖出拦截挡在进入瞄准之前）
+            if (deployData != null && deployData.unitType == UnitType.Building
+                && (!PassesBuildingTechPreview(deployData, snapshot) || !PassesBuildingLimitPreview(snapshot)))
+                return false;
+
             var forceType = deployData != null ? deployData.normalMoveType : ForceType.Walk;
             if (!_board.Map.IsPassable(cell.x, cell.y, forceType)) return false;
 

@@ -36,6 +36,9 @@ namespace GIC.Battle
 
         public IEnumerator ResolveTurnCoroutine(int turnNumber, List<ActionData> actions)
         {
+            // 回合计数真源写入（决策八十六批D，docs/active/45 §6——周期类建筑效果消费；
+            // 回合开头写一次，段内 RegisterUnit 的单位 DeployedTurn 同回合自洽）
+            _sim.CurrentTurn = turnNumber;
             // 部署段（B6c）：出战行动先于全部攻速片结算（新单位当回合即被后续行动波及；
             // 占玩家行动配额由上交通道保证——DeployUnit 同走 SubmitAction 一玩家一行动，docs/18 决策七）
             var deploys = actions.FindAll(a => a.actionType == ActionType.DeployUnit);
@@ -260,6 +263,26 @@ namespace GIC.Battle
                             segment.commands.Add(gain);
                         }
                     }
+                    // 骑士团部署即召（决策八十六批D，docs/active/45 §1.1 拍板 #10「部署时就立刻召唤
+                    // 1 个」）：周期召唤建筑落位后当场召 1 名 召唤单位（最近可部署格顺延）——不等
+                    // 回合末周期；召唤单位缺省（Amber=字段默认未配置）不召防误配
+                    var summonData = Wargame.Instance?.Context?.Get<UnitConfig>()?
+                        .GetUnitData((UnitName)action.deployUnitName);
+                    if (summonData != null && summonData.unitType == UnitType.Building
+                        && summonData.建筑效果 == BuildingEffectKind.PeriodicSummon
+                        && summonData.召唤单位 != UnitName.Amber)
+                    {
+                        var summonAnchor = DeployUnitExecutor.FindOwnUnitByName(_sim, action.playerId,
+                            (UnitName)action.deployUnitName);
+                        if (summonAnchor != null
+                            && DeployUnitExecutor.TrySummonAtNearestCell(_sim, action.playerId, summonData.召唤单位,
+                                _sim.GetPosition(summonAnchor), out var instantSummon))
+                        {
+                            instantSummon.sliceIndex = sliceIndex;
+                            instantSummon.indexInSlice = indexInSlice++;
+                            segment.commands.Add(instantSummon);
+                        }
+                    }
                 }
             }
 
@@ -374,6 +397,11 @@ namespace GIC.Battle
             }
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            // 建筑回合末效果段（决策八十六批D，docs/active/45 §6：泡湿之后、命令发射之前——回合末
+            // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
+            // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）
+            var buildingExtras = new List<BattleCommand>();
+            CollectBuildingEffects(turnNumber, effects, buildingExtras);
             var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
@@ -381,8 +409,104 @@ namespace GIC.Battle
             EmitSliceCommands($"回合{turnNumber}结束段", segment, sliceIndex,
                 effects, appliedBuffs, null, null, newlyDead, expired, shattered: shatters);
 
+            // 建筑效果直产命令（餐馆摩拉/骑士团召唤）段尾发射——indexInSlice 接续既有条数
+            foreach (var extra in buildingExtras)
+            {
+                extra.sliceIndex = sliceIndex;
+                extra.indexInSlice = segment.commands.Count;
+                segment.commands.Add(extra);
+            }
+
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
+        }
+
+        /// <summary>建筑回合末效果收集（决策八十六批D，docs/active/45 §1.1/§6）：只结算存活建筑
+        /// （消散即移除天然；多座同种独立结算——两座餐馆=+10）。旗帜=半径内我方非建筑单位（含倒下
+        /// 角色，拍板 #8）各+元能（EnergyEffect 建筑类别，合并键含来源建筑——两座旗帜对同一目标各
+        /// +1 不互吞）；餐馆=己方玩家+摩拉（StatChange 直产）；骑士团=以部署回合为 0、每过 效果周期
+        /// 回合再召 1 名（最近可部署格顺延；部署当回合末 diff=0 跳过——部署段已即召）；教堂=我方存活
+        /// HP&lt;效果阈值% 单位（含建筑，拍板 #9）治疗 效果数值%×本建筑攻击（末点截断通则）。
+        /// **先快照再处理**：周期召唤会 RegisterUnit 突变 _units，快照后枚举安全</summary>
+        private void CollectBuildingEffects(int turnNumber, List<BattleEffect> effects, List<BattleCommand> extraCommands)
+        {
+            var buildings = new List<(string id, Unit unit, UnitConfig.UnitData data, UnitIdentity identity)>();
+            foreach (var kv in _sim.Units)
+            {
+                var unit = kv.Value;
+                if (unit == null || BattleSimState.IsDead(unit)) continue;
+                var data = unit.RawData;
+                if (data == null || data.unitType != UnitType.Building || data.建筑效果 == BuildingEffectKind.None) continue;
+                var identity = unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null) continue;
+                buildings.Add((kv.Key, unit, data, identity));
+            }
+
+            foreach (var building in buildings)
+            {
+                var data = building.data;
+                switch (data.建筑效果)
+                {
+                    case BuildingEffectKind.EnergyAura:
+                    {
+                        if (data.效果半径 <= 0 || data.效果数值 <= 0) break;
+                        var center = _sim.GetPosition(building.unit);
+                        foreach (var tkv in _sim.Units)
+                        {
+                            var target = tkv.Value;
+                            if (target == null) continue;
+                            var targetIdentity = target.GetUnitComponent<UnitIdentity>();
+                            if (targetIdentity == null || targetIdentity.Team != building.identity.Team) continue; // 我方（Team 域，歌声之环同口径）
+                            var targetData = target.RawData;
+                            if (targetData != null && targetData.unitType == UnitType.Building) continue; // 非建筑（拍板 #8）
+                            // 倒下角色照常（拍板 #8 含倒下；眷属/建筑无尸体=自然缺席）
+                            if (_sim.GetPosition(target).ChebyshevTo(center) > data.效果半径) continue;
+                            effects.Add(new EnergyEffect(tkv.Key, data.效果数值, EnergyEffect.CategoryBuildingGain)
+                            {
+                                SourceUnitId = building.id,
+                            });
+                        }
+                        break;
+                    }
+                    case BuildingEffectKind.MoraIncome:
+                    {
+                        if (data.效果数值 <= 0) break;
+                        _sim.ApplyMoraDelta(building.identity.OwnerPlayerID, data.效果数值);
+                        extraCommands.Add(BattleCommand.StatChange(building.identity.OwnerPlayerID, 0, 0,
+                            BattleCommand.StatKindMora, data.效果数值));
+                        break;
+                    }
+                    case BuildingEffectKind.PeriodicSummon:
+                    {
+                        if (data.效果周期 <= 0) break;
+                        int diff = turnNumber - building.unit.DeployedTurn;
+                        if (diff <= 0 || diff % data.效果周期 != 0) break;
+                        if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, building.identity.OwnerPlayerID,
+                                data.召唤单位, _sim.GetPosition(building.unit), out var summonCommand))
+                            extraCommands.Add(summonCommand);
+                        break;
+                    }
+                    case BuildingEffectKind.HealWounded:
+                    {
+                        if (data.效果数值 <= 0) break;
+                        int healAmount = data.效果数值 * data.GetEffectiveAttack() / 100; // 末点截断（整数除法）
+                        if (healAmount <= 0) break;
+                        foreach (var tkv in _sim.Units)
+                        {
+                            var target = tkv.Value;
+                            if (target == null || BattleSimState.IsDead(target)) continue; // 存活（拍板 #9）
+                            var targetIdentity = target.GetUnitComponent<UnitIdentity>();
+                            if (targetIdentity == null || targetIdentity.Team != building.identity.Team) continue;
+                            var stats = target.GetUnitComponent<UnitStats>();
+                            if (stats == null) continue;
+                            var hp = stats.GetStatStruct(StatType.HP);
+                            if (hp.Max <= 0 || hp.Value * 100 >= data.效果阈值 * hp.Max) continue; // 低于阈值才奶
+                            effects.Add(new HealEffect(building.id, tkv.Key, healAmount));
+                        }
+                        break;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -752,14 +876,31 @@ namespace GIC.Battle
             foreach (var dead in newlyDead)
             {
                 bool hasId = _sim.TryGetUnitId(dead, out var deadId);
+                // 消散判定（决策八十六批B，docs/active/45 §4）：建筑全部+眷属角色（1~2★）死亡不留尸体
+                bool dissolve = BattleHeuristics.ShouldDissolve(dead);
                 if (hasId)
-                    segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++));
+                    segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++, dissolve ? 1 : 0));
                 // 装备掠夺（决策八十一「单位被击杀，其具有的装备被击杀方掠夺，放入手牌，耐久不变」）：
                 // 死亡命令随发——击杀方=同段内该单位最近一次 Damage 的攻击者归属玩家（OpponentProfiler
                 // 死亡归因同源口径）；掠夺条目=武器+全部配件（含耐久），入击杀方手牌后清死单位槽位
                 //（词条随撤——复苏不残留幻影词条）；无击杀归属=装备随葬（无动作）
                 if (hasId)
                     LootDeadEquipment(dead, deadId, segment, sliceIndex, ref indexInSlice);
+                // 消散分支（建筑+眷属，拍板 #5）：装备掠夺先行（上方已跑）→ 全部 Buff 注销（注册表
+                // 同步清——「死亡不清理」通则对消散单位作废：鞭尸 tick 天然停）→ 移除+销毁（格子/
+                // 碰撞/同名查找/复苏目标域随之消失）。RemoveBuff 命令不发——客户端整单位走消散
+                // 退场，徽章随 view 同殁（下回合快照消失路径天然自洽）
+                if (dissolve)
+                {
+                    for (int i = dead.Buffs.Count - 1; i >= 0; i--)
+                    {
+                        var buff = dead.Buffs[i];
+                        if (buff == null) continue;
+                        _sim.RemoveBuff(dead, buff); // OnRemoved 回调（冻结解状态等幂等无害）+注册表注销
+                    }
+                    _sim.RemoveUnit(dead);
+                    continue;
+                }
                 // 倒下即失的 Buff（B-3 ②：RemoveOnHolderDeath——歌声之环「持有者倒下，歌声之环消失」）：
                 // Death 命令后随发 RemoveBuff（客户端徽章即时移除），宿主注册表同步注销（倒序遍历边删）
                 for (int i = dead.Buffs.Count - 1; i >= 0; i--)

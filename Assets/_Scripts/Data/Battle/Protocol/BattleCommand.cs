@@ -75,6 +75,8 @@ namespace GIC.Data
 
         [InspectorName("获得物品卡")]
         ItemGain = 21, // 装备批：命座授予物品卡（安柏3命兔兔伯爵）——客户端手牌镜像新增+刷新（快照权威自愈）
+
+        CardGain = 22, // 购买批（决策八十六，2026-10-22）：购买单位卡入手牌（角色/建筑——物品卡复用 ItemGain）——客户端手牌镜像新增+刷新（快照权威自愈）
     }
 
     /// <summary>
@@ -279,7 +281,10 @@ namespace GIC.Data
             };
         }
 
-        public static BattleCommand Death(string unitId, int sliceIndex, int indexInSlice)
+        /// <summary>死亡命令工厂。metadata=消散标志（0=转尸体〔伙伴/魔神——压扁灰化，既有〕；
+        /// 1=消散〔建筑+眷属，决策八十六批B docs/active/45 §4——客户端立牌淡出退场，不留尸体〕）
+        /// </summary>
+        public static BattleCommand Death(string unitId, int sliceIndex, int indexInSlice, int dissolved = 0)
         {
             return new BattleCommand
             {
@@ -288,6 +293,7 @@ namespace GIC.Data
                 targetUnitId = unitId,
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
+                metadata = dissolved,
             };
         }
 
@@ -462,6 +468,24 @@ namespace GIC.Data
                 metadata = itemName,
                 value = amount,
                 buffLevel = durability,
+            };
+        }
+
+        /// <summary>获得单位卡命令工厂（购买批，决策八十六批E，docs/active/45 §7——购买角色/建筑卡
+        /// 入手牌）。actorUnitId=targetUnitId=获得玩家（同 ItemGain 口径）；metadata=UnitName 枚举值、
+        /// value=数量。客户端=本地手牌镜像新增+手牌刷新（快照权威自愈）</summary>
+        public static BattleCommand CardGain(string playerId, int sliceIndex, int indexInSlice,
+            int unitName, int count)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.CardGain,
+                actorUnitId = playerId,
+                targetUnitId = playerId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                metadata = unitName,
+                value = count,
             };
         }
 

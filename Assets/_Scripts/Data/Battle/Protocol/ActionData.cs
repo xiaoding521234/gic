@@ -81,6 +81,13 @@ namespace GIC.Data
         /// 玩家级行动 unitId 留空〔同 DeployUnit 口径〕）</summary>
         public int useItemId;
 
+        [Header("购买参数（BuyCard 有效，决策八十六批E，docs/active/45 §7）")]
+        /// <summary>购买的卡牌类型（CardType 枚举值：Unit=1/Item=0——单位卡/物品卡统一承载）</summary>
+        public int buyCardType;
+
+        /// <summary>购买的卡牌内容（UnitName 或 ItemName 枚举值）</summary>
+        public int buyCardValue;
+
         [Header("装备物品参数（EquipItem 有效，2026-10-18 装备批）")]
         /// <summary>装备的物品（ItemName 枚举值——subType 须为 Weapon/Accessory；装备即消耗手牌 1 张
         /// docs/01 §卡牌性质；目标装备单位复用 targetUnitId——玩家级行动 unitId 留空〔同 UseItem 口径，

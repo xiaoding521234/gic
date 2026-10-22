@@ -33,6 +33,11 @@ namespace GIC.Battle
         private static string _path;
         private static bool _hasHeader;
 
+        /// <summary>即时行动缓冲（购买批 2026-10-22，docs/active/45 §7 回放）：选择阶段发生的即时行动
+        /// （BuyCard）先入当回合缓冲——购买先于配额行动提交、且全部完成于开演前，CaptureActions 时
+        /// 按时序前置于配额行动合并落盘（回放器按行序先重演购买再喂演算）</summary>
+        private static readonly Dictionary<int, List<ActionData>> _pendingInstant = new Dictionary<int, List<ActionData>>();
+
         private static string ReplayDirectory => Path.Combine(Application.persistentDataPath, "Replays");
 
         /// <summary>当前录制文件路径（null=未在录制）</summary>
@@ -77,12 +82,33 @@ namespace GIC.Battle
         }
 
         /// <summary>每回合全量行动录制（TurnFlowController.TryBeginResolve 行动合并定稿后调）：
-        /// 全部玩家的行动 + 眷属自主 + 伙伴自主（回放按此直喂 TurnResolver，不重跑任何脑）</summary>
+        /// 全部玩家的行动 + 眷属自主 + 伙伴自主（回放按此直喂 TurnResolver，不重跑任何脑）。
+        /// 即时行动（购买）按发生序前置并入（选择阶段先于配额提交——回放先重演购买）</summary>
         public static void CaptureActions(int turn, List<ActionData> actions)
         {
             if (!Enabled || !_hasHeader) return;
+            if (_pendingInstant.TryGetValue(turn, out var buffered) && buffered.Count > 0)
+            {
+                var merged = new List<ActionData>(buffered);
+                if (actions != null && actions.Count > 0) merged.AddRange(actions);
+                actions = merged;
+                _pendingInstant.Remove(turn);
+            }
             if (actions == null || actions.Count == 0) return;
             Append(new ReplayActionsLine { turn = turn, actions = actions });
+        }
+
+        /// <summary>即时行动录制（购买批：BuyCardExecutor 结算成功后调）——入当回合缓冲，
+        /// 由 CaptureActions 定稿时合并（购买段=CaptureSegment 即时落盘——命令流断言面）</summary>
+        public static void CaptureInstantAction(int turn, ActionData action)
+        {
+            if (!Enabled || !_hasHeader || action == null) return;
+            if (!_pendingInstant.TryGetValue(turn, out var list))
+            {
+                list = new List<ActionData>();
+                _pendingInstant[turn] = list;
+            }
+            list.Add(action);
         }
 
         /// <summary>Segment 命令流录制（TurnResolver.PushSegmentAndWaitAck 推送前调）——断言面本体</summary>
@@ -105,6 +131,7 @@ namespace GIC.Battle
             if (!_hasHeader) return;
             _hasHeader = false;
             _path = null;
+            _pendingInstant.Clear();
         }
 
         // ==================== 序列化 ====================

@@ -133,18 +133,19 @@ namespace GIC.UI
             element.ClearAllEntries();
             element.AddEntry(raw.selfElement.GetEntry());
 
-            // 武器/移动行：建筑隐藏（2026-10-13 拍板「也隐藏」）；势力/元素行保留——
+            // 武器/移动行：**武器行建筑显示**（决策八十六批F 拍板 #2 推翻 2026-10-13 隐藏拍板武器
+            // 部分——建筑统一臂铠图标）；移动行维持隐藏（建筑不移动）；势力/元素行保留——
             // 建筑可有势力（如西风大教堂=蒙德），协议核心无势力自然留空
             bool isBuilding = raw.unitType == UnitType.Building;
-            if (weapon != null) weapon.gameObject.SetActive(!isBuilding);
+            if (weapon != null) weapon.gameObject.SetActive(true);
             if (move != null) move.gameObject.SetActive(!isBuilding);
+
+            // 武器（建筑=臂铠，拍板 #2 统一）
+            weapon.ClearAllEntries();
+            weapon.AddEntry(raw.weaponType.GetEntry());
 
             if (!isBuilding)
             {
-                // 武器
-                weapon.ClearAllEntries();
-                weapon.AddEntry(raw.weaponType.GetEntry());
-
                 // 移动
                 move.ClearAllEntries();
                 move.AddEntry(raw.normalMoveType.GetEntry());

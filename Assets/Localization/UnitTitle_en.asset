@@ -194,6 +194,26 @@ MonoBehaviour:
     m_Localized: Maid of Knights
     m_Metadata:
       m_Items: []
+  - m_Id: 3013
+    m_Localized: Banner of Gathering Winds
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3014
+    m_Localized: Mondstadt's Kitchen
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3015
+    m_Localized: Home of the Knights
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3016
+    m_Localized: Sanctuary of Grace
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3017
+    m_Localized: Sword of Protection
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

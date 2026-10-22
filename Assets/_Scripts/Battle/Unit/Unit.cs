@@ -34,6 +34,11 @@ namespace GIC.Battle
         /// 零资产污染、随战斗销毁自然回收，无需还原。2026-10-05 时轮编辑器「开一把试招」）</summary>
         [NonSerialized] public int TierOverrideStars = -1;
 
+        /// <summary>部署回合（决策八十六批D，docs/active/45 §6——RegisterUnit 写入〔真源=sim.CurrentTurn〕；
+        /// 周期类建筑效果以「当前回合−部署回合」相对计数：骑士团部署即召 1 个+每过 效果周期 回合再召——
+        /// 部署当回合末不再重复触发（相对差 0 跳过）。开局单位=0；随消散销毁无残留</summary>
+        [NonSerialized] public int DeployedTurn;
+
         /// <summary>
         /// 单位体积（docs/05 §5.3：角色/造物 = 1，建筑 = 2；格子体积容量 3。
         /// 体积判定在阻挡规则之上，无视阻挡能力也不可绕过）——

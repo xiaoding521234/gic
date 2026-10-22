@@ -179,6 +179,26 @@ MonoBehaviour:
     m_Key: Noelle
     m_Metadata:
       m_Items: []
+  - m_Id: 3013
+    m_Key: FavoniusBanner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3014
+    m_Key: GoodHunter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3015
+    m_Key: KnightsOfFavonius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3016
+    m_Key: FavoniusCathedral
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3017
+    m_Key: KnightOfFavonius
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

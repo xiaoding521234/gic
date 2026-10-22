@@ -33,12 +33,23 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _units = new Dictionary<string, Unit>();
         private int _nextUnitId = 1;
 
+        /// <summary>曾注册核心账本（决策八十六批B 消散，2026-10-22，docs/active/45 §4）：playerId→
+        /// 核心注册时 team。核心死亡走消散（_units 移除）后，「曾注册核心」记忆不再依赖尸体常驻——
+        /// IsPlayerDefeated/TeamHasLivingCore/HasAnyRegisteredCore 的 anyCore 种子改读此账本
+        /// （尸体在场的旧行为不受影响：账本覆盖已含在场核心）</summary>
+        private readonly Dictionary<string, TeamType> _playerCoreTeam = new Dictionary<string, TeamType>();
+
         /// <summary>对局实例号（静态计数器自增——每局新 BattleSimState 恒新值；进程级静态 AI 注册表
         /// （AIStrategist/OpponentProfiler）的新战斗自清判据（2026-10-15 审查修正）：比「T1 重入」回合
-        /// 判据可靠——上局仅观测到回合 1 的秒弃调试局会让回合判据失效（T1==T1 不触发）泄漏跨局陈旧态；
+        /// 判据可靠——上局仅观察到回合 1 的秒弃调试局会让回合判据失效（T1==T1 不触发）泄漏跨局陈旧态；
         /// 实例号恒新局必变、同局恒同，两种调用形态全覆盖。域重载随全部 static 一并归零=无跨重载歧义</summary>
         public readonly int InstanceId = ++_instanceCounter;
         private static int _instanceCounter;
+
+        /// <summary>当前回合数（决策八十六批D，docs/active/45 §6——回合数真源：TurnResolver 每回合
+        /// 开头写入；周期类效果（骑士团每 5 回合召唤）与 Unit.DeployedTurn 相对计数消费；0=回合开始前
+        /// （开局 RegisterUnit 的单位部署回合计 0）</summary>
+        public int CurrentTurn { get; set; }
 
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
@@ -506,10 +517,32 @@ namespace GIC.Battle
             // 核心身份已 tag 化（2026-10-13 拍板「所有持 核心 标签的单位全部被击倒才判战败」）——
             // 胜负族改动态查询 Core tag，无注册表：未来世界树等新核心单位=UnitConfig 配 [核心] tag
             // 零代码加入（旧 UnitName.ProtocolCore 单核心登记表已退役）
+            // 曾注册核心账本（决策八十六批B 消散，2026-10-22）：核心死亡走消散（_units 移除）后
+            // 「曾注册核心」记忆不再依赖尸体常驻——IsPlayerDefeated/TeamHasLivingCore 的 anyCore 种子
+            // 改读此账本（批次登记时记 team，供队伍判负口径）；同一玩家多核心=幂等覆写同 team
+            if (BattleHeuristics.IsCore(unit))
+                _playerCoreTeam[playerId] = team;
+            // 部署回合计数（决策八十六批D：周期类建筑效果以部署回合为 0 相对计数——骑士团
+            // 「部署后每过 5 回合」；开局单位（RegisterUnit 于回合 0 前）计 0）
+            unit.DeployedTurn = CurrentTurn;
             // 命座登场 Buff 授予（B8 批：0命固有被动的 Buff 形态——芭芭拉「获得歌声之环」，
             // OnDeploy[ApplyBuff] 原子；随后的 BuildUnitState 携带 buffs，客户端零额外命令）
             ConstellationApplier.ApplyDeployBuffs(this, unit);
             return unitId;
+        }
+
+        /// <summary>移除逻辑单位（决策八十六批B 消散专用，docs/active/45 §4）：_units 移除+GameObject
+        /// 销毁——死亡后不留尸体（建筑+眷属）；Buff 注销由调用方（TurnResolver 死亡分支）先行完成，
+        /// 附着/组件状态随 GO 销毁同殁。格子占用/碰撞/升命同名查找/鞭尸 tick 全随之天然消失。
+        /// **勿用于其它场景**（现役单位移除无消费者——复活/驱逐等未来需求须另立语义）</summary>
+        public void RemoveUnit(Unit unit)
+        {
+            if (unit == null) return;
+            var unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID;
+            if (unitId != null && _units.TryGetValue(unitId, out var registered) && registered == unit)
+                _units.Remove(unitId);
+            // GO 销毁：LogicRoot 下的单位物体（含全部组件状态——附着/冻结/装备计数器等）
+            UnityEngine.Object.Destroy(unit.gameObject);
         }
 
         public Unit GetUnit(string unitId)
@@ -599,10 +632,12 @@ namespace GIC.Battle
         }
 
         /// <summary>该玩家是否战败成立（2026-10-13 拍板「所有持 核心 标签的单位全部被击倒才判
-        /// 战败」）：曾注册核心单位 且 当前无存活核心；从未有核心=未败（装配异常防御口径）</summary>
+        /// 战败」）：曾注册核心单位 且 当前无存活核心；从未有核心=未败（装配异常防御口径）。
+        /// 「曾注册」种子=核心账本（消散批 2026-10-22：核心死亡后 _units 移除，尸体不再常驻——
+        /// 账本保证判负记忆不丢；多核心时代账本+在场存活双查同口径）</summary>
         public bool IsPlayerDefeated(string playerId)
         {
-            bool anyCore = false;
+            bool anyCore = _playerCoreTeam.ContainsKey(playerId);
             foreach (var kv in _units)
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
@@ -614,9 +649,11 @@ namespace GIC.Battle
             return anyCore; // 有过核心且无存活=败；从未有核心=未败
         }
 
-        /// <summary>全对局是否存在任何核心单位（装配异常判定：无核心对局回落旧全灭口径）</summary>
+        /// <summary>全对局是否存在任何核心单位（装配异常判定：无核心对局回落旧全灭口径）；
+        /// 账本种子（消散批：核心全灭移除后仍返回 true——「对局曾有核心」是装配期事实）</summary>
         public bool HasAnyRegisteredCore()
         {
+            if (_playerCoreTeam.Count > 0) return true;
             foreach (var kv in _units)
                 if (BattleHeuristics.IsCore(kv.Value)) return true;
             return false;
@@ -638,21 +675,20 @@ namespace GIC.Battle
         }
 
         /// <summary>队伍是否仍有存活的核心（多人：队内任一玩家的核心存活=该队未败；
-        /// 队内无任何核心单位=视作未败——防御口径；队败=该队全部玩家的核心全灭）</summary>
+        /// 队内无任何核心单位=视作未败——防御口径；队败=该队全部玩家的核心全灭）。
+        /// 「队内曾有核心」种子=核心账本（消散批 2026-10-22：队内核心全部消散移除后 anyCore
+        /// 仍由账本成立→正确判队败；在场存活判定维持迭代 _units）</summary>
         public bool TeamHasLivingCore(TeamType team)
         {
-            var seen = new HashSet<string>();
             bool anyCore = false;
+            foreach (var kv in _playerCoreTeam)
+                if (kv.Value == team) { anyCore = true; break; }
             foreach (var kv in _units)
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.Team != team || !BattleHeuristics.IsCore(kv.Value)) continue;
-                if (seen.Add(id.OwnerPlayerID))
-                {
-                    anyCore = true;
-                    if (!IsDead(kv.Value)) return true; // 队内任一玩家有存活核心=未败
-                }
-                else if (!IsDead(kv.Value)) return true;
+                anyCore = true;
+                if (!IsDead(kv.Value)) return true; // 队内任一玩家有存活核心=未败
             }
             return !anyCore;
         }
@@ -742,12 +778,17 @@ namespace GIC.Battle
             ApplyEnergy(target, delta, out _, out _);
         }
 
-        /// <summary>带溢出转移的元能应用（见上——overflowReceiverId/overflowAmount 回传转移事实）</summary>
+        /// <summary>带溢出转移的元能应用（见上——overflowReceiverId/overflowAmount 回传转移事实）。
+        /// **元能通则（决策八十六批D 拍板 #8，docs/active/45 §5）**：一切**加元能**对建筑一律无效
+        /// （覆盖战技/移动/光环 tick/溢出转移/旗帜等一切来源——能量应用段统一过滤单源；建筑无元能条，
+        /// baseEnergy=0）；对倒下角色照常生效（tick 含尸体先例维持——眷属/建筑无尸体，倒下=伙伴/魔神）。
+        /// 负增量（消耗）不受此滤——建筑无技能无消耗路径，防御性放行</summary>
         public void ApplyEnergy(Unit target, int delta, out string overflowReceiverId, out int overflowAmount)
         {
             overflowReceiverId = null;
             overflowAmount = 0;
             if (target == null) return;
+            if (delta > 0 && BattleHeuristics.IsBuilding(target)) return; // 拍板 #8：加元能对建筑不生效
             var stats = target.GetUnitComponent<UnitStats>();
             if (stats == null) return;
             var energy = stats.GetStatStruct(StatType.Energy);
@@ -794,7 +835,8 @@ namespace GIC.Battle
         }
 
         /// <summary>切比雪夫距离最近、元能未满的我方存活角色（不含自身；同距 unitId 升序——
-        /// 安柏1命溢出转移的接收方判定；尸体不算「角色」）</summary>
+        /// 安柏1命溢出转移的接收方判定；尸体不算「角色」；**建筑排除（决策八十六拍板 #8——
+        /// 溢出转移候选域=非建筑单位，自然排除〔建筑 baseEnergy=0 恒「满」〕之外显式单源）**）</summary>
         private Unit FindNearestNonFullEnergyAlly(Unit self)
         {
             var selfPos = GetPosition(self);
@@ -807,6 +849,7 @@ namespace GIC.Battle
             {
                 var candidate = kv.Value;
                 if (candidate == self || BattleSimState.IsDead(candidate)) continue;
+                if (BattleHeuristics.IsBuilding(candidate)) continue; // 拍板 #8：候选域排除建筑
                 var identity = candidate.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team != selfIdentity.Team) continue;
                 var stats = candidate.GetUnitComponent<UnitStats>();

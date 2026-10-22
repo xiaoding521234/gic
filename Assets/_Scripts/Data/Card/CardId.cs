@@ -45,6 +45,40 @@ namespace GIC.Data
         Unit = 1,
     }
 
+    /// <summary>
+    /// 购买价格单源（决策八十六批E，docs/active/45 §7.2 拍板 #11）：
+    /// - 单位卡（角色/建筑）= GetEffectiveDeployCost() / 2（部署价一半——西风骑士团 100→50、
+    ///   安柏/凯亚/琴/芭芭拉 3★ 出战 50→25）；
+    /// - 物品卡=摩拉价值星级表 MoraValueOfStar（1★=5 / 2★=15 / 3★=30 / 4★=80 / 5★=200）。
+    /// 消费方=BuyCardExecutor（Host 扣费校验）+ 购买面板角标/灰显（客户端镜像同口径）
+    /// </summary>
+    public static class CardIdPurchaseExtensions
+    {
+        /// <summary>卡牌购买价（摩拉）。UnitData/ItemData 缺配置=0（上游已过滤，防御口径）</summary>
+        public static int PurchaseCostOf(this CardId cardId, UnitConfig unitConfig, ItemConfig itemConfig)
+        {
+            if (cardId.cardType == CardType.Unit)
+            {
+                var unitData = unitConfig?.GetUnitData(cardId.AsUnitName());
+                return unitData != null ? unitData.GetEffectiveDeployCost() / 2 : 0;
+            }
+            var itemData = itemConfig?.GetItemData(cardId.AsItemName());
+            return itemData != null ? MoraValueOfStar(itemData.starLevel) : 0;
+        }
+
+        /// <summary>物品星级→摩拉价值表（拍板 #11 原需求）：1★=5 / 2★=15 / 3★=30 / 4★=80 / 5★=200</summary>
+        public static int MoraValueOfStar(int starLevel)
+        {
+            switch (starLevel)
+            {
+                case 1: return 5;
+                case 2: return 15;
+                case 3: return 30;
+                case 4: return 80;
+                default: return 200; // 5★及以上
+            }
+        }
+    }
 }
 
 

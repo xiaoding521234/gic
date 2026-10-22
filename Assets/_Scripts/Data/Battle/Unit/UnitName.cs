@@ -66,6 +66,21 @@ namespace GIC.Data
 
         [InspectorName("诺艾尔")]
         Noelle = 3012,
+
+        [InspectorName("西风旗帜")]
+        FavoniusBanner = 3013,
+
+        [InspectorName("猎鹿人餐馆")]
+        GoodHunter = 3014,
+
+        [InspectorName("西风骑士团")]
+        KnightsOfFavonius = 3015,
+
+        [InspectorName("西风大教堂")]
+        FavoniusCathedral = 3016,
+
+        [InspectorName("西风骑士")]
+        KnightOfFavonius = 3017,
         #endregion
 
         #region Liyue (4001-4999)

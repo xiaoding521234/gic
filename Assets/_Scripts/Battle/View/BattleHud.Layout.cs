@@ -206,7 +206,7 @@ namespace GIC.Battle
                 SetLayoutWidgetActive(key, acting);
             SetLayoutWidgetActive("move", acting);
             SetLayoutWidgetActive("passive", acting); // 被动技能盘（2026-10-07）：随技能盘成组显隐
-            SetLayoutWidgetActive("hand", !acting);
+            SetLayoutWidgetActive("hand", !acting || BuildingShopOpen); // 购买面板开=手牌保持显示（拖入目标可见+热区几何有效，2026-10-22 用户报障②）
             SetLayoutWidgetActive("cancel", _state == HudState.Aiming);
         }
 

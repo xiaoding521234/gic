@@ -199,9 +199,10 @@ namespace GIC.UI
             }
             else
             {
-                // 建筑防线（协议核心批勘正 2026-10-13）：拍板=「不可加入卡组」而非背包隐藏——
-                // 背包可见后此入口失去隐藏挡板，显式拦截建筑卡入组（判据与 BattleHeuristics.IsBuilding 同口径）
-                if (IsBuildingCard(cardData))
+                // 不可打出建筑防线（决策八十六批C 收窄，docs/active/45 §8）：原「全建筑不可入组」
+                //（2026-10-13 协议核心批）随「新建筑可打出、可编入卡组」作废——现仅拦 Core tag 建筑
+                //（协议核心开局在场、不可从手牌打出）；新建筑每卡 1 张上限=inDecks 成员资格模型天然成立
+                if (IsCoreBuildingCard(cardData))
                 {
                     PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(TableName.PopupText.ToString(), "Deck_BuildingNotAllowed"));
                     return;
@@ -241,12 +242,21 @@ namespace GIC.UI
                 AudioManager.Instance?.PlayVoiceExclusive(clip);
         }
 
-        /// <summary>是否建筑卡（不可入卡组防线：unitType 单一判据，与 BattleHeuristics.IsBuilding 同口径）</summary>
+        /// <summary>是否建筑卡（unitType 单一判据，与 BattleHeuristics.IsBuilding 同口径）</summary>
         private bool IsBuildingCard(SaveCardData card)
         {
             if (card == null || card.id.cardType != Data.CardType.Unit) return false;
             var unitData = unitConfig.GetUnitData(card.id.AsUnitName());
             return unitData != null && unitData.unitType == UnitType.Building;
+        }
+
+        /// <summary>是否不可打出的建筑卡（决策八十六批C 防线收窄后判据=Core tag——协议核心
+        /// 开局在场、不可从手牌打出；其余建筑可编入卡组，docs/active/45 §8）</summary>
+        private bool IsCoreBuildingCard(SaveCardData card)
+        {
+            if (!IsBuildingCard(card)) return false;
+            var unitData = unitConfig.GetUnitData(card.id.AsUnitName());
+            return unitData.tags != null && System.Array.IndexOf(unitData.tags, UnitTag.Core) >= 0;
         }
 
         private void RefreshDeckPanel()

@@ -103,7 +103,19 @@ namespace GIC.Editor
                 foreach (var turn in turns)
                 {
                     sim.RevealFog(); // 录制局 BeginSelectPhase 单钩同口径（迷雾账本同步——爆发破雾元能依赖）
-                    Pump(resolver.ResolveTurnCoroutine(turn, recording.ActionsByTurn[turn]));
+                    // 购买即时行动（购买批 2026-10-22）：选择阶段先于配额行动发生——按行序前置重演
+                    //（校验+状态+迷你段广播全同链，购买段进 CollectingTransport 与录制段 diff）
+                    var recorded = recording.ActionsByTurn[turn];
+                    var purchases = new List<ActionData>();
+                    var quota = new List<ActionData>();
+                    foreach (var a in recorded)
+                    {
+                        if (a != null && a.actionType == ActionType.BuyCard) purchases.Add(a);
+                        else quota.Add(a);
+                    }
+                    foreach (var purchase in purchases)
+                        BuyCardExecutor.TryResolve(sim, transport, purchase);
+                    Pump(resolver.ResolveTurnCoroutine(turn, quota));
                 }
 
                 // —— diff：回放 Segment 序列 vs 录制 Segment 序列（JsonUtility 字段序稳定）——

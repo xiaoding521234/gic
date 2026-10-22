@@ -32,11 +32,19 @@ namespace GIC.Battle
         /// <summary>来源类别：破雾获能（2026-10-17 迷雾批追拍六，安柏2命「爆发破除迷雾，每破除
         /// C2FogEnergyThreshold 格获得 C2FogEnergyGain 元能」——独立类别防与其它来源合并键互吞）</summary>
         public const int CategoryFogBreakGain = 7;
+        /// <summary>来源类别：建筑效果获能（决策八十六批D，docs/active/45 §6——西风旗帜回合末
+        /// 半径内我方非建筑单位 +N 元能）。**合并键含来源建筑 unitId**（拍板语义=每座旗帜各 +N——
+        /// 纯 (目标,类别) 键会让两座旗帜对同一目标合并吞成一次）</summary>
+        public const int CategoryBuildingGain = 8;
 
         public int Delta;
 
         /// <summary>来源类别（命令合并键成员；CategoryDefault=兜底）</summary>
         public int Category;
+
+        /// <summary>来源单位（CategoryBuildingGain 合并键成员——来源建筑 unitId；其余类别不参与键，
+        /// 语义=命令归因/调试参考）。能量应用层对建筑目标的增益统一过滤（拍板 #8），本字段不承载过滤</summary>
+        public string SourceUnitId;
 
         /// <summary>命中时刻（秒，相对片播放起点，ProjectileResolver 接触判定得出；0=立即——
         /// 移动获能/协奏/消耗/回合发放无命中时刻语义）。战技命中获能到点应用（2026-09-25 拍板
@@ -53,14 +61,17 @@ namespace GIC.Battle
         /// <summary>状态/命令合并键单源（ApplyEffects 与 MergeEnergyEffects 同口径恒等）：
         /// (目标, 来源类别)；**Buff 回合末 tick 逐层例外（2026-10-01 拍板④「元能条也逐层各跳一次，
         /// 每次+10」）**——BuffTickGain 类别并入层时刻（第 i 层 HitSeconds=i×BuffLayerStaggerSeconds：
-        /// 逐层条目键各异=各跳各弹；同刻同目标仍并=同层多来源合并不变）。其余类别维持纯 (目标,类别)
-        /// ——战技多命中「多次命中只获一次」B6a 去重口径不变（其 HitSeconds=真实命中时刻，并入键
-        /// 会让两发箭矢各自成键破坏去重，勿扩）。</summary>
+        /// 逐层条目键各异=各跳各弹；同刻同目标仍并=同层多来源合并不变）。**建筑效果例外（决策八十六
+        /// 批D）**——BuildingGain 类别并入来源建筑 unitId（两座旗帜对同一目标各 +1 不互吞）。
+        /// 其余类别维持纯 (目标,类别)——战技多命中「多次命中只获一次」B6a 去重口径不变（其
+        /// HitSeconds=真实命中时刻，并入键会让两发箭矢各自成键破坏去重，勿扩）。</summary>
         public string MergeKey()
         {
-            return Category == CategoryBuffTickGain
-                ? $"{TargetUnitId}:{Category}:{Mathf.RoundToInt(HitSeconds * 1000f)}"
-                : $"{TargetUnitId}:{Category}";
+            if (Category == CategoryBuffTickGain)
+                return $"{TargetUnitId}:{Category}:{Mathf.RoundToInt(HitSeconds * 1000f)}";
+            if (Category == CategoryBuildingGain)
+                return $"{TargetUnitId}:{Category}:{SourceUnitId}";
+            return $"{TargetUnitId}:{Category}";
         }
     }
 }

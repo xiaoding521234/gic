@@ -1051,17 +1051,38 @@ namespace GIC.Battle
         }
 
         /// <summary>立牌着色统一收口：尸体灰 > 冻结（霜化 shader 接管配色 tint 置白；shader 缺失回落冻结
-        /// 冰色）> 受击闪红 > 常态白</summary>
+        /// 冰色）> 受击闪红 > 常态白；消散透明度（_dissolveAlpha）叠加在末端——任何状态刷新后淡出持续有效</summary>
         private void RefreshTint()
         {
             if (_avatarRenderer == null) return;
             Color tint = IsCorpse ? Palette.立牌尸体灰
                 : IsFrozen && FrostSpriteMaterial == null ? Palette.冻结冰色 // shader 缺失兜底=纯冰色 tint
                 : Color.white;
+            tint.a *= 1f - _dissolveAlpha;
             _avatarRenderer.color = tint;
             if (_videoMaterial != null)
                 _videoMaterial.color = tint; // 视频路径同 tint（ChromaKey _Color，同 SpriteRenderer.color 语义）
+            // 底座盘同步淡出（运行时克隆材质本组件持有，直写安全；描边环随 Destroy 消失）
+            if (_dissolveAlpha > 0f && _baseDiscMaterial != null)
+            {
+                var discColor = _baseDiscMaterial.color;
+                discColor.a = WithDiscAlpha(discColor).a * (1f - _dissolveAlpha);
+                _baseDiscMaterial.color = discColor;
+            }
         }
+
+        /// <summary>消散透明度（0=原样，1=全透明；决策八十六批B docs/active/45 §4——建筑+眷属死亡
+        /// 不留尸体）：BattlePlayer.PlayDissolveCoroutine 逐帧驱动；素材批的消散特效落地后由特效
+        /// 接管本表现。写后即时刷新（RefreshTint 单源叠加）</summary>
+        public void SetDissolveAlpha(float alpha01)
+        {
+            _dissolveAlpha = Mathf.Clamp01(alpha01);
+            RefreshTint();
+        }
+
+        /// <summary>消淡透明度当前值（>0=处于消散退场中——防重复触发用）</summary>
+        public bool IsDissolving => _dissolveAlpha > 0f;
+        private float _dissolveAlpha;
 
         /// <summary>
         /// 受击闪红

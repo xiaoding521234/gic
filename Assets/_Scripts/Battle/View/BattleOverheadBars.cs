@@ -180,12 +180,28 @@ namespace GIC.Battle
                 Debug.LogWarning("[BattleOverheadBars] 头顶条圆角底图缺失（Resources/UI/Battle/BarBg.png|BarFill.png）");
         }
 
-        /// <summary>登记一个单位的头顶条（整个战斗期跟随；view 消亡前先 ClearAll）</summary>
+        /// <summary>登记一个单位的头顶条（整个战斗期跟随；view 消亡前先 ClearAll——尸体路径立牌
+        /// 保留整场；消散路径（决策八十六批B）走 Unregister 单位级注销）</summary>
         public void Register(UnitView view)
         {
             if (_canvas == null || view == null) return;
             _items.Add(BuildItem(view));
             _sortDirty = true; // #13：参与者集变化强制重排
+        }
+
+        /// <summary>注销单个单位的头顶条（决策八十六批B 消散，2026-10-22，docs/active/45 §4）：
+        /// 客户端消散退场（Death 命令消散标志）随视图移除同步拆条——遗留死引用会让
+        /// 深度排序/重投影循环踩 Unity-null。幂等：未登记直接返回</summary>
+        public void Unregister(UnitView view)
+        {
+            if (view == null) return;
+            for (int i = _items.Count - 1; i >= 0; i--)
+            {
+                if (_items[i].View != view) continue;
+                if (_items[i].Go != null) Destroy(_items[i].Go);
+                _items.RemoveAt(i);
+                _sortDirty = true; // #13：参与者集变化强制重排
+            }
         }
 
         /// <summary>清空全部头顶条（ClearViews 同步）</summary>

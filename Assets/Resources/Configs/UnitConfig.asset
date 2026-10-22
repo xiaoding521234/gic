@@ -81,6 +81,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2001
     unitType: 1
     factions: d1070000
@@ -156,6 +163,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2002
     unitType: 1
     factions: d1070000
@@ -230,6 +244,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2003
     unitType: 1
     factions: d1070000
@@ -304,6 +325,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2004
     unitType: 1
     factions: d1070000
@@ -372,6 +400,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3001
     unitType: 1
     factions: b90b0000
@@ -506,6 +541,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3002
     unitType: 1
     factions: b90b0000
@@ -654,6 +696,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3003
     unitType: 1
     factions: b90b0000
@@ -792,6 +841,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 1
       "\u76EE\u6807\u504F\u597D": 2
       "\u5019\u9009\u7C7B\u522B": 2
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3004
     unitType: 1
     factions: b90b0000
@@ -865,6 +921,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3005
     unitType: 1
     factions: b90b0000
@@ -933,6 +996,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3008
     unitType: 1
     factions: b90b0000
@@ -1005,6 +1075,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3010
     unitType: 1
     factions: b90b0000
@@ -1073,6 +1150,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3011
     unitType: 1
     factions: b90b0000
@@ -1148,6 +1232,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 2
       "\u5019\u9009\u7C7B\u522B": 2
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3012
     unitType: 1
     factions: b90b0000
@@ -1222,6 +1313,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4001
     unitType: 1
     factions: a10f0000
@@ -1295,6 +1393,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4002
     unitType: 1
     factions: a10f0000
@@ -1370,6 +1475,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4005
     unitType: 1
     factions: a10f0000
@@ -1444,6 +1556,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4007
     unitType: 1
     factions: a10f0000
@@ -1512,6 +1631,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5001
     unitType: 1
     factions: 89130000
@@ -1580,6 +1706,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5002
     unitType: 1
     factions: 89130000
@@ -1648,6 +1781,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5003
     unitType: 1
     factions: 89130000
@@ -1716,6 +1856,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5004
     unitType: 1
     factions: 89130000
@@ -1784,6 +1931,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6001
     unitType: 1
     factions: 71170000
@@ -1852,6 +2006,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6002
     unitType: 1
     factions: 71170000
@@ -1920,6 +2081,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6003
     unitType: 1
     factions: 71170000
@@ -1988,6 +2156,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6004
     unitType: 1
     factions: 71170000
@@ -2056,6 +2231,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7001
     unitType: 1
     factions: 591b0000
@@ -2124,6 +2306,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7002
     unitType: 1
     factions: 591b0000
@@ -2192,6 +2381,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7003
     unitType: 1
     factions: 591b0000
@@ -2260,6 +2456,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7004
     unitType: 1
     factions: 591b0000
@@ -2328,6 +2531,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 8001
     unitType: 1
     factions: 411f0000
@@ -2396,6 +2606,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 11002
     unitType: 1
     factions: f92a0000
@@ -2464,6 +2681,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 10001
     unitType: 1
     factions: 11270000
@@ -2532,6 +2756,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 10002
     unitType: 1
     factions: 11270000
@@ -2603,6 +2834,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 11001
     unitType: 3
     factions: f92a0000
@@ -2620,7 +2858,7 @@ MonoBehaviour:
     hideInBackpack: 0
     starLevel: 5
     deployCost: -64
-    weaponType: 0
+    weaponType: 3
     baseHP: -64
     baseAttack: -64
     baseDefense: -64
@@ -2671,3 +2909,405 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247":
+    - cardType: 1
+      value: 3013
+  - unitName: 3013
+    unitType: 3
+    factions: b90b0000
+    avatar: {fileID: 0}
+    cards: []
+    nameCard: {fileID: 0}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269\u7F29\u653E": 1
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
+    "\u7ACB\u724C\u524D\u79FB": 0
+    hideInBackpack: 0
+    starLevel: 1
+    deployCost: 20
+    weaponType: 3
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 0
+    normalMoveType: 1
+    blockAllies: 0
+    blockEnemies: 0
+    blockedByEnemies: 0
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
+    "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    selfElement: 0
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u63A2\u7D22\u89C6\u91CE": -64
+    tags: 
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+    "\u884C\u4E3A\u6863\u6848":
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
+      "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
+      "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
+      "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
+      "\u6FC0\u8FDB\u5EA6": 1
+      "\u96C6\u706B\u6743\u91CD": 0
+      "\u652F\u63F4\u8D34\u8FD1\u8DDD\u79BB": 0
+      "\u81EA\u4FDD\u6743\u91CD": 0
+      "\u5149\u73AF\u8D34\u654C\u6743\u91CD": 0
+      "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
+      "\u76EE\u6807\u504F\u597D": 1
+      "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 1
+    "\u6548\u679C\u534A\u5F84": 3
+    "\u6548\u679C\u6570\u503C": 1
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247":
+    - cardType: 1
+      value: 3014
+    - cardType: 1
+      value: 3015
+    - cardType: 1
+      value: 3016
+  - unitName: 3014
+    unitType: 3
+    factions: b90b0000
+    avatar: {fileID: 0}
+    cards: []
+    nameCard: {fileID: 0}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269\u7F29\u653E": 1
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
+    "\u7ACB\u724C\u524D\u79FB": 0
+    hideInBackpack: 0
+    starLevel: 2
+    deployCost: 50
+    weaponType: 3
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 0
+    normalMoveType: 1
+    blockAllies: 0
+    blockEnemies: 0
+    blockedByEnemies: 0
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
+    "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    selfElement: 0
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u63A2\u7D22\u89C6\u91CE": -64
+    tags: 
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+    "\u884C\u4E3A\u6863\u6848":
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
+      "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
+      "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
+      "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
+      "\u6FC0\u8FDB\u5EA6": 1
+      "\u96C6\u706B\u6743\u91CD": 0
+      "\u652F\u63F4\u8D34\u8FD1\u8DDD\u79BB": 0
+      "\u81EA\u4FDD\u6743\u91CD": 0
+      "\u5149\u73AF\u8D34\u654C\u6743\u91CD": 0
+      "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
+      "\u76EE\u6807\u504F\u597D": 1
+      "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 2
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 5
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247":
+    - cardType: 0
+      value: 4002
+    - cardType: 0
+      value: 4005
+    - cardType: 0
+      value: 4003
+  - unitName: 3015
+    unitType: 3
+    factions: b90b0000
+    avatar: {fileID: 0}
+    cards: []
+    nameCard: {fileID: 0}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269\u7F29\u653E": 1
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
+    "\u7ACB\u724C\u524D\u79FB": 0
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: 100
+    weaponType: 3
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 0
+    normalMoveType: 1
+    blockAllies: 0
+    blockEnemies: 0
+    blockedByEnemies: 0
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
+    "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    selfElement: 0
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u63A2\u7D22\u89C6\u91CE": -64
+    tags: 
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+    "\u884C\u4E3A\u6863\u6848":
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
+      "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
+      "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
+      "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
+      "\u6FC0\u8FDB\u5EA6": 1
+      "\u96C6\u706B\u6743\u91CD": 0
+      "\u652F\u63F4\u8D34\u8FD1\u8DDD\u79BB": 0
+      "\u81EA\u4FDD\u6743\u91CD": 0
+      "\u5149\u73AF\u8D34\u654C\u6743\u91CD": 0
+      "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
+      "\u76EE\u6807\u504F\u597D": 1
+      "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 3
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 5
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3017
+    "\u53EF\u8D2D\u4E70\u5361\u7247":
+    - cardType: 1
+      value: 3001
+    - cardType: 1
+      value: 3002
+    - cardType: 1
+      value: 3011
+  - unitName: 3016
+    unitType: 3
+    factions: b90b0000
+    avatar: {fileID: 0}
+    cards: []
+    nameCard: {fileID: 0}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269\u7F29\u653E": 1
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
+    "\u7ACB\u724C\u524D\u79FB": 0
+    hideInBackpack: 0
+    starLevel: 3
+    deployCost: 100
+    weaponType: 3
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: -64
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 0
+    normalMoveType: 1
+    blockAllies: 0
+    blockEnemies: 0
+    blockedByEnemies: 0
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
+    "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    selfElement: 0
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u63A2\u7D22\u89C6\u91CE": -64
+    tags: 
+    skills: []
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+    "\u884C\u4E3A\u6863\u6848":
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
+      "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
+      "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
+      "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
+      "\u6FC0\u8FDB\u5EA6": 1
+      "\u96C6\u706B\u6743\u91CD": 0
+      "\u652F\u63F4\u8D34\u8FD1\u8DDD\u79BB": 0
+      "\u81EA\u4FDD\u6743\u91CD": 0
+      "\u5149\u73AF\u8D34\u654C\u6743\u91CD": 0
+      "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
+      "\u76EE\u6807\u504F\u597D": 1
+      "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 4
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 10
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247":
+    - cardType: 1
+      value: 3003
+  - unitName: 3017
+    unitType: 1
+    factions: b90b0000
+    avatar: {fileID: 0}
+    cards: []
+    nameCard: {fileID: 0}
+    "\u7ACB\u724C\u56FE": {fileID: 0}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
+    "\u4E13\u5C5E\u5F39\u5C04\u7269\u7F29\u653E": 1
+    "\u79BB\u5730\u9AD8\u5EA6": 0.05
+    "\u989D\u5916\u7F29\u653E": 1
+    "\u7ACB\u724C\u524D\u79FB": 0
+    hideInBackpack: 0
+    starLevel: 2
+    deployCost: -64
+    weaponType: 1
+    baseHP: -64
+    baseAttack: -64
+    baseDefense: -64
+    baseAttackSpeed: -64
+    baseMoveSpeed: 20
+    baseLuck: -64
+    baseTenacity: -64
+    baseMastery: -64
+    baseSanity: -64
+    baseLifeSteal: -64
+    baseHealEfficiency: -64
+    baseEnergy: 50
+    normalMoveType: 1
+    blockAllies: 1
+    blockEnemies: 1
+    blockedByEnemies: 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
+    "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    selfElement: 0
+    "\u653B\u51FB\u89C6\u91CE": -64
+    "\u63A2\u7D22\u89C6\u91CE": -64
+    tags: 71170000bb0b0000be0b0000
+    skills:
+    - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
+    - {fileID: 11400000, guid: 52a78aad2aeb59845b6ead04bd53692d, type: 2}
+    - {fileID: 11400000, guid: 83711007077ad8c45b121884fe659421, type: 2}
+    voices:
+      onGoWar:
+        clips: []
+      onChooseHighHP:
+        clips: []
+      onChooseLowHP:
+        clips: []
+      onHitLight:
+        clips: []
+      onHitHeavy:
+        clips: []
+      onDie:
+        clips: []
+      skillVoices: []
+    "\u884C\u4E3A\u6863\u6848":
+      "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
+      "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
+      "\u7206\u53D1\u4F18\u5148\u6743\u91CD": 1
+      "\u79FB\u52A8\u4F18\u5148\u6743\u91CD": 1
+      "\u6FC0\u8FDB\u5EA6": 1
+      "\u96C6\u706B\u6743\u91CD": 0
+      "\u652F\u63F4\u8D34\u8FD1\u8DDD\u79BB": 0
+      "\u81EA\u4FDD\u6743\u91CD": 0
+      "\u5149\u73AF\u8D34\u654C\u6743\u91CD": 0
+      "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
+      "\u76EE\u6807\u504F\u597D": 1
+      "\u5019\u9009\u7C7B\u522B": 1
+    "\u5EFA\u7B51\u6548\u679C": 0
+    "\u6548\u679C\u534A\u5F84": 0
+    "\u6548\u679C\u6570\u503C": 0
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 50
+    "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u53EF\u8D2D\u4E70\u5361\u7247": []

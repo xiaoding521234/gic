@@ -147,7 +147,23 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 39566126329966592
-    m_Localized: Buildings cannot be added to decks
+    m_Localized: This card cannot be added to decks
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39566126329966593
+    m_Localized: Requires a Low-Tech building on the field first
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39566126329966594
+    m_Localized: Building limit reached
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39566126329966595
+    m_Localized: Character not yet unlocked
+    m_Metadata:
+      m_Items: []
+  - m_Id: 39566126329966596
+    m_Localized: Not enough Mora
     m_Metadata:
       m_Items: []
   references:

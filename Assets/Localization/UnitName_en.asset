@@ -194,6 +194,26 @@ MonoBehaviour:
     m_Localized: Noelle
     m_Metadata:
       m_Items: []
+  - m_Id: 3013
+    m_Localized: Favonius Banner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3014
+    m_Localized: Good Hunter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3015
+    m_Localized: Knights of Favonius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3016
+    m_Localized: Favonius Cathedral
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3017
+    m_Localized: Knight of Favonius
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
