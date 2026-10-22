@@ -272,11 +272,12 @@ namespace GIC.Battle
                         && summonData.建筑效果 == BuildingEffectKind.PeriodicSummon
                         && summonData.召唤单位 != UnitName.Amber)
                     {
-                        var summonAnchor = DeployUnitExecutor.FindOwnUnitByName(_sim, action.playerId,
-                            (UnitName)action.deployUnitName);
-                        if (summonAnchor != null
-                            && DeployUnitExecutor.TrySummonAtNearestCell(_sim, action.playerId, summonData.召唤单位,
-                                _sim.GetPosition(summonAnchor), out var instantSummon))
+                        // 召唤锚=本次部署落点（TryResolve 已把新建筑注册到 action.deployCell）——
+                        // 勿按名字查同名单位：多座同种建筑时 FindOwnUnitByName 恒命中先部署那座，
+                        // 后部署建筑的部署即召全挤到老建筑旁（2026-10-23 报障「两座骑士团产出的
+                        // 骑士都从第一座出来」根因）
+                        if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, action.playerId, summonData.召唤单位,
+                                action.deployCell, out var instantSummon))
                         {
                             instantSummon.sliceIndex = sliceIndex;
                             instantSummon.indexInSlice = indexInSlice++;
