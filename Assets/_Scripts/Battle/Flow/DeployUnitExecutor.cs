@@ -6,7 +6,7 @@ namespace GIC.Battle
 {
     /// <summary>
     /// 出战角色执行器（B6c，docs/18 决策七 + docs/05 §5.1）：校验链=配置存在 → 手牌成员（Host 权威）→
-    /// 建筑梯度前置+建筑上限（决策八十六批C，docs/active/45 §2/§3——仅建筑）→ 升命分支（**仅角色 3★+**，
+    /// 建筑星级链前置+建筑上限（决策八十六批C，2026-10-23 追记二改梯度为星级链，docs/active/45 §2/§3——仅建筑）→ 升命分支（**仅角色 3★+**，
     /// 建筑一律铺场新实例）→ 落点合法（核心半径内：角色 2/建筑 3 + 碰撞判定链——2026-09-25 拍板
     /// 「根据碰撞决定」：体积绝对层最高级不可绕过、与格内单位互不阻挡才可部署、地形按常态移动类型
     /// 通行，与 MovementResolver 进入判定同构）→ 摩拉够 → 生成单位登场。卡不消耗留手牌（可重复出战）；
@@ -100,14 +100,14 @@ namespace GIC.Battle
                 return false;
             }
 
-            // ==================== 建筑梯度/上限前置（决策八十六批C，docs/active/45 §2/§3）====================
+            // ==================== 建筑星级链/上限前置（决策八十六批C，2026-10-23 追记二：梯度制改星级链）====================
             // 建筑**永不升命**（拍板 #4「建筑无命座」+冲突勘正「3★+升命分支对建筑不适用」）：
-            // 重复部署=新实例，走铺场链；梯度/上限先于落点与摩拉校验（不满足=零成本拦截）
+            // 重复部署=新实例，走铺场链；星级链/上限先于落点与摩拉校验（不满足=零成本拦截）
             if (data.unitType == UnitType.Building)
             {
-                if (!PassesBuildingTechGate(sim, action.playerId, data))
+                if (!PassesBuildingStarGate(sim, action.playerId, data))
                 {
-                    GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被梯度前置拦截（上一梯度建筑不在场）");
+                    GICLog.Info($"[DeployUnit] {action.playerId} 部署 {unitName} 被星级链前置拦截（上一星级存活建筑不在场）");
                     return false;
                 }
                 if (!PassesBuildingLimit(sim, action.playerId, data))
@@ -216,20 +216,20 @@ namespace GIC.Battle
             return null;
         }
 
-        // ==================== 建筑梯度/上限（决策八十六批C，docs/active/45 §2）====================
+        // ==================== 建筑星级链/上限（决策八十六批C，2026-10-23 追记二：梯度制退役）====================
 
-        /// <summary>建筑部署梯度前置（拍板 #3）：低科=自己有存活的 Core tag 建筑在场（核心开局在场、
-        /// 被打掉即判负，恒满足仍显式校验）；中科=自己有存活**低科**建筑在场；高科=自己有存活
-        /// **中科**建筑在场。**不共享队友**（2v2 各算各——一律按 OwnerPlayerID 过滤不走 TeamType）；
-        /// 协议核心 5★=高科、不参与「上一梯度在场」判定（部署中科要的是低科在场，核心帮不上——
-        /// 中科必须先铺出旗帜/餐馆）。客户端镜像=BattleHud.PassesBuildingTechPreview（快照同口径）</summary>
-        public static bool PassesBuildingTechGate(BattleSimState sim, string playerId, UnitConfig.UnitData data)
+        /// <summary>建筑部署星级链前置（2026-10-23 追记二拍板，取代原科技梯度拍板 #3）：部署 1★=自己有
+        /// 存活的 Core tag 建筑在场（核心开局在场、被打掉即判负，恒满足仍显式校验）；部署 N★(N≥2)=
+        /// 自己有存活 **N-1★ 建筑**在场（任意同名——部署 2★ 要 1★、3★ 要 2★，以此类推；高星不抵低星：
+        /// 旗帜全灭时 2★ 也不可部署，须先重铺 1★）。**不共享队友**（2v2 各算各——一律按 OwnerPlayerID
+        /// 过滤不走 TeamType）；核心 5★ 恒≠N-1(≤4) 天然不占链位，IsCore 排除为防御性冗余。
+        /// 客户端镜像=BattleHud.PassesBuildingStarPreview（快照同口径）</summary>
+        public static bool PassesBuildingStarGate(BattleSimState sim, string playerId, UnitConfig.UnitData data)
         {
             if (data == null || data.unitType != UnitType.Building) return true; // 非建筑不查
-            var tech = BuildingTechHelper.FromStars(data.starLevel);
-            if (tech == BuildingTech.LowTech)
+            if (data.starLevel <= 1)
             {
-                // 低科前置=自己有存活 Core tag 建筑（含协议核心——恒满足仍显式校验）
+                // 1★ 前置=自己有存活 Core tag 建筑（含协议核心——恒满足仍显式校验）
                 foreach (var kv in sim.Units)
                 {
                     var identity = kv.Value.GetUnitComponent<UnitIdentity>();
@@ -239,7 +239,7 @@ namespace GIC.Battle
                 }
                 return false;
             }
-            var requiredTier = tech == BuildingTech.MidTech ? BuildingTech.LowTech : BuildingTech.MidTech;
+            var requiredStar = data.starLevel - 1;
             foreach (var kv in sim.Units)
             {
                 var identity = kv.Value.GetUnitComponent<UnitIdentity>();
@@ -247,7 +247,7 @@ namespace GIC.Battle
                 var unitData = kv.Value.RawData;
                 if (unitData == null || unitData.unitType != UnitType.Building) continue;
                 if (BattleHeuristics.IsCore(kv.Value) || BattleSimState.IsDead(kv.Value)) continue;
-                if (BuildingTechHelper.FromStars(unitData.starLevel) == requiredTier) return true;
+                if (unitData.starLevel == requiredStar) return true;
             }
             return false;
         }

@@ -44,6 +44,10 @@ namespace GIC.Battle
         [SerializeField] private float 出牌区不透明度 = 0.16f;
         [Tooltip("卡拖入出牌区时蒙层不透明度")]
         [SerializeField] private float 出牌区命中不透明度 = 0.3f;
+        [Tooltip("出牌区拦截色（拖动不可打出的卡时蒙层由白变红——2026-10-23 打出条件反馈批）")]
+        [SerializeField] private Color 出牌区拦截色 = new Color(1f, 0.32f, 0.26f, 1f);
+        [Tooltip("不满足打出条件的手牌卡暗度（对齐技能键资源不足变暗系数 0.6 惯例）")]
+        [SerializeField, Range(0.1f, 1f)] private float 出牌不可用卡暗度 = 0.6f;
         [Tooltip("移动倾斜：每（画布单位/秒）速度产生的度数")]
         [SerializeField] private float 拖拽倾斜系数 = 0.006f;
         [Tooltip("移动倾斜上限（度）")]
@@ -142,6 +146,7 @@ namespace GIC.Battle
         private UnityEngine.UI.Image _handPlayZoneImage;
         private UnityEngine.UI.Image _handPlayZoneLineImage; // 下界线
         private float _handPlayZoneAlpha;             // 当前蒙层 alpha（平滑趋近）
+        private bool _handPlayZoneBlocked;            // 拖动不可打出卡（蒙层红色；淡出期保持、隐藏归位清零）
         private GIC.UI.CardDetailView _handCardDetailView; // 手牌卡详情面板（懒加载实例，2026-10-10 点击手牌开详情）
         private HandCardSlot _handCardDetailSource;   // 详情面板当前展示的手牌槽（同卡再点=收起）
         private GIC.UI.UnitStatsPanel _handStatsPanel;  // 手牌卡详情的统计面板快照实例（懒加载，2026-10-10 追拍点小数据面板可开）
@@ -417,7 +422,8 @@ namespace GIC.Battle
             return local.y > canvasRt.rect.height * (出牌区下界比例 - 0.5f);
         }
 
-        /// <summary>蒙层 alpha 平滑（拖拽中=按命中/未命中两档；结束=淡出归零并隐藏）——Update 常驻调用</summary>
+        /// <summary>蒙层 alpha 平滑（拖拽中=按命中/未命中两档；结束=淡出归零并隐藏）——Update 常驻调用。
+        /// 拖动不可打出的卡时蒙层由白变红（2026-10-23 打出条件反馈——判定单源逐帧重估）</summary>
         private void UpdateHandPlayZoneAlpha()
         {
             if (_handPlayZoneImage == null) return;
@@ -425,14 +431,21 @@ namespace GIC.Battle
             float target = dragging ? (_handDrag.inPlayZone ? 出牌区命中不透明度 : 出牌区不透明度) : 0f;
             if (!dragging && _handPlayZoneAlpha < 0.005f && target <= 0f)
             {
-                if (_handPlayZone.gameObject.activeSelf) _handPlayZone.gameObject.SetActive(false);
+                if (_handPlayZone.gameObject.activeSelf)
+                {
+                    _handPlayZone.gameObject.SetActive(false);
+                    _handPlayZoneBlocked = false; // 隐藏归位清零（下张卡重新评估）
+                }
                 return;
             }
+            if (dragging)
+                _handPlayZoneBlocked = GetHandPlayBlockReason(_handDrag.slot) != HandPlayBlockReason.None;
             _handPlayZoneAlpha = Mathf.Lerp(_handPlayZoneAlpha, target,
                 1f - Mathf.Exp(-Time.unscaledDeltaTime * 12f));
-            _handPlayZoneImage.color = new Color(1f, 1f, 1f, _handPlayZoneAlpha);
+            Color zoneCol = _handPlayZoneBlocked ? 出牌区拦截色 : Color.white;
+            _handPlayZoneImage.color = new Color(zoneCol.r, zoneCol.g, zoneCol.b, _handPlayZoneAlpha);
             if (_handPlayZoneLineImage != null)
-                _handPlayZoneLineImage.color = new Color(1f, 1f, 1f,
+                _handPlayZoneLineImage.color = new Color(zoneCol.r, zoneCol.g, zoneCol.b,
                     Mathf.Clamp01(_handPlayZoneAlpha * 2.6f) * 0.45f);
         }
 
@@ -674,6 +687,69 @@ namespace GIC.Battle
             }
         }
 
+        // ==================== 打出条件预检（2026-10-23 拍板：变暗/红出牌区/松手报原因弹回） ====================
+
+        /// <summary>手牌卡打出条件判定结果</summary>
+        private enum HandPlayBlockReason
+        {
+            None = 0,
+            StarChain,        // 建筑星级链前置不满足
+            BuildingLimit,     // 每种建筑上限 3 已满
+            ConstellationMax,  // 3★+ 同名在场且已满命
+            Mora,              // 摩拉不足（部署价/升命价）
+        }
+
+        /// <summary>手牌卡打出条件判定单源（角色/建筑卡消费；物品卡各有专属路由无打出条件恒 None）：
+        /// 建筑=星级链（PassesBuildingStarPreview）→每种上限（PassesBuildingLimitPreview）；
+        /// 3★+同名在场（含尸体）=满命（IsConstellationUpgrade+UpgradeTargetAtMax）；
+        /// 角色与建筑通吃=摩拉不足（_myMora 资源缓存 vs GetEffectiveDeployCost——升命扣等同出战摩拉同判）。
+        /// 评估序=Host 拦截链同序（星级链/上限→满命→摩拉）；摩拉为提示性预检非权威（Host TryResolve
+        /// 落点校验后扣费兜底）。三个消费方同源：手牌变暗（RefreshHandCardPlayStates）、拖动红出牌区
+        /// （UpdateHandPlayZoneAlpha）、松手报原因弹回（HandleHandCardPlayed）</summary>
+        private HandPlayBlockReason GetHandPlayBlockReason(HandCardSlot slot)
+        {
+            if (slot == null || !slot.isUnit) return HandPlayBlockReason.None;
+            var data = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)slot.unitValue) : null;
+            if (data == null) return HandPlayBlockReason.None;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (data.unitType == UnitType.Building)
+            {
+                if (!PassesBuildingStarPreview(data, snapshot)) return HandPlayBlockReason.StarChain;
+                if (!PassesBuildingLimitPreview(data, snapshot)) return HandPlayBlockReason.BuildingLimit;
+            }
+            if (IsConstellationUpgrade(slot.unitValue) && UpgradeTargetAtMax(slot.unitValue))
+                return HandPlayBlockReason.ConstellationMax;
+            if (_myMora < data.GetEffectiveDeployCost()) return HandPlayBlockReason.Mora;
+            return HandPlayBlockReason.None;
+        }
+
+        /// <summary>打出拦截原因→toast 键（Battle_PurchaseNoMora「摩拉不足」=通用文案复用购买键，
+        /// 键名内部 Rule 先例；其余三键既有）</summary>
+        private static string HandPlayBlockToastKey(HandPlayBlockReason reason)
+        {
+            switch (reason)
+            {
+                case HandPlayBlockReason.StarChain: return "Battle_TechRequired";
+                case HandPlayBlockReason.BuildingLimit: return "Battle_BuildingLimit";
+                case HandPlayBlockReason.ConstellationMax: return "Battle_ConstellationMax";
+                default: return "Battle_PurchaseNoMora";
+            }
+        }
+
+        /// <summary>手牌打出条件变暗刷新（RebuildHandCards 尾+资源刷新链两路触发；只写 CanvasGroup.alpha
+        /// 零布局扰动）：判定单源 GetHandPlayBlockReason——与拖动红出牌区/松手报原因同口径；
+        /// 打出悬浮卡/拖拽中的卡同表评估（打出态本就通过预检恒亮）</summary>
+        private void RefreshHandCardPlayStates()
+        {
+            foreach (var s in _handCardSlots)
+            {
+                if (s == null || s.rt == null) continue;
+                var group = s.rt.GetComponent<CanvasGroup>();
+                if (group == null) continue;
+                group.alpha = GetHandPlayBlockReason(s) != HandPlayBlockReason.None ? 出牌不可用卡暗度 : 1f;
+            }
+        }
+
         // ==================== 落位 / 打出 / 反悔 ====================
 
         /// <summary>手牌区内松手=插到当前位置（智能让位的终点）：更新显示序（槽列表+缓存）+飞回槽位收口</summary>
@@ -689,9 +765,10 @@ namespace GIC.Battle
             FlyHandCardToSlot(st.slot, st.baseScale, HandSlotX(newIndex, count));
         }
 
-        /// <summary>打出路由（出牌区松手）：定死拦截→弹回；物品/货币→提示+弹回；
+        /// <summary>打出路由（出牌区松手）：定死拦截→弹回；**打出条件预检**（2026-10-23：不满足=toast
+        /// 报原因+弹回——变暗/红出牌区同源判定 GetHandPlayBlockReason）；物品/货币→提示+弹回；
         /// 角色卡→TryDeployOrUpgrade（升命=EnterUpgradePending 待确认态——完成选择才上交；
-        /// 否则=进部署瞄准，卡留在松手位悬浮）</summary>
+        /// 否则=进部署瞄准，卡留在松手位悬浮；TryDeployOrUpgrade 既有建筑/满命拦截保留为第二防线）</summary>
         private void HandleHandCardPlayed(HandCardSlot slot)
         {
             if (slot == null || slot.rt == null) return;
@@ -700,6 +777,18 @@ namespace GIC.Battle
                 ShowBattleToast("Battle_ActionConfirmed");
                 FlyHandCardToSlot(slot, slot.baseScale, HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
                 return;
+            }
+            if (slot.isUnit)
+            {
+                var block = GetHandPlayBlockReason(slot);
+                if (block != HandPlayBlockReason.None)
+                {
+                    ShowBattleToast(HandPlayBlockToastKey(block));
+                    GICLog.Info($"[BattleHud] 打出拦截（{block}）：{(UnitName)slot.unitValue}");
+                    FlyHandCardToSlot(slot, slot.baseScale,
+                        HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
+                    return;
+                }
             }
             if (!slot.isUnit)
             {
@@ -776,7 +865,9 @@ namespace GIC.Battle
             rt.localScale = baseScale;
             rt.localRotation = Quaternion.identity;
             var group = rt.GetComponent<CanvasGroup>();
-            if (group != null) group.alpha = 1f;
+            if (group != null)
+                group.alpha = GetHandPlayBlockReason(slot) != HandPlayBlockReason.None
+                    ? 出牌不可用卡暗度 : 1f; // 弹回落槽保持打出条件暗度（判定单源重估，2026-10-23）
             int idx = _handCardSlots.IndexOf(slot);
             if (idx >= 0) rt.SetSiblingIndex(idx);
             slot.hover?.Resume(); // 灵动悬停恢复驱动（Resume 按最后指针位重臂——指针仍在卡上时不丢悬停态）

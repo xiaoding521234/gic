@@ -151,7 +151,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 39566126329966593
-    m_Localized: Requires a Low-Tech building on the field first
+    m_Localized: Requires a surviving building of the previous star tier on the field
+      first
     m_Metadata:
       m_Items: []
   - m_Id: 39566126329966594

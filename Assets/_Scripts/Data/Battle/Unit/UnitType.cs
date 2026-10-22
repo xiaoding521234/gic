@@ -17,7 +17,7 @@ namespace GIC.Data
         Creation = 2,       // 元素造物，不可编入卡组，由技能召唤产出
 
         [InspectorName("建筑")]
-        Building = 3,       // 建筑，可编入卡组，无命座，重复打出=加一个，战技=科技面板
+        Building = 3,       // 建筑，可编入卡组，无命座无技能，重复打出=加一个新实例
     }
 
     /// <summary>

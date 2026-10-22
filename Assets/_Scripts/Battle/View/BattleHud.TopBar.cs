@@ -190,6 +190,7 @@ namespace GIC.Battle
             if (_myMoraChip != null) _myMoraChip.SetCount(_myMora);
             if (_myStaminaChip != null) _myStaminaChip.SetCount(_myStamina);
             RefreshHandCurrencyCards();
+            RefreshHandCardPlayStates(); // 打出条件变暗随资源链刷新（摩拉变动即重估手牌暗态，2026-10-23）
         }
 
         /// <summary>我方资源命令增量（B6d；BattlePlayer.OnResourceDelta→主件 OnResourceDeltaHandler 分流至此）：

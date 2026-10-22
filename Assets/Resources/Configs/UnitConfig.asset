@@ -2933,7 +2933,7 @@ MonoBehaviour:
     "\u7ACB\u724C\u524D\u79FB": 0
     hideInBackpack: 0
     starLevel: 1
-    deployCost: 20
+    deployCost: -64
     weaponType: 3
     baseHP: -64
     baseAttack: -64
@@ -3013,7 +3013,7 @@ MonoBehaviour:
     "\u7ACB\u724C\u524D\u79FB": 0
     hideInBackpack: 0
     starLevel: 2
-    deployCost: 50
+    deployCost: -64
     weaponType: 3
     baseHP: -64
     baseAttack: -64
@@ -3093,7 +3093,7 @@ MonoBehaviour:
     "\u7ACB\u724C\u524D\u79FB": 0
     hideInBackpack: 0
     starLevel: 3
-    deployCost: 100
+    deployCost: -64
     weaponType: 3
     baseHP: -64
     baseAttack: -64
@@ -3173,7 +3173,7 @@ MonoBehaviour:
     "\u7ACB\u724C\u524D\u79FB": 0
     hideInBackpack: 0
     starLevel: 3
-    deployCost: 100
+    deployCost: -64
     weaponType: 3
     baseHP: -64
     baseAttack: -64

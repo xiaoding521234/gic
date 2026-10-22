@@ -68,6 +68,8 @@ namespace GIC.Data
             [Header("稀有度")]
             [Range(1, 5)]
             public int starLevel = 3;
+            /// <summary>出战摩拉。Unspecified=按星级默认表回落（默认表按单位类型分档，见 GetDeployCost）——
+            /// 建筑自 2026-10-23 起默认表自含，无需逐座显式配置</summary>
             public int deployCost = Unspecified;
 
             [Header("武器")]
@@ -178,6 +180,10 @@ namespace GIC.Data
             public int GetDeployCost()
             {
                 if (IsSpecified(deployCost)) return deployCost;
+                // 2026-10-23 拍板：默认表按单位类型分档——建筑走独立星级表（1★=20 为旗帜原显式值入表；
+                // 协议核心 5★=300 与角色表同值零变化），角色/造物维持原表；建筑自此无需逐座配 deployCost
+                if (unitType == UnitType.Building)
+                    return starLevel switch { 1 => 20, 2 => 30, 3 => 60, 4 => 120, 5 => 300, _ => 60 };
                 return starLevel switch { 1 => 10, 2 => 20, 3 => 50, 4 => 100, 5 => 300, _ => 50 };
             }
 

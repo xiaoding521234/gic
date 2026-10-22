@@ -1068,6 +1068,7 @@ namespace GIC.Battle
                 builtIndex++;
             }
             WriteBackHandDisplayOrder(); // 显示序缓存=本次实铺序（剪除已不存在的键；拖拽重排经此跨重建保持）
+            RefreshHandCardPlayStates(); // 打出条件变暗初刷（后续随资源链/快照刷新，2026-10-23）
         }
 
         /// <summary>出战/升命路由（B8 命座批，docs/05 §5.2+docs/09）：3★+ 同名已在场（含尸体）→
@@ -1076,18 +1077,18 @@ namespace GIC.Battle
         /// 决策五十五起唯一入口=拖拽打出（slot=打出卡上下文）：满命拦截=弹回手牌槽、
         /// 升命卡=EnterUpgradePending 待确认态（2026-10-07 返拍「拖入出牌区，不应该直接上交」——
         /// 卡悬浮待「完成选择」确认上交，拖回/点空白/取消钮=反悔弹回）、部署=登记打出态进瞄准。
-        /// 建筑拦截（决策八十六批C，docs/active/45 §2）：梯度前置/上限不满足=toast+弹回手牌槽
-        ///（Host PassesBuildingTechGate/PassesBuildingLimit 权威兜底）</summary>
+        /// 建筑拦截（决策八十六批C，2026-10-23 追记二改星级链，docs/active/45 §2）：星级链前置/上限
+        /// 不满足=toast+弹回手牌槽（Host PassesBuildingStarGate/PassesBuildingLimit 权威兜底）</summary>
         private void TryDeployOrUpgrade(int unitNameValue, HandCardSlot slot)
         {
             var deployData = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
             if (deployData != null && deployData.unitType == UnitType.Building)
             {
                 var snapshot = _session?.Player?.LatestSnapshot;
-                if (!PassesBuildingTechPreview(deployData, snapshot))
+                if (!PassesBuildingStarPreview(deployData, snapshot))
                 {
-                    ShowBattleToast("Battle_TechRequired");
-                    GICLog.Info($"[BattleHud] 建筑部署拦截（梯度）：{(UnitName)unitNameValue}");
+                    ShowBattleToast("Battle_TechRequired"); // 键名 Tech=内部标识符沿用（Rule 键先例），文案已改星级链口径
+                    GICLog.Info($"[BattleHud] 建筑部署拦截（星级链）：{(UnitName)unitNameValue}");
                     if (slot != null)
                         FlyHandCardToSlot(slot, slot.baseScale,
                             HandSlotX(_handCardSlots.IndexOf(slot), _handCardSlots.Count));
@@ -2187,17 +2188,17 @@ namespace GIC.Battle
             return true;
         }
 
-        /// <summary>建筑部署梯度前置镜像（决策八十六批C，docs/active/45 §2——Host
-        /// DeployUnitExecutor.PassesBuildingTechGate 快照同口径）：低科=我方存活 Core tag 建筑在场；
-        /// 中科=我方存活低科建筑（非核心——核心 5★=高科帮不上）；高科=我方存活中科建筑。
+        /// <summary>建筑部署星级链前置镜像（决策八十六批C，2026-10-23 追记二改星级链，docs/active/45 §2
+        /// ——Host DeployUnitExecutor.PassesBuildingStarGate 快照同口径）：部署 1★=我方存活 Core tag
+        /// 建筑在场；部署 N★(N≥2)=我方存活 N-1★ 建筑在场（高星不抵低星；核心 5★ 恒≠N-1(≤4) 帮不上）。
         /// 不共享队友（playerId 过滤）；核心判据走 UnitConfig tags（单核心时代与 FindMyCorePosition
         /// 等价，世界树批扩 UnitState.tags 时一并迁移）</summary>
-        private bool PassesBuildingTechPreview(UnitConfig.UnitData deployData, BattleSnapshot snapshot)
+        private bool PassesBuildingStarPreview(UnitConfig.UnitData deployData, BattleSnapshot snapshot)
         {
             if (deployData == null || deployData.unitType != UnitType.Building) return true;
             if (snapshot == null) return false;
-            var tech = BuildingTechHelper.FromStars(deployData.starLevel);
-            bool hasCoreAlive = false, hasLowTech = false, hasMidTech = false;
+            bool hasCoreAlive = false, hasRequiredStar = false;
+            int requiredStar = deployData.starLevel - 1;
             foreach (var u in snapshot.units)
             {
                 if (u.playerId != _myPlayerId || u.isCorpse != 0) continue;
@@ -2205,17 +2206,10 @@ namespace GIC.Battle
                 if (data == null || data.unitType != UnitType.Building) continue;
                 bool isCore = data.tags != null
                     && System.Array.IndexOf(data.tags, UnitTag.Core) >= 0;
-                if (isCore) { hasCoreAlive = true; continue; } // 核心=高科、不参与梯度判定
-                var tier = BuildingTechHelper.FromStars(data.starLevel);
-                if (tier == BuildingTech.LowTech) hasLowTech = true;
-                else if (tier == BuildingTech.MidTech) hasMidTech = true;
+                if (isCore) { hasCoreAlive = true; continue; } // 核心=5★，恒≠N-1(≤4) 不占链位
+                if (data.starLevel == requiredStar) hasRequiredStar = true;
             }
-            return tech switch
-            {
-                BuildingTech.LowTech => hasCoreAlive,
-                BuildingTech.MidTech => hasLowTech,
-                _ => hasMidTech,
-            };
+            return deployData.starLevel <= 1 ? hasCoreAlive : hasRequiredStar;
         }
 
         /// <summary>建筑上限镜像（Host PassesBuildingLimit 快照同口径）：我方存活非核心建筑
@@ -2239,16 +2233,16 @@ namespace GIC.Battle
         }
 
         /// <summary>部署落点推荐预判（镜像 DeployUnitExecutor.IsDeployCellValid 碰撞判定链的客户端静态版，
-        /// 2026-09-25 拍板「根据碰撞决定」）：梯度/上限全局门（决策八十六批C——TryDeployOrUpgrade 拖出
-        /// 拦截为主 UX，此处镜像保持与 Host 校验链同口径）→ 地形层（按部署单位常态移动类型）→ 体积绝对层
+        /// 2026-09-25 拍板「根据碰撞决定」）：星级链/上限全局门（决策八十六批C 追记二——TryDeployOrUpgrade
+        /// 拖出拦截为主 UX，此处镜像保持与 Host 校验链同口径）→ 地形层（按部署单位常态移动类型）→ 体积绝对层
         /// （现有+自身 ≤3，最高级不可绕过）→ 阻挡规则层（与格内全部单位互不阻挡才推荐）；碰撞配置读
         /// UnitData——运行时 Buff 修改不可见，属提示非校验，Host 结算兜底。含尸体——尸体保留碰撞。
         /// 部署单位尚未登场无运行时组件——飞行互不阻挡豁免按 UnitData.normalMoveType 配置口径判（2026-09-26 拍板）。</summary>
         private bool CanDeployEnterPreview(BattleCell cell, UnitConfig.UnitData deployData, BattleSnapshot snapshot)
         {
-            // 建筑梯度/上限镜像（全局条件——不满足=全红格；正常流已被拖出拦截挡在进入瞄准之前）
+            // 建筑星级链/上限镜像（全局条件——不满足=全红格；正常流已被拖出拦截挡在进入瞄准之前）
             if (deployData != null && deployData.unitType == UnitType.Building
-                && (!PassesBuildingTechPreview(deployData, snapshot) || !PassesBuildingLimitPreview(deployData, snapshot)))
+                && (!PassesBuildingStarPreview(deployData, snapshot) || !PassesBuildingLimitPreview(deployData, snapshot)))
                 return false;
 
             var forceType = deployData != null ? deployData.normalMoveType : ForceType.Walk;
