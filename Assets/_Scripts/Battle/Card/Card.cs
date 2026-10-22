@@ -135,6 +135,19 @@ namespace GIC.Battle
                 skipFadeIn = true;
                 if (selectButton != null) selectButton.enabled = false;
             }
+            // 灵动悬停（HoverTiltEffect）随视图类型开关：OnlyDisplay=展示卡（祈愿轨道/详情内嵌）关停
+            // ——祈愿流程自写卡根 scale/rotation（WishDrawController 实证），双写必打架；
+            // 交互卡（背包/卡组）保持灵动。战斗手牌的卡内组件本就收不到事件（raycast 全关），关停无副作用。
+            SetHoverTiltEnabled(type != ViewType.OnlyDisplay);
+        }
+
+        private HoverTiltEffect _hoverTilt;
+
+        /// <summary>灵动悬停组件开关（组件挂卡根 prefab，池化复用随 SetViewType 翻转；enabled=false 触发 OnDisable 即刻还原基准）</summary>
+        private void SetHoverTiltEnabled(bool on)
+        {
+            if (_hoverTilt == null) _hoverTilt = GetComponent<HoverTiltEffect>();
+            if (_hoverTilt != null && _hoverTilt.enabled != on) _hoverTilt.enabled = on;
         }
 
         public void EnterEditMode()

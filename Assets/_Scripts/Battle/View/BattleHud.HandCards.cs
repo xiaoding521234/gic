@@ -63,6 +63,12 @@ namespace GIC.Battle
         [Tooltip("自动滚动触发余量（屏幕像素）")]
         [SerializeField] private float 手牌拖拽滚动余量 = 60f;
 
+        [Header("手牌悬停（灵动视效 2026-10-21）")]
+        [Tooltip("手牌卡悬停倾斜最大角（度）——卡内 raycast 全关收不到事件，悬停动效挂在 wrapper 命中层")]
+        [SerializeField] private float 手牌悬停倾角 = 8f;
+        [Tooltip("手牌卡悬停光泽强度（0-1；暖金光泽带随光标；0=关光泽）")]
+        [SerializeField, Range(0f, 1f)] private float 手牌悬停光泽 = 0.22f;
+
         [Header("手牌卡详情弹窗（2026-10-10 决策六十+架构收口批：直接实例化源 CardDetailPanel.prefab，宿主持摆位）")]
         [Tooltip("卡牌详情面板中心位（画布坐标，相对画布中心）")]
         [SerializeField] private Vector2 卡牌详情摆位 = new Vector2(0f, 70f);
@@ -77,6 +83,7 @@ namespace GIC.Battle
             public string key;        // 条目键（cardType:value[+装备 :耐久]，与手牌签名同形）
             public RectTransform rt;  // wrapper（点击/拖拽接收层）
             public UnityEngine.UI.Button btn;
+            public GIC.UI.HoverTiltEffect hover; // 灵动悬停（wrapper 层——拖拽让位协议见 HoverTiltEffect.Suspend/Resume）
             public bool isUnit;
             public int unitValue;     // 卡枚举值：isUnit=UnitName；物品卡=ItemName（2026-10-16 可打出物品批——打出路由消费）
             public int durability;    // 装备实例耐久（决策八十一——装备条目按耐久分实例，打出路由/提交载荷消费；非装备 0）
@@ -225,6 +232,15 @@ namespace GIC.Battle
                 baseScale = wrapperGo.transform.localScale,
             };
             _handCardSlots.Add(slot);
+            // 灵动悬停（2026-10-21）：卡内 raycast 全关，悬停动效挂 wrapper 命中层；缩放通道关闭——
+            // 手牌缩放所有权归拖拽系统（提起 1.06/命中 1.08），本组件零接触；拖拽期间经 Suspend/Resume 让位
+            var hover = wrapperGo.AddComponent<GIC.UI.HoverTiltEffect>();
+            hover.TiltMax = 手牌悬停倾角;
+            hover.ScaleEnabled = false;
+            hover.SheenEnabled = 手牌悬停光泽 > 0f;
+            hover.SheenIntensity = 手牌悬停光泽;
+            hover.RaiseOnHover = false; // sibling 序归槽位显示序（飞回 SetSiblingIndex 收口），勿上浮
+            slot.hover = hover;
             var fwd = wrapperGo.AddComponent<HandCardDragForwarder>();
             fwd.onBeginDrag = e => OnHandCardBeginDrag(slot, e);
             fwd.onDrag = e => OnHandCardDrag(slot, e);
@@ -446,6 +462,7 @@ namespace GIC.Battle
             if (regrab)
             {
                 // 打出态再拖：卡本就悬浮在拖拽层——直接进入跟随（无需上提仲裁）
+                slot.hover?.Suspend(); // 灵动悬停让位：悬浮卡可能正被悬停倾斜着，抓回拖拽前还原基准
                 st.lifted = true;
                 st.baseScale = slot.baseScale;
                 st.followAnchored = st.rt.anchoredPosition;
@@ -507,6 +524,7 @@ namespace GIC.Battle
         {
             var rt = st.rt;
             if (rt == null) { _handDrag = null; return; }
+            st.slot.hover?.Suspend(); // 灵动悬停让位：先还原基准再捕获——baseScale 不带悬停缩放态
             st.lifted = true;
             st.baseScale = rt.localScale; // 壳 0.7×槽缩放的世界量（layer 无缩放，localScale 原样成立）
             EnsureHandDragLayer();
@@ -761,6 +779,7 @@ namespace GIC.Battle
             if (group != null) group.alpha = 1f;
             int idx = _handCardSlots.IndexOf(slot);
             if (idx >= 0) rt.SetSiblingIndex(idx);
+            slot.hover?.Resume(); // 灵动悬停恢复驱动（Resume 按最后指针位重臂——指针仍在卡上时不丢悬停态）
         }
 
         /// <summary>wrapper anchor 参考点在 HandContent 局部空间的位置（局部空间以 pivot 为原点，
@@ -780,7 +799,11 @@ namespace GIC.Battle
         // ==================== 打出态登记 / 收口 ====================
 
         /// <summary>打出态登记（TryDeployOrUpgrade 部署分支调）：卡悬浮在松手位，部署瞄准期随取随拖</summary>
-        private void SetPlayedHandCard(HandCardSlot slot) => _playedHandCard = slot;
+        private void SetPlayedHandCard(HandCardSlot slot)
+        {
+            _playedHandCard = slot;
+            slot.hover?.Resume(); // 灵动悬停恢复驱动——悬浮卡在瞄准期仍可悬停倾斜+光泽（指针多半仍在卡上）
+        }
 
         /// <summary>升命卡打出=待确认态（决策五十五返拍「拖入出牌区，不应该直接上交」）：
         /// 卡留在松手位悬浮、手牌隐藏、取消钮现——与部署瞄准同构的反悔窗，仅无落格可选
@@ -837,6 +860,7 @@ namespace GIC.Battle
                 rt.anchoredPosition = new Vector2(HandSlotX(st.fromIndex, _handCardSlots.Count), -手牌行顶距);
                 rt.localScale = st.baseScale;
                 rt.localRotation = Quaternion.identity;
+                st.slot.hover?.Resume(); // 灵动悬停恢复驱动（瞬回原槽路径）
             }
         }
 
