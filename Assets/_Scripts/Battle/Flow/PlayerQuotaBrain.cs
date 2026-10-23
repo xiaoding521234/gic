@@ -62,7 +62,7 @@ namespace GIC.Battle
         /// 平时投资优先」的拍板位——实际数值随三账本批（AI-5）按摩拉水位重标定</summary>
         private static int UpgradeConstellationScore => AITuningConfig.Instance.升命投资分;
 
-        // 救命分已上提共享单源（F-3，docs/active/34）：CompanionBrain.RescueScore=30——配额脑号令
+        // 救命分已上提共享单源（F-3，docs/archive/34）：CompanionBrain.RescueScore=30——配额脑号令
         // 与伙伴脑预治疗两处同口径防漂移；本脑消费点直接引用（原 private EnsoRescueScore 退役）
 
         // ==================== AI 玩家配置（AI-4 批，docs/active/42 §9——Inspector/harness 可调） ====================
@@ -171,7 +171,7 @@ namespace GIC.Battle
 
             // ① 操魔神：己方魔神（5★）单位行动——共享评分骨架（CompanionBrain.ScoreUnitCandidates，
             //    中性档案；实池判定无虚拟预留——配额行动本脑独占，伙伴决策在其后自适应）。
-            //    E-1 对手建模（docs/active/33 §2）：威胁图传骨架——魔神攻击候选吃反威胁分、移动
+            //    E-1 对手建模（docs/archive/33 §2）：威胁图传骨架——魔神攻击候选吃反威胁分、移动
             //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）。
             //    AI-4：per-unit tracker＋人格军备桶乘子；学徒=对手预测器关闭件（威胁图不建）。
             //    AI-5：人格×态势军备乘子合成+体力保底门（§5.3——保自主军团 2 回合运转量）
@@ -226,7 +226,7 @@ namespace GIC.Battle
             // ② 号令：势力技能（延奏/契约）候选——施法者=己方存活单位（眷属/伙伴/魔神均可，
             //    眷属技能表本无势力技能条目=天然只有伙伴/魔神当施法者）；对伙伴施法者=本回合号令
             //    （CompanionBrain 跳过其自主决策），对魔神施法者=直接操控。
-            //    E-1：威胁图传号令估值（治疗救命档消费 DoomedAllies，docs/active/33 §2.3）
+            //    E-1：威胁图传号令估值（治疗救命档消费 DoomedAllies，docs/archive/33 §2.3）
             foreach (var entry in CollectFactionCasters(sim))
                 EvaluateEnsoSkills(sim, entry.Value, turn, tracker, threat, 契约桶 * strat.contractMul);
 
@@ -710,7 +710,7 @@ namespace GIC.Battle
                         int effective = Math.Min(heal, missing);
                         if (effective * 100 < heal * CompanionBrain.HealWorthRatioPercent) break; // 缺口不足半量：不占行动
                         value += effective;
-                        // E-1 救命分（docs/active/33 §2.3→F-3 上提共享单源 CompanionBrain.RescueScore）：
+                        // E-1 救命分（docs/archive/33 §2.3→F-3 上提共享单源 CompanionBrain.RescueScore）：
                         // 伤员在威胁图 DoomedAllies（敌方预测合计承伤 ≥ 当前 hp=将被集火致死）
                         // → 预治疗保命档（斩杀档对偶）
                         if (threat != null && threat.DoomedAllies.Contains(allyUnitId))

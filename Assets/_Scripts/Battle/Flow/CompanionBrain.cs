@@ -82,7 +82,7 @@ namespace GIC.Battle
         /// 与就位托底 95；调手感改此常量</summary>
         public static int VanguardChaseFloorScore => AITuningConfig.Instance.追赶托底分;
 
-        /// <summary>反威胁分上限（E-1 配额脑对手建模，docs/active/33 §2.3）：攻击候选目标是敌方
+        /// <summary>反威胁分上限（E-1 配额脑对手建模，docs/archive/33 §2.3）：攻击候选目标是敌方
         /// 威胁源（威胁图 EnemyThreatScore 高者）时加分——优先拆除敌方火力核心；上限低于斩杀 80
         /// （反威胁优先于平打、不优先于斩杀）。伙伴脑 threat=null 不消费=零行为变化</summary>
         public static int ThreatResponseScoreCap => AITuningConfig.Instance.反威胁分上限;
@@ -92,21 +92,21 @@ namespace GIC.Battle
         /// 换位为负倾向。扣后钳 1 保底 Offer（危险落点排后不缺席——挂机防线语义）</summary>
         public static int ThreatenedCellPenalty => AITuningConfig.Instance.火线格惩罚;
 
-        /// <summary>集火每档加分（E-2 协调层，docs/active/33 §3）：行为档案「集火权重」1 档=+3 分——
+        /// <summary>集火每档加分（E-2 协调层，docs/archive/33 §3）：行为档案「集火权重」1 档=+3 分——
         /// 量级低于战技获能（12）与斩杀（80）：集火倾向只影响同分域内的目标选择，不压过斩杀/反应
         /// 等强信号；权重 0（默认）=游走型不消费</summary>
         public static int FocusFireScorePerRank => AITuningConfig.Instance.集火每名次分;
 
-        /// <summary>支援自保危险半径（F-1，docs/active/34 §5.3）：落点距最近敌的切比雪夫距离
+        /// <summary>支援自保危险半径（F-1，docs/archive/34 §5.3）：落点距最近敌的切比雪夫距离
         /// 小于此值=「站敌人刀口」——支援型自保负分生效阈值</summary>
         public static int SupportDangerRadius => AITuningConfig.Instance.支援危险半径;
 
-        /// <summary>光环敌覆盖每敌加分（G-1 光环位置价值，docs/active/35）：持有半径型 tick 光环
+        /// <summary>光环敌覆盖每敌加分（G-1 光环位置价值，docs/archive/35）：持有半径型 tick 光环
         /// 时落点光环半径内每敌 +6——量级对齐走位线分 8（3 敌=18 显著牵引）：光环挂水/挂冰引擎
         /// 的贴敌驱动力；乘档案「光环贴敌权重」（0=默认不消费）与形态因子（保险形态归零 G-2）</summary>
         public static int SupportAuraPerEnemy => AITuningConfig.Instance.光环贴敌每敌分;
 
-        /// <summary>支援形态切换血线门（G-2，docs/active/35 §2）：hp% 低于此值=保险形态
+        /// <summary>支援形态切换血线门（G-2，docs/archive/35 §2）：hp% 低于此值=保险形态
         ///（贴敌分归零+自保×SupportStanceSafeFactor 后撤）——她活着=复活保险在（复苏无限程，
         /// 生存问题非站位问题）；光环 tick 含持有者自奶→奶回线上自动重返前线。
         /// 2026-10-04 观察局返修（W1）：伙伴流 threat=null 时血线门补「近敌存在」条件——
@@ -127,7 +127,7 @@ namespace GIC.Battle
         /// 奶程内）自然胜出</summary>
         public static int SupportStanceSafeFactor => AITuningConfig.Instance.保险自保倍率;
 
-        /// <summary>光环前瞻基准距离（G-5 光环前瞻梯度，docs/active/35 §2 返修——远距趋近驱动力）：
+        /// <summary>光环前瞻基准距离（G-5 光环前瞻梯度，docs/archive/35 §2 返修——远距趋近驱动力）：
         /// 距最近敌此距离处=0 分起点，每近 1 格 +SupportAuraApproachPerStep，上限 Cap。
         /// **2026-10-03 验证局调参 8→14**：开局敌距 9~11 格、旧值 8=零牵引（她缩角到敌自己走过来）；
         /// 14 覆盖测试军地图对角开局距</summary>
@@ -155,7 +155,7 @@ namespace GIC.Battle
         /// <summary>保险形态后撤梯度上限（G-5）</summary>
         public static int SupportRetreatCap => AITuningConfig.Instance.保险后撤分上限;
 
-        /// <summary>先锋交战判定距离（H-2 交战就位，docs/active/36 §5——2026-10-04 拍板「先锋与敌人
+        /// <summary>先锋交战判定距离（H-2 交战就位，docs/archive/36 §5——2026-10-04 拍板「先锋与敌人
         /// 交战时优先主动上前贴脸敌人」）：锚单位（先锋/伤员=先锋）距最近敌 ≤ 此值=交战态
         ///（对齐凯亚霜袭 2/丘丘人挥棒 1 的近战交换距离）</summary>
         public static int VanguardEngageRange => AITuningConfig.Instance.先锋交战距离;
@@ -179,7 +179,7 @@ namespace GIC.Battle
         /// 候选时支援型不选贴敌落点；乘档案「自保权重」（0=默认不消费，1=标准）</summary>
         public static int SupportSelfPreserveScore => AITuningConfig.Instance.自保基准扣分;
 
-        /// <summary>支援奶程内站位基础分（F-2 支援站位评分器，docs/active/34 §4）：落点距伤员
+        /// <summary>支援奶程内站位基础分（F-2 支援站位评分器，docs/archive/34 §4）：落点距伤员
         /// ≤ 治疗半径=「能奶到」满档；量级对齐攻击候选均值（水球伤害 20+获能 12）——奶程内站位
         /// 优先于平打，攻击候选在站位达成后自然由 healValue 估值接手</summary>
         public static int SupportHealReachScore => AITuningConfig.Instance.奶程内站位分;
@@ -188,7 +188,7 @@ namespace GIC.Battle
         /// 「走近伤员」的连续梯度，非硬门槛</summary>
         public static int SupportHealReachDecayPerCell => AITuningConfig.Instance.奶程外每格衰减;
 
-        /// <summary>救命分（F-3 预治疗档，docs/active/34 §4——上提共享单源：配额脑号令原独立常量
+        /// <summary>救命分（F-3 预治疗档，docs/archive/34 §4——上提共享单源：配额脑号令原独立常量
         /// EnsoRescueScore 上提后两脑同口径防漂移）：治疗行动覆盖「威胁图 DoomedAllies」（敌方预测
         /// 合计承伤 ≥ 当前 hp=将被集火致死）的我方单位 → 治疗估值 +30——斩杀档（80）的对偶、
         /// 量级低于斩杀（保命优先于平奶/平打，不优先于斩杀线候选）</summary>
@@ -197,13 +197,13 @@ namespace GIC.Battle
         /// <summary>中性档案（无配置/魔神档兜底：全 1 权重=评分制 v2 原口径）</summary>
         private static readonly UnitConfig.CompanionProfile NeutralProfile = new UnitConfig.CompanionProfile();
 
-        /// <summary>移动锚延续槽（E-3 意图延续槽，docs/active/33 §4）：unitId → 上回合移动锚 unitId。
+        /// <summary>移动锚延续槽（E-3 意图延续槽，docs/archive/33 §4）：unitId → 上回合移动锚 unitId。
         /// static 生命周期=进程——DecideAll 里 turn≤1 自清（每次 StartBattle 恒从回合 1 起=新战斗
         /// 自动清零，TurnFlow 零接线）；记录=评分期锚循环现场（RememberMoveAnchor 只记敌方锚）；
         /// 消费=ScoreMoveCandidate 锚序锁定插队（CR 式 target lock，治多锚贪心抖动）</summary>
         private static readonly Dictionary<string, string> _lastMoveAnchors = new Dictionary<string, string>();
 
-        /// <summary>追随外推槽（H-4，docs/active/36 §7——2026-10-04 拍板「不在先锋 1 格内就立刻跟上，
+        /// <summary>追随外推槽（H-4，docs/archive/36 §7——2026-10-04 拍板「不在先锋 1 格内就立刻跟上，
         /// 治同速追逐恒滞后」）：跟随者 unitId → (先锋 unitId, 上回合先锋位置, 回合号)。static 生命
         /// 周期=进程——DecideAll 里 turn≤1 自清（与 _lastMoveAnchors 同款零接线）；消费=伴随分支
         /// 按先锋上回合位移向量外推本回合追逐目标=当前位置+位移（迎头追逐——同速追逐〔双方皆
@@ -212,7 +212,7 @@ namespace GIC.Battle
         private static readonly Dictionary<string, (string vanguardId, BattleCell pos, int turn)> _vanguardTrack =
             new Dictionary<string, (string, BattleCell, int)>();
 
-        /// <summary>申报段标志（I-A 两遍法，docs/active/37 §2.2）：DecideAll 申报遍置 true——评分器
+        /// <summary>申报段标志（I-A 两遍法，docs/archive/37 §2.2）：DecideAll 申报遍置 true——评分器
         /// 内全部副作用（槽写入/板声明）统一抑制（「没承诺不记槽」：未获名额伙伴零槽脏写）；执行遍
         /// 复位 false。单线程同步决策链=static 安全；try/finally 保证复位</summary>
         private static bool _bidPhase;
@@ -259,12 +259,12 @@ namespace GIC.Battle
             var committed = new Dictionary<string, int>();
             var packed = new Dictionary<string, int>();
 
-            // E-2 本方意图板（决策序内登记-消费，docs/active/33 §3）：前位已定行动入板，后位评分
+            // E-2 本方意图板（决策序内登记-消费，docs/archive/33 §3）：前位已定行动入板，后位评分
             // 消费（伤害溢出去重/治疗去重/集火跟随）——与 committed 虚拟池同构；配额脑无此机制
             //（每回合仅 1 配额行动，无跨单位声明域）
             var board = new TeamIntentBoard();
 
-            // I-B 全玩家行动入板（docs/active/37 §3，2026-10-04 拍板「玩家做出的选择伙伴脑需要
+            // I-B 全玩家行动入板（docs/archive/37 §3，2026-10-04 拍板「玩家做出的选择伙伴脑需要
             // 考虑进去」——玩家选择已定稿=非隐私，阶段三本就感知）：Skill（魔神战技/爆发、伙伴
             // 号令）经 DeclareIntent 同口径声明攻击/治疗面——伙伴感知「魔神打了谁」自动补刀/
             // 转火、集火权重对魔神目标生效；Move/DeployUnit 落点入移动意图占位（I-D）——伙伴
@@ -332,7 +332,7 @@ namespace GIC.Battle
                     threatByTeam[id0.Team] = OpponentThreatModel.BuildCached(sim, snapshot, id0.Team, turnNumber); // #2 审查批：回合级缓存
             }
 
-            // I-A 申报遍（docs/active/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分
+            // I-A 申报遍（docs/archive/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分
             //（「假如只有我」的独立视角——排序公平；满池=实池−玩家预留，不扣同队申报）产出
             // (bestScore, bestAction, cost) 申报表。_bidPhase=true 抑制全部副作用（槽写入/板
             // 声明——「没承诺不记槽」，未获名额伙伴零脏写）。
@@ -431,7 +431,7 @@ namespace GIC.Battle
                 }
             }
 
-            // I 返修 3（docs/active/37 §2.1 追记）：执行序=同队内支援型**稳定殿后**——先锋/输出型
+            // I 返修 3（docs/archive/37 §2.1 追记）：执行序=同队内支援型**稳定殿后**——先锋/输出型
             // 先正式声明移动落点，跟随者后重评分消费正式声明（「凯亚宣告、芭芭拉响应」的顺序
             // 保证：追逐锚读到的声明落点=先锋本回合真实决策位）。OrderBy 稳定排序保持装包
             // 价值序；无支援型队伍=恒等重排零变化；支援型后决策同时获得更多板信息（输出型
@@ -482,7 +482,7 @@ namespace GIC.Battle
             return actions;
         }
 
-        /// <summary>I-A 申报条目（docs/active/37 §2）：申报遍产物——裸分最优候选+消耗，装包遍消费</summary>
+        /// <summary>I-A 申报条目（docs/archive/37 §2）：申报遍产物——裸分最优候选+消耗，装包遍消费</summary>
         private sealed class CompanionBid
         {
             public Unit unit;
@@ -495,7 +495,7 @@ namespace GIC.Battle
             public bool isSupport; // I 返修：执行序支援型殿后（先锋先正式声明、跟随者后消费）
         }
 
-        /// <summary>I-A 装包价值比较器（docs/active/37 §2.1）：单位体力价值 score/cost 降序
+        /// <summary>I-A 装包价值比较器（docs/archive/37 §2.1）：单位体力价值 score/cost 降序
         /// （交叉相乘 long 防溢出——cost 恒 5 现实下退化为分数降序）+unitId 升序决胜=确定性全序</summary>
         private sealed class BidValueComparer : IComparer<CompanionBid>
         {
@@ -509,7 +509,7 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>行动意图入板（E-2，docs/active/33 §3）：对已定行动按决策快照反推声明面——
+        /// <summary>行动意图入板（E-2，docs/archive/33 §3）：对已定行动按决策快照反推声明面——
         /// ①方向攻击技能：PreviewLineTargets 逐命中目标声明估伤（溢出去重消费）+入集火集；
         /// ②治疗原子：逐受治者声明 per-ally 有效治疗（治疗去重消费，EnumerateSkillHeals 单源——
         /// 声明端 board=null 全量口径）；③移动/Pass/自增益/单位指向增益：零伤害声明。
@@ -549,7 +549,7 @@ namespace GIC.Battle
         /// 支援型=最缺血我方）、步数逼近到偏好交战距离止步（非无脑贴脸）、走位进射击线加分。
         /// 每维度乘 UnitConfig.行为档案权重（profile null=中性=评分制 v2 原口径）。
         /// 支援型骨架多一个候选类别：技能携带治疗原子时估有效治疗并入评分（估「奶谁」而非只「打谁」）。
-        /// E-1 对手建模（docs/active/33 §2.3）：threat=威胁图（配额脑操魔神档传——攻击候选吃反威胁分、
+        /// E-1 对手建模（docs/archive/33 §2.3）：threat=威胁图（配额脑操魔神档传——攻击候选吃反威胁分、
         /// 移动候选落点吃避险扣分；伙伴脑不传=null 零行为变化——拍板 #4 威胁图暂只接配额脑）。
         /// isPlayerDirectControl（AI-1 批，2026-10-12 拍板「AI 玩家操控严格对齐真人」）：玩家配额直接
         /// 操控的候选门槛镜像——true 时体力减免 5 与真人 HUD 同口径（StaminaAmountOf 层级门=仅
@@ -596,7 +596,7 @@ namespace GIC.Battle
                 var skill = skills[i];
                 var data = skill?.RawData;
                 if (data == null) continue;
-                // F-3 技能维度集（docs/active/34 §4）：门槛扩 Henka（变奏技能接自主评估域——
+                // F-3 技能维度集（docs/archive/34 §4）：门槛扩 Henka（变奏技能接自主评估域——
                 // 2026-10-03 拍板「Henka 治疗类接自主域」；Enso/Contract=玩家域仍剥离不含）
                 if (data.skillType != SkillType.Normal && data.skillType != SkillType.Burst
                     && data.skillType != SkillType.Henka) continue;
@@ -653,14 +653,14 @@ namespace GIC.Battle
                     int score = 0;
                     foreach (var target in targets)
                     {
-                        // E-2 伤害溢出去重（docs/active/33 §3）：前位已声明伤害覆盖后的剩余有效血量——
+                        // E-2 伤害溢出去重（docs/archive/33 §3）：前位已声明伤害覆盖后的剩余有效血量——
                         // remaining ≤ 0 =前位足杀，本发边际价值 0（评分机制自然转向次优目标，勿显式
                         // 降档）；斩杀判定同步剩余口径（击杀已被前位拿走不重复计）；board=null
                         //（配额脑路径）时 remaining=target.hp 与原逻辑恒等
                         int remaining = target.hp - (board?.DeclaredDamage(target.unitId) ?? 0);
                         if (remaining > 0)
                         {
-                            // E-3 防御折减（估值感知补强，docs/active/33 §4）：DamagePipeline 易伤乘区
+                            // E-3 防御折减（估值感知补强，docs/archive/33 §4）：DamagePipeline 易伤乘区
                             // 轻量镜像——修「对高防目标伤害虚高」盲区（骨架级修正：伙伴脑与配额脑操
                             // 魔神档共享受益；眷属脑不消费估值零影响）
                             int effPerTarget = MitigatedDamage(perTarget, target.defense);
@@ -881,16 +881,16 @@ namespace GIC.Battle
                 ? profile.偏好交战距离
                 : BattleHeuristics.AttackRangeOf(sim, unit, playerId);
 
-            // F-2 支援站位评分器（docs/active/34 §4，Ellie 式候选格多维评分）：支援型+伤员存在时
+            // F-2 支援站位评分器（docs/archive/34 §4，Ellie 式候选格多维评分）：支援型+伤员存在时
             // **全接管移动档**——取代朝单锚 BFS 直冲的「位置=选格」语义：候选=十字射线直线可达格
             // （移动=推力直线，BFS 拐弯格不可达——与现有直线段钳制同构）∪当前格，多维评分选最优
             // 站位（奶程×开火线×火线规避×自保）。最优=当前格 → 无移动候选（驻位语义内化）。
-            // G-5 修 3（docs/active/35 §4——三态接管，光环引擎完整形态）：支援型站位评分器接管态
+            // G-5 修 3（docs/archive/35 §4——三态接管，光环引擎完整形态）：支援型站位评分器接管态
             // 扩为三态——①伤员锚（原语义）②**光环贴敌模式**（无伤员但持有光环且档案「光环贴敌
             // 权重」>0：woundedPos=自身=奶程恒满〔woundedIsSelf〕，光环前瞻分主导趋敌——治「开局
             // 无伤员阶段走锚循环、光环驱动不参与决策」的接管错位）③保险后撤模式（血线/威胁预警：
             // 贴敌归零+后撤梯度主导）。输出型路径零触碰（零回归基线）。
-            // H 近战先锋伴随（docs/active/36，2026-10-04 拍板「协助凯亚这样的近战单位，开局就进攻」）：
+            // H 近战先锋伴随（docs/archive/36，2026-10-04 拍板「协助凯亚这样的近战单位，开局就进攻」）：
             // ④先锋伴随模式插在光环贴敌之前——前线形态+「先锋伴随权重」>0 时锚=本方近战先锋
             // （凯亚/丘丘人），「自己冲敌脸」改「跟着近战压战线」：站先锋邻位=奶程+光环双覆盖、
             // 先锋冲她跟/先锋停她停（开局满血即跟随集团推进）；保险形态（活着>跟队）优先级更高。
@@ -932,7 +932,7 @@ namespace GIC.Battle
                 // 按先锋上回合位移向量把本回合追逐锚前移=当前位置+位移（迎头追逐：双方皆 2 格/回合
                 // 时追逐永不收敛、先锋驻位她才贴上=「凯亚走了四格远才跟」的根因；外推一步=先锋继续
                 // 推进她恰好迎头贴上）。先锋换人（死亡换先锋）=位移向量不可信，回落真实位置追逐。
-                // I 批讨论直连（docs/active/37 §5，2026-10-04 实测返修「凯亚走了 3 格芭芭拉没立刻
+                // I 批讨论直连（docs/archive/37 §5，2026-10-04 实测返修「凯亚走了 3 格芭芭拉没立刻
                 // 跟上」）：追逐锚优先=先锋**已声明/已申报的落点**（board.DeclaredMovement——凯亚
                 // 「告诉」芭芭拉「我要走到 X」，当回合即消费=治 WEGO 快照滞后首拍窗口；申报遍支援
                 // 轮读申报落点、执行遍读正式声明落点）。声明落点=真实决策位>外推猜测>快照滞后位，
@@ -1038,7 +1038,7 @@ namespace GIC.Battle
             }
 
             // 锚序：支援型先试最缺血我方（奶谁/去哪护），全军敌迭代殿后。
-            // E-3 移动锚延续（意图延续槽，docs/active/33 §4）：上回合锁定的敌**插队敌序首**=
+            // E-3 移动锚延续（意图延续槽，docs/archive/33 §4）：上回合锁定的敌**插队敌序首**=
             // CR 式 target lock——锁定敌在死亡/不可达前不被「最近敌」的边界震荡抢走（治多锚
             // 贪心抖动：朝敌1走→敌2 变近改道→又回敌1 的来回震荡）；锚死=GetUnit null/IsDead
             // 不插队自然回落距离序、不可达=BFS 0 换下一锚（自动解锁）；支援伤员锚动态变化频繁
@@ -1097,7 +1097,7 @@ namespace GIC.Battle
                 // 眷属 v4 换目标巡逻同语义）
                 var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, to, reservedCells);
                 if (direction == 0) continue;
-                // F-1 支援锚驻位分流（docs/active/34 §5.1）：锚的敌我决定距离语义——
+                // F-1 支援锚驻位分流（docs/archive/34 §5.1）：锚的敌我决定距离语义——
                 // 伤员锚（我方）=治疗半径（SupportRadiusOf 自动提取技能集最大治疗原子半径；档案
                 // 「支援贴近距离」>0 覆写）=贴身奶；敌锚=攻击射程 engageDistance（CR-Move 语义
                 // 不变）。治「驻位 5 格外治疗半径 1 空放」错配——Ellie 第一性原则：支援者贴着
@@ -1271,7 +1271,7 @@ namespace GIC.Battle
         /// 射程内但目标不在十字线上——沿横/纵轴朝目标直飞：列对齐=朝目标 x 走 |dx| 格、行对齐=朝
         /// 目标 y 走 |dy| 格（步数=轴差钳移速上限+直线地形，永不越过目标行/列）。两轴候选择优
         /// （确定性）：①对满轴且落点有开火线 ②对满轴 ③落点有开火线（部分进展但换到线）④部分
-        /// <summary>支援站位评分器（F-2，docs/active/34 §4）：支援型有伤员时的移动档形态——
+        /// <summary>支援站位评分器（F-2，docs/archive/34 §4）：支援型有伤员时的移动档形态——
         /// 「位置=选格」取代「朝单锚走」（Ellie 候选格多维评分的回合制直线版）。候选=当前格 +
         /// 十字四向直线可达格（移动=推力直线语义——BFS 拐弯格不可达；射线逐格推进、地形断止，
         /// 与主逼近档直线段钳制同构）。评分维度：
@@ -1282,7 +1282,7 @@ namespace GIC.Battle
         /// 确定性：CrossDirections 枚举序 × 步数升序 + 严格大于替换（同分先到先得）；零 roll。
         /// 最优=当前格 → 不 Offer（驻位内化：转攻/转 Pass 由攻击档与缺席兜底）；全射线无候选
         /// → 不 Offer（伤员不可直线达=保持原位不空耗）。
-        /// 返回值（H 伴随批，docs/active/36）：true=已 Offer；false=最优=当前格（无改进落点）——
+        /// 返回值（H 伴随批，docs/archive/36）：true=已 Offer；false=最优=当前格（无改进落点）——
         /// 伤员/光环/保险三态调用方不看返回值（驻位语义不变）；伴随模式 false=直线跟不到
         ///（平行线/地形断），调用方回落 FindApproachStraightSteps BFS 绕行</summary>
         private static bool TryOfferSupportPosition(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
@@ -1297,7 +1297,7 @@ namespace GIC.Battle
             if (supportRadius <= 0) supportRadius = 1; // 无治疗原子防御：贴 1 格（支援语义兜底）
             int auraRadius = BattleHeuristics.AuraRadiusOf(unit); // G-1 光环感知（无光环=0 不消费）
 
-            // H-2 交战就位态（docs/active/36 §5，2026-10-04 拍板「先锋与敌人交战时优先主动上前
+            // H-2 交战就位态（docs/archive/36 §5，2026-10-04 拍板「先锋与敌人交战时优先主动上前
             // 贴脸敌人，发挥光环挂水——考虑光环同时覆盖敌人和先锋的更优站位」）：锚=真实单位
             //（先锋/伤员=先锋）+交战（锚距最近敌≤VanguardEngageRange）+未就位（当前格光环罩不到
             // 敌）+让位门控过（救命奶/满槽复苏恒在就位之上，勿靠分数竞争——三者量级与常规技能挤
@@ -1464,7 +1464,7 @@ namespace GIC.Battle
             int nearestEnemyForStance = NearestEnemyDistance(sim, unit, team, cell);
             if (stance > 1 && nearestEnemyForStance < int.MaxValue)
                 score += Math.Min(SupportRetreatCap, nearestEnemyForStance * SupportRetreatPerStep);
-            // G-1 光环敌覆盖（docs/active/35 §2）：持有半径型 tick 光环且档案权重>0——落点光环半径内
+            // G-1 光环敌覆盖（docs/archive/35 §2）：持有半径型 tick 光环且档案权重>0——落点光环半径内
             // 每敌 +SupportAuraPerEnemy×权重（光环挂水/挂冰引擎的贴敌驱动力；队友 E-3 反应预期分自发
             // 消费挂水目标=冻结/蒸发联动零新机制）；G-2 保险形态（stance>1）贴敌分归零——血线/威胁
             // 预警时她后撤保命（复苏无限程，活着=复活保险在）。
@@ -1674,7 +1674,7 @@ namespace GIC.Battle
             return false;
         }
 
-        // ==================== E-1 威胁消费原语（配额脑对手建模，docs/active/33 §2.3） ====================
+        // ==================== E-1 威胁消费原语（配额脑对手建模，docs/archive/33 §2.3） ====================
 
         /// <summary>反威胁加分：目标是敌方威胁源（EnemyThreatScore 高者）加 min(威胁值/2, 上限)——
         /// 拆火力核心优先于平打、不优先于斩杀；threat=null（伙伴脑路径）恒 0</summary>
@@ -1693,7 +1693,7 @@ namespace GIC.Battle
             return threat != null && threat.ThreatenedCells.Contains(cell) ? ThreatenedCellPenalty : 0;
         }
 
-        // ==================== E-3 估值与延续原语（伙伴脑规划层，docs/active/33 §4） ====================
+        // ==================== E-3 估值与延续原语（伙伴脑规划层，docs/archive/33 §4） ====================
 
         /// <summary>防御折减（E-3 估值感知补强）：DamagePipeline 易伤乘区轻量镜像——正防御
         /// 100/(100+防御) 除法递减、负防御每点 +1% 线性增伤（与 Calculate 同公式口径，不并易伤 buff
@@ -1724,7 +1724,7 @@ namespace GIC.Battle
                 _lastMoveAnchors[unitId] = anchorId;
         }
 
-        /// <summary>意图板移动落点物化（I-D，docs/active/37 §5）：把板内已声明落点转为 BFS 占位集
+        /// <summary>意图板移动落点物化（I-D，docs/archive/37 §5）：把板内已声明落点转为 BFS 占位集
         /// （排除消费单位自身的声明——自己不避自己）。board=null/空板=null（BFS 默认参数零变化）</summary>
         private static List<BattleCell> BoardReservedCells(BattleSimState sim, TeamIntentBoard board, Unit self)
         {
@@ -1745,10 +1745,10 @@ namespace GIC.Battle
             return sim.TryGetUnitId(unit, out var id) ? id : null;
         }
 
-        /// <summary>支援自保扣分（F-1，docs/active/34 §5.3）：落点距最近敌切比雪夫 &lt; 危险半径=
+        /// <summary>支援自保扣分（F-1，docs/archive/34 §5.3）：落点距最近敌切比雪夫 &lt; 危险半径=
         ///「站敌人刀口」扣 SupportSelfPreserveScore × 档案「自保权重」（默认 0=恒 0=非支援/未配置
         /// 零变化）；与 E-1 火线扣分正交（火线=具体危险格、近敌=广义贴脸风险）。
-        /// G-2 形态切换（docs/active/35）：返回值乘 SupportStanceOf 形态因子——保险形态（血线低/
+        /// G-2 形态切换（docs/archive/35）：返回值乘 SupportStanceOf 形态因子——保险形态（血线低/
         /// 威胁预警）×3（贴敌格扣 45=后撤位自然胜出）；threat=null（配额脑路径）仅血线门生效</summary>
         private static int SelfPreservePenalty(BattleSimState sim, Unit unit, TeamType team,
             BattleCell cell, UnitConfig.CompanionProfile profile)
@@ -1771,7 +1771,7 @@ namespace GIC.Battle
             return 0;
         }
 
-        /// <summary>支援形态因子（G-2 形态切换，docs/active/35 §2）：1=前线形态（光环贴敌满效）/
+        /// <summary>支援形态因子（G-2 形态切换，docs/archive/35 §2）：1=前线形态（光环贴敌满效）/
         /// SupportStanceSafeFactor(3)=保险形态（贴敌分归零+自保×3 后撤）。双门控纯函数判据：
         /// ①血线门=hp% &lt; SupportStanceRetreatHpPercent(60)；②预警门（threatThreat 非 null 时）=
         /// 威胁图预期承伤 ≥ hp × SupportStanceRetreatThreatPercent(50)%——提前一回合后撤。
@@ -1833,12 +1833,12 @@ namespace GIC.Battle
             return best;
         }
 
-        /// <summary>近战先锋选择（H 批伴随，docs/active/36）：本方存活单位中「近战武器」
+        /// <summary>近战先锋选择（H 批伴随，docs/archive/36）：本方存活单位中「近战武器」
         /// （单手剑/双手剑/长枪/臂铠——原神口径法器/弓/枪=远程）的最近者（切比雪夫；
         /// 同距 unitId 升序——确定性铁律）。排除建筑（含协议核心）/支援型（奶妈互随=无人跟
         /// 战线）/自己。近战=武器身份判定（与体力/元能状态解耦——体力暂缺的凯亚仍是先锋，
         /// AttackRangeOf 的动态过滤不适用于身份域）；无候选=null（回落光环贴敌/锚循环）。
-        /// I-C 跟随目标分配（docs/active/37 §4）：board 非 null 时比较键前置「跟随者数升序」
+        /// I-C 跟随目标分配（docs/archive/37 §4）：board 非 null 时比较键前置「跟随者数升序」
         /// ——后位支援型选跟随者最少的先锋（「你跟凯亚、我跟丘丘人」的讨论分散；单先锋/
         /// 板 null=原语义零变化）</summary>
         private static Unit FindMeleeVanguard(BattleSimState sim, Unit self, TeamType team,
@@ -2099,7 +2099,7 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 本方意图板（E-2 协调层，docs/active/33 §3）：伙伴决策序内（unitId 升序）前位伙伴已定
+        /// 本方意图板（E-2 协调层，docs/archive/33 §3）：伙伴决策序内（unitId 升序）前位伙伴已定
         /// 行动的声明载体——与 staminaReserve/committed 虚拟池同构的「决策序内登记-消费」模式。
         /// 后位伙伴评分时消费：伤害溢出去重（DeclaredDamageOnEnemy）/治疗去重（DeclaredHealOnAlly）/
         /// 集火跟随（FocusedEnemies）。配额脑不使用（每回合仅 1 配额行动，无跨单位声明域）。

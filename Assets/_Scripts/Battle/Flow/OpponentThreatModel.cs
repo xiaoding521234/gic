@@ -5,7 +5,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 对手威胁模型（E-1 配额脑对手建模，docs/active/33 §2）——2026-10-03 立项：
+    /// 对手威胁模型（E-1 配额脑对手建模，docs/archive/33 §2）——2026-10-03 立项：
     /// 「对手如我」先验（业界标准做法：用己方策略先验建模对手）对敌方全部存活可动单位跑确定性
     /// 预测，把预测行动推导成威胁图，供配额脑（AI 玩家）的操魔神/号令候选做风险调整。
     ///
@@ -17,10 +17,10 @@ namespace GIC.Battle
     /// 信息 + 确定性先验，**不读** Host 内敌方眷属已定行动（_familiarUnitActions）/敌方玩家未交
     /// 选择，与真人玩家信息位完全对等（Frozen Synapse 哲学：信息对称，计划质量定胜负）。
     ///
-    /// 确定性（docs/active/33 §5 红线）：全链零 roll——启发式/骨架均枚举序确定性，同快照恒同预测，
+    /// 确定性（docs/archive/33 §5 红线）：全链零 roll——启发式/骨架均枚举序确定性，同快照恒同预测，
     /// 回放/联机（B7）安全。
     ///
-    /// v1 语义简化（docs/active/33 §10 已登记）：①敌方预测 Move/Pass/缺席对威胁图零贡献（移动后
+    /// v1 语义简化（docs/archive/33 §10 已登记）：①敌方预测 Move/Pass/缺席对威胁图零贡献（移动后
     /// 二阶先验不做——保守不虚报威胁）；②承伤=EstimatePerTargetDamage 粗估和（未计防御/反应
     /// 乘区——排序用途非精确预言）；③敌方伙伴真实决策发生在收齐我方选择后（会感知我们重决策），
     /// 单层预测不做博弈递归——预测失准空间=WEGO 本质。
@@ -28,7 +28,7 @@ namespace GIC.Battle
     public static class OpponentThreatModel
     {
         /// <summary>
-        /// 威胁图（E-1 数据载体）：一次构建、配额脑各候选统一消费的推导产物（docs/active/33 §2.2）。
+        /// 威胁图（E-1 数据载体）：一次构建、配额脑各候选统一消费的推导产物（docs/archive/33 §2.2）。
         /// 全部为粗估值——用途是「风险调整的相对排序」，不是精确预言。
         /// </summary>
         public sealed class ThreatMap
@@ -117,7 +117,7 @@ namespace GIC.Battle
 
         /// <summary>单敌预测（「对手如我」先验，确定性）：眷属=启发式脑原样复用；伙伴/魔神=共享
         /// 评分骨架中性档+敌方实池（ResourceGate 单源照查敌方玩家池）。骨架 threat=null——预测层
-        /// 不递归建威胁图（被预测方不再预测我们，单层博弈——docs/active/33 §10）</summary>
+        /// 不递归建威胁图（被预测方不再预测我们，单层博弈——docs/archive/33 §10）</summary>
         private static ActionData PredictAction(BattleSimState sim, BattleSnapshot snapshot,
             string unitId, Unit enemy, UnitIdentity identity, int turn)
         {

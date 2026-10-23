@@ -217,7 +217,7 @@ namespace GIC.Battle
         /// ——2026-10-03 抽提）：同格判定+单位占据格（含尸体；互不阻挡开启时友方格放行=CanEnter 的
         /// 保守近似，细节与同步条件见 FindApproachFirstStep 注释）+目标集（敌格十字邻格中「可通行且
         /// 无阻挡占据」的格）。false=同格/地图无效（调用方一律按"无逼近"处理）。
-        /// I-D 移动意图占位（docs/active/37 §5，2026-10-04）：reservedCells=意图板已声明的落点
+        /// I-D 移动意图占位（docs/archive/37 §5，2026-10-04）：reservedCells=意图板已声明的落点
         ///（前位伙伴/玩家魔神的决策落点）——后位 BFS 视作占位避让（集团推进不互撞）；null=零行为
         /// 变化（眷属/配额路径不传）。</summary>
         private static bool BuildApproachField(BattleSimState sim, Unit self, BattleCell target,
@@ -535,7 +535,7 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>单位支援半径（F-1 支援锚驻位分流，docs/active/34 §5.1）：技能集内全部
+        /// <summary>单位支援半径（F-1 支援锚驻位分流，docs/archive/34 §5.1）：技能集内全部
         /// Heal 原子（OnCast/OnHit）的 radiusKey 参数最大值（GetInt 缺省 1——与
         /// EnumerateSkillHeals 的半径提取同口径）；无治疗原子=0（非支援型天然不消费）。
         /// 伤员锚驻位距离=此值（贴身奶），敌锚仍=AttackRangeOf</summary>
@@ -559,7 +559,7 @@ namespace GIC.Battle
             return best;
         }
 
-        /// <summary>沿 BFS 最短路的「首段直线前缀」（G-5 修 1，docs/active/35 §4——伙伴锚循环
+        /// <summary>沿 BFS 最短路的「首段直线前缀」（G-5 修 1，docs/archive/35 §4——伙伴锚循环
         /// 移动语义直线前缀化，眷属 v6.1/FindApproachStraightSteps 同族防歪）：BFS 首步方向上
         /// 逐格推进，「到目标 BFS 距离严格递减」判据截断=路径开头的连续直线段（钳 maxSteps 与
         /// 该向地形可行程）。治「BFS 首步×N 直线飞越路径拐点」（环湖绕行首步=Left 被直线化
@@ -594,7 +594,7 @@ namespace GIC.Battle
             if (run <= 0) direction = 0;
         }
 
-        /// <summary>单位光环半径（G-1 光环位置价值，docs/active/35：持有「半径型 tick 光环」Buff
+        /// <summary>单位光环半径（G-1 光环位置价值，docs/archive/35：持有「半径型 tick 光环」Buff
         /// 的有效作用半径——光环挂水/挂冰引擎的贴敌驱动力来源）。读取=BuffConfig.AuraRadius 虚属性
         /// 单源（2026-10-20 审查批#6：原 is-pattern 白名单退役——新光环族=BuffConfig 子类覆写，
         /// 本口/AuraRadiusOfBuffType/客户端预估三处全通）；无光环=0（天然不消费）。
