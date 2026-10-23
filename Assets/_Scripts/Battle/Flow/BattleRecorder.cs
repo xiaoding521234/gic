@@ -33,7 +33,7 @@ namespace GIC.Battle
         private static string _path;
         private static bool _hasHeader;
 
-        /// <summary>即时行动缓冲（购买批 2026-10-22，docs/active/45 §7 回放）：选择阶段发生的即时行动
+        /// <summary>即时行动缓冲（购买批 2026-10-22，docs/45 §7 回放）：选择阶段发生的即时行动
         /// （BuyCard）先入当回合缓冲——购买先于配额行动提交、且全部完成于开演前，CaptureActions 时
         /// 按时序前置于配额行动合并落盘（回放器按行序先重演购买再喂演算）</summary>
         private static readonly Dictionary<int, List<ActionData>> _pendingInstant = new Dictionary<int, List<ActionData>>();

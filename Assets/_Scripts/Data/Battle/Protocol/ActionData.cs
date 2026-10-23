@@ -81,7 +81,7 @@ namespace GIC.Data
         /// 玩家级行动 unitId 留空〔同 DeployUnit 口径〕）</summary>
         public int useItemId;
 
-        [Header("购买参数（BuyCard 有效，决策八十六批E，docs/active/45 §7）")]
+        [Header("购买参数（BuyCard 有效，决策八十六批E，docs/45 §7）")]
         /// <summary>购买的卡牌类型（CardType 枚举值：Unit=1/Item=0——单位卡/物品卡统一承载）</summary>
         public int buyCardType;
 

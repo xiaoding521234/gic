@@ -6,7 +6,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 购买执行器（决策八十六批E，docs/active/45 §7）：选择阶段即时行动通道
+    /// 购买执行器（决策八十六批E，docs/45 §7）：选择阶段即时行动通道
     /// （SubmitInstantAction→BattleSession.HandleInstantSubmit 的 BuyCard 分支）——
     /// **即时执行、不占配额、不进执行段**（校验/结算/命令广播即完，不写 _pendingActions——
     /// 购买后玩家仍可照常上交本回合行动）。
@@ -79,7 +79,7 @@ namespace GIC.Battle
         }
 
         /// <summary>来源校验（拍板 #5）：该玩家任一存活建筑的可购买卡片列表含此卡——
-        /// 显式列表数据驱动（docs/active/45 §1.2），不指定具体建筑=等价校验防凭空购买</summary>
+        /// 显式列表数据驱动（docs/45 §1.2），不指定具体建筑=等价校验防凭空购买</summary>
         private static bool HasPurchaseSource(BattleSimState sim, string playerId, CardId cardId)
         {
             foreach (var kv in sim.Units)

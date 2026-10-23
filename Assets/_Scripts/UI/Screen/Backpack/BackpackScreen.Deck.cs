@@ -199,7 +199,7 @@ namespace GIC.UI
             }
             else
             {
-                // 不可打出建筑防线（决策八十六批C 收窄，docs/active/45 §8）：原「全建筑不可入组」
+                // 不可打出建筑防线（决策八十六批C 收窄，docs/45 §8）：原「全建筑不可入组」
                 //（2026-10-13 协议核心批）随「新建筑可打出、可编入卡组」作废——现仅拦 Core tag 建筑
                 //（协议核心开局在场、不可从手牌打出）；新建筑每卡 1 张上限=inDecks 成员资格模型天然成立
                 if (IsCoreBuildingCard(cardData))
@@ -251,7 +251,7 @@ namespace GIC.UI
         }
 
         /// <summary>是否不可打出的建筑卡（决策八十六批C 防线收窄后判据=Core tag——协议核心
-        /// 开局在场、不可从手牌打出；其余建筑可编入卡组，docs/active/45 §8）</summary>
+        /// 开局在场、不可从手牌打出；其余建筑可编入卡组，docs/45 §8）</summary>
         private bool IsCoreBuildingCard(SaveCardData card)
         {
             if (!IsBuildingCard(card)) return false;

@@ -32,7 +32,7 @@ namespace GIC.Battle
         /// <summary>来源类别：破雾获能（2026-10-17 迷雾批追拍六，安柏2命「爆发破除迷雾，每破除
         /// C2FogEnergyThreshold 格获得 C2FogEnergyGain 元能」——独立类别防与其它来源合并键互吞）</summary>
         public const int CategoryFogBreakGain = 7;
-        /// <summary>来源类别：建筑效果获能（决策八十六批D，docs/active/45 §6——西风旗帜回合末
+        /// <summary>来源类别：建筑效果获能（决策八十六批D，docs/45 §6——西风旗帜回合末
         /// 半径内我方非建筑单位 +N 元能）。**合并键含来源建筑 unitId**（拍板语义=每座旗帜各 +N——
         /// 纯 (目标,类别) 键会让两座旗帜对同一目标合并吞成一次）</summary>
         public const int CategoryBuildingGain = 8;

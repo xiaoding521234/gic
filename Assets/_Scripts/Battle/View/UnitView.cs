@@ -1071,7 +1071,7 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>消散透明度（0=原样，1=全透明；决策八十六批B docs/active/45 §4——建筑+眷属死亡
+        /// <summary>消散透明度（0=原样，1=全透明；决策八十六批B docs/45 §4——建筑+眷属死亡
         /// 不留尸体）：BattlePlayer.PlayDissolveCoroutine 逐帧驱动；素材批的消散特效落地后由特效
         /// 接管本表现。写后即时刷新（RefreshTint 单源叠加）</summary>
         public void SetDissolveAlpha(float alpha01)

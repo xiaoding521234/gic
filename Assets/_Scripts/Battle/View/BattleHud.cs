@@ -671,7 +671,7 @@ namespace GIC.Battle
                 // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
-                CloseBuildingShop(); // 购买面板随阶段收口（选择阶段专属交互，docs/active/45 §7.4）
+                CloseBuildingShop(); // 购买面板随阶段收口（选择阶段专属交互，docs/45 §7.4）
                 CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：卡瞬回原槽防悬空在拖拽层）
                 CloseHandCardDetail(); // 手牌卡详情随阶段收口（执行阶段棋盘视线让位给预览；统计面板随卡详情联动收）
                 if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
@@ -1077,7 +1077,7 @@ namespace GIC.Battle
         /// 决策五十五起唯一入口=拖拽打出（slot=打出卡上下文）：满命拦截=弹回手牌槽、
         /// 升命卡=EnterUpgradePending 待确认态（2026-10-07 返拍「拖入出牌区，不应该直接上交」——
         /// 卡悬浮待「完成选择」确认上交，拖回/点空白/取消钮=反悔弹回）、部署=登记打出态进瞄准。
-        /// 建筑拦截（决策八十六批C，2026-10-23 追记二改星级链，docs/active/45 §2）：星级链前置/上限
+        /// 建筑拦截（决策八十六批C，2026-10-23 追记二改星级链，docs/45 §2）：星级链前置/上限
         /// 不满足=toast+弹回手牌槽（Host PassesBuildingStarGate/PassesBuildingLimit 权威兜底）</summary>
         private void TryDeployOrUpgrade(int unitNameValue, HandCardSlot slot)
         {
@@ -1847,7 +1847,7 @@ namespace GIC.Battle
             _selectedUnitId = null;
             _state = HudState.Idle;
             ClosePopup();
-            CloseBuildingShop(); // 购买面板随取消选中收口（换选/点空白同路，docs/active/45 §7.4）
+            CloseBuildingShop(); // 购买面板随取消选中收口（换选/点空白同路，docs/45 §7.4）
             HideSelectMarker();
             ApplyStateVisibility();
             RefreshOutlines(); // 选中/目标描边随选中一并清（2026-10-05）
@@ -2195,7 +2195,7 @@ namespace GIC.Battle
             return true;
         }
 
-        /// <summary>建筑部署星级链前置镜像（决策八十六批C，2026-10-23 追记二改星级链，docs/active/45 §2
+        /// <summary>建筑部署星级链前置镜像（决策八十六批C，2026-10-23 追记二改星级链，docs/45 §2
         /// ——Host DeployUnitExecutor.PassesBuildingStarGate 快照同口径）：部署 1★=我方存活 Core tag
         /// 建筑在场；部署 N★(N≥2)=我方存活 N-1★ 建筑在场（高星不抵低星；核心 5★ 恒≠N-1(≤4) 帮不上）。
         /// 不共享队友（playerId 过滤）；核心判据走 UnitConfig tags（单核心时代与 FindMyCorePosition

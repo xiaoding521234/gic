@@ -36,7 +36,7 @@ namespace GIC.Battle
 
         public IEnumerator ResolveTurnCoroutine(int turnNumber, List<ActionData> actions)
         {
-            // 回合计数真源写入（决策八十六批D，docs/active/45 §6——周期类建筑效果消费；
+            // 回合计数真源写入（决策八十六批D，docs/45 §6——周期类建筑效果消费；
             // 回合开头写一次，段内 RegisterUnit 的单位 DeployedTurn 同回合自洽）
             _sim.CurrentTurn = turnNumber;
             // 部署段（B6c）：出战行动先于全部攻速片结算（新单位当回合即被后续行动波及；
@@ -263,7 +263,7 @@ namespace GIC.Battle
                             segment.commands.Add(gain);
                         }
                     }
-                    // 骑士团部署即召（决策八十六批D，docs/active/45 §1.1 拍板 #10「部署时就立刻召唤
+                    // 骑士团部署即召（决策八十六批D，docs/45 §1.1 拍板 #10「部署时就立刻召唤
                     // 1 个」）：周期召唤建筑落位后当场召 1 名 召唤单位（最近可部署格顺延）——不等
                     // 回合末周期；召唤单位缺省（Amber=字段默认未配置）不召防误配
                     var summonData = Wargame.Instance?.Context?.Get<UnitConfig>()?
@@ -398,7 +398,7 @@ namespace GIC.Battle
             }
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
-            // 建筑回合末效果段（决策八十六批D，docs/active/45 §6：泡湿之后、命令发射之前——回合末
+            // 建筑回合末效果段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——回合末
             // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
             // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）
             var buildingExtras = new List<BattleCommand>();
@@ -422,7 +422,7 @@ namespace GIC.Battle
             return segment;
         }
 
-        /// <summary>建筑回合末效果收集（决策八十六批D，docs/active/45 §1.1/§6）：只结算存活建筑
+        /// <summary>建筑回合末效果收集（决策八十六批D，docs/45 §1.1/§6）：只结算存活建筑
         /// （消散即移除天然；多座同种独立结算——两座餐馆=+10）。旗帜=半径内我方非建筑单位（含倒下
         /// 角色，拍板 #8）各+元能（EnergyEffect 建筑类别，合并键含来源建筑——两座旗帜对同一目标各
         /// +1 不互吞）；餐馆=己方玩家+摩拉（StatChange 直产）；骑士团=以部署回合为 0、每过 效果周期
@@ -877,7 +877,7 @@ namespace GIC.Battle
             foreach (var dead in newlyDead)
             {
                 bool hasId = _sim.TryGetUnitId(dead, out var deadId);
-                // 消散判定（决策八十六批B，docs/active/45 §4）：建筑全部+眷属角色（1~2★）死亡不留尸体
+                // 消散判定（决策八十六批B，docs/45 §4）：建筑全部+眷属角色（1~2★）死亡不留尸体
                 bool dissolve = BattleHeuristics.ShouldDissolve(dead);
                 if (hasId)
                     segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++, dissolve ? 1 : 0));

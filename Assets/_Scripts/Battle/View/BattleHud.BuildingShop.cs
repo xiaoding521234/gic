@@ -10,7 +10,7 @@ using GIC.Framework;
 namespace GIC.Battle
 {
     /// <summary>
-    /// 建筑购买面板分件（决策八十六批E，docs/active/45 §7.4——BattleHud partial）：选择阶段点击
+    /// 建筑购买面板分件（决策八十六批E，docs/45 §7.4——BattleHud partial）：选择阶段点击
     /// 我方存活建筑（含协议核心）=选中+购买面板弹出（敌方建筑/执行阶段点击=纯查看不弹）。
     /// 面板=可购买卡横排（Card.prefab 唯一形态复用+购买价角标覆写〔部署费角标字段填 PurchaseCostOf〕
     /// +未解锁/摩拉不足灰显）+**拖卡入手牌区（下方）=购买**（拍板原文「拖入下方」——客户端预检

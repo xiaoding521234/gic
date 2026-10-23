@@ -299,7 +299,7 @@ namespace GIC.Battle
                 return;
             }
 
-            // 购买即时分支（决策八十六批E，docs/active/45 §7）：玩家级行动（无行动单位）——
+            // 购买即时分支（决策八十六批E，docs/45 §7）：玩家级行动（无行动单位）——
             // **即时不占配额**（校验/结算/命令广播全在执行器内完成，不写 _pendingActions——
             // 购买后玩家仍可照常上交本回合行动）；失败零命令（客户端预检+灰显为主 UX）
             if (action.actionType == ActionType.BuyCard)

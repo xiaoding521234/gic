@@ -189,7 +189,7 @@ namespace GIC.Battle
             _sortDirty = true; // #13：参与者集变化强制重排
         }
 
-        /// <summary>注销单个单位的头顶条（决策八十六批B 消散，2026-10-22，docs/active/45 §4）：
+        /// <summary>注销单个单位的头顶条（决策八十六批B 消散，2026-10-22，docs/45 §4）：
         /// 客户端消散退场（Death 命令消散标志）随视图移除同步拆条——遗留死引用会让
         /// 深度排序/重投影循环踩 Unity-null。幂等：未登记直接返回</summary>
         public void Unregister(UnitView view)

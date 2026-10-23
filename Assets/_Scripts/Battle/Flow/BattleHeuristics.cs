@@ -61,7 +61,7 @@ namespace GIC.Battle
             => unit?.RawData?.tags != null
                && System.Array.IndexOf(unit.RawData.tags, GIC.Data.UnitTag.Core) >= 0;
 
-        /// <summary>是否消散单位（决策八十六批B，docs/active/45 §4 拍板 #5「建筑被摧毁与眷属死亡
+        /// <summary>是否消散单位（决策八十六批B，docs/45 §4 拍板 #5「建筑被摧毁与眷属死亡
         /// 不留尸体」）：建筑全部（含协议核心——核心摧毁由胜负判据接管）+ 眷属层级角色（1~2★：
         /// 丘丘人/西风骑士）。死亡后走移除链（Buff 注销+Units 移除+GO 销毁）而非转尸体——
         /// 「死亡不清理」通则对消散单位作废；伙伴/魔神尸体维持。单一判据源，勿散写</summary>

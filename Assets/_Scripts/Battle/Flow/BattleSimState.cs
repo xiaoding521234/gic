@@ -33,7 +33,7 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _units = new Dictionary<string, Unit>();
         private int _nextUnitId = 1;
 
-        /// <summary>曾注册核心账本（决策八十六批B 消散，2026-10-22，docs/active/45 §4）：playerId→
+        /// <summary>曾注册核心账本（决策八十六批B 消散，2026-10-22，docs/45 §4）：playerId→
         /// 核心注册时 team。核心死亡走消散（_units 移除）后，「曾注册核心」记忆不再依赖尸体常驻——
         /// IsPlayerDefeated/TeamHasLivingCore/HasAnyRegisteredCore 的 anyCore 种子改读此账本
         /// （尸体在场的旧行为不受影响：账本覆盖已含在场核心）</summary>
@@ -46,7 +46,7 @@ namespace GIC.Battle
         public readonly int InstanceId = ++_instanceCounter;
         private static int _instanceCounter;
 
-        /// <summary>当前回合数（决策八十六批D，docs/active/45 §6——回合数真源：TurnResolver 每回合
+        /// <summary>当前回合数（决策八十六批D，docs/45 §6——回合数真源：TurnResolver 每回合
         /// 开头写入；周期类效果（骑士团每 5 回合召唤）与 Unit.DeployedTurn 相对计数消费；0=回合开始前
         /// （开局 RegisterUnit 的单位部署回合计 0）</summary>
         public int CurrentTurn { get; set; }
@@ -531,7 +531,7 @@ namespace GIC.Battle
             return unitId;
         }
 
-        /// <summary>移除逻辑单位（决策八十六批B 消散专用，docs/active/45 §4）：_units 移除+GameObject
+        /// <summary>移除逻辑单位（决策八十六批B 消散专用，docs/45 §4）：_units 移除+GameObject
         /// 销毁——死亡后不留尸体（建筑+眷属）；Buff 注销由调用方（TurnResolver 死亡分支）先行完成，
         /// 附着/组件状态随 GO 销毁同殁。格子占用/碰撞/升命同名查找/鞭尸 tick 全随之天然消失。
         /// **勿用于其它场景**（现役单位移除无消费者——复活/驱逐等未来需求须另立语义）</summary>
@@ -779,7 +779,7 @@ namespace GIC.Battle
         }
 
         /// <summary>带溢出转移的元能应用（见上——overflowReceiverId/overflowAmount 回传转移事实）。
-        /// **元能通则（决策八十六批D 拍板 #8，docs/active/45 §5）**：一切**加元能**对建筑一律无效
+        /// **元能通则（决策八十六批D 拍板 #8，docs/45 §5）**：一切**加元能**对建筑一律无效
         /// （覆盖战技/移动/光环 tick/溢出转移/旗帜等一切来源——能量应用段统一过滤单源；建筑无元能条，
         /// baseEnergy=0）；对倒下角色照常生效（tick 含尸体先例维持——眷属/建筑无尸体，倒下=伙伴/魔神）。
         /// 负增量（消耗）不受此滤——建筑无技能无消耗路径，防御性放行</summary>

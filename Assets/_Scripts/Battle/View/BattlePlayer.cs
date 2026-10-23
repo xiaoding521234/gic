@@ -1092,7 +1092,7 @@ namespace GIC.Battle
                     case BattleCommandType.Death:
                         if (_views.TryGetValue(command.actorUnitId, out var dying))
                         {
-                            // 消散（决策八十六批B，docs/active/45 §4 拍板 #5）：建筑+眷属死亡不留尸体
+                            // 消散（决策八十六批B，docs/45 §4 拍板 #5）：建筑+眷属死亡不留尸体
                             // ——立牌淡出+视图清理；伙伴/魔神尸体路径维持既有 SetCorpseVisual
                             if (command.metadata == 1)
                                 playbacks.Add(StartCoroutine(PlayDissolveCoroutine(dying, stagger)));
@@ -1752,7 +1752,7 @@ namespace GIC.Battle
             view.SetCorpseVisual(true);
         }
 
-        /// <summary>消散退场协程（决策八十六批B，docs/active/45 §4）：延迟到位后驱动 UnitView 全渲染面
+        /// <summary>消散退场协程（决策八十六批B，docs/45 §4）：延迟到位后驱动 UnitView 全渲染面
         /// 淡出（素材批落地前=通用渐隐，特效随素材批替换），淡出完成清理视图——_views/头顶条/
         /// 专属弹射物登记（UnitView.OnDestroy 自清常驻播放器/RT 租约/材质，Destroyed 事件→
         /// ResidentVideoBudget 注销双保险）。此后该 unitId 的一切命令 TryGetValue miss=静默跳过

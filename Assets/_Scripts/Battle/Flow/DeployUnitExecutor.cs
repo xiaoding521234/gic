@@ -6,7 +6,7 @@ namespace GIC.Battle
 {
     /// <summary>
     /// 出战角色执行器（B6c，docs/18 决策七 + docs/05 §5.1）：校验链=配置存在 → 手牌成员（Host 权威）→
-    /// 建筑星级链前置+建筑上限（决策八十六批C，2026-10-23 追记二改梯度为星级链，docs/active/45 §2/§3——仅建筑）→ 升命分支（**仅角色 3★+**，
+    /// 建筑星级链前置+建筑上限（决策八十六批C，2026-10-23 追记二改梯度为星级链，docs/45 §2/§3——仅建筑）→ 升命分支（**仅角色 3★+**，
     /// 建筑一律铺场新实例）→ 落点合法（**自己存活建筑锚并集**：核心 tag 锚=建筑 3/角色 2、
     /// 其它建筑锚=建筑 2/角色 1〔2026-10-23 拍板「任何自己的建筑即可为锚，部署角色比建筑减 1」〕
     /// + 碰撞判定链——2026-09-25 拍板
@@ -21,7 +21,7 @@ namespace GIC.Battle
         /// 其它建筑锚再减 1——单源 DeployRadiusOf）</summary>
         public const int DeployRadiusFromCore = 2;
 
-        /// <summary>建筑部署·核心锚半径（决策八十六拍板 #6：角色 2 格+1=3 格，docs/active/45 §3；
+        /// <summary>建筑部署·核心锚半径（决策八十六拍板 #6：角色 2 格+1=3 格，docs/45 §3；
         /// 2026-10-23 锚点拍板后=核心锚专属值，其它建筑锚再减 1——单源 DeployRadiusOf）</summary>
         public const int DeployRadiusFromCoreBuilding = 3;
 
@@ -70,7 +70,7 @@ namespace GIC.Battle
         }
 
         /// <summary>建筑部署数量上限（决策八十六拍板 #4：自己存活建筑总数〔不含协议核心〕；
-        /// 拆掉即释放名额可重建——消散机制保证在场必存活，docs/active/45 §2）</summary>
+        /// 拆掉即释放名额可重建——消散机制保证在场必存活，docs/45 §2）</summary>
         public const int MaxBuildingsPerPlayer = 3;
 
         /// <summary>部署落点合法（角色/建筑统一）：**自己存活建筑锚并集**半径内（2026-10-23 拍板
@@ -329,7 +329,7 @@ namespace GIC.Battle
             return count < MaxBuildingsPerPlayer;
         }
 
-        // ==================== 召唤原语（决策八十六批D，docs/active/45 §1.1 骑士团）====================
+        // ==================== 召唤原语（决策八十六批D，docs/45 §1.1 骑士团）====================
 
         /// <summary>最近可部署格召唤（拍板 #10「自己格占满→最近可部署格顺延」）：BFS 距离场从锚点
         /// 扩散（固定方向序=CrossDirections 枚举序、距离升序=确定性），取首个合法格（地形按召唤单位

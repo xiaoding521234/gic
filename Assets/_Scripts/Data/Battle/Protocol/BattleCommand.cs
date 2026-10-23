@@ -282,7 +282,7 @@ namespace GIC.Data
         }
 
         /// <summary>死亡命令工厂。metadata=消散标志（0=转尸体〔伙伴/魔神——压扁灰化，既有〕；
-        /// 1=消散〔建筑+眷属，决策八十六批B docs/active/45 §4——客户端立牌淡出退场，不留尸体〕）
+        /// 1=消散〔建筑+眷属，决策八十六批B docs/45 §4——客户端立牌淡出退场，不留尸体〕）
         /// </summary>
         public static BattleCommand Death(string unitId, int sliceIndex, int indexInSlice, int dissolved = 0)
         {
@@ -471,7 +471,7 @@ namespace GIC.Data
             };
         }
 
-        /// <summary>获得单位卡命令工厂（购买批，决策八十六批E，docs/active/45 §7——购买角色/建筑卡
+        /// <summary>获得单位卡命令工厂（购买批，决策八十六批E，docs/45 §7——购买角色/建筑卡
         /// 入手牌）。actorUnitId=targetUnitId=获得玩家（同 ItemGain 口径）；metadata=UnitName 枚举值、
         /// value=数量。客户端=本地手牌镜像新增+手牌刷新（快照权威自愈）</summary>
         public static BattleCommand CardGain(string playerId, int sliceIndex, int indexInSlice,

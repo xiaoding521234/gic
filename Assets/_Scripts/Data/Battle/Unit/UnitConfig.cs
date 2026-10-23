@@ -145,7 +145,7 @@ namespace GIC.Data
             /// 魔神无脑（玩家全手操）不消费。</summary>
             public CompanionProfile 行为档案;
 
-            [Header("建筑效果（2026-10-21 决策八十六，docs/active/45 §6——建筑无技能无命座，效果=字段直白承载，回合末 TurnResolver 建筑效果段统一结算）")]
+            [Header("建筑效果（2026-10-21 决策八十六，docs/45 §6——建筑无技能无命座，效果=字段直白承载，回合末 TurnResolver 建筑效果段统一结算）")]
             /// <summary>建筑回合末效果类型：None=无效果；EnergyAura=半径内我方非建筑单位各+元能（含倒下角色，
             /// 拍板 #8）；MoraIncome=己方玩家+摩拉；PeriodicSummon=部署即召 1 个+每过效果周期回合再召 1 个
             ///（落点=最近可部署格顺延）；HealWounded=治疗生命值低于效果阈值%的我方存活单位（含建筑，拍板 #9），
@@ -169,7 +169,7 @@ namespace GIC.Data
             /// <summary>召唤单位——PeriodicSummon 消费（骑士团=西风骑士）</summary>
             public UnitName 召唤单位 = UnitName.Amber;
 
-            /// <summary>可购买卡片（显式列表，docs/active/45 §1.2——数据驱动显式而非动态过滤，防未来占位建筑
+            /// <summary>可购买卡片（显式列表，docs/45 §1.2——数据驱动显式而非动态过滤，防未来占位建筑
             /// 误入商店；**新建筑落地批须补录旗帜/核心对应列表行=审查维度 J 对账项**）。玩家点击我方存活建筑
             /// 弹购买面板、拖卡入手牌区=购买（角色/建筑卡=部署价一半、物品卡=星级摩拉价值表）；
             /// 旗帜/协议核心列表不含自己（部署不消耗手牌，拍板 #12/#17）</summary>
