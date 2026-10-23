@@ -53,12 +53,14 @@ namespace GIC.UI
         private TextCombiner _cardName;
         private TextCombiner _tags;
         private TextCombiner _description;
+        private TextCombiner _buildingEffect; // 建筑效果块（tag 后、数据面板前——2026-10-24 追拍结构性上移）
 
         /// <summary>
         /// 注入 CardDetailView 的公用字段引用
         /// </summary>
         public void InjectCommon(Image top, Image bottomImage, GameObject stars,
-            TextCombiner cardName, TextCombiner tags, TextCombiner description)
+            TextCombiner cardName, TextCombiner tags, TextCombiner description,
+            TextCombiner buildingEffect = null)
         {
             _top = top;
             _bottomImage = bottomImage;
@@ -66,6 +68,7 @@ namespace GIC.UI
             _cardName = cardName;
             _tags = tags;
             _description = description;
+            _buildingEffect = buildingEffect; // 建筑效果块（tag 后、数据面板前——2026-10-24 追拍结构性上移）
         }
 
         private void Awake()
@@ -168,7 +171,27 @@ namespace GIC.UI
                 数据小面板.Init(raw);
             }
 
-            // 描述
+            // 建筑效果块（2026-10-24 追拍「效果描述位于数据面板前面、即 tag 后面」：结构性上移出介绍区——
+            // 节点位=Content 下 Tags 与 SkillPanel 之间（建筑无技能行，效果块顶技能区视觉位）；占位符渲染
+            // 数据源与口径同追记三（UnitData 建筑段字段单源金色）；非建筑/无效果/缺模板=隐藏节点）
+            if (_buildingEffect != null)
+            {
+                string effectText = null;
+                if (isBuilding && raw.建筑效果 != BuildingEffectKind.None)
+                {
+                    var effectTemplate = SkillDescriptionBuilder.GetTableTemplate(
+                        TableName.BuildingEffectDescription, raw.unitName.ToString());
+                    if (!string.IsNullOrEmpty(effectTemplate))
+                        effectText = SkillDescriptionBuilder.BuildBuilding(effectTemplate, raw);
+                }
+                _buildingEffect.ClearAllEntries();
+                _buildingEffect.gameObject.SetActive(effectText != null);
+                if (effectText != null)
+                    _buildingEffect.AddStaticEntry(effectText);
+            }
+
+            // 描述（2026-10-24 建筑描述参数化：介绍区=纯风味（UnitDescription 分表惯例）；
+            // 效果段已上移 _buildingEffect 节点）
             _description.ClearAllEntries();
             _description.AddEntry(raw.GetDescriptionEntry());
         }

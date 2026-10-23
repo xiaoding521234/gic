@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b11a58205ec3474ca216360e9fa74a8, type: 3}
+  m_Name: BuildingEffectDescription Shared Data
+  m_EditorClassIdentifier: 
+  m_TableCollectionName: BuildingEffectDescription
+  m_TableCollectionNameGuidString: c9b992b375b4f8342acdaa18932b1df5
+  m_Entries:
+  - m_Id: 3013
+    m_Key: FavoniusBanner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3014
+    m_Key: GoodHunter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3015
+    m_Key: KnightsOfFavonius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3016
+    m_Key: FavoniusCathedral
+    m_Metadata:
+      m_Items: []
+  m_Metadata:
+    m_Items: []
+  m_KeyGenerator:
+    rid: 2594356501716402176
+  references:
+    version: 2
+    RefIds:
+    - rid: 2594356501716402176
+      type: {class: DistributedUIDGenerator, ns: UnityEngine.Localization.Tables, asm: Unity.Localization}
+      data:
+        m_CustomEpoch: 1792793442856

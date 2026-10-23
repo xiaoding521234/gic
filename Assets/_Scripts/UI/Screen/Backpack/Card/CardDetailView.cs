@@ -24,6 +24,11 @@ namespace GIC.UI
         public TextCombiner tags;
         public Transform tagContainer;
         public TextCombiner description;
+
+        /// <summary>建筑效果描述文本（2026-10-24 决策八十六追记三追拍「效果描述位于数据面板前面、tag 后面」：
+        /// 结构位=Content 下 Tags 与 SkillPanel 之间（建筑无技能行，效果块顶技能区视觉位）——
+        /// 仅建筑且 建筑效果≠None 时由 UnitDetailPanel 显式启用；角色/物品恒隐藏</summary>
+        public TextCombiner buildingEffect;
         public RectTransform descriptionContent;
         public Button skinButton;
         public TextMeshProUGUI skin;
@@ -48,7 +53,7 @@ namespace GIC.UI
 
             // 注入公用字段引用
             if (unitDetailPanel != null)
-                unitDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description);
+                unitDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description, buildingEffect);
             if (itemDetailPanel != null)
                 itemDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description);
         }
@@ -96,7 +101,7 @@ namespace GIC.UI
         private void EnsureInjected()
         {
             if (unitDetailPanel != null)
-                unitDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description);
+                unitDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description, buildingEffect);
             if (itemDetailPanel != null)
                 itemDetailPanel.InjectCommon(top, bottomImage, stars, cardName, tags, description);
         }

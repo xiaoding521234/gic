@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: BuildingEffectDescription_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: c9b992b375b4f8342acdaa18932b1df5, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 3013
+    m_Localized: At the end of each turn, restores {Value} energy to allied non-building
+      units within a radius of {Radius} (downed characters included).
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3014
+    m_Localized: At the end of each turn, its owner gains {Value} Mora.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3015
+    m_Localized: Summons 1 {SummonUnit} immediately when deployed, then again every
+      {Period} turns.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3016
+    m_Localized: At the end of each turn, heals allied living units below {Threshold}%
+      HP for an amount equal to {Value}% of this building's ATK.
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

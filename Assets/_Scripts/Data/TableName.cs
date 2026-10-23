@@ -77,6 +77,9 @@ namespace GIC.Data
         [InspectorName("物品效果描述表")]
         ItemEffectDescription = 23,
 
+        [InspectorName("建筑效果描述表")]
+        BuildingEffectDescription = 24,
+
     }
 }
 

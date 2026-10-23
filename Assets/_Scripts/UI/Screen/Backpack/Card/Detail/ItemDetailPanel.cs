@@ -132,13 +132,11 @@ namespace GIC.UI
         }
 
         /// <summary>物品描述表模板同步读取（当前语言；表未加载/无条目=null——调用方回落本地化异步链；
-        /// 分表重构批泛化：ItemDescription=风味段 / ItemEffectDescription=效果段，两表共用单出口）</summary>
-        private string GetItemTableTemplate(TableName table, ItemConfig.ItemData raw)
-        {
-            var stringTable = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
-                .GetTable(table.ToString());
-            return stringTable?.GetEntry(raw.itemID.ToString())?.Value;
-        }
+        /// 分表重构批泛化：ItemDescription=风味段 / ItemEffectDescription=效果段，两表共用单出口。
+        /// 2026-10-24 建筑描述参数化批：实现下沉单源委托 SkillDescriptionBuilder.GetTableTemplate
+        ///（UnitDetailPanel 建筑分支共用，勿再复制第三份）</summary>
+        private string GetItemTableTemplate(TableName table, ItemConfig.ItemData raw) =>
+            SkillDescriptionBuilder.GetTableTemplate(table, raw.itemID.ToString());
 
         public void SetActive(bool active)
         {

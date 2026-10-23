@@ -2293,3 +2293,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **坑② +1e-4f 容差是承重结构勿删，修法=守卫与消费方同源**：容差防的是平局位 `segEnd==t0` 的零进展死循环（删掉它 k=7 处会从「越界崩」变成「无限循环冻结」）。正解=把尾段判定改判消费方表达式自身：`int seg = FloorToInt(t0/stepT+1e-4f); if (seg >= totalSteps) → 尾段`（PositionAt 既有安全模式——它从来就用 seg≥Count-1 判界零事故）；边界 1.8e-5s 内的 t0 归尾段=位置误差 1e-4 格不可见。**通则：凡「守卫比较浮点边界、消费方 floor/ceil+容差重算同一边界」的结构，mulss 存储取整与比较未取整在平局位必然失配——守卫必须复用消费方的取整后值**。**复现/验证技法（可复用）**：反射 Invoke 私有静态方法 + 枚举 (launch×pathCount×maxT) 全组合——不复现整局即拿到必崩输入集与修复后 1092 组零崩溃；卡死现场活体取证=exec_runtime_script 读 TurnNumber/_pendingActions/运行时 SkillData 时轮值（当场分辨磁盘值≠运行值）。
 
+## §167 Export/Localization CSV 是滞后快照——取文案真值以资产/git HEAD 为准（2026-10-24 建筑描述参数化批实锤）
+
+**症状**：建筑描述参数化批用 `Export/Localization/UnitDescription.csv` 提取风味句作更新基准——写回后把 10-23 改名批的五语言风味「总部/總部/headquarters/本部/Штаб」回退成「营地/camp/キャンプ/Лагерь」。根因链=**10-22 批导出的 CSV 停在旧文案，10-23 改名批改了资产却未重导 CSV**——CSV 只是「上次导出时刻的快照」，任何在它之后改过资产的批都会让它变成误导源（本批审查结论「骑士团风味=营地」正是被它带偏）。
+
+**How to apply**：①审查/取样文案的**唯一真值=本地化 .asset 资产或 `git show HEAD:` 提取**（桥脚本 GetEntry 或 node 解码资产均可），CSV 只当参考；②**任何批次改了本地化条目后必须重导对应 CSV**（反射调 LocalizationCsvTool.ExportTable 同款配方）——漏导不只留脏 CSV，还会给下个批埋回退地雷；③用 CSV 做对比基线前，先抽 1~2 条与资产现值比对确认未滞后再消费；④顺带勘正：gic-localization skill 旧口径「先导出再编辑 CSV」防的是**导入覆盖**方向的风险，**导出侧同样有陈旧风险**，两方向都要防。
+
+**提取资产现值的配方（node 解码 \uXXXX）**：`git -c core.quotepath=false show HEAD:Assets/Localization/{表}_{lang}.asset` → 按 `- m_Id: <枚举值>` 行取下一行 `m_Localized:` 值解码——注意条目行形态带列表破折号（`- m_Id:`，正则须含 `-\s*`），与 SharedData 的键行不同。
+

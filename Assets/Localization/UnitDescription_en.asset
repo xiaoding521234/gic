@@ -241,25 +241,19 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3013
-    m_Localized: The battle flag of Mondstadt. At the end of each turn, restores
-      1 energy to allied non-building units within a radius of 3 (downed characters
-      included).
+    m_Localized: The battle flag of Mondstadt.
     m_Metadata:
       m_Items: []
   - m_Id: 3014
-    m_Localized: The famous restaurant of Mondstadt. At the end of each turn, its
-      owner gains 5 Mora.
+    m_Localized: The famous restaurant of Mondstadt.
     m_Metadata:
       m_Items: []
   - m_Id: 3015
-    m_Localized: The headquarters of the Knights of Favonius. Summons 1 Knight
-      of Favonius immediately when deployed, then again every 5 turns.
+    m_Localized: The headquarters of the Knights of Favonius.
     m_Metadata:
       m_Items: []
   - m_Id: 3016
-    m_Localized: The spiritual heart of Mondstadt. At the end of each turn, heals
-      allied living units below 50% HP for an amount equal to 10% of this building's
-      ATK.
+    m_Localized: The spiritual heart of Mondstadt.
     m_Metadata:
       m_Items: []
   - m_Id: 3017

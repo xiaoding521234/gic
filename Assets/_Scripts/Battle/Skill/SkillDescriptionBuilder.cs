@@ -125,6 +125,44 @@ namespace GIC.Battle
             return sb.ToString();
         }
 
+        /// <summary>建筑效果描述构建（2026-10-24 建筑描述参数化批——审查维度 J 收口，docs/45 §194/§209、
+        /// docs/11 挂账③销案）：建筑无技能描述表，效果模板存 BuildingEffectDescription 表按 unitName 键，
+        /// 占位符从 UnitData 建筑段字段单源取值（改 Inspector 数值描述自动跟随——BuildItem 同构闭环）：
+        /// {Radius}=效果半径、{Value}=效果数值、{Period}=效果周期、{Threshold}=效果阈值、
+        /// {SummonUnit}=召唤单位本地化名（UnitName 表同步读）。数值统一金色高亮。
+        /// 调用方=UnitDetailPanel（背包+战斗卡详情共链 CardDetailView）。</summary>
+        public static string BuildBuilding(string template, UnitConfig.UnitData raw)
+        {
+            if (string.IsNullOrEmpty(template) || raw == null) return template;
+            var sb = new StringBuilder(template);
+            sb.Replace("{Radius}", $"<color={ValueColor}>{raw.效果半径}</color>");
+            sb.Replace("{Value}", $"<color={ValueColor}>{raw.效果数值}</color>");
+            sb.Replace("{Period}", $"<color={ValueColor}>{raw.效果周期}</color>");
+            sb.Replace("{Threshold}", $"<color={ValueColor}>{raw.效果阈值}</color>");
+            if (template.Contains("{SummonUnit}"))
+                sb.Replace("{SummonUnit}", $"<color={ValueColor}>{GetLocalizedUnitName(raw.召唤单位)}</color>");
+            return sb.ToString();
+        }
+
+        /// <summary>本地化表同步模板读（描述构建共用辅助，ItemDetailPanel/UnitDetailPanel 两面板单源；
+        /// 表未加载/缺条目返回 null 由调用方回落——异步链由 TextCombiner 承担的场景勿用此处）</summary>
+        public static string GetTableTemplate(TableName table, string key)
+        {
+            var stringTable = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(table.ToString());
+            return stringTable?.GetEntry(key)?.Value;
+        }
+
+        /// <summary>单位名同步本地化（BuildBuilding 的 {SummonUnit} 供值——UnitName 表当前语言读，
+        /// 表未加载/缺条目回落枚举名兜底，与 GetLocalizedBaseName 同口径）</summary>
+        private static string GetLocalizedUnitName(UnitName unitName)
+        {
+            var table = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase
+                .GetTable(TableName.UnitName.ToString());
+            var entry = table?.GetEntry(unitName.ToString());
+            return string.IsNullOrEmpty(entry?.Value) ? unitName.ToString() : entry.Value;
+        }
+
         /// <summary>
         /// 获取单个参数的带颜色展示值
         /// 固定值 → "4" → "<color=#FFD700>4</color>"
