@@ -16,7 +16,7 @@ namespace GIC.Battle
     /// 永久不计时（RemainingTurns=-1），**持有者倒下仍生效**（RemoveOnHolderDeath=false——
     /// docs/05 §5.4 被动失效通则的技能级例外；倒下期间可被外部喂能〔歌声之环喂倒下单位——
     /// 2026-10-15 拍板「尸体可以获得元能」〕过阈即碎，无喂能则只 tick）。
-    /// 数值单源=Buff_Icicle.asset（docs/active/39 Buff 配置化——tick 伤害/碎裂治疗/碎裂阈值/半径/
+    /// 数值单源=Buff_Icicle.asset（docs/39 Buff 配置化——tick 伤害/碎裂治疗/碎裂阈值/半径/
     /// 叠层上限全在资产，调平衡改 Inspector 零代码）；**叠层上限不随命座（2026-10-08 重构拍板）；
     /// 作用半径 3命起 +C3Radius**（2026-10-15 决策七十二「3命=召唤数量+1 之外，额外加寒冰之棱
     /// 半径+1、元能上限+60」复活通道；旧 C2/C3StackLimit 通道仍退役，参数枚举值/本地化键保留=

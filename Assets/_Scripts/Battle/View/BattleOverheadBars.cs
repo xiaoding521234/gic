@@ -506,7 +506,7 @@ namespace GIC.Battle
             return BuffElementIconOf(buff.type);
         }
 
-        /// <summary>专属图标解析（2026-10-07 Buff 配置化 docs/active/39：图标=BuffConfig 资产
+        /// <summary>专属图标解析（2026-10-07 Buff 配置化 docs/39：图标=BuffConfig 资产
         ///〔专属图标〕字段引用，2026-10-07 用户指定源图——歌声之环=Skill_S_Barbara_01〔芭芭拉战技〕、
         /// 冰棱减防=UI_Talent_S_Lisa_06〔丽莎 6 命〕，256² alpha 已修）。**按具名 key 查资产**
         /// （决策五十七：同族异名各自图标）；key 空（旧回放）=按族首资产回落。**新增专属图标=在

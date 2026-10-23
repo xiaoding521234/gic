@@ -6,7 +6,7 @@ namespace GIC.Data
 
     /// <summary>
     /// Buff 配置资产基类（2026-10-07 拍板「遵循大厂的做法」——Buff 与技能/单位同等待遇，建独立配置资产。
-    /// docs/active/39；业界对照=EGamePlay StatusConfig 形态。**2026-10-08 决策五十七「资产即身份」**：
+    /// docs/39；业界对照=EGamePlay StatusConfig 形态。**2026-10-08 决策五十七「资产即身份」**：
     /// 每个具名 buff=一个资产（buffKey=资产名）——同资产叠层合并、**异资产同族共存**（安柏加攻
     /// 「百发百中」与班尼特加攻可同时存在，用户拍板「不同名即可叠加」）；BuffType 枚举降级为族分类。
     /// 施加方经 SkillEffectConfig.buffAsset 引用（或效应 BuffKey）指定具名 buff；新增同类 buff=

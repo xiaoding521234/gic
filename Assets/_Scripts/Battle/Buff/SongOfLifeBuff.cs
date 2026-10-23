@@ -9,7 +9,7 @@ namespace GIC.Battle
     /// <summary>
     /// 歌声之环（B-3 ② + B8 命座批，芭芭拉闪耀奇迹——docs/units/蒙德/芭芭拉.md「歌声之环」节）：
     /// 永久光环（不计时，持有者倒下消失——RemoveOnHolderDeath 覆写 true），叠层上限随施加者命座成长。
-    /// 数值单源=Buff_SongOfLife.asset（docs/active/39 Buff 配置化——光环百分比/基础元能/理智/半径
+    /// 数值单源=Buff_SongOfLife.asset（docs/39 Buff 配置化——光环百分比/基础元能/理智/半径
     /// 全在资产，调平衡改 Inspector 零代码）；命座成长仍走施加者 Talent 技能参数（正交）。
     /// 每回合结束：①为**半径内我方单位（含持有者，存活与倒下均可获元能——2026-10-15 拍板「尸体
     /// 可以获得元能」：倒下凯亚的寒冰之棱因此过阈碎裂；倒下获能不治疗/不恢复理智/不附着）**增加元能

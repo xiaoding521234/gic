@@ -31,7 +31,7 @@ namespace GIC.Battle
             if (cfg == null)
             {
                 GICLog.Warn($"[BuffFactory] BuffType.{type} 缺配置资产" +
-                            $"（Assets/Resources/Configs/Buffs/Buff_{type}.asset，docs/active/39）");
+                            $"（Assets/Resources/Configs/Buffs/Buff_{type}.asset，docs/39）");
                 return null;
             }
             switch (type)
