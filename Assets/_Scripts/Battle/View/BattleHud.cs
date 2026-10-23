@@ -204,7 +204,7 @@ namespace GIC.Battle
             public OrbitBeamsUi orbitFx; // 瞄准态环绕光束（2026-09-27 选中提示特效，懒建随键存留）
             public CanvasGroup tierGateGroup; // 层级门控置灰组（D-5：眷属/伙伴 AI 域键半透明——懒建）
             public bool IsMove => type == SkillType.Move;
-            /// <summary>势力技能键（号令入口，D-5 层级门控豁免——伙伴选中可点=号令；docs/active/32 §8）</summary>
+            /// <summary>势力技能键（号令入口，D-5 层级门控豁免——伙伴选中可点=号令；docs/32 §8）</summary>
             public bool IsFaction => type == SkillType.Enso || type == SkillType.Contract;
         }
 
@@ -4050,7 +4050,7 @@ namespace GIC.Battle
 
         /// <summary>技能按钮刷新（非移动键）：数据分拣→InitWithData 现有链（图标白底不染+底图染亮元素色+
         /// 主动/被动色环，2026-09-10 拍板规则全在 SkillIconView 内）；无数据=隐藏+置灰（原延奏特例泛化全键）。
-        /// 置灰两源（D-5 置灰单源 docs/active/32 §8；2026-10-04 拍板两源视觉独立可叠加）：
+        /// 置灰两源（D-5 置灰单源 docs/32 §8；2026-10-04 拍板两源视觉独立可叠加）：
         /// ①「AI 自主」层级门控——眷属/伙伴（任意归属，含敌方——其行动域同属 AI）的移动/战技/爆发键=
         ///   AI 域：45% 半透明（CanvasGroup）；**interactable 保持 true**（点击/拖拽照常进瞄准——显示
         ///   瞄准格直观看到技能范围、可留待定金格；操控权拦截在提交时轻弹窗=SubmitAim 防线，
@@ -4105,7 +4105,7 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>该技能键是否受层级门控（D-5，docs/active/32 §8；2026-10-12 拍板伙伴技能解锁）：
+        /// <summary>该技能键是否受层级门控（D-5，docs/32 §8；2026-10-12 拍板伙伴技能解锁）：
         /// 眷属的 移动/战技/爆发 键=AI 域（置灰）；**伙伴不再置灰**（玩家可直接操控，体力减免 5）；
         /// 势力技能键（延奏/契约）豁免=号令入口对伙伴开放；魔神选中恒不门控（全亮）</summary>
         private bool IsTierGatedButton(SkillButtonDef def)
@@ -4128,7 +4128,7 @@ namespace GIC.Battle
             def.tierGateGroup.alpha = gated ? 0.45f : 1f;
         }
 
-        /// <summary>选中单位层级（D 批次操控分层，docs/active/32 §2；无配置数据按眷属档=保守全门控）。
+        /// <summary>选中单位层级（D 批次操控分层，docs/32 §2；无配置数据按眷属档=保守全门控）。
         /// 快照 tier 优先（2026-10-05 试招沙盒：Unit.TierOverrideStars 覆盖经 BuildUnitState 进快照——
         /// 读原星会让沙盒的层级覆盖在客户端门控失效=战技被误拦「伙伴技能自主」）；0=未填回落原星级换算</summary>
         private UnitTier SelectedUnitTier()
@@ -4181,7 +4181,7 @@ namespace GIC.Battle
         /// 逐条镜像 ResourceGate.Has（元能=选中单位快照 energy / 体力·摩拉=本端缓存 /
         /// 物品=本地手牌镜像条目 count——Host 侧 HasAll 同口径）。
         /// **C-2 起消耗全量迁移完成：costs 空=免费技能**（无消耗语义，数据即事实）；
-        /// 体力条目按**选中单位层级换算**镜像（D 批次操控分层 docs/active/32 §5.2——实际扣值=施法者
+        /// 体力条目按**选中单位层级换算**镜像（D 批次操控分层 docs/32 §5.2——实际扣值=施法者
         /// 层级表 眷属0/伙伴5/魔神10，声明值=基准/校验值；与 ResourceGate.StaminaAmountOf 同口径）；
         /// **2026-10-12 拍板伙伴技能解锁：玩家操控伙伴=体力减免 5（可减免为负数=获得体力），
         /// 减免后 ≤0=门槛恒过**；

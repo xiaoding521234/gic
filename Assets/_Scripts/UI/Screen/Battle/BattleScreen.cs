@@ -267,7 +267,7 @@ namespace GIC.UI
                     launchConfig != null ? launchConfig.MapConfigName : BattleLaunchConfig.DefaultMapName,
                     (int)(launchConfig?.FogMode ?? BattleFogMode.None), playerSetups, spawnCells, replayHands);
 
-            // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/active/32 §6；
+            // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/32 §6；
             // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
             // 2026-10-12 选择器批：房间 AI 行点选的难度/人格经名册透传——建脑时注入（先于 Bind 登记）；
             // 人格按名换资产（缺资产=脑内回落默认 Persona_经济家，见 PlayerQuotaBrain.Persona）

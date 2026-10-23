@@ -139,7 +139,7 @@ namespace GIC.Data
             [Header("语音")]
             public UnitVoiceData voices;
 
-            [Header("伙伴行为档案（操控分层 D 批次，docs/active/32 §6.1——评分骨架权重；null=中性档案）")]
+            [Header("伙伴行为档案（操控分层 D 批次，docs/32 §6.1——评分骨架权重；null=中性档案）")]
             /// <summary>个体行为档案：一套评分骨架+每单位一份档案——行为差异全在档案，加新伙伴=配档案零代码
             ///（costs/时轮同哲学）。仅伙伴（3-4★）消费；眷属不配（启发式维持=层级特色+算量安全阀）、
             /// 魔神无脑（玩家全手操）不消费。</summary>
@@ -324,21 +324,21 @@ namespace GIC.Data
         }
 
         /// <summary>支援/输出倾向（行为档案「候选类别」）——支援型骨架多一个候选类别
-        /// （估「奶谁/去哪护」而非只「打谁」），非新脑（docs/active/32 §6.1）</summary>
+        /// （估「奶谁/去哪护」而非只「打谁」），非新脑（docs/32 §6.1）</summary>
         public enum CompanionRole
         {
             [InspectorName("输出型")] DamageDealer = 1,
             [InspectorName("支援型")] Support = 2,
         }
 
-        /// <summary>行为档案「目标偏好」：输出型=攻击目标锚；支援型=移动/保护锚（docs/active/32 §6.1）</summary>
+        /// <summary>行为档案「目标偏好」：输出型=攻击目标锚；支援型=移动/保护锚（docs/32 §6.1）</summary>
         public enum CompanionTargetPreference
         {
             [InspectorName("最近敌人")] NearestEnemy = 1,
             [InspectorName("最缺血我方")] MostWoundedAlly = 2,
         }
 
-        /// <summary>伙伴个体行为档案（docs/active/32 §6.1：评分骨架共享维度框架——每维度乘档案权重，
+        /// <summary>伙伴个体行为档案（docs/32 §6.1：评分骨架共享维度框架——每维度乘档案权重，
         /// 差异全在这）。v1 五维=偏好交战距离/技能优先权重/激进度/目标偏好/候选类别；
         /// 权重 1=中性（=评分制 v2 原口径）。</summary>
         [System.Serializable]

@@ -11,7 +11,7 @@ namespace GIC.Battle
     /// 本门为消耗检查/登记唯一出口**——移动走 MoveExecutor.GetMoveCosts（无 Move 条目单位常量兜底）。
     /// 资源路由（docs/18 决策十五）：
     /// - Energy（单位级）：Has=HasEnoughEnergy（门槛=消耗值非上限，B6a）；Charge=EnergyEffect(-, CategoryCost)
-    /// - Stamina（玩家账户）：**实际扣值按施法者层级强制换算**（D 批次操控分层 docs/active/32 §5.2——
+    /// - Stamina（玩家账户）：**实际扣值按施法者层级强制换算**（D 批次操控分层 docs/32 §5.2——
     ///   眷属 0/伙伴 5/魔神 10，UnitTierHelper.StaminaCostOf 唯一真源；技能资产声明值=基准/校验值，
     ///   实际扣值=层级函数——同一技能资产被多层级单位共享，技能级 costs 无法表达 per-tier 价格。
     ///   眷属 0=门槛恒过、登记跳过——决策十「眷属豁免」语义并入层级表自然表达，豁免特判退役）；
@@ -33,7 +33,7 @@ namespace GIC.Battle
         /// <param name="playerId">资源归属玩家（Stamina/Mora/Item/AnyItem 判定用）</param>
         /// <param name="staminaPoolOverride">决策期虚拟体力池（可选；null=读 sim 实池）——
         /// CompanionBrain 预留口径：伙伴决策时按「实池−己方已提交行动消耗−先前已定伙伴消耗」判定，
-        /// 防多伙伴对同一池超额承诺致后手落空（docs/active/32 §5.2「不出现选了落空」）</param>
+        /// 防多伙伴对同一池超额承诺致后手落空（docs/32 §5.2「不出现选了落空」）</param>
         /// <param name="isPlayerDirectControl">玩家直接操控标记（2026-10-12 拍板：伙伴技能解锁——
         /// 玩家通过配额直接操控伙伴时体力减免 5，可减免为负数=获得体力；AI 自主/号令=false 不减免）</param>
         public static bool Has(BattleSimState sim, Unit actor, string playerId, SkillCostEntry cost,
@@ -143,7 +143,7 @@ namespace GIC.Battle
                 Charge(sim, actor, playerId, cost, effects, isPlayerDirectControl);
         }
 
-        /// <summary>Stamina 条目实际扣值（层级换算唯一出口，docs/active/32 §5.2）：声明值=基准/校验值
+        /// <summary>Stamina 条目实际扣值（层级换算唯一出口，docs/32 §5.2）：声明值=基准/校验值
         /// （全技能资产按魔神基准 10 声明，编辑器校验行防漂移），实际扣值=施法者层级表
         /// （眷属 0/伙伴 5/魔神 10）。**玩家直接操控伙伴时减免 5（2026-10-12 拍板）**——可减免为负数
         /// （负值=获得体力）；AI 伙伴自主不减免。伙伴势力技能号令同带旗标（AI-1 批）——延奏/契约
