@@ -73,7 +73,7 @@ namespace GIC.Data
         [InspectorName("猎鹿人餐馆")]
         GoodHunter = 3014,
 
-        [InspectorName("西风骑士团")]
+        [InspectorName("骑士团总部")]
         KnightsOfFavonius = 3015,
 
         [InspectorName("西风大教堂")]

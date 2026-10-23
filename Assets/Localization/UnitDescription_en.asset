@@ -252,8 +252,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3015
-    m_Localized: The camp of the Knights of Favonius. Summons 1 Knight of Favonius
-      immediately when deployed, then again every 5 turns.
+    m_Localized: The headquarters of the Knights of Favonius. Summons 1 Knight
+      of Favonius immediately when deployed, then again every 5 turns.
     m_Metadata:
       m_Items: []
   - m_Id: 3016

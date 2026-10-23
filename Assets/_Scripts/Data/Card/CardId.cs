@@ -48,7 +48,7 @@ namespace GIC.Data
     /// <summary>
     /// 购买价格单源（决策八十六批E，docs/active/45 §7.2 拍板 #11）：
     /// - 单位卡（角色/建筑）= GetEffectiveDeployCost() / 2（部署价一半——安柏/凯亚/琴/芭芭拉 3★ 出战 50→25、
-    ///   西风骑士团/大教堂 3★ 出战 60→30；2026-10-23 起建筑默认表按单位类型分档，见 UnitConfig.GetDeployCost）；
+    ///   骑士团总部/大教堂 3★ 出战 60→30；2026-10-23 起建筑默认表按单位类型分档，见 UnitConfig.GetDeployCost）；
     /// - 物品卡=摩拉价值星级表 MoraValueOfStar（1★=5 / 2★=15 / 3★=30 / 4★=80 / 5★=200）。
     /// 消费方=BuyCardExecutor（Host 扣费校验）+ 购买面板角标/灰显（客户端镜像同口径）
     /// </summary>
