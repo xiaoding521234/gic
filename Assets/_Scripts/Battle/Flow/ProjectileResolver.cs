@@ -224,7 +224,13 @@ namespace GIC.Battle
                 {
                     float stepT = BattleMetrics.MoveStepSeconds;
                     int totalSteps = path.Count - 1;
-                    if (t0 >= totalSteps * stepT)
+                    // 尾段判定必须与下方 seg 同源（2026-10-23 执行阶段卡死修复，docs/14 §166）：
+                    // k×stepT 在 k=7/14… 处 float32 平局向下取整，segEnd 落盘为低侧值，而
+                    // t0 >= totalSteps*stepT 的比较按未取整的高侧积求值 → 守卫漏判走进 else，
+                    // +1e-4f 容差把 seg 顶成 totalSteps → path[seg+1] 越界炸死回合协程（执行阶段永久卡死）。
+                    // 改用 seg>=totalSteps 判尾段，两处取整同源，漏判与越界一并消除。
+                    int seg = Mathf.FloorToInt(t0 / stepT + 1e-4f);
+                    if (seg >= totalSteps)
                     {
                         segEnd = maxT; // 静止尾段：停在终点
                         unitPos = CellCenter(path[totalSteps]);
@@ -232,7 +238,6 @@ namespace GIC.Battle
                     }
                     else
                     {
-                        int seg = Mathf.FloorToInt(t0 / stepT + 1e-4f);
                         segEnd = Mathf.Min((seg + 1) * stepT, maxT);
                         float frac = Mathf.Clamp01((t0 - seg * stepT) / stepT); // t0 可能落在段中（launch 非步进整倍数）
                         unitPos = Vector2.Lerp(CellCenter(path[seg]), CellCenter(path[seg + 1]), frac);
