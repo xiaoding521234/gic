@@ -2301,3 +2301,23 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **提取资产现值的配方（node 解码 \uXXXX）**：`git -c core.quotepath=false show HEAD:Assets/Localization/{表}_{lang}.asset` → 按 `- m_Id: <枚举值>` 行取下一行 `m_Localized:` 值解码——注意条目行形态带列表破折号（`- m_Id:`，正则须含 `-\s*`），与 SharedData 的键行不同。
 
+## §168 表现协程持 UnitView 跨 yield 的拆件窗口（守卫族）+AI 升命候选域漏排建筑（2026-10-24 观察局三局实锤：终局在途伤害数字协程×2 MissingReferenceException；升命候选日志混入 `KnightsOfFavonius/FavoniusCathedral C0→C1` 靠平票侥幸未中）
+
+**症状①（客户端崩溃）**：探针 2 终局段（核心被摧毁消散）`BattlePlayer+<PlayDamageCoroutine>d__153.MoveNext () (BattlePlayer.cs:1585)` 连抛 2 次 `MissingReferenceException: The object of type 'UnitView' has been destroyed`。根因=**表现协程把 UnitView 引用跨 yield 持有**：`PlayDamageCoroutine(view, delay, …)` 先 `WaitForSeconds(delay)`（投射物命中延迟可达 ~1s），期间同一单位被 Death/消散命令拆件（0.45s 淡出→Destroy），yield 归来继续访问 `view.IsFogHidden/ApplyHpDelta/transform.position` 即炸。**同族全部命中**：PlayEnergyDeltaCoroutine（LaunchDelayOf 延迟窗口同构）、PlayMoveCoroutine/PlayBlockedBumpCoroutine（补间 lambda 逐帧触 view，单位移动中死亡即炸）、PlayProjectileThenDamageCoroutine（`casterView.ProjectileOriginWorld` 与 `target.transform.position` 兜底分支）。**修法=守卫族**：delay yield 后 `if (view == null) yield break;`（Unity 假 null 覆盖已销毁对象）；补间 lambda 内 `{ if (view != null) view.ApplyPosition(…); }`；finally 段 `if (view != null)` 再触；投射物 `to` 兜底加 `target != null ? … : _board.CellToWorld(command.cell)`。**A/B 验证**：被动 P1 同命令流终局——修复前 T12 终局段 2 次异常，修复后同局零异常+3s 后置等待清白。
+
+**症状②（AI 候选域）**：`PlayerQuotaBrain.EvaluateUpgrades` 只过滤 `starLevel<3`——**「3★+」写的是星级意图、漏了 unitType**：3★ 建筑（骑士团总部/大教堂）混入升命候选并与角色同分（观察局 T24 实证 `升命候选 KnightsOfFavonius C0→C1 分=66`、`FavoniusCathedral C0→C1 分=66`，靠 tracker 先到先得的平票才没选中）。选中后果=以 `deployCell=核心格`（升命候选的占位落点）走**部署链**烧摩拉——甚至把新建筑叠到核心格上。Host 侧升命分支本有 `data.unitType != UnitType.Building` 防线（决策八十六⑦），AI 候选域必须同口径：`if (data.unitType == UnitType.Building) continue;`。
+
+**附（同局观察结论，勿再当 bug 修/排查）**：①`[EffectCompiler] xxx 目标无效（Uxx），行动落空` 出现在 AI 延奏目标于**本回合更早的片**被打死时——片前快照按片新拍（TurnResolver L147 片前快照），尸体=合法拒绝，WYSIWYG 语义非 bug（AI 选了残血目标属观感问题）；②延奏选西风骑士（蒙德阵营 Character 型眷属）**合法**——docs/07-势力机制/蒙德.md「全图任意一个我方角色」；③眷属「锁」（冻结）回合被 FamiliarBrain.DecideAll 的 CanAct 过滤正确缺席；④召唤骑士落点=总部自身格（互不阻挡语义，`TrySummonAtNearestCell` origin 优先）——骑士叠在建筑上起步=预期。
+
+**观察局方法论坑（复用）**：连续 `exec_runtime_script` 观察局之间**必须 `unity_editor stop`**——上一局的 BattleScreen 若还在 Play 态，新脚本的 `FindObjectOfType<BattleScreen>` 会拿到**旧 session**（探针 5 首跑误读旧终局 3.5s 假完成，还顺带开了一场无人值守新局）。开局前等 SceneTransition 锁的老坑之外，加这条「先清场再开新局」。
+
+## §169 环墙核心判「真不可达」→敌方骑士全员 DecideOne=null 原地挂机（2026-10-24 用户 2v2 暂停局活体取证实锤「队友和敌人的西风骑士都在挂机」——1v1 探针测不出的几何病灶）
+
+**症状**：2v2（用户+AI_2 同队 A vs AI_1+AI_3 队 B），AI_2 的四名骑士（U62/U68/U82/U86）**全部一动不动站在召唤格 10+ 回合、DecideOne=null、不进眷属决策名单**。根因链=**建筑 AI 把自家核心四邻铺满**（AI_1 核心 (12,2) 四邻=旗帜 (13,2)/教堂 (11,2)/猎鹿人 (12,1)/(12,3)；AI_3 核心同构全堵）→ `BuildApproachField` 的 goals 集（=目标十字邻格中「可通行+无占」的格）**为空** → 多源 BFS 无源 → `dist[from]<0` 判「真不可达」返回 0 → 眷属脑对两个核心全拿 0 步、可感知的非核心远敌（雾账本可见但在攻击视野 5 格外）又被 CR 式视野门设计性跳过 → **全目标缺席 → null → 挂机**。1v1 探针不复现是因为基地环墙要凑满四块才触发，双方 AI 疯狂建设的 2v2 才自然凑齐（用户首次报障时 1v1 观察局三局全绿是对的——不是用户看错，是几何没凑齐）。雾「贴身 1 格账本揭开自愈」链也被环墙打断：骑士永远贴不了身，账本永远揭不开。
+
+**修法（攻城墙环扩展）**：goals 一圈全堵时**逐环外扩**——被堵邻格（占/不可行）自身的十字邻格（可通行+无占）也入目标集，直到找到可用格（受地图边界天然约束，expanded 防重+guard 兜底）。语义=**贴墙格就是墙单位自身的攻击位**：骑士站定 → 下个选择阶段探索账本揭示墙单位（雾自愈链恢复）→ 此后挥棒拆墙（环墙单位 HP 实测下降）→ 破墙后核心恢复可近。**有任一开放邻格时本块零行为变化**（只在 goals 全空时触发）——1v1 稀疏基地/普通单位围杀场景全零扰动；对「单位被四个敌人围死」同理受益（贴围杀者=其攻击位）。消费面=FindApproachFirstStep/FindApproachStraightSteps 全通（眷属攻击/核心锚定+伙伴 fallback 两脑）。
+
+**验证（2v2 复刻局，T1-T24）**：敌双核心 T13 起环墙 4/4 触发完全同构几何，**全程 A 队骑士 null 数=0**；U24 从 (4,11) 推进到 (10,12) 顶墙挥棒，U38/U48/U53/U56 贴墙后挥棒/全力挥棒连发，**环墙单位 HP 逐回合实测下降**（U19 150→96→80、U31 200→166，被教堂奶回再被打——攻防拉锯成立）；敌我骑士双向交战无站桩；24 回合 4 人局零异常。
+
+**顺带观察（勿当 bug 修/后续拍板项）**：①2v2 双核心等距时眷属核心锚定在等距线上小步游移（实局 U54 类 (11,10) 漂移）——与伙伴脑「锚翻转振荡 hysteresis」挂账同族（docs/11），眷属侧是否加迟滞窗口待拍板；②敌骑士「在自己基地驻扎防御」在观感上也像挂机（用户报障的敌侧成分）——实际是在打入侵者，修复后攻方破墙会打破这种静态。
+

@@ -518,6 +518,9 @@ namespace GIC.Battle
                 if (candidates.Exists(c => c.unitName == card.value)) continue; // 同卡去重=一次只评一级
                 var data = config.GetUnitData((UnitName)card.value);
                 if (data == null || data.starLevel < 3) continue; // 升命语义=3★+（执行器同口径）
+                if (data.unitType == UnitType.Building) continue; // 建筑无命座（决策八十六⑦「升命分支对建筑不适用」
+                // ——执行器同口径已分流铺场链）。2026-10-24 观察局 T24 实证 3★ 建筑混入候选靠平票侥幸未中：
+                // 选中后会以核心格为落点走部署链烧摩拉——升命候选域排除建筑
                 candidates.Add((card.value, data));
             }
             if (candidates.Count == 0) return;

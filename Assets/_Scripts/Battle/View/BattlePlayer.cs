@@ -452,7 +452,7 @@ namespace GIC.Battle
                 float arrowFacial = command.arrowHeightY > 0 ? command.arrowHeightY / 1000f : BattleMetrics.ArrowFlightHeight;
                 Vector3 from = _board.CellToWorld(command.cell);
                 float planeDepth = 0f; // 立牌面前伸量（55° 后仰：面上点随高度前移 sin55°×面内高）
-                if (_views.TryGetValue(command.actorUnitId, out var casterView))
+                if (_views.TryGetValue(command.actorUnitId, out var casterView) && casterView != null)
                 {
                     Vector3 cellCenter = from;
                     from = casterView.ProjectileOriginWorld(arrowFacial);
@@ -460,7 +460,7 @@ namespace GIC.Battle
                 }
                 Vector3 to = command.hitX != 0 || command.hitY != 0
                     ? _board.ContinuousCellToWorld(command.hitX / 1000f, command.hitY / 1000f)
-                    : target.transform.position; // 兜底：无定点数据时飞向目标
+                    : target != null ? target.transform.position : _board.CellToWorld(command.cell); // 兜底：无定点数据时飞向目标；目标在飞行窗口内被拆件回落命中格（守卫族）
                 to.y = from.y; // 与发射点同高=水平直线（飞行段世界系正常视差）
                 to.z += planeDepth; // 全程保持发射面深度=贴面飞行（东西向与一切立牌共面）
 
@@ -1389,11 +1389,15 @@ namespace GIC.Battle
                 float stepSeconds = MoveStepSeconds / _playbackSpeed;
                 for (int i = 1; i < path.Count; i++)
                 {
+                    if (view == null) break; // 中途死亡/消散拆件：停止补间（守卫族同 PlayDamageCoroutine）
                     Vector3 from = _board.CellToWorld(path[i - 1]);
                     Vector3 to = _board.CellToWorld(path[i]);
-                    yield return BattleViewTween.Over(stepSeconds, t => view.ApplyPosition(Vector3.Lerp(from, to, t)));
+                    yield return BattleViewTween.Over(stepSeconds, t =>
+                    {
+                        if (view != null) view.ApplyPosition(Vector3.Lerp(from, to, t));
+                    });
                 }
-                if (path.Count > 0)
+                if (path.Count > 0 && view != null)
                     view.ApplyPosition(_board.CellToWorld(path[path.Count - 1]));
 
                 // 被挡撞墙弹回：Host 已停在被挡格前（全挡=原格 / 部分挡=被挡格前一格），表现层探出再弹回
@@ -1403,7 +1407,7 @@ namespace GIC.Battle
             }
             finally
             {
-                view.SetMoveAnimation(false);
+                if (view != null) view.SetMoveAnimation(false); // 拆件后勿触（守卫族）
                 _meaningfulActionInFlight--; // 移动结算（正常/中断同收）
             }
         }
@@ -1422,12 +1426,16 @@ namespace GIC.Battle
 
             Vector3 home = _board.CellToWorld(homeCell);
             Vector3 peak = home + dir * 被挡撞墙探出幅度;
-            // 探出：缓出减速（挤向被挡格的"尝试"感）
+            // 探出：缓出减速（挤向被挡格的"尝试"感）；补间期间目标可能被拆件——lambda 内守卫（守卫族）
             yield return BattleViewTween.Over(stepSeconds * BlockedBumpOutSecondsFactor, t =>
-                view.ApplyPosition(Vector3.Lerp(home, peak, 1f - (1f - t) * (1f - t))));
+            {
+                if (view != null) view.ApplyPosition(Vector3.Lerp(home, peak, 1f - (1f - t) * (1f - t)));
+            });
             // 弹回：快速离开、临原位缓停（末帧保证 t=1 精确归位）
             yield return BattleViewTween.Over(stepSeconds * BlockedBumpBackSecondsFactor, t =>
-                view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t))));
+            {
+                if (view != null) view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t)));
+            });
         }
 
         /// <summary>反应子类型 → 本地化反应名（短命数字对象直接求值当前语言，不挂 TextCombiner）。
@@ -1542,6 +1550,11 @@ namespace GIC.Battle
             if (delay > 0f)
                 yield return new WaitForSeconds(delay);
 
+            // 延迟窗口内目标视图被拆件守卫（2026-10-24 观察局终局实锤：核心消散时在途伤害数字协程×2
+            // 访问已销毁 UnitView 抛 MissingReferenceException——死亡/消散命令与带命中延迟的数字协程
+            // 同段并发）：视图没了数字无锚定点，静默收尾（Unity 假 null 判定覆盖已销毁对象）
+            if (view == null) yield break;
+
             // 治疗不闪受击红（2026-09-25 三轮审查 S5 批修正：原实现无条件 FlashHit，
             // 治疗 +N 跳血时立牌闪红观感错误）；受击闪色维持原数字存活节律再恢复——
             // 拆独立协程不 gate ack（S5：纯装饰尾巴曾挂在 playbacks 里把每片拉长 0.8s）
@@ -1600,6 +1613,7 @@ namespace GIC.Battle
         private IEnumerator PlayEnergyDeltaCoroutine(UnitView view, BattleCommand command)
         {
             yield return new WaitForSeconds(LaunchDelayOf(command));
+            if (view == null) yield break; // 命中延迟窗口内视图被拆（同 PlayDamageCoroutine 守卫族）
             view.ApplyEnergyDelta(command.value);
             SpawnEnergyNumber(view, command.value);
         }

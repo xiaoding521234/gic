@@ -213,6 +213,15 @@ namespace GIC.Battle
             return 0; // 无路（真不可达）：缺席
         }
 
+        /// <summary>goals 是否存在任一可用格（攻城墙扩展的「一圈全堵才外扩」判据，2026-10-24）</summary>
+        private static bool HasAnyGoal(bool[,] goals)
+        {
+            for (int x = 0; x < goals.GetLength(0); x++)
+                for (int y = 0; y < goals.GetLength(1); y++)
+                    if (goals[x, y]) return true;
+            return false;
+        }
+
         /// <summary>逼近场构建（FindApproachFirstStep/FindApproachStraightSteps 共用口径，防双份漂移
         /// ——2026-10-03 抽提）：同格判定+单位占据格（含尸体；互不阻挡开启时友方格放行=CanEnter 的
         /// 保守近似，细节与同步条件见 FindApproachFirstStep 注释）+目标集（敌格十字邻格中「可通行且
@@ -256,14 +265,49 @@ namespace GIC.Battle
             // 目标集：敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
             // 被占/不可行邻格一律剔除——否则小兵走进去每回合被弹回=二轮报障根因）
             goals = new bool[map.width, map.height];
+            var blockedRing = new List<BattleCell>(); // 被堵邻格（攻城墙扩展的种子，见下）
             foreach (var dir in CrossDirections)
             {
                 var delta = SkillHitResolver.DirectionToDelta(dir);
                 int gx = target.x + delta.x, gy = target.y + delta.y;
                 if (!map.HasTile(gx, gy)) continue;
-                if (!map.IsPassable(gx, gy, forceType)) continue;
-                if (occupied[gx, gy]) continue;
+                if (!map.IsPassable(gx, gy, forceType) || occupied[gx, gy])
+                {
+                    blockedRing.Add(new BattleCell(gx, gy));
+                    continue;
+                }
                 goals[gx, gy] = true;
+            }
+            // 攻城墙扩展（2026-10-24 用户 2v2 实战实锤）：核心四邻被己方建筑/单位环墙全部堵满时
+            // goals 空→多源 BFS 无源→「真不可达」→敌侧骑士全目标 0 步→DecideOne=null 原地挂机
+            //（实局取证：AI_2 四骑士站召唤格 10+ 回合零决策）。修复语义：一圈全堵时逐环外扩——
+            // 贴墙格=墙单位自身的攻击位，骑士站定后探索账本揭示墙单位（雾「贴身 1 格自愈」链补全），
+            // 下回合起挥棒拆墙，破墙后核心恢复可近；有任一开放邻格时零行为变化（本块不触发）。
+            // expanded 防重：阻塞格互邻时防环；外扩环天然受地图边界约束，guard 为兜底保险。
+            if (blockedRing.Count > 0 && !HasAnyGoal(goals))
+            {
+                var expanded = new bool[map.width, map.height];
+                foreach (var b in blockedRing) expanded[b.x, b.y] = true;
+                int guard = 0;
+                while (blockedRing.Count > 0 && !HasAnyGoal(goals) && guard++ < 32)
+                {
+                    var nextRing = new List<BattleCell>();
+                    foreach (var b in blockedRing)
+                        foreach (var dir in CrossDirections)
+                        {
+                            var delta = SkillHitResolver.DirectionToDelta(dir);
+                            int gx = b.x + delta.x, gy = b.y + delta.y;
+                            if (!map.HasTile(gx, gy)) continue;
+                            if (gx == target.x && gy == target.y) continue; // 目标本体格不入目标集
+                            if (!map.IsPassable(gx, gy, forceType) || occupied[gx, gy])
+                            {
+                                if (!expanded[gx, gy]) { expanded[gx, gy] = true; nextRing.Add(new BattleCell(gx, gy)); }
+                                continue;
+                            }
+                            goals[gx, gy] = true;
+                        }
+                    blockedRing = nextRing;
+                }
             }
             // I-D 移动意图占位：前位已声明落点并入 occupied（越界格跳过；声明口径=乐观落点，
             // 结算偏差保守向——多绕路不会死锁，真实结算后下回合重算吸收）
