@@ -72,6 +72,32 @@ namespace GIC.Battle
 
         // ==================== 敌人查找 ====================
 
+        /// <summary>决策单位对敌单位的战术感知（2026-10-23 实战报障「敌方凯亚无视距离更近的
+        /// 我方凯亚、直奔协议核心」修复）：=队伍迷雾可见（IsUnitVisibleTo 单出口——探索账本/核心
+        /// 透视/视野暴露）**或**目标处于自身攻击视野（GetEffectiveAttackVision，决策三十一既定
+        /// 「追击感知半径」）切比雪夫半径内。Why：迷雾批把 AI 感知唯一入口收在探索账本（探索视野
+        /// 仅 1~2 格），低于决策三十一眷属 v7「攻击视野内才追」与伙伴 J-4「自身攻击视野内无普通敌
+        /// 才推核心」的既定语义——雾局下近处敌（2~5 格、所在格未探索）对 AI 完全不存在=J-4 每回合
+        /// 判「无视野敌」直奔核心、v7 追击域被账本架空（2026-10-23 观察局实锤：d=3 敌不在锚集）。
+        /// 雾只压**战略情报**（远端敌情——威胁图/AIStrategist/OpponentProfiler 仍走 IsUnitVisibleTo
+        /// 团队账本口径，勿混用本口），不夺单位自己的武器视距。敌我/存活过滤由调用方负责（本判定
+        /// 只管「看得见」）；本口为 Host 决策侧专用，结算域禁入</summary>
+        public static bool PerceivesEnemy(BattleSimState sim, Unit self, Unit enemy)
+        {
+            if (sim == null || self == null || enemy == null) return false;
+            var identity = self.GetUnitComponent<UnitIdentity>();
+            if (identity == null) return false;
+            return sim.IsUnitVisibleTo(identity.Team, enemy) || IsEnemyInTacticalSight(sim, self, enemy);
+        }
+
+        /// <summary>目标处于自身攻击视野（Chebyshev ≤ GetEffectiveAttackVision，Unspecified 回落 5——
+        /// 与眷属 v7 追击域/J-4/H-3 视野敌判同口径）内——「武器够得着的敌情自己看得见」</summary>
+        public static bool IsEnemyInTacticalSight(BattleSimState sim, Unit self, Unit enemy)
+        {
+            int vision = self.RawData != null ? self.RawData.GetEffectiveAttackVision() : 5;
+            return sim.GetPosition(enemy).ChebyshevTo(sim.GetPosition(self)) <= vision;
+        }
+
         /// <summary>
         /// 距离某单位最近的存活敌方单位（切比雪夫距离——docs/03 §3.3 八方向等价度量；
         /// 等距平局取 unitId 升序=枚举序铁律）
@@ -86,8 +112,9 @@ namespace GIC.Battle
         /// 低级单位换目标巡逻用（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标巡逻」：
         /// 逐敌试逼近步，贴身打不了/不可达的自动换下一个）；纯读不改状态。
         /// **AI 迷雾收口（2026-10-17 追拍三「AI 也受雾限」）**：雾内敌方不入列（敌方核心恒可见=
-        /// 攻城锚零回归，sim.IsUnitVisibleTo 单出口）——眷属目标序/伙伴敌锚/FindNearestEnemy
-        /// 三消费方一处收口；结算域勿走此口</summary>
+        /// 攻城锚零回归）——眷属目标序/伙伴敌锚/FindNearestEnemy 三消费方一处收口；结算域勿走此口。
+        /// **战术视距（2026-10-23 报障修复）**：判定走 PerceivesEnemy（雾账本可见或自身攻击视野内）
+        /// ——探索账本未覆盖的近处敌（≤攻击视野）照常入列，v7/J-4 语义在雾局恢复成立</summary>
         public static List<Unit> FindEnemiesByDistance(BattleSimState sim, Unit self)
         {
             var selfId = self.GetUnitComponent<UnitIdentity>();
@@ -101,7 +128,7 @@ namespace GIC.Battle
                 var id = unit.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.Team == selfId.Team) continue; // 敌我=TeamType 口径（2026-09-25 三轮审查 C2）
                 if (BattleSimState.IsDead(unit)) continue;
-                if (!sim.IsUnitVisibleTo(selfId.Team, unit)) continue; // AI 雾限（追拍三）：雾内敌方不可见
+                if (!PerceivesEnemy(sim, self, unit)) continue; // AI 雾限（追拍三）+战术视距（2026-10-23）：账本外近敌（≤自身攻击视野）照常入列
                 result.Add(unit);
             }
             var distOf = new Dictionary<Unit, int>();

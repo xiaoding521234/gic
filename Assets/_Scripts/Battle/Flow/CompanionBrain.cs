@@ -829,7 +829,7 @@ namespace GIC.Battle
                             var eid = e.GetUnitComponent<UnitIdentity>();
                             if (eid == null || eid.Team == selfIdJ2.Team) continue;
                             if (BattleSimState.IsDead(e)) continue;
-                            if (!sim.IsUnitVisibleTo(selfIdJ2.Team, e)) continue; // AI 雾限（追拍三）
+                            if (!BattleHeuristics.PerceivesEnemy(sim, unit, e)) continue; // AI 雾限（追拍三）+战术视距（2026-10-23）：光环内近敌照常计数
                             if (sim.GetPosition(e).ChebyshevTo(selfPosJ2) <= auraRadiusJ2) enemiesInAuraJ2++;
                         }
                 }
@@ -1055,7 +1055,8 @@ namespace GIC.Battle
             // 自身攻击视野内（GetEffectiveAttackVision 回落 5，眷属 v7 同口径）无普通敌单位（建筑不算
             // 「其它敌人」）→ 敌方核心（IsCore tag 化 2026-10-13——协议核心/未来世界树同识别，
             // 眷属 v7 同识别）插队锚序首直奔推进；视野内有普通敌=原最近敌锚序零变化。
-            // 核心插在 lock 之后=无视野敌时推核心优先于上回合锁定。
+            // 核心插在 lock 之后=无视野敌时推核心优先于上回合锁定；核心自身永不入 E-3 锁（RememberMoveAnchor
+            // 排除，2026-10-23 报障修复——锁核心=新出现的近敌被永久无视，观察局 S2 实锤）。
             int attackVisionJ4 = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;
             bool anyVisionEnemyJ4 = false;
             foreach (var e in enemyAnchors)
@@ -1519,7 +1520,7 @@ namespace GIC.Battle
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue;
                 if (BattleSimState.IsDead(enemy)) continue;
-                if (!sim.IsUnitVisibleTo(team, enemy)) continue; // AI 雾限（追拍三）
+                if (!BattleHeuristics.PerceivesEnemy(sim, unit, enemy)) continue; // AI 雾限（追拍三）+战术视距（2026-10-23）
                 var pos = sim.GetPosition(enemy);
                 int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
                 if (dist < nearest) nearest = dist;
@@ -1705,13 +1706,20 @@ namespace GIC.Battle
             return Mathf.Max(0, Mathf.RoundToInt(rawDamage * Mathf.Max(0f, mitigation)));
         }
 
-        /// <summary>移动锚延续记录（E-3）：只记**敌方**锚（支援伤员锚动态变化频繁——奶满即失效，
-        /// 锁定反而滞后；敌方锚=火力目标，锁定语义成立）。我方锚/取不到 id=不记录</summary>
+        /// <summary>移动锚延续记录（E-3）：只记**敌方非核心**锚（支援伤员锚动态变化频繁——奶满即失效，
+        /// 锁定反而滞后；敌方锚=火力目标，锁定语义成立）。我方锚/核心/取不到 id=不记录。
+        /// **核心不锁（2026-10-23 实战报障修复）**：核心=J-4 每回合按「自身攻击视野内无普通敌」
+        /// 重插锚序首的战略目标，非追击对象——锁核心会让单位在视野内出现更近敌后仍永久直奔核心
+        /// （2026-10-23 观察局 S2 实锤：账本可见 d=3 敌+锁核心 → 仍奔核心；与 J-4 注释
+        /// 「视野内有普通敌=原最近敌锚序零变化」自相矛盾）。J-4 插队已提供核心推进的每回合续位
+        /// （无视野敌时恒重插，无需锁）；E-3 防多锚振荡语义仅保留给非核心敌锚——与眷属 v7
+        /// （每回合纯核心锚定、无锁）对齐</summary>
         private static void RememberMoveAnchor(BattleSimState sim, Unit unit, Unit anchor, TeamType team)
         {
             if (_bidPhase) return; // I-A 申报遍：纯读申报，槽写入抑制（未获名额伙伴零脏写）
             var anchorIdentity = anchor?.GetUnitComponent<UnitIdentity>();
             if (anchorIdentity == null || anchorIdentity.Team == team) return;
+            if (BattleHeuristics.IsCore(anchor)) return; // 核心不锁（2026-10-23）：J-4 按回合重插，锁它=新出现的近敌被永久无视
             if (sim.TryGetUnitId(unit, out var unitId) && sim.TryGetUnitId(anchor, out var anchorId))
                 _lastMoveAnchors[unitId] = anchorId;
         }
@@ -1754,7 +1762,7 @@ namespace GIC.Battle
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue; // 敌我=TeamType 口径
                 if (BattleSimState.IsDead(enemy)) continue; // 尸体不构成贴脸威胁
-                if (!sim.IsUnitVisibleTo(team, enemy)) continue; // AI 雾限（追拍三）：雾内敌不触发自保
+                if (!BattleHeuristics.PerceivesEnemy(sim, unit, enemy)) continue; // AI 雾限+战术视距（2026-10-23）：攻击视野内近敌照常触发自保
                 var pos = sim.GetPosition(enemy);
                 if (Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y)) < SupportDangerRadius)
                     return Mathf.RoundToInt(SupportSelfPreserveScore * profile.自保权重)
@@ -1885,7 +1893,7 @@ namespace GIC.Battle
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
                 if (enemyIdentity == null || enemyIdentity.Team == team) continue;
                 if (BattleSimState.IsDead(enemy)) continue;
-                if (!sim.IsUnitVisibleTo(team, enemy)) continue; // AI 雾限（追拍三）
+                if (!BattleHeuristics.PerceivesEnemy(sim, unit, enemy)) continue; // AI 雾限（追拍三）+战术视距（2026-10-23）
                 var pos = sim.GetPosition(enemy);
                 int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
                 if (dist <= auraRadius) count++;
@@ -1908,7 +1916,7 @@ namespace GIC.Battle
                 var identity = enemy.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team == myTeam) continue;
                 if (BattleSimState.IsDead(enemy)) continue;
-                if (!sim.IsUnitVisibleTo(myTeam, enemy)) continue; // AI 雾限（追拍三）：雾内敌不在视野敌集
+                if (!BattleHeuristics.PerceivesEnemy(sim, vanguard, enemy)) continue; // AI 雾限+战术视距（2026-10-23）：先锋攻击视野内近敌照常入集（与集合本义一致——集合本就按先锋攻击视野截取）
                 var pos = sim.GetPosition(enemy);
                 if (Math.Max(Math.Abs(pos.x - vp.x), Math.Abs(pos.y - vp.y)) <= vision)
                     result.Add(kv.Key);

@@ -1757,7 +1757,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **场景**：AI 决策类改动（三脑增强/支援型重构）需要验证「眷属/伙伴行为是否正常」——纯编译验证只证不炸，行为正确性要么交用户目检（慢、难归因单回合决策），要么自动对局观察。
 **技法**（exec_runtime_script 全链，Play 自动进入）：
-1. **开局**=`BattleLaunchConfig.LaunchSinglePlayer(null)`（P1 真人+P2 AI 配额脑就位；绕过主界面直开战斗场景——BattleScreen 有装配兜底链可裸启）；
+1. **开局**=`BattleLaunchConfig.BuildFromRoster(null, [P1 真人(BattleDebugPlayerIds.P1/TeamType.A/Blue/Zone1), P2 AI(BattleDebugPlayerIds.P2/TeamType.B/Red/Zone2/IsAI=true)])` + `Launch(config)`（**2026-10-23 追记九实证——旧 `LaunchSinglePlayer(null)` 已随决策六十五退役勿再用**；BuildFromRoster 天然 FogMode=Skirmish=用户实战同模式；本地玩家身份自动回落 BattleDebugPlayerIds.P1；组合根经 `BattleScreen.Session` 公开属性拿——**BattleSession 是纯 C# 非 UnityEngine.Object，FindObjectOfType 不可用（CS0311）**；从 MainHall/Splash 场景冷启动即可，装配 ~10s 内出现）；
 2. **放权观察**=真人位每回合 `SubmitAction(Pass)`——自主军团（眷属+伙伴）照常运转=最干净的观察模式；
 3. **眷属真实决策**=反射 `TurnFlowController._familiarUnitActions`（private 字段，BeginSelectPhase 头已定——Selecting 期间可读，与旁听同输入可互证确定性）；
 4. **伙伴决策旁听**=直接调 `CompanionBrain.DecideAll(sim, turn, [P1Pass])`——评分制是纯函数（同快照恒同输出），旁听安全；**旁听口径注记**：真实伙伴脑跑在收齐全部玩家选择后（含 P2 行动），旁听时 P2 未交（0.8s 延迟）=少 P2 输入的近似，体力预留维度可能有偏差，行为方向观察够用；
@@ -1771,7 +1771,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 - **⑤seed 对战局无效（2026-10-03 G 批实证）**：全员幸运 0 时 `RollChance` 判定 ≤0 恒否**从不消费 RNG**——战局 100% 由确定性评分+AI 决定，**换 seed 战局逐位一致≠代码没生效**（三局同构假象的根源）；要验证行为变化，改的是评分/决策代码本身，别怀疑 seed。
 - **⑥反射探针法（行为归因的标准工具，G 批三轮归因全靠它）**：exec_runtime_script 直接反射调 private 评分方法（`typeof(CompanionBrain).GetMethod("ScoreSupportCell"/"ScoreMoveCandidate", NonPublic|Static)`+Activator 建 CandidateTracker）dump 逐格评分明细/档案实值/锚延续槽（_lastMoveAnchors static 字段）/地形图（HasTile×IsPassable 逐格渲染 15×15）——比快照对比纸上推演高效一个量级（环湖 BFS 走歪/伤员自身奶程锁两案均一发定位）。**探针调用陷阱**：调 ScoreMoveCandidate 要先跑 ScoreAttackCandidates 拿真实 hasActionCandidate（传 false 会改变驻位分支行为）。
 **How to apply**：AI 决策类批次的**结构化行为验证**默认走本 harness（非视觉：决策序列+快照 diff 足够判断行为正确性——画面观感仍交用户）；全量逐回合日志落盘（`File.WriteAllText`+UTF8 无 BOM）防返回截断——注意 Unity 的 `Temp/` 目录**编辑器退出时清空**，长存拷出。本节 harness 完整可抄范本=2026-10-03 会话 exec_runtime_script（战斗 AI 观察两局：8 回合抽样局+28 回合完整局）。
-- **⑦Play 中再 Launch=拿不到新局（2026-10-04 H 批实证）**：上一局 Play 未 stop 时再调 `LaunchSinglePlayer`，场景 Single 重载不生效（120s 找不到新装配 session），而 `FindObjectOfType<BattleScreen>()` 秒回**旧局**（Phase=Finished）——旧 session 通过一切等待条件、for 循环 335ms 假返回。**harness/探针连跑前必须先 `unity_editor stop`**；判新局的可靠指纹=`Phase==Idle && TurnNumber==0`（装配中）而非"找到了 session"。
+- **⑦Play 中再 Launch=拿不到新局（2026-10-04 H 批实证）**：上一局 Play 未 stop 时再 `Launch`（新配置），场景 Single 重载不生效（120s 找不到新装配 session），而 `FindObjectOfType<BattleScreen>()` 秒回**旧局**（Phase=Finished）——旧 session 通过一切等待条件、for 循环 335ms 假返回。**harness/探针连跑前必须先 `unity_editor stop`**；判新局的可靠指纹=`Phase==Idle && TurnNumber==0`（装配中）而非"找到了 session"。
 - **⑧伙伴 `ApproachStraightPrefix` 切比判据 vs 眷属 `FindApproachStraightSteps` BFS dist 判据（H 批伴随返修实锤）**：两者都是「BFS 首步直线前缀防歪」但判据不同——前者按**到目标切比雪夫距离**严格递减截断，**平行绕行段（沿湖岸平移、切比距离不减）恒 0 前缀=该锚直接废**；后者按**多源 BFS dist 场步数**递减（平行段 BFS 步数照减=可走，眷属 v6.1 绕湖实测通过）。**「绕行到目标旁」的场景一律用 FindApproachStraightSteps（goals=目标十字邻格集），切比判据只适合直线可直达的防歪截断**。H 批 T4 探针现场：朝先锋方向全湖、直线射线只剩平行格（评分同分不动）+BFS 首步 Left 方向正确但切比前缀 0 步=双重卡死；换 FindApproachStraightSteps 后 T4-T5 两回合绕行到伴随位。**2026-10-04 I 批回填补遗（教训=同族修复须全消费方扫描）**：H 批返修时只改了支援伴随路径，**锚循环（输出型主路径）的同一消费点漏改**——集团拥挤场景 BFS 首步=侧移绕行、切比不递减=前缀恒 1 格=「凯亚开局只走 1 格、移速 30 没发挥」报障（距 H 批仅隔一天）。锚循环本批已换 FindApproachStraightSteps，`ApproachStraightPrefix` 全生产消费方清零=退役保留+标注勿新增消费方。**判据：修一个判据型原语的缺陷时，rg 它的全部调用点逐一评估同病灶**——只改报障路径=给下一个消费方埋雷。
 - **⑨探针取评分现场的完整姿势**（一轮定位）：反射 private static 评分原语（`ScoreSupportCell`/`FindApproachFirstStep`/`IsCellOccupiedForStep`/`ThreatPenaltyAt`，威胁图用 `OpponentThreatModel.Build` 现场重建）对关键候选格逐格 dump 总分+火线扣分，配射线逐格「通/占/距」表——此前推演半小时猜错方向，探针一发实锤根因（平行线+同分+严格大于=不动）。
 - **⑩旁听 DecideAll 污染 B 侧决策（2026-10-04 J 批实证）**：Selecting 期反射调 `CompanionBrain.DecideAll(sim, turn, [P1Pass])` 旁听——A 侧（真人全 Pass 输入完整）决策与真实一致；**B 侧因旁听少了 P2 玩家行动=配额池计算漂移→B 侧行为改变**（j3 旁听局 B 芭位置 vs 净观察局漂移 1 格）。旁听局适合归因 A 侧；对照净观察局（只提交 Pass 不旁听）拿 B 侧真实行为。旁听的槽写入（_lastMoveAnchors 等）与真实执行同回合覆写=无害。
@@ -2277,3 +2277,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **坑② 拍时刻 0 值与「未设置」歧义（已知未修，B2 搁置——2026-10-23 拍板）**：光环逐层拍=「第 i 层时刻 i×0.15s」设计上层内多目标应同拍——层 1+ 正常（launchMs>0 客户端到点齐跳），**层 0 的拍=0 被 `launchMs>0 ? LaunchDelayOf : stagger` 三元当「无命中时刻」回落错峰槽排队**，层内同拍在层 0 失效（层 0=多数光环常态层）。将来嫌层 0 弹字仍散再修：区分「0=立即」与「未设置」或给层 0 显式拍；**两层绝不合并弹**（拍板④逐层各弹一次）。
 
 **坑③（诊断方法论）「结算同时」≠「回放同时」**：Host 回合末一瞬全算完（同时结算拍板），客户端却按命令流逐条排程——用户感知「光环奶同时进行怎么会等很久」的真答案是回放层传送带。战斗节奏类报障先拆「Host 结算时长/客户端段播槽位数学/段门等待」三层再归因；段结构取证=%LOCALAPPDATA%\Tuanjie\Editor\Editor.log 的 `[TurnResolver] [Segment turn=N slice=M speed=S cmds=C]` 行（无时间戳无命令明细，构成按规则推演）。
+
+## §165 战术感知被探索账本独占+锚锁定战略目标——AI 无视近敌直奔核心（2026-10-23 实战报障实锤「敌方凯亚看见了我方凯亚且更近，却直奔协议核心」）
+
+**坑① 感知唯一入口的半径低于历史拍板的语义半径=语义被静默架空**：迷雾批（追拍三）把 AI 感知唯一入口收在探索账本（探索视野仅 1~2 格），而决策三十一眷属 v7「攻击视野内才追」与 J-4「自身攻击视野内无普通敌才推核心」都建立在攻击视野（5）上——雾局下这两个条件在账本口径里**永远读不到 2~5 格的未探索近敌**，拍板语义不是被限制而是被杀死：J-4 每回合判「无视野敌」核心插队直奔、v7 追击域失效（观察局实锤：d=3 我方凯亚不在锚集）。**教训：给「感知」收唯一入口前，先枚举全部历史拍板的感知半径语义（追击感知/探索揭雾/开火目标各自几格）——入口半径小于语义半径时，语义等于删除而非降级**。修法=BattleHeuristics.PerceivesEnemy（雾账本可见或**自身**攻击视野内，视距源=决策单位本体——勿做团队共享视距：安柏攻击视野 24，共享=她的视距团溢出杀死迷雾）；战略层（威胁图/战力比/对手档案/开火目标）维持账本口径=雾的牙齿。
+
+**坑② 锁定「战略目标」=僵尸承诺**：E-3 移动锚锁（防多锚贪心振荡）不排除敌方核心——任何推过核心的伙伴把核心锁进 `_lastMoveAnchors` 后，**新进入视野的更近敌永远排在锁定核心之后**（J-4 只在「无视野敌」时才把核心插到锁前；有视野敌时锁优先——与 J-4 注释「视野内有普通敌=原最近敌锚序零变化」直接矛盾）。**教训：防抖锁定的收益域=「同类目标间的小幅摆动」；锁每回合都被独立机制重估的战略目标（核心=J-4 重插）=把战略决策固化成永久承诺。判断一个锚能不能锁：它是否已有每回合续位机制——有就永不入锁**。修法=RememberMoveAnchor 排除 IsCore（E-3 防振荡语义保留给非核心敌锚，与眷属 v7 无锁对齐）。
+
+**坑③（方法论）行为读数方向歧义时，证据下沉到决策输入层**：近敌与核心同向（都朝西）时「朝谁移动」的行为分类天然混向——观察局探针把取证下沉到**决策输入层**（FindEnemiesByDistance 锚集 + IsUnitVisibleTo 返回值 + 反射 `_lastMoveAnchors` 锁值），「d=3 的单位不在锚集」一发实锤，比行为推演可靠一个量级；再配合逐步解除变量（手动揭账本/清锁）三步隔离，单局内同时锁定两个病灶并验证修复（A 相位 d=3 接战 / B 相位 d=6 恢复推核心=边界保留 / C 相位回 d=3 重接战）。全案=docs/18 决策七十九追记九；设计侧=docs/active/44 §10。
