@@ -1240,7 +1240,8 @@ namespace GIC.Battle
             return local.x >= min.x && local.x <= max.x && local.y >= min.y && local.y <= max.y;
         }
 
-        /// <summary>进入部署瞄准（点手牌卡）：可选格=核心半径 2（客户端粗筛，Host IsDeployCellValid 兜底）</summary>
+        /// <summary>进入部署瞄准（点手牌卡）：可选格=自己存活建筑锚并集（2026-10-23 拍板——
+        /// 核心锚建筑 3/角色 2、其它建筑锚建筑 2/角色 1；客户端粗筛，Host IsDeployCellValid 兜底）</summary>
         private void EnterDeployAim(int unitNameValue)
         {
             if (_state != HudState.Idle) return; // 仅手牌态可起（选中单位时手牌已隐藏）
@@ -1255,23 +1256,29 @@ namespace GIC.Battle
             _aimRecommendedCells.Clear();
             var snapshot = _session.Player.LatestSnapshot;
             var deployData = _unitConfig != null ? _unitConfig.GetUnitData((UnitName)unitNameValue) : null;
-            var core = FindMyCorePosition(snapshot);
-            // 建筑部署半径（决策八十六拍板 #6）：角色 2 格、建筑 3 格（核心为圆心同源）
-            int deployRadius = deployData != null && deployData.unitType == UnitType.Building
-                ? DeployUnitExecutor.DeployRadiusFromCoreBuilding : DeployUnitExecutor.DeployRadiusFromCore;
+            bool deployIsBuilding = deployData != null && deployData.unitType == UnitType.Building;
             // 迷雾批（2026-10-17 拍板 D4）：部署碰撞预判吃迷雾滤后快照——迷雾内敌方按不存在
             //（红格不得泄露隐藏敌人占位；地形不可行仍如实=允许泄露）
             var fogSnapshot = FogFilteredSnapshot(snapshot);
-            for (int dx = -deployRadius; dx <= deployRadius; dx++)
-            for (int dy = -deployRadius; dy <= deployRadius; dy++)
+            // 部署锚点并集（2026-10-23 拍板「任何自己的建筑即可为锚」）：CollectDeployAnchorsFromSnapshot
+            // 镜像 Host 单源（DeployUnitExecutor.CollectDeployAnchors）——核心锚建筑 3/角色 2、
+            // 其它建筑锚建筑 2/角色 1，多锚重叠去重
+            var seen = new HashSet<BattleCell>();
+            foreach (var anchor in CollectDeployAnchorsFromSnapshot(snapshot))
             {
-                var c = new BattleCell(core.x + dx, core.y + dy);
-                if (!_board.Map.HasTile(c.x, c.y)) continue;
-                _aimCells.Add(c);
-                // 部署推荐分色（2026-09-25 拍板「根据碰撞决定」）：镜像 Host 碰撞判定链——
-                // 不推荐格仍可点击（Host 校验兜底，同移动瞄准「水面红格仍可点」语义）
-                if (CanDeployEnterPreview(c, deployData, fogSnapshot))
-                    _aimRecommendedCells.Add(c);
+                int deployRadius = DeployUnitExecutor.DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                for (int dx = -deployRadius; dx <= deployRadius; dx++)
+                for (int dy = -deployRadius; dy <= deployRadius; dy++)
+                {
+                    var c = new BattleCell(anchor.cell.x + dx, anchor.cell.y + dy);
+                    if (!_board.Map.HasTile(c.x, c.y)) continue;
+                    if (!seen.Add(c)) continue; // 多锚半径重叠去重
+                    _aimCells.Add(c);
+                    // 部署推荐分色（2026-09-25 拍板「根据碰撞决定」）：镜像 Host 碰撞判定链——
+                    // 不推荐格仍可点击（Host 校验兜底，同移动瞄准「水面红格仍可点」语义）
+                    if (CanDeployEnterPreview(c, deployData, fogSnapshot))
+                        _aimRecommendedCells.Add(c);
+                }
             }
             ShowAimHighlights();
             ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏
@@ -2230,6 +2237,38 @@ namespace GIC.Battle
                 count++;
             }
             return count < DeployUnitExecutor.MaxBuildingsPerPlayer;
+        }
+
+        /// <summary>部署锚点集合镜像（Host DeployUnitExecutor.CollectDeployAnchors 快照同口径——
+        /// 2026-10-23 拍板「任何自己的建筑即可为锚」）：自己（不共享队友）存活建筑全集（含协议核心）；
+        /// 锚序=核心优先+unitId 升序。己方单位对自己恒可见（迷雾不滤己方），快照直读。
+        /// 消费方=EnterDeployAim（部署瞄准可选格并集）</summary>
+        private List<(BattleCell cell, bool isCore)> CollectDeployAnchorsFromSnapshot(BattleSnapshot snapshot)
+        {
+            var result = new List<(BattleCell, bool)>();
+            if (snapshot == null) return result;
+            List<(string unitId, BattleCell cell)> others = null;
+            foreach (var u in snapshot.units)
+            {
+                if (u.playerId != _myPlayerId || u.isCorpse != 0) continue;
+                var data = TryGetUnitData(u.unitName);
+                if (data == null || data.unitType != UnitType.Building) continue;
+                bool isCore = data.tags != null
+                    && System.Array.IndexOf(data.tags, UnitTag.Core) >= 0;
+                if (isCore)
+                {
+                    result.Add((u.position, true)); // 核心锚优先登记（锚半径 3/2）
+                    continue;
+                }
+                if (others == null) others = new List<(string, BattleCell)>();
+                others.Add((u.unitId, u.position));
+            }
+            if (others != null)
+            {
+                others.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
+                foreach (var o in others) result.Add((o.cell, false));
+            }
+            return result;
         }
 
         /// <summary>部署落点推荐预判（镜像 DeployUnitExecutor.IsDeployCellValid 碰撞判定链的客户端静态版，

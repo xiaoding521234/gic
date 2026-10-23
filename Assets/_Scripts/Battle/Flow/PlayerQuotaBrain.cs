@@ -156,6 +156,11 @@ namespace GIC.Battle
                 $" 比值={strat.PowerRatio:F2} 乘子[军{strat.armyMul:F2}/契{strat.contractMul:F2}/升{strat.upgradeMul:F2}]" +
                 $" 意图=[{string.Join("，", strat.Intents)}]");
 
+            // ⓪-1 购买（2026-10-23 强化批拍板「让 AI 也会购买部署建筑」）：BuyCard 即时通道
+            //    **不占配额**（每回合至多一次；即时同步结算——LocalBattleTransport.ClientSend 直投，
+            //    下位部署分支当回合即可消费新购卡）；旗帜走购买补货、角色补货档待琴实装自然激活
+            TryPurchase(sim, turn);
+
             // ⓪ 部署：手牌角色卡+核心半径内有合法落点+摩拉够 → 出战（DeployUnitExecutor 校验链同源；
             //    同名单位在场〔含尸体〕=该卡暂不出战——规避升命语义烧配额〔docs/05 §5.4 尸体仅升命〕；
             //    三伙伴全上场后本分支自然空手，归位号令/操魔神评分流）
@@ -267,11 +272,16 @@ namespace GIC.Battle
         // ==================== 部署分支（2026-10-12 AI 固定卡组批） ====================
 
         /// <summary>
-        /// 部署候选（确定性）：手牌角色卡按 unitName 升序 × 落点由近及远（核心半径 1 环→2 环、
-        /// 行优先）→ 首个「合法落点+摩拉够+无同名在场（含尸体）」组合出战（AI-1 批起升命另走评分池）。
-        /// 落点合法性=DeployUnitExecutor.IsDeployCellValid 单源（核心半径 2+地形+碰撞共享原语）；
-        /// 摩拉=GetEffectiveDeployCost 同源；同名存活守卫=规避升命语义重复烧配额（卡不消耗，
-        /// 阵亡后同名卡自然重新可出战）。
+        /// 部署候选（确定性，2026-10-23 强化批扩建筑档）：三桶优先级——
+        /// ① **1★ 建筑首铺**（旗帜：便宜+每回合滚雪球经济先行；同桶 unitName 升序）；
+        /// ② **角色**（战力主力：unitName 升序 × 同名在场〔含尸体〕跳过——规避升命语义烧配额，
+        ///    卡不消耗、阵亡后同名卡自然重新可出战；AI-1 批起升命另走评分池）；
+        /// ③ **其余建筑**（2★+ 与 1★ 复制：首铺优先〔同名存活升序〕→ 星级升序 → unitName 升序
+        ///    ——先铺全种类再复制；校验=星级链 PassesBuildingStarGate+每种上限 PassesBuildingLimit）。
+        /// 落点合法性=DeployUnitExecutor.IsDeployCellValid 单源（**自己存活建筑锚并集**〔2026-10-23
+        /// 拍板：核心锚建筑 3/角色 2、其它建筑锚各减 1〕+地形+碰撞共享原语）；
+        /// 摩拉=GetEffectiveDeployCost 同源（不足的候选入桶前已滤——先攒）。
+        /// 每回合部署配额一张，逐桶找首个可出战候选。
         /// </summary>
         private ActionData TryBuildDeploy(BattleSimState sim, int turn)
         {
@@ -280,23 +290,46 @@ namespace GIC.Battle
             var config = Wargame.Instance?.Context?.Get<UnitConfig>();
             if (config == null) return null;
 
-            // 手牌角色卡收集（升序遍历；同卡多张去重=一次只出一张；物品/货币卡不可部署）
-            var candidates = new List<(int unitName, UnitConfig.UnitData data)>();
+            // 手牌单位卡收集（同卡多张去重=一次只出一张；物品/货币卡不可部署）
+            var unitCards = new List<(int unitName, UnitConfig.UnitData data)>();
             foreach (var card in hand)
             {
                 if (!card.IsUnit) continue;
-                if (candidates.Exists(c => c.unitName == card.value)) continue;
+                if (unitCards.Exists(c => c.unitName == card.value)) continue;
                 var data = config.GetUnitData((UnitName)card.value);
                 if (data == null) continue;
-                if (sim.GetMora(_playerId) < data.GetEffectiveDeployCost()) continue; // 摩拉不足先攒
-                candidates.Add((card.value, data));
+                unitCards.Add((card.value, data));
             }
-            if (candidates.Count == 0) return null;
-            candidates.Sort((a, b) => a.unitName.CompareTo(b.unitName));
 
-            foreach (var candidate in candidates)
+            // 三桶分拣（桶内排序见方法注释）
+            var firstLowStarBuildings = new List<(int unitName, UnitConfig.UnitData data)>(); // ① 1★ 建筑首铺
+            var characters = new List<(int unitName, UnitConfig.UnitData data)>();           // ② 角色
+            var otherBuildings = new List<(int unitName, bool sameNameAlive, UnitConfig.UnitData data)>(); // ③ 其余建筑
+            foreach (var card in unitCards)
             {
-                if (OwnUnitOnField(sim, (UnitName)candidate.unitName)) continue; // 同名在场（含尸体）=暂不出战
+                if (sim.GetMora(_playerId) < card.data.GetEffectiveDeployCost()) continue; // 摩拉不足先攒
+                if (card.data.unitType != UnitType.Building) { characters.Add(card); continue; }
+                // 建筑消散不留尸体=同名在场即存活（FindOwnUnitByName 含尸体口径对建筑等效存活）
+                bool sameNameAlive = DeployUnitExecutor.FindOwnUnitByName(sim, _playerId, (UnitName)card.unitName) != null;
+                if (card.data.starLevel <= 1 && !sameNameAlive)
+                    firstLowStarBuildings.Add(card);
+                else
+                    otherBuildings.Add((card.unitName, sameNameAlive, card.data));
+            }
+            firstLowStarBuildings.Sort((a, b) => a.unitName.CompareTo(b.unitName)); // unitName 升序（枚举序铁律）
+            characters.Sort((a, b) => a.unitName.CompareTo(b.unitName));
+
+            // ① 1★ 建筑首铺（旗帜滚雪球先行——星级链/上限/落点三重校验）
+            foreach (var candidate in firstLowStarBuildings)
+            {
+                var action = TryDeployBuildingCard(sim, turn, candidate.unitName, candidate.data);
+                if (action != null) return action;
+            }
+
+            // ② 角色（同名在场〔含尸体〕=暂不出战，卡不消耗）
+            foreach (var candidate in characters)
+            {
+                if (OwnUnitOnField(sim, (UnitName)candidate.unitName)) continue;
                 var cell = FindDeployCell(sim, candidate.data);
                 if (cell == null) continue;
                 return new ActionData
@@ -308,7 +341,37 @@ namespace GIC.Battle
                     turnNumber = turn,
                 };
             }
+
+            // ③ 其余建筑（首铺优先→星级→unitName）
+            otherBuildings.Sort((a, b) =>
+                a.sameNameAlive != b.sameNameAlive ? a.sameNameAlive.CompareTo(b.sameNameAlive)
+                : a.data.starLevel != b.data.starLevel ? a.data.starLevel.CompareTo(b.data.starLevel)
+                : a.unitName.CompareTo(b.unitName));
+            foreach (var candidate in otherBuildings)
+            {
+                var action = TryDeployBuildingCard(sim, turn, candidate.unitName, candidate.data);
+                if (action != null) return action;
+            }
             return null;
+        }
+
+        /// <summary>建筑卡出战尝试（星级链+每种上限+合法落点三重校验——与 Host 执行器同源；
+        /// 任一不满足=本候选跳过，摩拉已在分桶时过滤）</summary>
+        private ActionData TryDeployBuildingCard(BattleSimState sim, int turn, int unitNameValue,
+            UnitConfig.UnitData data)
+        {
+            if (!DeployUnitExecutor.PassesBuildingStarGate(sim, _playerId, data)) return null; // 星级链
+            if (!DeployUnitExecutor.PassesBuildingLimit(sim, _playerId, data)) return null;     // 每种上限 3
+            var cell = FindDeployCell(sim, data);
+            if (cell == null) return null;
+            return new ActionData
+            {
+                playerId = _playerId,
+                actionType = ActionType.DeployUnit,
+                deployUnitName = unitNameValue,
+                deployCell = cell.Value,
+                turnNumber = turn,
+            };
         }
 
         /// <summary>己方同名单位在场判定（**含尸体**——单源=DeployUnitExecutor.FindOwnUnitByName，
@@ -316,6 +379,117 @@ namespace GIC.Battle
         /// 部署分支守卫跳过〔升命候选另走 EvaluateUpgrades 存活口径〕；卡不消耗）</summary>
         private bool OwnUnitOnField(BattleSimState sim, UnitName unitName)
             => DeployUnitExecutor.FindOwnUnitByName(sim, _playerId, unitName) != null;
+
+        // ==================== 购买分支（2026-10-23 强化批：AI 也会购买部署建筑） ====================
+
+        /// <summary>
+        /// AI 购买（每回合至多一次；BuyCard 即时通道**不占配额**，LocalBattleTransport 同步结算——
+        /// 同回合购买→部署闭环：⓪-1 购买先行、⓪ 部署分支当回合即可消费新购卡）：
+        /// ① **旗帜补货**（协议核心出售；AI 默认卡组刻意不含旗帜=购买系统对 AI 负载化）：
+        ///    手牌无旗帜卡且摩拉 ≥ 购买价+部署价 → 买。卡不消耗=一次购入终身可重复出战
+        ///    （最多每种 3 座），故本条件整局至多触发一次——旗帜被拆后同名卡仍在手牌可直接重铺。
+        /// ② **角色补货**（骑士团/大教堂出售）：手牌无同名卡+**仅角色**（建筑/物品不买——建筑卡
+        ///    卡组自备、物品无配额脑使用档）+UnitConfig 有配置+**技能已实装**（任一技能 HasEffects
+        ///    ——观察局实锤琴技能全占位，买半成品=浪费；琴技能实装批自然激活本档）才买。
+        /// 解锁门槛由 Host BuyCardExecutor 权威校验兜底（AI 未解锁角色=购买落空零损失）；
+        /// 失败静默——下回合再试。商店建筑枚举序=unitId 升序（确定性枚举序铁律）。
+        /// </summary>
+        private void TryPurchase(BattleSimState sim, int turn)
+        {
+            var hand = sim.GetHand(_playerId);
+            if (hand == null) return;
+            var unitConfig = Wargame.Instance?.Context?.Get<UnitConfig>();
+            if (unitConfig == null) return;
+            var itemConfig = Wargame.Instance?.Context?.Get<ItemConfig>();
+
+            // ① 旗帜补货（协议核心出售）：手牌无旗帜卡 → 买一张（卡不消耗=终身部署材料）
+            bool handHasFlag = false;
+            foreach (var card in hand)
+            {
+                if (card.IsUnit && card.value == (int)UnitName.FavoniusBanner) { handHasFlag = true; break; }
+            }
+            if (!handHasFlag)
+            {
+                var flagData = unitConfig.GetUnitData(UnitName.FavoniusBanner);
+                if (flagData != null)
+                {
+                    var flagCard = new CardId(UnitName.FavoniusBanner);
+                    int cost = flagCard.PurchaseCostOf(unitConfig, itemConfig);
+                    int deployCost = flagData.GetEffectiveDeployCost();
+                    if (sim.GetMora(_playerId) >= cost + deployCost)
+                    {
+                        _session.SubmitInstantAction(new ActionData
+                        {
+                            playerId = _playerId,
+                            actionType = ActionType.BuyCard,
+                            buyCardType = (int)CardType.Unit,
+                            buyCardValue = (int)UnitName.FavoniusBanner,
+                            turnNumber = turn,
+                        });
+                        GICLog.Info($"[配额脑] {_playerId} T{turn} 购买旗帜（{cost} 摩拉，预留部署 {deployCost}）");
+                        return;
+                    }
+                }
+            }
+
+            // ② 角色补货（琴档）：自己存活建筑的可购买列表 × 手牌无同名卡 × 仅角色卡 × 配置存在
+            //    × 摩拉 ≥ 购买价+部署价 → 买（unitId 升序枚举，首个满足即买）
+            var shopBuildings = new List<KeyValuePair<string, Unit>>();
+            foreach (var kv in sim.Units)
+            {
+                var unit = kv.Value;
+                if (unit == null || BattleSimState.IsDead(unit)) continue;
+                var identity = unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.OwnerPlayerID != _playerId) continue;
+                var data = unit.RawData;
+                if (data == null || data.unitType != UnitType.Building) continue;
+                if (data.可购买卡片 == null || data.可购买卡片.Count == 0) continue;
+                shopBuildings.Add(kv);
+            }
+            shopBuildings.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key)); // unitId 升序（枚举序铁律）
+            foreach (var shop in shopBuildings)
+            {
+                foreach (var purchasable in shop.Value.RawData.可购买卡片)
+                {
+                    if (purchasable.cardType != CardType.Unit) continue; // 物品卡不买（无使用档=死牌）
+                    bool inHand = false;
+                    foreach (var card in hand)
+                    {
+                        if (card.IsUnit && card.value == purchasable.value) { inHand = true; break; }
+                    }
+                    if (inHand) continue; // 卡不消耗——手牌已有同名卡再买=死牌
+                    var data = unitConfig.GetUnitData(purchasable.AsUnitName());
+                    if (data == null) continue; // 缺配置（琴未入 UnitConfig）=免费死牌不买
+                    if (data.unitType == UnitType.Building) continue; // 建筑卡不买（卡组自备）
+                    // 技能已实装门槛（2026-10-23 观察局实锤：琴在 UnitConfig 但技能全占位
+                    // 〔SkillFactory 未配置效果原子×5〕——AI 买半成品角色=纯浪费；技能实装批自然进购买域）
+                    bool anySkillImplemented = false;
+                    if (data.skills != null)
+                    {
+                        foreach (var skill in data.skills)
+                        {
+                            if (skill == null || skill.data == null) continue;
+                            if (skill.data.HasEffects) { anySkillImplemented = true; break; }
+                        }
+                    }
+                    if (!anySkillImplemented) continue;
+                    int cost = purchasable.PurchaseCostOf(unitConfig, itemConfig);
+                    int deployCost = data.GetEffectiveDeployCost();
+                    if (sim.GetMora(_playerId) < cost + deployCost) continue; // 预留部署价
+                    _session.SubmitInstantAction(new ActionData
+                    {
+                        playerId = _playerId,
+                        actionType = ActionType.BuyCard,
+                        buyCardType = (int)purchasable.cardType,
+                        buyCardValue = purchasable.value,
+                        turnNumber = turn,
+                    });
+                    GICLog.Info($"[配额脑] {_playerId} T{turn} 购买角色卡 {purchasable.AsUnitName()}" +
+                        $"（{cost} 摩拉，预留部署 {deployCost}）");
+                    return;
+                }
+            }
+        }
 
         // ==================== 升命候选（AI-1 批，2026-10-12 docs/active/42 §11） ====================
 
@@ -372,20 +546,26 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>核心附近首个合法部署落点（由近及远：半径 1 环→2 环、行优先列序；确定性枚举）</summary>
+        /// <summary>首个合法部署落点（2026-10-23 锚点拍板后多锚环扫）：锚序=CollectDeployAnchors
+        /// 单源（核心优先+unitId 升序——安全区先铺的确定性枚举），每锚由近及远环序（1 环→N 环、
+        /// 行优先列序）；建筑锚半径=建筑 2/角色 1（DeployRadiusOf 同源）</summary>
         private BattleCell? FindDeployCell(BattleSimState sim, UnitConfig.UnitData deployData)
         {
-            var core = sim.GetCorePosition(_playerId);
-            for (int radius = 1; radius <= DeployUnitExecutor.DeployRadiusFromCore; radius++)
+            bool deployIsBuilding = deployData != null && deployData.unitType == UnitType.Building;
+            foreach (var anchor in DeployUnitExecutor.CollectDeployAnchors(sim, _playerId))
             {
-                for (int dy = -radius; dy <= radius; dy++)
+                int radius = DeployUnitExecutor.DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                for (int ring = 1; ring <= radius; ring++)
                 {
-                    for (int dx = -radius; dx <= radius; dx++)
+                    for (int dy = -ring; dy <= ring; dy++)
                     {
-                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != radius) continue; // 只遍历当前环
-                        var cell = new BattleCell(core.x + dx, core.y + dy);
-                        if (DeployUnitExecutor.IsDeployCellValid(sim, _playerId, cell, deployData))
-                            return cell;
+                        for (int dx = -ring; dx <= ring; dx++)
+                        {
+                            if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue; // 只遍历当前环
+                            var cell = new BattleCell(anchor.cell.x + dx, anchor.cell.y + dy);
+                            if (DeployUnitExecutor.IsDeployCellValid(sim, _playerId, cell, deployData))
+                                return cell;
+                        }
                     }
                 }
             }

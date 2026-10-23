@@ -12,8 +12,11 @@ namespace GIC.Battle
     {
         /// <summary>
         /// AI 玩家默认卡组（2026-10-12 用户拍板「AI 玩家暂时都用 安柏，凯亚，芭芭拉，体力，摩拉
-        /// 这套卡组」）：三伙伴角色各 1+体力/摩拉货币牌（数量=开局资源常量同源）。卡不消耗可
-        /// 重复出战——角色阵亡后可再部署；出牌逻辑=PlayerQuotaBrain 部署分支（TryBuildDeploy）。
+        /// 这套卡组」+2026-10-23 强化批「让 AI 也会购买部署建筑」追加建筑卡）：三伙伴角色各 1
+        /// +建筑卡三张（餐馆/骑士团/大教堂——2★+ 走卡组）+体力/摩拉货币牌（数量=开局资源常量同源）。
+        /// 卡不消耗可重复出战——角色阵亡后可再部署；出牌逻辑=PlayerQuotaBrain 部署分支（TryBuildDeploy
+        /// 三桶：1★ 建筑首铺→角色→其余建筑）。**1★ 旗帜刻意不入卡组**：配额脑 TryPurchase 从协议核心
+        /// 购买补货（10 摩拉）→部署分支同回合出战——购买系统对 AI 负载化（决策八十六批E 即时通道）。
         /// </summary>
         public static List<HandCard> BuildAIDefaultDeck()
         {
@@ -22,6 +25,9 @@ namespace GIC.Battle
                 new HandCard(new CardId(UnitName.Amber), 1),
                 new HandCard(new CardId(UnitName.Kaeya), 1),
                 new HandCard(new CardId(UnitName.Barbara), 1),
+                new HandCard(new CardId(UnitName.GoodHunter), 1),
+                new HandCard(new CardId(UnitName.KnightsOfFavonius), 1),
+                new HandCard(new CardId(UnitName.FavoniusCathedral), 1),
                 new HandCard(new CardId(ItemName.Stamina), BattleMetrics.InitialStamina),
                 new HandCard(new CardId(ItemName.Mora), BattleMetrics.InitialMora),
             };

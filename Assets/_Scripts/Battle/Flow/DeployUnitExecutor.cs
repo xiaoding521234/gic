@@ -7,7 +7,9 @@ namespace GIC.Battle
     /// <summary>
     /// 出战角色执行器（B6c，docs/18 决策七 + docs/05 §5.1）：校验链=配置存在 → 手牌成员（Host 权威）→
     /// 建筑星级链前置+建筑上限（决策八十六批C，2026-10-23 追记二改梯度为星级链，docs/active/45 §2/§3——仅建筑）→ 升命分支（**仅角色 3★+**，
-    /// 建筑一律铺场新实例）→ 落点合法（核心半径内：角色 2/建筑 3 + 碰撞判定链——2026-09-25 拍板
+    /// 建筑一律铺场新实例）→ 落点合法（**自己存活建筑锚并集**：核心 tag 锚=建筑 3/角色 2、
+    /// 其它建筑锚=建筑 2/角色 1〔2026-10-23 拍板「任何自己的建筑即可为锚，部署角色比建筑减 1」〕
+    /// + 碰撞判定链——2026-09-25 拍板
     /// 「根据碰撞决定」：体积绝对层最高级不可绕过、与格内单位互不阻挡才可部署、地形按常态移动类型
     /// 通行，与 MovementResolver 进入判定同构）→ 摩拉够 → 生成单位登场。卡不消耗留手牌（可重复出战）；
     /// 1~2 星角色直接铺场，3 星+角色重复出战升命座（命座 B8）。
@@ -15,18 +17,65 @@ namespace GIC.Battle
     /// </summary>
     public static class DeployUnitExecutor
     {
-        /// <summary>角色部署核心半径（docs/18 决策七拍板）</summary>
+        /// <summary>角色部署·核心锚半径（docs/18 决策七拍板；2026-10-23 锚点拍板后=核心锚专属值，
+        /// 其它建筑锚再减 1——单源 DeployRadiusOf）</summary>
         public const int DeployRadiusFromCore = 2;
 
-        /// <summary>建筑部署核心半径（决策八十六拍板 #6：角色 2 格+1=3 格，docs/active/45 §3）</summary>
+        /// <summary>建筑部署·核心锚半径（决策八十六拍板 #6：角色 2 格+1=3 格，docs/active/45 §3；
+        /// 2026-10-23 锚点拍板后=核心锚专属值，其它建筑锚再减 1——单源 DeployRadiusOf）</summary>
         public const int DeployRadiusFromCoreBuilding = 3;
+
+        /// <summary>部署半径单源（2026-10-23 拍板「任何自己的建筑即可为锚；核心 tag 的建筑才是 3，
+        /// 其它建筑都是 2；部署角色比部署建筑半径减 1」）：锚=Core tag 建筑 → 建筑 3/角色 2；
+        /// 锚=其它建筑 → 比核心锚各减 1（建筑 2/角色 1）。Host IsDeployCellValid/AI 配额脑/
+        /// 客户端镜像（BattleHud.CollectDeployAnchorsFromSnapshot 消费侧）三处同读。</summary>
+        public static int DeployRadiusOf(bool anchorIsCore, bool deployIsBuilding)
+        {
+            return anchorIsCore
+                ? (deployIsBuilding ? DeployRadiusFromCoreBuilding : DeployRadiusFromCore)
+                : (deployIsBuilding ? DeployRadiusFromCoreBuilding - 1 : DeployRadiusFromCore - 1);
+        }
+
+        /// <summary>部署锚点集合（2026-10-23 拍板）：自己（**不共享队友**——OwnerPlayerID 过滤）
+        /// 存活建筑全集（含协议核心 Core tag）。锚点序=核心优先（安全区先铺），其余按 unitId 升序
+        /// （确定性枚举序铁律）。客户端镜像=BattleHud.CollectDeployAnchorsFromSnapshot（快照同口径）。
+        /// 核心被拆=判负局终，无锚场景仅作防御性空集处理（一切落点不合法）</summary>
+        public static List<(BattleCell cell, bool isCore)> CollectDeployAnchors(BattleSimState sim, string playerId)
+        {
+            var result = new List<(BattleCell, bool)>();
+            List<(string unitId, BattleCell cell)> others = null;
+            foreach (var kv in sim.Units)
+            {
+                var unit = kv.Value;
+                if (unit == null || BattleSimState.IsDead(unit)) continue;
+                var identity = unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.OwnerPlayerID != playerId) continue;
+                var data = unit.RawData;
+                if (data == null || data.unitType != UnitType.Building) continue;
+                var cell = sim.GetPosition(kv.Key);
+                if (BattleHeuristics.IsCore(unit))
+                {
+                    result.Add((cell, true)); // 核心锚优先登记（锚半径 3/2）
+                    continue;
+                }
+                if (others == null) others = new List<(string, BattleCell)>();
+                others.Add((kv.Key, cell));
+            }
+            if (others != null)
+            {
+                others.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
+                foreach (var o in others) result.Add((o.cell, false));
+            }
+            return result;
+        }
 
         /// <summary>建筑部署数量上限（决策八十六拍板 #4：自己存活建筑总数〔不含协议核心〕；
         /// 拆掉即释放名额可重建——消散机制保证在场必存活，docs/active/45 §2）</summary>
         public const int MaxBuildingsPerPlayer = 3;
 
-        /// <summary>部署落点合法（角色/建筑统一）：协议核心半径内（角色 2/建筑 3，切比雪夫；
-        /// 核心位置代理=出生区中心，B8 换真核心）+ 地形层（按部署单位常态移动类型）+ 碰撞共享原语
+        /// <summary>部署落点合法（角色/建筑统一）：**自己存活建筑锚并集**半径内（2026-10-23 拍板
+        /// 「任何自己的建筑即可为锚」：核心 tag 锚=建筑 3/角色 2、其它建筑锚=建筑 2/角色 1，切比雪夫）
+        /// + 地形层（按部署单位常态移动类型）+ 碰撞共享原语
         /// （体积绝对层+阻挡规则层=MovementResolver.PassesVolumeLimit/PassesBlockingRules——与移动进入
         /// 判定**同源**，2026-10-02 复审收口，碰撞口径改动只改原语处）：① 体积绝对层（无视阻挡配置
         /// 不可绕过）；② 阻挡规则层（与格内单位互相阻挡即不可部署）。含尸体——尸体保留碰撞/体积
@@ -36,11 +85,20 @@ namespace GIC.Battle
             UnitConfig.UnitData deployData)
         {
             if (!sim.Map.HasTile(cell.x, cell.y)) return false;
-            var core = sim.GetCorePosition(playerId);
-            int radius = deployData != null && deployData.unitType == UnitType.Building
-                ? DeployRadiusFromCoreBuilding : DeployRadiusFromCore;
-            int distance = Math.Max(Math.Abs(cell.x - core.x), Math.Abs(cell.y - core.y));
-            if (distance > radius) return false;
+            // 锚点层（2026-10-23 拍板）：落点须落在任一自己存活建筑锚的部署半径内——
+            // 多锚并集取代旧「核心单锚」（锚序/半径=CollectDeployAnchors/DeployRadiusOf 单源）
+            bool deployIsBuilding = deployData != null && deployData.unitType == UnitType.Building;
+            bool withinAnchor = false;
+            foreach (var anchor in CollectDeployAnchors(sim, playerId))
+            {
+                int radius = DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                if (Math.Max(Math.Abs(cell.x - anchor.cell.x), Math.Abs(cell.y - anchor.cell.y)) <= radius)
+                {
+                    withinAnchor = true;
+                    break;
+                }
+            }
+            if (!withinAnchor) return false;
 
             // 地形层：按部署单位常态移动类型（步行不可入水等，与移动进入判定同构）
             var forceType = deployData?.normalMoveType ?? ForceType.Walk;
@@ -171,7 +229,7 @@ namespace GIC.Battle
 
             if (!IsDeployCellValid(sim, action.playerId, action.deployCell, data))
             {
-                GICLog.Info($"[DeployUnit] {unitName} 落点 {action.deployCell} 不合法（核心半径 {DeployRadiusFromCore} 内+碰撞判定），部署落空");
+                GICLog.Info($"[DeployUnit] {unitName} 落点 {action.deployCell} 不合法（自己建筑锚半径内+碰撞判定），部署落空");
                 return false;
             }
 
