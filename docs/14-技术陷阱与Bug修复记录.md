@@ -2136,7 +2136,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 
 
-## §152 LAN 三天全案（第八~十四批）：「手机→host 全死」七个独立断点——占位玩家终案 + 修复互相踩踏实证（2026-10-12~15 全案=docs/31）
+## §152 LAN 三天全案（第八~十四批）：「手机→host 全死」七个独立断点——占位玩家终案 + 修复互相踩踏实证（2026-10-12~15 全案=docs/46）
 
 **症状恒定不变三日**：手机加入房间显示「玩家1」、点准备/切队/换色无反应；host→手机方向（名册/房间状态广播）完全正常。根因=手机端唯一场景网络物体 NetworkEventBus（NEB）永不激活→`SendToHost→NetworkBehaviour.isServer→netIdentity null→NRE`。链上七个独立断点、互相掩盖，逐批剥离：
 
@@ -2150,7 +2150,7 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **通用判读陷阱（全实证）**：编辑器 -logFile 惰性 flush（mtime 滞后≠静默，验活性=主动写一行再查）；编辑器与 PC 构建同 persistentDataPath 混写 lan_debug.log；PC 构建 Player.log 被 [Conditional] 剥光+惰性 flush（退出时刻认 ##utp 泄漏报告 time 字段）；编辑器↔构建资产值比对=UnityPy 字节级（typetree 失败按低 4 字节小端搜+读后 4 位兜底）；进程身份=Time.time+WMI CreationDate+Get-NetTCPConnection OwningProcess；vivo 划后台≠杀进程；api.github.com 代理限流时直连通。
 
-**修复后形态（勿当 bug 修）**：每连接一个不可见占位玩家（DDOL、断线自动销毁）；NEB 激活链=Ready+AddPlayer（base 自动）→原生 replay→ObjectSpawnStarted 建字典→spawn 必中→激活→名字上报；进 Play Console 必现「编辑器场景哈希补打: NetworkEventBus sceneId=0xB97EAECEC3AF1A49」行（消失=修复失效先查本节）。**Mirror 内嵌补丁清单 +1：NetworkClient.SpawnSceneObject 的 [SceneCensus] 普查（gitignored 换机即丢，全清单=docs/31 §3）。**
+**修复后形态（勿当 bug 修）**：每连接一个不可见占位玩家（DDOL、断线自动销毁）；NEB 激活链=Ready+AddPlayer（base 自动）→原生 replay→ObjectSpawnStarted 建字典→spawn 必中→激活→名字上报；进 Play Console 必现「编辑器场景哈希补打: NetworkEventBus sceneId=0xB97EAECEC3AF1A49」行（消失=修复失效先查本节）。**Mirror 内嵌补丁清单 +1：NetworkClient.SpawnSceneObject 的 [SceneCensus] 普查（gitignored 换机即丢，全清单=docs/46 §3）。**
 
 ## §153 房间地图预览只显出生点：激活帧布局未跑 → RebuildTiles 静默零格且同图刷新永不自愈（2026-10-15 活体取证实锤）
 
