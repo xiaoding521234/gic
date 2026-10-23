@@ -28,8 +28,9 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3015
-    m_Localized: Summons 1 {SummonUnit} immediately when deployed, then again every
-      {Period} turns.
+    m_Localized: Starts with {InitEnergy} energy and gains {Value} more at the end
+      of each turn. Whenever its energy reaches {Threshold} or above, immediately
+      summons 1 {SummonUnit}, consuming {Threshold} energy.
     m_Metadata:
       m_Items: []
   - m_Id: 3016

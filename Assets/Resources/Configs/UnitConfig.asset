@@ -87,6 +87,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2001
     unitType: 1
@@ -169,6 +170,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2002
     unitType: 1
@@ -250,6 +252,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2003
     unitType: 1
@@ -331,6 +334,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 2004
     unitType: 1
@@ -406,6 +410,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3001
     unitType: 1
@@ -547,6 +552,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3002
     unitType: 1
@@ -702,6 +708,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3003
     unitType: 1
@@ -847,6 +854,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3004
     unitType: 1
@@ -927,6 +935,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3005
     unitType: 1
@@ -1002,6 +1011,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3008
     unitType: 1
@@ -1081,6 +1091,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3010
     unitType: 1
@@ -1156,6 +1167,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3011
     unitType: 1
@@ -1238,6 +1250,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 3012
     unitType: 1
@@ -1319,6 +1332,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4001
     unitType: 1
@@ -1399,6 +1413,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4002
     unitType: 1
@@ -1481,6 +1496,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4005
     unitType: 1
@@ -1562,6 +1578,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 4007
     unitType: 1
@@ -1637,6 +1654,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5001
     unitType: 1
@@ -1712,6 +1730,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5002
     unitType: 1
@@ -1787,6 +1806,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5003
     unitType: 1
@@ -1862,6 +1882,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 5004
     unitType: 1
@@ -1937,6 +1958,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6001
     unitType: 1
@@ -2012,6 +2034,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6002
     unitType: 1
@@ -2087,6 +2110,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6003
     unitType: 1
@@ -2162,6 +2186,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 6004
     unitType: 1
@@ -2237,6 +2262,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7001
     unitType: 1
@@ -2312,6 +2338,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7002
     unitType: 1
@@ -2387,6 +2414,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7003
     unitType: 1
@@ -2462,6 +2490,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 7004
     unitType: 1
@@ -2537,6 +2566,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 8001
     unitType: 1
@@ -2612,6 +2642,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 11002
     unitType: 1
@@ -2687,6 +2718,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 10001
     unitType: 1
@@ -2762,6 +2794,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 10002
     unitType: 1
@@ -2840,6 +2873,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []
   - unitName: 11001
     unitType: 3
@@ -2915,6 +2949,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247":
     - cardType: 1
       value: 3013
@@ -2991,6 +3026,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247":
     - cardType: 1
       value: 3014
@@ -3071,6 +3107,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247":
     - cardType: 0
       value: 4002
@@ -3106,7 +3143,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
-    baseEnergy: 0
+    baseEnergy: 120
     normalMoveType: 1
     blockAllies: 0
     blockEnemies: 0
@@ -3145,12 +3182,13 @@ MonoBehaviour:
       "\u5148\u950B\u4F34\u968F\u6743\u91CD": 0
       "\u76EE\u6807\u504F\u597D": 1
       "\u5019\u9009\u7C7B\u522B": 1
-    "\u5EFA\u7B51\u6548\u679C": 3
+    "\u5EFA\u7B51\u6548\u679C": 5
     "\u6548\u679C\u534A\u5F84": 0
-    "\u6548\u679C\u6570\u503C": 0
-    "\u6548\u679C\u5468\u671F": 5
-    "\u6548\u679C\u9608\u503C": 50
+    "\u6548\u679C\u6570\u503C": 20
+    "\u6548\u679C\u5468\u671F": 0
+    "\u6548\u679C\u9608\u503C": 100
     "\u53EC\u5524\u5355\u4F4D": 3017
+    "\u521D\u59CB\u5143\u80FD": 80
     "\u53EF\u8D2D\u4E70\u5361\u7247":
     - cardType: 1
       value: 3001
@@ -3231,6 +3269,7 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247":
     - cardType: 1
       value: 3003
@@ -3310,4 +3349,5 @@ MonoBehaviour:
     "\u6548\u679C\u5468\u671F": 0
     "\u6548\u679C\u9608\u503C": 50
     "\u53EC\u5524\u5355\u4F4D": 3001
+    "\u521D\u59CB\u5143\u80FD": 0
     "\u53EF\u8D2D\u4E70\u5361\u7247": []

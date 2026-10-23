@@ -24,5 +24,8 @@ namespace GIC.Data
 
         [InspectorName("治疗伤员（回合末治疗生命值低于阈值的我方存活单位）")]
         HealWounded = 4,
+
+        [InspectorName("元能引擎召唤（初始元能+回合末自充+过阈即召消耗）")]
+        EnergySummon = 5,
     }
 }

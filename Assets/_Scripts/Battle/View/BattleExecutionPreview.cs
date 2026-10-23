@@ -137,6 +137,17 @@ namespace GIC.Battle
 
         private static int BandLowOf(int attackSpeed) => Mathf.FloorToInt(attackSpeed / 10f) * 10;
 
+        /// <summary>眷属条目判据（2026-10-24 拍板「执行预览里，不需要显示眷属」）：
+        /// UnitTierHelper.FromStars 单源（1-2★=眷属）——建筑无行动不入 TurnPlan 天然不受影响；
+        /// 快照查无此单位/配置缺失不判眷属（防误吞，同雾滤口径）</summary>
+        private bool IsFamiliarEntry(UnitState planUnit)
+        {
+            if (planUnit == null || _unitConfig == null) return false;
+            if (!Enum.TryParse<UnitName>(planUnit.unitName, out var name)) return false;
+            return _unitConfig.TryGetUnitData(name, out var data)
+                && UnitTierHelper.FromStars(data.starLevel) == UnitTier.Familiar;
+        }
+
         private void Build(TurnPlanMessage message)
         {
             ClearRows();
@@ -170,6 +181,10 @@ namespace GIC.Battle
                     if (planUnit != null && _session.Player.Fog != null
                         && !_session.Player.Fog.IsUnitVisible(planUnit))
                         continue;
+                    // 眷属过滤（2026-10-24 拍板「执行预览里，不需要显示眷属」）：1-2★眷属（丘丘人/西风骑士
+                    // 等 AI 小兵）不入预览——行动高频低信息量，勿占行挤掉伙伴/魔神预告位（纯眷属区间
+                    // 条目全滤=空行不建既有语义）；快照查无此单位不过滤（同雾滤防误吞口径）
+                    if (IsFamiliarEntry(planUnit)) continue;
                     if (CreateEntry(rt, e)) row.entryCount++;
                 }
                 if (row.entryCount == 0) { Destroy(rowGo); continue; } // 空行不建（条目全失败）

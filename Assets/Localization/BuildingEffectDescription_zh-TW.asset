@@ -27,7 +27,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3015
-    m_Localized: "\u90E8\u7F72\u6642\u7ACB\u523B\u53EC\u559A1\u540D{SummonUnit}\uFF0C\u6B64\u5F8C\u6BCF\u904E{Period}\u500B\u56DE\u5408\u518D\u6B21\u53EC\u559A1\u540D\u3002"
+    m_Localized: "\u521D\u59CB\u81EA\u5E36{InitEnergy}\u5143\u80FD\uFF0C\u6BCF\u56DE\u5408\u7D50\u675F\u7372\u5F97{Value}\u5143\u80FD\u3002\u5143\u80FD\u4E0D\u4F4E\u65BC{Threshold}\u5143\u80FD\u6642\uFF0C\u7ACB\u523B\u53EC\u559A\u4E00\u540D{SummonUnit}\uFF0C\u6D88\u8017{Threshold}\u5143\u80FD\u3002"
     m_Metadata:
       m_Items: []
   - m_Id: 3016

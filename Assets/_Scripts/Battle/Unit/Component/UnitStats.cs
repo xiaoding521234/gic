@@ -104,8 +104,9 @@ namespace GIC.Battle
                 SetBaseValue(StatType.VisionRange, rawData.GetEffectiveExploreVision());
                 SetBaseValue(StatType.LifeSteal, rawData.GetEffectiveLifeSteal());
                 SetBaseValue(StatType.HealEfficiency, rawData.GetEffectiveHealEfficiency());
-                // Energy: max=baseEnergy, value=0（空蓝登场）
-                _stats[StatType.Energy] = new RangedInt(0, rawData.GetEffectiveEnergy(), 0);
+                // Energy: max=baseEnergy, value=初始元能（默认 0=空蓝登场；2026-10-24 决策八十六追记四：
+                // 骑士团总部元能引擎 80 起步——EnergySummon 建筑「初始自带」数据位，全员既有语义零变化）
+                _stats[StatType.Energy] = new RangedInt(0, rawData.GetEffectiveEnergy(), Mathf.Clamp(rawData.初始元能, 0, rawData.GetEffectiveEnergy()));
             }
             else
             {

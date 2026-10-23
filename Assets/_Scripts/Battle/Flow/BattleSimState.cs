@@ -779,19 +779,23 @@ namespace GIC.Battle
         }
 
         /// <summary>带溢出转移的元能应用（见上——overflowReceiverId/overflowAmount 回传转移事实）。
-        /// **元能通则（决策八十六批D 拍板 #8，docs/45 §5）**：一切**加元能**对建筑一律无效
-        /// （覆盖战技/移动/光环 tick/溢出转移/旗帜等一切来源——能量应用段统一过滤单源；建筑无元能条，
-        /// baseEnergy=0）；对倒下角色照常生效（tick 含尸体先例维持——眷属/建筑无尸体，倒下=伙伴/魔神）。
-        /// 负增量（消耗）不受此滤——建筑无技能无消耗路径，防御性放行</summary>
+        /// **元能通则（决策八十六批D 拍板 #8，docs/45 §5；2026-10-24 追记四修订）**：一切**加元能**
+        /// 对**无元能上限**的建筑一律无效（能量应用段统一过滤单源；建筑无元能条 baseEnergy=0）；
+        /// **有元能上限的建筑（骑士团总部 EnergySummon 元能引擎 baseEnergy=120）照常受能**——
+        /// 芭芭拉歌声之环 tick 等外部充能由此接入（推翻旧「一律无效」口径）；对倒下角色照常生效
+        /// （tick 含尸体先例维持——眷属/建筑无尸体，倒下=伙伴/魔神）。负增量（消耗）不受此滤
+        /// ——建筑无技能无消耗路径，防御性放行。**溢出转移候选域维持排除建筑**（安柏1命单跳
+        /// 接收方=「角色」设计未变，且转移写入不经本方法直改 stats——留排除免直改旁路）</summary>
         public void ApplyEnergy(Unit target, int delta, out string overflowReceiverId, out int overflowAmount)
         {
             overflowReceiverId = null;
             overflowAmount = 0;
             if (target == null) return;
-            if (delta > 0 && BattleHeuristics.IsBuilding(target)) return; // 拍板 #8：加元能对建筑不生效
             var stats = target.GetUnitComponent<UnitStats>();
             if (stats == null) return;
             var energy = stats.GetStatStruct(StatType.Energy);
+            if (delta > 0 && BattleHeuristics.IsBuilding(target) && energy.Max <= 0)
+                return; // 拍板 #8 修订版：加元能对「无元能上限」建筑不生效；元能建筑（骑士团总部）照常受能
 
             if (delta > 0 && target.EnergyOverflowPassive)
             {

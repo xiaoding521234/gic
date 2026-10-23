@@ -129,6 +129,7 @@ namespace GIC.Battle
         /// docs/11 挂账③销案）：建筑无技能描述表，效果模板存 BuildingEffectDescription 表按 unitName 键，
         /// 占位符从 UnitData 建筑段字段单源取值（改 Inspector 数值描述自动跟随——BuildItem 同构闭环）：
         /// {Radius}=效果半径、{Value}=效果数值、{Period}=效果周期、{Threshold}=效果阈值、
+        /// {InitEnergy}=初始元能（2026-10-24 追记四·元能引擎）、
         /// {SummonUnit}=召唤单位本地化名（UnitName 表同步读）。数值统一金色高亮。
         /// 调用方=UnitDetailPanel（背包+战斗卡详情共链 CardDetailView）。</summary>
         public static string BuildBuilding(string template, UnitConfig.UnitData raw)
@@ -139,6 +140,7 @@ namespace GIC.Battle
             sb.Replace("{Value}", $"<color={ValueColor}>{raw.效果数值}</color>");
             sb.Replace("{Period}", $"<color={ValueColor}>{raw.效果周期}</color>");
             sb.Replace("{Threshold}", $"<color={ValueColor}>{raw.效果阈值}</color>");
+            sb.Replace("{InitEnergy}", $"<color={ValueColor}>{raw.初始元能}</color>");
             if (template.Contains("{SummonUnit}"))
                 sb.Replace("{SummonUnit}", $"<color={ValueColor}>{GetLocalizedUnitName(raw.召唤单位)}</color>");
             return sb.ToString();
