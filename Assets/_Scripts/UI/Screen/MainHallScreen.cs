@@ -228,6 +228,10 @@ namespace GIC.UI
             if (backpackButton != null) backpackButton.onClick.AddListener(OnBackpackButtonClick);
             if (coopButton != null) coopButton.onClick.AddListener(OnCoopButtonClick);
             if (tutorialButton != null) tutorialButton.onClick.AddListener(OnTutorialButtonClick);
+
+            // 大厅按钮统一点击音（多播监听，不影响既有处理器）
+            foreach (var btn in new[] { missionButton, mapButton, achievementButton, settingsButton, wishButton, backpackButton, coopButton, tutorialButton })
+                btn?.onClick.AddListener(() => UiSfx.Play(UiSfxKind.Click));
         }
 
         // ==================== 场景切换 ====================

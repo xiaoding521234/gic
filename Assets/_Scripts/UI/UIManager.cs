@@ -169,6 +169,8 @@ namespace GIC.UI
         {
             if (id == null) return;
 
+            UiSfx.Play(UiSfxKind.PanelOpen);
+
             switch (id.Host)
             {
                 case ScreenHostKind.Scene:

@@ -170,6 +170,7 @@ namespace GIC.UI
         {
             if (isClosing) return;
             isClosing = true;
+            UiSfx.Play(UiSfxKind.PanelClose);
             InputLocks.Push(this, InputLockReason.Closing);
             PopMusicSafe();
             StartCoroutine(CloseScreenCoroutine(exitAnimation?.Invoke()));

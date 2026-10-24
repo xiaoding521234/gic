@@ -2268,6 +2268,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -10047,6 +10049,8 @@ MonoBehaviour:
   globalPrefix: 
   globalSuffix: 
   skipEmpty: 1
+  "\u6700\u5927\u5BBD\u5EA6": 0
+  "\u6700\u5C0F\u5B57\u53F7\u500D\u7387": 0.5
   textComponent: {fileID: 0}
   references:
     version: 2
@@ -10943,8 +10947,8 @@ MonoBehaviour:
   resultCardSpacing: 10
   holdCardSize: 280
   finalCardSize: 160
-  shootSFX: {fileID: 0}
-  cardHitSFX: {fileID: 0}
+  shootSFX: {fileID: 8300000, guid: 30d4bae3c974a5b4ea2889ae89b8c1fb, type: 3}
+  cardHitSFX: {fileID: 8300000, guid: 1ba0f411a9dd37c4c88a0f58911ea2d4, type: 3}
   sfxVolume: 0.8
   starglitterRainContainer: {fileID: 6650917181270309451}
   starglitterSprite: {fileID: 21300000, guid: aa067161f45acfc41bfba70b4a80b49b, type: 3}

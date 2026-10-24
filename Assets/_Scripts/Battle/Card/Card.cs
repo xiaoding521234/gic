@@ -175,6 +175,8 @@ namespace GIC.Battle
         /// <summary>点击=边沿动作：浏览开详情 / 编辑与卡组面板发事件（onClick，Button 原生含置灰门）</summary>
         private void OnClicked()
         {
+            UiSfx.Play(UiSfxKind.CardFlip);
+
             if (isDeckPanelMode)
             {
                 // 面板内卡片点击 → 移出卡组
