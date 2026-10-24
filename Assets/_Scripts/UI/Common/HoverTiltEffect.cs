@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -12,6 +13,10 @@ namespace GIC.UI
     /// 指针位置=Update 逐帧轮询单源（返修五——事件 move 派发有失效窗口勿依赖）。
     /// （厚度边条=返修六/七实验性朝向载体，2026-10-22 用户拍板「去掉这个厚度，不再采用」全量移除——
     /// 带形 mesh 实现与黑色块教训留档 docs/14 §163 坑⑥/§164。）
+    /// 朝向感载体=透视 Warp（2026-10-24 返修九）：正交画布纯旋转 180° 对称——Euler(±a,±b) 投影逐顶点全同，
+    /// 对角悬停两角渲染不可分（报障「有时对有时反」的根因；商业库全部用真透视承载方向——vanilla-tilt.js
+    /// perspective(1000px)/Atropos 1200px/Marvel Snap 真 3D）——EnsureWarps 给子树每个 Graphic 懒挂
+    /// HoverTiltWarp 做透视等效位移（近缘放大/远缘缩小 Keystone），细节与双路径见 HoverTiltWarp.cs 头注。
     ///
     /// 通道纪律（与既有系统零冲突的关键）：
     /// - 只写本物体 localRotation / localScale——位置通道（anchoredPosition）留给布局组/入场滑动/手牌让位等系统；
@@ -63,6 +68,12 @@ namespace GIC.UI
         [SerializeField] private float 微呼吸幅度 = 0.35f;
         [Tooltip("微呼吸频率（Hz）")]
         [SerializeField] private float 微呼吸频率 = 1.1f;
+
+        [Header("透视朝向感（返修九）")]
+        [Tooltip("透视形变承载倾斜方向感（近缘放大/远缘缩小的 Keystone 梯形；vanilla-tilt.js/Atropos 的 CSS perspective 的 UGUI 等效）。关=纯旋转——正交下对角悬停渲染全同、方向感随机翻转（返修九前的病灶形态）")]
+        [SerializeField] private bool 启用透视 = true;
+        [Tooltip("虚拟透视距离=倍率×卡面长边世界尺寸（越小透视越强；vanilla-tilt.js 默认 1000px≈3.3 倍卡宽、Atropos 1200px≈3 倍）")]
+        [SerializeField, Min(1f)] private float 透视距离倍率 = 3f;
 
         [Header("层级与响应")]
         [Tooltip("悬停渲染置顶（嵌套 Canvas overrideSorting——不动 sibling 序，布局组安全）。**默认关**：当前全部场景无重叠需求（背包间距 30/45px、按钮列 280px >> 放大外扩），而嵌套画布是新射线域——机制不全时挂上即 enter/exit 闪烁循环+点击丢失（2026-10-22 返修三实锤「一直在闪」）；真需要重叠压边时再开（机制已修全：自动补 GraphicRaycaster+销毁顺序与借用自愈=返修四）")]
@@ -117,6 +128,23 @@ namespace GIC.UI
         public bool SheenEnabled { get => 启用光泽; set => 启用光泽 = value; }
         public float SheenIntensity { get => 光泽强度; set => 光泽强度 = Mathf.Clamp01(value); }
         public bool RaiseOnHover { get => 悬停置顶; set => 悬停置顶 = value; }
+        public bool PerspectiveEnabled { get => 启用透视; set => 启用透视 = value; }
+        public float PerspectiveDistanceScale { get => 透视距离倍率; set => 透视距离倍率 = Mathf.Max(1f, value); }
+
+        // Warp 消费口（透视参数单源在本组件——子树所有 Warp 共读，勿给 Warp 单独配参；
+        // public=桥脚本/探针同可访问，桥 Roslyn 脚本是独立程序集读不到 internal）
+        public bool 透视生效 => enabled && isActiveAndEnabled && 启用透视;
+
+        public float 透视距离世界
+        {
+            get
+            {
+                var rt = Rt;
+                float span = rt != null ? Mathf.Max(rt.rect.width, rt.rect.height) : 0f;
+                // lossyScale 同乘=d 随等比缩放伸缩（k=d/(d+z) 对等比缩放不变——旧网格在平移/等比缩放后仍数学正确）
+                return 透视距离倍率 * Mathf.Max(1f, span * Mathf.Abs(transform.lossyScale.y));
+            }
+        }
 
         // ==================== 生命周期 ====================
 
@@ -230,6 +258,40 @@ namespace GIC.UI
             }
         }
 
+        // ==================== 透视 Warp 接线（返修九） ====================
+
+        private readonly List<HoverTiltWarp> _warps = new List<HoverTiltWarp>();
+
+        /// <summary>悬停期懒接线：给宿主子树每个 Graphic（含 TMP 文本/遮罩模板图）挂一枚 Warp。
+        /// 重复进入=GetComponent 查重跳过（池化复用零重复）；光泽层=CreateSheen 直接登记。</summary>
+        private void EnsureWarps()
+        {
+            _warps.Clear();
+            var graphics = GetComponentsInChildren<Graphic>(true);
+            foreach (var g in graphics)
+            {
+                if (g == null) continue;
+                var w = g.GetComponent<HoverTiltWarp>();
+                if (w == null)
+                {
+                    w = g.gameObject.AddComponent<HoverTiltWarp>();
+                    w.Driver = this;
+                }
+                else if (w.Driver == null) w.Driver = this;
+                _warps.Add(w);
+            }
+        }
+
+        /// <summary>倾斜角写入后必调：Warp 网格按当下 transform 重施（平置/关透视=回写原始）。</summary>
+        private void MarkWarpsDirty()
+        {
+            for (int i = 0; i < _warps.Count; i++)
+            {
+                var w = _warps[i];
+                if (w != null) w.MarkDirty();
+            }
+        }
+
         // ==================== 每帧驱动 ====================
 
         private void Update()
@@ -263,8 +325,8 @@ namespace GIC.UI
 
             // 倾斜目标（返修六翻向）：Ry·Rx 手算实证 Euler(+tx,+ty) 把 (−sign(ty),+sign(tx)) 角压向屏内
             // （观看者在 −Z，正面朝 −Z）——原 (mx−0.5)/(0.5−my) 符号组合实际压光标**对角**=朝向背离鼠标；
-            // 用户约定「朝向鼠标=光标侧压下」→ 两轴翻符号。正交投影下翻向前后的投影恒同（纯对称缩短），
-            // 方向差异只由厚度边条（返修六）与未来透视可见
+            // 用户约定「朝向鼠标=光标侧压下」→ 两轴翻符号。正交投影下翻向前后的投影恒同（纯对称缩短、
+            // 且与对角悬停逐顶点全同——返修九根因），方向差异由 HoverTiltWarp 透视位移承载可见
             float tx = 0f, ty = 0f;
             if (_hovered)
             {
@@ -309,6 +371,7 @@ namespace GIC.UI
             if (rt2 == null) return;
             rt2.localRotation = _baseRotation * Quaternion.Euler(_tiltX, _tiltY, 0f);
             if (scaleActive) rt2.localScale = _baseScale * _scaleMul;
+            MarkWarpsDirty(); // 旋转写入后 Warp 必重施（透视位移场随姿态变）
         }
 
         /// <summary>立即精确还原基准（OnDisable/让位/落定三路共用）；缩放通道关闭的宿主不碰 localScale</summary>
@@ -327,6 +390,7 @@ namespace GIC.UI
             if (启用缩放) rt.localScale = _baseScale;
             UpdateSheen();
             RestoreTopCanvas();
+            MarkWarpsDirty(); // 还原基准后 Warp 按原始回写（池化/让位/落定三路共用本方法）
         }
 
         // ==================== 渲染置顶（嵌套 Canvas overrideSorting） ====================
@@ -340,6 +404,7 @@ namespace GIC.UI
         /// 返修四自愈：借用的残留若是禁用态孤儿画布=启用+补射线器（销毁顺序雷/域重载残留防复发）</summary>
         private void Raise()
         {
+            EnsureWarps(); // 透视 Warp 懒接线先于置顶早退——任何宿主悬停即接线
             if (!悬停置顶) return;
             if (_topCanvas != null) return; // 已持有（Unity 假 null：pending-destroy 引用销毁后自动放行）
             var existing = GetComponent<Canvas>();
@@ -445,6 +510,10 @@ namespace GIC.UI
             _sheenMaterial.SetFloat("_Progress", 0.5f);
             _sheen.material = _sheenMaterial;
             _sheen.SetAllDirty();
+            // 返修九：光泽层同步 Warp（与卡面同场形变，光泽恒贴卡面）
+            var sheenWarp = go.AddComponent<HoverTiltWarp>();
+            sheenWarp.Driver = this;
+            _warps.Add(sheenWarp);
             return true;
         }
 
