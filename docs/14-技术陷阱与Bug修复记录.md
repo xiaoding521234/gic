@@ -2321,3 +2321,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **顺带观察（勿当 bug 修/后续拍板项）**：①2v2 双核心等距时眷属核心锚定在等距线上小步游移（实局 U54 类 (11,10) 漂移）——与伙伴脑「锚翻转振荡 hysteresis」挂账同族（docs/11），眷属侧是否加迟滞窗口待拍板；②敌骑士「在自己基地驻扎防御」在观感上也像挂机（用户报障的敌侧成分）——实际是在打入侵者，修复后攻方破墙会打破这种静态。
 
+## §170 编辑器域 Destroy 非法=ReplayRunner 拆单位静默泄漏+完整局观察批与新回放基线（2026-10-24 完整对局批实锤：49 回合 2v2 打穿终局零异常后，回放回归跑出 34× "Destroy may not be called from edit mode!"）
+
+**症状**：完整局回放回归（ReplayRunner 编辑器域 headless 重放）后控制台 34 条 `Destroy may not be called from edit mode! Use DestroyImmediate instead.`——`BattleSimState.RemoveUnit` 的 `Object.Destroy` 在编辑模式=**警告+静默不销毁**（场景对象泄漏：每回放一次漏一批 LogicUnits 下的单位物体）。修法=**双域销毁**：`if (Application.isPlaying) Destroy(go) else DestroyImmediate(go)`——Play 域维持 Destroy 勿改（DestroyImmediate 播放态会打断协程/在途引用）；BattleSimState 无 `using UnityEngine` 须全限定 `UnityEngine.Application`。验证：重跑回放回归 **PASS 138 段/6607 命令逐条一致+终局一致，零警告**。
+
+**完整局观察批结论（49 回合 2v2，212s=4.3s/回合，B 队破核正常终局）**：①骑士 null 全程≈0——仅 T25/26 己方崩盘瞬间 A 队 1 名骑士缺席一回合、T27 自愈（v8「全部敌不可达=缺席」设计语义内，勿当 bug 修）；②**攻城链端到端首次实证**：B 方逐回合系统性拆除 AI_2 环墙（建筑 12→11→…→5 座）→ 破墙后 T49 核心掉血至亡 → 终局——§169 修复的「贴墙→揭雾→拆墙→攻核」全链在真实完整局成立；③P1 核心无墙被 B 骑直取（T26 亡）——玩家裸奔核心的代价具象，实机有建筑防御时可对照；④教堂把核心从 169 奶回 600（治疗对建筑生效拍板语义复验）；⑤AI 建筑恒 ≤12 座（3/种×4 类上限内）；⑥零执行超时（ProjectileResolver 卡死修复保持有效）。
+
+**新回放基线**：`Replays/battle_20261024_075805_336668631.jsonl`（4.98MB，49 回合含 over 行，录制时已含本日三修）——ReplayRunner 回放 PASS，**docs/11 挂账⑦「回放基线重录」就此销案**；后续改命令流/脑层/经济参数的批次沿用「改后重录」纪律。
+

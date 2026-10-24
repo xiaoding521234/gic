@@ -541,8 +541,12 @@ namespace GIC.Battle
             var unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID;
             if (unitId != null && _units.TryGetValue(unitId, out var registered) && registered == unit)
                 _units.Remove(unitId);
-            // GO 销毁：LogicRoot 下的单位物体（含全部组件状态——附着/冻结/装备计数器等）
-            UnityEngine.Object.Destroy(unit.gameObject);
+            // GO 销毁：LogicRoot 下的单位物体（含全部组件状态——附着/冻结/装备计数器等）。
+            // 双域销毁（2026-10-24 回放回归实锤）：ReplayRunner 编辑器域 headless 重放同走本链——
+            // Object.Destroy 编辑模式非法（警告+不销毁=场景对象泄漏，一次完整局回放 34 条）；Play 域
+            // 维持 Destroy 勿改（DestroyImmediate 在播放态会打断协程/在途引用），编辑域用 DestroyImmediate。
+            if (UnityEngine.Application.isPlaying) UnityEngine.Object.Destroy(unit.gameObject);
+            else UnityEngine.Object.DestroyImmediate(unit.gameObject);
         }
 
         public Unit GetUnit(string unitId)
