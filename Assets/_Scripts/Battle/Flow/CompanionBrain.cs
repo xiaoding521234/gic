@@ -44,6 +44,14 @@ namespace GIC.Battle
         /// <summary>移动每逼近 1 格的加分</summary>
         public static int MoveProgressScorePerCell => AITuningConfig.Instance.移动每格逼近分;
 
+        /// <summary>无敌环境推进分（2026-10-25 凌晨批议题①，docs/11 决策八十四挂账）：感知无敌
+        ///（无可感知非建筑敌——敌锚全为建筑=核心透视恒可见）且移动锚为敌方建筑时的移动加分——
+        /// 治「号令挤掉推核心」（决策八十四根因④：配额脑延奏续航 10 恒赢裸推进 10+2p， commanded
+        /// 单位被无营养号令占用、伙伴自主推进被压制）。量级设计：低于一切战斗候选（攻击/治疗
+        /// 20~90）、高于裸移动兜底与延奏续航档——配额脑操魔神/伙伴操控共享骨架同获该分，号令
+        /// 在无敌环境让位推进。业界对照：petra/ItB 无目标时目标导向推进（attack-move 语义）。</summary>
+        public static int EmptyFieldAdvanceScore => AITuningConfig.Instance.无敌环境推进分;
+
         /// <summary>近敌接敌加分上限（离最近敌越近越优先动该单位）</summary>
         public static int MoveEngageBonusMax => AITuningConfig.Instance.接敌加分上限;
 
@@ -412,6 +420,15 @@ namespace GIC.Battle
                 _bidPhase = false; // 执行遍副作用恢复
             }
 
+            // 议题⑤申报附着广播（凌晨批）：全部 bid 的 OnHit 元素附着意图预声明进意图板——
+            // 执行序支援型殿后（I 返修 3），芭芭拉（Hydro）的挂水意图若只在执行遍声明，先决策的
+            // 安柏永远看不到=跨单位元素连招（挂水→蒸发/冻结）在决策层不可预判。申报遍全员广播=
+            // WEGO 版 WorldState 顺序模拟（Gears Tactics 映射）：「讨论时各自亮牌」，先位/后位
+            // 同回合都能预判连招。声明=估值口径（未获名额者可能落空），消费端只用于反应预期分
+            //（软信号 ±半伤），下回合重决策自然吸收
+            foreach (var b in bids)
+                DeclareElementIntent(sim, snapshot, b.unit, b.unitId, b.bid, board, false);
+
             // I-A 装包遍：按队伍独立装包（池 per playerId）。cost=0=白给（不占预算直接获名额，
             // unitId 升序）；cost>0 按单位体力价值（score/cost 交叉相乘降序——cost 恒 5 时退化为
             // 分数降序；long 防溢出）+unitId 决胜逐个扣预算，装不下的跳过（低价者仍可能装得下）
@@ -538,6 +555,47 @@ namespace GIC.Battle
 
             foreach (var heal in EnumerateSkillHeals(sim, unit, team, data, null))
                 board.DeclareHeal(heal.allyId, heal.effective);
+
+            // 议题⑤：已承诺附着落地声明（replacePrior=覆盖申报期旧声明——执行遍重定向时旧目标集
+            // 作废=最新意图权威；后位执行序消费）
+            DeclareElementIntent(sim, snapshot, unit, UnitIdOf(sim, unit), action, board, true);
+        }
+
+        /// <summary>行动的元素附着意图声明（凌晨批议题⑤）：方向攻击技能按行动方向预览命中集，
+        /// 逐命中目标声明 OnHit AttachElement 原子的元素与层数（element=Physical=施法者自身元素
+        /// ——SkillElementOf 同源回落，与 EffectCompiler 编译口径一致）。单位指向/自施放/非 Skill
+        /// 行动零声明（与 DeclareIntent 伤害声明同域）；board=null（配额脑/学徒档）零变化</summary>
+        private static void DeclareElementIntent(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
+            string unitId, ActionData action, TeamIntentBoard board, bool replacePriorDeclarations)
+        {
+            if (board == null || action == null || action.actionType != ActionType.Skill) return;
+            var skill = action.skillIndex >= 0 && action.skillIndex < unit.Skills.Count
+                ? unit.Skills[action.skillIndex]
+                : null;
+            var data = skill?.RawData;
+            if (data == null || data.effects == null || data.IsUnitTargeted() || data.IsSelfCast()) return;
+            bool anyAttach = false;
+            foreach (var atom in data.effects)
+                if (atom != null && atom.trigger == SkillEffectTrigger.OnHit
+                    && atom.kind == SkillEffectKind.AttachElement && atom.elementLayers > 0)
+                { anyAttach = true; break; }
+            if (!anyAttach) return;
+            var identity = unit.GetUnitComponent<UnitIdentity>();
+            if (identity == null) return;
+            var from = sim.GetPosition(unit);
+            var targets = BattleHeuristics.PreviewLineTargets(sim, snapshot, identity.Team, from, data, action.direction);
+            if (targets.Count == 0) return;
+            foreach (var atom in data.effects)
+            {
+                if (atom == null || atom.trigger != SkillEffectTrigger.OnHit
+                    || atom.kind != SkillEffectKind.AttachElement || atom.elementLayers <= 0) continue;
+                var element = atom.element != ElementType.Physical
+                    ? atom.element
+                    : SkillHitResolver.SkillElementOf(unit, data); // Physical=施法者自身元素（编译同源回落）
+                foreach (var target in targets)
+                    board.DeclareElement(unitId, target.unitId, (int)element, atom.elementLayers,
+                        replacePriorDeclarations);
+            }
         }
 
         // ==================== 共享评分骨架（伙伴脑+配额脑操魔神档复用） ====================
@@ -589,6 +647,7 @@ namespace GIC.Battle
         {
             var skills = unit.Skills;
             var from = sim.GetPosition(unit);
+            var selfBoardId = UnitIdOf(sim, unit); // 议题⑤：声明附着消费的自身排除键
             bool offeredAny = false; // 本单位任一技能产生过候选（Offer 调用即算——驻位判定消费）
 
             for (int i = 0; i < skills.Count; i++)
@@ -677,6 +736,17 @@ namespace GIC.Battle
                             // J-1 冻结协同分既有）
                             var reaction = ElementReactionResolver.Preview(
                                 (ElementType)target.dyedElement, target.dyedLayers, skillElement, 1);
+                            // 议题⑤：声明附着消费（凌晨批）——快照附着为空时读意图板「他人已声明的
+                            // 附着意图」预判反应（芭芭拉申报挂水→安柏同回合即预判蒸发：比快照预判准，
+                            // WEGO 版顺序模拟；board=null=零变化；与下方冻结层兜底同=附着为空才走）
+                            if (!reaction.HasReaction && (ElementType)target.dyedElement == ElementType.Physical
+                                && board != null)
+                            {
+                                var declaredEl = board.DeclaredElementExcluding(target.unitId, selfBoardId);
+                                if (declaredEl.element > 0)
+                                    reaction = ElementReactionResolver.Preview(
+                                        (ElementType)declaredEl.element, declaredEl.layers, skillElement, 1);
+                            }
                             if (!reaction.HasReaction
                                 && (ElementType)target.dyedElement == ElementType.Physical
                                 && target.isFrozen == 1)
@@ -1048,8 +1118,33 @@ namespace GIC.Battle
                 && !string.IsNullOrEmpty(lockedAnchorId))
             {
                 var locked = sim.GetUnit(lockedAnchorId);
-                if (locked != null && !BattleSimState.IsDead(locked) && enemyAnchors.Remove(locked))
-                    enemyAnchors.Insert(0, locked); // 锁定插队敌序首（不在敌列表=同队错配，自然回落）
+                if (locked != null && !BattleSimState.IsDead(locked) && enemyAnchors.Contains(locked))
+                {
+                    // 锚点滞回（凌晨批议题③，docs/11 hysteresis 挂账）：现锚廉价复核（存活+可感知）通过后
+                    // 与最优新锚比距离——新锚须比现锚**严格近「锚点滞回门槛」格**才接管，门槛内延续锁定
+                    //（治两等价锚来回=「频繁换目标=机器味」的感知层暴露点，GameAIPro ch04 实证+ItB
+                    // 反重复负波的门槛化；TPS CurrentHidepoint 惯性复核先例）。门槛外显著更优新锚=释放锁
+                    //（距离序接管，移动承诺时 RememberMoveAnchor 重锁新锚）
+                    var fromPosAnchorHyst = sim.GetPosition(unit);
+                    int lockedDist = sim.GetPosition(locked).ChebyshevTo(fromPosAnchorHyst);
+                    int bestOtherDist = int.MaxValue;
+                    foreach (var e in enemyAnchors)
+                    {
+                        if (e == locked) continue;
+                        int d = sim.GetPosition(e).ChebyshevTo(fromPosAnchorHyst);
+                        if (d < bestOtherDist) bestOtherDist = d;
+                    }
+                    if (bestOtherDist == int.MaxValue
+                        || lockedDist <= bestOtherDist + AITuningConfig.Instance.锚点滞回门槛)
+                    {
+                        enemyAnchors.Remove(locked);
+                        enemyAnchors.Insert(0, locked); // 锁定延续（滞回门槛内）：插队敌序首
+                    }
+                    else if (!_bidPhase)
+                    {
+                        _lastMoveAnchors.Remove(UnitIdOf(sim, unit)); // 显著更优新锚：释放锁（申报遍槽写入抑制）
+                    }
+                }
             }
             // J-4 伙伴推核心（2026-10-04 拍板「伙伴应当去推核心，攻击视野内没有其它敌人时」）：
             // 自身攻击视野内（GetEffectiveAttackVision 回落 5，眷属 v7 同口径）无普通敌单位（建筑不算
@@ -1073,6 +1168,17 @@ namespace GIC.Battle
                     enemyAnchors.RemoveAt(ci);
                     enemyAnchors.Insert(0, coreJ4);
                     break;
+                }
+            }
+            // 无敌环境判定（议题①）：全部可感知敌锚都是建筑（核心/建筑群）=感知无敌——唯一推进目标
+            // =敌核心，移动分吃「无敌环境推进分」（锚循环主评分+无解兜底两处；支援站位评分器
+            // 不消费——支援型有独立驱动域）。enemyAnchors 空（敌核心全灭未终局态）不触发=维持缺席
+            bool emptyFieldAdvance = enemyAnchors.Count > 0;
+            if (emptyFieldAdvance)
+            {
+                foreach (var e in enemyAnchors)
+                {
+                    if (!BattleHeuristics.IsBuilding(e)) { emptyFieldAdvance = false; break; }
                 }
             }
             var anchors = new List<Unit>();
@@ -1173,6 +1279,10 @@ namespace GIC.Battle
                             + progress * MoveProgressScorePerCell
                             + Mathf.RoundToInt(Math.Min(MoveEngageBonusMax, Math.Max(0, 16 - distance) / 2)
                                                * profile.激进度);
+                // 无敌环境推进分（议题①）：锚=敌方建筑（无敌环境下即核心）+感知无敌 → 推进加分
+                //（低于战斗候选、高于裸兜底——配额脑共享骨架同获，号令在无敌环境让位推进）
+                if (emptyFieldAdvance && !isAllyAnchor)
+                    score += EmptyFieldAdvanceScore;
 
                 // 走位进射击线：落点即有可开火攻击线（近似预判——被挡提前停/移动获能未计入，粗估即可）
                 var projectedCell = new BattleCell(from.x + step.x * steps, from.y + step.y * steps);
@@ -1227,7 +1337,9 @@ namespace GIC.Battle
                     }
                     if (run > 0)
                     {
-                        tracker.Offer(Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重), new ActionData
+                        tracker.Offer(Mathf.RoundToInt((MoveBaseScore
+                            + (emptyFieldAdvance ? EmptyFieldAdvanceScore : 0)) // 议题①：无敌环境兜底同享推进分
+                            * profile.移动优先权重), new ActionData
                         {
                             playerId = playerId,
                             unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
@@ -2126,6 +2238,17 @@ namespace GIC.Battle
             /// 落点，结算偏差保守向，下回合重算吸收）</summary>
             public readonly Dictionary<string, BattleCell> DeclaredMovement = new Dictionary<string, BattleCell>();
 
+            /// <summary>已声明的元素附着意图（凌晨批议题⑤，WEGO 版 WorldState 顺序模拟）：敌方 unitId
+            /// → 声明列表（声明者 unitId、元素 int、层数）。两路写入：①申报遍后全员 bid 附着广播
+            ///（执行序支援型殿后〔I 返修 3〕的补救——芭芭拉的挂水意图在安柏决策前即可见=「讨论时
+            /// 各自亮牌」）；②执行遍 DeclareIntent 落地已承诺附着（replacePriorDeclarations 覆盖该
+            /// 声明者申报期旧声明=最新意图权威）。消费=反应预期分（快照附着为空时读声明附着预判
+            /// 蒸发/冻结连招——ItB 先动者危险格标记/Gears Tactics WorldState 顺序模拟的映射）。
+            /// 声明口径=估值（OnHit 原子×预览命中集），未获名额者声明可能落空=评分层软信号，
+            /// 下回合重决策自然吸收</summary>
+            public readonly Dictionary<string, List<(string declarerId, int element, int layers)>> DeclaredElementOnEnemy =
+                new Dictionary<string, List<(string, int, int)>>();
+
             public void DeclareDamage(string enemyId, int amount)
             {
                 if (amount <= 0) return;
@@ -2139,6 +2262,52 @@ namespace GIC.Battle
                 if (amount <= 0) return;
                 DeclaredHealOnAlly.TryGetValue(allyId, out var cur);
                 DeclaredHealOnAlly[allyId] = cur + amount;
+            }
+
+            /// <summary>元素附着意图声明（议题⑤）。replacePriorDeclarations=true=执行遍落地口径：
+            /// 先清该声明者全部旧声明（申报期广播→执行重定向时旧目标集作废=最新意图权威）</summary>
+            public void DeclareElement(string declarerId, string enemyId, int element, int layers,
+                bool replacePriorDeclarations = false)
+            {
+                if (string.IsNullOrEmpty(declarerId) || string.IsNullOrEmpty(enemyId) || element <= 0 || layers <= 0)
+                    return;
+                if (replacePriorDeclarations) ForgetElementDeclarationsOf(declarerId);
+                if (!DeclaredElementOnEnemy.TryGetValue(enemyId, out var list))
+                {
+                    list = new List<(string, int, int)>();
+                    DeclaredElementOnEnemy[enemyId] = list;
+                }
+                list.Add((declarerId, element, layers));
+            }
+
+            /// <summary>查某敌已被**他人**声明的附着元素（排除自身声明——自声明自消费无新信息；
+            /// 无=0=Physical）。多声明取首个非自身（估值粗检，首个足用——多水叠加不改变反应类型）</summary>
+            public (int element, int layers) DeclaredElementExcluding(string enemyId, string selfId)
+            {
+                if (enemyId == null || !DeclaredElementOnEnemy.TryGetValue(enemyId, out var list))
+                    return (0, 0);
+                foreach (var d in list)
+                {
+                    if (d.declarerId == selfId) continue;
+                    return (d.element, d.layers);
+                }
+                return (0, 0);
+            }
+
+            /// <summary>清某声明者的全部附着声明（执行遍落地前调——申报广播的覆盖钩）</summary>
+            public void ForgetElementDeclarationsOf(string declarerId)
+            {
+                if (string.IsNullOrEmpty(declarerId) || DeclaredElementOnEnemy.Count == 0) return;
+                List<string> emptyKeys = null;
+                foreach (var kv in DeclaredElementOnEnemy)
+                {
+                    var list = kv.Value;
+                    for (int i = list.Count - 1; i >= 0; i--)
+                        if (list[i].declarerId == declarerId) list.RemoveAt(i);
+                    if (list.Count == 0) (emptyKeys ??= new List<string>()).Add(kv.Key);
+                }
+                if (emptyKeys != null)
+                    foreach (var k in emptyKeys) DeclaredElementOnEnemy.Remove(k);
             }
 
             /// <summary>跟随名额声明（I-C）：选定伴随先锋时调用——后位支援型经 FollowersOf 感知分散</summary>

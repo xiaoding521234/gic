@@ -39,6 +39,15 @@ namespace GIC.Battle
     /// </summary>
     public static class FamiliarBrain
     {
+        /// <summary>核心锚滞回锁（凌晨批议题③，2026-10-24 2v2 观察挂账「双核心等距线上眷属锚定
+        /// 小步游移」）：familiar unitId → 锁定的敌方核心 unitId。static 生命周期=进程——DecideAll
+        /// 里 turn≤1 自清（与 CompanionBrain E-3 同款零接线）。根治机制：纯距离序在绕行段
+        /// 「到核 A 距离翻转超过到核 B」时逐回合换核=推进方向反复横跳；锁+门槛（另一核心须严格近
+        /// 「锚点滞回门槛」格才接管=TPS CurrentHidepoint 惯性复核先例）使方向在等距邻域内稳定。
+        /// 预测器复用（OpponentThreatModel.DecideOne 直跑）：锁定规则为一步收敛不动点（锁内
+        /// 延续/显著更优换锁后，同输入重跑恒同输出）——预测与权威 DecideAll 同回合幂等。</summary>
+        private static readonly Dictionary<string, string> _coreLocks = new Dictionary<string, string>();
+
         /// <summary>
         /// 全部眷属单位的本回合行动（存活的；不可动者缺席=无行动——Pass 无结算意义不出命令）
         /// </summary>
@@ -46,6 +55,8 @@ namespace GIC.Battle
         {
             // 决策快照（纯读，与选择阶段广播同源状态）——技能预判的唯一状态源
             var snapshot = sim.TakeSnapshot(turnNumber);
+            if (turnNumber <= 1)
+                _coreLocks.Clear(); // 议题③：新战斗自清（StartBattle 恒从回合 1 起=每局零残留）
 
             var actions = new List<ActionData>();
             foreach (var kv in sim.Units)
@@ -112,10 +123,33 @@ namespace GIC.Battle
                 // 核心已破（不在场）=无锚，退化为「视野内最近敌」纯距离序兜底。逐敌距离升序+等距
                 // unitId 升序铁律不变（确定性）；v6.1 直线前缀步进不变。
                 var enemies = BattleHeuristics.FindEnemiesByDistance(sim, unit);
-                Unit core = null;
-                foreach (var e in enemies)
-                    if (BattleHeuristics.IsCore(e)) { core = e; break; } // 敌方核心=tag 化（2026-10-13）：核心标签即永恒目标（协议核心/未来世界树同识别）
                 var selfPos = sim.GetPosition(unit);
+                Unit core = null; // 敌方核心=tag 化（2026-10-13）：核心标签即永恒目标（协议核心/未来世界树同识别）
+                var cores = new List<Unit>();
+                foreach (var e in enemies)
+                    if (BattleHeuristics.IsCore(e)) cores.Add(e);
+                if (cores.Count > 0)
+                {
+                    core = cores[0]; // 距离序+unitId 决胜（FindEnemiesByDistance 既有确定性序）
+                    if (cores.Count > 1)
+                    {
+                        // 核心锚滞回锁（议题③）：双核心场（2v2）——现锁存活且在门槛内延续，
+                        // 另一核心须严格近「锚点滞回门槛」格才接管；锁失效（死亡/不可感知）自然重锁最近
+                        if (_coreLocks.TryGetValue(unitId, out var lockedCoreId))
+                        {
+                            var lockedCore = sim.GetUnit(lockedCoreId);
+                            if (lockedCore != null && !BattleSimState.IsDead(lockedCore) && cores.Contains(lockedCore))
+                            {
+                                int lockedDist = selfPos.ChebyshevTo(sim.GetPosition(lockedCore));
+                                int nearestDist = selfPos.ChebyshevTo(sim.GetPosition(cores[0]));
+                                if (lockedDist <= nearestDist + AITuningConfig.Instance.锚点滞回门槛)
+                                    core = lockedCore; // 门槛内延续锁定（抗等距邻域距离翻转游移）
+                            }
+                        }
+                        if (sim.TryGetUnitId(core, out var chosenCoreId))
+                            _coreLocks[unitId] = chosenCoreId; // 重锁当前选择（无锁首回合即锁最近）
+                    }
+                }
                 int coreDist = core != null ? selfPos.ChebyshevTo(sim.GetPosition(core)) : int.MaxValue;
                 int attackVision = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;
 

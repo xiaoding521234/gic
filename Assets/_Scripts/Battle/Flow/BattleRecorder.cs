@@ -74,6 +74,8 @@ namespace GIC.Battle
                     spawnX = spawnCells != null && spawnCells.TryGetValue(p.PlayerId, out var cell) ? cell.x : 0,
                     spawnY = spawnCells != null && spawnCells.TryGetValue(p.PlayerId, out var cell2) ? cell2.y : 0,
                     hand = hands != null && hands.TryGetValue(p.PlayerId, out var hand) ? hand : new List<HandCard>(),
+                    isAI = p.IsAI ? 1 : 0, // 凌晨批议题⑥：难度回放注册门（天理经济作弊=Host 侧结算差异源）
+                    aiDifficulty = (int)p.AIDifficulty, // 同上：重演前注册，否则回合末发放/建筑收入倍率回落 100% 必 diff
                 };
                 line.players.Add(pl);
             }
@@ -171,6 +173,14 @@ namespace GIC.Battle
         public int spawnX;
         public int spawnY;
         public List<HandCard> hand;
+
+        /// <summary>是否 AI 玩家（凌晨批议题⑥）：回放器据此注册难度。旧录制缺省 0=真人→不注册
+        ///（AIPlayerConfig 未注册回落棋圣=无经济作弊零漂移）</summary>
+        public int isAI;
+
+        /// <summary>AI 难度档（凌晨批议题⑥）：天理=经济作弊型（Host 侧结算差异）——回放器重演前
+        /// 注册进 AIPlayerConfig。类默认棋圣=旧录制（无此字段）零漂移</summary>
+        public int aiDifficulty = (int)AIDifficulty.Grandmaster;
     }
 
     [Serializable]

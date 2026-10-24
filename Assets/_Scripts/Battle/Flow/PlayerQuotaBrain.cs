@@ -248,6 +248,22 @@ namespace GIC.Battle
                 GICLog.Info($"[配额脑] {_playerId} T{turn} 学徒失误注入：榜 {ranked.Count} 候选取第 {rank} 名" +
                     $"（最优 {tracker.BestScore}→选中 {chosenScore}）");
             }
+            // 劲敌次优注入（凌晨批议题⑥）：榜首与次名分差占比 < AITuning.劲敌次优分差比 → 取次名
+            //（GameAIPro ch04 hustling「次优选择仅在分差<20% 内启用」——确定性零 roll；分差大仍取
+            // 最优=只在接近时犯错的拟人形态；与学徒轮转法互斥〔难度档不同〕）
+            else if (AIPlayerConfig.SecondBestInjectionEnabled(difficulty) && tracker.All.Count > 1)
+            {
+                var ranked = tracker.All.OrderByDescending(c => c.score).ToList();
+                int top = ranked[0].score, second = ranked[1].score;
+                int ratioPercent = Mathf.RoundToInt(AITuningConfig.Instance.劲敌次优分差比 * 100);
+                if (second * 100 >= top * (100 - ratioPercent))
+                {
+                    chosen = ranked[1].action;
+                    chosenScore = second;
+                    GICLog.Info($"[配额脑] {_playerId} T{turn} 劲敌次优注入：榜 {ranked.Count} 候选" +
+                        $"（最优 {top}→选中 {second}，分差比 {ratioPercent}% 内）");
+                }
+            }
 
             // 决策日志（docs/active/42 §10 可调试性：落选可审计——升命/号令常年不入选时
             // 从「配额=分」行归因分数构成，勿盲调常量）
@@ -269,18 +285,64 @@ namespace GIC.Battle
             return chosen ?? Pass(turn);
         }
 
-        // ==================== 部署分支（2026-10-12 AI 固定卡组批） ====================
+        // ==================== 部署分支（2026-10-12 AI 固定卡组批；凌晨批议题④⑦桶序升级） ====================
+
+        /// <summary>部署桶（议题④⑦桶序化的分拣单元——桶内容与校验链不动、只动序）</summary>
+        private enum DeployBucket
+        {
+            /// <summary>1★ 建筑首铺（旗帜：便宜+每回合滚雪球经济先行；同桶 unitName 升序）</summary>
+            Flag = 0,
+            /// <summary>角色（战力主力：unitName 升序 × 同名在场〔含尸体〕跳过——规避升命语义烧配额）</summary>
+            Characters = 1,
+            /// <summary>其余建筑（2★+ 与 1★ 复制：首铺优先〔同名存活升序〕→态势分档→星级→unitName）</summary>
+            OtherBuildings = 2,
+        }
+
+        /// <summary>per-局开局部署原型（凌晨批议题④，ZK 开局策略原型加权抽选先例）：三桶序变体——
+        /// 0=标准铺（旗→角→建=决策八十八观察线）1=经济先行（旗→建→角=餐馆提前滚雪球）2=速攻
+        ///（角→旗→建=先铺战力抢节奏）。抽选=FNV-1a(seed‖playerId) mod 3——**不走 RollChance**
+        ///（战斗 RNG 流为暴击专用〔EffectCompiler 唯一消费方〕，决策层消费会破「同 seed+同命令序列
+        /// =同战局」回放不变式；哈希抽选同 seed 同战局+回放零漂移目标不变）；开局窗口内生效
+        ///（AITuning.开局策略窗口回合），窗口后回归态势桶序（议题⑦）</summary>
+        private static int OpeningDeployVariant(int seed, string playerId)
+        {
+            unchecked
+            {
+                uint hash = 2166136261;
+                for (int i = 0; i < 4; i++)
+                {
+                    hash = (hash ^ (byte)(seed & 0xFF)) * 16777619;
+                    seed >>= 8;
+                }
+                if (!string.IsNullOrEmpty(playerId))
+                {
+                    foreach (var c in playerId)
+                    {
+                        hash = (hash ^ (byte)(c & 0xFF)) * 16777619;
+                        hash = (hash ^ (byte)((c >> 8) & 0xFF)) * 16777619;
+                    }
+                }
+                // murmur3 fmix32 终结器（avalanche）：裸 FNV-1a 短输入（12 字节）mod 3 有轻偏
+                //（1200 样本实测 348/397/455 → 加终结器 405/395/400）——三变体抽选均匀性校正
+                hash ^= hash >> 16;
+                hash *= 2246822519;
+                hash ^= hash >> 13;
+                hash *= 3266489917;
+                hash ^= hash >> 16;
+                return (int)(hash % 3);
+            }
+        }
 
         /// <summary>
-        /// 部署候选（确定性，2026-10-23 强化批扩建筑档）：三桶优先级——
-        /// ① **1★ 建筑首铺**（旗帜：便宜+每回合滚雪球经济先行；同桶 unitName 升序）；
-        /// ② **角色**（战力主力：unitName 升序 × 同名在场〔含尸体〕跳过——规避升命语义烧配额，
-        ///    卡不消耗、阵亡后同名卡自然重新可出战；AI-1 批起升命另走评分池）；
-        /// ③ **其余建筑**（2★+ 与 1★ 复制：首铺优先〔同名存活升序〕→ 星级升序 → unitName 升序
-        ///    ——先铺全种类再复制；校验=星级链 PassesBuildingStarGate+每种上限 PassesBuildingLimit）。
+        /// 部署候选（确定性，2026-10-23 强化批扩建筑档；凌晨批议题④⑦桶序化）：
+        /// 三桶分拣（旗帜首铺/角色/其余建筑）+ **桶序动态决定**——
+        /// ①开局窗口内（≤AITuning.开局策略窗口回合）=per-局开局原型（seed 派生抽选，议题④）；
+        /// ②窗口后=态势桶序（议题⑦，petra 优先级预算队列映射）：发育=经济建筑优先（旗→建→角，
+        /// 餐馆提前滚雪球）、守势=防御建筑优先（旗→建〔防御置顶〕→角）、压制/终局/相持=战力
+        /// 输出优先（旗→角→建=现状序）；桶③内序含态势分档（经济/防御/军团置顶）。
         /// 落点合法性=DeployUnitExecutor.IsDeployCellValid 单源（**自己存活建筑锚并集**〔2026-10-23
         /// 拍板：核心锚建筑 3/角色 2、其它建筑锚各减 1〕+地形+碰撞共享原语）；
-        /// 摩拉=GetEffectiveDeployCost 同源（不足的候选入桶前已滤——先攒）。
+        /// 摩拉=GetEffectiveDeployCost 同源（不足的候选入桶前已滤——先攒；红线语义维持）。
         /// 每回合部署配额一张，逐桶找首个可出战候选。
         /// </summary>
         private ActionData TryBuildDeploy(BattleSimState sim, int turn)
@@ -301,7 +363,7 @@ namespace GIC.Battle
                 unitCards.Add((card.value, data));
             }
 
-            // 三桶分拣（桶内排序见方法注释）
+            // 三桶分拣（桶内排序见各桶注释）
             var firstLowStarBuildings = new List<(int unitName, UnitConfig.UnitData data)>(); // ① 1★ 建筑首铺
             var characters = new List<(int unitName, UnitConfig.UnitData data)>();           // ② 角色
             var otherBuildings = new List<(int unitName, bool sameNameAlive, UnitConfig.UnitData data)>(); // ③ 其余建筑
@@ -319,38 +381,93 @@ namespace GIC.Battle
             firstLowStarBuildings.Sort((a, b) => a.unitName.CompareTo(b.unitName)); // unitName 升序（枚举序铁律）
             characters.Sort((a, b) => a.unitName.CompareTo(b.unitName));
 
-            // ① 1★ 建筑首铺（旗帜滚雪球先行——星级链/上限/落点三重校验）
-            foreach (var candidate in firstLowStarBuildings)
+            // —— 桶序决定（议题④开局原型 × 议题⑦态势预算）——
+            var stance = AIStrategist.StanceOf(_playerId);
+            DeployBucket[] order;
+            bool openingWindow = turn <= AITuningConfig.Instance.开局策略窗口回合;
+            if (openingWindow)
             {
-                var action = TryDeployBuildingCard(sim, turn, candidate.unitName, candidate.data);
-                if (action != null) return action;
-            }
-
-            // ② 角色（同名在场〔含尸体〕=暂不出战，卡不消耗）
-            foreach (var candidate in characters)
-            {
-                if (OwnUnitOnField(sim, (UnitName)candidate.unitName)) continue;
-                var cell = FindDeployCell(sim, candidate.data);
-                if (cell == null) continue;
-                return new ActionData
+                int variant = OpeningDeployVariant(sim.Seed, _playerId);
+                if (turn == 1)
+                    GICLog.Info($"[配额脑] {_playerId} T{turn} 开局部署原型={variant}" +
+                        (variant == 0 ? "（标准铺：旗→角→建）" : variant == 1 ? "（经济先行：旗→建→角）" : "（速攻：角→旗→建）"));
+                order = variant switch
                 {
-                    playerId = _playerId,
-                    actionType = ActionType.DeployUnit,
-                    deployUnitName = candidate.unitName,
-                    deployCell = cell.Value,
-                    turnNumber = turn,
+                    1 => new[] { DeployBucket.Flag, DeployBucket.OtherBuildings, DeployBucket.Characters },
+                    2 => new[] { DeployBucket.Characters, DeployBucket.Flag, DeployBucket.OtherBuildings },
+                    _ => new[] { DeployBucket.Flag, DeployBucket.Characters, DeployBucket.OtherBuildings },
+                };
+            }
+            else
+            {
+                // 窗口后：态势桶序（议题⑦——桶内容与校验链不动、只动序；摩拉红线维持）
+                order = stance switch
+                {
+                    AIStrategist.AIStance.Develop => new[] { DeployBucket.Flag, DeployBucket.OtherBuildings, DeployBucket.Characters },
+                    AIStrategist.AIStance.Defend => new[] { DeployBucket.Flag, DeployBucket.OtherBuildings, DeployBucket.Characters },
+                    _ => new[] { DeployBucket.Flag, DeployBucket.Characters, DeployBucket.OtherBuildings },
                 };
             }
 
-            // ③ 其余建筑（首铺优先→星级→unitName）
+            // 桶③内序（议题⑦态势分档）：首铺优先 → 态势置顶档（发育=经济/守势=防御/压制=军团）
+            // → 星级 → unitName（分档只是同档内前置，星级链校验仍在 Host 兜底——跳档候选自然落空）
+            int StanceTier(BuildingEffectKind kind)
+                => stance switch
+                {
+                    AIStrategist.AIStance.Develop =>
+                        kind == BuildingEffectKind.MoraIncome || kind == BuildingEffectKind.EnergyAura ? 0 : 1,
+                    AIStrategist.AIStance.Defend =>
+                        kind == BuildingEffectKind.HealWounded ? 0 : 1,
+                    AIStrategist.AIStance.Push or AIStrategist.AIStance.Endgame =>
+                        kind == BuildingEffectKind.EnergySummon || kind == BuildingEffectKind.PeriodicSummon ? 0 : 1,
+                    _ => 0, // 相持=无分档（维持星级序）
+                };
             otherBuildings.Sort((a, b) =>
-                a.sameNameAlive != b.sameNameAlive ? a.sameNameAlive.CompareTo(b.sameNameAlive)
-                : a.data.starLevel != b.data.starLevel ? a.data.starLevel.CompareTo(b.data.starLevel)
-                : a.unitName.CompareTo(b.unitName));
-            foreach (var candidate in otherBuildings)
             {
-                var action = TryDeployBuildingCard(sim, turn, candidate.unitName, candidate.data);
-                if (action != null) return action;
+                if (a.sameNameAlive != b.sameNameAlive) return a.sameNameAlive.CompareTo(b.sameNameAlive);
+                int ta = StanceTier(a.data.建筑效果), tb = StanceTier(b.data.建筑效果);
+                if (ta != tb) return ta.CompareTo(tb);
+                if (a.data.starLevel != b.data.starLevel) return a.data.starLevel.CompareTo(b.data.starLevel);
+                return a.unitName.CompareTo(b.unitName);
+            });
+
+            // 逐桶找首个可出战候选（桶序=order；每桶内枚举序铁律）
+            foreach (var bucket in order)
+            {
+                switch (bucket)
+                {
+                    case DeployBucket.Flag:
+                        foreach (var candidate in firstLowStarBuildings)
+                        {
+                            var action = TryDeployBuildingCard(sim, turn, candidate.unitName, candidate.data);
+                            if (action != null) return action;
+                        }
+                        break;
+                    case DeployBucket.Characters:
+                        // 同名在场〔含尸体〕=暂不出战，卡不消耗
+                        foreach (var candidate in characters)
+                        {
+                            if (OwnUnitOnField(sim, (UnitName)candidate.unitName)) continue;
+                            var cell = FindDeployCell(sim, candidate.data);
+                            if (cell == null) continue;
+                            return new ActionData
+                            {
+                                playerId = _playerId,
+                                actionType = ActionType.DeployUnit,
+                                deployUnitName = candidate.unitName,
+                                deployCell = cell.Value,
+                                turnNumber = turn,
+                            };
+                        }
+                        break;
+                    case DeployBucket.OtherBuildings:
+                        foreach (var candidate in otherBuildings)
+                        {
+                            var action = TryDeployBuildingCard(sim, turn, candidate.unitName, candidate.data);
+                            if (action != null) return action;
+                        }
+                        break;
+                }
             }
             return null;
         }
@@ -380,17 +497,20 @@ namespace GIC.Battle
         private bool OwnUnitOnField(BattleSimState sim, UnitName unitName)
             => DeployUnitExecutor.FindOwnUnitByName(sim, _playerId, unitName) != null;
 
-        // ==================== 购买分支（2026-10-23 强化批：AI 也会购买部署建筑） ====================
+        // ==================== 购买分支（2026-10-23 强化批立项；凌晨批议题②购物清单化） ====================
 
         /// <summary>
-        /// AI 购买（每回合至多一次；BuyCard 即时通道**不占配额**，LocalBattleTransport 同步结算——
-        /// 同回合购买→部署闭环：⓪-1 购买先行、⓪ 部署分支当回合即可消费新购卡）：
-        /// ① **旗帜补货**（协议核心出售；AI 默认卡组刻意不含旗帜=购买系统对 AI 负载化）：
-        ///    手牌无旗帜卡且摩拉 ≥ 购买价+部署价 → 买。卡不消耗=一次购入终身可重复出战
-        ///    （最多每种 3 座），故本条件整局至多触发一次——旗帜被拆后同名卡仍在手牌可直接重铺。
-        /// ② **角色补货**（骑士团/大教堂出售）：手牌无同名卡+**仅角色**（建筑/物品不买——建筑卡
-        ///    卡组自备、物品无配额脑使用档）+UnitConfig 有配置+**技能已实装**（任一技能 HasEffects
-        ///    ——观察局实锤琴技能全占位，买半成品=浪费；琴技能实装批自然激活本档）才买。
+        /// AI 购买（凌晨批议题②）：游戏规则购买**无每回合次数限制**（2026-10-24 用户勘正）——
+        /// 旧版「买入即 return」自限一购已拆除，改**购物清单循环**（BuyCard 即时通道不占配额，
+        /// LocalBattleTransport 同步结算——手牌/摩拉即时更新）：
+        /// ①清单=旗帜补货（协议核心出售；手牌无旗帜卡——卡不消耗=终身部署材料，整局至多触发一次）
+        /// +角色补货（己方存活建筑可购买列表×手牌无同名卡×仅角色×配置存在×**技能已实装**
+        /// 〔任一技能 HasEffects——观察局实锤琴技能全占位，买半成品=浪费；琴技能实装批自然激活〕）；
+        /// ②预算=当前摩拉 − 摩拉红线（AITuning.摩拉红线——与升命红线同源的保底语义，购买不掏空
+        /// 部署/升命资金池）；每项另须预留部署价（买来当回合即可部署）；
+        /// ③价值序=旗帜（部署锚+经济使能件）→角色 unitName 升序（购买价值无客观序，枚举序铁律）；
+        /// ④循环购入直至清单耗尽/预算不足（手牌守卫在清单构建期一次性评估+同名单去重=无重复购）。
+        /// 购物上限 8 件/回合=防御性护栏（正常对局清单 1~3 件远达不到）。
         /// 解锁门槛由 Host BuyCardExecutor 权威校验兜底（AI 未解锁角色=购买落空零损失）；
         /// 失败静默——下回合再试。商店建筑枚举序=unitId 升序（确定性枚举序铁律）。
         /// </summary>
@@ -401,6 +521,10 @@ namespace GIC.Battle
             var unitConfig = Wargame.Instance?.Context?.Get<UnitConfig>();
             if (unitConfig == null) return;
             var itemConfig = Wargame.Instance?.Context?.Get<ItemConfig>();
+            int moraRedLine = AITuningConfig.Instance.摩拉红线;
+
+            // —— 购物清单构建（tier 0=旗帜/1=角色；档内 unitName 升序）——
+            var list = new List<(int tier, int unitName, int cost, int deployReserve)>();
 
             // ① 旗帜补货（协议核心出售）：手牌无旗帜卡 → 买一张（卡不消耗=终身部署材料）
             bool handHasFlag = false;
@@ -414,26 +538,13 @@ namespace GIC.Battle
                 if (flagData != null)
                 {
                     var flagCard = new CardId(UnitName.FavoniusBanner);
-                    int cost = flagCard.PurchaseCostOf(unitConfig, itemConfig);
-                    int deployCost = flagData.GetEffectiveDeployCost();
-                    if (sim.GetMora(_playerId) >= cost + deployCost)
-                    {
-                        _session.SubmitInstantAction(new ActionData
-                        {
-                            playerId = _playerId,
-                            actionType = ActionType.BuyCard,
-                            buyCardType = (int)CardType.Unit,
-                            buyCardValue = (int)UnitName.FavoniusBanner,
-                            turnNumber = turn,
-                        });
-                        GICLog.Info($"[配额脑] {_playerId} T{turn} 购买旗帜（{cost} 摩拉，预留部署 {deployCost}）");
-                        return;
-                    }
+                    list.Add((0, (int)UnitName.FavoniusBanner,
+                        flagCard.PurchaseCostOf(unitConfig, itemConfig), flagData.GetEffectiveDeployCost()));
                 }
             }
 
-            // ② 角色补货（琴档）：自己存活建筑的可购买列表 × 手牌无同名卡 × 仅角色卡 × 配置存在
-            //    × 摩拉 ≥ 购买价+部署价 → 买（unitId 升序枚举，首个满足即买）
+            // ② 角色补货：自己存活建筑的可购买列表 × 手牌无同名卡 × 仅角色卡 × 配置存在
+            //    × 技能已实装 → 入清单（unitId 升序枚举+多建筑同售去重）
             var shopBuildings = new List<KeyValuePair<string, Unit>>();
             foreach (var kv in sim.Units)
             {
@@ -447,11 +558,13 @@ namespace GIC.Battle
                 shopBuildings.Add(kv);
             }
             shopBuildings.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key)); // unitId 升序（枚举序铁律）
+            var seenCharacters = new HashSet<int>();
             foreach (var shop in shopBuildings)
             {
                 foreach (var purchasable in shop.Value.RawData.可购买卡片)
                 {
                     if (purchasable.cardType != CardType.Unit) continue; // 物品卡不买（无使用档=死牌）
+                    if (!seenCharacters.Add(purchasable.value)) continue; // 多建筑同售去重（清单内同名一张）
                     bool inHand = false;
                     foreach (var card in hand)
                     {
@@ -473,21 +586,31 @@ namespace GIC.Battle
                         }
                     }
                     if (!anySkillImplemented) continue;
-                    int cost = purchasable.PurchaseCostOf(unitConfig, itemConfig);
-                    int deployCost = data.GetEffectiveDeployCost();
-                    if (sim.GetMora(_playerId) < cost + deployCost) continue; // 预留部署价
-                    _session.SubmitInstantAction(new ActionData
-                    {
-                        playerId = _playerId,
-                        actionType = ActionType.BuyCard,
-                        buyCardType = (int)purchasable.cardType,
-                        buyCardValue = purchasable.value,
-                        turnNumber = turn,
-                    });
-                    GICLog.Info($"[配额脑] {_playerId} T{turn} 购买角色卡 {purchasable.AsUnitName()}" +
-                        $"（{cost} 摩拉，预留部署 {deployCost}）");
-                    return;
+                    list.Add((1, purchasable.value,
+                        purchasable.PurchaseCostOf(unitConfig, itemConfig), data.GetEffectiveDeployCost()));
                 }
+            }
+            list.Sort((a, b) => a.tier != b.tier ? a.tier.CompareTo(b.tier)
+                : a.unitName.CompareTo(b.unitName)); // 价值序：旗帜→角色 unitName 升序（枚举序铁律）
+
+            // —— 循环购入（预算=摩拉 − 红线；每项预留部署价；预算不足跳下一项——更便宜的可能买得起）——
+            int purchased = 0;
+            foreach (var item in list)
+            {
+                if (purchased >= 8) break; // 防御性护栏（正常对局清单 1~3 件远达不到）
+                int mora = sim.GetMora(_playerId);
+                if (mora - item.cost - item.deployReserve < moraRedLine) continue;
+                _session.SubmitInstantAction(new ActionData
+                {
+                    playerId = _playerId,
+                    actionType = ActionType.BuyCard,
+                    buyCardType = (int)CardType.Unit,
+                    buyCardValue = item.unitName,
+                    turnNumber = turn,
+                });
+                purchased++;
+                GICLog.Info($"[配额脑] {_playerId} T{turn} 购买 {(UnitName)item.unitName}" +
+                    $"（{item.cost} 摩拉，预留部署 {item.deployReserve}，红线 {moraRedLine}，本轮已购 {purchased}）");
             }
         }
 

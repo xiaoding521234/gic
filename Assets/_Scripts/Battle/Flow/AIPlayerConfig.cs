@@ -66,6 +66,22 @@ namespace GIC.Battle
         public static bool MistakeInjectionEnabled(AIDifficulty difficulty)
             => difficulty == AIDifficulty.Apprentice;
 
+        /// <summary>劲敌次优注入门（凌晨批议题⑥）：中档难度=「分差内取次名」——GameAIPro ch04
+        /// hustling 三招之一「最优与次优分差&lt;20% 才选次优」的确定性实现（零 roll；分差大仍取
+        /// 最优=只在接近时犯错的拟人形态；学徒轮转法独立不变）</summary>
+        public static bool SecondBestInjectionEnabled(AIDifficulty difficulty)
+            => difficulty == AIDifficulty.Rival;
+
+        /// <summary>摩拉收入百分比（凌晨批议题⑥：天理=经济作弊型难度——SC2 proto CheatMoney/
+        /// petra 经济倍率表先例，决策逻辑不动、收入乘倍率；其余档恒 100）。消费点=TurnResolver
+        /// 回合末发放+建筑摩拉收入（玩家资源发放两单源，掠夺/消耗不复用）；数值真源=AITuning.
+        /// 天理摩拉收入百分比。**LAN 边界**：难度注册在配额脑 Bind（本地进程）——远端 AI 玩家
+        /// 的天理档对 Host 结算不可见（回落 100%），天理作弊单机/Host 本地 AI 生效</summary>
+        public static int MoraIncomePercentOf(string playerId)
+            => DifficultyOf(playerId) == AIDifficulty.Providence
+                ? AITuningConfig.Instance.天理摩拉收入百分比
+                : 100;
+
         /// <summary>战略层门（§9.2 学徒开启件「战略层仅发育态」——AIStrategist 态势机不走、
         /// 恒发育乘子；三账本红线/体力保底=硬保底语义非决策质量件、全档生效）</summary>
         public static bool StrategistDevelopOnly(AIDifficulty difficulty)

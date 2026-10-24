@@ -86,6 +86,16 @@ namespace GIC.Editor
                 if (recording.ActionsByTurn.Count == 0)
                     return "FAIL：录制无行动行（空局？）";
 
+                // —— 凌晨批议题⑥：回放难度注册——天理档经济作弊是 Host 侧结算差异（回合末摩拉
+                //    发放/建筑收入乘倍率），录制局的难度必须在重演前注册进 AIPlayerConfig，否则
+                //    倍率回落 100% 命令流必 diff。旧录制缺字段=类默认棋圣（无作弊）零漂移；
+                //    注册后跨局残留由录制局逐行覆盖+未参战条目无人查询（AIPlayerConfig 既有语义）
+                foreach (var pl in recording.Header.players)
+                {
+                    if (pl.isAI == 0) continue;
+                    AIPlayerConfig.SetDifficulty(pl.playerId, (AIDifficulty)pl.aiDifficulty);
+                }
+
                 // —— 编辑器域配置容器（演算层经 Wargame.Instance?.Context?.Get<ItemConfig>() 读配置；
                 // 编辑器域 Boot 未跑容器为空——最小容器注入：仅 ConfigManager（Bean 链），
                 // 勿跑 Wargame.Init 全家桶〔SaveManager 等有副作用〕）

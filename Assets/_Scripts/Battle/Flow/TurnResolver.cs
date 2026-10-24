@@ -368,9 +368,13 @@ namespace GIC.Battle
             int grantIndex = 0;
             foreach (var pid in _sim.PlayerIds)
             {
-                _sim.ApplyMoraDelta(pid, BattleMetrics.MoraGainPerTurn);
+                // 凌晨批议题⑥天理经济作弊：回合末摩拉发放按难度倍率（AIPlayerConfig.MoraIncomePercentOf
+                // 单源——天理=AITuning.天理摩拉收入百分比、其余档恒 100 零变化；SC2 CheatMoney/petra
+                // 经济倍率表先例：决策逻辑不动、收入作弊）
+                int moraGain = BattleMetrics.MoraGainPerTurn * AIPlayerConfig.MoraIncomePercentOf(pid) / 100;
+                _sim.ApplyMoraDelta(pid, moraGain);
                 segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
-                    BattleCommand.StatKindMora, BattleMetrics.MoraGainPerTurn));
+                    BattleCommand.StatKindMora, moraGain));
                 _sim.ApplyStaminaDelta(pid, BattleMetrics.StaminaGainPerTurn);
                 segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
                     BattleCommand.StatKindStamina, BattleMetrics.StaminaGainPerTurn));
@@ -483,9 +487,13 @@ namespace GIC.Battle
                     case BuildingEffectKind.MoraIncome:
                     {
                         if (data.效果数值 <= 0) break;
-                        _sim.ApplyMoraDelta(building.identity.OwnerPlayerID, data.效果数值);
+                        // 凌晨批议题⑥天理经济作弊：建筑摩拉收入同乘难度倍率（MoraIncomePercentOf 单源，
+                        // 与回合末发放同口径；掠夺/卡牌消耗不复用=作弊只在「收入」语义内）
+                        int moraGain = data.效果数值
+                            * AIPlayerConfig.MoraIncomePercentOf(building.identity.OwnerPlayerID) / 100;
+                        _sim.ApplyMoraDelta(building.identity.OwnerPlayerID, moraGain);
                         extraCommands.Add(BattleCommand.StatChange(building.identity.OwnerPlayerID, 0, 0,
-                            BattleCommand.StatKindMora, data.效果数值));
+                            BattleCommand.StatKindMora, moraGain));
                         break;
                     }
                     case BuildingEffectKind.PeriodicSummon:
