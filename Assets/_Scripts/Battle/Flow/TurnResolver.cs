@@ -54,7 +54,7 @@ namespace GIC.Battle
             {
                 actions.RemoveAll(a => a.actionType == ActionType.DeployUnit);
                 yield return PushSegmentAndWaitAck(ResolveDeploySegment(turnNumber, 0, deploys));
-                if (_sim.AnyCoreDestroyed()) yield break; // 核心片末检查（协议核心批）：防御性同口径
+                if (_sim.IsBattleDecided()) yield break; // 核心片末检查（协议核心批）：战斗已分胜负口径（2026-10-24 勘正，docs/14 §171）
             }
 
             // 物品行动段（2026-10-16 首个可打出物品批；2026-10-18 装备批并 EquipItem）：玩家级行动
@@ -68,7 +68,7 @@ namespace GIC.Battle
                 actions.RemoveAll(a => a.actionType == ActionType.UseItem || a.actionType == ActionType.EquipItem);
                 int useItemSlice = hasDeploySegment ? 1 : 0; // 紧随部署段占号
                 yield return PushSegmentAndWaitAck(ResolveItemActionsSegment(turnNumber, useItemSlice, itemActions));
-                if (_sim.AnyCoreDestroyed()) yield break; // 防御性同口径（物品效果理论上可含伤害）
+                if (_sim.IsBattleDecided()) yield break; // 防御性同口径（物品效果理论上可含伤害；战斗已分胜负口径 docs/14 §171）
             }
 
             // 玩家级 Pass（空 unitId：超时自动空过/AI 无单位 Pass）无单位归属——分桶前静默剔除，
@@ -93,10 +93,14 @@ namespace GIC.Battle
                 var segment = ResolveSlice(turnNumber, sliceIndex, bucket.speed, maxSpeed, bucket.actions);
                 yield return PushSegmentAndWaitAck(segment);
                 sliceIndex++;
-                // 片末核心检查（协议核心批 2026-09-29 拍板「片末检查立即停」）：任一核心已毁→
-                // 剩余片不再结算与推送（MOBA 观感：核心倒下即终局）；胜负广播由 TurnFlowController
-                // 既有 CheckBattleOver 位置接住（顺序铁律不变：先阶段事件再 BattleOver）
-                if (_sim.AnyCoreDestroyed()) yield break;
+                // 片末核心检查（协议核心批 2026-09-29 拍板「片末检查立即停」；2026-10-24 勘正为
+                // 战斗已分胜负口径 IsBattleDecided）：恰好一队核心存活→剩余片不再结算与推送
+                // （MOBA 观感：终局核心倒下即收尾）；**单玩家核心倒下≠终局**（2v2 队友核心仍在=
+                // 战斗继续、剩余片照常结算——旧 AnyCoreDestroyed 单玩家口径会把此后每回合截断在
+                // 首个攻速片=速度 30/10 档/即时队列/回合末段全停摆，docs/14 §171）；
+                // 胜负广播由 TurnFlowController 既有 CheckBattleOver 位置接住（口径同构；
+                // 顺序铁律不变：先阶段事件再 BattleOver）
+                if (_sim.IsBattleDecided()) yield break;
             }
 
             // 片边界 poll 即时行动队列（连携/契约类；B1 调试验证协议预留）
@@ -110,7 +114,7 @@ namespace GIC.Battle
                 {
                     yield return PushSegmentAndWaitAck(segment);
                     sliceIndex++;
-                    if (_sim.AnyCoreDestroyed()) yield break; // 即时段同口径
+                    if (_sim.IsBattleDecided()) yield break; // 即时段同口径（战斗已分胜负口径 docs/14 §171）
                 }
             }
 

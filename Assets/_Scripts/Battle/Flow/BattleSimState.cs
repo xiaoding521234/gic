@@ -663,9 +663,11 @@ namespace GIC.Battle
             return false;
         }
 
-        /// <summary>任一玩家战败成立（片末检查：最后一枚核心被击倒的那一片末中断剩余片结算，
-        /// 胜负广播由 TurnFlowController 既有 CheckBattleOver 位置接住——单核心时代与旧
-        /// 「任一核心死即中断」逐点等价：每玩家恰一枚核心时全灭=该枚死）</summary>
+        /// <summary>任一玩家战败成立（单玩家口径查询——曾注册核心且当前无存活核心）。
+        /// ⚠️ 勿再用作回合截断/终止判据：多人口径下单玩家战败≠战斗终局（2v2 队友核心仍在），
+        /// 且核心一倒它对余生每回合恒真——旧片末检查用它导致「此后每回合只结算首个攻速片、
+        /// 速度 30/10 档/即时队列/回合末段全停摆」的跛行态（2026-10-24 实战报障，docs/14 §171；
+        /// TurnResolver 片末检查已改用 IsBattleDecided 队伍口径）。保留作按玩家战败状态查询。</summary>
         public bool AnyCoreDestroyed()
         {
             var seen = new HashSet<string>();
@@ -676,6 +678,29 @@ namespace GIC.Battle
                 if (IsPlayerDefeated(id.OwnerPlayerID)) return true;
             }
             return false;
+        }
+
+        /// <summary>战斗是否已分出胜负（片末检查判据——与 TurnFlowController.CheckBattleOver
+        /// 广播口径严格同构：有登记核心 且 恰好一队仍有存活核心）。1v1 与旧「任一玩家战败」口径
+        /// 逐点等价（每队恰一人）；2v2 中单玩家核心倒下≠终局（队友核心仍在=未分胜负→剩余片照常
+        /// 结算）；双方核心同回合互灭=零队存活=未「分出」→不截断（平局回合照常走完，B8 结算口径
+        /// ——避免互灭态再次落入每回合截断）。</summary>
+        public bool IsBattleDecided()
+        {
+            if (!HasAnyRegisteredCore()) return false;
+            var seenTeams = new HashSet<TeamType>();
+            int aliveTeams = 0;
+            foreach (var pid in PlayerIds)
+            {
+                var team = GetTeamOf(pid);
+                if (!seenTeams.Add(team)) continue;
+                if (TeamHasLivingCore(team))
+                {
+                    aliveTeams++;
+                    if (aliveTeams > 1) return false; // 两队核心都存活：战斗继续
+                }
+            }
+            return aliveTeams == 1; // 恰好一队存活=胜负已分；零队（互灭平局）=不截断
         }
 
         /// <summary>队伍是否仍有存活的核心（多人：队内任一玩家的核心存活=该队未败；
