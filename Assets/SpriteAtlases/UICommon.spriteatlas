@@ -78,6 +78,7 @@ SpriteAtlas:
     - cf35a6c6d85ce844fa5ea23f08e1fd75: 21300000
     - 7c4bde67528d7cc498b3a23c01ad6c44: 21300000
     - abfbccb74b0d94342b8b4bb251264704: 21300000
+    - d1cf6dd71ade7ed4d920a02eb59d3cf5: 21300000
     - b86c50689bd9e9a408739a20a0a7dc05: 21300000
     - a678637873a9338489b850647e4ad1db: 21300000
     - 8574d0986f0c303488fad272c4bd4249: 21300000
@@ -149,6 +150,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: cf35a6c6d85ce844fa5ea23f08e1fd75, type: 3}
   - {fileID: 21300000, guid: 7c4bde67528d7cc498b3a23c01ad6c44, type: 3}
   - {fileID: 21300000, guid: abfbccb74b0d94342b8b4bb251264704, type: 3}
+  - {fileID: 21300000, guid: d1cf6dd71ade7ed4d920a02eb59d3cf5, type: 3}
   - {fileID: 21300000, guid: b86c50689bd9e9a408739a20a0a7dc05, type: 3}
   - {fileID: 21300000, guid: a678637873a9338489b850647e4ad1db, type: 3}
   - {fileID: 21300000, guid: 8574d0986f0c303488fad272c4bd4249, type: 3}
@@ -219,6 +221,7 @@ SpriteAtlas:
   - dropdown_triangle
   - hydro
   - logo_back
+  - dimension_button
   - close_button
   - disc
   - switch_skin

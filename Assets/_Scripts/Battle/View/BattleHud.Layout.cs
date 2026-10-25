@@ -81,7 +81,7 @@ namespace GIC.Battle
         /// 新设置钮上=同角同尺寸观感无损，未知键自然跳过纪律兜底）</summary>
         private static readonly string[] AllLayoutKeys =
         {
-            "burst", "skill", "enso", "move", "cancel", "exit", "settings",
+            "burst", "skill", "enso", "move", "cancel", "exit", "settings", "dimension",
             "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick", "passive",
         };
 

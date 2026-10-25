@@ -56,10 +56,12 @@ namespace GIC.Battle
                 return false;
             }
 
-            // 饮用目标校验：我方存活单位（TeamType 口径同延奏；尸体不可饮用——治疗对尸体恒 0 无意义）
+            // 饮用目标校验：我方存活单位（TeamType 口径同延奏；尸体不可饮用——治疗对尸体恒 0 无意义；
+            // 灵魂不可饮用——地脉维度不可及，决策九十一）
             var drinkerState = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
             var casterTeam = sim.GetTeamOf(action.playerId);
-            if (drinkerState == null || (TeamType)drinkerState.team != casterTeam || drinkerState.isCorpse != 0)
+            if (drinkerState == null || (TeamType)drinkerState.team != casterTeam || drinkerState.isCorpse != 0
+                || drinkerState.isSoul != 0)
             {
                 GICLog.Warn($"[UseItem] {action.playerId} 使用 {itemName} 目标无效（{action.targetUnitId}——须为我方存活单位），使用落空");
                 return false;

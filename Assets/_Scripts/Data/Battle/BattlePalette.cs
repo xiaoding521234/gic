@@ -139,6 +139,9 @@ namespace GIC.Data
         public Color 受击闪红 = new Color(1f, 0.35f, 0.3f);
         public Color 名字尸体灰 = new Color(0.5f, 0.5f, 0.5f, 0.85f);
 
+        [Tooltip("灵魂蓝（决策九十一，2026-10-25）：地脉灵魂立牌 tint/柔光晕/灵魂血条填充/衰减数字四链同源——半透明冰蓝（RGB 全值=tint 基色，不透明度由各消费方自定：立牌 tint 由 BattlePlayer 灵魂立牌不透明度 字段乘、光晕/条/数字直接用本色的 a 通道需乘各自强度）")]
+        public Color 灵魂蓝 = new Color(0.45f, 0.72f, 1f, 1f);
+
         private static BattlePalette _instance;
         private static bool _instanceLoadAttempted;
 

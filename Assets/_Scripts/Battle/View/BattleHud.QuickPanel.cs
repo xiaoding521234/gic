@@ -94,6 +94,7 @@ namespace GIC.Battle
             foreach (var u in snapshot.units)
             {
                 if (u == null || u.playerId != _myPlayerId) continue;
+                if (u.isSoul != 0) continue; // 灵魂不可号令（决策九十一：地脉驻留体无行动——不入快捷面板）
                 var data = TryGetUnitData(u.unitName);
                 if (data == null || data.unitType == UnitType.Building) continue; // 协议核心=纯查看且无爆发/势力技能
                 var tier = TierOfUnit(u);

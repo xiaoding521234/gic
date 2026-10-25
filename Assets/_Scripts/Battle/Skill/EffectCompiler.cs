@@ -45,7 +45,7 @@ namespace GIC.Battle
                 var target = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
                 bool allySide = skillData.skillType == SkillType.Enso;
                 var casterTeam = sim.GetTeamOf(action.playerId);
-                bool valid = target != null && target.isCorpse == 0
+                bool valid = target != null && target.isCorpse == 0 && target.isSoul == 0 // 灵魂在地脉维度不可及（决策九十一——Host 权威防线，客户端候选域双保险）
                     && (allySide ? (TeamType)target.team == casterTeam : (TeamType)target.team != casterTeam);
                 if (!valid)
                 {
@@ -63,7 +63,8 @@ namespace GIC.Battle
             {
                 var target = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
                 var casterTeam = sim.GetTeamOf(action.playerId);
-                bool valid = target != null && (TeamType)target.team == casterTeam;
+                bool valid = target != null && target.isSoul == 0 // 灵魂在地脉维度不可及（决策九十一）——复苏/增益直指域均拒灵魂
+                    && (TeamType)target.team == casterTeam;
                 if (!valid)
                 {
                     GICLog.Info($"[EffectCompiler] {action.unitId} {skillData.skillID} 目标无效（{action.targetUnitId}），行动落空");
@@ -344,7 +345,7 @@ namespace GIC.Battle
                     if (radius <= 0) break;
                     var casterTeam = sim.GetTeamOf(action.playerId);
                     foreach (var u in snapshot.units)
-                        if ((TeamType)u.team != casterTeam && u.isCorpse == 0
+                        if ((TeamType)u.team != casterTeam && u.isCorpse == 0 && u.isSoul == 0 // 灵魂在地脉维度不可及（决策九十一：两维度无法影响对方）
                             && Math.Max(Math.Abs(u.position.x - casterState.position.x),
                                         Math.Abs(u.position.y - casterState.position.y)) <= radius)
                             yield return u;
@@ -352,9 +353,10 @@ namespace GIC.Battle
                 }
                 case SkillEffectTargetFilter.AllAllies:
                     // 我方全体存活（元气迸发——群体治疗各按目标自身 maxHp 换算）；
-                    // 我军=TeamType 口径（2026-09-25 三轮审查 C2：2v2 含队友单位）
+                    // 我军=TeamType 口径（2026-09-25 三轮审查 C2：2v2 含队友单位）；
+                    // 灵魂排除（决策九十一：地脉维度与主世界互不可及）
                     foreach (var u in snapshot.units)
-                        if ((TeamType)u.team == sim.GetTeamOf(action.playerId) && u.isCorpse == 0)
+                        if ((TeamType)u.team == sim.GetTeamOf(action.playerId) && u.isCorpse == 0 && u.isSoul == 0)
                             yield return u;
                     break;
                 case SkillEffectTargetFilter.MondstadtOrSelf:
@@ -414,7 +416,7 @@ namespace GIC.Battle
                     if (radius <= 0) continue;
                     foreach (var ally in sliceSnapshot.units)
                     {
-                        if ((TeamType)ally.team != sim.GetTeamOf(action.playerId) || ally.isCorpse != 0) continue; // 尸体不治疗；我军=TeamType 口径（C2）
+                        if ((TeamType)ally.team != sim.GetTeamOf(action.playerId) || ally.isCorpse != 0 || ally.isSoul != 0) continue; // 尸体不治疗；灵魂在地脉维度不可及（决策九十一）；我军=TeamType 口径（C2）
                         int dist = Math.Max(Math.Abs(ally.position.x - casterState.position.x),
                             Math.Abs(ally.position.y - casterState.position.y));
                         if (dist > radius) continue;
@@ -981,6 +983,7 @@ namespace GIC.Battle
             foreach (var enemy in snapshot.units)
             {
                 if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
+                if (enemy.isSoul != 0) continue; // 灵魂在地脉维度不可及（决策九十一：两维度无法影响对方——主世界弹道/预判不可达）
                 float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
                 var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
                 if (rel.sqrMagnitude <= radius * radius) { into.Add(enemy); continue; } // 发射即贴脸（同格堆叠）
@@ -1029,6 +1032,7 @@ namespace GIC.Battle
             foreach (var enemy in snapshot.units)
             {
                 if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
+                if (enemy.isSoul != 0) continue; // 灵魂在地脉维度不可及（决策九十一：两维度无法影响对方——主世界弹道/预判不可达）
                 float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
                 var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
                 if (rel.sqrMagnitude <= radius * radius) return true; // 发射即贴脸（同格堆叠）

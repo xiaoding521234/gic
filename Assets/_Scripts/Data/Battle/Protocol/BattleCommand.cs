@@ -180,6 +180,7 @@ namespace GIC.Data
         public const int StatKindMora = 2;   // 摩拉（value=变化量；actorUnitId=归属玩家。B6c 部署扣费直产；B6d 回合结束发放直产+客户端 HUD 消费）
         public const int StatKindStamina = 3; // 体力（value=变化量；actorUnitId=归属玩家。B6d：配额行动消耗走 StaminaEffect 效应产出+回合结束发放直产）
         public const int StatKindSanity = 4; // 理智（value=变化量；2026-09-30 歌声之环批：Buff tick 恢复走 SanityEffect 效应产出+客户端 UnitView 缓存；UnitState.sanity 快照携带）
+        public const int StatKindHp = 5;     // 生命（value=变化量；决策九十一 2026-10-25：地脉灵魂回合末衰减专用——非伤害路径〔无防御/暴击/反应〕，客户端血条衰减+灵魂蓝数字；活体治疗仍走 Heal 命令勿混用）
 
         [Header("治疗子类型（Heal 命令 metadata；2026-10-01 拍板 B——吸血自疗带名前缀）")]
         public const int HealKindLifesteal = 1; // 吸血（客户端弹「吸血 +N」名前缀；普通治疗仍裸 +N）

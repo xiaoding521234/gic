@@ -169,6 +169,33 @@ namespace GIC.Battle
         {
             if (_fogOverlayGo != null) { Destroy(_fogOverlayGo); _fogOverlayGo = null; }
             if (_fogOverlayMesh != null) { _runtimeMeshes.Remove(_fogOverlayMesh); Destroy(_fogOverlayMesh); _fogOverlayMesh = null; }
+            _fogOverlayIntent = false; // 决策九十一：GO 已毁，意图复位（重建后按雾格集重评）
+        }
+
+        // ==================== 维度视角雾面让位（决策九十一，2026-10-25） ====================
+
+        /// <summary>雾面重建的「应有」意图（探索集决定：true=有未探索格应显示）</summary>
+        private bool _fogOverlayIntent;
+
+        /// <summary>地脉视角隐藏旗（灵界透视——切地脉视角雾面整体让位；重建 SetActive 经本旗门控，
+        /// 视角切回自动恢复当下正确态）</summary>
+        private bool _dimensionFogHidden;
+
+        /// <summary>雾面可见性落地单出口：意图 && !地脉视角隐藏——重建方与维度切换方共用</summary>
+        private void SetFogOverlayActive(bool intent)
+        {
+            _fogOverlayIntent = intent;
+            if (_fogOverlayGo != null)
+                _fogOverlayGo.SetActive(intent && !_dimensionFogHidden); // 唯一原生活性写点（本方法体内的直写勿再替换）
+        }
+
+        /// <summary>雾面显隐（决策九十一：BattlePlayer.SetDimensionView 消费——地脉视角=灵界透视
+        /// 雾面让位、主世界视角=恢复当下探索态）。幂等直通</summary>
+        public void SetFogOverlayVisible(bool visible)
+        {
+            if (_dimensionFogHidden == !visible) return;
+            _dimensionFogHidden = !visible;
+            SetFogOverlayActive(_fogOverlayIntent); // 经单出口重放当前意图（含地脉旗）
         }
 
         /// <summary>雾面/混沌盖共享运行时件确保（#1 审查批 mesh 复用）：首次建 GO+mesh，此后两模式
@@ -206,7 +233,7 @@ namespace GIC.Battle
 
             if (Map == null || cells == null || cells.Count == 0)
             {
-                _fogOverlayGo.SetActive(false); // 探索满格=无雾面
+                SetFogOverlayActive(false); // 探索满格=无雾面
                 return;
             }
 
@@ -231,11 +258,11 @@ namespace GIC.Battle
             }
             if (verts.Count == 0)
             {
-                _fogOverlayGo.SetActive(false);
+                SetFogOverlayActive(false);
                 return;
             }
 
-            _fogOverlayGo.SetActive(true);
+            SetFogOverlayActive(true);
             _fogOverlayMesh.Clear();
             _fogOverlayMesh.SetVertices(verts);
             _fogOverlayMesh.SetUVs(0, uvs);
@@ -253,7 +280,7 @@ namespace GIC.Battle
             EnsureFogOverlayGO("BattleFogLids");
             if (Map == null || cells == null || cells.Count == 0)
             {
-                _fogOverlayGo.SetActive(false);
+                SetFogOverlayActive(false);
                 return;
             }
 
@@ -282,19 +309,19 @@ namespace GIC.Battle
             }
             if (verts.Count == 0)
             {
-                _fogOverlayGo.SetActive(false);
+                SetFogOverlayActive(false);
                 return;
             }
 
             var mat = EnsureChaosFogMaterial();
             if (mat == null)
             {
-                _fogOverlayGo.SetActive(false);
+                SetFogOverlayActive(false);
                 return;
             }
             _fogOverlayGo.GetComponent<MeshRenderer>().sharedMaterial = mat;
 
-            _fogOverlayGo.SetActive(true);
+            SetFogOverlayActive(true);
             _fogOverlayMesh.Clear();
             _fogOverlayMesh.SetVertices(verts);
             _fogOverlayMesh.SetUVs(0, uvs);

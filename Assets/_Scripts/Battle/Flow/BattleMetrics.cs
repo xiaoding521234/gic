@@ -65,6 +65,22 @@ namespace GIC.Battle
         /// 低级单位 1~2 星自主行动豁免，延奏/契约等特殊技能 0）</summary>
         public const int StaminaCostPerAction = 10;
 
+        // ==================== 地脉维度与灵魂（决策九十一，2026-10-25） ====================
+
+        /// <summary>灵魂每回合末衰减百分比（占最大生命——10%×10 回合整好归零=「完整 10 回合复苏窗」；
+        /// 末点截断：⌊10%×MaxHp⌋）</summary>
+        public const int SoulDecayPercentPerTurn = 10;
+
+        /// <summary>灵魂治疗效率（拍板「灵魂的治疗效率-50%」=绝对 50——协议核心 50 同款语义：
+        /// 受疗者效率乘区单出口（EffectCompiler.ApplyHealEfficiency）对一切治疗自动减半；
+        /// 角色/命座自有效率不继承（灵魂只继承基础属性））</summary>
+        public const int SoulHealEfficiency = 50;
+
+        /// <summary>地脉驻留理智代价（拍板「在地脉维度的单位（不包括灵魂），每回合结束减少3点理智」——
+        /// 地脉专属维度规则；当前地脉仅灵魂=预留自动生效，胡桃/丽莎相位技能批上线即激活；
+        /// 霜月等未来维度的驻留规则另立常量勿复用本值）</summary>
+        public const int LeyLineSanityCostPerTurn = 3;
+
         // ==================== 世界/画布 sortingOrder 层级表（2026-09-28 批6 收口：8 处散布字面量单源） ====================
         // 完整层序自下而上：水面/薄冰 -3（2026-10-17 迷雾批自 -2 下移）→ 迷雾面 -2（迷雾批新增）→ 底座盘 -1 →
         // 瞄准贴片 0（隐式默认，无显式设置点）→ 底座弧光 1 → 立牌 10 → Buff 徽章 11 → 箭矢 12 →

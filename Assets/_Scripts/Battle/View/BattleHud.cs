@@ -1245,6 +1245,7 @@ namespace GIC.Battle
         private void EnterDeployAim(int unitNameValue)
         {
             if (_state != HudState.Idle) return; // 仅手牌态可起（选中单位时手牌已隐藏）
+            ReturnToMainWorldForAim(); // 地脉视角=纯观察（决策九十一）：起部署瞄准自动切回主世界
             _deployAimUnit = unitNameValue;
             _state = HudState.Aiming;
             _aimDef = null;
@@ -1295,6 +1296,7 @@ namespace GIC.Battle
         private void EnterItemUseAim(int itemNameValue)
         {
             if (_state != HudState.Idle) return; // 仅手牌态可起（同部署）
+            ReturnToMainWorldForAim(); // 地脉视角=纯观察（决策九十一）：起物品瞄准自动切回主世界
             _itemUseAimItem = itemNameValue;
             _state = HudState.Aiming;
             _aimDef = null; // 玩家级会话（无技能按钮定义——同部署/升命）
@@ -1334,6 +1336,7 @@ namespace GIC.Battle
         private void EnterEquipAim(int itemNameValue, int durability)
         {
             if (_state != HudState.Idle) return; // 仅手牌态可起（同部署/饮用）
+            ReturnToMainWorldForAim(); // 地脉视角=纯观察（决策九十一）：起装备瞄准自动切回主世界
             _equipAimItem = itemNameValue;
             _equipAimDurability = durability;
             _state = HudState.Aiming;
@@ -1470,6 +1473,7 @@ namespace GIC.Battle
             {
                 var view = kv.Value;
                 if (view == null) continue;
+                if (view.IsSoulView) continue; // 灵魂不可点选（决策九十一：v1 灵魂无详情无瞄准交互——地脉视角纯观察）
                 UnitState unit = null;
                 foreach (var u in snapshot.units)
                 {
@@ -1550,7 +1554,7 @@ namespace GIC.Battle
             {
                 foreach (var u in snapshot.units)
                 {
-                    if (u.isCorpse != 0) continue;
+                    if (u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不可选不可查看（决策九十一：地脉驻留体不入主世界交互域）
                     if (u.position.x != cell.x || u.position.y != cell.y) continue;
                     bool pick = side == UnitSide.Mine ? u.playerId == _myPlayerId
                         : side == UnitSide.MyTeam ? ((TeamType)u.team == MyTeam && u.playerId != _myPlayerId)
@@ -1564,6 +1568,7 @@ namespace GIC.Battle
             foreach (var u in snapshot.units) // 尸体垫底段（不分敌我——查看语义无优先级需求）
             {
                 if (u.isCorpse == 0) continue;
+                if (u.isSoul != 0) continue; // 灵魂永不入查看/选择域（决策九十一——灵魂非尸体双保险）
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
                 if (!FogVisible(u)) continue;
                 result.Add(u);
@@ -1600,7 +1605,7 @@ namespace GIC.Battle
             {
                 foreach (var u in snapshot.units)
                 {
-                    if (u.isCorpse != 0) continue;
+                    if (u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不可饮用（决策九十一：地脉维度不可及）
                     if ((TeamType)u.team != MyTeam) continue;
                     if (IsBuildingUnitState(u)) continue;
                     if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
@@ -1617,7 +1622,7 @@ namespace GIC.Battle
             {
                 foreach (var u in snapshot.units)
                 {
-                    if (u.isCorpse != 0) continue;
+                    if (u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不可装备（决策九十一：地脉维度不可及+无装备拍板）
                     if ((TeamType)u.team != MyTeam) continue;
                     if (IsBuildingUnitState(u)) continue;
                     if (!EquipTargetQualifies(u, _equipAimItem)) continue;
@@ -1635,6 +1640,7 @@ namespace GIC.Battle
             bool burstUnit = skillData.skillType == SkillType.Burst; // 单位指向型爆发（IsUnitTargeted 已保证）
             foreach (var u in snapshot.units)
             {
+                if (u.isSoul != 0) continue; // 灵魂不可为技能目标（决策九十一：地脉维度不可及——复苏/延奏/契约全拒）
                 if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
                 if ((TeamType)u.team == (TeamType)sel.team)
                 {
@@ -1811,6 +1817,7 @@ namespace GIC.Battle
         {
             foreach (var u in snapshot.units)
             {
+                if (u.isSoul != 0) continue; // 灵魂不可选中/不可为目标（决策九十一：地脉驻留体——精确点格/选择/物品/瞄准全拒）
                 if (u.isCorpse != 0 && !includeCorpses) continue; // 尸体默认不可选（单位指向型爆发例外——复苏目标）
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
                 bool pick;
@@ -1858,6 +1865,7 @@ namespace GIC.Battle
         private void EnterAiming(SkillButtonDef def)
         {
             if (def == null) return;
+            ReturnToMainWorldForAim(); // 地脉视角=纯观察（决策九十一）：起瞄准自动切回主世界（主世界单位在地脉视角隐藏——不切回=瞄准空板）
             _aimDef = def;
             _state = HudState.Aiming;
             _pendingAimCell = null; // 新瞄准会话待定清零
@@ -1887,6 +1895,27 @@ namespace GIC.Battle
                 && data.skillType != SkillType.Interact
                 && !data.IsUnitTargeted()
                 && !data.IsSelfCast();
+        }
+
+        /// <summary>地脉视角=纯观察（决策九十一，2026-10-25）：一切瞄准/打出交互入口先自动切回
+        /// 主世界视角（主世界单位在地脉视角隐藏——不切回=瞄空板）。与维度切换钮的「先收瞄准再切」
+        /// 互不冲突：本守卫先行时无在途瞄准</summary>
+        private void ReturnToMainWorldForAim()
+        {
+            var player = _session?.Player;
+            if (player != null && player.CurrentDimension != BattleDimension.MainWorld)
+                player.SetDimensionView(BattleDimension.MainWorld);
+        }
+
+        /// <summary>维度切换钮（决策九十一）：主世界↔地脉观察视角循环（纯视觉——战斗逻辑/协议/
+        /// Host 零感知，LAN 各端独立）。瞄准/打出会话先收（地脉=纯观察）；地脉视角下按技能/打出键
+        /// 经 ReturnToMainWorldForAim 自动切回。音效=开关切换咔哒（UiSfx 备用库存位）</summary>
+        private void OnDimensionButtonClicked()
+        {
+            if (_layoutEditing) return;
+            if (_state == HudState.Aiming) ExitAiming(); // 地脉纯观察：先收瞄准会话（拖拽打出/部署/物品/装备同收）
+            _session?.Player?.ToggleDimensionView();
+            UiSfx.Play(UiSfxKind.Toggle);
         }
 
         private void ExitAiming()
@@ -3957,19 +3986,32 @@ namespace GIC.Battle
         /// <summary>迷雾滤后快照（迷雾批 2026-10-17，拍板 D4）：迷雾内敌方按「不存在」处理——
         /// 移动/部署占用预判（CanMove/CanDeployEnterPreview）与方向推荐（WouldHitEnemyInDirection）
         /// 等一切单位类预览消费此视图（否则「不推荐格」泄露隐藏敌人占位）。迷雾未激活/无隐藏=原样
-        /// 直通零分配</summary>
+        /// 直通零分配。**灵魂恒滤（决策九十一 2026-10-25）**：灵魂在地脉维度不占主世界格——
+        /// 移动/部署占用预判按不存在（灵魂悬于尸体格不产生阻挡泄露）</summary>
         private BattleSnapshot FogFilteredSnapshot(BattleSnapshot src)
         {
             if (src?.units == null) return src;
             var fog = _session?.Player?.Fog;
-            if (fog == null || !fog.Active) return src;
+            bool fogActive = fog != null && fog.Active;
+            if (!fogActive)
+            {
+                bool anySoul = false;
+                foreach (var u in src.units)
+                    if (u != null && u.isSoul != 0) { anySoul = true; break; }
+                if (!anySoul) return src;
+                var soulStripped = new BattleSnapshot { turnNumber = src.turnNumber, resources = src.resources };
+                foreach (var u in src.units)
+                    if (u != null && u.isSoul == 0)
+                        soulStripped.units.Add(u);
+                return soulStripped;
+            }
             bool anyHidden = false;
             foreach (var u in src.units)
-                if (u != null && !fog.IsUnitVisible(u)) { anyHidden = true; break; }
+                if (u == null || !fog.IsUnitVisible(u) || u.isSoul != 0) { anyHidden = true; break; }
             if (!anyHidden) return src;
             var filtered = new BattleSnapshot { turnNumber = src.turnNumber, resources = src.resources };
             foreach (var u in src.units)
-                if (u != null && fog.IsUnitVisible(u))
+                if (u != null && fog.IsUnitVisible(u) && u.isSoul == 0)
                     filtered.units.Add(u);
             return filtered;
         }

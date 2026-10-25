@@ -75,7 +75,7 @@ namespace GIC.Battle
                 var casterTeam = sim.GetTeamOf(projectile.PlayerId);
                 var enemies = new List<UnitState>();
                 foreach (var state in sliceSnapshot.units)
-                    if ((TeamType)state.team != casterTeam)
+                    if ((TeamType)state.team != casterTeam && state.isSoul == 0) // 灵魂在地脉维度——主世界弹道不可及（决策九十一：两维度无法影响对方）
                         enemies.Add(state);
                 enemies.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
 

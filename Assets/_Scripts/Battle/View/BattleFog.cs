@@ -248,6 +248,7 @@ namespace GIC.Battle
         public void OnUnitSummoned(UnitState state)
         {
             if (!Active || state == null) return;
+            if (state.isSoul != 0) return; // 灵魂在地脉维度（决策九十一）：不入雾域——灵界视角恒显、不揭雾不被雾隐藏
             if (state.exploreVision > 0)
                 _visionByUnit[state.unitId] = state.exploreVision;
             else if (_unitConfig != null && System.Enum.TryParse<UnitName>(state.unitName, out var name)
@@ -309,6 +310,7 @@ namespace GIC.Battle
             foreach (var view in views.Values)
             {
                 if (view == null || view.IsCorpse) continue;
+                if (view.IsSoulView) continue; // 灵魂不揭雾（决策九十一：地脉驻留体无探索语义——灵界透视）
                 if (view.OwnerTeam != _myTeam) continue; // 敌方不为本端揭雾
 
                 int vision = ResolveVision(view.UnitId);
@@ -379,7 +381,7 @@ namespace GIC.Battle
             var sb = new System.Text.StringBuilder();
             foreach (var u in snapshot.units)
             {
-                if (u == null || (TeamType)u.team != _myTeam || u.isCorpse != 0) continue;
+                if (u == null || (TeamType)u.team != _myTeam || u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不揭雾不入诊断（决策九十一）
                 sb.Append(' ').Append(u.unitName).Append('=').Append(ResolveVision(u.unitId));
             }
             if (sb.Length > 0) GICLog.Info("[迷雾] 揭雾视野:" + sb);
@@ -424,6 +426,7 @@ namespace GIC.Battle
             foreach (var view in views.Values)
             {
                 if (view == null) continue;
+                if (view.IsSoulView) { view.SetFogHidden(false); continue; } // 灵魂永不雾隐（决策九十一：地脉视角可见性与雾无关；防御复位）
                 bool hidden = view.OwnerTeam != _myTeam
                     && !IsExposed(view) // 视野暴露（追拍八）：解除隐身=所有人可见
                     && !IsExplored(_board.WorldToCell(view.transform.position));

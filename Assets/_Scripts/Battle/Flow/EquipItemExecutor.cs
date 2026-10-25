@@ -54,10 +54,12 @@ namespace GIC.Battle
                 return false;
             }
 
-            // 装备目标校验：我方存活非建筑单位（域=饮用同款——TeamType 口径同延奏；尸体不可装备）
+            // 装备目标校验：我方存活非建筑单位（域=饮用同款——TeamType 口径同延奏；尸体不可装备；
+            // 灵魂不可装备——地脉维度不可及+无装备拍板，决策九十一）
             var targetState = SkillHitResolver.FindUnitState(sliceSnapshot, action.targetUnitId);
             var ownerTeam = sim.GetTeamOf(action.playerId);
-            if (targetState == null || (TeamType)targetState.team != ownerTeam || targetState.isCorpse != 0)
+            if (targetState == null || (TeamType)targetState.team != ownerTeam || targetState.isCorpse != 0
+                || targetState.isSoul != 0)
             {
                 GICLog.Warn($"[EquipItem] {action.playerId} 装备 {itemName} 目标无效（{action.targetUnitId}——须为我方存活单位），装备落空");
                 return false;

@@ -21,6 +21,11 @@ namespace GIC.Battle
         /// <summary>应用回填（目标为尸体才应用；false=活体防御性 no-op——命令发射/对账豁免零命令）</summary>
         public bool Applied;
 
+        /// <summary>灵魂归体消散回填（决策九十一，2026-10-25）：应用层移除尸体所链灵魂时写入其
+        /// unitId（无链接=null 零动作）；命令层随 Revive 命令补发 Death(dissolve)=灵魂归体淡出
+        /// ——「同一实体的两半」系统级联动，非维度间影响（尸体在主世界被复苏，灵魂无需跨界）</summary>
+        public string RemovedSoulId;
+
         public ReviveEffect(string sourceUnitId, string targetUnitId, int healAmount)
         {
             SourceUnitId = sourceUnitId;

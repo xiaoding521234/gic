@@ -834,7 +834,7 @@ namespace GIC.Battle
             string bestId = null;
             foreach (var u in snapshot.units)
             {
-                if ((TeamType)u.team != team || u.isCorpse != 0) continue;
+                if ((TeamType)u.team != team || u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂在地脉维度——AI 主世界候选域不可及（决策九十一）
                 var live = sim.GetUnit(u.unitId);
                 // 满层判定按具名身份（决策五十七：buffAsset 引用优先；null 回落 type——与编译/工厂同口径）
                 var existingBuff = live?.Buffs.Find(b => b != null && (grantAtom != null && grantAtom.buffAsset != null

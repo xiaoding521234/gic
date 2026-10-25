@@ -51,15 +51,80 @@ namespace GIC.Battle
             ApplyRenderables();
         }
 
-        /// <summary>渲染件统一落地单出口（迷雾批）：sprite/视频按意图态、盘/环恒意图真——全部
-        /// 「&& !IsFogHidden」迷雾覆盖。迷雾隐藏期间各路径照常更新意图（视频首帧落地/解码失败
-        /// 回落），unhide 恢复到**当下**正确态而非快照旧态（盲开全部会错：视频路径下 sprite 本应禁）</summary>
+        // ==================== 地脉灵魂形态 + 维度视角（决策九十一，2026-10-25） ====================
+
+        /// <summary>灵魂视图标记（BattlePlayer.CreateView 按 UnitState.isSoul 调 SetSoulVisual 落地）：
+        /// 幽灵立牌=冰蓝半透明 tint（RefreshTint 单源链最高优先级）+倾斜组正弦幽浮+柔光晕；
+        /// 无底座盘/描边环（幽灵不落地）；无视频路径（灵魂=静态立牌省解码器，由调用方不传
+        /// idleVideo 保证）。与 IsFogHidden 同为渲染件意图覆盖层</summary>
+        public bool IsSoulView { get; private set; }
+
+        /// <summary>维度视角隐藏态（决策九十一）：**灵魂=主世界视角隐藏、主世界单位=地脉视角隐藏**
+        /// （BattlePlayer.SetDimensionView 切换写入——「地脉视角只显示灵魂+地形」拍板）。与
+        /// IsFogHidden 同为覆盖层（ApplyRenderables 单出口 && 语义）；头顶条/弹字等屏幕件由
+        /// 消费方按本态自隐（BattleOverheadBars L243 同款门）</summary>
+        public bool IsDimensionHidden { get; private set; }
+
+        /// <summary>灵魂柔光晕（倾斜组子级 SpriteRenderer——软圆程序纹理，与立牌同平面随幽浮同漂）</summary>
+        private SpriteRenderer _soulGlowRenderer;
+        private float _soulBobBaseY;      // 幽浮基准（倾斜组局部 y=hoverHeight，SetSoulVisual 捕获）
+        private float _soulBobPhase;      // 幽浮相位（建件随机=多灵魂错开）
+        private float _soulBobAmplitude = 0.05f;
+        private float _soulBobSpeed = 22f; // 度/秒
+        private float _soulTintAlpha = 0.55f;
+
+        /// <summary>灵魂形态落地（BattlePlayer.CreateView 唯一调用）：tint/幽浮/光晕三件参数由
+        /// BattlePlayer Inspector「地脉灵魂表现」段注入（中文可调）；幂等（重复调用直通）</summary>
+        public void SetSoulVisual(float bobAmplitude, float bobSpeed, float tintAlpha, float glowAlpha)
+        {
+            if (IsSoulView) return;
+            IsSoulView = true;
+            _soulBobAmplitude = bobAmplitude;
+            _soulBobSpeed = bobSpeed;
+            _soulTintAlpha = tintAlpha;
+            _soulBobPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+            if (_tiltGroup != null) _soulBobBaseY = _tiltGroup.localPosition.y;
+            // 柔光晕：软圆程序纹理（BattleViewFactory 静态缓存）挂倾斜组——立牌中心微后（+z 离相机）、
+            // 立牌同排序层低一位（Avatar-1=灵魂光晕恒垫在立牌之下）；尺寸随立牌显示高
+            if (_tiltGroup != null)
+            {
+                var glowGo = new GameObject("SoulGlow");
+                glowGo.transform.SetParent(_tiltGroup, false);
+                glowGo.transform.localPosition = new Vector3(0f, _avatarDisplayHeight * 0.5f, 0.02f);
+                _soulGlowRenderer = glowGo.AddComponent<SpriteRenderer>();
+                _soulGlowRenderer.sprite = BattleViewFactory.SoulGlowSprite();
+                var glowColor = Palette.灵魂蓝;
+                glowColor.a = glowAlpha;
+                _soulGlowRenderer.color = glowColor;
+                _soulGlowRenderer.sortingOrder = BattleMetrics.AvatarSortingOrder - 1;
+                float s = _avatarDisplayHeight * 1.3f;
+                glowGo.transform.localScale = new Vector3(s, s, 1f);
+            }
+            RefreshTint();
+            ApplyRenderables();
+        }
+
+        /// <summary>维度视角可见性开关（幂等；visible=false=整单位渲染件隐藏——灵魂在主视角/
+        /// 主世界单位在地脉视角）</summary>
+        public void SetDimensionVisible(bool visible)
+        {
+            if (IsDimensionHidden == !visible) return;
+            IsDimensionHidden = !visible;
+            ApplyRenderables();
+        }
+
+        /// <summary>渲染件统一落地单出口（迷雾批+维度批）：sprite/视频按意图态、盘/环恒意图真——
+        /// 全部「&& !IsFogHidden && !IsDimensionHidden」双覆盖（迷雾=敌方探索态、维度=视角切换）；
+        /// 灵魂的盘/环恒禁（幽灵不落地）；光晕随灵魂意图。迷雾隐藏期间各路径照常更新意图（视频首帧
+        /// 落地/解码失败回落），unhide 恢复到**当下**正确态而非快照旧态（盲开全部会错：视频路径下
+        /// sprite 本应禁）</summary>
         private void ApplyRenderables()
         {
-            if (_avatarRenderer != null) _avatarRenderer.enabled = _spriteVisible && !IsFogHidden;
-            if (_videoRenderer != null) _videoRenderer.enabled = _videoVisible && !IsFogHidden;
-            if (_baseDiscRenderer != null) _baseDiscRenderer.enabled = !IsFogHidden;
-            if (_baseDiscOutlineRenderer != null) _baseDiscOutlineRenderer.enabled = !IsFogHidden;
+            if (_avatarRenderer != null) _avatarRenderer.enabled = _spriteVisible && !IsFogHidden && !IsDimensionHidden;
+            if (_videoRenderer != null) _videoRenderer.enabled = _videoVisible && !IsFogHidden && !IsDimensionHidden;
+            if (_baseDiscRenderer != null) _baseDiscRenderer.enabled = !IsFogHidden && !IsDimensionHidden && !IsSoulView;
+            if (_baseDiscOutlineRenderer != null) _baseDiscOutlineRenderer.enabled = !IsFogHidden && !IsDimensionHidden && !IsSoulView;
+            if (_soulGlowRenderer != null) _soulGlowRenderer.enabled = !IsFogHidden && !IsDimensionHidden;
         }
         private Color _baseColor = Color.white;
 
@@ -205,8 +270,28 @@ namespace GIC.Battle
         /// 判据也永不满足（解冻后仍黑矩形）。延到首帧落地再停（≤几帧，霜化 0.9s 蔓延窗口内不可感）</summary>
         private static bool CanHaltNow(VideoPlayer vp) => vp != null && vp.isPlaying && vp.frame >= 1;
 
+        /// <summary>灵魂立牌 tint（决策九十一）：灵魂蓝（BattlePalette 单源）×灵魂立牌不透明度
+        /// （BattlePlayer Inspector 注入）——半透明冰蓝「认出是谁的灵魂」；消散淡出随
+        /// _dissolveAlpha 末端乘（RefreshTint 单源链）</summary>
+        private Color SoulTint()
+        {
+            var c = Palette.灵魂蓝;
+            c.a = _soulTintAlpha;
+            return c;
+        }
+
         private void Update()
         {
+            // 灵魂幽浮（决策九十一，2026-10-25）：倾斜组正弦上下漂（含悬浮离地基准 _soulBobBaseY）——
+            // 灵魂无视频路径（调用方不建），本块=灵魂唯一逐帧事务；暂停（timeScale=0）自动停
+            if (IsSoulView && _tiltGroup != null)
+            {
+                _soulBobPhase += Time.deltaTime * _soulBobSpeed * Mathf.Deg2Rad;
+                var bobPos = _tiltGroup.localPosition;
+                _tiltGroup.localPosition = new Vector3(bobPos.x,
+                    _soulBobBaseY + Mathf.Sin(_soulBobPhase) * _soulBobAmplitude, bobPos.z);
+            }
+
             // 冻结中持续刷新霜化锚点：被击退/牵引等罕见位移也贴住（几 float 写入，代价可忽略）
             if (IsFrozen && _frostAmount > 0f) ApplyFrost(_frostAmount);
 
@@ -1054,7 +1139,8 @@ namespace GIC.Battle
         private void RefreshTint()
         {
             if (_avatarRenderer == null) return;
-            Color tint = IsCorpse ? Palette.立牌尸体灰
+            Color tint = IsSoulView ? SoulTint() // 灵魂最高优先级（灵魂永不入尸体/冻结态——维度隔离）
+                : IsCorpse ? Palette.立牌尸体灰
                 : IsFrozen && FrostSpriteMaterial == null ? Palette.冻结冰色 // shader 缺失兜底=纯冰色 tint
                 : Color.white;
             tint.a *= 1f - _dissolveAlpha;

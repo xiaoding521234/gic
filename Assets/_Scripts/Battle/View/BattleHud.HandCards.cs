@@ -905,6 +905,7 @@ namespace GIC.Battle
         private void EnterUpgradePending(int unitNameValue, HandCardSlot slot)
         {
             if (_state != HudState.Idle) return;
+            ReturnToMainWorldForAim(); // 地脉视角=纯观察（决策九十一）：打出升命待确认自动切回主世界
             SetPlayedHandCard(slot);
             _deployAimUnit = unitNameValue;
             _upgradePending = true;

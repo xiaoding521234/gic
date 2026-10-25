@@ -35,6 +35,7 @@ namespace GIC.Battle
             var reactionKeys = new HashSet<string>();
             var energyKeys = new HashSet<string>();
             var sanityKeys = new HashSet<string>();
+            var soulHpKeys = new HashSet<string>(); // 灵魂衰减 HP 命令目标索引（决策九十一对账用）
             var staminaKeys = new HashSet<string>();
             var moraKeys = new HashSet<string>();
             var itemConsumeKeys = new HashSet<string>();
@@ -67,6 +68,8 @@ namespace GIC.Battle
                             energyKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindSanity)
                             sanityKeys.Add(command.targetUnitId);
+                        else if (command.metadata == BattleCommand.StatKindHp)
+                            soulHpKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindStamina)
                             staminaKeys.Add(command.targetUnitId);
                         else if (command.metadata == BattleCommand.StatKindMora)
@@ -134,6 +137,13 @@ namespace GIC.Battle
                     // 理智恢复（2026-09-30 歌声之环批）：效应→StatChange(StatKindSanity) 命令；
                     // 合并键=目标去重（同元能按目标查存在性）
                     if (!sanityKeys.Contains(sanity.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is SoulDecayEffect soulDecay)
+                {
+                    // 地脉灵魂衰减（决策九十一）：效应→StatChange(StatKindHp) 命令（每灵魂一条，
+                    // 非合并语义——按目标查存在性即可）
+                    if (!soulHpKeys.Contains(soulDecay.TargetUnitId))
                         Report(context, effect, BattleCommandType.StatChange);
                 }
                 else if (effect is MoraPlunderEffect plunder)

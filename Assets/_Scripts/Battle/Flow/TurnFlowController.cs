@@ -270,6 +270,14 @@ namespace GIC.Battle
                 return;
             }
 
+            // 灵魂无任何行动（决策九十一）：灵魂只驻留地脉衰减待援，不参与上交——GetUnit 维度透明
+            // 解析使灵魂 id 可达此处，本门=Host 权威防线（客户端候选域已结构性排除，双保险）
+            if (unit.IsSoul)
+            {
+                GICLog.Warn($"[TurnFlow] 灵魂 {action.unitId} 无任何行动（地脉驻留体），忽略上交");
+                return;
+            }
+
             // 归属校验
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null || identity.OwnerPlayerID != action.playerId)

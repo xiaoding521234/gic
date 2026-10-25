@@ -33,6 +33,32 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _units = new Dictionary<string, Unit>();
         private int _nextUnitId = 1;
 
+        // ==================== 地脉维度（决策九十一，2026-10-25） ====================
+        // 非主世界维度单位（当前=地脉灵魂；未来霜月等新维度单位同库，Unit.Dimension 区分归属维度）。
+        // **独立注册表=维度隔离的结构实现**：主世界一切枚举域（AI 三脑/阻挡碰撞/威胁图/光环 tick/
+        // 攻击目标/升命查找/核心查询）读 sim.Units——灵魂/相位单位天然不可见零过滤；效应应用与命令
+        // 目标解析走 GetUnit 透明解析（unitId 双注册表联查）。地脉内交互（伤害/附着/治疗灵魂）由
+        // 未来相位技能的维度感知域显式枚举本表。
+        private readonly Dictionary<string, Unit> _crossDimensionUnits = new Dictionary<string, Unit>();
+
+        /// <summary>尸体 unitId → 灵魂 unitId（灵魂↔尸体「同一实体的两半」系统级联动账本：
+        /// 灵魂 HP 扣完→尸体随散；尸体被复苏→灵魂归体消散——TurnResolver 死亡分支/ReviveEffect 消费）</summary>
+        private readonly Dictionary<string, string> _corpseSoulIds = new Dictionary<string, string>();
+
+        /// <summary>非主世界维度单位（只读；当前=地脉灵魂。维度感知域/回合末维度规则/快照消费）</summary>
+        public IReadOnlyDictionary<string, Unit> CrossDimensionUnits => _crossDimensionUnits;
+
+        /// <summary>地脉维度单位便捷枚举（Unit.Dimension==LeyLine 过滤——含灵魂与未来入地脉的相位单位）</summary>
+        public IEnumerable<Unit> LeyLineUnits
+        {
+            get
+            {
+                foreach (var kv in _crossDimensionUnits)
+                    if (kv.Value != null && kv.Value.Dimension == BattleDimension.LeyLine)
+                        yield return kv.Value;
+            }
+        }
+
         /// <summary>曾注册核心账本（决策八十六批B 消散，2026-10-22，docs/45 §4）：playerId→
         /// 核心注册时 team。核心死亡走消散（_units 移除）后，「曾注册核心」记忆不再依赖尸体常驻——
         /// IsPlayerDefeated/TeamHasLivingCore/HasAnyRegisteredCore 的 anyCore 种子改读此账本
@@ -534,30 +560,100 @@ namespace GIC.Battle
         /// <summary>移除逻辑单位（决策八十六批B 消散专用，docs/45 §4）：_units 移除+GameObject
         /// 销毁——死亡后不留尸体（建筑+眷属）；Buff 注销由调用方（TurnResolver 死亡分支）先行完成，
         /// 附着/组件状态随 GO 销毁同殁。格子占用/碰撞/升命同名查找/鞭尸 tick 全随之天然消失。
-        /// **勿用于其它场景**（现役单位移除无消费者——复活/驱逐等未来需求须另立语义）</summary>
+        /// **勿用于其它场景**（现役单位移除无消费者——复活/驱逐等未来需求须另立语义；
+        /// 灵魂/非主维度单位移除走 RemoveSoul/RemoveLinkedSoul）</summary>
         public void RemoveUnit(Unit unit)
         {
             if (unit == null) return;
             var unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID;
             if (unitId != null && _units.TryGetValue(unitId, out var registered) && registered == unit)
                 _units.Remove(unitId);
-            // GO 销毁：LogicRoot 下的单位物体（含全部组件状态——附着/冻结/装备计数器等）。
-            // 双域销毁（2026-10-24 回放回归实锤）：ReplayRunner 编辑器域 headless 重放同走本链——
-            // Object.Destroy 编辑模式非法（警告+不销毁=场景对象泄漏，一次完整局回放 34 条）；Play 域
-            // 维持 Destroy 勿改（DestroyImmediate 在播放态会打断协程/在途引用），编辑域用 DestroyImmediate。
+            DestroyUnitObject(unit);
+        }
+
+        /// <summary>GO 销毁单点（RemoveUnit/RemoveSoul 共用）：LogicRoot 下的单位物体（含全部组件状态
+        /// ——附着/冻结/装备计数器等）。双域销毁（2026-10-24 回放回归实锤）：ReplayRunner 编辑器域
+        /// headless 重放同走本链——Object.Destroy 编辑模式非法（警告+不销毁=场景对象泄漏，一次完整局
+        /// 回放 34 条）；Play 域维持 Destroy 勿改（DestroyImmediate 在播放态会打断协程/在途引用），
+        /// 编辑域用 DestroyImmediate。</summary>
+        private static void DestroyUnitObject(Unit unit)
+        {
             if (UnityEngine.Application.isPlaying) UnityEngine.Object.Destroy(unit.gameObject);
             else UnityEngine.Object.DestroyImmediate(unit.gameObject);
         }
 
+        // ==================== 地脉维度（决策九十一）：灵魂注册/移除/链接 ====================
+
+        /// <summary>注册地脉灵魂（TurnResolver 死亡分支调用——留尸体单位倒下时同位生成）：
+        /// unitId 与主世界共用同一自增计数器（回放确定性：同输入同命令流=同 unitId 序列）；
+        /// 灵魂不进 _units（维度隔离结构实现）、不跑 OnDeploy 登场 Buff（灵魂无 Buff 拍板）。
+        /// DeployedTurn=死亡当回合（回合末衰减首回合豁免判据——完整 10 回合驻留）</summary>
+        public string RegisterSoul(Unit soul, string playerId, TeamType team, BattleCell position, string corpseUnitId)
+        {
+            string unitId = $"U{_nextUnitId++}";
+            soul.GetUnitComponent<UnitIdentity>()?.SetIdentity(unitId, playerId, team);
+            soul.GetUnitComponent<UnitGridPosition>()?.SetPosition(BoardType.MainWorld, position.ToVector2Int());
+            soul.IsSoul = true;
+            soul.LinkedCorpseUnitId = corpseUnitId;
+            soul.Dimension = BattleDimension.LeyLine;
+            _crossDimensionUnits[unitId] = soul;
+            _corpseSoulIds[corpseUnitId] = unitId;
+            soul.DeployedTurn = CurrentTurn;
+            return unitId;
+        }
+
+        /// <summary>移除灵魂（死亡循环「灵魂+尸体双双消散」分支用）：跨维度注册表+尸体链接账本
+        /// 双清+GO 销毁；灵魂本体无 Buff 无装备（基础属性拍板），无残留清理</summary>
+        public void RemoveSoul(Unit soul)
+        {
+            if (soul == null) return;
+            var unitId = soul.GetUnitComponent<UnitIdentity>()?.UnitID;
+            if (unitId != null && _crossDimensionUnits.TryGetValue(unitId, out var registered) && registered == soul)
+            {
+                _crossDimensionUnits.Remove(unitId);
+                if (soul.LinkedCorpseUnitId != null
+                    && _corpseSoulIds.TryGetValue(soul.LinkedCorpseUnitId, out var linkedId) && linkedId == unitId)
+                    _corpseSoulIds.Remove(soul.LinkedCorpseUnitId);
+            }
+            DestroyUnitObject(soul);
+        }
+
+        /// <summary>尸体所链灵魂（无链接/已消散返回 null——复活门判据+归体消散消费）</summary>
+        public Unit GetLinkedSoul(string corpseUnitId)
+        {
+            return corpseUnitId != null && _corpseSoulIds.TryGetValue(corpseUnitId, out var soulId)
+                && _crossDimensionUnits.TryGetValue(soulId, out var soul)
+                    ? soul : null;
+        }
+
+        /// <summary>移除尸体所链灵魂（复苏归体——ReviveEffect 应用层调用）：返回被移除灵魂 unitId
+        /// （命令层 Death(dissolve) 发射用；无链接=返回 null 零动作）</summary>
+        public string RemoveLinkedSoul(string corpseUnitId)
+        {
+            if (corpseUnitId == null || !_corpseSoulIds.TryGetValue(corpseUnitId, out var soulId))
+                return null;
+            _corpseSoulIds.Remove(corpseUnitId);
+            if (_crossDimensionUnits.TryGetValue(soulId, out var soul))
+            {
+                _crossDimensionUnits.Remove(soulId);
+                DestroyUnitObject(soul);
+            }
+            return soulId;
+        }
+
+        /// <summary>unitId 解析（**维度透明**：主世界 _units 优先、跨维度注册表兜底——效应应用/
+        /// 命令目标解析按 id 找灵魂与找主世界单位同口径；枚举域不透明=维度隔离的结构前提）</summary>
         public Unit GetUnit(string unitId)
         {
-            return unitId != null && _units.TryGetValue(unitId, out var unit) ? unit : null;
+            if (unitId == null) return null;
+            if (_units.TryGetValue(unitId, out var unit)) return unit;
+            return _crossDimensionUnits.TryGetValue(unitId, out var soul) ? soul : null;
         }
 
         public bool TryGetUnitId(Unit unit, out string unitId)
         {
             unitId = unit?.GetUnitComponent<UnitIdentity>()?.UnitID;
-            return unitId != null && _units.ContainsKey(unitId);
+            return unitId != null && (_units.ContainsKey(unitId) || _crossDimensionUnits.ContainsKey(unitId));
         }
 
         // ==================== 存活/状态判定 ====================
@@ -1062,6 +1158,8 @@ namespace GIC.Battle
                 dyedLayers = element?.DyedLayers ?? 0, // 多层附着（决策七十四铺路——客户端暂不消费，Host 编译视图初值用）
                 isCorpse = status != null && status.IsDead ? 1 : 0,
                 isFrozen = status != null && status.IsFrozen ? 1 : 0,
+                isSoul = unit.IsSoul ? 1 : 0, // 灵魂标记（决策九十一）：客户端建幽灵立牌+地脉视角专属显示
+                dimension = (int)unit.Dimension, // 所在维度（决策九十一）：0=主世界，1=地脉；非主维度单位不入主世界交互域（快照消费方过滤）
                 volume = unit.Volume,
                 energy = stats?.Energy ?? 0,
                 maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
@@ -1106,6 +1204,13 @@ namespace GIC.Battle
             var snapshot = new BattleSnapshot { turnNumber = turnNumber };
 
             foreach (var kv in _units)
+                snapshot.units.Add(BuildUnitState(kv.Key, kv.Value));
+
+            // 跨维度单位（决策九十一）：灵魂随快照携带（客户端建幽灵立牌+地脉视角显示；注册序
+            // 确定性=回放同构）。**快照消费方注意**：snapshot.units 自此含非主维度单位——主世界
+            // 交互域（伤害/治疗/附着/AI 候选）一律加 isSoul==0 过滤（维度隔离的主动侧，
+            // EffectCompiler/ProjectileResolver/SkillHitResolver/CompanionBrain 等已过滤）
+            foreach (var kv in _crossDimensionUnits)
                 snapshot.units.Add(BuildUnitState(kv.Key, kv.Value));
 
             foreach (var kv in _resources)

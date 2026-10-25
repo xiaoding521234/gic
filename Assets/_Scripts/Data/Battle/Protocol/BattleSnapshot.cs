@@ -31,6 +31,17 @@ namespace GIC.Data
         public int isCorpse;
         public int isFrozen;
 
+        /// <summary>灵魂标记（决策九十一，2026-10-25）：死亡伙伴/魔神的灵魂驻留地脉维度——同位生成、
+        /// 每回合末 −10% 最大生命衰减、扣完灵魂与尸体双双消散、尸体复苏时灵魂归体消散；无行动不可上交；
+        /// 只继承基础属性（无装备/无 Buff/无命座加成、满血）+治疗效率 50（受疗者效率乘区单出口自动减半
+        /// 一切治疗）；可被地脉内单位按标准单位交互（未来胡桃/丽莎相位技能入地脉清理灵魂）。
+        /// 客户端建幽灵立牌（半透明冰蓝立牌图）+地脉视角专属显示</summary>
+        public int isSoul;
+
+        /// <summary>所在维度（BattleDimension 枚举值，决策九十一：0=主世界，1=地脉；未来霜月等追加）。
+        /// 主世界快照域一律按「dimension==主世界」判定；非主维度单位仅在其维度视角显示</summary>
+        public int dimension;
+
         /// <summary>命座等级（B8 批 2026-09-30，docs/09：0~3——3★+同名重复出战升命；命座被动由 Host
         /// ConstellationApplier 结算，本字段=展示/升命门控/B7 联机同源真源）</summary>
         public int constellation;

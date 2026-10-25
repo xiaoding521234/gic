@@ -36,8 +36,27 @@ namespace GIC.Battle
 
         /// <summary>部署回合（决策八十六批D，docs/45 §6——RegisterUnit 写入〔真源=sim.CurrentTurn〕；
         /// 周期类建筑效果以「当前回合−部署回合」相对计数：骑士团部署即召 1 个+每过 效果周期 回合再召——
-        /// 部署当回合末不再重复触发（相对差 0 跳过）。开局单位=0；随消散销毁无残留</summary>
+        /// 部署当回合末不再重复触发（相对差 0 跳过）。开局单位=0；随消散销毁无残留。
+        /// 灵魂复用为衰减首回合豁免判据（RegisterSoul 写入=死亡当回合——回合末不衰减=完整 10 回合驻留）</summary>
         [NonSerialized] public int DeployedTurn;
+
+        // ==================== 地脉维度与灵魂（决策九十一，2026-10-25） ====================
+
+        /// <summary>当前维度（多维度体系：主世界单位恒 MainWorld〔默认零赋值〕；灵魂=LeyLine；
+        /// 未来霜月等新维度随相位技能写入 BattleDimension 新枚举值——勿散写 int 硬编码判断）。
+        /// 维度间完全隔离（用户拍板「二者无法影响到对方」）：主世界效果够不到非主维度单位、
+        /// 反之亦然；同维度内交互照常</summary>
+        [NonSerialized] public BattleDimension Dimension = BattleDimension.MainWorld;
+
+        /// <summary>灵魂标记（决策九十一）：死亡伙伴/魔神同位生成的地脉驻留体——无行动不可上交、
+        /// 每回合末衰减 10%、与尸体同消散（见 LinkedCorpseUnitId）；只继承基础属性（无装备/无
+        /// Buff/无命座加成、满血）+治疗效率 50。灵魂=地脉注册表成员（不进 _units——主世界
+        /// 枚举域结构上不可见）；GetUnit 按 unitId 透明可查（效应应用/命令目标解析需要）</summary>
+        [NonSerialized] public bool IsSoul;
+
+        /// <summary>所链尸体 unitId（灵魂用）：灵魂 HP 扣完→尸体随散；尸体被复苏→灵魂归体消散。
+        /// 系统级「同一实体的两半」联动（用户拍板），非维度间影响</summary>
+        [NonSerialized] public string LinkedCorpseUnitId;
 
         /// <summary>
         /// 单位体积（docs/05 §5.3：角色/造物 = 1，建筑 = 2；格子体积容量 3。

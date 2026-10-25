@@ -239,9 +239,12 @@ namespace GIC.Battle
                 if (item.View == null || item.Go == null) continue; // view 被销毁时容错（正常路径 ClearAll 先行）
 
                 // 迷雾批（2026-10-17）：所在格未探索的敌方单位——头顶条整簇随立牌隐藏（条=屏幕空间件
-                // 不随渲染器禁用自隐；Go 纯 UI 对象 SetActive 安全，同值幂等直写）
-                if (item.Go.activeSelf == item.View.IsFogHidden)
-                    item.Go.SetActive(!item.View.IsFogHidden);
+                // 不随渲染器禁用自隐；Go 纯 UI 对象 SetActive 安全，同值幂等直写）。
+                // 维度批（决策九十一 2026-10-25）：维度视角隐藏同口径——灵魂在主视角/主世界单位在
+                // 地脉视角=整簇隐藏（「地脉视角只显示灵魂+地形」拍板）
+                bool barVisible = !item.View.IsFogHidden && !item.View.IsDimensionHidden;
+                if (item.Go.activeSelf != barVisible)
+                    item.Go.SetActive(barVisible);
 
                 // 智能整体抬高（2026-10-07 拍板「下面加了 buff 图标后，应当智能整体抬高，避免遮挡到
                 // 角色立牌」）：有 Buff 图标时整簇上移「锚点以下悬垂深度」——图标底缘回到锚点（立牌顶）
@@ -275,8 +278,9 @@ namespace GIC.Battle
 
                 var enGo = item.EnBarRoot;
                 // 元能条显隐：EnergyMax>0 即显（2026-10-06 拍板「尸体应当同样显示血条和能量条」
-                // ——旧「尸体隐藏元能条」预期作废；尸血条恒显=空条、元能=死亡残留值）
-                bool showEnergy = item.View.EnergyMax > 0;
+                // ——旧「尸体隐藏元能条」预期作废；尸血条恒显=空条、元能=死亡残留值）；
+                // **灵魂恒隐元能条（决策九十一）**：灵魂无行动无施放——条=噪声，血条即全部读数
+                bool showEnergy = item.View.EnergyMax > 0 && !item.View.IsSoulView;
                 if (enGo != null && enGo.activeSelf != showEnergy) enGo.SetActive(showEnergy);
 
                     var element = item.View.AttachedElement;
@@ -648,9 +652,12 @@ namespace GIC.Battle
 
             // 血条（容器 y=0 中线；填充色=血条色解析器〔2026-10-15 三色批：玩家色模式=归属玩家色
             // ——2026-10-12 拍板口径；三色模式（默认）=自己绿/队友蓝/敌红，参照王者荣耀〕；
-            /// 未注入（调试直开）回落归属玩家色现行口径——底座圆盘/描边/弧光链路不受本解析器影响）
+            /// 未注入（调试直开）回落归属玩家色现行口径——底座圆盘/描边/弧光链路不受本解析器影响。
+            /// **灵魂=灵魂蓝（决策九十一 2026-10-25）**：血条=衰减倒计时读数，蓝色一眼「灵界物」））
             var hpBar = NewBar("HpBar", rootRect, new Vector2(0f, 0f), 血条宽, 血条高,
-                Palette.血条底, _hpBarColorOf != null ? _hpBarColorOf(view) : view.OwnerColor,
+                Palette.血条底,
+                view.IsSoulView ? (Palette != null ? Palette.灵魂蓝 : view.OwnerColor)
+                    : (_hpBarColorOf != null ? _hpBarColorOf(view) : view.OwnerColor),
                 out var hpFill);
 
             // 元能条（血条下方；白色——2026-09-25 目检拍板）

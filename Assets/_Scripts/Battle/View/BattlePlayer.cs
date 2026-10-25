@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Localization;
+using UnityEngine.UI;
 using UnityEngine.Video;
 using GIC.Framework;
 using GIC.Data;
@@ -38,6 +39,28 @@ namespace GIC.Battle
 
         [Tooltip("全身立牌（UnitData.立牌图）放大倍数：全身立绘人物在图中占比小，放大对齐头像版人物观感（2026-09-21 先试 2.5；2026-09-27 拍板 2.5→2：站立全身图 tight bounds 撑满 1.375 格超格子、且比安柏视频立牌（主体仅占帧 69~87%）高 15~45%，降至 2 后显示高=1.1 格）；血条/名字/Buff 行尺寸不变、随立牌顶抬高；头像版（无立牌图回落 avatar）恒为原尺寸")]
         [SerializeField, Min(0.1f)] private float 全身立牌放大倍数 = 2f;
+
+        [Header("地脉灵魂表现（决策九十一，2026-10-25）")]
+        [Tooltip("灵魂立牌不透明度（半透明冰蓝 tint 强度——「认出是谁的灵魂」）")]
+        [SerializeField, Range(0.1f, 1f)] private float 灵魂立牌不透明度 = 0.55f;
+        [Tooltip("灵魂漂浮幅度（米——倾斜组正弦幽浮）")]
+        [SerializeField, Range(0f, 0.2f)] private float 灵魂漂浮幅度 = 0.05f;
+        [Tooltip("灵魂漂浮角速度（度/秒——慢速幽浮）")]
+        [SerializeField, Range(0f, 90f)] private float 灵魂漂浮速度 = 22f;
+        [Tooltip("灵魂光晕不透明度（立牌后的柔光底）")]
+        [SerializeField, Range(0f, 1f)] private float 灵魂光晕不透明度 = 0.30f;
+
+        [Header("地脉维度视角（决策九十一：主世界↔地脉切换=纯客户端视角，战斗逻辑/协议零感知）")]
+        [Tooltip("阴间滤镜顶色（地脉视角全屏渐变上端）")]
+        [SerializeField] private Color 滤镜顶色 = new Color(0.05f, 0.10f, 0.20f, 0.28f);
+        [Tooltip("阴间滤镜底色（全屏渐变下端——下坠感更浓）")]
+        [SerializeField] private Color 滤镜底色 = new Color(0.02f, 0.14f, 0.22f, 0.50f);
+        [Tooltip("滤镜暗角强度（屏幕四缘压暗）")]
+        [SerializeField, Range(0f, 1f)] private float 滤镜暗角强度 = 0.55f;
+        [Tooltip("切换维度滤镜过渡时长（秒）")]
+        [SerializeField, Range(0.05f, 1f)] private float 维度切换过渡 = 0.28f;
+        [Tooltip("地脉视角相机底色（背景换阴间深蓝黑；切回自动还原）")]
+        [SerializeField] private Color 地脉相机底色 = new Color(0.015f, 0.03f, 0.06f);
 
         [Header("投射物箭矢")]
         [Tooltip("箭矢屏幕长度（格）——正式素材长轴按 bounds 归一到该长度，高度随素材纵横比；十字四向全长（2026-09-28 拍板方案 A：屏幕平行布告板+屏幕平面内旋转，上下射=屏幕竖直箭；0.7→0.49=同日目检拍板调小 30%）")]
@@ -326,6 +349,193 @@ namespace GIC.Battle
                     ClientSelectTimerExpired?.Invoke(_clientTurn);
                 }
             }
+
+            // 地脉滤镜灵雾漂移（决策九十一）：滤镜激活（alpha>0）才驱动——锚点慢正弦漂+透明度呼吸
+            if (_leyLineFilterGroup != null && _leyLineFilterGroup.alpha > 0.01f)
+                AnimateLeyLineWisps();
+        }
+
+        // ==================== 地脉维度视角（决策九十一，2026-10-25）：切换 + 阴间滤镜 ====================
+
+        /// <summary>当前维度视角（主世界默认；地脉=HUD 维度钮切换——纯客户端观察视角，
+        /// 战斗逻辑/协议/Host 零感知；LAN 各端独立切换互不同步）</summary>
+        public BattleDimension CurrentDimension => _currentDimension;
+        private BattleDimension _currentDimension = BattleDimension.MainWorld;
+
+        /// <summary>维度切换事件（BattleHud 消费：瞄准取消/技能键自动回主世界等交互联动）</summary>
+        public event System.Action<BattleDimension> OnDimensionChanged;
+
+        private Canvas _leyLineFilterCanvas;      // 阴间滤镜层（懒建；sorting 37——盖场景/立牌、让位头顶条 38/伤害数字 39/HUD 40）
+        private CanvasGroup _leyLineFilterGroup;  // 滤镜整体透明度（切换过渡驱动）
+        private readonly List<RectTransform> _leyLineWisps = new List<RectTransform>();
+        private readonly List<Vector2> _leyLineWispBases = new List<Vector2>();
+        private readonly List<float> _leyLineWispPhases = new List<float>();
+        private Color _origCameraBg;              // 切地脉前相机底色（切回还原）
+        private bool _cameraBgSaved;
+        private Coroutine _filterFadeCo;
+
+        /// <summary>切换维度视角（HUD 维度钮驱动）：主世界↔地脉循环（未来霜月等新维度=追加
+        /// 枚举值后循环自然扩展）。切地脉=滤镜淡入+主世界单位渲染件隐藏+灵魂现身+雾面让位
+        /// （灵界透视）+相机底色换阴间深蓝；切回反向。交互联动（瞄准取消）由 HUD 侧在调用前处理</summary>
+        public void ToggleDimensionView()
+        {
+            SetDimensionView(_currentDimension == BattleDimension.MainWorld
+                ? BattleDimension.LeyLine : BattleDimension.MainWorld);
+        }
+
+        public void SetDimensionView(BattleDimension dimension)
+        {
+            if (dimension == _currentDimension) return;
+            _currentDimension = dimension;
+            // 灵魂=地脉视角显示；主世界单位（活体/尸体/建筑）=主世界视角显示
+            // （拍板「地脉视角只显示灵魂+地形」——草簇/水面保留=地脉地形与主世界完全同步）
+            bool leyLine = dimension == BattleDimension.LeyLine;
+            foreach (var kv in _views)
+            {
+                var view = kv.Value;
+                if (view == null) continue;
+                view.SetDimensionVisible(view.IsSoulView == leyLine);
+            }
+            _board?.SetFogOverlayVisible(!leyLine); // 灵界透视：雾面整体让位
+            ApplyDimensionFilter(leyLine);
+            GICLog.Info($"[BattlePlayer] 维度视角切换 → {dimension}");
+            OnDimensionChanged?.Invoke(dimension);
+        }
+
+        /// <summary>滤镜+相机底色落地（切地脉=淡入 1；切回=淡出 0 后维持 Canvas 空转——alpha 0 零渲染）</summary>
+        private void ApplyDimensionFilter(bool leyLine)
+        {
+            if (leyLine) EnsureLeyLineFilter();
+            var cam = ViewCamera;
+            if (leyLine)
+            {
+                if (cam != null)
+                {
+                    if (!_cameraBgSaved) { _origCameraBg = cam.backgroundColor; _cameraBgSaved = true; }
+                    cam.backgroundColor = 地脉相机底色;
+                }
+            }
+            else if (_cameraBgSaved)
+            {
+                if (cam != null) cam.backgroundColor = _origCameraBg;
+                _cameraBgSaved = false;
+            }
+            if (_leyLineFilterGroup == null) return;
+            if (_filterFadeCo != null) StopCoroutine(_filterFadeCo);
+            _filterFadeCo = StartCoroutine(FadeLeyLineFilterCoroutine(leyLine ? 1f : 0f));
+        }
+
+        private IEnumerator FadeLeyLineFilterCoroutine(float targetAlpha)
+        {
+            float from = _leyLineFilterGroup.alpha;
+            if (Mathf.Approximately(from, targetAlpha)) { _leyLineFilterGroup.alpha = targetAlpha; yield break; }
+            float t = 0f;
+            while (t < 1f)
+            {
+                t += Time.unscaledDeltaTime / Mathf.Max(0.01f, 维度切换过渡);
+                _leyLineFilterGroup.alpha = Mathf.Lerp(from, targetAlpha, t);
+                yield return null;
+            }
+            _leyLineFilterGroup.alpha = targetAlpha;
+        }
+
+        /// <summary>阴间滤镜层懒建（首次切地脉）：全屏双色渐变（顶浅底沉）+暗角+三粒灵雾漂片。
+        /// 纯视觉层——无 GraphicRaycaster（勿补，BattleOverheadBars 同纪律）、blocksRaycasts 恒关；
+        /// 挂 BattlePlayer 子级随场同亡</summary>
+        private void EnsureLeyLineFilter()
+        {
+            if (_leyLineFilterCanvas != null) return;
+            var go = new GameObject("LeyLineFilterCanvas");
+            go.transform.SetParent(transform, false); // 随 BattlePlayer 同亡（Overlay 画布渲染与层级无关）
+            _leyLineFilterCanvas = go.AddComponent<Canvas>();
+            _leyLineFilterCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _leyLineFilterCanvas.sortingOrder = BattleMetrics.DamageNumbersCanvasOrder - 2; // 37：盖场景、让位头顶条/数字/HUD
+            _leyLineFilterGroup = go.AddComponent<CanvasGroup>();
+            _leyLineFilterGroup.blocksRaycasts = false;
+            _leyLineFilterGroup.interactable = false;
+            _leyLineFilterGroup.alpha = 0f;
+            var root = (RectTransform)go.transform;
+
+            // 双色垂直渐变：同一 alpha 渐变 sprite（白 RGB、alpha 顶 0→底 1）——顶片 y 翻转承顶色
+            var gradient = BattleViewFactory.LeyLineGradientSprite();
+            AddFilterImage(root, "TintTop", gradient, 滤镜顶色, flipY: true);
+            AddFilterImage(root, "TintBottom", gradient, 滤镜底色, flipY: false);
+            // 暗角（径向：中心透明→四缘实）——深蓝黑压暗四缘
+            AddFilterImage(root, "Vignette", BattleViewFactory.LeyLineVignetteSprite(),
+                new Color(0f, 0.02f, 0.05f, 滤镜暗角强度), flipY: false);
+            // 灵雾三粒（软圆 sprite=灵魂光晕同源纹理；慢漂+呼吸由 AnimateLeyLineWisps 驱动）
+            for (int i = 0; i < 3; i++)
+            {
+                var wispGo = new GameObject($"LeyLineWisp{i}", typeof(RectTransform), typeof(Image));
+                var wispRect = (RectTransform)wispGo.transform;
+                wispRect.SetParent(root, false);
+                wispRect.anchorMin = wispRect.anchorMax = wispRect.pivot = new Vector2(0.5f, 0.5f);
+                float size = Screen.height * (0.20f + i * 0.06f);
+                wispRect.sizeDelta = new Vector2(size, size);
+                var wispColor = Palette.灵魂蓝;
+                wispColor.a = 0.06f + i * 0.03f;
+                var img = wispGo.GetComponent<Image>();
+                img.sprite = BattleViewFactory.SoulGlowSprite();
+                img.color = wispColor;
+                img.raycastTarget = false;
+                // 基准位三粒散开（屏宽 1/4 间隔），初始随机相位错开
+                _leyLineWisps.Add(wispRect);
+                _leyLineWispBases.Add(new Vector2(
+                    (i - 1) * Screen.width * 0.22f, (i - 1) * Screen.height * 0.13f));
+                _leyLineWispPhases.Add(UnityEngine.Random.Range(0f, Mathf.PI * 2f));
+            }
+        }
+
+        /// <summary>滤镜全屏贴图件（stretch 满屏、raycastTarget=false；flipY=顶色片用 scale.y=-1 翻转渐变方向）</summary>
+        private static void AddFilterImage(RectTransform root, string name, Sprite sprite, Color color, bool flipY)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(root, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            if (flipY) rect.localScale = new Vector3(1f, -1f, 1f);
+            var image = go.GetComponent<Image>();
+            image.sprite = sprite;
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
+        /// <summary>灵雾漂移（Update 驱动，滤镜激活时）：锚点慢正弦漂 + 透明度呼吸（unscaled——
+        /// 暂停时滤镜仍活，纯观感同命座满命渐变先例）</summary>
+        private void AnimateLeyLineWisps()
+        {
+            float t = Time.unscaledTime;
+            for (int i = 0; i < _leyLineWisps.Count; i++)
+            {
+                var wisp = _leyLineWisps[i];
+                if (wisp == null) continue;
+                float phase = _leyLineWispPhases[i];
+                float x = Mathf.Sin(t * (0.05f + i * 0.021f) + phase) * Screen.width * 0.06f;
+                float y = Mathf.Sin(t * (0.03f + i * 0.017f) + phase * 1.7f) * Screen.height * 0.05f;
+                wisp.anchoredPosition = _leyLineWispBases[i] + new Vector2(x, y);
+                var img = wisp.GetComponent<Image>();
+                if (img != null)
+                {
+                    var c = img.color;
+                    c.a = (0.06f + i * 0.03f) * (0.7f + 0.3f * Mathf.Sin(t * (0.11f + i * 0.05f) + phase)); // 呼吸
+                    img.color = c;
+                }
+            }
+        }
+
+        /// <summary>灵魂衰减数字（决策九十一）：灵魂蓝 N（伤害不带负号先例）——血条同步下降的
+        /// 衰减读数；仅灵魂在地脉视角可见时弹（主世界视角灵魂隐藏不弹）</summary>
+        private void SpawnSoulDecayNumber(UnitView view, int delta)
+        {
+            if (view == null || delta >= 0) return;
+            int value = Mathf.Abs(delta);
+            var randomOffset = new Vector3(
+                UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
+                UnityEngine.Random.Range(-0.15f, 0.15f));
+            EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, value.ToString(),
+                Palette.灵魂蓝, value, _playbackSpeed);
         }
 
         // ==================== 消息处理（客户端侧） ====================
@@ -1222,6 +1432,14 @@ namespace GIC.Battle
                                 // 视觉消费方随未来理智机制批；下个快照自然校正
                                 statChanged.ApplySanityDelta(command.value);
                             }
+                            else if (command.metadata == BattleCommand.StatKindHp)
+                            {
+                                // 地脉灵魂衰减（决策九十一）：血条即时下降+灵魂蓝数字（非伤害路径——
+                                // 无受击反馈/闪红/格挡）；灵魂在主世界视角隐藏时不弹（数字锚=灵魂位置）
+                                statChanged.ApplyHpDelta(command.value);
+                                if (command.value < 0 && !statChanged.IsDimensionHidden)
+                                    SpawnSoulDecayNumber(statChanged, command.value);
+                            }
                         }
                         break;
 
@@ -1823,6 +2041,9 @@ namespace GIC.Battle
             if (_views.ContainsKey(state.unitId)) return;
 
             // 客户端只依快照与共享配置建场（不触 Host 逻辑对象）；配置经 [Autowired] 注入（Y10）
+            // 灵魂（决策九十一）：静态立牌路径（跳过待机视频+动作片预热——省解码器+幽灵观感）、
+            // 幽灵形态（冰蓝半透明+幽浮+柔光晕）、维度视角门（主世界默认隐藏——地脉视角现身）
+            bool isSoul = state.isSoul != 0;
 
             Sprite avatar = null;
             bool useFullBody = false;
@@ -1842,9 +2063,10 @@ namespace GIC.Battle
                 // （序列帧路线已退役——2026-10-05 拍板全库移除，旧尝试遗留零单位在用）。
                 // 移动循环片=per-skill（决策四十四「尽可能统一」：Move 型技能 SkillData.动作视频，
                 // SkillCast 登记+Move 片起止消费——不再走单位级字段）
-                idleVideo = unitData.立牌动画视频;
+                // **灵魂跳过视频路径（决策九十一）**：静态立牌省解码器（多灵魂≠多解码器），幽灵观感更贴
+                idleVideo = isSoul ? null : unitData.立牌动画视频;
                 // 动作片预热线（决策四十五：首次施放/移动零黑屏）——仅视频路径单位有意义
-                // （动作片走主视频机，PlayActionVideo 无播放器早退）
+                // （动作片走主视频机，PlayActionVideo 无播放器早退；灵魂无行动=天然跳过）
                 if (idleVideo != null && unitData.skills != null)
                     foreach (var s in unitData.skills)
                     {
@@ -1855,7 +2077,7 @@ namespace GIC.Battle
                 unitScale = unitData.额外缩放;
                 hoverHeight = unitData.离地高度;
                 standForward = unitData.立牌前移;
-                if (unitData.专属弹射物 != null) // per-unit 专属弹射物登记（2026-10-05 拍板；命中/消散/箭雨三路消费）
+                if (unitData.专属弹射物 != null && !isSoul) // per-unit 专属弹射物登记（2026-10-05 拍板；命中/消散/箭雨三路消费——灵魂无弹射路径不登记）
                     _customProjectiles[state.unitId] = (unitData.专属弹射物,
                         unitData.专属弹射物缩放 > 0f ? unitData.专属弹射物缩放 : 1f);
             }
@@ -1884,9 +2106,16 @@ namespace GIC.Battle
                 state.accessoryDurability); // 装备态（建场权威态；装备批 2026-10-18）
             view.ApplyPosition(_board.CellToWorld(state.position));
             _views[state.unitId] = view;
+            if (isSoul)
+            {
+                // 灵魂形态落地（决策九十一）：冰蓝半透明+幽浮+柔光晕（参数=Inspector「地脉灵魂表现」段）
+                // +维度视角门（当前地脉视角=现身；主世界视角=隐藏——建场即按当下视角取正确态）
+                view.SetSoulVisual(灵魂漂浮幅度, 灵魂漂浮速度, 灵魂立牌不透明度, 灵魂光晕不透明度);
+                view.SetDimensionVisible(_currentDimension == BattleDimension.LeyLine);
+            }
             if (prewarmClips.Count > 0)
                 view.PrewarmActionClips(prewarmClips); // 动作片建场预热（决策四十五）：首次施放/移动零黑屏
-            EnsureOverheadBars().Register(view); // 原神式头顶条（血条+元能条+附着图标，2026-09-24）
+            EnsureOverheadBars().Register(view); // 原神式头顶条（血条+元能条+附着图标，2026-09-24；灵魂=蓝色血条计时器，2026-10-25）
         }
 
         /// <summary>
@@ -1898,6 +2127,7 @@ namespace GIC.Battle
             var byCell = new Dictionary<BattleCell, List<UnitView>>();
             foreach (var view in _views.Values)
             {
+                if (view.IsSoulView) continue; // 灵魂不参与同格队形偏移（决策九十一：恒钉格心浮于尸体上——幽灵语义）
                 if (!byCell.TryGetValue(view.Cell, out var list))
                 {
                     list = new List<UnitView>();

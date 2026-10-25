@@ -412,6 +412,13 @@ namespace GIC.Battle
                     effects.Add(new AttachElementEffect(kv.Key, kv.Key, (int)ElementType.Hydro, 1));
             }
 
+            // 地脉维度回合末规则（决策九十一，2026-10-25）：①灵魂衰减（每回合末 −⌊10%×MaxHp⌋，
+            // 死亡当回合末豁免=完整 10 回合驻留）——SoulDecayEffect 走标准效应管道（应用层扣 HP、
+            // 命令层 StatChange(StatKindHp)、HP≤0 经死亡循环「灵魂+尸体双双消散」分支）；
+            // ②地脉驻留理智代价（非灵魂地脉单位 −3 理智/回合末——当前地脉仅灵魂=预留自动生效，
+            // 胡桃/丽莎相位技能批上线即激活）。位置=泡湿之后（同为回合末收尾类环境规则）
+            CollectLeyLineTurnEndEffects(effects);
+
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             // 建筑回合末效果段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——回合末
             // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
@@ -796,6 +803,12 @@ namespace GIC.Battle
             foreach (var sanityPair in sanityTotals)
                 segment.commands.Add(BattleCommand.StatChange(sanityPair.Key, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindSanity, sanityPair.Value));
+            // 地脉灵魂衰减（决策九十一）：每灵魂一条 StatChange(StatKindHp) 负值——客户端血条
+            // 衰减+灵魂蓝数字（非伤害路径：无防御/暴击/反应/格挡；发射位先于死亡循环=血条先落
+            // 再播消散淡出）
+            foreach (var effect in EnumerateEffects<SoulDecayEffect>(effects))
+                segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindHp, -effect.Amount));
             // 体力变化（B6d）：TargetUnitId=玩家 ID；同片同玩家防御性去重（配额行动唯一，
             // 理论只一条——低级单位豁免、延奏契约 0 消耗，正常流不会同玩家多条）
             var staminaSeen = new HashSet<string>();
@@ -845,6 +858,10 @@ namespace GIC.Battle
                 if (!effect.Applied) continue;
                 segment.commands.Add(BattleCommand.Revive(effect.SourceUnitId, effect.TargetUnitId,
                     sliceIndex, indexInSlice++, effect.HealAmount));
+                // 灵魂归体消散（决策九十一）：随 Revive 命令补发 Death(dissolve)——客户端灵魂幽灵
+                // 淡出（复苏=肉体归位，灵魂「回到」身体）；未来可升级为飞入躯体动画
+                if (effect.RemovedSoulId != null)
+                    segment.commands.Add(BattleCommand.Death(effect.RemovedSoulId, sliceIndex, indexInSlice++, 1));
             }
             foreach (var effect in MergeHealEffects(effects))
             {
@@ -908,6 +925,30 @@ namespace GIC.Battle
             foreach (var dead in newlyDead)
             {
                 bool hasId = _sim.TryGetUnitId(dead, out var deadId);
+                // 灵魂死亡（决策九十一，2026-10-25）：衰减扣完/（未来）地脉内被胡桃类击杀 → 灵魂本体
+                // 与所链尸体**双双消散**（拍板「生命值扣完时，灵魂和尸体都消散」——同名部署位随之
+                // 释放、复苏窗口关闭）。灵魂无装备无 Buff（基础属性拍板）→ 无掠夺无 RemoveBuff；
+                // 尸体侧残留 Buff 注销（消散分支同款——「死亡不清理」通则对消散单位作废）
+                if (dead.IsSoul)
+                {
+                    var corpse = dead.LinkedCorpseUnitId != null ? _sim.GetUnit(dead.LinkedCorpseUnitId) : null;
+                    if (hasId)
+                        segment.commands.Add(BattleCommand.Death(deadId, sliceIndex, indexInSlice++, 1)); // 灵魂消散
+                    if (corpse != null && _sim.TryGetUnitId(corpse, out var corpseId))
+                    {
+                        segment.commands.Add(BattleCommand.Death(corpseId, sliceIndex, indexInSlice++, 1)); // 尸体随散
+                        for (int i = corpse.Buffs.Count - 1; i >= 0; i--)
+                        {
+                            var corpseBuff = corpse.Buffs[i];
+                            if (corpseBuff == null) continue;
+                            _sim.RemoveBuff(corpse, corpseBuff); // OnRemoved 回调（冻结解状态等幂等无害）+注册表注销
+                        }
+                        _sim.RemoveUnit(corpse);
+                        GICLog.Info($"[TurnResolver] 地脉灵魂耗尽：灵魂 {deadId} 与尸体 {corpseId} 双双消散");
+                    }
+                    _sim.RemoveSoul(dead);
+                    continue;
+                }
                 // 消散判定（决策八十六批B，docs/45 §4）：建筑全部+眷属角色（1~2★）死亡不留尸体
                 bool dissolve = BattleHeuristics.ShouldDissolve(dead);
                 if (hasId)
@@ -947,6 +988,13 @@ namespace GIC.Battle
                         segment.commands.Add(BattleCommand.RemoveBuff(buffSourceId, deadId,
                             sliceIndex, indexInSlice++, (int)diedBuff.Type, diedBuff.Config?.name)); // 具名 key（决策五十七）
                 }
+
+                // 地脉灵魂生成（决策九十一）：走到本尾=非消散存活分支（留尸体=伙伴/魔神）→ 倒下即
+                // 同位生成灵魂（「当主世界有伙伴倒下，留下尸体，其灵魂会脱离肉体，出现于地脉维度
+                // 相同位置」）。基础属性+满血+治疗效率 50；Summon 命令复用（UnitState.isSoul 客户端
+                // 建幽灵立牌）；死亡当回合末不衰减（RegisterSoul 写 DeployedTurn，完整 10 回合驻留）
+                if (hasId)
+                    SpawnSoul(dead, deadId, segment, sliceIndex, ref indexInSlice);
             }
 
             // 到期 Buff：发射 RemoveBuff 后注销注册表（仅回合结束段传入）
@@ -1391,6 +1439,12 @@ namespace GIC.Battle
                 {
                     _sim.ApplyHeal(target, heal.Amount);
                 }
+                else if (effect is SoulDecayEffect soulDecay)
+                {
+                    // 地脉灵魂衰减（决策九十一）：直扣 HP（非伤害——无防御/暴击/反应/格挡；
+                    // 灵魂无装备无 Buff）。HP≤0 由死亡循环「灵魂+尸体双双消散」分支统一处理
+                    _sim.ApplyDamage(target, soulDecay.Amount);
+                }
                 else if (effect is ReviveEffect revive)
                 {
                     // 复苏（B-3 ②）：清尸体态+治疗——docs/05 §5.4「血量永远0不复苏」唯一例外通道。
@@ -1401,6 +1455,10 @@ namespace GIC.Battle
                         target.GetUnitComponent<UnitStatus>()?.SetStatus(StatusType.Dead, false);
                         _sim.ApplyHeal(target, revive.HealAmount);
                         revive.Applied = true;
+                        // 灵魂归体消散（决策九十一）：尸体复苏→所链灵魂移除（「同一实体的两半」系统级
+                        // 联动——尸体在主世界被复苏、灵魂直接归体，无跨界交互）；RemovedSoulId 回传
+                        // 命令层随 Revive 命令补发 Death(dissolve)（客户端灵魂淡出）
+                        revive.RemovedSoulId = _sim.RemoveLinkedSoul(effect.TargetUnitId);
                     }
                 }
                 else if (effect is EquipEffect equip)
@@ -1747,13 +1805,68 @@ namespace GIC.Battle
             return result;
         }
 
+        /// <summary>地脉灵魂生成（决策九十一，2026-10-25）：死亡分支尾部调用（留尸体单位=伙伴/魔神）——
+        /// UnitFactory 按同 UnitData 建**基础属性**灵魂（拍板「只继承基础属性，无装备、buff 等」：
+        /// 工厂 Init=配置基值+0命被动，满血；无命座等级〔0命无徽章〕、无装备、无登场 Buff）；
+        /// 治疗效率覆写 50（拍板「灵魂的治疗效率-50%」——受疗者效率乘区单出口对一切治疗自动减半；
+        /// 协议核心 50 同款语义）；RegisterSoul=地脉注册表+尸体链接；Summon 命令复用（UnitState.isSoul
+        /// 客户端建幽灵立牌）。同 UnitId 自增计数器=回放确定性</summary>
+        private void SpawnSoul(Unit dead, string deadId, Segment segment, int sliceIndex, ref int indexInSlice)
+        {
+            var identity = dead.GetUnitComponent<UnitIdentity>();
+            if (dead.RawData == null || identity == null) return;
+            var soul = UnitFactory.CreateUnitWithData(dead.RawData);
+            if (soul == null) return;
+            var stats = soul.GetUnitComponent<UnitStats>();
+            if (stats != null)
+                stats.SetStatStruct(StatType.HealEfficiency,
+                    new RangedInt(0, 300, BattleMetrics.SoulHealEfficiency)); // 满血由工厂 Init 保证（value=max）
+            string soulId = _sim.RegisterSoul(soul, identity.OwnerPlayerID, identity.Team,
+                _sim.GetPosition(dead), deadId);
+            segment.commands.Add(BattleCommand.Summon(identity.OwnerPlayerID, sliceIndex, indexInSlice++,
+                _sim.BuildUnitState(soulId, soul)));
+            GICLog.Info($"[TurnResolver] 地脉灵魂生成：{dead.RawData.unitName}（{deadId}）→ 灵魂 {soulId}");
+        }
+
+        /// <summary>地脉维度回合末规则（决策九十一）：①灵魂衰减——每回合末 −⌊10%×MaxHp⌋
+        /// （SoulDecayPercentPerTurn 单源，末点截断）；生成当回合末豁免（DeployedTurn 判据，
+        /// 骑士团「部署当回合末跳过」同构）=完整 10 回合驻留；②地脉驻留代价——非灵魂地脉单位
+        /// −3 理智/回合末（LeyLineSanityCostPerTurn；当前地脉仅灵魂=预留钩子自动生效，相位技能批
+        /// 上线即激活）。霜月等未来维度的驻留规则另立收集器勿并入本方法</summary>
+        private void CollectLeyLineTurnEndEffects(List<BattleEffect> effects)
+        {
+            foreach (var kv in _sim.CrossDimensionUnits)
+            {
+                var unit = kv.Value;
+                if (unit == null || unit.Dimension != BattleDimension.LeyLine) continue;
+                if (unit.IsSoul)
+                {
+                    if (_sim.CurrentTurn <= unit.DeployedTurn) continue; // 生成当回合末不衰减
+                    var stats = unit.GetUnitComponent<UnitStats>();
+                    if (stats == null) continue;
+                    var hp = stats.GetStatStruct(StatType.HP);
+                    if (hp.Max <= 0) continue;
+                    int decay = hp.Max * BattleMetrics.SoulDecayPercentPerTurn / 100;
+                    if (decay > 0)
+                        effects.Add(new SoulDecayEffect(kv.Key, decay));
+                }
+                else if (!BattleSimState.IsDead(unit))
+                {
+                    effects.Add(new SanityEffect(kv.Key, -BattleMetrics.LeyLineSanityCostPerTurn));
+                }
+            }
+        }
+
         private List<Unit> CollectDamagedTargets(List<BattleEffect> effects)
         {
             var targets = new List<Unit>();
             var seen = new HashSet<string>();
             foreach (var effect in effects)
             {
-                if (effect is DamageEffect && effect.TargetUnitId != null && seen.Add(effect.TargetUnitId))
+                // SoulDecayEffect 一并入列（决策九十一）：灵魂衰减致 HP≤0 → 死亡循环「灵魂+尸体
+                // 双双消散」分支（将来地脉内伤害致死灵魂同链）
+                if ((effect is DamageEffect || effect is SoulDecayEffect)
+                    && effect.TargetUnitId != null && seen.Add(effect.TargetUnitId))
                 {
                     var unit = _sim.GetUnit(effect.TargetUnitId);
                     if (unit != null)

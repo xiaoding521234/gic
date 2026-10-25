@@ -282,6 +282,100 @@ namespace GIC.Battle
             }
         }
 
+        private static Sprite _soulGlowSprite;
+
+        /// <summary>灵魂柔光晕 sprite（决策九十一，2026-10-25）：128² 白色软圆（径向 SmoothStep
+        /// 0.30→0.85 淡出、30% 亮芯）——tint 承色（灵魂蓝×光晕不透明度，SpriteRenderer.color）。
+        /// 静态缓存（域重载随 static 归零自然重建）；消费=UnitView.SetSoulVisual 挂倾斜组子级
+        /// （幽灵立牌的柔光底，与立牌同平面随幽浮同漂）</summary>
+        public static Sprite SoulGlowSprite()
+        {
+            if (_soulGlowSprite != null) return _soulGlowSprite;
+            const int s = 128;
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false)
+            {
+                name = "BattleSoulGlowTexture",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            var pixels = new Color32[s * s];
+            float center = (s - 1) * 0.5f;
+            for (int y = 0; y < s; y++)
+            {
+                for (int x = 0; x < s; x++)
+                {
+                    float dx = x - center, dy = y - center;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy) / center;
+                    float a = 1f - Mathf.SmoothStep(0.30f, 0.85f, d); // 亮芯+柔和淡出
+                    pixels[y * s + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+            _soulGlowSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _soulGlowSprite;
+        }
+
+        private static Sprite _leyLineGradientSprite;
+
+        /// <summary>地脉滤镜渐变 sprite（决策九十一）：4×256 白 RGB、alpha 顶 0→底 1（垂直渐变）
+        /// ——BattlePlayer 阴间滤镜层消费（顶片 y 翻转承滤镜顶色、底片承滤镜底色=下沉感）。
+        /// 静态缓存（域重载归零重建）</summary>
+        public static Sprite LeyLineGradientSprite()
+        {
+            if (_leyLineGradientSprite != null) return _leyLineGradientSprite;
+            const int w = 4, h = 256;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                name = "LeyLineGradientTexture",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            var pixels = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                byte a = (byte)Mathf.RoundToInt(y / (float)(h - 1) * 255f); // v=0 底亮 → v=1 顶淡
+                for (int x = 0; x < w; x++)
+                    pixels[y * w + x] = new Color32(255, 255, 255, a);
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+            _leyLineGradientSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            return _leyLineGradientSprite;
+        }
+
+        private static Sprite _leyLineVignetteSprite;
+
+        /// <summary>地脉滤镜暗角 sprite（决策九十一）：256² 径向（中心透明→0.55 半径起 SmoothStep
+        /// 到边缘实心）——四缘压暗的「阴间」包边。静态缓存</summary>
+        public static Sprite LeyLineVignetteSprite()
+        {
+            if (_leyLineVignetteSprite != null) return _leyLineVignetteSprite;
+            const int s = 256;
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false)
+            {
+                name = "LeyLineVignetteTexture",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            var pixels = new Color32[s * s];
+            float center = (s - 1) * 0.5f;
+            for (int y = 0; y < s; y++)
+            {
+                for (int x = 0; x < s; x++)
+                {
+                    float dx = (x - center) / center, dy = (y - center) / center;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy); // 0=中心 → ~1.41 角点
+                    float a = Mathf.SmoothStep(0.55f, 1.0f, d); // 中心 55% 内透明，四缘实
+                    pixels[y * s + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+            _leyLineVignetteSprite = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), s);
+            return _leyLineVignetteSprite;
+        }
+
         private static readonly System.Collections.Generic.Dictionary<int, Texture2D> _aimRadiusBlockTextures
             = new System.Collections.Generic.Dictionary<int, Texture2D>();
 

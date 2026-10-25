@@ -119,6 +119,17 @@ namespace GIC.Battle
                     });
             }
             else GICLog.Warn("[BattleHud] 布局槽缺失：settings");
+
+            // 维度切换钮（决策九十一，2026-10-25）：主世界↔地脉观察视角循环——纯客户端视角
+            // （战斗逻辑/协议/Host 零感知，LAN 各端独立）；瞄准会话先收（地脉=纯观察），交互自动
+            // 切回守卫见 ReturnToMainWorldForAim。槽=退出钮正下方右缘同列（prefab Slots/dimension）
+            if (_layoutByKey.TryGetValue("dimension", out var dimension))
+            {
+                var button = dimension.content.GetComponent<Button>();
+                if (button != null)
+                    button.onClick.AddListener(OnDimensionButtonClicked);
+            }
+            else GICLog.Warn("[BattleHud] 布局槽缺失：dimension");
         }
 
         // 纯文本件（turn/countdown/clock 槽内容=文本本体）与容器件（槽内容包子级文本）两种结构并存，
