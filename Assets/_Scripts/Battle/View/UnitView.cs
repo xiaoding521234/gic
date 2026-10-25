@@ -54,9 +54,9 @@ namespace GIC.Battle
         // ==================== 地脉灵魂形态 + 维度视角（决策九十一，2026-10-25） ====================
 
         /// <summary>灵魂视图标记（BattlePlayer.CreateView 按 UnitState.isSoul 调 SetSoulVisual 落地）：
-        /// 幽灵立牌=冰蓝半透明 tint（RefreshTint 单源链最高优先级）+倾斜组正弦幽浮+柔光晕；
-        /// 无底座盘/描边环（幽灵不落地）；无视频路径（灵魂=静态立牌省解码器，由调用方不传
-        /// idleVideo 保证）。与 IsFogHidden 同为渲染件意图覆盖层</summary>
+        /// 幽灵立牌=冰蓝半透明 tint（RefreshTint 单源链最高优先级，ChromaKey _Color 同语义）+倾斜组正弦
+        /// 幽浮+柔光晕；无底座盘/描边环（幽灵不落地）；待机动画视频与活体同享（2026-10-26 拍板——
+        /// 曾「静态立牌省解码器」已废）。与 IsFogHidden 同为渲染件意图覆盖层</summary>
         public bool IsSoulView { get; private set; }
 
         /// <summary>单位所在维度视图（2026-10-26 fix-batch2 ②a 泛化：灵魂=LeyLine、其余=MainWorld；
@@ -289,7 +289,7 @@ namespace GIC.Battle
         private void Update()
         {
             // 灵魂幽浮（决策九十一，2026-10-25）：倾斜组正弦上下漂（含悬浮离地基准 _soulBobBaseY）——
-            // 灵魂无视频路径（调用方不建），本块=灵魂唯一逐帧事务；暂停（timeScale=0）自动停
+            // 本块先于视频停摆块恒执行（2026-10-26 灵魂待机动画拍板后视频路径建立）；暂停（timeScale=0）自动停
             if (IsSoulView && _tiltGroup != null)
             {
                 _soulBobPhase += Time.deltaTime * _soulBobSpeed * Mathf.Deg2Rad;

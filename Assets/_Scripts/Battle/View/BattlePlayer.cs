@@ -306,6 +306,26 @@ namespace GIC.Battle
         private void OnDestroy()
         {
             if (_flow != null) _flow.OnPhaseChanged -= OnPhaseChangedForFormations;
+            // 维度视角清理（2026-10-26 返修）：相机可能跨对局存活（场景复用/沙盒重开等路径）——退出时
+            // 把 mask 归位主世界视角（幂等重算同式）+还原底色，防脏值流入下一场（「只剩血条」根因的另一半）
+            var cam = _viewCamera != null ? _viewCamera : CameraContext.Resolve();
+            if (cam != null)
+            {
+                int mask = cam.cullingMask;
+                foreach (BattleDimension dim in Enum.GetValues(typeof(BattleDimension)))
+                {
+                    int layer = LayerMask.NameToLayer(BattleViewFactory.DimensionLayerName(dim));
+                    if (layer >= 0) mask &= ~(1 << layer);
+                }
+                int mainLayer = LayerMask.NameToLayer(BattleViewFactory.DimensionLayerName(BattleDimension.MainWorld));
+                if (mainLayer >= 0) mask |= 1 << mainLayer;
+                cam.cullingMask = mask;
+            }
+            if (_cameraBgSaved && cam != null)
+            {
+                cam.backgroundColor = _origCameraBg;
+                _cameraBgSaved = false;
+            }
         }
 
         private void OnPhaseChangedForFormations(BattlePhase phase, int turn)
@@ -367,7 +387,6 @@ namespace GIC.Battle
         private readonly List<Vector2> _leyLineWispBases = new List<Vector2>();
         private readonly List<float> _leyLineWispPhases = new List<float>();
         private Color _origCameraBg;              // 切地脉前相机底色（切回还原）
-        private int _origCameraMask = -1;         // 切维度前相机 cullingMask（2026-10-25 泄漏修复拍板 A：层隔离单开关）
         private bool _cameraBgSaved;
         private Coroutine _filterFadeCo;
 
@@ -429,8 +448,10 @@ namespace GIC.Battle
             OnDimensionChanged?.Invoke(dimension);
         }
 
-        /// <summary>滤镜+相机落地（②a/②b 泛化：档案驱动+相机 mask 查表——切入某维度=从捕获基值
-        /// 重算、关全部其它维度层；fade 时长=离开维度的过渡秒，回主世界回落 0.28 默认）</summary>
+        /// <summary>滤镜+相机落地（②a/②b 泛化：档案驱动+相机 mask 查表——切入某维度=**从当前 mask
+        /// 幂等重算**：剥掉全部维度层再点亮当前维度层；2026-10-26 返修：原「一次性捕获基值」在相机跨
+        /// 对局存活时把上一场遗留的脏 mask 当原始值锁死（bit 永久丢失=「切回主世界只剩血条」根因），
+        /// 重算式天然自愈历史脏值；fade 时长=离开维度的过渡秒，回主世界回落 0.28 默认）</summary>
         private void ApplyDimensionFilter(BattleDimension dimension, BattleDimension previous)
         {
             var profile = ProfileOf(dimension);
@@ -443,14 +464,16 @@ namespace GIC.Battle
             // 弹出点门控分别管。加新维度=枚举+层注册即自动纳入循环（②b 查表）
             if (cam != null)
             {
-                if (_origCameraMask < 0) _origCameraMask = cam.cullingMask;
-                int mask = _origCameraMask;
+                // 幂等重算（2026-10-26 返修）：从**当前** mask 剥掉全部维度层再点亮当前维度层——无捕获
+                // 基值、无还原依赖，相机携带任何历史脏值（跨对局未还原/异地切换残留）都一并自愈
+                int mask = cam.cullingMask;
                 foreach (BattleDimension dim in Enum.GetValues(typeof(BattleDimension)))
                 {
-                    if (dim == dimension) continue;
                     int layer = LayerMask.NameToLayer(BattleViewFactory.DimensionLayerName(dim));
                     if (layer >= 0) mask &= ~(1 << layer);
                 }
+                int curLayer = LayerMask.NameToLayer(BattleViewFactory.DimensionLayerName(dimension));
+                if (curLayer >= 0) mask |= 1 << curLayer;
                 cam.cullingMask = mask;
             }
             if (filterOn)
@@ -2092,8 +2115,9 @@ namespace GIC.Battle
             if (_views.ContainsKey(state.unitId)) return;
 
             // 客户端只依快照与共享配置建场（不触 Host 逻辑对象）；配置经 [Autowired] 注入（Y10）
-            // 灵魂（决策九十一）：静态立牌路径（跳过待机视频+动作片预热——省解码器+幽灵观感）、
-            // 幽灵形态（冰蓝半透明+幽浮+柔光晕）、维度视角门（主世界默认隐藏——地脉视角现身）
+            // 灵魂（决策九十一）：幽灵形态（冰蓝半透明+幽浮+柔光晕）+待机动画视频（2026-10-26 拍板
+            // 「灵魂应当用其待机动画，而不是静态的待机立牌」——曾「跳视频省解码器」已废）、
+            // 维度视角门（主世界默认隐藏——地脉视角现身）；动作片预热仍跳（灵魂无行动）
             bool isSoul = state.isSoul != 0;
 
             Sprite avatar = null;
@@ -2114,11 +2138,13 @@ namespace GIC.Battle
                 // （序列帧路线已退役——2026-10-05 拍板全库移除，旧尝试遗留零单位在用）。
                 // 移动循环片=per-skill（决策四十四「尽可能统一」：Move 型技能 SkillData.动作视频，
                 // SkillCast 登记+Move 片起止消费——不再走单位级字段）
-                // **灵魂跳过视频路径（决策九十一）**：静态立牌省解码器（多灵魂≠多解码器），幽灵观感更贴
-                idleVideo = isSoul ? null : unitData.立牌动画视频;
+                // **灵魂同享待机动画视频（2026-10-26 拍板）**：tint 走 ChromaKey _Color、幽浮/光晕/
+                // 无底座盘链对视频路径全兼容（RefreshTint 单源）；灵魂=+1 解码器属拍板接受成本
+                idleVideo = unitData.立牌动画视频;
                 // 动作片预热线（决策四十五：首次施放/移动零黑屏）——仅视频路径单位有意义
-                // （动作片走主视频机，PlayActionVideo 无播放器早退；灵魂无行动=天然跳过）
-                if (idleVideo != null && unitData.skills != null)
+                // （动作片走主视频机，PlayActionVideo 无播放器早退；灵魂无行动=跳过预热省常驻解码器，
+                // 待机视频照常）
+                if (idleVideo != null && !isSoul && unitData.skills != null)
                     foreach (var s in unitData.skills)
                     {
                         var d = s != null ? s.data : null;
