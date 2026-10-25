@@ -2379,3 +2379,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **通则**：凡「保存基值→改→还原」型状态切换，基值捕获必须与被改对象**生命周期严格同源**（谁改谁还、同场必还原）；被改对象可能带着历史状态入场时，一律改幂等重算（每次从当前值剥掉自己管理的全部位再点亮目标值）。与滚动视差「缓存 authored 基准再叠加」铁律（缓存侧）互补——缓存基准的前提同样是「基准在对象生命周期内不会被外来的同型修改污染」。
 
+## §174 覆盖旗「建场初始化」缺口：晚入场对象漏设意图旗=Overlay 消费方恒显（2026-10-26 地脉视角「凭空出现两个血条」报障实锤）
+
+**症状**：地脉视角点完成选择看执行播放，出现两个无实体的悬浮血条（暂停局探针定案：68 条头顶条中 U111/U113 两条 soul=False/dv=MainWorld/IsDimensionHidden=False 且条激活——其余存量单位全 dh=True 条隐藏；同场两个灵魂 U79/U112 幽灵立牌可见属正常非报障对象）。
+
+**根因链**：`UnitView.IsDimensionHidden` 是渲染件+头顶条+伤害数字共用的维度意图旗（ApplyRenderables 单出口 && 语义）——`SetDimensionView` 切换时对**存量** views 全量重放写旗，但 `CreateView` 建场只给灵魂分支写了初值，**地脉视角期间入场的主世界单位（AI 部署/骑士召唤等执行期生成）漏设**=IsDimensionHidden 恒 false：3D 渲染树挂 BattleMain 层被相机 cullingMask 隐藏（主体不可见），Overlay 头顶条不经相机→BattleOverheadBars.Update 每帧 `!IsFogHidden && !IsDimensionHidden` 重估恒真→条恒显=「凭空血条」；伤害数字/元能数字弹出点门同判据（一并自愈）。
+
+**修法**：CreateView 尾统一 `view.SetDimensionVisible(view.DimensionView == _currentDimension)`（灵魂 DimensionView=SetSoulVisual 落 LeyLine、其余=MainWorld 默认；SetDimensionVisible 幂等早退=主世界视角建场零开销）。
+
+**通则**：意图覆盖旗（迷雾隐藏/维度隐藏/冻结态…）的写入方必须**两口齐全**——「切换/变更时全量重放」+「建场时按当下态初始化」；只做全量重放、漏建场初始化=晚入场对象（执行期部署/召唤/命令驱动生成物）带默认旗入场，**Overlay/屏幕空间消费方（不经相机 culling 的件）恒显**（3D 件反而因 cullingMask 相安无事——视觉分层越全越要查旗初始化）。新增覆盖旗时两处成对出现。
+

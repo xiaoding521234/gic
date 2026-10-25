@@ -2189,10 +2189,13 @@ namespace GIC.Battle
             if (isSoul)
             {
                 // 灵魂形态落地（决策九十一）：冰蓝半透明+幽浮+柔光晕（参数=Inspector「地脉灵魂表现」段）
-                // +维度视角门（当前地脉视角=现身；主世界视角=隐藏——建场即按当下视角取正确态）
                 view.SetSoulVisual(灵魂漂浮幅度, 灵魂漂浮速度, 灵魂立牌不透明度, 灵魂光晕不透明度);
-                view.SetDimensionVisible(_currentDimension == BattleDimension.LeyLine);
             }
+            // 维度视角门建场初始化（2026-10-26 返修二）：地脉视角期间入场的主世界单位（部署/召唤）
+            // 3D 被 cullingMask 隐藏，但 Overlay 头顶条/伤害数字不经相机——漏设 IsDimensionHidden=
+            // 消费方逐帧重估恒显=「凭空出现血条」根因（此前仅灵魂分支设，主世界分支漏）。
+            // 幂等早退：主世界视角建场零开销。详案=docs/14 §174
+            view.SetDimensionVisible(view.DimensionView == _currentDimension);
             if (prewarmClips.Count > 0)
                 view.PrewarmActionClips(prewarmClips); // 动作片建场预热（决策四十五）：首次施放/移动零黑屏
             EnsureOverheadBars().Register(view); // 原神式头顶条（血条+元能条+附着图标，2026-09-24；灵魂=蓝色血条计时器，2026-10-25）
