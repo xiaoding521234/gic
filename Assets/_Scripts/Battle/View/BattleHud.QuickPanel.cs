@@ -68,6 +68,8 @@ namespace GIC.Battle
                 GICLog.Warn("[BattleHud] 快捷面板滚动壳不完整（需 QuickScroll(ScrollRect)/QuickViewport(RectMask2D)/QuickContent）");
         }
 
+        private GameObject _quickRowPrefab; // 行模板（QuickRow.prefab——2026-10-26 fix-batch2 ①c：壳入 prefab，行高/监听/内容运行时接线）
+
         /// <summary>快照驱动刷新（RefreshFromSnapshot 调）：收录→签名比对→重建/就地刷新</summary>
         private void RefreshQuickPanel(BattleSnapshot snapshot)
         {
@@ -91,10 +93,9 @@ namespace GIC.Battle
             if (snapshot?.units == null) return result;
             var ranked = new List<(UnitState u, int tierRank, int alive, int idx)>();
             int idx = 0;
-            foreach (var u in snapshot.units)
+            foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂不入快捷面板=维度隔离）
             {
                 if (u == null || u.playerId != _myPlayerId) continue;
-                if (u.isSoul != 0) continue; // 灵魂不可号令（决策九十一：地脉驻留体无行动——不入快捷面板）
                 var data = TryGetUnitData(u.unitName);
                 if (data == null || data.unitType == UnitType.Building) continue; // 协议核心=纯查看且无爆发/势力技能
                 var tier = TierOfUnit(u);
@@ -128,24 +129,31 @@ namespace GIC.Battle
                 return;
             }
 
+            if (_quickRowPrefab == null)
+                _quickRowPrefab = Resources.Load<GameObject>("Prefabs/Battle/QuickRow");
+            if (_quickRowPrefab == null)
+            {
+                GICLog.Warn("[BattleHud] QuickRow.prefab 未找到（Resources/Prefabs/Battle/）——快捷面板不显示");
+                return;
+            }
+
             foreach (var u in units)
             {
                 var data = TryGetUnitData(u.unitName);
                 if (data == null) continue;
 
-                var rowGo = new GameObject("Quick_" + u.unitId, typeof(RectTransform), typeof(Image), typeof(Button));
+                // 行模板=QuickRow.prefab（2026-10-26 fix-batch2 ①c：壳件/默认色/无过渡已烘焙——
+                // 行高/监听/头像与技能图标=运行时数据绑定）
+                var rowGo = Instantiate(_quickRowPrefab, _quickContent, false);
+                rowGo.name = "Quick_" + u.unitId;
                 var rt = (RectTransform)rowGo.transform;
-                rt.SetParent(_quickContent, false);
-                var le = rowGo.AddComponent<LayoutElement>();
+                var le = rowGo.GetComponent<LayoutElement>();
                 le.minHeight = 快捷行高;
                 le.preferredHeight = 快捷行高;
                 le.flexibleHeight = 0f;
-                var bg = rowGo.GetComponent<Image>();
-                bg.color = Color.clear; // 选中高亮时改色（UpdateQuickSelectionHighlight）
-                bg.raycastTarget = true; // 行点击射线承接（覆盖整行）
-                var button = rowGo.GetComponent<Button>();
-                button.transition = Selectable.Transition.None; // 底图=高亮载体，勿被 tint 覆盖
-                var group = rowGo.AddComponent<CanvasGroup>();
+                var bg = rowGo.GetComponent<Image>(); // 透明射线底（clear+raycast）已烘焙——选中高亮时改色
+                var button = rowGo.GetComponent<Button>(); // transition=None 已烘焙（底图=高亮载体，勿被 tint 覆盖）
+                var group = rowGo.GetComponent<CanvasGroup>();
                 var unitId = u.unitId;
                 button.onClick.AddListener(() => OnQuickRowClicked(unitId));
 

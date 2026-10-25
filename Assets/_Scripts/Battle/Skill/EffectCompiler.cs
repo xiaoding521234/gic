@@ -344,8 +344,8 @@ namespace GIC.Battle
                         ? skillData.GetInt(atom.radiusKey) : 0;
                     if (radius <= 0) break;
                     var casterTeam = sim.GetTeamOf(action.playerId);
-                    foreach (var u in snapshot.units)
-                        if ((TeamType)u.team != casterTeam && u.isCorpse == 0 && u.isSoul == 0 // 灵魂在地脉维度不可及（决策九十一：两维度无法影响对方）
+                    foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
+                        if ((TeamType)u.team != casterTeam && u.isCorpse == 0
                             && Math.Max(Math.Abs(u.position.x - casterState.position.x),
                                         Math.Abs(u.position.y - casterState.position.y)) <= radius)
                             yield return u;
@@ -354,9 +354,9 @@ namespace GIC.Battle
                 case SkillEffectTargetFilter.AllAllies:
                     // 我方全体存活（元气迸发——群体治疗各按目标自身 maxHp 换算）；
                     // 我军=TeamType 口径（2026-09-25 三轮审查 C2：2v2 含队友单位）；
-                    // 灵魂排除（决策九十一：地脉维度与主世界互不可及）
-                    foreach (var u in snapshot.units)
-                        if ((TeamType)u.team == sim.GetTeamOf(action.playerId) && u.isCorpse == 0 && u.isSoul == 0)
+                    // 灵魂排除（决策九十一：地脉维度与主世界互不可及）——已随 MainWorldUnits 收口（②④）
+                    foreach (var u in snapshot.MainWorldUnits())
+                        if ((TeamType)u.team == sim.GetTeamOf(action.playerId) && u.isCorpse == 0)
                             yield return u;
                     break;
                 case SkillEffectTargetFilter.MondstadtOrSelf:
@@ -414,9 +414,9 @@ namespace GIC.Battle
                 {
                     int radius = atom.radiusKey != SkillParamKey.None ? skillData.GetInt(atom.radiusKey) : 0;
                     if (radius <= 0) continue;
-                    foreach (var ally in sliceSnapshot.units)
+                    foreach (var ally in sliceSnapshot.MainWorldUnits()) // 主世界域单源（②④迁移）
                     {
-                        if ((TeamType)ally.team != sim.GetTeamOf(action.playerId) || ally.isCorpse != 0 || ally.isSoul != 0) continue; // 尸体不治疗；灵魂在地脉维度不可及（决策九十一）；我军=TeamType 口径（C2）
+                        if ((TeamType)ally.team != sim.GetTeamOf(action.playerId) || ally.isCorpse != 0) continue; // 尸体不治疗；灵魂排除已随 MainWorldUnits 收口（决策九十一）；我军=TeamType 口径（C2）
                         int dist = Math.Max(Math.Abs(ally.position.x - casterState.position.x),
                             Math.Abs(ally.position.y - casterState.position.y));
                         if (dist > radius) continue;
@@ -980,10 +980,9 @@ namespace GIC.Battle
 
             var dir = new Vector2(delta.x, delta.y).normalized;
             var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
-            foreach (var enemy in snapshot.units)
+            foreach (var enemy in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
             {
                 if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
-                if (enemy.isSoul != 0) continue; // 灵魂在地脉维度不可及（决策九十一：两维度无法影响对方——主世界弹道/预判不可达）
                 float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
                 var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
                 if (rel.sqrMagnitude <= radius * radius) { into.Add(enemy); continue; } // 发射即贴脸（同格堆叠）
@@ -1029,10 +1028,9 @@ namespace GIC.Battle
 
             var dir = new Vector2(delta.x, delta.y).normalized;
             var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
-            foreach (var enemy in snapshot.units)
+            foreach (var enemy in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
             {
                 if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
-                if (enemy.isSoul != 0) continue; // 灵魂在地脉维度不可及（决策九十一：两维度无法影响对方——主世界弹道/预判不可达）
                 float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
                 var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
                 if (rel.sqrMagnitude <= radius * radius) return true; // 发射即贴脸（同格堆叠）

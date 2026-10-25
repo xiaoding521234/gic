@@ -74,8 +74,8 @@ namespace GIC.Battle
                 // 敌我=TeamType 口径（2026-09-25 三轮审查 C2：2v2 下不再把队友单位算进命中筛选）
                 var casterTeam = sim.GetTeamOf(projectile.PlayerId);
                 var enemies = new List<UnitState>();
-                foreach (var state in sliceSnapshot.units)
-                    if ((TeamType)state.team != casterTeam && state.isSoul == 0) // 灵魂在地脉维度——主世界弹道不可及（决策九十一：两维度无法影响对方）
+                foreach (var state in sliceSnapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
+                    if ((TeamType)state.team != casterTeam)
                         enemies.Add(state);
                 enemies.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
 

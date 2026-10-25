@@ -50,17 +50,13 @@ namespace GIC.Battle
         [Tooltip("灵魂光晕不透明度（立牌后的柔光底）")]
         [SerializeField, Range(0f, 1f)] private float 灵魂光晕不透明度 = 0.30f;
 
-        [Header("地脉维度视角（决策九十一：主世界↔地脉切换=纯客户端视角，战斗逻辑/协议零感知）")]
-        [Tooltip("阴间滤镜顶色（地脉视角全屏渐变上端）")]
-        [SerializeField] private Color 滤镜顶色 = new Color(0.05f, 0.10f, 0.20f, 0.28f);
-        [Tooltip("阴间滤镜底色（全屏渐变下端——下坠感更浓）")]
-        [SerializeField] private Color 滤镜底色 = new Color(0.02f, 0.14f, 0.22f, 0.50f);
-        [Tooltip("滤镜暗角强度（屏幕四缘压暗）")]
-        [SerializeField, Range(0f, 1f)] private float 滤镜暗角强度 = 0.55f;
-        [Tooltip("切换维度滤镜过渡时长（秒）")]
-        [SerializeField, Range(0.05f, 1f)] private float 维度切换过渡 = 0.28f;
-        [Tooltip("地脉视角相机底色（背景换阴间深蓝黑；切回自动还原）")]
-        [SerializeField] private Color 地脉相机底色 = new Color(0.015f, 0.03f, 0.06f);
+        [Header("维度视角档案（2026-10-26 fix-batch2 ②a：per-dimension 滤镜档案）")]
+        [Tooltip("维度滤镜档案（按 BattleDimension 枚举值索引：0=主世界〔占位不消费〕、1=地脉；加霜月等新维度=枚举值+本表加一行，相机 mask/滤镜/地形三件自动扩展）")]
+        [SerializeField] private List<DimensionViewProfile> 维度滤镜档案 = new List<DimensionViewProfile>
+        {
+            null,                              // 0=MainWorld：无滤镜（切回=淡出）
+            new DimensionViewProfile(),        // 1=LeyLine：默认值=原单字段初始值
+        };
 
         [Header("投射物箭矢")]
         [Tooltip("箭矢屏幕长度（格）——正式素材长轴按 bounds 归一到该长度，高度随素材纵横比；十字四向全长（2026-09-28 拍板方案 A：屏幕平行布告板+屏幕平面内旋转，上下射=屏幕竖直箭；0.7→0.49=同日目检拍板调小 30%）")]
@@ -371,6 +367,7 @@ namespace GIC.Battle
         private readonly List<Vector2> _leyLineWispBases = new List<Vector2>();
         private readonly List<float> _leyLineWispPhases = new List<float>();
         private Color _origCameraBg;              // 切地脉前相机底色（切回还原）
+        private int _origCameraMask = -1;         // 切维度前相机 cullingMask（2026-10-25 泄漏修复拍板 A：层隔离单开关）
         private bool _cameraBgSaved;
         private Coroutine _filterFadeCo;
 
@@ -383,36 +380,85 @@ namespace GIC.Battle
                 ? BattleDimension.LeyLine : BattleDimension.MainWorld);
         }
 
+        /// <summary>维度滤镜档案（2026-10-26 fix-batch2 ②a）：每维度一套滤镜/相机表现——主世界=无滤镜
+        /// （档案槽占位不消费）；加新维度=枚举值+档案表加一行</summary>
+        [Serializable]
+        public class DimensionViewProfile
+        {
+            [Tooltip("滤镜顶色（该维度全屏渐变上端）")]
+            public Color 滤镜顶色 = new Color(0.05f, 0.10f, 0.20f, 0.28f);
+            [Tooltip("滤镜底色（全屏渐变下端——下坠感更浓）")]
+            public Color 滤镜底色 = new Color(0.02f, 0.14f, 0.22f, 0.50f);
+            [Tooltip("滤镜暗角强度（屏幕四缘压暗）")]
+            [Range(0f, 1f)] public float 滤镜暗角强度 = 0.55f;
+            [Tooltip("切入该维度的滤镜过渡时长（秒）")]
+            [Range(0.05f, 1f)] public float 过渡秒 = 0.28f;
+            [Tooltip("该维度相机底色（背景换色；切回主世界自动还原）")]
+            public Color 相机底色 = new Color(0.015f, 0.03f, 0.06f);
+            [Tooltip("灵雾漂片数量（0=无灵雾；prefab 现烘 3 节点——扩量需同步 prefab 加节点）")]
+            [Min(0)] public int 灵雾数量 = 3;
+        }
+
+        /// <summary>维度档案查询（越界/空槽=null=无滤镜；主世界恒 null——语义由枚举位决定，
+        /// 序列化空槽 round-trip 变默认实例也不影响消费）</summary>
+        private DimensionViewProfile ProfileOf(BattleDimension dimension)
+        {
+            if (dimension == BattleDimension.MainWorld) return null;
+            int i = (int)dimension;
+            if (i >= 0 && i < 维度滤镜档案.Count && 维度滤镜档案[i] != null) return 维度滤镜档案[i];
+            return null;
+        }
+
         public void SetDimensionView(BattleDimension dimension)
         {
             if (dimension == _currentDimension) return;
+            var previous = _currentDimension;
             _currentDimension = dimension;
-            // 灵魂=地脉视角显示；主世界单位（活体/尸体/建筑）=主世界视角显示
-            // （拍板「地脉视角只显示灵魂+地形」——草簇/水面保留=地脉地形与主世界完全同步）
-            bool leyLine = dimension == BattleDimension.LeyLine;
+            // 单位可见性=维度匹配（②a 泛化：DimensionView 替代 IsSoulView 二元判）
             foreach (var kv in _views)
             {
                 var view = kv.Value;
                 if (view == null) continue;
-                view.SetDimensionVisible(view.IsSoulView == leyLine);
+                view.SetDimensionVisible(view.DimensionView == dimension);
             }
-            _board?.SetFogOverlayVisible(!leyLine); // 灵界透视：雾面整体让位
-            ApplyDimensionFilter(leyLine);
+            _board?.SetFogOverlayVisible(dimension == BattleDimension.MainWorld); // 灵界透视：非主世界视角雾面让位
+            _board?.SetDimensionTerrain(dimension); // 地脉地形=开局快照（2026-10-25 拍板：不同步主世界演化）
+            EnsureOverheadBars().SetDimensionVisible(dimension); // 头顶条=Overlay 画布不吃相机 culling——逐条目门控
+            ApplyDimensionFilter(dimension, previous);
             GICLog.Info($"[BattlePlayer] 维度视角切换 → {dimension}");
             OnDimensionChanged?.Invoke(dimension);
         }
 
-        /// <summary>滤镜+相机底色落地（切地脉=淡入 1；切回=淡出 0 后维持 Canvas 空转——alpha 0 零渲染）</summary>
-        private void ApplyDimensionFilter(bool leyLine)
+        /// <summary>滤镜+相机落地（②a/②b 泛化：档案驱动+相机 mask 查表——切入某维度=从捕获基值
+        /// 重算、关全部其它维度层；fade 时长=离开维度的过渡秒，回主世界回落 0.28 默认）</summary>
+        private void ApplyDimensionFilter(BattleDimension dimension, BattleDimension previous)
         {
-            if (leyLine) EnsureLeyLineFilter();
+            var profile = ProfileOf(dimension);
+            bool filterOn = profile != null;
+            if (filterOn) EnsureDimensionFilter(profile);
             var cam = ViewCamera;
-            if (leyLine)
+            // 维度渲染层隔离（2026-10-25 泄漏修复拍板 A）：箭矢/瞄准贴片等世界特效由工厂统一挂
+            // BattleMain 层、灵魂树挂 BattleLeyLine——此处单开关管全部 3D 渲染件（根治「切地脉见
+            // 主世界箭矢」）；Overlay 画布（头顶条/伤害数字）不经相机——由 SetDimensionVisible/
+            // 弹出点门控分别管。加新维度=枚举+层注册即自动纳入循环（②b 查表）
+            if (cam != null)
+            {
+                if (_origCameraMask < 0) _origCameraMask = cam.cullingMask;
+                int mask = _origCameraMask;
+                foreach (BattleDimension dim in Enum.GetValues(typeof(BattleDimension)))
+                {
+                    if (dim == dimension) continue;
+                    int layer = LayerMask.NameToLayer(BattleViewFactory.DimensionLayerName(dim));
+                    if (layer >= 0) mask &= ~(1 << layer);
+                }
+                cam.cullingMask = mask;
+            }
+            if (filterOn)
             {
                 if (cam != null)
                 {
                     if (!_cameraBgSaved) { _origCameraBg = cam.backgroundColor; _cameraBgSaved = true; }
-                    cam.backgroundColor = 地脉相机底色;
+                    cam.backgroundColor = profile.相机底色;
                 }
             }
             else if (_cameraBgSaved)
@@ -422,63 +468,66 @@ namespace GIC.Battle
             }
             if (_leyLineFilterGroup == null) return;
             if (_filterFadeCo != null) StopCoroutine(_filterFadeCo);
-            _filterFadeCo = StartCoroutine(FadeLeyLineFilterCoroutine(leyLine ? 1f : 0f));
+            var fadeDuration = ProfileOf(previous)?.过渡秒 ?? 0.28f;
+            _filterFadeCo = StartCoroutine(FadeLeyLineFilterCoroutine(filterOn ? 1f : 0f, fadeDuration));
         }
 
-        private IEnumerator FadeLeyLineFilterCoroutine(float targetAlpha)
+        private IEnumerator FadeLeyLineFilterCoroutine(float targetAlpha, float duration)
         {
             float from = _leyLineFilterGroup.alpha;
             if (Mathf.Approximately(from, targetAlpha)) { _leyLineFilterGroup.alpha = targetAlpha; yield break; }
             float t = 0f;
             while (t < 1f)
             {
-                t += Time.unscaledDeltaTime / Mathf.Max(0.01f, 维度切换过渡);
+                t += Time.unscaledDeltaTime / Mathf.Max(0.01f, duration);
                 _leyLineFilterGroup.alpha = Mathf.Lerp(from, targetAlpha, t);
                 yield return null;
             }
             _leyLineFilterGroup.alpha = targetAlpha;
         }
 
-        /// <summary>阴间滤镜层懒建（首次切地脉）：全屏双色渐变（顶浅底沉）+暗角+三粒灵雾漂片。
+        /// <summary>维度滤镜层懒建（首次切入带档案的维度）：全屏双色渐变+暗角+灵雾漂片。
         /// 纯视觉层——无 GraphicRaycaster（勿补，BattleOverheadBars 同纪律）、blocksRaycasts 恒关；
-        /// 挂 BattlePlayer 子级随场同亡</summary>
-        private void EnsureLeyLineFilter()
+        /// 挂 BattlePlayer 子级随场同亡。结构真源=LeyLineFilterCanvas.prefab（①b）；
+        /// 色/暗角/灵雾数按维度档案绑定（②a）</summary>
+        private void EnsureDimensionFilter(DimensionViewProfile profile)
         {
             if (_leyLineFilterCanvas != null) return;
-            var go = new GameObject("LeyLineFilterCanvas");
-            go.transform.SetParent(transform, false); // 随 BattlePlayer 同亡（Overlay 画布渲染与层级无关）
-            _leyLineFilterCanvas = go.AddComponent<Canvas>();
-            _leyLineFilterCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _leyLineFilterCanvas.sortingOrder = BattleMetrics.DamageNumbersCanvasOrder - 2; // 37：盖场景、让位头顶条/数字/HUD
-            _leyLineFilterGroup = go.AddComponent<CanvasGroup>();
-            _leyLineFilterGroup.blocksRaycasts = false;
-            _leyLineFilterGroup.interactable = false;
-            _leyLineFilterGroup.alpha = 0f;
+            var prefab = Resources.Load<GameObject>("Prefabs/Battle/LeyLineFilterCanvas");
+            if (prefab == null)
+            {
+                GICLog.Warn("[BattlePlayer] LeyLineFilterCanvas.prefab 缺失（Assets/Resources/Prefabs/Battle/）——维度滤镜不可用");
+                return;
+            }
+            var go = Instantiate(prefab, transform, false); // 随 BattlePlayer 同亡（Overlay 画布渲染与层级无关）
+            _leyLineFilterCanvas = go.GetComponent<Canvas>();
+            _leyLineFilterCanvas.sortingOrder = BattleMetrics.DamageNumbersCanvasOrder - 2; // 37：盖场景、让位头顶条/数字/HUD（Metrics 单源覆写防 prefab 漂移）
+            _leyLineFilterGroup = go.GetComponent<CanvasGroup>();
             var root = (RectTransform)go.transform;
 
-            // 双色垂直渐变：同一 alpha 渐变 sprite（白 RGB、alpha 顶 0→底 1）——顶片 y 翻转承顶色
+            // 双色垂直渐变：同一 alpha 渐变 sprite（白 RGB、alpha 顶 0→底 1）——顶片 y 翻转承顶色（翻转已烘焙 prefab）
             var gradient = BattleViewFactory.LeyLineGradientSprite();
-            AddFilterImage(root, "TintTop", gradient, 滤镜顶色, flipY: true);
-            AddFilterImage(root, "TintBottom", gradient, 滤镜底色, flipY: false);
+            BindFilterImage(root, "TintTop", gradient, profile.滤镜顶色);
+            BindFilterImage(root, "TintBottom", gradient, profile.滤镜底色);
             // 暗角（径向：中心透明→四缘实）——深蓝黑压暗四缘
-            AddFilterImage(root, "Vignette", BattleViewFactory.LeyLineVignetteSprite(),
-                new Color(0f, 0.02f, 0.05f, 滤镜暗角强度), flipY: false);
-            // 灵雾三粒（软圆 sprite=灵魂光晕同源纹理；慢漂+呼吸由 AnimateLeyLineWisps 驱动）
-            for (int i = 0; i < 3; i++)
+            BindFilterImage(root, "Vignette", BattleViewFactory.LeyLineVignetteSprite(),
+                new Color(0f, 0.02f, 0.05f, profile.滤镜暗角强度));
+            // 灵雾漂片（软圆 sprite=灵魂光晕同源纹理；慢漂+呼吸由 AnimateLeyLineWisps 驱动；
+            // 尺寸/基准位随屏幕分辨率——运行时绑定；数量按档案〔prefab 现烘 3 节点，扩量同步 prefab〕）
+            int wispCount = Mathf.Max(0, profile.灵雾数量);
+            for (int i = 0; i < wispCount; i++)
             {
-                var wispGo = new GameObject($"LeyLineWisp{i}", typeof(RectTransform), typeof(Image));
-                var wispRect = (RectTransform)wispGo.transform;
-                wispRect.SetParent(root, false);
-                wispRect.anchorMin = wispRect.anchorMax = wispRect.pivot = new Vector2(0.5f, 0.5f);
+                var wispRect = root.Find($"LeyLineWisp{i}") as RectTransform;
+                if (wispRect == null) continue;
                 float size = Screen.height * (0.20f + i * 0.06f);
                 wispRect.sizeDelta = new Vector2(size, size);
                 var wispColor = Palette.灵魂蓝;
                 wispColor.a = 0.06f + i * 0.03f;
-                var img = wispGo.GetComponent<Image>();
+                var img = wispRect.GetComponent<Image>();
                 img.sprite = BattleViewFactory.SoulGlowSprite();
                 img.color = wispColor;
                 img.raycastTarget = false;
-                // 基准位三粒散开（屏宽 1/4 间隔），初始随机相位错开
+                // 基准位散开（屏宽 1/4 间隔），初始随机相位错开
                 _leyLineWisps.Add(wispRect);
                 _leyLineWispBases.Add(new Vector2(
                     (i - 1) * Screen.width * 0.22f, (i - 1) * Screen.height * 0.13f));
@@ -486,17 +535,14 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>滤镜全屏贴图件（stretch 满屏、raycastTarget=false；flipY=顶色片用 scale.y=-1 翻转渐变方向）</summary>
-        private static void AddFilterImage(RectTransform root, string name, Sprite sprite, Color color, bool flipY)
+        /// <summary>prefab 贴图件绑定（节点/锚点/翻转=prefab 契约；本方法只绑 sprite/色/射线——程序生成
+        /// sprite 无法序列化进 prefab，运行时绑定属合法接线）</summary>
+        private static void BindFilterImage(RectTransform root, string name, Sprite sprite, Color color)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(root, false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = rect.offsetMax = Vector2.zero;
-            if (flipY) rect.localScale = new Vector3(1f, -1f, 1f);
-            var image = go.GetComponent<Image>();
+            var rect = root.Find(name) as RectTransform;
+            if (rect == null) return;
+            var image = rect.GetComponent<Image>();
+            if (image == null) return;
             image.sprite = sprite;
             image.color = color;
             image.raycastTarget = false;
@@ -920,6 +966,7 @@ namespace GIC.Battle
             var arrowGo = _arrowPool.Count > 0 ? _arrowPool.Pop() : null;
             if (arrowGo == null) arrowGo = new GameObject("Projectile");
             arrowGo.SetActive(true);
+            BattleViewFactory.SetMainWorldLayer(arrowGo); // 维度渲染层（2026-10-25 泄漏修复：箭矢随主世界层=相机 culling 单开关隐藏）
             arrowGo.transform.SetParent(_viewRoot, false);
             arrowGo.transform.position = from;
 
@@ -1813,6 +1860,9 @@ namespace GIC.Battle
             // ——修订首版 D4 的目标侧抑制为**归属方**口径：我方命中的伤害数字恒显（即便目标在迷雾内）；
             // 仅敌方施放且目标隐藏（敌方自奶/自增益类反馈）才抑制
             if (view.IsFogHidden && _fog != null && _fog.IsEnemyActor(actorUnitId)) yield break;
+            // 维度视角门（2026-10-25 泄漏修复：主世界伤害数字只在主世界视角弹、灵魂数字只在地脉
+            // 视角弹——Overlay 画布不吃相机 culling，逐弹出点门控；②a 泛化 DimensionView）
+            if (view.DimensionView != _currentDimension) yield break;
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
                 numberColor, value, _playbackSpeed, isHeal, isCrit);
         }
@@ -1852,6 +1902,7 @@ namespace GIC.Battle
             var randomOffset = new Vector3(
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
+            if (view.DimensionView != _currentDimension) return; // 维度视角门（2026-10-25 泄漏修复；②a 泛化）
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, $"+{delta}",
                 Palette.元能条色, delta, _playbackSpeed);
         }
@@ -2094,6 +2145,9 @@ namespace GIC.Battle
                 state.cylinderDiameter, standForward); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）
             view.OwnerPlayerId = state.playerId; // 归属身份（2026-10-15 血条三色批：三色模式按自己/队友/敌分档判定）
             view.OwnerTeam = (TeamType)state.team;
+            // 维度渲染层（2026-10-25 泄漏修复拍板 A）：单位渲染件整树挂维度层——相机 cullingMask
+            // 单开关管全部单位 3D；按 state.dimension 落层（灵魂=LeyLine、主世界=Main；霜月=新枚举自动纳入）
+            SetViewDimensionLayer(view.transform, (BattleDimension)state.dimension);
             view.Cell = state.position;
             view.SetCorpseVisual(state.isCorpse != 0);
             view.SetFrozenVisual(state.isFrozen != 0);
@@ -2116,6 +2170,17 @@ namespace GIC.Battle
             if (prewarmClips.Count > 0)
                 view.PrewarmActionClips(prewarmClips); // 动作片建场预热（决策四十五）：首次施放/移动零黑屏
             EnsureOverheadBars().Register(view); // 原神式头顶条（血条+元能条+附着图标，2026-09-24；灵魂=蓝色血条计时器，2026-10-25）
+        }
+
+        /// <summary>单位渲染树挂维度层（2026-10-25 泄漏修复拍板 A；②b 泛化 dimension 落层）——与
+        /// BattleViewFactory.DimensionLayerName 同源；层未配置（<0）静默退回旧行为
+        /// （IsDimensionHidden 逐单位门仍在，双保险）</summary>
+        private static void SetViewDimensionLayer(Transform root, BattleDimension dimension)
+        {
+            int layer = LayerMask.NameToLayer(BattleViewFactory.DimensionLayerName(dimension));
+            if (layer < 0) return;
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                t.gameObject.layer = layer;
         }
 
         /// <summary>

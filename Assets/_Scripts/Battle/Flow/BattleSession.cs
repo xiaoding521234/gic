@@ -168,20 +168,8 @@ namespace GIC.Battle
                 IsHostSide = false,
             };
 
-            // Client 侧路由（Host 下行）——与 host 本机视图同构
-            session._clientRouter.Register<BattleStartMessage>(BattleMessageType.BattleStart,
-                msg => player.OnBattleStart(msg));
-            session._clientRouter.Register<SnapshotMessage>(BattleMessageType.Snapshot,
-                msg => player.OnSnapshot(msg));
-            session._clientRouter.Register<SegmentMessage>(BattleMessageType.Segment,
-                msg => player.OnSegment(msg));
-            session._clientRouter.Register<TurnEndMessage>(BattleMessageType.TurnEnd,
-                msg => player.OnTurnEnd(msg));
-            session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver,
-                msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播
-            session._clientRouter.Register<TurnPlanMessage>(BattleMessageType.TurnPlan,
-                msg => player.OnTurnPlan(msg)); // 行动预告（执行预览）
-            transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
+            // Client 侧路由（Host 下行）——与 host 本机视图同构（2026-10-25 复审批 T6：注册单源化）
+            RegisterClientRoutes(session, transport, player);
 
             player.Bind(transport, null); // map 经 BattleStartMessage 到达（客户端无 Sim）
 
@@ -228,7 +216,22 @@ namespace GIC.Battle
                 }
             });
 
-            // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 回合结束）
+            // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 回合结束）——注册单源化（T6）
+            RegisterClientRoutes(session, transport, player);
+
+            player.Bind(transport, sim.Map);
+            player.BindFlow(flow); // 两态模型：立牌布局随回合阶段切换（散开/收拢，docs/22 §11）
+
+            // Flow 权威相位 → 门面事件（HUD 订阅单源）
+            flow.OnPhaseChanged += (phase, turn) => session.OnPhaseChanged?.Invoke(phase, turn);
+            flow.OnSelectTimerExpired += turn => session.OnSelectTimerExpired?.Invoke(turn);
+            return session;
+        }
+
+        /// <summary>客户端路由注册单源（2026-10-25 复审批 T6：CreateClient 与 CreateHostCore 两处
+        /// 逐字重复收口——新增下行消息类型只改此处，勿再双写）</summary>
+        private static void RegisterClientRoutes(BattleSession session, IBattleTransport transport, BattlePlayer player)
+        {
             session._clientRouter.Register<BattleStartMessage>(BattleMessageType.BattleStart,
                 msg => player.OnBattleStart(msg));
             session._clientRouter.Register<SnapshotMessage>(BattleMessageType.Snapshot,
@@ -238,18 +241,10 @@ namespace GIC.Battle
             session._clientRouter.Register<TurnEndMessage>(BattleMessageType.TurnEnd,
                 msg => player.OnTurnEnd(msg));
             session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver,
-                msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播（订阅方=HUD 胜负提示）
+                msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播
             session._clientRouter.Register<TurnPlanMessage>(BattleMessageType.TurnPlan,
-                msg => player.OnTurnPlan(msg)); // 行动预告（2026-09-29 执行预览：分桶后、首片推送前）
+                msg => player.OnTurnPlan(msg)); // 行动预告（执行预览）
             transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
-
-            player.Bind(transport, sim.Map);
-            player.BindFlow(flow); // 两态模型：立牌布局随回合阶段切换（散开/收拢，docs/22 §11）
-
-            // Flow 权威相位 → 门面事件（HUD 订阅单源）
-            flow.OnPhaseChanged += (phase, turn) => session.OnPhaseChanged?.Invoke(phase, turn);
-            flow.OnSelectTimerExpired += turn => session.OnSelectTimerExpired?.Invoke(turn);
-            return session;
         }
 
         // ==================== 对局流程 ====================

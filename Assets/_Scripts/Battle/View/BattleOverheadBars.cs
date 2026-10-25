@@ -149,6 +149,21 @@ namespace GIC.Battle
         private float _lastZoomScale = -1f;
         private bool _sortDirty = true;
 
+        /// <summary>维度视角激活维度（2026-10-26 ②a 泛化）：条目只在自身维度与当前视角一致时显示
+        /// ——本层 Overlay 画布（sorting 38）高于阴间滤镜（37）且不吃相机 cullingMask，须逐条目门控；
+        /// 新条目注册时按本值取初态</summary>
+        private BattleDimension _activeDimension = BattleDimension.MainWorld;
+
+        /// <summary>维度视角条目门控（BattlePlayer.SetDimensionView 消费）：防主世界头顶条透过滤镜
+        /// 漂浮在地脉视角上</summary>
+        public void SetDimensionVisible(BattleDimension dimension)
+        {
+            _activeDimension = dimension;
+            foreach (var item in _items)
+                if (item != null && item.Go != null && item.View != null)
+                    item.Go.SetActive(item.View.DimensionView == dimension);
+        }
+
         /// <summary>血条填色解析器（2026-10-15 血条三色批，BattlePlayer 透传注入——HUD Bind 提供：
         /// 读设置模式〔玩家色/三色〕+本端身份判定；null=未注入回落归属玩家色现行口径）。
         /// **只消费血条填充色**——本层其余彩色件（命座徽章/Buff 描环/附着图标）与底座圆盘链路不动</summary>
@@ -185,7 +200,10 @@ namespace GIC.Battle
         public void Register(UnitView view)
         {
             if (_canvas == null || view == null) return;
-            _items.Add(BuildItem(view));
+            var item = BuildItem(view);
+            if (item.Go != null)
+                item.Go.SetActive(view.DimensionView == _activeDimension); // 维度视角初态（2026-10-26 ②a 泛化）
+            _items.Add(item);
             _sortDirty = true; // #13：参与者集变化强制重排
         }
 

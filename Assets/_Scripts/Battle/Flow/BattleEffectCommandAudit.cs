@@ -12,6 +12,9 @@ namespace GIC.Battle
     /// B6 扩效应种类（治疗技能/StatChange/Summon/手牌）前，新 BattleEffect 子类必须在此登记映射，
     /// 未登记类型默认报警——这正是机制目的（新效应漏接命令即被发现）。
     /// 只报警不阻断（对账失败不炸战斗流程；B6 后按需升级为断言）。
+    /// 直产命令族边界（2026-10-25 复审批划定）：灵魂生成（SpawnSoul→Summon）/购买（BuyCard→CardGain/ItemGain）/
+    /// 命座授予（ConstellationApplier→EquipItem/ItemGain）无效应中间体=单向对账天然不覆盖（非漏发）；
+    /// 建筑元能引擎过阈=唯一「结算事实直产命令」族，以 BuildingSummonFactEffect 事实凭据对账（extraFacts）。
     /// </summary>
     public static class BattleEffectCommandAudit
     {
@@ -25,7 +28,7 @@ namespace GIC.Battle
         /// 命令产出以本列表为准，与 TurnResolver 产出循环同源）</param>
         /// <param name="commands">本段产出的全部命令</param>
         public static void Assert(string context, List<BattleEffect> effects, List<ApplyBuffEffect> appliedBuffs,
-            List<BattleCommand> commands)
+            List<BattleCommand> commands, List<BattleEffect> extraFacts = null)
         {
             // 命令键索引（一次构建；合并语义的效应按合并键查存在性）
             var damageKeys = new HashSet<string>();
@@ -225,6 +228,17 @@ namespace GIC.Battle
                     if (!applyBuffKeys.Contains($"{applied.TargetUnitId}:{applied.BuffKey ?? applied.BuffType.ToString()}"))
                         Report(context, applied, BattleCommandType.ApplyBuff);
                 }
+            }
+
+            if (extraFacts != null)
+            {
+                // 建筑元能引擎过阈（2026-10-25 复审批）：每条过阈事实必产消费命令（StatChange 能量
+                // -阈值，DrainPendingBuildingSummons 直产且先于本对账执行）——按建筑 id 查 energyKeys；
+                // 召唤命令可选（棋盘占满/同段死亡=合法落空）不对账
+                foreach (var fact in extraFacts)
+                    if (fact is BuildingSummonFactEffect summonFact
+                        && !energyKeys.Contains(summonFact.BuildingId))
+                        Report(context, summonFact, BattleCommandType.StatChange);
             }
         }
 

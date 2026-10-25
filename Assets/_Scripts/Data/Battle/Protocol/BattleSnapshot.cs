@@ -155,5 +155,17 @@ namespace GIC.Data
         public int turnNumber;
         public List<UnitState> units = new List<UnitState>();
         public List<PlayerResourceState> resources = new List<PlayerResourceState>();
+
+        /// <summary>主世界单位视图单源查询（决策九十一隔离纪律的结构件，2026-10-25 复审批 T1）：
+        /// 快照含跨维度单位，主世界消费域一律走本口而非手写过滤——判据=dimension（规范判据，
+        /// UnitState 注释口径；isSoul 只区分灵魂——未来霜月相位单位 isSoul=0 但 dimension≠0 会被漏过）；
+        /// 新维度（霜月）落地时此处一处收口；存量散点过滤逐步迁移（迁移面=HUD 雾统计/瞄准域/
+        /// 绘制遍历，见 skill 审计义务）。当前与 isSoul==0 等价（跨维单位只有灵魂，两字段同写）</summary>
+        public IEnumerable<UnitState> MainWorldUnits()
+        {
+            foreach (var u in units)
+                if (u != null && u.dimension == (int)BattleDimension.MainWorld)
+                    yield return u;
+        }
     }
 }

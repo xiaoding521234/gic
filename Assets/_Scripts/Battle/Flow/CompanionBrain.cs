@@ -225,6 +225,9 @@ namespace GIC.Battle
         /// 复位 false。单线程同步决策链=static 安全；try/finally 保证复位</summary>
         private static bool _bidPhase;
 
+        /// <summary>静态槽跨局自清判据（sim 实例号——2026-10-25 复审批修复，OpponentProfiler.EnsureFresh 同款）</summary>
+        private static int _lastSimInstance = -1;
+
         // ==================== 决策主入口（伙伴决策阶段） ====================
 
         /// <summary>
@@ -235,10 +238,13 @@ namespace GIC.Battle
         {
             var actions = new List<ActionData>();
             var snapshot = sim.TakeSnapshot(turnNumber);
-            if (turnNumber <= 1)
+            // 新战斗自清（2026-10-25 复审批修复：改 sim 实例号判据——旧 turn<=1 对秒弃调试局/回放/
+            // 中途入局失效；docs/18 2026-10-15 四定案②：新静态 AI 注册表一律 InstanceId）
+            if (sim.InstanceId != _lastSimInstance)
             {
-                _lastMoveAnchors.Clear(); // E-3：新战斗自清（StartBattle 恒从回合 1 起）
-                _vanguardTrack.Clear(); // H-4：追随外推槽同款自清
+                _lastMoveAnchors.Clear();
+                _vanguardTrack.Clear();
+                _lastSimInstance = sim.InstanceId;
             }
 
             // 玩家选择足迹：号令占用集 + 各玩家体力预留（己方已提交单位级行动的层级消耗）
@@ -832,9 +838,9 @@ namespace GIC.Battle
             UnitState best = null;
             int bestRatio = int.MaxValue;
             string bestId = null;
-            foreach (var u in snapshot.units)
+            foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
             {
-                if ((TeamType)u.team != team || u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂在地脉维度——AI 主世界候选域不可及（决策九十一）
+                if ((TeamType)u.team != team || u.isCorpse != 0) continue;
                 var live = sim.GetUnit(u.unitId);
                 // 满层判定按具名身份（决策五十七：buffAsset 引用优先；null 回落 type——与编译/工厂同口径）
                 var existingBuff = live?.Buffs.Find(b => b != null && (grantAtom != null && grantAtom.buffAsset != null
@@ -1625,16 +1631,10 @@ namespace GIC.Battle
             HashSet<string> filter = null)
         {
             int nearest = int.MaxValue;
-            foreach (var kv in sim.Units)
+            foreach (var (enemyId, enemy) in BattleHeuristics.CollectVisibleEnemies(sim, team, unit))
             {
-                if (filter != null && !filter.Contains(kv.Key)) continue;
-                var enemy = kv.Value;
-                var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
-                if (enemyIdentity == null || enemyIdentity.Team == team) continue;
-                if (BattleSimState.IsDead(enemy)) continue;
-                if (!BattleHeuristics.PerceivesEnemy(sim, unit, enemy)) continue; // AI 雾限（追拍三）+战术视距（2026-10-23）
-                var pos = sim.GetPosition(enemy);
-                int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
+                if (filter != null && !filter.Contains(enemyId)) continue;
+                int dist = sim.GetPosition(enemy).ChebyshevTo(cell);
                 if (dist < nearest) nearest = dist;
             }
             return nearest;
@@ -1998,17 +1998,10 @@ namespace GIC.Battle
             BattleCell cell, int auraRadius, HashSet<string> filter)
         {
             int count = 0;
-            foreach (var kv in sim.Units)
+            foreach (var (enemyId, enemy) in BattleHeuristics.CollectVisibleEnemies(sim, team, unit))
             {
-                if (filter != null && !filter.Contains(kv.Key)) continue;
-                var enemy = kv.Value;
-                var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
-                if (enemyIdentity == null || enemyIdentity.Team == team) continue;
-                if (BattleSimState.IsDead(enemy)) continue;
-                if (!BattleHeuristics.PerceivesEnemy(sim, unit, enemy)) continue; // AI 雾限（追拍三）+战术视距（2026-10-23）
-                var pos = sim.GetPosition(enemy);
-                int dist = Math.Max(Math.Abs(pos.x - cell.x), Math.Abs(pos.y - cell.y));
-                if (dist <= auraRadius) count++;
+                if (filter != null && !filter.Contains(enemyId)) continue;
+                if (sim.GetPosition(enemy).ChebyshevTo(cell) <= auraRadius) count++;
             }
             return count;
         }
@@ -2020,19 +2013,11 @@ namespace GIC.Battle
         private static HashSet<string> CollectVisionEnemies(BattleSimState sim, Unit vanguard, TeamType myTeam)
         {
             var result = new HashSet<string>();
-            int vision = vanguard.RawData != null ? vanguard.RawData.GetEffectiveAttackVision() : 5;
+            int vision = BattleHeuristics.TacticalSightOf(vanguard); // 战术视距单源（2026-10-25 复审批 T5）
             var vp = sim.GetPosition(vanguard);
-            foreach (var kv in sim.Units)
-            {
-                var enemy = kv.Value;
-                var identity = enemy.GetUnitComponent<UnitIdentity>();
-                if (identity == null || identity.Team == myTeam) continue;
-                if (BattleSimState.IsDead(enemy)) continue;
-                if (!BattleHeuristics.PerceivesEnemy(sim, vanguard, enemy)) continue; // AI 雾限+战术视距（2026-10-23）：先锋攻击视野内近敌照常入集（与集合本义一致——集合本就按先锋攻击视野截取）
-                var pos = sim.GetPosition(enemy);
-                if (Math.Max(Math.Abs(pos.x - vp.x), Math.Abs(pos.y - vp.y)) <= vision)
-                    result.Add(kv.Key);
-            }
+            foreach (var (enemyId, enemy) in BattleHeuristics.CollectVisibleEnemies(sim, myTeam, vanguard))
+                if (sim.GetPosition(enemy).ChebyshevTo(vp) <= vision)
+                    result.Add(enemyId);
             return result;
         }
 

@@ -30,6 +30,10 @@ namespace GIC.Battle
         private CardId _shopDragCard;     // 拖拽购买会话（拖起卡；None=无会话）
         private RectTransform _shopDragGhost; // 拖拽中的 wrapper 本体（跟随指针）
 
+        [Header("建筑购买面板（结构=BuildingShopPanel.prefab；可调参数此处单源）")]
+        [Tooltip("未解锁/摩拉不足卡片的灰显遮罩色（2026-10-26 T9：原字面量迁 Inspector）")]
+        [SerializeField] private Color 购买灰显遮罩色 = new Color(0f, 0f, 0f, 0.55f);
+
         private bool BuildingShopOpen => _shopRoot != null && _shopRoot.activeSelf;
 
         /// <summary>选择我方存活建筑=弹购买面板（SelectUnit 尾部调用；条件不满足静默=敌方纯查看）</summary>
@@ -105,11 +109,17 @@ namespace GIC.Battle
 
         private void BuildBuildingShop()
         {
-            _shopRoot = new GameObject("BuildingShopPanel");
-            // 挂画布根（HandPlayZone 运行时建件同款先例）：**勿挂 BattleHud 组件根**——prefab 根=
-            // 3px 左边缘竖条（(0,0)-(0,1) 锚），挂其下 anchor(0.5,0.5) 会把面板画到屏幕外（首版实证）；
-            // 画布引用=_canvas 字段单源（CanvasRect/手牌热区同源——GetComponentInParent<Canvas> 在
-            // BattleHud 实例上实测返回 null，勿再用）
+            // 结构真源=BuildingShopPanel.prefab（2026-10-26 fix-batch2 ①a 烘焙迁移：原运行时建件退役为
+            // 寻址接线——槽契约=根下 ShopRow 容器；卡行内容（RebuildShopCards）仍为运行时数据绑定）
+            var prefab = Resources.Load<GameObject>("Prefabs/Battle/BuildingShopPanel");
+            if (prefab == null)
+            {
+                GICLog.Warn("[BuildingShop] BuildingShopPanel.prefab 缺失（Assets/Resources/Prefabs/Battle/）——面板不可用");
+                return;
+            }
+            // 挂画布根（HandPlayZone 同款先例）：**勿挂 BattleHud 组件根**——prefab 根=3px 左边缘竖条
+            // （(0,0)-(0,1) 锚），挂其下会把面板画到屏幕外（首版实证）；画布引用=_canvas 字段单源
+            // （CanvasRect/手牌热区同源——GetComponentInParent<Canvas> 在 BattleHud 实例上实测返回 null）
             Transform canvasTransform = _canvas != null ? _canvas.transform : null;
             if (canvasTransform == null)
             {
@@ -121,25 +131,11 @@ namespace GIC.Battle
                 GICLog.Warn("[BuildingShop] 画布引用缺失，面板不建（Bind 前点击防御）");
                 return;
             }
-            _shopRoot.transform.SetParent(canvasTransform, false);
+            _shopRoot = Instantiate(prefab, canvasTransform, false);
             _shopRoot.transform.SetAsLastSibling(); // 顶栏/手牌之上（同画布后画的在上）
-            var rootRt = _shopRoot.AddComponent<RectTransform>();
-            rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
-            rootRt.anchoredPosition = new Vector2(0f, 60f);
-            rootRt.sizeDelta = new Vector2(860f, 300f);
-
-            // 深底面板（纯色 Image——无资产依赖；后续素材批可换九切片资产）
-            var bg = _shopRoot.AddComponent<UnityEngine.UI.Image>();
-            bg.color = new Color(0.07f, 0.08f, 0.11f, 0.94f);
-            bg.raycastTarget = true; // 点面板内不穿到棋盘（点外关闭由棋盘点击路径换选/取消选中承担）
-
-            // 卡行（横排居中；无滚动——当前建筑列表 ≤3）
-            var rowGo = new GameObject("ShopRow");
-            rowGo.transform.SetParent(_shopRoot.transform, false);
-            _shopRow = rowGo.AddComponent<RectTransform>();
-            _shopRow.anchorMin = _shopRow.anchorMax = new Vector2(0.5f, 0.5f);
-            _shopRow.anchoredPosition = Vector2.zero;
-            _shopRow.sizeDelta = new Vector2(820f, 260f);
+            _shopRow = _shopRoot.transform.Find("ShopRow") as RectTransform; // 槽寻址（prefab 契约）
+            if (_shopRow == null)
+                GICLog.Warn("[BuildingShop] prefab 缺 ShopRow 槽——卡行不可用");
         }
 
         /// <summary>重建卡行（开面板/购买成功后刷新共用）</summary>
@@ -207,7 +203,7 @@ namespace GIC.Battle
                 grayRt.offsetMin = Vector2.zero;
                 grayRt.offsetMax = Vector2.zero;
                 var gray = grayGo.AddComponent<UnityEngine.UI.Image>();
-                gray.color = new Color(0f, 0f, 0f, 0.55f);
+                gray.color = 购买灰显遮罩色; // T9：原字面量迁 Inspector（2026-10-26）
                 gray.raycastTarget = locked || noMora; // 可买态不拦射线（拖拽走 wrapper）
 
                 var dragHandler = wrapperGo.AddComponent<ShopCardDragHandler>();

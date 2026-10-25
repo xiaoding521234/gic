@@ -48,6 +48,9 @@ namespace GIC.Battle
         /// 延续/显著更优换锁后，同输入重跑恒同输出）——预测与权威 DecideAll 同回合幂等。</summary>
         private static readonly Dictionary<string, string> _coreLocks = new Dictionary<string, string>();
 
+        /// <summary>静态槽跨局自清判据（sim 实例号——2026-10-25 复审批修复，OpponentProfiler.EnsureFresh 同款）</summary>
+        private static int _lastSimInstance = -1;
+
         /// <summary>
         /// 全部眷属单位的本回合行动（存活的；不可动者缺席=无行动——Pass 无结算意义不出命令）
         /// </summary>
@@ -55,8 +58,13 @@ namespace GIC.Battle
         {
             // 决策快照（纯读，与选择阶段广播同源状态）——技能预判的唯一状态源
             var snapshot = sim.TakeSnapshot(turnNumber);
-            if (turnNumber <= 1)
-                _coreLocks.Clear(); // 议题③：新战斗自清（StartBattle 恒从回合 1 起=每局零残留）
+            // 新战斗自清（2026-10-25 复审批修复：sim 实例号判据——旧 turn<=1 对秒弃调试局/回放失效；
+            // docs/18 2026-10-15 四定案②：新静态 AI 注册表一律 InstanceId）
+            if (sim.InstanceId != _lastSimInstance)
+            {
+                _coreLocks.Clear();
+                _lastSimInstance = sim.InstanceId;
+            }
 
             var actions = new List<ActionData>();
             foreach (var kv in sim.Units)
@@ -151,7 +159,7 @@ namespace GIC.Battle
                     }
                 }
                 int coreDist = core != null ? selfPos.ChebyshevTo(sim.GetPosition(core)) : int.MaxValue;
-                int attackVision = unit.RawData != null ? unit.RawData.GetEffectiveAttackVision() : 5;
+                int attackVision = BattleHeuristics.TacticalSightOf(unit); // 战术视距单源（2026-10-25 复审批 T5）
 
                 foreach (var target in enemies)
                 {

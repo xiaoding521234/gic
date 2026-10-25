@@ -143,10 +143,9 @@ namespace GIC.Battle
         {
             var result = new List<UnitState>();
             if (snapshot == null) return result;
-            foreach (var state in snapshot.units)
+            foreach (var state in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
             {
                 if ((TeamType)state.team == casterTeam) continue;
-                if (state.isSoul != 0) continue; // 灵魂在地脉维度——主世界命中域不可及（决策九十一：两维度无法影响对方）
                 if (state.position.x != cell.x || state.position.y != cell.y) continue;
                 result.Add(state);
             }

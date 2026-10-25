@@ -379,9 +379,9 @@ namespace GIC.Battle
             var snapshot = _player != null ? _player.LatestSnapshot : null;
             if (snapshot?.units == null) return;
             var sb = new System.Text.StringBuilder();
-            foreach (var u in snapshot.units)
+            foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂不揭雾不入诊断）
             {
-                if (u == null || (TeamType)u.team != _myTeam || u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不揭雾不入诊断（决策九十一）
+                if (u == null || (TeamType)u.team != _myTeam || u.isCorpse != 0) continue;
                 sb.Append(' ').Append(u.unitName).Append('=').Append(ResolveVision(u.unitId));
             }
             if (sb.Length > 0) GICLog.Info("[迷雾] 揭雾视野:" + sb);

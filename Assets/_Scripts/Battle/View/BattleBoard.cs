@@ -102,6 +102,16 @@ namespace GIC.Battle
         public void Build(BattleMapData map)
         {
             Map = map;
+            // 维度初始地形快照（2026-10-25 拍板：地脉不与主世界同步地形——开局与主世界一模一样，
+            // 此后主世界 TerrainChange〔冻薄冰/融化〕不演化非主世界维度；②c 泛化=每非主世界维度
+            // 一份快照，未来某维度需独立演化时在其回合末规则里写自己的表即可）
+            _dimensionInitialTiles.Clear();
+            foreach (BattleDimension dim in Enum.GetValues(typeof(BattleDimension)))
+            {
+                if (dim == BattleDimension.MainWorld) continue;
+                _dimensionInitialTiles[dim] = map.tiles != null ? map.tiles.ToArray() : null;
+            }
+            _activeTerrainDimension = BattleDimension.MainWorld;
 
             if (_tilesRoot == null)
             {
@@ -196,6 +206,36 @@ namespace GIC.Battle
             if (_dimensionFogHidden == !visible) return;
             _dimensionFogHidden = !visible;
             SetFogOverlayActive(_fogOverlayIntent); // 经单出口重放当前意图（含地脉旗）
+        }
+
+        // ==================== 地脉维度地形（2026-10-25 拍板追记：地脉地形独立演化）====================
+
+        /// <summary>各非主世界维度的初始地形快照（维度→平铺 tiles 拷贝；主世界=live Map 真值不占表。
+        /// 2026-10-26 ②c 泛化：原单份 _initialTiles 升字典）</summary>
+        private readonly Dictionary<BattleDimension, int[]> _dimensionInitialTiles = new Dictionary<BattleDimension, int[]>();
+
+        /// <summary>当前视角取用的地形维度（主世界=Map 当前真值；雾面让位旗同族视角态）</summary>
+        private BattleDimension _activeTerrainDimension = BattleDimension.MainWorld;
+
+        /// <summary>按维度取地形：非主世界=该维度初始快照（主世界冻/融不演化）、主世界=当前真值</summary>
+        private TileType TerrainSourceTile(int x, int y)
+        {
+            if (_activeTerrainDimension != BattleDimension.MainWorld
+                && _dimensionInitialTiles.TryGetValue(_activeTerrainDimension, out var tiles)
+                && tiles != null && Map != null
+                && x >= 0 && x < Map.width && y >= 0 && y < Map.height)
+                return (TileType)tiles[y * Map.width + x];
+            return Map != null ? Map.GetTile(x, y) : TileType.None;
+        }
+
+        /// <summary>维度视角地形切换（BattlePlayer.SetDimensionView 消费）：按维度重铺薄冰面——
+        /// 非主世界=初始快照（水格上仍结着开局的冰）、主世界=当前真值（含融化/新冻）。幂等直通；
+        /// _thinIceDirty 帧内合并重建（Update 消费，与 ApplyTerrainChange 同路径）</summary>
+        public void SetDimensionTerrain(BattleDimension dimension)
+        {
+            if (_activeTerrainDimension == dimension) return;
+            _activeTerrainDimension = dimension;
+            _thinIceDirty = true; // 按新地形源全量重建（RebuildThinIceSurface 读 TerrainSourceTile=维度感知）
         }
 
         /// <summary>雾面/混沌盖共享运行时件确保（#1 审查批 mesh 复用）：首次建 GO+mesh，此后两模式
@@ -380,7 +420,7 @@ namespace GIC.Battle
             var cells = new List<BattleCell>();
             for (int y = 0; y < Map.height; y++)
             for (int x = 0; x < Map.width; x++)
-                if (Map.GetTile(x, y) == TileType.ThinIce)
+                if (TerrainSourceTile(x, y) == TileType.ThinIce) // 维度感知（2026-10-25 拍板：地脉=初始快照）
                     cells.Add(new BattleCell(x, y));
             if (cells.Count == 0) return;
 

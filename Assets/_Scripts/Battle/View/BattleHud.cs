@@ -1552,9 +1552,9 @@ namespace GIC.Battle
             var result = new List<UnitState>();
             foreach (var side in new[] { UnitSide.Mine, UnitSide.MyTeam, UnitSide.Enemy })
             {
-                foreach (var u in snapshot.units)
+                foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移）
                 {
-                    if (u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不可选不可查看（决策九十一：地脉驻留体不入主世界交互域）
+                    if (u.isCorpse != 0) continue; // 灵魂不可选不可查看（决策九十一：已随 MainWorldUnits 收口）
                     if (u.position.x != cell.x || u.position.y != cell.y) continue;
                     bool pick = side == UnitSide.Mine ? u.playerId == _myPlayerId
                         : side == UnitSide.MyTeam ? ((TeamType)u.team == MyTeam && u.playerId != _myPlayerId)
@@ -1565,10 +1565,9 @@ namespace GIC.Battle
                     result.Add(u);
                 }
             }
-            foreach (var u in snapshot.units) // 尸体垫底段（不分敌我——查看语义无优先级需求）
+            foreach (var u in snapshot.MainWorldUnits()) // 尸体垫底段（不分敌我——查看语义无优先级需求；②④迁移）
             {
-                if (u.isCorpse == 0) continue;
-                if (u.isSoul != 0) continue; // 灵魂永不入查看/选择域（决策九十一——灵魂非尸体双保险）
+                if (u.isCorpse == 0) continue; // 灵魂永不入查看域=维度隔离收口（决策九十一）
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
                 if (!FogVisible(u)) continue;
                 result.Add(u);
@@ -1603,9 +1602,9 @@ namespace GIC.Battle
             // 视同未点，同延奏点尸体立牌先例。
             if (_itemUseAimItem != 0)
             {
-                foreach (var u in snapshot.units)
+                foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移）
                 {
-                    if (u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不可饮用（决策九十一：地脉维度不可及）
+                    if (u.isCorpse != 0) continue; // 灵魂不可饮用（决策九十一：已随 MainWorldUnits 收口）
                     if ((TeamType)u.team != MyTeam) continue;
                     if (IsBuildingUnitState(u)) continue;
                     if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
@@ -1620,9 +1619,9 @@ namespace GIC.Battle
             // _itemConfig 单源判定（EquipTargetQualifies 单出口）
             if (_equipAimItem != 0)
             {
-                foreach (var u in snapshot.units)
+                foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移）
                 {
-                    if (u.isCorpse != 0 || u.isSoul != 0) continue; // 灵魂不可装备（决策九十一：地脉维度不可及+无装备拍板）
+                    if (u.isCorpse != 0) continue; // 灵魂不可装备（决策九十一：已随 MainWorldUnits 收口+无装备拍板）
                     if ((TeamType)u.team != MyTeam) continue;
                     if (IsBuildingUnitState(u)) continue;
                     if (!EquipTargetQualifies(u, _equipAimItem)) continue;
@@ -1638,9 +1637,8 @@ namespace GIC.Battle
             if (sel == null) return;
             bool contract = skillData.skillType == SkillType.Contract;
             bool burstUnit = skillData.skillType == SkillType.Burst; // 单位指向型爆发（IsUnitTargeted 已保证）
-            foreach (var u in snapshot.units)
+            foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂排除=维度隔离，延奏/契约全拒）
             {
-                if (u.isSoul != 0) continue; // 灵魂不可为技能目标（决策九十一：地脉维度不可及——复苏/延奏/契约全拒）
                 if (cell.HasValue && (u.position.x != cell.Value.x || u.position.y != cell.Value.y)) continue;
                 if ((TeamType)u.team == (TeamType)sel.team)
                 {
@@ -1815,10 +1813,9 @@ namespace GIC.Battle
         private UnitState FindUnitAt(BattleSnapshot snapshot, BattleCell cell, UnitSide side,
             bool includeCorpses = false)
         {
-            foreach (var u in snapshot.units)
+            foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移）
             {
-                if (u.isSoul != 0) continue; // 灵魂不可选中/不可为目标（决策九十一：地脉驻留体——精确点格/选择/物品/瞄准全拒）
-                if (u.isCorpse != 0 && !includeCorpses) continue; // 尸体默认不可选（单位指向型爆发例外——复苏目标）
+                if (u.isCorpse != 0 && !includeCorpses) continue; // 尸体默认不可选（单位指向型爆发例外——复苏目标）；灵魂排除=维度隔离收口
                 if (u.position.x != cell.x || u.position.y != cell.y) continue;
                 bool pick;
                 if (side == UnitSide.Mine) pick = u.playerId == _myPlayerId;          // 操控权（B7 分端=本机玩家）
@@ -3081,45 +3078,39 @@ namespace GIC.Battle
         private void EnsureDragWheel()
         {
             if (_dragWheelRoot != null || _canvas == null) return;
+            // 结构真源=DragAimWheel.prefab（2026-10-26 fix-batch2 ①c 烘焙迁移：全拉伸壳+三盘件
+            // 结构/sprite 入 prefab；尺寸随 BattleHud 序列化字段、颜色随 BattlePalette——运行时绑定）
+            var prefab = Resources.Load<GameObject>("Prefabs/Battle/DragAimWheel");
+            if (prefab == null)
+            {
+                GICLog.Warn("[BattleHud] DragAimWheel.prefab 未找到（Resources/Prefabs/Battle/）——拖动瞄准盘不显示");
+                return;
+            }
             var canvasRt = (RectTransform)_canvas.transform;
-            _dragWheelRoot = new GameObject("DragAimWheel", typeof(RectTransform));
+            _dragWheelRoot = Instantiate(prefab, canvasRt, false);
             var rootRt = (RectTransform)_dragWheelRoot.transform;
-            rootRt.SetParent(canvasRt, false);
-            rootRt.anchorMin = Vector2.zero; // 全拉伸壳：子件中心锚=画布中心，anchoredPosition 即画布局部坐标
-            rootRt.anchorMax = Vector2.one;
-            rootRt.offsetMin = rootRt.offsetMax = Vector2.zero;
             rootRt.SetAsLastSibling(); // 盘画在 HUD 最上层（仅视觉，无射线）
-            _dragWheelRoot.SetActive(false);
+            _dragWheelRoot.SetActive(false); // 初始隐藏（prefab 烘焙 false——保险重申防误存激活态）
 
-            var disc = Resources.Load<Sprite>("UI/Backpack/TabGlyphs/disc");   // 实心白圆盘（小盘）
-            var fill = Resources.Load<Sprite>("UI/Battle/DragWheelFill");      // 圆角矩形实心盘（大盘填充）
-            var ring = Resources.Load<Sprite>("UI/Battle/DragWheelRing");      // 圆角矩形细环（大盘描边）
-            if (disc == null) GICLog.Warn("[BattleHud] disc.png（TabGlyphs）未找到——小圆盘不显示");
-            if (fill == null) GICLog.Warn("[BattleHud] DragWheelFill.png（UI/Battle）未找到——大盘填充不显示");
-            if (ring == null) GICLog.Warn("[BattleHud] DragWheelRing.png（UI/Battle）未找到——大盘描环不显示");
             // 大盘两件=裁剪到内容框的圆角矩形素材（补偿恒 1.0——实心盘贴图补偿仅小盘消费）；
             // 填充件按比例内缩见「大盘填充内缩比例」常量注（两素材角弧不同，平齐绘制四角有暗唇）
-            _dragWheelBigFill = MakeWheelDisc("BigFill", rootRt, fill, 拖动瞄准大盘半边 * (1f - 大盘填充内缩比例),
+            _dragWheelBigFill = BindWheelDisc(rootRt, "BigFill", 拖动瞄准大盘半边 * (1f - 大盘填充内缩比例),
                 new Color(Palette.按钮底盘.r, Palette.按钮底盘.g, Palette.按钮底盘.b, 0.45f));
-            _dragWheelBigRing = MakeWheelDisc("BigRing", rootRt, ring, 拖动瞄准大盘半边,
+            _dragWheelBigRing = BindWheelDisc(rootRt, "BigRing", 拖动瞄准大盘半边,
                 new Color(Palette.高亮金.r, Palette.高亮金.g, Palette.高亮金.b, 0.8f));
-            _dragWheelSmall = MakeWheelDisc("SmallDisc", rootRt, disc, 拖动瞄准小圆盘半径 * 实心盘贴图补偿,
+            _dragWheelSmall = BindWheelDisc(rootRt, "SmallDisc", 拖动瞄准小圆盘半径 * 实心盘贴图补偿,
                 Palette.瞄准已选色);
         }
 
-        /// <summary>圆盘子件（中心锚；尺寸=半径×2；raycastTarget 恒关）</summary>
-        private static RectTransform MakeWheelDisc(string name, RectTransform parent, Sprite sprite,
-            float radius, Color color)
+        /// <summary>prefab 盘件绑定（节点/中心锚/sprite=prefab 契约；尺寸=半径×2 与色运行时绑定——
+        /// 序列化字段与 Palette 活色单源）</summary>
+        private static RectTransform BindWheelDisc(RectTransform root, string name, float radius, Color color)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            var rt = (RectTransform)go.transform;
-            rt.SetParent(parent, false);
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            var rt = root.Find(name) as RectTransform;
+            if (rt == null) return null;
             rt.sizeDelta = new Vector2(radius * 2f, radius * 2f);
-            var img = go.GetComponent<Image>();
-            img.sprite = sprite;
-            img.color = color;
-            img.raycastTarget = false; // 盘覆盖技能盘区，勿拦射线
+            var img = rt.GetComponent<Image>();
+            if (img != null) img.color = color;
             return rt;
         }
 
@@ -3997,21 +3988,19 @@ namespace GIC.Battle
             {
                 bool anySoul = false;
                 foreach (var u in src.units)
-                    if (u != null && u.isSoul != 0) { anySoul = true; break; }
+                    if (u != null && u.dimension != 0) { anySoul = true; break; }
                 if (!anySoul) return src;
                 var soulStripped = new BattleSnapshot { turnNumber = src.turnNumber, resources = src.resources };
-                foreach (var u in src.units)
-                    if (u != null && u.isSoul == 0)
-                        soulStripped.units.Add(u);
+                soulStripped.units.AddRange(src.MainWorldUnits()); // 主世界域单源（②④迁移）
                 return soulStripped;
             }
             bool anyHidden = false;
             foreach (var u in src.units)
-                if (u == null || !fog.IsUnitVisible(u) || u.isSoul != 0) { anyHidden = true; break; }
+                if (u == null || !fog.IsUnitVisible(u) || u.dimension != 0) { anyHidden = true; break; }
             if (!anyHidden) return src;
             var filtered = new BattleSnapshot { turnNumber = src.turnNumber, resources = src.resources };
             foreach (var u in src.units)
-                if (u != null && fog.IsUnitVisible(u) && u.isSoul == 0)
+                if (u != null && fog.IsUnitVisible(u) && u.dimension == 0)
                     filtered.units.Add(u);
             return filtered;
         }

@@ -59,6 +59,11 @@ namespace GIC.Battle
         /// idleVideo 保证）。与 IsFogHidden 同为渲染件意图覆盖层</summary>
         public bool IsSoulView { get; private set; }
 
+        /// <summary>单位所在维度视图（2026-10-26 fix-batch2 ②a 泛化：灵魂=LeyLine、其余=MainWorld；
+        /// 未来霜月相位单位随 SetSoulVisual 同族入口落值。维度视角门/渲染层/头顶条门全按本属性判定
+        /// （替代 IsSoulView 二元判——灵魂语义仍由 IsSoulView 承载）</summary>
+        public BattleDimension DimensionView { get; private set; } = BattleDimension.MainWorld;
+
         /// <summary>维度视角隐藏态（决策九十一）：**灵魂=主世界视角隐藏、主世界单位=地脉视角隐藏**
         /// （BattlePlayer.SetDimensionView 切换写入——「地脉视角只显示灵魂+地形」拍板）。与
         /// IsFogHidden 同为覆盖层（ApplyRenderables 单出口 && 语义）；头顶条/弹字等屏幕件由
@@ -79,6 +84,7 @@ namespace GIC.Battle
         {
             if (IsSoulView) return;
             IsSoulView = true;
+            DimensionView = BattleDimension.LeyLine; // 维度视图泛化（②a）：灵魂恒地脉
             _soulBobAmplitude = bobAmplitude;
             _soulBobSpeed = bobSpeed;
             _soulTintAlpha = tintAlpha;
@@ -407,8 +413,10 @@ namespace GIC.Battle
             if (!vp.isPrepared) yield break; // 超时：RT 留黑=旧行为兜底
             if (!renderFirstFrame) yield break; // 租约被占：解码器温备即达目的（RT 内容不动）
             vp.Play();
-            yield return null;
-            yield return null; // 两帧确保 WMF 完成一次渲染入 RT
+            // 首帧落地后才 Pause（2026-10-25 复审批：固定两帧在解码慢时停在 frame 0=黑 RT——部署
+            // 黑窗复发面；等待式落帧与 IdleClipPrewarmPool 同判据，超时兜底=RT 留黑旧行为）
+            float frameDeadline = Time.unscaledTime + 3f;
+            while (vp.frame < 1 && Time.unscaledTime < frameDeadline) yield return null;
             vp.Pause(); // 留 warm：解码器保持已初始化（常驻核心语义）
         }
 
@@ -466,7 +474,11 @@ namespace GIC.Battle
             // 常驻批：移动循环片若走常驻播放器（loop 态不停播），移动结束时显式停它（Pause 留 warm）
             // ——否则解码器空转渲染不显示的 RT
             if (_moveClip != null && _residentPlayers.TryGetValue(_moveClip, out var rmove) && rmove != null && rmove.isPlaying)
-                rmove.Pause();
+            {
+                // 停摆守卫（2026-10-25 复审批：CanHaltNow 防停在未渲首帧的黑 RT——同 Update 停摆防线；
+                // frame<1 罕见窗口留播，由 Update 守卫在首帧后接管停摆）
+                if (CanHaltNow(rmove)) rmove.Pause();
+            }
             SwitchToIdleLoop(vp);
         }
 
@@ -506,7 +518,7 @@ namespace GIC.Battle
             {
                 ResidentVideoBudget.Touch(rvp);
                 if (rvp.targetTexture != actionRt) rvp.targetTexture = actionRt; // #3：绑定租得的 RT（共享/私有；常态=共享零切换）
-                if (vp.isPlaying) vp.Pause(); // 主播放器让位（待机解码器暂挂——回待机时恢复，无需关停）
+                if (CanHaltNow(vp)) vp.Pause(); // 主播放器让位（停摆守卫：勿停在未渲首帧的黑 RT——2026-10-25 复审批）
                 _activeResidentClip = clip; // 在显片登记（回切守卫）
             }
             var active = resident ? rvp : vp; // 播放参数统一写 active；loopPointReached 两路共用 OnActionVideoFinished
@@ -528,7 +540,7 @@ namespace GIC.Battle
                 // 清在显登记（本片走主播放器，播完回切由 source==_videoPlayer 分支负责）
                 _activeResidentClip = null;
                 foreach (var rp in _residentPlayers.Values)
-                    if (rp != null && rp.isPlaying) rp.Pause();
+                    if (rp != null && rp.isPlaying && CanHaltNow(rp)) rp.Pause(); // 停摆守卫（2026-10-25 复审批）
                 active.clip = clip;
                 active.targetTexture = actionRt;
                 // 冻结/尸体态不再就地 Pause（同常驻路径报障修复：黑 RT 冻整幅防线）——恒 Play，

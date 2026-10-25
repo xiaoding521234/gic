@@ -94,8 +94,33 @@ namespace GIC.Battle
         /// 与眷属 v7 追击域/J-4/H-3 视野敌判同口径）内——「武器够得着的敌情自己看得见」</summary>
         public static bool IsEnemyInTacticalSight(BattleSimState sim, Unit self, Unit enemy)
         {
-            int vision = self.RawData != null ? self.RawData.GetEffectiveAttackVision() : 5;
-            return sim.GetPosition(enemy).ChebyshevTo(sim.GetPosition(self)) <= vision;
+            return sim.GetPosition(enemy).ChebyshevTo(sim.GetPosition(self)) <= TacticalSightOf(self);
+        }
+
+        /// <summary>战术视距单源（2026-10-25 复审批 T5 下沉：攻击视野回落 5 此前在眷属脑/伙伴脑多处
+        /// 手抄——「Unspecified 回落 5」语义一处维护；与 IsEnemyInTacticalSight/J-4/H-3 同口径）</summary>
+        public static int TacticalSightOf(Unit self)
+            => self != null && self.RawData != null ? self.RawData.GetEffectiveAttackVision() : 5;
+
+        /// <summary>可见敌集单源（2026-10-25 复审批 T5 下沉：CompanionBrain 敌集枚举三连抄收口）——
+        /// 敌我（TeamType）/存活/PerceivesEnemy（雾账本+战术视距）过滤后按 (id, 单位) 返回；
+        /// 距离/光环/视野内筛选由调用方按需附加（NearestEnemyDistance/EnemiesInAuraAt/
+        /// CollectVisionEnemies 三消费方同口径，勿再手抄循环）</summary>
+        public static List<(string id, Unit enemy)> CollectVisibleEnemies(BattleSimState sim, TeamType myTeam, Unit self)
+        {
+            var result = new List<(string, Unit)>();
+            if (sim == null) return result;
+            foreach (var kv in sim.Units)
+            {
+                var enemy = kv.Value;
+                if (enemy == null) continue;
+                var identity = enemy.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.Team == myTeam) continue;
+                if (BattleSimState.IsDead(enemy)) continue;
+                if (!PerceivesEnemy(sim, self, enemy)) continue;
+                result.Add((kv.Key, enemy));
+            }
+            return result;
         }
 
         /// <summary>

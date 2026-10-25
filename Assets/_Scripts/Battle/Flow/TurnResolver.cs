@@ -21,12 +21,9 @@ namespace GIC.Battle
         private readonly IBattleTransport _transport;
         private readonly ITurnResolverHost _flow;
 
-        /// <summary>骑士团总部元能引擎过阈待召队列（2026-10-24 决策八十六追记四）：(建筑 unitId, 过阈
-        /// 获能命中时刻)——ApplyEffects 加能落地同拍入队（状态层已扣消耗额），EmitSliceCommands 尾
-        /// DrainPendingBuildingSummons 统一发射消费命令+召唤命令（RegisterUnit 只在发射拍执行，
-        /// 防应用循环内枚举突变——CollectBuildingEffects「先快照再处理」同族纪律）</summary>
-        private readonly List<(string buildingId, float hitSeconds)> _pendingBuildingSummons
-            = new List<(string buildingId, float hitSeconds)>();
+        /// <summary>建筑效果系统（2026-10-26 fix-batch2 ③收口：内联建筑段迁出——回合末效果收集/
+        /// 元能引擎过阈收集与发射全走本实例；每局随 resolver 创建，无静态跨局状态）</summary>
+        private readonly BuildingEffectsSystem _buildingEffects;
 
         /// <summary>ack 等待超时（秒，真实时间；超时快进）——阈值真源=BattleMetrics.SegmentAckTimeoutSeconds
         /// （2026-10-02 复审收口：协议常量入 Metrics，与其它战斗阈值同址）</summary>
@@ -37,6 +34,7 @@ namespace GIC.Battle
             _sim = sim;
             _transport = transport;
             _flow = flow;
+            _buildingEffects = new BuildingEffectsSystem(sim);
         }
 
         // ==================== 回合主循环 ====================
@@ -424,7 +422,7 @@ namespace GIC.Battle
             // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
             // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）
             var buildingExtras = new List<BattleCommand>();
-            CollectBuildingEffects(turnNumber, effects, buildingExtras);
+            _buildingEffects.CollectTurnEndEffects(turnNumber, effects, buildingExtras);
             var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
@@ -442,110 +440,6 @@ namespace GIC.Battle
 
             GICLog.Info($"[TurnResolver] {segment}");
             return segment;
-        }
-
-        /// <summary>建筑回合末效果收集（决策八十六批D，docs/45 §1.1/§6）：只结算存活建筑
-        /// （消散即移除天然；多座同种独立结算——两座餐馆=+10）。旗帜=半径内我方非建筑单位（含倒下
-        /// 角色，拍板 #8）各+元能（EnergyEffect 建筑类别，合并键含来源建筑——两座旗帜对同一目标各
-        /// +1 不互吞）；餐馆=己方玩家+摩拉（StatChange 直产）；骑士团=以部署回合为 0、每过 效果周期
-        /// 回合再召 1 名（最近可部署格顺延；部署当回合末 diff=0 跳过——部署段已即召）；教堂=我方存活
-        /// HP&lt;效果阈值% 单位（含建筑，拍板 #9）治疗 效果数值%×本建筑攻击（末点截断通则）。
-        /// **先快照再处理**：周期召唤会 RegisterUnit 突变 _units，快照后枚举安全</summary>
-        private void CollectBuildingEffects(int turnNumber, List<BattleEffect> effects, List<BattleCommand> extraCommands)
-        {
-            var buildings = new List<(string id, Unit unit, UnitConfig.UnitData data, UnitIdentity identity)>();
-            foreach (var kv in _sim.Units)
-            {
-                var unit = kv.Value;
-                if (unit == null || BattleSimState.IsDead(unit)) continue;
-                var data = unit.RawData;
-                if (data == null || data.unitType != UnitType.Building || data.建筑效果 == BuildingEffectKind.None) continue;
-                var identity = unit.GetUnitComponent<UnitIdentity>();
-                if (identity == null) continue;
-                buildings.Add((kv.Key, unit, data, identity));
-            }
-
-            foreach (var building in buildings)
-            {
-                var data = building.data;
-                switch (data.建筑效果)
-                {
-                    case BuildingEffectKind.EnergyAura:
-                    {
-                        if (data.效果半径 <= 0 || data.效果数值 <= 0) break;
-                        var center = _sim.GetPosition(building.unit);
-                        foreach (var tkv in _sim.Units)
-                        {
-                            var target = tkv.Value;
-                            if (target == null) continue;
-                            var targetIdentity = target.GetUnitComponent<UnitIdentity>();
-                            if (targetIdentity == null || targetIdentity.Team != building.identity.Team) continue; // 我方（Team 域，歌声之环同口径）
-                            var targetData = target.RawData;
-                            if (targetData != null && targetData.unitType == UnitType.Building) continue; // 非建筑（拍板 #8）
-                            // 倒下角色照常（拍板 #8 含倒下；眷属/建筑无尸体=自然缺席）
-                            if (_sim.GetPosition(target).ChebyshevTo(center) > data.效果半径) continue;
-                            effects.Add(new EnergyEffect(tkv.Key, data.效果数值, EnergyEffect.CategoryBuildingGain)
-                            {
-                                SourceUnitId = building.id,
-                            });
-                        }
-                        break;
-                    }
-                    case BuildingEffectKind.MoraIncome:
-                    {
-                        if (data.效果数值 <= 0) break;
-                        // 凌晨批议题⑥天理经济作弊：建筑摩拉收入同乘难度倍率（MoraIncomePercentOf 单源，
-                        // 与回合末发放同口径；掠夺/卡牌消耗不复用=作弊只在「收入」语义内）
-                        int moraGain = data.效果数值
-                            * AIPlayerConfig.MoraIncomePercentOf(building.identity.OwnerPlayerID) / 100;
-                        _sim.ApplyMoraDelta(building.identity.OwnerPlayerID, moraGain);
-                        extraCommands.Add(BattleCommand.StatChange(building.identity.OwnerPlayerID, 0, 0,
-                            BattleCommand.StatKindMora, moraGain));
-                        break;
-                    }
-                    case BuildingEffectKind.PeriodicSummon:
-                    {
-                        if (data.效果周期 <= 0) break;
-                        int diff = turnNumber - building.unit.DeployedTurn;
-                        if (diff <= 0 || diff % data.效果周期 != 0) break;
-                        if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, building.identity.OwnerPlayerID,
-                                data.召唤单位, _sim.GetPosition(building.unit), out var summonCommand))
-                            extraCommands.Add(summonCommand);
-                        break;
-                    }
-                    case BuildingEffectKind.EnergySummon:
-                    {
-                        // 元能引擎自充（2026-10-24 追记四，骑士团总部）：回合末自获 效果数值 元能——
-                        // EnergyEffect 自身为目标（建筑类别获能，合并键含来源=多座总部各自各跳）；
-                        // 过阈即召由 ApplyEffects 落地拍统一判定（外部充能〔歌声之环 tick〕同拍同权）
-                        if (data.效果数值 <= 0) break;
-                        effects.Add(new EnergyEffect(building.id, data.效果数值, EnergyEffect.CategoryBuildingGain)
-                        {
-                            SourceUnitId = building.id,
-                        });
-                        break;
-                    }
-                    case BuildingEffectKind.HealWounded:
-                    {
-                        if (data.效果数值 <= 0) break;
-                        int healAmount = data.效果数值 * data.GetEffectiveAttack() / 100; // 末点截断（整数除法）
-                        if (healAmount <= 0) break;
-                        foreach (var tkv in _sim.Units)
-                        {
-                            var target = tkv.Value;
-                            if (target == null || BattleSimState.IsDead(target)) continue; // 存活（拍板 #9）
-                            var targetIdentity = target.GetUnitComponent<UnitIdentity>();
-                            if (targetIdentity == null || targetIdentity.Team != building.identity.Team) continue;
-                            var stats = target.GetUnitComponent<UnitStats>();
-                            if (stats == null) continue;
-                            var hp = stats.GetStatStruct(StatType.HP);
-                            if (hp.Max <= 0 || hp.Value * 100 >= data.效果阈值 * hp.Max) continue; // 低于阈值才奶
-                            effects.Add(new HealEffect(building.id, tkv.Key, healAmount));
-                        }
-                        break;
-                    }
-                }
-            }
         }
 
         /// <summary>
@@ -695,8 +589,9 @@ namespace GIC.Battle
 
         /// <summary>效应命中时刻→命令应用时刻注入（WYSIWYP 时间通道单源，2026-10-02 复审收口）：
         /// HitSeconds>0 才覆写 launchMs（0=立即=构造默认）；Reaction/Energy/MoraPlunder/Heal 各发射
-        /// 分支统一走此口，勿散抄公式（新增带时刻效应同样走此口）</summary>
-        private static void ApplyHitMs(BattleCommand command, float hitSeconds)
+        /// 分支统一走此口，勿散抄公式（新增带时刻效应同样走此口；internal=BuildingEffectsSystem
+        /// 发射侧共用——2026-10-26 ③收口）</summary>
+        internal static void ApplyHitMs(BattleCommand command, float hitSeconds)
         {
             if (hitSeconds > 0f)
                 command.launchMs = Mathf.RoundToInt(hitSeconds * 1000f);
@@ -1014,43 +909,11 @@ namespace GIC.Battle
                 }
             }
 
-            BattleEffectCommandAudit.Assert(context, effects, appliedBuffs, segment.commands);
+            // 建筑元能引擎过阈召唤（2026-10-24 追记四）：直产命令——消费命令+召唤命令逐建筑发射；
+            // 先于对账执行（2026-10-25 复审批修复：原排 audit 后=审计对它失明）+返回过阈事实供对账
+            var buildingSummonFacts = _buildingEffects.DrainPendingSummons(segment, sliceIndex);
 
-            // 建筑元能引擎过阈召唤（2026-10-24 追记四）：直产命令（audit 后=MoraIncome/PeriodicSummon
-            // 直产同族口径）——消费命令+召唤命令逐建筑发射
-            DrainPendingBuildingSummons(segment, sliceIndex);
-        }
-
-        /// <summary>建筑元能引擎过阈召唤发射（决策八十六追记四）：ApplyEffects 落地拍收集的过阈事实——
-        /// 逐建筑发射 消费命令（-效果阈值；带过阈获能同拍时刻，客户端能量条先涨后扣）+ 召唤命令
-        ///（TrySummonAtNearestCell 锚=建筑自身格，最近可部署格顺延）；同段死亡的建筑=召唤取消；
-        /// 落点无合法格（棋盘占满）=召唤落空、能量已耗（边缘自担，与「立刻」语义一致）。
-        /// RegisterUnit 只在此发射拍执行——应用循环内不突变 _units（枚举安全，
-        /// CollectBuildingEffects「先快照再处理」同族纪律）</summary>
-        private void DrainPendingBuildingSummons(Segment segment, int sliceIndex)
-        {
-            if (_pendingBuildingSummons.Count == 0) return;
-            foreach (var (buildingId, hitSeconds) in _pendingBuildingSummons)
-            {
-                var building = _sim.GetUnit(buildingId);
-                if (building == null || BattleSimState.IsDead(building)) continue; // 同段死亡=取消
-                var data = building.RawData;
-                if (data == null || data.召唤单位 == UnitName.Amber) continue; // 召唤缺省防误配
-                var identity = building.GetUnitComponent<UnitIdentity>();
-                if (identity == null) continue;
-                var consume = BattleCommand.StatChange(buildingId, sliceIndex, segment.commands.Count,
-                    BattleCommand.StatKindEnergy, -data.效果阈值);
-                ApplyHitMs(consume, hitSeconds);
-                segment.commands.Add(consume);
-                if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, identity.OwnerPlayerID, data.召唤单位,
-                        _sim.GetPosition(building), out var summonCommand))
-                {
-                    summonCommand.sliceIndex = sliceIndex;
-                    summonCommand.indexInSlice = segment.commands.Count;
-                    segment.commands.Add(summonCommand);
-                }
-            }
-            _pendingBuildingSummons.Clear();
+            BattleEffectCommandAudit.Assert(context, effects, appliedBuffs, segment.commands, buildingSummonFacts);
         }
 
         // ==================== 分桶与应用 ====================
@@ -1707,29 +1570,6 @@ namespace GIC.Battle
                 shatters.Add((holderId, sourceId, buff));
             }
 
-            // 骑士团总部元能引擎过阈收集（2026-10-24 决策八十六追记四）：加能落地同拍判定——过阈即耗
-            //（状态层立刻扣 效果阈值，不留「过阈未耗」窗口）+入队待召；消费命令与召唤命令由
-            // EmitSliceCommands 尾统一发射（命令序=全部获能命令之后：客户端能量条先涨后扣再出骑士，
-            // 因果读得懂）。外部充能（歌声之环 tick/自充）与未来中途给能同拍触发——建筑效果不必
-            // 等回合末（用户拍板「注意建筑的效果不一定是在回合结束才生效了」）
-            void CollectBuildingEnergySummon(Unit unit, float hitSeconds)
-            {
-                if (unit == null) return;
-                var data = unit.RawData;
-                if (data == null || data.unitType != UnitType.Building
-                    || data.建筑效果 != BuildingEffectKind.EnergySummon) return;
-                if (data.效果阈值 <= 0 || data.召唤单位 == UnitName.Amber) return; // 召唤缺省防误配（部署即召同款守卫）
-                var stats = unit.GetUnitComponent<UnitStats>();
-                if (stats == null) return;
-                var energy = stats.GetStatStruct(StatType.Energy);
-                if (energy.Value < data.效果阈值) return;
-                energy.Add(-data.效果阈值); // 过阈即耗（触发线=消耗额单字段）
-                stats.SetStatStruct(StatType.Energy, energy);
-                string buildingId = unit.GetUnitComponent<UnitIdentity>()?.UnitID;
-                if (!string.IsNullOrEmpty(buildingId))
-                    _pendingBuildingSummons.Add((buildingId, hitSeconds));
-            }
-
             if (energyCosts != null || energyGains != null)
             {
                 var appliedEnergy = new HashSet<string>();
@@ -1758,7 +1598,7 @@ namespace GIC.Battle
                             CollectIcicleShatter(_sim.GetUnit(overflowReceiver)); // 溢出接收方元能已内联写入——同拍碎裂判定
                         }
                         CollectIcicleShatter(_sim.GetUnit(gain.TargetUnitId)); // 元能>50% 立刻碎裂（复测拍板①）
-                        CollectBuildingEnergySummon(_sim.GetUnit(gain.TargetUnitId), gain.HitSeconds); // 元能引擎过阈即召（追记四）
+                        _buildingEffects.CollectEnergySummon(_sim.GetUnit(gain.TargetUnitId), gain.HitSeconds); // 元能引擎过阈即召（追记四）
                     }
             }
             return appliedBuffs;
@@ -1810,7 +1650,10 @@ namespace GIC.Battle
         /// 工厂 Init=配置基值+0命被动，满血；无命座等级〔0命无徽章〕、无装备、无登场 Buff）；
         /// 治疗效率覆写 50（拍板「灵魂的治疗效率-50%」——受疗者效率乘区单出口对一切治疗自动减半；
         /// 协议核心 50 同款语义）；RegisterSoul=地脉注册表+尸体链接；Summon 命令复用（UnitState.isSoul
-        /// 客户端建幽灵立牌）。同 UnitId 自增计数器=回放确定性</summary>
+        /// 客户端建幽灵立牌）。同 UnitId 自增计数器=回放确定性。
+        /// **位置独立（2026-10-25 拍板追记：灵魂与尸体是独立单位）**：生成=死亡拍一次性取尸体同格，
+        /// 此后无任何同步链路——尸体被移动/牵引不带动灵魂；复苏归体也不读灵魂位置（尸体在哪复活在哪）
+        /// </summary>
         private void SpawnSoul(Unit dead, string deadId, Segment segment, int sliceIndex, ref int indexInSlice)
         {
             var identity = dead.GetUnitComponent<UnitIdentity>();

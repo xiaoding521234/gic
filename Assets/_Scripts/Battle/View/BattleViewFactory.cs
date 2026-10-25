@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using GIC.Data;
 
 namespace GIC.Battle
 {
@@ -452,6 +453,33 @@ namespace GIC.Battle
             return d1 * d2 >= 0f;
         }
 
+        /// <summary>主世界战斗渲染层名（2026-10-25 维度泄漏修复拍板 A：世界特效 quad/圆盘统一挂
+        /// BattleMain 层——相机 cullingMask 切地脉视角时一并隐藏，根治「切地脉见主世界箭矢」；
+        /// ProjectSettings/TagManager layer 9；灵魂立牌树=BattleLeyLine〔layer 10，BattlePlayer.CreateView 落层〕）</summary>
+        public const string LayerBattleMain = "BattleMain";
+
+        /// <summary>地脉渲染层名（灵魂立牌树整树挂载）</summary>
+        public const string LayerBattleLeyLine = "BattleLeyLine";
+
+        /// <summary>维度→渲染层名映射（2026-10-26 fix-batch2 ②b：加新维度=枚举值+此处一行 case；
+        /// 层未配置时 NameToLayer&lt;0=调用方静默退回旧行为）</summary>
+        public static string DimensionLayerName(BattleDimension dimension)
+        {
+            switch (dimension)
+            {
+                case BattleDimension.LeyLine: return LayerBattleLeyLine;
+                case BattleDimension.MainWorld:
+                default: return LayerBattleMain;
+            }
+        }
+
+        /// <summary>世界件挂主世界层（TagManager 未配层时静默退回 Default=旧行为）</summary>
+        public static void SetMainWorldLayer(GameObject go)
+        {
+            int layer = LayerMask.NameToLayer(LayerBattleMain);
+            if (layer >= 0 && go != null) go.layer = layer;
+        }
+
         /// <summary>世界层纯色 Quad（基元 + 去 Collider + 挂材质；姿态/缩放由调用方补——既有调用点世界系/本地系两种用法）</summary>
         public static GameObject CreateQuad(Transform parent, string name, Material sharedMaterial)
         {
@@ -460,6 +488,7 @@ namespace GIC.Battle
             UnityEngine.Object.Destroy(quad.GetComponent<Collider>());
             quad.transform.SetParent(parent, false);
             quad.GetComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
+            SetMainWorldLayer(quad); // 维度渲染层（2026-10-25 泄漏修复：瞄准贴片/范围块/箭雨 cue 等全走本工厂）
             return quad;
         }
 
@@ -502,6 +531,7 @@ namespace GIC.Battle
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = _discMesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
+            SetMainWorldLayer(go); // 维度渲染层（2026-10-25 泄漏修复）
             return go;
         }
 

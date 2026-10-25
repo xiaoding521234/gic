@@ -42,7 +42,9 @@ namespace GIC.Battle
         /// <summary>武器槽（恒 1，docs/05 §5.2——null=未装备）</summary>
         private ItemName? _weapon;
 
-        /// <summary>武器耐久（0=无耐久概念）</summary>
+        /// <summary>武器耐久（0=无耐久概念）。**T10 注记（2026-10-26 复审批）**：与配件 _accessoryDurability
+        /// 的「耐久/堆叠双语义」同族但**独立字段=刻意平行实现**（武器恒耐久语义、配件堆叠语义分叉——
+        /// 合并需动存档/快照/命令三链序列化，等「按源撤销」需求出现再裁，勿提前统一）</summary>
         private int _weaponDurability;
 
         /// <summary>配件槽（数量按层级——Init 分配；null=空槽位）</summary>
