@@ -197,6 +197,14 @@ namespace GIC.Battle
         private Vector3 _avatarVideoFlipBaseScale;
         private Vector3 _avatarVideoFlipBasePosition; // 视频 quad 基准位（B-S4c 校准：动作片位置偏移的回退锚点）
 
+        /// <summary>冻结/尸体停摆守卫（2026-10-25「敌方凯亚冻成长方体冰块」报障修复）：只停「已渲出首帧」
+        /// 的播放器（frame≥1=首帧已落 RT，与 WaitForFirstFrameThenShow/大厅视频预热批同判据）。
+        /// 并发同片施放的后到方 RT=新分配恒黑（ActionRtPool 私有 RT），若在首帧落地前 Pause：黑帧过不了
+        /// ChromaShape 暗部门（g>60）→ 霜化形状门 step(0.003, baseAlpha) 全开=整幅动作片画布被当身体
+        /// 冻成乳白矩形（长方体冰块报障）；且暂停的播放器永不再渲帧=整个冻结期不愈，解冻恢复 frame>0
+        /// 判据也永不满足（解冻后仍黑矩形）。延到首帧落地再停（≤几帧，霜化 0.9s 蔓延窗口内不可感）</summary>
+        private static bool CanHaltNow(VideoPlayer vp) => vp != null && vp.isPlaying && vp.frame >= 1;
+
         private void Update()
         {
             // 冻结中持续刷新霜化锚点：被击退/牵引等罕见位移也贴住（几 float 写入，代价可忽略）
@@ -206,10 +214,10 @@ namespace GIC.Battle
             {
                 if (IsCorpse || IsFrozen)
                 {
-                    if (_videoPlayer.isPlaying) { _videoPlayer.Pause(); _videoHalted = true; }
-                    // 常驻动作播放器同停摆（冻结/尸体时不得继续渲 RT）
+                    if (CanHaltNow(_videoPlayer)) { _videoPlayer.Pause(); _videoHalted = true; } // 同守卫：黑 RT 冻整幅防线
+                    // 常驻动作播放器同停摆（冻结/尸体时不得继续渲 RT）——同守卫
                     foreach (var rp in _residentPlayers.Values)
-                        if (rp != null && rp.isPlaying) { rp.Pause(); _residentHalted = true; }
+                        if (CanHaltNow(rp)) { rp.Pause(); _residentHalted = true; }
                 }
                 else if (_videoHalted && !_videoFailed)
                 {
@@ -421,17 +429,13 @@ namespace GIC.Battle
             active.playbackSpeed = Mathf.Max(0.1f, playbackSpeed); // =战斗回放速度×技能校准倍率（移动循环片同口径——行走 tween 同按回放速度缩放，快进不脚滑）
             if (resident)
             {
-                // 常驻路径：seek 回 0 再 Play（Tuanjie 末帧怪态「播完态 Play 续播」——先归零再放）
+                // 常驻路径：seek 回 0 再 Play（Tuanjie 末帧怪态「播完态 Play 续播」——先归零再放）。
+                // 冻结/尸体态不再就地 Pause（2026-10-25 报障修复：冻结状态先于本片命令落态时，就地停=
+                // 停在从未渲帧的黑私有 RT 上=整幅画布冻成长方体冰块）——恒 Play，交 Update 停摆守卫
+                //（首帧落地 frame≥1 后停，CanHaltNow）
                 rvp.frame = 0;
                 rvp.Play();
-                if (IsCorpse || IsFrozen)
-                {
-                    if (rvp.isPlaying) { rvp.Pause(); _residentHalted = true; }
-                }
-                else
-                {
-                    _residentHalted = false;
-                }
+                if (!IsCorpse && !IsFrozen) _residentHalted = false;
             }
             else
             {
@@ -442,14 +446,9 @@ namespace GIC.Battle
                     if (rp != null && rp.isPlaying) rp.Pause();
                 active.clip = clip;
                 active.targetTexture = actionRt;
-                if (IsCorpse || IsFrozen)
-                {
-                    if (active.isPlaying) { active.Pause(); _videoHalted = true; }
-                }
-                else
-                {
-                    active.Play();
-                }
+                // 冻结/尸体态不再就地 Pause（同常驻路径报障修复：黑 RT 冻整幅防线）——恒 Play，
+                // 交 Update 停摆守卫（首帧落地 frame≥1 后停）
+                active.Play();
             }
             _videoMaterial.mainTexture = actionRt;
             // Alpha 打包模式开关（2026-10-16 离线抠绿批）：打包片直读 alpha 区跳过运行时抠色；
@@ -565,7 +564,7 @@ namespace GIC.Battle
             }
             if (IsCorpse || IsFrozen)
             {
-                if (_videoPlayer.isPlaying) { _videoPlayer.Pause(); _videoHalted = true; }
+                if (CanHaltNow(_videoPlayer)) { _videoPlayer.Pause(); _videoHalted = true; } // 同守卫：黑 RT 冻整幅防线
             }
             else if (!_videoPlayer.isPlaying && _videoPlayer.clip == idle)
             {
