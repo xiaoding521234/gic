@@ -135,6 +135,23 @@ namespace GIC.UI
         // public=桥脚本/探针同可访问，桥 Roslyn 脚本是独立程序集读不到 internal）
         public bool 透视生效 => enabled && isActiveAndEnabled && 启用透视;
 
+        /// <summary>透视位移场原点（=本 rect 中心的世界位，经当前姿态变换——倾斜中随卡面旋转）。
+        /// 2026-10-26 手牌报障「中心点判定上移」修复：原点原取 root.position（=pivot 世界位）——
+        /// 战斗手牌 wrapper pivot=顶边中点（行定位），场锚在顶边=悬停卡上半零形变/下半最大，
+        /// 观感即「转幅上小下大」；恒锚 rect 中心后透视场对称（悬停上下缘形变等幅）。
+        /// pivot 居中宿主（Card.prefab/按钮）中心=pivot，与旧 root.position 恒等零回归。</summary>
+        public Vector3 透视原点世界
+        {
+            get
+            {
+                var rt = Rt;
+                if (rt == null) return transform.position;
+                Rect rect = rt.rect;
+                return transform.TransformPoint(new Vector3(
+                    (rect.xMin + rect.xMax) * 0.5f, (rect.yMin + rect.yMax) * 0.5f, 0f));
+            }
+        }
+
         public float 透视距离世界
         {
             get

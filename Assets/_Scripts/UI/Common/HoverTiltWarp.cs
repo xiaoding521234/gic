@@ -39,7 +39,9 @@ namespace GIC.UI
     ///
     /// 稳定性设计：
     /// - 射线域零扰动：只动网格顶点不动 RectTransform——命中区域=未形变矩形（边缘不因形变抖动触发 enter/exit 循环）；
-    /// - 平移/等比缩放不失效：位移场以 pivot 为锚、以局部坐标表达，且 d 随 lossyScale 等比伸缩
+    /// - 平移/等比缩放不失效：位移场以 **rect 中心** 为锚（2026-10-26 修复：原以 pivot 为锚——
+    ///   顶边 pivot 宿主〔战斗手牌 wrapper〕场锚顶边=「中心点判定上移」报障根因）、以局部坐标表达，
+    ///   且 d 随 lossyScale 等比伸缩
     ///   （k=D/(D+z) 对等比缩放不变）——父级平移/等比缩放后旧网格依然数学正确；仅旋转需重刷
     ///   （驱动写完旋转必 MarkDirty；拖拽期 Suspend 已还原=拖拽速度倾斜照旧行为零冲突）；
     /// - 模板遮罩随卡面：Card.prefab 的 CardMask=Image+Mask（stencil）——模板网格同经本组件位移，裁切随卡面一致形变；
@@ -103,7 +105,9 @@ namespace GIC.UI
             if (d <= 0.01f) return;
             Matrix4x4 l2w = transform.localToWorldMatrix;
             Matrix4x4 w2l = transform.worldToLocalMatrix;
-            Vector3 pivotW = root.position;
+            // 位移场原点=驱动者 rect 中心（2026-10-26 修复：原 root.position=pivot 世界位——
+            // 顶边 pivot 宿主〔手牌 wrapper〕场锚顶边=「中心点判定上移」报障根因；见 Driver.透视原点世界注）
+            Vector3 pivotW = Driver.透视原点世界;
             int count = vh.currentVertCount;
             if (count <= 0) return;
 
@@ -233,7 +237,7 @@ namespace GIC.UI
             bool warpOn = active && d > 0.01f;
             Matrix4x4 l2w = transform.localToWorldMatrix;
             Matrix4x4 w2l = transform.worldToLocalMatrix;
-            Vector3 pivotW = root.position;
+            Vector3 pivotW = Driver.透视原点世界; // rect 中心（2026-10-26 修复，与 ModifyMesh 同源）
             var meshInfo = info.meshInfo;
             for (int i = 0; i < _pristine.Length && i < meshInfo.Length; i++)
             {

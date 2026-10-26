@@ -66,7 +66,9 @@ namespace GIC.Battle
         /// enemyinfo 已移除（2026-09-25 用户拍板「不需要显示敌人的资源等信息」）；
         /// queue 已退役（2026-09-29 拍板：攻速队列整体删除，执行阶段改 BattleExecutionPreview——存量
         /// 方案条目按未知 key 自然跳过，同 enemyinfo 先例）；
-        /// confirm=完成选择按钮（2026-09-26 新增，选择阶段常显、显隐随 Update 轮询同 countdown）；
+        /// countdown 已退役（2026-10-26 拍板「不再需要显示倒计时」——底部进度线接替
+        /// 〔BattleHud.PhaseLine.cs 运行时懒建非布局槽〕，存量方案旧键自然跳过）；
+        /// confirm=完成选择按钮（2026-09-26 新增，选择阶段常显、显隐随 Update 轮询）；
         /// preview=执行预览（2026-10-04 下移贴底批接入：执行阶段无行不可见——布局编辑模式由
         /// _executionPreview.ShowLayoutPlaceholder 建占位行显形，可拖可缩同其它件）；
         /// quick=快捷面板（2026-10-06 拍板：左侧竖条，己方魔神/伙伴每行=头像+爆发+势力技能，
@@ -82,7 +84,7 @@ namespace GIC.Battle
         private static readonly string[] AllLayoutKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "exit", "settings", "dimension",
-            "turn", "countdown", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick", "passive",
+            "turn", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick", "passive",
         };
 
         /// <summary>

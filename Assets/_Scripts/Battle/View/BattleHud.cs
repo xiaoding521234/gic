@@ -64,16 +64,6 @@ namespace GIC.Battle
         [Tooltip("升/降指数趋近系数（1/s，12≈0.25s 到位）")]
         [SerializeField] private float 手牌升降速度 = 12f;
 
-        [Header("倒计时（2026-09-26 拍板：3 倍字号+黑描边；小于告急秒数=红色+字号持续脉动）")]
-        [Tooltip("告急阈值（秒）——剩余时间低于此值进入红色脉动")]
-        [SerializeField] private float 倒计时告急秒数 = 5f;
-        [Tooltip("告急字号呼吸幅度（基准字号的比例，0.12=±12%）")]
-        [SerializeField] private float 倒计时脉动幅度 = 0.12f;
-        [Tooltip("告急字号呼吸频率（次/秒）")]
-        [SerializeField] private float 倒计时脉动频率 = 1.5f;
-        [Tooltip("SDF 原生描边宽度（0~1 相对字形，随视口缩放恒定；迭代链 0.3→0.22→0.15→0.08（2026-09-26 三拍「调细」）；首版 UGUI Outline 固定像素描边在缩放视口下不可见已弃用）")]
-        [SerializeField] private float 倒计时描边宽度 = 0.08f;
-
         [Header("拖动式瞄准（B4，2026-09-26 落地：王者荣耀式手势+待定制——按下拖出，拖向=瞄准方向，松手=留金色待定单格）")]
         [Tooltip("指向型瞄准（延奏/契约）拖向锁定锥角（度）：候选目标屏幕方向与「轮心→小盘」拖向的夹角不超过此值才锁定（轮盘化后小盘无法位移到目标——以拖向选目标，夹角最小者胜；精确选择仍可点击式点格）")]
         [SerializeField] private float 拖动瞄准指向锥角 = 60f;
@@ -183,7 +173,7 @@ namespace GIC.Battle
         private RectTransform _cancelButton;
         private TextCombiner _handTextCombiner;
         // 完成选择按钮（2026-09-26：顶部阶段级按钮，样式=祈愿 Marketplace 同款 prefab 烘焙；
-        // 瞄准待定确认/无待定 Pass 双语义，显隐随选择阶段——Update 轮询同 countdown）
+        // 瞄准待定确认/无待定 Pass 双语义，显隐随选择阶段——Update 轮询同进度线/confirm）
         private Button _confirmButton;
 
         // 技能盘按钮（表驱动四键；现成 Skill.prefab/SkillIconView 视觉填充走 InitWithData 现有链。
@@ -445,6 +435,8 @@ namespace GIC.Battle
             _session.Player.OnItemGained += OnShopPurchaseRefreshHandler; // 购买批：物品卡购买后面板灰显/摩拉态刷新
             _session.Player.OnUnitCardGained += OnShopPurchaseRefreshHandler; // 购买批：角色/建筑卡购买后面板刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
+            _session.Player.SegmentReceived += OnPhaseLineSegment;     // 底部进度线（2026-10-26）：执行阶段片计数
+            _session.Player.TurnPlanUpdated += OnPhaseLineTurnPlan;    // 底部进度线：片总数估计（分桶数+1）
             // 单位显示色解析器注入（2026-10-12 拍板「单位显示的颜色应当是玩家色」）：立牌底座/选中描边/
             // 血条填充全链改走房间玩家色单源（roster 命中=房间选色——同队队友异色可辨识归属；
             // 无 roster 调试直开回落 BattlePalette 两表口径）——先于 BattleStart 建场注入
@@ -544,6 +536,8 @@ namespace GIC.Battle
                     _session.Player.OnItemGained -= OnShopPurchaseRefreshHandler;
                     _session.Player.OnUnitCardGained -= OnShopPurchaseRefreshHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
+                    _session.Player.SegmentReceived -= OnPhaseLineSegment;   // 底部进度线（2026-10-26）
+                    _session.Player.TurnPlanUpdated -= OnPhaseLineTurnPlan;
                 }
                 _session.OnPhaseChanged -= OnPhaseChanged;
                 _session.OnSelectTimerExpired -= OnSelectTimerExpiredHandler;
@@ -568,11 +562,6 @@ namespace GIC.Battle
             }
             if (_aimRadiusBlockMaterial != null)                       // 范围提示整块材质（2026-10-15）
                 Destroy(_aimRadiusBlockMaterial);
-            if (_countdownOutlineMat != null) // SDF 描边实例（TopBar 分件，TMP 不自销）
-            {
-                Destroy(_countdownOutlineMat);
-                _countdownOutlineMat = null;
-            }
         }
 
         // ==================== 数据回调 ====================
@@ -765,51 +754,18 @@ namespace GIC.Battle
                 _camera.SetDragFollowTarget(followWorld, followCenter);
             }
 
-            // 选择倒计时（docs/04 §4.2；每秒级刷新，静态数字条目）
-            // 2026-10-11 联机批：改走 BattleSession 相位门面（host=Flow 权威；LAN client=消息派生本地倒数）
-            if (_session == null || _countdownText == null) return;
+            // 选择阶段件（docs/04 §4.2）：完成选择按钮常显+定死置灰——2026-10-11 联机批走 BattleSession
+            // 相位门面（host=Flow 权威；LAN client=消息派生本地倒数）
+            if (_session == null) return;
             var flow = _session;
             bool selecting = flow.Phase == BattlePhase.Selecting;
             bool show = selecting && flow.SelectRemainingSeconds >= 0f;
-            SetLayoutWidgetActive("countdown", show); // 编辑态强制可见由统一口处理（数字冻结展示）
             SetLayoutWidgetActive("confirm", show);  // 完成选择按钮=选择阶段常显（2026-09-26）
             if (_confirmButton != null)
                 _confirmButton.interactable = !_actionConfirmed; // 已定死置灰——再按=无操作（超时自动按下同款）
-            UpdateCountdownUrgency(show && flow.SelectRemainingSeconds < 倒计时告急秒数); // 告急红+脉动（早退前调保还原）
-            if (!show && !_layoutEditing)
-            {
-                _lastCountdownSecond = -1; // #16 审查批：离场重置缓存（HUD 跨局复用防陈值跳过首刷）
-                return;
-            }
-
-            // #16 审查批：先比对整数再格式化——旧版每帧 ToString 分配（选择阶段 60-165 次/秒），
-            // 值不变时连 GetCombinedText 比对都省
-            int secondsInt = Mathf.CeilToInt(Mathf.Max(0f, flow.SelectRemainingSeconds));
-            if (secondsInt != _lastCountdownSecond)
-            {
-                _lastCountdownSecond = secondsInt;
-                _countdownCombiner.SetSingleEntry(secondsInt.ToString());
-            }
-        }
-
-        /// <summary>倒计时告急态（2026-09-26 拍板「当时间小于5秒时，数字大小持续循环变化，颜色变为红色」）：
-        /// 剩余<告急秒数=伤害红+基准字号呼吸脉动（持续循环，Cos 0→1→0 无跳变）；离告急/离选择阶段
-        /// 还原暖金与基准字号一次（等值守卫免每帧重写）。描边/字号基准接线在 TopBar 分件 ResolveTopBar</summary>
-        private void UpdateCountdownUrgency(bool urgent)
-        {
-            if (_countdownText == null) return;
-            if (urgent)
-            {
-                _countdownText.color = Palette.伤害红;
-                float pulse = 1f + 倒计时脉动幅度 * (0.5f - 0.5f * Mathf.Cos(2f * Mathf.PI * 倒计时脉动频率 * Time.time));
-                _countdownText.fontSize = _countdownBaseFontSize * pulse;
-            }
-            else if (!Mathf.Approximately(_countdownText.fontSize, _countdownBaseFontSize)
-                     || _countdownText.color != Palette.暖金)
-            {
-                _countdownText.fontSize = _countdownBaseFontSize;
-                _countdownText.color = Palette.暖金;
-            }
+            // 底部进度线（2026-10-26 拍板「最底部加一条进度线，参考祈愿界面，不再需要显示倒计时」：
+            // 选择阶段随剩余时间缩短+告急红闪、执行阶段随片推进变长；原倒计时数字槽随批退役）
+            UpdatePhaseLine();
         }
 
         private void RefreshFromSnapshot(BattleSnapshot snapshot)

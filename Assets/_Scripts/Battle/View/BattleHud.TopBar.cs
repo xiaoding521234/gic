@@ -14,27 +14,19 @@ namespace GIC.Battle
 {
     /// <summary>
     /// BattleHud 顶栏分件（2026-09-22 prefab 化：构建退役为寻址接线；结构改在 prefab 编辑器里做）：
-    /// 回合中枢/选择倒计时/战斗时钟/我方信息块（左上角摩拉·体力物品牌计数，B6d）/设置钮
+    /// 回合中枢/战斗时钟/我方信息块（左上角摩拉·体力物品牌计数，B6d）/设置钮
     /// 的引用解析 + 运行时刷新。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
     /// 敌方信息块已移除（2026-09-25 拍板「不需要显示敌人的资源等信息」）；
     /// **攻速队列条已退役（2026-09-29 拍板整体删除——执行阶段改由 BattleExecutionPreview 多行
-    /// 行动预览接管，槽/prefab 代码/布局键全清；QueueSlot.prefab 保留作预览单位块嵌套件）**。
+    /// 行动预览接管，槽/prefab 代码/布局键全清；QueueSlot.prefab 保留作预览单位块嵌套件）**；
+    /// **选择倒计时数字已退役（2026-10-26 拍板「最底部加一条进度线，参考祈愿界面，不再需要显示
+    /// 倒计时」——countdown 槽/prefab/布局键全清，接替者=BattleHud.PhaseLine.cs 底部进度线）**。
     /// </summary>
     public partial class BattleHud
     {
-        // 顶栏：回合中枢 + 倒计时 + 时钟（本地化 = TextCombiner；数字 = 静态条目）
+        // 顶栏：回合中枢 + 时钟（本地化 = TextCombiner；数字 = 静态条目）
         private TMP_Text _turnPhaseText;
         private TextCombiner _turnPhaseCombiner;
-        private TMP_Text _countdownText;
-        private TextCombiner _countdownCombiner;
-        /// <summary>#16 审查批：倒计时整数缓存（值不变跳过 ToString+SetSingleEntry——每帧分配清理）</summary>
-        private int _lastCountdownSecond = -1;
-        /// <summary>倒计时基准字号（2026-09-26 拍板 3 倍烘焙=61.2；告急脉动以它为基线，解析时捕获）</summary>
-        private float _countdownBaseFontSize = 61.2f;
-        /// <summary>倒计时 SDF 描边材质实例（2026-09-26 报障返修：UGUI Outline 固定像素描边在缩放视口下
-        /// ~1.5 屏幕像素不可见+大字对角断缝——改 SDF 着色器原生 _OutlineWidth（相对字形、随缩放恒定）。
-        /// 独立实例勿污染共享字体材质；主分件 OnDestroy 释放（docs/14 §63 生命周期纪律）</summary>
-        private Material _countdownOutlineMat;
         private TMP_Text _clockText;
         private TextCombiner _clockCombiner;
 
@@ -54,24 +46,8 @@ namespace GIC.Battle
             _turnPhaseCombiner = FindSlotCombiner("turn", "TurnPhaseText");
             RecolorText(_turnPhaseCombiner, Palette.文字米白);
 
-            // 选择倒计时（选择阶段常显；数字条目。2026-09-26 拍板：3 倍字号+黑描边+<5 秒红色脉动——
-            // 字号烘 prefab，描边=SDF 原生（运行时独立材质实例），告急脉动/变色在主分件 UpdateCountdownUrgency）
-            _countdownText = FindSlotText("countdown", "CountdownText");
-            _countdownCombiner = FindSlotCombiner("countdown", "CountdownText");
-            RecolorText(_countdownCombiner, Palette.暖金);
-            if (_countdownText != null)
-            {
-                _countdownBaseFontSize = _countdownText.fontSize;
-                var sharedMat = _countdownText.fontSharedMaterial;
-                if (sharedMat != null && sharedMat.HasProperty("_OutlineWidth"))
-                {
-                    _countdownOutlineMat = new Material(sharedMat);
-                    _countdownOutlineMat.SetColor("_OutlineColor", Palette.伤害数字描边色); // 黑描边与伤害数字同源
-                    _countdownOutlineMat.SetFloat("_OutlineWidth", 倒计时描边宽度);
-                    _countdownText.fontMaterial = _countdownOutlineMat;
-                }
-                else GICLog.Warn("[BattleHud] 倒计时字体材质不支持 SDF 描边（_OutlineWidth），描边不生效");
-            }
+            // 选择倒计时数字已退役（2026-10-26 拍板「不再需要显示倒计时」——接替者=PhaseLine 分件
+            // 底部进度线：选择阶段随剩余时间缩短+告急红闪、执行阶段随片推进变长，见 BattleHud.PhaseLine.cs）
 
             // 战斗时钟（独立时钟 6:00 起 +20/回合）
             _clockText = FindSlotText("clock", "ClockText");
@@ -132,7 +108,7 @@ namespace GIC.Battle
             else GICLog.Warn("[BattleHud] 布局槽缺失：dimension");
         }
 
-        // 纯文本件（turn/countdown/clock 槽内容=文本本体）与容器件（槽内容包子级文本）两种结构并存，
+        // 纯文本件（turn/clock 槽内容=文本本体）与容器件（槽内容包子级文本）两种结构并存，
         // 寻址先自检内容本体名、再下探子级——曾按容器件一刀切致三文本件寻空静默失显（2026-09-22）
         private TMP_Text FindSlotText(string key, string contentName)
         {

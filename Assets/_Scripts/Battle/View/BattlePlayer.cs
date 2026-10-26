@@ -143,6 +143,11 @@ namespace GIC.Battle
         /// 只属攻速片；旧消费方=攻速队列高亮已随队列退役）</summary>
         public event Action<int> OnSegmentPlaying;
 
+        /// <summary>片到达（2026-10-26 底部进度线批）：**全类型**（部署/攻速/回合末/即时段均含、
+        /// 购买迷你段 sliceIndex=-1 亦含——消费方自行过滤），到达即发不等播放——本地 host 视图与
+        /// LAN 客户端经 OnSegment 同源；与 OnSegmentPlaying（只攻速片、播到才发）互补勿混用</summary>
+        public event Action<Segment> SegmentReceived;
+
         /// <summary>行动预告到达（2026-09-29 执行预览：Host 分桶后、首片推送前下发——
         /// 订阅方=执行预览建行；载荷自含攻速/归属/技能索引。命名同 SnapshotUpdated 模式）</summary>
         public event Action<TurnPlanMessage> TurnPlanUpdated;
@@ -665,6 +670,7 @@ namespace GIC.Battle
             if (_flow == null && _clientPhase == BattlePhase.Selecting
                 && message.segment.insertedInstantAction == 0) // B7 LAN 客户端：首片=执行阶段开始
                 DeriveClientPhase(BattlePhase.Resolving, message.segment.turnNumber);
+            SegmentReceived?.Invoke(message.segment); // 到达即发（全类型——底部进度线片计数）
             StartCoroutine(PlaySegmentCoroutine(message.segment));
         }
 
