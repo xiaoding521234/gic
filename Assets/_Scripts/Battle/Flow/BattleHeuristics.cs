@@ -267,10 +267,13 @@ namespace GIC.Battle
         /// 无阻挡占据」的格）。false=同格/地图无效（调用方一律按"无逼近"处理）。
         /// I-D 移动意图占位（docs/archive/37 §5，2026-10-04）：reservedCells=意图板已声明的落点
         ///（前位伙伴/玩家魔神的决策落点）——后位 BFS 视作占位避让（集团推进不互撞）；null=零行为
-        /// 变化（眷属/配额路径不传）。</summary>
+        /// 变化（眷属/配额路径不传）。
+        /// targetCellAsGoal（2026-10-28 采集档返修，安柏振荡报障）：目标格**本身**入目标集
+        ///（站立/途经采集语义——堆格不是敌人，采集要站上去而非贴邻；目标可停即唯一 goal，被堵→
+        /// 目标格作环扩展种子=邻格悬停待位，占者离开下回合自愈）。默认 false=攻击接近语义零变化。</summary>
         private static bool BuildApproachField(BattleSimState sim, Unit self, BattleCell target,
             out bool[,] occupied, out bool[,] goals, out BattleCell from, out ForceType forceType,
-            List<BattleCell> reservedCells = null)
+            List<BattleCell> reservedCells = null, bool targetCellAsGoal = false)
         {
             occupied = null; goals = null;
             from = new BattleCell(0, 0);
@@ -301,21 +304,35 @@ namespace GIC.Battle
                     occupied[pos.x, pos.y] = true;
             }
 
-            // 目标集：敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
+            // 目标集：targetCellAsGoal=目标格本身（2026-10-28 采集档返修——采集要**站上**堆格而非
+            // 贴邻：旧口径把堆格传进攻击接近场，目标集=堆的十字邻格，采集者被引去邻格永远站不上堆、
+            // 邻格间左右乒乓；目标可停即唯一 goal，被堵→以目标格为种子走下方环扩展兜底）；
+            // 否则=敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
             // 被占/不可行邻格一律剔除——否则小兵走进去每回合被弹回=二轮报障根因）
             goals = new bool[map.width, map.height];
-            var blockedRing = new List<BattleCell>(); // 被堵邻格（攻城墙扩展的种子，见下）
-            foreach (var dir in CrossDirections)
+            var blockedRing = new List<BattleCell>(); // 被堵格（攻城墙扩展的种子，见下）
+            if (targetCellAsGoal)
             {
-                var delta = SkillHitResolver.DirectionToDelta(dir);
-                int gx = target.x + delta.x, gy = target.y + delta.y;
-                if (!map.HasTile(gx, gy)) continue;
-                if (!map.IsPassable(gx, gy, forceType) || occupied[gx, gy])
+                if (map.HasTile(target.x, target.y)
+                    && map.IsPassable(target.x, target.y, forceType) && !occupied[target.x, target.y])
+                    goals[target.x, target.y] = true;
+                else
+                    blockedRing.Add(target);
+            }
+            else
+            {
+                foreach (var dir in CrossDirections)
                 {
-                    blockedRing.Add(new BattleCell(gx, gy));
-                    continue;
+                    var delta = SkillHitResolver.DirectionToDelta(dir);
+                    int gx = target.x + delta.x, gy = target.y + delta.y;
+                    if (!map.HasTile(gx, gy)) continue;
+                    if (!map.IsPassable(gx, gy, forceType) || occupied[gx, gy])
+                    {
+                        blockedRing.Add(new BattleCell(gx, gy));
+                        continue;
+                    }
+                    goals[gx, gy] = true;
                 }
-                goals[gx, gy] = true;
             }
             // 攻城墙扩展（2026-10-24 用户 2v2 实战实锤）：核心四邻被己方建筑/单位环墙全部堵满时
             // goals 空→多源 BFS 无源→「真不可达」→敌侧骑士全目标 0 步→DecideOne=null 原地挂机
@@ -368,14 +385,17 @@ namespace GIC.Battle
         /// BFS 指回程=左右乒乓，打不进射程就永不收敛）的区别：每回合距离单调递减，数学上不可能振荡。
         /// 返回 0=已贴身/同格/无路（与 FindApproachFirstStep 同判）；direction out=四向中
         /// **最长递减直线段**的方向（2026-10-04 择优——旧为十字序首个递减向；同长保持十字序）。
-        /// 口径=BuildApproachField 共用（保守近似同 FindApproachFirstStep 注释）</summary>
+        /// 口径=BuildApproachField 共用（保守近似同 FindApproachFirstStep 注释）。
+        /// targetCellAsGoal（2026-10-28 采集档返修）：目标格本身入目标集——dist=「到目标格的步数」，
+        /// dist=0=踏上目标格即停（采集档消费：站上堆格，回合末自动采集+途经采集落在同停点）。</summary>
         public static int FindApproachStraightSteps(BattleSimState sim, Unit self, BattleCell target,
-            int maxSteps, out Direction2D direction, List<BattleCell> reservedCells = null)
+            int maxSteps, out Direction2D direction, List<BattleCell> reservedCells = null,
+            bool targetCellAsGoal = false)
         {
             direction = 0;
             if (maxSteps <= 0) return 0;
             if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType,
-                reservedCells))
+                reservedCells, targetCellAsGoal))
                 return 0;
             var map = sim.Map;
             if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义

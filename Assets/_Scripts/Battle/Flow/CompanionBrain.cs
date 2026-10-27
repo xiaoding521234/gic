@@ -643,66 +643,137 @@ namespace GIC.Battle
             // 采集档（docs/47 拍板⑦，2026-10-27）：采集型角色（IsHarvester——安柏双判据都满足）
             // 有可见资源点时先评采集候选——基准分稳压攻击档（「相比攻击敌人，更主动采集资源点」），
             // 距离衰减保证远资源点不越俎代庖。**保命档（Rescue/复苏）天然在采集之上**——采集候选
-            // 只是 Offer 进共享 tracker 与救命/斩杀候选公平竞争，采集基准分只压「攻击典型分」
+            // 只是 Offer 进共享 tracker 与救命/斩杀候选公平竞争，采集基准分只压「攻击典型分」。
+            // **站上存活资源点=移动候选整体让位**（2026-10-28 返修；**仅纯 tag 型采集者**——无途经
+            // 配额站桩即其采集上限；途经采集型〔安柏〕同日追拍「站住采集的收益远不如用移动来回走」
+            // 改收获档持续移动采集，不让位——采集 Offer 分值自稳压移动档）
             bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
                 tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl, reactionPreview,
                 legionAggression);
-            ScoreCollectCandidate(sim, unit, playerId, team, turn, tracker);
-            ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
-                profile, hasActionCandidate, threat, board, isPlayerDirectControl);
+            bool standingOnLiveNode = ScoreCollectCandidate(sim, unit, playerId, team, turn, tracker);
+            if (!standingOnLiveNode)
+                ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
+                    profile, hasActionCandidate, threat, board, isPlayerDirectControl);
         }
 
-        /// <summary>采集候选档（docs/47 拍板⑦）：采集型角色朝**最近未耗尽资源点**移动一步
-        ///（FindApproachFirstStep BFS 首步——防绕障，走满可行程；「真无解兜底」同款 run 计数含
-        /// 穿占虚守卫）。**采集角色透视（2026-10-28 返拍「对资源点自带透视，就像对核心建筑有
-        /// 透视一样」）=感知层豁免探索账本**——采集候选不查 IsFogExplored（核心透视
-        /// IsUnitVisibleTo「敌方 Core 恒真」同构：雾压画面/战略情报，不夺采集感知；客户端堆件
-        /// 在未探索格隐藏属渲染层，与本感知层分口径）；已站上资源点=不 Offer（回合末自动采集，
-        /// 本回合继续出攻击候选=采集者最优行为）；分=采集意图基准分−距离×每格衰减（**不乘人格
-        /// 移动优先权重**——拍板硬语义，人格不得压没采集积极性）。资源点全耗尽=零候选零回归
-        /// （战斗行为不受影响）</summary>
-        private static void ScoreCollectCandidate(BattleSimState sim, Unit unit,
+        /// <summary>采集候选档（docs/47 拍板⑦）：采集型角色朝**最近未耗尽且未被占资源点**推进
+        ///（FindApproachStraightSteps targetCellAsGoal——目标=**堆格本身**〔站立/途经采集语义〕的
+        /// BFS 严格递减直线段：踏上堆格即停不越过、每回合距离单调递减=数学上不可能振荡）。
+        /// **采集角色透视（2026-10-28 返拍「对资源点自带透视，就像对核心建筑有透视一样」）
+        /// =感知层豁免探索账本**——采集候选不查 IsFogExplored（核心透视 IsUnitVisibleTo
+        /// 「敌方 Core 恒真」同构：雾压画面/战略情报，不夺采集感知；客户端堆件在未探索格隐藏
+        /// 属渲染层，与本感知层分口径）；**返回 true=纯 tag 型采集者已站在存活资源点上**——上层
+        /// 据此让移动候选整体缺席（tag 型无途经配额，站桩即其采集上限；攻击候选照常）；被占堆
+        /// 跳过（谁站谁采——被占零收益，转投次近堆，防「贴着被占堆悬停等位」振荡）；分=采集
+        /// 意图基准分−距离×每格衰减（**不乘人格移动优先权重**——拍板硬语义，人格不得压没采集
+        /// 积极性）。资源点全耗尽/全被占=零候选零回归（战斗行为不受影响）。
+        /// 2026-10-28 返修三（用户报障「安柏在摩拉堆右下角左右来回飞、不肯上移一格」）：旧实现
+        /// FindApproachFirstStep+首步方向走满 run=眷属 v6 同款振荡病灶复发——①目标集错位：攻击
+        /// 接近场把堆格的十字邻格当目标（采集者被引去邻格、永远站不上堆）；②走满 run 冲过拐点
+        /// 不减速、越过堆不停（复现局实锤：(12,10)→(7,10)→(2,10) 沿行 10 左右乒乓 9 回合零采集）。
+        /// 根治=目标格入目标集+严格递减两件。
+        /// 2026-10-28 追拍（用户拍板「站住采集的收益远不如用移动来回走」）：**途经采集型
+        ///（CollectCount&gt;0，安柏）新增收获档**——路径够得着存活堆时不逼近不站桩，改枚举十字向
+        /// 全部可停落点选「采集价值」最高的一步：路径格（**含起点离场/终点到达**，与 Host 途经
+        /// 采集同口径）每命中一堆 +min(配额,余量) 次采、落点为存活堆再 +1（回合末站立采集）——
+        /// 单堆原地往返=3~4 采/回合、两堆一线穿梭=3+3+1=7 采/回合，全面碾压站桩 1 采/回合；
+        /// 评分=基准分顶格（收获期=意图峰值，与攻击档竞争口径不变）；无可采移动（够不着任何
+        /// 存活堆）落回逼近档；同值取首枚举序=确定性（同向取最短停点=落点稳定）。</summary>
+        private static bool ScoreCollectCandidate(BattleSimState sim, Unit unit,
             string playerId, TeamType team, int turn, CandidateTracker tracker)
         {
-            if (!BattleHeuristics.IsHarvester(unit)) return;
+            if (!BattleHeuristics.IsHarvester(unit)) return false;
             var from = sim.GetPosition(unit);
+            var collect = MoveExecutor.CollectParamsOf(unit);
+            bool passCollector = collect.count > 0;
 
-            // 最近未耗尽资源点（切比雪夫距离；同距取首个枚举序=注册序确定性；透视=不查探索账本）
+            // 纯 tag 型采集者已站上存活资源点：站桩即其采集上限——返回 true 让移动候选让位
+            //（回合末自动采），攻击候选照常。途经采集型不走此口（移动来回采收益远高——追拍）
+            if (!passCollector)
+            {
+                foreach (var node in sim.ResourceNodes)
+                    if (node != null && node.remainingCharges > 0
+                        && node.cell.x == from.x && node.cell.y == from.y)
+                        return true;
+            }
+
+            // 最近未耗尽且未被占资源点（切比雪夫距离；同距取首个枚举序=注册序确定性；
+            // 透视=不查探索账本；被占堆跳过——谁站谁采，被占零收益转投次近堆）——逼近档目标
             ResourceNodeState bestNode = null;
             int bestDist = int.MaxValue;
             foreach (var node in sim.ResourceNodes)
             {
                 if (node == null || node.remainingCharges <= 0) continue;
+                if (IsCellOccupiedForStep(sim, node.cell)) continue;
                 int dist = from.ChebyshevTo(node.cell);
                 if (dist >= bestDist) continue;
                 bestDist = dist;
                 bestNode = node;
             }
-            if (bestNode == null) return;
-            if (bestDist <= 0) return; // 已站上：回合末自动采，本回合继续攻击候选
+            if (bestNode == null && !passCollector) return false; // 全耗尽/全被占：tag 型零候选
 
-            // BFS 首步逼近（防绕障；走满可行程——同「真无解兜底」run 计数与穿占虚守卫）
-            var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, bestNode.cell, null);
-            if (direction == 0) return; // BFS=0=首步无路（保持缺席）
-            var step = SkillHitResolver.DirectionToDelta(direction);
-            var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
             int maxMove = MoveExecutor.MaxMoveDistance(unit);
-            int run = 0;
-            for (int s = 1; s <= maxMove; s++)
+
+            // 收获档（途经采集型，2026-10-28 追拍）：枚举十字向全部可停落点选「采集价值」最高的
+            // 一步——与 Host 途经采集同口径：路径全量（起点离场/终点到达都算）每命中一堆
+            // =min(配额,余量)次采；落点为存活堆再+1（回合末站立采集）；穿占格仍在 Path=照采
+            if (passCollector)
             {
-                var cell = new BattleCell(from.x + step.x * s, from.y + step.y * s);
-                if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
-                if (IsCellOccupiedForStep(sim, cell))
+                var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
+                Direction2D bestDir = 0;
+                int bestRun = 0, bestValue = 0;
+                foreach (var dir in BattleHeuristics.CrossDirections)
                 {
-                    if (!CanPassThroughCell(sim, unit, cell)) break;
-                    continue;
+                    var delta = SkillHitResolver.DirectionToDelta(dir);
+                    // 起点格堆=离场即采（Host Path[0] 同口径）
+                    int pathValue = LivePileCollectValue(sim, from, collect.count);
+                    for (int s = 1; s <= maxMove; s++)
+                    {
+                        var cell = new BattleCell(from.x + delta.x * s, from.y + delta.y * s);
+                        if (!sim.Map.HasTile(cell.x, cell.y)
+                            || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                        if (IsCellOccupiedForStep(sim, cell))
+                        {
+                            if (!CanPassThroughCell(sim, unit, cell)) break; // 敌/尸体硬断
+                            pathValue += LivePileCollectValue(sim, cell, collect.count);
+                            continue; // 可穿不可停
+                        }
+                        pathValue += LivePileCollectValue(sim, cell, collect.count);
+                        int stopValue = pathValue + (LivePileAt(sim, cell) ? 1 : 0);
+                        if (stopValue > bestValue) // 严格大于=同值取首（同向短停点优先，落点稳定）
+                        {
+                            bestValue = stopValue;
+                            bestDir = dir;
+                            bestRun = s;
+                        }
+                    }
                 }
-                run++;
+                if (bestValue > 0)
+                {
+                    tracker.Offer(CollectIntentBaseScore, new ActionData
+                    {
+                        playerId = playerId,
+                        unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                        actionType = ActionType.Move,
+                        direction = bestDir,
+                        moveMagnitude = bestRun,
+                        turnNumber = turn,
+                    });
+                    return false;
+                }
+                // 无可采移动（路径够不着任何存活堆）：落回逼近档
+                if (bestNode == null) return false;
             }
-            if (run <= 0) return;
+
+            // 逼近档（严格递减直线段；防绕障；被地形/单位挡即停=保守向，下回合重算换向；
+            // 踏上堆格即停不越过——到达回合 3 途经+1 站立=4 采落地）
+            Direction2D direction;
+            int run = BattleHeuristics.FindApproachStraightSteps(sim, unit, bestNode.cell, maxMove,
+                out direction, null, true);
+            if (run <= 0) return false; // 四向均无递减首步（保持缺席）
 
             int score = CollectIntentBaseScore - bestDist * CollectDistancePenalty;
-            if (score <= 0) return;
+            if (score <= 0) return false;
             tracker.Offer(score, new ActionData
             {
                 playerId = playerId,
@@ -712,6 +783,28 @@ namespace GIC.Battle
                 moveMagnitude = run,
                 turnNumber = turn,
             });
+            return false;
+        }
+
+        /// <summary>该格存活资源点的单步可采次数=min(移动配额, 堆余量)（无堆=0）——收获档路径
+        /// 价值估算，与 Host 途经采集同口径（per-堆配额）</summary>
+        private static int LivePileCollectValue(BattleSimState sim, BattleCell cell, int quota)
+        {
+            foreach (var node in sim.ResourceNodes)
+                if (node != null && node.remainingCharges > 0
+                    && node.cell.x == cell.x && node.cell.y == cell.y)
+                    return Mathf.Min(quota, node.remainingCharges);
+            return 0;
+        }
+
+        /// <summary>该格是否存活资源点（收获档落点 +1=回合末站立采集估值）</summary>
+        private static bool LivePileAt(BattleSimState sim, BattleCell cell)
+        {
+            foreach (var node in sim.ResourceNodes)
+                if (node != null && node.remainingCharges > 0
+                    && node.cell.x == cell.x && node.cell.y == cell.y)
+                    return true;
+            return false;
         }
 
         /// <summary>①攻击技能候选（战技/爆发）：预判与结算形态同源（WouldHitEnemyInDirection）；评分=逐目标
