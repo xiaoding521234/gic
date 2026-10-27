@@ -156,6 +156,11 @@ namespace GIC.Data
         public List<UnitState> units = new List<UnitState>();
         public List<PlayerResourceState> resources = new List<PlayerResourceState>();
 
+        /// <summary>回合头资源点权威态（docs/47 资源点批，2026-10-27）：客户端表现层对齐与 AI
+        /// 采集候选消费域——剩余次数/在场集合以此为准（采集时刻变化走 ResourceHarvest 命令增量，
+        /// 回合头快照整表覆盖自愈）</summary>
+        public List<ResourceNodeState> resourceNodes = new List<ResourceNodeState>();
+
         /// <summary>主世界单位视图单源查询（决策九十一隔离纪律的结构件，2026-10-25 复审批 T1）：
         /// 快照含跨维度单位，主世界消费域一律走本口而非手写过滤——判据=dimension（规范判据，
         /// UnitState 注释口径；isSoul 只区分灵魂——未来霜月相位单位 isSoul=0 但 dimension≠0 会被漏过）；

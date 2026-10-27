@@ -28,6 +28,9 @@ namespace GIC.Battle
     /// **执行期反馈按归属方**（2026-10-17 追拍二）：敌方施放的世界特效（投射物/箭雨/落地箭——
     /// RegisterProjectileVisual 注册逐格门控，飞到已探索格才显示）与敌方自增益数字隐藏；
     /// 我方特效恒显（我方箭矢全程可见、**我方命中的伤害数字不隐藏**——即便目标在迷雾内）。
+    /// 资源点（2026-10-28 返拍「摩拉堆在迷雾中应当隐藏」）：未探索格堆件整体隐藏
+    /// （EvaluateResourceNodeVisibility——渲染层；采集角色的资源点透视=AI 感知层豁免，
+    /// CompanionBrain 采集候选不查探索账本，核心透视同构，两层分口径勿混）。
     /// </summary>
     public class BattleFog : MonoBehaviour
     {
@@ -108,6 +111,7 @@ namespace GIC.Battle
             LogResolvedVisions(); // 揭雾视野诊断（开局一次——「配置值≠实际揭雾半径」分歧排查锚点，追拍六）
             ApplyFogChanges();
             EvaluateUnitHiding();
+            EvaluateResourceNodeVisibility();
         }
 
         /// <summary>清场钩子（BattlePlayer.ClearViews）：探索集/雾面/隐藏态/特效注册表全清</summary>
@@ -144,6 +148,7 @@ namespace GIC.Battle
             }
             else _dirtyAge = 0f;
             EvaluateUnitHiding();
+            EvaluateResourceNodeVisibility();
             EvaluateProjectileFog();
         }
 
@@ -432,6 +437,16 @@ namespace GIC.Battle
                     && !IsExplored(_board.WorldToCell(view.transform.position));
                 view.SetFogHidden(hidden);
             }
+        }
+
+        /// <summary>资源点隐藏评估（每帧，2026-10-28 返修拍板「摩拉堆在迷雾中应当隐藏」）：未探索格
+        /// 堆件整体隐藏——探索过永久可见（探索集单调，与单位口径一致）；采集角色透视=AI 感知层
+        /// 豁免（CompanionBrain 采集候选不查探索账本——核心透视 IsUnitVisibleTo 同构），客户端
+        /// 渲染无透视（透视≠揭雾：堆可见不揭格）。幂等直通（BattleBoard 侧隐藏态缓存零开销）</summary>
+        private void EvaluateResourceNodeVisibility()
+        {
+            if (_board == null) return;
+            _board.ApplyResourceNodeFogVisibility(cell => IsExplored(cell));
         }
 
         /// <summary>敌方特效门控评估（每帧，追拍二）：注册表内敌方特效按**当前位置**所在格探索态显隐

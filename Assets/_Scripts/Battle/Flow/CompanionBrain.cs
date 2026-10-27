@@ -52,6 +52,14 @@ namespace GIC.Battle
         /// 在无敌环境让位推进。业界对照：petra/ItB 无目标时目标导向推进（attack-move 语义）。</summary>
         public static int EmptyFieldAdvanceScore => AITuningConfig.Instance.无敌环境推进分;
 
+        /// <summary>采集意图基准分（docs/47 拍板⑦，2026-10-27）：稳压攻击档典型分——采集型角色
+        /// 有可见资源点时优先采集移动（保命档恒在其上）；**不乘人格移动优先权重**（拍板硬语义）</summary>
+        public static int CollectIntentBaseScore => AITuningConfig.Instance.采集意图基准分;
+
+        /// <summary>采集每格衰减分（docs/47）：采集候选分=基准分−距离×本值——距离越远优先度
+        /// 越低，衰减至攻击典型分之下自然回归战斗（「够得着才优先」软边界）</summary>
+        public static int CollectDistancePenalty => AITuningConfig.Instance.采集每格衰减分;
+
         /// <summary>近敌接敌加分上限（离最近敌越近越优先动该单位）</summary>
         public static int MoveEngageBonusMax => AITuningConfig.Instance.接敌加分上限;
 
@@ -632,13 +640,78 @@ namespace GIC.Battle
         {
             if (unit == null || tracker == null) return;
             profile ??= NeutralProfile;
-            // 攻击档先跑并回报「本单位是否有攻击/增益候选」（2026-10-02 挂机修复：驻位判定用
-            // per-unit 候选存在性——配额脑共享 tracker，勿用 tracker.Best 判定〔那是全场最优〕）
+            // 采集档（docs/47 拍板⑦，2026-10-27）：采集型角色（IsHarvester——安柏双判据都满足）
+            // 有可见资源点时先评采集候选——基准分稳压攻击档（「相比攻击敌人，更主动采集资源点」），
+            // 距离衰减保证远资源点不越俎代庖。**保命档（Rescue/复苏）天然在采集之上**——采集候选
+            // 只是 Offer 进共享 tracker 与救命/斩杀候选公平竞争，采集基准分只压「攻击典型分」
             bool hasActionCandidate = ScoreAttackCandidates(sim, snapshot, unit, playerId, team, turn,
                 tracker, staminaPoolOverride, profile, threat, board, isPlayerDirectControl, reactionPreview,
                 legionAggression);
+            ScoreCollectCandidate(sim, unit, playerId, team, turn, tracker);
             ScoreMoveCandidate(sim, snapshot, unit, playerId, team, turn, tracker, staminaPoolOverride,
                 profile, hasActionCandidate, threat, board, isPlayerDirectControl);
+        }
+
+        /// <summary>采集候选档（docs/47 拍板⑦）：采集型角色朝**最近未耗尽资源点**移动一步
+        ///（FindApproachFirstStep BFS 首步——防绕障，走满可行程；「真无解兜底」同款 run 计数含
+        /// 穿占虚守卫）。**采集角色透视（2026-10-28 返拍「对资源点自带透视，就像对核心建筑有
+        /// 透视一样」）=感知层豁免探索账本**——采集候选不查 IsFogExplored（核心透视
+        /// IsUnitVisibleTo「敌方 Core 恒真」同构：雾压画面/战略情报，不夺采集感知；客户端堆件
+        /// 在未探索格隐藏属渲染层，与本感知层分口径）；已站上资源点=不 Offer（回合末自动采集，
+        /// 本回合继续出攻击候选=采集者最优行为）；分=采集意图基准分−距离×每格衰减（**不乘人格
+        /// 移动优先权重**——拍板硬语义，人格不得压没采集积极性）。资源点全耗尽=零候选零回归
+        /// （战斗行为不受影响）</summary>
+        private static void ScoreCollectCandidate(BattleSimState sim, Unit unit,
+            string playerId, TeamType team, int turn, CandidateTracker tracker)
+        {
+            if (!BattleHeuristics.IsHarvester(unit)) return;
+            var from = sim.GetPosition(unit);
+
+            // 最近未耗尽资源点（切比雪夫距离；同距取首个枚举序=注册序确定性；透视=不查探索账本）
+            ResourceNodeState bestNode = null;
+            int bestDist = int.MaxValue;
+            foreach (var node in sim.ResourceNodes)
+            {
+                if (node == null || node.remainingCharges <= 0) continue;
+                int dist = from.ChebyshevTo(node.cell);
+                if (dist >= bestDist) continue;
+                bestDist = dist;
+                bestNode = node;
+            }
+            if (bestNode == null) return;
+            if (bestDist <= 0) return; // 已站上：回合末自动采，本回合继续攻击候选
+
+            // BFS 首步逼近（防绕障；走满可行程——同「真无解兜底」run 计数与穿占虚守卫）
+            var direction = BattleHeuristics.FindApproachFirstStep(sim, unit, bestNode.cell, null);
+            if (direction == 0) return; // BFS=0=首步无路（保持缺席）
+            var step = SkillHitResolver.DirectionToDelta(direction);
+            var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
+            int maxMove = MoveExecutor.MaxMoveDistance(unit);
+            int run = 0;
+            for (int s = 1; s <= maxMove; s++)
+            {
+                var cell = new BattleCell(from.x + step.x * s, from.y + step.y * s);
+                if (!sim.Map.HasTile(cell.x, cell.y) || !sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
+                if (IsCellOccupiedForStep(sim, cell))
+                {
+                    if (!CanPassThroughCell(sim, unit, cell)) break;
+                    continue;
+                }
+                run++;
+            }
+            if (run <= 0) return;
+
+            int score = CollectIntentBaseScore - bestDist * CollectDistancePenalty;
+            if (score <= 0) return;
+            tracker.Offer(score, new ActionData
+            {
+                playerId = playerId,
+                unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID,
+                actionType = ActionType.Move,
+                direction = direction,
+                moveMagnitude = run,
+                turnNumber = turn,
+            });
         }
 
         /// <summary>①攻击技能候选（战技/爆发）：预判与结算形态同源（WouldHitEnemyInDirection）；评分=逐目标

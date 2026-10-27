@@ -70,6 +70,20 @@ namespace GIC.Battle
                || (unit != null && unit.RawData != null
                    && unit.RawData.unitType == UnitType.Character && IsFamiliar(unit));
 
+        /// <summary>是否采集型单位（docs/47 拍板⑦，2026-10-27「有特别采集能力或有采集tag的角色，
+        /// 相比于攻击敌人，更主动采集资源点」——双判据任一即采集型）：①UnitConfig.tags 含
+        /// Gathering（采集 tag——安柏等身份标识）；②任一移动技能 CollectCount&gt;0（安柏飞行冠军
+        /// 「沿途采集」——特别采集能力）。数据驱动：将来自创采集单位配 tag 或给移动技能配参数
+        /// 即自动进入采集档，零代码。消费=CompanionBrain 采集档（眷属脑同构判据预留——
+        /// 现役眷属零采集型=零候选零行为变化）</summary>
+        public static bool IsHarvester(Unit unit)
+        {
+            if (unit?.RawData?.tags != null
+                && System.Array.IndexOf(unit.RawData.tags, GIC.Data.UnitTag.Gathering) >= 0)
+                return true;
+            return MoveExecutor.CollectParamsOf(unit).count > 0;
+        }
+
         // ==================== 敌人查找 ====================
 
         /// <summary>决策单位对敌单位的战术感知（2026-10-23 实战报障「敌方凯亚无视距离更近的

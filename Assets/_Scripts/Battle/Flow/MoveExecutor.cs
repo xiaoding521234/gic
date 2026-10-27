@@ -68,5 +68,44 @@ namespace GIC.Battle
         {
             new SkillCostEntry { kind = CostKind.Stamina, amount = BattleMetrics.StaminaCostPerAction }
         };
+
+        // ==================== 途经采集（docs/47 资源点批，2026-10-27；docs/11 旧挂账销案） ====================
+
+        /// <summary>途经采集参数（移动技能条目数据驱动——安柏飞行冠军 CollectCount=3/
+        /// CollectStaminaGain=5/CollectEnergyGain=5；0 次=无途经采集〔默认，普通移动零行为变化〕）。
+        /// 参数只配在 Move 条目上=未来采集型移动技能配参即生效零代码</summary>
+        public readonly struct CollectParams
+        {
+            public readonly int count;          // 每次移动至多采集次数（CollectCount）
+            public readonly int energyGain;     // 每次采集元能（CollectEnergyGain）
+            public readonly int staminaGain;    // 每次采集体力（CollectStaminaGain）
+
+            public CollectParams(int count, int energyGain, int staminaGain)
+            {
+                this.count = count;
+                this.energyGain = energyGain;
+                this.staminaGain = staminaGain;
+            }
+        }
+
+        /// <summary>读移动者移动技能条目的采集参数（与 MaxMoveDistance/GetMoveCosts 同源条目遍历；
+        /// 无 Move 条目/无 CollectCount 参数=零采集）</summary>
+        public static CollectParams CollectParamsOf(Unit unit)
+        {
+            if (unit?.Skills != null)
+            {
+                foreach (var skill in unit.Skills)
+                {
+                    var data = skill?.RawData;
+                    if (data == null || data.skillType != SkillType.Move) continue;
+                    int count = data.GetInt(SkillParamKey.CollectCount, 0);
+                    if (count <= 0) return default;
+                    return new CollectParams(count,
+                        data.GetInt(SkillParamKey.CollectEnergyGain, 0),
+                        data.GetInt(SkillParamKey.CollectStaminaGain, 0));
+                }
+            }
+            return default;
+        }
     }
 }

@@ -15,10 +15,17 @@ namespace GIC.Battle
     {
         public int Delta;
 
-        public StaminaEffect(string playerId, int delta)
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即——配额消耗/延奏津贴/回合发放无命中时刻）。
+        /// 途经采集=行走到达资源点格时刻（2026-10-28 返修：安柏「每次采集获得体力」逐次到点入账，
+        /// docs/units/蒙德/安柏.md 技能行——同片与移动消耗并存各发各命令，**勿恢复同玩家去重**
+        /// 〔去重会吞采集增量：状态逐条应用 vs 命令只剩消耗=漂移〕）</summary>
+        public float HitSeconds;
+
+        public StaminaEffect(string playerId, int delta, float hitSeconds = 0f)
         {
             TargetUnitId = playerId;
             Delta = delta;
+            HitSeconds = hitSeconds;
         }
     }
 }

@@ -48,6 +48,36 @@ namespace GIC.Battle
         /// <summary>非主世界维度单位（只读；当前=地脉灵魂。维度感知域/回合末维度规则/快照消费）</summary>
         public IReadOnlyDictionary<string, Unit> CrossDimensionUnits => _crossDimensionUnits;
 
+        // ==================== 资源点（docs/47，2026-10-27 拍板「非地形非单位不占体积」） ====================
+        // 独立注册表=独立实体拍板的结构实现（灵魂 _crossDimensionUnits 先例）：不进 _units（体积/
+        // 阻挡/瞄准域天然零参与）、不进 TileType（docs/11 旧挂账「地形扩展」方向作废）。主世界专属
+        // （地脉维度独立地形不演化资源点）。开局态从 Map.resourceNodes 复制（Map=开局协议快照恒
+        // 静态，本注册表=运行时可变真值）；余量变化走 ResourceHarvest 命令镜像+回合头快照自愈。
+        private readonly Dictionary<BattleCell, ResourceNodeState> _resourceNodes = new Dictionary<BattleCell, ResourceNodeState>();
+
+        /// <summary>主世界资源点运行时视图（AI 采集候选/只读遍历；查询走 GetResourceNodeAt）</summary>
+        public IReadOnlyCollection<ResourceNodeState> ResourceNodes => _resourceNodes.Values;
+
+        /// <summary>查询格上资源点（无=返回 null；每格至多一个——BattleCell 唯一键）</summary>
+        public ResourceNodeState GetResourceNodeAt(BattleCell cell)
+        {
+            return _resourceNodes.TryGetValue(cell, out var node) ? node : null;
+        }
+
+        /// <summary>
+        /// 采集扣减（Host 权威单点）：余量-1、归零即从注册表移除（SC2 矿脉「耗尽从地图消失」拍板⑤）。
+        /// 返回采集后剩余次数（-1=该格无资源点=未采集）。**调用方立即产出采集事实效应**
+        /// （ResourceHarvestEffect+MoraGainEffect 等——余量在此已改，效应只承载事实勿重复扣）
+        /// </summary>
+        public int TryHarvestResourceNode(BattleCell cell)
+        {
+            if (!_resourceNodes.TryGetValue(cell, out var node) || node.remainingCharges <= 0) return -1;
+            node.remainingCharges--;
+            int remaining = node.remainingCharges;
+            if (remaining <= 0) _resourceNodes.Remove(cell);
+            return remaining;
+        }
+
         /// <summary>地脉维度单位便捷枚举（Unit.Dimension==LeyLine 过滤——含灵魂与未来入地脉的相位单位）</summary>
         public IEnumerable<Unit> LeyLineUnits
         {
@@ -94,6 +124,12 @@ namespace GIC.Battle
             Map = map;
             Seed = seed;
             _rng = new System.Random(seed);
+            // 资源点开局态复制（docs/47：Map=开局协议快照恒静态；本注册表=运行时可变真值）
+            var nodes = map != null ? map.resourceNodes : null;
+            if (nodes != null)
+                foreach (var node in nodes)
+                    if (node != null && node.remainingCharges > 0)
+                        _resourceNodes[node.cell] = node.Clone();
         }
 
         /// <summary>概率判定单出口（2026-10-02 幸运暴击批）：percent 0~100（20 即 20%）；
@@ -1240,6 +1276,11 @@ namespace GIC.Battle
                 }
                 snapshot.resources.Add(snapshotRes);
             }
+
+            // 资源点权威态（docs/47）：回合头整表覆盖自愈（客户端表现层对齐+AI 采集候选消费域）；
+            // 注册序=BattleMapConfig 解析序（构造时复制保序）——回放确定性同构
+            foreach (var node in _resourceNodes.Values)
+                snapshot.resourceNodes.Add(node.Clone());
 
             return snapshot;
         }

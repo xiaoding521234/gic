@@ -205,6 +205,46 @@ namespace GIC.Battle
             foreach (var mover in movers)
                 effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
 
+            // 途经采集（docs/47 拍板⑥·docs/11 B-S1b 旧挂账销案，2026-10-27；2026-10-28 返修语义
+            // 勘正）：移动技能 CollectCount>0（安柏飞行冠军——数据驱动，普通移动零行为变化）的
+            // 移动者按 Path **全量**（含起点与终点——拍板「『经过』包含了起始和终点位置」）逐格
+            // 采集；**同一堆连采至多 CollectCount 次**（拍板「只有一堆摩拉也能采三次」——CollectCount
+            // =per-堆配额，旧版每堆至多 1 次+移动总量上限=需三堆才采满，语义作废）。每次采集=资源
+            // 点余量-1+MoraPerHarvest 摩拉〔资源点定义收益〕+CollectStaminaGain 体力/
+            // CollectEnergyGain 元能〔技能收益，**逐次**——docs/units/蒙德/安柏.md「每次采集获得」〕。
+            // 命中时刻（WYSIWYG 三件套效应侧）=行走到达该格时刻 i×MoveStepSeconds+连采错峰
+            // k×CommandStaggerSeconds（移动补间与客户端 PlayMoveCoroutine 同源零漂移——采集事实/
+            // 摩拉/体力/元能四路命令到点应用，「表现对齐动画」返修）；起点堆=离场即采（i=0 恒立即）、
+            // 终点堆=到达即采（停堆双采合法：途经 CollectCount 次+回合末站立 1 次）。
+            // 余量已在 TryHarvest 扣减（建筑元能引擎「能量落地同拍判定」同模式）
+            foreach (var mover in movers)
+            {
+                var collect = MoveExecutor.CollectParamsOf(mover.Unit);
+                if (collect.count <= 0) continue;
+                var identity = mover.Unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null) continue; // 注册单位必有 identity（防御口径同 PassesBlockingRules）
+                for (int i = 0; i < mover.Path.Count; i++)
+                {
+                    for (int k = 0; k < collect.count; k++)
+                    {
+                        int remaining = _sim.TryHarvestResourceNode(mover.Path[i]);
+                        if (remaining < 0) break; // 无堆/已耗尽——续走后续途经格
+                        float hitSeconds = i * BattleMetrics.MoveStepSeconds
+                            + k * BattleMetrics.CommandStaggerSeconds;
+                        effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest,
+                            hitSeconds));
+                        if (collect.staminaGain != 0)
+                            effects.Add(new StaminaEffect(identity.OwnerPlayerID, collect.staminaGain, hitSeconds));
+                        if (collect.energyGain != 0)
+                            effects.Add(new EnergyEffect(mover.UnitId, collect.energyGain, EnergyEffect.CategoryCollectGain)
+                                { HitSeconds = hitSeconds }); // 合并键并入命中时刻=逐采集事件各 +N（勿并一笔）
+                        effects.Add(new ResourceHarvestEffect(mover.UnitId, mover.Path[i],
+                            ResourceNodeMetrics.MoraPerHarvest, remaining, hitSeconds));
+                        mover.Unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
+                    }
+                }
+            }
+
             // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整路径，
             // docs/22 §11——命中点/消散点随命令千分定点下发）
             var vanishes = new List<BattleCommand>();
@@ -416,6 +456,35 @@ namespace GIC.Battle
             // ②地脉驻留理智代价（非灵魂地脉单位 −3 理智/回合末——当前地脉仅灵魂=预留自动生效，
             // 胡桃/丽莎相位技能批上线即激活）。位置=泡湿之后（同为回合末收尾类环境规则）
             CollectLeyLineTurnEndEffects(effects);
+
+            // 资源点回合末站立采集（docs/47 拍板③，2026-10-27）：存活单位站资源点格=采集 1 次
+            // （中立无主谁站谁采，拍板②——含敌方单位）；同格多单位=整格该回合至多 1 次、
+            // unitId 升序首个（拍板①——Dictionary 枚举序不保证，显式升序遍历确定「首个」）。
+            // 产出=资源点定义收益（MoraPerHarvest 摩拉）走标准效应链（MoraGainEffect 应用+命令
+            // 发射单源）；采集事实 ResourceHarvestEffect 供命令发射（余量已在 TryHarvest 扣减）；
+            // 位置=泡湿/地脉之后（同为回合末收尾族环境规则——按单位位置结算）
+            var harvestedCells = new HashSet<BattleCell>();
+            var standHarvestOrder = new List<(string id, Unit unit)>();
+            foreach (var kv in _sim.Units)
+            {
+                if (kv.Value == null || BattleSimState.IsDead(kv.Value)) continue;
+                standHarvestOrder.Add((kv.Key, kv.Value));
+            }
+            standHarvestOrder.Sort((a, b) => string.CompareOrdinal(a.id, b.id));
+            foreach (var stander in standHarvestOrder)
+            {
+                var pos = _sim.GetPosition(stander.unit);
+                if (harvestedCells.Contains(pos)) continue;
+                int remaining = _sim.TryHarvestResourceNode(pos);
+                if (remaining < 0) continue;
+                harvestedCells.Add(pos);
+                var identity = stander.unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null) continue;
+                effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest));
+                effects.Add(new ResourceHarvestEffect(stander.id, pos,
+                    ResourceNodeMetrics.MoraPerHarvest, remaining));
+                stander.unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
+            }
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             // 建筑回合末效果段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——回合末
@@ -704,15 +773,16 @@ namespace GIC.Battle
             foreach (var effect in EnumerateEffects<SoulDecayEffect>(effects))
                 segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindHp, -effect.Amount));
-            // 体力变化（B6d）：TargetUnitId=玩家 ID；同片同玩家防御性去重（配额行动唯一，
-            // 理论只一条——低级单位豁免、延奏契约 0 消耗，正常流不会同玩家多条）
-            var staminaSeen = new HashSet<string>();
+            // 体力变化（B6d）：TargetUnitId=玩家 ID；逐条发射（2026-10-28 返修：撤同玩家去重——
+            // 移动片内配额消耗与途经采集体力并存为常态，去重会吞采集增量=状态逐条应用 vs 命令
+            // 只剩首条的漂移）；途经采集体力带命中时刻到点入账（与堆减件同拍）
             foreach (var effect in effects)
             {
                 if (!(effect is StaminaEffect stamina)) continue;
-                if (!staminaSeen.Add(stamina.TargetUnitId)) continue;
-                segment.commands.Add(BattleCommand.StatChange(stamina.TargetUnitId, sliceIndex, indexInSlice++,
-                    BattleCommand.StatKindStamina, stamina.Delta));
+                var staminaCommand = BattleCommand.StatChange(stamina.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindStamina, stamina.Delta);
+                ApplyHitMs(staminaCommand, stamina.HitSeconds);
+                segment.commands.Add(staminaCommand);
             }
             // 摩拉掠夺（B-3 首个资源类原子）：实际量双向 StatChange(Mora)——被掠夺方 −Gain / 掠夺方 +Gain
             //（AppliedGain=应用钳出的实际量，池空零动作零命令；命令按应用后实际值发，客户端增量与 Host 一致）。
@@ -736,6 +806,27 @@ namespace GIC.Battle
                 if (effect.AppliedAmount <= 0) continue;
                 segment.commands.Add(BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindMora, -effect.AppliedAmount));
+            }
+            // 摩拉获取（docs/47 资源点批，2026-10-27——MoraSpend 获取侧对偶）：采集产出（站立/途经
+            // 两路径共用）→StatChange(StatKindMora)——玩家池入账唯一出口单源（HUD 资源 chips/
+            // 手牌货币卡既有消费链零改动自动跟随）；途经采集带命中时刻到点入账（行走到达堆格再跳
+            // chips，「表现对齐动画」返修）；回合末站立采集恒 0 立即（泡湿同族）
+            foreach (var effect in EnumerateEffects<MoraGainEffect>(effects))
+            {
+                var moraGainCommand = BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
+                    BattleCommand.StatKindMora, effect.Amount);
+                ApplyHitMs(moraGainCommand, effect.HitSeconds);
+                segment.commands.Add(moraGainCommand);
+            }
+            // 资源点采集事实（docs/47）：ResourceHarvest type=23——客户端 BattleBoard 余量刷新/
+            // 耗尽移除+采集飘字；metadata=采集后剩余次数、value=本次获得摩拉、cell=资源点格；
+            // launchMs=途经采集命中时刻（行走到达该格再减件，客户端 PlayDelayedStateApply 到点应用）
+            foreach (var effect in EnumerateEffects<ResourceHarvestEffect>(effects))
+            {
+                var harvestCommand = BattleCommand.ResourceHarvest(effect.TargetUnitId,
+                    sliceIndex, indexInSlice++, effect.NodeCell, effect.MoraGain, effect.Remaining);
+                ApplyHitMs(harvestCommand, effect.HitSeconds);
+                segment.commands.Add(harvestCommand);
             }
             // 物品消耗（统一消耗模型 C-1）：按 Consumed 明细逐条 ItemConsume（指定模式=单条；
             // 同类任意模式=每实际扣到的物品一条——客户端逐条扣镜像刷角标；**装备实例耐久随条透传**
@@ -1129,6 +1220,15 @@ namespace GIC.Battle
                     moraSpend.AppliedAmount = applied;
                     if (applied > 0)
                         _sim.TrySpendMora(moraSpend.TargetUnitId, applied);
+                    continue;
+                }
+
+                // 摩拉获取（docs/47 资源点批，2026-10-27——MoraSpend 获取侧对偶）：玩家级池写
+                // （ApplyMoraDelta 含手牌货币条目同步）；TargetUnitId=玩家 ID。资源点采集（站立/
+                // 途经两路径）的共用产出原子，未来资源产出族同用
+                if (effect is MoraGainEffect moraGain)
+                {
+                    _sim.ApplyMoraDelta(moraGain.TargetUnitId, moraGain.Amount);
                     continue;
                 }
 

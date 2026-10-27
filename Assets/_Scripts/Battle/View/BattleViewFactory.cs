@@ -70,6 +70,39 @@ namespace GIC.Battle
             return material;
         }
 
+        /// <summary>新建 Unlit 半透明贴图材质（docs/47 追拍「摩拉堆直接用摩拉素材」：带 alpha 贴图的
+        /// 立式小件——透明面参数与 CreateTransparentUnlitMaterial 同款+mainTexture；调用方负责持有与
+        /// OnDestroy 释放）</summary>
+        public static Material CreateTransparentUnlitTexturedMaterial(Texture2D texture, Color tint)
+        {
+            var material = CreateTransparentUnlitMaterial(tint);
+            if (texture != null) material.mainTexture = texture;
+            return material;
+        }
+
+        /// <summary>新建 Unlit 贴图 cutout（alpha clip）材质（2026-10-28 摩拉堆返修二「顶件像在水下」）：
+        /// **硬边贴图件与透明水面/雾面/立牌混排的业界正解（HD-2D 路线）**——不透明面+_ALPHATEST_ON+
+        /// ZWrite=On 进 AlphaTest 队列（2450）：件先画并写深度，后画的透明面（水面 3000）depth test
+        /// 自动剔除件身后的像素=「世界坐标高于水面就正确盖住水面」由 Z-buffer 机制保证（透明材质
+        /// 不写深度、透明件之间只按 sortingOrder 排与高度无关=本返修病灶根因；调研=Unity 官方
+        /// Renderer.sortingOrder/Camera.transparencySortMode 文档+Octopath HD-2D billboard 深度管线）。
+        /// 边缘半透明像素按 _Cutoff 硬切（硬边图标小件可接受；锯齿明显时调低 cutoff）。
+        /// 调用方负责持有与 OnDestroy 释放</summary>
+        public static Material CreateCutoutUnlitTexturedMaterial(Texture2D texture, Color tint, float cutoff = 0.5f)
+        {
+            var material = new Material(UnlitShader);
+            material.color = tint;
+            if (texture != null) material.mainTexture = texture;
+            material.SetFloat("_Surface", 0f);      // 不透明面（AlphaTest 属 opaque 族）
+            material.SetFloat("_AlphaClip", 1f);    // SurfaceOptions→Alpha Clipping
+            material.EnableKeyword("_ALPHATEST_ON"); // URP 14 Unlit 片元 clip 分支
+            material.SetFloat("_Cutoff", cutoff);
+            material.SetFloat("_ZWrite", 1f);       // 写深度=与透明面正确遮挡的机制载体
+            material.SetOverrideTag("RenderType", "TransparentCutout");
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+            return material;
+        }
+
         private static Shader _chromaKeyShader;
 
         /// <summary>立牌动画视频 ChromaKey shader（GIC/Battle/ChromaKeyVideo，B-S3 视频路线）——

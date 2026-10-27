@@ -37,6 +37,13 @@ namespace GIC.Battle
         /// 纯 (目标,类别) 键会让两座旗帜对同一目标合并吞成一次）</summary>
         public const int CategoryBuildingGain = 8;
 
+        /// <summary>来源类别：采集获能（docs/47 资源点批，2026-10-27）：安柏飞行途经采集的
+        /// CollectEnergyGain 走本类别。**合并键并入命中时刻**（2026-10-28 返修勘正：技能行
+        /// 「每次采集获得{CollectEnergyGain}元能」=逐采集事件各 +N——旧纯 (目标,类别) 键把
+        /// 同一次移动多堆/同堆连采合并成一笔违背技能语义；BuffTickGain 逐层同款先例，
+        /// (i,k) 命中时刻逐事件唯一=键恒可分）</summary>
+        public const int CategoryCollectGain = 9;
+
         public int Delta;
 
         /// <summary>来源类别（命令合并键成员；CategoryDefault=兜底）</summary>
@@ -63,6 +70,7 @@ namespace GIC.Battle
         /// 每次+10」）**——BuffTickGain 类别并入层时刻（第 i 层 HitSeconds=i×BuffLayerStaggerSeconds：
         /// 逐层条目键各异=各跳各弹；同刻同目标仍并=同层多来源合并不变）。**建筑效果例外（决策八十六
         /// 批D）**——BuildingGain 类别并入来源建筑 unitId（两座旗帜对同一目标各 +1 不互吞）。
+        /// **采集例外（2026-10-28 返修）**——CollectGain 并入命中时刻（逐采集事件各 +N，BuffTick 同款）。
         /// 其余类别维持纯 (目标,类别)——战技多命中「多次命中只获一次」B6a 去重口径不变（其
         /// HitSeconds=真实命中时刻，并入键会让两发箭矢各自成键破坏去重，勿扩）。</summary>
         public string MergeKey()
@@ -71,6 +79,8 @@ namespace GIC.Battle
                 return $"{TargetUnitId}:{Category}:{Mathf.RoundToInt(HitSeconds * 1000f)}";
             if (Category == CategoryBuildingGain)
                 return $"{TargetUnitId}:{Category}:{SourceUnitId}";
+            if (Category == CategoryCollectGain)
+                return $"{TargetUnitId}:{Category}:{Mathf.RoundToInt(HitSeconds * 1000f)}";
             return $"{TargetUnitId}:{Category}";
         }
     }

@@ -77,6 +77,9 @@ namespace GIC.Data
         ItemGain = 21, // 装备批：命座授予物品卡（安柏3命兔兔伯爵）——客户端手牌镜像新增+刷新（快照权威自愈）
 
         CardGain = 22, // 购买批（决策八十六，2026-10-22）：购买单位卡入手牌（角色/建筑——物品卡复用 ItemGain）——客户端手牌镜像新增+刷新（快照权威自愈）
+
+        [InspectorName("资源点采集")]
+        ResourceHarvest = 23, // 资源点批（docs/47，2026-10-27）：站立/途经采集事实——value=获得摩拉、metadata=采集后剩余次数（0=已耗尽）、cell=资源点格、actorUnitId=采集者单位；玩家摩拉入账仍走 StatChange(StatKindMora) 单源（MoraGainEffect 产出——本命令不承载玩家池写）；客户端=BattleBoard 余量刷新/耗尽移除+采集飘字
     }
 
     /// <summary>
@@ -487,6 +490,25 @@ namespace GIC.Data
                 indexInSlice = indexInSlice,
                 metadata = unitName,
                 value = count,
+            };
+        }
+
+        /// <summary>资源点采集命令工厂（docs/47 资源点批，2026-10-27）。actorUnitId=采集者单位、
+        /// value=本次获得摩拉、metadata=采集后剩余次数（0=已耗尽→客户端移除表现件）、
+        /// cell=资源点格。玩家摩拉入账由 MoraGainEffect→StatChange(StatKindMora) 单源承载
+        /// （本命令只镜像资源点侧事实+采集飘字，勿在客户端消费本命令做池写）</summary>
+        public static BattleCommand ResourceHarvest(string collectorUnitId,
+            int sliceIndex, int indexInSlice, BattleCell nodeCell, int moraGain, int remaining)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.ResourceHarvest,
+                actorUnitId = collectorUnitId,
+                sliceIndex = sliceIndex,
+                indexInSlice = indexInSlice,
+                cell = nodeCell,
+                value = moraGain,
+                metadata = remaining,
             };
         }
 

@@ -93,6 +93,11 @@ namespace GIC.Battle
         /// 同格互斥（单位所在格恒已探索）不同格屏幕不叠=层序安全）</summary>
         public const int WaterSurfaceSortingOrder = -3;
 
+        /// <summary>摩拉堆表现件（docs/47 追拍 2026-10-27「摩拉堆直接用摩拉素材」：官方 mora.png 立式
+        /// 小片堆=透明件须显式排序——与水面/薄冰同层 -3：合法同序形态=同格互斥〔'$' 布局字符只落
+        /// 草地格、水面格无堆〕+被雾面（-2）恒罩=未探索格自动雾暗〔透明序通则：雾面后画恒盖〕）</summary>
+        public const int MoraPileSortingOrder = -3;
+
         /// <summary>对战迷雾面（2026-10-17 迷雾批：半透明暗雾盖未探索格——水面 -3 之上、底座盘 -1 之下）</summary>
         public const int FogOverlaySortingOrder = -2;
 

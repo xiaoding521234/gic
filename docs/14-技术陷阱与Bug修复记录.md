@@ -2401,3 +2401,17 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **通则**：①**不可见 UI（全透明 Image/空文本 TMP）=射线命中与可见内容无关，凡「背景板/接板」不该拦点击的一律 raycastTarget=False**；②给 ScrollRect 配拖拽接板前先问「内容自身能否承射线」——行/卡自带命中层时接板是多余的死区源；③改动会放大既有隐形接板的覆盖面（宽度/高度/位置变化）时，顺手扫一遍该区域 raycast 现状（`GetComponentsInChildren<Graphic>` 列 raycastTarget+alpha 一眼定责）。
 
+## §176 透明件「件间微序」击穿层边界+高度不参与透明排序=「坐标高于水面却像在水下」（2026-10-28 决策九十三返修二实锤「摩拉堆顶件像在水下」）
+
+**症状**：水边摩拉堆顶部三枚（世界 y 明明高于水面）隔着半透明水面显示=「像在水下」；平移视角更明显。
+
+**根因（两层）**：①**透明排序与世界坐标高度完全无关**——透明材质不写 Z-buffer（防半透明像素挡住后方），透明件之间只按 sortingOrder 数值排（Unity 官方 Renderer.sortingOrder：数值大=近相机；Camera.transparencySortMode：默认按距离排也不按高度）。「堆件位置高于水面」这一几何事实在透明管线里**没有任何表达渠道**。②**件间递减序击穿层边界**：返修一为防共面闪烁给件设 `sortingOrder=−3−index`（顶件 −12），低于水面（−2）→ 水面后画、半透明叠在顶件上；顶件 55° 面内向上恰朝远侧水面伸出，屏幕与水面格重叠。
+
+**修法（HD-2D 路线，调研档案=.codely-cli/webrefs/mora-sorting-2026-10/）**：硬边小件与透明面（水面/雾面）混排时改 **cutout（alpha clip）+ZWrite=1+AlphaTest 队列**（`BattleViewFactory.CreateCutoutUnlitTexturedMaterial`）：件先画写深度，后画的透明面 depth test 自动只在无更近深度处混合——「高于水面=盖住水面」由深度管线机制性保证（Square Enix Octopath/三角战略 billboard 融 3D 场景同构）。**共面重叠件须配法向微偏移防 z-fight**（同平面重叠区深度全等）：件局部 z 分量按 index 单调偏移 0.0025/件（每件独立平行平面，深度差≫深度精度 LSB≈0.00024@z=35；底排最近相机=正确遮挡序）。
+
+**验证方法（可复用）**：隔离渲染对照实验（独立相机+RT+程序纹理）——cutout 金件（近）+透明蓝面（远）重叠区像素=纯金零蓝染（深度剔除生效）；对照组（金件改透明材质+透明面后画）=明显混合色——两态可分辨证明实验装置有效；勿只断言材质参数不断言渲染结果。
+
+**通则**：①**「物体高于透明面应盖住它」类需求一律走 cutout/不透明+深度缓冲，勿用 sortingOrder 手排**——order 是层标不是几何；②给透明件排**件间微序**（−index/+index 类）必须核对结果与全库所有透明层（水面−2/雾−2/盘−1/瞄准0/立牌10/箭矢12）的相对关系——微序击穿层边界=同病；③cutout 化的共面件家族必配法向微偏移（纯共面+ZWrite=z-fighting）；④cutoff 边缘锯齿在硬边图标小件（≤30px）上不可辨，不满意调低 _Cutoff。
+
+**统一现状（2026-10-28 收尾盘点，回答「是否全部 HD-2D」）**：战场表现件两翼架构定案——**贴地硬边 props 家族全量深度管线**（草簇 BattleGrassSway=AlphaTest+clip+ZWrite〔2026-09-27 起先例〕+摩拉堆件 cutout〔本批〕）；**半透明介质与特效/标记层维持 alpha blend+层梯**（水面 BattleWaterFlow〔Transparent-1/Blend/ZWrite Off〕、薄冰、雾面/混沌盖、底座圆盘、瞄准贴片/箭头带、立牌 ChromaKeyVideo/FrozenSprite〔视频抠像连续 alpha 软边——blend 保画质〕、箭矢、OrbitBeams）——Octopath 同构（精灵 cutout、水透明），两翼互补非替代。**cutout 化顺带修复潜在遮挡错误**：旧层梯下「立牌/箭矢在摩拉堆后方却被画在堆前」（order 10/12 > 堆层无法表达几何前后）——现由深度管线正确裁决，立牌/箭矢零改动。
+

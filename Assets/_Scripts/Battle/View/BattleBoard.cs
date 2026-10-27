@@ -94,6 +94,7 @@ namespace GIC.Battle
                 if (mesh != null) Destroy(mesh);
             _runtimeMeshes.Clear();
             if (_thinIceMaterial != null) Destroy(_thinIceMaterial);
+            if (_moraPileMaterial != null) Destroy(_moraPileMaterial); // 灰盒材质实例清理（§63 纪律）
         }
 
         /// <summary>
@@ -150,6 +151,195 @@ namespace GIC.Battle
 
             BuildWaterSurface(map);
             RebuildThinIceSurface(); // 幂等（初始地图无薄冰=空面板；防御性支持已含薄冰的重建）
+            RebuildResourceNodes(map.resourceNodes); // 资源点表现件（docs/47：开局态；快照/命令增量维护）
+        }
+
+        // ==================== 资源点表现（docs/47 资源点批，2026-10-27；同日追拍「直接用摩拉素材+
+        // 数量随采集变少」；2026-10-28 返修一=55° 平面内堆叠+迷雾隐藏；返修二=透明排序→cutout 深度管线） ====================
+        // 摩拉堆=官方 mora.png（ItemConfig.Mora icon[0] 同源）立式小片堆：**件数=剩余可采次数**
+        //（满堆 10 件金字塔〔底 4/二 3/三 2/顶 1〕，采集 1 次=顶件隐藏，余 1 件=底排居中）——
+        // 「显示的摩拉数量也变少」拍板直译。
+        // **材质=cutout（AlphaTest 2450+ZWrite On，2026-10-28 返修二「顶件像在水下」）**：返修一的
+        // 件层序（sortingOrder=−3−index）把顶件压到水面（−2）之下——透明材质不写 Z-buffer、
+        // 透明件之间只按 sortingOrder 排（**与世界坐标高度无关**，Unity 官方 Renderer.sortingOrder
+        // 口径），水面后画半透明叠上=顶件隔水观感。**业界正解（HD-2D 路线，调研=Octopath billboard
+        // 深度管线+newarteest「hard-edged cutouts 深度排序正确」）**：硬边小件走 cutout 写深度，
+        // 先画并占据深度，后画的透明面（水面/雾面/立牌/瞄准贴片）depth test 自动只在无更近深度处
+        // 混合——「高于水面就盖住水面」由 Z-buffer 机制保证，不再依赖手排 order。
+        // 挂 BattleMain 层=地脉视角 culling mask 自动隐藏（BattleViewFactory.SetMainWorldLayer 单口）。
+
+        /// <summary>格→资源点表现件（每格至多一个；Build 清空重建/命令增量维护）</summary>
+        private readonly Dictionary<BattleCell, GameObject> _resourceNodeViews = new Dictionary<BattleCell, GameObject>();
+
+        /// <summary>堆件迷雾隐藏态缓存（cell→hidden；跨快照重建存续——回合头 RebuildResourceNodes
+        /// 重建件按缓存态落地，防「回合头未探索堆闪现一帧再隐藏」）</summary>
+        private readonly Dictionary<BattleCell, bool> _resourceNodeFogHidden = new Dictionary<BattleCell, bool>();
+
+        /// <summary>摩拉件共享材质（OnDestroy 清理实例——_thinIceMaterial 同款纪律）</summary>
+        private Material _moraPileMaterial;
+
+        /// <summary>摩拉件 55° 面旋转（布局面内坐标→世界偏移的变换单源；yaw 抖动只转件自身
+        /// 不改堆叠面——「堆叠在他们自己的55度平面内」2026-10-28 返拍的本体）</summary>
+        private static readonly Quaternion MoraChunkPlaneRotation = Quaternion.Euler(55f, 0f, 0f);
+
+        /// <summary>摩拉件固定堆叠布局（金字塔从底到顶；件数=remainingCharges 从底部取前 N 件——
+        /// 采集从顶减=堆自然变小；余 1 件=底排居中）。**坐标=件局部系**（2026-10-28 返修一
+        /// 「应当堆叠是在他们自己的55度平面内」+返修二 z 分量语义）：x=面内横向〔世界 X〕、
+        /// y=面内高度〔沿面内向上 u=(0,cos55°,sin55°)=上+远离相机；行进 0.10/排=上排件自下排
+        /// 件顶探出；底排 y=0.20=半件面内高→件底边恰触地块表面〕、**z=法向微偏移**
+        /// 〔返修二：0.0025×(9−index) 底排最朝相机逐件递减——件横距 0.17<件宽 0.40、行距 0.10
+        /// <件高 0.40 均屏幕重叠，纯共面则 cutout ZWrite 下重叠区深度全等=z-fighting；法向逐件
+        /// 错开=每件独立平行平面（深度差 0.0025 起≫深度精度），底排（近）恒盖上排（远）下缘
+        /// =金字塔正确遮挡；总量 ≤0.023 视觉不可辨，法向偏移同时微沉底件=插入表面更扎实〕——
+        /// 世界偏移=MoraChunkPlaneRotation×(x,y,z)。确定性写死零随机。
+        /// 旧版=世界系垂直抬升+z 朝相机倒伏（上排悬空探向镜头）——平移视角时上层件与堆体脱开
+        /// =「上面的摩拉在浮空」报障根因，勿回退。2026-10-27 二次追拍「摩拉要调大」：
+        /// 件 0.24→0.40 格+布局放大 ~1.5×（屏上约 27px/枚；首版 0.24〔约 16px/枚〕被用户目检
+        /// 「完全未看见」淘汰）</summary>
+        private static readonly Vector4[] MoraChunkLayout =
+        {
+            // 底排 4 件（y=0.20=半件面内高，件底边触地；z 法向偏移最大=最朝相机）
+            new Vector4(-0.265f, 0.20f, 0.0225f,  12f),
+            new Vector4(-0.088f, 0.20f, 0.0200f,  -7f),
+            new Vector4( 0.084f, 0.20f, 0.0175f,  16f),
+            new Vector4( 0.258f, 0.20f, 0.0150f, -11f),
+            // 二排 3 件（面内 +0.10）
+            new Vector4(-0.171f, 0.30f, 0.0125f, -14f),
+            new Vector4( 0.012f, 0.30f, 0.0100f,   9f),
+            new Vector4( 0.192f, 0.30f, 0.0075f,  -5f),
+            // 三排 2 件
+            new Vector4(-0.072f, 0.40f, 0.0050f,   7f),
+            new Vector4( 0.117f, 0.40f, 0.0025f, -13f),
+            // 顶 1 件（法向偏移 0=基准面）
+            new Vector4( 0.018f, 0.50f, 0.0000f,   4f),
+        };
+
+        /// <summary>资源点表现件全量重建（Build 开局态+回合头快照权威自愈同口）</summary>
+        public void RebuildResourceNodes(List<ResourceNodeState> nodes)
+        {
+            foreach (var view in _resourceNodeViews.Values)
+                if (view != null) DestroyResourceNodeView(view);
+            _resourceNodeViews.Clear();
+            if (nodes == null) return;
+            foreach (var node in nodes)
+            {
+                if (node == null || node.remainingCharges <= 0) continue;
+                var view = CreateResourceNodeView(node);
+                if (view != null) _resourceNodeViews[node.cell] = view;
+            }
+        }
+
+        /// <summary>采集增量（ResourceHarvest 命令客户端入口）：**件数=剩余次数**（追拍「数量随采集
+        /// 变少」）——remaining>0=隐藏顶部 (N−remaining) 件；=0=表现件整体移除（耗尽消失拍板⑤）。
+        /// 幂等：未知格直通</summary>
+        public void ApplyResourceHarvest(BattleCell cell, int remaining)
+        {
+            if (!_resourceNodeViews.TryGetValue(cell, out var view)) return;
+            if (view == null) { _resourceNodeViews.Remove(cell); return; }
+            if (remaining <= 0)
+            {
+                DestroyResourceNodeView(view);
+                _resourceNodeViews.Remove(cell);
+                return;
+            }
+            ApplyChunkCount(view, remaining);
+        }
+
+        /// <summary>表现件销毁（双域安全——BattleSimState.RemoveUnit 同款纪律：编辑模式 Destroy
+        /// 报错且静默不销毁〔地图预览/编辑器域断言路径会踩〕，isPlaying 分流）</summary>
+        private static void DestroyResourceNodeView(GameObject view)
+        {
+            if (Application.isPlaying) Destroy(view);
+            else DestroyImmediate(view);
+        }
+
+        /// <summary>摩拉件堆建件：件数=remainingCharges（追拍语义本体），根下 N 子件按
+        /// MoraChunkLayout 前 N 位摆（透明贴图材质=mora.png 白 tint）</summary>
+        private GameObject CreateResourceNodeView(ResourceNodeState node)
+        {
+            if (Map == null) return null;
+            if (_moraPileMaterial == null)
+            {
+                var tex = UnityEngine.Resources.Load<Texture2D>("UI/Items/mora"); // 官方摩拉图标（ItemConfig.Mora icon[0] 同源）
+                // cutout 材质（2026-10-28 返修二）：写深度+AlphaTest 队列——与水面等透明面由
+                // depth test 机制性正确遮挡（「高于水面=盖住水面」），透明排序病灶根治
+                _moraPileMaterial = BattleViewFactory.CreateCutoutUnlitTexturedMaterial(tex, Color.white);
+            }
+
+            var rootGo = new GameObject($"ResourceNode_{node.cell.x}_{node.cell.y}");
+            rootGo.transform.SetParent(_tilesRoot, false);
+            // **堆放地块表面**（2026-10-27 返修二真根因）：TileBottomPosition=预制体底面中心（y=0），
+            // 地块是厚 _tileTopHeight(0.5) 的 3D 块——首版堆从底面起算=整堆埋进地形块内部，
+            // 相机全图渲染四堆窗金像素=0、用户两轮「完全未看见」（灰盒版同错故从未可见）；
+            // 草簇能见=GetSurfaceHeight 贴表面先例。抬升走 _tileTopHeight 序列化值（勿写死 0.5 双源）
+            rootGo.transform.localPosition = TileBottomPosition(node.cell.x, node.cell.y)
+                + new Vector3(0f, _tileTopHeight, 0f);
+            BattleViewFactory.SetMainWorldLayer(rootGo); // 地脉视角自动隐藏（子件层随根同步见 SpawnMoraChunk）
+            int count = Mathf.Clamp(node.remainingCharges, 0, MoraChunkLayout.Length);
+            for (int i = 0; i < count; i++)
+                SpawnMoraChunk(rootGo.transform, i);
+            if (_resourceNodeFogHidden.TryGetValue(node.cell, out var fogHidden) && fogHidden)
+                rootGo.SetActive(false); // 迷雾隐藏态跨重建保持（防回合头快照重建未探索堆闪现一帧）
+            return rootGo;
+        }
+
+        /// <summary>按件数刷子件显隐（采集增量——从顶减：显示前 remaining 件=布局表从底取，余 1 件
+        /// 落在底排居中附近）</summary>
+        private static void ApplyChunkCount(GameObject view, int remaining)
+        {
+            int target = Mathf.Clamp(remaining, 0, MoraChunkLayout.Length);
+            for (int i = 0; i < view.transform.childCount; i++)
+            {
+                var chunk = view.transform.GetChild(i);
+                if (chunk.name.StartsWith("MoraChunk"))
+                    chunk.gameObject.SetActive(i < target);
+            }
+        }
+
+        /// <summary>资源点迷雾显隐（BattleFog 每帧消费，2026-10-28 返修拍板「摩拉堆在迷雾中应当
+        /// 隐藏」）：未探索格堆件整体隐藏（表现层镜像——探索过永久可见同单位口径；采集角色对
+        /// 资源点的透视=AI 感知层豁免〔CompanionBrain 采集候选不查探索账本，核心透视 IsUnitVisibleTo
+        /// 同构〕，客户端渲染无透视）。幂等：隐藏态未变零开销；写入缓存供重建路径（Create 时落地）
+        /// 消费——防回合头快照重建闪现</summary>
+        public void ApplyResourceNodeFogVisibility(System.Func<BattleCell, bool> isVisible)
+        {
+            foreach (var kv in _resourceNodeViews)
+            {
+                if (kv.Value == null) continue;
+                bool hidden = !isVisible(kv.Key);
+                if (_resourceNodeFogHidden.TryGetValue(kv.Key, out var prev) && prev == hidden) continue;
+                _resourceNodeFogHidden[kv.Key] = hidden;
+                kv.Value.SetActive(!hidden);
+            }
+        }
+
+        /// <summary>单枚摩拉小片：Quad 0.40 立式后仰 55°（草簇同款「顶部远离相机后仰」姿态）+yaw 抖动
+        ///（布局表确定性）；**布局偏移经 55° 平面旋转变换落地**（2026-10-28 返修一「堆叠在他们自己
+        /// 的55度平面内」——件局部系坐标含法向微偏移，见 MoraChunkLayout 注释）；材质=cutout 写深度
+        ///（返修二）——件间遮挡由 depth test 决定（法向偏移逐件分离防 z-fighting、底排近=盖上排），
+        /// 与水面/雾面/立牌的遮挡同样由深度管线承载；sortingOrder 统一登记层位（cutout 队列内
+        /// order 只影响绘制顺序不影响结果，留作未来查层定位）。
+        /// **角度符号=+55 勿改负**（2026-10-27 返修：-55° 把 Quad 法线转到朝下 (0,−0.819,−0.574)
+        /// =相机俯视只见背面，URP Unlit 默认 Cull Back 剔除=整堆隐形〔用户报障「怎么没看到有摩拉」
+        /// 根因〕；+55° 法线 (0,+0.819,−0.574) 朝上偏相机侧=正面可见。Quad 正面法线朝 −Z（草簇无
+        /// 此坑=自建 mesh 手排法线+Cull Off；ChromaKeyVideo/FrozenSprite 同族「翻面剔除」先例）。
+        /// Collider 销毁双域安全（编辑模式 Destroy 报错不销毁——RemoveUnit 同款纪律）</summary>
+        private void SpawnMoraChunk(Transform parent, int layoutIndex)
+        {
+            var chunk = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            chunk.name = "MoraChunk";
+            var collider = chunk.GetComponent<Collider>();
+            if (Application.isPlaying) Destroy(collider); // 资源点非物理件（勿挡射线/碰撞）
+            else DestroyImmediate(collider);
+            chunk.transform.SetParent(parent, false);
+            var layout = MoraChunkLayout[layoutIndex];
+            chunk.transform.localPosition = MoraChunkPlaneRotation * new Vector3(layout.x, layout.y, layout.z);
+            chunk.transform.localRotation = Quaternion.Euler(55f, layout.w, 0f);
+            chunk.transform.localScale = Vector3.one * 0.40f; // 2026-10-27 二次追拍「摩拉要调大」：0.24→0.40（约 27px/枚）
+            var renderer = chunk.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = _moraPileMaterial;
+            renderer.sortingOrder = BattleMetrics.MoraPileSortingOrder; // 层位登记（遮挡由深度管线决定，勿再加 −index）
+            chunk.layer = parent.gameObject.layer; // 维度层随根
         }
 
         /// <summary>地形变化应用（决策七十六元素×地形，TerrainChange 命令客户端入口）：

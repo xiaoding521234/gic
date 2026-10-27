@@ -65,6 +65,9 @@ namespace GIC.Data
         public Color 反应冻结色 = new Color(0.353f, 0.549f, 1f);
         [Tooltip("反应伤害数字色——超导（决策七十四实装：长春花蓝紫 #B4B4FF——超导图标双色调=冰青#428C97×雷紫#703FBF/#D59EF8〔webrefs/damage-number-colors 实测〕，与 Baity #B4B4FF 互证；比冻结深冰蓝更亮更紫、比雷淡紫 #E19BFF 更蓝=三向互异）")]
         public Color 反应超导色 = new Color(0.706f, 0.706f, 1f);
+        [Tooltip("采集数字色（docs/47 资源点批，2026-10-27）：摩拉堆采集「+N」飘字=摩拉亮暖金 #FFD65E"
+                + "——比岩淡金 #FFCC66 更亮更黄=摩拉钱袋意象、与伤害数字族互异")]
+        public Color 采集摩拉色 = new Color(1f, 0.837f, 0.369f);
         [Tooltip("原神式伤害数字（BattleDamageNumbers）的黑描边色")]
         public Color 伤害数字描边色 = new Color(0.04f, 0.03f, 0.03f, 0.85f);
         [Tooltip("头顶条元能填充色（BattleOverheadBars 元能条，2026-09-24；09-25 目检拍板改白色）")]

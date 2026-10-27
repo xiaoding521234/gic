@@ -612,6 +612,19 @@ namespace GIC.Battle
                 Palette.灵魂蓝, value, _playbackSpeed);
         }
 
+        /// <summary>采集数字（docs/47 资源点批）：资源点格上弹「+N」摩拉金飘字——锚=资源点世界位
+        ///（摩拉从堆里出来，比锚在采集者身上直观）；采集者归属玩家与采集路径（站立/途经）不区分
+        /// 弹字（同堆双路径弹同款）。抬升 0.55=堆顶之上（2026-10-28 返修堆叠 55° 平面化后堆顶
+        /// ≈表面+0.42，旧 0.35 会扎进顶件）</summary>
+        private void SpawnMoraHarvestNumber(BattleCell cell, int moraGain)
+        {
+            if (_board == null || moraGain <= 0) return;
+            var palette = Palette != null ? Palette : BattlePalette.Instance;
+            if (palette == null) return;
+            var pos = _board.CellToWorld(cell) + new Vector3(0f, 0.55f, 0f);
+            EnsureDamageNumbers().Spawn(pos, $"+{moraGain}", palette.采集摩拉色, moraGain, _playbackSpeed);
+        }
+
         // ==================== 消息处理（客户端侧） ====================
 
         public void OnBattleStart(BattleStartMessage message)
@@ -661,6 +674,11 @@ namespace GIC.Battle
                         state.accessoryDurability); // 装备态（权威态；装备批 2026-10-18）
                 }
             }
+
+            // 资源点权威态自愈（docs/47）：回合头快照整表覆盖（采集时刻变化走 ResourceHarvest 命令
+            // 增量；重连/漏命令场景由本口兜底对齐）
+            if (_board != null)
+                _board.RebuildResourceNodes(message.snapshot.resourceNodes);
 
             SnapshotUpdated?.Invoke(message.snapshot);
         }
@@ -1459,6 +1477,40 @@ namespace GIC.Battle
                         }
                         break;
 
+                    case BattleCommandType.ResourceHarvest:
+                        // 资源点采集（docs/47，2026-10-27）：采集事实镜像——BattleBoard 表现件余量/耗尽
+                        // 维护+资源点位置弹「+N」摩拉金飘字（采集是玩家可见的主动交互，默认弹——
+                        // 与「元能获取弹数字」默认关不同：采集场景少且是资源点核心反馈）。
+                        // 玩家摩拉入账由 StatChange(StatKindMora) 既有链承载（本命令零池写）。
+                        // **命中时刻到点应用（2026-10-28 返修「表现对齐动画」）**：途经采集
+                        // launchMs=行走到达堆格时刻（Host 按 i×MoveStepSeconds+k×CommandStaggerSeconds
+                        // 同源计算）——到点再减件/弹字（段首即减=安柏还没走到堆顶件就没了）；
+                        // 0=立即（回合末站立采集）。
+                        // 迷雾口径（2026-10-28 返修「摩拉堆在迷雾中应当隐藏」）：堆格对本端未探索=
+                        // 零飘字（堆件已隐藏，凭空浮字会泄露位置；我方采集者途经格必然已揭雾，
+                        // 本门实际只拦敌方迷雾内采集）
+                        if (_board != null)
+                        {
+                            var harvestCell = command.cell;
+                            var harvestRemaining = command.metadata;
+                            var harvestGain = command.value;
+                            if (command.launchMs > 0)
+                                playbacks.Add(StartCoroutine(PlayDelayedStateApply(LaunchDelayOf(command), () =>
+                                {
+                                    if (_board == null) return;
+                                    _board.ApplyResourceHarvest(harvestCell, harvestRemaining);
+                                    if (_fog == null || _fog.IsExplored(harvestCell))
+                                        SpawnMoraHarvestNumber(harvestCell, harvestGain);
+                                })));
+                            else
+                            {
+                                _board.ApplyResourceHarvest(harvestCell, harvestRemaining);
+                                if (_fog == null || _fog.IsExplored(harvestCell))
+                                    SpawnMoraHarvestNumber(harvestCell, harvestGain);
+                            }
+                        }
+                        break;
+
                     case BattleCommandType.Reaction:
                         // 反应发生事件：冻结=立牌冰色即时同步（此前冰色只随快照来，反应当回合不显）；
                         // 融化=反应爆发特效属 B5/B6 画面批次，此处仅留挂点。
@@ -1476,11 +1528,12 @@ namespace GIC.Battle
                     case BattleCommandType.StatChange:
                         // 属性变化增量：元能（B6a）→单位缓存；摩拉/体力（B6d）→玩家资源事件——
                         // 玩家资源命令的 targetUnitId=玩家 ID 不在 _views，先分流否则被静默丢弃。
-                        // 摩拉掠夺命令带命中时刻（B-3，同元能「命中时才给」）：launchMs>0 到点再应用
+                        // 摩拉掠夺（B-3）/途经采集体力（2026-10-28 返修）带命中时刻：launchMs>0
+                        // 到点再应用（行走到达堆格再跳 chips，与堆减件/飘字同拍）
                         if (command.metadata == BattleCommand.StatKindMora
                             || command.metadata == BattleCommand.StatKindStamina)
                         {
-                            if (command.metadata == BattleCommand.StatKindMora && command.launchMs > 0)
+                            if (command.launchMs > 0)
                                 playbacks.Add(StartCoroutine(PlayResourceDeltaCoroutine(command)));
                             else
                                 OnResourceDelta?.Invoke(command.targetUnitId, command.metadata, command.value);

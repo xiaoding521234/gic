@@ -19,6 +19,10 @@ namespace GIC.Data
         /// <summary>玩家出生区（3x3 石路中心格）</summary>
         public List<BattleCell> spawnCenters = new List<BattleCell>();
 
+        /// <summary>开局资源点（docs/47，2026-10-27：非地形非单位不占体积——独立实体随地图协议
+        /// 一次下发；每格至多一个；采集余量变化走 ResourceHarvest 命令增量+回合头快照自愈）</summary>
+        public List<ResourceNodeState> resourceNodes = new List<ResourceNodeState>();
+
         /// <summary>地图所属势力（FactionType 的 int 值）：HUD 徽标等表现层取用（B7 客户端无 mapConfig 资产）</summary>
         public int faction;
 

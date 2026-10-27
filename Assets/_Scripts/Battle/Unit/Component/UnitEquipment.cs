@@ -264,6 +264,23 @@ namespace GIC.Battle
             return recovered;
         }
 
+        /// <summary>采集事件入口（docs/47 资源点批，2026-10-27 接线——决策八十一挂账义务销案）：
+        /// 采集者每次采集（站立/途经两路径统一调本口），对**全部已装备耐久件**各恢复 1——
+        /// 数据驱动单源（描述文案绑定兔兔伯爵，现役耐久件仅此一件；未来「采集恢复」型装备零代码）。
+        /// 耐久件判定=MaxDurabilityOf>0（纯词条武器恒满/堆叠件勾玉=层语义，均不吃采集恢复）；
+        /// 恢复经 RecoverDurability 单口（跨 0 恢复重挂词条同款）</summary>
+        public void OnCollect()
+        {
+            if (_weapon.HasValue && MaxDurabilityOf(_weapon.Value) > 0)
+                RecoverDurability(_weapon.Value, 1);
+            for (int i = 0; i < _accessories.Count; i++)
+            {
+                var item = _accessories[i];
+                if (!item.HasValue || MaxDurabilityOf(item.Value) <= 0) continue;
+                RecoverDurability(item.Value, 1);
+            }
+        }
+
         /// <summary>指定配件槽耐久（槽号越界=0）</summary>
         public int GetAccessoryDurability(int slotIndex)
             => slotIndex >= 0 && slotIndex < _accessoryDurability.Count ? _accessoryDurability[slotIndex] : 0;

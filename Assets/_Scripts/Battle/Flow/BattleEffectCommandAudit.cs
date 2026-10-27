@@ -46,6 +46,7 @@ namespace GIC.Battle
             var removeBuffKeys = new HashSet<string>(); // RemoveBuff 命令目标索引（冻结层归零解冻对账用，决策七十四）
             var terrainKeys = new HashSet<string>(); // 地形变化命令格索引（元素×地形对账用，决策七十六）
             var equipKeys = new HashSet<string>(); // 装备命令单位索引（装备批 2026-10-18 对账用）
+            var harvestKeys = new HashSet<string>(); // 资源点采集命令 (采集者:格) 索引（docs/47 对账用）
             foreach (var command in commands)
             {
                 switch (command.type)
@@ -93,6 +94,9 @@ namespace GIC.Battle
                     case BattleCommandType.EquipItem:
                     case BattleCommandType.UnequipItem:
                         equipKeys.Add(command.targetUnitId);
+                        break;
+                    case BattleCommandType.ResourceHarvest:
+                        harvestKeys.Add($"{command.actorUnitId}:{command.cell.x}:{command.cell.y}");
                         break;
                 }
             }
@@ -163,6 +167,21 @@ namespace GIC.Battle
                     // 有产出=StatChange(StatKindMora)
                     if (moraSpend.AppliedAmount > 0 && !moraKeys.Contains(moraSpend.TargetUnitId))
                         Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is MoraGainEffect moraGain)
+                {
+                    // 资源点批（docs/47，2026-10-27——MoraSpend 获取侧对偶）：效应→StatChange(StatKindMora)
+                    //（同玩家多源摩拉变化按玩家查存在性，同 MoraSpend/Stamina 键口径）
+                    if (!moraKeys.Contains(moraGain.TargetUnitId))
+                        Report(context, effect, BattleCommandType.StatChange);
+                }
+                else if (effect is ResourceHarvestEffect harvest)
+                {
+                    // 资源点批（docs/47）：采集事实→ResourceHarvest 命令（每采集事件一条；2026-10-28
+                    // 返修后同采集者同格同片可连采至多 CollectCount 次=多事件同键——对账按键存在性
+                    // 即可，多条同键不冲突；站立/途经路径同键不冲突）
+                    if (!harvestKeys.Contains($"{harvest.TargetUnitId}:{harvest.NodeCell.x}:{harvest.NodeCell.y}"))
+                        Report(context, effect, BattleCommandType.ResourceHarvest);
                 }
                 else if (effect is ItemConsumeEffect itemConsume)
                 {

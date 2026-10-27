@@ -24,6 +24,8 @@ namespace GIC.Data
     /// <summary>
     /// 战场地图配置（字符行布局，可读可手编）
     /// 字符约定：G=草地 W=水 S=石路 P=平原 D=土地 C=圆石 .=虚空（无地形）
+    /// $=摩拉堆（docs/47 资源点批，2026-10-27：该格地形回落草地 + 开局摩拉堆
+    /// 〔ResourceNodeMetrics.MoraPileMaxCharges 次可采〕——非地形非单位不占体积）
     /// </summary>
     [CreateAssetMenu(fileName = "BattleMapConfig", menuName = "Game/BattleMapConfig")]
     public class BattleMapConfig : ScriptableObject
@@ -75,7 +77,21 @@ namespace GIC.Data
                 }
                 for (int x = 0; x < width; x++)
                 {
-                    data.tiles.Add((int)CharToTile(row[x]));
+                    char c = row[x];
+                    if (c == '$')
+                    {
+                        // '$'=摩拉堆（docs/47）：地形回落草地 + 资源点登记（每格至多一个；
+                        // 采集余量变化走 ResourceHarvest 命令增量+回合头快照自愈）
+                        data.tiles.Add((int)TileType.Grassland);
+                        data.resourceNodes.Add(new ResourceNodeState
+                        {
+                            kind = (int)ResourceNodeKind.MoraPile,
+                            cell = new BattleCell(x, y),
+                            remainingCharges = ResourceNodeMetrics.MoraPileMaxCharges,
+                        });
+                        continue;
+                    }
+                    data.tiles.Add((int)CharToTile(c));
                 }
             }
 
