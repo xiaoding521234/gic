@@ -27,6 +27,7 @@ namespace GIC.Battle
         public bool IsCorpse { get; private set; }
 
         private SpriteRenderer _avatarRenderer;
+        private BuildingModelView _buildingModel;
         private Transform _baseDisc;
         private Transform _baseDiscOutline; // 底座盘不透明黑描边环（2026-10-06 拍板；尸体压扁随盘同步）
 
@@ -126,6 +127,7 @@ namespace GIC.Battle
         /// sprite 本应禁）</summary>
         private void ApplyRenderables()
         {
+            if (_buildingModel != null) _buildingModel.SetVisible(!IsFogHidden && !IsDimensionHidden);
             if (_avatarRenderer != null) _avatarRenderer.enabled = _spriteVisible && !IsFogHidden && !IsDimensionHidden;
             if (_videoRenderer != null) _videoRenderer.enabled = _videoVisible && !IsFogHidden && !IsDimensionHidden;
             if (_baseDiscRenderer != null) _baseDiscRenderer.enabled = !IsFogHidden && !IsDimensionHidden && !IsSoulView;
@@ -165,7 +167,8 @@ namespace GIC.Battle
 
         /// <summary>头顶条锚点（世界坐标，含 55° 后仰偏移——血条/命座/Buff 行整簇以此为基准）</summary>
         public Vector3 OverheadBarAnchor =>
-            _tiltGroup != null ? _tiltGroup.TransformPoint(new Vector3(0f, OverheadRowY(HpBarY), 0f)) : transform.position;
+            _buildingModel != null ? transform.position + Vector3.up * OverheadRowY(HpBarY)
+            : _tiltGroup != null ? _tiltGroup.TransformPoint(new Vector3(0f, OverheadRowY(HpBarY), 0f)) : transform.position;
 
         // Buff 状态（快照权威 + ApplyBuff/RemoveBuff 命令增量；**数据载体**——视觉归 BattleOverheadBars
         // 屏幕空间层〔能量条下方图标行，2026-10-06 拍板〕，本类不再建世界空间徽章〔旧名字/Buff 徽章行
@@ -757,7 +760,8 @@ namespace GIC.Battle
         public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color ownerColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, VideoClip idleVideo = null,
-            float hoverHeight = 0f, float cylinderDiameter = 0f, float standForward = 0f)
+            float hoverHeight = 0f, float cylinderDiameter = 0f, float standForward = 0f,
+            GameObject buildingModel = null, float buildingModelWidth = 1f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -780,6 +784,16 @@ namespace GIC.Battle
             avatarGo.transform.localPosition = new Vector3(0f, hoverHeight, -standForward);
             avatarGo.transform.localRotation = Quaternion.Euler(tiltDegrees, 0f, 0f);
             view._tiltGroup = avatarGo.transform;
+
+            // 建筑 3D 模型分支（2026-10-28 骑士团总部接入）：模型本体挂 root（不随 55° 倾斜组），
+            // 仍保留隐藏的 sprite/视频状态链（RefreshTint/冻结/描边/拾取继续单源驱动）——模型只承接
+            // 可见性、着色与消散；头顶行高度改按模型实际显示高（OverheadBarAnchor 建筑分支）
+            if (buildingModel != null)
+            {
+                view._buildingModel = BuildingModelView.Create(root.transform, buildingModel, buildingModelWidth);
+                view._avatarDisplayHeight = view._buildingModel.DisplayHeight;
+                view._spriteVisible = false; // 兜底立牌意图关（模型路径在显）；ApplyRenderables 统一落地
+            }
 
             var spriteGo = new GameObject("Avatar");
             spriteGo.transform.SetParent(avatarGo.transform, false);
@@ -808,7 +822,8 @@ namespace GIC.Battle
             // 立牌循环动画视频（B-S3 视频路线）：绿幕 mp4 → VideoPlayer→RT → ChromaKey quad 运行时抠色。
             // 静态 sprite（上方已按同尺寸建好）保留作兜底但禁用——解码失败时 OnVideoError 恢复；
             // shader 缺失（构建剥离防线）时整块跳过=自然回落静态立牌
-            if (idleVideo != null && BattleViewFactory.ChromaKeyShader != null)
+            // 建筑 3D 模型路径不走视频立牌（模型本体已替代表现件）
+            if (buildingModel == null && idleVideo != null && BattleViewFactory.ChromaKeyShader != null)
             {
                 view._spriteVisible = false; // 视频路径建立：兜底 sprite 意图关（意图态，迷雾批单出口落地）
                 float videoDisplayHeight = AvatarHeight * avatarScale;
@@ -888,6 +903,7 @@ namespace GIC.Battle
             view._baseDiscOutline = outlineGo.transform;
             view._baseDiscOutlineRenderer = outlineGo.GetComponent<MeshRenderer>(); // 迷雾批：渲染器缓存
 
+            view.ApplyRenderables(); // 建筑模型路径在此落地隐藏兜底立牌；常规路径幂等直通
             view.SetHp(hp, maxHp);
 
             return view;
@@ -1113,6 +1129,8 @@ namespace GIC.Battle
         public bool TryGetPaperdollWorldCorners(Vector3[] corners)
         {
             if (corners == null || corners.Length < 4) return false;
+            if (_buildingModel != null)
+                return _buildingModel.IsVisible && _buildingModel.TryGetWorldCorners(corners); // 3D 建筑：包围盒朝相机面片（隐藏态拒绝命中；拾取链不改）
             if (_videoPlayer != null && !_videoFailed && _avatarVideoFlip != null)
             {
                 for (int i = 0; i < 4; i++)
@@ -1156,6 +1174,17 @@ namespace GIC.Battle
                 : IsFrozen && FrostSpriteMaterial == null ? Palette.冻结冰色 // shader 缺失兜底=纯冰色 tint
                 : Color.white;
             tint.a *= 1f - _dissolveAlpha;
+            if (_buildingModel != null)
+            {
+                // 3D 模型无 2D 霜化 shader——冻结直接落冰色 tint（shader 存在时 sprite tint 保持白，
+                // 模型须独立取冻结冰色，勿共用上面分支）
+                var modelTint = IsSoulView ? SoulTint()
+                    : IsCorpse ? Palette.立牌尸体灰
+                    : IsFrozen ? Palette.冻结冰色
+                    : Color.white;
+                modelTint.a *= 1f - _dissolveAlpha;
+                _buildingModel.SetTint(modelTint);
+            }
             _avatarRenderer.color = tint;
             if (_videoMaterial != null)
                 _videoMaterial.color = tint; // 视频路径同 tint（ChromaKey _Color，同 SpriteRenderer.color 语义）
@@ -1174,6 +1203,8 @@ namespace GIC.Battle
         public void SetDissolveAlpha(float alpha01)
         {
             _dissolveAlpha = Mathf.Clamp01(alpha01);
+            if (_buildingModel != null)
+                _buildingModel.SetDissolveAlpha(_dissolveAlpha); // 3D 材质切透明混合（一次性，消散全程有效）
             RefreshTint();
         }
 
@@ -1186,6 +1217,8 @@ namespace GIC.Battle
         /// </summary>
         public void FlashHit()
         {
+            if (_buildingModel != null && !IsCorpse)
+                _buildingModel.SetTint(Palette.受击闪红);
             if (_avatarRenderer != null && !IsCorpse)
                 _avatarRenderer.color = Palette.受击闪红;
             if (_videoMaterial != null && !IsCorpse)

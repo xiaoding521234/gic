@@ -2426,3 +2426,13 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **通则**：①**复用「攻击接近场」前先问目标语义——要「贴着打」还是「站上去」**：目标格可停且玩法要求占据（采集点/地产站/驻留点）必须 targetCellAsGoal，目标格是敌人/不可停才用邻格集；②**BFS 首步只给方向不给步数**——有目标落点的移动一律走 FindApproachStraightSteps 严格递减段（首步×走满 run 在拐点/越点场景必振荡，v6 已判死一次勿再犯）；③**「到达即驻留」类目标必须给该档让位权**（到达后无候选≠驻留——其它档会把单位移走）。
 **追拍补充（2026-10-28 同日用户拍板「站住采集的收益远不如用移动来回走」）**：③的让位权**只适用于「驻留=收益上限」的目标**（纯 tag 型采集者：站桩即其 1 采/回合上限）；单位收益结构是「移动路过＞驻留」时（途经配额型安柏：移动来回 3.5~7 采/回合 vs 站桩 1 采/回合）让位反而是错——**按收益结构定档：到达不是终态而是进入收获循环**（途经采集型改「收获档」=枚举移动采集价值最高的一步持续移动，估值与 Host 途经采集同口径：起点离场/终点到达都计、per-堆配额、落点存活堆+1 站立）。**通用教训：给 AI 定「到达目标后做什么」前先算驻留 vs 移动的收益差——勿把「站着」默认当最优驻点行为。**
 
+## §178 静态建筑提取件「顶部大量异样小贴图」=多子网格材质槽错配；3D 建筑接入必须沿用 UnitView 状态链（2026-10-28 骑士团总部屋顶实锤+接入批）
+
+**症状**：GI 提取的骑士团总部模型在编辑器预览中，屋顶与多个面显示大量密集重复的小贴图；用户目检直接报「顶部贴图是大量异样小贴图」。
+
+**根因（不是 UV、不是贴图本身）**：主 mesh `Area_MdBuild_KnightHQ02_Lod0` 含 8 个 g 组/子网格，原提取件只建了 Assembly/Column/Window 三材质并按猜测分派——多个子网格被配上 `Area_MdBuild_Column01`（细节平铺贴图）后按屋顶 UV 重复平铺=密集小图。**OBJ 导出不保存 MeshRenderer 材质槽映射**（只含 mesh/UV），子网格→材质的权威顺序在原始 GameObject JSON 的 `m_MeshRenderer.m_Materials` 里。
+
+**修法（可复用配方）**：①CLI 导出原始 GameObject JSON（`--types GameObject --export_type JSON --names "KnightHQ02"`）；②读 `m_MeshRenderer.m_Materials` 的 PathID 列表（与 submesh 序严格一一对应）；③逐 PathID 在 AssetMap 反查材质名；④再导出各材质 JSON 拿 `_MainTex/_BumpMap` PathID→AssetMap 反查贴图名→CLI 按名提取 diffuse/normal；⑤按八槽顺序重接 prefab（骑士团终表：sub0=Area_Mdcity_Wall09〔贴图=Area_Mdbuild_Wall06〕/sub1=Area_MdBuild_Wall09/sub2=Area_MdBuild_Wall08/sub3=KnightHQ02_Assembly01/sub4=Area_MdBuild_House_Roof_05〔屋顶〕/sub5=Area_Mdcity_Ground15/sub6=Window_Time/sub7=Area_Mdbuild_Stage）。**静态建筑多 g/submesh 不得凭名字猜材质或全铺同一图集**。
+
+**3D 建筑接入陷阱（同批实锤）**：①**建筑模型不得自建独立状态链**——血条/冻结/消散/维度隐藏/点击拾取全在 UnitView 既有单源里，新 `BuildingModelView` 只持模型渲染器/材质实例，状态由 UnitView 驱动（模型挂 root 不挂 55° 倾斜组，保留隐藏 sprite 承载状态链）；②**3D 模型冻结无 2D 霜化 shader**——模型 tint 须独立取冻结冰色（sprite 因 shader 存在保持白 tint，共用同一 tint 分支=模型冻结不变色）；③**消散前材质须一次性切透明混合**（URP opaque 材质 alpha 无效，写 `_Surface/_Blend/_SrcBlend/_DstBlend/_ZWrite`+keyword+queue）；④**模型拾取走包围盒朝相机面片**（`TryGetPaperdollWorldCorners` 建筑分支），勿让既有立牌面片逻辑拿到隐藏 sprite 的 bounds；⑤**宽度等比缩放按原始包围盒 X**——深度可大于 1 格（1.246），不是错误缩放。
+
