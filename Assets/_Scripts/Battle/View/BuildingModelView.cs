@@ -14,6 +14,8 @@ namespace GIC.Battle
         private Material[] _materials;
         private Bounds _localBounds;
         private bool _transparentForDissolve;
+        private Color _lastTint = Color.white;
+        private float _dissolveAlpha;
 
         public float DisplayHeight { get; private set; }
 
@@ -35,7 +37,7 @@ namespace GIC.Battle
             var instance = Instantiate(prefab);
             instance.name = prefab.name + "_Model";
             instance.transform.position = Vector3.zero;
-            instance.transform.rotation = Quaternion.identity;
+            instance.transform.localRotation = prefab.transform.localRotation;
             instance.transform.localScale = Vector3.one;
 
             var filters = instance.GetComponentsInChildren<MeshFilter>(true);
@@ -97,6 +99,8 @@ namespace GIC.Battle
 
         public void SetTint(Color tint)
         {
+            _lastTint = tint;
+            tint.a *= 1f - _dissolveAlpha;
             if (_materials == null) return;
             foreach (var material in _materials)
             {
@@ -110,6 +114,7 @@ namespace GIC.Battle
         {
             if (alpha01 <= 0f || _transparentForDissolve) return;
             _transparentForDissolve = true;
+            _dissolveAlpha = Mathf.Clamp01(alpha01);
             foreach (var material in _materials)
             {
                 if (material == null) continue;
@@ -123,6 +128,22 @@ namespace GIC.Battle
                 material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
                 material.renderQueue = (int)RenderQueue.Transparent;
             }
+            SetTint(_lastTint);
+        }
+
+        /// <summary>战斗时钟转窗户夜间发光系数：8:00—20:00 熄灭，其余时段点亮。</summary>
+        public static float NightTargetForMinutes(int minutes)
+        {
+            int hour = (minutes / 60) % 24;
+            return hour >= GIC.Tool.TimeUtility.DayStartHour && hour < GIC.Tool.TimeUtility.DayEndHour ? 0f : 1f;
+        }
+
+        public void SetNightEmission(float factor)
+        {
+            if (_materials == null) return;
+            foreach (var material in _materials)
+                if (material != null && material.HasProperty("_NightEmission"))
+                    material.SetFloat("_NightEmission", Mathf.Clamp01(factor));
         }
 
         /// <summary>供 UnitView 的既有面片拾取链消费：返回模型朝相机一侧的世界包围四角。</summary>

@@ -241,6 +241,7 @@ namespace GIC.Battle
         /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
         [Autowired] private UnitConfig _unitConfig;
         private TurnFlowController _flow;
+        private float _windowNightFactor = 1f;
 
         /// <summary>单位显示色解析器（2026-10-12 用户拍板「单位显示的颜色应当是玩家色，本游戏没有
         /// 队伍色，否则无法区分哪些单位是自己的，哪些是队友的」）：HUD Bind 注入 playerId→Color
@@ -370,6 +371,15 @@ namespace GIC.Battle
                     ClientSelectTimerExpired?.Invoke(_clientTurn);
                 }
             }
+
+            // 建筑窗灯只随战斗独立时钟变化；LAN 客户端按最新快照回合推导，不新建协议或灯光系统。
+            int battleMinutes = _flow != null ? _flow.BattleTimeMinutes
+                : TurnFlowController.BattleClockStartMinutes + TurnFlowController.BattleClockMinutesPerTurn
+                    * Mathf.Max(0, (LatestSnapshot?.turnNumber ?? 1) - 1);
+            float nightTarget = BuildingModelView.NightTargetForMinutes(battleMinutes);
+            _windowNightFactor = Mathf.MoveTowards(_windowNightFactor, nightTarget, Time.deltaTime * 2f);
+            foreach (var view in _views.Values)
+                if (view != null) view.SetNightEmission(_windowNightFactor);
 
             // 地脉滤镜灵雾漂移（决策九十一）：滤镜激活（alpha>0）才驱动——锚点慢正弦漂+透明度呼吸
             if (_leyLineFilterGroup != null && _leyLineFilterGroup.alpha > 0.01f)

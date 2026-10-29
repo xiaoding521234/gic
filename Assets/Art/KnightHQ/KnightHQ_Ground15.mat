@@ -8,12 +8,15 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: KnightHQ_Ground15
-  m_Shader: {fileID: 4800000, guid: 8d2bb70cbf9db8d4da26e15b26e74248, type: 3}
+  m_Shader: {fileID: 4800000, guid: 8d5d4b598d1c21146940c0140e5f33d3, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _NORMALMAP
-  m_InvalidKeywords: []
+  - _POM
+  - _SECOND_TEXTURE
+  m_InvalidKeywords:
+  - _INVERTBLEND_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -33,12 +36,32 @@ Material:
         m_Texture: {fileID: 2800000, guid: 2c7595c3dfe9fe6438817540f14e8b86, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 2800000, guid: 718a5152316c906469f37991f3fd2c4f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: 418fcbc143d87d248a523c1ea76411a1, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _POMHeightMap:
+        m_Texture: {fileID: 2800000, guid: 31f21b0e609f34b428c8786920bd217b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SecondaryBumpMap:
+        m_Texture: {fileID: 2800000, guid: 2c7595c3dfe9fe6438817540f14e8b86, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SecondaryDetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SecondaryTex:
+        m_Texture: {fileID: 2800000, guid: 34b4ebb1072bbac46a860fea74c3f462, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
@@ -66,10 +89,23 @@ Material:
     - _BumpScale: 1
     - _Cull: 2
     - _Cutoff: 0.5
+    - _DiffuseBlendIntensity: 0.35
     - _DstBlend: 0
     - _DstBlendAlpha: 0
+    - _EmissionStrength: 1
+    - _EmissionType: 0
+    - _EnablePOM: 1
+    - _EnableSecondTex: 1
     - _GlossinessSource: 0
+    - _InvertBlend: 1
+    - _NightEmission: 1
+    - _NormalBlendIntensity: 0
+    - _NormalMapEnabled: 1
+    - _POMHeight: 0.0227
     - _QueueOffset: 0
+    - _RGPower: 1
+    - _RGStrength: 0
+    - _ReceiveShadow: 1
     - _ReceiveShadows: 1
     - _Shininess: 0
     - _Smoothness: 0.5
@@ -84,6 +120,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _RGColor: {r: 1, g: 1, b: 1, a: 1}
     - _SpecColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
   m_BuildTextureStacks: []
 --- !u!114 &7857279241772994672

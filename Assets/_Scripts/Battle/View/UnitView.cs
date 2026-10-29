@@ -1182,7 +1182,6 @@ namespace GIC.Battle
                     : IsCorpse ? Palette.立牌尸体灰
                     : IsFrozen ? Palette.冻结冰色
                     : Color.white;
-                modelTint.a *= 1f - _dissolveAlpha;
                 _buildingModel.SetTint(modelTint);
             }
             _avatarRenderer.color = tint;
@@ -1195,6 +1194,12 @@ namespace GIC.Battle
                 discColor.a = WithDiscAlpha(discColor).a * (1f - _dissolveAlpha);
                 _baseDiscMaterial.color = discColor;
             }
+        }
+
+        /// <summary>建筑窗户的夜间发光系数（仅 3D 建筑分支消费；纸片立牌不受影响）。</summary>
+        public void SetNightEmission(float factor)
+        {
+            if (_buildingModel != null) _buildingModel.SetNightEmission(factor);
         }
 
         /// <summary>消散透明度（0=原样，1=全透明；决策八十六批B docs/45 §4——建筑+眷属死亡

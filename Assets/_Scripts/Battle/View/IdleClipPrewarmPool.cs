@@ -79,7 +79,6 @@ namespace GIC.Battle
             if (clip == null || targetRt == null) return false;
             if (!_frames.TryGetValue(clip, out var frame) || frame == null) return false;
             var prev = RenderTexture.active;
-            RenderTexture.active = targetRt;
             Graphics.Blit(frame, targetRt);
             RenderTexture.active = prev;
             return true;
