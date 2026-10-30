@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using GIC.Battle;
 using UnityEditor;
@@ -34,22 +35,77 @@ namespace GIC.Editor
                     "Create 保留 prefab 的默认朝向");
                 Check(Vector3.Dot(model.rotation * Vector3.right, Vector3.back) > 0.999f,
                     "实例正门 +X 朝向玩家 -Z");
+                Check(Mathf.Abs(view.DisplayHeight - 1.165275f) < 0.001f && Mathf.Abs(model.localScale.x - 0.021034f) < 0.00001f,
+                    "接触阴影不参与模型尺寸与居中计算");
+
+                var shadow = model.Find("ContactShadow")?.GetComponent<MeshRenderer>();
+                Check(shadow != null, "总部具有独立接触阴影表现件");
+                if (shadow != null)
+                {
+                    Check(shadow.sharedMaterial != null && shadow.sharedMaterial.shader.name == "GIC/Battle/ContactShadow",
+                        "接触阴影使用专用透明顶点色 shader");
+                    Check(shadow.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.Off && !shadow.receiveShadows,
+                        "接触阴影不投射或接收实时阴影");
+                    Check(shadow.sortingOrder < -1, "接触阴影排序低于底座盘");
+                    var shadowFilter = shadow.GetComponent<MeshFilter>();
+                    Check(shadowFilter != null && shadowFilter.sharedMesh != null && shadowFilter.sharedMesh.vertexCount > 100,
+                        "接触阴影由细分网格构成");
+                    if (shadowFilter != null && shadowFilter.sharedMesh != null)
+                    {
+                        var colors = shadowFilter.sharedMesh.colors;
+                        float maxAlpha = 0f;
+                        int visible = 0;
+                        foreach (var color in colors)
+                        {
+                            maxAlpha = Mathf.Max(maxAlpha, color.a);
+                            if (color.a > 0.01f) visible++;
+                        }
+                        Check(colors.Length == shadowFilter.sharedMesh.vertexCount && maxAlpha > 0.05f,
+                            "接触阴影顶点 alpha 含有实际 footprint");
+                        Check(visible > 0 && visible < colors.Length * 0.8f,
+                            "接触阴影不是通用矩形面片");
+                        Check(colors.Length > 0 && colors[0].a < 0.001f && colors[colors.Length - 1].a < 0.001f,
+                            "接触阴影外缘透明无黑矩形");
+                    }
+                }
 
                 view.SetTint(new Color(1f, 0.25f, 0.5f, 1f));
                 var materials = new HashSet<Material>();
                 foreach (var renderer in model.GetComponentsInChildren<Renderer>(true))
                     foreach (var material in renderer.sharedMaterials)
                         if (material != null) materials.Add(material);
-                foreach (var material in materials)
+                var buildingMaterials = materials.Where(m => m.shader != null && m.shader.name == ShaderName).ToArray();
+                foreach (var material in buildingMaterials)
+                {
                     Check(material.GetColor("_BaseColor") == new Color(1f, 0.25f, 0.5f, 1f),
                         $"状态 tint 写入克隆材质：{material.name}");
+                    Check(material.HasProperty("_FacadeFillStrength") && material.GetFloat("_FacadeFillStrength") > 0f,
+                        $"正立面局部补光已接线：{material.name}");
+                    Check(Vector3.Dot(material.GetVector("_FacadeFillDirection"), Vector3.back) > 0.999f,
+                        $"补光方向取本地正门 +X：{material.name}");
+                    Check(material.GetFloat("_NightSpillCount") >= 6f,
+                        $"窗光外溢覆盖全部窗面组：{material.name}");
+                }
+
+                view.SetNightEmission(0.25f);
+                foreach (var material in buildingMaterials)
+                    Check(Mathf.Approximately(material.GetFloat("_NightEmission"), 0.25f),
+                        $"窗光外溢复用夜间系数：{material.name}");
 
                 view.SetDissolveAlpha(0.5f);
-                foreach (var material in materials)
+                foreach (var material in buildingMaterials)
                 {
                     Check(Mathf.Approximately(material.GetFloat("_Surface"), 1f), $"消散切透明：{material.name}");
                     Check(Mathf.Approximately(material.GetFloat("_ZWrite"), 0f), $"消散关深度写入：{material.name}");
                     Check(Mathf.Approximately(material.GetColor("_BaseColor").a, 0.5f), $"消散 alpha=0.5：{material.name}");
+                }
+                if (shadow != null)
+                {
+                    Check(Mathf.Approximately(shadow.sharedMaterial.GetFloat("_DissolveAlpha"), 0.5f),
+                        "接触阴影随建筑同步消散");
+                    view.SetDissolveAlpha(0.8f);
+                    Check(Mathf.Approximately(shadow.sharedMaterial.GetFloat("_DissolveAlpha"), 0.8f),
+                        "接触阴影消散 alpha 连续逐帧更新");
                 }
             }
             finally

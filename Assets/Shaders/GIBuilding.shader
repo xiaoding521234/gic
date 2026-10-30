@@ -66,6 +66,12 @@ Shader "GIC/Battle/GIBuilding"
         _RGColor ("RG color", Color) = (1,1,1,1)
         _RGStrength ("RG strength", Float) = 0
         _RGPower ("RG power", Float) = 1
+        [Header(Local Enhancement)]
+        _FacadeFillStrength ("Facade fill strength", Range(0,0.5)) = 0.16
+        _FacadeFillColor ("Facade fill color", Color) = (1,0.96,0.88,1)
+        [HideInInspector] _FacadeFillDirection ("Facade fill direction", Vector) = (0,0,-1,0)
+        _NightSpillStrength ("Night spill strength", Range(0,1)) = 0.22
+        _NightSpillColor ("Night spill color", Color) = (1,0.71353996,0.3098039,1)
     }
 
     // HLSLINCLUDE

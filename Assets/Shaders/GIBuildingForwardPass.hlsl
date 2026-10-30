@@ -185,6 +185,14 @@ float _NightEmission;
 float _RGStrength;
 float _RGPower;
 half4 _RGColor;
+float _FacadeFillStrength;
+half4 _FacadeFillColor;
+float4 _FacadeFillDirection;
+float _NightSpillStrength;
+float _NightSpillCount;
+half4 _NightSpillColor;
+float4 _NightSpillCenters[8];
+float4 _NightSpillExtents[8];
 
 float2 ApplyGIBuildingParallax(float2 uv, Varyings input)
 {
@@ -234,6 +242,34 @@ void ApplyGIBuildingInputs(float2 uv, inout SurfaceData surfaceData)
         surfaceData.emission = _EmissionColor.rgb * _EmissionStrength * _NightEmission * mainMask.a * _BaseColor.rgb;
 }
 
+half3 ApplyGIBuildingLocalEnhancements(Varyings input, InputData inputData, SurfaceData surfaceData)
+{
+    half3 normalWS = normalize(inputData.normalWS);
+    half3 fillDirection = normalize(_FacadeFillDirection.xyz);
+    half facade = dot(normalWS, fillDirection);
+    half wrapped = saturate((facade + 0.6) / 1.6);
+    half fillMask = smoothstep(-0.2, 0.5, facade);
+    half3 addition = surfaceData.albedo * _FacadeFillColor.rgb * (_FacadeFillStrength * wrapped * fillMask);
+
+    if (_NightEmission > 0.001 && _NightSpillStrength > 0.0)
+    {
+        float3 positionOS = TransformWorldToObject(input.positionWS);
+        half spill = 0;
+        [unroll] for (int sourceIndex = 0; sourceIndex < 8; sourceIndex++)
+        {
+            if (sourceIndex < (int)_NightSpillCount)
+            {
+                float3 extents = max(float3(0.001, 0.001, 0.001), _NightSpillExtents[sourceIndex].xyz);
+                float3 delta = (positionOS - _NightSpillCenters[sourceIndex].xyz) / extents;
+                half contribution = saturate(1.0 - length(delta));
+                spill = max(spill, contribution * contribution);
+            }
+        }
+        addition += surfaceData.albedo * _NightSpillColor.rgb * (_NightSpillStrength * spill * _NightEmission);
+    }
+    return addition;
+}
+
 void GIBuildingFragment(
     Varyings input
     , out half4 outColor : SV_Target0
@@ -263,6 +299,7 @@ void GIBuildingFragment(
 #endif
 
     half4 color = UniversalFragmentBlinnPhong(inputData, surfaceData);
+    color.rgb += ApplyGIBuildingLocalEnhancements(input, inputData, surfaceData);
     if (_RGStrength > 0) { half rim = pow(saturate(1.0 - dot(inputData.normalWS, inputData.viewDirectionWS)), max(0.05, 1.0 / _RGPower)); half lightSide = saturate(dot(inputData.normalWS, GetMainLight().direction)); color.rgb += _RGColor.rgb * (_RGStrength * rim * lightSide) * _BaseColor.rgb; }
     color.rgb = MixFog(color.rgb, inputData.fogCoord);
     color.a = OutputAlpha(color.a, IsSurfaceTypeTransparent(_Surface));

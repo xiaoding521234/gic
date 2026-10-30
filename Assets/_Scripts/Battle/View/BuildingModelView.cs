@@ -10,6 +10,11 @@ namespace GIC.Battle
     /// </summary>
     public sealed class BuildingModelView : MonoBehaviour
     {
+        private const string ContactShadowName = "ContactShadow";
+        private const string BuildingShaderName = "GIC/Battle/GIBuilding";
+        private const string ContactShadowShaderName = "GIC/Battle/ContactShadow";
+        private const int MaxNightSpillSources = 8;
+
         private Renderer[] _renderers;
         private Material[] _materials;
         private Bounds _localBounds;
@@ -50,6 +55,7 @@ namespace GIC.Battle
             var bounds = new Bounds(instance.transform.position, Vector3.zero);
             foreach (var filter in filters)
             {
+                if (filter.name == ContactShadowName) continue;
                 var renderer = filter.GetComponent<MeshRenderer>();
                 if (renderer != null) bounds.Encapsulate(renderer.bounds);
             }
@@ -87,7 +93,60 @@ namespace GIC.Battle
                 renderer.sharedMaterials = shared;
             }
             view._materials = uniqueMaterials.ToArray();
+            view.ConfigureLocalEnhancements(instance);
             return view;
+        }
+
+        private void ConfigureLocalEnhancements(GameObject instance)
+        {
+            var centers = new List<Vector4>();
+            var extents = new List<Vector4>();
+            Color spillColor = new Color(1f, 0.71353996f, 0.3098039f, 1f);
+            bool spillColorResolved = false;
+
+            foreach (var filter in instance.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.name == ContactShadowName || filter.sharedMesh == null) continue;
+                var renderer = filter.GetComponent<MeshRenderer>();
+                if (renderer == null) continue;
+                bool isWindow = false;
+                foreach (var material in renderer.sharedMaterials)
+                {
+                    if (material == null || material.shader == null || material.shader.name != BuildingShaderName) continue;
+                    if (material.GetFloat("_EmissionType") <= 0.5f) continue;
+                    isWindow = true;
+                    if (!spillColorResolved && material.HasProperty("_EmissionColor"))
+                    {
+                        spillColor = material.GetColor("_EmissionColor");
+                        spillColorResolved = true;
+                    }
+                }
+                if (!isWindow || centers.Count >= MaxNightSpillSources) continue;
+
+                var bounds = filter.sharedMesh.bounds;
+                Vector3 center = instance.transform.InverseTransformPoint(filter.transform.TransformPoint(bounds.center));
+                Vector3 size = Vector3.Scale(bounds.extents, filter.transform.localScale) * 1.15f + Vector3.one * 0.75f;
+                centers.Add(new Vector4(center.x, center.y, center.z, 0f));
+                extents.Add(new Vector4(size.x, size.y, size.z, 0f));
+            }
+
+            Vector3 facadeDirection = instance.transform.TransformDirection(Vector3.right).normalized;
+            foreach (var material in _materials)
+            {
+                if (material == null || material.shader == null || material.shader.name != BuildingShaderName) continue;
+                material.SetVector("_FacadeFillDirection", facadeDirection);
+                material.SetFloat("_NightSpillCount", centers.Count);
+                material.SetVectorArray("_NightSpillCenters", centers);
+                material.SetVectorArray("_NightSpillExtents", extents);
+                material.SetColor("_NightSpillColor", spillColor);
+                if (material.GetFloat("_EmissionType") > 0.5f)
+                    material.SetFloat("_NightSpillStrength", 0f);
+            }
+        }
+
+        private static bool IsContactShadow(Material material)
+        {
+            return material.shader != null && material.shader.name == ContactShadowShaderName;
         }
 
         public void SetVisible(bool visible)
@@ -104,7 +163,7 @@ namespace GIC.Battle
             if (_materials == null) return;
             foreach (var material in _materials)
             {
-                if (material == null) continue;
+                if (material == null || IsContactShadow(material)) continue;
                 if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", tint);
                 if (material.HasProperty("_Color")) material.SetColor("_Color", tint);
             }
@@ -112,12 +171,24 @@ namespace GIC.Battle
 
         public void SetDissolveAlpha(float alpha01)
         {
-            if (alpha01 <= 0f || _transparentForDissolve) return;
-            _transparentForDissolve = true;
+            if (alpha01 <= 0f) return;
             _dissolveAlpha = Mathf.Clamp01(alpha01);
+            if (_transparentForDissolve)
+            {
+                foreach (var material in _materials)
+                    if (material != null && IsContactShadow(material))
+                        material.SetFloat("_DissolveAlpha", _dissolveAlpha);
+                return;
+            }
+            _transparentForDissolve = true;
             foreach (var material in _materials)
             {
                 if (material == null) continue;
+                if (IsContactShadow(material))
+                {
+                    material.SetFloat("_DissolveAlpha", _dissolveAlpha);
+                    continue;
+                }
                 material.SetOverrideTag("RenderType", "Transparent");
                 material.SetFloat("_Surface", 1f);
                 material.SetFloat("_Blend", 0f);
