@@ -46,7 +46,7 @@ namespace GIC.Editor
                 Check(list != null && list.isArray && list.arraySize == Required.Length,
                     $"显式动作条目={Required.Length}");
                 if (list != null && list.isArray)
-                    for (int i = 0; i < list.arraySize; i++)
+                    for (int i = 0; i < Mathf.Min(list.arraySize, Required.Length); i++)
                     {
                         var entry = list.GetArrayElementAtIndex(i);
                         var display = entry.FindPropertyRelative("显示名")?.stringValue;
