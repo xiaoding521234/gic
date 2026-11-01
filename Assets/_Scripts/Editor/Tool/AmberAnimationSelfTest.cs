@@ -52,11 +52,35 @@ namespace GIC.Editor
                         var display = entry.FindPropertyRelative("显示名")?.stringValue;
                         var body = entry.FindPropertyRelative("身体动画")?.objectReferenceValue as AnimationClip;
                         var physics = entry.FindPropertyRelative("物理动画")?.objectReferenceValue as AnimationClip;
+                        var loop = entry.FindPropertyRelative("循环");
                         Check(body != null && body.humanMotion, $"身体动画有效：{display}");
                         Check(body != null && AssetDatabase.GetAssetPath(body) == BodyRoot + Required[i] + ".anim",
                             $"身体动画路径匹配：{display}");
                         Check(physics != null && physics.legacy, $"物理动画为 legacy：{display}");
+                        Check(loop != null && body != null && loop.boolValue == body.isLooping,
+                            $"身体与配置循环一致：{display}");
                     }
+            }
+
+            var guardObject = new GameObject("AmberAnimationSelfTest_NullEntry");
+            try
+            {
+                var guardPanel = guardObject.AddComponent<AmberTestPanel>();
+                guardPanel.动作列表 = new AmberTestPanel.动作条目[] { null };
+                string guardName;
+                try
+                {
+                    guardName = guardPanel.GetActionName(0);
+                }
+                catch (System.Exception ex)
+                {
+                    guardName = "<异常 " + ex.GetType().Name + ">";
+                }
+                Check(guardName == "<空动作 0>", $"空条目名称安全回退：{guardName}");
+            }
+            finally
+            {
+                Object.DestroyImmediate(guardObject);
             }
 
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/AmberTMR/AmberTMR.prefab");

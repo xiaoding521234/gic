@@ -34,7 +34,11 @@ public class AmberTestPanel : MonoBehaviour
 
     public string GetActionName(int index)
     {
-        return index >= 0 && index < ActionCount ? 动作列表[index].显示名 : string.Empty;
+        if (index < 0 || index >= ActionCount) return string.Empty;
+        var entry = 动作列表[index];
+        return entry != null && !string.IsNullOrEmpty(entry.显示名)
+            ? entry.显示名
+            : $"<空动作 {index}>";
     }
 
     private void Awake()
@@ -53,7 +57,7 @@ public class AmberTestPanel : MonoBehaviour
 
     private void Start()
     {
-        PlayAction(0);
+        if (ActionCount > 0) PlayAction(0);
     }
 
     private void Update()
@@ -95,6 +99,8 @@ public class AmberTestPanel : MonoBehaviour
         graph = PlayableGraph.Create("AmberTestPanel");
         var output = AnimationPlayableOutput.Create(graph, "out", animator);
         var playable = AnimationClipPlayable.Create(graph, entry.身体动画);
+        playable.SetOverrideLoopTime(true);
+        playable.SetLoopTime(entry.循环);
         playable.SetApplyFootIK(false);
         playable.SetTime(0);
         output.SetSourcePlayable(playable);
@@ -107,7 +113,8 @@ public class AmberTestPanel : MonoBehaviour
             animation.Stop();
             animation.clip = entry.物理动画;
             animation.wrapMode = entry.循环 ? WrapMode.Loop : WrapMode.Once;
-            animation.Play();
+            if (!animation.Play())
+                Debug.LogError($"安柏物理动画播放失败：动作 {GetActionName(index)}，clip {entry.物理动画.name}", animation);
         }
     }
 
