@@ -16,7 +16,7 @@
 | D · 渲染 · Shader · 大地图图形 | §8 §13 §89 §92–§95 §98 §108 §109 §111 §112 §123 |
 | E · 网络与异步回调 | §15 §19 |
 | F · 构建与平台差异（编辑器 vs 真机 / PC vs 移动） | §1 §3 §20 §21 §12 §51 §52 §99 |
-| G · 编辑器工具与资产管线 | §7 §9 §23 §24 §25 §49 §55–§61 §66–§68 §71 §73 §74 §90 §91 §100–§102 §104 §113 §118–§122 §124 |
+| G · 编辑器工具与资产管线 | §7 §9 §23 §24 §25 §49 §55–§61 §66–§68 §71 §73 §74 §90 §91 §100–§102 §104 §113 §118–§122 §124 §179 |
 | H · 桌宠 · Win32 · 双进程 | §16a §16 §17 §36 |
 | I · 战斗系统判定与 AI（2026-09-21 起新增，未归位） | §69 §76–§81 §86 §105–§107 §110 §114–§117 §125 §126 §131 |
 
@@ -42,6 +42,7 @@
 | 编译炸（插值字符串/匿名委托） | §48 §51 |
 | 构建被静默吃掉 / 包版本剔包 | §52 §99 |
 | 肌肉动画零驱动 / 身体不动 | §58–§61 §68 |
+| humanMotion / Avatar / 数据自检全绿，画面仍倒立、木桩或拉伸 | §179 |
 | 投射物/命中判定异常 | §69 §76 §80 §86 §106 §107 |
 | AI 移动偏航 / 驻位早退 | §110 §114 §116 |
 | 冻结/霜化视觉异常 | §108 §109 §111 §112 |
@@ -2434,5 +2435,15 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **修法（可复用配方）**：①CLI 导出原始 GameObject JSON（`--types GameObject --export_type JSON --names "KnightHQ02"`）；②读 `m_MeshRenderer.m_Materials` 的 PathID 列表（与 submesh 序严格一一对应）；③逐 PathID 在 AssetMap 反查材质名；④再导出各材质 JSON 拿 `_MainTex/_BumpMap` PathID→AssetMap 反查贴图名→CLI 按名提取 diffuse/normal；⑤按八槽顺序重接 prefab（骑士团终表：sub0=Area_Mdcity_Wall09〔贴图=Area_Mdbuild_Wall06〕/sub1=Area_MdBuild_Wall09/sub2=Area_MdBuild_Wall08/sub3=KnightHQ02_Assembly01/sub4=Area_MdBuild_House_Roof_05〔屋顶〕/sub5=Area_Mdcity_Ground15/sub6=Window_Time/sub7=Area_Mdbuild_Stage）。**静态建筑多 g/submesh 不得凭名字猜材质或全铺同一图集**。
 
-**3D 建筑接入陷阱（同批实锤）**：①**建筑模型不得自建独立状态链**——血条/冻结/消散/维度隐藏/点击拾取全在 UnitView 既有单源里，新 `BuildingModelView` 只持模型渲染器/材质实例，状态由 UnitView 驱动（模型挂 root 不挂 55° 倾斜组，保留隐藏 sprite 承载状态链）；②**3D 模型冻结无 2D 霜化 shader**——模型 tint 须独立取冻结冰色（sprite 因 shader 存在保持白 tint，共用同一 tint 分支=模型冻结不变色）；③**消散前材质须一次性切透明混合**（URP opaque 材质 alpha 无效，写 `_Surface/_Blend/_SrcBlend/_DstBlend/_ZWrite`+keyword+queue）；④**模型拾取走包围盒朝相机面片**（`TryGetPaperdollWorldCorners` 建筑分支），勿让既有立牌面片逻辑拿到隐藏 sprite 的 bounds；⑤**宽度等比缩放按原始包围盒 X**——深度可大于 1 格（1.246），不是错误缩放。
+**3D 建筑接入陷阱（同批实锤）**：①**建筑模型不得自建独立状态链**——血条/冻结/消散/维度隐藏/点击拾取全在 UnitView 既有单源里，新 `BuildingModelView` 只持模型渲染器/材质实例，状态由 UnitView 驱动（模型挂 root 不挂 55° 倾斜组，保留隐藏 sprite 承载状态链）；②**3D 模型冻结无 2D 霜化 shader**——模型 tint 须独立取冻结冰色（sprite 因 shader 存在保持白 tint，共用同一 tint 分支=模型冻结不变色）；③**消散前材质须一次性切透明混合**（URP opaque 材质 alpha 无效，写 `_Surface/_Blend/_SrcBlend/_DstBlend/_ZWrite`+keyword+queue）；④**模型拾取走包围盒朝相机面片**（`TryGetPaperdollWorldCorners` 建筑分支），勿让既有立牌面片逻辑拿到隐藏 sprite 的 bounds）；⑤**宽度等比缩放按原始包围盒 X**——深度可大于 1 格（1.246），不是错误缩放。
+
+## §179 动画数据自检全绿不等于画面可用：安柏完整模型动作重做最终放弃（2026-11-02 多路线实机视频证伪）
+
+**症状**：完整 TMR 安柏模型的 5 个 SMR、86 根骨骼、47 个面部 morph 与官方材质均正常，但多条动画路线在实际 Game View 中反复出现倒立、躺卧、木桩化、严重拉伸、错位与交替踏步等异常。原生 Humanoid muscle、Ruri muscle→TRS、自研 generic 嫁接及 Hunyuan 生成动作重定向均未得到自然可用画面。最后的 Hunyuan 待机 clip `SMPLH_Animation` 时长 4.9667 秒、130 条绑定、`humanMotion=true`、`isLooping=true`，源/目标 Avatar 也都是 `isValid=true`、`isHuman=true`，实机 MP4 仍是全程倒立拉伸且无有效待机动作，视频验收 FAIL。
+
+**根因与边界**：①模型完整不代表任意动画链兼容——失败集中在 Avatar 参照姿态、骨架语义、坐标/单位与重定向链，不能继续靠修模型材质解决；②`humanMotion`、Avatar 有效、绑定数量、曲线帧表、逐帧 VAD、编译通过和 `AMBER_ANIMATION_ALL_PASS` 只证明数据可解析/可求值，**不证明骨骼在画面中形成了正确姿态**；③曾发现非法 `RootQ` 并删除 Motion/Root、修复帧表恒等与额外 Hips 补偿，仍不能根治，说明局部数据修正不能替代端到端视觉验收；④旧自包含 generic FBX 曾在自身骨架上通过视频，不代表同一 clip 可直接套到 TMR 骨架。
+
+**最终处置**：用户于 2026-11-02 拍板「放弃，收尾」，停止本轮全部动作重建路线；保留完整官方模型，失败动画只作归档，不接入战斗、不作为成品交付。`AmberTMR/README.md` 已标明未验收资产范围，后续不得因文件存在或导入器全绿而误判为可用。
+
+**规范（后续任何 3D 动作路线必须遵守）**：①先做一条待机的最小垂直切片，用实际 Game View 录满「完整动作+一次循环衔接」并检查视频，通过后才扩展跑步/攻击；②目标模型重定向失败时，先让动作在源 FBX 自身骨架上隔离播放，分清「源动作已坏」与「重定向坏」，但源骨架通过仍不等于目标骨架通过；③验收项必须包含直立/脚落地、自然小动作、无拉伸扭曲、循环平顺，禁止用编译或数据断言替代画面；④设置 `EditorSceneManager.playModeStartScene` 后，未保存的场景探针不会随 Play 带入，录制前必须保存目标场景；退出 Play 后活动场景可能是 Boot，恢复/保存前先重新打开 `AmberTest` 并核对场景路径，避免把清理写进错误场景。
 

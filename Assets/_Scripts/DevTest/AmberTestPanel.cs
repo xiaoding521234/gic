@@ -1,11 +1,9 @@
 using System;
 using UnityEngine;
-using UnityEngine.Playables;
-using UnityEngine.Animations;
 
 /// <summary>
-/// 安柏测试场景（Assets/Scenes/AmberTest.unity）的显式双通道动画切换面板。
-/// 身体肌肉曲线由 Animator + PlayableGraph 播放，物理骨 TRS 曲线由 Animation 播放。
+/// 安柏测试场景（Assets/Scenes/AmberTest.unity）的 Generic 分层双通道动画切换面板。
+/// 身体与物理骨 TRS 曲线均由 Animation 播放。
 /// </summary>
 public class AmberTestPanel : MonoBehaviour
 {
@@ -20,14 +18,10 @@ public class AmberTestPanel : MonoBehaviour
 
     [Header("安柏测试面板")]
     [SerializeField] private Animation[] 安柏动画组 = new Animation[0];
-    [Tooltip("可选：Animator 通道（未填则自动取安柏动画组所在物体上的）")]
-    [SerializeField] private Animator 安柏动画机 = null;
     [SerializeField] public 动作条目[] 动作列表 = new 动作条目[0];
 
     private Vector2 scrollPos;
     private int current = -1;
-    private Animator animator;
-    private PlayableGraph graph;
 
     public int ActionCount => 动作列表 != null ? 动作列表.Length : 0;
     public int CurrentActionIndex => current;
@@ -43,15 +37,11 @@ public class AmberTestPanel : MonoBehaviour
 
     private void Awake()
     {
-        animator = 安柏动画机;
-        if (animator == null && 安柏动画组 != null && 安柏动画组.Length > 0 && 安柏动画组[0] != null)
-            animator = 安柏动画组[0].GetComponentInParent<Animator>();
-
-        // 自建图的人形肌肉求值依赖 Animator.enabled。
-        if (animator != null)
+        if (安柏动画组 == null) return;
+        foreach (var animation in 安柏动画组)
         {
-            animator.enabled = true;
-            animator.applyRootMotion = false;
+            if (animation != null)
+                animation.enabled = true;
         }
     }
 
@@ -83,44 +73,39 @@ public class AmberTestPanel : MonoBehaviour
             Debug.LogError($"安柏动作条目缺少身体或物理动画：索引 {index}", this);
             return;
         }
-        if (animator == null)
+
+        Animation player = null;
+        if (安柏动画组 != null)
         {
-            Debug.LogError("安柏动作缺少 Animator，无法播放身体动画", this);
+            foreach (var animation in 安柏动画组)
+            {
+                if (animation == null) continue;
+                player = animation;
+                break;
+            }
+        }
+        if (player == null)
+        {
+            Debug.LogError("安柏动作缺少 Animation，无法播放分层动画", this);
             return;
         }
 
         current = index;
 
-        // 先销毁 Animator 原控制器图和本面板旧图，避免多个图源相互覆盖。
-        var prev = animator.playableGraph;
-        if (prev.IsValid()) prev.Destroy();
-        if (graph.IsValid()) graph.Destroy();
+        player.Stop();
+        player.RemoveClip("Body");
+        player.RemoveClip("Phys");
+        player.AddClip(entry.身体动画, "Body");
+        player.AddClip(entry.物理动画, "Phys");
+        player["Body"].layer = 0;
+        player["Phys"].layer = 1;
+        player.wrapMode = entry.循环 ? WrapMode.Loop : WrapMode.Once;
+        player.clip = entry.身体动画;
 
-        graph = PlayableGraph.Create("AmberTestPanel");
-        var output = AnimationPlayableOutput.Create(graph, "out", animator);
-        var playable = AnimationClipPlayable.Create(graph, entry.身体动画);
-        playable.SetOverrideLoopTime(true);
-        playable.SetLoopTime(entry.循环);
-        playable.SetApplyFootIK(false);
-        playable.SetTime(0);
-        output.SetSourcePlayable(playable);
-        graph.Play();
-
-        if (安柏动画组 == null) return;
-        foreach (var animation in 安柏动画组)
-        {
-            if (animation == null) continue;
-            animation.Stop();
-            animation.clip = entry.物理动画;
-            animation.wrapMode = entry.循环 ? WrapMode.Loop : WrapMode.Once;
-            if (!animation.Play())
-                Debug.LogError($"安柏物理动画播放失败：动作 {GetActionName(index)}，clip {entry.物理动画.name}", animation);
-        }
-    }
-
-    private void OnDestroy()
-    {
-        if (graph.IsValid()) graph.Destroy();
+        bool bodyPlayed = player.Play("Body");
+        bool physPlayed = player.Play("Phys");
+        if (!bodyPlayed || !physPlayed)
+            Debug.LogError($"安柏动作播放失败：{GetActionName(index)}（Body={bodyPlayed}，Phys={physPlayed}）", player);
     }
 
     private void OnGUI()
