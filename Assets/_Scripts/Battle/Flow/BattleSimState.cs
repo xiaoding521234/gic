@@ -104,8 +104,18 @@ namespace GIC.Battle
 
         /// <summary>当前回合数（决策八十六批D，docs/45 §6——回合数真源：TurnResolver 每回合
         /// 开头写入；周期类效果（骑士团每 5 回合召唤）与 Unit.DeployedTurn 相对计数消费；0=回合开始前
-        /// （开局 RegisterUnit 的单位部署回合计 0）</summary>
+        /// （开局 RegisterUnit 的单位部署回合计 0）。
+        /// 即时制语义（决策九十五，docs/active/48 §2.3）：字段语义随回合机退役改为**逻辑秒**——
+        /// RTSFlowController 每秒整拍同步写 CurrentTurn=CurrentSecond，周期类相对计数零改动兼容
+        /// （每 1 秒走 1 拍=旧「每回合走 1」等价节拍，周期字段值按秒生效，P6 调参批集中校）</summary>
         public int CurrentTurn { get; set; }
+
+        /// <summary>即时制 tick 真源（决策九十五，docs/active/48 §2）——RTSFlowController 每 tick 写入；
+        /// 1 秒=20 tick（BattleMetrics.TicksPerSecond）</summary>
+        public int CurrentTick { get; set; }
+
+        /// <summary>当前逻辑秒（tick/20）</summary>
+        public int CurrentSecond => CurrentTick / BattleMetrics.TicksPerSecond;
 
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();

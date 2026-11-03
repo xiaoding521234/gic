@@ -15,6 +15,10 @@ namespace GIC.Data
         public int turnNumber;
         public int sliceIndex;
 
+        /// <summary>段产生时刻（tick 数，决策九十五即时制 docs/active/48 §8——Host 侧 RTSFlowController
+        /// tick 循环写入；客户端按绝对时刻播放对齐；0=旧回放兼容缺省）</summary>
+        public int startTick;
+
         /// <summary>本片攻速（播放侧按 (回合最高攻速 - 本片攻速) / 10 秒排程）</summary>
         public int sliceAttackSpeed;
 

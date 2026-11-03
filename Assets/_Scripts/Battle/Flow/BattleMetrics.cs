@@ -170,6 +170,41 @@ namespace GIC.Battle
         /// （第 i 层=i×BuffLayerStaggerSeconds；消费方=光环 Buff OnTurnEnd 声明 PendingAuraHit/Heal/
         /// Energy 的 HitSeconds 与 TurnResolver 碎裂回血错峰，勿再散抄公式）</summary>
         public static float LayerBeatSeconds(int layer) => layer * BuffLayerStaggerSeconds;
+
+        // ==================== 即时制 tick 机（决策九十五，docs/active/48 §2） ====================
+        // 20Hz 固定步长；accumulator 累加器模式（Gaffer《Fix Your Timestep!》业界标准）+每帧步数 clamp
+        // （spiral of death 防护——模拟跟不上时整体慢放不雪崩）；1 秒=20 tick=「每秒整拍」结算节拍。
+
+        /// <summary>逻辑帧率（tick/秒）——1 tick=1/20 秒（RTS 业界区间 20~30Hz，蓝图 §2.1）</summary>
+        public const int TicksPerSecond = 20;
+
+        /// <summary>单 tick 时长（秒）=1/TicksPerSecond</summary>
+        public const float TickSeconds = 1f / TicksPerSecond;
+
+        /// <summary>单帧最大 tick 步数（spiral of death 防护——帧率暴跌时逻辑整体慢放，不欠债雪崩）</summary>
+        public const int MaxTicksPerFrame = 20;
+
+        /// <summary>累加器单帧时间钳制（秒——Gaffer 标准护栏，防切后台巨帧一次吞掉模拟）</summary>
+        public const float MaxFrameDeltaSeconds = 0.25f;
+
+        /// <summary>AI 决策节拍（tick 数）=每 0.5 秒三脑同频一次（蓝图 §6）</summary>
+        public const int AiBeatTicks = 10;
+
+        /// <summary>每秒整拍发放摩拉（决策九十五拍板 4「每秒整拍」——回合制 +10/回合 缩 1/10 节奏）</summary>
+        public const int MoraGainPerSecond = 1;
+
+        /// <summary>每秒整拍发放体力（同上）</summary>
+        public const int StaminaGainPerSecond = 1;
+
+        /// <summary>战斗时钟步进（分钟/秒——昼夜每秒 +1 分钟，回合数显示退役，蓝图 §2.3）</summary>
+        public const int BattleClockMinutesPerSecond = 1;
+
+        /// <summary>灵魂衰减（%/秒——决策九十五拍板 4：−10% 每秒整拍，复苏窗直译 10 秒；P6 调参重点）</summary>
+        public const int SoulDecayPercentPerSecond = 10;
+
+        /// <summary>desync hash 落盘节拍（秒——确定性护栏四件套之一：state hash 落 BattleRecorder 行，
+        /// 后置 LAN 联机的漂移定位手段，王者荣耀同款）</summary>
+        public const int DesyncHashEverySeconds = 1;
     }
 
     /// <summary>

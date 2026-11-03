@@ -107,6 +107,10 @@ namespace GIC.Data
         /// （拍板口径「延奏号令 0→−5」）；AI 伙伴自主行动=false 不减免。默认 false 序列化兼容旧存档</summary>
         public bool isPlayerDirectControl;
 
+        /// <summary>行动产生时刻（tick 数，决策九十五即时制 docs/active/48 §8——RTSFlowController
+        /// 提交时写入；段命令流对齐用；0=旧回放/旧客户端兼容缺省）</summary>
+        public int submitTick;
+
         public override string ToString()
         {
             return $"[ActionData {playerId}/{unitId} {actionType} turn={turnNumber}" +
