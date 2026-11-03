@@ -186,6 +186,10 @@ MonoBehaviour:
     m_Localized: "\xB7\u9009\u62E9\u5341\u5B57\u65B9\u5411\u5176\u4E00\uFF0C\u5168\u529B\u6325\u51FA\u6728\u68D2\n\xB7\u5BF9\u524D\u65B9{DamageDistance}\u683C\u5185\u7684\u654C\u4EBA\u9020\u6210{Damage}\u7269\u4F24"
     m_Metadata:
       m_Items: []
+  - m_Id: 3002006
+    m_Localized: "\xB7\u9009\u62E9\u5341\u5B57\u65B9\u5411\u5176\u4E00\uFF0C\u75BE\u884C"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

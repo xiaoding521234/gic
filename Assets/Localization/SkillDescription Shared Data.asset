@@ -183,6 +183,10 @@ MonoBehaviour:
     m_Key: Hilichurl_PowerSwing
     m_Metadata:
       m_Items: []
+  - m_Id: 3002006
+    m_Key: Kaeya_Move
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

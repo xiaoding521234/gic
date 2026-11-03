@@ -1,5 +1,7 @@
 # AmberTMR — 安柏 TMR 官方提取模型（现行）
 
+> **2026-11-02 动作重做放弃归档**：完整官方模型与材质仍可复用，但 `MuscleClips/Rebuilt/`、`AmberBaked.prefab`、`BakedClips/`、`AmberMotion.prefab`、`Amber_motion.fbx` 及两个新 Controller 均未通过实际视频验收，仅是失败路线留档，**不得当作可用动画交付或接入游戏**。用户已拍板停止本轮原生 muscle、自研 harness 与 Hunyuan 重定向迭代；教训见 docs/14 §179。
+
 2026-09-15 落地，**取代已删除的 AmberExtract**（用户拍板）。来源 = The Models Resource
 [asset/328742](https://www.models-resource.com/pc_computer/genshinimpact/asset/328742/)
 （Playable Characters (Pyro) - Amber，2021-12-24 上传，gabrielvict / Adverse56）。

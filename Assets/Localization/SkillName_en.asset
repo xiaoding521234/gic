@@ -262,6 +262,10 @@ MonoBehaviour:
     m_Localized: Powerful Club Swing
     m_Metadata:
       m_Items: []
+  - m_Id: 3002006
+    m_Localized: Sprint
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
