@@ -543,12 +543,12 @@ namespace GIC.Battle
             // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
             // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）
             var buildingExtras = new List<BattleCommand>();
-            _buildingEffects.CollectTurnEndEffects(turnNumber, effects, buildingExtras);
+            _buildingEffects.CollectTurnEndEffects(_sim.CurrentTurn, effects, buildingExtras);
             var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
             // 产出回合结束段命令（三段唯一出口；到期 Buff 的 RemoveBuff 发射+注册表注销在出口尾部）
-            EmitSliceCommands($"回合{turnNumber}结束段", segment, sliceIndex,
+            EmitSliceCommands($"回合{_sim.CurrentTurn}结束段", segment, sliceIndex,
                 effects, appliedBuffs, null, null, newlyDead, expired, shattered: shatters);
 
             // 建筑效果直产命令（餐馆摩拉/骑士团召唤）段尾发射——indexInSlice 接续既有条数

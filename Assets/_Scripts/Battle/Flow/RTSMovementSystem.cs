@@ -74,10 +74,10 @@ namespace GIC.Battle
         }
 
         /// <summary>格序列（起点格+逐 waypoint 所在格去重——途经采集消费；含起终点语义同旧轨）</summary>
-        private static List<BattleCell> BuildPathCells(BattleSimState sim, Vector2IntCm fromCm, List<Vector2IntCm> waypoints)
+        private static List<BattleCell> BuildPathCells(BattleSimState sim, Vector2Int fromCm, List<Vector2IntCm> waypoints)
         {
             var cells = new List<BattleCell>();
-            var first = BattleCell.FromCm(fromCm.x, fromCm.z);
+            var first = BattleCell.FromCm(fromCm.x, fromCm.y);
             cells.Add(first);
             foreach (var wp in waypoints)
             {
@@ -94,7 +94,7 @@ namespace GIC.Battle
         public static List<RTSMoveState> AdvanceTick(BattleSimState sim)
         {
             List<RTSMoveState> finished = null;
-            var movers = sim.ActiveMovers;
+            var movers = sim.ActiveMoversInternal;
             if (movers.Count == 0) return null;
 
             // 速度累积（整数无偏差：每 tick 累 speed，每 20 tick 总推进恰为 speed）
@@ -143,7 +143,7 @@ namespace GIC.Battle
                     // 整数方向步进（dx, dz 同比缩放——避免浮点）
                     int nx = x + (int)((long)dx * budgetStep / dist);
                     int nz = z + (int)((long)dz * budgetStep / dist);
-                    (x, z) = CheckBlocked(sim, mover, x, z, nx, nz, out blockedHit);
+                    (x, z, _) = CheckBlocked(sim, mover, x, z, nx, nz, out blockedHit);
                     budgetStep = 0;
                     if (blockedHit) done = true;
                 }
