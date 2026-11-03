@@ -325,9 +325,18 @@ namespace GIC.Battle
         private string _pendingTargetUnitId;
 
         /// <summary>拖动式瞄准会话中（B4，2026-09-26 落地）：技能键 OnBeginDrag 起手置位，
-        /// OnDrag 逐帧刷金色待定单格、OnEndDrag 松手=留待定（确认走完成选择）；任何瞄准退出
-        /// （取消/完成选择确认/超时/阶段切换）经 ExitAiming 统一收口清零</summary>
+        /// OnDrag 逐帧刷金色待定单格、OnEndDrag 松手=**松手即放**（决策九十五 P4，蓝图 §4.1「拖拽=
+        /// 王者荣耀一致」——推翻 2026-09-26「留待定」拍板）；任何瞄准退出
+        /// （取消/阶段切换）经 ExitAiming 统一收口清零</summary>
         private bool _dragAiming;
+
+        /// <summary>拖拽自由角瞄准向量 X（千分定点——盘心→小盘位移归一；决策九十五 P4 蓝图 §4.1
+        /// 「任意角度」：取代旧十字轴量化；0=非拖拽会话/点击式——上交时 FillAimVector 回落
+        /// 施法者→落点推导）</summary>
+        private int _dragAimVecX;
+
+        /// <summary>拖拽自由角瞄准向量 Z（千分定点，同上）</summary>
+        private int _dragAimVecZ;
 
         /// <summary>拖动瞄准松手帧号（松手尾巴点击防线，2026-09-30 报障「很近的地方松手→落格
         /// 变打开详情面板」）：UGUI 抬起时「按压/抬起命中同一 IPointerClickHandler」即补发一次点击
@@ -1614,12 +1623,10 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>瞄准态点击可选格（2026-10-05 拍板：指定单位型同格多候选重复点击轮换目标；
-        /// 金格语义不变=2026-09-26 待定制）。precise=立牌精确指到的单位（可空，**含尸体立牌命中**）：
-        /// precise 须在当前技能候选域内才生效（复苏爆发点尸体立牌=直选尸体；延奏点同格尸体立牌=
-        /// 尸体不在域 → 视同未点、按格选首个候选——域外 precise 勿污染目标）。规则：
-        /// ① 同格重复点击 → 轮换到下一候选（域内精确点到非当前候选的立牌=直接选它）；
-        /// ② 新格 → 首个候选（域内精确命中优先）。非指定单位型/无候选 → 纯方向语义待定（目标恒 null）</summary>
+        /// <summary>瞄准态点击可选格——**P4 点击即放**（决策九十五，蓝图 §4.1「点击式=英雄联盟：点
+        /// 目标点/目标单位即放」——取代 2026-09-26 待定制；**同格多候选轮换交互退役**，精确指定=
+        /// 点立牌 precise 直选〔复苏爆发点尸体立牌=直选尸体〕；防线/资源拦截=SubmitAim false 保持
+        /// 瞄准态可再点）。装备瞄准点空域反馈（决策八十一追拍）保留在拦截路径</summary>
         private void HandleAimTap(BattleCell cell, UnitState precise, BattleSnapshot snapshot)
         {
             if (IsCurrentAimUnitTargeted())
@@ -1628,34 +1635,21 @@ namespace GIC.Battle
                 CollectAimTargets(snapshot, cell, candidates);
                 if (candidates.Count > 0)
                 {
-                    // 域校验：precise 不在候选域内（如延奏点尸体立牌）视同未精确点
-                    UnitState preciseValid = null;
+                    // 精确候选优先（立牌直选）；无 precise=首个候选
+                    UnitState target = candidates[0];
                     if (precise != null)
                     {
                         foreach (var c in candidates)
-                            if (c.unitId == precise.unitId) { preciseValid = c; break; }
-                    }
-                    bool sameCell = _pendingAimCell.HasValue && _pendingAimCell.Value.Equals(cell);
-                    UnitState target;
-                    if (sameCell)
-                    {
-                        int idx = candidates.FindIndex(c => c.unitId == _pendingTargetUnitId);
-                        target = preciseValid != null && idx >= 0 && preciseValid.unitId != _pendingTargetUnitId
-                            ? preciseValid
-                            : candidates[(idx + 1) % candidates.Count];
-                    }
-                    else
-                    {
-                        target = preciseValid != null ? preciseValid : candidates[0];
+                            if (c.unitId == precise.unitId) { target = c; break; }
                     }
                     _pendingTargetUnitId = target.unitId;
-                    if (!sameCell) SetPendingAimCell(cell); // 金格换装（同格仅换目标——金格不动）
-                    RefreshOutlines(); // 待定目标描边反馈（轮换到谁一目了然）
+                    SetPendingAimCell(cell);
+                    RefreshOutlines(); // 目标描边反馈（提交成功随 ExitAiming 收口）
+                    TrySubmitPendingAim();
                     return;
                 }
-                // 装备瞄准点空域反馈（决策八十一追拍「满提示应当在打出装备并选择单位时才提示」）：
-                // 点格无候选（域外）——该格有我方存活非建筑单位且**持有该物品但已满**（耐久满/层满）
-                // → toast 提示（耐久件/堆叠件分流键）；其余空格静默（原行为）
+                // 点格无候选（域外）——该格有我方存活非建筑单位且持有该物品但已满（耐久满/层满）
+                // → toast 提示（耐件/堆件分流键）；其余空格静默（原行为）
                 if (_equipAimItem != 0)
                 {
                     var tapped = FindUnitAt(snapshot, cell, UnitSide.MyTeam) ?? precise;
@@ -1664,12 +1658,13 @@ namespace GIC.Battle
                         ShowBattleToast(EquipFullToastKey(_equipAimItem));
                 }
             }
-            SetPendingAimCell(cell); // 方向型/部署：纯方向语义待定
+            SetPendingAimCell(cell); // 方向型/部署：金格反馈（拦截=保持待定可视化）
             if (_pendingTargetUnitId != null)
             {
                 _pendingTargetUnitId = null;
                 RefreshOutlines();
             }
+            TrySubmitPendingAim();
         }
 
         /// <summary>待定格+目标单位（拖动瞄准路径消费）：头像命中=直接指定该单位；无精确目标=该格首个
@@ -1876,6 +1871,8 @@ namespace GIC.Battle
         {
             if (_state != HudState.Aiming) return;
             _dragAiming = false; // 拖动会话统一收口（松手取消/确认提交/超时/阶段切换同一处清零）
+            _dragAimVecX = 0; // P4 自由角向量随会话清（防陈旧向量污染下一次上交）
+            _dragAimVecZ = 0;
             _upgradePending = false; // 升命待确认态随会话收口（决策五十五返拍）
             HideDragWheel();      // 圆盘随会话收口（EndDrag 已隐藏，此处=外部退出安全网，幂等）
             ClosePopup();         // 详情面板随会话收口（2026-09-27 点击循环：详情模式=瞄准+面板并开，
@@ -2452,12 +2449,16 @@ namespace GIC.Battle
             {
                 int dx = cell.x - sel.position.x;
                 int dy = cell.y - sel.position.y;
-                action.direction = DeltaToDirection(dx, dy);
+                action.direction = DeltaToDirection(dx, dy); // 旧客户端立牌朝向镜像（判定真源=aim 向量）
                 action.moveMagnitude = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy));
+                // P4 即时制（决策九十五）：连续目标点直填新轨（桥兼容——targetX>0 走 tick 移动 1 米/秒）
+                action.targetX = cell.CenterXCm;
+                action.targetZ = cell.CenterYCm;
             }
             else if (IsLineSkill(_aimDef))
             {
-                // 直线型：点方向格 → 归一十字方向（目标由 Host 投射物扫描即定，无需指定单位）
+                // 直线型（P4 自由角）：aim 向量=方向真值（Host CompileJudgment 消费）；
+                // direction=旧客户端立牌朝向镜像（十字近似——朝向随 aim 优先，见 BattlePlayer SkillCast 分支）
                 int dx = cell.x - sel.position.x;
                 int dy = cell.y - sel.position.y;
                 action.direction = SnapToCardinal(dx, dy);
@@ -2478,6 +2479,9 @@ namespace GIC.Battle
                 action.targetUnitId = unitAtCell != null ? unitAtCell.unitId : "";
             }
 
+            // P4 自由角瞄准向量（决策九十五，蓝图 §4.1）：拖拽会话=盘方向真值（任意角）；
+            // 点击式=施法者→落点格心。全型统一填装（单位指向型/自施放=朝向参考，判定主载 targetUnitId/自身格）
+            FillAimVector(action, sel, cell);
             _session.SubmitAction(action);
             GICLog.Info($"[BattleHud] {_myPlayerId} 上交：{action.actionType} by {sel.unitName}" +
                         (isMove
@@ -2490,6 +2494,49 @@ namespace GIC.Battle
             DeselectUnit();
             SetTip("Battle_TipSubmitted");
             return true;
+        }
+
+        /// <summary>待定瞄准统一提交出口（P4 即放，决策九十五蓝图 §4.1）：拖拽松手/点击可选格两路共用——
+        /// 提交成功=SubmitAim 内 ExitAiming+DeselectUnit 收口；此处补相机拖动会话终结（原完成选择
+        /// 确认链承载的职责随即放迁移至此）。防线/资源拦截=false 保持瞄准态可再拖/再点
+        ///（轻提示已由 NotifySelectionBlockedOrConfirmed 先行）。无待定=无操作</summary>
+        private bool TrySubmitPendingAim()
+        {
+            if (!_pendingAimCell.HasValue) return false;
+            var snapshot = _session.Player.LatestSnapshot;
+            if (snapshot == null) return false;
+            var cell = _pendingAimCell.Value;
+            var enemyAtCell = FindUnitAt(snapshot, cell, UnitSide.Enemy);
+            if (SubmitAim(cell, enemyAtCell))
+            {
+                if (_camera != null) _camera.EndDragFollowSession(); // 提交=会话正常终结（相机留位、清快照防误重置）
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>P4 自由角瞄准向量填装（决策九十五，蓝图 §4.1「任意角度」）：拖拽会话向量优先
+        ///（_dragAimVecX/Z=盘心→小盘位移归一千分——任意角真值，Host AimVectorOf 直读）；
+        /// 点击式=施法者连续位置→落点格心向量（NormalizePerMille 整数归一）。零向量兜底=东
+        ///（与 Host AimVectorOf 同向，防御口径）</summary>
+        private void FillAimVector(ActionData action, UnitState sel, BattleCell targetCell)
+        {
+            if (_dragAimVecX != 0 || _dragAimVecZ != 0)
+            {
+                action.aimX = _dragAimVecX;
+                action.aimZ = _dragAimVecZ;
+                return;
+            }
+            int dx = targetCell.CenterXCm - sel.PosXCm();
+            int dz = targetCell.CenterYCm - sel.PosZCm();
+            if (dx == 0 && dz == 0)
+            {
+                action.aimX = 1000; // 原地兜底=东（与 Host 同向）
+                return;
+            }
+            var v = SkillHitResolver.NormalizePerMille(dx, dz);
+            action.aimX = v.x;
+            action.aimZ = v.y;
         }
 
         /// <summary>操控防线判定单出口（2026-09-29 追拍：点格/拖拽落格/提交三触点同判定同文案；
@@ -2667,12 +2714,13 @@ namespace GIC.Battle
             {
                 ExitAiming();
                 if (_camera != null) _camera.CancelDragFollow(); // 2026-10-06 拍板「取消时重置摄像机位置为瞄准开始时」——瞬移回拖动起始位
+                return;
             }
-            // 有效待定：保持金色待定+瞄准态——提交唯一入口=完成选择按钮
-            // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属）、已定死或资源不足时
-            // 立即提示「不会执行」——与点击式同判定同文案（NotifySelectionBlockedOrConfirmed 单出口）
-            else
-                NotifySelectionBlockedOrConfirmed();
+            // **松手即放**（决策九十五 P4，蓝图 §4.1「拖拽=王者荣耀一致」——推翻 2026-09-26「松手留
+            // 待定+完成选择确认」拍板）：有效待定=落格轻提示（防线/资源不足——Notify 内含三段判定）
+            // 后立即提交；拦截=轻 toast 保持瞄准态可再拖
+            NotifySelectionBlockedOrConfirmed();
+            TrySubmitPendingAim();
         }
 
         /// <summary>拖动瞄准实时解析（单格）：判定基准=**大盘中心**——方向型（移动/直线）=盘心→小盘
@@ -2740,42 +2788,51 @@ namespace GIC.Battle
         /// 键心死区带拍板=2026-09-26 报障返修「只拖最近的1格松开判定我空放」（docs/14 §87）。</summary>
         private BattleCell? ComputeDragAimCellFromWheel(Vector2 discLocal)
         {
+            // P4 自由角（决策九十五，蓝图 §4.1「拖拽=王者荣耀：方向+距离→松手即放、超圆钳边、拖回取消」
+            // ——取代旧十字轴量化）：盘心→小盘位移=瞄准真值——方向=位移归一（任意角）、
+            // 距离=盘距比例×臂长（死区缘=最近、盘缘=臂满；比例钳 0..1=超圆钳边）
             Vector2 d = discLocal - _dragWheelCenterLocal;
-            if (d.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null; // 盘心死区
+            if (d.sqrMagnitude < 拖动瞄准小圆盘半径 * 拖动瞄准小圆盘半径) return null; // 盘心死区（拖回取消）
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return null;
 
-            bool horizontal = Mathf.Abs(d.x) >= Mathf.Abs(d.y);
-            int cdx = horizontal ? (d.x >= 0 ? 1 : -1) : 0;
-            int cdy = horizontal ? 0 : (d.y >= 0 ? 1 : -1);
+            // 方向=盘位移归一（自由角真值）；向量千分记录随会话（上交消费）
+            var dir = d.normalized;
+            _dragAimVecX = Mathf.RoundToInt(dir.x * 1000f);
+            _dragAimVecZ = Mathf.RoundToInt(dir.y * 1000f);
 
-            int maxStep = 0;
-            foreach (var c in _aimCells)
+            // 臂长（cm）：移动=瞄准域最大格距（移动域模型保留——「不限距走点」放开挂 P4 后续批）；
+            // 线技=时轮射程单源（DirectionRangeOf 格域桥×100）
+            int rangeCm;
+            if (_aimDef != null && _aimDef.IsMove)
             {
-                int adx = c.x - sel.position.x, ady = c.y - sel.position.y;
-                bool onArm = horizontal
-                    ? (ady == 0 && adx * cdx > 0)
-                    : (adx == 0 && ady * cdy > 0);
-                if (onArm) maxStep = Mathf.Max(maxStep, Mathf.Max(Mathf.Abs(adx), Mathf.Abs(ady)));
+                int maxStep = 0;
+                foreach (var c in _aimCells)
+                    maxStep = Mathf.Max(maxStep, Mathf.Max(
+                        Mathf.Abs(c.x - sel.position.x), Mathf.Abs(c.y - sel.position.y)));
+                if (maxStep <= 0) return null;
+                rangeCm = maxStep * CellMetrics.CellSizeCm;
             }
-            if (maxStep == 0) return null; // 该方向无臂（虚空/无格）
+            else
+            {
+                var data = GetSelectedSkillData(_aimDef);
+                rangeCm = EffectCompiler.DirectionRangeOf(data?.timeline) * CellMetrics.CellSizeCm;
+            }
+            if (rangeCm <= 0) return null;
 
-            // 盘距→步数：死区缘=第 1 格、盘缘=最远格（大盘半边=全臂程——方形盘两轴同值；
-            // 小盘夹在盘内，拖到盘缘=该方向拖满——盘已自适应入屏）
-            float axisCanvas = horizontal ? Mathf.Abs(d.x) : Mathf.Abs(d.y);
-            float span = Mathf.Max(1f, 拖动瞄准大盘半边 - 拖动瞄准小圆盘半径);
-            float norm = Mathf.Clamp01((axisCanvas - 拖动瞄准小圆盘半径) / span);
-            int k = Mathf.Clamp(Mathf.RoundToInt(norm * maxStep), 1, maxStep);
-            foreach (var c in _aimCells)
-            {
-                int adx = c.x - sel.position.x, ady = c.y - sel.position.y;
-                bool onArm = horizontal
-                    ? (ady == 0 && adx * cdx == k)
-                    : (adx == 0 && ady * cdy == k);
-                if (onArm) return c;
-            }
-            return null;
+            // 距离=盘距比例×臂长；死区外即拖=最小距离兜底（防零距=原地无效）
+            float dead = 拖动瞄准小圆盘半径;
+            float span = Mathf.Max(1f, 拖动瞄准大盘半边 - dead);
+            float t = Mathf.Clamp01((d.magnitude - dead) / span);
+            if (t <= 0f) t = Mathf.Min(0.08f, 1f);
+
+            // 落点=施法者连续位置+方向×距离（cm 域）→格；出棋盘=无效（落点可走性 Host 权威兜底）
+            int xCm = Mathf.RoundToInt(sel.PosXCm() + dir.x * (t * rangeCm));
+            int zCm = Mathf.RoundToInt(sel.PosZCm() + dir.y * (t * rangeCm));
+            var cell = BattleCell.FromCm(xCm, zCm);
+            if (!_board.Map.HasTile(cell.x, cell.y)) return null;
+            return cell;
         }
 
         /// <summary>指向锥角锁定（兜底保留）：候选目标格的屏幕方向（相对**盘心**——与拖向同基准）与
@@ -3309,35 +3366,13 @@ namespace GIC.Battle
                 return;
             }
 
-            // 瞄准待定确认：提交待定格上的行动（部署/移动/直线/单位指向全在 SubmitAim 单出口）
-            if (_state == HudState.Aiming && _pendingAimCell.HasValue)
-            {
-                var snapshot = _session.Player.LatestSnapshot;
-                if (snapshot == null) return;
-                var cell = _pendingAimCell.Value;
-                var enemyAtCell = FindUnitAt(snapshot, cell, UnitSide.Enemy);
-                if (SubmitAim(cell, enemyAtCell))
-                {
-                    _actionConfirmed = true; // 防线拦截（false）不定死
-                    if (_camera != null) _camera.EndDragFollowSession(); // 提交=会话正常终结（相机留位、清快照防下回合误重置）
-                }
-                return;
-            }
-
-            // 无待定瞄准：完成选择=空过上交——本回合就此定死（再瞄准再确认不再受理）
-            _session.SubmitAction(new ActionData
-            {
-                playerId = _myPlayerId,
-                actionType = ActionType.Pass,
-            });
-            _actionConfirmed = true;
-            GICLog.Info($"[BattleHud] {_myPlayerId} 完成选择：空过（已定死）");
-            ExitAiming();
-            DeselectUnit();
-            SetTip("Battle_TipSubmitted");
+            // P4 即时制收窄（决策九十五，蓝图 §2.4「Pass 按钮、完成选择按钮退役；升命保留手动确认/取消」）：
+            // 瞄准待定已随「点击/拖拽即放」退役（无待定可确认）；Pass=回合配额制语义即时制无效。
+            // 本按钮自此=**升命待确认（EnterUpgradePending）专用确认载体**；非升命待确认态=无操作
+            //（按钮显隐收窄挂 P4 视觉批）。提交链（含相机终结）由 TrySubmitPendingAim 统一承载
         }
 
-        /// <summary>倒计时归零=自动按下完成选择（2026-09-26 拍板「统一复用链路」**完全统一版**）：
+                /// <summary>倒计时归零=自动按下完成选择（2026-09-26 拍板「统一复用链路」**完全统一版**）：
         /// 无条件复用 OnConfirmButtonClicked，超时与手动按下按钮**零差异**——待定金格确认提交/
         /// 无待定上交空过；**已定死（本回合点过完成选择）则按钮同款无操作**——已确认的行动 A
         /// 天然保留，无需任何特例。事件在 Host 超时 Pass 兜底填充**之前**同步触发——HUD 先交，
