@@ -2447,3 +2447,11 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 
 **规范（后续任何 3D 动作路线必须遵守）**：①先做一条待机的最小垂直切片，用实际 Game View 录满「完整动作+一次循环衔接」并检查视频，通过后才扩展跑步/攻击；②目标模型重定向失败时，先让动作在源 FBX 自身骨架上隔离播放，分清「源动作已坏」与「重定向坏」，但源骨架通过仍不等于目标骨架通过；③验收项必须包含直立/脚落地、自然小动作、无拉伸扭曲、循环平顺，禁止用编译或数据断言替代画面；④设置 `EditorSceneManager.playModeStartScene` 后，未保存的场景探针不会随 Play 带入，录制前必须保存目标场景；退出 Play 后活动场景可能是 Boot，恢复/保存前先重新打开 `AmberTest` 并核对场景路径，避免把清理写进错误场景。
 
+## §180 移动循环片（跑步片）归一化与「时轮编辑器看不到移动片」两坑（2026-11-03 凯亚跑步循环批实锤）
+
+**坑一：缩放补偿算错方向（两版都偏大）**。症状=跑步立牌在战场上明显大于待机立牌。根因链：①首版 comp=1.3023 用「裁剪前」768×1024 画布算，落地片裁到 904 高后整体放大 ~13%（裁后必须按 `comp_new = comp_old × 新H/旧H` 重算）；②第二版 1.1497 仍偏大——改用「主体包围盒高」而跑步循环逐帧身高在 730~848px 间波动（腾空/收腿/前倾），中位数天然偏小使 comp 偏大，取最大高也只对上「最伸展那一帧」。**正解=头（深蓝发）宽度锚定**：头围与姿态无关，且是玩家判断角色大小的主锚点，`comp = (idle头宽/idle画布H) ÷ (移动片头宽/移动片画布H)`；凯亚实测 idle 217/1086、跑步 209/904 → comp=0.864275，头围显示比 1.000000。位置偏移按同一 comp 用「脚部中心 x + 全片最低脚 y」对齐待机片。工具=`.codely-cli/tools/paperdoll_move_normalize.py <idle.mp4> <move.mp4> [--anchor=head|height]`（自动抽帧/抠绿/测头宽身高脚位，直接打印 comp 与 offset）。验收=同画布同地面线渲染 idle 与移动片多相位对照图看头围/躯干体量，**只看包围盒高度会漏掉「头大」**。
+
+**坑二：时轮编辑器里没有移动技能的动作片**。症状=新做的 `{角色}_Move` 技能在时轮编辑器里查不到、也没有「动作片校准」栏。根因=`SkillTimelineEditor.FindPreviewSkill` 是**按技能持有的 timeline 反查**（`skill.data.timeline == 当前打开的时轮资产`，兜底按 skillID 名匹配），从 `Common_Walk` 复制来的技能 `timeline=null` → 永远反查不到。**修法=每个要校准的 Move 技能必须挂一个 SkillTimelineAsset**（`Resources/Configs/SkillTimelines/{角色}_Move.asset`：totalTime=片长、aimMode=十字方向、一条 Action 轨 0→片长、cueName 任意）。运行时只消费时轮里的**判定轨/特效轨**（`SkillTimelineQuery.JudgmentClips`/Vfx cue），纯占位时轮对移动距离与结算零影响。打开方式=选中该时轮资产 → `Tools/TG/时轮编辑器`；回读确认=`_asset`/`_previewSkillConfig`/`_previewActionClip` 三者非空且校准区 visible。
+
+**架构口径**：每角色一个 `{角色}_Move` 专属 Move 技能承载跑步片；`Common_Walk` 仍是多单位共享移动技能，**勿把角色专属片挂到共享资产**（一处改全处变）。全配方=gic-paperdoll skill「跑步循环片」节。
+

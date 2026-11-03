@@ -57,6 +57,9 @@ namespace GIC.Data
         #endregion
 
         #region 凯亚 (3002)
+        [InspectorName("疾行")]
+        Kaeya_Move = 3002006,
+
         [InspectorName("霜袭")]
         Kaeya_Frostgnaw = 3002001,
 

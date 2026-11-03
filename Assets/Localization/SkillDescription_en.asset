@@ -275,6 +275,10 @@ MonoBehaviour:
       tiles ahead"
     m_Metadata:
       m_Items: []
+  - m_Id: 3002006
+    m_Localized: "\xB7Sprint in one of the four cardinal directions"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
