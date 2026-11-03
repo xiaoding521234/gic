@@ -674,13 +674,15 @@ namespace GIC.Battle
 
         /// <summary>首个合法部署落点（2026-10-23 锚点拍板后多锚环扫）：锚序=CollectDeployAnchors
         /// 单源（核心优先+unitId 升序——安全区先铺的确定性枚举），每锚由近及远环序（1 环→N 环、
-        /// 行优先列序）；建筑锚半径=建筑 2/角色 1（DeployRadiusOf 同源）</summary>
+        /// 行优先列序）；锚半径=DeployRadiusOf 同源（P3 cm 制→÷CellSizeCm 回格环扫——建筑 3/2 格、
+        /// 角色 2/1 格不变）</summary>
         private BattleCell? FindDeployCell(BattleSimState sim, UnitConfig.UnitData deployData)
         {
             bool deployIsBuilding = deployData != null && deployData.unitType == UnitType.Building;
             foreach (var anchor in DeployUnitExecutor.CollectDeployAnchors(sim, _playerId))
             {
-                int radius = DeployUnitExecutor.DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                int radius = DeployUnitExecutor.DeployRadiusOf(anchor.isCore, deployIsBuilding)
+                    / CellMetrics.CellSizeCm; // P3 cm→格桥（格环扫）
                 for (int ring = 1; ring <= radius; ring++)
                 {
                     for (int dy = -ring; dy <= ring; dy++)

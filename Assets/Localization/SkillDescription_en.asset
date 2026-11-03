@@ -47,7 +47,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
-    m_Localized: "\xB7When concerted: enemies within {EffectRadius} tiles gain <color=#FFD700><u><link=\"Buff:\u89C6\u91CE\u66B4\u9732\">Exposure</link></u></color>"
+    m_Localized: "\xB7When concerted: enemies within {EffectRadius} cm gain <color=#FFD700><u><link=\"Buff:\u89C6\u91CE\u66B4\u9732\">Exposure</link></u></color>"
     m_Metadata:
       m_Items: []
   - m_Id: 24651732772147200
@@ -67,7 +67,7 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3002001
     m_Localized: "\xB7Thrust frost in one of the four cardinal directions\n\xB7Deal
-      {Damage} Cryo DMG to enemies within {DamageDistance} tiles ahead\n\xB7Plunder
+      {Damage} Cryo DMG to enemies within {DamageDistance} cm ahead\n\xB7Plunder
       {MoraPlunder} Mora from each enemy hit"
     m_Metadata:
       m_Items: []
@@ -118,14 +118,14 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3003004
     m_Localized: "\xB7Launch a water orb in one of the four cardinal directions,
-      flying {ProjectileDistance} tiles\n\xB7Deal {Damage} Hydro DMG on hit\n\xB7Heal
-      all allied units within {HealRadius} tiles of self for {Heal} HP"
+      flying {ProjectileDistance} cm\n\xB7Deal {Damage} Hydro DMG on hit\n\xB7Heal
+      all allied units within {HealRadius} cm of self for {Heal} HP"
     m_Metadata:
       m_Items: []
   - m_Id: 4001001
     m_Localized: "\xB7Choose one cardinal direction: deal {Damage} Hydro DMG to enemies
-      in a straight line, {DamageDistance} tiles ahead\n\xB7Gain {RainSwordGain}
-      <color=#FFD700><u><link=\"Buff:\u96E8\u5E18\u5251\">Rain Sword</link></u></color>(s)"
+      in a straight line, {DamageDistance} cm ahead\n\xB7Gain {RainSwordGain} <color=#FFD700><u><link=\"Buff:\u96E8\u5E18\u5251\">Rain
+      Sword</link></u></color>(s)"
     m_Metadata:
       m_Items: []
   - m_Id: 4001002
@@ -148,7 +148,7 @@ MonoBehaviour:
       attack also grants {C1SynergyEnergyGain} Energy to both Xingqiu and the assisted
       ally\n\xB7[C2] After any allied unit downs an enemy, Xingqiu gains {C2KillSwordGain}
       Rain Swords; overflowing Rain Swords immediately strike the lowest-HP enemy
-      within {C2OverflowRadius} tiles\n\xB7[C3] Each coordinated attack also grants
+      within {C2OverflowRadius} cm\n\xB7[C3] Each coordinated attack also grants
       {C3SynergyTenacityGain} Tenacity to both Xingqiu and the assisted ally"
     m_Metadata:
       m_Items: []
@@ -157,16 +157,16 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3004001
-    m_Localized: "\xB7Teleport to an empty tile within {CastRadius} tiles, striking
+    m_Localized: "\xB7Teleport to an empty tile within {CastRadius} cm, striking
       lightning at both the start and end points\n\xB7The lightning deals {Damage}
-      Electro DMG to enemies within {EffectRadius} tiles\n\xB7Enemies hit by lightning
+      Electro DMG to enemies within {EffectRadius} cm\n\xB7Enemies hit by lightning
       at both points are Stunned for {Duration} turns"
     m_Metadata:
       m_Items: []
   - m_Id: 3004002
     m_Localized: "\xB7Teleport the unit carrying <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
       Thorn</link></u></color> to any empty tile and strike lightning\n\xB7The lightning
-      deals {Damage} Electro DMG to enemies within {EffectRadius} tiles\n\xB7If that
+      deals {Damage} Electro DMG to enemies within {EffectRadius} cm\n\xB7If that
       unit is Banished, Lisa takes {PenaltyDamage} True DMG and forcibly recalls
       it"
     m_Metadata:
@@ -178,7 +178,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3004004
-    m_Localized: "\xB7Stun enemies within {EffectRadius} tiles for {Duration} turns\n\xB7If
+    m_Localized: "\xB7Stun enemies within {EffectRadius} cm for {Duration} turns\n\xB7If
       the <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose Thorn</link></u></color>
       holder is a Mondstadt character (excluding Lisa), trigger their Henka; otherwise
       grant them {EnergyGain} Energy"
@@ -189,7 +189,7 @@ MonoBehaviour:
       Thorn</link></u></color> holder is within the strike range of Lisa's Move,
       Burst, or the Rose Thorn lightning, the rose fires needles, dealing {C1NeedleCount}
       hits of {C1NeedleDamage} Electro DMG to the nearest enemy within {C1NeedleRadius}
-      tiles of the holder\n\xB7[C2] Henka also grants {C2EnergyGain} Energy to allies
+      cm of the holder\n\xB7[C2] Henka also grants {C2EnergyGain} Energy to allies
       in range; the Rose Thorn lightning triggers at most {C2TriggerLimit} times
       per turn\n\xB7[C3] Units carrying <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
       Thorn</link></u></color> gain {C3DamageBonus} DMG Bonus"
@@ -202,9 +202,9 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3011002
     m_Localized: "\xB7Release wind pressure in one of the four cardinal directions\n\xB7Enemies
-      more than {CloseRange} tiles away: pulled in front of Jean\n\xB7Enemies within
-      {CloseRange} tiles: take {Damage} Anemo DMG and are knocked back {Knockback}
-      tiles\n\xB7Max range {MaxRange} tiles"
+      more than {CloseRange} cm away: pulled in front of Jean\n\xB7Enemies within
+      {CloseRange} cm: take {Damage} Anemo DMG and are knocked back {Knockback} cm\n\xB7Max
+      range {MaxRange} cm"
     m_Metadata:
       m_Items: []
   - m_Id: 3011003
@@ -213,8 +213,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3011004
-    m_Localized: "\xB7Create {WindFieldRange} tiles of Dandelion Wind in each of
-      the four cardinal directions from the coordinated ally, blowing away from them"
+    m_Localized: "\xB7Create {WindFieldRange} cm of Dandelion Wind in each of the
+      four cardinal directions from the coordinated ally, blowing away from them"
     m_Metadata:
       m_Items: []
   - m_Id: 3011005
@@ -224,8 +224,7 @@ MonoBehaviour:
       dash direction becomes that wind's direction and dash range refreshes (each
       wind counts once)\n\xB7When the dash is blocked by an enemy, deal {Damage}+{MoveSpeedDamage}
       DMG to it, counted as Skill DMG\n\xB7If Jean is not on a wind, teleport to
-      the farthest Dandelion Wind within {TeleportRange} tiles; no effect if none
-      exists"
+      the farthest Dandelion Wind within {TeleportRange} cm; no effect if none exists"
     m_Metadata:
       m_Items: []
   - m_Id: 3011006
@@ -266,13 +265,13 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 10002001
     m_Localized: "\xB7Swing the club in one of the four cardinal directions\n\xB7Deal
-      {Damage} physical DMG to enemies within {DamageDistance} tiles ahead"
+      {Damage} physical DMG to enemies within {DamageDistance} cm ahead"
     m_Metadata:
       m_Items: []
   - m_Id: 10002002
     m_Localized: "\xB7Deliver a full-power club swing in one of the four cardinal
       directions\n\xB7Deal {Damage} physical DMG to enemies within {DamageDistance}
-      tiles ahead"
+      cm ahead"
     m_Metadata:
       m_Items: []
   - m_Id: 3002006

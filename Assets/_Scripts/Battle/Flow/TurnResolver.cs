@@ -196,36 +196,34 @@ namespace GIC.Battle
                 switch (action.actionType)
                 {
                     case ActionType.Move:
+                        // **2026-11-04 拍板「100 移速=走完一米要 1 秒」**：移动统一新轨——旧格式上交
+                        //（AI 三脑〔P5 移植前〕与玩家 HUD 的 direction+magnitude）在 Host 侧桥为目标点
+                        // cm（当前格+方向×步数→格心），与 targetX 直填同走 RTSMovementSystem
+                        //（100cm/s tick 推进+圆碰撞+1 米/秒节奏）。旧格轨移动执行退役（0.18s/格
+                        //≈5.5 米/秒观感被否）；MovementResolver 保留（部署碰撞原语消费方，移动执行不再走它）
+                        if (action.targetX <= 0 && action.targetZ <= 0 && action.moveMagnitude > 0)
+                        {
+                            var delta = SkillHitResolver.DirectionToDelta(action.direction);
+                            var fromCell = BattleCell.FromCm(_sim.GetPosCm(unit).x, _sim.GetPosCm(unit).y);
+                            var targetCell = new BattleCell(
+                                fromCell.x + delta.x * action.moveMagnitude,
+                                fromCell.y + delta.y * action.moveMagnitude);
+                            action.targetX = targetCell.CenterXCm;
+                            action.targetZ = targetCell.CenterYCm;
+                        }
                         if (action.targetX > 0 || action.targetZ > 0)
                         {
-                            // 即时制 tick 移动（决策九十五 P2，蓝图 §3.3）：免费 0 体力 0 元能——启动即入
-                            // sim.ActiveMovers，RTSFlow 每 tick 推进（A* 路径+圆碰撞）；收尾（到达/被挡）走
-                            // ResolveMoveArrivals（途经采集保留、移动获能已删除——蓝图 §4.3）
+                            // 同单位重复移动=替换（玩家连点重定目标/AI 每 0.5 秒重决策——旧 mover 作废）
+                            _sim.ActiveMoversInternal.RemoveAll(m => m.UnitId == action.unitId);
                             var cmMover = RTSMovementSystem.BuildCmMover(_sim, action, out var moveCommand);
                             if (cmMover != null)
                             {
                                 _sim.ActiveMoversInternal.Add(cmMover);
-                                if (moveCommand != null) casts.Add(moveCommand); // 启动 Move 命令（casts 首发位——客户端旧播放器照播）
+                                if (moveCommand != null) casts.Add(moveCommand); // 启动 Move 命令（casts 首发位——客户端按 MoveStepSeconds=1s/格补间）
                                 AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能
                             }
-                            break;
                         }
-                        var mover = MoveExecutor.BuildMover(_sim, action); // 旧格轨兜底（AI 三脑 P5 移植前退役）
-                        if (mover == null) break;
-                        // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
-                        // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
-                        var moveCosts = MoveExecutor.GetMoveCosts(unit);
-                        if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _,
-                                isPlayerDirectControl: action.isPlayerDirectControl))
-                        {
-                            GICLog.Info($"[TurnResolver] 单位 {action.unitId} 移动消耗不足，移动落空");
-                            break;
-                        }
-                        ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects,
-                            isPlayerDirectControl: action.isPlayerDirectControl);
-                        movers.Add(mover);
-                        AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
-                        break;
+                        break; // 零步/不可寻路=移动落空（与技能落空同语义）
 
                     case ActionType.Skill:
                         effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot, casts));
@@ -241,55 +239,16 @@ namespace GIC.Battle
                 }
             }
 
-            // 移动同步逐步结算（动态展开；与快照结算并存）
-            MovementResolver.Resolve(_sim, movers);
+            // 旧格轨移动执行已退役（2026-11-04 拍板「1 米/秒」：Move 分支全部桥入新轨——
+            // MovementResolver.Resolve/旧轨途经采集随移动执行链停用；movers 保留传参形态恒空集，
+            // ProjectileResolver 的 legacyMovers 轨迹源保留 P5 前防御性兼容）
 
-            // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算——移动行动已使用）
-            foreach (var mover in movers)
-                effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
+            // 途经采集=新轨唯一路径：RTSMovementSystem 收尾（到达/被挡）→ResolveMoveArrivals
+            //（PathCells 全量逐格+per-堆 CollectCount 连采+耐久钩子——docs/47 §5；本段为旧轨
+            // 执行链的采集残留，移动执行新轨化后恒空转，保留注释存档语义）
 
-            // 途经采集（docs/47 拍板⑥·docs/11 B-S1b 旧挂账销案，2026-10-27；2026-10-28 返修语义
-            // 勘正）：移动技能 CollectCount>0（安柏飞行冠军——数据驱动，普通移动零行为变化）的
-            // 移动者按 Path **全量**（含起点与终点——拍板「『经过』包含了起始和终点位置」）逐格
-            // 采集；**同一堆连采至多 CollectCount 次**（拍板「只有一堆摩拉也能采三次」——CollectCount
-            // =per-堆配额，旧版每堆至多 1 次+移动总量上限=需三堆才采满，语义作废）。每次采集=资源
-            // 点余量-1+MoraPerHarvest 摩拉〔资源点定义收益〕+CollectStaminaGain 体力/
-            // CollectEnergyGain 元能〔技能收益，**逐次**——docs/units/蒙德/安柏.md「每次采集获得」〕。
-            // 命中时刻（WYSIWYG 三件套效应侧）=行走到达该格时刻 i×MoveStepSeconds+连采错峰
-            // k×CommandStaggerSeconds（移动补间与客户端 PlayMoveCoroutine 同源零漂移——采集事实/
-            // 摩拉/体力/元能四路命令到点应用，「表现对齐动画」返修）；起点堆=离场即采（i=0 恒立即）、
-            // 终点堆=到达即采（停堆双采合法：途经 CollectCount 次+回合末站立 1 次）。
-            // 余量已在 TryHarvest 扣减（建筑元能引擎「能量落地同拍判定」同模式）
-            foreach (var mover in movers)
-            {
-                var collect = MoveExecutor.CollectParamsOf(mover.Unit);
-                if (collect.count <= 0) continue;
-                var identity = mover.Unit.GetUnitComponent<UnitIdentity>();
-                if (identity == null) continue; // 注册单位必有 identity（防御口径同 PassesBlockingRules）
-                for (int i = 0; i < mover.Path.Count; i++)
-                {
-                    for (int k = 0; k < collect.count; k++)
-                    {
-                        int remaining = _sim.TryHarvestResourceNode(mover.Path[i]);
-                        if (remaining < 0) break; // 无堆/已耗尽——续走后续途经格
-                        float hitSeconds = i * BattleMetrics.MoveStepSeconds
-                            + k * BattleMetrics.CommandStaggerSeconds;
-                        effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest,
-                            hitSeconds));
-                        if (collect.staminaGain != 0)
-                            effects.Add(new StaminaEffect(identity.OwnerPlayerID, collect.staminaGain, hitSeconds));
-                        if (collect.energyGain != 0)
-                            effects.Add(new EnergyEffect(mover.UnitId, collect.energyGain, EnergyEffect.CategoryCollectGain)
-                                { HitSeconds = hitSeconds }); // 合并键并入命中时刻=逐采集事件各 +N（勿并一笔）
-                        effects.Add(new ResourceHarvestEffect(mover.UnitId, mover.Path[i],
-                            ResourceNodeMetrics.MoraPerHarvest, remaining, hitSeconds));
-                        mover.Unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
-                    }
-                }
-            }
-
-            // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整路径，
-            // docs/22 §11——命中点/消散点随命令千分定点下发）
+            // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整轨迹
+            //——即时制新轨 mover/静止快照，docs/22 §11；命中点/消散点随命令毫米定点下发）
             var vanishes = new List<BattleCommand>();
             ProjectileResolver.Resolve(_sim, snapshot, effects, movers, vanishes);
             _sim.EndCompileDyeView(); // 命中编译全部完成（此后效应应用/命令发射不再读附着）
@@ -430,14 +389,16 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 每秒整拍结算段（决策九十五「每秒整拍」拍板 4——原回合结束段秒化，docs/active/48 §2.3/§9）：
-        /// ①每玩家发放 1摩拉+1体力（MoraGainPerSecond/StaminaGainPerSecond——+10/回合 缩 1/10 节奏，
-        /// 初始 60/200 不变；发放直产命令不走效应链，资源变更非单位效应）→
-        /// ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingTurns 语义改秒）→
-        /// ③计时减一（上 buff 当拍结束即减）→ 到期移除 → 产出 turnEnd 段（发放恒非空，段必推）。
+        /// 每秒整拍结算段（决策九十五「每秒整拍」拍板 4——原回合结束段秒化，docs/active/48 §2.3/§9；
+        /// **2026-11-04 追拍「效果触发时间翻倍」**：拆秒拍/效果拍两档——秒拍=发放 1摩拉+1体力/Buff 计时
+        /// 递减/泡湿/资源点站立采集/快照；**效果拍（每 EffectBeatTicks=2 秒）=Buff tick 效果〔OnTurnEnd
+        /// 产出——歌声之环/冰棱/燃烧〕+建筑效果〔教堂/旗帜/餐馆/骑士引擎〕**，单次数值不动=触发频率
+        /// 减半；战技/爆发 CD 不受影响（独立 3s/5s 拍板））：
+        /// ①每玩家发放 → ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingTurns 语义改秒）
+        /// → ③计时减一（上 buff 当拍结束即减）→ 到期移除 → 产出 turnEnd 段（发放恒非空，段必推）。
         /// 由 RTSFlowController 每秒整拍（tick%20==0）调用；胜负检查归调用方。
         /// </summary>
-        public void ResolveSecondBeat(int second)
+        public void ResolveSecondBeat(int second, bool effectBeat)
         {
             // 逻辑秒真源写入（即时制：CurrentTurn 语义=逻辑秒——周期类建筑效果/灵魂 DeployedTurn
             // 相对计数零改动兼容：每 1 秒走 1 拍=旧「每回合走 1」等价节拍）
@@ -476,12 +437,15 @@ namespace GIC.Battle
             // **回合末=同时结算（决策二十四终版「逐拍交错」）**：buff 的 OnTurnEnd 只产出声明（元素
             // 伤害走 PendingAuraHit），循环后统一按 (拍时刻, 施法者, 目标) 排序逐个过共享编译视图结算
             // ——双异元素光环同拍交错、每层附着、每拍可触发反应（对齐原神双光环同开互融）
+            // **2026-11-04 追拍**：OnTurnEnd 产出只在效果拍（每 2 秒）执行——「太频繁」节奏翻倍；
+            // 计时递减仍每秒（Duration 秒语义不变：冻结 2 秒仍 2 秒，只少一次无产出的空转调用）
             foreach (var buff in _sim.ActiveBuffs)
             {
-                effects.AddRange(buff.OnTurnEnd());
+                if (effectBeat) effects.AddRange(buff.OnTurnEnd());
                 if (!buff.IsPermanent) buff.RemainingTurns--;
             }
-            ResolveAuraHits(effects);
+            if (effectBeat)
+                ResolveAuraHits(effects);
             var expired = _sim.CollectExpiredBuffs();
 
             // 泡湿附着（决策七十六拍板②「在水面上，且不为飞行或两栖移动的单位，每个回合结束时
@@ -541,9 +505,12 @@ namespace GIC.Battle
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             // 建筑回合末效果段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——回合末
             // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
-            // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）
+            // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）。
+            // **2026-11-04 追拍**：建筑效果只在效果拍（每 2 秒）结算——教堂治疗/旗帜/餐馆/骑士引擎
+            // 触发频率翻倍拍板；周期类字段（效果周期）按拍计数=时长自然翻倍
             var buildingExtras = new List<BattleCommand>();
-            _buildingEffects.CollectTurnEndEffects(_sim.CurrentTurn, effects, buildingExtras);
+            if (effectBeat)
+                _buildingEffects.CollectTurnEndEffects(_sim.CurrentTurn, effects, buildingExtras);
             var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
@@ -684,9 +651,12 @@ namespace GIC.Battle
 
             foreach (var effect in MergeDamageEffects(effects))
             {
+                // 命中点 mm 定点（P3 cm 化：HitPointX/Y 自 ProjectileResolver 起即厘米域 float——
+                // ×10=毫米；旧 ×1000 是千分格系数，cm 迁移后若沿用=放大 100 倍〔P3 观察局抓出〕。
+                // 客户端消费 ÷1000 换世界=cm÷1000÷10=cm/100=格——分母不变零改动）
                 var dmgCmd = BattleCommand.Damage(effect.AttackerUnitId, effect.TargetUnitId, sliceIndex, indexInSlice++, effect.Amount,
                     effect.Element, effect.Delivery, effect.FromCell,
-                    Mathf.RoundToInt(effect.HitPointX * 1000f), Mathf.RoundToInt(effect.HitPointY * 1000f), effect.ReactionType,
+                    Mathf.RoundToInt(effect.HitPointX * 10f), Mathf.RoundToInt(effect.HitPointY * 10f), effect.ReactionType,
                     effect.LaunchMs, effect.IsCrit ? 1 : 0);
                 // 箭矢视觉高度（2026-10-05 对齐动作片松弦位）：投射物路径经发射声明透传千分下发；
                 // 瞬发直击（Delivery=0）无箭矢视觉不消费
@@ -1279,7 +1249,7 @@ namespace GIC.Battle
                                 ? blockItemData.GetInt(nameof(SkillParamKey.ExplodePercent), 0) : 0;
                             if (explodePercent > 0)
                             {
-                                int explodeRadius = blockItemData.GetInt(nameof(SkillParamKey.ExplodeRadius), 1);
+                                int explodeRadius = blockItemData.GetInt(nameof(SkillParamKey.ExplodeRadius), 100); // cm（P3 资产 cm 制：缺省=100=旧 1 格直译）
                                 bunnyExplosionBlocks.Add((target, effect.TargetUnitId,
                                     damage.HitSeconds, explodePercent, explodeRadius));
                             }
@@ -1550,7 +1520,7 @@ namespace GIC.Battle
                         string enemyOwnerId = enemy.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
                         if (enemyOwnerId == null || _sim.GetTeamOf(enemyOwnerId) == holderTeam) continue;
                         var enemyPos = _sim.GetPosition(enemy);
-                        long explosionR = (long)explosion.radius * CellMetrics.CellSizeCm; // 欧氏平方（决策九十五迁移）
+                        long explosionR = explosion.radius; // 欧氏平方（P3 统一资产 cm 制：ExplodeRadius 资产迁厘米〔1 格→100〕直比——不再 ×CellSizeCm）
                         if (holderPos.SquaredEuclideanCmTo(enemyPos) > explosionR * explosionR) continue;
                         EffectCompiler.CompileElementalDamage(_sim, explosion.holderId, kv.Key, null,
                             ElementType.Pyro,

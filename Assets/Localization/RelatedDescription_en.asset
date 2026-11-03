@@ -33,7 +33,7 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 26802933513924608
     m_Localized: "\xB7Stacks up to {BaseStackLimit}\n\xB7At each turn end, deals
-      {AuraDamagePercent} Cryo DMG to enemies within {AuraRadius} tile of the holder\n\xB7Shatters
+      {AuraDamagePercent} Cryo DMG to enemies within {AuraRadius} cm of the holder\n\xB7Shatters
       when the holder's Energy exceeds {ShatterEnergyThreshold}, healing the holder
       for {ShatterHealPercent} per shard\n\xB7When recast at max stacks, overflowing
       shards shatter immediately, healing the holder for {ShatterHealPercent} each\n\xB7Persists
@@ -42,8 +42,8 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 26802933564256256
     m_Localized: "\xB7Single stack\n\xB7At each turn end, deals {AuraDamagePercent}
-      Hydro DMG to enemies within {AuraRadius} tile of the holder\n\xB7At each turn
-      end, heals allies within {AuraRadius} tile for {AuraHealPercent} of the applier,
+      Hydro DMG to enemies within {AuraRadius} cm of the holder\n\xB7At each turn
+      end, heals allies within {AuraRadius} cm for {AuraHealPercent} of the applier,
       grants them {AuraEnergyGain} Energy, restores {AuraSanityGain} Sanity and applies
       Hydro to them\n\xB7Vanishes when the holder is downed"
     m_Metadata:

@@ -95,8 +95,11 @@ namespace GIC.Battle
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null) continue;
-                if (Sim.GetPosition(unit).ChebyshevTo(holderPos) > radius)
-                    continue; // 出半径（ChebyshevTo 单源）
+                // 欧氏 cm 域（决策九十五 P3 统一资产 cm 制：作用半径资产迁 100cm 直比；
+                // SquaredEuclideanCmTo 全整数零开方——「最近」比较平方值单调等价）
+                long auraR = radius;
+                if (Sim.GetPosition(unit).SquaredEuclideanCmTo(holderPos) > auraR * auraR)
+                    continue; // 出半径
 
                 if (identity.Team != holderTeam)
                 {

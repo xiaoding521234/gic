@@ -507,10 +507,11 @@ namespace GIC.Battle
             var delta = SkillHitResolver.DirectionToDelta(direction);
 
             // 投射物形态：首个敌方占格（含尸体）截停，命中格 AoE 同格存活敌全中
+            // （P3 cm 化适配：clip.maxRange 资产迁厘米——RangeCellsOf 桥回格域步进，AI 逐格预判零改动）
             var projClips = SkillTimelineQuery.JudgmentClips(skillData?.timeline, SkillJudgmentKind.LineProjectile);
             if (projClips.Count > 0)
             {
-                int maxRange = projClips[0].maxRange > 0 ? projClips[0].maxRange : ProjectileRule.MaxRange;
+                int maxRange = EffectCompiler.RangeCellsOf(projClips[0].maxRange);
                 for (int step = 1; step <= maxRange; step++)
                 {
                     var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
@@ -527,8 +528,7 @@ namespace GIC.Battle
 
             // 整线/距离段形态：射程内存活敌全中（虚空截断、无截停）
             var burstClips = SkillTimelineQuery.JudgmentClips(skillData?.timeline, SkillJudgmentKind.LineBurst);
-            int range = burstClips.Count > 0 && burstClips[0].maxRange > 0
-                ? burstClips[0].maxRange : ProjectileRule.MaxRange;
+            int range = EffectCompiler.RangeCellsOf(burstClips.Count > 0 ? burstClips[0].maxRange : 0);
             for (int step = 1; step <= range; step++)
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
@@ -617,12 +617,11 @@ namespace GIC.Battle
                 int range;
                 var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
                 if (projClips.Count > 0)
-                    range = projClips[0].maxRange > 0 ? projClips[0].maxRange : ProjectileRule.MaxRange;
+                    range = EffectCompiler.RangeCellsOf(projClips[0].maxRange); // P3 cm→格桥
                 else
                 {
                     var burstClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst);
-                    range = burstClips.Count > 0 && burstClips[0].maxRange > 0
-                        ? burstClips[0].maxRange : ProjectileRule.MaxRange;
+                    range = EffectCompiler.RangeCellsOf(burstClips.Count > 0 ? burstClips[0].maxRange : 0);
                 }
                 if (range > best) best = range;
             }

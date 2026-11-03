@@ -213,15 +213,11 @@ namespace GIC.Battle
             return dx * dx + dz * dz < touchDist * touchDist;
         }
 
-        /// <summary>单位碰撞圆半径（厘米）——受击圆柱直径同源（BattleMetrics.CylinderDiameterOf：
-        /// per-unit 覆写〔协议核心 0.8〕+全局 0.5，蓝图 §3.2 统一拍板）</summary>
+        /// <summary>单位碰撞圆半径（厘米）——受击圆柱直径同源（BattleMetrics.CylinderDiameterOf(Unit)
+        /// 直读重载：per-unit 覆写〔协议核心 0.8〕+全局 0.5，蓝图 §3.2 统一拍板；P3 取代旧 UnitState
+        /// 哑实例传参——P2 已知断裂面修复）</summary>
         private static int RadiusCmOf(Unit unit)
-        {
-            var state = new UnitState();
-            state.cylinderDiameter = unit.RawData != null ? unit.RawData.受击圆柱直径 : 0f;
-            float diameter = BattleMetrics.CylinderDiameterOf(state);
-            return Mathf.RoundToInt(diameter * CellMetrics.CellSizeCm);
-        }
+            => Mathf.RoundToInt(BattleMetrics.CylinderDiameterOf(unit) * CellMetrics.CellSizeCm);
 
         /// <summary>整数平方根（牛顿迭代全整数——确定性纪律零浮点）</summary>
         private static int SqrtI(long value)

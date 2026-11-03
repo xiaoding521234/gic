@@ -102,7 +102,8 @@ namespace GIC.Battle
             TeamType casterTeam, BattleCell from, Direction2D direction)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
-            for (int step = 1; step <= ProjectileRule.MaxRange; step++)
+            int maxRangeCells = ProjectileRule.MaxRange / CellMetrics.CellSizeCm; // P3 cm 化：默认 2400cm→24 格（行为不变）
+            for (int step = 1; step <= maxRangeCells; step++)
             {
                 var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
                 if (!map.HasTile(cell.x, cell.y)) break; // 虚空截断

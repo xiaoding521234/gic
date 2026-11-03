@@ -22,7 +22,7 @@ MonoBehaviour:
     hitInterval: 0
     projectileSpeed: 0
     hitDiameter: 0
-    maxRange: 2
+    maxRange: 150
     projectileHeight: 0
     cueName: 
   - trackType: 1

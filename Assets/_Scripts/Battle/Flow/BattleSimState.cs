@@ -901,6 +901,48 @@ namespace GIC.Battle
         /// <summary>tick 移动注册表写入（TurnResolver 启动移动时 Add；推进器内部 Remove）</summary>
         public List<RTSMoveState> ActiveMoversInternal => _activeMovers;
 
+        // ==================== 攻击冷却（决策九十五 P3，蓝图 §4.3——战技 3 秒/爆发 5 秒） ====================
+        // 纪元制（到期 tick 记账，非逐 tick 递减——零每帧遍历、回放由命令流派生天然确定）：
+        // Normal 型（战技+AI 普攻条目同享）→攻击 CD；Burst 型→爆发 CD；其余类型（延奏/契约/势力/
+        // 变奏/移动/命座）无 CD。单位死亡不清条目（量=单位数上限，无泄漏面；unitId 不复用）。
+
+        /// <summary>战技 CD 就绪 tick（=可再次施放的最早 tick；缺省 0=就绪）</summary>
+        private readonly Dictionary<string, int> _attackCdReadyTick = new Dictionary<string, int>();
+
+        /// <summary>爆发 CD 就绪 tick（同上；元能门槛仍走 costs 资源链=双 gate）</summary>
+        private readonly Dictionary<string, int> _burstCdReadyTick = new Dictionary<string, int>();
+
+        /// <summary>该技能类型对单位是否处于 CD 中（Normal→攻击 CD；Burst→爆发 CD；其余类型恒 false）</summary>
+        public bool IsSkillOnCooldown(string unitId, GIC.Data.SkillType skillType)
+        {
+            if (skillType == GIC.Data.SkillType.Burst)
+                return SkillCdRemainTicks(unitId, skillType) > 0;
+            if (skillType == GIC.Data.SkillType.Normal)
+                return SkillCdRemainTicks(unitId, skillType) > 0;
+            return false;
+        }
+
+        /// <summary>技能 CD 剩余 tick（0=就绪；非法/无 CD 类型恒 0）</summary>
+        public int SkillCdRemainTicks(string unitId, GIC.Data.SkillType skillType)
+        {
+            var table = skillType == GIC.Data.SkillType.Burst ? _burstCdReadyTick : _attackCdReadyTick;
+            if (skillType != GIC.Data.SkillType.Burst && skillType != GIC.Data.SkillType.Normal) return 0;
+            if (!table.TryGetValue(unitId, out int readyTick)) return 0;
+            int remain = readyTick - CurrentTick;
+            return remain > 0 ? remain : 0;
+        }
+
+        /// <summary>消耗技能 CD（门槛全过后调用——与资源扣减同拍；写就绪 tick 纪元）</summary>
+        public void ConsumeSkillCooldown(string unitId, GIC.Data.SkillType skillType)
+        {
+            int cdTicks = skillType == GIC.Data.SkillType.Burst
+                ? BattleMetrics.BurstCooldownTicks
+                : BattleMetrics.CasterCooldownTicks;
+            if (skillType != GIC.Data.SkillType.Burst && skillType != GIC.Data.SkillType.Normal) return;
+            var table = skillType == GIC.Data.SkillType.Burst ? _burstCdReadyTick : _attackCdReadyTick;
+            table[unitId] = CurrentTick + cdTicks;
+        }
+
         /// <summary>
         /// 获取某格上的全部单位（含尸体——尸体保留碰撞/体积，docs/05 §5.4）
         /// </summary>
@@ -1233,6 +1275,10 @@ namespace GIC.Battle
                 constellation = unit.ConstellationLevel, // 命座（B8 批：展示/升命门控真源）
                 tier = (int)BattleHeuristics.TierOf(unit), // 操控层级单源（TierOverrideStars 覆盖随此进快照——客户端门控同源）
                 exploreVision = stats?.VisionRange ?? 0, // 探索视野真源（迷雾批追拍六：stats 终值=config 基值+1命 StatBoost；0=未填→客户端回落 config 链）
+                posX = GetPosCm(unit).x,   // 连续位置（决策九十五 P3，蓝图 §8）：弹道求交/欧氏域真值源
+                posZ = GetPosCm(unit).y,
+                attackCdRemainTicks = SkillCdRemainTicks(unitId, GIC.Data.SkillType.Normal), // 攻击 CD 剩余（HUD CD 转圈 P4 接线）
+                burstCdRemainTicks = SkillCdRemainTicks(unitId, GIC.Data.SkillType.Burst),   // 爆发 CD 剩余
             };
             // 装备态（装备批 2026-10-18）：武器+配件槽位表（含耐久）——客户端血条右侧图标行+瞄准域
             //「有空槽」预判的数据源；无 UnitEquipment 组件（异常）=空表

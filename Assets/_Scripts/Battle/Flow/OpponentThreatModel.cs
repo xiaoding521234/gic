@@ -164,19 +164,19 @@ namespace GIC.Battle
 
         /// <summary>敌方预测攻击的火线格（沿预测方向逐格扫到技能射程，虚空格截断——与
         /// PreviewLineTargets 虚空截断/AttackRangeOf per-skill 射程提取两处同口径：投射物=
-        /// clip.maxRange 缺省 ProjectileRule.MaxRange；整线=LineBurst clip 同规则）</summary>
+        /// clip.maxRange 缺省默认；整线=LineBurst clip 同规则。P3 cm 化适配：clip 资产已迁
+        /// 厘米——RangeCellsOf 桥回格域步进）</summary>
         private static IEnumerable<BattleCell> ThreatLineCells(BattleSimState sim, BattleCell from,
             SkillConfig.SkillData data, Direction2D direction)
         {
             var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
             int range;
             if (projClips.Count > 0)
-                range = projClips[0].maxRange > 0 ? projClips[0].maxRange : ProjectileRule.MaxRange;
+                range = EffectCompiler.RangeCellsOf(projClips[0].maxRange);
             else
             {
                 var burstClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst);
-                range = burstClips.Count > 0 && burstClips[0].maxRange > 0
-                    ? burstClips[0].maxRange : ProjectileRule.MaxRange;
+                range = EffectCompiler.RangeCellsOf(burstClips.Count > 0 ? burstClips[0].maxRange : 0);
             }
 
             var delta = SkillHitResolver.DirectionToDelta(direction);

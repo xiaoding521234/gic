@@ -306,6 +306,13 @@ namespace GIC.Data
         // 未来魔法箭矢类同语义）。连携勾玉=首个堆叠配件（槽内层数=连携储存数）
         [InspectorName("装备堆叠上限")]
         EquipStackLimit = 85,
+
+        // 命中伤害范围真圆（决策九十五 P3，蓝图 §4.2「范围=真圆」）：投射物命中点/线爆命中域
+        // 半径（厘米；1 格=100——箭矢/箭雨/水球拍板 50=0.5 格）；**0=单体**（仅接触命中者，
+        // 取代旧「同格成员聚合」方形域）。数值单源=customParams 本键，时轮发射声明携带
+        // （ProjectileEffect.AoeRadiusCm），ProjectileResolver 消费
+        [InspectorName("命中半径")]
+        AoERadius = 86,
     }
 
     /// <summary>

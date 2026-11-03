@@ -19,7 +19,7 @@ MonoBehaviour:
     "\u6280\u80FD\u6807\u7B7E": 2003
     customParams:
     - key: 6
-      value: 3
+      value: 300
       baseType: 0
     timeline: {fileID: 0}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}

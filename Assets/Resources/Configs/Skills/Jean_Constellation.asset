@@ -22,7 +22,7 @@ MonoBehaviour:
       value: 50
       baseType: 0
     - key: 67
-      value: 3
+      value: 300
       baseType: 0
     - key: 68
       value: 3
@@ -33,6 +33,8 @@ MonoBehaviour:
     timeline: {fileID: 0}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
     "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
     "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}

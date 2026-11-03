@@ -202,6 +202,9 @@ namespace GIC.Battle
             if (skillIndex < 0) return null;
             var skill = unit.Skills[skillIndex];
             if (skill == null || !skill.CanCast(unit)) return null;
+            // 攻击冷却门槛（决策九十五 P3，蓝图 §6）：CD 中不施放（眷属挥棒/全力挥棒同享 Normal 3 秒——
+            // 即时制攻击节流；上交层 Host gate 兜底，此处防 0.5 秒节拍空决策）
+            if (sim.IsSkillOnCooldown(unitId, skill.RawData.skillType)) return null;
             if (!ResourceGate.HasAll(sim, unit, identity.OwnerPlayerID, skill.RawData?.costs, out _)) return null;
             var direction = BattleHeuristics.FindAttackDirection(sim, snapshot, unit, skill);
             if (direction == 0) return null;

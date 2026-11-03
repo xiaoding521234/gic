@@ -1223,7 +1223,8 @@ namespace GIC.Battle
             var seen = new HashSet<BattleCell>();
             foreach (var anchor in CollectDeployAnchorsFromSnapshot(snapshot))
             {
-                int deployRadius = DeployUnitExecutor.DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                int deployRadius = DeployUnitExecutor.DeployRadiusOf(anchor.isCore, deployIsBuilding)
+                    / CellMetrics.CellSizeCm; // P3 cm 制→格环扫（Host 欧氏 cm 域判定的格域近似镜像——P4 HUD 真圆指示器批精确化）
                 for (int dx = -deployRadius; dx <= deployRadius; dx++)
                 for (int dy = -deployRadius; dy <= deployRadius; dy++)
                 {

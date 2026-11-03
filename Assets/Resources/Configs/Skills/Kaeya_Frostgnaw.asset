@@ -22,7 +22,7 @@ MonoBehaviour:
       value: 100
       baseType: 1
     - key: 31
-      value: 2
+      value: 150
       baseType: 0
     - key: 75
       value: 5
@@ -52,6 +52,8 @@ MonoBehaviour:
       targetSkillType: 7
       statType: 0
       minConstellation: 0
+      requiredTag: 0
+      subType: 5
     - trigger: 1
       kind: 4
       targetFilter: 0
@@ -68,6 +70,8 @@ MonoBehaviour:
       targetSkillType: 7
       statType: 0
       minConstellation: 0
+      requiredTag: 0
+      subType: 5
     - trigger: 1
       kind: 5
       targetFilter: 1
@@ -84,6 +88,8 @@ MonoBehaviour:
       targetSkillType: 7
       statType: 0
       minConstellation: 0
+      requiredTag: 0
+      subType: 5
     - trigger: 1
       kind: 7
       targetFilter: 0
@@ -100,6 +106,8 @@ MonoBehaviour:
       targetSkillType: 7
       statType: 0
       minConstellation: 0
+      requiredTag: 0
+      subType: 5
     costs:
     - kind: 2
       item: 0

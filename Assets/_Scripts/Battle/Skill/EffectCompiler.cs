@@ -186,8 +186,12 @@ namespace GIC.Battle
         {
             int damagePercent = skillData.GetInt(SkillParamKey.Damage, 100);
             int damageCount = skillData.GetInt(SkillParamKey.DamageCount, 1);
-            var delta = SkillHitResolver.DirectionToDelta(action.direction);
-            var from = casterState.position;
+            int aoeRadiusCm = skillData.GetInt(SkillParamKey.AoERadius, 0);
+            // P3 自由角（蓝图 §4.1）：方向=千分向量单源（十字=向量子集零回归）；发射点=施法者连续位置
+            var aim = SkillHitResolver.AimVectorOf(sim, action, snapshot);
+            int rate = BattleMetrics.ReleaseSpeedPerMille(casterState.attackSpeed); // 释放速度千分（蓝图 §4.3）
+            int fromXCm = casterState.posX;
+            int fromZCm = casterState.posZ;
 
             // 整线迸发段编译：Burst 型；或**配了 LineBurst clip 的技能**（Normal 型同消费——2026-09-25
             // 修法 A：修复前 Normal+LineBurst clip 读不到投射物 clip 走"无时轮兜底"=24 格首停投射物，
@@ -199,16 +203,17 @@ namespace GIC.Battle
                 {
                     foreach (var clip in burstClips)
                         for (int i = 0; i < damageCount; i++)
-                            CompileLineBurstSegment(sim, action, snapshot, skillData, from, delta,
-                                damagePercent, clip.startTime + clip.hitInterval * i, clip.maxRange, effects);
-                    CompileBurstFogBreak(sim, action, skillData, from, delta,
-                        burstClips[0].startTime, burstClips[0].maxRange, effects); // 2命破雾（一次/施放——段循环外）
+                            CompileLineBurstSegment(sim, action, snapshot, skillData, fromXCm, fromZCm, aim,
+                                damagePercent, RateSeconds(clip.startTime + clip.hitInterval * i, rate),
+                                clip.maxRange, effects);
+                    CompileBurstFogBreak(sim, action, skillData, fromXCm, fromZCm, aim,
+                        RateSeconds(burstClips[0].startTime, rate), burstClips[0].maxRange, effects); // 2命破雾（一次/施放——段循环外）
                 }
                 else
                 {
-                    CompileLineBurstSegment(sim, action, snapshot, skillData, from, delta,
+                    CompileLineBurstSegment(sim, action, snapshot, skillData, fromXCm, fromZCm, aim,
                         damagePercent * damageCount, 0f, 0, effects); // 无时轮兜底：合并单段
-                    CompileBurstFogBreak(sim, action, skillData, from, delta, 0f, 0, effects);
+                    CompileBurstFogBreak(sim, action, skillData, fromXCm, fromZCm, aim, 0f, 0, effects);
                 }
                 return;
             }
@@ -221,15 +226,22 @@ namespace GIC.Battle
                 foreach (var clip in projClips)
                     for (int i = 0; i < damageCount; i++)
                         effects.Add(new ProjectileEffect(action.unitId, action, damagePercent,
-                            from, delta.x, delta.y, clip.startTime + clip.hitInterval * i,
-                            clip.projectileSpeed, clip.hitDiameter, clip.maxRange, clip.projectileHeight));
+                            fromXCm, fromZCm, aim,
+                            RateSeconds(clip.startTime + clip.hitInterval * i, rate),
+                            Mathf.RoundToInt(clip.projectileSpeed), clip.hitDiameter, clip.maxRange,
+                            aoeRadiusCm, clip.projectileHeight));
             }
             else
             {
                 effects.Add(new ProjectileEffect(action.unitId, action, damagePercent * damageCount,
-                    from, delta.x, delta.y)); // 无时轮兜底：合并单发
+                    fromXCm, fromZCm, aim, 0f, 0, 0f, 0, aoeRadiusCm)); // 无时轮兜底：合并单发
             }
         }
+
+        /// <summary>释放速度时刻换算（蓝图 §4.3「时轮 clip 发射/命中时刻同乘释放速度倍率」——
+        /// 攻速快→时刻提前=秒值÷率；率=1000 恒原速，下限 500 防负速率反转）</summary>
+        private static float RateSeconds(float seconds, int ratePerMille)
+            => seconds * 1000f / Mathf.Max(ratePerMille, 500);
 
         /// <summary>安柏 2命「爆发可以破除迷雾，每破除 C2FogEnergyThreshold 格迷雾获得 C2FogEnergyGain
         /// 元能」实装（docs/active/44 §9-②，2026-10-17 迷雾批追拍六；**每施放一次**——挂在段循环外）：
@@ -239,8 +251,8 @@ namespace GIC.Battle
         /// 可破=零元能（沙盒/观察局零回归）。客户端表现层揭雾=BattleFog.RevealCells（PlayArrowRainCoroutine
         /// 同口径线域+同首段时刻）——表现层与 Host 各算各的账本，两端同口径恒一致</summary>
         private static void CompileBurstFogBreak(BattleSimState sim, ActionData action,
-            SkillConfig.SkillData skillData, BattleCell from, Vector2Int delta,
-            float firstHitSeconds, int clipMaxRange, List<BattleEffect> effects)
+            SkillConfig.SkillData skillData, int fromXCm, int fromZCm, Vector2Int aim,
+            float firstHitSeconds, int clipMaxRangeCm, List<BattleEffect> effects)
         {
             if (skillData.skillType != SkillType.Burst) return; // 玩家版口径「爆发」限定（霜袭等 Normal 线技不触发）
             if (sim.FogMode == BattleFogMode.None) return;      // 无迷雾=无破雾无元能
@@ -251,18 +263,104 @@ namespace GIC.Battle
             int gain = talent != null ? talent.GetInt(SkillParamKey.C2FogEnergyGain, 0) : 0;
             if (threshold <= 0 || gain <= 0) return; // 未配参数=无此被动（数据驱动门）
 
-            int maxRange = clipMaxRange > 0 ? clipMaxRange : ProjectileRule.MaxRange;
-            var cells = new List<BattleCell>(); // 线域格集（CompileLineBurstSegment 同口径）
-            for (int step = 1; step <= maxRange; step++)
-            {
-                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
-                if (!sim.Map.HasTile(cell.x, cell.y)) break;
-                cells.Add(cell);
-            }
+            var cells = BurstLineCells(sim, fromXCm, fromZCm, aim, clipMaxRangeCm); // 线域格集（CompileLineBurstSegment 同口径）
             int newCells = sim.RevealFogCells(sim.GetTeamOf(action.playerId), cells);
             if (newCells > 0)
                 effects.Add(new EnergyEffect(action.unitId, gain * (newCells / threshold),
                     EnergyEffect.CategoryFogBreakGain) { HitSeconds = firstHitSeconds });
+        }
+
+        /// <summary>整线迸发单段：线段全长达人（蓝图 §4.2「LineBurst=线段×受击圆求交」——P3 起取代
+        /// 旧逐格步进+同格聚合：敌方受击圆与线段相交即命中，自由角向量方向；虚空=线终止；无截停——
+        /// 投放形态=整线天降）。
+        /// **元素×地形交互（决策七十六）**：沿线采样格按技能元素突变——冰=水面格→薄冰（霜袭冻结，
+        /// 含无单位格）、火=薄冰格→水面（箭雨天降语义=线域直接融、无需单位——与直线箭矢「命中单位才融」
+        /// 的区分正落在形状分支上）；采样格天然去重（每格至多产一条）</summary>
+        private static void CompileLineBurstSegment(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
+            SkillConfig.SkillData skillData, int fromXCm, int fromZCm, Vector2Int aim, int attackPercent,
+            float launchSeconds, int clipMaxRangeCm, List<BattleEffect> effects)
+        {
+            int maxRangeCm = clipMaxRangeCm > 0 ? clipMaxRangeCm : ProjectileRule.MaxRange;
+            var skillElement = SkillHitResolver.SkillElementOf(sim.GetUnit(action.unitId), skillData);
+            var casterTeam = sim.GetTeamOf(action.playerId);
+            var fromCell = BattleCell.FromCm(fromXCm, fromZCm);
+
+            // 元素×地形：沿线采样格突变（冰冻/火融；物理及其它元素不触发）；HitSeconds=波次段时刻
+            // （箭雨多段融冰按波到点融化——WYSIWYG）
+            var cells = BurstLineCells(sim, fromXCm, fromZCm, aim, maxRangeCm);
+            foreach (var cell in cells)
+            {
+                if (skillElement == ElementType.Cryo)
+                {
+                    var tile = sim.Map.GetTile(cell.x, cell.y);
+                    if (tile == TileType.Water || tile == TileType.Swamp)
+                        effects.Add(new TerrainChangeEffect(cell, (int)TileType.ThinIce) { HitSeconds = launchSeconds });
+                }
+                else if (skillElement == ElementType.Pyro)
+                {
+                    if (sim.Map.GetTile(cell.x, cell.y) == TileType.ThinIce)
+                        effects.Add(new TerrainChangeEffect(cell, (int)TileType.Water) { HitSeconds = launchSeconds });
+                }
+            }
+
+            // 线段×受击圆求交（整平方整数域；含尸体——鞭尸同旧逐格口径）：线段端点=发射点→发射点
+            // 沿瞄准向量 maxRangeCm；命中=敌方受击圆与线段相交（「线全长达人」）
+            int endXCm = fromXCm + (int)((long)aim.x * maxRangeCm / 1000);
+            int endZCm = fromZCm + (int)((long)aim.y * maxRangeCm / 1000);
+            foreach (var enemy in snapshot.MainWorldUnits()) // 主世界域单源（维度隔离）
+            {
+                if ((TeamType)enemy.team == casterTeam) continue;
+                if (!SegmentTouchesUnitCircle(fromXCm, fromZCm, endXCm, endZCm, enemy))
+                    continue;
+                effects.AddRange(CompileOnHit(sim, action, snapshot, skillData, enemy.unitId,
+                    attackPercent, 0, fromCell, 0f, 0f, launchSeconds, launchSeconds)); // 整线迸发：段时刻即命中时刻（瞬发无飞行段）
+            }
+        }
+
+        /// <summary>线段×敌方受击圆相交判定（整平方整数域；敌方圆心=快照连续位置，半径=受击圆柱
+        /// 直径同源 CylinderDiameterOf 换 cm）——LineBurst 命中域单源（CompileLineBurstSegment 消费）</summary>
+        private static bool SegmentTouchesUnitCircle(int axCm, int azCm, int bxCm, int bzCm, UnitState enemy)
+        {
+            int radiusCm = Mathf.RoundToInt(BattleMetrics.CylinderDiameterOf(enemy) * CellMetrics.CellSizeCm * 0.5f);
+            long abx = bxCm - axCm, abz = bzCm - azCm;
+            long apx = enemy.PosXCm() - axCm, apz = enemy.PosZCm() - azCm;
+            long abSq = abx * abx + abz * abz;
+            long t = 0;
+            if (abSq > 0)
+            {
+                t = apx * abx + apz * abz; // 点积
+                if (t < 0) t = 0;
+                if (t > abSq) t = abSq;
+            }
+            long qx = abSq > 0 ? axCm + abx * t / abSq : axCm; // 最近点 Q（零长线段=A）
+            long qz = abSq > 0 ? azCm + abz * t / abSq : azCm;
+            long dx = enemy.PosXCm() - qx, dz = enemy.PosZCm() - qz;
+            return dx * dx + dz * dz <= (long)radiusCm * radiusCm;
+        }
+
+        /// <summary>整线迸发线域采样格（CompileLineBurstSegment 地形突变/CompileBurstFogBreak 破雾共用）：
+        /// 从发射点沿瞄准向量步进采样（半格 50cm），产出沿途格去重序列；虚空格 break（线终止）</summary>
+        private static List<BattleCell> BurstLineCells(BattleSimState sim, int fromXCm, int fromZCm,
+            Vector2Int aim, int maxRangeCm)
+        {
+            var cells = new List<BattleCell>();
+            int range = maxRangeCm > 0 ? maxRangeCm : ProjectileRule.MaxRange;
+            const int stepCm = 50; // 半格采样：格对角 √2/2≈70.7cm，50cm 步长保证无漏格
+            int steps = range / stepCm + 1;
+            var last = BattleCell.FromCm(fromXCm, fromZCm);
+            cells.Add(last);
+            for (int i = 1; i <= steps; i++)
+            {
+                int dCm = i * stepCm;
+                int x = fromXCm + (int)((long)aim.x * dCm / 1000);
+                int z = fromZCm + (int)((long)aim.y * dCm / 1000);
+                var cell = BattleCell.FromCm(x, z);
+                if (cell.x == last.x && cell.y == last.y) continue;
+                if (!sim.Map.HasTile(cell.x, cell.y)) break; // 虚空=线终止
+                cells.Add(cell);
+                last = cell;
+            }
+            return cells;
         }
 
         /// <summary>施法者 Talent 命座技能数据（ConstellationApplier 同口径遍历；null=无 Talent 技能）</summary>
@@ -274,41 +372,6 @@ namespace GIC.Battle
                 if (d != null && d.skillType == SkillType.Talent) return d;
             }
             return null;
-        }
-
-        /// <summary>整线迸发单段：线上全目标各编译一次 OnHit（虚空=线终止；无截停——投放形态=整线天降）。
-        /// **元素×地形交互（决策七十六）**：线上每格按技能元素突变——冰=水面格→薄冰（霜袭冻结，
-        /// 含无单位格）、火=薄冰格→水面（箭雨天降语义=线域直接融、无需单位——与直线箭矢「命中单位才融」
-        /// 的区分正落在形状分支上）；段内同格天然去重（每格至多产一条）</summary>
-        private static void CompileLineBurstSegment(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
-            SkillConfig.SkillData skillData, BattleCell from, Vector2Int delta, int attackPercent,
-            float launchSeconds, int clipMaxRange, List<BattleEffect> effects)
-        {
-            int maxRange = clipMaxRange > 0 ? clipMaxRange : ProjectileRule.MaxRange;
-            var skillElement = SkillHitResolver.SkillElementOf(sim.GetUnit(action.unitId), skillData);
-            for (int step = 1; step <= maxRange; step++)
-            {
-                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
-                if (!sim.Map.HasTile(cell.x, cell.y)) break;
-
-                // 元素×地形（线格突变——冰冻/火融；物理及其它元素不触发）；HitSeconds=波次段时刻
-                // （箭雨多段融冰按波到点融化——WYSIWYG）
-                if (skillElement == ElementType.Cryo)
-                {
-                    var tile = sim.Map.GetTile(cell.x, cell.y);
-                    if ((tile == TileType.Water || tile == TileType.Swamp))
-                        effects.Add(new TerrainChangeEffect(cell, (int)TileType.ThinIce) { HitSeconds = launchSeconds });
-                }
-                else if (skillElement == ElementType.Pyro)
-                {
-                    if (sim.Map.GetTile(cell.x, cell.y) == TileType.ThinIce)
-                        effects.Add(new TerrainChangeEffect(cell, (int)TileType.Water) { HitSeconds = launchSeconds });
-                }
-
-                foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, sim.GetTeamOf(action.playerId), cell))
-                    effects.AddRange(CompileOnHit(sim, action, snapshot, skillData, enemy.unitId,
-                        attackPercent, 0, from, 0f, 0f, launchSeconds, launchSeconds)); // 整线迸发：段时刻即命中时刻（瞬发无飞行段）
-            }
         }
 
         // ==================== OnCast 编译（施放时效果） ====================
@@ -338,17 +401,22 @@ namespace GIC.Battle
                     break;
                 case SkillEffectTargetFilter.CasterRadiusEnemies:
                 {
-                    // 变奏「全面侦查」（2026-10-17 追拍七）：以施法者（被协奏的安柏）为中心 radiusKey 格内
-                    // 敌方存活各编译一次（切比雪夫；尸体不施加；半径=参数表 radiusKey 单源——EffectRadius）
-                    int radius = skillData != null && atom.radiusKey != SkillParamKey.None
+                    // 变奏「全面侦查」（2026-10-17 追拍七）：以施法者（被协奏的安柏）为中心 radiusKey
+                    // 半径内敌方存活各编译一次（P3 欧氏 cm 域：radiusKey 资产迁厘米〔EffectRadius 3 格→300〕
+                    // 直比；尸体不施加；半径参数键 radiusKey 单源——EffectRadius）
+                    long radiusCm = skillData != null && atom.radiusKey != SkillParamKey.None
                         ? skillData.GetInt(atom.radiusKey) : 0;
-                    if (radius <= 0) break;
+                    if (radiusCm <= 0) break;
                     var casterTeam = sim.GetTeamOf(action.playerId);
+                    long casterX = casterState.PosXCm(), casterZ = casterState.PosZCm();
                     foreach (var u in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
-                        if ((TeamType)u.team != casterTeam && u.isCorpse == 0
-                            && Math.Max(Math.Abs(u.position.x - casterState.position.x),
-                                        Math.Abs(u.position.y - casterState.position.y)) <= radius)
-                            yield return u;
+                    {
+                        if ((TeamType)u.team != casterTeam || u.isCorpse != 0) continue;
+                        long dx = u.PosXCm() - casterX;
+                        long dz = u.PosZCm() - casterZ;
+                        if (dx * dx + dz * dz > radiusCm * radiusCm) continue;
+                        yield return u;
+                    }
                     break;
                 }
                 case SkillEffectTargetFilter.AllAllies:
@@ -409,17 +477,19 @@ namespace GIC.Battle
             {
                 if (atom.trigger != SkillEffectTrigger.OnHit) continue;
 
-                // 群体语义（水之浅唱治疗）：以施法者为中心 radiusKey 格内我方存活各编译一次（含施法者）
+                // 群体语义（水之浅唱治疗）：以施法者为中心 radiusKey 半径内我方存活各编译一次（含施法者）
+                //（P3 欧氏 cm 域：radiusKey 资产迁厘米值〔HealRadius 1 格→100〕直比，全整数零开方）
                 if (atom.targetFilter == SkillEffectTargetFilter.CasterRadiusAllies)
                 {
-                    int radius = atom.radiusKey != SkillParamKey.None ? skillData.GetInt(atom.radiusKey) : 0;
-                    if (radius <= 0) continue;
+                    long radiusCm = atom.radiusKey != SkillParamKey.None ? skillData.GetInt(atom.radiusKey) : 0;
+                    if (radiusCm <= 0) continue;
+                    long casterX = casterState.PosXCm(), casterZ = casterState.PosZCm();
                     foreach (var ally in sliceSnapshot.MainWorldUnits()) // 主世界域单源（②④迁移）
                     {
                         if ((TeamType)ally.team != sim.GetTeamOf(action.playerId) || ally.isCorpse != 0) continue; // 尸体不治疗；灵魂排除已随 MainWorldUnits 收口（决策九十一）；我军=TeamType 口径（C2）
-                        int dist = Math.Max(Math.Abs(ally.position.x - casterState.position.x),
-                            Math.Abs(ally.position.y - casterState.position.y));
-                        if (dist > radius) continue;
+                        long dx = ally.PosXCm() - casterX;
+                        long dz = ally.PosZCm() - casterZ;
+                        if (dx * dx + dz * dz > radiusCm * radiusCm) continue;
                         if (CompileAtom(sim, action, sliceSnapshot, skillData, atom, ally.unitId, casterState,
                                 attackPercent, delivery, fromCell, hitPointX, hitPointY, launchSeconds, hitSeconds,
                                 effects, EnergyEffect.CategorySkillHitGain))
@@ -916,20 +986,28 @@ namespace GIC.Battle
 
         // ==================== 预判工厂（决策九 D5：预判/结算同形由 kind 强制） ====================
 
-        /// <summary>直线技能方向射程单源（格）：LineProjectile clip 优先（maxRange 0=回落
-        /// ProjectileRule.MaxRange），否则 LineBurst clip，再回落默认——与 <see cref="WouldHitEnemyInDirection"/>
+        /// <summary>直线技能方向射程单源（**格**——预判工厂/旧格轨 AI/HUD 瞄准臂的格域值）：LineProjectile
+        /// clip 优先（maxRange 0=回落默认），否则 LineBurst clip，再回落默认——与 <see cref="WouldHitEnemyInDirection"/>
         /// 两分支的射程解析同式。消费方=HUD 直线瞄准臂长/箭头长度（2026-10-15 拍板「瞄准显示的距离
-        /// 应当和射出飞行物距离一致」：安柏双箭/箭雨 24、芭芭拉水球 5、凯亚霜袭 2、丘丘人挥棒 1）</summary>
+        /// 应当和射出飞行物距离一致」）。
+        /// **P3 cm 化适配**：时轮 clip.maxRange 资产已迁厘米（蓝图 §10），本方法出**格值**
+        /// （cm÷100——RangeCellsOf 桥）——格域消费方（预判逐格步进/瞄准臂格数）零改动直通</summary>
         public static int DirectionRangeOf(SkillTimelineAsset timeline)
         {
             var projClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile);
             if (projClips.Count > 0)
-                return projClips[0].maxRange > 0 ? projClips[0].maxRange : ProjectileRule.MaxRange;
+                return RangeCellsOf(projClips[0].maxRange);
             var burstClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst);
             if (burstClips.Count > 0 && burstClips[0].maxRange > 0)
-                return burstClips[0].maxRange;
-            return ProjectileRule.MaxRange;
+                return RangeCellsOf(burstClips[0].maxRange);
+            return ProjectileRule.MaxRange / CellMetrics.CellSizeCm;
         }
+
+        /// <summary>时轮 clip.maxRange（厘米）→格域值（预判工厂/旧格轨 AI 的逐格步进消费——判定主链
+        /// 已 cm 直读，预判族保留格域步进；0/负=回落默认格数 24）</summary>
+        public static int RangeCellsOf(int clipMaxRangeCm)
+            => clipMaxRangeCm > 0 ? clipMaxRangeCm / CellMetrics.CellSizeCm
+                : ProjectileRule.MaxRange / CellMetrics.CellSizeCm;
 
         /// <summary>方向命中预判按判定 kind 派发：LineProjectile=投射物圆柱接触静态形态、
         /// LineBurst/无轨=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）。
@@ -962,13 +1040,14 @@ namespace GIC.Battle
             PredictLineSegmentHits(map, snapshot, casterTeam, from, direction, DirectionRangeOf(timeline), into);
         }
 
-        /// <summary>投射物圆柱接触预判的命中单位枚举版（弹道+maxDist 与 WouldHitProjectile 同式）</summary>
+        /// <summary>投射物圆柱接触预判的命中单位枚举版（弹道+maxDist 与 WouldHitProjectile 同式）；
+        /// maxRange 经 RangeCellsOf 桥（clip cm 值→格域步进）</summary>
         private static void PredictProjectileHits(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
             BattleCell from, Direction2D direction, SkillTimelineClip clip, List<UnitState> into)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
             bool skillOverride = clip != null && clip.hitDiameter > 0f;
-            int maxRange = clip != null && clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
+            int maxRange = RangeCellsOf(clip != null ? clip.maxRange : 0);
 
             float maxDist = maxRange + 0.5f;
             for (int k = 1; k <= maxRange; k++)
@@ -1010,13 +1089,14 @@ namespace GIC.Battle
         /// <summary>投射物圆柱接触预判（原安柏战技覆写泛化）：距离空间版 Host maxT/VoidBoundary 同口径；
         /// 敌方恒=快照格心（移动中命中不可预知，属提示非校验）。
         /// per-enemy 受击半径（协议核心批 2026-09-29）：技能 hitDiameter 覆写优先，否则该单位自身
-        /// 受击圆柱（默认 0.42/协议核心 0.8）——与 ProjectileResolver 接触判定同口径，推荐色不漂移</summary>
+        /// 受击圆柱（默认 0.42/协议核心 0.8）——与 ProjectileResolver 接触判定同口径，推荐色不漂移；
+        /// maxRange 经 RangeCellsOf 桥（clip cm 值→格域步进）</summary>
         private static bool WouldHitProjectile(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
             BattleCell from, Direction2D direction, SkillTimelineClip clip)
         {
             var delta = SkillHitResolver.DirectionToDelta(direction);
             bool skillOverride = clip != null && clip.hitDiameter > 0f; // per-skill 判定圆柱覆写（替代单位圆柱）
-            int maxRange = clip != null && clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
+            int maxRange = RangeCellsOf(clip != null ? clip.maxRange : 0);
 
             float maxDist = maxRange + 0.5f;
             for (int k = 1; k <= maxRange; k++)

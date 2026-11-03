@@ -221,19 +221,16 @@ namespace GIC.Data
 
             public int GetAttackSpeedByWeaponType()
             {
-                return weaponType switch
-                {
-                    WeaponType.Claymore => 20, WeaponType.Sword => 40,
-                    WeaponType.Polearm => 50, WeaponType.Gauntlet => 60,
-                    WeaponType.Catalyst => 10, WeaponType.Bow => 30,
-                    WeaponType.Gun => 70, _ => 40
-                };
+                // 决策九十五 P3（蓝图 §4.3「攻速全员 0；武器不影响攻速」）：武器分档攻速退役——
+                // 释放速度=1+攻速/100（恒 1 原速）；未来攻速成长走 baseAttackSpeed 覆写/装备词条接线
+                return 0;
             }
 
             public int GetEffectiveAttack() => IsSpecified(baseAttack) ? baseAttack : GetAttackByWeaponType();
             public int GetEffectiveAttackSpeed() => IsSpecified(baseAttackSpeed) ? baseAttackSpeed : GetAttackSpeedByWeaponType();
             public int GetEffectiveDefense() => IsSpecified(baseDefense) ? baseDefense : 0;
-            public int GetEffectiveMoveSpeed() => IsSpecified(baseMoveSpeed) ? baseMoveSpeed : 30;
+            // 移速回落 100（决策九十五 P3，蓝图 §3.3「全员统一 100cm/s=1 格/s」；显式覆写资产批同步迁 100）
+            public int GetEffectiveMoveSpeed() => IsSpecified(baseMoveSpeed) ? baseMoveSpeed : 100;
             public int GetEffectiveLuck() => IsSpecified(baseLuck) ? baseLuck : 0;
             public int GetEffectiveTenacity() => IsSpecified(baseTenacity) ? baseTenacity : 0;
             public int GetEffectiveMastery() => IsSpecified(baseMastery) ? baseMastery : 0;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GIC.Framework;
 using GIC.Data;
+using UnityEngine;
 namespace GIC.Battle
 {
     /// <summary>
@@ -17,23 +18,26 @@ namespace GIC.Battle
     /// </summary>
     public static class DeployUnitExecutor
     {
-        /// <summary>角色部署·核心锚半径（docs/18 决策七拍板；2026-10-23 锚点拍板后=核心锚专属值，
-        /// 其它建筑锚再减 1——单源 DeployRadiusOf）</summary>
-        public const int DeployRadiusFromCore = 2;
+        /// <summary>角色部署·核心锚半径（厘米——决策九十五 P3 统一 cm 制：原 2 格→200 直译，
+        /// 蓝图 §10「部署半径欧氏 200」；2026-10-23 锚点拍板后=核心锚专属值，其它建筑锚再减 1 格
+        /// 〔100〕——单源 DeployRadiusOf；格域消费〔AI 环扫/客户端镜像〕÷CellSizeCm 回格）</summary>
+        public const int DeployRadiusFromCore = 200;
 
-        /// <summary>建筑部署·核心锚半径（决策八十六拍板 #6：角色 2 格+1=3 格，docs/45 §3；
-        /// 2026-10-23 锚点拍板后=核心锚专属值，其它建筑锚再减 1——单源 DeployRadiusOf）</summary>
-        public const int DeployRadiusFromCoreBuilding = 3;
+        /// <summary>建筑部署·核心锚半径（厘米：角色 200+100=300，决策八十六拍板 #6；同上格域消费
+        /// ÷100——AI 环扫半径=3 格/2 格/1 格不变）</summary>
+        public const int DeployRadiusFromCoreBuilding = 300;
 
-        /// <summary>部署半径单源（2026-10-23 拍板「任何自己的建筑即可为锚；核心 tag 的建筑才是 3，
-        /// 其它建筑都是 2；部署角色比部署建筑半径减 1」）：锚=Core tag 建筑 → 建筑 3/角色 2；
-        /// 锚=其它建筑 → 比核心锚各减 1（建筑 2/角色 1）。Host IsDeployCellValid/AI 配额脑/
-        /// 客户端镜像（BattleHud.CollectDeployAnchorsFromSnapshot 消费侧）三处同读。</summary>
+        /// <summary>部署半径单源（**厘米**——2026-10-23 拍板「任何自己的建筑即可为锚；核心 tag 的
+        /// 建筑才是 3 格，其它建筑都是 2 格；部署角色比部署建筑半径减 1」×P3 cm 直译）：锚=Core tag
+        /// 建筑 → 建筑 300/角色 200；锚=其它建筑 → 各减 100（建筑 200/角色 100）。
+        /// Host IsDeployCellValid/IsDeployPointValid（欧氏 cm 域直比）、AI 配额脑/客户端镜像
+        /// （BattleHud.CollectDeployAnchorsFromSnapshot——格环扫 ÷CellSizeCm）三处同读。</summary>
         public static int DeployRadiusOf(bool anchorIsCore, bool deployIsBuilding)
         {
             return anchorIsCore
                 ? (deployIsBuilding ? DeployRadiusFromCoreBuilding : DeployRadiusFromCore)
-                : (deployIsBuilding ? DeployRadiusFromCoreBuilding - 1 : DeployRadiusFromCore - 1);
+                : (deployIsBuilding ? DeployRadiusFromCoreBuilding - CellMetrics.CellSizeCm
+                                   : DeployRadiusFromCore - CellMetrics.CellSizeCm);
         }
 
         /// <summary>部署锚点集合（2026-10-23 拍板）：自己（**不共享队友**——OwnerPlayerID 过滤）
@@ -73,26 +77,25 @@ namespace GIC.Battle
         /// 拆掉即释放名额可重建——消散机制保证在场必存活，docs/45 §2）</summary>
         public const int MaxBuildingsPerPlayer = 3;
 
-        /// <summary>部署落点合法（角色/建筑统一）：**自己存活建筑锚并集**半径内（2026-10-23 拍板
-        /// 「任何自己的建筑即可为锚」：核心 tag 锚=建筑 3/角色 2、其它建筑锚=建筑 2/角色 1，切比雪夫）
-        /// + 地形层（按部署单位常态移动类型）+ 碰撞共享原语
-        /// （体积绝对层+阻挡规则层=MovementResolver.PassesVolumeLimit/PassesBlockingRules——与移动进入
-        /// 判定**同源**，2026-10-02 复审收口，碰撞口径改动只改原语处）：① 体积绝对层（无视阻挡配置
-        /// 不可绕过）；② 阻挡规则层（与格内单位互相阻挡即不可部署）。含尸体——尸体保留碰撞/体积
-        /// （消散单位已移除天然不占格）。客户端镜像预判=BattleHud.CanDeployEnterPreview（快照静态口径，
-        /// Host 结算兜底）</summary>
+        /// <summary>部署落点合法（角色/建筑统一，**旧格轨**——HUD 格落点 P4 前路径）：**自己存活建筑锚
+        /// 并集**欧氏半径内（P3：切比雪夫→欧氏 cm，锚/落点均按格心 cm 判定）+ 地形层（按部署单位常态
+        /// 移动类型）+ 旧格碰撞判定链（体积+阻挡——P4 HUD 切自由落点后本方法退役，自由落点走
+        /// IsDeployPointValid 圆重叠判定）。客户端镜像预判=BattleHud.CanDeployEnterPreview</summary>
         public static bool IsDeployCellValid(BattleSimState sim, string playerId, BattleCell cell,
             UnitConfig.UnitData deployData)
         {
             if (!sim.Map.HasTile(cell.x, cell.y)) return false;
             // 锚点层（2026-10-23 拍板）：落点须落在任一自己存活建筑锚的部署半径内——
-            // 多锚并集取代旧「核心单锚」（锚序/半径=CollectDeployAnchors/DeployRadiusOf 单源）
+            // 多锚并集取代旧「核心单锚」（锚序/半径=CollectDeployAnchors/DeployRadiusOf 单源；
+            // P3 欧氏 cm 域：格心距平方 ≤ 半径²）
             bool deployIsBuilding = deployData != null && deployData.unitType == UnitType.Building;
             bool withinAnchor = false;
             foreach (var anchor in CollectDeployAnchors(sim, playerId))
             {
-                int radius = DeployRadiusOf(anchor.isCore, deployIsBuilding);
-                if (Math.Max(Math.Abs(cell.x - anchor.cell.x), Math.Abs(cell.y - anchor.cell.y)) <= radius)
+                long radiusCm = DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                long dx = cell.CenterXCm - anchor.cell.CenterXCm;
+                long dz = cell.CenterYCm - anchor.cell.CenterYCm;
+                if (dx * dx + dz * dz <= radiusCm * radiusCm)
                 {
                     withinAnchor = true;
                     break;
@@ -114,6 +117,52 @@ namespace GIC.Battle
             return MovementResolver.PassesBlockingRules(occupants, sim.GetTeamOf(playerId),
                 deployData != null && deployData.与友方互不阻挡,
                 deployData != null && deployData.blockedByEnemies);
+        }
+
+        /// <summary>部署自由落点合法（决策九十五 P3，蓝图 §3.4「拖卡出牌区→自由落点瞄准」Host 侧）：
+        /// ①欧氏锚半径内（锚=格心 cm，DeployRadiusOf cm 单源）②落点所在格可走（按部署单位常态
+        /// 移动类型）③无碰撞圆重叠（与一切在场单位〔存活+尸体〕的碰撞圆不重叠——碰撞圆=受击圆柱
+        /// 直径同源，取代旧格体积/阻挡判定链）。HUD 自由落点瞄准随 P4 接线（deployX&gt;0 分支）</summary>
+        public static bool IsDeployPointValid(BattleSimState sim, string playerId, int xCm, int zCm,
+            UnitConfig.UnitData deployData)
+        {
+            var cell = BattleCell.FromCm(xCm, zCm);
+            if (!sim.Map.HasTile(cell.x, cell.y)) return false;
+
+            bool deployIsBuilding = deployData != null && deployData.unitType == UnitType.Building;
+            bool withinAnchor = false;
+            foreach (var anchor in CollectDeployAnchors(sim, playerId))
+            {
+                long radiusCm = DeployRadiusOf(anchor.isCore, deployIsBuilding);
+                long dx = xCm - anchor.cell.CenterXCm;
+                long dz = zCm - anchor.cell.CenterYCm;
+                if (dx * dx + dz * dz <= radiusCm * radiusCm)
+                {
+                    withinAnchor = true;
+                    break;
+                }
+            }
+            if (!withinAnchor) return false;
+
+            var forceType = deployData?.normalMoveType ?? ForceType.Walk;
+            if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) return false;
+
+            // 碰撞圆重叠层：半格自由站位下「格内无单位」不再充分——圆重叠精确判定
+            int selfRadiusCm = Mathf.RoundToInt(
+                BattleMetrics.CylinderDiameterOf(deployData) * CellMetrics.CellSizeCm * 0.5f);
+            foreach (var kv in sim.Units)
+            {
+                var other = kv.Value;
+                if (other == null) continue;
+                var otherPos = sim.GetPosCm(other);
+                int otherRadiusCm = Mathf.RoundToInt(
+                    BattleMetrics.CylinderDiameterOf(other) * CellMetrics.CellSizeCm * 0.5f);
+                long touch = selfRadiusCm + otherRadiusCm;
+                long dx = otherPos.x - xCm;
+                long dz = otherPos.y - zCm;
+                if (dx * dx + dz * dz < touch * touch) return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -227,9 +276,22 @@ namespace GIC.Battle
                 return true;
             }
 
-            if (!IsDeployCellValid(sim, action.playerId, action.deployCell, data))
+            // 落点校验双轨（决策九十五 P3，蓝图 §3.4）：deployX&gt;0=自由落点（厘米——欧氏锚+可走
+            // tile+无碰撞圆重叠，HUD 自由落点瞄准 P4 接线）；=0=旧 deployCell 格轨（欧氏锚+体积/阻挡链）
+            int deployXCm = action.deployX, deployZCm = action.deployZ;
+            BattleCell deployCell = action.deployCell;
+            if (deployXCm > 0 || deployZCm > 0)
             {
-                GICLog.Info($"[DeployUnit] {unitName} 落点 {action.deployCell} 不合法（自己建筑锚半径内+碰撞判定），部署落空");
+                if (!IsDeployPointValid(sim, action.playerId, deployXCm, deployZCm, data))
+                {
+                    GICLog.Info($"[DeployUnit] {unitName} 自由落点 ({deployXCm},{deployZCm}) 不合法（欧氏锚半径+圆重叠），部署落空");
+                    return false;
+                }
+                deployCell = BattleCell.FromCm(deployXCm, deployZCm);
+            }
+            else if (!IsDeployCellValid(sim, action.playerId, deployCell, data))
+            {
+                GICLog.Info($"[DeployUnit] {unitName} 落点 {deployCell} 不合法（自己建筑锚半径内+碰撞判定），部署落空");
                 return false;
             }
 
@@ -245,7 +307,9 @@ namespace GIC.Battle
             if (unit == null) return false;
             if (sim.LogicRoot != null)
                 unit.transform.SetParent(sim.LogicRoot, false);
-            var unitId = sim.RegisterUnit(unit, action.playerId, sim.GetTeamOf(action.playerId), action.deployCell);
+            var unitId = sim.RegisterUnit(unit, action.playerId, sim.GetTeamOf(action.playerId), deployCell);
+            if (deployXCm > 0 || deployZCm > 0)
+                sim.SetPosCm(unit, deployXCm, deployZCm); // 自由落点连续位置（RegisterUnit 落格心，覆写为 cm 落点——半格自由站位）
 
             // 全量 UnitState 单一出口（2026-09-23 审查 Y3：与快照同构——登场回合附着/元能/防御
             // 等字段不缺，客户端建 view 与下回合快照零偏差）

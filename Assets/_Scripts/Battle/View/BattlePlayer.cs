@@ -726,8 +726,10 @@ namespace GIC.Battle
         // ==================== 片播放 ====================
 
         // 投射物/移动速度常量统一走 BattleMetrics（B5 连续判定：Host 判定与客户端播放同源，
-        // "所见即所得"=双方按同一速度常量推进时间轴）
-        private const float ProjectileSpeed = BattleMetrics.ProjectileSpeed;
+        // "所见即所得"=双方按同一速度常量推进时间轴）。P3 cm 化：Host 常量=800cm/s——客户端
+        // 世界单位/秒=cm÷100=8，数值与旧 8f 完全一致（1 格=1 世界单位=100cm）
+        private const float ProjectileSpeed =
+            BattleMetrics.ProjectileSpeedCmPerSecond / (float)CellMetrics.CellSizeCm;
 
         /// <summary>在途有意义行动计数（2026-09-30 拍板「跳过空等：只要这期间已经没有任何正在进行的
         /// 行动，包括箭矢飞行等，必须已经没有任何意义了才可跳过空等」——攻速片片头空等跳过
@@ -830,9 +832,11 @@ namespace GIC.Battle
                 }
                 else
                 {
+                    // P3 cm 兼容：value=厘米（2400）——÷100 回格；正常路径恒有 hitX/hitY 定点，本兜底不可达
                     var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
-                    to = _board.CellToWorld(new BattleCell(command.cell.x + delta.x * command.value,
-                        command.cell.y + delta.y * command.value));
+                    int valueCells = command.value / CellMetrics.CellSizeCm;
+                    to = _board.CellToWorld(new BattleCell(command.cell.x + delta.x * valueCells,
+                        command.cell.y + delta.y * valueCells));
                 }
                 to.y = from.y; // 与发射点同高=水平直线
                 to.z += vanishPlaneDepth; // 消散端保持发射面深度（无目标立牌可贴，东西向全程同面）
@@ -869,9 +873,11 @@ namespace GIC.Battle
                 cell = new BattleCell(Mathf.FloorToInt(command.hitX / 1000f), Mathf.FloorToInt(command.hitY / 1000f));
             else
             {
+                // P3 cm 兼容：value=厘米 ÷100 回格（同 PlayProjectileVanishCoroutine 兜底口径）
                 var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
-                cell = new BattleCell(command.cell.x + delta.x * command.value,
-                    command.cell.y + delta.y * command.value);
+                int valueCells = command.value / CellMetrics.CellSizeCm;
+                cell = new BattleCell(command.cell.x + delta.x * valueCells,
+                    command.cell.y + delta.y * valueCells);
             }
             if (_board == null || _board.Map == null || !_board.Map.HasTile(cell.x, cell.y))
             {
@@ -1645,7 +1651,9 @@ namespace GIC.Battle
                                     $" 方向 {(Direction2D)command.direction}");
                         if (_views.TryGetValue(command.actorUnitId, out var caster))
                         {
-                            caster.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随施放方向（拍板③：向左射箭→转向左）
+                            // P3 自由角朝向：aimX/aimZ 千分向量优先（x 符号定左右——任意角）、
+                            // 0=旧 direction 十字口径（P4 HUD 接线前 AI/HUD 上交恒十字=行为不变）
+                            caster.SetFacing(command.aimX != 0 ? command.aimX < 0 : IsLeftFacing(command.direction));
                             // 动作轨（B-S4c）：技能资产 动作视频≠null → 立牌从头播一次性动作片（拉弓-释放-收势，
                             // 时长≈时轮 totalTime）、播完自动回待机循环（UnitView.PlayActionVideo 双 RT+缩放补偿
                             // ——宽幅 16:9 动作片原生尺寸独立 RT 渲染+主体视觉大小恒等补偿）；null=待机照播
@@ -1655,19 +1663,22 @@ namespace GIC.Battle
                             {
                                 // B-S4c 校准批次：播放速度=战斗回放速度×技能校准倍率（0/负=按 1，非法回落原速）
                                 var 校准速度 = skillData.动作片播放速度 > 0f ? skillData.动作片播放速度 : 1f;
+                                // P3 释放速度（蓝图 §4.3）：动作片播放速率同乘 castRate 千分
+                                //（Host 编译=时轮时刻÷率——攻速快动画同倍加快；攻速 0 恒 1000=原速）
+                                float releaseRate = command.castRate > 0 ? command.castRate / 1000f : 1f;
                                 if (skillData.skillType == SkillType.Move)
                                 {
                                     // 移动技能动作片=循环态移动片（2026-10-05 决策四十四「尽可能统一」）：
                                     // SkillCast 片头登记（每段移动行动同产 SkillCast——AddMoveCast，登记恒新鲜）、
                                     // Move 命令片起止 SetMoveAnimation 消费；速度同一次性动作片口径乘回放速度
-                                    // （行走 tween 同按回放速度缩放，快进不脚滑）
-                                    caster.SetMoveVideo(actionClip, _playbackSpeed * 校准速度,
+                                    //（行走 tween 同按回放速度缩放，快进不脚滑）
+                                    caster.SetMoveVideo(actionClip, _playbackSpeed * 校准速度 * releaseRate,
                                         skillData.动作片缩放补偿, skillData.动作片位置偏移,
                                         skillData.当前动作片Alpha打包); // 打包标志随片（2026-10-16 离线抠绿批）
                                 }
                                 else
                                 {
-                                    caster.PlayActionVideo(actionClip, _playbackSpeed * 校准速度,
+                                    caster.PlayActionVideo(actionClip, _playbackSpeed * 校准速度 * releaseRate,
                                         skillData.动作片缩放补偿, skillData.动作片位置偏移,
                                         packedAlpha: skillData.当前动作片Alpha打包); // 打包片直读 alpha 区跳过运行时抠色
                                 }

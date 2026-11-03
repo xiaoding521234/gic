@@ -22,7 +22,7 @@ MonoBehaviour:
       value: 150
       baseType: 1
     - key: 31
-      value: 1
+      value: 100
       baseType: 0
     - key: 9
       value: 50
@@ -30,6 +30,8 @@ MonoBehaviour:
     timeline: {fileID: 11400000, guid: c5a0bccf27662ad4f8f441ca5dca63c9, type: 2}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
     "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
     "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
@@ -44,11 +46,14 @@ MonoBehaviour:
       radiusKey: 0
       value: 0
       element: 0
+      elementLayers: 1
       buffType: 1
       buffAsset: {fileID: 0}
       targetSkillType: 7
       statType: 0
       minConstellation: 0
+      requiredTag: 0
+      subType: 5
     costs:
     - kind: 2
       item: 0

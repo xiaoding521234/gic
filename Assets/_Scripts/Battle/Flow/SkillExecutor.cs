@@ -41,6 +41,15 @@ namespace GIC.Battle
                 return effects;
             }
 
+            // 攻击冷却 gate（决策九十五 P3，蓝图 §4.3：战技〔Normal 型〕3 秒/爆发〔Burst 型〕5 秒——
+            // 即时制攻击节流主闸；延奏/契约/势力/移动/命座无 CD。CD 未就绪=行动落空不扣资源不播施放
+            //（与「消耗不足=落空不扣」同口径——CD 属门槛维度；目标失效口径拍板不受影响）
+            if (sim.IsSkillOnCooldown(action.unitId, skill.RawData.skillType))
+            {
+                GICLog.Info($"[SkillExecutor] 单位 {action.unitId} 技能 {skill.RawData?.skillID} 冷却中，行动落空");
+                return effects;
+            }
+
             // ==================== 消耗段（统一消耗模型 C-2：全量迁移完成，双轨回落退役）====================
             // 消耗单源=SkillData.costs（docs/30）：先全查后全扣（多 cost 防「扣了体力才发现苹果不够」
             // ——任一不足=行动落空且不登记任何消耗）；**costs 空=免费技能**（无消耗语义，数据即事实）
@@ -58,6 +67,8 @@ namespace GIC.Battle
             }
             ResourceGate.ChargeAll(sim, attacker, action.playerId, skill.RawData?.costs, effects,
                 isPlayerDirectControl: action.isPlayerDirectControl);
+            // CD 消耗（门槛全过后与资源扣减同拍——纪元制写就绪 tick）
+            sim.ConsumeSkillCooldown(action.unitId, skill.RawData.skillType);
 
             // 号令体力津贴（AI-1 批接线，2026-10-12 拍板口径「玩家操控伙伴势力技能＝0→−5 获得体力」）：
             // 势力技能基 0 体力（docs/07-00「号令不消耗体力」）＋玩家直接操控伙伴减免 5（负值=获得）
@@ -74,14 +85,20 @@ namespace GIC.Battle
             effects.AddRange(skill.ResolveEffects(sim, action, sliceSnapshot));
 
             // 时轮施放事件（B-S1）：施放者片初位置=发射格/朝向参考（sliceIndex/indexInSlice 由发射出口回填）；
-            // 技能元素随命令下发（箭雨染色单源——丘丘人借凯亚霜袭=冰色箭雨非施法者物理灰）
+            // 技能元素随命令下发（箭雨染色单源——丘丘人借凯亚霜袭=冰色箭雨非施法者物理灰）。
+            // P3（蓝图 §4.1/§4.3）：瞄准千分向量+CD 剩余+释放速度千分随命令下发（P4 HUD 消费）
             if (castsOut != null)
             {
                 var casterState = SkillHitResolver.FindUnitState(sliceSnapshot, action.unitId);
+                var aim = SkillHitResolver.AimVectorOf(sim, action, sliceSnapshot);
+                int cdTicks = sim.SkillCdRemainTicks(action.unitId, skill.RawData.skillType);
+                int castRate = BattleMetrics.ReleaseSpeedPerMille(
+                    casterState != null ? casterState.attackSpeed : 0);
                 castsOut.Add(BattleCommand.SkillCast(action.unitId, 0, 0,
                     (int)skill.RawData.skillID, (int)action.direction,
                     casterState != null ? casterState.position : BattleCell.zero,
-                    (int)SkillHitResolver.ResolveProjectileElement(sim, action)));
+                    (int)SkillHitResolver.ResolveProjectileElement(sim, action),
+                    aim.x, aim.y, cdTicks, castRate));
             }
 
             return effects;

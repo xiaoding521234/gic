@@ -159,6 +159,19 @@ namespace GIC.Data
         [Header("箭矢视觉高度（Damage 投射物/Effect 消散有效；千分=格面起算高度×1000；0=客户端回落 BattleMetrics.ArrowFlightHeight 默认——纯视觉参数对齐动画松弦位，判定圆柱与世界高度无关。2026-10-05）")]
         public int arrowHeightY;
 
+        [Header("瞄准向量与冷却（决策九十五 P3，蓝图 §4.1/§4.3——SkillCast 命令有效）")]
+        /// <summary>瞄准向量 X（千分定点=轴向单位向量×1000；P4 HUD 任意角朝向消费；0=旧 direction 十字）</summary>
+        public int aimX;
+
+        /// <summary>瞄准向量 Z（千分定点，同上）</summary>
+        public int aimZ;
+
+        /// <summary>本次施放对应类型 CD 剩余 tick（客户端 CD 转圈即时起点——每秒快照校准兜底；P4 接线）</summary>
+        public int cdTicks;
+
+        /// <summary>释放速度千分（1+攻速/100——客户端动作片播放速率乘数；0=1 倍原速）</summary>
+        public int castRate;
+
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
 
@@ -272,9 +285,13 @@ namespace GIC.Data
         /// 动作/音效/特效轨；特效轨首个消费方=arrow_rain 箭雨天降，2026-09-28）。value=skillID（SkillName 枚举值）、
         /// direction=瞄准方向、cell=施放者片初位置（朝向参考）；reactionKind=技能元素
         /// （箭雨染色单源=ResolveProjectileElement，移动施放不填=物理）。
-        /// 前摇期投射物视觉由 Damage/Effect 命令的 launchMs 承载。</summary>
+        /// 前摇期投射物视觉由 Damage/Effect 命令的 launchMs 承载。
+        /// **决策九十五 P3**：aimX/aimZ=瞄准千分向量（自由角——旧 direction 保留兼容旧客户端；
+        /// P4 HUD 消费）、cdTicks=该技能类型 CD 剩余 tick（客户端 CD 转圈即时起点，P4 接线）、
+        /// castRate=释放速度千分（客户端动作片播放速率乘数）。</summary>
         public static BattleCommand SkillCast(string unitId, int sliceIndex, int indexInSlice,
-            int skillId, int direction, BattleCell fromCell, int element = 0)
+            int skillId, int direction, BattleCell fromCell, int element = 0,
+            int aimVecX = 0, int aimVecZ = 0, int cdRemainTicks = 0, int castRatePerMille = 0)
         {
             return new BattleCommand
             {
@@ -286,6 +303,10 @@ namespace GIC.Data
                 direction = direction,
                 cell = fromCell,
                 reactionKind = element,
+                aimX = aimVecX,
+                aimZ = aimVecZ,
+                cdTicks = cdRemainTicks,
+                castRate = castRatePerMille,
             };
         }
 

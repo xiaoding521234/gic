@@ -833,6 +833,11 @@ namespace GIC.Battle
                     && data.skillType != SkillType.Henka) continue;
                 if (!skill.CanCast(unit)) continue; // 占位技能跳过——凛冽轮舞/闪耀奇迹未实装不可施放
 
+                // 攻击冷却门槛（决策九十五 P3，蓝图 §6「候选门槛加 CD 检查」）：战技/爆发 CD 中
+                //（Normal 3 秒/Burst 5 秒）不进候选域——防每 0.5 秒节拍空放刷决策（上交层 Host gate
+                // 也会拦，此处=AI 侧不浪费决策预算；Henka 无 CD 恒过）
+                if (sim.IsSkillOnCooldown(selfBoardId, data.skillType)) continue;
+
                 // 消耗门槛（统一消耗模型 C-2）：costs 全条目镜像 Host 判定（体力按施法者层级换算；
                 // 决策期虚拟池透传——伙伴决策不超额承诺；isPlayerDirectControl=配额直接操控减免口径）
                 if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _, staminaPoolOverride,

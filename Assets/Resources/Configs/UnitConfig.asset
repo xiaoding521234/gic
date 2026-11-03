@@ -446,7 +446,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 50
+    baseMoveSpeed: 100
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
@@ -461,7 +461,7 @@ MonoBehaviour:
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
     selfElement: 1
-    "\u653B\u51FB\u89C6\u91CE": 24
+    "\u653B\u51FB\u89C6\u91CE": 8
     "\u63A2\u7D22\u89C6\u91CE": 2
     tags: 72170000a10f0000ba0b0000e9030000ed030000
     skills:
@@ -1302,7 +1302,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 20
+    baseMoveSpeed: 100
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
@@ -2886,7 +2886,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 20
+    baseMoveSpeed: 100
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
@@ -3374,7 +3374,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 20
+    baseMoveSpeed: 100
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64

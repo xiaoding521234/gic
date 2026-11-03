@@ -107,7 +107,7 @@ namespace GIC.Battle
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team == holderTeam) continue; // 只作用敌方
-                long auraR = (long)radius * CellMetrics.CellSizeCm; // 欧氏平方（决策九十五迁移：切比雪夫→欧氏）
+                long auraR = radius; // 欧氏平方（决策九十五 P3 统一资产 cm 制：作用半径资产迁 100cm 直比——不再 ×CellSizeCm）
                 if (Sim.GetPosition(unit).SquaredEuclideanCmTo(holderPos) > auraR * auraR)
                     continue; // 出半径
 
@@ -139,9 +139,11 @@ namespace GIC.Battle
 
             // 元素×地形（决策七十六「凯亚的寒冰之棱同样影响」）：作用半径内全部**水面/沼泽格**→薄冰
             // （含无单位格；每 tick 维持——格已是薄冰自动跳过幂等；冰棱碎裂后已冻薄冰不回水=无寿命
-            // 拍板③）。范围与伤害半径同源（上方 ChebyshevTo 判定同值 radius）——光环持续冻结脚下水域
-            for (int dx = -radius; dx <= radius; dx++)
-            for (int dy = -radius; dy <= radius; dy++)
+            // 拍板③）。范围与伤害半径同源（上方欧氏判定同值 radius——格循环半径=cm÷100 桥，
+            // 冰棱光环=1 格=100cm）
+            int radiusCells = radius / CellMetrics.CellSizeCm;
+            for (int dx = -radiusCells; dx <= radiusCells; dx++)
+            for (int dy = -radiusCells; dy <= radiusCells; dy++)
             {
                 int tx = holderPos.x + dx, ty = holderPos.y + dy;
                 if (!Sim.Map.HasTile(tx, ty)) continue;

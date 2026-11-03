@@ -71,6 +71,24 @@ namespace GIC.Data
         /// 客户端 BattleFog 首选直读（零配置解析链）。0=未填（旧端/手工构造态）——消费方回落 config 基值链</summary>
         public int exploreVision;
 
+        // ==================== 连续位置与冷却（决策九十五 P3，蓝图 §8） ====================
+
+        /// <summary>连续位置 X（厘米，真源=UnitGridPosition.PositionCm；1 格=100cm=1 世界单位）。
+        /// position（格）自此为派生粗粒度值——**弹道命中判定/投射物求交/欧氏域消费一律读本字段**；
+        /// 0=未填（旧快照/手工构造态）——消费方回落 position 格心换算</summary>
+        public int posX;
+
+        /// <summary>连续位置 Z（厘米，同上）</summary>
+        public int posZ;
+
+        /// <summary>战技（Normal 型）攻击 CD 剩余 tick（0=就绪；蓝图 §4.3「战技 CD=3 秒」——
+        /// 即时制攻击节流；客户端 HUD CD 转圈（P4 接线）随每秒快照校准+SkillCast 命令即时起点）</summary>
+        public int attackCdRemainTicks;
+
+        /// <summary>爆发 CD 剩余 tick（0=就绪；蓝图 §4.3「爆发 CD=5 秒」+元能门槛双 gate——
+        /// 本字段仅 CD 维度，元能门槛仍走 costs 资源链）</summary>
+        public int burstCdRemainTicks;
+
         /// <summary>武器（装备批 2026-10-18）：ItemName 枚举值，0=空槽（武器槽恒 1，docs/05 §5.2）。
         /// Host BuildUnitState 从 UnitEquipment 填充；客户端=血条右侧装备图标行（首个图标）+瞄准域槽位预判</summary>
         public int weaponItem;
@@ -86,6 +104,23 @@ namespace GIC.Data
         public List<int> accessoryDurability = new List<int>();
 
         public List<BuffState> buffs = new List<BuffState>();
+    }
+
+    /// <summary>
+    /// UnitState 连续位置读取扩展（决策九十五 P3）：cm 真源 posX/posZ；**双零=未填**
+    /// （旧快照/手工构造态）——回落格心换算。判据安全性：盘内连续位置恒 ≥ 半格 50cm
+    /// （tile 0 内站位），双零点=棋盘原点角不可能站住，误判面为零。
+    /// 弹道求交/线段命中/欧氏域消费一律走此口，勿直接读 posX/posZ。
+    /// </summary>
+    public static class UnitStatePosExtensions
+    {
+        /// <summary>连续位置 X（厘米；双零未填回落格心）</summary>
+        public static int PosXCm(this UnitState state)
+            => state.posX != 0 ? state.posX : state.position.CenterXCm;
+
+        /// <summary>连续位置 Z（厘米；同上）</summary>
+        public static int PosZCm(this UnitState state)
+            => state.posZ != 0 ? state.posZ : state.position.CenterYCm;
     }
 
     /// <summary>

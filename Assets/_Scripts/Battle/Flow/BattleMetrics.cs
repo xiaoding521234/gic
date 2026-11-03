@@ -11,11 +11,15 @@ namespace GIC.Battle
     /// </summary>
     public static class BattleMetrics
     {
-        /// <summary>投射物飞行速度（格/秒；1 格=1 世界单位）</summary>
-        public const float ProjectileSpeed = 8f;
+        /// <summary>投射物飞行速度（厘米/秒——决策九十五 P3，蓝图 §10：8 格/s=800cm/s 直译；
+        /// 1 格=100cm=1 米=1 世界单位；时轮 clip.projectileSpeed=0 回落此默认；全整数模拟纪律）</summary>
+        public const int ProjectileSpeedCmPerSecond = 800;
 
-        /// <summary>移动每格耗时（秒）——移动插值速度 = 1/此值 格/秒</summary>
-        public const float MoveStepSeconds = 0.18f;
+        /// <summary>移动每格耗时（秒）——**2026-11-04 拍板「100 移速=走完一米要 1 秒」**：客户端旧播放器
+        /// 移动补间/途经采集节拍消费（0.18→1.0 对齐新轨 1 格/秒——旧 0.18s/格≈5.5 米/秒观感被否）；
+        /// 即时制新轨移动=RTSMovementSystem 厘米速度累积器（100cm/s），不读本值——本值只保证客户端
+        /// 补间时长≈逻辑移动时长（格数×1 秒）视觉一致</summary>
+        public const float MoveStepSeconds = 1.0f;
 
         /// <summary>箭矢视觉飞行高度（格=世界单位，格面起算；默认 0.45）——纯视觉参数（判定圆柱与世界
         /// 高度无关）；per-skill 覆写=时轮 clip.projectileHeight（对齐动作片弓的松弦位置，2026-10-05）</summary>
@@ -39,6 +43,17 @@ namespace GIC.Battle
         /// OrbitBeamsWorld 选中弧光贴紧折算</summary>
         public static float CylinderDiameterOf(UnitState state)
             => state != null && state.cylinderDiameter > 0f ? state.cylinderDiameter : UnitCylinderDiameter;
+
+        /// <summary>per-unit 受击圆柱直径——活体 Unit 直读重载（P3：取代 RTSMovementSystem 旧
+        /// UnitState 哑实例传参〔P2 断裂面〕；UnitState 版消费方照旧）</summary>
+        public static float CylinderDiameterOf(Unit unit)
+            => unit != null && unit.RawData != null && unit.RawData.受击圆柱直径 > 0f
+                ? unit.RawData.受击圆柱直径 : UnitCylinderDiameter;
+
+        /// <summary>per-unit 受击圆柱直径——UnitData 直读重载（P3 部署自由落点：部署单位尚未生成，
+        /// 从配置直读；三重载同口径=声明值优先、回落全局）</summary>
+        public static float CylinderDiameterOf(GIC.Data.UnitConfig.UnitData data)
+            => data != null && data.受击圆柱直径 > 0f ? data.受击圆柱直径 : UnitCylinderDiameter;
 
         // ==================== 元能（B6a；获取端拍板 2026-09-22） ====================
 
@@ -217,16 +232,54 @@ namespace GIC.Battle
         /// <summary>desync hash 落盘节拍（秒——确定性护栏四件套之一：state hash 落 BattleRecorder 行，
         /// 后置 LAN 联机的漂移定位手段，王者荣耀同款）</summary>
         public const int DesyncHashEverySeconds = 1;
+
+        /// <summary>效果拍节拍（tick 数——2026-11-04 拍板「效果触发时间翻倍，现在太频繁」：Buff tick
+        /// 效果〔歌声之环/冰棱/燃烧等 OnTurnEnd 产出〕+建筑效果〔教堂治疗/旗帜元能/餐馆摩拉/骑士团
+        /// 引擎〕自每秒整拍改**每 2 秒一拍**——单次数值不动（DPS/产出随之减半，属拍板预期，嫌伤害低
+        /// 再单独调数值）；**战技/爆发 CD 不受影响**（3s/5s 拍板保持）；Buff 持续计时仍按秒（Duration
+        /// 语义不变）；资源发放/泡湿/站立采集保持每秒整拍（经济与判定窗口不随本拍板变动）；
+        /// P6 调参旋钮=本常量）</summary>
+        public const int EffectBeatTicks = 2 * TicksPerSecond;
+
+        // ==================== 攻击冷却与释放速度（决策九十五 P3，蓝图 §4.3——战技=MOBA 普攻地位） ====================
+
+        /// <summary>战技攻击 CD（秒——蓝图拍板：战技+AI 普攻条目〔Normal 型〕同享 3 秒 CD；
+        /// Normal 无 CD 会被 AI 每 0.5 秒连放，CD=即时制攻击节流主闸；per-skill 覆写后续按需）</summary>
+        public const int CasterCooldownSeconds = 3;
+
+        /// <summary>爆发 CD（秒——5 秒+元能门槛双 gate；costs 条目〔安柏 30/凯亚 40/芭芭拉 100〕不变）</summary>
+        public const int BurstCooldownSeconds = 5;
+
+        /// <summary>战技 CD（tick）=CasterCooldownSeconds×TicksPerSecond</summary>
+        public const int CasterCooldownTicks = CasterCooldownSeconds * TicksPerSecond;
+
+        /// <summary>爆发 CD（tick）=BurstCooldownSeconds×TicksPerSecond</summary>
+        public const int BurstCooldownTicks = BurstCooldownSeconds * TicksPerSecond;
+
+        /// <summary>释放速度千分基线（蓝图 §4.3「释放速度=1+攻速/100」：攻速全员 0〔资产迁移 40→0〕
+        /// →恒 1；时轮 clip 发射/命中时刻与动作片播放速率同乘该倍率——攻速词条接线后自动生效；
+        /// 千分定点协议=per-mille〔1.0=1000〕，整数确定性纪律）</summary>
+        public const int ReleaseSpeedPerMilleBase = 1000;
+
+        /// <summary>释放速度（千分定点：1+攻速/100，攻速≤−100 钳 0.5〔500〕防负速率反转）——
+        /// 单源：Host 编译（时轮时刻÷率）与客户端动作片播放（速率×率）共用</summary>
+        public static int ReleaseSpeedPerMille(int attackSpeed)
+        {
+            int perMille = ReleaseSpeedPerMilleBase + attackSpeed * 10;
+            return perMille >= 500 ? perMille : 500;
+        }
     }
 
     /// <summary>
     /// 投射物规则常量（docs/05 §5.3 统一拍板 + docs/18 决策二"投放形态由技能数据驱动"；
-    /// 原寄居 AmberDoubleShotSkill.cs，B-1 技能类退役迁入常量收口处）
+    /// 原寄居 AmberDoubleShotSkill.cs，B-1 技能类退役迁入常量收口处。
+    /// **决策九十五 P3**：MaxRange 单位=厘米（旧 24 格→2400=蓝图 §10「默认射程回落 24 格→2400」
+    /// 直译；时轮 clip.maxRange 同批资产迁移为 cm 值））
     /// </summary>
     public static class ProjectileRule
     {
-        /// <summary>直线型弹射物飞行上限（统一 24 格）</summary>
-        public const int MaxRange = 24;
+        /// <summary>直线型弹射物飞行上限（厘米=2400；时轮 clip.maxRange=0 回落此默认）</summary>
+        public const int MaxRange = 2400;
 
         /// <summary>投放形态：直线飞行投射物（客户端播箭矢）</summary>
         public const int LineDelivery = 1;

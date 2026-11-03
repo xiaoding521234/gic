@@ -163,7 +163,10 @@ namespace GIC.Battle
             if (Phase != BattlePhase.Selecting) return;
             int second = TurnNumber;
 
-            _resolver.ResolveSecondBeat(second); // 发放 1+1/Buff 计时/泡湿/灵魂衰减/采集/建筑效果
+            // 效果拍（2026-11-04 拍板「时间翻倍」）：Buff tick 效果+建筑效果每 2 秒一拍
+            //（EffectBeatTicks=40）——秒拍族（发放/计时递减/泡湿/采集/快照/时钟）仍每秒
+            bool effectBeat = CurrentTick % BattleMetrics.EffectBeatTicks == 0;
+            _resolver.ResolveSecondBeat(second, effectBeat);
 
             CheckBattleEnded();
             if (Phase != BattlePhase.Selecting) return; // 秒拍内终局不再广播快照

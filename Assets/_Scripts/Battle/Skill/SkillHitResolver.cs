@@ -136,6 +136,69 @@ namespace GIC.Battle
             }
         }
 
+        // ==================== 自由角瞄准向量（决策九十五 P3，蓝图 §4.1） ====================
+
+        /// <summary>行动瞄准向量单源（千分定点=轴向单位向量×1000；如 (1000,0)=东、(707,707)=东北 45°）
+        /// ——**P3 起 EffectCompiler/ProjectileResolver 全部方向消费走此口**。
+        /// 推导序（前者优先）：①action.aimX/aimZ 显式声明（P4 HUD 任意角直填）→②direction 十字桥
+        /// （AI 三脑〔P5 移植前〕与旧 HUD 链上交的 Direction2D 归一主轴——十字=向量子集，判定数学
+        /// 天然兼容零回归；**与 P3 前消费序完全一致**=direction 为现状唯一真源，坐标格型优先序留 P4
+        /// HUD 改版拍板）→③targetCell（施法者→目标格心）→④targetUnitId（施法者→目标位置）→⑤东兜底
+        /// （DirectionToDelta default 同向）。</summary>
+        public static Vector2Int AimVectorOf(BattleSimState sim, ActionData action, BattleSnapshot snapshot)
+        {
+            if (action.aimX != 0 || action.aimZ != 0)
+                return NormalizePerMille(action.aimX, action.aimZ);
+
+            var delta = DirectionToDelta(action.direction);
+            if (delta.x != 0 || delta.y != 0)
+                return new Vector2Int(delta.x * 1000, delta.y * 1000);
+
+            var caster = snapshot != null ? FindUnitState(snapshot, action.unitId) : null;
+            if (caster != null
+                && (action.targetCell.x != 0 || action.targetCell.y != 0
+                    || caster.posX != action.targetCell.CenterXCm || caster.posZ != action.targetCell.CenterYCm))
+            {
+                int dx = action.targetCell.CenterXCm - caster.posX;
+                int dz = action.targetCell.CenterYCm - caster.posZ;
+                if (dx != 0 || dz != 0) return NormalizePerMille(dx, dz);
+            }
+
+            var target = snapshot != null && !string.IsNullOrEmpty(action.targetUnitId)
+                ? FindUnitState(snapshot, action.targetUnitId) : null;
+            if (caster != null && target != null)
+            {
+                int dx = target.posX - caster.posX;
+                int dz = target.posZ - caster.posZ;
+                if (dx != 0 || dz != 0) return NormalizePerMille(dx, dz);
+            }
+
+            return new Vector2Int(1000, 0);
+        }
+
+        /// <summary>整数千分归一（全整数确定性纪律——牛顿迭代平方根同 RTSMovementSystem.SqrtI 款；
+        /// 零向量=东兜底）</summary>
+        public static Vector2Int NormalizePerMille(int x, int z)
+        {
+            if (x == 0 && z == 0) return new Vector2Int(1000, 0);
+            int len = SqrtI((long)x * x + (long)z * z);
+            if (len <= 0) return new Vector2Int(1000, 0);
+            int nx = (int)((long)x * 1000 / len);
+            int nz = (int)((long)z * 1000 / len);
+            if (nx == 0 && nz == 0) return new Vector2Int(1000, 0);
+            return new Vector2Int(nx, nz);
+        }
+
+        /// <summary>整数平方根（牛顿迭代全整数——初值浮点仅初始化，迭代收敛后与平台无关）</summary>
+        private static int SqrtI(long value)
+        {
+            if (value <= 0) return 0;
+            int x = (int)Mathf.Sqrt(value);
+            while ((long)(x + 1) * (x + 1) <= value) x++;
+            while ((long)x * x > value) x--;
+            return x;
+        }
+
         /// <summary>片前快照中该格的敌方存活+尸体单位（含尸体——尸体完全算判定，docs/05 §5.4）。
         /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2 收口：casterTeam 为施法者**队伍**，
         /// 2v2 下不再把队友当敌人）</summary>

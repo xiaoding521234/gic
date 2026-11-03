@@ -127,6 +127,18 @@ namespace GIC.Data
         /// <summary>部署自由落点 Z（厘米，同上）</summary>
         public int deployZ;
 
+        // ==================== 技能瞄准（决策九十五 P3，蓝图 §4.1/§8——自由角瞄准） ====================
+        // 旧 direction（Direction2D 十字）随 P3 起只作输入兜底：AI 三脑（P5 移植前）与旧 HUD
+        // 链上交的十字方向由 AimVectorOf 单源桥为轴对齐向量（十字=向量子集，判定数学天然兼容零回归）；
+        // P4 HUD 批接线后由瞄准层直接填任意角千分向量（拖拽轮盘落点/点击落点→施法者→落点方向）。
+
+        /// <summary>瞄准向量 X（千分定点：轴向单位向量×1000，如 (1000,0)=东、(707,707)=东北 45°；
+        /// =0 时由 AimVectorOf 按 direction/targetCell/targetUnitId 桥推导）</summary>
+        public int aimX;
+
+        /// <summary>瞄准向量 Z（千分定点，同上；X/Z 双 0=未声明走桥）</summary>
+        public int aimZ;
+
         public override string ToString()
         {
             return $"[ActionData {playerId}/{unitId} {actionType} turn={turnNumber}" +

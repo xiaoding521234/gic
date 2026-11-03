@@ -23,6 +23,7 @@ MonoBehaviour:
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 0
+    projectileHeight: 0
     cueName: draw_bow
   - trackType: 2
     startTime: 1.1
@@ -31,7 +32,8 @@ MonoBehaviour:
     hitInterval: 0.15
     projectileSpeed: 0
     hitDiameter: 0
-    maxRange: 0
+    maxRange: 800
+    projectileHeight: 0
     cueName: 
   - trackType: 4
     startTime: 0.9
@@ -41,6 +43,7 @@ MonoBehaviour:
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 0
+    projectileHeight: 0
     cueName: arrow_rain_release
   - trackType: 1
     startTime: 1.55
@@ -50,6 +53,7 @@ MonoBehaviour:
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 0
+    projectileHeight: 0
     cueName: recover
   - trackType: 3
     startTime: 1.1
@@ -59,4 +63,5 @@ MonoBehaviour:
     projectileSpeed: 0
     hitDiameter: 0
     maxRange: 0
+    projectileHeight: 0
     cueName: arrow_rain
