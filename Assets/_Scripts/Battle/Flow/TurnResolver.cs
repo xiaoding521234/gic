@@ -101,6 +101,61 @@ namespace GIC.Battle
                 PushSegment(segment);
         }
 
+        /// <summary>
+        /// tick 移动收尾段（决策九十五 P2，蓝图 §3.3）：RTSMovementSystem 推进出的到达/被挡 mover
+        /// 由 RTSFlow 每 tick 交来——途经采集保留（PathCells 全量逐格，docs/47 旧语义：含起终点、
+        /// 同堆连采至多 CollectCount 次）；**移动获能已删除**（蓝图 §4.3「移动 +10 元能来源删除」——
+        /// 旧格轨获能随 P5 旧轨退役消失）。采集耐久钩子（决策八十一）随每笔采集触发。
+        /// 纯到达（无采集）=零命令零段。
+        /// </summary>
+        public void ResolveMoveArrivals(List<RTSMoveState> arrivals)
+        {
+            if (arrivals == null || arrivals.Count == 0) return;
+            var effects = new List<BattleEffect>();
+            foreach (var mover in arrivals)
+            {
+                var collect = MoveExecutor.CollectParamsOf(mover.Unit);
+                if (collect.count <= 0) continue;
+                var identity = mover.Unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null) continue;
+                foreach (var cell in mover.PathCells)
+                {
+                    for (int k = 0; k < collect.count; k++)
+                    {
+                        int remaining = _sim.TryHarvestResourceNode(cell);
+                        if (remaining < 0) break; // 无堆/已耗尽——续走后续途经格
+                        effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest, 0));
+                        if (collect.staminaGain != 0)
+                            effects.Add(new StaminaEffect(identity.OwnerPlayerID, collect.staminaGain, 0));
+                        if (collect.energyGain != 0)
+                            effects.Add(new EnergyEffect(mover.UnitId, collect.energyGain, EnergyEffect.CategoryCollectGain));
+                        effects.Add(new ResourceHarvestEffect(mover.UnitId, cell,
+                            ResourceNodeMetrics.MoraPerHarvest, remaining, 0));
+                        mover.Unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
+                    }
+                }
+            }
+            if (effects.Count == 0) return;
+
+            int slice = _sliceCounter++;
+            var segment = new Segment
+            {
+                turnNumber = _sim.CurrentSecond,
+                sliceIndex = slice,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
+                insertedInstantAction = 0,
+                startTick = _sim.CurrentTick,
+            };
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = ApplyEffects(effects, shatters);
+            var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
+            EmitSliceCommands($"tick{_sim.CurrentTick}移动收尾", segment, slice,
+                effects, appliedBuffs, null, null, newlyDead, expired: null, skillCasts: null,
+                shattered: shatters);
+            if (segment.commands.Count > 0) PushSegment(segment);
+        }
+
         // ==================== 片结算 ====================
 
         /// <summary>
@@ -141,7 +196,21 @@ namespace GIC.Battle
                 switch (action.actionType)
                 {
                     case ActionType.Move:
-                        var mover = MoveExecutor.BuildMover(_sim, action);
+                        if (action.targetX > 0 || action.targetZ > 0)
+                        {
+                            // 即时制 tick 移动（决策九十五 P2，蓝图 §3.3）：免费 0 体力 0 元能——启动即入
+                            // sim.ActiveMovers，RTSFlow 每 tick 推进（A* 路径+圆碰撞）；收尾（到达/被挡）走
+                            // ResolveMoveArrivals（途经采集保留、移动获能已删除——蓝图 §4.3）
+                            var cmMover = RTSMovementSystem.BuildCmMover(_sim, action, out var moveCommand);
+                            if (cmMover != null)
+                            {
+                                _sim.ActiveMoversInternal.Add(cmMover);
+                                if (moveCommand != null) casts.Add(moveCommand); // 启动 Move 命令（casts 首发位——客户端旧播放器照播）
+                                AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能
+                            }
+                            break;
+                        }
+                        var mover = MoveExecutor.BuildMover(_sim, action); // 旧格轨兜底（AI 三脑 P5 移植前退役）
                         if (mover == null) break;
                         // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
                         // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
@@ -1481,7 +1550,8 @@ namespace GIC.Battle
                         string enemyOwnerId = enemy.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
                         if (enemyOwnerId == null || _sim.GetTeamOf(enemyOwnerId) == holderTeam) continue;
                         var enemyPos = _sim.GetPosition(enemy);
-                        if (holderPos.ChebyshevTo(enemyPos) > explosion.radius) continue;
+                        long explosionR = (long)explosion.radius * CellMetrics.CellSizeCm; // 欧氏平方（决策九十五迁移）
+                        if (holderPos.SquaredEuclideanCmTo(enemyPos) > explosionR * explosionR) continue;
                         EffectCompiler.CompileElementalDamage(_sim, explosion.holderId, kv.Key, null,
                             ElementType.Pyro,
                             new DamageRequest

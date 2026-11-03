@@ -106,6 +106,14 @@ namespace GIC.Battle
             CurrentTick++;
             _sim.CurrentTick = CurrentTick;
 
+            // —— tick 移动推进（P2 连续空间，蓝图 §3.3：A* 路径+圆碰撞每 tick 步进；收尾段=采集结算）——
+            var arrivals = RTSMovementSystem.AdvanceTick(_sim);
+            if (arrivals != null && arrivals.Count > 0)
+            {
+                _resolver.ResolveMoveArrivals(arrivals);
+                CheckBattleEnded();
+            }
+
             // —— AI 三脑节拍（每 0.5 秒）——
             if (CurrentTick % BattleMetrics.AiBeatTicks == 0)
                 RunAiBeat();

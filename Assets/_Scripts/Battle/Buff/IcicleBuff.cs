@@ -107,8 +107,9 @@ namespace GIC.Battle
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.Team == holderTeam) continue; // 只作用敌方
-                if (Sim.GetPosition(unit).ChebyshevTo(holderPos) > radius)
-                    continue; // 出半径（ChebyshevTo 单源）
+                long auraR = (long)radius * CellMetrics.CellSizeCm; // 欧氏平方（决策九十五迁移：切比雪夫→欧氏）
+                if (Sim.GetPosition(unit).SquaredEuclideanCmTo(holderPos) > auraR * auraR)
+                    continue; // 出半径
 
                 // 每层伤害=% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：回合末
                 // 交错管道统一结算（反应预判+消耗+每层附着=决策二十四终版；伤害走 DamagePipeline 全
