@@ -63,7 +63,8 @@ namespace GIC.Battle
                             var targetData = target.RawData;
                             if (targetData != null && targetData.unitType == UnitType.Building) continue; // 非建筑（拍板 #8）
                             // 倒下角色照常（拍板 #8 含倒下；眷属/建筑无尸体=自然缺席）
-                            if (_sim.GetPosition(target).ChebyshevTo(center) > data.效果半径) continue;
+                            long auraR = (long)data.效果半径 * CellMetrics.CellSizeCm; // 欧氏平方（决策九十五迁移：切比雪夫→欧氏）
+                            if (_sim.GetPosition(target).SquaredEuclideanCmTo(center) > auraR * auraR) continue;
                             effects.Add(new EnergyEffect(tkv.Key, data.效果数值, EnergyEffect.CategoryBuildingGain)
                             {
                                 SourceUnitId = building.id,

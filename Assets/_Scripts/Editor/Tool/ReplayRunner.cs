@@ -125,7 +125,8 @@ namespace GIC.Editor
                     }
                     foreach (var purchase in purchases)
                         BuyCardExecutor.TryResolve(sim, transport, purchase);
-                    Pump(resolver.ResolveTurnCoroutine(turn, quota));
+                    GICLog.Error("[ReplayRunner] v1 格式回放已退役（决策九十五拍板 7）——演算入口随回合机删除；v2 tick 格式回放器随 P6 批重写");
+                    return;
                 }
 
                 // —— diff：回放 Segment 序列 vs 录制 Segment 序列（JsonUtility 字段序稳定）——
@@ -246,7 +247,8 @@ namespace GIC.Editor
                         new ActionData { playerId = BattleDebugPlayerIds.P2, actionType = ActionType.Pass, turnNumber = turn },
                     };
                     BattleRecorder.CaptureActions(turn, actions);
-                    Pump(resolver.ResolveTurnCoroutine(turn, actions));
+                    GICLog.Error("[ReplayRunner] 冒烟测试已退役（决策九十五：演算入口随回合机删除）——v2 tick 冒烟随 P6 批");
+                    return;
                 }
             }
             finally

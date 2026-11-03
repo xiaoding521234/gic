@@ -30,7 +30,7 @@ namespace GIC.Battle
         public BattleSimState Sim { get; private set; }
         public IBattleTransport Transport { get; private set; }
         public BattlePlayer Player { get; private set; }
-        public TurnFlowController Flow { get; private set; }
+        public RTSFlowController Flow { get; private set; }
 
         /// <summary>开局名册（房间 PlayerInfo 全量投影；null=调试直开）——队伍/颜色/出生点局内单源</summary>
         public List<BattlePlayerSetup> Roster { get; private set; }
@@ -60,10 +60,11 @@ namespace GIC.Battle
         public float SelectRemainingSeconds => Flow != null ? Flow.SelectRemainingSeconds
             : (Player != null ? Player.ClientSelectRemainingSeconds : -1f);
 
-        /// <summary>战斗时钟（分钟）：host=Flow 权威值；client=按快照回合数推导（06:00 起每回合+20）</summary>
+        /// <summary>战斗时钟（分钟）：host=Flow 权威值；client 兼容派生=按快照秒数推导
+        /// （06:00 起每秒+1 分钟，决策九十五）</summary>
         public int BattleTimeMinutes => Flow != null ? Flow.BattleTimeMinutes
-            : TurnFlowController.BattleClockStartMinutes
-              + (TurnFlowController.BattleClockMinutesPerTurn * Mathf.Max(0, (Player?.LatestSnapshot?.turnNumber ?? 1) - 1));
+            : RTSFlowController.BattleClockStartMinutes
+              + (BattleMetrics.BattleClockMinutesPerSecond * Mathf.Max(0, (Player?.LatestSnapshot?.turnNumber ?? 1) - 1));
 
         /// <summary>需人工提交行动的玩家数（决策六十七 N0 自动暂停判据单源，docs/active/43 §10）：
         /// Roster 非 AI 计数（Roster 空缺=本地调试双开 P1/P2 按 2 计）−沙盒空座（SandboxAutoPassPlayerId
@@ -135,52 +136,20 @@ namespace GIC.Battle
 
         /// <param name="seed">战斗种子（模拟核心概率事件 RNG 初始化——幸运暴击 roll；
         /// 联机 B7 两端经同一 BattleLaunchConfig 广播得到同 seed，客户端零 roll）</param>
-        public static BattleSession CreateLocal(BattleMapData map, BattlePlayer player, TurnFlowController flow,
+        public static BattleSession CreateLocal(BattleMapData map, BattlePlayer player, RTSFlowController flow,
             Transform logicRoot, int seed, List<BattlePlayerSetup> roster = null)
         {
             return CreateHostCore(new LocalBattleTransport(), map, player, flow, logicRoot, seed, roster,
                 isNetworked: false);
         }
 
-        /// <summary>LAN host 端装配（B7）：Sim/Flow 全量 + Mirror 传输（逐远端下发+本机直投）+
-        /// 期望 ack 方数注入（host 本机 1 + 远端连接数）</summary>
-        public static BattleSession CreateHosted(BattleMapData map, BattlePlayer player, TurnFlowController flow,
-            Transform logicRoot, int seed, List<BattlePlayerSetup> roster)
-        {
-            var session = CreateHostCore(new MirrorBattleTransport(isHost: true), map, player, flow, logicRoot,
-                seed, roster, isNetworked: true);
-            session.Flow.ExpectedAckerCount = () => 1 + MirrorBattleTransport.RemoteClientCount();
-            return session;
-        }
-
-        /// <summary>LAN 客户端装配（B7）：仅表现层（BattlePlayer）+ 客户端路由——Sim/Flow=null，
-        /// 一切经 BattleStartMessage/Snapshot/Segment 消息驱动；相位/倒计时由消息派生</summary>
-        public static BattleSession CreateClient(BattlePlayer player, List<BattlePlayerSetup> roster)
-        {
-            var transport = new MirrorBattleTransport(isHost: false);
-
-            var session = new BattleSession
-            {
-                Transport = transport,
-                Player = player,
-                Roster = roster,
-                IsNetworked = true,
-                IsHostSide = false,
-            };
-
-            // Client 侧路由（Host 下行）——与 host 本机视图同构（2026-10-25 复审批 T6：注册单源化）
-            RegisterClientRoutes(session, transport, player);
-
-            player.Bind(transport, null); // map 经 BattleStartMessage 到达（客户端无 Sim）
-
-            // 客户端相位派生 → 门面事件（HUD 订阅单源）
-            player.ClientPhaseChanged += (phase, turn) => session.OnPhaseChanged?.Invoke(phase, turn);
-            player.ClientSelectTimerExpired += turn => session.OnSelectTimerExpired?.Invoke(turn);
-            return session;
-        }
+        // （LAN host CreateHosted / LAN client CreateClient 装配已随决策九十五拍板 2 退役删除——
+        // 即时制 v1 单机；实时 Mirror 同步=tick 命令流后置批次，docs/active/48 §13。
+        // MirrorBattleTransport/Mirror 联机域文件保留不删，装配入口拦截=BattleScreen；
+        // 房间流程 toast 化拦截与完整清理随 P4/P6 批）
 
         private static BattleSession CreateHostCore(IBattleTransport transport, BattleMapData map,
-            BattlePlayer player, TurnFlowController flow, Transform logicRoot, int seed,
+            BattlePlayer player, RTSFlowController flow, Transform logicRoot, int seed,
             List<BattlePlayerSetup> roster, bool isNetworked)
         {
             var sim = new BattleSimState(map, seed);
@@ -198,29 +167,19 @@ namespace GIC.Battle
                 IsHostSide = true,
             };
 
-            // Host 侧路由（客户端上行：行动上交 / ack / 即时行动）——SegmentAck 单列（携带发送方计数）
+            // Host 侧路由（客户端上行：行动上交/即时行动）——SegmentAck 特判随 ack 门控退役删除
             session._hostRouter.Register<SubmitActionRequest>(BattleMessageType.SubmitAction,
                 req => flow.OnSubmitAction(req.action));
             session._hostRouter.Register<SubmitInstantAction>(BattleMessageType.SubmitInstantAction,
                 req => session.HandleInstantSubmit(req.action));
-            transport.RegisterHostHandler((type, json, sender) =>
-            {
-                if (type == BattleMessageType.SegmentAck)
-                {
-                    var ack = BattleJsonSerializer.Instance.Deserialize<SegmentAck>(json);
-                    flow.OnSegmentAck(ack.turnNumber, ack.sliceIndex, sender);
-                }
-                else
-                {
-                    session._hostRouter.Handle(type, json);
-                }
-            });
+            transport.RegisterHostHandler((type, json, sender) => session._hostRouter.Handle(type, json));
 
             // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 回合结束）——注册单源化（T6）
             RegisterClientRoutes(session, transport, player);
 
             player.Bind(transport, sim.Map);
-            player.BindFlow(flow); // 两态模型：立牌布局随回合阶段切换（散开/收拢，docs/22 §11）
+            // （BindFlow 两态立牌布局〔散开/收拢〕已随回合机退役——即时制立牌恒散开态自由站位，
+            // docs/active/48 §2.4；BattlePlayer.BindFlow 方法保留待 P4 清理，未绑定=_flow 恒 null 守卫全生效）
 
             // Flow 权威相位 → 门面事件（HUD 订阅单源）
             flow.OnPhaseChanged += (phase, turn) => session.OnPhaseChanged?.Invoke(phase, turn);
@@ -276,6 +235,7 @@ namespace GIC.Battle
         public void SubmitAction(ActionData action)
         {
             action.turnNumber = Flow != null ? Flow.TurnNumber : (Player?.LatestSnapshot?.turnNumber ?? 1);
+            action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 决策九十五：上交时刻 tick
             Transport.ClientSend(BattleMessageType.SubmitAction, new SubmitActionRequest { action = action });
         }
 
@@ -288,58 +248,23 @@ namespace GIC.Battle
         private void HandleInstantSubmit(ActionData action)
         {
             if (action == null) return;
-            if (Flow.Phase != BattlePhase.Resolving && Flow.Phase != BattlePhase.Selecting)
+            if (Flow == null || Flow.Phase != BattlePhase.Selecting)
             {
-                GICLog.Warn("[BattleSession] 非进行中状态，即时行动丢弃");
+                GICLog.Warn("[BattleSession] 战斗未运行/已终局，即时行动丢弃");
                 return;
             }
 
-            // 购买即时分支（决策八十六批E，docs/45 §7）：玩家级行动（无行动单位）——
-            // **即时不占配额**（校验/结算/命令广播全在执行器内完成，不写 _pendingActions——
-            // 购买后玩家仍可照常上交本回合行动）；失败零命令（客户端预检+灰显为主 UX）
+            // 购买即时分支（决策八十六批E，docs/45 §7）：玩家级行动——即时即结算
+            // （校验/结算/命令广播全在执行器内完成；失败零命令，客户端预检+灰显为主 UX）
             if (action.actionType == ActionType.BuyCard)
             {
                 BuyCardExecutor.TryResolve(Sim, Transport, action);
                 return;
             }
 
-            var unit = Sim.GetUnit(action.unitId);
-            if (unit == null || BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit))
-            {
-                GICLog.Warn($"[BattleSession] 即时行动单位 {action?.unitId} 不可用，丢弃");
-                return;
-            }
-
-            // 归属校验（2026-09-25 三轮审查 S3：上交通道有、此处漏——B7 LAN 下客户端可上交
-            // 他人单位的即时行动=作弊口）+ 眷属防线（操控分层 docs/32：眷属=启发式脑 AI 域
-            // 不走即时通道；伙伴/魔神的技能链即时行动放行——旧 IsMajorUnit 口径=非眷属即过，恒等）
-            var identity = unit.GetUnitComponent<UnitIdentity>();
-            if (identity == null || identity.OwnerPlayerID != action.playerId)
-            {
-                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 不属于 {action?.playerId}，丢弃");
-                return;
-            }
-            if (BattleHeuristics.IsFamiliar(unit))
-            {
-                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为眷属（FamiliarBrain 自主决策），丢弃");
-                return;
-            }
-
-            // 建筑防线（协议核心批 2026-09-29）：建筑（含 5★ 协议核心）不参与任何行动，即时通道同拒
-            if (BattleHeuristics.IsBuilding(unit))
-            {
-                GICLog.Warn($"[BattleSession] 即时行动单位 {action.unitId} 为建筑（含协议核心），丢弃");
-                return;
-            }
-
-            if (action.actionType != ActionType.Skill && action.actionType != ActionType.Move && action.actionType != ActionType.Pass)
-            {
-                GICLog.Warn($"[BattleSession] 即时行动类型 {action.actionType} B1 不支持，丢弃");
-                return;
-            }
-
-            // 入队等片边界 poll（软窗语义：演算照走，片边界插入结算）
-            Sim.EnqueueInstantAction(action);
+            // 非购买即时行动（旧片边界队列语义随回合机退役，决策九十五）：
+            // 直接走 RTSFlow 权威校验+即时结算——归属/眷属/建筑/灵魂防线在 OnSubmitAction 内收口
+            Flow.OnSubmitAction(action);
         }
 
         // ==================== 调试单位生成 ====================

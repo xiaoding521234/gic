@@ -9,11 +9,12 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 执行阶段片循环（docs/22 §2 分步流式演算）：
-    /// 攻速分桶 → 片内快照结算（瞬发读片前快照）→ 移动同步逐步结算 → 效应统一应用
-    /// → 产出片命令块 → 推送并等待 ack（超时快进）→ 片边界 poll 即时行动队列。
+    /// 即时制演算核心（决策九十五，docs/active/48 §2.5——原执行阶段片循环 tick 化）：
+    /// 单行动/批行动/每秒整拍三类入口 → 片内快照结算（瞬发读片前快照）→ 移动同步逐步结算
+    /// → 效应统一应用 → 产出段命令块 → 即时推送（ack 门控随回合机退役，命令带 startTick）。
     ///
-    /// Host 永不跑在客户端前面（片级 ack 门控）。
+    /// 驱动方=RTSFlowController tick 循环（20Hz accumulator 累加器）；攻速分桶/行动预告/
+    /// Segment+ack 门控/片边界即时队列已退役（清单见 docs/active/48 §2.4，勿再当 bug 修）。
     /// </summary>
     public class TurnResolver
     {
@@ -25,10 +26,6 @@ namespace GIC.Battle
         /// 元能引擎过阈收集与发射全走本实例；每局随 resolver 创建，无静态跨局状态）</summary>
         private readonly BuildingEffectsSystem _buildingEffects;
 
-        /// <summary>ack 等待超时（秒，真实时间；超时快进）——阈值真源=BattleMetrics.SegmentAckTimeoutSeconds
-        /// （2026-10-02 复审收口：协议常量入 Metrics，与其它战斗阈值同址）</summary>
-        private const float AckTimeoutSeconds = BattleMetrics.SegmentAckTimeoutSeconds;
-
         public TurnResolver(BattleSimState sim, IBattleTransport transport, ITurnResolverHost flow)
         {
             _sim = sim;
@@ -37,95 +34,126 @@ namespace GIC.Battle
             _buildingEffects = new BuildingEffectsSystem(sim);
         }
 
-        // ==================== 回合主循环 ====================
+        // ==================== 演算入口（即时制，决策九十五 docs/active/48 §2.5） ====================
+        // 回合主循环/攻速分桶/行动预告/Segment+ack 门控/片边界即时队列随回合机退役（新仓拆既定清单，
+        // 勿再当 bug 修）——驱动方=RTSFlowController tick 循环；本类只提供三类演算入口：
+        // ①玩家/配额脑单行动即时结算；②眷属+伙伴脑批演算（0.5s 节拍）；③每秒整拍结算（回合末族秒化）。
 
-        public IEnumerator ResolveTurnCoroutine(int turnNumber, List<ActionData> actions)
+        /// <summary>段序计数器（每段自增——ack 键语义退役后仅作段唯一序/客户端对齐）</summary>
+        private int _sliceCounter;
+
+        /// <summary>
+        /// 玩家/配额脑单行动即时结算（RTSFlowController.OnSubmitAction 校验通过后调）：
+        /// DeployUnit→部署段；UseItem/EquipItem→物品段；Move/Skill/Pass→单行动片。
+        /// 每段独立即时推送（即时制无攻速排序——行动上交即结算，蓝图 §2.4）。
+        /// 胜负检查归调用方（RTSFlow 每段后自检）。
+        /// </summary>
+        public void ResolveSubmittedAction(ActionData action)
         {
-            // 回合计数真源写入（决策八十六批D，docs/45 §6——周期类建筑效果消费；
-            // 回合开头写一次，段内 RegisterUnit 的单位 DeployedTurn 同回合自洽）
-            _sim.CurrentTurn = turnNumber;
-            // 部署段（B6c）：出战行动先于全部攻速片结算（新单位当回合即被后续行动波及；
-            // 占玩家行动配额由上交通道保证——DeployUnit 同走 SubmitAction 一玩家一行动，docs/18 决策七）
-            var deploys = actions.FindAll(a => a.actionType == ActionType.DeployUnit);
-            bool hasDeploySegment = deploys.Count > 0;
-            if (hasDeploySegment)
+            if (action == null) return;
+            int slice = _sliceCounter++;
+            Segment segment;
+            switch (action.actionType)
             {
-                actions.RemoveAll(a => a.actionType == ActionType.DeployUnit);
-                yield return PushSegmentAndWaitAck(ResolveDeploySegment(turnNumber, 0, deploys));
-                if (_sim.IsBattleDecided()) yield break; // 核心片末检查（协议核心批）：战斗已分胜负口径（2026-10-24 勘正，docs/14 §171）
+                case ActionType.DeployUnit:
+                    segment = ResolveDeploySegment(action.turnNumber, slice, new List<ActionData> { action });
+                    break;
+                case ActionType.UseItem:
+                case ActionType.EquipItem:
+                    segment = ResolveItemActionsSegment(action.turnNumber, slice, new List<ActionData> { action });
+                    break;
+                case ActionType.Move:
+                case ActionType.Skill:
+                case ActionType.Pass:
+                    var unit = _sim.GetUnit(action.unitId);
+                    int speed = unit?.GetUnitComponent<UnitStats>()?.AttackSpeed ?? 0;
+                    segment = ResolveSlice(action.turnNumber, slice, speed, speed, new List<ActionData> { action });
+                    break;
+                default:
+                    GICLog.Warn($"[TurnResolver] 即时制不支持行动类型 {action.actionType}，丢弃");
+                    return;
             }
+            if (segment != null && segment.commands.Count > 0)
+                PushSegment(segment);
+        }
 
-            // 物品行动段（2026-10-16 首个可打出物品批；2026-10-18 装备批并 EquipItem）：玩家级行动
-            //（unitId 留空）不进攻速分桶——先行摘出独立段结算（部署段之后：刚出战的单位当回合可被
-            // 喂酒/装备；首个消费方=蒲公英酒，装备批加兔兔伯爵/武器）
-            var itemActions = actions.FindAll(a => a.actionType == ActionType.UseItem
-                                                   || a.actionType == ActionType.EquipItem);
-            bool hasUseItemSegment = itemActions.Count > 0;
-            if (hasUseItemSegment)
+        /// <summary>
+        /// 眷属+伙伴脑批演算（RTSFlow 每 0.5 秒 AI 节拍调）：整批同段结算（同拍=同片=同片前快照，
+        /// 沿用旧同片语义）——即时制无攻速排序，行动受攻击 CD/元能/体力自然节流（蓝图 §6）。
+        /// Brain 内部格寻路/十字方向域 P1 保持不动（P5 才移植）。
+        /// </summary>
+        public void ResolveAiActions(List<ActionData> actions)
+        {
+            if (actions == null || actions.Count == 0) return;
+            var valid = new List<ActionData>();
+            foreach (var action in actions)
             {
-                actions.RemoveAll(a => a.actionType == ActionType.UseItem || a.actionType == ActionType.EquipItem);
-                int useItemSlice = hasDeploySegment ? 1 : 0; // 紧随部署段占号
-                yield return PushSegmentAndWaitAck(ResolveItemActionsSegment(turnNumber, useItemSlice, itemActions));
-                if (_sim.IsBattleDecided()) yield break; // 防御性同口径（物品效果理论上可含伤害；战斗已分胜负口径 docs/14 §171）
+                if (action == null) continue;
+                var unit = _sim.GetUnit(action.unitId);
+                if (unit == null) continue;
+                if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue; // 跨拍击杀落空
+                valid.Add(action);
             }
+            if (valid.Count == 0) return;
+            int slice = _sliceCounter++;
+            var segment = ResolveSlice(valid[0].turnNumber, slice, 0, 0, valid);
+            if (segment != null && segment.commands.Count > 0)
+                PushSegment(segment);
+        }
 
-            // 玩家级 Pass（空 unitId：超时自动空过/AI 无单位 Pass）无单位归属——分桶前静默剔除，
-            // 勿落进 BucketByAttackSpeed 的「行动引用了不存在的单位」Warn（2026-09-25 审查 S4）
-            actions.RemoveAll(a => a.actionType == ActionType.Pass && string.IsNullOrEmpty(a.unitId));
-
-            // 攻速分桶：攻速值完全相同才同片；片按攻速降序（先结算高攻速）
-            var buckets = BucketByAttackSpeed(actions);
-            int maxSpeed = 0;
-            if (buckets.Count > 0)
-                maxSpeed = buckets[0].speed;
-
-            // 行动预告（2026-09-29 执行预览拍板）：分桶后、首片推送前下发——与后续攻速片一一对应；
-            // 部署段（已抽出）/玩家级 Pass（已剔除）天然不入表；单位级 Pass=无行动不入（预览只收
-            // 真行动）；attackSpeed 取分桶同源 UnitStats 活值。客户端据此建多行执行预览（攻速 10 点
-            // 分区间成行，HUD 侧归组——Host 仍按精确攻速分片结算，两套分组互不干扰）
-            SendTurnPlan(turnNumber, actions);
-
-            int sliceIndex = (hasDeploySegment ? 1 : 0) + (hasUseItemSegment ? 1 : 0); // 部署/使用物品段占前置号（ack 键 turn:slice 唯一性）
-            foreach (var bucket in buckets)
+        /// <summary>
+        /// tick 移动收尾段（决策九十五 P2，蓝图 §3.3）：RTSMovementSystem 推进出的到达/被挡 mover
+        /// 由 RTSFlow 每 tick 交来——途经采集保留（PathCells 全量逐格，docs/47 旧语义：含起终点、
+        /// 同堆连采至多 CollectCount 次）；**移动获能已删除**（蓝图 §4.3「移动 +10 元能来源删除」——
+        /// 旧格轨获能随 P5 旧轨退役消失）。采集耐久钩子（决策八十一）随每笔采集触发。
+        /// 纯到达（无采集）=零命令零段。
+        /// </summary>
+        public void ResolveMoveArrivals(List<RTSMoveState> arrivals)
+        {
+            if (arrivals == null || arrivals.Count == 0) return;
+            var effects = new List<BattleEffect>();
+            foreach (var mover in arrivals)
             {
-                var segment = ResolveSlice(turnNumber, sliceIndex, bucket.speed, maxSpeed, bucket.actions);
-                yield return PushSegmentAndWaitAck(segment);
-                sliceIndex++;
-                // 片末核心检查（协议核心批 2026-09-29 拍板「片末检查立即停」；2026-10-24 勘正为
-                // 战斗已分胜负口径 IsBattleDecided）：恰好一队核心存活→剩余片不再结算与推送
-                // （MOBA 观感：终局核心倒下即收尾）；**单玩家核心倒下≠终局**（2v2 队友核心仍在=
-                // 战斗继续、剩余片照常结算——旧 AnyCoreDestroyed 单玩家口径会把此后每回合截断在
-                // 首个攻速片=速度 30/10 档/即时队列/回合末段全停摆，docs/14 §171）；
-                // 胜负广播由 TurnFlowController 既有 CheckBattleOver 位置接住（口径同构；
-                // 顺序铁律不变：先阶段事件再 BattleOver）
-                if (_sim.IsBattleDecided()) yield break;
-            }
-
-            // 片边界 poll 即时行动队列（连携/契约类；B1 调试验证协议预留）
-            while (true)
-            {
-                var instant = _sim.DequeueInstantAction();
-                if (instant == null) break;
-
-                var segment = ResolveInstantAction(turnNumber, sliceIndex, maxSpeed, instant);
-                if (segment != null)
+                var collect = MoveExecutor.CollectParamsOf(mover.Unit);
+                if (collect.count <= 0) continue;
+                var identity = mover.Unit.GetUnitComponent<UnitIdentity>();
+                if (identity == null) continue;
+                foreach (var cell in mover.PathCells)
                 {
-                    yield return PushSegmentAndWaitAck(segment);
-                    sliceIndex++;
-                    if (_sim.IsBattleDecided()) yield break; // 即时段同口径（战斗已分胜负口径 docs/14 §171）
+                    for (int k = 0; k < collect.count; k++)
+                    {
+                        int remaining = _sim.TryHarvestResourceNode(cell);
+                        if (remaining < 0) break; // 无堆/已耗尽——续走后续途经格
+                        effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest, 0));
+                        if (collect.staminaGain != 0)
+                            effects.Add(new StaminaEffect(identity.OwnerPlayerID, collect.staminaGain, 0));
+                        if (collect.energyGain != 0)
+                            effects.Add(new EnergyEffect(mover.UnitId, collect.energyGain, EnergyEffect.CategoryCollectGain));
+                        effects.Add(new ResourceHarvestEffect(mover.UnitId, cell,
+                            ResourceNodeMetrics.MoraPerHarvest, remaining, 0));
+                        mover.Unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
+                    }
                 }
             }
+            if (effects.Count == 0) return;
 
-            // 回合结束效果按注册序（B2 = Buff 回合制计时 + DoT；产出独立 turnEnd 段）
-            var turnEndSegment = ResolveTurnEnd(turnNumber, sliceIndex, maxSpeed);
-            if (turnEndSegment != null)
+            int slice = _sliceCounter++;
+            var segment = new Segment
             {
-                yield return PushSegmentAndWaitAck(turnEndSegment);
-                sliceIndex++;
-            }
-
-            // WaitConditions 扫描（B1 无）
-            _transport.HostSend(BattleMessageType.TurnEnd, new TurnEndMessage { turnNumber = turnNumber });
+                turnNumber = _sim.CurrentSecond,
+                sliceIndex = slice,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
+                insertedInstantAction = 0,
+                startTick = _sim.CurrentTick,
+            };
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = ApplyEffects(effects, shatters);
+            var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
+            EmitSliceCommands($"tick{_sim.CurrentTick}移动收尾", segment, slice,
+                effects, appliedBuffs, null, null, newlyDead, expired: null, skillCasts: null,
+                shattered: shatters);
+            if (segment.commands.Count > 0) PushSegment(segment);
         }
 
         // ==================== 片结算 ====================
@@ -142,6 +170,7 @@ namespace GIC.Battle
                 sliceAttackSpeed = sliceSpeed,
                 turnMaxAttackSpeed = maxSpeed,
                 insertedInstantAction = 0,
+                startTick = _sim.CurrentTick, // 决策九十五即时制：段产生时刻（客户端绝对时刻播放）
             };
 
             // 片前快照（瞬发效应读取状态）+ 片内附着编译视图（2026-10-01 双蒸发修复）：
@@ -167,7 +196,21 @@ namespace GIC.Battle
                 switch (action.actionType)
                 {
                     case ActionType.Move:
-                        var mover = MoveExecutor.BuildMover(_sim, action);
+                        if (action.targetX > 0 || action.targetZ > 0)
+                        {
+                            // 即时制 tick 移动（决策九十五 P2，蓝图 §3.3）：免费 0 体力 0 元能——启动即入
+                            // sim.ActiveMovers，RTSFlow 每 tick 推进（A* 路径+圆碰撞）；收尾（到达/被挡）走
+                            // ResolveMoveArrivals（途经采集保留、移动获能已删除——蓝图 §4.3）
+                            var cmMover = RTSMovementSystem.BuildCmMover(_sim, action, out var moveCommand);
+                            if (cmMover != null)
+                            {
+                                _sim.ActiveMoversInternal.Add(cmMover);
+                                if (moveCommand != null) casts.Add(moveCommand); // 启动 Move 命令（casts 首发位——客户端旧播放器照播）
+                                AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能
+                            }
+                            break;
+                        }
+                        var mover = MoveExecutor.BuildMover(_sim, action); // 旧格轨兜底（AI 三脑 P5 移植前退役）
                         if (mover == null) break;
                         // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
                         // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
@@ -282,6 +325,7 @@ namespace GIC.Battle
                 sliceAttackSpeed = 0,
                 turnMaxAttackSpeed = 0,
                 deploy = 1,
+                startTick = _sim.CurrentTick, // 决策九十五即时制：段产生时刻（客户端绝对时刻播放）
             };
 
             int indexInSlice = 0;
@@ -357,6 +401,7 @@ namespace GIC.Battle
                 sliceAttackSpeed = 0,
                 turnMaxAttackSpeed = 0,
                 insertedInstantAction = 0,
+                startTick = _sim.CurrentTick, // 决策九十五即时制：段产生时刻（客户端绝对时刻播放）
             };
 
             var snapshot = _sim.TakeSnapshot(turnNumber);
@@ -385,37 +430,44 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 回合结束段（B2 + B6d 经济闭环）：①每玩家发放 5摩拉+5体力（docs/04 §4.3——发放直产命令
-        /// 不走效应链，资源变更非单位效应，同部署扣费先例；发放恒有内容，段必推送）→
-        /// ②Buff 回合结束效果按注册序结算（docs/22 §2）→ ③计时减一（上 buff 当回合结束即减，
-        /// docs/04 §4.4）→ 到期移除 → 产出 turnEnd 段。
+        /// 每秒整拍结算段（决策九十五「每秒整拍」拍板 4——原回合结束段秒化，docs/active/48 §2.3/§9）：
+        /// ①每玩家发放 1摩拉+1体力（MoraGainPerSecond/StaminaGainPerSecond——+10/回合 缩 1/10 节奏，
+        /// 初始 60/200 不变；发放直产命令不走效应链，资源变更非单位效应）→
+        /// ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingTurns 语义改秒）→
+        /// ③计时减一（上 buff 当拍结束即减）→ 到期移除 → 产出 turnEnd 段（发放恒非空，段必推）。
+        /// 由 RTSFlowController 每秒整拍（tick%20==0）调用；胜负检查归调用方。
         /// </summary>
-        private Segment ResolveTurnEnd(int turnNumber, int sliceIndex, int maxSpeed)
+        public void ResolveSecondBeat(int second)
         {
+            // 逻辑秒真源写入（即时制：CurrentTurn 语义=逻辑秒——周期类建筑效果/灵魂 DeployedTurn
+            // 相对计数零改动兼容：每 1 秒走 1 拍=旧「每回合走 1」等价节拍）
+            _sim.CurrentTurn = second;
+            int sliceIndex = _sliceCounter++;
             var segment = new Segment
             {
-                turnNumber = turnNumber,
+                turnNumber = second,
                 sliceIndex = sliceIndex,
-                sliceAttackSpeed = maxSpeed,
-                turnMaxAttackSpeed = maxSpeed,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
                 insertedInstantAction = 0,
                 turnEnd = 1,
+                startTick = _sim.CurrentTick,
             };
 
-            // B6d 经济闭环：回合结束发放（段首；indexInSlice 自此起算——EmitSliceCommands 接续 segment.commands.Count）
+            // 秒拍发放（段首；indexInSlice 自此起算——EmitSliceCommands 接续 segment.commands.Count）
             int grantIndex = 0;
             foreach (var pid in _sim.PlayerIds)
             {
-                // 凌晨批议题⑥天理经济作弊：回合末摩拉发放按难度倍率（AIPlayerConfig.MoraIncomePercentOf
+                // 凌晨批议题⑥天理经济作弊：摩拉发放按难度倍率（AIPlayerConfig.MoraIncomePercentOf
                 // 单源——天理=AITuning.天理摩拉收入百分比、其余档恒 100 零变化；SC2 CheatMoney/petra
                 // 经济倍率表先例：决策逻辑不动、收入作弊）
-                int moraGain = BattleMetrics.MoraGainPerTurn * AIPlayerConfig.MoraIncomePercentOf(pid) / 100;
+                int moraGain = BattleMetrics.MoraGainPerSecond * AIPlayerConfig.MoraIncomePercentOf(pid) / 100;
                 _sim.ApplyMoraDelta(pid, moraGain);
                 segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
                     BattleCommand.StatKindMora, moraGain));
-                _sim.ApplyStaminaDelta(pid, BattleMetrics.StaminaGainPerTurn);
+                _sim.ApplyStaminaDelta(pid, BattleMetrics.StaminaGainPerSecond);
                 segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
-                    BattleCommand.StatKindStamina, BattleMetrics.StaminaGainPerTurn));
+                    BattleCommand.StatKindStamina, BattleMetrics.StaminaGainPerSecond));
             }
 
             var effects = new List<BattleEffect>();
@@ -508,7 +560,7 @@ namespace GIC.Battle
             }
 
             GICLog.Info($"[TurnResolver] {segment}");
-            return segment;
+            PushSegment(segment); // 秒拍发放恒非空段必推（决策九十五：直发无 ack）
         }
 
         /// <summary>
@@ -575,84 +627,9 @@ namespace GIC.Battle
             _sim.EndCompileDyeView();
         }
 
-        /// <summary>
-        /// 即时行动独立结算（片边界插入；产出 insertedInstantAction 标记的独立块）
-        /// </summary>
-        private Segment ResolveInstantAction(int turnNumber, int sliceIndex, int maxSpeed, ActionData action)
-        {
-            var unit = _sim.GetUnit(action.unitId);
-            if (unit == null || BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit))
-            {
-                GICLog.Warn($"[TurnResolver] 即时行动 {action.unitId} 不可执行，丢弃");
-                return null;
-            }
-
-            var snapshot = _sim.TakeSnapshot(turnNumber);
-            _sim.BeginCompileDyeView(); // 片内附着编译视图（同片多命中消耗序贯可见，双蒸发修复）
-            var effects = new List<BattleEffect>();
-            var moverList = new List<MoveActionState>();
-            var casts = new List<BattleCommand>(); // 时轮施放事件（B-S1）
-
-            switch (action.actionType)
-            {
-                case ActionType.Skill:
-                    effects.AddRange(SkillExecutor.Resolve(_sim, action, snapshot, casts));
-                    break;
-                case ActionType.Move:
-                    var mover = MoveExecutor.BuildMover(_sim, action);
-                    if (mover == null) break;
-                    // 移动消耗（统一消耗模型 C-2）：移动技能 costs 单源（MoveExecutor.GetMoveCosts——
-                    // 无 Move 条目单位走常量兜底）；低级单位豁免（ResourceGate 口径）；不足→移动落空
-                    var moveCosts = MoveExecutor.GetMoveCosts(unit);
-                    if (!ResourceGate.HasAll(_sim, unit, action.playerId, moveCosts, out _,
-                            isPlayerDirectControl: action.isPlayerDirectControl))
-                    {
-                        GICLog.Info($"[TurnResolver] 单位 {action.unitId} 移动消耗不足，移动落空");
-                        break;
-                    }
-                    ResourceGate.ChargeAll(_sim, unit, action.playerId, moveCosts, effects,
-                        isPlayerDirectControl: action.isPlayerDirectControl);
-                    moverList.Add(mover);
-                    MovementResolver.Resolve(_sim, moverList);
-
-                    // 移动即获元能（B6a 拍板：移动使用 +10，被挡也算）
-                    effects.Add(new EnergyEffect(mover.UnitId, BattleMetrics.EnergyGainPerMove, EnergyEffect.CategoryMoveGain));
-
-                    AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能，同样产施放事件
-                    break;
-                case ActionType.Pass:
-                    break;
-                default:
-                    GICLog.Warn($"[TurnResolver] 即时行动类型 {action.actionType} B1 不支持");
-                    return null;
-            }
-
-            // 投射物连续命中判定（即时行动段无并发移动者，连续判定退化为静止接触）
-            var vanishes = new List<BattleCommand>();
-            ProjectileResolver.Resolve(_sim, snapshot, effects, moverList, vanishes);
-            _sim.EndCompileDyeView(); // 命中编译全部完成（此后效应应用/命令发射不再读附着）
-
-            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
-            var appliedBuffs = ApplyEffects(effects, shatters);
-            var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
-
-            var segment = new Segment
-            {
-                turnNumber = turnNumber,
-                sliceIndex = sliceIndex,
-                sliceAttackSpeed = unit.GetUnitComponent<UnitStats>()?.AttackSpeed ?? 0,
-                turnMaxAttackSpeed = maxSpeed,
-                insertedInstantAction = 1,
-            };
-
-            // 产出即时段命令（三段唯一出口；单 mover 复用同一 Move 发射循环）
-            EmitSliceCommands($"回合{turnNumber}即时段", segment, sliceIndex,
-                effects, appliedBuffs, moverList, vanishes, newlyDead, expired: null, skillCasts: casts,
-                shattered: shatters);
-
-            GICLog.Info($"[TurnResolver] 即时行动 {segment}");
-            return segment;
-        }
+        // （即时行动独立结算 ResolveInstantAction 已随片边界即时队列退役删除——决策九十五
+        // docs/active/48 §2.4：即时通道购买分支=BuyCardExecutor 直通；非购买即时行动改走
+        // RTSFlowController.OnSubmitAction 校验+ResolveSubmittedAction 即时结算）
 
         // ==================== 段命令发射（三段唯一出口，2026-09-23 审查 Y1 收口） ====================
 
@@ -1004,6 +981,10 @@ namespace GIC.Battle
             // 先于对账执行（2026-10-25 复审批修复：原排 audit 后=审计对它失明）+返回过阈事实供对账
             var buildingSummonFacts = _buildingEffects.DrainPendingSummons(segment, sliceIndex);
 
+            // 命令产生时刻整段回填（决策九十五即时制）：客户端按绝对时刻播对齐
+            for (int i = 0; i < segment.commands.Count; i++)
+                segment.commands[i].tick = segment.startTick;
+
             BattleEffectCommandAudit.Assert(context, effects, appliedBuffs, segment.commands, buildingSummonFacts);
         }
 
@@ -1028,61 +1009,8 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>
-        /// 行动预告下发（2026-09-29 执行预览）：全部真行动扁平化广播（玩家上交+低级单位+AI 脑同源；
-        /// 部署/玩家级 Pass 不入——前者已抽出、后者已剔除；单位级 Pass 预览无行动不入）。
-        /// 攻速取 UnitStats 活值=分桶同源；未知名单位跳过（与分桶 Warn 同口径）
-        /// </summary>
-        private void SendTurnPlan(int turnNumber, List<ActionData> actions)
-        {
-            var msg = new TurnPlanMessage { turnNumber = turnNumber };
-            foreach (var action in actions)
-            {
-                if (action.actionType == ActionType.Pass) continue; // 空过=无行动不入预告
-                var unit = _sim.GetUnit(action.unitId);
-                if (unit == null) continue;
-                msg.entries.Add(new TurnPlanEntry
-                {
-                    unitId = action.unitId,
-                    playerId = action.playerId,
-                    actionType = (int)action.actionType,
-                    skillIndex = action.skillIndex,
-                    attackSpeed = unit.GetUnitComponent<UnitStats>()?.AttackSpeed ?? 0,
-                });
-            }
-            _transport.HostSend(BattleMessageType.TurnPlan, msg);
-        }
-
-        /// <summary>
-        /// 按行动单位攻速分桶（攻速完全相同才同片），桶按攻速降序
-        /// </summary>
-        private List<(int speed, List<ActionData> actions)> BucketByAttackSpeed(List<ActionData> actions)
-        {
-            var dict = new SortedDictionary<int, List<ActionData>>();
-            foreach (var action in actions)
-            {
-                var unit = _sim.GetUnit(action.unitId);
-                if (unit == null)
-                {
-                    GICLog.Warn($"[TurnResolver] 行动引用了不存在的单位 {action.unitId}，丢弃");
-                    continue;
-                }
-                var stats = unit.GetUnitComponent<UnitStats>();
-                int speed = stats?.AttackSpeed ?? 0;
-                if (!dict.TryGetValue(speed, out var list))
-                {
-                    list = new List<ActionData>();
-                    dict[speed] = list;
-                }
-                list.Add(action);
-            }
-
-            var buckets = new List<(int, List<ActionData>)>();
-            // SortedDictionary 升序 → 倒序遍历得降序
-            foreach (var speed in dict.Keys)
-                buckets.Insert(0, (speed, dict[speed]));
-            return buckets;
-        }
+        // （行动预告 SendTurnPlan/攻速分桶 BucketByAttackSpeed 已随回合机退役删除——决策九十五
+        // docs/active/48 §2.4：即时制行动上交即结算、无攻速排序；执行预览 UI 退役随 P4 批）
 
         // ==================== 死亡装备掠夺（决策八十一「单位被击杀，其具有的装备被击杀方掠夺，放入手牌，耐久不变」） ====================
 
@@ -1622,7 +1550,8 @@ namespace GIC.Battle
                         string enemyOwnerId = enemy.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
                         if (enemyOwnerId == null || _sim.GetTeamOf(enemyOwnerId) == holderTeam) continue;
                         var enemyPos = _sim.GetPosition(enemy);
-                        if (holderPos.ChebyshevTo(enemyPos) > explosion.radius) continue;
+                        long explosionR = (long)explosion.radius * CellMetrics.CellSizeCm; // 欧氏平方（决策九十五迁移）
+                        if (holderPos.SquaredEuclideanCmTo(enemyPos) > explosionR * explosionR) continue;
                         EffectCompiler.CompileElementalDamage(_sim, explosion.holderId, kv.Key, null,
                             ElementType.Pyro,
                             new DamageRequest
@@ -1771,11 +1700,11 @@ namespace GIC.Battle
             GICLog.Info($"[TurnResolver] 地脉灵魂生成：{dead.RawData.unitName}（{deadId}）→ 灵魂 {soulId}");
         }
 
-        /// <summary>地脉维度回合末规则（决策九十一）：①灵魂衰减——每回合末 −⌊10%×MaxHp⌋
-        /// （SoulDecayPercentPerTurn 单源，末点截断）；生成当回合末豁免（DeployedTurn 判据，
-        /// 骑士团「部署当回合末跳过」同构）=完整 10 回合驻留；②地脉驻留代价——非灵魂地脉单位
-        /// −3 理智/回合末（LeyLineSanityCostPerTurn；当前地脉仅灵魂=预留钩子自动生效，相位技能批
-        /// 上线即激活）。霜月等未来维度的驻留规则另立收集器勿并入本方法</summary>
+        /// <summary>地脉维度秒拍规则（决策九十一；决策九十五拍板 4「每秒整拍」秒化）：①灵魂衰减——
+        /// 每秒整拍 −⌊10%×MaxHp⌋（SoulDecayPercentPerSecond 单源，末点截断）=复苏窗直译 10 秒；
+        /// 生成当秒拍豁免（DeployedTurn 判据〔CurrentTurn 语义=逻辑秒〕，骑士团「部署当拍跳过」同构）；
+        /// ②地脉驻留代价——非灵魂地脉单位 −3 理智/秒拍（LeyLineSanityCostPerTurn；当前地脉仅灵魂=
+        /// 预留钩子自动生效，相位技能批上线即激活）。霜月等未来维度的驻留规则另立收集器勿并入本方法</summary>
         private void CollectLeyLineTurnEndEffects(List<BattleEffect> effects)
         {
             foreach (var kv in _sim.CrossDimensionUnits)
@@ -1789,7 +1718,7 @@ namespace GIC.Battle
                     if (stats == null) continue;
                     var hp = stats.GetStatStruct(StatType.HP);
                     if (hp.Max <= 0) continue;
-                    int decay = hp.Max * BattleMetrics.SoulDecayPercentPerTurn / 100;
+                    int decay = hp.Max * BattleMetrics.SoulDecayPercentPerSecond / 100;
                     if (decay > 0)
                         effects.Add(new SoulDecayEffect(kv.Key, decay));
                 }
@@ -1927,25 +1856,20 @@ namespace GIC.Battle
             return costs;
         }
 
-        // ==================== 推送与 ack ====================
+        // ==================== 推送（即时制：ack 门控随回合机退役，docs/active/48 §2.4） ====================
 
-        private IEnumerator PushSegmentAndWaitAck(Segment segment)
+        /// <summary>段直发（决策九十五）：录制+档案采集+HostSend 即时下发——无 ack 等待
+        /// （SegmentAck 通道/15s 超时快进随回合机退役；命令流带 startTick 客户端按绝对时刻播，
+        /// 客户端播放跟不上由渲染插值自然吸收，不再反压 Host——「Host 永不跑在客户端前面」
+        /// 旧铁律随片级 ack 门控一并退役）</summary>
+        private void PushSegment(Segment segment)
         {
-            _flow.NotifySegmentPushed(segment.turnNumber, segment.sliceIndex);
             // 回放录制（2026-10-20 Replay harness 批）：命令流本体在推送前定稿——断言面单点
             BattleRecorder.CaptureSegment(segment);
             // 对手档案采集（AI-2 批，docs/active/42 §4）：段命令流观察——Damage→元素习惯/最爱
             // 目标/交战距离，Death(建筑)→核心摧毁事件账本（公开信息=全体客户端广播态，红线①合规）
             OpponentProfiler.ObserveCommands(_sim, segment.commands, segment.turnNumber);
             _transport.HostSend(BattleMessageType.Segment, new SegmentMessage { segment = segment });
-
-            // 等全体客户端 ack 或超时快进（本地单客户端）
-            float elapsed = 0f;
-            while (!_flow.HasSegmentAck(segment.turnNumber, segment.sliceIndex) && elapsed < AckTimeoutSeconds)
-            {
-                yield return null;
-                elapsed += Time.unscaledDeltaTime;
-            }
         }
     }
 }

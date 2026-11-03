@@ -22,6 +22,9 @@ namespace GIC.Battle
     }
 
     /// <summary>
+    /// **已退役（决策九十五，2026-11-03，docs/active/48 §2.5）**：即时制改造起由 RTSFlowController
+    /// （tick 状态机）取代——本类保留仅供旧回放器（ReplayRunner）与历史链编译兼容，勿再扩展、
+    /// 勿再当主流程修 bug；回合制终版存档=tag `turnbased-final`（cc125499）。以下为历史语义：
     /// 回合状态机（D 批次操控分层五阶段，docs/32 §3 / docs/04 §4.1）：
     /// 眷属决策（1-2★ 启发式脑，选择阶段头 Host 内部生成）→ 玩家选择（所有玩家同时提交 1 配额：
     /// 号令/部署/升命/购买/物品/魔神操作/空过）→ **伙伴决策（3-4★ 评分制脑——收齐全部玩家选择后、
@@ -347,7 +350,9 @@ namespace GIC.Battle
             SelectRemainingSeconds = -1f; // 计时终止（HUD 不再显示倒计时）
             OnPhaseChanged?.Invoke(Phase, TurnNumber);
 
-            yield return _resolver.ResolveTurnCoroutine(TurnNumber, actions);
+            // 已退役（决策九十五，docs/active/48 §2.5）：演算入口 ResolveTurnCoroutine 已随回合机
+            // 删除——本类仅编译兼容保留、不被装配（主流程=RTSFlowController），不实际演算
+            GICLog.Warn("[TurnFlow] 回合状态机已退役（决策九十五）——演算跳过");
 
             _resolveCoroutine = null;
 

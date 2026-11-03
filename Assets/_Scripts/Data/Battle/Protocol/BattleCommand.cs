@@ -123,6 +123,10 @@ namespace GIC.Data
         public int sliceIndex;
         public int indexInSlice;
 
+        /// <summary>产生时刻（tick 数，决策九十五即时制 docs/active/48 §8——段推送前由
+        /// TurnResolver 整段回填=Segment.startTick；客户端按绝对时刻播对齐；0=旧回放兼容）</summary>
+        public int tick;
+
         [Header("可见性（迷雾预留，切片期恒全可见）")]
         public int visibilityScope;
 

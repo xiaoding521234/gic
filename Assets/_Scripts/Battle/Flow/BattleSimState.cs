@@ -104,8 +104,18 @@ namespace GIC.Battle
 
         /// <summary>当前回合数（决策八十六批D，docs/45 §6——回合数真源：TurnResolver 每回合
         /// 开头写入；周期类效果（骑士团每 5 回合召唤）与 Unit.DeployedTurn 相对计数消费；0=回合开始前
-        /// （开局 RegisterUnit 的单位部署回合计 0）</summary>
+        /// （开局 RegisterUnit 的单位部署回合计 0）。
+        /// 即时制语义（决策九十五，docs/active/48 §2.3）：字段语义随回合机退役改为**逻辑秒**——
+        /// RTSFlowController 每秒整拍同步写 CurrentTurn=CurrentSecond，周期类相对计数零改动兼容
+        /// （每 1 秒走 1 拍=旧「每回合走 1」等价节拍，周期字段值按秒生效，P6 调参批集中校）</summary>
         public int CurrentTurn { get; set; }
+
+        /// <summary>即时制 tick 真源（决策九十五，docs/active/48 §2）——RTSFlowController 每 tick 写入；
+        /// 1 秒=20 tick（BattleMetrics.TicksPerSecond）</summary>
+        public int CurrentTick { get; set; }
+
+        /// <summary>当前逻辑秒（tick/20）</summary>
+        public int CurrentSecond => CurrentTick / BattleMetrics.TicksPerSecond;
 
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
@@ -873,6 +883,24 @@ namespace GIC.Battle
             unit.GetUnitComponent<UnitGridPosition>()?.SetPosition(BoardType.MainWorld, cell.ToVector2Int());
         }
 
+        // ==================== 连续坐标（决策九十五 P2，蓝图 §3.1：格→连续双轨） ====================
+
+        /// <summary>连续位置（厘米，真源——UnitGridPosition.PositionCm 门面；格坐标 GetPosition 由其派生）</summary>
+        public UnityEngine.Vector2Int GetPosCm(Unit unit)
+            => unit?.GetUnitComponent<UnitGridPosition>()?.PositionCm ?? UnityEngine.Vector2Int.zero;
+
+        /// <summary>连续位置写入（tick 移动推进每步调用——格缓存自动派生，全链 GetPosition 零改动兼容）</summary>
+        public void SetPosCm(Unit unit, int xCm, int zCm)
+            => unit?.GetUnitComponent<UnitGridPosition>()?.SetPositionCm(xCm, zCm);
+
+        /// <summary>即时制 tick 移动注册表（RTSMovementSystem 推进/移除；RTSFlow 每 tick 调 AdvanceTick）</summary>
+        private readonly List<RTSMoveState> _activeMovers = new List<RTSMoveState>();
+
+        public IReadOnlyList<RTSMoveState> ActiveMovers => _activeMovers;
+
+        /// <summary>tick 移动注册表写入（TurnResolver 启动移动时 Add；推进器内部 Remove）</summary>
+        public List<RTSMoveState> ActiveMoversInternal => _activeMovers;
+
         /// <summary>
         /// 获取某格上的全部单位（含尸体——尸体保留碰撞/体积，docs/05 §5.4）
         /// </summary>
@@ -999,16 +1027,17 @@ namespace GIC.Battle
             stats.SetStatStruct(StatType.Sanity, sanity);
         }
 
-        /// <summary>切比雪夫距离最近、元能未满的我方存活角色（不含自身；同距 unitId 升序——
+        /// <summary>欧氏距离最近、元能未满的我方存活角色（不含自身；同距 unitId 升序——
         /// 安柏1命溢出转移的接收方判定；尸体不算「角色」；**建筑排除（决策八十六拍板 #8——
-        /// 溢出转移候选域=非建筑单位，自然排除〔建筑 baseEnergy=0 恒「满」〕之外显式单源）**）</summary>
+        /// 溢出转移候选域=非建筑单位，自然排除〔建筑 baseEnergy=0 恒「满」〕之外显式单源）**）。
+        /// 决策九十五欧氏迁移（蓝图 §3.1）：切比雪夫→平方欧氏（全整数零开方，确定性纪律）</summary>
         private Unit FindNearestNonFullEnergyAlly(Unit self)
         {
             var selfPos = GetPosition(self);
             var selfIdentity = self.GetUnitComponent<UnitIdentity>();
             if (selfIdentity == null) return null;
             Unit best = null;
-            int bestDist = int.MaxValue;
+            long bestDist = long.MaxValue;
             string bestId = null;
             foreach (var kv in _units)
             {
@@ -1021,7 +1050,7 @@ namespace GIC.Battle
                 if (stats == null) continue;
                 var energy = stats.GetStatStruct(StatType.Energy);
                 if (energy.Value >= energy.Max) continue; // 已满不接收
-                int dist = GetPosition(candidate).ChebyshevTo(selfPos); // 切比雪夫单源（BattleCell.ChebyshevTo）
+                long dist = GetPosition(candidate).SquaredEuclideanCmTo(selfPos); // 欧氏平方单源（决策九十五迁移）
                 if (dist < bestDist || (dist == bestDist && bestId != null
                     && string.CompareOrdinal(kv.Key, bestId) < 0))
                 {

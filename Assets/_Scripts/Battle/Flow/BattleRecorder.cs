@@ -127,6 +127,15 @@ namespace GIC.Battle
             Append(new ReplayOverLine { winnerTeam = winnerTeam, finalTurn = finalTurn });
         }
 
+        /// <summary>tick 状态 hash 录制（决策九十五确定性护栏四件套之一，docs/active/48 §2.2）——
+        /// 每秒整拍随快照落一行：后置 LAN 联机双端比对漂移（王者荣耀同款定位手段）；单机回放
+        /// 亦可用作「同 seed 同命令流=同 hash」的自证断言。旧回放器缺该行类型=跳过不判（缺省兼容）</summary>
+        public static void CaptureTickHash(int tick, int hash)
+        {
+            if (!Enabled || !_hasHeader) return;
+            Append(new ReplayTickLine { tick = tick, hash = hash });
+        }
+
         /// <summary>收笔（BattleScreen.OnDestroy 调——中途退出/正常终局统一兜底；空录制删文件）</summary>
         public static void EndSession()
         {
@@ -205,5 +214,13 @@ namespace GIC.Battle
         public string kind = "over";
         public int winnerTeam;
         public int finalTurn;
+    }
+
+    [Serializable]
+    public class ReplayTickLine
+    {
+        public string kind = "tick";
+        public int tick;
+        public int hash;
     }
 }

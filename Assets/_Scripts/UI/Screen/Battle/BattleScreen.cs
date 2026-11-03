@@ -25,7 +25,7 @@ namespace GIC.UI
         [Header("战斗组件（场景装配）")]
         [SerializeField] private BattleBoard _board;
         [SerializeField] private BattlePlayer _player;
-        [SerializeField] private TurnFlowController _flow;
+        [SerializeField] private RTSFlowController _flow;
         [SerializeField] private BattleHud _hud;
 
         private BattleSession _session;
@@ -117,7 +117,7 @@ namespace GIC.UI
                     return !string.IsNullOrEmpty(id) && id != PlayerID.Offline ? id : BattleDebugPlayerIds.P1;
                 },
                 pid => _session != null ? _session.GetTeamOf(pid) : TeamType.A);
-            if (_flow == null && !isLanClient) _flow = gameObject.AddComponent<TurnFlowController>(); // 客户端无回合状态机
+            if (_flow == null && !isLanClient) _flow = gameObject.AddComponent<RTSFlowController>(); // 决策九十五：即时制 tick 状态机（客户端无状态机口径沿用）
             if (_board == null)
             {
                 _board = GetComponentInChildren<BattleBoard>();
@@ -149,16 +149,10 @@ namespace GIC.UI
 
             if (isLanClient)
             {
-                // ==================== ③ LAN 客户端装配（B7）：仅表现层 ====================
-                // Sim/Flow 全 null——建盘/快照/片全部经消息驱动；HUD 即可绑定（板面组件先就位，
-                // BattleStart 消息到达时 BattlePlayer.Build 建盘）；就绪握手在 HUD 绑定后发出
-                // （Host 收齐就绪才 StartBattle，保证 BattleStart 不早到——传输层早到队列双保险）。
-                // 场景可能序列化 TurnFlowController 引用——客户端作废置空（未绑定 Sim 的控制器
-                // 是死物，相位门面会误读其 Idle 态）
-                _flow = null;
-                _session = BattleSession.CreateClient(_player, playerSetups);
-                GICLog.Info($"[BattleScreen] LAN 客户端装配：等待 Host 广播开局（名册 {playerSetups.Count} 人）");
-                yield return StartCoroutine(BindHudAndAwaitStart(mapConfig));
+                // LAN 退役（决策九十五拍板 2，docs/active/48 §13）：即时制 v1 单机——LAN 客户端装配链
+                // 整段退役，实时 Mirror 同步=后置批次；房间流程入口 toast 化拦截随 P4 批补
+                GICLog.Error("[BattleScreen] LAN 客户端已退役（即时制 v1 单机）——无法进战，返回");
+                DoClose();
                 yield break;
             }
 
@@ -172,9 +166,10 @@ namespace GIC.UI
 
             if (launchConfig != null && launchConfig.IsNetworked)
             {
-                // LAN host：Mirror 传输（逐远端下发+本机直投）+ 期望 ack 方数注入
-                _session = BattleSession.CreateHosted(map, _player, _flow, logicGo.transform, battleSeed, playerSetups);
-                GICLog.Info("[BattleScreen] LAN host 装配：等待远端卡组+就绪握手…");
+                // LAN 退役（决策九十五拍板 2）：host 装配链整段退役——同客户端分支拦截
+                GICLog.Error("[BattleScreen] LAN host 已退役（即时制 v1 单机）——无法进战，返回");
+                DoClose();
+                yield break;
             }
             else
             {

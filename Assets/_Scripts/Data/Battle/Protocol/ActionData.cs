@@ -107,6 +107,26 @@ namespace GIC.Data
         /// （拍板口径「延奏号令 0→−5」）；AI 伙伴自主行动=false 不减免。默认 false 序列化兼容旧存档</summary>
         public bool isPlayerDirectControl;
 
+        /// <summary>行动产生时刻（tick 数，决策九十五即时制 docs/active/48 §8——RTSFlowController
+        /// 提交时写入；段命令流对齐用；0=旧回放/旧客户端兼容缺省）</summary>
+        public int submitTick;
+
+        /// <summary>移动目标点 X（厘米，决策九十五蓝图 §8 Move 双轨）：&gt;0 时走即时制 tick 移动
+        /// （tile A* 路径+steering 每步推进+圆碰撞，RTSMovementSystem）；=0 时回落旧
+        /// direction+magnitude 格移动（MovementResolver 旧轨——AI 三脑 P5 移植前兜底）</summary>
+        public int targetX;
+
+        /// <summary>移动目标点 Z（厘米，同上）</summary>
+        public int targetZ;
+
+        /// <summary>部署自由落点 X（厘米，蓝图 §3.4 DeployUnit 双轨）：&gt;0 时自由落点校验
+        /// （欧氏半径+可走 tile+无碰撞圆重叠）；=0 时回落旧 deployCell 格部署（HUD 自由落点
+        /// 瞄准随 P4 批接线）</summary>
+        public int deployX;
+
+        /// <summary>部署自由落点 Z（厘米，同上）</summary>
+        public int deployZ;
+
         public override string ToString()
         {
             return $"[ActionData {playerId}/{unitId} {actionType} turn={turnNumber}" +

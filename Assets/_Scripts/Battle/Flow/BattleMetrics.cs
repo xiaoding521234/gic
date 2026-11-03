@@ -27,9 +27,11 @@ namespace GIC.Battle
         /// launchMs 到点再弹已支持，零客户端改动）</summary>
         public const float BuffLayerStaggerSeconds = 0.15f;
 
-        /// <summary>单位受击圆柱直径（世界单位；底座圆盘可视化同源，视觉即判定——docs/18 决策二）。
-        /// 容错目检后可调（基线起点 0.42）</summary>
-        public const float UnitCylinderDiameter = 0.42f;
+        /// <summary>单位受击/碰撞圆柱直径（世界单位=格；底座圆盘可视化同源，视觉即判定——docs/18 决策二）。
+        /// **决策九十五（蓝图 §3.2）**：碰撞圆=受击圆柱统一 0.5 格（「体积=1/4 格」拍板释义——
+        /// 1 格 2×2 容 4 个单位；per-unit 覆写保留、协议核心 0.8 不变；旧基线 0.42 已换代，
+        /// 底座圆盘视觉随常量自动放大）</summary>
+        public const float UnitCylinderDiameter = 0.5f;
 
         /// <summary>per-unit 受击圆柱直径单出口（协议核心批 2026-09-29）：声明值>0 用声明值（协议核心=0.8，
         /// 大目标易命中=攻城手感），0=回落全局 0.42。四消费方同源：ProjectileResolver 接触判定（Host 权威）、
@@ -162,14 +164,59 @@ namespace GIC.Battle
         /// <summary>回合结束段固定节拍（秒，不按攻速排程）</summary>
         public const float TurnEndDelaySeconds = 0.25f;
 
-        /// <summary>单格体积绝对层上限（docs/05 §5.3：格内现有体积+自身体积 ≤ 3——无视阻挡配置
-        /// 不可绕过的最高级；移动进入/部署落点共享原语 MovementResolver.PassesVolumeLimit 同读）</summary>
+        /// <summary>单格体积绝对层上限（docs/05 §5.3 旧回合制规则）——**决策九十五退役中**
+        /// （蓝图 §3.2：单格体积上限随格制退役，密度由碰撞圆自然限制）：常量保留仅供旧格移动
+        /// 兜底轨（MovementResolver.PassesVolumeLimit，AI 三脑 P5 移植前）消费；即时制新轨
+        /// （RTSMovementSystem 圆碰撞）不读本值；P5 旧轨退役后本常量随批删除</summary>
         public const int MaxTileVolume = 3;
+
+        // ==================== 连续坐标与碰撞圆（决策九十五 P2，蓝图 §3） ====================
+        // 1 格=1 米=100 厘米=1 世界单位（CellSizeCm 常量真源=GIC.Data.CellMetrics，BattleCell 同址）；
+        // 单位连续位置=厘米定点整数（确定性纪律）；碰撞圆=受击圆柱统一 0.5 格（CylinderDiameterOf 同源）。
+
+        /// <summary>默认移速基线（厘米/秒——蓝图 §3.3：全员统一 100=1 格/s；资产迁移〔UnitConfig
+        /// 移速 30/50→100〕随 P3 数值批，本常量=新轨默认回落+P3 迁移对照值）</summary>
+        public const int DefaultMoveSpeedCm = 100;
 
         /// <summary>多层 Buff 第 i 层拍时刻（秒，相对段播放起点）——逐层错峰单源
         /// （第 i 层=i×BuffLayerStaggerSeconds；消费方=光环 Buff OnTurnEnd 声明 PendingAuraHit/Heal/
         /// Energy 的 HitSeconds 与 TurnResolver 碎裂回血错峰，勿再散抄公式）</summary>
         public static float LayerBeatSeconds(int layer) => layer * BuffLayerStaggerSeconds;
+
+        // ==================== 即时制 tick 机（决策九十五，docs/active/48 §2） ====================
+        // 20Hz 固定步长；accumulator 累加器模式（Gaffer《Fix Your Timestep!》业界标准）+每帧步数 clamp
+        // （spiral of death 防护——模拟跟不上时整体慢放不雪崩）；1 秒=20 tick=「每秒整拍」结算节拍。
+
+        /// <summary>逻辑帧率（tick/秒）——1 tick=1/20 秒（RTS 业界区间 20~30Hz，蓝图 §2.1）</summary>
+        public const int TicksPerSecond = 20;
+
+        /// <summary>单 tick 时长（秒）=1/TicksPerSecond</summary>
+        public const float TickSeconds = 1f / TicksPerSecond;
+
+        /// <summary>单帧最大 tick 步数（spiral of death 防护——帧率暴跌时逻辑整体慢放，不欠债雪崩）</summary>
+        public const int MaxTicksPerFrame = 20;
+
+        /// <summary>累加器单帧时间钳制（秒——Gaffer 标准护栏，防切后台巨帧一次吞掉模拟）</summary>
+        public const float MaxFrameDeltaSeconds = 0.25f;
+
+        /// <summary>AI 决策节拍（tick 数）=每 0.5 秒三脑同频一次（蓝图 §6）</summary>
+        public const int AiBeatTicks = 10;
+
+        /// <summary>每秒整拍发放摩拉（决策九十五拍板 4「每秒整拍」——回合制 +10/回合 缩 1/10 节奏）</summary>
+        public const int MoraGainPerSecond = 1;
+
+        /// <summary>每秒整拍发放体力（同上）</summary>
+        public const int StaminaGainPerSecond = 1;
+
+        /// <summary>战斗时钟步进（分钟/秒——昼夜每秒 +1 分钟，回合数显示退役，蓝图 §2.3）</summary>
+        public const int BattleClockMinutesPerSecond = 1;
+
+        /// <summary>灵魂衰减（%/秒——决策九十五拍板 4：−10% 每秒整拍，复苏窗直译 10 秒；P6 调参重点）</summary>
+        public const int SoulDecayPercentPerSecond = 10;
+
+        /// <summary>desync hash 落盘节拍（秒——确定性护栏四件套之一：state hash 落 BattleRecorder 行，
+        /// 后置 LAN 联机的漂移定位手段，王者荣耀同款）</summary>
+        public const int DesyncHashEverySeconds = 1;
     }
 
     /// <summary>
