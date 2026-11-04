@@ -112,8 +112,20 @@ namespace GIC.Battle
         {
             if (arrivals == null || arrivals.Count == 0) return;
             var effects = new List<BattleEffect>();
+            var corrects = new List<BattleCommand>(); // P4-E 被挡位置校正命令（空 path+hitX/hitY=停点 cm）
             foreach (var mover in arrivals)
             {
+                if (mover.Blocked)
+                {
+                    // P4-E 移动实时化：被挡=停于接触前（连续 cm 位非格心）——恒发位置校正命令
+                    //（客户端停活动补间+落位+撞墙弹回表现；纯到达=无命令——补间终点=目标格心天然对齐）
+                    var stopCm = _sim.GetPosCm(mover.Unit);
+                    var correct = BattleCommand.Move(mover.UnitId, 0, 0, new List<BattleCell>(),
+                        BattleCommand.MoveBlocked, (int)mover.BlockedDirection);
+                    correct.hitX = stopCm.x;
+                    correct.hitY = stopCm.y;
+                    corrects.Add(correct);
+                }
                 var collect = MoveExecutor.CollectParamsOf(mover.Unit);
                 if (collect.count <= 0) continue;
                 var identity = mover.Unit.GetUnitComponent<UnitIdentity>();
@@ -135,7 +147,7 @@ namespace GIC.Battle
                     }
                 }
             }
-            if (effects.Count == 0) return;
+            if (corrects.Count == 0 && effects.Count == 0) return;
 
             int slice = _sliceCounter++;
             var segment = new Segment
@@ -148,8 +160,19 @@ namespace GIC.Battle
                 startTick = _sim.CurrentTick,
             };
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
-            var appliedBuffs = ApplyEffects(effects, shatters);
-            var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
+            var appliedBuffs = new List<ApplyBuffEffect>();
+            var newlyDead = new List<Unit>(); // EmitSliceCommands 无空守卫遍历（881 行）——被挡纯校正段=空表
+            if (effects.Count > 0)
+            {
+                appliedBuffs = ApplyEffects(effects, shatters);
+                newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
+            }
+            foreach (var correct in corrects) // P4-E 段首直产（EmitSliceCommands 的 indexInSlice 接续既定语义）
+            {
+                correct.sliceIndex = slice;
+                correct.indexInSlice = segment.commands.Count;
+                segment.commands.Add(correct);
+            }
             EmitSliceCommands($"tick{_sim.CurrentTick}移动收尾", segment, slice,
                 effects, appliedBuffs, null, null, newlyDead, expired: null, skillCasts: null,
                 shattered: shatters);

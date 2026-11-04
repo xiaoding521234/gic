@@ -172,6 +172,12 @@ namespace GIC.Data
         /// <summary>释放速度千分（1+攻速/100——客户端动作片播放速率乘数；0=1 倍原速）</summary>
         public int castRate;
 
+        [Header("移动载荷（决策九十五 P4-E 移动实时化——Move 命令有效）")]
+        /// <summary>移速（cm/秒，施放时刻实际值含 Buff——客户端逐段补间时长=段距离/速度，修斜向
+        /// 1s/格恒速误差；0=回落 BattleMetrics.DefaultMoveSpeedCm。**空 path+MoveBlocked=被挡位置
+        /// 校正命令**：hitX/hitY=被挡停点 cm（与 Damage 的毫米语义不同——空路径命令无投射物消费面）</summary>
+        public int speedCm;
+
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
         public int buffType;
 
@@ -215,7 +221,7 @@ namespace GIC.Data
         public const int MoveBlocked = 1;
 
         public static BattleCommand Move(string unitId, int sliceIndex, int indexInSlice, List<BattleCell> path,
-            int blocked = 0, int blockedDirection = 0)
+            int blocked = 0, int blockedDirection = 0, int speedCmPerSecond = 0)
         {
             return new BattleCommand
             {
@@ -227,6 +233,7 @@ namespace GIC.Data
                 cell = path.Count > 0 ? path[path.Count - 1] : BattleCell.zero,
                 metadata = blocked,
                 direction = blockedDirection,
+                speedCm = speedCmPerSecond,
             };
         }
 

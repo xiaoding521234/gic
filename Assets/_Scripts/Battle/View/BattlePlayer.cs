@@ -176,6 +176,11 @@ namespace GIC.Battle
         /// 结算画面=B8）</summary>
         public event Action<BattleOverMessage> BattleOver;
 
+        /// <summary>技能施放命令到达（P4-D CD 转圈即时起点，决策九十五蓝图 §7）：参数=施放单位 /
+        /// 技能类型 / CD 剩余 tick。仅 cdTicks>0 且技能数据可载时发（移动施放 cdTicks=0 不发）——
+        /// 快照 attackCdRemainTicks/burstCdRemainTicks 每秒权威校准，本事件=两次快照间新施放的即时起点</summary>
+        public event Action<string, SkillType, int> SkillCasted;
+
         // ===== B7 LAN 客户端相位派生（2026-10-11 联机批；_flow==null 的端=LAN 客户端） =====
         // 客户端无 TurnFlowController——阶段/倒计时从消息流派生（Snapshot→Selecting、Segment→Resolving、
         // BattleOver→Finished）；host/本地端 _flow!=null 恒走 Flow 权威相位，本派生段零生效（各入口守卫）。
@@ -221,6 +226,26 @@ namespace GIC.Battle
         private BattleOverheadBars _overheadBars;
         private Quaternion _billboardRotation = Quaternion.identity;
         private readonly Dictionary<string, UnitView> _views = new Dictionary<string, UnitView>();
+
+        // ==================== P4-E 移动实时化（决策九十五蓝图 §3.3/§7——世代补间+位置自愈） ====================
+
+        /// <summary>移动补间世代（unitId→当前世代号）：同单位新移动命令/位置校正=世代递增，旧补间
+        /// 逐段+逐帧自检发现失配即自废（防双补间同帧双写 jitter——玩家连点重定目标/AI 0.5s 重决策）</summary>
+        private readonly Dictionary<string, int> _moveGeneration = new Dictionary<string, int>();
+
+        /// <summary>移动播放中的单位集（世代开始加入、finally 世代匹配才移除）——OnSnapshot 位置自愈
+        /// 的让位表（移动中不回拉：补间与模拟同速推进，1s 滞后快照回拉会抖）</summary>
+        private readonly HashSet<string> _activeMovePlayback = new HashSet<string>();
+
+        /// <summary>cm 连续位置→世界坐标（BattleBoard.CellToWorld 同基准：BattleCell.zero 格心为原点
+        ///——P4-E 被挡停点/快照自愈消费；与 BattleHud.CmToWorld 同式）</summary>
+        private Vector3 BoardCmToWorld(int xCm, int zCm)
+        {
+            var o = _board.CellToWorld(BattleCell.zero);
+            float s = 1f / CellMetrics.CellSizeCm;
+            return new Vector3(o.x + (xCm - BattleCell.zero.CenterXCm) * s, 0f,
+                o.z + (zCm - BattleCell.zero.CenterYCm) * s);
+        }
 
         /// <summary>血条填色解析器（2026-10-15 血条三色批，HUD Bind 注入——先于 BattleStart 建场：
         /// 玩家色模式=归属玩家色、三色模式=自己绿/队友蓝/敌红；未注入回落 view.OwnerColor 现行口径）。
@@ -689,6 +714,20 @@ namespace GIC.Battle
             // 增量；重连/漏命令场景由本口兜底对齐）
             if (_board != null)
                 _board.RebuildResourceNodes(message.snapshot.resourceNodes);
+
+            // P4-E 位置自愈（每秒快照）：非移动播放中的单位，视图位与快照连续位漂移>15cm=拉回
+            //（被挡停点校正/死亡中断等残留纠偏；移动播放中让位——补间与模拟同速，回拉 1s 滞后值会抖）
+            if (_board != null)
+            {
+                foreach (var state in message.snapshot.units)
+                {
+                    if (!_views.TryGetValue(state.unitId, out var healView) || healView == null) continue;
+                    if (_activeMovePlayback.Contains(state.unitId)) continue;
+                    var snapWorld = BoardCmToWorld(state.PosXCm(), state.PosZCm());
+                    if ((healView.transform.position - snapWorld).sqrMagnitude > 0.15f * 0.15f)
+                        healView.ApplyPosition(snapWorld);
+                }
+            }
 
             SnapshotUpdated?.Invoke(message.snapshot);
         }
@@ -1325,8 +1364,30 @@ namespace GIC.Battle
                     case BattleCommandType.Move:
                         if (_views.TryGetValue(command.actorUnitId, out var mover))
                         {
-                            mover.Cell = command.path.Count > 0 ? command.path[command.path.Count - 1] : mover.Cell;
-                            playbacks.Add(StartCoroutine(PlayMoveCoroutine(mover, command)));
+                            if (command.path.Count == 0)
+                            {
+                                // P4-E 位置校正命令（被挡收尾）：空 path+hitX/hitY=停点 cm——停活动补间
+                                //（世代递增=旧补间自废）+落位+撞墙弹回；被挡=真停（移动循环动画收）
+                                _moveGeneration[command.actorUnitId] =
+                                    (_moveGeneration.TryGetValue(command.actorUnitId, out var prevGen) ? prevGen : 0) + 1;
+                                _activeMovePlayback.Remove(command.actorUnitId);
+                                var stopWorld = BoardCmToWorld(command.hitX, command.hitY);
+                                mover.ApplyPosition(stopWorld);
+                                mover.SetMoveAnimation(false);
+                                if (command.metadata == BattleCommand.MoveBlocked)
+                                    playbacks.Add(StartCoroutine(PlayBlockedBumpCoroutine(mover,
+                                        stopWorld, command.direction, 0.25f)));
+                            }
+                            else
+                            {
+                                mover.Cell = command.path[command.path.Count - 1];
+                                // P4-E 移动世代（同单位新移动=替换旧补间防双写 jitter——玩家连点重定
+                                // 目标/AI 0.5s 重决策两条路都高频换目标）
+                                int gen = (_moveGeneration.TryGetValue(command.actorUnitId, out var g) ? g : 0) + 1;
+                                _moveGeneration[command.actorUnitId] = gen;
+                                _activeMovePlayback.Add(command.actorUnitId);
+                                playbacks.Add(StartCoroutine(PlayMoveCoroutine(mover, command, gen)));
+                            }
                         }
                         break;
 
@@ -1658,6 +1719,10 @@ namespace GIC.Battle
                             // 时长≈时轮 totalTime）、播完自动回待机循环（UnitView.PlayActionVideo 双 RT+缩放补偿
                             // ——宽幅 16:9 动作片原生尺寸独立 RT 渲染+主体视觉大小恒等补偿）；null=待机照播
                             var skillData = LoadSkillData(command.value);
+                            // P4-D CD 转圈即时起点（决策九十五）：cdTicks>0=新施放——HUD 记就绪时刻
+                            //（战技/爆发两槽）；移动施放 cdTicks=0 与技能缺载不发
+                            if (skillData != null && command.cdTicks > 0)
+                                SkillCasted?.Invoke(command.actorUnitId, skillData.skillType, command.cdTicks);
                             var actionClip = skillData?.当前动作片;
                             if (actionClip != null)
                             {
@@ -1743,7 +1808,7 @@ namespace GIC.Battle
                 || direction == (int)Direction2D.Left || direction == (int)Direction2D.DownLeft;
         }
 
-        private IEnumerator PlayMoveCoroutine(UnitView view, BattleCommand command)
+        private IEnumerator PlayMoveCoroutine(UnitView view, BattleCommand command, int generation)
         {
             // 移动态动画（B-S4a；2026-10-05 决策四十四 per-skill 统一）：移动片内切登记的移动循环片
             // （SkillCast 片头经 SetMoveVideo 登记）、片末回 待机（含被挡弹回段——弹回也是移动表现）；
@@ -1754,45 +1819,64 @@ namespace GIC.Battle
             try
             {
                 var path = command.path;
-                float stepSeconds = MoveStepSeconds / _playbackSpeed;
+                // P4-E 逐段时长=段距离/实际移速（斜向 1.41 格段不再恒 1s——与模拟同速推进；
+                // speedCm=施放时刻实际移速含 Buff，0=回落默认；_playbackSpeed 回放倍率沿用）
+                float speedWorldPerSec = (command.speedCm > 0 ? command.speedCm : BattleMetrics.DefaultMoveSpeedCm)
+                    / (float)CellMetrics.CellSizeCm;
+                float lastStepSeconds = 0.25f;
                 for (int i = 1; i < path.Count; i++)
                 {
                     if (view == null) break; // 中途死亡/消散拆件：停止补间（守卫族同 PlayDamageCoroutine）
+                    if (_moveGeneration.TryGetValue(command.actorUnitId, out var cur) && cur != generation)
+                        yield break; // P4-E 世代替换：新移动命令已接管（移动态/活动表由新世代 finally 管理）
                     Vector3 from = _board.CellToWorld(path[i - 1]);
                     Vector3 to = _board.CellToWorld(path[i]);
+                    float stepSeconds = Mathf.Max(0.05f,
+                        Vector3.Distance(from, to) / (speedWorldPerSec * _playbackSpeed));
+                    lastStepSeconds = stepSeconds;
                     yield return BattleViewTween.Over(stepSeconds, t =>
                     {
-                        if (view != null) view.ApplyPosition(Vector3.Lerp(from, to, t));
+                        if (view != null
+                            && (!_moveGeneration.TryGetValue(command.actorUnitId, out var c) || c == generation))
+                            view.ApplyPosition(Vector3.Lerp(from, to, t));
                     });
                 }
-                if (path.Count > 0 && view != null)
+                if (path.Count > 0 && view != null
+                    && (!_moveGeneration.TryGetValue(command.actorUnitId, out var c3) || c3 == generation))
                     view.ApplyPosition(_board.CellToWorld(path[path.Count - 1]));
 
-                // 被挡撞墙弹回：Host 已停在被挡格前（全挡=原格 / 部分挡=被挡格前一格），表现层探出再弹回
+                // 被挡撞墙弹回（启动命令恒 blocked=0——P4-E 被挡改走空 path 校正命令；保留防御位）
                 if (command.metadata == BattleCommand.MoveBlocked)
-                    yield return PlayBlockedBumpCoroutine(view, path.Count > 0 ? path[path.Count - 1] : view.Cell,
-                        command.direction, stepSeconds);
+                    yield return PlayBlockedBumpCoroutine(view,
+                        _board.CellToWorld(path.Count > 0 ? path[path.Count - 1] : view.Cell),
+                        command.direction, lastStepSeconds);
             }
             finally
             {
-                if (view != null) view.SetMoveAnimation(false); // 拆件后勿触（守卫族）
+                // P4-E 世代守卫：仅当世代仍归本补间（未被替换/校正）才收移动态与活动表——
+                // 被替换时移动态由新世代管理（防旧 finally 关掉新补间刚开的动画）
+                if (!_moveGeneration.TryGetValue(command.actorUnitId, out var curF) || curF == generation)
+                {
+                    if (view != null) view.SetMoveAnimation(false); // 拆件后勿触（守卫族）
+                    _activeMovePlayback.Remove(command.actorUnitId);
+                }
                 _meaningfulActionInFlight--; // 移动结算（正常/中断同收）
             }
         }
 
         /// <summary>
         /// 被挡撞墙弹回（2026-09-21）：向被挡方向探出后弹回原位——纯表现层反馈，逻辑位置不变。
-        /// 探出缓出挤向被挡格、弹回快出缓停，时长跟随步进节奏（0.18s/格）；
-        /// 方向换算用 MovementResolver.StepVector（8 向与 Host 步进同源，斜向=朝下一格格心等比例 45%）
+        /// 探出缓出挤向被挡格、弹回快出缓停；
+        /// 方向换算用 MovementResolver.StepVector（8 向与 Host 步进同源，斜向=朝下一格格心等比例 45%）。
+        /// P4-E：home 改世界坐标入参（被挡停点=连续 cm 位非格心——校正命令直传停点）
         /// </summary>
-        private IEnumerator PlayBlockedBumpCoroutine(UnitView view, BattleCell homeCell, int blockedDirection, float stepSeconds)
+        private IEnumerator PlayBlockedBumpCoroutine(UnitView view, Vector3 home, int blockedDirection, float stepSeconds)
         {
             // 勿用 SkillHitResolver.DirectionToDelta——十字归一映射会把斜向弹回归一到主轴（首版教训）
             var step = MovementResolver.StepVector((Direction2D)blockedDirection);
             var dir = new Vector3(step.x, 0f, step.y);
             if (dir.sqrMagnitude < 0.001f) yield break;
 
-            Vector3 home = _board.CellToWorld(homeCell);
             Vector3 peak = home + dir * 被挡撞墙探出幅度;
             // 探出：缓出减速（挤向被挡格的"尝试"感）；补间期间目标可能被拆件——lambda 内守卫（守卫族）
             yield return BattleViewTween.Over(stepSeconds * BlockedBumpOutSecondsFactor, t =>

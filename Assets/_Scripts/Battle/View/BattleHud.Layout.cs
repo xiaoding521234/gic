@@ -66,11 +66,11 @@ namespace GIC.Battle
         /// enemyinfo 已移除（2026-09-25 用户拍板「不需要显示敌人的资源等信息」）；
         /// queue 已退役（2026-09-29 拍板：攻速队列整体删除，执行阶段改 BattleExecutionPreview——存量
         /// 方案条目按未知 key 自然跳过，同 enemyinfo 先例）；
-        /// countdown 已退役（2026-10-26 拍板「不再需要显示倒计时」——底部进度线接替
-        /// 〔BattleHud.PhaseLine.cs 运行时懒建非布局槽〕，存量方案旧键自然跳过）；
-        /// confirm=完成选择按钮（2026-09-26 新增，选择阶段常显、显隐随 Update 轮询）；
-        /// preview=执行预览（2026-10-04 下移贴底批接入：执行阶段无行不可见——布局编辑模式由
-        /// _executionPreview.ShowLayoutPlaceholder 建占位行显形，可拖可缩同其它件）；
+        /// countdown 已退役（2026-10-26 拍板「不再需要显示倒计时」——底部进度线接替；进度线又随
+        /// 即时制退役〔2026-11-04 决策九十五 P4：选择时限/执行片序语义皆不存在〕，存量方案旧键自然跳过）；
+        /// confirm=完成选择按钮（P4 即时制收窄=升命待确认专用载体，显隐随 Update 轮询）；
+        /// turn/preview 已退役（2026-11-04 决策九十五 P4：回合数显示退役=战斗时钟为主显示；
+        /// 执行预览随回合机/攻速分桶退役——存量方案旧键自然跳过，prefab 槽同批删除）；
         /// quick=快捷面板（2026-10-06 拍板：左侧竖条，己方魔神/伙伴每行=头像+爆发+势力技能，
         /// 点击行=选中该角色+相机丝滑居中；常驻战斗全程不走 ApplyStateVisibility——存量方案缺条目自然回落默认位）；
         /// passive=被动技能盘（2026-10-07 拍板：选中单位的变奏/天赋等被动图标列——尺寸=主动键 70%
@@ -84,7 +84,7 @@ namespace GIC.Battle
         private static readonly string[] AllLayoutKeys =
         {
             "burst", "skill", "enso", "move", "cancel", "exit", "settings", "dimension",
-            "turn", "clock", "myinfo", "hand", "tip", "confirm", "preview", "quick", "passive",
+            "clock", "myinfo", "hand", "tip", "confirm", "quick", "passive",
         };
 
         /// <summary>
@@ -234,8 +234,7 @@ namespace GIC.Battle
 
             foreach (var def in _layoutWidgets)
                 def.plate.SetActive(true);
-            _executionPreview?.ShowLayoutPlaceholder(); // 预览无行时建占位行（否则编辑态不可见无从拖）；真实行在场则跳过
-            ShowPassiveLayoutPlaceholder();             // 被动技能盘同款占位（无选中单位时空盘不可见无从拖，2026-10-07）
+            ShowPassiveLayoutPlaceholder();             // 被动技能盘占位（无选中单位时空盘不可见无从拖，2026-10-07）
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(true); // prefab 烘焙工具栏，编辑态激活
             SelectWidget(null);
             SetTip("Battle_LayoutHint");
@@ -246,7 +245,6 @@ namespace GIC.Battle
             if (!_layoutEditing) return;
             _layoutEditing = false;
             if (_editToolbar != null) _editToolbar.gameObject.SetActive(false); // 隐藏回烘焙态（引用保留，重进即用）
-            _executionPreview?.HideLayoutPlaceholder(); // 清编辑占位行（真实行在场不受影响——ShowLayoutPlaceholder 早退未建）
             HidePassiveLayoutPlaceholder();              // 清被动盘占位（真图标/占位互斥，2026-10-07）
             foreach (var def in _layoutWidgets)
             {

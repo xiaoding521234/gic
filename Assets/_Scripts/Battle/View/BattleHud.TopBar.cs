@@ -14,19 +14,19 @@ namespace GIC.Battle
 {
     /// <summary>
     /// BattleHud 顶栏分件（2026-09-22 prefab 化：构建退役为寻址接线；结构改在 prefab 编辑器里做）：
-    /// 回合中枢/战斗时钟/我方信息块（左上角摩拉·体力物品牌计数，B6d）/设置钮
-    /// 的引用解析 + 运行时刷新。寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
+    /// 战斗时钟/我方信息块（左上角摩拉·体力物品牌计数，B6d）/设置钮的引用解析 + 运行时刷新。
+    /// 寻址依赖 Build 分件先建好的布局槽表（槽内控件名=旧构建命名）。
     /// 敌方信息块已移除（2026-09-25 拍板「不需要显示敌人的资源等信息」）；
-    /// **攻速队列条已退役（2026-09-29 拍板整体删除——执行阶段改由 BattleExecutionPreview 多行
-    /// 行动预览接管，槽/prefab 代码/布局键全清；QueueSlot.prefab 保留作预览单位块嵌套件）**；
-    /// **选择倒计时数字已退役（2026-10-26 拍板「最底部加一条进度线，参考祈愿界面，不再需要显示
-    /// 倒计时」——countdown 槽/prefab/布局键全清，接替者=BattleHud.PhaseLine.cs 底部进度线）**。
+    /// **攻速队列条已退役（2026-09-29 拍板整体删除——执行阶段多行行动预览随 2026-11-04 即时制 P4
+    /// 批整体退役〔回合机/攻速分桶不复存在〕；QueueSlot.prefab 保留=头顶条 Buff 徽章行嵌套件）**；
+    /// **选择倒计时数字已退役（2026-10-26 拍板）——其接替者底部进度线亦随即时制 P4 批退役
+    /// （选择时限/执行片序语义皆不存在，BattleHud.PhaseLine.cs 已删）**；
+    /// **回合中枢已退役（2026-11-04 决策九十五 P4：回合数显示退役=战斗时钟为主显示，turn 槽/
+    /// TurnPhaseText 随批删除）**。
     /// </summary>
     public partial class BattleHud
     {
-        // 顶栏：回合中枢 + 时钟（本地化 = TextCombiner；数字 = 静态条目）
-        private TMP_Text _turnPhaseText;
-        private TextCombiner _turnPhaseCombiner;
+        // 顶栏：战斗时钟（本地化 = TextCombiner；数字 = 静态条目）
         private TMP_Text _clockText;
         private TextCombiner _clockCombiner;
 
@@ -41,15 +41,11 @@ namespace GIC.Battle
 
         private void ResolveTopBar()
         {
-            // 回合中枢（顶部中央）：回合数 + 阶段徽章
-            _turnPhaseText = FindSlotText("turn", "TurnPhaseText");
-            _turnPhaseCombiner = FindSlotCombiner("turn", "TurnPhaseText");
-            RecolorText(_turnPhaseCombiner, Palette.文字米白);
+            // 回合中枢已退役（2026-11-04 决策九十五 P4：回合数显示退役=时钟为主显示——turn 槽随批删除）
 
-            // 选择倒计时数字已退役（2026-10-26 拍板「不再需要显示倒计时」——接替者=PhaseLine 分件
-            // 底部进度线：选择阶段随剩余时间缩短+告急红闪、执行阶段随片推进变长，见 BattleHud.PhaseLine.cs）
+            // 选择倒计时数字已退役（2026-10-26 拍板）——接替者进度线亦随即时制 P4 批退役（选择时限语义不存在）
 
-            // 战斗时钟（独立时钟 6:00 起 +20/回合）
+            // 战斗时钟（独立时钟 6:00 起 +20/回合；即时制=每秒 +1 分钟）
             _clockText = FindSlotText("clock", "ClockText");
             _clockCombiner = FindSlotCombiner("clock", "ClockText");
             RecolorText(_clockCombiner, Palette.文字米白);

@@ -167,6 +167,10 @@ MonoBehaviour:
     m_Localized: Not enough Mora
     m_Metadata:
       m_Items: []
+  - m_Id: 20
+    m_Localized: Skill on cooldown
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

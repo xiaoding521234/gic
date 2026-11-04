@@ -159,6 +159,10 @@ MonoBehaviour:
     m_Key: Battle_PurchaseNoMora
     m_Metadata:
       m_Items: []
+  - m_Id: 20
+    m_Key: Battle_SkillOnCooldown
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

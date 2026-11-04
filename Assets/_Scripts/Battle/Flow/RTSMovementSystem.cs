@@ -30,6 +30,7 @@ namespace GIC.Battle
         public int AccumSpeedCm;                // 整数速度累积器（每 tick 累积，除以 TicksPerSecond 取步）
         public bool Arrived;
         public bool Blocked;
+        public Direction2D BlockedDirection;   // P4-E 被挡方向（被挡校正命令 direction 载荷——客户端弹回表现）
     }
 
     public static class RTSMovementSystem
@@ -67,9 +68,11 @@ namespace GIC.Battle
                 SpeedCmPerSecond = speedCm,
             };
 
-            // 启动 Move 命令（旧协议格式：格路径+方向——客户端旧播放器照播；blocked=0）
+            // 启动 Move 命令（旧协议格式：格路径+方向——客户端按实际移速逐段补间〔P4-E：speedCm 载荷，
+            // 斜向段时长=距离/速度，修旧 1s/格恒速误差〕；blocked=0）
             moveCommand = BattleCommand.Move(action.unitId, 0, 0, mover.PathCells, 0,
-                (int)DirectionOfSegment(posCm.x, posCm.y, waypoints[0].x, waypoints[0].z));
+                (int)DirectionOfSegment(posCm.x, posCm.y, waypoints[0].x, waypoints[0].z),
+                mover.SpeedCmPerSecond);
             return mover;
         }
 
@@ -143,7 +146,10 @@ namespace GIC.Battle
                     // 整数方向步进（dx, dz 同比缩放——避免浮点）
                     int nx = x + (int)((long)dx * budgetStep / dist);
                     int nz = z + (int)((long)dz * budgetStep / dist);
+                    int stepFromX = x, stepFromZ = z; // P4-E：被挡方向采样（步进前位）
                     (x, z, _) = CheckBlocked(sim, mover, x, z, nx, nz, out blockedHit);
+                    if (blockedHit)
+                        mover.BlockedDirection = DirectionOfSegment(stepFromX, stepFromZ, nx, nz);
                     budgetStep = 0;
                     if (blockedHit) done = true;
                 }

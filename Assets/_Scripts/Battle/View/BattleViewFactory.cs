@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using GIC.Data;
@@ -632,6 +633,55 @@ namespace GIC.Battle
             go.AddComponent<MeshFilter>().sharedMesh = _discOutlineMesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
             return go;
+        }
+
+        /// <summary>射程环 mesh 缓存（P4-C 瞄准指示器——按 (半径mm,带宽mm) 键复用；Destroy 物体不销
+        /// mesh，§63① mesh 条款同 _discMesh/_discOutlineMesh 常驻口径）</summary>
+        private static readonly Dictionary<int, Mesh> _rangeRingMeshes = new Dictionary<int, Mesh>();
+
+        /// <summary>世界层射程环（P4-C 自由角瞄准指示器，决策九十五蓝图 §4.1）：**固定带宽**圆环 mesh
+        ///（内径=radius−带宽/2、外径=radius+带宽/2——带宽不随半径等比缩放；CreateRing 的 3.5% 比例带
+        /// 在大半径〔如安柏射程 8 格〕下会粗成 0.56 格宽带）。mesh 按 (半径mm,带宽mm) 缓存；
+        /// localScale 恒 (1,1,1)（几何已按半径烘焙）；姿态（平铺 Euler 90°X）由调用方补</summary>
+        public static GameObject CreateRangeRing(Transform parent, string name,
+            float radiusWorld, float bandWidth, Material sharedMaterial)
+        {
+            int radiusMm = Mathf.Max(50, Mathf.RoundToInt(radiusWorld * 1000f));
+            int bandMm = Mathf.Max(20, Mathf.RoundToInt(bandWidth * 1000f));
+            int key = radiusMm * 100003 + bandMm;
+            if (!_rangeRingMeshes.TryGetValue(key, out var mesh) || mesh == null)
+            {
+                const int segs = 64;
+                float rIn = (radiusMm - bandMm * 0.5f) / 1000f;
+                float rOut = (radiusMm + bandMm * 0.5f) / 1000f;
+                var vertices = new Vector3[segs * 2];
+                var triangles = new int[segs * 6];
+                for (int i = 0; i < segs; i++)
+                {
+                    float angle = 2f * Mathf.PI * i / segs;
+                    var d = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+                    vertices[i] = d * rIn;
+                    vertices[segs + i] = d * rOut;
+                    int next = (i + 1) % segs;
+                    int inA = i, inB = next, outA = segs + i, outB = segs + next;
+                    int t = i * 6;
+                    triangles[t] = inA; triangles[t + 1] = inB; triangles[t + 2] = outB;
+                    triangles[t + 3] = inA; triangles[t + 4] = outB; triangles[t + 5] = outA;
+                }
+                mesh = new Mesh { name = "BattleRangeRing_" + radiusMm + "_" + bandMm };
+                mesh.vertices = vertices;
+                mesh.triangles = triangles;
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                _rangeRingMeshes[key] = mesh;
+            }
+
+            var ring = new GameObject(name);
+            ring.transform.SetParent(parent, false);
+            ring.AddComponent<MeshFilter>().sharedMesh = mesh;
+            ring.AddComponent<MeshRenderer>().sharedMaterial = sharedMaterial;
+            SetMainWorldLayer(ring); // 维度渲染层（2026-10-25 泄漏修复：瞄准件全走工厂）
+            return ring;
         }
     }
 }

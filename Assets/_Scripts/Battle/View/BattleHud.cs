@@ -275,26 +275,49 @@ namespace GIC.Battle
 
         // ==================== 瞄准预览增强（2026-10-15 拍板：预计命中单位描边+落点玩家色光柱+方向技能箭头） ====================
 
-        /// <summary>直线技能四方向预判推荐（箭头着色单源；ComputeAimCells 直线分支填充）</summary>
-        private readonly bool[] _aimDirRecommended = new bool[4];
+        /// <summary>P4-C 自由角瞄准指示器（决策九十五蓝图 §4.1「真圆/线段/落点指示器」——取代四方向
+        /// 箭头与方向型逐格贴片）：射程环（技能=DirectionRangeCmOf cm 单源；移动=不限距无环）+方向线
+        ///（chevron 滚动带复用，自由角 yaw）+落点金圈（AoERadius 真圆/单体=受击圆柱半径；黑描边环=
+        /// 底座盘同语言）。BuildAimIndicators 建会话实例、ClearHighlights 销、RefreshAimIndicators 驱动
+        ///（着色：拖拽=待定金、点击悬停=白、静止=推荐/不推荐）</summary>
+        private GameObject _aimRangeRing;
+        private GameObject _aimBandLine;
+        private GameObject _aimLandingDisc;
+        private GameObject _aimLandingOutline;
+        private Material _aimRingMaterial;      // 射程环（瞄准推荐色半透；OnDestroy 释放）
+        private Material _aimBandMaterial;      // 方向线（chevron 纹理；tiling/滚动/着色单实例）
+        private Material _aimLandingMaterial;   // 落点金圈（瞄准已选色半透）
+        private float _aimBandScrollPhase;
+        private bool _aimBandScroll;
 
-        /// <summary>直线技能瞄准射程（EffectCompiler.DirectionRangeOf 单源——臂长/箭头长度共用，
-        /// 2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离一致」）</summary>
-        private int _aimLineRange;
+        /// <summary>当前瞄准会话射程（cm；0=移动不限距/无射程）——射程环半径/点击钳边共用</summary>
+        private int _aimRangeCm;
+
+        /// <summary>落点金圈半径（世界单位）——AoE 技能=AoERadius 真圆半径、单体=受击圆柱半径 0.25</summary>
+        private float _aimLandingRadiusWorld = 0.25f;
+
+        /// <summary>当前瞄准会话是否 LineBurst（整线迸发——伤害域=线段，无落点金圈）</summary>
+        private bool _aimIsLineBurst;
+
+        /// <summary>射程环带宽（世界单位=8cm——固定带宽不随半径缩放，CreateRing 比例带在大半径下过粗）</summary>
+        private const float 瞄准指示环带宽 = 0.08f;
+
+        /// <summary>P4-C 待定落点连续位置（cm）——拖拽=盘解析落点、点击=射程钳边落点；
+        /// FillAimVector/指示器/相机跟随优先消费（格=其含格近似）</summary>
+        private Vector2Int? _pendingAimCm;
+
+        /// <summary>P4-C 点击式方向型悬停落点（cm）——方向线/落点圈跟随鼠标（钳边后）</summary>
+        private Vector2Int? _hoverAimCm;
+
+        /// <summary>P4-C 投射物沿瞄准向首接触距离（格=世界单位；-1=无接触/非投射物——落点金圈
+        /// 骑首接触点，无接触回落射程端；迷雾过滤后不可见=回落同 -1）</summary>
+        private float _aimFirstEntryCells = -1f;
 
         /// <summary>预计命中竖线（2026-10-15 二轮拍板「每个预计命中单位各一条竖线」取代首版单条落点
         /// 光柱）：每命中单位一条软渐变竖光，色=该单位归属玩家色（与描边成对同色）；
         /// 集合变化时重建（RebuildAimHitLines）、ClearHighlights 销毁</summary>
         private readonly List<GameObject> _aimHitLines = new List<GameObject>();
         private readonly Dictionary<string, Material> _aimHitLineMats = new Dictionary<string, Material>(); // 按单位归属 playerId 缓存（OnDestroy 释放）
-
-        /// <summary>方向技能四方向箭头（chevron 滚动带+箭头头；BuildAimArrows 建/ClearHighlights 销）</summary>
-        private readonly GameObject[] _aimArrowBands = new GameObject[4];
-        private readonly GameObject[] _aimArrowHeads = new GameObject[4];
-        private readonly Material[] _aimArrowBandMats = new Material[4]; // per 方向实例（tiling/滚动独立；OnDestroy 释放）
-        private readonly Material[] _aimArrowHeadMats = new Material[4];
-        private readonly float[] _aimArrowScrollPhase = new float[4];
-        private readonly bool[] _aimArrowScroll = new bool[4];          // 悬停/待定方向滚动开关
 
         /// <summary>预计命中单位集（直线技能活动方向预判——描边刷新数据源；空集=无预览）</summary>
         private readonly HashSet<string> _aimHitUnitIds = new HashSet<string>();
@@ -444,8 +467,7 @@ namespace GIC.Battle
             _session.Player.OnItemGained += OnShopPurchaseRefreshHandler; // 购买批：物品卡购买后面板灰显/摩拉态刷新
             _session.Player.OnUnitCardGained += OnShopPurchaseRefreshHandler; // 购买批：角色/建筑卡购买后面板刷新
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
-            _session.Player.SegmentReceived += OnPhaseLineSegment;     // 底部进度线（2026-10-26）：执行阶段片计数
-            _session.Player.TurnPlanUpdated += OnPhaseLineTurnPlan;    // 底部进度线：片总数估计（分桶数+1）
+            _session.Player.SkillCasted += OnSkillCastedHandler;        // P4-D：新施放=CD 转圈即时起点
             // 单位显示色解析器注入（2026-10-12 拍板「单位显示的颜色应当是玩家色」）：立牌底座/选中描边/
             // 血条填充全链改走房间玩家色单源（roster 命中=房间选色——同队队友异色可辨识归属；
             // 无 roster 调试直开回落 BattlePalette 两表口径）——先于 BattleStart 建场注入
@@ -454,9 +476,10 @@ namespace GIC.Battle
             // 填充色**，底座/描边/弧光链路不动）：先于建场注入（OverheadBars 懒建时透传）
             _session.Player.SetHpBarColorOf(HpBarColorOf);
             // 相位/计时经 BattleSession 门面（2026-10-11 联机批）：host/本地=TurnFlowController、
-            // LAN client=消息派生——HUD 不再直接触 Flow（客户端 Flow=null）
+            // LAN client=消息派生——HUD 不再直接触 Flow（客户端 Flow=null）。
+            // P4 即时制（2026-11-04）：选择倒计时已退役（RTSFlowController 无倒计时语义）——
+            // OnSelectTimerExpired 订阅随超时自动确认链一并退役
             _session.OnPhaseChanged += OnPhaseChanged;
-            _session.OnSelectTimerExpired += OnSelectTimerExpiredHandler; // 超时=自动完成选择（统一链路）
 
             // 头顶 Buff 图标批（2026-10-06）接线：来源玩家色解析器（本端视角单源）+ 相机缩放源
             // （放大=半速率跟随、缩小=下限不缩）——层侧每帧/重建时消费；Bind 先于建场亦安全（懒取值）
@@ -466,7 +489,6 @@ namespace GIC.Battle
                 bars.PlayerColorOf = OverheadBuffSourceColor;
                 bars.CameraController = camera;
             }
-            InitExecutionPreview(); // 执行预览（2026-09-29）：TopBar 攻速队列退役后的执行阶段多行行动预览
             if (_camera != null)
                 _camera.OnBoardTap += OnBoardTap;
             if (_inputManager != null)
@@ -545,11 +567,9 @@ namespace GIC.Battle
                     _session.Player.OnItemGained -= OnShopPurchaseRefreshHandler;
                     _session.Player.OnUnitCardGained -= OnShopPurchaseRefreshHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
-                    _session.Player.SegmentReceived -= OnPhaseLineSegment;   // 底部进度线（2026-10-26）
-                    _session.Player.TurnPlanUpdated -= OnPhaseLineTurnPlan;
+                    _session.Player.SkillCasted -= OnSkillCastedHandler;       // P4-D CD 转圈
                 }
                 _session.OnPhaseChanged -= OnPhaseChanged;
-                _session.OnSelectTimerExpired -= OnSelectTimerExpiredHandler;
             }
             if (_camera != null)
                 _camera.OnBoardTap -= OnBoardTap;
@@ -564,11 +584,9 @@ namespace GIC.Battle
             foreach (var kv in _aimHitLineMats)                        // 命中竖线材质（2026-10-15 二轮；单光柱方案已废随字段删除）
                 if (kv.Value != null) Destroy(kv.Value);
             _aimHitLineMats.Clear();
-            for (int dir = 0; dir < 4; dir++)                          // 方向箭头材质×8（2026-10-15）
-            {
-                if (_aimArrowBandMats[dir] != null) Destroy(_aimArrowBandMats[dir]);
-                if (_aimArrowHeadMats[dir] != null) Destroy(_aimArrowHeadMats[dir]);
-            }
+            if (_aimRingMaterial != null) Destroy(_aimRingMaterial);       // P4-C 指示器材质（射程环/方向线/落点圈）
+            if (_aimBandMaterial != null) Destroy(_aimBandMaterial);
+            if (_aimLandingMaterial != null) Destroy(_aimLandingMaterial);
             if (_aimRadiusBlockMaterial != null)                       // 范围提示整块材质（2026-10-15）
                 Destroy(_aimRadiusBlockMaterial);
         }
@@ -711,24 +729,6 @@ namespace GIC.Battle
 
         /// <summary>执行预览组件（2026-10-04 下移贴底+自定义布局批起=Slots/preview 槽内烘焙实例；
         /// 布局编辑模式占位行=BattleExecutionPreview.Show/HideLayoutPlaceholder）</summary>
-        private BattleExecutionPreview _executionPreview;
-
-        /// <summary>执行预览装配（2026-09-29 拍板：TopBar 攻速队列退役——执行阶段中下方多行行动预览；
-        /// 2026-10-04 下移贴底+自定义布局批：实例烘焙进 BattleHud.prefab 的 Slots/preview 槽〔首子级=
-        /// ExecutionPreview 实例〕，运行时只寻址接线，摆位/缩放随布局系统槽锚点走）</summary>
-        private void InitExecutionPreview()
-        {
-            var content = _canvas.transform.Find("Slots/preview")?.GetChild(0);
-            var preview = content?.GetComponent<BattleExecutionPreview>();
-            if (preview == null)
-            {
-                GICLog.Warn("[BattleHud] 布局槽 preview 缺执行预览（BattleHud.prefab Slots/preview 首子级应为 ExecutionPreview 实例）——执行预览不显示");
-                return;
-            }
-            _executionPreview = preview;
-            preview.Init(_session, _myPlayerId);
-        }
-
         private void Update()
         {
             // 防快捷键双触发：UGUI 选中件把 Space/Enter 当 Submit 重发 onClick（KeyBindingSettingItem 同款坑）——
@@ -757,44 +757,102 @@ namespace GIC.Battle
                 bool followCenter = false;
                 if (_dragAiming && _pendingAimCell.HasValue && _board != null && _board.Map != null)
                 {
-                    followWorld = _board.CellToWorld(_pendingAimCell.Value);
+                    // P4-C：方向型拖拽跟随连续落点（cm 任意角精确）；其余（指向型）=待定格
+                    followWorld = _pendingAimCm.HasValue
+                        ? CmToWorld(_pendingAimCm.Value.x, _pendingAimCm.Value.y)
+                        : _board.CellToWorld(_pendingAimCell.Value);
                     followCenter = IsCurrentAimUnitTargeted();
                 }
                 _camera.SetDragFollowTarget(followWorld, followCenter);
             }
 
-            // 选择阶段件（docs/04 §4.2）：完成选择按钮常显+定死置灰——2026-10-11 联机批走 BattleSession
-            // 相位门面（host=Flow 权威；LAN client=消息派生本地倒数）
+            // P4 即时制（决策九十五蓝图 §2.4）：会话级收尾驱动——完成选择按钮显隐收窄=升命待确认态
+            //（EnterUpgradePending 专用确认载体——选择阶段常显/瞄准待定确认语义已随即放退役）；
+            // 技能键 CD 转圈+剩余秒数（P4-D，选中单位战技/爆发键逐帧驱动）
             if (_session == null) return;
-            var flow = _session;
-            bool selecting = flow.Phase == BattlePhase.Selecting;
-            bool show = selecting && flow.SelectRemainingSeconds >= 0f;
-            SetLayoutWidgetActive("confirm", show);  // 完成选择按钮=选择阶段常显（2026-09-26）
+            bool confirmShow = _state == HudState.Aiming && _upgradePending;
+            SetLayoutWidgetActive("confirm", confirmShow);
             if (_confirmButton != null)
                 _confirmButton.interactable = !_actionConfirmed; // 已定死置灰——再按=无操作（超时自动按下同款）
-            // 底部进度线（2026-10-26 拍板「最底部加一条进度线，参考祈愿界面，不再需要显示倒计时」：
-            // 选择阶段随剩余时间缩短+告急红闪、执行阶段随片推进变长；原倒计时数字槽随批退役）
-            UpdatePhaseLine();
+            UpdateSkillCooldowns(); // P4-D：技能键 CD 转圈+秒数（转圈数据源=SkillCasted 事件+快照校准）
+        }
+
+        // ==================== P4-D 技能 CD 转圈（决策九十五蓝图 §7「CD 转圈+剩余秒数」） ====================
+
+        /// <summary>每单位 CD 就绪时刻（realtimeSinceStartup 秒；[0]=战技/普攻槽、[1]=爆发槽）——
+        /// SkillCasted 事件即时起点+快照 attackCdRemainTicks/burstCdRemainTicks 每秒权威校准
+        ///（校准=整表重写，单位离场残留条目无消费方=无害）</summary>
+        private readonly Dictionary<string, float[]> _cdReadyAtByUnit = new Dictionary<string, float[]>();
+
+        /// <summary>技能施放事件（BattlePlayer.SkillCasted）：新施放=CD 即时起点（战技/爆发两槽；
+        /// cdTicks=施放起该技能类 CD 剩余 tick——转圈总时长=BattleMetrics 秒常量）</summary>
+        private void OnSkillCastedHandler(string unitId, SkillType skillType, int cdTicks)
+        {
+            if (cdTicks <= 0) return;
+            if (skillType != SkillType.Normal && skillType != SkillType.Burst) return;
+            if (!_cdReadyAtByUnit.TryGetValue(unitId, out var slots))
+                _cdReadyAtByUnit[unitId] = slots = new float[2];
+            slots[skillType == SkillType.Burst ? 1 : 0] =
+                Time.realtimeSinceStartup + cdTicks / (float)BattleMetrics.TicksPerSecond;
+        }
+
+        /// <summary>快照 CD 校准（每秒权威）：全单位战技/爆发剩余 tick→就绪时刻（remain=0=即刻就绪）——
+        /// 事件起点与快照校准双通道，快照恒覆盖修正漂移</summary>
+        private void RecalibrateCooldownsFromSnapshot(BattleSnapshot snapshot)
+        {
+            if (snapshot?.units == null) return;
+            float now = Time.realtimeSinceStartup;
+            foreach (var u in snapshot.units)
+            {
+                if (u == null) continue;
+                if (!_cdReadyAtByUnit.TryGetValue(u.unitId, out var slots))
+                    _cdReadyAtByUnit[u.unitId] = slots = new float[2];
+                slots[0] = now + u.attackCdRemainTicks / (float)BattleMetrics.TicksPerSecond;
+                slots[1] = now + u.burstCdRemainTicks / (float)BattleMetrics.TicksPerSecond;
+            }
+        }
+
+        /// <summary>选中单位该技能槽 CD 是否未就绪（P4-D 拦截判据——与转圈数据同源；50ms 容差防
+        /// 「显示 0 秒仍拦」秒末抖动；无记录=就绪）</summary>
+        private bool SelectedUnitSkillOnCooldown(SkillType type)
+        {
+            if (_selectedUnitId == null) return false;
+            if (!_cdReadyAtByUnit.TryGetValue(_selectedUnitId, out var slots)) return false;
+            return slots[type == SkillType.Burst ? 1 : 0] > Time.realtimeSinceStartup + 0.05f;
+        }
+
+        /// <summary>技能键 CD 转圈驱动（Update 每帧）：选中单位战技/爆发键=径向遮罩+剩余秒数；
+        /// 其余键（移动/延奏/契约）无 CD 不参与——HasCooldownVisual 防为无 CD 键空建视觉件</summary>
+        private void UpdateSkillCooldowns()
+        {
+            if (_selectedUnitId == null) return;
+            if (!_cdReadyAtByUnit.TryGetValue(_selectedUnitId, out var slots)) return;
+            float now = Time.realtimeSinceStartup;
+            foreach (var def in _skillButtons)
+            {
+                if (def?.view == null) continue;
+                int slot = def.type == SkillType.Normal ? 0 : def.type == SkillType.Burst ? 1 : -1;
+                if (slot < 0) continue;
+                float remain = slots[slot] - now;
+                if (remain > 0f || def.view.HasCooldownVisual)
+                    def.view.SetCooldown(remain, slot == 0
+                        ? BattleMetrics.CasterCooldownSeconds : BattleMetrics.BurstCooldownSeconds);
+            }
         }
 
         private void RefreshFromSnapshot(BattleSnapshot snapshot)
         {
-            if (snapshot == null || _turnPhaseText == null) return;
-
-            // 回合中枢：回合 label + 数字 + 阶段徽章（动态数字 = 静态条目拼接，语言切换随下次刷新）
-            _turnPhaseCombiner.ClearAllEntries();
-            _turnPhaseCombiner.AddEntry(new LocalizedString("UIText", "Battle_Turn"));
-            _turnPhaseCombiner.AddStaticEntry(" " + snapshot.turnNumber + " · ");
-            string phaseKey = PhaseKey(_session.Phase);
-            if (phaseKey != null)
-                _turnPhaseCombiner.AddEntry(new LocalizedString("UIText", phaseKey));
+            if (snapshot == null || _clockCombiner == null) return;
 
             // 战斗时钟（独立时钟；host=TurnFlowController 权威、LAN client=按快照回合推导——session 门面）
+            // P4（2026-11-04）：回合数显示退役=时钟为主显示（蓝图 §2.3「回合数显示退役」）——
+            // 回合中枢文本件随 turn 布局槽退役（时钟件存在性=本方法守卫）
             int minutes = _session.BattleTimeMinutes;
             _clockCombiner.SetSingleEntry($"{minutes / 60:D2}:{minutes % 60:D2}");
 
             // 我方资源 chips（左上角摩拉/体力物品牌计数，B6d；敌方资源不显示——2026-09-25 拍板）
             UpdateMyResources(snapshot);
+            RecalibrateCooldownsFromSnapshot(snapshot); // P4-D：CD 就绪时刻每秒权威校准（全单位战技/爆发）
 
             // （攻速队列条已退役 2026-09-29——执行阶段改由 BattleExecutionPreview 多行预览接管）
 
@@ -830,16 +888,7 @@ namespace GIC.Battle
             }
         }
 
-        private static string PhaseKey(BattlePhase phase)
-        {
-            switch (phase)
-            {
-                case BattlePhase.Selecting: return "Battle_SelectingPhase";
-                case BattlePhase.Resolving: return "Battle_ResolvingPhase";
-                case BattlePhase.Finished: return "Battle_Finished";
-                default: return null; // Idle：HUD 未开战不显示
-            }
-        }
+        // PhaseKey 已退役（2026-11-04 决策九十五 P4：回合中枢/阶段徽章随回合数显示退役）
 
         // ==================== 手牌与部署瞄准（B6c） ====================
 
@@ -1395,10 +1444,26 @@ namespace GIC.Battle
             switch (_state)
             {
                 case HudState.Aiming:
-                    // 点可选格=金色待定（2026-09-26 拍板：不立即提交，可反复点其它格变更，
-                    // 确认走「完成选择」按钮；2026-10-05：指定单位型同格多候选重复点击轮换目标）
-                    if (targetInBounds && _aimCells.Contains(targetCell))
+                    // P4-C 自由角域放开（决策九十五蓝图 §4.1）：方向型/移动=点板内任意格即放
+                    //（技能射程外钳到射程圆边、移动不限距走点）；其余域=原可选格判定
+                    //（单位指向/自施放/部署/物品/装备）
+                    bool freeDomain = IsFreeAngleAim();
+                    if (targetInBounds && (freeDomain || _aimCells.Contains(targetCell)))
                     {
+                        // P4-C 自由角：方向型/移动的点击落点=板面精确 cm（射程钳边；移动不限距）——
+                        // 立牌命中（precise）保持格语义（点敌立牌=朝该向）；钳边落点含格无 tile=回落原格
+                        if (freeDomain && precise == null
+                            && TryPickBoardCm(screenPos, out var tapCm, out bool cmOk) && cmOk)
+                        {
+                            var landing = ClampAimLanding(tapCm);
+                            var landingCell = BattleCell.FromCm(landing.x, landing.y);
+                            if (_board.Map.HasTile(landingCell.x, landingCell.y))
+                            {
+                                targetCell = landingCell;
+                                _pendingAimCm = landing;
+                            }
+                            else _pendingAimCm = null;
+                        }
                         HandleAimTap(targetCell, precise, snapshot);
                         // 落格轻提示（2026-09-29 追拍）：不可操作技能（敌方/眷属）、已定死或资源
                         // 不足时立即提示「不会执行」，防玩家选了却不知为何没被执行；金格照常显示
@@ -1819,6 +1884,7 @@ namespace GIC.Battle
             _state = HudState.Aiming;
             _pendingAimCell = null; // 新瞄准会话待定清零
             _pendingTargetUnitId = null; // 待定目标随会话清零（2026-10-05 指定单位型轮换）
+            _pendingAimCm = null; // P4-C 连续落点随会话清（新会话无落点）
             SetAimSelectRing(def, true);
             ClosePopup();
             CloseHandCardDetail(); // 手牌卡详情让位瞄准视线
@@ -1873,6 +1939,8 @@ namespace GIC.Battle
             _dragAiming = false; // 拖动会话统一收口（松手取消/确认提交/超时/阶段切换同一处清零）
             _dragAimVecX = 0; // P4 自由角向量随会话清（防陈旧向量污染下一次上交）
             _dragAimVecZ = 0;
+            _pendingAimCm = null; // P4-C 连续落点随会话清（防陈旧落点污染下一次上交/指示器）
+            _hoverAimCm = null;
             _upgradePending = false; // 升命待确认态随会话收口（决策五十五返拍）
             HideDragWheel();      // 圆盘随会话收口（EndDrag 已隐藏，此处=外部退出安全网，幂等）
             ClosePopup();         // 详情面板随会话收口（2026-09-27 点击循环：详情模式=瞄准+面板并开，
@@ -1961,38 +2029,15 @@ namespace GIC.Battle
         {
             _aimCells.Clear();
             _aimRecommendedCells.Clear();
-            Array.Clear(_aimDirRecommended, 0, _aimDirRecommended.Length); // 非直线分支无方向推荐（防御清）
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
 
             if (_aimDef.IsMove)
             {
-                // 移动：十字四向 × 1..N 步（全员移动技能描述=「选择十字方向其一」，2026-09-23 修正——
-                // 首版误做成米字 8 向；上限=移动技能 MoveDistance 参数——移动是特殊技能、距离数据驱动，
-                // B-S1b；客户端只做地块粗筛，体积/阻挡由 Host 结算兜底）
-                // 推荐=步进可达（如凯亚步行不可入水——水面及其后全不推荐，Host 同款停在格前）
-                // 迷雾批（2026-10-17 拍板 D4）：占用预判吃迷雾滤后快照——迷雾内敌方按不存在
-                //（「不推荐」不得泄露隐藏敌人占位；地形不可行仍如实显示=允许泄露）
-                int maxSteps = 移动技能步数上限();
-                var selfData = GetSelectedUnitData();
-                var fogSnapshot = FogFilteredSnapshot(snapshot);
-                for (int dir = 0; dir < 4; dir++)
-                {
-                    int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
-                    int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
-                    bool reachable = true; // 步进可达链（被挡即断，该向余下格全不推荐）
-                    for (int step = 1; step <= maxSteps; step++)
-                    {
-                        var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
-                        if (!_board.Map.HasTile(c.x, c.y)) break; // 虚空=可选区截止（不可选无提示）
-                        _aimCells.Add(c);
-                        if (reachable && CanMoveEnterPreview(c, sel, selfData, fogSnapshot))
-                            _aimRecommendedCells.Add(c);
-                        else
-                            reachable = false;
-                    }
-                }
+                // P4-C 移动域放开（决策九十五蓝图 §4.1「移动=点地走点不限距」）：不再产十字臂格域——
+                // 点击=任意板内格直达（Host A* 寻路权威）、拖拽=盘距比例×移动距离上限（ResolveMoveDistance
+                // 数据驱动）。旧臂格推荐分色（步进可达链）随臂域退役；落点可走性=Host 落空兜底+快照自愈
                 return;
             }
 
@@ -2032,34 +2077,10 @@ namespace GIC.Battle
                 return;
             }
 
-            // 直线型（战技/爆发）：十字 4 方向瞄准格（点方向格提交 direction；投射物路径 Host 即定）。
-            // 推荐=该方向能命中敌人（含尸体，Host 同语义）：预判走技能实例 WouldHitEnemyInDirection
-            // （SkillFactory 按 skillID 建实例，判定形态与各技能 Host 结算同源）
-            // 迷雾批（2026-10-17 拍板 D4 原话案例）：推荐预判吃迷雾滤后快照——「变为推荐色」不得
-            // 泄露该方向迷雾里有敌人
-            var previewSkill = SkillFactory.CreateWithData(skillData);
-            var fogSnapshotForLine = FogFilteredSnapshot(snapshot);
-            // 瞄准臂长=该技能投射物实际射程单源（2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离
-            // 一致」）：EffectCompiler.DirectionRangeOf 与 Host 判定同源——安柏双箭/箭雨 24（旧常量 8
-            // 明显偏短）、芭芭拉水球 5/凯亚霜袭 2/丘丘人挥棒 1（旧 8 偏长，全员一并修正）
-            _aimLineRange = EffectCompiler.DirectionRangeOf(skillData.timeline);
-            for (int dir = 0; dir < 4; dir++)
-            {
-                int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
-                int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
-                var direction = dir == 0 ? Direction2D.Right : dir == 1 ? Direction2D.Left
-                    : dir == 2 ? Direction2D.Up : Direction2D.Down;
-                bool recommended = previewSkill.WouldHitEnemyInDirection(
-                    _board.Map, fogSnapshotForLine, (TeamType)sel.team, sel.position, direction);
-                _aimDirRecommended[dir] = recommended; // 箭头着色单源（2026-10-15 箭头显示批）
-                for (int step = 1; step <= _aimLineRange; step++)
-                {
-                    var c = new BattleCell(sel.position.x + dx * step, sel.position.y + dy * step);
-                    if (!_board.Map.HasTile(c.x, c.y)) break;
-                    _aimCells.Add(c);
-                    if (recommended) _aimRecommendedCells.Add(c);
-                }
-            }
+            // P4-C 方向型（战技/爆发非指向非自施放）自由角域（决策九十五蓝图 §4.1）：不再产四方向
+            // 臂格域——点击=点目标点（射程外钳到射程圆边）、拖拽=盘向任意角+盘距比例×射程。
+            // 推荐分色/预计命中=自由角向量预判（PredictDirectionHits 向量重载）随 RefreshAimIndicators
+            // 逐帧驱动；射程 cm 真源=DirectionRangeCmOf（DirectionRangeOf 格桥 150cm 会被整除抹尾）
         }
 
         /// <summary>单位名 → UnitData（快照 unitName 为枚举名字符串；查不到返回 null——
@@ -2416,6 +2437,16 @@ namespace GIC.Battle
                     ShowBattleToast("Battle_NotEnoughResources");
                     return false;
                 }
+                // P4-D CD 拦截（决策九十五蓝图 §4.3）：战技/爆发 CD 未就绪=轻 toast 保持瞄准态
+                //（与转圈数据同源 _cdReadyAtByUnit；Host SkillExecutor gate「未就绪=落空不扣不播」权威兜底）
+                if (skillData != null
+                    && (skillData.skillType == SkillType.Normal || skillData.skillType == SkillType.Burst)
+                    && SelectedUnitSkillOnCooldown(skillData.skillType))
+                {
+                    GICLog.Info($"[BattleHud] 提交拦截：{sel.unitName} 技能冷却中");
+                    ShowBattleToast("Battle_SkillOnCooldown");
+                    return false;
+                }
             }
             else if (isMove)
             {
@@ -2527,8 +2558,18 @@ namespace GIC.Battle
                 action.aimZ = _dragAimVecZ;
                 return;
             }
-            int dx = targetCell.CenterXCm - sel.PosXCm();
-            int dz = targetCell.CenterYCm - sel.PosZCm();
+            // P4-C 点击式自由角：钳边连续落点优先（方向精度=实际点击向）；无落点缓存=落点格心
+            int dx, dz;
+            if (_pendingAimCm.HasValue)
+            {
+                dx = _pendingAimCm.Value.x - sel.PosXCm();
+                dz = _pendingAimCm.Value.y - sel.PosZCm();
+            }
+            else
+            {
+                dx = targetCell.CenterXCm - sel.PosXCm();
+                dz = targetCell.CenterYCm - sel.PosZCm();
+            }
             if (dx == 0 && dz == 0)
             {
                 action.aimX = 1000; // 原地兜底=东（与 Host 同向）
@@ -2590,6 +2631,11 @@ namespace GIC.Battle
                 var skillData = GetSelectedSkillData(_aimDef);
                 if (skillData != null && !HasSkillResources(skillData))
                     ShowBattleToast("Battle_NotEnoughResources");
+                // P4-D CD 未就绪提前提示（点格/拖拽落点即报——与提交拦截同源同文案；资源足才轮到 CD 判定）
+                else if (skillData != null
+                    && (skillData.skillType == SkillType.Normal || skillData.skillType == SkillType.Burst)
+                    && SelectedUnitSkillOnCooldown(skillData.skillType))
+                    ShowBattleToast("Battle_SkillOnCooldown");
             }
         }
 
@@ -2652,7 +2698,24 @@ namespace GIC.Battle
             }
 
             if (_state == HudState.UnitSelected)
+            {
+                // P4-C 自施放点键直接施放（蓝图 §4.1⑤——无目标自施放爆发〔凛冽轮舞〕点键=立即上交
+                // 自身格，复用 SubmitAim 全防线链；拦截=保持瞄准态可再点；拖拽路径维持盘心死区语义）
+                var selfData = GetSelectedSkillData(def);
+                if (selfData != null && selfData.IsSelfCast())
+                {
+                    EnterAiming(def);
+                    var snap = _session.Player.LatestSnapshot;
+                    var sel = snap?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+                    if (sel != null && _aimCells.Count > 0)
+                    {
+                        SetPendingAimCell(_aimCells.First());
+                        TrySubmitPendingAim();
+                    }
+                    return;
+                }
                 EnterAiming(def); // 第一次点击=瞄准模式
+            }
         }
 
         // ==================== 拖动式瞄准（B4，2026-09-26 落地；王者荣耀式手势+待定制：docs/18 决策六两方式之拖动） ====================
@@ -2776,6 +2839,8 @@ namespace GIC.Battle
             }
             if (cell.HasValue) SetPendingAimCellWithTarget(cell.Value, targetUnit);
             else ClearPendingAimCell();
+            // P4-C：自由角拖拽格内微移（同格异落点）也要驱动指示器三件+向量预判——同格幂等早退护不到
+            if (IsFreeAngleAim()) UpdateAimPreviewFx();
         }
 
         /// <summary>方向型拖动瞄准解析（轮盘内单格）：**判定基准=大盘中心**（2026-09-26 三拍
@@ -2788,6 +2853,7 @@ namespace GIC.Battle
         /// 键心死区带拍板=2026-09-26 报障返修「只拖最近的1格松开判定我空放」（docs/14 §87）。</summary>
         private BattleCell? ComputeDragAimCellFromWheel(Vector2 discLocal)
         {
+            _pendingAimCm = null; // P4-C：会话重置（死区/无效路径=无落点）
             // P4 自由角（决策九十五，蓝图 §4.1「拖拽=王者荣耀：方向+距离→松手即放、超圆钳边、拖回取消」
             // ——取代旧十字轴量化）：盘心→小盘位移=瞄准真值——方向=位移归一（任意角）、
             // 距离=盘距比例×臂长（死区缘=最近、盘缘=臂满；比例钳 0..1=超圆钳边）
@@ -2802,23 +2868,12 @@ namespace GIC.Battle
             _dragAimVecX = Mathf.RoundToInt(dir.x * 1000f);
             _dragAimVecZ = Mathf.RoundToInt(dir.y * 1000f);
 
-            // 臂长（cm）：移动=瞄准域最大格距（移动域模型保留——「不限距走点」放开挂 P4 后续批）；
-            // 线技=时轮射程单源（DirectionRangeOf 格域桥×100）
-            int rangeCm;
-            if (_aimDef != null && _aimDef.IsMove)
-            {
-                int maxStep = 0;
-                foreach (var c in _aimCells)
-                    maxStep = Mathf.Max(maxStep, Mathf.Max(
-                        Mathf.Abs(c.x - sel.position.x), Mathf.Abs(c.y - sel.position.y)));
-                if (maxStep <= 0) return null;
-                rangeCm = maxStep * CellMetrics.CellSizeCm;
-            }
-            else
-            {
-                var data = GetSelectedSkillData(_aimDef);
-                rangeCm = EffectCompiler.DirectionRangeOf(data?.timeline) * CellMetrics.CellSizeCm;
-            }
+            // 距离上限（cm，P4-C）：移动=移动技能数据驱动上限（ResolveMoveDistance=10% 移速——拖拽=
+            // 快速短距档，「不限距走点」放开的是点击式；蓝图 §4.1 拖拽=王者荣耀方向+距离）；技能=时轮
+            // 射程 cm 单源（DirectionRangeCmOf——DirectionRangeOf 格桥会把 150cm 整除抹成 100）
+            int rangeCm = _aimDef.IsMove
+                ? 移动技能步数上限() * CellMetrics.CellSizeCm
+                : EffectCompiler.DirectionRangeCmOf(GetSelectedSkillData(_aimDef)?.timeline);
             if (rangeCm <= 0) return null;
 
             // 距离=盘距比例×臂长；死区外即拖=最小距离兜底（防零距=原地无效）
@@ -2832,6 +2887,7 @@ namespace GIC.Battle
             int zCm = Mathf.RoundToInt(sel.PosZCm() + dir.y * (t * rangeCm));
             var cell = BattleCell.FromCm(xCm, zCm);
             if (!_board.Map.HasTile(cell.x, cell.y)) return null;
+            _pendingAimCm = new Vector2Int(xCm, zCm); // P4-C 连续落点缓存（指示器/FillAimVector/相机跟随消费）
             return cell;
         }
 
@@ -3372,17 +3428,6 @@ namespace GIC.Battle
             //（按钮显隐收窄挂 P4 视觉批）。提交链（含相机终结）由 TrySubmitPendingAim 统一承载
         }
 
-                /// <summary>倒计时归零=自动按下完成选择（2026-09-26 拍板「统一复用链路」**完全统一版**）：
-        /// 无条件复用 OnConfirmButtonClicked，超时与手动按下按钮**零差异**——待定金格确认提交/
-        /// 无待定上交空过；**已定死（本回合点过完成选择）则按钮同款无操作**——已确认的行动 A
-        /// 天然保留，无需任何特例。事件在 Host 超时 Pass 兜底填充**之前**同步触发——HUD 先交，
-        /// Host 兜底只填仍未交的玩家；B7 LAN 分端时 Host 兜底语义不变，客户端迟到上交按超时丢弃。</summary>
-        private void OnSelectTimerExpiredHandler(int turn)
-        {
-            GICLog.Info($"[BattleHud] 倒计时归零：{_myPlayerId} 自动按下完成选择");
-            OnConfirmButtonClicked();
-        }
-
         // ==================== 可选格高亮 + 选中标记（世界层） ====================
 
         private void ShowAimHighlights()
@@ -3390,50 +3435,49 @@ namespace GIC.Battle
             ClearHighlights();
             if (_highlightRoot == null) return;
 
-            if (IsLineSkill(_aimDef))
+            // P4-C 自由角指示器（决策九十五蓝图 §4.1「真圆/线段/落点指示器」）：方向型（战技/爆发
+            // 非指向非自施放）与移动走射程环+方向线+落点金圈三件，四方向箭头与逐格贴片域退役；
+            // 单位指向/自施放/部署/物品/装备维持逐格贴片（目标域即语义本身）
+            if (IsFreeAngleAim())
             {
-                // 直线技能（战技/爆发）=方向箭头显示（2026-10-15 拍板「只需要选择方向的不应显示
-                // 单独每个格子，应当显示箭头，并且悬停或落地后箭头持续循环滚动」）：不再逐格铺贴片，
-                // 每方向=chevron 滚动带+箭头头，长度=技能实际射程；点击/拖拽解析不变
-                // （_aimCells 仍为命中域——箭头纯视觉换代）
-                BuildAimArrows();
+                BuildAimIndicators();
+                UpdateAimPreviewFx(); // 会话初始态：无落点=指示器隐藏、预计命中描边清
+                return;
             }
-            else
-            {
-                foreach (var cell in _aimCells)
-                {
-                    // 分色（2026-09-23 拍板）：推荐/不推荐（推荐集差集；色值=BattlePalette 两字段）
-                    var material = _aimRecommendedCells.Contains(cell)
-                        ? GetAimRecommendedMaterial()
-                        : GetAimNotRecommendedMaterial();
-                    var quad = BattleViewFactory.CreateQuad(_highlightRoot,
-                        $"AimHighlight_{cell.x}_{cell.y}", material);
-                    quad.transform.position = new Vector3(
-                        _board.CellToWorld(cell).x,
-                        _board.GetDecalHeight(cell, 0.03f), // 水格含波峰带防高亮被波峰盖过（docs/14 §89 第四轮）
-                        _board.CellToWorld(cell).z);
-                    quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-                    quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
-                    // 瞄准层显式化（2026-10-15 四轮拍板：层号入 BattleMetrics 单源，消费方勿写字面量）
-                    quad.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder;
-                    _highlightQuads.Add(quad);
-                    _aimQuadByCell[cell] = quad.GetComponent<MeshRenderer>(); // 待定金格材质换装索引
-                }
 
-                // 自施放光环范围提示（2026-10-15 拍板「额外加上范围提示……不是复用现有的单格高亮，
-                // 而是完整的一块」）：技能施加带作用半径的行为族 Buff（寒冰之棱）时，以自身为中心
-                // 整块提示 (2R+1)² 格——半径智能随命座（3命 +C3Radius：0命 3×3/3命 5×5）
-                var selfCastData = _aimDef != null ? GetSelectedSkillData(_aimDef) : null;
-                if (selfCastData != null && selfCastData.IsSelfCast() && _aimCells.Count > 0)
-                {
-                    var snap = _session?.Player?.LatestSnapshot;
-                    var selState = snap != null
-                        ? snap.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
-                    int auraRadius = SelfCastAuraRadiusOf(selfCastData, selState);
-                    if (auraRadius > 0) ShowAimRadiusBlock(_aimCells.First(), auraRadius);
-                }
+            foreach (var cell in _aimCells)
+            {
+                // 分色（2026-09-23 拍板）：推荐/不推荐（推荐集差集；色值=BattlePalette 两字段）
+                var material = _aimRecommendedCells.Contains(cell)
+                    ? GetAimRecommendedMaterial()
+                    : GetAimNotRecommendedMaterial();
+                var quad = BattleViewFactory.CreateQuad(_highlightRoot,
+                    $"AimHighlight_{cell.x}_{cell.y}", material);
+                quad.transform.position = new Vector3(
+                    _board.CellToWorld(cell).x,
+                    _board.GetDecalHeight(cell, 0.03f), // 水格含波峰带防高亮被波峰盖过（docs/14 §89 第四轮）
+                    _board.CellToWorld(cell).z);
+                quad.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                quad.transform.localScale = new Vector3(0.92f, 0.92f, 1f);
+                // 瞄准层显式化（2026-10-15 四轮拍板：层号入 BattleMetrics 单源，消费方勿写字面量）
+                quad.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder;
+                _highlightQuads.Add(quad);
+                _aimQuadByCell[cell] = quad.GetComponent<MeshRenderer>(); // 待定金格材质换装索引
             }
-            UpdateAimPreviewFx(); // 会话初始态：光柱隐、预计命中描边清、箭头基色（悬停/待定起再驱动）
+
+            // 自施放光环范围提示（2026-10-15 拍板「额外加上范围提示……完整的一块」）：技能施加带
+            // 作用半径的行为族 Buff（寒冰之棱）时，以自身为中心整块提示 (2R+1)² 格——半径智能随命座
+            //（3命 +C3Radius：0命 3×3/3命 5×5）
+            var selfCastData = _aimDef != null ? GetSelectedSkillData(_aimDef) : null;
+            if (selfCastData != null && selfCastData.IsSelfCast() && _aimCells.Count > 0)
+            {
+                var snap = _session?.Player?.LatestSnapshot;
+                var selState = snap != null
+                    ? snap.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
+                int auraRadius = SelfCastAuraRadiusOf(selfCastData, selState);
+                if (auraRadius > 0) ShowAimRadiusBlock(_aimCells.First(), auraRadius);
+            }
+            UpdateAimPreviewFx(); // 会话初始态：预计命中描边清（悬停/待定起再驱动）
         }
 
         // ==================== 自施放光环范围提示（2026-10-15 拍板「额外加上范围提示……完整的一块，
@@ -3491,135 +3535,237 @@ namespace GIC.Battle
             if (_aimRadiusBlock != null) { Destroy(_aimRadiusBlock); _aimRadiusBlock = null; }
         }
 
-        // ==================== 方向箭头（直线技能瞄准显示，2026-10-15 拍板） ====================
+        // ==================== P4-C 自由角瞄准指示器（决策九十五蓝图 §4.1：射程环+方向线+落点金圈） ====================
 
-        /// <summary>建四方向箭头：每方向=chevron 滚动带（起点=施法者格缘，终点=射程内最远格远缘，
-        /// 板面虚空截断）+箭头头；四态着色由 RefreshAimArrowStates 单点重算（待定金>悬停白>
-        /// 推荐青/不推荐红——与逐格显示同语言）。臂方向无格（贴边）跳过不建</summary>
-        private void BuildAimArrows()
+        /// <summary>方向型/移动瞄准会话是否走自由角指示器（IsLineSkill=战技/爆发非指向非自施放；
+        /// 移动=不限距走点）——点击式与拖拽式共用；单位指向/自施放/部署/物品/装备维持逐格贴片域</summary>
+        private bool IsFreeAngleAim()
+            => _aimDef != null && (_aimDef.IsMove || IsLineSkill(_aimDef));
+
+        /// <summary>技能 AoE 真圆半径（cm；0=单体——仅接触命中者）：SkillParamKey.AoERadius 参数单源
+        ///（与 Host EffectCompiler 同键）——P4-C 落点金圈半径数据源</summary>
+        private static int GetSkillAoERadiusCm(SkillConfig.SkillData data)
+        {
+            if (data == null) return 0;
+            foreach (var p in data.customParams)
+                if (p != null && p.key == SkillParamKey.AoERadius && p.value > 0) return p.value;
+            return 0;
+        }
+
+        /// <summary>cm 连续位置→世界坐标（与 BattleBoard.CellToWorld 同基准：BattleCell.zero 格心
+        /// 为原点——P4-C 指示器/相机跟随的连续落点消费）</summary>
+        private Vector3 CmToWorld(int xCm, int zCm)
+        {
+            var o = _board.CellToWorld(BattleCell.zero);
+            float s = 1f / CellMetrics.CellSizeCm;
+            return new Vector3(o.x + (xCm - BattleCell.zero.CenterXCm) * s, 0f,
+                o.z + (zCm - BattleCell.zero.CenterYCm) * s);
+        }
+
+        /// <summary>世界坐标→cm 连续位置（TryPickBoardCm 消费——CellToWorld 逆运算）</summary>
+        private Vector2Int WorldToCm(Vector3 world)
+        {
+            var o = _board.CellToWorld(BattleCell.zero);
+            float s = CellMetrics.CellSizeCm;
+            return new Vector2Int(Mathf.RoundToInt((world.x - o.x) * s + BattleCell.zero.CenterXCm),
+                Mathf.RoundToInt((world.z - o.z) * s + BattleCell.zero.CenterYCm));
+        }
+
+        /// <summary>板面拾取 cm 连续点（P4-C 自由角：点击/悬停的精确落点——与 TryPickBoardCell 同
+        /// 投影链〔TileTopHeight 平面+水面精化〕，出 cm 域+所在格有效性）</summary>
+        private bool TryPickBoardCm(Vector2 screenPos, out Vector2Int cm, out bool inBounds)
+        {
+            cm = default;
+            inBounds = false;
+            if (!_camera.TryGetPlanePoint(screenPos, _board.TileTopHeight, out var world)) return false;
+            var first = _board.WorldToCell(world);
+            if (_board.Map.HasTile(first.x, first.y))
+            {
+                var surface = _board.GetSurfaceHeight(first);
+                if (surface < _board.TileTopHeight &&
+                    _camera.TryGetPlanePoint(screenPos, surface, out var refined))
+                    world = refined;
+            }
+            cm = WorldToCm(world);
+            var cell = BattleCell.FromCm(cm.x, cm.y);
+            inBounds = _board.Map.HasTile(cell.x, cell.y);
+            return true;
+        }
+
+        /// <summary>自由角落点钳边（蓝图 §4.1「射程外钳到圆边」）：技能=以施法者连续位置为圆心、
+        /// 射程为半径的圆钳；移动/无射程=不限距直通。落点含格可走性由调用方判（Host 权威兜底）</summary>
+        private Vector2Int ClampAimLanding(Vector2Int cm)
+        {
+            if (_aimRangeCm <= 0) return cm; // 移动/无射程=不限距
+            var snapshot = _session?.Player?.LatestSnapshot;
+            var sel = snapshot != null ? snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
+            if (sel == null) return cm;
+            int dx = cm.x - sel.PosXCm(), dz = cm.y - sel.PosZCm();
+            float distSq = (float)dx * dx + (float)dz * dz;
+            float rangeSq = (float)_aimRangeCm * _aimRangeCm;
+            if (distSq <= rangeSq) return cm;
+            float t = _aimRangeCm / Mathf.Sqrt(distSq);
+            return new Vector2Int(Mathf.RoundToInt(sel.PosXCm() + dx * t),
+                Mathf.RoundToInt(sel.PosZCm() + dz * t));
+        }
+
+        /// <summary>建指示器三件（会话级——ShowAimHighlights 调）：射程环（技能=DirectionRangeCmOf
+        /// cm 单源、固定带宽不随半径缩放；移动=不限距无环）+方向线（chevron 带自由角）+落点金圈
+        ///（AoERadius 真圆/单体=受击圆柱半径；黑描边环=底座盘同语言）。位置姿态随
+        /// RefreshAimIndicators 逐帧驱动</summary>
+        private void BuildAimIndicators()
         {
             var snapshot = _session.Player.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
             if (sel == null) return;
+            var data = GetSelectedSkillData(_aimDef);
+            float y = _board.TileTopHeight + 0.03f; // 与瞄准贴片同高（草顶上方恒高于水面波峰）
+
+            // 射程与落点半径：移动=不限距（无环；落点圈=受击圆柱半径）；技能=时轮射程 cm+AoE 真圆；
+            // LineBurst（整线迸发）=伤害域为线段，无落点金圈
+            _aimRangeCm = 0;
+            _aimLandingRadiusWorld = 0.25f; // 单体档=受击圆柱半径（直径 0.5 格）
+            _aimIsLineBurst = false;
+            if (!_aimDef.IsMove && data != null)
+            {
+                _aimRangeCm = EffectCompiler.DirectionRangeCmOf(data.timeline);
+                _aimIsLineBurst = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst).Count > 0;
+                int aoeCm = GetSkillAoERadiusCm(data);
+                if (aoeCm > 0) _aimLandingRadiusWorld = aoeCm / (float)CellMetrics.CellSizeCm;
+            }
+
             var origin = _board.CellToWorld(sel.position);
-            float y = _board.TileTopHeight + 0.03f; // 与瞄准格贴片同高（草顶上方恒高于水面波峰）
-            for (int dir = 0; dir < 4; dir++)
+            if (_aimRangeCm > 0)
             {
-                _aimArrowBands[dir] = null;
-                _aimArrowHeads[dir] = null;
-                int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
-                int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
-                int armLen = 0; // 板面截断后的实际臂长（<=_aimLineRange）
-                while (armLen < _aimLineRange
-                       && _board.Map.HasTile(sel.position.x + dx * (armLen + 1), sel.position.y + dy * (armLen + 1)))
-                    armLen++;
-                if (armLen == 0) continue; // 该方向贴边无臂
-                float yaw = Mathf.Atan2(-dy, dx) * Mathf.Rad2Deg; // 局部 +X（纹理 U 前进向）对准 (dx,dy)
-                var rot = Quaternion.Euler(90f, 0f, 0f) * Quaternion.Euler(0f, 0f, -yaw); // 平铺后绕法线旋（90°X 平铺坐标系）
-                float end = armLen + 0.5f;            // 最远格远缘
-                const float bandStart = 0.5f;         // 施法者格缘起（=格边——宽度 0.92 时十字双臂恰好不相接，无角点 z-fight）
-                float bandLen = end - bandStart;      // 滚动带全程铺到最远格（2026-10-15 三轮拍板「最后一格不要用箭头，改用滚动带」）
-                float mid = (bandStart + end) * 0.5f;
-                var bandMat = GetAimArrowBandMaterial(dir);
-                // 纹理设计面=1 格×1 格：tiling=(带长,1)——1 节 chevron/格、V 向黑描边随带宽等比
-                bandMat.mainTextureScale = new Vector2(bandLen, 1f);
-                var band = BattleViewFactory.CreateQuad(_highlightRoot, $"AimArrowBand_{dir}", bandMat);
-                band.transform.position = new Vector3(origin.x + dx * mid, y, origin.z + dy * mid);
-                band.transform.rotation = rot;
-                band.transform.localScale = new Vector3(bandLen, 瞄准箭头带宽, 1f);
-                band.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder; // 瞄准层（=格子贴片同层）
-                _aimArrowBands[dir] = band;
-                // 箭头头=叠加在第一格上（2026-10-15 三轮拍板「把箭头叠加在第一格上」——取代旧最远端收头：
-                // 箭头贴施法者脚下直指方向、滚动带铺完全程）。**四轮拍板：与带分显式层**——同序透明件按
-                // 包围盒中心距相机排序=下方向带中心更近相机恒把头盖住（方向依赖翻车，0.001 微抬敌不过
-                // 整段长带的中心偏移已删）；头=叠加层恒在带上（BattleMetrics.AimOverlayTopSortingOrder 单源）
-                var head = BattleViewFactory.CreateQuad(_highlightRoot, $"AimArrowHead_{dir}",
-                    GetAimArrowHeadMaterial(dir));
-                head.transform.position = new Vector3(origin.x + dx, y, origin.z + dy); // 第一格中心
-                head.transform.rotation = rot;
-                head.transform.localScale = new Vector3(0.92f, 瞄准箭头带宽, 1f);
-                head.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlayTopSortingOrder;
-                _aimArrowHeads[dir] = head;
+                if (_aimRingMaterial == null)
+                    _aimRingMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(Palette.瞄准推荐色);
+                var ringColor = Palette.瞄准推荐色; ringColor.a *= 0.45f;
+                _aimRingMaterial.color = ringColor; // 环体恒半透
+                _aimRangeRing = BattleViewFactory.CreateRangeRing(_highlightRoot, "AimRangeRing",
+                    _aimRangeCm / (float)CellMetrics.CellSizeCm, 瞄准指示环带宽, _aimRingMaterial);
+                _aimRangeRing.transform.position = new Vector3(origin.x, y, origin.z);
+                _aimRangeRing.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                _aimRangeRing.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimRadiusBlockSortingOrder;
             }
+
+            if (_aimBandMaterial == null)
+            {
+                _aimBandMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(Color.white);
+                _aimBandMaterial.mainTexture = BattleViewFactory.AimArrowBandTexture; // chevron 带纹理复用
+            }
+            _aimBandLine = BattleViewFactory.CreateQuad(_highlightRoot, "AimBandLine", _aimBandMaterial);
+            _aimBandLine.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder;
+            _aimBandLine.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+            if (_aimLandingMaterial == null)
+                _aimLandingMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(Palette.瞄准已选色);
+            var discColor = Palette.瞄准已选色; discColor.a *= 0.5f;
+            _aimLandingMaterial.color = discColor;
+            _aimLandingDisc = BattleViewFactory.CreateDisc(_highlightRoot, "AimLandingDisc", _aimLandingMaterial);
+            _aimLandingDisc.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlaySortingOrder;
+            _aimLandingDisc.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            _aimLandingOutline = BattleViewFactory.CreateRing(_highlightRoot, "AimLandingOutline",
+                BattleViewFactory.DiscOutlineMaterial);
+            _aimLandingOutline.GetComponent<MeshRenderer>().sortingOrder = BattleMetrics.AimOverlayTopSortingOrder;
+            _aimLandingOutline.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
-        /// <summary>箭头四态重算（待定金 > 悬停白 > 推荐青/不推荐红——与逐格三态同语言）+
-        /// 滚动开关（待定/悬停方向 chevron 持续滚动）。调用点=UpdateAimPreviewFx 单点</summary>
-        private void RefreshAimArrowStates()
+        /// <summary>活动落点 cm（拖拽=待定落点；点击式=悬停落点〔钳边后〕优先、无悬停回落待定）</summary>
+        private Vector2Int? ActiveLandingCm()
         {
-            if (!IsLineSkill(_aimDef)) return;
-            int hoverDir = _dragAiming ? -1 : ActiveAimDirection(_hoverAimCell);
-            int pendingDir = ActiveAimDirection(_pendingAimCell);
-            for (int dir = 0; dir < 4; dir++)
-            {
-                _aimArrowScroll[dir] = false;
-                var bandMat = _aimArrowBandMats[dir];
-                if (bandMat == null || _aimArrowBands[dir] == null) continue; // 该方向无臂
-                bool pending = dir == pendingDir;
-                bool hover = !pending && dir == hoverDir;
-                Color c = pending ? Palette.瞄准已选色
-                    : hover ? Palette.瞄准悬停色
-                    : _aimDirRecommended[dir] ? Palette.瞄准推荐色 : Palette.瞄准不推荐色;
-                bandMat.color = c;
-                _aimArrowHeadMats[dir].color = c;
-                _aimArrowScroll[dir] = pending || hover;
-            }
+            if (!IsFreeAngleAim()) return null;
+            if (_dragAiming) return _pendingAimCm;
+            return _hoverAimCm ?? _pendingAimCm;
         }
 
-        private Material GetAimArrowBandMaterial(int dir)
+        /// <summary>指示器逐帧驱动（UpdateAimPreviewFx 单点调）：方向线姿态=施法者→落点自由角
+        ///（chevron tiling=带长）；落点金圈=AoE 真圆半径（LineProjectile=骑首个预计接触点、无接触=
+        /// 射程端〔本类投射物距离不受盘距影响——盘只定向〕；LineBurst=无落点圈〔伤害域=整线〕；
+        /// 移动=盘距落点）；无落点=两件隐藏。着色：拖拽=待定金、点击悬停=白、静止=推荐/不推荐</summary>
+        private void RefreshAimIndicators()
         {
-            if (_aimArrowBandMats[dir] == null)
-            {
-                _aimArrowBandMats[dir] = BattleViewFactory.CreateTransparentUnlitMaterial(Color.white);
-                _aimArrowBandMats[dir].mainTexture = BattleViewFactory.AimArrowBandTexture;
-            }
-            return _aimArrowBandMats[dir];
-        }
+            if (_aimBandLine == null) return; // 非自由角会话（未建指示器）
+            var snapshot = _session?.Player?.LatestSnapshot;
+            var sel = snapshot != null ? snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
+            var landing = ActiveLandingCm();
+            bool show = sel != null && landing.HasValue;
+            _aimBandScroll = show;
+            _aimBandLine.SetActive(show);
+            bool showDisc = show && !_aimIsLineBurst;
+            if (_aimLandingDisc != null) _aimLandingDisc.SetActive(showDisc);
+            if (_aimLandingOutline != null) _aimLandingOutline.SetActive(showDisc);
+            if (!show) return;
 
-        private Material GetAimArrowHeadMaterial(int dir)
-        {
-            if (_aimArrowHeadMats[dir] == null)
+            var from = _board.CellToWorld(sel.position);
+            var toWorld = CmToWorld(landing.Value.x, landing.Value.y);
+            Vector2 delta = new Vector2(toWorld.x - from.x, toWorld.z - from.z);
+            float dist = delta.magnitude;
+            if (dist < 0.05f)
             {
-                _aimArrowHeadMats[dir] = BattleViewFactory.CreateTransparentUnlitMaterial(Color.white);
-                _aimArrowHeadMats[dir].mainTexture = BattleViewFactory.AimArrowHeadTexture;
+                _aimBandLine.SetActive(false);
+                _aimBandScroll = false;
+                if (_aimLandingDisc != null) _aimLandingDisc.SetActive(false);
+                if (_aimLandingOutline != null) _aimLandingOutline.SetActive(false);
+                return;
             }
-            return _aimArrowHeadMats[dir];
+            var dir = delta / dist;
+
+            // 带终点：LineBurst/投射物=铺到射程端（虚空截断——方向线即实际弹道，盘距不缩带）；移动=到落点
+            float bandEnd;
+            if (_aimDef.IsMove) bandEnd = Mathf.Max(0.8f, dist);
+            else if (_aimRangeCm > 0)
+            {
+                float range = _aimRangeCm / (float)CellMetrics.CellSizeCm;
+                bandEnd = range;
+                for (float t = 0.5f; t <= range; t += 0.5f) // 沿向 0.5 步进虚空截断（与 Host 同语义）
+                {
+                    var p = new Vector2(from.x, from.z) + dir * t;
+                    var stepCell = _board.WorldToCell(new Vector3(p.x, 0f, p.y));
+                    if (!_board.Map.HasTile(stepCell.x, stepCell.y)) { bandEnd = t - 0.25f; break; }
+                }
+            }
+            else bandEnd = dist;
+
+            const float bandStart = 0.5f; // 施法者格缘起（与旧箭头带同锚）
+            if (bandEnd <= bandStart + 0.3f) bandEnd = bandStart + 0.3f;
+            float bandLen = bandEnd - bandStart;
+            float yaw = Mathf.Atan2(-dir.y, dir.x) * Mathf.Rad2Deg;
+            var rot = Quaternion.Euler(90f, 0f, 0f) * Quaternion.Euler(0f, 0f, -yaw); // 平铺后绕法线旋（同旧带）
+            float mid = (bandStart + bandEnd) * 0.5f;
+            _aimBandMaterial.mainTextureScale = new Vector2(bandLen, 1f); // 1 节 chevron/格
+            _aimBandLine.transform.position = new Vector3(from.x + dir.x * mid,
+                _board.TileTopHeight + 0.03f, from.z + dir.y * mid);
+            _aimBandLine.transform.rotation = rot;
+            _aimBandLine.transform.localScale = new Vector3(bandLen, 瞄准箭头带宽, 1f);
+
+            // 落点金圈：LineProjectile=骑首个预计接触点（无接触=射程端）；移动=盘距落点
+            Vector2 discPoint;
+            if (!_aimDef.IsMove && !_aimIsLineBurst && _aimFirstEntryCells >= 0f)
+                discPoint = new Vector2(from.x, from.z) + dir * _aimFirstEntryCells;
+            else discPoint = new Vector2(toWorld.x, toWorld.z);
+            var discCell = _board.WorldToCell(new Vector3(discPoint.x, 0f, discPoint.y));
+            var discPos = new Vector3(discPoint.x, _board.GetDecalHeight(discCell, 0.03f), discPoint.y);
+            _aimLandingDisc.transform.position = discPos;
+            _aimLandingOutline.transform.position = discPos;
+            _aimLandingDisc.transform.localScale = new Vector3(_aimLandingRadiusWorld * 2f, _aimLandingRadiusWorld * 2f, 1f);
+            _aimLandingOutline.transform.localScale = new Vector3(_aimLandingRadiusWorld * 2f, _aimLandingRadiusWorld * 2f, 1f);
+
+            // 着色（拖拽=待定金 > 点击悬停白 > 静止推荐/不推荐——推荐=该角度预计命中非空）
+            Color c = _dragAimVecX != 0 || _dragAimVecZ != 0 ? Palette.瞄准已选色
+                : _dragAiming || _hoverAimCm.HasValue ? Palette.瞄准悬停色
+                : _aimHitUnitIds.Count > 0 ? Palette.瞄准推荐色 : Palette.瞄准不推荐色;
+            _aimBandMaterial.color = c;
         }
 
         // ==================== 瞄准预览增强（光柱+预计命中描边，2026-10-15 拍板） ====================
 
-        /// <summary>活动瞄准格：拖动会话=金色待定格；点击式=悬停格优先（无悬停回落待定格）。
-        /// 光柱与预计命中预览的驱动真值（拍板「悬停时就应该显示」「点击或拖拽两种瞄准都需要」）</summary>
-        private BattleCell? ActiveAimCell()
-        {
-            if (_state != HudState.Aiming) return null;
-            return _dragAiming ? _pendingAimCell : (_hoverAimCell ?? _pendingAimCell);
-        }
-
-        /// <summary>该格在选中单位十字臂上的方向索引（0=右 1=左 2=上 3=下；不在臂上=-1）</summary>
-        private int ActiveAimDirection(BattleCell? cell)
-        {
-            if (!cell.HasValue || _selectedUnitId == null) return -1;
-            var snapshot = _session?.Player?.LatestSnapshot;
-            var sel = snapshot != null
-                ? snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
-            if (sel == null) return -1;
-            int dx = cell.Value.x - sel.position.x, dy = cell.Value.y - sel.position.y;
-            if (dy == 0 && dx > 0) return 0;
-            if (dy == 0 && dx < 0) return 1;
-            if (dx == 0 && dy > 0) return 2;
-            if (dx == 0 && dy < 0) return 3;
-            return -1;
-        }
-
-        /// <summary>瞄准预览总刷新（悬停/待定变化单点调）：预计命中单位描边+逐单位竖线+箭头四态。
-        /// 直线技能=方向预判命中单位；其余瞄准形态（部署/移动/指向/自施放）无命中预览（2026-10-15
-        /// 二轮拍板：竖线=每个预计命中单位各一条，落点单光柱方案已废）</summary>
+        /// <summary>瞄准预览总刷新（悬停/待定变化单点调）：预计命中单位描边+逐单位竖线+自由角指示器。
+        /// 非自由角形态（部署/指向/自施放）指示器自守卫（RefreshAimIndicators 空引用早退）</summary>
         private void UpdateAimPreviewFx()
         {
             if (_session == null) return;
             UpdateAimHitPreview();
-            RefreshAimArrowStates();
+            RefreshAimIndicators(); // P4-C 自由角指示器（方向型/移动；其余型内部自守卫）
         }
 
         /// <summary>预计命中竖线材质（按单位归属 playerId 缓存——同玩家多单位共享一实例；
@@ -3692,33 +3838,37 @@ namespace GIC.Battle
             return forward.sqrMagnitude > 0.001f ? Quaternion.LookRotation(forward, Vector3.up) : Quaternion.identity;
         }
 
-        /// <summary>预计命中单位描边预览（拍板「对预计有效单位高亮描边（复用现有高亮描边）」）：
-        /// 仅直线技能——活动瞄准格所在方向的静态预判命中单位（EffectCompiler.PredictDirectionHits
-        /// 与 Host 判定同形，含尸体=完全算判定同口径）；集合无变化零刷新（拖动逐帧防抖）。
-        /// 非直线技能/无方向=清空</summary>
+        /// <summary>预计命中单位描边预览（P4-C 自由角向量版）：沿瞄准向量的弹道/线段预判
+        ///（与 Host 判定同形——LineProjectile=射线×受击圆、LineBurst=射程线段×受击圆；含尸体=
+        /// 完全算判定同口径）；集合无变化零刷新（拖动逐帧防抖）。非自由角/无落点=清空</summary>
         private void UpdateAimHitPreview()
         {
             _aimHitScratch.Clear();
-            if (IsLineSkill(_aimDef))
+            _aimFirstEntryCells = -1f;
+            if (IsFreeAngleAim())
             {
                 var snapshot = _session?.Player?.LatestSnapshot;
                 var sel = snapshot != null
                     ? snapshot.units.FirstOrDefault(u => u.unitId == _selectedUnitId) : null;
-                int dir = sel != null ? ActiveAimDirection(ActiveAimCell()) : -1;
-                if (dir >= 0 && _board != null && _board.Map != null)
+                var landing = ActiveLandingCm();
+                if (sel != null && landing.HasValue && _board != null && _board.Map != null)
                 {
                     var skill = AimPreviewSkill();
                     if (skill != null)
                     {
-                        var direction = dir == 0 ? Direction2D.Right : dir == 1 ? Direction2D.Left
-                            : dir == 2 ? Direction2D.Up : Direction2D.Down;
+                        var v = SkillHitResolver.NormalizePerMille(
+                            landing.Value.x - sel.PosXCm(), landing.Value.y - sel.PosZCm());
+                        if (v.x == 0 && v.y == 0) v = new Vector2Int(1000, 0); // 零向量兜底=东（与 Host 同向）
                         EffectCompiler.PredictDirectionHits(skill.Timeline, _board.Map, snapshot,
-                            (TeamType)sel.team, sel.position, direction, _aimHitScratch);
+                            (TeamType)sel.team, sel.position, v.x, v.y, _aimHitScratch, out _aimFirstEntryCells);
                         // 迷雾批（2026-10-17，拍板 D4 原话案例）：迷雾内敌方不进预判集合——预计命中
-                        // 描边/命中竖线/方向带推荐色三消费方同源于此，一处后滤全链零泄露
+                        // 描边/命中竖线/落点圈三消费方同源于此，一处后滤全链零泄露；首接触被滤=落点回落射程端
                         for (int i = _aimHitScratch.Count - 1; i >= 0; i--)
                             if (!FogVisible(_aimHitScratch[i]))
+                            {
                                 _aimHitScratch.RemoveAt(i);
+                                _aimFirstEntryCells = -1f;
+                            }
                     }
                 }
             }
@@ -3753,19 +3903,16 @@ namespace GIC.Battle
             return _aimPreviewSkill;
         }
 
-        /// <summary>瞄准增强动画推进（Update 每帧，Aiming 态）：悬停/待定方向 chevron 持续循环滚动
-        /// +命中竖线亮度呼吸</summary>
+        /// <summary>瞄准增强动画推进（Update 每帧，Aiming 态）：方向线 chevron 持续循环滚动
+        ///（P4-C 自由角单带）+命中竖线亮度呼吸</summary>
         private void UpdateAimFxAnimation()
         {
             if (_state != HudState.Aiming) return;
             float dt = Time.deltaTime;
-            for (int dir = 0; dir < 4; dir++)
+            if (_aimBandScroll && _aimBandMaterial != null)
             {
-                if (!_aimArrowScroll[dir]) continue;
-                var m = _aimArrowBandMats[dir];
-                if (m == null) continue;
-                _aimArrowScrollPhase[dir] += dt * 瞄准箭头滚动速度;
-                m.mainTextureOffset = new Vector2(-_aimArrowScrollPhase[dir], 0f); // 负向=沿箭头方向流出
+                _aimBandScrollPhase += dt * 瞄准箭头滚动速度;
+                _aimBandMaterial.mainTextureOffset = new Vector2(-_aimBandScrollPhase, 0f); // 负向=沿方向线流出
             }
             if (_aimHitLines.Count > 0)
             {
@@ -3821,6 +3968,7 @@ namespace GIC.Battle
             if (!_pendingAimCell.HasValue) return;
             var old = _pendingAimCell;
             _pendingAimCell = null;
+            _pendingAimCm = null; // P4-C 连续落点随待定清（方向型指示器随隐）
             RefreshCellVisual(old.Value);
             if (_pendingTargetUnitId != null)
             {
@@ -3838,24 +3986,36 @@ namespace GIC.Battle
         private Material _aimHoverMaterial; // 悬停提亮（色=BattlePalette.瞄准悬停色）
 
         /// <summary>点击式瞄准悬停轮询（Update 调）：Aiming 态且非拖动会话时鼠标所在可选格=悬停提亮；
-        /// 拖动会话中恒无悬停（拖动有金格/头像反馈，指针语义不同）</summary>
+        /// 拖动会话中恒无悬停（拖动有金格/头像反馈，指针语义不同）。P4-C 自由角（方向型/移动）：
+        /// 悬停=板面精确 cm 落点（射程钳边；移动不限距）——指示器三件跟随鼠标，无格高亮</summary>
         private void UpdateAimHover()
         {
             BattleCell? hover = null;
+            Vector2Int? hoverCm = null;
             if (_state == HudState.Aiming && !_dragAiming && _camera != null && _board != null && _board.Map != null)
             {
-                if (TryPickBoardCell(Input.mousePosition, out var cell, out bool inBounds)
+                if (IsFreeAngleAim())
+                {
+                    // P4-C 自由角点击式悬停：cm 落点跟随鼠标（钳边）——方向线/落点金圈/预计命中随动
+                    if (TryPickBoardCm(Input.mousePosition, out var freeCm, out bool cmInBounds) && cmInBounds)
+                        hoverCm = ClampAimLanding(freeCm);
+                }
+                else if (TryPickBoardCell(Input.mousePosition, out var cell, out bool inBounds)
                     && inBounds && _aimCells.Contains(cell))
                     hover = cell;
             }
+            // 悬停未变零操作（格与 cm 双轨比对）
             if (_hoverAimCell.HasValue == hover.HasValue
-                && (!hover.HasValue || _hoverAimCell.Value.Equals(hover.Value)))
-                return; // 悬停未变零操作
+                && (!hover.HasValue || _hoverAimCell.Value.Equals(hover.Value))
+                && _hoverAimCm.HasValue == hoverCm.HasValue
+                && (!hoverCm.HasValue || _hoverAimCm.Value.Equals(hoverCm.Value)))
+                return;
             var old = _hoverAimCell;
             _hoverAimCell = hover;
+            _hoverAimCm = hoverCm;
             if (old.HasValue) RefreshCellVisual(old.Value);
             if (hover.HasValue) RefreshCellVisual(hover.Value);
-            UpdateAimPreviewFx(); // 悬停变化驱动光柱/预计命中描边/箭头态（2026-10-15 瞄准预览批）
+            UpdateAimPreviewFx(); // 悬停变化驱动预计命中描边/自由角指示器（2026-10-15 瞄准预览批+P4-C）
         }
 
         /// <summary>该格材质按三态重算（待定金 > 悬停提亮 > 推荐/不推荐；quad 缺失安全跳过）</summary>
@@ -3900,13 +4060,14 @@ namespace GIC.Battle
             _highlightQuads.Clear();
             _aimQuadByCell.Clear();
             HideAimRadiusBlock(); // 范围提示整块随会话收口（2026-10-15）
-            // 瞄准增强件随会话收口（2026-10-15）：箭头销毁、命中竖线销毁、预计命中描边清
-            for (int dir = 0; dir < 4; dir++)
-            {
-                if (_aimArrowBands[dir] != null) { Destroy(_aimArrowBands[dir]); _aimArrowBands[dir] = null; }
-                if (_aimArrowHeads[dir] != null) { Destroy(_aimArrowHeads[dir]); _aimArrowHeads[dir] = null; }
-                _aimArrowScroll[dir] = false;
-            }
+            // 瞄准增强件随会话收口（P4-C）：指示器三件（射程环/方向线/落点圈+描边环）销毁、
+            // 命中竖线销毁、预计命中描边清
+            if (_aimRangeRing != null) { Destroy(_aimRangeRing); _aimRangeRing = null; }
+            if (_aimBandLine != null) { Destroy(_aimBandLine); _aimBandLine = null; }
+            if (_aimLandingDisc != null) { Destroy(_aimLandingDisc); _aimLandingDisc = null; }
+            if (_aimLandingOutline != null) { Destroy(_aimLandingOutline); _aimLandingOutline = null; }
+            _aimBandScroll = false;
+            _hoverAimCm = null;
             foreach (var line in _aimHitLines)
                 if (line != null) Destroy(line);
             _aimHitLines.Clear();

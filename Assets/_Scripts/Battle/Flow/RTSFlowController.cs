@@ -132,6 +132,10 @@ namespace GIC.Battle
             if (Phase != BattlePhase.Selecting) return;
             int second = TurnNumber;
 
+            // Host 探索账本同步（决策七十九 P4 适配：旧「BeginSelectPhase 单钩」随回合机退役——
+            // 决策时态同步语义秒化为每 AI 节拍揭雾；客户端表现层逐帧揭雾不受影响）
+            _sim.RevealFog();
+
             // 眷属脑（1~2★ 启发式）+ 伙伴脑（3~4★ 评分制——感知窗口内玩家上交行动）
             var actions = new List<ActionData>();
             actions.AddRange(FamiliarBrain.DecideAll(_sim, second));

@@ -1009,6 +1009,18 @@ namespace GIC.Battle
             => clipMaxRangeCm > 0 ? clipMaxRangeCm / CellMetrics.CellSizeCm
                 : ProjectileRule.MaxRange / CellMetrics.CellSizeCm;
 
+        /// <summary>P4-C 方向技能射程（cm 精确，决策九十五蓝图 §4.1——瞄准射程环/落点钳边消费）：
+        /// 与 <see cref="DirectionRangeOf"/> 同源但跳过格桥整除（150cm 类值格桥会抹成 100）；
+        /// LineProjectile/LineBurst=clip.maxRange；缺=ProjectileRule.MaxRange</summary>
+        public static int DirectionRangeCmOf(SkillTimelineAsset timeline)
+        {
+            var projClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile);
+            if (projClips.Count > 0 && projClips[0].maxRange > 0) return projClips[0].maxRange;
+            var burstClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineBurst);
+            if (burstClips.Count > 0 && burstClips[0].maxRange > 0) return burstClips[0].maxRange;
+            return ProjectileRule.MaxRange;
+        }
+
         /// <summary>方向命中预判按判定 kind 派发：LineProjectile=投射物圆柱接触静态形态、
         /// LineBurst/无轨=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）。
         /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2：casterTeam=施法者队伍，2v2 不再误伤判定队友）</summary>
@@ -1038,6 +1050,99 @@ namespace GIC.Battle
                 return;
             }
             PredictLineSegmentHits(map, snapshot, casterTeam, from, direction, DirectionRangeOf(timeline), into);
+        }
+
+        /// <summary>P4-C 自由角方向预计命中（决策九十五蓝图 §4.1——瞄准向量版，任意角）：与
+        /// <see cref="PredictDirectionHits(SkillTimelineAsset, BattleMapData, BattleSnapshot, TeamType, BattleCell, Direction2D, List{UnitState})"/>
+        /// 同形派发——LineProjectile=弹道穿过的全部敌方受击圆柱（含尸体）；LineBurst=射程线段×受击圆
+        ///（SegmentTouchesUnitCircle 与 Host CompileLineBurstSegment 同源）。into 先清后填。
+        /// firstEntryCells=LineProjectile 沿向首个接触距离（**格=世界单位**；-1=无接触——HUD 落点
+        /// 圆消费：AoE 圈骑首接触点，无接触回落射程端）；LineBurst 恒 -1（伤害域=整线无落点语义）</summary>
+        public static void PredictDirectionHits(SkillTimelineAsset timeline, BattleMapData map,
+            BattleSnapshot snapshot, TeamType casterTeam, BattleCell from, int aimX, int aimZ,
+            List<UnitState> into, out float firstEntryCells)
+        {
+            into.Clear();
+            firstEntryCells = -1f;
+            if (timeline == null) return;
+            var v = SkillHitResolver.NormalizePerMille(aimX, aimZ);
+            if (v.x == 0 && v.y == 0) v = new Vector2Int(1000, 0); // 零向量兜底=东（与 AimVectorOf 同向）
+            var dir = new Vector2(v.x, v.y) / 1000f;
+            var projClips = SkillTimelineQuery.JudgmentClips(timeline, SkillJudgmentKind.LineProjectile);
+            if (projClips.Count > 0)
+            {
+                PredictProjectileHits(map, snapshot, casterTeam, from, dir, projClips[0], into, out firstEntryCells);
+                return;
+            }
+            PredictLineSegmentHits(map, snapshot, casterTeam, from, dir, DirectionRangeOf(timeline), into);
+        }
+
+        /// <summary>P4-C 投射物圆柱接触预判·向量版（弹道+maxDist 与 WouldHitProjectile 同式；虚空截断=
+        /// 沿向 0.5 步进采样首 void 格近缘）；敌方圆心=快照格心（移动中命中不可预知，属提示非校验）</summary>
+        private static void PredictProjectileHits(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
+            BattleCell from, Vector2 dir, SkillTimelineClip clip, List<UnitState> into, out float firstEntryCells)
+        {
+            firstEntryCells = -1f;
+            bool skillOverride = clip != null && clip.hitDiameter > 0f;
+            int maxRange = RangeCellsOf(clip != null ? clip.maxRange : 0);
+
+            float maxDist = maxRange + 0.5f;
+            var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
+            for (float t = 0.5f; t <= maxRange; t += 0.5f)
+            {
+                var p = origin + dir * t;
+                if (map.HasTile(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y))) continue;
+                maxDist = t - 0.25f; // 首个虚空格近边界=弹道截断
+                break;
+            }
+
+            foreach (var enemy in snapshot.MainWorldUnits()) // 主世界域单源（②④迁移：灵魂维度隔离判据收口）
+            {
+                if ((TeamType)enemy.team == casterTeam) continue; // 含尸体——尸体完全算判定；敌我=TeamType（C2）
+                float radius = (skillOverride ? clip.hitDiameter : BattleMetrics.CylinderDiameterOf(enemy)) * 0.5f;
+                var rel = new Vector2(enemy.position.x + 0.5f, enemy.position.y + 0.5f) - origin;
+                float entry;
+                if (rel.sqrMagnitude <= radius * radius)
+                    entry = 0f; // 发射即贴脸（同格堆叠）
+                else
+                {
+                    float along = Vector2.Dot(rel, dir);
+                    float perpSq = rel.sqrMagnitude - along * along;
+                    if (perpSq > radius * radius) continue; // 弹道不穿该圆柱
+                    entry = along - Mathf.Sqrt(radius * radius - perpSq);
+                }
+                if (entry >= 0f && entry <= maxDist)
+                {
+                    into.Add(enemy);
+                    if (firstEntryCells < 0f || entry < firstEntryCells) firstEntryCells = entry;
+                }
+            }
+        }
+
+        /// <summary>P4-C 整线预判·向量版（射程线段×受击圆——SegmentTouchesUnitCircle 与 Host
+        /// CompileLineBurstSegment 同源，取代方向版逐格 FindEnemiesAt 的格域近似）；虚空截断同上</summary>
+        private static void PredictLineSegmentHits(BattleMapData map, BattleSnapshot snapshot, TeamType casterTeam,
+            BattleCell from, Vector2 dir, int maxRange, List<UnitState> into)
+        {
+            var origin = new Vector2(from.x + 0.5f, from.y + 0.5f);
+            float maxDist = maxRange;
+            for (float t = 0.5f; t <= maxRange; t += 0.5f)
+            {
+                var p = origin + dir * t;
+                if (map.HasTile(Mathf.FloorToInt(p.x), Mathf.FloorToInt(p.y))) continue;
+                maxDist = t - 0.25f; // 首个虚空格近边界=线段截断
+                break;
+            }
+            var end = origin + dir * maxDist;
+            int axCm = Mathf.RoundToInt(origin.x * CellMetrics.CellSizeCm);
+            int azCm = Mathf.RoundToInt(origin.y * CellMetrics.CellSizeCm);
+            int bxCm = Mathf.RoundToInt(end.x * CellMetrics.CellSizeCm);
+            int bzCm = Mathf.RoundToInt(end.y * CellMetrics.CellSizeCm);
+            foreach (var enemy in snapshot.MainWorldUnits())
+            {
+                if ((TeamType)enemy.team == casterTeam) continue;
+                if (SegmentTouchesUnitCircle(axCm, azCm, bxCm, bzCm, enemy)) into.Add(enemy);
+            }
         }
 
         /// <summary>投射物圆柱接触预判的命中单位枚举版（弹道+maxDist 与 WouldHitProjectile 同式）；

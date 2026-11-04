@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using GIC.Battle;
 using GIC.Data;
 using GIC.Tool;
@@ -142,6 +143,110 @@ namespace GIC.UI
         /// <summary>RGB 乘暗系数、alpha 保持（Color 运算符连 alpha 一起乘=变透明，非本拍板语义）</summary>
         private static Color Darken(Color c, float factor) =>
             new Color(c.r * factor, c.g * factor, c.b * factor, c.a);
+
+        // ==================== P4-D CD 转圈（决策九十五蓝图 §7「CD 转圈+剩余秒数」） ====================
+
+        private Image _cdOverlay;        // 懒建：Radial360 暗半透扇形（Icon 区整圆覆盖、按钮内最顶）
+        private TMP_Text _cdSecondsText; // 懒建：剩余秒数（整数向上取整）
+        private static Sprite _cdCircleSprite;
+
+        /// <summary>是否已建 CD 视觉件（消费方防每帧空写——无 CD 键永不懒建）</summary>
+        public bool HasCooldownVisual => _cdOverlay != null;
+
+        /// <summary>CD 白圆 sprite（程序生成单实例常驻——Filled Image 需要 sprite，纯色运行时生成零资产依赖）</summary>
+        private static Sprite CdCircleSprite
+        {
+            get
+            {
+                if (_cdCircleSprite == null)
+                {
+                    const int size = 128, radius = 62;
+                    var tex = new Texture2D(size, size, TextureFormat.ARGB32, false);
+                    for (int y = 0; y < size; y++)
+                        for (int x = 0; x < size; x++)
+                        {
+                            float dx = x - size * 0.5f + 0.5f, dy = y - size * 0.5f + 0.5f;
+                            tex.SetPixel(x, y, dx * dx + dy * dy <= radius * radius
+                                ? Color.white : Color.clear);
+                        }
+                    tex.Apply();
+                    _cdCircleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), Vector2.one * 0.5f, 100f);
+                }
+                return _cdCircleSprite;
+            }
+        }
+
+        /// <summary>CD 状态驱动（P4-D）：remainSeconds<=0=无 CD（两件隐藏）；否则径向遮罩自 12 点方向
+        /// 顺时针按 剩余/总时长 收缩+中心剩余秒数（整数向上取整）。totalSeconds<=0 按 1 防除零。
+        /// 背包等非战斗消费方不调用恒隐；调用方（BattleHud）每帧驱动，幂等无闪烁</summary>
+        public void SetCooldown(float remainSeconds, float totalSeconds)
+        {
+            bool active = remainSeconds > 0f;
+            var overlay = EnsureCdOverlay();
+            if (overlay != null)
+            {
+                overlay.gameObject.SetActive(active);
+                if (active)
+                {
+                    float total = totalSeconds > 0f ? totalSeconds : 1f;
+                    overlay.fillAmount = Mathf.Clamp01(remainSeconds / total);
+                }
+            }
+            var text = EnsureCdSecondsText();
+            if (text != null)
+            {
+                text.gameObject.SetActive(active);
+                if (active) text.text = Mathf.CeilToInt(remainSeconds).ToString();
+            }
+        }
+
+        private Image EnsureCdOverlay()
+        {
+            if (_cdOverlay != null) return _cdOverlay;
+            if (skillIcon == null) return null;
+            var iconRt = (RectTransform)skillIcon.transform;
+            var go = new GameObject("CdOverlay", typeof(Image));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(iconRt.parent, false);
+            rt.SetAsLastSibling(); // 按钮内最顶——CD 遮罩恒盖图标（选中弧光/描边为组件级不受影响）
+            rt.anchorMin = iconRt.anchorMin;
+            rt.anchorMax = iconRt.anchorMax;
+            rt.offsetMin = iconRt.offsetMin;
+            rt.offsetMax = iconRt.offsetMax;
+            var img = go.GetComponent<Image>();
+            img.sprite = CdCircleSprite;
+            img.type = Image.Type.Filled;
+            img.fillMethod = Image.FillMethod.Radial360;
+            img.fillOrigin = (int)Image.Origin360.Top; // 12 点起
+            img.fillClockwise = true;
+            img.color = new Color(0f, 0f, 0f, 0.62f); // 暗半透（推荐「转圈遮罩」业界常态——不遮名条）
+            img.raycastTarget = false;
+            _cdOverlay = img;
+            return img;
+        }
+
+        private TMP_Text EnsureCdSecondsText()
+        {
+            if (_cdSecondsText != null) return _cdSecondsText;
+            if (skillIcon == null) return null;
+            var iconRt = (RectTransform)skillIcon.transform;
+            var go = new GameObject("CdSeconds", typeof(TMPro.TextMeshProUGUI));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(iconRt.parent, false);
+            rt.SetAsLastSibling();
+            rt.anchorMin = iconRt.anchorMin;
+            rt.anchorMax = iconRt.anchorMax;
+            rt.offsetMin = iconRt.offsetMin;
+            rt.offsetMax = iconRt.offsetMax;
+            var text = go.GetComponent<TMPro.TextMeshProUGUI>();
+            text.font = GIC.Battle.BattleViewFactory.WorldTextFont;
+            text.fontSize = 64f;
+            text.alignment = TMPro.TextAlignmentOptions.Center;
+            text.color = Color.white;
+            text.raycastTarget = false;
+            _cdSecondsText = text;
+            return text;
+        }
 
         /// <summary>选中态=两束元素色环绕弧光（2026-09-27 拍板全项目统一：打钩图退役、
         /// 战斗/背包同表现；战斗屏 OnlyDisplay 不走此链——由 BattleHud.SetAimSelectRing 驱动同款弧光。
