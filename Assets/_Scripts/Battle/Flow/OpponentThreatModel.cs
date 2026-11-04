@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 using GIC.Data;
 namespace GIC.Battle
 {
@@ -145,8 +146,10 @@ namespace GIC.Battle
             int perTarget = BattleHeuristics.EstimatePerTargetDamage(enemy, data);
             if (perTarget <= 0) return;
 
-            var from = sim.GetPosition(enemy);
-            var targets = BattleHeuristics.PreviewLineTargets(sim, snapshot, identity.Team, from, data, action.direction);
+            // P5：预测行动的瞄准向量（aimX 直读/方向桥——预测器消费「对手如我」先验产出的
+            // 任意角/目标点行动，与三脑上交形态同构）；命中集=PredictAimTargets（存活+雾限内建）
+            var aim = SkillHitResolver.AimVectorOf(sim, action, snapshot);
+            var targets = BattleHeuristics.PredictAimTargets(sim, snapshot, identity.Team, enemy, data, aim.x, aim.y);
             foreach (var target in targets)
             {
                 map.ExpectedDamageOnAlly.TryGetValue(target.unitId, out var cur);
@@ -158,33 +161,27 @@ namespace GIC.Battle
                 map.EnemyThreatScore[enemyId] = enemyCur + perTarget * targets.Count;
             }
 
-            foreach (var cell in ThreatLineCells(sim, from, data, action.direction))
+            foreach (var cell in ThreatLineCells(sim, enemy, data, aim.x, aim.y))
                 map.ThreatenedCells.Add(cell);
         }
 
-        /// <summary>敌方预测攻击的火线格（沿预测方向逐格扫到技能射程，虚空格截断——与
-        /// PreviewLineTargets 虚空截断/AttackRangeOf per-skill 射程提取两处同口径：投射物=
-        /// clip.maxRange 缺省默认；整线=LineBurst clip 同规则。P3 cm 化适配：clip 资产已迁
-        /// 厘米——RangeCellsOf 桥回格域步进）</summary>
-        private static IEnumerable<BattleCell> ThreatLineCells(BattleSimState sim, BattleCell from,
-            SkillConfig.SkillData data, Direction2D direction)
+        /// <summary>敌方预测攻击的火线格（P5 连续版：瞄准向量线段沿途格——50cm 步进采样落格去重，
+        /// 虚空截断与 BattleHeuristics.PredictAimTargets 同口径；旧方向逐格步进随十字域退役）</summary>
+        private static IEnumerable<BattleCell> ThreatLineCells(BattleSimState sim, Unit enemy,
+            SkillConfig.SkillData data, int aimX, int aimZ)
         {
-            var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
-            int range;
-            if (projClips.Count > 0)
-                range = EffectCompiler.RangeCellsOf(projClips[0].maxRange);
-            else
+            var v = SkillHitResolver.NormalizePerMille(aimX, aimZ);
+            if (v.x == 0 && v.y == 0) v = new Vector2Int(1000, 0); // 零向量兜底=东
+            var from = sim.GetPosCm(enemy);
+            int maxRange = EffectCompiler.DirectionRangeCmOf(data.timeline);
+            var seen = new HashSet<string>();
+            for (int t = 50; t <= maxRange; t += 50)
             {
-                var burstClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst);
-                range = EffectCompiler.RangeCellsOf(burstClips.Count > 0 ? burstClips[0].maxRange : 0);
-            }
-
-            var delta = SkillHitResolver.DirectionToDelta(direction);
-            for (int step = 1; step <= range; step++)
-            {
-                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
-                if (!sim.Map.HasTile(cell.x, cell.y)) yield break; // 虚空截断（同 PreviewLineTargets）
-                yield return cell;
+                int px = from.x + v.x * t / 1000;
+                int pz = from.y + v.y * t / 1000;
+                var cell = BattleCell.FromCm(px, pz);
+                if (!sim.Map.HasTile(cell.x, cell.y)) yield break; // 虚空截断
+                if (seen.Add(cell.x + "," + cell.y)) yield return cell;
             }
         }
     }

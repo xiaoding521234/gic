@@ -227,8 +227,9 @@ namespace GIC.UI
             行列表[10].SetValue($"{_raw.GetEffectiveHealEfficiency():N0}%");
             行列表[11].SetValue($"{_raw.GetEffectiveLifeSteal():N0}%");
             行列表[12].SetValue($"{_raw.GetEffectiveDeployCost():N0}");
-            行列表[13].SetValue($"{_raw.GetEffectiveAttackVision():N0}");
-            行列表[14].SetValue($"{_raw.GetEffectiveExploreVision():N0}");
+            // P5 视野 cm 化：资产值=厘米，显示 ÷100=米（1 格=1 米——数字与旧格值一致，观感零变化）
+            行列表[13].SetValue($"{_raw.GetEffectiveAttackVision() / CellMetrics.CellSizeCm:N0}");
+            行列表[14].SetValue($"{_raw.GetEffectiveExploreVision() / CellMetrics.CellSizeCm:N0}");
 
             // 行图标=原神官方属性图标；行底圆角条明暗相间（斑马纹）
             for (int i = 0; i < 行列表.Length; i++)

@@ -19,7 +19,7 @@ MonoBehaviour:
     "\u6280\u80FD\u6807\u7B7E": 5001
     customParams:
     - key: 14
-      value: 1
+      value: 100
       baseType: 0
     - key: 15
       value: 20

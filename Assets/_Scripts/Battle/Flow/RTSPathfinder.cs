@@ -127,7 +127,15 @@ namespace GIC.Battle
                 pathCells.Add(n.cell);
                 waypoints.Insert(0, new Vector2IntCm(n.cell.CenterXCm, n.cell.CenterYCm));
             }
-            if (waypoints.Count > 0) waypoints[waypoints.Count - 1] = new Vector2IntCm(toXCm, toZCm);
+            if (waypoints.Count > 0)
+            {
+                // P5-D 零推进修复：首点=精确起点（对称于末点=精确目标）。旧形态首点=起点格心——
+                // AI 每 0.5s 重决策替换 mover 时，新 mover 先回走格心再前进，单位围绕格心震荡、
+                // 净推进≈0（双 AI 观察局实锤：8 秒净位移 1~48cm）；首点改精确起点后重决策=从
+                // 当前位连续推进（同格直达/钳制回退的单点路径不经过本段，零影响）
+                waypoints[0] = new Vector2IntCm(fromXCm, fromZCm);
+                waypoints[waypoints.Count - 1] = new Vector2IntCm(toXCm, toZCm);
+            }
             return waypoints;
         }
 

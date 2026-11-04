@@ -39,11 +39,10 @@ namespace GIC.Data
         public static BattleCell operator +(BattleCell a, BattleCell b) => new BattleCell(a.x + b.x, a.y + b.y);
         public static BattleCell operator -(BattleCell a, BattleCell b) => new BattleCell(a.x - b.x, a.y - b.y);
 
-        /// <summary>切比雪夫距离（八方向等价度量，docs/03 §3.3）——战斗域半径/逼近/转移类判定的
-        /// 几何单源（光环 Buff 半径过滤、溢出转移找最近、AI 逼近等统一走此口，勿散抄双 Math.Abs）。
-        /// **决策九十五欧氏迁移中**（蓝图 §3.1）：消费方逐批切 SquaredEuclideanCmTo（全整数零开方，
-        /// 确定性）；本方法保留供 AI 三脑旧轨（P5 移植）兜底，P5 后随批退役</summary>
-        public int ChebyshevTo(BattleCell other) => Math.Max(Math.Abs(x - other.x), Math.Abs(y - other.y));
+        /// <summary>切比雪夫距离（八方向等价度量，docs/03 §3.3）——**决策九十五 P5 已退役**：
+        /// 全链欧氏迁移收官（蓝图 §3.1），AI 三脑/光环/溢出转移/部署消费方全部改走
+        /// BattleHeuristics.DistCm / SquaredEuclideanCmTo（2026-11-04 终检零引用后删除方法体；
+        /// 本注记保历史口径——旧回放/文档检索锚）</summary>
 
         /// <summary>格心欧氏距离平方（厘米²，决策九十五欧氏迁移几何单源——**全整数零开方**，确定性
         /// 纪律不破：Math.Sqrt 跨平台浮点差异被平方比较绕开）。消费口径：①「距离≤R 格」判定=

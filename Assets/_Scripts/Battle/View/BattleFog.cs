@@ -321,7 +321,7 @@ namespace GIC.Battle
                 int vision = ResolveVision(view.UnitId);
                 if (vision <= 0) continue;
                 var cell = _board.WorldToCell(view.transform.position); // 视觉位置（移动途中随行揭雾）
-                int r = vision;
+                int r = Mathf.Max(1, vision / CellMetrics.CellSizeCm); // P5 视野 cm 化：厘米→格域方块半径（Host RevealFog 同形）
                 for (int dy = -r; dy <= r; dy++)
                 {
                     int y = cell.y + dy;
@@ -353,11 +353,12 @@ namespace GIC.Battle
         /// <summary>单位探索视野解析（缓存，追拍六「1命视野真源化」）：**首选快照 exploreVision**
         /// （Host 从 UnitStats.VisionRange 终值填充=config 基值+1命 StatBoost——升命中途生效随快照
         /// 到达，docs/active/44 §9-③）；0=未填（旧端/手工构造态）回落旧链（快照 unitName→UnitConfig
-        /// 基值，回落 1）。缓存随快照换代整体失效（Update 口）——新召唤单位/升命视野变化自愈</summary>
+        /// 基值）。**P5 视野 cm 化：值域=厘米**（回落 CellMetrics.CellSizeCm=100=1 格）。缓存随快照换代
+        /// 整体失效（Update 口）——新召唤单位/升命视野变化自愈</summary>
         private int ResolveVision(string unitId)
         {
             if (_visionByUnit.TryGetValue(unitId, out int cached)) return cached;
-            int vision = 1;
+            int vision = CellMetrics.CellSizeCm;
             var snapshot = _player != null ? _player.LatestSnapshot : null;
             if (snapshot?.units != null)
             {

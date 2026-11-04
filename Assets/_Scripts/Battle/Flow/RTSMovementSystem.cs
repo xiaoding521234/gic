@@ -76,8 +76,9 @@ namespace GIC.Battle
             return mover;
         }
 
-        /// <summary>格序列（起点格+逐 waypoint 所在格去重——途经采集消费；含起终点语义同旧轨）</summary>
-        private static List<BattleCell> BuildPathCells(BattleSimState sim, Vector2Int fromCm, List<Vector2IntCm> waypoints)
+        /// <summary>格序列（起点格+逐 waypoint 所在格去重——途经采集消费；含起终点语义同旧轨；
+        /// P5 起 CompanionBrain 收获档路径堆值同源复用——脑层估值与执行层途经判定共用格序=单源）</summary>
+        public static List<BattleCell> BuildPathCells(BattleSimState sim, Vector2Int fromCm, List<Vector2IntCm> waypoints)
         {
             var cells = new List<BattleCell>();
             var first = BattleCell.FromCm(fromCm.x, fromCm.y);

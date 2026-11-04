@@ -69,6 +69,8 @@ namespace GIC.Battle
                 isPlayerDirectControl: action.isPlayerDirectControl);
             // CD 消耗（门槛全过后与资源扣减同拍——纪元制写就绪 tick）
             sim.ConsumeSkillCooldown(action.unitId, skill.RawData.skillType);
+            // AI 施放节流记账（P5-D）：全 gate 通过=实际出招——三脑候选域按「单位×技能槽」判节流
+            BattleHeuristics.RecordSkillCast(sim, action.unitId, action.skillIndex);
 
             // 号令体力津贴（AI-1 批接线，2026-10-12 拍板口径「玩家操控伙伴势力技能＝0→−5 获得体力」）：
             // 势力技能基 0 体力（docs/07-00「号令不消耗体力」）＋玩家直接操控伙伴减免 5（负值=获得）

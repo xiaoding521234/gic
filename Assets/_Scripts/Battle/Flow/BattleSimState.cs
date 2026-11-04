@@ -430,11 +430,12 @@ namespace GIC.Battle
 
         private Dictionary<TeamType, bool[]> _fogExplored;
 
-        /// <summary>全量幂等揭雾（单调有进无出）：**每选择阶段开始（BeginSelectPhase）AI 决策前**调——
+        /// <summary>全量幂等揭雾（单调有进无出）：**每 AI 节拍（RTSFlow.RunAiBeat，0.5s）AI 决策前**调——
         /// 各队伍以存活单位（含协议核心等建筑；尸体不探索）为心、探索视野
         /// （UnitStats.VisionRange 终值=config 基值+1命 StatBoost，与快照 exploreVision 同源——追拍六
-        /// 「两侧统一升档」；stats 缺失回落 RawData 基值）
-        /// 切比雪夫揭雾。WEGO 全行动先提交后结算=回合边界全量同步即覆盖决策时态，无需逐命令挂钩</summary>
+        /// 「两侧统一升档」；stats 缺失回落 RawData 基值）揭雾——**P5 视野 cm 化：视野值=厘米，
+        /// 揭雾半径=÷CellSizeCm 回格域方块**（与客户端 BattleFog.EvaluateReveal 同形）。即时制无回合边界
+        /// 全量同步=每拍增量揭雾，决策时态恒新鲜</summary>
         public void RevealFog()
         {
             if (FogMode == BattleFogMode.None || Map == null) return;
@@ -450,10 +451,12 @@ namespace GIC.Battle
                     _fogExplored[identity.Team] = explored;
                 }
                 // 探索视野真源=UnitStats.VisionRange 终值（config 基值+1命 StatBoost——与快照 exploreVision
-                // 同源，追拍六「两侧统一升档」）；stats 缺失回落 RawData 基值
+                // 同源，追拍六「两侧统一升档」）；stats 缺失回落 RawData 基值。
+                // 决策九十五 P5 视野 cm 化：值域=厘米——揭雾格半径=÷CellSizeCm（两侧与客户端 BattleFog 同口径）
                 var stats = unit.GetUnitComponent<UnitStats>();
-                int radius = stats != null ? stats.VisionRange
-                    : (unit.RawData != null ? unit.RawData.GetEffectiveExploreVision() : 1);
+                int radiusCm = stats != null ? stats.VisionRange
+                    : (unit.RawData != null ? unit.RawData.GetEffectiveExploreVision() : CellMetrics.CellSizeCm);
+                int radius = radiusCm / CellMetrics.CellSizeCm;
                 if (radius <= 0) continue;
                 var pos = GetPosition(unit);
                 for (int dy = -radius; dy <= radius; dy++)
@@ -540,7 +543,7 @@ namespace GIC.Battle
             return IsFogExplored(viewerTeam, GetPosition(enemy));
         }
 
-        /// <summary>AI 迷雾可见性（快照态重载——PreviewLineTargets 等 UnitState 域消费）：
+        /// <summary>AI 迷雾可见性（快照态重载——BattleHeuristics.PredictAimTargets 等 UnitState 域消费）：
         /// 同队/None/核心（经 unitId 反查活体）恒可见；其余=所在格已探索</summary>
         public bool IsEnemyStateVisibleTo(TeamType viewerTeam, UnitState enemyState)
         {

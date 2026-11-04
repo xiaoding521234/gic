@@ -318,8 +318,10 @@ namespace GIC.Battle
         }
 
         /// <summary>线段×敌方受击圆相交判定（整平方整数域；敌方圆心=快照连续位置，半径=受击圆柱
-        /// 直径同源 CylinderDiameterOf 换 cm）——LineBurst 命中域单源（CompileLineBurstSegment 消费）</summary>
-        private static bool SegmentTouchesUnitCircle(int axCm, int azCm, int bxCm, int bzCm, UnitState enemy)
+        /// 直径同源 CylinderDiameterOf 换 cm）——LineBurst 命中域单源（CompileLineBurstSegment 消费；
+        /// P5 起 BattleHeuristics.PredictAimTargets〔AI 线段预判〕同源复用——Host 结算与 AI 决策预判
+        /// 共用此原语=预判/结算同形铁律的 LineBurst 通道）</summary>
+        public static bool SegmentTouchesUnitCircle(int axCm, int azCm, int bxCm, int bzCm, UnitState enemy)
         {
             int radiusCm = Mathf.RoundToInt(BattleMetrics.CylinderDiameterOf(enemy) * CellMetrics.CellSizeCm * 0.5f);
             long abx = bxCm - axCm, abz = bzCm - azCm;
@@ -1022,8 +1024,11 @@ namespace GIC.Battle
         }
 
         /// <summary>方向命中预判按判定 kind 派发：LineProjectile=投射物圆柱接触静态形态、
-        /// LineBurst/无轨=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）。
-        /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2：casterTeam=施法者队伍，2v2 不再误伤判定队友）</summary>
+        /// LineBurst/无时轮=整线或 maxRange 距离段——与各判定编译路径同口径（静态快照预判，Host 结算权威）。
+        /// 敌我判定=TeamType 口径（2026-09-25 三轮审查 C2：casterTeam=施法者队伍，2v2 不再误伤判定队友）。
+        /// **P5 注记：十字方向预判族（本方法+方向版 PredictDirectionHits）AI 三脑零消费**——自由角
+        /// 时代脑层走 BattleHeuristics.PredictAimTargets（aimX/aimZ 向量、cm 精确）；HUD P4-C 起消费
+        /// 向量重载。方向族保留=预判工厂历史形态+HUD 零星兼容，勿新增消费方。</summary>
         public static bool WouldHitEnemyInDirection(SkillTimelineAsset timeline, BattleMapData map,
             BattleSnapshot snapshot, TeamType casterTeam, BattleCell from, Direction2D direction)
         {

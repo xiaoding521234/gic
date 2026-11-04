@@ -123,16 +123,17 @@ namespace GIC.Data
 
             [Header("视野（2026-10-03 拍板拆分：攻击视野=AI 追击感知半径 / 探索视野=破雾半径；2026-10-17 迷雾批改名迷雾视野→探索视野）")]
             /// <summary>攻击视野（2026-10-03 拍板「眷属总是向协议核心进攻，除非攻击视野内有其它敌人」）：
-            /// 眷属 AI 追击**非核心**敌人的感知半径（切比雪夫，格）——视野外的敌不关心（皇室战争式）；
+            /// 眷属 AI 追击**非核心**敌人的感知半径——**厘米**（决策九十五 P5 视野域 cm 化：1 格=100cm；
+            /// 蓝图 §10 直译 5 格→500/安柏 8 格→800）；视野外的敌不关心（皇室战争式）；
             /// 协议核心无视野门槛恒为目标，非核心敌还须严格近于核心（同距核心优先）。
-            /// Unspecified=回落 5；安柏=24（对齐全图狙击射程）。攻击档自身射程即感知边界（射程≤视野
-            /// 对现役单位恒成立）。未来 Buff 要改它时再入 StatType（预留勿提前造）。</summary>
+            /// Unspecified=回落 500。攻击档自身射程即感知边界（射程≤视野对现役单位恒成立）。
+            /// 未来 Buff 要改它时再入 StatType（预留勿提前造）。</summary>
             public int 攻击视野 = Unspecified;
 
-            /// <summary>探索视野（原「迷雾视野」，2026-10-17 迷雾批改名）：可自动破除迷雾的范围（切比雪夫，格）
-            /// ——迷雾系统（docs/active/44）真消费方=BattleFog 揭雾半径。**Unspecified=回落 1**（2026-10-17
-            /// 迷雾批追拍「探索视野都改为 1，且默认值改为 1」——取代决策三十一的回落 2；安柏/协议核心=2 已写资产）；
-            /// StatType.VisionRange 基值管线（安柏 1命「视野提升」休眠数据位挂此管线）。
+            /// <summary>探索视野（原「迷雾视野」，2026-10-17 迷雾批改名）：可自动破除迷雾的范围
+            /// ——**厘米**（决策九十五 P5 视野域 cm 化：回落 1 格→100、安柏/协议核心 2 格→200 已迁资产）
+            /// ——迷雾系统（docs/active/44）真消费方=BattleFog 揭雾半径（两侧同源口径）。
+            /// StatType.VisionRange 基值管线（安柏 1命「视野提升」休眠数据位挂此管线，C1Vision 参数已迁 cm）。
             /// 序列化兼容：FormerlySerializedAs 保旧资产「迷雾视野」字段值零迁移。</summary>
             [UnityEngine.Serialization.FormerlySerializedAs("迷雾视野")]
             public int 探索视野 = Unspecified;
@@ -236,8 +237,8 @@ namespace GIC.Data
             public int GetEffectiveMastery() => IsSpecified(baseMastery) ? baseMastery : 0;
             public int GetEffectiveSanity() => IsSpecified(baseSanity) ? baseSanity : 50;
             public int GetEffectiveHP() => IsSpecified(baseHP) ? baseHP : GetHPByStarLevel();
-            public int GetEffectiveAttackVision() => IsSpecified(攻击视野) ? 攻击视野 : 5;
-            public int GetEffectiveExploreVision() => IsSpecified(探索视野) ? 探索视野 : 1;
+            public int GetEffectiveAttackVision() => IsSpecified(攻击视野) ? 攻击视野 : 500;
+            public int GetEffectiveExploreVision() => IsSpecified(探索视野) ? 探索视野 : 100;
             public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
             public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
             public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;

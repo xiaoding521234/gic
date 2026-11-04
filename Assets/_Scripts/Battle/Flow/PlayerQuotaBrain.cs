@@ -39,8 +39,9 @@ namespace GIC.Battle
             ? _session.Sim.GetTeamOf(_playerId)
             : TeamType.A;
 
-        /// <summary>AI 提交延迟（秒）——模拟"思考"，同时让回合切换肉眼可辨</summary>
-        private const float SubmitDelaySeconds = 0.8f;
+        /// <summary>AI 提交延迟（秒）——P5 三脑同频（蓝图 §6「决策频率=每 0.5 秒」）：延迟=节拍长；
+        /// 旧 0.8s 回合制「让回合切换肉眼可辨」语义随回合机退役（即时制无回合切换可辨）</summary>
+        private const float SubmitDelaySeconds = 0.5f;
 
         // ==================== 评分口径（#4 审查批资产化：数值真源=Resources/Configs/AI/AITuning.asset——
         // 调 AI 平衡=改资产 Inspector 零代码；下列属性=代码侧访问别名，勿散写调用处） ====================
@@ -108,24 +109,37 @@ namespace GIC.Battle
                 _session.Flow.OnPhaseChanged -= OnPhaseChanged;
         }
 
+        /// <summary>配额脑思考协程句柄（P5 串行守卫——0.5s 节拍×0.5s 思考延迟下防协程重叠双交；
+        /// 串行=每拍至多一交，上一拍未完成则本拍跳过）</summary>
+        private Coroutine _submitRoutine;
+
         private void OnPhaseChanged(BattlePhase phase, int turn)
         {
             if (phase != BattlePhase.Selecting) return;
-            if (turn == _lastSubmittedTurn) return; // 同回合防重复提交
-            StartCoroutine(SubmitActionRoutine(turn));
+            if (_submitRoutine != null) return; // 上一拍仍在思考：本拍跳过（P5 串行守卫）
+            _submitRoutine = StartCoroutine(SubmitActionRoutine(turn));
         }
 
-        private IEnumerator SubmitActionRoutine(int turn)
+        private IEnumerator SubmitActionRoutine(int startedTurn)
         {
             yield return new WaitForSeconds(SubmitDelaySeconds);
+            _submitRoutine = null;
 
-            // 回合已推进（战斗结束/状态机停止）则放弃
+            // 战斗结束/状态机停止则放弃。P5 同频改造：TurnNumber=逻辑秒（每秒翻号），旧
+            // 「Phase!=Selecting || TurnNumber!=turn」双校验在 0.8s 延迟跨秒界时会 20% 丢拍——
+            // 改 Phase 单校验+当前秒取值（思考延迟可能跨秒界，决策用当下拍）
             if (_session == null || _session.Flow == null) yield break;
-            if (_session.Flow.Phase != BattlePhase.Selecting || _session.Flow.TurnNumber != turn) yield break;
+            if (_session.Flow.Phase != BattlePhase.Selecting) yield break;
+            int now = _session.Flow.TurnNumber;
+            if (now == _lastSubmittedTurn) yield break; // 同拍防重复提交（幂等）
 
-            var action = Decide(turn);
-            _session.SubmitAction(action);
-            _lastSubmittedTurn = turn;
+            var action = Decide(now);
+            // P5-D：空 unitId 的 Pass（配额=空过放权）不上交——tick 制无配额语义，上交只产
+            // RTSFlow「未知单位」警告刷屏（部署/物品/装备等玩家级行动本就无 unitId，照常上交）
+            if (action != null
+                && !(action.actionType == ActionType.Pass && string.IsNullOrEmpty(action.unitId)))
+                _session.SubmitAction(action);
+            _lastSubmittedTurn = now;
         }
 
         // ==================== 配额评分制决策（号令/操魔神/空过） ====================
@@ -775,6 +789,9 @@ namespace GIC.Battle
                 if (data == null || data.skillType != SkillType.Enso) continue; // 契约 AI 档随其实装批接线（docs/11）
                 if (!skill.CanCast(caster)) continue;
                 if (!ResourceGate.HasAll(sim, caster, _playerId, data.costs, out _)) continue; // 消耗门槛（C-2 costs 单源）
+                // AI 施放节流（P5-D）：延奏无 CD——0.5s 节拍下自我延奏每拍刷分（分恒 38 压一切候选）；
+                // 按 AITuning「AI 重施最短间隔 tick」节流后回到战术节拍
+                if (BattleHeuristics.AiCastThrottled(sim, caster.GetUnitComponent<UnitIdentity>()?.UnitID, i)) continue;
 
                 // 候选目标：我军存活**角色**（含自身）unitId 升序——延奏目标域=阵营口径
                 // （2026-09-25 三轮审查 C2：2v2 可协奏队友单位）；行动者归属=playerId 保留。

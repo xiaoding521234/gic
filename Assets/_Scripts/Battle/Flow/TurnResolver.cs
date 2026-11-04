@@ -80,7 +80,8 @@ namespace GIC.Battle
         /// <summary>
         /// 眷属+伙伴脑批演算（RTSFlow 每 0.5 秒 AI 节拍调）：整批同段结算（同拍=同片=同片前快照，
         /// 沿用旧同片语义）——即时制无攻速排序，行动受攻击 CD/元能/体力自然节流（蓝图 §6）。
-        /// Brain 内部格寻路/十字方向域 P1 保持不动（P5 才移植）。
+        /// P5 已移植：三脑连续空间化（任意角瞄准 aimX/aimZ+目标点移动 targetX/targetZ 直交，
+        /// A*+steering 交 RTSMovementSystem——旧「Brain 格寻路/十字方向域 P1 保持不动」注记就此销案）。
         /// </summary>
         public void ResolveAiActions(List<ActionData> actions)
         {

@@ -31,6 +31,11 @@ namespace GIC.Battle
     /// 核心无视野门槛恒为目标；非核心敌须「攻击视野内（Unspecified 回落 5）且严格近于核心」才追
     /// （UnitData.攻击视野 字段）；核心已破=退化为视野内纯距离序。攻击档（战技/爆发）射程即感知
     /// 边界，不另设视野门。
+    /// v9（2026-11-04 决策九十五 P5 连续空间移植，蓝图 §6）：十字方向域/格 BFS 全退役——攻击档=
+    /// **任意角瞄准**（FindAttackAim：可见敌距离序逐敌试瞄，aimX/aimZ 千分向量上交）；移动档=
+    /// **驻位点直交**（StandoffTargetCm 把敌锚拉攻击射程得目标点，targetX/targetZ 上交——A*+steering
+    /// 全权交执行层 RTSMovementSystem）；距离=欧氏 cm（战术视距/核心锚定/滞回门槛全 cm 域）；
+    /// 可达性预判=PathReachable（被地形/尸体围死跳过）；已进射程=驻位即最优（CD 期站桩等，勿对锚抖动）。
     /// 纯读 BattleSimState 由 Host 在选择阶段头生成（docs/18 决策一），行动与玩家行动合并进执行阶段。
     /// 决策档：爆发可命中（满槽）→ 爆发朝敌 → 战技可命中→打 → 否则按「核心锚定视野序」逐敌
     /// 沿最短路按移速步进 → 全部敌打不了也走不近=缺席。
@@ -110,90 +115,83 @@ namespace GIC.Battle
             var skillAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Normal);
             if (skillAction != null) return skillAction;
 
-            // 朝敌按移速步进——v6（2026-10-03 报障「移速 20 根本没发挥出来」）：步数上限退役
-            // 「小兵蠕动 1 步/回合」硬编码，改读 MoveExecutor.MaxMoveDistance（移动技能 MoveDistance×
-            // 移速单源换算=10%×移速，含 Buff 减速——与玩家移动/HUD 同口径）。
-            // v6.1（2026-10-03 同日报障「来回左右移动持续多回合」）：步进改走 BFS 最短路「直线前缀」
-            // （FindApproachStraightSteps——只踏到攻击位距离严格递减的最短路格、踏上攻击位即停）；
-            // 旧写法「首步方向×N 直线飞」会越过路径拐点与攻击位，下回合 BFS 指回程=左右振荡
-            // 永不收敛（L 形路径+对角目标场景），每回合距离单调递减后数学上不可能振荡。v4 换目标
-            // 巡逻不变（攻击档打不了时按距离升序逐敌试逼近步）；遇阻/拐点由原语就地截停（被挡也算
-            // 已使用）；移速被压到 0 步（重减速）=缺席不空耗。
-            int moveSteps = MoveExecutor.MaxMoveDistance(unit);
-            if (moveSteps > 0)
+            // 朝敌驻位推进——v9（P5 连续版）：步数上限/直线段/十字方向全退役——移动=「选目标点」：
+            // 每拍对锚敌计算 StandoffTargetCm 驻位点（敌锚拉攻击射程；射程 0=贴身接触，执行层碰撞圆
+            // 停于接触前），targetX/targetZ 直交；速度与绕行全权交执行层（RTSMovementSystem A*+steering
+            // 100cm/s tick 推进）；移速被压到 0=缺席不空耗（v6 语义保留）。
+            // v7 目标序不变（核心锚定+视野门+严格近核）；v4 换目标巡逻不变（不可达敌 PathReachable 跳过）；
+            // 已进射程=驻位即最优（CD 期站桩等下一拍，勿对锚抖动）。
+            var liveStats = unit.GetUnitComponent<UnitStats>();
+            if (liveStats == null || liveStats.MoveSpeed <= 0)
+                return null; // 移速被压到 0（重减速）：缺席不空耗
+            var enemies = BattleHeuristics.FindEnemiesByDistance(sim, unit);
+            Unit core = null; // 敌方核心=tag 化（2026-10-13）：核心标签即永恒目标（协议核心/未来世界树同识别）
+            var cores = new List<Unit>();
+            foreach (var e in enemies)
+                if (BattleHeuristics.IsCore(e)) cores.Add(e);
+            if (cores.Count > 0)
             {
-                // v7（2026-10-03 拍板「眷属总是向协议核心进攻，除非攻击视野内有其它敌人，才会去追
-                // （需要比协议核心更近才行，同距离时优先协议核心），不在攻击视野则不关心——就像
-                // 皇室战争的单位一样」）：目标序从纯距离升序改**核心锚定**——
-                // ①敌方协议核心（建筑）=永恒目标：无视野门槛；
-                // ②非核心敌须同时满足：在攻击视野内（RawData.GetEffectiveAttackVision 切比雪夫半径，
-                //   Unspecified 回落 5）**且**严格近于核心（同距核心优先）才可追；视野外不关心。
-                // 核心已破（不在场）=无锚，退化为「视野内最近敌」纯距离序兜底。逐敌距离升序+等距
-                // unitId 升序铁律不变（确定性）；v6.1 直线前缀步进不变。
-                var enemies = BattleHeuristics.FindEnemiesByDistance(sim, unit);
-                var selfPos = sim.GetPosition(unit);
-                Unit core = null; // 敌方核心=tag 化（2026-10-13）：核心标签即永恒目标（协议核心/未来世界树同识别）
-                var cores = new List<Unit>();
-                foreach (var e in enemies)
-                    if (BattleHeuristics.IsCore(e)) cores.Add(e);
-                if (cores.Count > 0)
+                core = cores[0]; // 距离序+unitId 决胜（FindEnemiesByDistance 既有确定性序）
+                if (cores.Count > 1)
                 {
-                    core = cores[0]; // 距离序+unitId 决胜（FindEnemiesByDistance 既有确定性序）
-                    if (cores.Count > 1)
+                    // 核心锚滞回锁（议题③）：双核心场（2v2）——现锁存活且在门槛内延续，
+                    // 另一核心须严格近「锚点滞回门槛」cm 才接管；锁失效（死亡/不可感知）自然重锁最近
+                    if (_coreLocks.TryGetValue(unitId, out var lockedCoreId))
                     {
-                        // 核心锚滞回锁（议题③）：双核心场（2v2）——现锁存活且在门槛内延续，
-                        // 另一核心须严格近「锚点滞回门槛」格才接管；锁失效（死亡/不可感知）自然重锁最近
-                        if (_coreLocks.TryGetValue(unitId, out var lockedCoreId))
+                        var lockedCore = sim.GetUnit(lockedCoreId);
+                        if (lockedCore != null && !BattleSimState.IsDead(lockedCore) && cores.Contains(lockedCore))
                         {
-                            var lockedCore = sim.GetUnit(lockedCoreId);
-                            if (lockedCore != null && !BattleSimState.IsDead(lockedCore) && cores.Contains(lockedCore))
-                            {
-                                int lockedDist = selfPos.ChebyshevTo(sim.GetPosition(lockedCore));
-                                int nearestDist = selfPos.ChebyshevTo(sim.GetPosition(cores[0]));
-                                if (lockedDist <= nearestDist + AITuningConfig.Instance.锚点滞回门槛)
-                                    core = lockedCore; // 门槛内延续锁定（抗等距邻域距离翻转游移）
-                            }
+                            int lockedDist = BattleHeuristics.DistanceCm(sim, unit, lockedCore); // 欧氏 cm（P5）
+                            int nearestDist = BattleHeuristics.DistanceCm(sim, unit, cores[0]);
+                            if (lockedDist <= nearestDist + AITuningConfig.Instance.锚点滞回门槛) // cm 域（P5 资产 ×100）
+                                core = lockedCore; // 门槛内延续锁定（抗等距邻域距离翻转游移）
                         }
-                        if (sim.TryGetUnitId(core, out var chosenCoreId))
-                            _coreLocks[unitId] = chosenCoreId; // 重锁当前选择（无锁首回合即锁最近）
                     }
-                }
-                int coreDist = core != null ? selfPos.ChebyshevTo(sim.GetPosition(core)) : int.MaxValue;
-                int attackVision = BattleHeuristics.TacticalSightOf(unit); // 战术视距单源（2026-10-25 复审批 T5）
-
-                foreach (var target in enemies)
-                {
-                    // 可达性预判（2026-10-10 拍板）：先算逼近步，不可达（水上/虚空/被围）直接跳过——
-                    // 避免「追一个永远打不到的目标，却忘了攻城」的傻站行为。核心也走同一口（防御性统一）。
-                    var steps = BattleHeuristics.FindApproachStraightSteps(sim, unit, sim.GetPosition(target), moveSteps, out var moveDirection);
-                    if (steps <= 0) continue; // 打不到也走不近：换下一个目标（最终会轮到核心）
-
-                    if (target != core)
-                    {
-                        int targetDist = selfPos.ChebyshevTo(sim.GetPosition(target));
-                        if (targetDist > attackVision) continue; // 攻击视野外：不关心（CR 式感知）
-                        if (targetDist >= coreDist) continue;   // 不严格近于核心：不追（同距核心优先）
-                    }
-
-                    return new ActionData
-                    {
-                        playerId = identity.OwnerPlayerID,
-                        unitId = unitId,
-                        actionType = ActionType.Move,
-                        direction = moveDirection,
-                        moveMagnitude = steps,
-                        turnNumber = turnNumber,
-                    };
+                    if (sim.TryGetUnitId(core, out var chosenCoreId))
+                        _coreLocks[unitId] = chosenCoreId; // 重锁当前选择（无锁首回合即锁最近）
                 }
             }
-            return null; // 全场敌都无可逼近步（或移速被压到 0）：缺席
+            int coreDist = core != null ? BattleHeuristics.DistanceCm(sim, unit, core) : int.MaxValue;
+            int attackVision = BattleHeuristics.TacticalSightOf(unit); // 战术视距单源（cm——P5）
+            int attackRangeCm = BattleHeuristics.AttackRangeCmOf(sim, unit, identity.OwnerPlayerID);
+
+            foreach (var target in enemies)
+            {
+                if (target != core)
+                {
+                    int targetDist = BattleHeuristics.DistanceCm(sim, unit, target);
+                    if (targetDist > attackVision) continue; // 攻击视野外：不关心（CR 式感知）
+                    if (targetDist >= coreDist) continue;   // 不严格近于核心：不追（同距核心优先）
+                }
+                // 已进射程（敌圆边可及=dist ≤ 射程+敌半径，与命中几何同口径）：驻位即最优，不产移动
+                //（战技 CD 期站桩等下一拍——对锚抖动防线；核心/其它敌同判）
+                int distToTarget = BattleHeuristics.DistanceCm(sim, unit, target);
+                if (distToTarget <= attackRangeCm + BattleHeuristics.UnitRadiusCm(target)) continue;
+
+                // v8 可达性预判（连续版）：驻位点不可达（被地形/尸体围死）跳过——防「追一个
+                // 永远打不到的目标，却忘了攻城」的傻站行为。核心也走同一口（防御性统一）
+                var dest = BattleHeuristics.StandoffTargetCm(sim, unit, target, attackRangeCm);
+                if (!BattleHeuristics.PathReachable(sim, unit, dest.x, dest.z)) continue;
+
+                return new ActionData
+                {
+                    playerId = identity.OwnerPlayerID,
+                    unitId = unitId,
+                    actionType = ActionType.Move,
+                    targetX = dest.x,
+                    targetZ = dest.z,
+                    turnNumber = turnNumber,
+                };
+            }
+            return null; // 全场敌都不可达/已进射程无需动（或移速被压到 0）：缺席
         }
 
         /// <summary>
         /// 攻击技能施放尝试（战技/爆发共用，v5 爆发档抽提）：类型槽定位（FindSkillIndex——与
         /// SkillExecutor.GetSkill 同源索引）+ CanCast（占位技能不可施放）+ 消耗门槛（统一消耗模型
         /// C-2：costs 单源镜像 ResourceGate.HasAll——眷属豁免玩家资源、元能照查，与 Host 同口径）
-        /// + 十字向首可命中方向（FindAttackDirection：WouldHitEnemyInDirection+存活目标校验）
+        /// + **P5 任意角瞄准口**（FindAttackAim：可见敌距离序逐敌试瞄取首个可命中的 aimX/aimZ 千分
+        /// 向量——取代十字向 FindAttackDirection；存活目标校验内建=纯尸体线不浪费行动）
         /// </summary>
         private static ActionData TryCastAttack(BattleSimState sim, BattleSnapshot snapshot,
             Unit unit, UnitIdentity identity, string unitId, int turnNumber, SkillType skillType)
@@ -205,16 +203,20 @@ namespace GIC.Battle
             // 攻击冷却门槛（决策九十五 P3，蓝图 §6）：CD 中不施放（眷属挥棒/全力挥棒同享 Normal 3 秒——
             // 即时制攻击节流；上交层 Host gate 兜底，此处防 0.5 秒节拍空决策）
             if (sim.IsSkillOnCooldown(unitId, skill.RawData.skillType)) return null;
+            // AI 施放节流（P5-D）：无 CD 技能按 AITuning「AI 重施最短间隔 tick」节流（眷属现役全为
+            // CD 攻击族=零影响，防线与伙伴脑/配额脑统一）
+            if (BattleHeuristics.AiCastThrottled(sim, unitId, skillIndex)) return null;
             if (!ResourceGate.HasAll(sim, unit, identity.OwnerPlayerID, skill.RawData?.costs, out _)) return null;
-            var direction = BattleHeuristics.FindAttackDirection(sim, snapshot, unit, skill);
-            if (direction == 0) return null;
+            if (!BattleHeuristics.FindAttackAim(sim, snapshot, unit, skill, out var aimX, out var aimZ, null))
+                return null;
             return new ActionData
             {
                 playerId = identity.OwnerPlayerID,
                 unitId = unitId,
                 actionType = ActionType.Skill,
                 skillIndex = skillIndex,
-                direction = direction,
+                aimX = aimX,
+                aimZ = aimZ,
                 turnNumber = turnNumber,
             };
         }

@@ -7,15 +7,20 @@ namespace GIC.Battle
 
     /// <summary>
     /// AI 决策共享工具（B6b；2026-09-25 v2 强化；D 批次术语迁移）：配额脑（PlayerQuotaBrain）与
-    /// 眷属脑（FamiliarBrain）、伙伴脑（CompanionBrain）共用的敌人查找/方向/技能查询/命中预判
+    /// 眷属脑（FamiliarBrain）、伙伴脑（CompanionBrain）共用的敌人查找/距离/技能查询/命中预判
     /// 启发式原语。全部纯读 BattleSimState/BattleSnapshot，不改状态（docs/18 决策一）。
-    /// 方向纪律（docs/18 决策八）：移动与直线技能瞄准全员=「十字方向其一」——AI 上交方向
-    /// 一律十字四向，勿走八向（八向上交技能侧被 SkillHitResolver.DirectionToDelta 归一主轴，
-    /// 斜向敌人必空放=白耗元能，docs/11 方向纪律①④ 已收口）。
+    /// **P5 连续空间移植（决策九十五，蓝图 §6）**：格固有原语全退役——十字 BFS（FindApproachFirstStep/
+    /// FindApproachStraightSteps）、距离场（BuildApproachField）、主轴逼近（BestCrossApproachDirection）、
+    /// 格步进线预判（PreviewLineTargets）、轴对齐/换线族（消费方 CompanionBrain 内随批退役）→
+    /// **tile A*（RTSPathfinder）+目标点驻位（StandoffTargetCm）+向量瞄准预判（PredictAimTargets，线段×圆）**；
+    /// 距离度量=欧氏厘米（蓝图 §3.1 切比雪夫→欧氏全链迁移）；AI 移动=「选目标点」（targetX/targetZ 直交，
+    /// 执行层 RTSMovementSystem A*+steering）；瞄准=自由角千分向量（aimX/aimZ——旧「十字方向其一」
+    /// 方向纪律随八方向限制退役，docs/18 决策八历史注记）。
     /// </summary>
     public static class BattleHeuristics
     {
-        /// <summary>十字四向（移动/直线技能瞄准方向域；枚举值序遍历=决策确定性）</summary>
+        /// <summary>十字四向（P5 注记：AI 移动/瞄准方向域已退役——本表仅剩 DeployUnitExecutor
+        /// 召唤落格 BFS 的展开序消费〔执行层非脑层〕；枚举值序遍历=决策确定性语义保持）</summary>
         public static readonly Direction2D[] CrossDirections =
         {
             Direction2D.Right,
@@ -104,17 +109,19 @@ namespace GIC.Battle
             return sim.IsUnitVisibleTo(identity.Team, enemy) || IsEnemyInTacticalSight(sim, self, enemy);
         }
 
-        /// <summary>目标处于自身攻击视野（Chebyshev ≤ GetEffectiveAttackVision，Unspecified 回落 5——
-        /// 与眷属 v7 追击域/J-4/H-3 视野敌判同口径）内——「武器够得着的敌情自己看得见」</summary>
+        /// <summary>目标处于自身攻击视野（P5：欧氏 cm ≤ GetEffectiveAttackVision——资产值已迁厘米，
+        /// Unspecified 回落 500=5 格；与眷属 v7 追击域/J-4/H-3 视野敌判同口径）内——
+        /// 「武器够得着的敌情自己看得见」</summary>
         public static bool IsEnemyInTacticalSight(BattleSimState sim, Unit self, Unit enemy)
         {
-            return sim.GetPosition(enemy).ChebyshevTo(sim.GetPosition(self)) <= TacticalSightOf(self);
+            return DistanceCm(sim, enemy, self) <= TacticalSightOf(self);
         }
 
-        /// <summary>战术视距单源（2026-10-25 复审批 T5 下沉：攻击视野回落 5 此前在眷属脑/伙伴脑多处
-        /// 手抄——「Unspecified 回落 5」语义一处维护；与 IsEnemyInTacticalSight/J-4/H-3 同口径）</summary>
+        /// <summary>战术视距单源（2026-10-25 复审批 T5 下沉：攻击视野回落此前在眷属脑/伙伴脑多处
+        /// 手抄——「Unspecified 回落」语义一处维护；与 IsEnemyInTacticalSight/J-4/H-3 同口径。
+        /// P5 视野 cm 化：**值域=厘米**（回落 500=5 格、安柏 800=8 格）</summary>
         public static int TacticalSightOf(Unit self)
-            => self != null && self.RawData != null ? self.RawData.GetEffectiveAttackVision() : 5;
+            => self != null && self.RawData != null ? self.RawData.GetEffectiveAttackVision() : 500;
 
         /// <summary>可见敌集单源（2026-10-25 复审批 T5 下沉：CompanionBrain 敌集枚举三连抄收口）——
         /// 敌我（TeamType）/存活/PerceivesEnemy（雾账本+战术视距）过滤后按 (id, 单位) 返回；
@@ -137,29 +144,19 @@ namespace GIC.Battle
             return result;
         }
 
-        /// <summary>
-        /// 距离某单位最近的存活敌方单位（切比雪夫距离——docs/03 §3.3 八方向等价度量；
-        /// 等距平局取 unitId 升序=枚举序铁律）
-        /// </summary>
-        public static Unit FindNearestEnemy(BattleSimState sim, Unit self)
-        {
-            var enemies = FindEnemiesByDistance(sim, self);
-            return enemies.Count > 0 ? enemies[0] : null;
-        }
-
-        /// <summary>全部存活敌方单位按切比雪夫距离升序（等距平局 unitId 升序=枚举序铁律）——
+        /// <summary>全部存活敌方单位按欧氏 cm 距离升序（等距平局 unitId 升序=枚举序铁律；P5 度量迁移：
+        /// 切比雪夫格→欧氏厘米，蓝图 §3.1）——
         /// 低级单位换目标巡逻用（2026-09-26 拍板「当自己的任何攻击都无法打到时，换目标巡逻」：
         /// 逐敌试逼近步，贴身打不了/不可达的自动换下一个）；纯读不改状态。
         /// **AI 迷雾收口（2026-10-17 追拍三「AI 也受雾限」）**：雾内敌方不入列（敌方核心恒可见=
-        /// 攻城锚零回归）——眷属目标序/伙伴敌锚/FindNearestEnemy 三消费方一处收口；结算域勿走此口。
+        /// 攻城锚零回归）——眷属目标序/伙伴敌锚/FindAttackAim 三消费方一处收口；结算域勿走此口。
         /// **战术视距（2026-10-23 报障修复）**：判定走 PerceivesEnemy（雾账本可见或自身攻击视野内）
-        /// ——探索账本未覆盖的近处敌（≤攻击视野）照常入列，v7/J-4 语义在雾局恢复成立</summary>
+        /// ——探索账本未覆盖的近处敌（≤自身攻击视野）照常入列，v7/J-4 语义在雾局恢复成立</summary>
         public static List<Unit> FindEnemiesByDistance(BattleSimState sim, Unit self)
         {
             var selfId = self.GetUnitComponent<UnitIdentity>();
             var result = new List<Unit>();
             if (selfId == null) return result;
-            var selfPos = sim.GetPosition(self);
 
             foreach (var kv in sim.Units)
             {
@@ -172,7 +169,7 @@ namespace GIC.Battle
             }
             var distOf = new Dictionary<Unit, int>();
             foreach (var unit in result)
-                distOf[unit] = sim.GetPosition(unit).ChebyshevTo(selfPos); // 切比雪夫单源（BattleCell.ChebyshevTo）；顺删零消费的 posOf（2026-10-02 复审）
+                distOf[unit] = DistanceCm(sim, unit, self); // 欧氏 cm 单源（P5 迁移）；顺删零消费的 posOf（2026-10-02 复审）与零消费的 FindNearestEnemy（P5 退役）
             result.Sort((a, b) =>
             {
                 int da = distOf[a], db = distOf[b];
@@ -184,277 +181,245 @@ namespace GIC.Battle
             return result;
         }
 
-        // ==================== 方向与技能 ====================
+        // ==================== 连续空间原语与技能查询（P5：方向与技能段头——方向域已退役） ====================
+        // ==================== 连续空间原语（决策九十五 P5，蓝图 §6：tile A* + 向量瞄准 + 驻位点） ====================
 
-        /// <summary>
-        /// 十字逼近方向（朝目标的主轴先行：|dx|≥|dy| 走横轴、否则纵轴——切比雪夫域内只有走
-        /// 大差轴才缩短距离；等距取横轴=确定性约定）。dx=dy=0 返回 0（同格堆叠无逼近意义）
-        /// </summary>
-        public static Direction2D BestCrossApproachDirection(int dx, int dy)
+        /// <summary>两单位欧氏距离（厘米，整数截断——牛顿迭代平方根，零浮点纪律与
+        /// RTSMovementSystem.SqrtI 同式；评分域换算格=÷CellMetrics.CellSizeCm——AITuning
+        /// 「每格 X 分」评分系数保持格语义不漂移）。a/b 缺失=int.MaxValue（判缺席域勿 NaN）</summary>
+        public static int DistanceCm(BattleSimState sim, Unit a, Unit b)
         {
-            if (dx == 0 && dy == 0) return 0;
-            if (Math.Abs(dx) >= Math.Abs(dy))
-                return dx > 0 ? Direction2D.Right : Direction2D.Left;
-            return dy > 0 ? Direction2D.Up : Direction2D.Down;
+            if (sim == null || a == null || b == null) return int.MaxValue;
+            var pa = sim.GetPosCm(a);
+            var pb = sim.GetPosCm(b);
+            return DistCm(pa.x, pa.y, pb.x, pb.y);
         }
 
-        /// <summary>朝目标格的最短路首步（十字 BFS 绕行，2026-09-26 报障「低级单位不会绕路，一直卡在
-        /// 湖旁边」+同日二轮报障「走了两步后就再也不走了」）：替代直行方向分量——直行被湖/虚空/单位
-        /// 挡时按 BFS 拐弯绕行；小兵每回合重算走一步=逐回合沿最短路逼近。
-        /// **目标集=敌格十字邻格中「可通行且无阻挡单位占据」的格**——敌格本身剔除（走进必被敌挡弹回）
-        /// +被占/不可行邻格剔除（二轮报障根因：goal 豁免让小兵走进被占格/水格，结算弹回、被挡也算
-        /// 已使用→每回合原地弹回看起来再也不走）。通行=地形按移动者常态类型 IsPassable；阻挡=存活+
-        /// 尸体单位格（移动者开「与友方互不阻挡」时友方格放行——**注意：这是 MovementResolver.CanEnter
-        /// 的保守近似而非同口径**（2026-09-28 批5 复审勘正）：CanEnter 实为「占据者.BlockAllies 且双方
-        /// 都未开 flag」才挡、另有体积绝对层；此处只查移动者侧 flag 且一律视为阻挡——偏差全为保守向
-        /// （多绕路不会被结算弹回），现役低级单位全开 flag 时与 CanEnter 等价；首个不开 flag 的低级
-        /// 单位落地时须同步双侧条件）。
-        /// 返回 0=已贴身/同格/无路（缺席）。方向域=十字四向，方向纪律不变；枚举序展开=决策确定性。</summary>
-        public static Direction2D FindApproachFirstStep(BattleSimState sim, Unit self, BattleCell target,
-            List<BattleCell> reservedCells = null)
+        /// <summary>两点欧氏距离（厘米）——点位域消费方（支援站位评分/采集距离/驻位点）单源</summary>
+        public static int DistCm(int axCm, int azCm, int bxCm, int bzCm)
         {
-            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType,
-                reservedCells))
-                return 0;
-            var map = sim.Map;
-            if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
+            long dx = bxCm - axCm;
+            long dz = bzCm - azCm;
+            return SqrtI(dx * dx + dz * dz);
+        }
 
-            // BFS（十字域）：队列携带首步方向；到任一目标格即回传
-            var visited = new bool[map.width, map.height];
-            var queue = new Queue<(int x, int y, Direction2D first)>();
-            visited[from.x, from.y] = true;
-            foreach (var dir in CrossDirections)
+        /// <summary>整数平方根（牛顿迭代收敛后与平台无关——sim 决策域零浮点纪律）</summary>
+        private static int SqrtI(long value)
+        {
+            if (value <= 0) return 0;
+            int x = (int)Math.Sqrt(value); // 初值仅初始化（浮点不进结果）
+            while ((long)(x + 1) * (x + 1) <= value) x++;
+            while ((long)x * x > value) x--;
+            return x;
+        }
+
+        /// <summary>单位碰撞圆半径（cm）——受击圆柱直径同源（BattleMetrics.CylinderDiameterOf 格值×100，
+        /// per-unit 覆写〔协议核心 0.8〕+全局 0.5；RTSMovementSystem.RadiusCmOf 同式——驻位点接触钳消费）</summary>
+        public static int UnitRadiusCm(Unit unit)
+            => (int)Math.Round(BattleMetrics.CylinderDiameterOf(unit) * CellMetrics.CellSizeCm) / 2;
+
+        /// <summary>单位攻击射程（厘米，P5 取代格桥 AttackRangeOf）：全部可施放方向攻击技能
+        /// （Normal/Burst、非单位指向/自施放、伤害>0、消耗门槛过）能命中的最远 cm——
+        /// DirectionRangeCmOf 直读（不经 RangeCellsOf 格桥整除，150cm 类值不再抹尾）。
+        /// 无可施放方向攻击技能=0（驻位距离回落 0=贴身逼近）。纯读不查命中线——有射程≠有线
+        ///（无线时攻击档自然不产候选，勿在此混入线判定）</summary>
+        public static int AttackRangeCmOf(BattleSimState sim, Unit unit, string playerId)
+        {
+            int best = 0;
+            var skills = unit?.Skills;
+            if (skills == null) return 0;
+            for (int i = 0; i < skills.Count; i++)
             {
-                var delta = SkillHitResolver.DirectionToDelta(dir);
-                int nx = from.x + delta.x, ny = from.y + delta.y;
-                if (!map.HasTile(nx, ny) || visited[nx, ny]) continue;
-                if (occupied[nx, ny]) continue;
-                if (!map.IsPassable(nx, ny, forceType)) continue;
-                visited[nx, ny] = true;
-                if (goals[nx, ny]) return dir; // 一步贴身：直接到位
-                queue.Enqueue((nx, ny, dir));
+                var skill = skills[i];
+                var data = skill?.RawData;
+                if (data == null) continue;
+                if (data.skillType != SkillType.Normal && data.skillType != SkillType.Burst) continue;
+                if (data.IsUnitTargeted() || data.IsSelfCast()) continue;
+                if (!skill.CanCast(unit)) continue;
+                if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _)) continue;
+                if (EstimatePerTargetDamage(unit, data) <= 0) continue;
+                int range = EffectCompiler.DirectionRangeCmOf(data.timeline);
+                if (range > best) best = range;
             }
-            while (queue.Count > 0)
+            return best;
+        }
+
+        /// <summary>敌单位快照连续位（cm；posX/posZ 双零=未填态回落格心换算——快照文档口径）</summary>
+        private static (int x, int z) EnemyPosCm(UnitState enemy)
+        {
+            if (enemy.posX != 0 || enemy.posZ != 0) return (enemy.posX, enemy.posZ);
+            return ((int)((enemy.position.x + 0.5f) * CellMetrics.CellSizeCm),
+                (int)((enemy.position.y + 0.5f) * CellMetrics.CellSizeCm));
+        }
+
+        /// <summary>技能对某瞄准向量将实际命中的存活敌（AI 评分/预判目标清单——P5 取代格步进
+        /// PreviewLineTargets，蓝图 §4.1 线段×圆）：镜像 Host 结算形态——LineProjectile=射线×受击圆
+        /// **cm 精确版**（敌圆心=快照 posX/posZ 而非格心——P4-C HUD 预判族是格域近似版，两族配对勿混），
+        /// **首接触单位截停（含尸体——Host 同语义：纯尸体线=空表浪费行动不选）**，命中=接触点
+        /// AoE 半径内（AoERadius 资产 cm；0=单体回落受击圆半径 25cm——P4-C 口径）存活+雾限敌；
+        /// LineBurst=整线线段×受击圆（EffectCompiler.SegmentTouchesUnitCircle——Host 单源）。
+        /// 虚空截断=沿向半格采样首 void 格近缘。存活+雾限过滤=AI 雾限口径（追拍三：雾限决策不限结算；
+        /// **结算域 EffectCompiler 勿走此口**）</summary>
+        public static List<UnitState> PredictAimTargets(BattleSimState sim, BattleSnapshot snapshot,
+            TeamType casterTeam, Unit caster, SkillConfig.SkillData data, int aimX, int aimZ)
+        {
+            var result = new List<UnitState>();
+            if (sim == null || snapshot == null || caster == null || data == null) return result;
+            var v = SkillHitResolver.NormalizePerMille(aimX, aimZ);
+            if (v.x == 0 && v.y == 0) v = new UnityEngine.Vector2Int(1000, 0); // 零向量兜底=东（与 AimVectorOf 同向）
+            var from = sim.GetPosCm(caster);
+            int dirX = v.x, dirZ = v.y; // 千分单位向量（分量绝对值 ≤1000）
+
+            // 虚空截断（沿向半格=50cm 采样，与 EffectCompiler.PredictProjectileHits 同步长）
+            int maxRange = EffectCompiler.DirectionRangeCmOf(data.timeline);
+            int voidCut = -1;
+            for (int t = 50; t <= maxRange; t += 50)
             {
-                var cur = queue.Dequeue();
-                foreach (var dir in CrossDirections)
+                int px = from.x + dirX * t / 1000;
+                int pz = from.y + dirZ * t / 1000;
+                var cell = BattleCell.FromCm(px, pz);
+                if (sim.Map == null || !sim.Map.HasTile(cell.x, cell.y)) { voidCut = t - 25; break; }
+            }
+
+            var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
+            if (projClips.Count > 0)
+            {
+                // LineProjectile：首接触（含尸体）截停——逐敌求入射距离取最小者
+                bool skillOverride = projClips[0].hitDiameter > 0f;
+                int maxDist = voidCut >= 0 ? voidCut : maxRange + 50;
+                int bestEntry = int.MaxValue;
+                UnitState firstContact = null;
+                foreach (var enemy in snapshot.MainWorldUnits())
                 {
-                    var delta = SkillHitResolver.DirectionToDelta(dir);
-                    int nx = cur.x + delta.x, ny = cur.y + delta.y;
-                    if (!map.HasTile(nx, ny) || visited[nx, ny]) continue;
-                    if (occupied[nx, ny]) continue;
-                    if (!map.IsPassable(nx, ny, forceType)) continue;
-                    visited[nx, ny] = true;
-                    if (goals[nx, ny]) return cur.first; // 到达目标集：回传首步方向
-                    queue.Enqueue((nx, ny, cur.first));
+                    if ((TeamType)enemy.team == casterTeam) continue; // 含尸体（截停语义）；敌我=TeamType（C2）
+                    int radiusCm = (int)Math.Round((skillOverride ? projClips[0].hitDiameter
+                        : BattleMetrics.CylinderDiameterOf(enemy)) * CellMetrics.CellSizeCm) / 2;
+                    var ep = EnemyPosCm(enemy);
+                    long relX = ep.x - from.x, relZ = ep.z - from.y;
+                    long relSq = relX * relX + relZ * relZ;
+                    long rSq = (long)radiusCm * radiusCm;
+                    int entry;
+                    if (relSq <= rSq) entry = 0; // 发射即贴脸（同点堆叠）
+                    else
+                    {
+                        long along = (relX * dirX + relZ * dirZ) / 1000; // cm（千分向量点积÷1000）
+                        long perpSq = relSq - along * along;
+                        if (perpSq > rSq) continue; // 射线不穿该圆
+                        entry = (int)(along - SqrtI(rSq - perpSq));
+                    }
+                    if (entry >= 0 && entry <= maxDist && entry < bestEntry)
+                    { bestEntry = entry; firstContact = enemy; }
                 }
+                if (firstContact == null) return result;
+                // 命中集=接触点 AoE 半径内存活+雾限敌
+                int aoeCm = data.GetInt(SkillParamKey.AoERadius, 0);
+                if (aoeCm <= 0) aoeCm = 25;
+                int hx = from.x + dirX * bestEntry / 1000;
+                int hz = from.y + dirZ * bestEntry / 1000;
+                foreach (var enemy in snapshot.MainWorldUnits())
+                {
+                    if ((TeamType)enemy.team == casterTeam) continue;
+                    if (enemy.isCorpse != 0 || !sim.IsEnemyStateVisibleTo(casterTeam, enemy)) continue; // AI 雾限（追拍三）
+                    var ep = EnemyPosCm(enemy);
+                    long ddx = ep.x - hx, ddz = ep.z - hz;
+                    if (ddx * ddx + ddz * ddz <= (long)aoeCm * aoeCm) result.Add(enemy);
+                }
+                return result;
             }
-            return 0; // 无路（真不可达）：缺席
+
+            // LineBurst：整线线段×受击圆——SegmentTouchesUnitCircle（Host CompileLineBurstSegment 单源）
+            int maxDistBurst = voidCut >= 0 ? voidCut : maxRange;
+            int endX = from.x + dirX * maxDistBurst / 1000;
+            int endZ = from.y + dirZ * maxDistBurst / 1000;
+            foreach (var enemy in snapshot.MainWorldUnits())
+            {
+                if ((TeamType)enemy.team == casterTeam) continue;
+                if (enemy.isCorpse != 0 || !sim.IsEnemyStateVisibleTo(casterTeam, enemy)) continue;
+                if (EffectCompiler.SegmentTouchesUnitCircle(from.x, from.y, endX, endZ, enemy)) result.Add(enemy);
+            }
+            return result;
         }
 
-        /// <summary>goals 是否存在任一可用格（攻城墙扩展的「一圈全堵才外扩」判据，2026-10-24）</summary>
-        private static bool HasAnyGoal(bool[,] goals)
+        /// <summary>首个可命中存活敌的瞄准向量（P5 取代十字向 FindAttackDirection——低级单位/共享
+        /// 骨架攻击档的任意角瞄准口）：可见敌距离序逐敌试瞄（aim=自身→敌向量千分），
+        /// PredictAimTargets 非空即命中——首个可命中敌即返回（旧「首个可命中十字向」语义的连续版；
+        /// 确定性=FindEnemiesByDistance 距离+unitId 序，零 roll）。全部敌不可命中=false（aimX/aimZ=0）
+        /// ——纯尸体线/全被虚空截断/全超射程均落空。targetsInto=命中清单（评分消费，调用方复用）</summary>
+        public static bool FindAttackAim(BattleSimState sim, BattleSnapshot snapshot, Unit self,
+            BaseSkill skill, out int aimX, out int aimZ, List<UnitState> targetsInto)
         {
-            for (int x = 0; x < goals.GetLength(0); x++)
-                for (int y = 0; y < goals.GetLength(1); y++)
-                    if (goals[x, y]) return true;
+            aimX = 0; aimZ = 0;
+            if (targetsInto != null) targetsInto.Clear();
+            var identity = self.GetUnitComponent<UnitIdentity>();
+            var data = skill?.RawData;
+            if (identity == null || data == null) return false;
+            var from = sim.GetPosCm(self);
+            foreach (var enemy in FindEnemiesByDistance(sim, self))
+            {
+                var enemyPos = sim.GetPosCm(enemy);
+                int dx = enemyPos.x - from.x;
+                int dz = enemyPos.y - from.y;
+                int dist = SqrtI((long)dx * dx + (long)dz * dz);
+                int vx, vz;
+                if (dist <= 0) { vx = 1000; vz = 0; } // 同点堆叠：东兜底（与 AimVectorOf 同向）
+                else { vx = dx * 1000 / dist; vz = dz * 1000 / dist; }
+                var targets = PredictAimTargets(sim, snapshot, identity.Team, self, data, vx, vz);
+                if (targets.Count == 0) continue;
+                aimX = vx; aimZ = vz;
+                if (targetsInto != null) { targetsInto.Clear(); targetsInto.AddRange(targets); }
+                return true;
+            }
             return false;
         }
 
-        /// <summary>逼近场构建（FindApproachFirstStep/FindApproachStraightSteps 共用口径，防双份漂移
-        /// ——2026-10-03 抽提）：同格判定+单位占据格（含尸体；互不阻挡开启时友方格放行=CanEnter 的
-        /// 保守近似，细节与同步条件见 FindApproachFirstStep 注释）+目标集（敌格十字邻格中「可通行且
-        /// 无阻挡占据」的格）。false=同格/地图无效（调用方一律按"无逼近"处理）。
-        /// I-D 移动意图占位（docs/archive/37 §5，2026-10-04）：reservedCells=意图板已声明的落点
-        ///（前位伙伴/玩家魔神的决策落点）——后位 BFS 视作占位避让（集团推进不互撞）；null=零行为
-        /// 变化（眷属/配额路径不传）。
-        /// targetCellAsGoal（2026-10-28 采集档返修，安柏振荡报障）：目标格**本身**入目标集
-        ///（站立/途经采集语义——堆格不是敌人，采集要站上去而非贴邻；目标可停即唯一 goal，被堵→
-        /// 目标格作环扩展种子=邻格悬停待位，占者离开下回合自愈）。默认 false=攻击接近语义零变化。</summary>
-        private static bool BuildApproachField(BattleSimState sim, Unit self, BattleCell target,
-            out bool[,] occupied, out bool[,] goals, out BattleCell from, out ForceType forceType,
-            List<BattleCell> reservedCells = null, bool targetCellAsGoal = false)
+        /// <summary>锚单位驻位目标点（cm，P5 移动档核心——「进攻击范围即停」CR-Move 的连续版）：
+        /// 沿 anchor→self 方向、距 anchor 中心 standoffCm 处的点；standoff&lt;=0=anchor 本位（贴身接触，
+        /// 执行层碰撞圆停于接触前）。**接触钳**：standoff 小于双方碰撞圆半径和+10cm 时钳到接触外——
+        /// 驻位点不得站进碰撞域（目标格不可走时执行侧 RTSPathfinder 钳最近可走格，brain 不再预判格可走性）</summary>
+        public static Vector2IntCm StandoffTargetCm(BattleSimState sim, Unit self, Unit anchor, int standoffCm)
         {
-            occupied = null; goals = null;
-            from = new BattleCell(0, 0);
-            forceType = ForceType.Walk;
-            var map = sim.Map;
-            if (map == null || map.width <= 0 || map.height <= 0) return false;
-            from = sim.GetPosition(self);
-            if (from.x == target.x && from.y == target.y) return false; // 同格：无逼近意义
+            var anchorPos = sim.GetPosCm(anchor);
+            if (standoffCm <= 0) return new Vector2IntCm(anchorPos.x, anchorPos.y);
+            var selfPos = sim.GetPosCm(self);
+            int dx = selfPos.x - anchorPos.x;
+            int dz = selfPos.y - anchorPos.y;
+            int dist = SqrtI((long)dx * dx + (long)dz * dz);
+            if (dist <= 0) return new Vector2IntCm(anchorPos.x, anchorPos.y); // 同点堆叠：锚本位
+            int standoff = Math.Max(standoffCm, UnitRadiusCm(self) + UnitRadiusCm(anchor) + 10);
+            return new Vector2IntCm(anchorPos.x + dx * standoff / dist,
+                anchorPos.y + dz * standoff / dist);
+        }
 
+        /// <summary>驻位目标点（点位版——锚位非在场单位实体时消费：先锋外推追逐位/资源堆格心等）；
+        /// 接触钳按通用受击圆 25cm+自身半径计（锚半径未知时保守），语义同 <see cref="StandoffTargetCm"/></summary>
+        public static Vector2IntCm StandoffPointCm(BattleSimState sim, Unit self, int anchorXCm, int anchorZCm, int standoffCm)
+        {
+            if (standoffCm <= 0) return new Vector2IntCm(anchorXCm, anchorZCm);
+            var selfPos = sim.GetPosCm(self);
+            int dx = selfPos.x - anchorXCm;
+            int dz = selfPos.y - anchorZCm;
+            int dist = SqrtI((long)dx * dx + (long)dz * dz);
+            if (dist <= 0) return new Vector2IntCm(anchorXCm, anchorZCm);
+            int standoff = Math.Max(standoffCm, UnitRadiusCm(self) + 25 + 10);
+            return new Vector2IntCm(anchorXCm + dx * standoff / dist, anchorZCm + dz * standoff / dist);
+        }
+
+        /// <summary>路径可达性预判（v8 可达性语义的连续版）：RTSPathfinder 从自身到目标点寻路——
+        /// 不可达（被地形/尸体围死）=false，防「追一个永远打不到的目标傻站不攻城」。占用避让
+        /// （旧 I-D 移动意图占位）随 BFS 退役——执行层 A* 尸体/地形硬挡+友军可穿，真阻挡由
+        /// 碰撞收尾（被挡停+下拍重决策）自然吸收</summary>
+        public static bool PathReachable(BattleSimState sim, Unit self, int toXCm, int toZCm)
+        {
+            if (sim == null || self == null) return false;
+            var pos = sim.GetPosCm(self);
+            if (pos.x == toXCm && pos.y == toZCm) return true; // 已到=可达
             var moveable = self.GetUnitComponent<UnitMoveable>();
-            forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
-            bool passAllies = moveable != null && moveable.与友方互不阻挡;
-            var selfIdentity = self.GetUnitComponent<UnitIdentity>();
-
-            // 单位占据格（含尸体——尸体保留碰撞）：自身除外；互不阻挡开启时友方格放行
-            occupied = new bool[map.width, map.height];
-            foreach (var kv in sim.Units)
-            {
-                var pos = sim.GetPosition(kv.Value);
-                if (pos.x == from.x && pos.y == from.y) continue;
-                bool isAlly = false;
-                if (passAllies && selfIdentity != null)
-                {
-                    var id = kv.Value.GetUnitComponent<UnitIdentity>();
-                    isAlly = id != null && id.Team == selfIdentity.Team;
-                }
-                if (!isAlly && pos.x >= 0 && pos.x < map.width && pos.y >= 0 && pos.y < map.height)
-                    occupied[pos.x, pos.y] = true;
-            }
-
-            // 目标集：targetCellAsGoal=目标格本身（2026-10-28 采集档返修——采集要**站上**堆格而非
-            // 贴邻：旧口径把堆格传进攻击接近场，目标集=堆的十字邻格，采集者被引去邻格永远站不上堆、
-            // 邻格间左右乒乓；目标可停即唯一 goal，被堵→以目标格为种子走下方环扩展兜底）；
-            // 否则=敌格十字邻格中「可通行 + 无阻挡单位占据」的格（敌在水里时取岸格；
-            // 被占/不可行邻格一律剔除——否则小兵走进去每回合被弹回=二轮报障根因）
-            goals = new bool[map.width, map.height];
-            var blockedRing = new List<BattleCell>(); // 被堵格（攻城墙扩展的种子，见下）
-            if (targetCellAsGoal)
-            {
-                if (map.HasTile(target.x, target.y)
-                    && map.IsPassable(target.x, target.y, forceType) && !occupied[target.x, target.y])
-                    goals[target.x, target.y] = true;
-                else
-                    blockedRing.Add(target);
-            }
-            else
-            {
-                foreach (var dir in CrossDirections)
-                {
-                    var delta = SkillHitResolver.DirectionToDelta(dir);
-                    int gx = target.x + delta.x, gy = target.y + delta.y;
-                    if (!map.HasTile(gx, gy)) continue;
-                    if (!map.IsPassable(gx, gy, forceType) || occupied[gx, gy])
-                    {
-                        blockedRing.Add(new BattleCell(gx, gy));
-                        continue;
-                    }
-                    goals[gx, gy] = true;
-                }
-            }
-            // 攻城墙扩展（2026-10-24 用户 2v2 实战实锤）：核心四邻被己方建筑/单位环墙全部堵满时
-            // goals 空→多源 BFS 无源→「真不可达」→敌侧骑士全目标 0 步→DecideOne=null 原地挂机
-            //（实局取证：AI_2 四骑士站召唤格 10+ 回合零决策）。修复语义：一圈全堵时逐环外扩——
-            // 贴墙格=墙单位自身的攻击位，骑士站定后探索账本揭示墙单位（雾「贴身 1 格自愈」链补全），
-            // 下回合起挥棒拆墙，破墙后核心恢复可近；有任一开放邻格时零行为变化（本块不触发）。
-            // expanded 防重：阻塞格互邻时防环；外扩环天然受地图边界约束，guard 为兜底保险。
-            if (blockedRing.Count > 0 && !HasAnyGoal(goals))
-            {
-                var expanded = new bool[map.width, map.height];
-                foreach (var b in blockedRing) expanded[b.x, b.y] = true;
-                int guard = 0;
-                while (blockedRing.Count > 0 && !HasAnyGoal(goals) && guard++ < 32)
-                {
-                    var nextRing = new List<BattleCell>();
-                    foreach (var b in blockedRing)
-                        foreach (var dir in CrossDirections)
-                        {
-                            var delta = SkillHitResolver.DirectionToDelta(dir);
-                            int gx = b.x + delta.x, gy = b.y + delta.y;
-                            if (!map.HasTile(gx, gy)) continue;
-                            if (gx == target.x && gy == target.y) continue; // 目标本体格不入目标集
-                            if (!map.IsPassable(gx, gy, forceType) || occupied[gx, gy])
-                            {
-                                if (!expanded[gx, gy]) { expanded[gx, gy] = true; nextRing.Add(new BattleCell(gx, gy)); }
-                                continue;
-                            }
-                            goals[gx, gy] = true;
-                        }
-                    blockedRing = nextRing;
-                }
-            }
-            // I-D 移动意图占位：前位已声明落点并入 occupied（越界格跳过；声明口径=乐观落点，
-            // 结算偏差保守向——多绕路不会死锁，真实结算后下回合重算吸收）
-            if (reservedCells != null)
-            {
-                foreach (var rc in reservedCells)
-                {
-                    if (rc.x >= 0 && rc.x < map.width && rc.y >= 0 && rc.y < map.height)
-                        occupied[rc.x, rc.y] = true;
-                }
-            }
-            return true;
+            var forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
+            var path = RTSPathfinder.FindPath(sim, pos.x, pos.y, toXCm, toZCm, forceType);
+            // FindPath 不可达/钳回起点=「原地单点」——真路径=多于一点或末点异于起点
+            return path != null && (path.Count > 1 || path[0].x != pos.x || path[0].z != pos.y);
         }
 
-        /// <summary>沿 BFS 最短路的「直线前缀」步数（2026-10-03 报障「丘丘人来回左右移动持续多回合」
-        /// 返修原语——眷属 v6 多格移动专用）：从单位位到目标攻击位集的最短路上，沿首步方向**不拐弯**
-        /// 能连续走几格——只踏「到攻击位距离严格递减」的最短路格，**踏上攻击位（dist=0）即停不越过**。
-        /// 与「首步方向×N 直线飞」（旧 v6 写法=振荡根源：L 形路径越拐点偏航+越过攻击位不停，下回合
-        /// BFS 指回程=左右乒乓，打不进射程就永不收敛）的区别：每回合距离单调递减，数学上不可能振荡。
-        /// 返回 0=已贴身/同格/无路（与 FindApproachFirstStep 同判）；direction out=四向中
-        /// **最长递减直线段**的方向（2026-10-04 择优——旧为十字序首个递减向；同长保持十字序）。
-        /// 口径=BuildApproachField 共用（保守近似同 FindApproachFirstStep 注释）。
-        /// targetCellAsGoal（2026-10-28 采集档返修）：目标格本身入目标集——dist=「到目标格的步数」，
-        /// dist=0=踏上目标格即停（采集档消费：站上堆格，回合末自动采集+途经采集落在同停点）。</summary>
-        public static int FindApproachStraightSteps(BattleSimState sim, Unit self, BattleCell target,
-            int maxSteps, out Direction2D direction, List<BattleCell> reservedCells = null,
-            bool targetCellAsGoal = false)
-        {
-            direction = 0;
-            if (maxSteps <= 0) return 0;
-            if (!BuildApproachField(sim, self, target, out var occupied, out var goals, out var from, out var forceType,
-                reservedCells, targetCellAsGoal))
-                return 0;
-            var map = sim.Map;
-            if (goals[from.x, from.y]) return 0; // 已贴身（站合法邻格）：无逼近意义
-
-            // 多源 BFS（自攻击位集反向扩散）：每格到最近攻击位的步数 dist
-            var dist = new int[map.width, map.height];
-            var queue = new Queue<(int x, int y)>();
-            for (int x = 0; x < map.width; x++)
-                for (int y = 0; y < map.height; y++)
-                {
-                    if (goals[x, y]) { dist[x, y] = 0; queue.Enqueue((x, y)); }
-                    else dist[x, y] = -1;
-                }
-            while (queue.Count > 0)
-            {
-                var cur = queue.Dequeue();
-                foreach (var dir in CrossDirections)
-                {
-                    var delta = SkillHitResolver.DirectionToDelta(dir);
-                    int nx = cur.x + delta.x, ny = cur.y + delta.y;
-                    if (!map.HasTile(nx, ny) || dist[nx, ny] >= 0) continue;
-                    if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) continue;
-                    dist[nx, ny] = dist[cur.x, cur.y] + 1;
-                    queue.Enqueue((nx, ny));
-                }
-            }
-            if (dist[from.x, from.y] < 0) return 0; // 无路（真不可达）
-
-            // 直线段择优（2026-10-04 寻路优化，docs/18 决策三十八）：十字四向各算一条「距离严格
-            // 递减直线段」的长度，取**最长**者为本回合推进向。旧版取十字序首个递减向——选中向
-            // 1 步即拐点/撞地形时富余预算被整段丢弃（凯亚 T3 实证：Right 递减段 1 步撞水、Up 向
-            // 递减段更长，枚举序却取了 Right=整回合只走 1 格）。同长保持十字序（确定性不动）；
-            // 每格仍严格递减=每回合单调收敛的防振荡性质保持。
-            int bestLen = 0;
-            foreach (var dir in CrossDirections)
-            {
-                var delta = SkillHitResolver.DirectionToDelta(dir);
-                // 该向严格递减直线段长度：距离不严格递减（拐弯/绕行起点）即停；被地形/单位挡即停；
-                // 踏上攻击位（dist=0）即停——到位不越点（逐格判定与旧版推进环同口径）
-                int len = 0;
-                int cx = from.x, cy = from.y;
-                while (len < maxSteps)
-                {
-                    int nx = cx + delta.x, ny = cy + delta.y;
-                    if (!map.HasTile(nx, ny)) break;
-                    if (occupied[nx, ny] || !map.IsPassable(nx, ny, forceType)) break;
-                    if (dist[nx, ny] != dist[cx, cy] - 1) break; // 偏离最短路：停在拐点，下回合重算换向
-                    len++;
-                    cx = nx; cy = ny;
-                    if (dist[cx, cy] == 0) break; // 踏上攻击位：本回合到此为止
-                }
-                if (len > bestLen)
-                {
-                    bestLen = len;
-                    direction = dir;
-                }
-            }
-            return bestLen; // 0=四向均无递减首步（同旧版无路口径）
-        }
 
         /// <summary>单位技能实例列表中首个指定类型技能的索引（-1=无）——遍历 unit.Skills
         /// 实例（与 SkillExecutor.GetSkill 同源索引；RawData.skills 空槽不进实例表，勿混用）</summary>
@@ -467,77 +432,6 @@ namespace GIC.Battle
                 if (skills[i]?.RawData?.skillType == skillType) return i;
             }
             return -1;
-        }
-
-        /// <summary>
-        /// 技能可开火的首个十字方向（低级单位简化预判用；AI 玩家脑评分制逐向自评勿走此口）。
-        /// 预判=技能实例 WouldHitEnemyInDirection（与 HUD 瞄准推荐/结算形态同源，docs/18 决策九 D5
-        /// 工厂强制同形）+ 存活目标校验（纯尸体线=浪费行动不选）。返回 0=无可命中方向
-        /// </summary>
-        public static Direction2D FindAttackDirection(BattleSimState sim, BattleSnapshot snapshot,
-            Unit self, BaseSkill skill)
-        {
-            var identity = self.GetUnitComponent<UnitIdentity>();
-            if (identity == null || skill == null) return 0;
-            var from = sim.GetPosition(self);
-            foreach (var direction in CrossDirections)
-            {
-                if (!skill.WouldHitEnemyInDirection(sim.Map, snapshot, identity.Team, from, direction))
-                    continue;
-                if (PreviewLineTargets(sim, snapshot, identity.Team, from, skill.RawData, direction).Count == 0)
-                    continue;
-                return direction;
-            }
-            return 0;
-        }
-
-        /// <summary>
-        /// 该方向上技能将实际命中的存活敌方（评分/预判共用的目标清单）——镜像 EffectCompiler
-        /// 判定两分支同口径：LineProjectile=投射物首停格（含尸体截停=Host 同语义）该格存活敌全中；
-        /// LineBurst/无时轮=射程（clip.maxRange，缺省 24）内整线存活敌全中。纯尸体线返回空表
-        /// （伤害打尸体=浪费，评分口径按存活目标计）。
-        /// **AI 迷雾收口（2026-10-17 追拍三）**：雾内敌方不入目标清单（核心恒可见）——眷属
-        /// FindAttackDirection（WouldHit 预检的超集无碍：雾内敌不产开火方向）/伙伴评分/威胁图
-        /// 三消费方一处收口；**结算域（EffectCompiler）勿走此口**（雾限决策不限结算）
-        /// </summary>
-        public static List<UnitState> PreviewLineTargets(BattleSimState sim, BattleSnapshot snapshot,
-            TeamType casterTeam, BattleCell from, SkillConfig.SkillData skillData, Direction2D direction)
-        {
-            var result = new List<UnitState>();
-            var delta = SkillHitResolver.DirectionToDelta(direction);
-
-            // 投射物形态：首个敌方占格（含尸体）截停，命中格 AoE 同格存活敌全中
-            // （P3 cm 化适配：clip.maxRange 资产迁厘米——RangeCellsOf 桥回格域步进，AI 逐格预判零改动）
-            var projClips = SkillTimelineQuery.JudgmentClips(skillData?.timeline, SkillJudgmentKind.LineProjectile);
-            if (projClips.Count > 0)
-            {
-                int maxRange = EffectCompiler.RangeCellsOf(projClips[0].maxRange);
-                for (int step = 1; step <= maxRange; step++)
-                {
-                    var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
-                    if (!sim.Map.HasTile(cell.x, cell.y)) break; // 虚空截断
-                    var enemies = SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell);
-                    if (enemies.Count == 0) continue;
-                    foreach (var enemy in enemies)
-                        if (enemy.isCorpse == 0 && sim.IsEnemyStateVisibleTo(casterTeam, enemy))
-                            result.Add(enemy); // AI 雾限（追拍三）
-                    break; // 首停
-                }
-                return result;
-            }
-
-            // 整线/距离段形态：射程内存活敌全中（虚空截断、无截停）
-            var burstClips = SkillTimelineQuery.JudgmentClips(skillData?.timeline, SkillJudgmentKind.LineBurst);
-            int range = EffectCompiler.RangeCellsOf(burstClips.Count > 0 ? burstClips[0].maxRange : 0);
-            for (int step = 1; step <= range; step++)
-            {
-                var cell = new BattleCell(from.x + delta.x * step, from.y + delta.y * step);
-                if (!sim.Map.HasTile(cell.x, cell.y)) break;
-                foreach (var enemy in SkillHitResolver.FindEnemiesAt(snapshot, casterTeam, cell))
-                    if (enemy.isCorpse == 0 && sim.IsEnemyStateVisibleTo(casterTeam, enemy))
-                        result.Add(enemy); // AI 雾限（追拍三）
-            }
-            return result;
         }
 
         /// <summary>
@@ -590,44 +484,6 @@ namespace GIC.Battle
             return false;
         }
 
-        /// <summary>
-        /// 单位方向攻击射程（CR-Move 驻位基准，2026-10-02 拍板「像皇室战争那样」）：全部可施放
-        /// 方向攻击技能（Normal/Burst、非单位指向/自施放、伤害>0、消耗门槛过）能命中的最远格数。
-        /// 射程语义与 PreviewLineTargets 两分支**完全同口径**（投射物=clip.maxRange 缺省 24 截停；
-        /// 整线=clip.maxRange 缺省 24——安柏箭矢/箭雨未配 maxRange=全图 24 狙击射程；凯亚霜袭=2；
-        /// 芭芭拉水球=5）。无可施放方向攻击技能=0（驻位距离回落 0=贴身逼近）。
-        /// 纯读不 roll 不查命中线——有射程≠有线（无线时走对齐/兜底链，勿在此混入线判定）
-        /// </summary>
-        public static int AttackRangeOf(BattleSimState sim, Unit unit, string playerId)
-        {
-            int best = 0;
-            var skills = unit?.Skills;
-            if (skills == null) return 0;
-            for (int i = 0; i < skills.Count; i++)
-            {
-                var skill = skills[i];
-                var data = skill?.RawData;
-                if (data == null) continue;
-                if (data.skillType != SkillType.Normal && data.skillType != SkillType.Burst) continue;
-                if (data.IsUnitTargeted() || data.IsSelfCast()) continue;
-                if (!skill.CanCast(unit)) continue;
-                if (!ResourceGate.HasAll(sim, unit, playerId, data.costs, out _)) continue;
-                if (EstimatePerTargetDamage(unit, data) <= 0) continue;
-
-                int range;
-                var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
-                if (projClips.Count > 0)
-                    range = EffectCompiler.RangeCellsOf(projClips[0].maxRange); // P3 cm→格桥
-                else
-                {
-                    var burstClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst);
-                    range = EffectCompiler.RangeCellsOf(burstClips.Count > 0 ? burstClips[0].maxRange : 0);
-                }
-                if (range > best) best = range;
-            }
-            return best;
-        }
-
         /// <summary>技能参数表查参数（EffectCompiler.FindParam 同构私有出口）</summary>
         private static SkillParam FindParam(SkillConfig.SkillData skillData, SkillParamKey key)
         {
@@ -637,10 +493,11 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>单位支援半径（F-1 支援锚驻位分流，docs/archive/34 §5.1）：技能集内全部
-        /// Heal 原子（OnCast/OnHit）的 radiusKey 参数最大值（GetInt 缺省 1——与
-        /// EnumerateSkillHeals 的半径提取同口径）；无治疗原子=0（非支援型天然不消费）。
-        /// 伤员锚驻位距离=此值（贴身奶），敌锚仍=AttackRangeOf</summary>
+        /// <summary>单位支援半径（F-1 支援锚驻位分流，docs/archive/34 §5.1）——**厘米**（P3 资产迁移后
+        /// 治疗半径参数=cm 本口直读；P5 拆「格消费方」错配：此前消费方按切比雪夫格比较 100cm 值=
+        /// 恒在奶程内的站桩错配随 P5-C 欧氏化修复）：技能集内全部 Heal 原子（OnCast/OnHit）的
+        /// radiusKey 参数最大值（GetInt 缺省 100=1 格——与 EnumerateSkillHeals 半径提取同口径）；
+        /// 无治疗原子=0（非支援型天然不消费）。伤员锚驻位距离=此值（贴身奶），敌锚仍=AttackRangeCmOf</summary>
         public static int SupportRadiusOf(Unit unit)
         {
             int best = 0;
@@ -654,50 +511,18 @@ namespace GIC.Battle
                 {
                     if (atom == null || atom.kind != SkillEffectKind.Heal) continue;
                     if (atom.trigger != SkillEffectTrigger.OnCast && atom.trigger != SkillEffectTrigger.OnHit) continue;
-                    int radius = atom.radiusKey != SkillParamKey.None ? data.GetInt(atom.radiusKey, 1) : 1;
+                    int radius = atom.radiusKey != SkillParamKey.None
+                        ? data.GetInt(atom.radiusKey, CellMetrics.CellSizeCm) : CellMetrics.CellSizeCm;
                     if (radius > best) best = radius;
                 }
             }
             return best;
         }
 
-        /// <summary>沿 BFS 最短路的「首段直线前缀」（G-5 修 1，docs/archive/35 §4——伙伴锚循环
-        /// 移动语义直线前缀化，眷属 v6.1/FindApproachStraightSteps 同族防歪）：BFS 首步方向上
-        /// 逐格推进，「到目标 BFS 距离严格递减」判据截断=路径开头的连续直线段（钳 maxSteps 与
-        /// 该向地形可行程）。治「BFS 首步×N 直线飞越路径拐点」（环湖绕行首步=Left 被直线化
-        /// 执行成纯西行滑边——2026-10-03 探针实证，docs/14 §114 同族）。不可达/无直线段=
-        ///（direction=0, steps=0）
-        /// 【2026-10-04 退役】：切比判据在绕行段恒短前缀=「凯亚开局只走 1 格」根因（§115 坑⑧），
-        /// 最后一处生产调用点（伙伴锚循环）已换 FindApproachStraightSteps（BFS dist 场递减判据）。
-        /// **勿新增消费方**——绕行/集团拥挤场景一律用 FindApproachStraightSteps。</summary>
-        public static void ApproachStraightPrefix(BattleSimState sim, Unit unit, BattleCell to,
-            int maxSteps, out Direction2D direction, out int steps)
-        {
-            direction = FindApproachFirstStep(sim, unit, to);
-            steps = 0;
-            if (direction == 0 || maxSteps <= 0) { direction = 0; return; }
-
-            var delta = SkillHitResolver.DirectionToDelta(direction);
-            var from = sim.GetPosition(unit);
-            var forceType = unit.GetUnitComponent<UnitMoveable>()?.NormalMoveType ?? ForceType.Walk;
-            int prevDist = Math.Max(Math.Abs(to.x - from.x), Math.Abs(to.y - from.y));
-            int run = 0;
-            for (int s = 1; s <= maxSteps; s++)
-            {
-                var cell = new BattleCell(from.x + delta.x * s, from.y + delta.y * s);
-                if (!sim.Map.HasTile(cell.x, cell.y)) break;
-                if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) break;
-                int nextDist = Math.Max(Math.Abs(to.x - cell.x), Math.Abs(to.y - cell.y));
-                if (nextDist >= prevDist) break; // 距离不减=越过路径拐点（直线前缀终点）
-                prevDist = nextDist;
-                run++;
-            }
-            steps = run;
-            if (run <= 0) direction = 0;
-        }
-
         /// <summary>单位光环半径（G-1 光环位置价值，docs/archive/35：持有「半径型 tick 光环」Buff
-        /// 的有效作用半径——光环挂水/挂冰引擎的贴敌驱动力来源）。读取=BuffConfig.AuraRadius 虚属性
+        /// 的有效作用半径——光环挂水/挂冰引擎的贴敌驱动力来源）——**厘米**（P3 资产迁移后
+        /// BuffConfig.AuraRadius=cm〔冰棱/歌声之环=100〕，P5 起消费方欧氏 cm 比较）。
+        /// 读取=BuffConfig.AuraRadius 虚属性
         /// 单源（2026-10-20 审查批#6：原 is-pattern 白名单退役——新光环族=BuffConfig 子类覆写，
         /// 本口/AuraRadiusOfBuffType/客户端预估三处全通）；无光环=0（天然不消费）。
         /// **静态基础值口径**：命座加成在 Buff 类内部结算——本原语取基础值=保守感知（命座单位感知
@@ -717,5 +542,46 @@ namespace GIC.Battle
         /// switch 白名单退役）——与运行时结算同源</summary>
         public static int AuraRadiusOfBuffType(BuffType type)
             => BuffConfig.OfType(type)?.AuraRadius ?? 0;
+
+        // ==================== AI 施放节流（决策九十五 P5-D——tick 时代无 CD 技能刷屏防线） ====================
+
+        /// <summary>最近实际施放 tick 记账（key=unitId|skillIndex）。**写=SkillExecutor 全 gate
+        /// 通过后**（RecordSkillCast）——决策侧只读不写：预测器（OpponentThreatModel.DecideOne 直跑）
+        /// 与观察局旁听同权威决策幂等（一步收敛不动点契约保持）。静态生命周期=进程——
+        /// sim 实例号自清（2026-10-15 四定案②：新静态 AI 注册表一律 InstanceId）</summary>
+        private static readonly Dictionary<string, int> _lastAiCastTick = new Dictionary<string, int>();
+        private static int _lastThrottleSim = -1;
+
+        /// <summary>AI 候选施放节流查询（纯读）：距该单位该技能最近一次实际施放不足
+        /// AITuning「AI 重施最短间隔 tick」=节流中（不产候选）。三脑候选域统一消费——tick 制无 CD
+        /// 技能（延奏/变奏/治疗族）在 0.5s 决策节拍下会每拍施放：自我延奏刷分+治疗刷屏把伤害完全
+        /// 抵消=无人死亡的死水僵局（P5-D 双 AI 观察局实锤：U177 承伤 160/30s 但被奶回、全场零死亡）。
+        /// 攻击技能不受影响（战技 CD 60/爆发 CD 100 tick 恒大于缺省 40）；0=关闭节流</summary>
+        public static bool AiCastThrottled(BattleSimState sim, string unitId, int skillIndex)
+        {
+            if (sim == null || string.IsNullOrEmpty(unitId)) return false;
+            int interval = AITuningConfig.Instance.AI重施最短间隔tick;
+            if (interval <= 0) return false;
+            if (sim.InstanceId != _lastThrottleSim)
+            {
+                _lastAiCastTick.Clear();
+                _lastThrottleSim = sim.InstanceId;
+            }
+            return _lastAiCastTick.TryGetValue(unitId + "|" + skillIndex, out int last)
+                && sim.CurrentTick - last < interval;
+        }
+
+        /// <summary>记录一次实际施放（SkillExecutor 全 gate 通过后调——真人施放同记账：
+        /// 语义=「该单位该技能最近一次实际出招」，真人占用同样构成 AI 侧节流窗）</summary>
+        public static void RecordSkillCast(BattleSimState sim, string unitId, int skillIndex)
+        {
+            if (sim == null || string.IsNullOrEmpty(unitId)) return;
+            if (sim.InstanceId != _lastThrottleSim)
+            {
+                _lastAiCastTick.Clear();
+                _lastThrottleSim = sim.InstanceId;
+            }
+            _lastAiCastTick[unitId + "|" + skillIndex] = sim.CurrentTick;
+        }
     }
 }
