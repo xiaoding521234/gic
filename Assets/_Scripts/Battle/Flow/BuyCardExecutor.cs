@@ -73,7 +73,7 @@ namespace GIC.Battle
                     BattleCommand.StatKindMora, -cost));
             transport?.HostSend(BattleMessageType.Segment, new SegmentMessage { segment = segment });
             BattleRecorder.CaptureSegment(segment); // 回放断言面（生成的购买段进命令流 diff）
-            BattleRecorder.CaptureInstantAction(action.turnNumber, action); // 行动行（CaptureActions 时前置合并）
+            BattleRecorder.CaptureSubmittedAction(action); // 回放 v2：购买行动直落 submit 行（带 submitTick）
             GICLog.Info($"[BuyCard] {action.playerId} 购买 {cardId}（摩拉 {cost}）");
             return true;
         }

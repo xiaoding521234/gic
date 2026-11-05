@@ -51,9 +51,6 @@ namespace GIC.Battle
         /// <summary>阶段变化（Selecting/Resolving/Finished；参数=阶段、回合数）</summary>
         public event Action<BattlePhase, int> OnPhaseChanged;
 
-        /// <summary>选择倒计时归零（参数=回合数；客户端=本地倒数归零自动完成选择，host 仍权威兜底）</summary>
-        public event Action<int> OnSelectTimerExpired;
-
         public BattlePhase Phase => Flow != null ? Flow.Phase
             : (Player != null ? Player.ClientPhase : BattlePhase.Idle);
 
@@ -183,7 +180,6 @@ namespace GIC.Battle
 
             // Flow 权威相位 → 门面事件（HUD 订阅单源）
             flow.OnPhaseChanged += (phase, turn) => session.OnPhaseChanged?.Invoke(phase, turn);
-            flow.OnSelectTimerExpired += turn => session.OnSelectTimerExpired?.Invoke(turn);
             return session;
         }
 
@@ -242,6 +238,7 @@ namespace GIC.Battle
         public void SubmitInstantAction(ActionData action)
         {
             action.turnNumber = Flow != null ? Flow.TurnNumber : (Player?.LatestSnapshot?.turnNumber ?? 1);
+            action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 回放 v2：即时行动（购买）同盖 tick——submit 窗消费锚
             Transport.ClientSend(BattleMessageType.SubmitInstantAction, new SubmitInstantAction { action = action });
         }
 

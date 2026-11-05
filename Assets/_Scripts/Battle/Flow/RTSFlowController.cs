@@ -66,10 +66,6 @@ namespace GIC.Battle
         /// 终局发 Finished）</summary>
         public event Action<BattlePhase, int> OnPhaseChanged;
 
-        /// <summary>选择倒计时归零事件（View 兼容声明——即时制无选择倒计时，永不触发；
-        /// BattleSession 门面订阅/转发链保留，HUD 侧消费点随 P4 批退役）</summary>
-        public event Action<int> OnSelectTimerExpired;
-
         private BattleSimState _sim;
         private IBattleTransport _transport;
         private TurnResolver _resolver;
@@ -186,7 +182,7 @@ namespace GIC.Battle
             BattleTimeMinutes = (BattleTimeMinutes + BattleMetrics.BattleClockMinutesPerSecond) % (24 * 60);
 
             // desync hash（确定性护栏四：单机自证断言 + 后置 LAN 漂移定位，王者荣耀同款）
-            BattleRecorder.CaptureTickHash(CurrentTick, ComputeStateHash());
+            BattleRecorder.CaptureTickHash(CurrentTick, ComputeStateHash(_sim));
         }
 
         // ==================== 行动上交（配额制退役：即交即结算） ====================
@@ -271,6 +267,7 @@ namespace GIC.Battle
         {
             action.turnNumber = TurnNumber;
             action.submitTick = CurrentTick;
+            BattleRecorder.CaptureSubmittedAction(action); // 回放 v2：玩家/配额脑上交行动录制（校验后=拒绝不上盘）
             _recentPlayerActions.Add(action); // 伙伴脑下一节拍的感知输入（窗口 0.5 秒）
             _resolver.ResolveSubmittedAction(action);
             CheckBattleEnded();
@@ -282,7 +279,7 @@ namespace GIC.Battle
         private void CheckBattleEnded()
         {
             if (Phase != BattlePhase.Selecting) return; // 已终局幂等
-            var overWinner = CheckBattleOver();
+            var overWinner = CheckBattleOver(_sim);
             if (!overWinner.HasValue) return;
 
             Phase = BattlePhase.Finished;
@@ -294,19 +291,20 @@ namespace GIC.Battle
             BattleRecorder.CaptureGameOver((int)overWinner.Value, TurnNumber); // 回放终局对照
         }
 
-        /// <summary>胜负判定（协议核心批拍板，docs/02 §2——与旧 TurnFlowController 逐条同构）：
-        /// 核心摧毁=唯一败北判据（队败=该队全部玩家核心被摧毁）；恰好一队核心存活=胜方；
-        /// 双方核心同拍互灭=null（平局语义 B8 定义保留）。无已登记核心（装配异常）回落旧全灭口径</summary>
-        private TeamType? CheckBattleOver()
+        /// <summary>胜负判定（协议核心批拍板，docs/02 §2——与旧 TurnFlowController 逐条同构；回放器
+        /// v2 同源消费，public static 单源勿复制分叉）：核心摧毁=唯一败北判据（队败=该队全部玩家核心
+        /// 被摧毁）；恰好一队核心存活=胜方；双方核心同拍互灭=null（平局语义 B8 定义保留）。
+        /// 无已登记核心（装配异常）回落旧全灭口径</summary>
+        public static TeamType? CheckBattleOver(BattleSimState sim)
         {
-            if (!_sim.HasAnyRegisteredCore())
+            if (!sim.HasAnyRegisteredCore())
             {
                 TeamType? aliveTeam = null;
-                foreach (var pid in _sim.PlayerIds)
+                foreach (var pid in sim.PlayerIds)
                 {
-                    var team = _sim.GetTeamOf(pid);
+                    var team = sim.GetTeamOf(pid);
                     if (aliveTeam == team) continue;
-                    if (!_sim.HasLivingUnits(team)) continue;
+                    if (!sim.HasLivingUnits(team)) continue;
                     if (aliveTeam.HasValue) return null;
                     aliveTeam = team;
                 }
@@ -314,11 +312,11 @@ namespace GIC.Battle
             }
 
             TeamType? coreAliveTeam = null;
-            foreach (var pid in _sim.PlayerIds)
+            foreach (var pid in sim.PlayerIds)
             {
-                var team = _sim.GetTeamOf(pid);
+                var team = sim.GetTeamOf(pid);
                 if (coreAliveTeam == team) continue;
-                if (!_sim.TeamHasLivingCore(team)) continue;
+                if (!sim.TeamHasLivingCore(team)) continue;
                 if (coreAliveTeam.HasValue) return null;
                 coreAliveTeam = team;
             }
@@ -368,28 +366,29 @@ namespace GIC.Battle
 
         /// <summary>战场状态 hash（确定序遍历：单位 unitId 升序→HP/元能/位置；玩家资源按注册序）——
         /// 同 seed 同命令流必同 hash（漂移=演算层引入了非确定性）；单机=回放自证断言，
-        /// 后置 LAN=双端比对定位漂移拍（王者荣耀不同步率 2%→0.03% 同款手段）</summary>
-        private int ComputeStateHash()
+        /// 后置 LAN=双端比对定位漂移拍（王者荣耀不同步率 2%→0.03% 同款手段）。
+        /// 回放器 v2 同源消费——public static 单源勿复制分叉</summary>
+        public static int ComputeStateHash(BattleSimState sim)
         {
             int hash = 17;
-            var unitIds = new List<string>(_sim.Units.Keys);
+            var unitIds = new List<string>(sim.Units.Keys);
             unitIds.Sort(StringComparer.Ordinal); // 确定性：unitId 升序（Dictionary 枚举序不稳定）
             foreach (var unitId in unitIds)
             {
-                var unit = _sim.Units[unitId];
+                var unit = sim.Units[unitId];
                 if (unit == null) continue;
                 var stats = unit.GetUnitComponent<UnitStats>();
                 if (stats == null) continue;
-                var pos = _sim.GetPosition(unit);
+                var pos = sim.GetPosition(unit);
                 hash = hash * 31 + stats.HP;
                 hash = hash * 31 + stats.Energy;
                 hash = hash * 31 + pos.x;
                 hash = hash * 31 + pos.y;
             }
-            foreach (var pid in _sim.PlayerIds) // PlayerIds=注册序（List，稳定）
+            foreach (var pid in sim.PlayerIds) // PlayerIds=注册序（List，稳定）
             {
-                hash = hash * 31 + _sim.GetMora(pid);
-                hash = hash * 31 + _sim.GetStamina(pid);
+                hash = hash * 31 + sim.GetMora(pid);
+                hash = hash * 31 + sim.GetStamina(pid);
             }
             return hash;
         }

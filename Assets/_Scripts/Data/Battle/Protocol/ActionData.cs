@@ -111,6 +111,13 @@ namespace GIC.Data
         /// 提交时写入；段命令流对齐用；0=旧回放/旧客户端兼容缺省）</summary>
         public int submitTick;
 
+        /// <summary>真摇杆持续态标记（决策九十五 P6，蓝图 §3.3 移动命令两形态之二「方向持续：
+        /// 按住期间朝向移动，松手停」）：拖拽移动按住期间客户端周期重提交远距目标点维持行进
+        /// （普通移动命令 mover 替换链）；**aimX/aimZ 双零=停止信号**——Host 移除该单位在途 mover
+        /// 并发位置校正命令（空 path+cm 停点，P4-E 被挡校正同协议形态、无在途 mover=幂等零命令）。
+        /// 默认 false=旧「目标点移动」语义零回归（旧回放/旧客户端缺省兼容）</summary>
+        public bool moveContinuous;
+
         /// <summary>移动目标点 X（厘米，决策九十五蓝图 §8 Move 双轨）：&gt;0 时走即时制 tick 移动
         /// （tile A* 路径+steering 每步推进+圆碰撞，RTSMovementSystem）；=0 时回落旧
         /// direction+magnitude 格移动（MovementResolver 旧轨——AI 三脑 P5 移植前兜底）</summary>

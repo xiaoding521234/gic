@@ -1776,12 +1776,9 @@ namespace GIC.Battle
             // 按当前布局态收拢/散开重排（执行阶段=收拢重叠格心；阶段切换事件负责切态）
             RefreshAllFormations(_spreadFormations);
 
-            // 片播放完成确认（Host 等全体 ack 才结算下一片）
-            _transport.ClientSend(BattleMessageType.SegmentAck, new SegmentAck
-            {
-                turnNumber = segment.turnNumber,
-                sliceIndex = segment.sliceIndex,
-            });
+            // P6 退役件清理：片播放完成确认（SegmentAck）随 ack 门控退役——Host 已无监听
+            //（旧「等全体 ack 才结算下一片」语义随回合机退役；死发送=每段刷
+            // 「BattleMessageRouter 未注册的消息类型」Warning，2026-11-05 观察局实录实锤）
         }
 
         /// <summary>攻速片片头等待——空等跳过（2026-09-30 拍板，docs/18「回合流程重排+攻速延迟执行模型」

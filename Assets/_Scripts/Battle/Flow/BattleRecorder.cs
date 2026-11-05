@@ -10,18 +10,22 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 战斗回放录制器（2026-10-20 Replay/回归 harness 批，docs/18 决策八十四）：
-    /// 「初始配置 + 每回合全量行动（真人+AI+眷属+伙伴）+ Host 演算的 Segment 命令流」逐行落盘 JSONL
-    /// ——回放器（Editor/Tool/ReplayRunner）以同 seed/同初始配置/同行动序列 headless 重演算，
-    /// 命令流逐条 diff = 演算层（TurnResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline）回归安全网
-    /// + B7 LAN desync 调试底座。
+    /// 战斗回放录制器（**v2 即时制 tick 格式**，决策九十五 P6 批，docs/active/48 §8 拍板 7——
+    /// v1 回合格式随回合机归档不迁移；v1 原案 2026-10-20=docs/18 决策八十四）：
+    /// 「初始配置 + 全部演算输入（AI 节拍批/玩家与配额脑上交/购买）+ Host 演算的 Segment 命令流 +
+    /// 每秒状态 hash」逐行落盘 JSONL——回放器（Editor/Tool/ReplayRunner v2）以同 seed/同初始配置
+    /// headless 逐 tick 重演：命令流逐条 diff + tick hash 自证 = 演算层
+    /// （TurnResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）回归安全网
+    /// + 后置 LAN desync 调试底座。
     ///
-    /// 录制面语义：
-    /// - **全行动录制**（非仅真人行动）——AI 配额脑（MonoBehaviour 场景件）与眷属/伙伴脑的改动不在
-    ///   断言面：脑改动后命令流差异属预期，需重录基线；断言只对演算层漂移报警（噪声最小）。
-    /// - 断言面 = TurnResolver 出口三件里的 Segment（命令流本体）；TurnPlan/TurnEnd 派生数据不录。
+    /// 录制面语义（v2）：
+    /// - **全演算输入录制**：AI 节拍批（RTSFlowController.RunAiBeat 眷属+伙伴脑批）=kind=actions 行
+    ///   （批内行动带 submitTick=节拍 tick）；玩家/配额脑上交+购买=kind=submit 行
+    ///   （钩点=RTSFlowController.SubmitAndResolve〔校验通过后〕与 BuyCardExecutor）。
+    ///   脑层不在断言面——脑改动后命令流差异属预期，需重录基线；断言只对演算层漂移报警（噪声最小）。
+    /// - 断言面 = Segment（命令流本体，TurnResolver.PushSegment 钩）+ tick hash（RTSFlowController
+    ///   RunSecondBeat 钩，确定性护栏四）；TurnPlan/TurnEnd 派生数据不录。
     /// - 初始手牌逐条录制（含初始资源卡）——卡组构建/存档变化不影响回放（初始态全量快照式）。
-    /// - 即时行动队列（EnqueueInstantAction，连携/契约预留）当前无生产消费方，未录；实装时扩展。
     ///
     /// 开关：调试指令 `replay on/off/status/list`（BattleReplayCommands）；默认关、发布版不落盘。
     /// </summary>
@@ -32,11 +36,6 @@ namespace GIC.Battle
 
         private static string _path;
         private static bool _hasHeader;
-
-        /// <summary>即时行动缓冲（购买批 2026-10-22，docs/45 §7 回放）：选择阶段发生的即时行动
-        /// （BuyCard）先入当回合缓冲——购买先于配额行动提交、且全部完成于开演前，CaptureActions 时
-        /// 按时序前置于配额行动合并落盘（回放器按行序先重演购买再喂演算）</summary>
-        private static readonly Dictionary<int, List<ActionData>> _pendingInstant = new Dictionary<int, List<ActionData>>();
 
         private static string ReplayDirectory => Path.Combine(Application.persistentDataPath, "Replays");
 
@@ -83,34 +82,24 @@ namespace GIC.Battle
             GICLog.Info($"[BattleRecorder] 开录 → {Path.GetFileName(_path)}（{players.Count} 名玩家）");
         }
 
-        /// <summary>每回合全量行动录制（TurnFlowController.TryBeginResolve 行动合并定稿后调）：
-        /// 全部玩家的行动 + 眷属自主 + 伙伴自主（回放按此直喂 TurnResolver，不重跑任何脑）。
-        /// 即时行动（购买）按发生序前置并入（选择阶段先于配额提交——回放先重演购买）</summary>
+        /// <summary>AI 节拍批录制（RTSFlowController.RunAiBeat 脑批定稿后调）：v2 批内行动全带
+        /// submitTick（=节拍 tick），回放器在 AI 节拍窗（%10）按 tick 喂回——不重跑任何脑；
+        /// 空批不落行（空批零演算，无对应窗口动作）</summary>
         public static void CaptureActions(int turn, List<ActionData> actions)
         {
             if (!Enabled || !_hasHeader) return;
-            if (_pendingInstant.TryGetValue(turn, out var buffered) && buffered.Count > 0)
-            {
-                var merged = new List<ActionData>(buffered);
-                if (actions != null && actions.Count > 0) merged.AddRange(actions);
-                actions = merged;
-                _pendingInstant.Remove(turn);
-            }
             if (actions == null || actions.Count == 0) return;
             Append(new ReplayActionsLine { turn = turn, actions = actions });
         }
 
-        /// <summary>即时行动录制（购买批：BuyCardExecutor 结算成功后调）——入当回合缓冲，
-        /// 由 CaptureActions 定稿时合并（购买段=CaptureSegment 即时落盘——命令流断言面）</summary>
-        public static void CaptureInstantAction(int turn, ActionData action)
+        /// <summary>上交行动录制（v2 新增钩点，RTSFlowController.SubmitAndResolve 校验通过后调）——
+        /// 覆盖真人/配额脑/经即时通道回流的非购买行动（玩家级 Deploy/UseItem/Equip 与 Move/Skill/Pass）。
+        /// 行动带 submitTick（BattleSession.SubmitAction 客户端侧盖章、SubmitAndResolve Host 侧兜底盖章）
+        /// ——回放器在「submit 窗」（当拍确定性步骤之后）按 tick 依次消费，file 序=时间序</summary>
+        public static void CaptureSubmittedAction(ActionData action)
         {
             if (!Enabled || !_hasHeader || action == null) return;
-            if (!_pendingInstant.TryGetValue(turn, out var list))
-            {
-                list = new List<ActionData>();
-                _pendingInstant[turn] = list;
-            }
-            list.Add(action);
+            Append(new ReplaySubmitLine { action = action });
         }
 
         /// <summary>Segment 命令流录制（TurnResolver.PushSegmentAndWaitAck 推送前调）——断言面本体</summary>
@@ -142,7 +131,6 @@ namespace GIC.Battle
             if (!_hasHeader) return;
             _hasHeader = false;
             _path = null;
-            _pendingInstant.Clear();
         }
 
         // ==================== 序列化 ====================
@@ -167,7 +155,7 @@ namespace GIC.Battle
     public class ReplayHeaderLine
     {
         public string kind = "header";
-        public int formatVersion = 1;
+        public int formatVersion = 2; // v2=tick 格式（决策九十五拍板 7：v1 回合格式归档不迁移）
         public int seed;
         public string mapName;
         public int fogMode;
@@ -198,6 +186,15 @@ namespace GIC.Battle
         public string kind = "actions";
         public int turn;
         public List<ActionData> actions;
+    }
+
+    [Serializable]
+    public class ReplaySubmitLine
+    {
+        /// <summary>玩家/配额脑上交或购买的行动（v2）——action.submitTick=回放消费 tick 锚；
+        /// 行序（file 序）=发生时间序，同 tick 内按行序重演</summary>
+        public string kind = "submit";
+        public ActionData action;
     }
 
     [Serializable]

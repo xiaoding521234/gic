@@ -368,6 +368,25 @@ namespace GIC.Battle
         /// click/endDrag 执行顺序差异（§103）</summary>
         private int _dragAimEndFrame = -1;
 
+        // ==================== P6 真摇杆持续态（蓝图 §3.3 移动命令两形态之二「方向持续」） ====================
+
+        /// <summary>摇杆行进中（已提交远距目标、mover 在途）：盘心死区/松手=停止信号判据；
+        /// 回中→再推出=重新行进（王者荣耀摇杆语义：按住期间朝向移动，松手停）</summary>
+        private bool _joyMoveSubmitted;
+
+        /// <summary>上次提交的摇杆向量（千分）——持稳不刷命令（变向超阈值才重提交，与 AI 0.5s
+        /// 重决策替换同路；在途 mover 由替换链自然接管新方向）</summary>
+        private int _joyLastVecX;
+        private int _joyLastVecZ;
+
+        /// <summary>摇杆行进目标距离（cm）：快照位+方向×该距离=远距目标点（RTSPathfinder
+        /// ClampToNearestPassable 钳最近可走点兜底——按住期间行进只受阻挡/边界约束）</summary>
+        private const int 摇杆行进距离Cm = 2000;
+
+        /// <summary>摇杆变向重提阈值（千分点积：两向量各≈1000 千分长，dot&gt;该值=变向小于 ~15°
+        /// 不重提交——在途 mover 沿旧方向继续，待下次显著变向/回中纠正）</summary>
+        private const long 摇杆变向阈值Dot = 966_000;
+
         // 拖动瞄准圆盘（2026-09-26 拍板「和王者一样，技能上显示一个大圆盘，并且手指拖拽位置还有小圆盘；
         // 圆盘不可超出屏幕边缘」+同日三拍「大圆盘太小/小圆盘不超大圆盘/选中格精确性全在大圆盘内」；
         // 2026-09-28 拍板「大盘改圆角矩形，贴合格子战场」）：运行时建在 HUD 画布（非布局件、
@@ -748,6 +767,11 @@ namespace GIC.Battle
             UpdateHandCardDrag(); // 手牌拖拽手感主循环（决策五十四：跟随/抖动/让位/出牌区蒙层）
             UpdateSelectMarkerFog(); // 迷雾批 2026-10-17：选中的敌方单位走进迷雾——选中弧光随隐
 
+            // P6 真摇杆持续态（蓝图 §3.3「方向持续：按住期间朝向移动，松手停」）：移动瞄准拖拽会话=
+            // 摇杆——方向首提/显著变向→提交远距目标点维持行进（mover 替换链）；盘心死区=回中停止
+            if (_dragAiming && _aimDef != null && _aimDef.IsMove)
+                DriveMoveJoystick();
+
             // 拖动瞄准屏幕跟随喂点（2026-09-26 拍板「当拖拽的金格在屏幕外时，屏幕会丝滑的移动过去」
             // +2026-10-06 三段改造）：仅拖动会话中且有金色待定格才喂；单位指向型喂 centerMode=true
             // （选中单位恒居中、出屏瞬移——MOBA 式）；方向型 centerMode=false（出屏+1 格余量才补间居中）
@@ -757,11 +781,24 @@ namespace GIC.Battle
                 bool followCenter = false;
                 if (_dragAiming && _pendingAimCell.HasValue && _board != null && _board.Map != null)
                 {
-                    // P4-C：方向型拖拽跟随连续落点（cm 任意角精确）；其余（指向型）=待定格
-                    followWorld = _pendingAimCm.HasValue
-                        ? CmToWorld(_pendingAimCm.Value.x, _pendingAimCm.Value.y)
-                        : _board.CellToWorld(_pendingAimCell.Value);
-                    followCenter = IsCurrentAimUnitTargeted();
+                    // P6 摇杆行进中改跟**单位**（拖点恒在盘内、行进目标在远方——跟拖点=单位走出屏；
+                    // 跟视图实时位=跟人）；未行进/技能瞄准=旧口径
+                    var player = _session != null ? _session.Player : null;
+                    if (_aimDef != null && _aimDef.IsMove && _joyMoveSubmitted
+                        && player != null
+                        && player.Views.TryGetValue(_selectedUnitId, out var joyView)
+                        && joyView != null)
+                    {
+                        followWorld = joyView.transform.position;
+                    }
+                    if (!followWorld.HasValue)
+                    {
+                        // P4-C：方向型拖拽跟随连续落点（cm 任意角精确）；其余（指向型）=待定格
+                        followWorld = _pendingAimCm.HasValue
+                            ? CmToWorld(_pendingAimCm.Value.x, _pendingAimCm.Value.y)
+                            : _board.CellToWorld(_pendingAimCell.Value);
+                        followCenter = IsCurrentAimUnitTargeted();
+                    }
                 }
                 _camera.SetDragFollowTarget(followWorld, followCenter);
             }
@@ -822,12 +859,26 @@ namespace GIC.Battle
         }
 
         /// <summary>技能键 CD 转圈驱动（Update 每帧）：选中单位战技/爆发键=径向遮罩+剩余秒数；
-        /// 其余键（移动/延奏/契约）无 CD 不参与——HasCooldownVisual 防为无 CD 键空建视觉件</summary>
+        /// 快捷面板行爆发键（P6 挂账销账）同数据源逐帧驱动——_cdReadyAtByUnit 全单位表
+        ///（SkillCasted 事件起点+快照每秒校准）天然覆盖面板单位；
+        /// 其余键（移动/延奏/契约/势力）无 CD 不参与——HasCooldownVisual 防为无 CD 键空建视觉件</summary>
         private void UpdateSkillCooldowns()
         {
+            float now = Time.realtimeSinceStartup;
+
+            // 快捷面板行（P6）：爆发键转圈+秒数；势力技能无 CD 不参与；无爆发技能行已隐藏跳过
+            for (int i = 0; i < _quickRows.Count; i++)
+            {
+                var row = _quickRows[i];
+                if (row.burstView == null || row.burstHost == null || !row.burstHost.activeSelf) continue;
+                float remain = _cdReadyAtByUnit.TryGetValue(row.unitId, out var rowSlots)
+                    ? rowSlots[1] - now : 0f;
+                if (remain > 0f || row.burstView.HasCooldownVisual)
+                    row.burstView.SetCooldown(remain, BattleMetrics.BurstCooldownSeconds);
+            }
+
             if (_selectedUnitId == null) return;
             if (!_cdReadyAtByUnit.TryGetValue(_selectedUnitId, out var slots)) return;
-            float now = Time.realtimeSinceStartup;
             foreach (var def in _skillButtons)
             {
                 if (def?.view == null) continue;
@@ -1882,6 +1933,7 @@ namespace GIC.Battle
             ReturnToMainWorldForAim(); // 地脉视角=纯观察（决策九十一）：起瞄准自动切回主世界（主世界单位在地脉视角隐藏——不切回=瞄准空板）
             _aimDef = def;
             _state = HudState.Aiming;
+            _joyMoveSubmitted = false; // P6 摇杆态随会话清（新会话未行进）
             _pendingAimCell = null; // 新瞄准会话待定清零
             _pendingTargetUnitId = null; // 待定目标随会话清零（2026-10-05 指定单位型轮换）
             _pendingAimCm = null; // P4-C 连续落点随会话清（新会话无落点）
@@ -1936,6 +1988,10 @@ namespace GIC.Battle
         private void ExitAiming()
         {
             if (_state != HudState.Aiming) return;
+            // P6 真摇杆持续态：拖拽仍按住时会话被外部收口（单位死亡/阶段切换/换技能重瞄/切维度）→
+            // 停止信号（远距目标在途不收=单位走穿棋盘）。已松手的常规退出（提交成功/点击路径）此处
+            // _dragAiming=false 不触发——移动提交本身即新 mover。已停/终局态被 Host 拒绝均幂等无害
+            if (_dragAiming && _joyMoveSubmitted) SubmitJoystickMove(0, 0, 0, 0);
             _dragAiming = false; // 拖动会话统一收口（松手取消/确认提交/超时/阶段切换同一处清零）
             _dragAimVecX = 0; // P4 自由角向量随会话清（防陈旧向量污染下一次上交）
             _dragAimVecZ = 0;
@@ -2773,6 +2829,16 @@ namespace GIC.Battle
             if (_state != HudState.Aiming) { HideDragWheel(); return; }
             UpdateDragAimPreview(eventData); // 圆盘未收——终帧校准与拖动中同用夹取指针（屏缘一致）
             HideDragWheel(); // 手指已离键——圆盘随会话收（留待定路径也隐藏）
+            // P6 真摇杆持续态（蓝图 §3.3「方向持续：松手停」）：移动瞄准拖拽=摇杆语义——松手=停止信号
+            //（行进中才发，幂等）+收会话。旧「移动松手即放落点跳跃」随 P6 退役（技能瞄准保持松手即放）；
+            // 拖回死区/取消区松手同语义（摇杆回中=停，已在 Update 停过的此处零命令静默）
+            if (_aimDef != null && _aimDef.IsMove)
+            {
+                if (_joyMoveSubmitted) SubmitJoystickMove(0, 0, 0, 0);
+                ExitAiming();
+                if (_camera != null) _camera.CancelDragFollow(); // 2026-10-06 拍板「取消时重置摄像机位置为瞄准开始时」
+                return;
+            }
             if (ReleaseOverCancelButton(eventData.position) || !_pendingAimCell.HasValue)
             {
                 ExitAiming();
@@ -2889,6 +2955,64 @@ namespace GIC.Battle
             if (!_board.Map.HasTile(cell.x, cell.y)) return null;
             _pendingAimCm = new Vector2Int(xCm, zCm); // P4-C 连续落点缓存（指示器/FillAimVector/相机跟随消费）
             return cell;
+        }
+
+        // ==================== P6 真摇杆持续态驱动（蓝图 §3.3 移动命令两形态之二「方向持续」） ====================
+
+        /// <summary>摇杆驱动（Update 每帧；移动瞄准拖拽会话=王者荣耀摇杆语义——按住期间朝向移动，
+        /// 松手停）：盘心死区（摇杆回中）→ 停止信号（行进中才发；Host 移除在途 mover+位置校正落位，
+        /// 重复停幂等零命令）；方向有效 → 首提/变向超阈值才提交远距目标点（快照位+方向×2000cm，
+        /// RTSPathfinder 钳最近可走点兜底；mover 替换链维持行进）。持稳不刷命令——与 AI 0.5s
+        /// 重决策替换同路。速度恒全速（盘距比例不映射步长——MOBA 精确速度档后续调参批再评）</summary>
+        private void DriveMoveJoystick()
+        {
+            if (_state != HudState.Aiming || _selectedUnitId == null || _session == null) return;
+            bool hasDir = _pendingAimCm.HasValue && (_dragAimVecX != 0 || _dragAimVecZ != 0);
+            if (!hasDir)
+            {
+                if (_joyMoveSubmitted) SubmitJoystickMove(0, 0, 0, 0); // 摇杆回中=停
+                return;
+            }
+            if (_joyMoveSubmitted)
+            {
+                long dot = (long)_dragAimVecX * _joyLastVecX + (long)_dragAimVecZ * _joyLastVecZ;
+                if (dot > 摇杆变向阈值Dot) return; // 变向 <~15°：在途 mover 沿旧向继续，待显著变向再纠正
+            }
+            var sel = _session?.Player?.LatestSnapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
+            if (sel == null) return;
+            float len = Mathf.Sqrt(_dragAimVecX * (float)_dragAimVecX + _dragAimVecZ * (float)_dragAimVecZ);
+            if (len < 1f) return;
+            int targetX = Mathf.RoundToInt(sel.PosXCm() + _dragAimVecX / len * 摇杆行进距离Cm);
+            int targetZ = Mathf.RoundToInt(sel.PosZCm() + _dragAimVecZ / len * 摇杆行进距离Cm);
+            SubmitJoystickMove(targetX, targetZ, _dragAimVecX, _dragAimVecZ);
+        }
+
+        /// <summary>摇杆行动裸上交：**不走 SubmitAim 出口**（保持瞄准会话——选中/轮盘/相机拖拽会话
+        /// 不被提交终结；松手 OnSkillButtonDragEnd 才收会话）。targetX/Z 双零+aim 双零=停止信号
+        /// （Host 移除在途 mover+位置校正命令落位——moveContinuous 标记承载语义，P4-E 校正同协议形态）。
+        /// turnNumber/submitTick 由 BattleSession.SubmitAction 盖章；归属/眷属/建筑防线 Host 权威校验
+        ///（回放 v2：随 SubmitAndResolve 钩入 submit 行，重演走同分支）</summary>
+        private void SubmitJoystickMove(int targetX, int targetZ, int aimX, int aimZ)
+        {
+            if (_session == null || string.IsNullOrEmpty(_selectedUnitId)) return;
+            var action = new ActionData
+            {
+                playerId = _myPlayerId,
+                unitId = _selectedUnitId,
+                actionType = ActionType.Move,
+                moveContinuous = true,
+                targetX = targetX,
+                targetZ = targetZ,
+                aimX = aimX,
+                aimZ = aimZ,
+            };
+            _session.SubmitAction(action);
+            _joyMoveSubmitted = targetX != 0 || targetZ != 0;
+            if (_joyMoveSubmitted)
+            {
+                _joyLastVecX = aimX;
+                _joyLastVecZ = aimZ;
+            }
         }
 
         /// <summary>指向锥角锁定（兜底保留）：候选目标格的屏幕方向（相对**盘心**——与拖向同基准）与

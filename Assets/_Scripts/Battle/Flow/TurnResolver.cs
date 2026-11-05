@@ -220,6 +220,23 @@ namespace GIC.Battle
                 switch (action.actionType)
                 {
                     case ActionType.Move:
+                        // P6 真摇杆持续态（蓝图 §3.3「方向持续：松手停」）：aim 双零=停止信号——移除
+                        // 该单位在途 mover+发位置校正命令（空 path+cm 停点，P4-E 被挡校正同协议形态、
+                        // blocked=0 客户端净停不弹回）；无在途 mover=幂等零命令纯静默（重复停/摇杆回中抖动）
+                        if (action.moveContinuous && action.aimX == 0 && action.aimZ == 0)
+                        {
+                            int removed = _sim.ActiveMoversInternal.RemoveAll(m => m.UnitId == action.unitId);
+                            if (removed > 0)
+                            {
+                                var stopCm = _sim.GetPosCm(unit);
+                                var stop = BattleCommand.Move(action.unitId, 0, 0, new List<BattleCell>(), 0,
+                                    (int)Direction2D.Right);
+                                stop.hitX = stopCm.x;
+                                stop.hitY = stopCm.y;
+                                casts.Add(stop);
+                            }
+                            break;
+                        }
                         // **2026-11-04 拍板「100 移速=走完一米要 1 秒」**：移动统一新轨——旧格式上交
                         //（AI 三脑〔P5 移植前〕与玩家 HUD 的 direction+magnitude）在 Host 侧桥为目标点
                         // cm（当前格+方向×步数→格心），与 targetX 直填同走 RTSMovementSystem
