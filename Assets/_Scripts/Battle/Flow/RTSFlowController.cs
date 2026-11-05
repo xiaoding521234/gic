@@ -70,6 +70,27 @@ namespace GIC.Battle
         private IBattleTransport _transport;
         private TurnResolver _resolver;
 
+        // ==================== 帧同步输入管线（F1，docs/active/50 §4） ====================
+
+        /// <summary>Host 侧=true（唯一权威输入定序者）；客户端=false（只消费 InputBatch，不跑脑/不定序）</summary>
+        public bool IsHost { get; private set; } = true;
+
+        /// <summary>联机模式=true（输入按 targetTick 对齐）；单机=false（即时结算，零手感损失）</summary>
+        public bool IsNetworked { get; private set; }
+
+        /// <summary>待结算输入批（按 targetTick 升序）；Host 与客户端共用</summary>
+        private readonly SortedDictionary<int, List<OrderedInput>> _inputByTick =
+            new SortedDictionary<int, List<OrderedInput>>();
+
+        /// <summary>玩家内输入序号（Host 定序 tie-break；客户端提交时递增）</summary>
+        private readonly Dictionary<string, int> _inputSeq = new Dictionary<string, int>();
+
+        /// <summary>Host 侧每秒 hash（按 tick 存，供客户端 HashReport 比对）</summary>
+        private readonly Dictionary<int, int> _hostHashByTick = new Dictionary<int, int>();
+
+        /// <summary>最近一次 desync tick（-1=无）</summary>
+        public int LastDesyncTick { get; private set; } = -1;
+
         /// <summary>最近 AI 节拍窗内的玩家上交行动（伙伴脑感知输入——旧「感知己方玩家已提交选择」
         /// 秒化：每 0.5 秒窗口收集，节拍后清空）</summary>
         private readonly List<ActionData> _recentPlayerActions = new List<ActionData>();
@@ -106,6 +127,9 @@ namespace GIC.Battle
             CurrentTick++;
             _sim.CurrentTick = CurrentTick;
 
+            // —— F1：先应用本 tick 输入批（Host 广播+两端同批结算），再做移动/节拍 ——
+            ApplyDueInputs();
+
             // —— tick 移动推进（P2 连续空间，蓝图 §3.3：A* 路径+圆碰撞每 tick 步进；收尾段=采集结算）——
             var arrivals = RTSMovementSystem.AdvanceTick(_sim);
             if (arrivals != null && arrivals.Count > 0)
@@ -128,6 +152,7 @@ namespace GIC.Battle
         private void RunAiBeat()
         {
             if (Phase != BattlePhase.Selecting) return;
+            if (!IsHost) return; // F1：AI 三脑只在 Host 跑；客户端只消费 InputBatch 里的 AI 行动
             int second = TurnNumber;
 
             // Host 探索账本同步（决策七十九 P4 适配：旧「BeginSelectPhase 单钩」随回合机退役——
@@ -148,7 +173,17 @@ namespace GIC.Battle
 
             // 回放录制（决策九十五：节拍批=旧「回合全量行动」的秒化等价物——回放按批直喂演算）
             BattleRecorder.CaptureActions(second, actions);
-            _resolver.ResolveAiActions(actions);
+            if (IsNetworked)
+            {
+                // F1：AI 行动也作为输入进批（targetTick=下一 tick），客户端同批结算；
+                // 不在此刻结算——否则 Host 提前一 tick，与客户端不同步
+                foreach (var action in actions)
+                    EnqueueInput(action, CurrentTick + 1, isAi: true, seq: NextSeq(action.playerId));
+            }
+            else
+            {
+                _resolver.ResolveAiActions(actions);
+            }
 
             // 配额脑驱动（PlayerQuotaBrain 场景件零改动兼容：沿用 Selecting 事件触发，
             // 脑内协程验证 Phase==Selecting && TurnNumber==second 后 Decide→SubmitAction）；
@@ -184,7 +219,33 @@ namespace GIC.Battle
             BattleTimeMinutes = (BattleTimeMinutes + BattleMetrics.BattleClockMinutesPerSecond) % (24 * 60);
 
             // desync hash（确定性护栏四：单机自证断言 + 后置 LAN 漂移定位，王者荣耀同款）
-            BattleRecorder.CaptureTickHash(CurrentTick, ComputeStateHash(_sim));
+            // desync hash（确定性护栏四）：Host 记录按 tick 供比对；客户端上报
+            int stateHash = ComputeStateHash(_sim);
+            BattleRecorder.CaptureTickHash(CurrentTick, stateHash);
+            if (IsNetworked)
+            {
+                if (IsHost)
+                {
+                    _hostHashByTick[CurrentTick] = stateHash;
+                    if (_hostHashByTick.Count > 4 * 60 * BattleMetrics.TicksPerSecond)
+                    {
+                        int minTick = CurrentTick - 4 * 60 * BattleMetrics.TicksPerSecond;
+                        var stale = new List<int>();
+                        foreach (var kv in _hostHashByTick)
+                            if (kv.Key < minTick) stale.Add(kv.Key);
+                        foreach (var k in stale) _hostHashByTick.Remove(k);
+                    }
+                }
+                else
+                {
+                    _transport.ClientSend(BattleMessageType.HashReport, new HashReportMessage
+                    {
+                        tick = CurrentTick,
+                        hash = stateHash,
+                        unitCount = _sim.Units.Count,
+                    });
+                }
+            }
         }
 
         // ==================== 行动上交（配额制退役：即交即结算） ====================
@@ -271,8 +332,29 @@ namespace GIC.Battle
             action.submitTick = CurrentTick;
             BattleRecorder.CaptureSubmittedAction(action); // 回放 v2：玩家/配额脑上交行动录制（校验后=拒绝不上盘）
             _recentPlayerActions.Add(action); // 伙伴脑下一节拍的感知输入（窗口 0.5 秒）
-            _resolver.ResolveSubmittedAction(action);
-            CheckBattleEnded();
+
+            if (!IsNetworked)
+            {
+                // 单机：保持即时结算（零手感损失）
+                _resolver.ResolveSubmittedAction(action);
+                CheckBattleEnded();
+                return;
+            }
+            if (IsHost)
+            {
+                // Host：入队到权威窗口，由 ApplyDueInputs 在 targetTick 结算+广播
+                EnqueueInput(action, CurrentTick + BattleMetrics.InputDelayTicks,
+                    isAi: false, seq: NextSeq(action.playerId));
+                return;
+            }
+            // 客户端：只上报输入（F3 预测在 View 层）；本地不结算
+            _transport.ClientSend(BattleMessageType.InputCommand, new InputCommandMessage
+            {
+                playerId = action.playerId,
+                seq = NextSeq(action.playerId),
+                submitTick = CurrentTick,
+                action = action,
+            });
         }
 
         // ==================== 胜负判定（核心摧毁唯一判据，口径同旧 CheckBattleOver） ====================
@@ -327,11 +409,129 @@ namespace GIC.Battle
 
         // ==================== 战斗启停 ====================
 
-        public void Bind(BattleSimState sim, IBattleTransport transport)
+        public void Bind(BattleSimState sim, IBattleTransport transport,
+            bool isHost = true, bool isNetworked = false)
         {
             _sim = sim;
             _transport = transport;
+            IsHost = isHost;
+            IsNetworked = isNetworked;
             _resolver = new TurnResolver(sim, transport, this);
+        }
+
+        // ==================== 帧同步输入管线（F1） ====================
+
+        private int NextSeq(string playerId)
+        {
+            _inputSeq.TryGetValue(playerId, out int seq);
+            _inputSeq[playerId] = seq + 1;
+            return seq;
+        }
+
+        /// <summary>入队一条输入（Host 侧；targetTick 已重定基）。同 tick 内按 (playerId, seq) 定序。</summary>
+        private void EnqueueInput(ActionData action, int targetTick, bool isAi, int seq)
+        {
+            if (action == null) return;
+            if (targetTick <= CurrentTick) targetTick = CurrentTick + 1; // 过期→顺延下一 tick
+            if (targetTick - CurrentTick > BattleMetrics.MaxInputLatenessTicks)
+            {
+                GICLog.Warn($"[RTSFlow] 输入迟到超限丢弃 player={action.playerId} target={targetTick} now={CurrentTick}");
+                return;
+            }
+            if (!_inputByTick.TryGetValue(targetTick, out var list))
+            {
+                list = new List<OrderedInput>();
+                _inputByTick[targetTick] = list;
+            }
+            list.Add(new OrderedInput
+            {
+                playerId = action.playerId,
+                seq = seq,
+                isAi = isAi ? 1 : 0,
+                action = action,
+            });
+        }
+
+        /// <summary>应用当前 tick 的输入批：Host 先广播（客户端拿到同一批），随后各端按同一序结算。</summary>
+        private void ApplyDueInputs()
+        {
+            if (!_inputByTick.TryGetValue(CurrentTick, out var inputs) || inputs.Count == 0) return;
+            _inputByTick.Remove(CurrentTick);
+
+            // Host 是唯一定序者；客户端保留 Host 下发的批内顺序（勿重排）
+            if (IsHost)
+            {
+                inputs.Sort((a, b) =>
+                {
+                    int p = string.CompareOrdinal(a.playerId, b.playerId);
+                    return p != 0 ? p : a.seq.CompareTo(b.seq);
+                });
+                if (IsNetworked)
+                    _transport.HostSend(BattleMessageType.InputBatch,
+                        new InputBatchMessage { tick = CurrentTick, inputs = inputs });
+            }
+
+            var aiBatch = new List<ActionData>();
+            foreach (var input in inputs)
+            {
+                if (input?.action == null) continue;
+                if (input.isAi == 1)
+                {
+                    aiBatch.Add(input.action);
+                    continue;
+                }
+                if (aiBatch.Count > 0)
+                {
+                    _resolver.ResolveAiActions(aiBatch);
+                    aiBatch.Clear();
+                }
+                _resolver.ResolveSubmittedAction(input.action);
+            }
+            if (aiBatch.Count > 0) _resolver.ResolveAiActions(aiBatch);
+            CheckBattleEnded();
+        }
+
+        /// <summary>Host：收到客户端输入（重定基到 targetTick 后入队）。</summary>
+        public void ReceiveInputCommand(InputCommandMessage msg)
+        {
+            if (msg?.action == null) return;
+            int target = msg.submitTick + BattleMetrics.InputDelayTicks;
+            int min = CurrentTick + 1;
+            if (target < min) target = min;
+            EnqueueInput(msg.action, target, isAi: false, seq: msg.seq);
+        }
+
+        /// <summary>客户端：收到 Host 定序输入批（不重排，按批内顺序结算）。</summary>
+        public void ReceiveInputBatch(InputBatchMessage msg)
+        {
+            if (msg?.inputs == null || msg.inputs.Count == 0) return;
+            if (msg.tick <= CurrentTick)
+            {
+                GICLog.Warn($"[RTSFlow] 输入批迟到丢弃 tick={msg.tick} now={CurrentTick}");
+                return;
+            }
+            _inputByTick[msg.tick] = msg.inputs;
+        }
+
+        /// <summary>Host：比对客户端 hash 上报（F1 只告警+落日志，不中断）。</summary>
+        public void ReceiveHashReport(HashReportMessage msg)
+        {
+            if (msg == null) return;
+            if (!_hostHashByTick.TryGetValue(msg.tick, out int hostHash))
+            {
+                GICLog.Warn($"[RTSFlow] HashReport tick={msg.tick} 无本地记录（已过期）");
+                return;
+            }
+            if (hostHash == msg.hash) return;
+            LastDesyncTick = msg.tick;
+            GICLog.Error($"[Desync] tick={msg.tick} host={hostHash} client={msg.hash} units={msg.unitCount}");
+            if (IsNetworked)
+                _transport.HostSend(BattleMessageType.DesyncAlert, new DesyncAlertMessage
+                {
+                    tick = msg.tick,
+                    hostHash = hostHash,
+                    clientHash = msg.hash,
+                });
         }
 
         /// <summary>开战：进入 tick 循环（Phase=Selecting=Running 兼容映射；初始快照广播）</summary>
@@ -392,6 +592,8 @@ namespace GIC.Battle
                 hash = hash * 31 + sim.GetMora(pid);
                 hash = hash * 31 + sim.GetStamina(pid);
             }
+            // F0-4/F1：RNG 状态纳入 hash——随机序列一旦分叉必须能定位到 tick
+            hash = hash * 31 + unchecked((int)sim.RngState);
             return hash;
         }
 

@@ -117,7 +117,8 @@ namespace GIC.UI
                     return !string.IsNullOrEmpty(id) && id != PlayerID.Offline ? id : BattleDebugPlayerIds.P1;
                 },
                 pid => _session != null ? _session.GetTeamOf(pid) : TeamType.A);
-            if (_flow == null && !isLanClient) _flow = gameObject.AddComponent<RTSFlowController>(); // 决策九十五：即时制 tick 状态机（客户端无状态机口径沿用）
+            // F1 帧同步：客户端也跑 tick 状态机（同构 Sim）；单机/LAN host/LAN client 三形态统一
+            if (_flow == null) _flow = gameObject.AddComponent<RTSFlowController>();
             if (_board == null)
             {
                 _board = GetComponentInChildren<BattleBoard>();
@@ -147,35 +148,35 @@ namespace GIC.UI
 
             yield return null; // ── 分帧：兜底/建会话分开（单帧 304ms 实测拆半，2026-09-13） ──
 
-            if (isLanClient)
-            {
-                // LAN 退役（决策九十五拍板 2，docs/active/48 §13）：即时制 v1 单机——LAN 客户端装配链
-                // 整段退役，实时 Mirror 同步=后置批次；房间流程入口 toast 化拦截随 P4 批补
-                GICLog.Error("[BattleScreen] LAN 客户端已退役（即时制 v1 单机）——无法进战，返回");
-                DoClose();
-                yield break;
-            }
-
-            // ==================== ①本地 / ②LAN host 装配 ====================
-            // 逻辑单位隐藏根（Host 侧逻辑对象；表现层为 UnitView）
+            // ==================== ①本地 / ②LAN host / ③LAN client 装配（F1 帧同步） ====================
+            // 逻辑单位隐藏根（Host 侧逻辑对象；表现层为 UnitView；客户端 Sim 也挂此根）
             var logicGo = new GameObject("LogicUnits");
             logicGo.transform.SetParent(transform, false);
 
-            // 战斗种子（2026-10-02 幸运暴击批）：配置带种用配置（联机/复现），调试直开随机生成
+            // 战斗种子（配置带种用配置；调试直开随机生成——Host 生成后随 BattleStart 广播）
             int battleSeed = launchConfig != null ? launchConfig.Seed : UnityEngine.Random.Range(0, int.MaxValue);
 
             if (launchConfig != null && launchConfig.IsNetworked)
             {
-                // LAN 退役（决策九十五拍板 2）：host 装配链整段退役——同客户端分支拦截
-                GICLog.Error("[BattleScreen] LAN host 已退役（即时制 v1 单机）——无法进战，返回");
-                DoClose();
-                yield break;
+                if (isLanClient)
+                {
+                    // F1/F2：客户端也跑同构 Sim；Sim 在收到 BattleStart 后创建（seed/map/roster 随消息到达）
+                    _session = BattleSession.CreateClientSim(_player, _flow, logicGo.transform,
+                        new MirrorBattleTransport(isHost: false));
+                }
+                else
+                {
+                    _session = BattleSession.CreateHosted(map, _player, _flow, logicGo.transform, battleSeed,
+                        launchConfig.Players);
+                }
             }
             else
             {
                 _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform, battleSeed,
                     launchConfig?.Players); // 调试直开 Players=null（无房间名册——色/队回落旧口径）
             }
+            if (_session.IsHostSide)
+            {
             _session.Sim.LogicRoot = logicGo.transform; // 部署等运行时生成单位挂同根（B6c）
             // 迷雾账本模式注入（2026-10-17 追拍三「AI 也受雾限」）：Host 侧 AI 探索集与表现层同模式
             //（房间对战=Skirmish/任务=Mission/调试直开=None=AI 不受限）；LAN 客户端无 Sim 零消费
@@ -280,6 +281,7 @@ namespace GIC.UI
                 GICLog.Info($"[BattleScreen] AI 玩家就位：{setup.PlayerId}（{setup.DisplayName}，" +
                     $"难度={setup.AIDifficulty} 人格={setup.AIPersona}）");
             }
+            } // IsHostSide：客户端 Sim 由 BattleStart 消息创建（BuildClientSimUnits），不走 Host 装配
 
             yield return null; // ── 分帧：HUD 绑定/开局前让渲染喘一口气 ──
 
@@ -290,14 +292,16 @@ namespace GIC.UI
             // 正式进入战斗地图：启动音乐轮换链（2026-09-14 用户拍板，揭幕同时起曲）
             StartBattleMusic(mapConfig);
 
-            if (launchConfig != null && launchConfig.IsNetworked)
+            if (_session.IsHostSide)
             {
-                // LAN host：等远端「战斗就绪」握手（HUD 绑定完成=可收片）再广播开局——
-                // Host 永不跑在客户端前面（超时兜底快进，防慢端卡全局）
-                yield return StartCoroutine(WaitForRemoteBattleReady(playerSetups));
+                if (launchConfig != null && launchConfig.IsNetworked)
+                {
+                    // LAN host：等远端「战斗就绪」握手（HUD 绑定完成=可收片）再广播开局——
+                    // Host 永不跑在客户端前面（超时兜底快进，防慢端卡全局）
+                    yield return StartCoroutine(WaitForRemoteBattleReady(playerSetups));
+                }
+                _session.StartBattle();
             }
-
-            _session.StartBattle();
 
             // 联机入口开局经加载页转场而来（SceneFadeOverlay.Cover）：装配尖峰已分帧摊薄，
             // 装配完毕揭幕；调试直开无黑场时为纯 no-op

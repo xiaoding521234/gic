@@ -20,6 +20,12 @@ namespace GIC.Data
         Resume = 8,            // Host↔Client：硬停恢复（B1 占位）
         BattleOver = 9,        // Host→Client：战斗结束（2026-09-25 三轮审查 S10 轻量全灭软停；结算画面=B8）
         TurnPlan = 10,         // Host→Client：本回合行动预告（执行预览用，2026-09-29；分桶后、首片推送前下发）
+
+        // ===== 帧同步（F1，docs/active/50 §4）=====
+        InputCommand = 11,     // Client→Host：单条输入（玩家行动 + seq/submitTick）
+        InputBatch = 12,       // Host→All：Host 定序后的输入批（targetTick + OrderedInput[]）
+        HashReport = 13,       // Client→Host：本地状态 hash（每秒）
+        DesyncAlert = 14,      // Host→Client：hash 失配诊断（F1 只告警）
     }
 
     /// <summary>
@@ -37,6 +43,59 @@ namespace GIC.Data
     {
         public BattleMapData map;
         public BattleSnapshot initialSnapshot;
+
+        /// <summary>F1 帧同步：战斗种子（客户端按同 seed 建 DeterministicRng，RNG 序列与 Host 一致）</summary>
+        public int seed;
+
+        /// <summary>F1 帧同步：开局名册（客户端按同序建协议核心，保证 unitId 分配序一致；
+        /// 类型在 GIC.Battle 命名空间，同程序集内可跨命名空间引用）</summary>
+        public List<GIC.Battle.BattlePlayerSetup> roster;
+
+        /// <summary>迷雾模式（BattleFogMode 枚举值；客户端 Sim 与 Host 同模式）</summary>
+        public int fogMode;
+    }
+
+    // ==================== 帧同步（F1，docs/active/50 §4） ====================
+
+    [Serializable]
+    public class InputCommandMessage
+    {
+        public string playerId;
+        public int seq;          // 玩家内单调递增（Host 去重/诊断，不参与跨玩家排序）
+        public int submitTick;   // 客户端本地提交 tick（Host 重定基用）
+        public ActionData action;
+    }
+
+    [Serializable]
+    public class OrderedInput
+    {
+        public string playerId;
+        public int seq;
+        public int isAi;         // 1=AI 行动（Host 生成，客户端只消费，不跑脑）
+        public ActionData action;
+    }
+
+    [Serializable]
+    public class InputBatchMessage
+    {
+        public int tick;         // targetTick：各端在该 tick 应用整批
+        public List<OrderedInput> inputs = new List<OrderedInput>();
+    }
+
+    [Serializable]
+    public class HashReportMessage
+    {
+        public int tick;
+        public int hash;
+        public int unitCount;
+    }
+
+    [Serializable]
+    public class DesyncAlertMessage
+    {
+        public int tick;
+        public int hostHash;
+        public int clientHash;
     }
 
     [Serializable]

@@ -234,6 +234,18 @@ namespace GIC.Battle
         /// 后置 LAN 联机的漂移定位手段，王者荣耀同款）</summary>
         public const int DesyncHashEverySeconds = 1;
 
+        // ==================== 帧同步输入管线（F1，docs/active/50 §4.3） ====================
+
+        /// <summary>网络权威窗口（tick）——客户端提交后 targetTick=本地 tick+本值；**只决定权威确认
+        /// 何时到，不决定手感**（感知延迟由 F3 本地预测归零，MOBA 红线 ≤1 帧）。LAN 基线 2 tick=100ms。</summary>
+        public const int InputDelayTicks = 2;
+
+        /// <summary>迟到输入最大容忍（tick）——超过则丢弃（Host 重定基后仍过期）。</summary>
+        public const int MaxInputLatenessTicks = 10;
+
+        /// <summary>客户端 hash 上报节拍（tick）——每 20 tick=1 秒，与 Host 比对。</summary>
+        public const int HashReportIntervalTicks = 1 * TicksPerSecond;
+
         /// <summary>效果拍节拍（tick 数——2026-11-04 拍板「效果触发时间翻倍，现在太频繁」：Buff tick
         /// 效果〔歌声之环/冰棱/燃烧等 OnTurnEnd 产出〕+建筑效果〔教堂治疗/旗帜元能/餐馆摩拉/骑士团
         /// 引擎〕自每秒整拍改**每 2 秒一拍**——单次数值不动（DPS/产出随之减半，属拍板预期，嫌伤害低

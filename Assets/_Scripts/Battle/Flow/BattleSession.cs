@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using GIC.Framework;
 using GIC.Data;
@@ -43,6 +44,8 @@ namespace GIC.Battle
 
         private readonly BattleMessageRouter _hostRouter = new BattleMessageRouter();
         private readonly BattleMessageRouter _clientRouter = new BattleMessageRouter();
+        /// <summary>F2 本地 Sim 回环路由（客户端 TurnResolver 产出的 Segment/Snapshot → View）</summary>
+        private readonly BattleMessageRouter _localRouter = new BattleMessageRouter();
         private Transform _logicRoot;
 
         // ==================== 相位/计时门面（HUD 唯一订阅口，B7 LAN） ====================
@@ -140,17 +143,126 @@ namespace GIC.Battle
                 isNetworked: false);
         }
 
-        // （LAN host CreateHosted / LAN client CreateClient 装配已随决策九十五拍板 2 退役删除——
-        // 即时制 v1 单机；实时 Mirror 同步=tick 命令流后置批次，docs/active/48 §13。
-        // MirrorBattleTransport/Mirror 联机域文件保留不删，装配入口拦截=BattleScreen；
-        // 房间流程 toast 化拦截与完整清理随 P4/P6 批）
+        // ==================== 帧同步装配（F1，docs/active/50） ====================
+
+        /// <summary>LAN Host 装配（Mirror 传输；Host 跑 Sim+AI，只广播 InputBatch）</summary>
+        public static BattleSession CreateHosted(BattleMapData map, BattlePlayer player, RTSFlowController flow,
+            Transform logicRoot, int seed, List<BattlePlayerSetup> roster)
+        {
+            return CreateHostCore(new MirrorBattleTransport(isHost: true), map, player, flow, logicRoot, seed,
+                roster, isNetworked: true);
+        }
+
+        /// <summary>LAN 客户端装配：客户端也跑同构 Sim（F1）；Sim 在收到 BattleStart 后创建
+        /// （seed/map/roster 随消息到达）。本地 Segment 回环驱动 View（F2），网络 Segment 仅诊断。</summary>
+        public static BattleSession CreateClientSim(BattlePlayer player, RTSFlowController flow,
+            Transform logicRoot, IBattleTransport network)
+        {
+            var session = new BattleSession
+            {
+                Transport = network,
+                Player = player,
+                Flow = flow,
+                _logicRoot = logicRoot,
+                IsNetworked = true,
+                IsHostSide = false,
+            };
+
+            session._clientRouter.Register<BattleStartMessage>(BattleMessageType.BattleStart,
+                msg => session.OnClientBattleStart(msg));
+            session._clientRouter.Register<InputBatchMessage>(BattleMessageType.InputBatch,
+                msg => flow.ReceiveInputBatch(msg));
+            session._clientRouter.Register<DesyncAlertMessage>(BattleMessageType.DesyncAlert,
+                msg => GICLog.Error($"[Desync] tick={msg.tick} host={msg.hostHash} client={msg.clientHash}"));
+            network.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
+
+            player.Bind(network, null); // map 随 BattleStart 到达（BattlePlayer.OnBattleStart 自建盘）
+            return session;
+        }
+
+        private void OnClientBattleStart(BattleStartMessage msg)
+        {
+            Player.OnBattleStart(msg); // View 建盘（既有链）
+
+            var sim = new BattleSimState(msg.map, msg.seed);
+            Sim = sim;
+            sim.LogicRoot = _logicRoot;
+            sim.FogMode = (BattleFogMode)msg.fogMode;
+            BuildClientSimUnits(sim, msg);
+
+            // 本地 Sim 回环：TurnResolver 产出的 Segment/Snapshot/BattleOver 直接喂 View（F2）
+            var loop = new ClientLoopbackTransport(Transport);
+            loop.RegisterClientHandler((type, json) => _localRouter.Handle(type, json));
+            _localRouter.Register<SegmentMessage>(BattleMessageType.Segment, m => Player.OnSegment(m));
+            _localRouter.Register<SnapshotMessage>(BattleMessageType.Snapshot, m => Player.OnSnapshot(m));
+            _localRouter.Register<TurnEndMessage>(BattleMessageType.TurnEnd, m => Player.OnTurnEnd(m));
+            _localRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver, m => Player.OnBattleOver(m));
+
+            Flow.Bind(sim, loop, isHost: false, isNetworked: true);
+            Flow.StartBattle();
+        }
+
+        /// <summary>客户端按 Host 同序建 Sim 单位（名册序=unitId 分配序；核心落点取快照权威位）。</summary>
+        private static void BuildClientSimUnits(BattleSimState sim, BattleStartMessage msg)
+        {
+            var unitConfig = Wargame.Instance?.Context?.Get<UnitConfig>();
+            var roster = msg.roster;
+            if (roster == null || roster.Count == 0)
+            {
+                GICLog.Error("[BattleSession] 客户端名册为空，无法建 Sim 单位");
+                return;
+            }
+            foreach (var pl in roster)
+            {
+                sim.RegisterPlayer(pl.PlayerId);
+                sim.SetPlayerTeam(pl.PlayerId, pl.Team);
+            }
+            foreach (var pl in roster)
+            {
+                var coreState = msg.initialSnapshot?.units?.FirstOrDefault(u =>
+                    u.playerId == pl.PlayerId && u.unitName == (int)UnitName.ProtocolCore);
+                var coreData = unitConfig != null ? unitConfig.GetUnitData(UnitName.ProtocolCore) : null;
+                var core = UnitFactory.CreateUnitWithData(coreData);
+                if (core == null) continue;
+                core.transform.SetParent(sim.LogicRoot, false);
+                var cell = coreState != null ? coreState.position : new BattleCell(0, 0);
+                sim.RegisterUnit(core, pl.PlayerId, pl.Team, cell);
+            }
+            if (msg.initialSnapshot?.resources != null)
+            {
+                foreach (var res in msg.initialSnapshot.resources)
+                {
+                    sim.RegisterHand(res.playerId, new List<HandCard>());
+                    if (res.handCards == null) continue;
+                    foreach (var h in res.handCards)
+                        sim.GainCard(res.playerId, h.AsCardId(), h.count);
+                }
+            }
+        }
+
+        /// <summary>客户端回环传输：HostSend=本地 Sim 命令直喂 View；ClientSend=走网络上行。</summary>
+        private sealed class ClientLoopbackTransport : IBattleTransport
+        {
+            private readonly IBattleTransport _network;
+            private Action<BattleMessageType, string, string> _hostHandler;
+            private Action<BattleMessageType, string> _clientHandler;
+
+            public ClientLoopbackTransport(IBattleTransport network) { _network = network; }
+
+            public void HostSend(BattleMessageType type, object message)
+                => _clientHandler?.Invoke(type, BattleJsonSerializer.Instance.Serialize(message));
+
+            public void ClientSend(BattleMessageType type, object message) => _network.ClientSend(type, message);
+            public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) => _hostHandler = handler;
+            public void RegisterClientHandler(Action<BattleMessageType, string> handler) => _clientHandler = handler;
+        }
 
         private static BattleSession CreateHostCore(IBattleTransport transport, BattleMapData map,
             BattlePlayer player, RTSFlowController flow, Transform logicRoot, int seed,
             List<BattlePlayerSetup> roster, bool isNetworked)
         {
             var sim = new BattleSimState(map, seed);
-            flow.Bind(sim, transport);
+            flow.Bind(sim, transport, isHost: true, isNetworked: isNetworked);
 
             var session = new BattleSession
             {
@@ -169,6 +281,11 @@ namespace GIC.Battle
                 req => flow.OnSubmitAction(req.action));
             session._hostRouter.Register<SubmitInstantAction>(BattleMessageType.SubmitInstantAction,
                 req => session.HandleInstantSubmit(req.action));
+            // F1 帧同步：客户端输入与 hash 上报
+            session._hostRouter.Register<InputCommandMessage>(BattleMessageType.InputCommand,
+                msg => flow.ReceiveInputCommand(msg));
+            session._hostRouter.Register<HashReportMessage>(BattleMessageType.HashReport,
+                msg => flow.ReceiveHashReport(msg));
             transport.RegisterHostHandler((type, json, sender) => session._hostRouter.Handle(type, json));
 
             // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 回合结束）——注册单源化（T6）
@@ -213,6 +330,9 @@ namespace GIC.Battle
             {
                 map = Sim.Map,
                 initialSnapshot = Sim.TakeSnapshot(0),
+                seed = Sim.Seed,
+                roster = Roster,
+                fogMode = (int)Sim.FogMode,
             });
             Flow.StartBattle();
         }
@@ -232,6 +352,12 @@ namespace GIC.Battle
         {
             action.turnNumber = Flow != null ? Flow.TurnNumber : (Player?.LatestSnapshot?.turnNumber ?? 1);
             action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 决策九十五：上交时刻 tick
+            if (!IsHostSide && Flow != null)
+            {
+                // F1 客户端：走 Flow 校验→InputCommand 上报（本地不结算；F3 预测在 View 层）
+                Flow.OnSubmitAction(action);
+                return;
+            }
             Transport.ClientSend(BattleMessageType.SubmitAction, new SubmitActionRequest { action = action });
         }
 
