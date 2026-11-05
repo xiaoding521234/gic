@@ -18,10 +18,16 @@ namespace GIC.Battle
         /// 初始化种子——同 seed+同命令序列=同战局（回放/复现/联机确定性）；客户端零 roll 不消费</summary>
         public int Seed { get; }
 
-        /// <summary>Host 概率事件 RNG（System.Random=种子可注入、与 Unity 帧无关）——模拟核心
-        /// 唯一随机源；模拟核心禁直调 UnityEngine.Random（联机双端漂移/回放破坏），一切概率
-        /// 判定走 RollChance 单出口</summary>
-        private readonly System.Random _rng;
+        /// <summary>概率事件 RNG（F0-4，docs/active/50 §7.3）：自研 xorshift32，状态可序列化——
+        /// 替换 System.Random（其内部状态不可导出，帧同步无法 hash 比对/回滚恢复）。
+        /// 模拟核心唯一随机源；禁直调 UnityEngine.Random，一切概率判定走 RollChance 单出口。</summary>
+        private readonly DeterministicRng _rng;
+
+        /// <summary>RNG 当前状态（hash 覆盖 / 检查点用，F0-4）</summary>
+        public uint RngState => _rng.State;
+
+        /// <summary>恢复 RNG 状态（回滚/重连检查点用，F3）</summary>
+        public void RestoreRng(uint state) => _rng.Restore(state);
 
         /// <summary>已注册玩家ID（**注册序保序**——部署核心位置代理按注册序映射 spawnCenters、回合提交完成度判定用。
         /// 2026-09-23 审查 Y5：原 HashSet 迭代序 .NET 无保证，B7 换注册实现会静默错位部署基准）</summary>
@@ -129,11 +135,41 @@ namespace GIC.Battle
         public IReadOnlyDictionary<string, Unit> Units => _units;
         public IReadOnlyList<ActionData> InstantActionQueue => _instantActionQueue;
 
+        /// <summary>确定性单位遍历（F0-2，docs/active/50 §6.1）：按 unitId 升序返回快照。
+        /// **结算路径禁止直接 foreach `Units`**——Dictionary 枚举序不保证跨端/跨运行时一致；
+        /// 只读查询若最终会排序可不用本方法，但凡「遍历中产生副作用/决定先后」必须走这里。</summary>
+        public List<KeyValuePair<string, Unit>> SortedUnits()
+        {
+            var list = new List<KeyValuePair<string, Unit>>(_units);
+            list.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+            return list;
+        }
+
+        /// <summary>确定性玩家资源遍历（F0-2）：按 playerId 升序（发放/结算路径用）。</summary>
+        public List<KeyValuePair<string, PlayerResourceState>> SortedResources()
+        {
+            var list = new List<KeyValuePair<string, PlayerResourceState>>(_resources);
+            list.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+            return list;
+        }
+
+        /// <summary>确定性资源点遍历（F0-2）：按格坐标 (x,y) 升序。</summary>
+        public List<ResourceNodeState> SortedResourceNodes()
+        {
+            var list = new List<ResourceNodeState>(_resourceNodes.Values);
+            list.Sort((a, b) =>
+            {
+                int cx = a.cell.x.CompareTo(b.cell.x);
+                return cx != 0 ? cx : a.cell.y.CompareTo(b.cell.y);
+            });
+            return list;
+        }
+
         public BattleSimState(BattleMapData map, int seed)
         {
             Map = map;
             Seed = seed;
-            _rng = new System.Random(seed);
+            _rng = new DeterministicRng(seed);
             // 资源点开局态复制（docs/47：Map=开局协议快照恒静态；本注册表=运行时可变真值）
             var nodes = map != null ? map.resourceNodes : null;
             if (nodes != null)
@@ -440,7 +476,7 @@ namespace GIC.Battle
         {
             if (FogMode == BattleFogMode.None || Map == null) return;
             if (_fogExplored == null) _fogExplored = new Dictionary<TeamType, bool[]>();
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var unit = kv.Value;
                 var identity = unit?.GetUnitComponent<UnitIdentity>();
@@ -474,7 +510,7 @@ namespace GIC.Battle
 
             // 视野暴露（安柏变奏「全面侦查」，追拍七）：持有者所在格揭给施加者阵营（**非全队公开**
             // ——与客户端 BattleFog 随行揭雾同口径；BeginSelectPhase 全量同步已覆盖决策时点）
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var unit = kv.Value;
                 if (unit == null || IsDead(unit)) continue;
@@ -722,7 +758,7 @@ namespace GIC.Battle
         /// 正常对局胜负唯一判据=协议核心，TurnFlowController.CheckBattleOver 消费）</summary>
         public bool HasLivingUnits(TeamType team)
         {
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id != null && id.Team == team && !IsDead(kv.Value))
@@ -739,7 +775,7 @@ namespace GIC.Battle
         public List<Unit> GetCoreUnits(string playerId)
         {
             var result = new List<Unit>();
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.OwnerPlayerID != playerId) continue;
@@ -754,7 +790,7 @@ namespace GIC.Battle
         {
             Unit first = null;
             string firstId = null;
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.OwnerPlayerID != playerId) continue;
@@ -771,7 +807,7 @@ namespace GIC.Battle
         /// <summary>该玩家是否仍有存活核心（无任何核心单位=视作存活，避免装配异常秒判负）</summary>
         public bool HasLivingCore(string playerId)
         {
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.OwnerPlayerID != playerId) continue;
@@ -787,7 +823,7 @@ namespace GIC.Battle
         public bool IsPlayerDefeated(string playerId)
         {
             bool anyCore = _playerCoreTeam.ContainsKey(playerId);
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.OwnerPlayerID != playerId) continue;
@@ -803,7 +839,7 @@ namespace GIC.Battle
         public bool HasAnyRegisteredCore()
         {
             if (_playerCoreTeam.Count > 0) return true;
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
                 if (BattleHeuristics.IsCore(kv.Value)) return true;
             return false;
         }
@@ -816,7 +852,7 @@ namespace GIC.Battle
         public bool AnyCoreDestroyed()
         {
             var seen = new HashSet<string>();
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || !seen.Add(id.OwnerPlayerID)) continue;
@@ -857,7 +893,7 @@ namespace GIC.Battle
             bool anyCore = false;
             foreach (var kv in _playerCoreTeam)
                 if (kv.Value == team) { anyCore = true; break; }
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var id = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (id == null || id.Team != team || !BattleHeuristics.IsCore(kv.Value)) continue;
@@ -952,7 +988,7 @@ namespace GIC.Battle
         public List<Unit> GetUnitsAt(BattleCell cell)
         {
             var result = new List<Unit>();
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 if (GetPosition(kv.Value).Equals(cell))
                     result.Add(kv.Value);
@@ -1084,7 +1120,7 @@ namespace GIC.Battle
             Unit best = null;
             long bestDist = long.MaxValue;
             string bestId = null;
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
             {
                 var candidate = kv.Value;
                 if (candidate == self || BattleSimState.IsDead(candidate)) continue;
@@ -1317,7 +1353,7 @@ namespace GIC.Battle
         {
             var snapshot = new BattleSnapshot { turnNumber = turnNumber };
 
-            foreach (var kv in _units)
+            foreach (var kv in SortedUnits())
                 snapshot.units.Add(BuildUnitState(kv.Key, kv.Value));
 
             // 跨维度单位（决策九十一）：灵魂随快照携带（客户端建幽灵立牌+地脉视角显示；注册序
@@ -1327,7 +1363,7 @@ namespace GIC.Battle
             foreach (var kv in _crossDimensionUnits)
                 snapshot.units.Add(BuildUnitState(kv.Key, kv.Value));
 
-            foreach (var kv in _resources)
+            foreach (var kv in SortedResources())
             {
                 var res = kv.Value;
                 var snapshotRes = new PlayerResourceState

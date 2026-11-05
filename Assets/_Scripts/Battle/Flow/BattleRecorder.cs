@@ -54,7 +54,7 @@ namespace GIC.Battle
 
             Directory.CreateDirectory(ReplayDirectory);
             _path = Path.Combine(ReplayDirectory,
-                $"battle_{DateTime.Now:yyyyMMdd_HHmmss}_{seed}.jsonl");
+                $"battle_{DateTime.Now:yyyyMMdd_HHmmss}_{seed}.jsonl"); // DETERMINISM-ALLOW: 录制文件名（诊断，不入模拟）
             _hasHeader = true;
 
             var line = new ReplayHeaderLine

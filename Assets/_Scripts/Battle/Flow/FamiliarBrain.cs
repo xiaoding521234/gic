@@ -72,7 +72,7 @@ namespace GIC.Battle
             }
 
             var actions = new List<ActionData>();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（含未来低星建筑）

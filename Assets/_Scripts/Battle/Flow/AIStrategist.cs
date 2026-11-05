@@ -141,7 +141,7 @@ namespace GIC.Battle
             int myValue = 0, enemyValue = 0;
             var enemyCores = new List<Unit>();
             Unit myCore = null;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 var id = unit.GetUnitComponent<UnitIdentity>();
@@ -197,7 +197,7 @@ namespace GIC.Battle
 
             // ── 三账本（§5.3）：体力硬保底=当前伙伴数×5×2（自主军团 2 回合运转量）──
             int companionCount = 0;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 var id = unit.GetUnitComponent<UnitIdentity>();
@@ -214,7 +214,7 @@ namespace GIC.Battle
             int totalCoreTeams = 0, enemyCoreTeams = 0;
             {
                 var seenTeams = new HashSet<TeamType>();
-                foreach (var kv in sim.Units)
+                foreach (var kv in sim.SortedUnits())
                 {
                     var unit = kv.Value;
                     var id = unit.GetUnitComponent<UnitIdentity>();

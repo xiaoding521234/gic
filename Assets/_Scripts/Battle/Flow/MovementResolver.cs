@@ -117,7 +117,7 @@ namespace GIC.Battle
         private static Dictionary<string, BattleCell> CapturePositions(BattleSimState sim, List<MoveActionState> movers)
         {
             var positions = new Dictionary<string, BattleCell>();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
                 positions[kv.Key] = sim.GetPosition(kv.Value);
             foreach (var mover in movers)
                 positions[mover.UnitId] = mover.Current;

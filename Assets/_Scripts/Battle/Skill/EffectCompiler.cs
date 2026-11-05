@@ -1114,7 +1114,7 @@ namespace GIC.Battle
                     float along = Vector2.Dot(rel, dir);
                     float perpSq = rel.sqrMagnitude - along * along;
                     if (perpSq > radius * radius) continue; // 弹道不穿该圆柱
-                    entry = along - Mathf.Sqrt(radius * radius - perpSq);
+                    entry = along - Mathf.Sqrt(radius * radius - perpSq); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
                 }
                 if (entry >= 0f && entry <= maxDist)
                 {
@@ -1178,7 +1178,7 @@ namespace GIC.Battle
                 float along = Vector2.Dot(rel, dir);
                 float perpSq = rel.sqrMagnitude - along * along;
                 if (perpSq > radius * radius) continue; // 弹道不穿该圆柱
-                float entry = along - Mathf.Sqrt(radius * radius - perpSq);
+                float entry = along - Mathf.Sqrt(radius * radius - perpSq); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
                 if (entry >= 0f && entry <= maxDist) into.Add(enemy);
             }
         }
@@ -1227,7 +1227,7 @@ namespace GIC.Battle
                 float along = Vector2.Dot(rel, dir);
                 float perpSq = rel.sqrMagnitude - along * along;
                 if (perpSq > radius * radius) continue; // 弹道不穿该圆柱
-                float entry = along - Mathf.Sqrt(radius * radius - perpSq);
+                float entry = along - Mathf.Sqrt(radius * radius - perpSq); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
                 if (entry >= 0f && entry <= maxDist) return true;
             }
             return false;

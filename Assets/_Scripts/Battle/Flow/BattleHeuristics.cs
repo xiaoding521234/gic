@@ -131,7 +131,7 @@ namespace GIC.Battle
         {
             var result = new List<(string, Unit)>();
             if (sim == null) return result;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var enemy = kv.Value;
                 if (enemy == null) continue;
@@ -158,7 +158,7 @@ namespace GIC.Battle
             var result = new List<Unit>();
             if (selfId == null) return result;
 
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 var id = unit.GetUnitComponent<UnitIdentity>();

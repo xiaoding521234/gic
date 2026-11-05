@@ -336,14 +336,14 @@ namespace GIC.Battle
             // 才建图（学徒/劲敌 AI 队伍零成本跳过；真人玩家不注册=门恒全开=全件质量）；
             // E-1 拍板 #4「威胁图暂只接配额脑」由 AI 批设计蓝图全面取代（F-1 支援型先行=前身）。
             var threatByTeam = new Dictionary<TeamType, OpponentThreatModel.ThreatMap>();
-            foreach (var kv0 in sim.Units)
+            foreach (var kv0 in sim.SortedUnits())
             {
                 var u0 = kv0.Value;
                 if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
                 var id0 = u0.GetUnitComponent<UnitIdentity>();
                 if (id0 == null || threatByTeam.ContainsKey(id0.Team)) continue;
                 bool anyFeed = false;
-                foreach (var kv1 in sim.Units)
+                foreach (var kv1 in sim.SortedUnits())
                 {
                     var u1 = kv1.Value;
                     if (!BattleHeuristics.IsCompanion(u1) || BattleSimState.IsDead(u1)) continue;
@@ -382,7 +382,7 @@ namespace GIC.Battle
                             bidBoard.DeclareMovement(b.unitId, DeclaredLandingCell(sim, b.bid, b.unit)); // P5：targetX 直读
                         }
                     }
-                    foreach (var kv in sim.Units)
+                    foreach (var kv in sim.SortedUnits())
                     {
                         var unit = kv.Value;
                         if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（协议核心批单一判据）
@@ -651,7 +651,7 @@ namespace GIC.Battle
         /// 价值估算，与 Host 途经采集同口径（per-堆配额）</summary>
         private static int LivePileCollectValue(BattleSimState sim, BattleCell cell, int quota)
         {
-            foreach (var node in sim.ResourceNodes)
+            foreach (var node in sim.SortedResourceNodes())
                 if (node != null && node.remainingCharges > 0
                     && node.cell.x == cell.x && node.cell.y == cell.y)
                     return Mathf.Min(quota, node.remainingCharges);
@@ -661,7 +661,7 @@ namespace GIC.Battle
         /// <summary>该格是否存活资源点（收获档落点 +1=回合末站立采集估值）</summary>
         private static bool LivePileAt(BattleSimState sim, BattleCell cell)
         {
-            foreach (var node in sim.ResourceNodes)
+            foreach (var node in sim.SortedResourceNodes())
                 if (node != null && node.remainingCharges > 0
                     && node.cell.x == cell.x && node.cell.y == cell.y)
                     return true;
@@ -944,7 +944,7 @@ namespace GIC.Battle
                 {
                     var selfIdJ2 = unit.GetUnitComponent<UnitIdentity>();
                     if (selfIdJ2 != null)
-                        foreach (var kv in sim.Units)
+                        foreach (var kv in sim.SortedUnits())
                         {
                             var e = kv.Value;
                             var eid = e.GetUnitComponent<UnitIdentity>();
@@ -967,7 +967,7 @@ namespace GIC.Battle
         /// 保守向偏差=少选格不会被结算弹回）</summary>
         private static bool IsCellOccupiedForStep(BattleSimState sim, BattleCell cell)
         {
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var pos = sim.GetPosition(kv.Value);
                 if (pos.x == cell.x && pos.y == cell.y) return true;
@@ -1002,7 +1002,7 @@ namespace GIC.Battle
             //（回合末/秒拍自动采），攻击候选照常
             if (!passCollector)
             {
-                foreach (var node in sim.ResourceNodes)
+                foreach (var node in sim.SortedResourceNodes())
                     if (node != null && node.remainingCharges > 0
                         && node.cell.x == fromCell.x && node.cell.y == fromCell.y)
                         return true;
@@ -1012,7 +1012,7 @@ namespace GIC.Battle
             // 透视=不查探索账本；被占堆跳过——谁站谁采，被占零收益转投次近堆）
             ResourceNodeState bestNode = null;
             int bestDist = int.MaxValue;
-            foreach (var node in sim.ResourceNodes)
+            foreach (var node in sim.SortedResourceNodes())
             {
                 if (node == null || node.remainingCharges <= 0) continue;
                 if (IsCellOccupiedForStep(sim, node.cell)) continue;
@@ -1030,7 +1030,7 @@ namespace GIC.Battle
                 var forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
                 int bestValue = 0;
                 ResourceNodeState bestPile = null;
-                foreach (var node in sim.ResourceNodes)
+                foreach (var node in sim.SortedResourceNodes())
                 {
                     if (node == null || node.remainingCharges <= 0) continue;
                     var path = RTSPathfinder.FindPath(sim, from.x, from.y,
@@ -1040,7 +1040,7 @@ namespace GIC.Battle
                     int value = 0;
                     var seenPiles = new HashSet<string>();
                     foreach (var c in cells)
-                        foreach (var hit in sim.ResourceNodes)
+                        foreach (var hit in sim.SortedResourceNodes())
                         {
                             if (hit == null || hit.remainingCharges <= 0) continue;
                             if (hit.cell.x != c.x || hit.cell.y != c.y) continue;
@@ -1558,7 +1558,7 @@ namespace GIC.Battle
             if (profile == null || profile.自保权重 <= 0f) return 0;
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null) return 0;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var enemy = kv.Value;
                 var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
@@ -1692,7 +1692,7 @@ namespace GIC.Battle
             Unit best = null;
             int bestRatio = int.MaxValue;
             string bestId = null;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var candidate = kv.Value;
                 if (BattleSimState.IsDead(candidate)) continue;
@@ -1733,7 +1733,7 @@ namespace GIC.Battle
             int bestFollowers = int.MaxValue;
             string bestId = null;
             var fromCm = sim.GetPosCm(self); // P5：连续位
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var candidate = kv.Value;
                 if (BattleSimState.IsDead(candidate) || ReferenceEquals(candidate, self)) continue;
@@ -1766,7 +1766,7 @@ namespace GIC.Battle
         /// <summary>本方是否有尸体（H-2 就位让位门控——尸体在场且爆发满槽时复苏候选恒优先）</summary>
         private static bool HasAllyCorpse(BattleSimState sim, TeamType team)
         {
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 if (!BattleSimState.IsDead(kv.Value)) continue;
                 var identity = kv.Value.GetUnitComponent<UnitIdentity>();
@@ -1808,7 +1808,7 @@ namespace GIC.Battle
                 int radius = atom.radiusKey != SkillParamKey.None
                     ? data.GetInt(atom.radiusKey, CellMetrics.CellSizeCm) : CellMetrics.CellSizeCm; // P5：cm（与 SupportRadiusOf 同口径）
 
-                foreach (var kv in sim.Units)
+                foreach (var kv in sim.SortedUnits())
                 {
                     var ally = kv.Value;
                     if (BattleSimState.IsDead(ally)) continue;

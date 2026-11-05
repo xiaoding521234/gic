@@ -64,7 +64,7 @@ namespace GIC.Data
 
         public bool Equals(BattleCell other) => x == other.x && y == other.y;
         public override bool Equals(object obj) => obj is BattleCell other && Equals(other);
-        public override int GetHashCode() => (x * 397) ^ y;
+        public override int GetHashCode() => (x * 397) ^ y; // DETERMINISM-ALLOW: 值类型哈希仅作字典键；结算遍历已改 SortedUnits/SortedResourceNodes
 
         public static BattleCell zero => new BattleCell(0, 0);
 

@@ -34,7 +34,7 @@ namespace GIC.Battle
         public void CollectTurnEndEffects(int turnNumber, List<BattleEffect> effects, List<BattleCommand> extraCommands)
         {
             var buildings = new List<(string id, Unit unit, UnitConfig.UnitData data, UnitIdentity identity)>();
-            foreach (var kv in _sim.Units)
+            foreach (var kv in _sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (unit == null || BattleSimState.IsDead(unit)) continue;
@@ -54,7 +54,7 @@ namespace GIC.Battle
                     {
                         if (data.效果半径 <= 0 || data.效果数值 <= 0) break;
                         var center = _sim.GetPosition(building.unit);
-                        foreach (var tkv in _sim.Units)
+                        foreach (var tkv in _sim.SortedUnits())
                         {
                             var target = tkv.Value;
                             if (target == null) continue;
@@ -119,7 +119,7 @@ namespace GIC.Battle
                         if (data.效果数值 <= 0) break;
                         int healAmount = data.效果数值 * data.GetEffectiveAttack() / 100; // 末点截断（整数除法）
                         if (healAmount <= 0) break;
-                        foreach (var tkv in _sim.Units)
+                        foreach (var tkv in _sim.SortedUnits())
                         {
                             var target = tkv.Value;
                             if (target == null || BattleSimState.IsDead(target)) continue; // 存活（拍板 #9）

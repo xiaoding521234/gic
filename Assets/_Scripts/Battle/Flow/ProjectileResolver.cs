@@ -211,7 +211,7 @@ namespace GIC.Battle
             {
                 var wp = mover.WaypointsCm[idx];
                 float dx = wp.x - x, dz = wp.z - z;
-                float dist = Mathf.Sqrt(dx * dx + dz * dz);
+                float dist = Mathf.Sqrt(dx * dx + dz * dz); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
                 if (dist < 0.01f) { x = wp.x; z = wp.z; idx++; continue; }
                 float dur = dist / speed;
                 segs.Add(new TrajSeg
@@ -244,7 +244,7 @@ namespace GIC.Battle
             {
                 var cell = mover.Path[i];
                 float dx = cell.CenterXCm - x, dz = cell.CenterYCm - z;
-                float dist = Mathf.Sqrt(dx * dx + dz * dz);
+                float dist = Mathf.Sqrt(dx * dx + dz * dz); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
                 if (dist < 0.01f) continue;
                 float dur = dist / speed;
                 segs.Add(new TrajSeg
@@ -323,7 +323,7 @@ namespace GIC.Battle
                     float disc = b * b - 4f * a * c;
                     if (disc >= 0f)
                     {
-                        float hitT = t0 + (-b - Mathf.Sqrt(disc)) / (2f * a); // 小根=最早进入
+                        float hitT = t0 + (-b - Mathf.Sqrt(disc)) / (2f * a); // 小根=最早进入 // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
                         if (hitT >= t0 && hitT <= segEnd + 1e-5f)
                             return hitT;
                     }

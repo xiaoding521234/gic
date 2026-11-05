@@ -48,7 +48,7 @@ namespace GIC.Battle
         {
             var result = new List<(BattleCell, bool)>();
             List<(string unitId, BattleCell cell)> others = null;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (unit == null || BattleSimState.IsDead(unit)) continue;
@@ -120,7 +120,7 @@ namespace GIC.Battle
         {
             int selfRadiusCm = Mathf.RoundToInt(
                 BattleMetrics.CylinderDiameterOf(selfData) * CellMetrics.CellSizeCm * 0.5f);
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var other = kv.Value;
                 if (other == null) continue;
@@ -332,7 +332,7 @@ namespace GIC.Battle
         /// AI 配额脑部署/升命候选同读此单源（AI-1 批公开——防两处手写同构漂移）</summary>
         public static Unit FindOwnUnitByName(BattleSimState sim, string playerId, UnitName unitName)
         {
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var identity = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.OwnerPlayerID != playerId) continue;
@@ -355,7 +355,7 @@ namespace GIC.Battle
             if (data.starLevel <= 1)
             {
                 // 1★ 前置=自己有存活 Core tag 建筑（含协议核心——恒满足仍显式校验）
-                foreach (var kv in sim.Units)
+                foreach (var kv in sim.SortedUnits())
                 {
                     var identity = kv.Value.GetUnitComponent<UnitIdentity>();
                     if (identity == null || identity.OwnerPlayerID != playerId) continue;
@@ -365,7 +365,7 @@ namespace GIC.Battle
                 return false;
             }
             var requiredStar = data.starLevel - 1;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var identity = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.OwnerPlayerID != playerId) continue;
@@ -385,7 +385,7 @@ namespace GIC.Battle
         {
             if (data == null || data.unitType != UnitType.Building) return true; // 非建筑不查
             int count = 0;
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var identity = kv.Value.GetUnitComponent<UnitIdentity>();
                 if (identity == null || identity.OwnerPlayerID != playerId) continue;

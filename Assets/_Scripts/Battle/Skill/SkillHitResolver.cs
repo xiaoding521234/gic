@@ -196,7 +196,7 @@ namespace GIC.Battle
         private static int SqrtI(long value)
         {
             if (value <= 0) return 0;
-            int x = (int)Mathf.Sqrt(value);
+            int x = (int)Mathf.Sqrt(value); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
             while ((long)(x + 1) * (x + 1) <= value) x++;
             while ((long)x * x > value) x--;
             return x;

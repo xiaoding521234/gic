@@ -480,7 +480,7 @@ namespace GIC.Battle
             // ——双异元素光环同拍交错、每层附着、每拍可触发反应（对齐原神双光环同开互融）
             // **2026-11-04 追拍**：OnTurnEnd 产出只在效果拍（每 2 秒）执行——「太频繁」节奏翻倍；
             // 计时递减仍每秒（Duration 秒语义不变：冻结 2 秒仍 2 秒，只少一次无产出的空转调用）
-            foreach (var buff in _sim.ActiveBuffs)
+            foreach (var buff in _sim.ActiveBuffs) // DETERMINISM-ALLOW: ActiveBuffs 是 List（注册序确定，非字典）
             {
                 if (effectBeat) effects.AddRange(buff.OnTurnEnd());
                 if (!buff.IsPermanent) buff.RemainingSeconds--;
@@ -494,7 +494,7 @@ namespace GIC.Battle
             // 豁免=移动类型飞行/两栖，存活单位才附着（尸体不挂——复活不带附着语义接近）。
             // 覆盖语义=挂 1 层水覆盖旧附着（泡在水里火挂不住）；放 tick/到期之后=回合末收尾。
             // 元素联动：泡湿单位天然带水附着——凯亚冰打=冻结反应、安柏火箭=蒸发（战术意义自洽）
-            foreach (var kv in _sim.Units)
+            foreach (var kv in _sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (unit == null || BattleSimState.IsDead(unit)) continue;
@@ -522,7 +522,7 @@ namespace GIC.Battle
             // 位置=泡湿/地脉之后（同为回合末收尾族环境规则——按单位位置结算）
             var harvestedCells = new HashSet<BattleCell>();
             var standHarvestOrder = new List<(string id, Unit unit)>();
-            foreach (var kv in _sim.Units)
+            foreach (var kv in _sim.SortedUnits())
             {
                 if (kv.Value == null || BattleSimState.IsDead(kv.Value)) continue;
                 standHarvestOrder.Add((kv.Key, kv.Value));
@@ -1554,7 +1554,7 @@ namespace GIC.Battle
                     string holderOwnerId = explosion.holder.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
                     if (holderOwnerId == null) continue; // 无归属防御（理论不可达——活体格挡者必有主人）
                     var holderTeam = _sim.GetTeamOf(holderOwnerId);
-                    foreach (var kv in _sim.Units)
+                    foreach (var kv in _sim.SortedUnits())
                     {
                         var enemy = kv.Value;
                         if (BattleSimState.IsDead(enemy)) continue;

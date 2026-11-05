@@ -59,7 +59,7 @@ namespace GIC.Battle
         public UnitName SandboxDummyUnit;
 
         /// <summary>战斗种子（2026-10-02 幸运暴击批）：模拟核心概率事件唯一随机源的初始化种子
-        /// （Host 端 BattleSimState 按 seed 建 System.Random，同 seed+同命令序列=同战局——回放/复现/
+        /// （Host 端 BattleSimState 按 seed 建 DeterministicRng〔F0-4：xorshift32，状态可序列化〕，同 seed+同命令序列=同战局——回放/复现/
         /// 联机防漂移；客户端零 roll 不消费）。BuildFromRoster 自动随机生成；测试/复现可显式注入；
         /// 未经本工厂直接 new 的配置 Seed=0=确定性种子（合法，仅同输入对局暴击序列一致）。
         /// B7 LAN：Host 广播本配置即双端同 seed</summary>
@@ -110,7 +110,7 @@ namespace GIC.Battle
             {
                 MapConfigName = string.IsNullOrEmpty(mapConfigName) ? DefaultMapName : mapConfigName,
                 // 种子用表现层 UnityEngine.Random 生成（开局壳层，不入模拟流；模拟核心禁该随机源）
-                Seed = UnityEngine.Random.Range(0, int.MaxValue),
+                Seed = UnityEngine.Random.Range(0, int.MaxValue), // DETERMINISM-ALLOW: 开局种子（Host 生成，随 BattleStart 广播；不入模拟流）
                 // 迷雾批（2026-10-17）：房间对战默认对战迷雾（用户拍板「开房间对战时，不用记忆地图」）
                 FogMode = BattleFogMode.Skirmish,
                 Players = new List<BattlePlayerSetup>(),
@@ -139,7 +139,7 @@ namespace GIC.Battle
             return new BattleLaunchConfig
             {
                 MapConfigName = DefaultMapName,
-                Seed = UnityEngine.Random.Range(0, int.MaxValue),
+                Seed = UnityEngine.Random.Range(0, int.MaxValue), // DETERMINISM-ALLOW: 开局种子（Host 生成，随 BattleStart 广播；不入模拟流）
                 IsSandbox = true,
                 SandboxAllyUnit = ally,
                 SandboxDummyUnit = dummy,

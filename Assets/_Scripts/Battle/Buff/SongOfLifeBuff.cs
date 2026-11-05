@@ -90,7 +90,7 @@ namespace GIC.Battle
             // 治疗基准=施加者（芭芭拉）最大生命（与伤害同基准单位；float 末点 FloorToInt 同 ResolveHealAmount 口径）
             int healPerLayer = (attackerStats != null ? Mathf.FloorToInt(attackerStats.GetStatStruct(StatType.HP).Max * Cfg.每回合治疗百分比 / 100f) : 0);
 
-            foreach (var kv in Sim.Units)
+            foreach (var kv in Sim.SortedUnits())
             {
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();

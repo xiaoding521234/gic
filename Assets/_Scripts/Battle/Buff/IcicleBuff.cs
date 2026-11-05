@@ -102,7 +102,7 @@ namespace GIC.Battle
             bool applyDefDown = cLevel >= 2; // 2命起 tick 命中附带冰棱减防（是否施加=命座开关；数值全在 Buff_DefenseDown 资产单源）
             int layers = Mathf.Max(1, Level);
 
-            foreach (var kv in Sim.Units)
+            foreach (var kv in Sim.SortedUnits())
             {
                 var unit = kv.Value;
                 var identity = unit.GetUnitComponent<UnitIdentity>();

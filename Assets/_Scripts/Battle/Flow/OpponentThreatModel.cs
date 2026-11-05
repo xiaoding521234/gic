@@ -57,7 +57,7 @@ namespace GIC.Battle
         public static ThreatMap Build(BattleSimState sim, BattleSnapshot snapshot, TeamType myTeam, int turn)
         {
             var map = new ThreatMap();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var enemy = kv.Value;
                 if (BattleHeuristics.IsBuilding(enemy)) continue; // 建筑（含协议核心）无技能无行动不产威胁

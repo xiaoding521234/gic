@@ -568,7 +568,7 @@ namespace GIC.Battle
             // ② 角色补货：自己存活建筑的可购买列表 × 手牌无同名卡 × 仅角色卡 × 配置存在
             //    × 技能已实装 → 入清单（unitId 升序枚举+多建筑同售去重）
             var shopBuildings = new List<KeyValuePair<string, Unit>>();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (unit == null || BattleSimState.IsDead(unit)) continue;
@@ -727,7 +727,7 @@ namespace GIC.Battle
         private List<KeyValuePair<string, Unit>> CollectArchons(BattleSimState sim)
         {
             var archons = new List<KeyValuePair<string, Unit>>();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 if (BattleHeuristics.IsBuilding(kv.Value)) continue; // 协议核心 5★ ≠ 可操魔神
                 if (!BattleHeuristics.IsArchon(kv.Value)) continue;
@@ -746,7 +746,7 @@ namespace GIC.Battle
         private List<KeyValuePair<string, Unit>> CollectCompanions(BattleSimState sim)
         {
             var companions = new List<KeyValuePair<string, Unit>>();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 if (BattleHeuristics.IsBuilding(kv.Value)) continue; // 建筑不参与任何行动
                 if (!BattleHeuristics.IsCompanion(kv.Value)) continue;
@@ -764,7 +764,7 @@ namespace GIC.Battle
         private List<KeyValuePair<string, Unit>> CollectFactionCasters(BattleSimState sim)
         {
             var casters = new List<KeyValuePair<string, Unit>>();
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 if (BattleHeuristics.IsBuilding(kv.Value)) continue; // 建筑不参与任何行动
                 if (BattleSimState.IsDead(kv.Value) || !BattleSimState.CanAct(kv.Value)) continue;
@@ -807,7 +807,7 @@ namespace GIC.Battle
                 // 非角色，buff/变奏/元能对核心零收益（治疗核心归伙伴治疗技能域），混入候选
                 // 只会污染评分榜（交涉家契约桶 ×1.6 放大后显形——学徒失误注入选中过给核心的延奏）
                 var allies = new List<(string unitId, Unit unit)>();
-                foreach (var kv in sim.Units)
+                foreach (var kv in sim.SortedUnits())
                 {
                     if (BattleSimState.IsDead(kv.Value)) continue;
                     if (BattleHeuristics.IsBuilding(kv.Value)) continue;

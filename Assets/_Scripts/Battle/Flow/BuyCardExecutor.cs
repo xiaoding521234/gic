@@ -82,7 +82,7 @@ namespace GIC.Battle
         /// 显式列表数据驱动（docs/45 §1.2），不指定具体建筑=等价校验防凭空购买</summary>
         private static bool HasPurchaseSource(BattleSimState sim, string playerId, CardId cardId)
         {
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (unit == null || BattleSimState.IsDead(unit)) continue;

@@ -187,7 +187,7 @@ namespace GIC.Battle
             var selfIdentity = mover.Unit.GetUnitComponent<UnitIdentity>();
             var selfTeam = selfIdentity?.Team;
 
-            foreach (var kv in sim.Units)
+            foreach (var kv in sim.SortedUnits())
             {
                 if (kv.Key == mover.UnitId) continue;
                 var other = kv.Value;
