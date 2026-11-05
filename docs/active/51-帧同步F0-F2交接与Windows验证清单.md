@@ -169,3 +169,39 @@ Unity 菜单：
 - `Tools/TG/回放回归（最新录制）`
 - `Tools/TG/回放回归（双跑确定性）`
 - `Tools/TG/回放回归（自测·合成局闭环）`
+
+---
+
+## 11. Windows 侧接手记录（2026-11-06）
+
+> 分支 `feature/frame-sync` @ `04e4b17e`；本节=§3「编译排错」的完成回执。修复提交=`c7393f92`。
+
+### 11.1 编译排错（已完成，0 错）
+
+| # | 现象 | 根因 | 处置 |
+|---|---|---|---|
+| 1 | `CS0246: DeterministicRng` | `DeterministicRng.cs.meta` guid 仅 44 字符（正常=32 明文/56 加密），Unity 判「GUID 无法解析」并整份忽略该脚本 | 删除 meta 重建（新文件、guid 零引用） |
+| 2 | `CS0246: BattlePhase`（继承自基线） | 同上，`BattlePhase.cs.meta` 畸形 | master 已修（`84114c32`），分支内一并带入 |
+| 3 | `BattleSession.cs(223) CS0019` | `UnitState.unitName` 是 **string**，写成 `== (int)UnitName.ProtocolCore` | 改 `UnitName.ProtocolCore.ToString()`（与全库口径一致） |
+
+最终 **refresh 0 CS 错**（唯一 warning=`PetTtsClient CS0414` 既有项）；`tools/determinism-audit.sh --strict` = **PASS**。
+
+> **Mac 侧写码注意**：新建 .cs 的 .meta guid 必须由 Unity 生成（32 明文 / 56 加密）。手写或复用 44 字符值会让文件被整份忽略，症状是「文件明明存在却 CS0246」。
+
+### 11.2 F1 时序缺陷（已修，`c7393f92`）
+
+- **缺陷**：`ApplyDueInputs` 在**应用该 tick 的时刻**才 `HostSend(InputBatch)`。客户端同一刻已进入/越过该 tick，`ReceiveInputBatch` 命中 `msg.tick <= CurrentTick` → 「输入批迟到丢弃」→ 从第一个含输入的 tick 起必漂。违反设计稿 §3.3「至少提前 1 tick 广播」。
+- **修法**：入队标脏（`_dirtyBatchTicks`）→ `TickAdvance` 末尾 `FlushInputBroadcasts()` 提前广播；定序比较器抽 `CompareInputs` 单源，**广播前排序**（客户端保序不重排），结算前再排一次（幂等）。AI 节拍在同一 tick 内生成 `targetTick=+1` 的行动，当拍末尾即发出，客户端仍有一个完整 tick（50ms）接收余量。
+- **顺带**：客户端路由显式吞掉 Host 仍广播的 `Segment/Snapshot`（原会每秒刷「未注册的消息类型」警告，F2 下网络帧仅诊断），`BattleOver` 加权威兜底（本地未终局时按 Host 收尾）。
+
+### 11.3 尚未完成（需实机/双机）
+
+1. **§4 重录回放基线**：`battle_20261105_084820` 在 `9ea7475d` 已 FAIL（P6 语义变更），叠加 `DeterministicRng` 后必须在本分支重录；重录后跑「双跑确定性」应为 PASS。
+2. **§5 LAN 双机 hash**：本机单端无法验证；按清单跑，关注 `[Desync] tick=...`。
+3. **§6 观察局 AI 回归**：AI 行动改走 `targetTick=+1` 输入批后，行为应与单机一致（无感知差异）。
+4. **F3（本地预测+回滚）**：按 §7 顺序实现，前置=上面 1~3 全绿。
+
+### 11.4 已知遗留（建议放进 F2.5 小批）
+
+- `ReceiveInputCommand` 只入队、不复跑 Host 侧校验（所有权/建筑/眷属拦截在客户端 `SubmitAndResolve` 已跑，F4 反作弊批再收紧）；同时**不进 `_recentPlayerActions`**——伙伴脑「感知窗口内玩家行动」目前只看到 Host 本地玩家，远端玩家行动不可见（行为差异待实机确认）。
+- LAN 远端行动未进 `BattleRecorder`（回放覆盖 Host 本地玩家+AI），LAN 局回放不完整。
