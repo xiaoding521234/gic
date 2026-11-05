@@ -73,6 +73,12 @@ namespace GIC.Battle
             moveCommand = BattleCommand.Move(action.unitId, 0, 0, mover.PathCells, 0,
                 (int)DirectionOfSegment(posCm.x, posCm.y, waypoints[0].x, waypoints[0].z),
                 mover.SpeedCmPerSecond);
+            // 精确落点 cm（连续空间，2026-11-05 移动抖动修复）：格路径只表达「经过哪些格」，
+            // 客户端若按格心收尾会与 Host 的真实停点差最多半格，随后又被每秒快照自愈拉回=瞬移；
+            // 末 waypoint=精确目标（不可达时=钳制落点），与 Host 推进终点同源
+            var lastWp = waypoints[waypoints.Count - 1];
+            moveCommand.hitX = lastWp.x;
+            moveCommand.hitY = lastWp.z;
             return mover;
         }
 

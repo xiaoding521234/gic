@@ -233,6 +233,10 @@ namespace GIC.Battle
         /// 逐段+逐帧自检发现失配即自废（防双补间同帧双写 jitter——玩家连点重定目标/AI 0.5s 重决策）</summary>
         private readonly Dictionary<string, int> _moveGeneration = new Dictionary<string, int>();
 
+        /// <summary>被挡弹回冷却（逐单位，unscaledTime）：即时制拥挤近战里停点每 0.5 秒微变——
+        /// 只靠「已停在停点」判据仍会每拍弹一次；冷却把反馈收敛到 ~1 秒一次（2026-11-05 闪烁修复）</summary>
+        private readonly Dictionary<string, float> _lastBlockedBumpTime = new Dictionary<string, float>();
+
         /// <summary>移动播放中的单位集（世代开始加入、finally 世代匹配才移除）——OnSnapshot 位置自愈
         /// 的让位表（移动中不回拉：补间与模拟同速推进，1s 滞后快照回拉会抖）</summary>
         private readonly HashSet<string> _activeMovePlayback = new HashSet<string>();
@@ -1371,12 +1375,28 @@ namespace GIC.Battle
                                 _moveGeneration[command.actorUnitId] =
                                     (_moveGeneration.TryGetValue(command.actorUnitId, out var prevGen) ? prevGen : 0) + 1;
                                 _activeMovePlayback.Remove(command.actorUnitId);
+                                Vector3 beforeStop = mover.transform.position;
                                 var stopWorld = BoardCmToWorld(command.hitX, command.hitY);
                                 mover.ApplyPosition(stopWorld);
+                                mover.Cell = BattleCell.FromCm(command.hitX, command.hitY); // 停点格（离开移动态后
+                                // 队形重排/被挡弹回兜底按真实停点分组，勿留旧的路径终点格）
                                 mover.SetMoveAnimation(false);
-                                if (command.metadata == BattleCommand.MoveBlocked)
+                                // 被挡弹回仅在「确实朝墙推进了一段」时播放（2026-11-05 闪烁修复）：即时制下
+                                // AI 每 0.5 秒重决策，单位持续顶墙会每拍收到一条停点相同的校正命令——旧实现
+                                // 每次重播探出/弹回，表现为角色原地高频抖动；已停在停点（<15cm）＝重复顶墙，
+                                // 静默落位即可
+                                bool advanced = new Vector2(beforeStop.x - stopWorld.x, beforeStop.z - stopWorld.z)
+                                    .magnitude > 0.15f;
+                                _lastBlockedBumpTime.TryGetValue(command.actorUnitId, out var lastBump);
+                                bool bumpReady = Time.unscaledTime - lastBump > 0.9f;
+                                if (command.metadata == BattleCommand.MoveBlocked && advanced && bumpReady)
+                                {
+                                    _lastBlockedBumpTime[command.actorUnitId] = Time.unscaledTime;
                                     playbacks.Add(StartCoroutine(PlayBlockedBumpCoroutine(mover,
-                                        stopWorld, command.direction, 0.25f)));
+                                        stopWorld, command.direction, 0.25f,
+                                        _moveGeneration.TryGetValue(command.actorUnitId, out var bumpGen) ? bumpGen : 0,
+                                        command.actorUnitId)));
+                                }
                             }
                             else
                             {
@@ -1821,26 +1841,70 @@ namespace GIC.Battle
                 float speedWorldPerSec = (command.speedCm > 0 ? command.speedCm : BattleMetrics.DefaultMoveSpeedCm)
                     / (float)CellMetrics.CellSizeCm;
                 float lastStepSeconds = 0.25f;
-                for (int i = 1; i < path.Count; i++)
+                // 连续移动（2026-11-05「角色闪烁/瞬移」修复）：起点=立牌当前视觉位，并跳过已经走过的
+                // 路径点。AI 每 0.5 秒重决策、摇杆变向都会换发 Move 命令；旧实现恒从 path[0] 格心起步，
+                // 已推进的立牌被拉回格心（≤半格回退），与片尾队形重排叠加即每帧在起点/终点间瞬移。
+                if (path.Count == 1 && view != null && (command.hitX != 0 || command.hitY != 0))
                 {
-                    if (view == null) break; // 中途死亡/消散拆件：停止补间（守卫族同 PlayDamageCoroutine）
-                    if (_moveGeneration.TryGetValue(command.actorUnitId, out var cur) && cur != generation)
-                        yield break; // P4-E 世代替换：新移动命令已接管（移动态/活动表由新世代 finally 管理）
-                    Vector3 from = _board.CellToWorld(path[i - 1]);
-                    Vector3 to = _board.CellToWorld(path[i]);
-                    float stepSeconds = Mathf.Max(0.05f,
-                        Vector3.Distance(from, to) / (speedWorldPerSec * _playbackSpeed));
-                    lastStepSeconds = stepSeconds;
-                    yield return BattleViewTween.Over(stepSeconds, t =>
+                    // 同格移动（起点格=终点格，命令只带 1 个格心）：旧实现无补间→客户端不动、Host 在格内
+                    // 走到精确落点，随后每秒快照自愈再拉一次=格内瞬移。按精确落点补间即可（≤1 格行程）。
+                    Vector3 sameCellFrom = view.transform.position;
+                    Vector3 sameCellTo = BoardCmToWorld(command.hitX, command.hitY);
+                    float sameCellSec = Mathf.Max(0.05f,
+                        Vector3.Distance(sameCellFrom, sameCellTo) / (speedWorldPerSec * _playbackSpeed));
+                    if ((sameCellTo - sameCellFrom).sqrMagnitude > 0.0001f)
                     {
-                        if (view != null
-                            && (!_moveGeneration.TryGetValue(command.actorUnitId, out var c) || c == generation))
-                            view.ApplyPosition(Vector3.Lerp(from, to, t));
-                    });
+                        lastStepSeconds = sameCellSec;
+                        var segFromSame = sameCellFrom;
+                        yield return BattleViewTween.Over(sameCellSec, t =>
+                        {
+                            if (view != null
+                                && (!_moveGeneration.TryGetValue(command.actorUnitId, out var c0) || c0 == generation))
+                                view.ApplyPosition(Vector3.Lerp(segFromSame, sameCellTo, t));
+                        });
+                    }
                 }
-                if (path.Count > 0 && view != null
+                else if (path.Count > 1)
+                {
+                    // 补间点列（2026-11-05）：末点=命令携带的精确落点 cm（连续空间 Host 真实停点），
+                    // 其余=格心——旧实现收尾于格心，静止后与 Host 差最多半格，下一秒快照自愈再拉回=瞬移
+                    var points = new List<Vector3>(path.Count);
+                    for (int i = 0; i < path.Count; i++) points.Add(_board.CellToWorld(path[i]));
+                    if (command.hitX != 0 || command.hitY != 0)
+                        points[points.Count - 1] = BoardCmToWorld(command.hitX, command.hitY);
+                    Vector3 startPos = view != null ? view.transform.position : points[0];
+                    int firstTarget = 1;
+                    float bestSqr = float.MaxValue;
+                    for (int i = 1; i < points.Count; i++)
+                    {
+                        float distToWp = (points[i] - startPos).sqrMagnitude;
+                        if (distToWp < bestSqr) { bestSqr = distToWp; firstTarget = i; }
+                    }
+                    for (int i = firstTarget; i < points.Count; i++)
+                    {
+                        if (view == null) break; // 中途死亡/消散拆件：停止补间（守卫族同 PlayDamageCoroutine）
+                        if (_moveGeneration.TryGetValue(command.actorUnitId, out var cur) && cur != generation)
+                            yield break; // P4-E 世代替换：新移动命令已接管（移动态/活动表由新世代 finally 管理）
+                        Vector3 from = startPos;
+                        Vector3 to = points[i];
+                        float stepSeconds = Mathf.Max(0.05f,
+                            Vector3.Distance(from, to) / (speedWorldPerSec * _playbackSpeed));
+                        lastStepSeconds = stepSeconds;
+                        var segFrom = from; // 逐段闭包快照（startPos 每段推进，lambda 不得读到新值）
+                        yield return BattleViewTween.Over(stepSeconds, t =>
+                        {
+                            if (view != null
+                                && (!_moveGeneration.TryGetValue(command.actorUnitId, out var c) || c == generation))
+                                view.ApplyPosition(Vector3.Lerp(segFrom, to, t));
+                        });
+                        startPos = to;
+                    }
+                }
+                if (path.Count > 1 && view != null
                     && (!_moveGeneration.TryGetValue(command.actorUnitId, out var c3) || c3 == generation))
-                    view.ApplyPosition(_board.CellToWorld(path[path.Count - 1]));
+                    view.ApplyPosition(command.hitX != 0 || command.hitY != 0
+                        ? BoardCmToWorld(command.hitX, command.hitY)
+                        : _board.CellToWorld(path[path.Count - 1]));
 
                 // 被挡撞墙弹回（启动命令恒 blocked=0——P4-E 被挡改走空 path 校正命令；保留防御位）
                 if (command.metadata == BattleCommand.MoveBlocked)
@@ -1867,8 +1931,12 @@ namespace GIC.Battle
         /// 方向换算用 MovementResolver.StepVector（8 向与 Host 步进同源，斜向=朝下一格格心等比例 45%）。
         /// P4-E：home 改世界坐标入参（被挡停点=连续 cm 位非格心——校正命令直传停点）
         /// </summary>
-        private IEnumerator PlayBlockedBumpCoroutine(UnitView view, Vector3 home, int blockedDirection, float stepSeconds)
+        private IEnumerator PlayBlockedBumpCoroutine(UnitView view, Vector3 home, int blockedDirection,
+            float stepSeconds, int generation = -1, string unitId = null)
         {
+            // 世代守卫（2026-11-05 闪烁修复）：弹回表现与移动补间是同一 transform 的两个写者——弹回期间
+            // 若单位收到新的移动命令（世代递增），必须立刻让位，否则两边交替写位置=原地抖/回拉。
+            // generation<0 = 无世代语义（历史调用面/防御位）不设门。
             // 勿用 SkillHitResolver.DirectionToDelta——十字归一映射会把斜向弹回归一到主轴（首版教训）
             var step = MovementResolver.StepVector((Direction2D)blockedDirection);
             var dir = new Vector3(step.x, 0f, step.y);
@@ -1876,14 +1944,20 @@ namespace GIC.Battle
 
             Vector3 peak = home + dir * 被挡撞墙探出幅度;
             // 探出：缓出减速（挤向被挡格的"尝试"感）；补间期间目标可能被拆件——lambda 内守卫（守卫族）
+            bool GenerationAlive()
+                => unitId == null || generation < 0
+                   || !_moveGeneration.TryGetValue(unitId, out var cur) || cur == generation;
             yield return BattleViewTween.Over(stepSeconds * BlockedBumpOutSecondsFactor, t =>
             {
-                if (view != null) view.ApplyPosition(Vector3.Lerp(home, peak, 1f - (1f - t) * (1f - t)));
+                if (view != null && GenerationAlive())
+                    view.ApplyPosition(Vector3.Lerp(home, peak, 1f - (1f - t) * (1f - t)));
             });
+            if (!GenerationAlive()) yield break;
             // 弹回：快速离开、临原位缓停（末帧保证 t=1 精确归位）
             yield return BattleViewTween.Over(stepSeconds * BlockedBumpBackSecondsFactor, t =>
             {
-                if (view != null) view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t)));
+                if (view != null && GenerationAlive())
+                    view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t)));
             });
         }
 
@@ -2387,6 +2461,11 @@ namespace GIC.Battle
             foreach (var view in _views.Values)
             {
                 if (view.IsSoulView) continue; // 灵魂不参与同格队形偏移（决策九十一：恒钉格心浮于尸体上——幽灵语义）
+                // 移动补间独占位置（2026-11-05「角色闪烁/瞬移」修复）：片尾每段都会重排全场立牌，
+                // 而移动中的 view.Cell 是「出发时登记的路径终点格心」——重排会把已推进的立牌拽到终点
+                // 格心，下一帧补间又写回近起点，多段并发下每帧来回瞬移。移动中单位的位置一律由
+                // PlayMoveCoroutine 单源写入，移动结束（活动表移除）后才重新纳入队形重排。
+                if (_activeMovePlayback.Contains(view.UnitId)) continue;
                 if (!byCell.TryGetValue(view.Cell, out var list))
                 {
                     list = new List<UnitView>();
@@ -2403,7 +2482,7 @@ namespace GIC.Battle
                 for (int i = 0; i < occupants.Count; i++)
                 {
                     Vector3 offset = spread ? GetFormationOffset(occupants.Count, i) : Vector3.zero;
-                    occupants[i].ApplyPosition(_board.CellToWorld(kv.Key) + offset);
+                    occupants[i].ApplyFormationOffset(offset);
                 }
             }
         }

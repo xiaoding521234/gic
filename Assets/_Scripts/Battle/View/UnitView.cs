@@ -260,6 +260,7 @@ namespace GIC.Battle
         private Vector2 _moveOffset;       // 位置偏移
         private bool _movePacked;           // 移动片 Alpha 打包标志（2026-10-16 离线抠绿批——SetMoveAnimation 透传 PlayActionVideo）
         private bool _moveLoopActive;      // 移动循环态在播（SetMoveAnimation(false) 精确归位，防无谓相位跳）
+        private VideoClip _moveLoopClip;   // 在播的移动片（连续移动重发命令时同片幂等早退——2026-11-05 闪烁修复）
 
         // ==================== 立牌朝向（B-S4a 方向镜像，2026-09-29 拍板③：素材统一朝右单份复用） ====================
         // 行动方向 ∈ {上,左上,左,左下} → 朝左（水平镜像），其余 → 朝右；行动后保持（待机延续朝向）；
@@ -467,12 +468,18 @@ namespace GIC.Battle
             if (moving)
             {
                 if (_moveClip == null) return; // 无登记移动片=待机照播（旧行为）
+                // 已在移动循环且仍是同一支片=幂等早退（2026-11-05「角色闪烁」修复）：连续移动每 0.5 秒
+                // 重发 Move 命令，重复 PlayActionVideo 会把常驻播放器 frame=0 重播——立牌跑动动画每 0.5 秒
+                // 跳回首帧=肉眼可见闪烁。换片（不同移动技能）才重新起播。
+                if (_moveLoopActive && _moveLoopClip == _moveClip) return;
                 PlayActionVideo(_moveClip, _moveSpeed, _moveScaleComp, _moveOffset, loop: true, packedAlpha: _movePacked);
                 _moveLoopActive = true;
+                _moveLoopClip = _moveClip;
                 return;
             }
             if (!_moveLoopActive) return;
             _moveLoopActive = false;
+            _moveLoopClip = null;
             _activeResidentClip = null; // 移动片常驻登记清（移动态结束=无在显动作片）
             // 常驻批：移动循环片若走常驻播放器（loop 态不停播），移动结束时显式停它（Pause 留 warm）
             // ——否则解码器空转渲染不显示的 RT
@@ -919,12 +926,21 @@ namespace GIC.Battle
         // （单位名世界空间文本已随 2026-10-06 拍板「血条上不再需要显示名字，改为显示命座数字」退役
         // ——命座徽章归 BattleOverheadBars 屏幕空间层；本地化单位名仍见技能详情/快捷面板等 UGUI 消费方）
 
-        /// <summary>
-        /// 应用格位 + 队形偏移（世界坐标由 BattleBoard 换算）
-        /// </summary>
+        /// <summary>权威世界位（最近一次 ApplyPosition）——连续空间下单位可停在任意 cm 点，
+        /// 队形偏移必须以此锚点叠加，不得回落到格心（2026-11-05 闪烁修复）</summary>
+        public Vector3 FormationAnchor { get; private set; }
+
         public void ApplyPosition(Vector3 worldPosition)
         {
+            FormationAnchor = worldPosition;
             transform.position = worldPosition;
+        }
+
+        /// <summary>队形偏移叠加（仅渲染位移，不改权威锚点）——同格多立牌的错开展示；
+        /// 锚点=单位真实站位，静止于格内任意点时不会被拉回格心</summary>
+        public void ApplyFormationOffset(Vector3 offset)
+        {
+            transform.position = FormationAnchor + offset;
         }
 
         /// <summary>

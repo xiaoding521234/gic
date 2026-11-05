@@ -90,7 +90,7 @@ namespace GIC.Data
     /// 返修先例=launchMs 双语义、direction 复用投放形态，2026-09-27 复审批1 收口）：
     /// type            | value    | metadata         | direction        | cell      | path | hitX/Y | launchMs              | buff 载荷      | summonUnit
     /// ----------------|----------|------------------|------------------|-----------|------|--------|-----------------------|----------------|-----------
-    /// Move            | —        | MoveBlocked 标记 | 移动方向（恒填；被挡=被挡方向。2026-09-29 前仅被挡填——拍板③朝向镜像据此翻立牌，成功移动传 0 曾把朝向重置回右） | 终点格    | 路径 | —      | —                     | —              | —
+    /// Move            | —        | MoveBlocked 标记 | 移动方向（恒填；被挡=被挡方向。2026-09-29 前仅被挡填——拍板③朝向镜像据此翻立牌，成功移动传 0 曾把朝向重置回右） | 终点格    | 路径 | 精确落点 cm（2026-11-05） | —                     | —              | —
     /// Damage          | 伤害量   | 元素             | 投放形态 delivery | 发射格    | —    | 命中点 | 发射时刻（投射物前摇） | —              | —
     /// Heal            | 治疗量   | —                | —                | —         | —    | —      | 应用时刻（命中类治疗） | —              | —
     /// Death           | —        | —                | —                | —         | —    | —      | —                     | —              | —
@@ -174,8 +174,9 @@ namespace GIC.Data
 
         [Header("移动载荷（决策九十五 P4-E 移动实时化——Move 命令有效）")]
         /// <summary>移速（cm/秒，施放时刻实际值含 Buff——客户端逐段补间时长=段距离/速度，修斜向
-        /// 1s/格恒速误差；0=回落 BattleMetrics.DefaultMoveSpeedCm。**空 path+MoveBlocked=被挡位置
-        /// 校正命令**：hitX/hitY=被挡停点 cm（与 Damage 的毫米语义不同——空路径命令无投射物消费面）</summary>
+        /// 1s/格恒速误差；0=回落 BattleMetrics.DefaultMoveSpeedCm）。**hitX/hitY=本段移动的精确落点 cm**
+        /// （与 Damage 的毫米语义不同）：有 path 时=连续落点（客户端补间末点，勿落格心——否则静止后与
+        /// Host 差最多半格、被每秒快照自愈拉回=瞬移，2026-11-05）；空 path+MoveBlocked=被挡停点 cm</summary>
         public int speedCm;
 
         [Header("Buff 载荷（ApplyBuff/RemoveBuff 有效）")]
