@@ -68,6 +68,47 @@ namespace GIC.Editor
             ReportResult(summary, Path.GetFileName(path));
         }
 
+        /// <summary>F0-5 双跑确定性：同 seed 同命令连续跑两遍，摘要逐字比对——
+        /// 捕捉字典遍历序/静态状态泄漏等「录制基线之外」的非确定性（Run 摘要只含计数与断言文本，无耗时字段）。</summary>
+        [MenuItem("Tools/TG/回放回归（双跑确定性）")]
+        public static void RunDoubleLatest()
+        {
+            if (!Directory.Exists(ReplayDir))
+            {
+                ReportFail("无录制目录", $"先开录制（游戏内 replay on）打一局：{ReplayDir}");
+                return;
+            }
+            var files = Directory.GetFiles(ReplayDir, "*.jsonl");
+            if (files.Length == 0)
+            {
+                ReportFail("无录制文件", $"先开录制（游戏内 replay on）打一局：{ReplayDir}");
+                return;
+            }
+            Array.Sort(files); // 文件名含时间戳=按局序
+            var path = files[files.Length - 1];
+
+            var first = Run(path);
+            var second = Run(path);
+            bool bothPass = !first.Contains("FAIL") && !second.Contains("FAIL");
+            bool identical = string.Equals(first, second, StringComparison.Ordinal);
+
+            var sb = new StringBuilder();
+            if (bothPass && identical)
+            {
+                sb.Append("PASS：双跑确定性（摘要逐字一致）");
+                sb.Append($"\n{first}");
+            }
+            else
+            {
+                sb.Append("FAIL：双跑不一致或存在断言失败");
+                sb.Append($"\n第一跑：{(first.Contains("FAIL") ? "FAIL" : "PASS")}");
+                sb.Append($"\n第二跑：{(second.Contains("FAIL") ? "FAIL" : "PASS")}");
+                sb.Append($"\n--- 第一跑 ---\n{first}");
+                sb.Append($"\n--- 第二跑 ---\n{second}");
+            }
+            ReportResult(sb.ToString(), Path.GetFileName(path));
+        }
+
         [MenuItem("Tools/TG/回放回归（自测·合成局闭环）")]
         public static void SelfTestMenu()
         {
