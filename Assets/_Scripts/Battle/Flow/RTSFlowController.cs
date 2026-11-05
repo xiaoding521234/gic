@@ -91,6 +91,10 @@ namespace GIC.Battle
         /// <summary>最近一次 desync tick（-1=无）</summary>
         public int LastDesyncTick { get; private set; } = -1;
 
+        /// <summary>尚未广播的输入批 tick（Host）：入队即标脏，tick 末尾统一提前广播（设计稿 §3.3
+        /// 「Host 至少提前 1 tick 广播」——不能等到应用该 tick 时才发，否则客户端注定晚到丢批）。</summary>
+        private readonly HashSet<int> _dirtyBatchTicks = new HashSet<int>();
+
         /// <summary>最近 AI 节拍窗内的玩家上交行动（伙伴脑感知输入——旧「感知己方玩家已提交选择」
         /// 秒化：每 0.5 秒窗口收集，节拍后清空）</summary>
         private readonly List<ActionData> _recentPlayerActions = new List<ActionData>();
@@ -145,6 +149,11 @@ namespace GIC.Battle
             // —— 每秒整拍（发放/Buff 计时/泡湿/灵魂/采集/建筑效果 + 快照 + 时钟 + hash）——
             if (CurrentTick % BattleMetrics.TicksPerSecond == 0)
                 RunSecondBeat();
+
+            // —— F1：tick 末尾把本拍新增的输入批提前广播（设计稿 §3.3「至少提前 1 tick」）——
+            // 放在 AI 节拍/秒拍之后：本拍生成的 AI 行动（targetTick=下一 tick）当拍即出，
+            // 客户端下一 tick 才有整整一个 tick（50ms）的接收余量。
+            FlushInputBroadcasts();
         }
 
         // ==================== AI 节拍（每 0.5 秒，蓝图 §6：三脑同频） ====================
@@ -450,9 +459,37 @@ namespace GIC.Battle
                 isAi = isAi ? 1 : 0,
                 action = action,
             });
+            if (IsHost) _dirtyBatchTicks.Add(targetTick); // 待广播（tick 末尾统一提前发出）
         }
 
-        /// <summary>应用当前 tick 的输入批：Host 先广播（客户端拿到同一批），随后各端按同一序结算。</summary>
+        /// <summary>输入定序（唯一序）：playerId 序数升序 → seq 升序。Host 广播前与结算前同源消费，
+        /// 客户端保序不重排（docs/active/50 §4.2 定序规则）。</summary>
+        private static int CompareInputs(OrderedInput a, OrderedInput b)
+        {
+            int p = string.CompareOrdinal(a.playerId, b.playerId);
+            return p != 0 ? p : a.seq.CompareTo(b.seq);
+        }
+
+        /// <summary>Host：把标脏的输入批提前广播（tick 末尾调用）。只发改动过的 tick，
+        /// 且必须在应用前 ≥1 tick 到手——客户端据此与本端同批同序结算。</summary>
+        private void FlushInputBroadcasts()
+        {
+            if (!IsHost || !IsNetworked || _dirtyBatchTicks.Count == 0) return;
+            var ticks = new List<int>(_dirtyBatchTicks);
+            ticks.Sort();
+            foreach (var tick in ticks)
+            {
+                _dirtyBatchTicks.Remove(tick);
+                if (tick <= CurrentTick) continue; // 已应用/过期，不补发
+                if (!_inputByTick.TryGetValue(tick, out var list) || list.Count == 0) continue;
+                // 定序在广播前完成：客户端「保序不重排」，本处序=各端结算序（唯一序）。
+                list.Sort(CompareInputs);
+                _transport.HostSend(BattleMessageType.InputBatch,
+                    new InputBatchMessage { tick = tick, inputs = new List<OrderedInput>(list) });
+            }
+        }
+
+        /// <summary>应用当前 tick 的输入批：各端按同一序结算（Host 定序在广播前完成）。</summary>
         private void ApplyDueInputs()
         {
             if (!_inputByTick.TryGetValue(CurrentTick, out var inputs) || inputs.Count == 0) return;
@@ -461,14 +498,10 @@ namespace GIC.Battle
             // Host 是唯一定序者；客户端保留 Host 下发的批内顺序（勿重排）
             if (IsHost)
             {
-                inputs.Sort((a, b) =>
-                {
-                    int p = string.CompareOrdinal(a.playerId, b.playerId);
-                    return p != 0 ? p : a.seq.CompareTo(b.seq);
-                });
-                if (IsNetworked)
-                    _transport.HostSend(BattleMessageType.InputBatch,
-                        new InputBatchMessage { tick = CurrentTick, inputs = inputs });
+                // 定序在广播前完成：FlushInputBroadcasts 发的是「应用时刻之前的同一份序」，
+                // 勿在此刻再发一份（那时客户端已进入/越过本 tick，只会收到「迟到丢弃」警告）。
+                // 此处再排一次=幂等（广播后可能又追加了迟到项，重定基已保证不会进来）。
+                inputs.Sort(CompareInputs);
             }
 
             var aiBatch = new List<ActionData>();

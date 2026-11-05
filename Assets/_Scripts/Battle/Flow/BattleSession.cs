@@ -174,6 +174,18 @@ namespace GIC.Battle
                 msg => flow.ReceiveInputBatch(msg));
             session._clientRouter.Register<DesyncAlertMessage>(BattleMessageType.DesyncAlert,
                 msg => GICLog.Error($"[Desync] tick={msg.tick} host={msg.hostHash} client={msg.clientHash}"));
+            // F2 降级面（docs/active/50 §8.2）：Host 仍会广播 Segment/Snapshot（诊断/回退用），
+            // 客户端 View 由本地 Sim 回环驱动——这里显式吞掉，避免每秒刷「未注册的消息类型」警告。
+            session._clientRouter.Register<SegmentMessage>(BattleMessageType.Segment, _ => { });
+            session._clientRouter.Register<SnapshotMessage>(BattleMessageType.Snapshot, _ => { });
+            // 终局回退：本地 Sim 应自行判定终局；若本地尚未终局（漂移/掉帧），以 Host 广播兜底收尾
+            session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver, msg =>
+            {
+                if (flow.Phase == BattlePhase.Finished) return;
+                GICLog.Warn("[BattleSession] 本地 Sim 未终局但收到 Host BattleOver——按权威终局收尾");
+                flow.Stop();
+                player.OnBattleOver(msg);
+            });
             network.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
 
             player.Bind(network, null); // map 随 BattleStart 到达（BattlePlayer.OnBattleStart 自建盘）
@@ -220,7 +232,7 @@ namespace GIC.Battle
             foreach (var pl in roster)
             {
                 var coreState = msg.initialSnapshot?.units?.FirstOrDefault(u =>
-                    u.playerId == pl.PlayerId && u.unitName == (int)UnitName.ProtocolCore);
+                    u.playerId == pl.PlayerId && u.unitName == UnitName.ProtocolCore.ToString());
                 var coreData = unitConfig != null ? unitConfig.GetUnitData(UnitName.ProtocolCore) : null;
                 var core = UnitFactory.CreateUnitWithData(coreData);
                 if (core == null) continue;
