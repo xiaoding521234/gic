@@ -81,7 +81,9 @@ namespace GIC.Battle
         private void Update()
         {
             if (Phase != BattlePhase.Selecting) return; // 未开战/已终局不推进
-
+            if (SelectTimerPaused) return; // N0 单人局浏览暂停（决策六十七）：暂停位不推 tick（HUD BrowseUiOpen 每帧重估写入、
+                                           // BattleSession 门控 value && IsSoloHumanGame——多人局不冻全场；P6 批修复：P1 重写时
+                                           // 本消费点断链，旧回合机 SelectTimerPaused 语义曾由倒计时链承载）
             float frameDelta = Time.deltaTime;
             if (frameDelta > BattleMetrics.MaxFrameDeltaSeconds)
                 frameDelta = BattleMetrics.MaxFrameDeltaSeconds; // 巨帧钳制（切后台回归）
