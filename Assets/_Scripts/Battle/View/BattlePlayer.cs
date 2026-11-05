@@ -189,7 +189,8 @@ namespace GIC.Battle
         public event Action<BattlePhase, int> ClientPhaseChanged;
 
         /// <summary>客户端本地选择倒数归零（host 仍权威超时兜底；双端重复提交由 host 忽略）</summary>
-        public event Action<int> ClientSelectTimerExpired;
+        // P6 残留审计清理（docs/active/49 A4）：选择倒计时已随回合机退役，旧
+        // ClientSelectTimerExpired 事件与本地倒数递减链一并删除（selectLimitSeconds 恒 0）。
 
         public BattlePhase ClientPhase => _clientPhase;
         public float ClientSelectRemainingSeconds => _clientSelectRemaining;
@@ -199,22 +200,19 @@ namespace GIC.Battle
 
         private BattlePhase _clientPhase = BattlePhase.Idle;
         private int _clientTurn;
-        private float _clientSelectRemaining = -1f;
-        private bool _clientExpiredFired;
+        private float _clientSelectRemaining = -1f; // 即时制恒 -1（无选择倒计时；保留字段供 BattleSession 门面读取）
 
-        /// <summary>消息流派生相位（客户端专用；phase 变化或换回合时广播+驱动两态立牌模型）</summary>
+        /// <summary>消息流派生相位（客户端专用；**仅相位真变化**时广播+驱动两态立牌模型——
+        /// P6 残留审计修复（docs/active/49 A3）：turnNumber 已是逻辑秒、每秒都变，旧实现把
+        /// 「换回合」当相位切换，导致每秒全场立牌重排一次）</summary>
         private void DeriveClientPhase(BattlePhase phase, int turn, int selectLimitSeconds = -1)
         {
-            bool turnChanged = turn != _clientTurn;
             _clientTurn = turn;
 
             if (phase == BattlePhase.Selecting)
-            {
                 _clientSelectRemaining = selectLimitSeconds > 0 ? selectLimitSeconds : -1f;
-                _clientExpiredFired = false;
-            }
 
-            if (_clientPhase == phase && !turnChanged) return;
+            if (_clientPhase == phase) return;
             _clientPhase = phase;
             OnPhaseChangedForFormations(phase, turn); // 两态模型：客户端本地派生驱动散开/收拢
             ClientPhaseChanged?.Invoke(phase, turn);
@@ -269,7 +267,7 @@ namespace GIC.Battle
 
         /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
         [Autowired] private UnitConfig _unitConfig;
-        private TurnFlowController _flow;
+        // P6 残留审计 D1（docs/active/49）：TurnFlowController 已删除——客户端相位恒走消息派生。
         private float _windowNightFactor = 1f;
 
         /// <summary>单位显示色解析器（2026-10-12 用户拍板「单位显示的颜色应当是玩家色，本游戏没有
@@ -330,17 +328,8 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>绑定回合状态机：两态模型由阶段切换驱动（选择阶段散开 / 执行阶段收拢，docs/22 §11）</summary>
-        public void BindFlow(TurnFlowController flow)
-        {
-            if (_flow != null) _flow.OnPhaseChanged -= OnPhaseChangedForFormations;
-            _flow = flow;
-            if (_flow != null) _flow.OnPhaseChanged += OnPhaseChangedForFormations;
-        }
-
         private void OnDestroy()
         {
-            if (_flow != null) _flow.OnPhaseChanged -= OnPhaseChangedForFormations;
             // 维度视角清理（2026-10-26 返修）：相机可能跨对局存活（场景复用/沙盒重开等路径）——退出时
             // 把 mask 归位主世界视角（幂等重算同式）+还原底色，防脏值流入下一场（「只剩血条」根因的另一半）
             var cam = _viewCamera != null ? _viewCamera : CameraContext.Resolve();
@@ -371,10 +360,8 @@ namespace GIC.Battle
             RefreshAllFormations(_spreadFormations);
         }
 
-        public void SetPlaybackSpeed(float speed)
-        {
-            _playbackSpeed = Mathf.Max(0.1f, speed);
-        }
+        // P6 残留审计 D5（docs/active/49）：SetPlaybackSpeed 无调用方（回放倍率语义随回合机退役），
+        // 已删除；_playbackSpeed 字段保留=表现层倍率恒 1（伤害数字/弹道时长换算同源）。
 
         private void Update()
         {
@@ -388,23 +375,12 @@ namespace GIC.Battle
                     _billboardRotation = Quaternion.LookRotation(forward, Vector3.up);
             }
 
-            // B7 LAN 客户端本地选择倒数（_flow==null 的端；host 端 Flow 权威计时零生效）
-            if (_flow == null && _clientPhase == BattlePhase.Selecting
-                && _clientSelectRemaining > 0f && !ClientPhasePaused)
-            {
-                _clientSelectRemaining -= Time.deltaTime;
-                if (_clientSelectRemaining <= 0f && !_clientExpiredFired)
-                {
-                    _clientExpiredFired = true;
-                    _clientSelectRemaining = 0f;
-                    ClientSelectTimerExpired?.Invoke(_clientTurn);
-                }
-            }
-
-            // 建筑窗灯只随战斗独立时钟变化；LAN 客户端按最新快照回合推导，不新建协议或灯光系统。
-            int battleMinutes = _flow != null ? _flow.BattleTimeMinutes
-                : TurnFlowController.BattleClockStartMinutes + TurnFlowController.BattleClockMinutesPerTurn
-                    * Mathf.Max(0, (LatestSnapshot?.turnNumber ?? 1) - 1);
+            // 建筑窗灯只随战斗独立时钟变化。P6 残留审计修复（docs/active/49 C4/D1）：
+            // 即时制无选择倒计时（selectLimitSeconds 恒 0），旧 LAN 客户端倒数链已删除；
+            // 时钟兜底改按「每秒 +1 分钟」推导——turnNumber 已是逻辑秒，旧回合常量
+            // BattleClockMinutesPerTurn=20 会让昼夜窗灯跑成 20 倍速。
+            int battleMinutes = RTSFlowController.BattleClockStartMinutes + BattleMetrics.BattleClockMinutesPerSecond
+                * Mathf.Max(0, LatestSnapshot?.turnNumber ?? 0);
             float nightTarget = BuildingModelView.NightTargetForMinutes(battleMinutes);
             _windowNightFactor = Mathf.MoveTowards(_windowNightFactor, nightTarget, Time.deltaTime * 2f);
             foreach (var view in _views.Values)
@@ -693,8 +669,9 @@ namespace GIC.Battle
         {
             LatestSnapshot = message.snapshot;
 
-            if (_flow == null) // B7 LAN 客户端：快照=选择阶段头（相位派生+本地倒数源）
-                DeriveClientPhase(BattlePhase.Selecting, message.snapshot.turnNumber, message.selectLimitSeconds);
+            // 即时制（docs/active/49 D1/A3）：相位恒由快照派生（Selecting=Running 常驻）——
+            // TurnFlowController 已删除，不再有 host/客户端双源分支。
+            DeriveClientPhase(BattlePhase.Selecting, message.snapshot.turnNumber, message.selectLimitSeconds);
 
             // 尸体态 + 头顶血量 + 冻结可视同步（快照为准）
             foreach (var state in message.snapshot.units)
@@ -738,9 +715,9 @@ namespace GIC.Battle
 
         public void OnSegment(SegmentMessage message)
         {
-            if (_flow == null && _clientPhase == BattlePhase.Selecting
-                && message.segment.insertedInstantAction == 0) // B7 LAN 客户端：首片=执行阶段开始
-                DeriveClientPhase(BattlePhase.Resolving, message.segment.turnNumber);
+            // 即时制（docs/active/49 A3/D1）：不再由片派生 Resolving 相位——秒拍段每秒到达，
+            // 旧逻辑会让客户端相位在 Selecting↔Resolving 间每秒振荡并触发全场立牌重排。
+            // 相位唯一派生源=快照（Selecting 常驻）+ BattleOver（Finished）。
             SegmentReceived?.Invoke(message.segment); // 到达即发（全类型——底部进度线片计数）
             StartCoroutine(PlaySegmentCoroutine(message.segment));
         }
@@ -761,8 +738,7 @@ namespace GIC.Battle
         public void OnBattleOver(BattleOverMessage message)
         {
             GICLog.Info($"[BattlePlayer] 战斗结束：胜方队伍 {(TeamType)message.winnerTeam}");
-            if (_flow == null) // B7 LAN 客户端：终局相位派生
-                DeriveClientPhase(BattlePhase.Finished, _clientTurn);
+            DeriveClientPhase(BattlePhase.Finished, _clientTurn); // 终局相位派生（唯一非 Selecting 相位）
             BattleOver?.Invoke(message);
         }
 

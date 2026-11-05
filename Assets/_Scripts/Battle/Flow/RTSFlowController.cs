@@ -362,7 +362,7 @@ namespace GIC.Battle
         public void NotifySegmentPushed(int turnNumber, int sliceIndex) { }
 
         /// <summary>ack 门控已退役——恒 true（无等待语义）</summary>
-        public bool HasSegmentAck(int turnNumber, int sliceIndex) => true;
+        // P6 残留审计 D2：HasSegmentAck 随 ack 门控退役删除（ITurnResolverHost 已收窄）。
 
         // ==================== desync hash（确定性护栏四，蓝图 §2.2） ====================
 

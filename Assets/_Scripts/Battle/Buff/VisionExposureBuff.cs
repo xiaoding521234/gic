@@ -23,7 +23,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = 1;
-            RemainingTurns = Cfg.持续回合;
+            RemainingSeconds = Cfg.持续回合;
         }
 
         private static readonly List<BattleEffect> _empty = new List<BattleEffect>();
@@ -34,7 +34,7 @@ namespace GIC.Battle
         /// <summary>重施加=时长刷新取大（冻结同款；默认的时长累加不适用标记型）</summary>
         public override void Merge(BaseBuff newer)
         {
-            RemainingTurns = Mathf.Max(RemainingTurns, newer.RemainingTurns);
+            RemainingSeconds = Mathf.Max(RemainingSeconds, newer.RemainingSeconds);
         }
     }
 }

@@ -87,11 +87,19 @@ namespace GIC.Battle
                     case BuildingEffectKind.PeriodicSummon:
                     {
                         if (data.效果周期 <= 0) break;
-                        int diff = turnNumber - building.unit.DeployedTurn;
-                        if (diff <= 0 || diff % data.效果周期 != 0) break;
+                        // P6 残留审计 C3（docs/active/49）：效果结算只在效果拍（每 2 秒）发生，旧
+                        // 「diff % 效果周期 == 0」在周期为奇数时永远对不齐（5 秒周期实际变 10 秒）——
+                        // 改为「距上次成功召唤 ≥ 周期」的单调判定（首次=部署时刻），周期语义恢复为秒。
+                        int lastSummonSecond = building.unit.LastPeriodicSummonSecond > 0
+                            ? building.unit.LastPeriodicSummonSecond
+                            : building.unit.DeployedTurn;
+                        if (turnNumber - lastSummonSecond < data.效果周期) break;
                         if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, building.identity.OwnerPlayerID,
                                 data.召唤单位, _sim.GetPosition(building.unit), out var summonCommand))
+                        {
+                            building.unit.LastPeriodicSummonSecond = turnNumber;
                             extraCommands.Add(summonCommand);
+                        }
                         break;
                     }
                     case BuildingEffectKind.EnergySummon:

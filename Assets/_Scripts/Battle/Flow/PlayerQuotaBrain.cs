@@ -33,6 +33,9 @@ namespace GIC.Battle
         private BattleSession _session;
         private string _playerId;
         private int _lastSubmittedTurn = -1;
+        /// <summary>上次尝试购买的逻辑秒（P6 残留审计 C6，docs/active/49）：恢复「每回合（=1 秒）
+        /// 至多一次购买」的 1:1 语义——决策节拍本身是 0.5 秒。</summary>
+        private int _lastPurchaseSecond = -1;
 
         /// <summary>AI 玩家队伍（2026-09-25 三轮审查 C2：敌我/我军判定=TeamType 口径；操控权归属=playerId 保留）</summary>
         private TeamType MyTeam => _session != null && _session.Sim != null
@@ -41,7 +44,7 @@ namespace GIC.Battle
 
         /// <summary>AI 提交延迟（秒）——P5 三脑同频（蓝图 §6「决策频率=每 0.5 秒」）：延迟=节拍长；
         /// 旧 0.8s 回合制「让回合切换肉眼可辨」语义随回合机退役（即时制无回合切换可辨）</summary>
-        private const float SubmitDelaySeconds = 0.5f;
+        private const float SubmitDelaySeconds = 0.4f; // 略短于 0.5s 节拍：保证串行守卫在下一拍前释放（P6 残留审计 A5）
 
         // ==================== 评分口径（#4 审查批资产化：数值真源=Resources/Configs/AI/AITuning.asset——
         // 调 AI 平衡=改资产 Inspector 零代码；下列属性=代码侧访问别名，勿散写调用处） ====================
@@ -530,6 +533,11 @@ namespace GIC.Battle
         /// </summary>
         private void TryPurchase(BattleSimState sim, int turn)
         {
+            // P6 残留审计 C6（docs/active/49）：决策节拍=每 0.5 秒，旧「每回合至多一次」注释对应的
+            // 实际门控不存在——补逻辑秒门控，恢复「每回合（=1 秒）至多一次」的 1:1 语义。
+            if (turn == _lastPurchaseSecond) return;
+            _lastPurchaseSecond = turn;
+
             var hand = sim.GetHand(_playerId);
             if (hand == null) return;
             var unitConfig = Wargame.Instance?.Context?.Get<UnitConfig>();
@@ -874,7 +882,7 @@ namespace GIC.Battle
                             // 满层：限时且快到期=续航分（避免断档重新叠层）；时长充足/永久=零
                             buffCappedNoGain = true;
                             if (!existing.IsPermanent
-                                && existing.RemainingTurns <= AITuningConfig.Instance.延奏续航临近到期回合)
+                                && existing.RemainingSeconds <= AITuningConfig.Instance.延奏续航临近到期回合)
                                 value += AITuningConfig.Instance.延奏满层续航分;
                             break;
                         }

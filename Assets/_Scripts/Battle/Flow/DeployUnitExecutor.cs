@@ -107,16 +107,32 @@ namespace GIC.Battle
             var forceType = deployData?.normalMoveType ?? ForceType.Walk;
             if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) return false;
 
-            // 体积绝对层+阻挡规则层（共享原语，2026-10-02 复审收口——与移动进入判定同源：原两处
-            // 平行手写的同构链收单源，碰撞口径改动只改原语处）：自身规格从 UnitData 取（部署单位
-            // 尚未生成）——体积真源=UnitData.GetVolume() 单出口（与 Unit.Volume 同读，2026-09-27
-            // 复审收口双源）、豁免/被挡=碰撞配置字段（与移动侧 UnitMoveable 组件同源字段）
-            var occupants = sim.GetUnitsAt(cell); // 含尸体——尸体保留碰撞/体积
-            if (!MovementResolver.PassesVolumeLimit(occupants, deployData != null ? deployData.GetVolume() : 1))
-                return false;
-            return MovementResolver.PassesBlockingRules(occupants, sim.GetTeamOf(playerId),
-                deployData != null && deployData.与友方互不阻挡,
-                deployData != null && deployData.blockedByEnemies);
+            // 碰撞层（P6 残留审计 B1 单源，docs/active/49）：旧「格体积上限 3 + 阻挡规则」链退役——
+            // 与自由落点 IsDeployPointValid 统一走碰撞圆重叠判定（蓝图 §3.2「格容量上限退役」）。
+            // AI 配额脑仍上交 deployCell，本方法=其唯一入口，规则必须与玩家自由落点一致。
+            return !HasCollisionOverlap(sim, cell.CenterXCm, cell.CenterYCm, deployData);
+        }
+
+        /// <summary>碰撞圆重叠判定（P6 残留审计 B1/B2 单源）：落点与一切在场单位（存活+尸体）
+        /// 的碰撞圆不重叠。半径=BattleMetrics.CylinderDiameterOf × 格宽 /2（与受击圆柱同源）。</summary>
+        private static bool HasCollisionOverlap(BattleSimState sim, int xCm, int zCm,
+            UnitConfig.UnitData selfData)
+        {
+            int selfRadiusCm = Mathf.RoundToInt(
+                BattleMetrics.CylinderDiameterOf(selfData) * CellMetrics.CellSizeCm * 0.5f);
+            foreach (var kv in sim.Units)
+            {
+                var other = kv.Value;
+                if (other == null) continue;
+                var otherPos = sim.GetPosCm(other);
+                int otherRadiusCm = Mathf.RoundToInt(
+                    BattleMetrics.CylinderDiameterOf(other) * CellMetrics.CellSizeCm * 0.5f);
+                long touch = selfRadiusCm + otherRadiusCm;
+                long dx = otherPos.x - xCm;
+                long dz = otherPos.y - zCm;
+                if (dx * dx + dz * dz < touch * touch) return true;
+            }
+            return false;
         }
 
         /// <summary>部署自由落点合法（决策九十五 P3，蓝图 §3.4「拖卡出牌区→自由落点瞄准」Host 侧）：
@@ -148,21 +164,8 @@ namespace GIC.Battle
             if (!sim.Map.IsPassable(cell.x, cell.y, forceType)) return false;
 
             // 碰撞圆重叠层：半格自由站位下「格内无单位」不再充分——圆重叠精确判定
-            int selfRadiusCm = Mathf.RoundToInt(
-                BattleMetrics.CylinderDiameterOf(deployData) * CellMetrics.CellSizeCm * 0.5f);
-            foreach (var kv in sim.Units)
-            {
-                var other = kv.Value;
-                if (other == null) continue;
-                var otherPos = sim.GetPosCm(other);
-                int otherRadiusCm = Mathf.RoundToInt(
-                    BattleMetrics.CylinderDiameterOf(other) * CellMetrics.CellSizeCm * 0.5f);
-                long touch = selfRadiusCm + otherRadiusCm;
-                long dx = otherPos.x - xCm;
-                long dz = otherPos.y - zCm;
-                if (dx * dx + dz * dz < touch * touch) return false;
-            }
-            return true;
+            // （P6 残留审计 B1/B2：与格落点 IsDeployCellValid/召唤 CellCanHost 共用单源）
+            return !HasCollisionOverlap(sim, xCm, zCm, deployData);
         }
 
         /// <summary>
@@ -459,10 +462,9 @@ namespace GIC.Battle
         {
             if (!sim.Map.HasTile(cell.x, cell.y)) return false;
             if (!sim.Map.IsPassable(cell.x, cell.y, data.normalMoveType)) return false;
-            var occupants = sim.GetUnitsAt(cell);
-            if (!MovementResolver.PassesVolumeLimit(occupants, data.GetVolume())) return false;
-            return MovementResolver.PassesBlockingRules(occupants, sim.GetTeamOf(playerId),
-                data.与友方互不阻挡, data.blockedByEnemies);
+            // P6 残留审计 B2（docs/active/49）：召唤落格同步退役「格体积上限 3」，与部署/自由落点
+            // 统一走碰撞圆重叠判定（蓝图 §3.2 格容量退役）。
+            return !HasCollisionOverlap(sim, cell.CenterXCm, cell.CenterYCm, data);
         }
     }
 }

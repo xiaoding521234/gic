@@ -59,7 +59,7 @@ namespace GIC.Data
         StaminaCost = 11,
 
         // 持续
-        [InspectorName("持续回合")]
+        [InspectorName("持续秒")]
         Duration = 12,
 
         // 命座
@@ -78,7 +78,7 @@ namespace GIC.Data
         [InspectorName("2命迷雾元能获取")]
         C2FogEnergyGain = 19,
 
-        [InspectorName("视野暴露持续回合")]
+        [InspectorName("视野暴露持续秒")]
         VisionDuration = 20,
 
         [InspectorName("召唤数量")]
@@ -244,7 +244,7 @@ namespace GIC.Data
         C2ThornDamage = 69,
 
         // 诺艾尔
-        [InspectorName("蓄力回合")]
+        [InspectorName("蓄力秒")]
         ChargeTurns = 70,
 
         [InspectorName("护盾")]

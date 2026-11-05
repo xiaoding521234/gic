@@ -13,7 +13,7 @@ namespace GIC.Battle
     /// 持有者=凯亚自身（OnCast[ApplyBuff Caster] 经 ShardCount 参数通道注入初始 2 层，
     /// 2命/3命各+1 召唤增补——2026-10-08 拍板「寒冰之棱上限改为4（不再依靠命座），2命 3命
     /// 的效果改为增加爆发召唤数量各为1」：上限常驻资产值、命座只改每次施放的召唤量），
-    /// 永久不计时（RemainingTurns=-1），**持有者倒下仍生效**（RemoveOnHolderDeath=false——
+    /// 永久不计时（RemainingSeconds=-1），**持有者倒下仍生效**（RemoveOnHolderDeath=false——
     /// docs/05 §5.4 被动失效通则的技能级例外；倒下期间可被外部喂能〔歌声之环喂倒下单位——
     /// 2026-10-15 拍板「尸体可以获得元能」〕过阈即碎，无喂能则只 tick）。
     /// 数值单源=Buff_Icicle.asset（docs/39 Buff 配置化——tick 伤害/碎裂治疗/碎裂阈值/半径/
@@ -51,7 +51,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = Mathf.Max(1, initialStacks); // 层数（初始=ShardCount+命座召唤增补；上限=资产常驻值 4）
-            RemainingTurns = -1;                  // 永久（IsPermanent 标记——不计时，碎裂才消失）
+            RemainingSeconds = -1;                  // 永久（IsPermanent 标记——不计时，碎裂才消失）
         }
 
         /// <summary>爆发召唤数量按施加者命座增补（2026-10-08 拍板：2命/3命各+1——

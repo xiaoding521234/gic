@@ -431,6 +431,10 @@ namespace GIC.Battle
         /// 均为无操作（完全统一：按已定死的按钮=无事发生）；新回合选择阶段复位。
         /// 旧「后交覆盖先交、可再瞄准再确认改行动」语义随之废除，Host 侧同拒绝双保险</summary>
         private bool _actionConfirmed;
+        /// <summary>P6 残留审计（docs/active/49 A1）：即时制下 RTSFlowController 每 0.5 秒广播
+        /// OnPhaseChanged(Selecting, second) 作 AI 节拍兼容事件——HUD 只在相位**真变化**时执行
+        /// 「进入新阶段」副作用（复位定死/提示/手牌显隐），避免每 0.5 秒重置一次。</summary>
+        private BattlePhase _lastHudPhase = BattlePhase.Idle;
 
         /// <summary>详情面板当前是否开着（以现有面板 activeSelf 为准——关闭只走 BattleHud 显式路径，
         /// 自带点外关闭已在 BuildSkillPopup 关闭，docs/14 §64b）</summary>
@@ -701,6 +705,11 @@ namespace GIC.Battle
 
         private void OnPhaseChanged(BattlePhase phase, int turn)
         {
+            // P6 残留审计（docs/active/49 A1）：即时制复用相位事件承载 AI 节拍（每 0.5 秒一次），
+            // 同一相位会被重复广播——副作用只在相位真变化时执行一次。
+            if (phase == _lastHudPhase) return;
+            _lastHudPhase = phase;
+
             if (phase != BattlePhase.Selecting)
             {
                 // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
@@ -2220,34 +2229,28 @@ namespace GIC.Battle
             return false;
         }
 
-        /// <summary>移动推荐预判的单格进入判定（镜像 MovementResolver.CanEnter 判定链的客户端静态版）：
-        /// 地形层（IsPassable 按 ForceType——步行不可入水/沼泽）→ 体积绝对层（格内体积+自身体积≤3）
-        /// → 阻挡规则层（blockAllies/blockEnemies/blockedByEnemies 配置值——运行时 Buff 修改不可见）。
-        /// 尸体保留碰撞（Host 同语义）；属提示非校验——Host 结算兜底不变。</summary>
+        /// <summary>移动推荐预判的落点合法性（P6 残留审计 B4，docs/active/49）：与 Host 连续空间
+        /// 同口径——地形可走 + 碰撞圆不重叠（旧「格体积上限 3 + blockAllies 格内判定」已随
+        /// 即时制退役）。属提示非校验——Host 结算兜底不变；运行时 Buff 修改不可见。</summary>
         private bool CanMoveEnterPreview(BattleCell cell, UnitState self, UnitConfig.UnitData selfData,
             BattleSnapshot snapshot)
         {
             var forceType = selfData != null ? selfData.normalMoveType : ForceType.Walk;
             if (!_board.Map.IsPassable(cell.x, cell.y, forceType)) return false;
 
-            int selfVolume = self.volume > 0 ? self.volume : 1;
-            int existingVolume = 0;
+            int selfRadiusCm = Mathf.RoundToInt(
+                BattleMetrics.CylinderDiameterOf(selfData) * CellMetrics.CellSizeCm * 0.5f);
+            int xCm = cell.CenterXCm, zCm = cell.CenterYCm;
             foreach (var u in snapshot.units)
             {
-                if (u.unitId == self.unitId) continue;
-                if (u.position.x != cell.x || u.position.y != cell.y) continue; // 含尸体——尸体保留碰撞
-                existingVolume += u.volume > 0 ? u.volume : 1;
-                if (existingVolume + selfVolume > 3) return false; // 体积绝对层（无视阻挡能力不可绕过）
-
+                if (u.unitId == self.unitId) continue; // 含尸体——尸体保留碰撞
                 var occupantData = TryGetUnitData(u.unitName);
-                if (occupantData == null) continue;
-                bool sameTeam = (TeamType)u.team == (TeamType)self.team; // 阵营判定（TeamType 口径，2026-09-25 三轮审查 C2）
-                // 与友方互不阻挡（UnitConfig.与友方互不阻挡 单字段双向——配置驱动，Host MovementResolver 同口径）
-                if (sameTeam && occupantData.blockAllies
-                    && !occupantData.与友方互不阻挡
-                    && (selfData == null || !selfData.与友方互不阻挡)) return false;
-                if (!sameTeam && occupantData.blockEnemies && selfData != null && selfData.blockedByEnemies)
-                    return false;
+                int otherRadiusCm = Mathf.RoundToInt(
+                    BattleMetrics.CylinderDiameterOf(occupantData) * CellMetrics.CellSizeCm * 0.5f);
+                long touch = selfRadiusCm + otherRadiusCm;
+                long dx = u.PosXCm() - xCm;
+                long dz = u.PosZCm() - zCm;
+                if (dx * dx + dz * dz < touch * touch) return false;
             }
             return true;
         }

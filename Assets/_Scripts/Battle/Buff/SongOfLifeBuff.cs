@@ -45,7 +45,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = 1;          // 层数（上限随施加者命座：0命1层/3命2层）
-            RemainingTurns = -1; // 永久（IsPermanent 标记——不计时，倒下即失）
+            RemainingSeconds = -1; // 永久（IsPermanent 标记——不计时，倒下即失）
         }
 
         /// <summary>同类重复施加：叠层（钳当前施加者命座上限）+刷新施加者（数值基准随之更新）。</summary>

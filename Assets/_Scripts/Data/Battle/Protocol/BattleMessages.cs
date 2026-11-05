@@ -13,7 +13,7 @@ namespace GIC.Data
         Snapshot = 1,          // Host→Client：选择阶段头全量
         SubmitAction = 2,      // Client→Host：行动选择上交
         Segment = 3,           // Host→Client：片命令块推流
-        SegmentAck = 4,        // Client→Host：片播放完成确认
+        // 4 已退役（P6 残留审计 D2，docs/active/49：SegmentAck 随回合机 ack 门控删除，编号不复用）
         SubmitInstantAction = 5, // Client→Host：即时行动（片边界 poll）
         TurnEnd = 6,           // Host→Client：回合结束
         Pause = 7,             // Host↔Client：硬停交互点（B1 占位）
@@ -63,12 +63,8 @@ namespace GIC.Data
         public Segment segment;
     }
 
-    [Serializable]
-    public class SegmentAck
-    {
-        public int turnNumber;
-        public int sliceIndex;
-    }
+    // P6 残留审计 D2：SegmentAck 消息类随 ack 门控退役删除（即时制命令流带 startTick，
+// 客户端按绝对时刻播，无需回执；LAN 后置重做时按新协议另立）。
 
     [Serializable]
     public class SubmitInstantAction

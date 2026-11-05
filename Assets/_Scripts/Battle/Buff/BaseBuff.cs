@@ -32,10 +32,10 @@ namespace GIC.Battle
         /// Buff 消费——如歌声之环按持有者位置枚举半径内单位。单局生命周期，勿跨对局复用）</summary>
         public BattleSimState Sim;
 
-        /// <summary>永久 Buff（RemainingTurns&lt;0 标记——歌声之环/寒冰之棱类：不计时）；
+        /// <summary>永久 Buff（RemainingSeconds&lt;0 标记——歌声之环/寒冰之棱类：不计时）；
         /// 回合递减与到期收集均跳过（TurnResolver/CollectExpiredBuffs 同判据），
         /// 消失通道=持有者倒下（RemoveOnHolderDeath）或碎裂/驱散即时移除（BattleSimState.RemoveBuff）</summary>
-        public bool IsPermanent => RemainingTurns < 0;
+        public bool IsPermanent => RemainingSeconds < 0;
 
         /// <summary>是否已达叠层上限（AI 脑增益候选排除用——重施加 Merge 无增益时不占行动）；
         /// 默认否=不限/不适用，按命座成长的叠层型 Buff 覆写（寒冰之棱）</summary>
@@ -52,7 +52,7 @@ namespace GIC.Battle
         public int Level = 1;
 
         /// <summary>回合制剩余回合数（回合结束减一，含上 buff 当回合）</summary>
-        public int RemainingTurns = 1;
+        public int RemainingSeconds = 1;
 
         /// <summary>全局注册序（回合结束效果结算顺序）</summary>
         public int ApplicationIndex;
@@ -74,7 +74,7 @@ namespace GIC.Battle
         /// </summary>
         public virtual void Merge(BaseBuff newer)
         {
-            RemainingTurns += newer.RemainingTurns;
+            RemainingSeconds += newer.RemainingSeconds;
             Level = Mathf.Max(Level, newer.Level);
         }
 

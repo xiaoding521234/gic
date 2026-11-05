@@ -435,7 +435,7 @@ namespace GIC.Battle
         /// 递减/泡湿/资源点站立采集/快照；**效果拍（每 EffectBeatTicks=2 秒）=Buff tick 效果〔OnTurnEnd
         /// 产出——歌声之环/冰棱/燃烧〕+建筑效果〔教堂/旗帜/餐馆/骑士引擎〕**，单次数值不动=触发频率
         /// 减半；战技/爆发 CD 不受影响（独立 3s/5s 拍板））：
-        /// ①每玩家发放 → ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingTurns 语义改秒）
+        /// ①每玩家发放 → ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingSeconds 语义改秒）
         /// → ③计时减一（上 buff 当拍结束即减）→ 到期移除 → 产出 turnEnd 段（发放恒非空，段必推）。
         /// 由 RTSFlowController 每秒整拍（tick%20==0）调用；胜负检查归调用方。
         /// </summary>
@@ -474,7 +474,7 @@ namespace GIC.Battle
 
             var effects = new List<BattleEffect>();
 
-            // 按注册序结算回合结束效果，随后计时减一（到期收集；永久 Buff（RemainingTurns<0）不计时——歌声之环类）
+            // 按注册序结算回合结束效果，随后计时减一（到期收集；永久 Buff（RemainingSeconds<0）不计时——歌声之环类）
             // **回合末=同时结算（决策二十四终版「逐拍交错」）**：buff 的 OnTurnEnd 只产出声明（元素
             // 伤害走 PendingAuraHit），循环后统一按 (拍时刻, 施法者, 目标) 排序逐个过共享编译视图结算
             // ——双异元素光环同拍交错、每层附着、每拍可触发反应（对齐原神双光环同开互融）
@@ -483,7 +483,7 @@ namespace GIC.Battle
             foreach (var buff in _sim.ActiveBuffs)
             {
                 if (effectBeat) effects.AddRange(buff.OnTurnEnd());
-                if (!buff.IsPermanent) buff.RemainingTurns--;
+                if (!buff.IsPermanent) buff.RemainingSeconds--;
             }
             if (effectBeat)
                 ResolveAuraHits(effects);
@@ -1453,7 +1453,7 @@ namespace GIC.Battle
                         ? target.Buffs.Find(b => b.Config != null && b.Config.name == applyBuff.BuffKey)
                         : target.Buffs.Find(b => b.Type == (BuffType)applyBuff.BuffType);
                     applyBuff.Level = state != null ? state.Level : applyBuff.Level;
-                    applyBuff.Turns = state != null ? state.RemainingTurns : 0;
+                    applyBuff.Turns = state != null ? state.RemainingSeconds : 0;
                     appliedBuffs.Add(applyBuff);
 
                     // 溢出层立即碎裂：未吸收层逐枚弹治疗（LayerBeatSeconds 错峰同碎裂路径）；
@@ -1522,9 +1522,9 @@ namespace GIC.Battle
                     else
                     {
                         consumeFreeze.AppliedTurns = Mathf.Min(consumeFreeze.Turns,
-                            Mathf.Max(0, freeze.RemainingTurns));
-                        freeze.RemainingTurns -= consumeFreeze.AppliedTurns;
-                        if (freeze.RemainingTurns <= 0)
+                            Mathf.Max(0, freeze.RemainingSeconds));
+                        freeze.RemainingSeconds -= consumeFreeze.AppliedTurns;
+                        if (freeze.RemainingSeconds <= 0)
                         {
                             consumeFreeze.AppliedKey = freeze.Config?.name; // 具名身份（决策五十七）——RemoveBuff 命令载荷
                             _sim.RemoveBuff(target, freeze); // OnRemoved 清 Frozen 状态=归零即解冻
@@ -1659,7 +1659,7 @@ namespace GIC.Battle
         // | MoraPlunder     | (被掠方, 掠夺方) 双命令               | AppliedGain=0 零命令；按应用后实际量+命中时刻发 |
         // | ApplyBuff       | (目标, BuffType)                     | 级别取大、回合取后施合并态；命令数以合并态为准  |
         // | Attach/Reaction | 不合并（一一对应）                    | 覆盖语义后到者胜属预期                          |
-        // 注：永久 Buff（RemainingTurns<0，歌声之环）不走到期收集——倒下即失走死亡循环 RemoveBuff
+        // 注：永久 Buff（RemainingSeconds<0，歌声之环）不走到期收集——倒下即失走死亡循环 RemoveBuff
         // =================================================================================
 
         /// <summary>同片同 (目标,类型) 的多次施加合并为一条命令（回合数以最终合并态为准）</summary>

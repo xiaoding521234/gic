@@ -114,7 +114,10 @@ namespace GIC.Battle
             return null;
         }
 
-        /// <summary>十字方向 → 格增量（斜向输入归一到主轴；投射物=十字方向其一）</summary>
+        /// <summary>十字方向 → 格增量（**legacy 桥**，P6 残留审计 B5/B6，docs/active/49）：
+        /// 即时制自由角主链走 <see cref="AimVectorOf"/>（千分定点向量）；本方法仅供旧格式
+        /// direction 载荷（AI 旧轨/历史命令/召唤散点）兜底——**新代码勿再使用**，
+        /// 斜向输入会被归一到主轴（8 向限制的根源）。</summary>
         public static Vector2Int DirectionToDelta(Direction2D direction)
         {
             switch (direction)

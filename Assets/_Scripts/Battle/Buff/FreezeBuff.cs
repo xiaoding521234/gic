@@ -22,7 +22,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = Mathf.Max(1, level);
-            RemainingTurns = Cfg.每级持续回合 * Level;
+            RemainingSeconds = Cfg.每级持续回合 * Level;
         }
 
         public override List<BattleEffect> OnTurnEnd()
@@ -43,7 +43,7 @@ namespace GIC.Battle
         /// <summary>重复冰冻取时间更长者（docs/06）——覆写默认的时长累加</summary>
         public override void Merge(BaseBuff newer)
         {
-            RemainingTurns = Mathf.Max(RemainingTurns, newer.RemainingTurns);
+            RemainingSeconds = Mathf.Max(RemainingSeconds, newer.RemainingSeconds);
             Level = Mathf.Max(Level, newer.Level);
         }
     }

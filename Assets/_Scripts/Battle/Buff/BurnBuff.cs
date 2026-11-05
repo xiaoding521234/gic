@@ -25,7 +25,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = Mathf.Max(1, level);
-            RemainingTurns = Cfg.每级持续回合 * Level;
+            RemainingSeconds = Cfg.每级持续回合 * Level;
         }
 
         public override List<BattleEffect> OnTurnEnd()

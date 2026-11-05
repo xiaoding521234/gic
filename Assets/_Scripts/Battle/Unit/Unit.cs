@@ -40,6 +40,11 @@ namespace GIC.Battle
         /// 灵魂复用为衰减首回合豁免判据（RegisterSoul 写入=死亡当回合——回合末不衰减=完整 10 回合驻留）</summary>
         [NonSerialized] public int DeployedTurn;
 
+        /// <summary>上次周期召唤成功的逻辑秒（P6 残留审计 C3，docs/active/49）：效果结算只在效果拍
+        /// （每 2 秒）发生，旧「当前秒 − 部署秒 % 周期」在奇数周期下对不齐（5 秒变 10 秒）——
+        /// 改单调判定「距上次成功召唤 ≥ 效果周期」；0=尚未召唤过（首次基准=DeployedTurn）。</summary>
+        [NonSerialized] public int LastPeriodicSummonSecond;
+
         // ==================== 地脉维度与灵魂（决策九十一，2026-10-25） ====================
 
         /// <summary>当前维度（多维度体系：主世界单位恒 MainWorld〔默认零赋值〕；灵魂=LeyLine；

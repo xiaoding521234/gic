@@ -533,11 +533,10 @@ namespace GIC.Editor
             public void RegisterClientHandler(Action<BattleMessageType, string> handler) { }
         }
 
-        /// <summary>恒真 ack 宿主：ack 门控已随回合机退役（接口空实现兼容保留）</summary>
+        /// <summary>回放宿主：ack 门控已随回合机退役（接口仅剩推送钩子，docs/active/49 D2）</summary>
         private class FakeResolverHost : ITurnResolverHost
         {
             public void NotifySegmentPushed(int turnNumber, int sliceIndex) { }
-            public bool HasSegmentAck(int turnNumber, int sliceIndex) => true;
         }
 
         private static void ReportResult(string summary, string fileName)

@@ -157,9 +157,7 @@ namespace GIC.Battle
 
         // ==================== 演算/碰撞规则常量（2026-10-02 执行阶段复审收口批次） ====================
 
-        /// <summary>Host 片 ack 等待超时（秒，真实时间；超时快进——客户端卡死不冻结演算；
-        /// B7 LAN 前按网络余量另议）</summary>
-        public const float SegmentAckTimeoutSeconds = 15f;
+        // P6 残留审计 D2（docs/active/49）：SegmentAckTimeoutSeconds 随 ack 门控退役删除。
 
         // ==================== 段播放 pacing 契约（2026-10-20 审查批#10 收口） ====================
         // Host 只随 Segment 下发攻速差值等演算事实，下列节拍换算全在客户端 BattlePlayer——
@@ -183,6 +181,9 @@ namespace GIC.Battle
         /// （蓝图 §3.2：单格体积上限随格制退役，密度由碰撞圆自然限制）：常量保留仅供旧格移动
         /// 兜底轨（MovementResolver.PassesVolumeLimit，AI 三脑 P5 移植前）消费；即时制新轨
         /// （RTSMovementSystem 圆碰撞）不读本值；P5 旧轨退役后本常量随批删除</summary>
+        // P6 残留审计 B1/B2（docs/active/49）：格体积上限已退役——部署/召唤/客户端推荐全链改
+        // 碰撞圆重叠判定；本常量仅 MovementResolver.CanEnter 旧格原语内部兜底（无生产调用方），
+        // 后续整理批可随 MovementResolver 旧轨一并删除。
         public const int MaxTileVolume = 3;
 
         // ==================== 连续坐标与碰撞圆（决策九十五 P2，蓝图 §3） ====================

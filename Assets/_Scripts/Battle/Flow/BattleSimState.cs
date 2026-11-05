@@ -1214,14 +1214,14 @@ namespace GIC.Battle
             target?.GetUnitComponent<UnitElement>()?.ClearDye();
         }
 
-        /// <summary>按注册序结算后的到期收集（RemainingTurns≤0；永久 Buff（RemainingTurns&lt;0）不计时
+        /// <summary>按注册序结算后的到期收集（RemainingSeconds≤0；永久 Buff（RemainingSeconds&lt;0）不计时
         /// 不收集——歌声之环/寒冰之棱类消失走 RemoveOnHolderDeath 倒下移除或碎裂即时移除
         /// （BattleSimState.RemoveBuff——寒冰之棱 TryShatter 直接注销）</summary>
         public List<BaseBuff> CollectExpiredBuffs()
         {
             var expired = new List<BaseBuff>();
             foreach (var buff in _activeBuffs)
-                if (!buff.IsPermanent && buff.RemainingTurns <= 0) expired.Add(buff);
+                if (!buff.IsPermanent && buff.RemainingSeconds <= 0) expired.Add(buff);
             return expired;
         }
 
@@ -1303,7 +1303,7 @@ namespace GIC.Battle
                     type = (int)buff.Type,
                     buffKey = buff.Config != null ? buff.Config.name : "", // 具名身份（决策五十七——客户端徽章匹配/图标解析按 key）
                     level = buff.Level,
-                    remainingTurns = buff.RemainingTurns,
+                    remainingTurns = buff.RemainingSeconds,
                     // 来源（2026-10-06 头顶 Buff 图标批）：来源单位 id（客户端描环按其玩家色）+
                     // 来源技能 id（客户端图标取 SkillConfig.icon；反应类 Buff=0 回落元素图标）
                     sourceUnitId = buff.source != null
@@ -1446,7 +1446,7 @@ namespace GIC.Battle
         public int GetCompileFreezeTurns(string unitId)
         {
             var freeze = GetFreezeBuff(unitId);
-            int turns = freeze != null ? freeze.RemainingTurns : 0;
+            int turns = freeze != null ? freeze.RemainingSeconds : 0;
             if (_compileFreezeView != null && _compileFreezeView.TryGetValue(unitId, out var consumed))
                 turns -= consumed;
             return UnityEngine.Mathf.Max(0, turns);
