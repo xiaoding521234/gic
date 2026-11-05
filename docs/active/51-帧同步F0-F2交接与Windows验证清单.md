@@ -203,5 +203,6 @@ Unity 菜单：
 
 ### 11.4 已知遗留（建议放进 F2.5 小批）
 
-- `ReceiveInputCommand` 只入队、不复跑 Host 侧校验（所有权/建筑/眷属拦截在客户端 `SubmitAndResolve` 已跑，F4 反作弊批再收紧）；同时**不进 `_recentPlayerActions`**——伙伴脑「感知窗口内玩家行动」目前只看到 Host 本地玩家，远端玩家行动不可见（行为差异待实机确认）。
+- `ReceiveInputCommand` 只入队、**不复跑 Host 侧校验**（所有权/建筑/眷属拦截已在客户端 `SubmitAndResolve` 跑过，F4 反作弊批再收紧）。
 - LAN 远端行动未进 `BattleRecorder`（回放覆盖 Host 本地玩家+AI），LAN 局回放不完整。
+- ~~远端行动不进 `_recentPlayerActions`~~ 已修（本提交）：Host 收远端输入时同步塞入伙伴脑感知窗口，与单机同构。

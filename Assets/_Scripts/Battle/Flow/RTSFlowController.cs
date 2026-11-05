@@ -531,6 +531,9 @@ namespace GIC.Battle
             int target = msg.submitTick + BattleMetrics.InputDelayTicks;
             int min = CurrentTick + 1;
             if (target < min) target = min;
+            // 与 Host 本地玩家同权：远端行动也进伙伴脑「感知窗口内玩家行动」（F1 单机同构——
+            // 旧实现只看到 Host 本地玩家，AI 行为随「谁在操作」而变）。
+            _recentPlayerActions.Add(msg.action);
             EnqueueInput(msg.action, target, isAi: false, seq: msg.seq);
         }
 
