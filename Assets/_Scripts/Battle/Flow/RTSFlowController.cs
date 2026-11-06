@@ -609,25 +609,91 @@ namespace GIC.Battle
         public static int ComputeStateHash(BattleSimState sim)
         {
             int hash = 17;
+            // 主世界 + 地脉维度（灵魂独立注册表——按 unitId 合并排序=确定序）
             var unitIds = new List<string>(sim.Units.Keys);
-            unitIds.Sort(StringComparer.Ordinal); // 确定性：unitId 升序（Dictionary 枚举序不稳定）
+            foreach (var kv in sim.CrossDimensionUnits) unitIds.Add(kv.Key);
+            unitIds.Sort(StringComparer.Ordinal);
             foreach (var unitId in unitIds)
             {
-                var unit = sim.Units[unitId];
+                var unit = sim.GetUnit(unitId); // 双注册表透明解析
                 if (unit == null) continue;
                 var stats = unit.GetUnitComponent<UnitStats>();
                 if (stats == null) continue;
-                var pos = sim.GetPosition(unit);
+                var posCm = sim.GetPosCm(unit);
+
                 hash = hash * 31 + stats.HP;
                 hash = hash * 31 + stats.Energy;
-                hash = hash * 31 + pos.x;
-                hash = hash * 31 + pos.y;
+                hash = hash * 31 + stats.Sanity;
+                hash = hash * 31 + posCm.x;
+                hash = hash * 31 + posCm.y;
+                hash = hash * 31 + (int)unit.Dimension;
+                hash = hash * 31 + unit.DeployedTurn;
+                hash = hash * 31 + unit.LastPeriodicSummonSecond;
+
+                // Buff：身份（族×资产名）+ 层数 + 剩余秒——先排序再折叠，列表序差异不致漂
+                var buffKeys = new List<string>();
+                if (unit.Buffs != null)
+                {
+                    foreach (var buff in unit.Buffs)
+                    {
+                        if (buff == null) continue;
+                        buffKeys.Add($"{(int)buff.Type}|{(buff.Config != null ? buff.Config.name : string.Empty)}" +
+                                     $"|{buff.Level}|{buff.RemainingSeconds}");
+                    }
+                }
+                buffKeys.Sort(StringComparer.Ordinal);
+                foreach (var key in buffKeys)
+                    foreach (char c in key) hash = hash * 31 + c;
+
+                // 冷却（战技/爆发）
+                hash = hash * 31 + sim.SkillCdRemainTicks(unitId, SkillType.Normal);
+                hash = hash * 31 + sim.SkillCdRemainTicks(unitId, SkillType.Burst);
+
+                // 装备（武器+耐久；配件按槽序+各件耐久）
+                var equipment = unit.GetUnitComponent<UnitEquipment>();
+                if (equipment != null)
+                {
+                    hash = hash * 31 + (equipment.Weapon.HasValue ? (int)equipment.Weapon.Value : 0);
+                    hash = hash * 31 + equipment.WeaponDurability;
+                    hash = hash * 31 + equipment.AccessorySlotCount;
+                    var accessories = equipment.Accessories;
+                    if (accessories != null)
+                    {
+                        for (int i = 0; i < accessories.Count; i++)
+                        {
+                            var acc = accessories[i];
+                            hash = hash * 31 + (acc.HasValue ? (int)acc.Value : 0);
+                            hash = hash * 31 + (acc.HasValue ? equipment.HeldAccessoryDurability(acc.Value) : 0);
+                        }
+                    }
+                }
             }
+
             foreach (var pid in sim.PlayerIds) // PlayerIds=注册序（List，稳定）
             {
                 hash = hash * 31 + sim.GetMora(pid);
                 hash = hash * 31 + sim.GetStamina(pid);
+                var hand = sim.GetHand(pid);
+                if (hand != null)
+                {
+                    foreach (var card in hand)
+                    {
+                        hash = hash * 31 + card.cardType;
+                        hash = hash * 31 + card.value;
+                        hash = hash * 31 + card.count;
+                        hash = hash * 31 + card.durability;
+                    }
+                }
             }
+
+            // 资源点余量（耗尽即消失——余量错=采集经济已分叉）
+            foreach (var node in sim.SortedResourceNodes())
+            {
+                hash = hash * 31 + node.cell.x;
+                hash = hash * 31 + node.cell.y;
+                hash = hash * 31 + node.remainingCharges;
+            }
+
             // F0-4/F1：RNG 状态纳入 hash——随机序列一旦分叉必须能定位到 tick
             hash = hash * 31 + unchecked((int)sim.RngState);
             return hash;

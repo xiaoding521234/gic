@@ -193,6 +193,7 @@ Unity 菜单：
 - **缺陷**：`ApplyDueInputs` 在**应用该 tick 的时刻**才 `HostSend(InputBatch)`。客户端同一刻已进入/越过该 tick，`ReceiveInputBatch` 命中 `msg.tick <= CurrentTick` → 「输入批迟到丢弃」→ 从第一个含输入的 tick 起必漂。违反设计稿 §3.3「至少提前 1 tick 广播」。
 - **修法**：入队标脏（`_dirtyBatchTicks`）→ `TickAdvance` 末尾 `FlushInputBroadcasts()` 提前广播；定序比较器抽 `CompareInputs` 单源，**广播前排序**（客户端保序不重排），结算前再排一次（幂等）。AI 节拍在同一 tick 内生成 `targetTick=+1` 的行动，当拍末尾即发出，客户端仍有一个完整 tick（50ms）接收余量。
 - **顺带**：客户端路由显式吞掉 Host 仍广播的 `Segment/Snapshot`（原会每秒刷「未注册的消息类型」警告，F2 下网络帧仅诊断），`BattleOver` 加权威兜底（本地未终局时按 Host 收尾）。
+- **状态 hash 覆盖补齐（设计稿 §7.1 前置）**：原 `ComputeStateHash` 只折叠 HP/元能/格坐标/摩拉/体力/RNG，单位 buff、冷却、装备、地脉维度、召唤周期、手牌、资源点余量全在覆盖面之外——这些任一分叉都不会被发现。现改为：单位（HP/元能/理智/精确 cm 位置/维度/部署秒/周期召唤秒）+ Buff（族×资产名/层数/剩余秒，排序后折叠）+ 战技/爆发 CD + 装备（武器+耐久/配件槽序+各件耐久）+ 玩家（摩拉/体力/手牌条目含耐久）+ 资源点余量 + RNG 状态，地脉灵魂（独立注册表）一并纳入。改动=hash 值语义变更，旧录制一律不可比（反正待重录）。
 
 ### 11.3 尚未完成（需实机/双机）
 
