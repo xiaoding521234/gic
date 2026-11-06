@@ -240,12 +240,17 @@ namespace GIC.Battle
         private readonly HashSet<string> _activeMovePlayback = new HashSet<string>();
 
         /// <summary>cm 连续位置→世界坐标（BattleBoard.CellToWorld 同基准：BattleCell.zero 格心为原点
-        ///——P4-E 被挡停点/快照自愈消费；与 BattleHud.CmToWorld 同式）</summary>
+        ///——P4-E 被挡停点/同格移动终点/快照自愈消费）。
+        /// Y=该点所在格的视觉表面高度（地块顶面 0.5、水面/薄冰含波峰带）——2026-11-06「立牌全部陷进地下」
+        /// 修复：旧实现把 Y 写死 0f（地块底面），快照自愈每秒按 0.5 落差判定漂移并把全场立牌拉回 y=0，
+        /// 移动停点同样落到地下；单位站位与 CellToWorld 必须同一表面口径（§176 贴地件起算面教训）</summary>
         private Vector3 BoardCmToWorld(int xCm, int zCm)
         {
             var o = _board.CellToWorld(BattleCell.zero);
             float s = 1f / CellMetrics.CellSizeCm;
-            return new Vector3(o.x + (xCm - BattleCell.zero.CenterXCm) * s, 0f,
+            var cell = BattleCell.FromCm(xCm, zCm);
+            return new Vector3(o.x + (xCm - BattleCell.zero.CenterXCm) * s,
+                _board.GetVisualSurfaceHeight(cell),
                 o.z + (zCm - BattleCell.zero.CenterYCm) * s);
         }
 
