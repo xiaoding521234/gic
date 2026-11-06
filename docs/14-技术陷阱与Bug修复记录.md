@@ -2505,3 +2505,35 @@ The .meta file ... does not have a valid GUID and its corresponding Asset file w
 **定序配套**：客户端「保序不重排」，所以 **Host 必须在广播前排序**（比较器抽单源 `CompareInputs`，结算前再排一次幂等）——否则广播发出的是入队序、结算用的是排序序，两端序不同=必漂。
 
 **验证**（可复用）：编辑器域无头自检 `Tools/TG/帧同步管线自检（输入批时序）`（6/6：入队不广播 / 提前一 tick / 单批一次 / 定序 / 迟到丢弃 / 双端开局同构 hash 一致）——不需要 Play Mode，真实 `RTSFlowController` + 合成 Sim 即可。
+
+## §184 「贴地/站位」类 cm→world 换算写死 Y=0 ＝ 全场立牌陷进地下（2026-11-06 实战报障「立牌全部陷进地下」+ 用户实机验证通过）
+
+**症状**：对局进行到某个时刻后，**全场所有立牌**一起沉到地块下方（半格），头顶血条/伤害数字仍浮在正常高度（Overlay 屏幕空间件不跟随 3D 位置）。
+
+**根因**：`BattlePlayer.BoardCmToWorld`（cm 连续位→世界坐标，`BattleCell.zero` 格心为原点）把 Y 写死 `0f`——那是**地块预制体底面**，而地块是有厚度的 3D 块（`TileTopHeight = 0.5`），单位该站的是**顶面**。该函数被四处写入源消费：P4-E 被挡停点校正 / 同格移动终点 / 被挡弹回 home / **每秒快照位置自愈**——最后一项最致命：快照自愈每秒比较「权威位」与视图位，0.5 的固定落差恒判为漂移，于是每秒把全场立牌拉回 `y=0`，观感就是「所有立牌一起陷进地下」。
+
+**现场判决式**（下次同类问题直接套）：`UnitView.FormationAnchor.y == 0` 而 `BattleBoard.GetVisualSurfaceHeight(该格) == 0.5` ⇒ 唯一作者就是这段写死 Y 的换算（正常运行时队形锚点 y 必等于表面高）。
+
+**修法**：Y 改走表面高度单源 —— `_board.GetVisualSurfaceHeight(BattleCell.FromCm(xCm, zCm))`（与 `BattleBoard.CellToWorld` 同口径，水面/薄冰含波峰带）。
+
+**教训**：①「贴地/站位」类世界坐标 helper 一律从**表面高度**起算，不得写死任何常量 Y（同族=§176 摩拉堆埋进地形块）；②同一空间量的多个消费者（视图建场 / 停点校正 / 快照自愈）必须共用**同一个**换算函数——本例正是共用才让一处错值污染全场；③`BattleHud.CmToWorld` 里同样的 `y=0` 是**正确的**（它只服务地面平面上的相机跟随/方向线），不要"顺手统一"成表面高度。
+
+## §185 后期卡顿：AI 热点原语的「每次 new List/排序/拼字符串」＝分配风暴；摊平必须有界窗口且错开节拍 tick（2026-11-06 后期卡顿批，两轮实测对照）
+
+**症状**：对局后期（单位数 100+）周期性掉到 6fps，帧 p95 400~570ms、max 780ms。**秒拍结算本身只有 7ms、快照 0.4ms、hash 0.3ms**——卡顿全在 AI 决策侧。
+
+**归因（先量再改）**：临时 `BattlePerfProbe`（`Stopwatch.GetTimestamp` 包住每个节拍入口、每 5 秒打 avg/max）一轮定位：`FamiliarBrain.DecideAll` **740~866ms/拍**、`CompanionBrain.DecideAll` 210~247ms、`ResolveAiActions` 55~71ms。**profiler.\* 自定义工具本次未注册、`ProfilerDriver.GetHierarchyFrameDataView` 反射调用抛异常——工具链不可用时直接上 Stopwatch 探针，别纠缠。**
+
+**四个算法级病灶（都是「原语每次调用都重建」）**：
+1. `FindAttackAim` 对**每个可见敌**跑一次 `PredictAimTargets`，后者内部再扫全场 + 每次 2~3 次 `JudgmentClips`（每次 `new List` + 排序）= O(可见敌 × 全场)。
+2. `RTSPathfinder.FindPath` **每次寻路**都重建尸体阻塞集：复制全单位 id + 排序 + 逐单位拼 `"x,y"` 字符串——后期每拍上千次寻路。
+3. `BattleSimState.SortedUnits()` 每次调用 `new List` + 排序——AI 单拍上百次。
+4. `CompanionBrain` 威胁图门控 O(队 × 单位²) 双循环，且每次内层都 `SortedUnits()`。
+
+**修法（先剪枝/去重，后摊平——顺序不能反）**：判定轨**单次查询**同时得射程与投影轨（取代 `DirectionRangeCmOf` 的 2~3 次）；**射程剪枝**（圆心距 > 射程 + 目标半径 + 裕量 ⇒ 首接触恒不成立，直接跳过）→ 眷属单拍 866ms → ~25ms；`FindAttackAim` 加可选 `enemiesIn` 复用可见敌集，眷属单次决策三档（爆发/战技/移动）共用一份；`SortedUnits` 加缓存 + 注册/移除置脏（返回**共享只读快照**，调用方禁改写）；`CorpseCellsOfTick()` 按 `CurrentTick` 缓存；威胁图门控改**单遍聚合 feedTeams** 再单遍建图。
+
+**摊平的正确形状**：`FamiliarBrain.DecideAll(sim, turn, phase, span)` 按「候选序号 % span == phase」切片，流程侧 `RunFamiliarBrainWave()` 在节拍后 4 个 tick 内摊完 1/4；**每单位仍每 0.5 秒决策一次，只是决策时刻错开**；且**必须错开节拍 tick 本身**（伙伴脑/揭雾/配额脑都在该 tick，叠加=单帧峰值）。
+
+**实测对照**：眷属 12~28ms/片、伙伴 42~65ms、帧 p95 90~230ms、最坏 150~430ms、p50 7~23ms。
+
+**教训**：①**先剪枝再摊平**——只摊平不剪枝则总工作量与分配不变，GC 照样拖死；②**摊平必须有界窗口**：改成「每 tick 决策 1/N 候选」（全程逐 tick）实测触发 tick 追帧螺旋，p50 反而劣化到 275~376ms——挂到每个 tick 的工作会被追帧乘性放大；③凡「AI 每拍调上千次」的原语（`FindEnemiesByDistance` / `PredictAimTargets` / `FindPath` / `SortedUnits`），内部**任何** `new List` / `Sort` / 字符串拼接都是分配风暴源，优先消除；④**剩余主因是分配率驱动的全量 GC**（300 帧内 gen0/1/2 同升 18 次、堆 ~1.1GB、帧中位 121ms）——要根治得做去分配改造，光调算法不够；⑤单位数会因「无限召唤 + 尸体常驻」单调增长（60 秒即 112 单位），属设计层上限问题，需产品拍板。
