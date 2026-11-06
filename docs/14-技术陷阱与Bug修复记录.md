@@ -2474,3 +2474,34 @@ c) 静默 return 链全通+真点击链全通时，转向**视觉层**查「开�
 **队形锚点模型**：`UnitView.FormationAnchor`（权威位）+ `ApplyFormationOffset(offset)`——偏移叠加在真实站位上，不再以格心为基准；**任何「运行时叠偏移」的组件都必须缓存权威基准再叠加，不得直写绝对值**（同 §135 既有铁律）。
 
 **验证口径**：修前/修后同配置观察局对照（最大单帧跳 8~11 格 → 0.65 格且仅出现在撞墙弹回帧；>15cm 跳变从移动单位人均 100+ 降到全场合计 5 次/25s）+ 新回放基线回归 PASS（679 段/25299 命令）。**多写者编排顺序**：先修「独占位置」（formation 让位），再修「连续起步」与「精确落点」，最后给弹回加「世代让位+逐单位冷却」——每层单独观测，数量级逐层收敛（8~11 → 1 → 0.65）。
+
+## §182 Tuanjie `.meta` 的 guid 畸形＝脚本被整份静默忽略（症状是「文件明明存在却 CS0246」）（2026-11-06 帧同步分支接手实证）
+
+**症状**：合并外部（无 Unity 环境）写的新代码后编译报 `CS0246: 找不到类型/命名空间 X`，而 X 的 `.cs` 文件就在磁盘上、内容与命名空间都正确；重新 refresh / 重新导入都救不回。
+
+**根因**：`.cs.meta` 里 `guid:` 值不是本项目合法形态（合法只有 **32 字符明文** 与 **56 字符加密** 两种；坏例=44 字符，来自在 Unity 外部手写/复制的 meta）。Unity 在导入时报：
+
+```
+The GUID inside '<path>.meta' cannot be extracted by the YAML Parser.
+The .meta file ... does not have a valid GUID and its corresponding Asset file will be ignored.
+```
+
+**该脚本根本不进编译域**——所以不是「类型没写对」，而是「文件不存在于编译」。
+
+**判定**：`AssetDatabase.AssetPathToGUID(path)` 返回空串 = 未被导入（同名 `.meta` 存在也不算数）。批量排查=扫描 `Assets/` 下所有 `.meta` 的 `^guid: ` 值长度，`∉{32,56}` 即畸形。
+
+**修法**：确认该 guid 在场景/prefab/资产中零引用（纯代码/枚举文件天然零引用）后**删除 `.meta`**，让编辑器重建。有序列化引用（组件、ScriptableObject 类）的类型不能删——那种情况才需要 `FormerlySerializedAs`/重新挂载。
+
+**教训**：外部写码交付（Mac 等无 Unity 环境）时，`.meta` 必须由 Unity 生成或明确不入库；**接手第一件事是扫 meta 长度**，比重读业务代码更快定位「神秘 CS0246」。
+
+## §183 帧同步输入批「等到应用该 tick 才广播」＝客户端必迟到；定序必须在广播前（2026-11-06 F1 时序实证）
+
+**症状**（若不修）：LAN 双端从第一个含输入的 tick 起就漂——客户端只打印「输入批迟到丢弃」，因为收到 `InputBatch(tick=T)` 时它已进入或越过 T。
+
+**根因**：Host 在 `ApplyDueInputs()`（**应用该 tick 的时刻**）才 `HostSend` 整批。同一墙钟时刻客户端也在跑 tick T，网络再快也只能在 T 之后到达；设计稿写的是「输入批必须在 targetTick 之前到达，Host 至少提前 1 tick 广播」。
+
+**修法**：入队标脏（`_dirtyBatchTicks`）+ 每 tick 末尾 `FlushInputBroadcasts()` 提前广播（只发改动过的 tick、丢弃 `tick <= CurrentTick`）。AI 行动在 tick T 内生成 `targetTick=T+1`，当拍末尾即发出，客户端仍有完整一个 tick（50ms）窗口。
+
+**定序配套**：客户端「保序不重排」，所以 **Host 必须在广播前排序**（比较器抽单源 `CompareInputs`，结算前再排一次幂等）——否则广播发出的是入队序、结算用的是排序序，两端序不同=必漂。
+
+**验证**（可复用）：编辑器域无头自检 `Tools/TG/帧同步管线自检（输入批时序）`（6/6：入队不广播 / 提前一 tick / 单批一次 / 定序 / 迟到丢弃 / 双端开局同构 hash 一致）——不需要 Play Mode，真实 `RTSFlowController` + 合成 Sim 即可。
