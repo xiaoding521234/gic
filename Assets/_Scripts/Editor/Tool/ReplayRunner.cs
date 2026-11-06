@@ -556,6 +556,200 @@ namespace GIC.Editor
             GICLog.Info("[ReplayRunner] 编辑器域配置容器已注入（ConfigManager Bean 链）");
         }
 
+        // ==================== 帧同步输入管线自检（F1，docs/active/50 §3.3/§4.2） ====================
+
+        /// <summary>
+        /// 无头自检：验证 Host 输入批「提前一 tick 广播 / 单批只发一次 / 定序 (playerId,seq) /
+        /// 客户端迟到丢弃」四件。不依赖 Play Mode，也不重跑真实战局（编辑域 AddComponent 不跑 Awake，
+        /// 只走输入管线——AI 节拍在 %10 tick，本自检只推进到 tick≤5，零脑参与）。
+        /// </summary>
+        [MenuItem("Tools/TG/帧同步管线自检（输入批时序）")]
+        public static void FrameSyncPipelineSelfTestMenu()
+        {
+            ReportResult(FrameSyncPipelineSelfTest(), "帧同步管线自检");
+        }
+
+        public static string FrameSyncPipelineSelfTest()
+        {
+            EnsureEditorConfigs();
+            var mapConfig = Resources.Load<BattleMapConfig>("Configs/" + BattleLaunchConfig.DefaultMapName);
+            if (mapConfig == null || mapConfig.spawnZones == null || mapConfig.spawnZones.Count < 2)
+                return "FAIL：默认地图出生区不足 2（自测前置不满足）";
+
+            var header = new ReplayHeaderLine
+            {
+                seed = 20261106,
+                mapName = BattleLaunchConfig.DefaultMapName,
+                fogMode = (int)BattleFogMode.None,
+                players = new List<ReplayPlayerLine>
+                {
+                    new ReplayPlayerLine
+                    {
+                        playerId = BattleDebugPlayerIds.P1, team = (int)TeamType.A,
+                        spawnX = mapConfig.spawnZones[0].center.x, spawnY = mapConfig.spawnZones[0].center.y,
+                        hand = new List<HandCard>(),
+                    },
+                    new ReplayPlayerLine
+                    {
+                        playerId = BattleDebugPlayerIds.P2, team = (int)TeamType.B,
+                        spawnX = mapConfig.spawnZones[1].center.x, spawnY = mapConfig.spawnZones[1].center.y,
+                        hand = new List<HandCard>(),
+                    },
+                },
+            };
+
+            var sb = new StringBuilder();
+            int failures = 0;
+            GameObject root = null, hostGo = null, clientGo = null;
+            try
+            {
+                root = new GameObject("FSSelfTestRoot") { hideFlags = HideFlags.HideAndDontSave };
+                var hostSim = BuildSimFromHeader(header, root);
+                var hostTransport = new BatchRecordingTransport();
+                hostGo = new GameObject("FSSelfTestHost") { hideFlags = HideFlags.HideAndDontSave };
+                var host = hostGo.AddComponent<RTSFlowController>();
+                host.Bind(hostSim, hostTransport, isHost: true, isNetworked: true);
+                host.StartBattle();
+                hostTransport.Batches.Clear(); // 丢掉开局快照等，只留输入批
+
+                // ① 入队当帧不发批（dirty 只在 tick 末尾 flush）
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 0, submitTick: host.CurrentTick));
+                failures += Check(sb, "①入队当帧不发批", hostTransport.Batches.Count == 0,
+                    $"batches={hostTransport.Batches.Count}");
+
+                // ② 提前一 tick 广播：target=当前+2，在 tick=1 末尾就发出
+                Tick(host);
+                int target = host.CurrentTick + 1;
+                var early = hostTransport.FindBatch(target);
+                failures += Check(sb, "②提前一 tick 广播", host.CurrentTick == 1 && early != null,
+                    $"nowTick={host.CurrentTick} batch(tick={target})={(early == null ? "无" : "有")}");
+
+                // ③ 应用该 tick 后不再补发（同一批只广播一次）
+                Tick(host);
+                failures += Check(sb, "③单批只发一次", hostTransport.CountBatches(target) == 1,
+                    $"count={hostTransport.CountBatches(target)} nowTick={host.CurrentTick}");
+
+                // ④ 定序：P2 先入队也要广播成 (playerId,seq) 升序
+                int target2 = host.CurrentTick + 2;
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P2, seq: 0, submitTick: host.CurrentTick));
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 1, submitTick: host.CurrentTick));
+                Tick(host);
+                var ordered = hostTransport.FindBatch(target2);
+                bool orderOk = ordered != null && ordered.inputs != null && ordered.inputs.Count == 2
+                    && ordered.inputs[0].playerId == BattleDebugPlayerIds.P1
+                    && ordered.inputs[1].playerId == BattleDebugPlayerIds.P2;
+                failures += Check(sb, "④定序=playerId 升序", orderOk,
+                    ordered == null || ordered.inputs == null ? "无批"
+                        : string.Join("→", ordered.inputs.ConvertAll(i => i.playerId)));
+
+                // ⑤ 客户端：迟到批丢弃 / 未来批入队
+                var clientSim = BuildSimFromHeader(header, root);
+                var clientTransport = new BatchRecordingTransport();
+                clientGo = new GameObject("FSSelfTestClient") { hideFlags = HideFlags.HideAndDontSave };
+                var client = clientGo.AddComponent<RTSFlowController>();
+                client.Bind(clientSim, clientTransport, isHost: false, isNetworked: true);
+                client.StartBattle();
+                client.ReceiveInputBatch(new InputBatchMessage { tick = 0, inputs = new List<OrderedInput>() });
+                bool dropped = !HasQueuedTick(client, 0);
+                client.ReceiveInputBatch(new InputBatchMessage
+                {
+                    tick = 5,
+                    inputs = new List<OrderedInput>
+                    {
+                        new OrderedInput
+                        {
+                            playerId = BattleDebugPlayerIds.P1, seq = 2, isAi = 0,
+                            action = PassInput(BattleDebugPlayerIds.P1, submitTick: 5),
+                        },
+                    },
+                });
+                bool queued = HasQueuedTick(client, 5);
+                failures += Check(sb, "⑤客户端迟到丢弃/未来入队", dropped && queued,
+                    $"dropped={dropped} queued={queued}");
+            }
+            finally
+            {
+                if (hostGo != null) UnityEngine.Object.DestroyImmediate(hostGo);
+                if (clientGo != null) UnityEngine.Object.DestroyImmediate(clientGo);
+                if (root != null) UnityEngine.Object.DestroyImmediate(root);
+            }
+
+            sb.Append(failures == 0 ? "PASS：5/5" : $"FAIL：{failures} 项不通过");
+            sb.Append("\n注：⑤ 的迟到丢弃会打印一条 [RTSFlow] 输入批迟到丢弃警告，属预期");
+            return sb.ToString();
+        }
+
+        private static ActionData PassInput(string playerId, int submitTick)
+            => new ActionData
+            {
+                actionType = ActionType.Pass,
+                playerId = playerId,
+                unitId = string.Empty,
+                submitTick = submitTick,
+            };
+
+        private static InputCommandMessage InputOf(string playerId, int seq, int submitTick)
+            => new InputCommandMessage
+            {
+                playerId = playerId,
+                seq = seq,
+                submitTick = submitTick,
+                action = PassInput(playerId, submitTick),
+            };
+
+        private static void Tick(RTSFlowController flow)
+        {
+            typeof(RTSFlowController)
+                .GetMethod("TickAdvance", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(flow, null);
+        }
+
+        private static bool HasQueuedTick(RTSFlowController flow, int tick)
+        {
+            var field = typeof(RTSFlowController)
+                .GetField("_inputByTick", BindingFlags.Instance | BindingFlags.NonPublic);
+            var dict = field?.GetValue(flow) as SortedDictionary<int, List<OrderedInput>>;
+            return dict != null && dict.ContainsKey(tick);
+        }
+
+        private static int Check(StringBuilder sb, string name, bool ok, string detail)
+        {
+            sb.Append('\n').Append(ok ? "  ✓ " : "  ✗ ").Append(name);
+            if (!string.IsNullOrEmpty(detail)) sb.Append("（").Append(detail).Append('）');
+            return ok ? 0 : 1;
+        }
+
+        /// <summary>自检用传输：只收 InputBatch（其余 Host 下行丢弃）。</summary>
+        private class BatchRecordingTransport : IBattleTransport
+        {
+            public readonly List<InputBatchMessage> Batches = new List<InputBatchMessage>();
+
+            public void HostSend(BattleMessageType type, object message)
+            {
+                if (type == BattleMessageType.InputBatch && message is InputBatchMessage batch && batch != null)
+                    Batches.Add(batch);
+            }
+
+            public void ClientSend(BattleMessageType type, object message) { }
+            public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) { }
+            public void RegisterClientHandler(Action<BattleMessageType, string> handler) { }
+
+            public InputBatchMessage FindBatch(int tick)
+            {
+                foreach (var batch in Batches)
+                    if (batch.tick == tick) return batch;
+                return null;
+            }
+
+            public int CountBatches(int tick)
+            {
+                int count = 0;
+                foreach (var batch in Batches)
+                    if (batch.tick == tick) count++;
+                return count;
+            }
+        }
+
         // ==================== 内部件 ====================
 
         /// <summary>回放收集传输：只收 Segment 消息（断言面），其余 Host 下行丢弃</summary>

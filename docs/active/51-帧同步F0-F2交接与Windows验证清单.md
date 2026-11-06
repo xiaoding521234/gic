@@ -206,4 +206,18 @@ Unity 菜单：
 
 - `ReceiveInputCommand` 只入队、**不复跑 Host 侧校验**（所有权/建筑/眷属拦截已在客户端 `SubmitAndResolve` 跑过，F4 反作弊批再收紧）。
 - LAN 远端行动未进 `BattleRecorder`（回放覆盖 Host 本地玩家+AI），LAN 局回放不完整。
+
+### 11.5 新增：编辑器域无头自检（`Tools/TG/帧同步管线自检（输入批时序）`）
+
+不依赖 Play Mode、不重跑真实战局，用真实 `RTSFlowController` + 合成 Sim 覆盖输入管线四件，实测 **5/5 PASS**：
+
+| # | 断言 | 实测 |
+|---|---|---|
+| ① | 入队当帧不广播（dirty 只在 tick 末尾 flush） | batches=0 |
+| ② | 提前一 tick 广播（target=当前+2，在 tick=当前+1 末尾发出） | nowTick=1 已发 batch(tick=2) |
+| ③ | 应用该 tick 后不补发同一批 | count=1 |
+| ④ | 定序=playerId 升序（P2 先入队仍发 P1→P2） | P1→P2 |
+| ⑤ | 客户端迟到批丢弃 / 未来批入队 | dropped=true / queued=true |
+
+（⑤ 会打印一条「输入批迟到丢弃」警告，属预期。）后续改输入管线（加宽窗口、改排序键、F3 预测回填）先跑此菜单。
 - ~~远端行动不进 `_recentPlayerActions`~~ 已修（本提交）：Host 收远端输入时同步塞入伙伴脑感知窗口，与单机同构。
