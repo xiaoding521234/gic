@@ -587,13 +587,21 @@ namespace GIC.Editor
                     {
                         playerId = BattleDebugPlayerIds.P1, team = (int)TeamType.A,
                         spawnX = mapConfig.spawnZones[0].center.x, spawnY = mapConfig.spawnZones[0].center.y,
-                        hand = new List<HandCard>(),
+                        hand = new List<HandCard>
+                        {
+                            new HandCard(new CardId(ItemName.Mora), BattleMetrics.InitialMora),
+                            new HandCard(new CardId(ItemName.Stamina), BattleMetrics.InitialStamina),
+                        },
                     },
                     new ReplayPlayerLine
                     {
                         playerId = BattleDebugPlayerIds.P2, team = (int)TeamType.B,
                         spawnX = mapConfig.spawnZones[1].center.x, spawnY = mapConfig.spawnZones[1].center.y,
-                        hand = new List<HandCard>(),
+                        hand = new List<HandCard>
+                        {
+                            new HandCard(new CardId(ItemName.Mora), BattleMetrics.InitialMora),
+                            new HandCard(new CardId(ItemName.Stamina), BattleMetrics.InitialStamina),
+                        },
                     },
                 },
             };
@@ -666,6 +674,38 @@ namespace GIC.Editor
                 bool queued = HasQueuedTick(client, 5);
                 failures += Check(sb, "⑤客户端迟到丢弃/未来入队", dropped && queued,
                     $"dropped={dropped} queued={queued}");
+
+                // ⑥ 双端同构：客户端按 BattleStart（seed/map/roster/初始快照）重建的 Sim 必须与
+                //    Host 完全同 hash——覆盖 unitId 分配序、初始手牌、雾模式（交接清单首秒漂移风险）
+                var hostSim2 = BuildSimFromHeader(header, root);
+                var startMsg = new BattleStartMessage
+                {
+                    map = hostSim2.Map,
+                    seed = header.seed,
+                    fogMode = header.fogMode,
+                    initialSnapshot = hostSim2.TakeSnapshot(0),
+                    roster = new List<BattlePlayerSetup>
+                    {
+                        new BattlePlayerSetup
+                        {
+                            PlayerId = BattleDebugPlayerIds.P1, DisplayName = "自测P1", Team = TeamType.A,
+                        },
+                        new BattlePlayerSetup
+                        {
+                            PlayerId = BattleDebugPlayerIds.P2, DisplayName = "自测P2", Team = TeamType.B,
+                        },
+                    },
+                };
+                var clientSim2 = new BattleSimState(startMsg.map, startMsg.seed);
+                clientSim2.LogicRoot = root.transform;
+                clientSim2.FogMode = (BattleFogMode)startMsg.fogMode;
+                typeof(BattleSession)
+                    .GetMethod("BuildClientSimUnits", BindingFlags.NonPublic | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { clientSim2, startMsg });
+                int hostHash = RTSFlowController.ComputeStateHash(hostSim2);
+                int clientHash = RTSFlowController.ComputeStateHash(clientSim2);
+                failures += Check(sb, "⑥双端 Sim 开局同构（hash 一致）", hostHash == clientHash,
+                    $"host={hostHash} client={clientHash} units={hostSim2.Units.Count}/{clientSim2.Units.Count}");
             }
             finally
             {
@@ -674,7 +714,7 @@ namespace GIC.Editor
                 if (root != null) UnityEngine.Object.DestroyImmediate(root);
             }
 
-            sb.Append(failures == 0 ? "PASS：5/5" : $"FAIL：{failures} 项不通过");
+            sb.Append(failures == 0 ? "PASS：6/6" : $"FAIL：{failures} 项不通过");
             sb.Append("\n注：⑤ 的迟到丢弃会打印一条 [RTSFlow] 输入批迟到丢弃警告，属预期");
             return sb.ToString();
         }
