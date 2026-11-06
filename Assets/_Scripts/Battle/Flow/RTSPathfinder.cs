@@ -49,16 +49,10 @@ namespace GIC.Battle
                 }
             }
 
-            // 尸体格阻塞集（确定性：unitId 升序收集）
-            var corpseCells = new HashSet<string>();
-            var unitIds = new List<string>(sim.Units.Keys);
-            unitIds.Sort(StringComparer.Ordinal);
-            foreach (var unitId in unitIds)
-            {
-                var unit = sim.Units[unitId];
-                if (unit != null && BattleSimState.IsDead(unit))
-                    corpseCells.Add($"{sim.GetPosition(unit).x},{sim.GetPosition(unit).y}");
-            }
+            // 尸体格阻塞集（确定性：unitId 升序收集）——按 tick 缓存（2026-11-06 后期卡顿修复）：
+            // 旧实现每次寻路都「复制全单位 id + 排序 + 逐单位拼 "x,y" 字符串」重建集合；后期 AI
+            // 每拍上千次寻路（AI 预判 + 执行层 A*）= 纯分配风暴（实测每帧数百 KB 分配的主源之一）
+            var corpseCells = sim.CorpseCellsOfTick();
 
             // A*（open=列表线性取最小——单位量级小，勿造堆）
             var open = new List<Node>();

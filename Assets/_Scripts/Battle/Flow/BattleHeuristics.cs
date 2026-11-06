@@ -271,7 +271,20 @@ namespace GIC.Battle
             int dirX = v.x, dirZ = v.y; // 千分单位向量（分量绝对值 ≤1000）
 
             // 虚空截断（沿向半格=50cm 采样，与 EffectCompiler.PredictProjectileHits 同步长）
-            int maxRange = EffectCompiler.DirectionRangeCmOf(data.timeline);
+            // 判定轨单次查询（2026-11-06 后期卡顿修复）：原走 EffectCompiler.DirectionRangeCmOf——
+            // 该函数内部各查一次 LineProjectile/LineBurst（每次 new List+排序），而本方法在 AI 决策里
+            // 对「每个候选敌 × 每单位 × 每技能」调用一次=百单位级分配风暴（实测单拍 0.7s）；
+            // 此处一次查询同时得 maxRange 与投影轨，取值优先级与 DirectionRangeCmOf 完全一致
+            var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
+            int maxRange;
+            if (projClips.Count > 0 && projClips[0].maxRange > 0) maxRange = projClips[0].maxRange;
+            else
+            {
+                var burstRangeClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineBurst);
+                maxRange = burstRangeClips.Count > 0 && burstRangeClips[0].maxRange > 0
+                    ? burstRangeClips[0].maxRange
+                    : ProjectileRule.MaxRange;
+            }
             int voidCut = -1;
             for (int t = 50; t <= maxRange; t += 50)
             {
@@ -281,7 +294,6 @@ namespace GIC.Battle
                 if (sim.Map == null || !sim.Map.HasTile(cell.x, cell.y)) { voidCut = t - 25; break; }
             }
 
-            var projClips = SkillTimelineQuery.JudgmentClips(data.timeline, SkillJudgmentKind.LineProjectile);
             if (projClips.Count > 0)
             {
                 // LineProjectile：首接触（含尸体）截停——逐敌求入射距离取最小者
@@ -346,7 +358,7 @@ namespace GIC.Battle
         /// 确定性=FindEnemiesByDistance 距离+unitId 序，零 roll）。全部敌不可命中=false（aimX/aimZ=0）
         /// ——纯尸体线/全被虚空截断/全超射程均落空。targetsInto=命中清单（评分消费，调用方复用）</summary>
         public static bool FindAttackAim(BattleSimState sim, BattleSnapshot snapshot, Unit self,
-            BaseSkill skill, out int aimX, out int aimZ, List<UnitState> targetsInto)
+            BaseSkill skill, out int aimX, out int aimZ, List<UnitState> targetsInto, List<Unit> enemiesIn = null)
         {
             aimX = 0; aimZ = 0;
             if (targetsInto != null) targetsInto.Clear();
@@ -354,12 +366,20 @@ namespace GIC.Battle
             var data = skill?.RawData;
             if (identity == null || data == null) return false;
             var from = sim.GetPosCm(self);
-            foreach (var enemy in FindEnemiesByDistance(sim, self))
+            // 射程剪枝（2026-11-06 后期卡顿修复）：本技能最大命中距离（cm，单源）——圆心距已超出
+            // 「射程 + 目标受击半径」的敌，首接触判定恒不成立（命中点必在圆心内侧 radius 且沿向
+            // ≤ maxRange+50），继续跑 PredictAimTargets 纯浪费：后期百单位 × 双技能 × 可见敌数 =
+            // 单拍 0.7s 的主项。判据保守留 50cm 裕量，行为与命中几何同口径
+            int reachCm = EffectCompiler.DirectionRangeCmOf(data.timeline) + 50;
+            // 可见敌集可由调用方传入复用（2026-11-06 后期卡顿修复）：眷属脑单次决策内爆发/战技/移动
+            // 三处需要同一份「距离序可见敌」，旧实现各算一遍（每次新建 SortedUnits+全量距离+排序）
+            foreach (var enemy in enemiesIn ?? FindEnemiesByDistance(sim, self))
             {
                 var enemyPos = sim.GetPosCm(enemy);
                 int dx = enemyPos.x - from.x;
                 int dz = enemyPos.y - from.y;
                 int dist = SqrtI((long)dx * dx + (long)dz * dz);
+                if (dist > reachCm + UnitRadiusCm(enemy) + 50) continue; // 超射程：恒不可命中（见上）
                 int vx, vz;
                 if (dist <= 0) { vx = 1000; vz = 0; } // 同点堆叠：东兜底（与 AimVectorOf 同向）
                 else { vx = dx * 1000 / dist; vz = dz * 1000 / dist; }

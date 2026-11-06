@@ -57,9 +57,13 @@ namespace GIC.Battle
         private static int _lastSimInstance = -1;
 
         /// <summary>
-        /// 全部眷属单位的本回合行动（存活的；不可动者缺席=无行动——Pass 无结算意义不出命令）
+        /// 全部眷属单位的本回合行动（存活的；不可动者缺席=无行动——Pass 无结算意义不出命令）。
+        /// **摊平切片（2026-11-06 后期卡顿修复）**：后期百余眷属在同一个 0.5 秒节拍里全量决策，
+        /// 实测单拍 0.7~0.87 秒主线程卡顿。按调用方给的相位/片数只处理「候选序号 % span == phase」
+        /// 的候选——每单位仍按节拍决策一次，只是各单位的决策时刻错开（现役调用方=4 片，峰值降为 1/4）。
+        /// span&lt;=1=全量（旧语义，观测/回放/预测器调用方沿用）。
         /// </summary>
-        public static List<ActionData> DecideAll(BattleSimState sim, int turnNumber)
+        public static List<ActionData> DecideAll(BattleSimState sim, int turnNumber, int phase = -1, int span = 1)
         {
             // 决策快照（纯读，与选择阶段广播同源状态）——技能预判的唯一状态源
             var snapshot = sim.TakeSnapshot(turnNumber);
@@ -72,12 +76,16 @@ namespace GIC.Battle
             }
 
             var actions = new List<ActionData>();
+            int eligible = 0; // 候选序号（切片分配用——只数「真正会决策」的眷属，分布均匀）
             foreach (var kv in sim.SortedUnits())
             {
                 var unit = kv.Value;
                 if (BattleHeuristics.IsBuilding(unit)) continue; // 建筑不参与任何行动（含未来低星建筑）
                 if (!BattleHeuristics.IsFamiliar(unit)) continue;
                 if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) continue;
+
+                int slot = eligible++;
+                if (span > 1 && slot % span != ((phase % span + span) % span)) continue; // 本 tick 相位不归本片
 
                 var action = DecideOne(sim, snapshot, kv.Key, unit, turnNumber);
                 if (action != null)
@@ -108,11 +116,14 @@ namespace GIC.Battle
             // 爆发档（v5，2026-10-03 拍板「扩眷属脑会放爆发」）：满槽即放、优先于战技——单次伤害
             // 更高+倾倒元能（攒满即放勿囤积，同凛冽轮舞 AI 口径）；方向攻击型爆发与战技走同一
             // 十字预判口（单位指向/无目标自施放型无方向域不消费——眷属现无此类）
-            var burstAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Burst);
+            // 单次决策内可见敌集复用（2026-11-06 后期卡顿修复）：爆发/战技/移动三档同用一份，
+            // 旧实现各算一遍（每次 SortedUnits+全量距离+排序）——后期百单位单拍 0.7s 的组成项之一
+            List<Unit> enemiesCache = null;
+            var burstAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Burst, ref enemiesCache);
             if (burstAction != null) return burstAction;
 
             // 战技（无该型技能=自动跳过此档；占位技能不可施放同理）
-            var skillAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Normal);
+            var skillAction = TryCastAttack(sim, snapshot, unit, identity, unitId, turnNumber, SkillType.Normal, ref enemiesCache);
             if (skillAction != null) return skillAction;
 
             // 朝敌驻位推进——v9（P5 连续版）：步数上限/直线段/十字方向全退役——移动=「选目标点」：
@@ -124,7 +135,7 @@ namespace GIC.Battle
             var liveStats = unit.GetUnitComponent<UnitStats>();
             if (liveStats == null || liveStats.MoveSpeed <= 0)
                 return null; // 移速被压到 0（重减速）：缺席不空耗
-            var enemies = BattleHeuristics.FindEnemiesByDistance(sim, unit);
+            var enemies = enemiesCache ?? BattleHeuristics.FindEnemiesByDistance(sim, unit);
             Unit core = null; // 敌方核心=tag 化（2026-10-13）：核心标签即永恒目标（协议核心/未来世界树同识别）
             var cores = new List<Unit>();
             foreach (var e in enemies)
@@ -194,7 +205,8 @@ namespace GIC.Battle
         /// 向量——取代十字向 FindAttackDirection；存活目标校验内建=纯尸体线不浪费行动）
         /// </summary>
         private static ActionData TryCastAttack(BattleSimState sim, BattleSnapshot snapshot,
-            Unit unit, UnitIdentity identity, string unitId, int turnNumber, SkillType skillType)
+            Unit unit, UnitIdentity identity, string unitId, int turnNumber, SkillType skillType,
+            ref List<Unit> enemiesCache)
         {
             int skillIndex = BattleHeuristics.FindSkillIndex(unit, skillType);
             if (skillIndex < 0) return null;
@@ -207,7 +219,9 @@ namespace GIC.Battle
             // CD 攻击族=零影响，防线与伙伴脑/配额脑统一）
             if (BattleHeuristics.AiCastThrottled(sim, unitId, skillIndex)) return null;
             if (!ResourceGate.HasAll(sim, unit, identity.OwnerPlayerID, skill.RawData?.costs, out _)) return null;
-            if (!BattleHeuristics.FindAttackAim(sim, snapshot, unit, skill, out var aimX, out var aimZ, null))
+            // 可见敌集惰性一次（CD/资源门先过——多数单位在此零代价）
+            enemiesCache ??= BattleHeuristics.FindEnemiesByDistance(sim, unit);
+            if (!BattleHeuristics.FindAttackAim(sim, snapshot, unit, skill, out var aimX, out var aimZ, null, enemiesCache))
                 return null;
             return new ActionData
             {

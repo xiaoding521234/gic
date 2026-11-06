@@ -336,23 +336,24 @@ namespace GIC.Battle
             // 才建图（学徒/劲敌 AI 队伍零成本跳过；真人玩家不注册=门恒全开=全件质量）；
             // E-1 拍板 #4「威胁图暂只接配额脑」由 AI 批设计蓝图全面取代（F-1 支援型先行=前身）。
             var threatByTeam = new Dictionary<TeamType, OpponentThreatModel.ThreatMap>();
+            // 单遍聚合「该队存在 ThreatFeed 开启的伙伴」（2026-11-06 后期卡顿修复）：旧实现对每个
+            // 队伍都重扫一遍全场（O(队×单位²)，且每次 SortedUnits 重建+排序）；语义完全一致
+            var feedTeams = new HashSet<TeamType>();
             foreach (var kv0 in sim.SortedUnits())
             {
                 var u0 = kv0.Value;
                 if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
                 var id0 = u0.GetUnitComponent<UnitIdentity>();
-                if (id0 == null || threatByTeam.ContainsKey(id0.Team)) continue;
-                bool anyFeed = false;
-                foreach (var kv1 in sim.SortedUnits())
-                {
-                    var u1 = kv1.Value;
-                    if (!BattleHeuristics.IsCompanion(u1) || BattleSimState.IsDead(u1)) continue;
-                    var id1 = u1.GetUnitComponent<UnitIdentity>();
-                    if (id1 == null || id1.Team != id0.Team) continue;
-                    if (AIPlayerConfig.GatesFor(id1.OwnerPlayerID).ThreatFeed) { anyFeed = true; break; }
-                }
-                if (anyFeed)
-                    threatByTeam[id0.Team] = OpponentThreatModel.BuildCached(sim, snapshot, id0.Team, turnNumber); // #2 审查批：回合级缓存
+                if (id0 == null || !AIPlayerConfig.GatesFor(id0.OwnerPlayerID).ThreatFeed) continue;
+                feedTeams.Add(id0.Team);
+            }
+            foreach (var kv0 in sim.SortedUnits())
+            {
+                var u0 = kv0.Value;
+                if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
+                var id0 = u0.GetUnitComponent<UnitIdentity>();
+                if (id0 == null || threatByTeam.ContainsKey(id0.Team) || !feedTeams.Contains(id0.Team)) continue;
+                threatByTeam[id0.Team] = OpponentThreatModel.BuildCached(sim, snapshot, id0.Team, turnNumber); // #2 审查批：回合级缓存
             }
 
             // I-A 申报遍（docs/archive/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分

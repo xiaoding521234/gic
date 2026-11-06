@@ -146,6 +146,12 @@ namespace GIC.Battle
             if (CurrentTick % BattleMetrics.AiBeatTicks == 0)
                 RunAiBeat();
 
+            // —— 眷属脑摊平波（2026-11-06 后期卡顿修复）——
+            // 每个 0.5 秒节拍只处理 1/FamiliarDecisionSlices 的眷属候选（分 4 个 tick 摊完），
+            // 每单位仍每节拍决策一次——把「百余单位同拍全量」的 0.2~0.7 秒卡顿摊成 1/4 小片。
+            // 不用「全程逐 tick 摊」：tick 追帧时会被乘性放大成螺旋（实测 p50 反而劣化到 375ms）
+            RunFamiliarBrainWave();
+
             // —— 每秒整拍（发放/Buff 计时/泡湿/灵魂/采集/建筑效果 + 快照 + 时钟 + hash）——
             if (CurrentTick % BattleMetrics.TicksPerSecond == 0)
                 RunSecondBeat();
@@ -168,9 +174,11 @@ namespace GIC.Battle
             // 决策时态同步语义秒化为每 AI 节拍揭雾；客户端表现层逐帧揭雾不受影响）
             _sim.RevealFog();
 
-            // 眷属脑（1~2★ 启发式）+ 伙伴脑（3~4★ 评分制——感知窗口内玩家上交行动）
+            // 眷属脑改按 tick 相位摊平（2026-11-06 后期卡顿修复）：见 RunFamiliarBrainSlice——
+            // 百余眷属同拍全量决策=单拍 0.7~0.2 秒卡顿，现每 tick 只决策 1/AiBeatTicks 的候选
+
+            // 伙伴脑（3~4★ 评分制——感知窗口内玩家上交行动）
             var actions = new List<ActionData>();
-            actions.AddRange(FamiliarBrain.DecideAll(_sim, second));
             var playerWindow = new List<ActionData>(_recentPlayerActions);
             actions.AddRange(CompanionBrain.DecideAll(_sim, second, playerWindow));
             _recentPlayerActions.Clear();
@@ -199,6 +207,48 @@ namespace GIC.Battle
             // HUD 门面同收本事件=同值幂等刷新（P4 批拆分专用事件）
             OnPhaseChanged?.Invoke(BattlePhase.Selecting, second);
 
+            CheckBattleEnded();
+        }
+
+        /// <summary>眷属决策分摊片数（节拍后 N 个 tick 摊完一轮；4=单拍峰值降为 1/4）</summary>
+        private const int FamiliarDecisionSlices = 4;
+
+        /// <summary>
+        /// 眷属脑摊平波（2026-11-06 后期卡顿修复）：节拍 tick 起的 FamiliarDecisionSlices 个 tick 内，
+        /// 每个 tick 只决策「候选序号 % 片数 == 本 tick 偏移」的眷属——每单位仍每 0.5 秒决策一次，
+        /// 只是把同拍峰值切成 4 小片。上交/录制/广播链与节拍批完全同构。
+        /// </summary>
+        private void RunFamiliarBrainWave()
+        {
+            if (Phase != BattlePhase.Selecting) return;
+            if (!IsHost) return; // 与节拍批同口径：AI 只在 Host 决策
+            int beat = BattleMetrics.AiBeatTicks;
+            if (beat <= 1) return;
+            // 错开节拍 tick 本身（2026-11-06）：伙伴脑/揭雾/配额脑都在节拍 tick 上跑（实测 45~65ms），
+            // 眷属切片若从节拍 tick 起会与之叠加成单帧峰值——故从节拍后第 1 个 tick 起算
+            int slot = CurrentTick % beat - 1;
+            if (slot < 0 || slot >= FamiliarDecisionSlices) return; // 只在节拍后窗口内分摊
+            int second = TurnNumber;
+            int offset = slot; // 切片相位 0..FamiliarDecisionSlices-1
+
+            var actions = FamiliarBrain.DecideAll(_sim, second, offset, FamiliarDecisionSlices);
+            if (actions.Count == 0) return;
+
+            foreach (var action in actions)
+            {
+                action.turnNumber = second;
+                action.submitTick = CurrentTick;
+            }
+            BattleRecorder.CaptureActions(second, actions);
+            if (IsNetworked)
+            {
+                foreach (var action in actions)
+                    EnqueueInput(action, CurrentTick + 1, isAi: true, seq: NextSeq(action.playerId));
+            }
+            else
+            {
+                _resolver.ResolveAiActions(actions);
+            }
             CheckBattleEnded();
         }
 

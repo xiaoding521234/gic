@@ -137,12 +137,43 @@ namespace GIC.Battle
 
         /// <summary>确定性单位遍历（F0-2，docs/active/50 §6.1）：按 unitId 升序返回快照。
         /// **结算路径禁止直接 foreach `Units`**——Dictionary 枚举序不保证跨端/跨运行时一致；
-        /// 只读查询若最终会排序可不用本方法，但凡「遍历中产生副作用/决定先后」必须走这里。</summary>
+        /// 只读查询若最终会排序可不用本方法，但凡「遍历中产生副作用/决定先后」必须走这里。
+        /// **缓存（2026-11-06 后期卡顿修复）**：AI 决策热点（眷属脑/伙伴脑/威胁图）单拍要调上百次，
+        /// 旧实现每次 new List+排序（百余单位）=单拍数十 ms 纯分配；改为注册/移除单位时置脏重建。
+        /// 返回共享只读快照——调用方仅可遍历，禁止 Add/Remove/原地改写。</summary>
         public List<KeyValuePair<string, Unit>> SortedUnits()
         {
-            var list = new List<KeyValuePair<string, Unit>>(_units);
-            list.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
-            return list;
+            if (_sortedUnitsCache == null)
+            {
+                _sortedUnitsCache = new List<KeyValuePair<string, Unit>>(_units);
+                _sortedUnitsCache.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+            }
+            return _sortedUnitsCache;
+        }
+
+        private List<KeyValuePair<string, Unit>> _sortedUnitsCache;
+
+        /// <summary>尸体格阻塞集（"x,y" 键，RTSPathfinder A* 消费）——按 tick 缓存（2026-11-06
+        /// 后期卡顿修复）：旧实现每次寻路都重建（复制全单位 id+排序+逐单位拼字符串），后期 AI
+        /// 每拍上千次寻路=纯分配风暴。同 tick 内尸体不移动、死亡只发生在结算拍，缓存安全。</summary>
+        private HashSet<string> _corpseCellCache;
+        private int _corpseCellCacheTick = int.MinValue;
+
+        public HashSet<string> CorpseCellsOfTick()
+        {
+            if (_corpseCellCacheTick == CurrentTick && _corpseCellCache != null)
+                return _corpseCellCache;
+            var set = _corpseCellCache ?? (_corpseCellCache = new HashSet<string>());
+            set.Clear();
+            foreach (var kv in SortedUnits())
+            {
+                var unit = kv.Value;
+                if (unit == null || !IsDead(unit)) continue;
+                var pos = GetPosition(unit);
+                set.Add($"{pos.x},{pos.y}"); // 键格式=RTSPathfinder 既有口径（勿改）
+            }
+            _corpseCellCacheTick = CurrentTick;
+            return set;
         }
 
         /// <summary>确定性玩家资源遍历（F0-2）：按 playerId 升序（发放/结算路径用）。</summary>
@@ -625,6 +656,7 @@ namespace GIC.Battle
             unit.GetUnitComponent<UnitIdentity>()?.SetIdentity(unitId, playerId, team);
             unit.GetUnitComponent<UnitGridPosition>()?.SetPosition(BoardType.MainWorld, position.ToVector2Int());
             _units[unitId] = unit;
+            _sortedUnitsCache = null; // 确定性遍历缓存置脏（2026-11-06 后期卡顿修复）
             // 核心身份已 tag 化（2026-10-13 拍板「所有持 核心 标签的单位全部被击倒才判战败」）——
             // 胜负族改动态查询 Core tag，无注册表：未来世界树等新核心单位=UnitConfig 配 [核心] tag
             // 零代码加入（旧 UnitName.ProtocolCore 单核心登记表已退役）
@@ -652,7 +684,10 @@ namespace GIC.Battle
             if (unit == null) return;
             var unitId = unit.GetUnitComponent<UnitIdentity>()?.UnitID;
             if (unitId != null && _units.TryGetValue(unitId, out var registered) && registered == unit)
+            {
                 _units.Remove(unitId);
+                _sortedUnitsCache = null; // 确定性遍历缓存置脏（2026-11-06 后期卡顿修复）
+            }
             DestroyUnitObject(unit);
         }
 
