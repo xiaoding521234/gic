@@ -1169,8 +1169,9 @@ namespace GIC.Battle
                         board?.DeclareFollow(vanguardId); // I-C：跟随名额声明（执行遍）
                     }
                     var vPosCm = new Vector2IntCm(vanguardPosCell.CenterXCm, vanguardPosCell.CenterYCm);
-                    if (TryOfferSupportPosition(sim, unit, playerId, team, turn, from, maxSearchCm, forceType,
-                            vanguard, vPosCm, threat, tracker, profile, visionEnemies))
+                    bool __offeredSV = TryOfferSupportPosition(sim, unit, playerId, team, turn, from, maxSearchCm, forceType,
+                            vanguard, vPosCm, threat, tracker, profile, visionEnemies);
+                    if (__offeredSV)
                         return; // H：伴随位已 Offer（或最优=当前格=已罩满视野敌）
                     // 评分器圆盘无改进落点：伴随半径内=驻位完成；否则兜底直奔先锋驻位（奶程内停）
                     //——托底 VanguardChaseFloorScore 压常规单体技能（T15 探针口径：先锋/伤员追赶期
@@ -1178,10 +1179,12 @@ namespace GIC.Battle
                     int accompanyRadiusCm = profile.支援贴近距离 > 0
                         ? profile.支援贴近距离 * CellMetrics.CellSizeCm
                         : BattleHeuristics.SupportRadiusOf(unit);
-                    if (BattleHeuristics.DistCm(from.x, from.z, vPosCm.x, vPosCm.z) <= accompanyRadiusCm)
+                    bool __inAccompany = BattleHeuristics.DistCm(from.x, from.z, vPosCm.x, vPosCm.z) <= accompanyRadiusCm;
+                    if (__inAccompany)
                         return; // 已在伴随（奶程）半径内：驻位完成
                     var chaseDest = BattleHeuristics.StandoffPointCm(sim, unit, vPosCm.x, vPosCm.z, accompanyRadiusCm);
-                    if (BattleHeuristics.PathReachable(sim, unit, chaseDest.x, chaseDest.z))
+                    bool __chaseOk = BattleHeuristics.PathReachable(sim, unit, chaseDest.x, chaseDest.z);
+                    if (__chaseOk)
                     {
                         tracker.Offer(Mathf.Max(VanguardChaseFloorScore,
                             Mathf.RoundToInt(MoveBaseScore * profile.移动优先权重)),
@@ -1302,7 +1305,8 @@ namespace GIC.Battle
 
                 // 驻位点+可达性（不可达=围死换下一锚——最近可达优先，眷属 v4 换目标巡逻同语义）
                 var dest = BattleHeuristics.StandoffTargetCm(sim, unit, anchor, anchorEngageCm);
-                if (!BattleHeuristics.PathReachable(sim, unit, dest.x, dest.z)) continue;
+                bool reachable = BattleHeuristics.PathReachable(sim, unit, dest.x, dest.z);
+                if (!reachable) continue;
 
                 // 逼近进度（格域折算保持 AITuning「每格 X 分」语义；钳搜索半径=远锚进度有界）
                 int progressCells = Math.Min(maxSearchCm, distance - anchorEngageCm) / CellMetrics.CellSizeCm;
@@ -1338,16 +1342,44 @@ namespace GIC.Battle
         {
             int rangeCm = BattleHeuristics.AttackRangeCmOf(sim, unit, playerId);
             if (rangeCm <= 0) return false;
+            return WouldHaveFiringLinePrecomputed(sim, BattleHeuristics.CollectVisibleEnemies(sim, team, unit), cell, rangeCm);
+        }
+
+        /// <summary>同上，但射程与可见敌集由调用方预算（2026-11-07 后期卡顿 A 批：站位圆盘每格
+        /// 都重算 AttackRangeCmOf〔内部判定轨 new List+排序〕+ CollectVisibleEnemies）</summary>
+        private static bool WouldHaveFiringLinePrecomputed(BattleSimState sim,
+            List<(string id, Unit enemy)> visible, BattleCell cell, int rangeCm)
+        {
+            if (rangeCm <= 0 || visible == null) return false;
             int cellXCm = cell.CenterXCm;
             int cellZCm = cell.CenterYCm;
-            foreach (var (_, enemy) in BattleHeuristics.CollectVisibleEnemies(sim, team, unit))
+            for (int i = 0; i < visible.Count; i++)
             {
-                var ep = sim.GetPosCm(enemy);
+                var ep = sim.GetPosCm(visible[i].enemy);
                 long dx = ep.x - cellXCm;
                 long dz = ep.y - cellZCm;
                 if (dx * dx + dz * dz <= (long)rangeCm * rangeCm) return true;
             }
             return false;
+        }
+
+        /// <summary>站位评分循环不变量（2026-11-07 后期卡顿 A 批）：圆盘枚举每格复用同一份
+        /// 可见敌集/攻击射程/形态——原实现每格都重算，千格级枚举=单次站位评分 12ms 的主源。</summary>
+        private readonly struct SupportScoreCtx
+        {
+            public readonly List<(string id, Unit enemy)> Visible;
+            public readonly int Stance;
+            public readonly int StanceNoThreat;
+            public readonly int AttackRangeCm;
+
+            public SupportScoreCtx(BattleSimState sim, Unit unit, string playerId, TeamType team,
+                OpponentThreatModel.ThreatMap threat)
+            {
+                Visible = BattleHeuristics.CollectVisibleEnemies(sim, team, unit);
+                Stance = SupportStanceOf(sim, unit, team, threat);
+                StanceNoThreat = SupportStanceOf(sim, unit, team, null); // 自保惩罚按其原口径（threat=null）
+                AttackRangeCm = BattleHeuristics.AttackRangeCmOf(sim, unit, playerId);
+            }
         }
 
         /// <summary>支援站位评分器（F-2，docs/archive/34 §4）：支援型有伤员/先锋时的移动档形态——
@@ -1366,6 +1398,10 @@ namespace GIC.Battle
                 ? profile.支援贴近距离 * CellMetrics.CellSizeCm
                 : BattleHeuristics.SupportRadiusOf(unit);
             if (supportRadius <= 0) supportRadius = CellMetrics.CellSizeCm; // 无治疗原子防御：贴 1 格（cm）
+            // —— 循环不变量预算一次（2026-11-07 后期卡顿 A 批：以下两项原在 ScoreSupportCell 内
+            //    每格重算——千格级枚举里 CollectVisibleEnemies 每次都新建 List+全量枚举+迷雾判定，
+            //    是单次站位评分 12ms 的主源；形态 SupportStanceOf 同理纯白耗）——
+            var scoreCtx = new SupportScoreCtx(sim, unit, playerId, team, threat);
             int auraRadius = BattleHeuristics.AuraRadiusOf(unit); // G-1 光环感知（无光环=0 不消费）
 
             // H-2 交战就位态（评分器豁免/托底共用单源）
@@ -1374,7 +1410,8 @@ namespace GIC.Battle
 
             // 当前位评分（「不动」基准——所有候选格与它比，选出比它好的才动）
             int currentScore = ScoreSupportCell(sim, unit, playerId, team, from, woundedPos,
-                supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies);
+                supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies,
+                scoreCtx);
 
             int bestScore = currentScore;
             Vector2IntCm bestDest = default;
@@ -1382,7 +1419,7 @@ namespace GIC.Battle
             int bestDistSq = 0;
             int auraBestScore = -1; Vector2IntCm auraBest = default; bool hasAuraBest = false; // H-2 罩敌格跟踪
             int currentCoverage = visionEnemies != null && auraRadius > 0
-                ? EnemiesInAuraAt(sim, unit, team, from, auraRadius, visionEnemies) : -1;
+                ? EnemiesInAuraFrom(sim, scoreCtx.Visible, from, auraRadius, visionEnemies) : -1;
             int coverBestCount = currentCoverage; int coverBestScore = -1;
             Vector2IntCm coverBest = default; bool hasCoverBest = false; // H-3b 覆盖最优格跟踪
 
@@ -1400,9 +1437,10 @@ namespace GIC.Battle
                     if (IsCellOccupiedForStep(sim, cell)) continue; // 占格不可停（自身格天然排除）
                     var dest = new Vector2IntCm(cell.CenterXCm, cell.CenterYCm);
                     int score = ScoreSupportCell(sim, unit, playerId, team, dest, woundedPos,
-                        supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies);
+                        supportRadius, auraRadius, woundedIsSelf, threat, profile, visionEnemies,
+                        scoreCtx);
                     int cellCoverage = auraRadius > 0 && (visionEnemies != null || takePosition)
-                        ? EnemiesInAuraAt(sim, unit, team, dest, auraRadius, visionEnemies) : 0;
+                        ? EnemiesInAuraFrom(sim, scoreCtx.Visible, dest, auraRadius, visionEnemies) : 0;
                     if (takePosition && auraRadius > 0 && cellCoverage > 0 && score > auraBestScore)
                     { auraBestScore = score; auraBest = dest; hasAuraBest = true; }
                     if (visionEnemies != null && auraRadius > 0
@@ -1424,7 +1462,7 @@ namespace GIC.Battle
             // 豁免严格大于；罩敌格内部取评分最高者=双覆盖交集格）
             if (takePosition && hasAuraBest
                 && (!hasBest || auraBestScore >= bestScore || (hasBest
-                        && EnemiesInAuraAt(sim, unit, team, bestDest, auraRadius, visionEnemies) == 0)))
+                        && EnemiesInAuraFrom(sim, scoreCtx.Visible, bestDest, auraRadius, visionEnemies) == 0)))
             {
                 bestDest = auraBest;
                 bestScore = Math.Max(auraBestScore, bestScore);
@@ -1448,7 +1486,7 @@ namespace GIC.Battle
             // H-2/H-3b 就位 Offer 托底：选中罩敌格→Offer 分托底恒压常规技能（先就位贴脸再输出）
             int offerFloor = 0;
             if (takePosition && hasAuraBest
-                && EnemiesInAuraAt(sim, unit, team, bestDest, auraRadius, visionEnemies) > 0)
+                && EnemiesInAuraFrom(sim, scoreCtx.Visible, bestDest, auraRadius, visionEnemies) > 0)
                 offerFloor = SupportAuraTakePositionScore;
             if (improveTake)
                 offerFloor = Math.Max(offerFloor, SupportAuraTakePositionScore);
@@ -1468,31 +1506,32 @@ namespace GIC.Battle
         /// 移动——distToWounded 恒 0（G-5 返修 2 语义保留）</summary>
         private static int ScoreSupportCell(BattleSimState sim, Unit unit, string playerId, TeamType team,
             Vector2IntCm pos, Vector2IntCm woundedPos, int supportRadius, int auraRadius, bool woundedIsSelf,
-            OpponentThreatModel.ThreatMap threat, UnitConfig.CompanionProfile profile, HashSet<string> visionEnemies)
+            OpponentThreatModel.ThreatMap threat, UnitConfig.CompanionProfile profile, HashSet<string> visionEnemies,
+            in SupportScoreCtx ctx)
         {
-            int stance = SupportStanceOf(sim, unit, team, threat); // G-2 形态因子（本点评估用）
+            // stance 由调用方预算一次（2026-11-07 后期卡顿 A 批：逐格重算形态=纯白耗） // G-2 形态因子（本点评估用）
             int distToWounded = woundedIsSelf ? 0
                 : BattleHeuristics.DistCm(pos.x, pos.z, woundedPos.x, woundedPos.z);
             int score = distToWounded <= supportRadius
                 ? SupportHealReachScore
                 : Math.Max(0, SupportHealReachScore
                     - (distToWounded - supportRadius) / CellMetrics.CellSizeCm * SupportHealReachDecayPerCell);
-            if (WouldHaveFiringLineFrom(sim, unit, playerId, team, BattleCell.FromCm(pos.x, pos.z)))
+            if (WouldHaveFiringLinePrecomputed(sim, ctx.Visible, BattleCell.FromCm(pos.x, pos.z), ctx.AttackRangeCm))
                 score += MoveLineUpScore; // 支援型照常输出：落点有开火线=能打水球
             int threatPenalty = Mathf.CeilToInt(ThreatPenaltyAt(threat, BattleCell.FromCm(pos.x, pos.z))
                 * SupportThreatPenaltyScale); // E-1 火线规避——支援型 ×减半系数（G-5 调参语义保留）
             if (threatPenalty > 0) score = Mathf.Max(1, score - threatPenalty);
-            score -= SelfPreservePenalty(sim, unit, team, pos.x, pos.z, profile); // F-1 自保（内含 G-2 形态因子）
+            score -= SelfPreservePenaltyFrom(sim, ctx.Visible, pos.x, pos.z, profile, ctx.StanceNoThreat); // F-1 自保（内含 G-2 形态因子）
             // G-5 保险形态后撤梯度：远离最近敌每格 +2（上限 12）——保险形态贴敌分归零后的方向性驱动
-            int nearestEnemyForStance = NearestEnemyDistance(sim, unit, team, pos.x, pos.z);
-            if (stance > 1 && nearestEnemyForStance < int.MaxValue)
+            int nearestEnemyForStance = NearestEnemyDistanceFrom(sim, ctx.Visible, pos.x, pos.z);
+            if (ctx.Stance > 1 && nearestEnemyForStance < int.MaxValue)
                 score += Math.Min(SupportRetreatCap,
                     nearestEnemyForStance / CellMetrics.CellSizeCm * SupportRetreatPerStep);
             // G-1 光环敌覆盖 + G-5 前瞻梯度 + H-3 视野口径（语义保留，距离域 cm——「每格」系数格折算）
-            if (auraRadius > 0 && profile.光环贴敌权重 > 0f && stance == 1)
+            if (auraRadius > 0 && profile.光环贴敌权重 > 0f && ctx.Stance == 1)
             {
-                int nearestEnemy = NearestEnemyDistance(sim, unit, team, pos.x, pos.z, visionEnemies);
-                int enemiesInAura = EnemiesInAuraAt(sim, unit, team, pos, auraRadius, visionEnemies);
+                int nearestEnemy = NearestEnemyDistanceFrom(sim, ctx.Visible, pos.x, pos.z, visionEnemies);
+                int enemiesInAura = EnemiesInAuraFrom(sim, ctx.Visible, pos, auraRadius, visionEnemies);
                 int perEnemy = SupportAuraPerEnemy
                     * (visionEnemies != null ? VanguardAuraPerEnemyMult : 1); // H-3：伴随语境敌分翻倍
                 int auraScore = Mathf.RoundToInt(perEnemy * profile.光环贴敌权重) * enemiesInAura;
@@ -1511,9 +1550,19 @@ namespace GIC.Battle
         private static int NearestEnemyDistance(BattleSimState sim, Unit unit, TeamType team,
             int xCm, int zCm, HashSet<string> filter = null)
         {
+            return NearestEnemyDistanceFrom(sim, BattleHeuristics.CollectVisibleEnemies(sim, team, unit), xCm, zCm, filter);
+        }
+
+        /// <summary>同上，但复用调用方预算好的可见敌列表（2026-11-07 后期卡顿 A 批：站位枚举
+        /// 每格一次 CollectVisibleEnemies=每次新建 List+全量枚举+迷雾判定，千格级=秒级开销）</summary>
+        private static int NearestEnemyDistanceFrom(BattleSimState sim, List<(string id, Unit enemy)> visible,
+            int xCm, int zCm, HashSet<string> filter = null)
+        {
             int nearest = int.MaxValue;
-            foreach (var (enemyId, enemy) in BattleHeuristics.CollectVisibleEnemies(sim, team, unit))
+            if (visible == null) return nearest;
+            for (int i = 0; i < visible.Count; i++)
             {
+                var (enemyId, enemy) = visible[i];
                 if (filter != null && !filter.Contains(enemyId)) continue;
                 var ep = sim.GetPosCm(enemy);
                 int dist = BattleHeuristics.DistCm(xCm, zCm, ep.x, ep.y);
@@ -1527,9 +1576,18 @@ namespace GIC.Battle
         private static int EnemiesInAuraAt(BattleSimState sim, Unit unit, TeamType team,
             Vector2IntCm pos, int auraRadiusCm, HashSet<string> filter)
         {
+            return EnemiesInAuraFrom(sim, BattleHeuristics.CollectVisibleEnemies(sim, team, unit), pos, auraRadiusCm, filter);
+        }
+
+        /// <summary>同上，但复用调用方预算好的可见敌列表（2026-11-07 后期卡顿 A 批）</summary>
+        private static int EnemiesInAuraFrom(BattleSimState sim, List<(string id, Unit enemy)> visible,
+            Vector2IntCm pos, int auraRadiusCm, HashSet<string> filter)
+        {
             int count = 0;
-            foreach (var (enemyId, enemy) in BattleHeuristics.CollectVisibleEnemies(sim, team, unit))
+            if (visible == null) return count;
+            for (int i = 0; i < visible.Count; i++)
             {
+                var (enemyId, enemy) = visible[i];
                 if (filter != null && !filter.Contains(enemyId)) continue;
                 var ep = sim.GetPosCm(enemy);
                 if (BattleHeuristics.DistCm(pos.x, pos.z, ep.x, ep.y) <= auraRadiusCm) count++;
@@ -1559,17 +1617,22 @@ namespace GIC.Battle
             if (profile == null || profile.自保权重 <= 0f) return 0;
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null) return 0;
-            foreach (var kv in sim.SortedUnits())
+            var visible = BattleHeuristics.CollectVisibleEnemies(sim, team, unit);
+            int stanceNoThreat = SupportStanceOf(sim, unit, team, null);
+            return SelfPreservePenaltyFrom(sim, visible, xCm, zCm, profile, stanceNoThreat);
+        }
+
+        /// <summary>同上，但可见敌集/形态由调用方预算（2026-11-07 后期卡顿 A 批：站位圆盘每格
+        /// 都重扫全场+PerceivesEnemy 判定+触发时再算一次形态）</summary>
+        private static int SelfPreservePenaltyFrom(BattleSimState sim, List<(string id, Unit enemy)> visible,
+            int xCm, int zCm, UnitConfig.CompanionProfile profile, int stanceNoThreat)
+        {
+            if (profile == null || profile.自保权重 <= 0f || visible == null) return 0;
+            for (int i = 0; i < visible.Count; i++)
             {
-                var enemy = kv.Value;
-                var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
-                if (enemyIdentity == null || enemyIdentity.Team == team) continue; // 敌我=TeamType 口径
-                if (BattleSimState.IsDead(enemy)) continue; // 尸体不构成贴脸威胁
-                if (!BattleHeuristics.PerceivesEnemy(sim, unit, enemy)) continue; // AI 雾限+战术视距：攻击视野内近敌照常触发自保
-                var ep = sim.GetPosCm(enemy);
+                var ep = sim.GetPosCm(visible[i].enemy);
                 if (BattleHeuristics.DistCm(xCm, zCm, ep.x, ep.y) < SupportDangerRadius) // cm（P5 ×100）
-                    return Mathf.RoundToInt(SupportSelfPreserveScore * profile.自保权重)
-                        * SupportStanceOf(sim, unit, team, null); // 任一活敌近于危险半径即触发（×G-2 形态因子）
+                    return Mathf.RoundToInt(SupportSelfPreserveScore * profile.自保权重) * stanceNoThreat;
             }
             return 0;
         }

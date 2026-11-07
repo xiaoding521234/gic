@@ -2537,3 +2537,23 @@ The .meta file ... does not have a valid GUID and its corresponding Asset file w
 **实测对照**：眷属 12~28ms/片、伙伴 42~65ms、帧 p95 90~230ms、最坏 150~430ms、p50 7~23ms。
 
 **教训**：①**先剪枝再摊平**——只摊平不剪枝则总工作量与分配不变，GC 照样拖死；②**摊平必须有界窗口**：改成「每 tick 决策 1/N 候选」（全程逐 tick）实测触发 tick 追帧螺旋，p50 反而劣化到 275~376ms——挂到每个 tick 的工作会被追帧乘性放大；③凡「AI 每拍调上千次」的原语（`FindEnemiesByDistance` / `PredictAimTargets` / `FindPath` / `SortedUnits`），内部**任何** `new List` / `Sort` / 字符串拼接都是分配风暴源，优先消除；④**剩余主因是分配率驱动的全量 GC**（300 帧内 gen0/1/2 同升 18 次、堆 ~1.1GB、帧中位 121ms）——要根治得做去分配改造，光调算法不够；⑤单位数会因「无限召唤 + 尸体常驻」单调增长（60 秒即 112 单位），属设计层上限问题，需产品拍板。
+
+## §186 热点函数里的「逐候选重算循环不变量」＝单函数吃掉 1/4 帧预算（2026-11-07 伙伴脑实测：85.8ms → 31.7ms/拍，fps 25 → 45）
+
+**症状**：后期 100+ 单位时观感是「秒级卡顿」，实际量到的是**帧耗时**——帧均 25.5ms、fps 15、周期性掉到 5~6fps；而秒拍结算只 7ms、快照 0.4ms、hash 0.3ms。
+
+**归因路径（每一层都用 Stopwatch 探针量，勿跳层猜）**：`CompanionBrain.DecideAll` **85.8ms/拍** → 90% 在 `ScoreUnitCandidates` → `ScoreMoveCandidate` **3.5~4.2ms/次**（每秒被调 70 次）→ 其中 **95% 在 `TryOfferSupportPosition` 12.2ms/次**（每秒 19 次）。
+
+**根因（同一个模式重复三次）**：站位评分器「圆盘枚举候选格」的循环体里，每格都在重算**与格无关**的东西——
+
+1. `CollectVisibleEnemies`：每格 `new List` + 全量枚举 + 逐敌迷雾判定；
+2. `BattleHeuristics.AttackRangeCmOf`：每格一次判定轨查询（内部 `new List` + 排序）；
+3. `SupportStanceOf` / `NearestEnemyDistance` / `EnemiesInAuraAt` / `SelfPreservePenalty`：每格重扫全场敌集（后者还额外 `SortedUnits` + `PerceivesEnemy`）。
+
+半径 40 格的圆盘≈5000 格 × 每次几十到上百单位 → 单次评分 12ms；而其中几乎全是**重复劳动**。
+
+**修法**：把循环不变量提到循环外，打包成 `SupportScoreCtx`（`Visible` 可见敌集 / `Stance` / `StanceNoThreat` / `AttackRangeCm`）一次构造，`ScoreSupportCell` 改为消费 ctx；被复用的原语统一加 `XxxFrom(sim, visible, …)` 重载（旧签名保留并委托，其它调用方零改动）。
+
+**实测**：`TryOfferSupportPosition` 12.23 → **1.9~2.2ms**；`ScoreMoveCandidate` 3.66 → **0.7~0.8ms**；`CompanionBrain.DecideAll` 85.8 → **31.7ms**；帧均 12~15ms → **5.4~5.6ms**；fps 25~33 → **42~45**；110 单位稳态 **46fps**（同日首测同规模 5~15fps）。
+
+**教训**：①**先量到「哪个函数 / 单次多少 ms / 每秒几次」，再动代码**——本次四层细分（DecideAll → ScoreUnitCandidates → ScoreMoveCandidate → TryOfferSupportPosition）才落到真凶，任何一层凭直觉都会改错地方；②「枚举候选 × 逐候选评分」的写法必须过一遍**循环不变量清点**：敌集/射程/形态/威胁图引用只要与候选无关就外提，这是最便宜的 5~10 倍收益；③同一原语被多个调用方（伙伴脑申报遍/执行遍、`PlayerQuotaBrain` 候选、`OpponentThreatModel`「对手如我」预测）重复调用时，**先在语义层做缓存**（如 `PathReachable` 的「同 tick 同 (单位, 起点, 终点) 恒定」缓存——位置与占位只在该 tick 开头推进，决策期只读），再谈算法级替换；④这类「零行为变化」改造不改变 AI 决策序列——本次回放基线不受影响，可放心先做。

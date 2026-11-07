@@ -433,12 +433,39 @@ namespace GIC.Battle
             if (sim == null || self == null) return false;
             var pos = sim.GetPosCm(self);
             if (pos.x == toXCm && pos.y == toZCm) return true; // 已到=可达
+
+            // 同 tick 结果缓存（2026-11-07 后期卡顿 A 批）：位置与占位只在该 tick 开头推进
+            // （RTSMovementSystem.AdvanceTick），决策期只读——同 tick 内同 (unitId, 起点, 终点)
+            // 的可达性恒定，可安全复用。病灶=伙伴脑申报遍/执行遍 + 配额脑候选 + 威胁图
+            // 「对手如我」预测三处对同一 (单位,目标) 反复问，每次一条完整 A*（0.1~0.3ms），
+            // 后期 100+ 单位单拍被问上千次。跨 tick / 跨战斗（InstanceId 变）即失效。
+            string unitId = self.GetUnitComponent<UnitIdentity>()?.UnitID;
+            var key = (unitId, pos.x, pos.y, toXCm, toZCm);
+            if (unitId != null)
+            {
+                if (sim.InstanceId != _reachCacheSim || sim.CurrentTick != _reachCacheTick)
+                {
+                    _reachCache.Clear();
+                    _reachCacheSim = sim.InstanceId;
+                    _reachCacheTick = sim.CurrentTick;
+                }
+                if (_reachCache.TryGetValue(key, out var cached)) return cached;
+            }
+
             var moveable = self.GetUnitComponent<UnitMoveable>();
             var forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
             var path = RTSPathfinder.FindPath(sim, pos.x, pos.y, toXCm, toZCm, forceType);
             // FindPath 不可达/钳回起点=「原地单点」——真路径=多于一点或末点异于起点
-            return path != null && (path.Count > 1 || path[0].x != pos.x || path[0].z != pos.y);
+            bool reachable = path != null && (path.Count > 1 || path[0].x != pos.x || path[0].z != pos.y);
+            if (unitId != null && _reachCache.Count < 50000) _reachCache[key] = reachable; // 上限兜底防异常涨
+            return reachable;
         }
+
+        // PathReachable 同 tick 缓存载体（键含起点与终点——单位位置变化自然换键）
+        private static readonly System.Collections.Generic.Dictionary<(string, int, int, int, int), bool> _reachCache =
+            new System.Collections.Generic.Dictionary<(string, int, int, int, int), bool>();
+        private static int _reachCacheSim = int.MinValue;
+        private static int _reachCacheTick = int.MinValue;
 
 
         /// <summary>单位技能实例列表中首个指定类型技能的索引（-1=无）——遍历 unit.Skills
