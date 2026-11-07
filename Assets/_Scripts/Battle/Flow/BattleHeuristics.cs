@@ -454,9 +454,10 @@ namespace GIC.Battle
 
             var moveable = self.GetUnitComponent<UnitMoveable>();
             var forceType = moveable != null ? moveable.NormalMoveType : ForceType.Walk;
-            var path = RTSPathfinder.FindPath(sim, pos.x, pos.y, toXCm, toZCm, forceType);
-            // FindPath 不可达/钳回起点=「原地单点」——真路径=多于一点或末点异于起点
-            bool reachable = path != null && (path.Count > 1 || path[0].x != pos.x || path[0].z != pos.y);
+            // 2026-11-07 三轮：可达性从「每次跑完整 A*」改为查按 tick 构建的连通域（O(1)）——
+            // RTSPathfinder.IsReachable 与 FindPath 同口径（钳制/防穿角/尸体阻塞全同源），
+            // 「同连通域 ⇔ A* 能到」严格成立，决策结果逐条一致。
+            bool reachable = RTSPathfinder.IsReachable(sim, pos.x, pos.y, toXCm, toZCm, forceType);
             if (unitId != null && _reachCache.Count < 50000) _reachCache[key] = reachable; // 上限兜底防异常涨
             return reachable;
         }

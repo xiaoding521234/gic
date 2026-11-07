@@ -159,6 +159,34 @@ namespace GIC.Battle
         private HashSet<string> _corpseCellCache;
         private int _corpseCellCacheTick = int.MinValue;
 
+        // 尸体格掩码（按格索引 y*width+x）——A* 热路径专用（2026-11-07）：字符串集在 A* 里
+        // 「每节点 8 邻居各一次 $"x,y" 插值」= 数千次分配，掩码是 bool[] 直查。同 tick 缓存同源。
+        private bool[] _corpseMaskCache;
+        private int _corpseMaskTick = int.MinValue;
+
+        /// <summary>尸体格掩码（A* 消费；同 tick 缓存。与 CorpseCellsOfTick 同源语义，勿另立口径）</summary>
+        public bool[] CorpseMaskOfTick()
+        {
+            int w = Map.width, h = Map.height;
+            int size = w * h;
+            if (_corpseMaskTick == CurrentTick && _corpseMaskCache != null && _corpseMaskCache.Length == size)
+                return _corpseMaskCache;
+            if (_corpseMaskCache == null || _corpseMaskCache.Length != size)
+                _corpseMaskCache = new bool[size];
+            else
+                System.Array.Clear(_corpseMaskCache, 0, size);
+            foreach (var kv in SortedUnits())
+            {
+                var unit = kv.Value;
+                if (unit == null || !IsDead(unit)) continue;
+                var pos = GetPosition(unit);
+                if (pos.x < 0 || pos.x >= w || pos.y < 0 || pos.y >= h) continue;
+                _corpseMaskCache[pos.y * w + pos.x] = true;
+            }
+            _corpseMaskTick = CurrentTick;
+            return _corpseMaskCache;
+        }
+
         public HashSet<string> CorpseCellsOfTick()
         {
             if (_corpseCellCacheTick == CurrentTick && _corpseCellCache != null)
