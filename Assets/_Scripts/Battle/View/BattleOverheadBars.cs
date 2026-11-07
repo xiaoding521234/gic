@@ -143,6 +143,11 @@ namespace GIC.Battle
 
         private readonly List<Item> _items = new List<Item>();
         private readonly List<Item> _sortBuffer = new List<Item>();   // 深度排序复用（零逐帧分配）
+        // 上次排序结果快照（2026-11-07）：旧实现用逐条 Go.transform.GetSiblingIndex() 判断「顺序是否变」，
+        // 而 UGUI 的 GetSiblingIndex 是父级子列表**线性查找**——108 条 × 108 ≈ 万次/帧，是
+        // View.OverheadBars.Update 的主要开销。改为与上一轮排序结果逐项引用比较（O(n)），
+        // SetSiblingIndex 的目标状态完全不变（零行为/观感变化）。
+        private readonly List<Item> _lastSortOrder = new List<Item>();
         // #13 审查批静态门控：相机位姿/缩放缓存 + 重排脏标记（相机或单位动才重排/重投影）
         private Vector3 _lastCamPos;
         private Quaternion _lastCamRot;
@@ -204,7 +209,8 @@ namespace GIC.Battle
             if (item.Go != null)
                 item.Go.SetActive(view.DimensionView == _activeDimension); // 维度视角初态（2026-10-26 ②a 泛化）
             _items.Add(item);
-            _sortDirty = true; // #13：参与者集变化强制重排
+            _sortDirty = true;
+            _lastSortOrder.Clear(); // #13：参与者集变化强制重排
         }
 
         /// <summary>注销单个单位的头顶条（决策八十六批B 消散，2026-10-22，docs/45 §4）：
@@ -218,7 +224,8 @@ namespace GIC.Battle
                 if (_items[i].View != view) continue;
                 if (_items[i].Go != null) Destroy(_items[i].Go);
                 _items.RemoveAt(i);
-                _sortDirty = true; // #13：参与者集变化强制重排
+                _sortDirty = true;
+            _lastSortOrder.Clear(); // #13：参与者集变化强制重排
             }
         }
 
@@ -228,7 +235,8 @@ namespace GIC.Battle
             foreach (var item in _items)
                 if (item.Go != null) Destroy(item.Go);
             _items.Clear();
-            _sortDirty = true; // #13：参与者集变化强制重排
+            _sortDirty = true;
+            _lastSortOrder.Clear(); // #13：参与者集变化强制重排
         }
 
         private void Update()
@@ -624,7 +632,7 @@ namespace GIC.Battle
         /// ≤70 项每帧排序可忽略</summary>
         private void SortItemsByDepth(Camera cam)
         {
-            if (_items.Count < 2) return;
+            if (_items.Count < 2) { _lastSortOrder.Clear(); return; }
             _sortBuffer.Clear();
             foreach (var item in _items)
             {
@@ -634,15 +642,23 @@ namespace GIC.Battle
             _depthComparer.CamPos = cam.transform.position;
             _sortBuffer.Sort(_depthComparer); // 远→近（升序=距离降序；零逐帧分配——比较器实例复用）
 
-            bool changed = false;
-            for (int i = 0; i < _sortBuffer.Count; i++)
+            // 顺序判定：与上次排序快照逐项比较（2026-11-07 去 GetSiblingIndex 万次/帧）
+            bool changed = _lastSortOrder.Count != _sortBuffer.Count;
+            if (!changed)
             {
-                if (_sortBuffer[i].Go.transform.GetSiblingIndex() != i) { changed = true; break; }
+                for (int i = 0; i < _sortBuffer.Count; i++)
+                {
+                    if (!ReferenceEquals(_lastSortOrder[i], _sortBuffer[i])) { changed = true; break; }
+                }
             }
             if (!changed) return; // 顺序稳定零写（免逐帧 canvas reorder 脏标记）
 
             for (int i = 0; i < _sortBuffer.Count; i++)
                 _sortBuffer[i].Go.transform.SetSiblingIndex(i); // sibling 序=画序（大序后画=顶层）
+
+            _lastSortOrder.Clear();
+            for (int i = 0; i < _sortBuffer.Count; i++)
+                _lastSortOrder.Add(_sortBuffer[i]);
         }
 
         /// <summary>距离降序比较器（远者在前=先画底层；CamPos 每帧注入；平方距离同序免开方）</summary>
