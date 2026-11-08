@@ -199,6 +199,16 @@ namespace GIC.Editor
                         over.Check(sim, tick);
                     }
 
+                    // ①b 弹性分离（2026-11-08）——与 RTSFlowController.TickAdvance 同点位同序：
+                    // 分离（重量加权挤开）+ 5Hz 推挤校正段（MovePushed）；确定性=同输入同位移。
+                    // 终局后不再跑：live 的 TickAdvance 在 Phase!=Selecting 即停，多跑会产生回放侧多余段
+                    if (!over.Ended)
+                    {
+                        UnitSeparationSystem.ResolveTick(sim);
+                        if (tick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
+                            resolver.EmitSeparationCorrections();
+                    }
+
                     // ② AI 节拍窗（%10）——live RunAiBeat 同点位（RevealFog=决策时态账本同步；批不重跑脑）
                     if (!over.Ended && tick % BattleMetrics.AiBeatTicks == 0)
                     {
@@ -390,6 +400,9 @@ namespace GIC.Editor
                     var arrivals = RTSMovementSystem.AdvanceTick(sim);
                     if (arrivals != null && arrivals.Count > 0)
                         resolver.ResolveMoveArrivals(arrivals);
+                    UnitSeparationSystem.ResolveTick(sim); // ①b 弹性分离（与 live TickAdvance 同点位）
+                    if (tick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
+                        resolver.EmitSeparationCorrections();
                     if (tick % BattleMetrics.TicksPerSecond != 0) continue;
                     bool effectBeat = tick % BattleMetrics.EffectBeatTicks == 0;
                     resolver.ResolveSecondBeat(tick / BattleMetrics.TicksPerSecond, effectBeat);

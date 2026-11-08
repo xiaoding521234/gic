@@ -34,6 +34,9 @@ namespace GIC.Battle
         [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
         [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
 
+        [Tooltip("弹性推挤补间秒（友军重叠被挤开的滑移时长——Host 5Hz 下发绝对位，客户端在此时间内滑过去）")]
+        [SerializeField, Range(0.02f, 0.5f)] private float 推挤补间秒 = 0.18f;
+
         [Tooltip("全身立牌（UnitData.立牌图）放大倍数：全身立绘人物在图中占比小，放大对齐头像版人物观感（2026-09-21 先试 2.5；2026-09-27 拍板 2.5→2：站立全身图 tight bounds 撑满 1.375 格超格子、且比安柏视频立牌（主体仅占帧 69~87%）高 15~45%，降至 2 后显示高=1.1 格）；血条/名字/Buff 行尺寸不变、随立牌顶抬高；头像版（无立牌图回落 avatar）恒为原尺寸")]
         [SerializeField, Min(0.1f)] private float 全身立牌放大倍数 = 2f;
 
@@ -227,6 +230,13 @@ namespace GIC.Battle
         /// <summary>移动补间世代（unitId→当前世代号）：同单位新移动命令/位置校正=世代递增，旧补间
         /// 逐段+逐帧自检发现失配即自废（防双补间同帧双写 jitter——玩家连点重定目标/AI 0.5s 重决策）</summary>
         private readonly Dictionary<string, int> _moveGeneration = new Dictionary<string, int>();
+
+        /// <summary>本次移动的目标世界点（推挤续跑用——弹性分离把移动中单位挤开时，客户端从这里接着走向
+        /// 原目标，不能另起一个和移动补间抢写位置的补间）</summary>
+        private readonly Dictionary<string, Vector3> _moveTargetWorld = new Dictionary<string, Vector3>();
+
+        /// <summary>本次移动的世界移速（格/秒，推挤续跑算时长；来源=Move 命令 speedCm）</summary>
+        private readonly Dictionary<string, float> _moveSpeedWorldPerSec = new Dictionary<string, float>();
 
         /// <summary>移动播放中的单位集（世代开始加入、finally 世代匹配才移除）——OnSnapshot 位置自愈
         /// 的让位表（移动中不回拉：补间与模拟同速推进，1s 滞后快照回拉会抖）</summary>
@@ -1338,6 +1348,29 @@ namespace GIC.Battle
                         {
                             if (command.path.Count == 0)
                             {
+                                if (command.metadata == BattleCommand.MovePushed)
+                                {
+                                    // 弹性推挤（2026-11-08）：空 path+MovePushed+hitX/hitY=Host 权威**新绝对位**。
+                                    // 该单位正在走=**续跑原目标**（世代替换旧补间后从权威位接着走，
+                                    // 「两个都在走也不许互相穿过」）；静止=短补间滑过去即可。
+                                    var pushedWorld = BoardCmToWorld(command.hitX, command.hitY);
+                                    mover.Cell = BattleCell.FromCm(command.hitX, command.hitY);
+                                    if (_activeMovePlayback.Contains(command.actorUnitId)
+                                        && _moveTargetWorld.TryGetValue(command.actorUnitId, out var moveTarget))
+                                    {
+                                        int pgen = (_moveGeneration.TryGetValue(command.actorUnitId, out var pg) ? pg : 0) + 1;
+                                        _moveGeneration[command.actorUnitId] = pgen;
+                                        float pspeed = _moveSpeedWorldPerSec.TryGetValue(command.actorUnitId, out var ps)
+                                            ? ps : BattleMetrics.DefaultMoveSpeedCm / (float)CellMetrics.CellSizeCm;
+                                        StartCoroutine(PlayMoveResumeCoroutine(mover, command.actorUnitId,
+                                            pushedWorld, moveTarget, pspeed, pgen));
+                                    }
+                                    else
+                                    {
+                                        StartCoroutine(PlayPushCoroutine(mover, pushedWorld));
+                                    }
+                                    break;
+                                }
                                 // P4-E 位置校正命令（被挡收尾）：空 path+hitX/hitY=停点 cm——停活动补间
                                 //（世代递增=旧补间自废）+落位+撞墙弹回；被挡=真停（移动循环动画收）
                                 _moveGeneration[command.actorUnitId] =
@@ -1360,6 +1393,13 @@ namespace GIC.Battle
                                 int gen = (_moveGeneration.TryGetValue(command.actorUnitId, out var g) ? g : 0) + 1;
                                 _moveGeneration[command.actorUnitId] = gen;
                                 _activeMovePlayback.Add(command.actorUnitId);
+                                // 推挤续跑用：记住本次移动的目标点与移速（世界单位/秒）
+                                _moveTargetWorld[command.actorUnitId] = command.hitX != 0 || command.hitY != 0
+                                    ? BoardCmToWorld(command.hitX, command.hitY)
+                                    : _board.CellToWorld(command.path[command.path.Count - 1]);
+                                _moveSpeedWorldPerSec[command.actorUnitId] =
+                                    (command.speedCm > 0 ? command.speedCm : BattleMetrics.DefaultMoveSpeedCm)
+                                    / (float)CellMetrics.CellSizeCm;
                                 playbacks.Add(StartCoroutine(PlayMoveCoroutine(mover, command, gen)));
                             }
                         }
@@ -2365,6 +2405,64 @@ namespace GIC.Battle
         /// 原两态队形（选择阶段散开 / 执行阶段收拢）整体退役——任何阶段都贴各自权威站位，
         /// 同格多单位自然重叠。本方法只做一次幂等归零重放（收敛历史残留偏移）。
         /// </summary>
+        /// <summary>弹性推挤补间（2026-11-08）：Host 5Hz 下发新绝对位 → 短补间滑过去（不并入段等待，
+        /// 避免每 0.2 秒一段的推挤把段播放拖长）。只写位置（ApplyPosition 同步 FormationAnchor），
+        /// 不改移动动画/朝向——推挤不是移动。</summary>
+        private IEnumerator PlayPushCoroutine(UnitView view, Vector3 target)
+        {
+            if (view == null) yield break;
+            Vector3 from = view.transform.position;
+            float duration = Mathf.Max(0.02f, 推挤补间秒);
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                if (view == null) yield break;
+                view.ApplyPosition(Vector3.Lerp(from, target, Mathf.Clamp01(elapsed / duration)));
+                yield return null;
+            }
+            if (view != null) view.ApplyPosition(target);
+        }
+
+        /// <summary>推挤打断移动补间后的**续跑**（2026-11-08「两个都在走也不许互相穿过」）：
+        /// 先短补间滑到 Host 权威位，再沿直线续跑到原移动目标。世代守卫与 PlayMoveCoroutine 同口径；
+        /// 不重复计 _meaningfulActionInFlight（旧补间仍持有其令牌，由它收尾释放）。
+        /// 注：续跑走直线（不重放剩余折线路径）——推挤位移只有厘米级，终点一致，观感无差。</summary>
+        private IEnumerator PlayMoveResumeCoroutine(UnitView view, string unitId, Vector3 pushedWorld,
+            Vector3 targetWorld, float speedWorldPerSec, int generation)
+        {
+            bool StillCurrent()
+            {
+                return view != null
+                    && (!_moveGeneration.TryGetValue(unitId, out var cur) || cur == generation);
+            }
+
+            float speed = Mathf.Max(0.01f, speedWorldPerSec * _playbackSpeed);
+            Vector3 fromPush = view != null ? view.transform.position : pushedWorld;
+            float pushSeconds = Mathf.Min(0.15f,
+                Mathf.Max(0.03f, Vector3.Distance(fromPush, pushedWorld) / speed));
+            yield return BattleViewTween.Over(pushSeconds, t =>
+            {
+                if (StillCurrent()) view.ApplyPosition(Vector3.Lerp(fromPush, pushedWorld, t));
+            });
+
+            Vector3 from = pushedWorld;
+            float seconds = Mathf.Max(0.03f, Vector3.Distance(from, targetWorld) / speed);
+            yield return BattleViewTween.Over(seconds, t =>
+            {
+                if (StillCurrent()) view.ApplyPosition(Vector3.Lerp(from, targetWorld, t));
+            });
+
+            if (StillCurrent())
+            {
+                view.ApplyPosition(targetWorld);
+                view.SetMoveAnimation(false);
+                _activeMovePlayback.Remove(unitId);
+                _moveTargetWorld.Remove(unitId);
+                _moveSpeedWorldPerSec.Remove(unitId);
+            }
+        }
+
         private void RefreshAllFormations()
         {
             foreach (var view in _views.Values)

@@ -142,6 +142,16 @@ namespace GIC.Battle
                 CheckBattleEnded();
             }
 
+            // —— 弹性分离（2026-11-08 拍板「友军碰撞有弹性、建筑硬」）——
+            // 友军重叠按重量加权挤开（移动中的单位当 tick 不可推、建筑/尸体=硬挡圆不进域）；
+            // 位移 5Hz 批量成段下发（MovePushed+绝对位，客户端短补间）。仅 Host：客户端以命令流为准。
+            if (IsHost)
+            {
+                UnitSeparationSystem.ResolveTick(_sim);
+                if (CurrentTick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
+                    _resolver.EmitSeparationCorrections();
+            }
+
             // —— AI 三脑节拍（每 0.5 秒）——
             if (CurrentTick % BattleMetrics.AiBeatTicks == 0)
                 RunAiBeat();

@@ -221,6 +221,10 @@ namespace GIC.Data
         /// 客户端播"撞墙弹回"表现——探出后弹回，逻辑位置不变</summary>
         public const int MoveBlocked = 1;
 
+        /// <summary>弹性推挤标记（2026-11-08，metadata）：空 path+hitX/hitY=被挤开后的**新绝对位**
+        /// （不是停点）——客户端短补间滑过去；Host 侧移动中的单位恒不被推，故不会与在途移动补间抢位置</summary>
+        public const int MovePushed = 2;
+
         public static BattleCommand Move(string unitId, int sliceIndex, int indexInSlice, List<BattleCell> path,
             int blocked = 0, int blockedDirection = 0, int speedCmPerSecond = 0)
         {

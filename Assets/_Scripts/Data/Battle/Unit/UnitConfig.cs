@@ -118,6 +118,14 @@ namespace GIC.Data
             /// 协议核心=0.8（近乎占满格，大目标易命中=攻城手感）</summary>
             public float 受击圆柱直径 = 0f;
 
+            [Header("重量（弹性碰撞的质量，2026-11-08）")]
+            /// <summary>重量（质量，≥1；2026-11-08 拍板「参考皇室战争：巨人比小骷髅更难推动」）：
+            /// 友军弹性分离按**反质量**分摊位移——重者几乎不动，轻者全额让位
+            /// （UnitSeparationSystem）。移动中的单位当 tick 视为不可推（只推静止方）。
+            /// 0=未指定，按类型/星级推定（GetEffectiveWeight）。建筑虽为硬墙不参与分离，
+            /// 仍按 20 给值，保「强制位移」类玩法语义一致。</summary>
+            public int 重量 = 0;
+
             [Header("元素")]
             public ElementType selfElement = ElementType.Physical;
 
@@ -242,6 +250,19 @@ namespace GIC.Data
             public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
             public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
             public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;
+
+            /// <summary>有效重量（2026-11-08 弹性碰撞）：0=未指定按类型/星级推定——建筑 20、
+            /// 魔神(5★) 8、4★ 6、3★ 3、1~2★ 1；下限 1（分离按反质量分摊，分母不可为零）。
+            /// 单独调某个单位手感=Inspector 填 重量，勿改本推定链。</summary>
+            public int GetEffectiveWeight()
+            {
+                if (重量 > 0) return 重量;
+                if (unitType == UnitType.Building) return 20;
+                if (starLevel >= 5) return 8;
+                if (starLevel >= 4) return 6;
+                if (starLevel >= 3) return 3;
+                return 1;
+            }
             public int GetEffectiveDeployCost() => IsSpecified(deployCost) ? deployCost : GetDeployCost();
 
             /// <summary>单位体积单出口（2026-09-27 复审收口：原「Building?2:1」在 Unit.Volume 与部署校验各写一份=双源，

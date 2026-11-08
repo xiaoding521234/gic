@@ -180,6 +180,48 @@ namespace GIC.Battle
             if (segment.commands.Count > 0) PushSegment(segment);
         }
 
+        /// <summary>弹性分离位移下发（2026-11-08 拍板「友军碰撞有弹性、建筑硬」）：Host 权威推挤按
+        /// 5Hz 批量成段——命令=Move + MovePushed 标记 + hitX/hitY 新绝对位 cm。移动中的单位跳过
+        /// （Move 补间权威，避免双写）；与 ResolveMoveArrivals 的被挡校正段同构：段首直产命令 +
+        /// EmitSliceCommands 领 sliceIndex（零效应载荷=纯表现段）。</summary>
+        public void EmitSeparationCorrections()
+        {
+            var pending = _sim.PushPending;
+            if (pending.Count == 0) return;
+            var commands = new List<BattleCommand>();
+            foreach (var kv in pending) // SortedDictionary=确定性命令序（回放段 diff）
+            {
+                var push = BattleCommand.Move(kv.Key, 0, 0, new List<BattleCell>(),
+                    BattleCommand.MovePushed, (int)Direction2D.Right);
+                push.hitX = kv.Value.x;
+                push.hitY = kv.Value.y;
+                commands.Add(push);
+            }
+            pending.Clear();
+            if (commands.Count == 0) return;
+
+            int slice = _sliceCounter++;
+            var segment = new Segment
+            {
+                turnNumber = _sim.CurrentSecond,
+                sliceIndex = slice,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
+                insertedInstantAction = 0,
+                startTick = _sim.CurrentTick,
+            };
+            foreach (var command in commands)
+            {
+                command.sliceIndex = slice;
+                command.indexInSlice = segment.commands.Count;
+                segment.commands.Add(command);
+            }
+            EmitSliceCommands($"tick{_sim.CurrentTick}推挤", segment, slice,
+                new List<BattleEffect>(), new List<ApplyBuffEffect>(), null, null, new List<Unit>(),
+                expired: null, skillCasts: null, shattered: null);
+            if (segment.commands.Count > 0) PushSegment(segment);
+        }
+
         // ==================== 片结算 ====================
 
         /// <summary>

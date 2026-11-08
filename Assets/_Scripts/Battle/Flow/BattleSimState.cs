@@ -1003,6 +1003,22 @@ namespace GIC.Battle
         /// <summary>tick 移动注册表写入（TurnResolver 启动移动时 Add；推进器内部 Remove）</summary>
         public List<RTSMoveState> ActiveMoversInternal => _activeMovers;
 
+        // ==================== 弹性分离（2026-11-08 拍板：友军按重量加权挤开） ====================
+
+        /// <summary>待下发推挤绝对位（unitId→cm）——Host 权威位移 5Hz 批量成段下发（MovePushed），
+        /// 客户端短补间消费（移动中单位由客户端续跑原目标）；下发后清空。
+        /// SortedDictionary：确定性枚举序（段内命令序进回放 diff）。</summary>
+        public readonly SortedDictionary<string, UnityEngine.Vector2Int> PushPending =
+            new SortedDictionary<string, UnityEngine.Vector2Int>(StringComparer.Ordinal);
+
+        /// <summary>本 tick 各单位已分离位移（cm，单 tick 位移上限记账——UnitSeparationSystem 每 tick 清空）</summary>
+        public readonly Dictionary<string, int> SeparationDisplacedCm =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+
+        /// <summary>分离系统空中标志缓存（按 SortedUnits 下标；复用数组避免每 tick 分配——
+        /// 空/地分层 2026-11-08：飞行×地面不参与分离）</summary>
+        public bool[] SeparationAirborneScratch;
+
         // ==================== 攻击冷却（决策九十五 P3，蓝图 §4.3——战技 3 秒/爆发 5 秒） ====================
         // 纪元制（到期 tick 记账，非逐 tick 递减——零每帧遍历、回放由命令流派生天然确定）：
         // Normal 型（战技+AI 普攻条目同享）→攻击 CD；Burst 型→爆发 CD；其余类型（延奏/契约/势力/

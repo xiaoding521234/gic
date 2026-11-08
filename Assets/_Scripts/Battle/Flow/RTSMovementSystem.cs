@@ -184,8 +184,6 @@ namespace GIC.Battle
             int fromX, int fromZ, int toX, int toZ, out bool blockedHit)
         {
             blockedHit = false;
-            var selfIdentity = mover.Unit.GetUnitComponent<UnitIdentity>();
-            var selfTeam = selfIdentity?.Team;
 
             foreach (var kv in sim.SortedUnits())
             {
@@ -193,12 +191,9 @@ namespace GIC.Battle
                 var other = kv.Value;
                 if (other == null) continue;
 
-                // 硬挡域：尸体一律挡（保留碰撞语义）；存活=敌队才挡（友军可穿）；建筑（含核心）对双方皆墙
-                var otherIdentity = other.GetUnitComponent<UnitIdentity>();
-                bool isEnemy = otherIdentity != null && selfTeam.HasValue && otherIdentity.Team != selfTeam.Value;
-                bool isBuilding = other.RawData != null && other.RawData.unitType == UnitType.Building;
-                bool dead = BattleSimState.IsDead(other);
-                if (!dead && !isEnemy && !isBuilding) continue;
+                // 硬挡域（2026-11-08「真·皇室战争」）：尸体/建筑恒挡；敌方存活单位**只有推不动时才挡**
+                // （重量 ≥ 自身）——更重的一方推开轻的（IsHardBlockerForMover）；友军零阻挡
+                if (!IsHardBlockerForMover(mover.Unit, other)) continue;
 
                 var otherPos = sim.GetPosCm(other);
                 int selfRadius = RadiusCmOf(mover.Unit);
@@ -219,6 +214,83 @@ namespace GIC.Battle
             return (toX, toZ, false);
         }
 
+        /// <summary>空中单位（ForceType.Fly）——2026-11-08 空/地碰撞分层：**飞行与地面单位互不碰撞**
+        /// （皇室战争语义：飞行从头顶飞过），飞行×飞行照常推挤；Amphibious=地面（可走水面但不是空中）。
+        /// **建筑只挡地面层**（追拍：飞行直接越过建筑/塔）。</summary>
+        public static bool IsAirborne(Unit unit)
+        {
+            var moveable = unit != null ? unit.GetUnitComponent<UnitMoveable>() : null;
+            return moveable != null && moveable.NormalMoveType == ForceType.Fly;
+        }
+
+        /// <summary>两单位是否在同一碰撞层（同为空中 或 同为地面）——分离与推进阻挡共用</summary>
+        public static bool SharesCollisionPlane(Unit a, Unit b) => IsAirborne(a) == IsAirborne(b);
+
+        /// <summary>硬墙（对**同一碰撞层**的单位而言）：尸体（静态硬挡圆）、建筑含核心。
+        /// 2026-11-08 追拍：**建筑只挡地面层**——飞行单位可越过建筑（塔顶飞过）；
+        /// 尸体同样按自身碰撞层挡；敌方存活单位从来不是硬墙（轻重决定谁被推开，见 IsHardBlockerForMover）。</summary>
+        public static bool IsHardBlocker(Unit self, Unit other)
+        {
+            if (other == null) return false;
+            bool samePlane = SharesCollisionPlane(self, other);
+            if (other.RawData != null && other.RawData.unitType == UnitType.Building)
+                return samePlane; // 建筑：只挡地面；飞行越过
+            if (BattleSimState.IsDead(other)) return samePlane; // 尸体按碰撞层挡
+            return false;
+        }
+
+        /// <summary>推进层对该 mover 的硬挡：真硬墙 + **推不动的同层敌队存活单位**（皇室战争口径——
+        /// 巨人（重 8）推开小骷髅（重 1）；小骷髅撞巨人=停于接触前；**等重=互不相让（停）**，
+        /// 只有严格更重才推得走）。友军恒零阻挡（可穿）；**异碰撞层（空/地）恒不挡**。</summary>
+        public static bool IsHardBlockerForMover(Unit mover, Unit other)
+        {
+            if (IsHardBlocker(mover, other)) return true;
+            if (mover == null || other == null) return false;
+            if (BattleSimState.IsDead(other)) return false; // 尸体已由 IsHardBlocker 判过（异层=不挡）
+            var moverIdentity = mover.GetUnitComponent<UnitIdentity>();
+            var otherIdentity = other.GetUnitComponent<UnitIdentity>();
+            if (moverIdentity == null || otherIdentity == null) return false;
+            if (otherIdentity.Team == moverIdentity.Team) return false;
+            if (!SharesCollisionPlane(mover, other)) return false; // 空/地分层：互不阻挡
+            return WeightOf(other) >= WeightOf(mover);
+        }
+
+        /// <summary>有效重量（0/缺失回落 1）——UnitData.重量 单源</summary>
+        public static int WeightOf(Unit unit)
+        {
+            int w = unit?.RawData != null ? unit.RawData.GetEffectiveWeight() : 1;
+            return w > 0 ? w : 1;
+        }
+
+        /// <summary>该点是否被硬挡圆压住（弹性分离落点守卫）。圆距口径=受击圆柱半径真值
+        /// （直径 0.5 格 → 半径 25cm，两圆接触=50cm；2026-11-08 修正：原把直径当半径用，
+        /// 接触距离曾为 100cm=1 格）</summary>
+        public static bool HardBlockedAt(BattleSimState sim, Unit self, int xCm, int zCm)
+            => HardPenetrationCm(sim, self, xCm, zCm) > 0;
+
+        /// <summary>硬挡圆最大穿透深度（cm；0=不接触）——弹性分离守卫用「不许比现在更深」而不是
+        /// 「绝对不许碰」：自由落点/召唤常把单位放在建筑 65cm 接触距之内（既成事实），若按绝对规则
+        /// 判非法，该单位任何方向都动不了、会被永久锁死（2026-11-08 观测局实锤：双静止重叠 74/74
+        /// 样本零收敛，根因就是贴建筑的单位被拒）。</summary>
+        public static int HardPenetrationCm(BattleSimState sim, Unit self, int xCm, int zCm)
+        {
+            if (sim == null || self == null) return 0;
+            string selfId = self.GetUnitComponent<UnitIdentity>()?.UnitID;
+            int worst = 0;
+            foreach (var kv in sim.SortedUnits())
+            {
+                if (kv.Key == selfId) continue;
+                var other = kv.Value;
+                if (!IsHardBlocker(self, other)) continue;
+                var p = sim.GetPosCm(other);
+                long touch = (long)RadiusCmOf(self) + RadiusCmOf(other);
+                int dist = SqrtI((long)(xCm - p.x) * (xCm - p.x) + (long)(zCm - p.y) * (zCm - p.y));
+                int pen = (int)touch - dist;
+                if (pen > worst) worst = pen;
+            }
+            return worst;
+        }
+
         private static bool CircleHitsPoint(int cx, int cz, int px, int pz, long touchDist)
         {
             long dx = px - cx;
@@ -226,14 +298,14 @@ namespace GIC.Battle
             return dx * dx + dz * dz < touchDist * touchDist;
         }
 
-        /// <summary>单位碰撞圆半径（厘米）——受击圆柱直径同源（BattleMetrics.CylinderDiameterOf(Unit)
-        /// 直读重载：per-unit 覆写〔协议核心 0.8〕+全局 0.5，蓝图 §3.2 统一拍板；P3 取代旧 UnitState
-        /// 哑实例传参——P2 已知断裂面修复）</summary>
+        /// <summary>单位碰撞圆半径（厘米）=受击圆柱直径 × 格宽 ÷ 2（直径 0.5 格 → 半径 25cm，
+        /// 两圆接触=50cm）。2026-11-08 修正：原漏 ÷2 把直径当半径用，接触距离曾达 100cm=1 格
+        /// （与 docs/05 §5.3、部署校验、投射物判定三处口径不符）。</summary>
         private static int RadiusCmOf(Unit unit)
-            => Mathf.RoundToInt(BattleMetrics.CylinderDiameterOf(unit) * CellMetrics.CellSizeCm);
+            => Mathf.RoundToInt(BattleMetrics.CylinderDiameterOf(unit) * CellMetrics.CellSizeCm * 0.5f);
 
-        /// <summary>整数平方根（牛顿迭代全整数——确定性纪律零浮点）</summary>
-        private static int SqrtI(long value)
+        /// <summary>整数平方根（牛顿迭代全整数——确定性纪律零浮点；弹性分离共用）</summary>
+        public static int SqrtI(long value)
         {
             if (value <= 0) return 0;
             int x = (int)Math.Sqrt(value); // 初值（浮点仅初始化，迭代收敛后与平台无关）

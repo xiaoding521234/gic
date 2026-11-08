@@ -51,6 +51,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 2
     selfElement: 8
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -130,6 +131,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 7
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -214,6 +216,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 7
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -298,6 +301,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 7
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -382,6 +386,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 2
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -458,8 +463,9 @@ MonoBehaviour:
     blockAllies: 1
     blockEnemies: 1
     blockedByEnemies: 1
-    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
+    "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 2
     selfElement: 1
     "\u653B\u51FB\u89C6\u91CE": 800
     "\u63A2\u7D22\u89C6\u91CE": 200
@@ -604,6 +610,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 4
     selfElement: 5
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -731,8 +738,8 @@ MonoBehaviour:
     cards:
     - {fileID: 21300000, guid: 83919bccf87fcc9449de328b28ce6b4a, type: 3}
     nameCard: {fileID: 21300000, guid: 2ce814b262046f442bbd3617f98ccc87, type: 3}
-    "\u7ACB\u724C\u56FE": {fileID: 0}
-    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 0}
+    "\u7ACB\u724C\u56FE": {fileID: 21300000, guid: f0d3a8421af6e0e44a6eaff9d534042d, type: 3}
+    "\u7ACB\u724C\u52A8\u753B\u89C6\u9891": {fileID: 32900000, guid: 56fb6204f6fa9384491d64b9b55ea744, type: 3}
     "\u5EFA\u7B51\u6A21\u578B": {fileID: 0}
     "\u5EFA\u7B51\u6A21\u578B\u5BBD\u5EA6": 1
     "\u4E13\u5C5E\u5F39\u5C04\u7269": {fileID: 0}
@@ -762,12 +769,13 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 2
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
     tags: 72170000a20f0000a50f0000
     skills:
-    - {fileID: 11400000, guid: 3e6ddf752c1b255459b935598fb8d6f2, type: 2}
+    - {fileID: 11400000, guid: 862a0c4774407154e9328daf4db8a568, type: 2}
     - {fileID: 11400000, guid: 72abeef17598e3f41a8f5d0c3b4d8cc5, type: 2}
     - {fileID: 11400000, guid: ca83fdc526b172f4c9cff95f1793d653, type: 2}
     - {fileID: 11400000, guid: 448e4aa5cac0cd54e9b07e471539ccc2, type: 2}
@@ -910,6 +918,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 4
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -993,6 +1002,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 2
     selfElement: 5
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1071,6 +1081,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 3
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1153,6 +1164,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 1
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1232,6 +1244,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 5
     selfElement: 3
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1316,6 +1329,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 5
     selfElement: 7
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1400,6 +1414,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 2
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1484,6 +1499,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 5
     selfElement: 4
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1568,6 +1584,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 1
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1652,6 +1669,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 7
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1730,6 +1748,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1808,6 +1827,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1886,6 +1906,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -1964,6 +1985,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 4
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2042,6 +2064,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 4
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2120,6 +2143,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2198,6 +2222,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2276,6 +2301,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2354,6 +2380,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2432,6 +2459,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 5
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2510,6 +2538,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 3
     selfElement: 6
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2588,6 +2617,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 2
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2666,6 +2696,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 8
     selfElement: 1
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2744,6 +2775,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 5
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2822,6 +2854,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 5
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2900,6 +2933,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 1
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -2981,6 +3015,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 0
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    "\u91CD\u91CF": 20
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": 200
@@ -3060,6 +3095,7 @@ MonoBehaviour:
     blockedByEnemies: 0
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    "\u91CD\u91CF": 20
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -3143,6 +3179,7 @@ MonoBehaviour:
     blockedByEnemies: 0
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    "\u91CD\u91CF": 20
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -3226,6 +3263,7 @@ MonoBehaviour:
     blockedByEnemies: 0
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    "\u91CD\u91CF": 20
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -3309,6 +3347,7 @@ MonoBehaviour:
     blockedByEnemies: 0
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0.8
+    "\u91CD\u91CF": 20
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
@@ -3388,6 +3427,7 @@ MonoBehaviour:
     blockedByEnemies: 1
     "\u4E0E\u53CB\u65B9\u4E92\u4E0D\u963B\u6321": 1
     "\u53D7\u51FB\u5706\u67F1\u76F4\u5F84": 0
+    "\u91CD\u91CF": 2
     selfElement: 0
     "\u653B\u51FB\u89C6\u91CE": -64
     "\u63A2\u7D22\u89C6\u91CE": -64
