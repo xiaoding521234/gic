@@ -75,7 +75,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 20
-    m_Localized: Vision Reveal Duration
+    m_Localized: Vision Reveal Duration (sec)
     m_Metadata:
       m_Items: []
   - m_Id: 19
@@ -139,7 +139,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12
-    m_Localized: Duration Turns
+    m_Localized: Duration (sec)
     m_Metadata:
       m_Items: []
   - m_Id: 3
@@ -295,7 +295,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 70
-    m_Localized: Charge Turns
+    m_Localized: Charge (sec)
     m_Metadata:
       m_Items: []
   - m_Id: 71

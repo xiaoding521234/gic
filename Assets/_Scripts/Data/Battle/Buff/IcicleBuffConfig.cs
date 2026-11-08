@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 namespace GIC.Data
 {
 
@@ -8,8 +9,9 @@ namespace GIC.Data
     [CreateAssetMenu(fileName = "Buff_Icicle", menuName = "Game/BuffConfig 寒冰之棱")]
     public class IcicleBuffConfig : BuffConfig
     {
-        [Header("每回合对半径内敌人的伤害（% 施加者攻击力/层——平值非按层）")]
-        public int 每回合伤害百分比 = 20;
+        [Header("每 2 秒对半径内敌人的伤害（% 施加者攻击力/层——平值非按层）")]
+        [FormerlySerializedAs("每回合伤害百分比")]
+        public int 每拍伤害百分比 = 20;
 
         [Header("碎裂时每层治疗（% 施加者攻击力）")]
         public int 碎裂治疗百分比 = 30;
@@ -35,7 +37,7 @@ namespace GIC.Data
         {
             switch (key)
             {
-                case KeyAuraDamagePercent: return 每回合伤害百分比;
+                case KeyAuraDamagePercent: return 每拍伤害百分比;
                 case KeyShatterHealPercent: return 碎裂治疗百分比;
                 case KeyShatterEnergyThreshold: return 碎裂元能阈值百分比;
                 case KeyAuraRadius: return 作用半径;

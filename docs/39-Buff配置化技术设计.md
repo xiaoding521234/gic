@@ -14,7 +14,7 @@
 | `Buff_101.asset` 等（Resources/AbilityObjects/Buff/） | **每 Buff 一个 ScriptableObject 配置资产**（Id/ShowName/触发器/效果列表） | 新 `BuffConfig` 资产（本设计） |
 | `AddStatusEffect : Effect`（技能侧效果原子） | `AddStatus: AbilityConfigObject` **资产引用** + `Duration` 覆盖 + `Params` 字典透传 | 既有 `ApplyBuffEffect`（paramKey/2/3 通道）——**已同构，维持** |
 | `BuffComponent`（实体挂载） | List\<Ability\> + 按类型 id 分组 | 既有 `Unit.Buffs` + BuffType 分组——已同构 |
-| Buff 行为 = 资产内 Effects/TriggerActions（运行时组件化） | 效果类本身仍是 C# | **GIC 分叉点**：行为留在 `BaseBuff` 子类（编译期展开定式，2026-09-25 审查已拍板更贴回合制）——配置只装「数据」，不装「过程」 |
+| Buff 行为 = 资产内 Effects/TriggerActions（运行时组件化） | 效果类本身仍是 C# | **GIC 分叉点**：行为留在 `BaseBuff` 子类（编译期展开定式，2026-09-25 审查已拍板更贴当时的片/回合结算模型；即时制后仍保留编译期展开）——配置只装「数据」，不装「过程」 |
 
 对齐口径：**抽象对齐业界的组件划分与数据所有权，运行时形态沿用本项目既有定式**（与派蒙知识库批「Spring AI 组件对照」同款纪律）。
 
@@ -39,7 +39,7 @@
 | buffType | BuffType | 协议标识，与 `BuffState.type` 同值域；**一资产一类型，注册表按它索引** |
 | 专属图标 | Sprite（可空） | 客户端图标解析第一优先；空=回落来源技能图标→元素图标（决策五十回落链不变） |
 | 参数表 | List\<ParamEntry\>（复用技能 customParams 同构条目） | 行为族基础数值（Burn 10/3、歌声之环 10%/5%、冰棱 20%/30%/50%、光环半径等）；键空间复用 `SkillParamKey` 枚举语义 |
-| 默认持续回合 | int（0=无默认） | 无技能语境时（反应类）的真源；技能实参优先于它 |
+| 默认持续秒数 | int（0=无默认） | 无技能语境时（反应类）的真源；技能实参优先于它（即时制秒制直读） |
 | 默认叠层上限 | int（0=无默认） | 同上 |
 
 ### 2.2 数值所有权（模板 + 覆盖，业界标准双源规则）

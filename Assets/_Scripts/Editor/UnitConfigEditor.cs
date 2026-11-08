@@ -827,7 +827,7 @@ namespace GIC.Editor
             // 载荷字段（按 kind 部分有效——全建后显隐切换，kind 值变化时同步）
             var paramKeyField = new PropertyField(el.FindPropertyRelative("paramKey"), "主参数键");
             var paramKey2Field = new PropertyField(el.FindPropertyRelative("paramKey2"), "第二参数键(叠层上限)");
-            var paramKey3Field = new PropertyField(el.FindPropertyRelative("paramKey3"), "第三参数键(持续回合)");
+            var paramKey3Field = new PropertyField(el.FindPropertyRelative("paramKey3"), "第三参数键(持续秒数)");
             var valueField = new PropertyField(el.FindPropertyRelative("value"), "直读值(机制常量)");
             var elementField = new PropertyField(el.FindPropertyRelative("element"), "元素(物理=施法者元素)");
             var elementLayersField = new PropertyField(el.FindPropertyRelative("elementLayers"), "元素层数(0=纯伤害不反应不附着)");

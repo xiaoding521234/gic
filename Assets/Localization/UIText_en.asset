@@ -929,13 +929,13 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12010
-    m_Localized: "Pick a move target tile \u2014 press Confirm to submit, click empty
-      space to cancel"
+    m_Localized: Click the ground to move; hold and drag to keep moving toward the
+      aim wheel. Click empty space to exit
     m_Metadata:
       m_Items: []
   - m_Id: 12011
-    m_Localized: "Pick the target's tile \u2014 press Confirm to submit, click empty
-      space to cancel"
+    m_Localized: Click a target to cast instantly, or drag and release to cast. Click
+      empty space to exit
     m_Metadata:
       m_Items: []
   - m_Id: 12012
@@ -947,8 +947,8 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12014
-    m_Localized: "Pick a direction tile (4-way) \u2014 press Confirm to submit, click
-      empty space to cancel"
+    m_Localized: Drag to pick a direction and release to cast. Click empty space
+      to exit
     m_Metadata:
       m_Items: []
   - m_Id: 12015
@@ -1028,8 +1028,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 12034
-    m_Localized: "Pick a deploy tile (around the core) \u2014 press Confirm to deploy,
-      click empty space to cancel"
+    m_Localized: Click or drag to a valid tile to deploy. Click empty space to exit
     m_Metadata:
       m_Items: []
   - m_Id: 12035

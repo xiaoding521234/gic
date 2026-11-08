@@ -18,10 +18,10 @@ namespace GIC.Battle
     /// 独享——OnTurnEnd 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，2命起=C2EnergyGain
     /// 参数=+10——复用丽莎同键（2026-10-15 决策七十二三次返修拍板「枚举只和显示名对应，两个名称
     /// 刚好一样」；原 C1EnergyGain=32 退役占位；参数载体=施加者命座技能〔调换后2命生效〕）；②对持有者切比雪夫
-    /// 〔作用半径〕（1命起 +C1Radius=2〔原2命件，调换后1命生效；键名随生效层改 C2Radius→C1Radius——决策七十二二次返修〕）内敌人造成〔每回合伤害百分比〕施加者攻击力水伤
+    /// 〔作用半径〕（1命起 +C1Radius=2〔原2命件，调换后1命生效；键名随生效层改 C2Radius→C1Radius——决策七十二二次返修〕）内敌人造成〔每拍伤害百分比〕施加者攻击力水伤
     /// （含尸体——鞭尸同 Burn 先例；**走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01 拍板
     /// 「这些伤害都应该统一」——与寒冰之棱 tick 同口径；不经反应预览=不触发反应〕）；③对半径内
-    /// 我方**存活**单位（含持有者）治疗**施加者〔每回合治疗百分比〕最大生命值**、恢复〔每回合理智恢复〕
+    /// 我方**存活**单位（含持有者）治疗**施加者〔每拍治疗百分比〕最大生命值**、恢复〔每拍理智恢复〕
     /// 理智并附着水元素（**1命起不再附着**〔原2命件，2026-10-15 决策七十二调换前移〕；2026-09-30 拍板：平值 10 无法成长改比例；基准=施加者
     /// 芭芭拉自身最大生命〔非各自〕，末点截断后×层数）。
     /// 叠层上限 1（**3命起 +C3StackLimit=2**——Level=层数；
@@ -88,7 +88,7 @@ namespace GIC.Battle
             //（同日拍板②；命令层按目标合并总值防漂移）；附着=每目标一枚（覆盖幂等；敌方附着为
             // 统一拍板新增——tick 参与反应链，docs/18 决策二十三）
             // 治疗基准=施加者（芭芭拉）最大生命（与伤害同基准单位；float 末点 FloorToInt 同 ResolveHealAmount 口径）
-            int healPerLayer = (attackerStats != null ? Mathf.FloorToInt(attackerStats.GetStatStruct(StatType.HP).Max * Cfg.每回合治疗百分比 / 100f) : 0);
+            int healPerLayer = (attackerStats != null ? Mathf.FloorToInt(attackerStats.GetStatStruct(StatType.HP).Max * Cfg.每拍治疗百分比 / 100f) : 0);
 
             foreach (var kv in Sim.SortedUnits())
             {
@@ -115,7 +115,7 @@ namespace GIC.Battle
                                 Attacker = attacker,
                                 Target = unit,
                                 Element = (int)ElementType.Hydro,
-                                AttackPercent = Cfg.每回合伤害百分比,
+                                AttackPercent = Cfg.每拍伤害百分比,
                             }, BattleMetrics.LayerBeatSeconds(layer)));
                     }
                 }
@@ -146,7 +146,7 @@ namespace GIC.Battle
                     // 理智恢复逐层（2026-10-01 拍板②「+1 应当也是每层的效果」）：每层各一枚
                     // ——命令层按目标合并总值（TurnResolver 发射，防状态/命令漂移）
                     for (int layer = 0; layer < stacks; layer++)
-                        effects.Add(new SanityEffect(kv.Key, Cfg.每回合理智恢复));
+                        effects.Add(new SanityEffect(kv.Key, Cfg.每拍理智恢复));
                     // 附着我方（0~1命）：逐层纯附着声明（Request=null）——同进交错管道，敌方异元素
                     // 光环 tick 同拍可见可反应（挂水的我方被敌方冰棱 tick 冻结等）
                     if (attachAllies)

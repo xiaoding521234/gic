@@ -20,10 +20,10 @@ namespace GIC.Battle
     /// </summary>
     public static class OpponentProfiler
     {
-        /// <summary>习惯计数每回合衰减系数（§4 遗忘策略「指数滑动平均」族——半衰期≈7 回合，
-        /// 与样本环「近 8 回合加倍」同节奏：允许对手变招但需持续证据）——#4 审查批资产化：
-        /// 真源=AITuningConfig.习惯衰减每回合</summary>
-        private static float HabitDecayPerTurn => AITuningConfig.Instance.习惯衰减每回合;
+        /// <summary>习惯计数每秒衰减系数（§4 遗忘策略「指数滑动平均」族——半衰期≈7 秒，
+        /// 与样本环「近 8 秒加倍」同节奏：允许对手变招但需持续证据）——#4 审查批资产化：
+        /// 真源=AITuningConfig.习惯衰减每秒</summary>
+        private static float HabitDecayPerTurn => AITuningConfig.Instance.习惯衰减每秒;
 
         /// <summary>习惯计数剪枝阈值（低于即移除，防长期对局长尾膨胀）——真源=AITuningConfig.习惯剪枝阈值</summary>
         private static float HabitPruneThreshold => AITuningConfig.Instance.习惯剪枝阈值;

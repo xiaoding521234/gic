@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GIC.Data
 {
@@ -52,7 +53,7 @@ namespace GIC.Data
         [Header("伙伴脑·威胁响应（E-1/E-2）")]
         [Tooltip("反威胁分上限：攻击候选是敌方威胁源时的加分上限（低于斩杀）")]
         public int 反威胁分上限 = 25;
-        [Tooltip("落点受威胁扣分：候选落点在敌方预测火线格内=下回合白挨打（扣后钳 1 保底 Offer）")]
+        [Tooltip("落点受威胁扣分：候选落点在敌方预测火线格内=随后白挨打（扣后钳 1 保底 Offer）")]
         public int 火线格惩罚 = 12;
         [Tooltip("集火每档加分：行为档案「集火权重」1 档的分值（只影响同分域内目标选择）")]
         public int 集火每名次分 = 3;
@@ -66,7 +67,7 @@ namespace GIC.Data
         public int 保险血线百分比 = 60;
         [Tooltip("保险形态近敌半径：最近敌≤此值=有近敌（保险候选），否则=安全区随军")]
         public int 保险近敌半径 = 5;
-        [Tooltip("支援形态预警门：威胁图预期承伤≥hp×此百分比=提前一回合后撤")]
+        [Tooltip("支援形态预警门：威胁图预期承伤≥hp×此百分比=提前后撤")]
         public int 保险预警承伤百分比 = 50;
         [Tooltip("保险形态自保倍率：自保负分×此值=后撤位自然胜出")]
         public int 保险自保倍率 = 3;
@@ -108,8 +109,9 @@ namespace GIC.Data
         public int 延奏传输分 = 4;
         [Tooltip("延奏满层续航分（死水修复：目标该 buff 已满层且快到期时的续 buff 价值——低于推进/进攻候选，2026-10-20 决策八十四）")]
         public int 延奏满层续航分 = 10;
-        [Tooltip("延奏续航临近到期回合（剩余回合≤此值才算「快到期」值得续航；更长=时长充足零分放权，2026-10-20 决策八十四）")]
-        public int 延奏续航临近到期回合 = 2;
+        [Tooltip("延奏续航临近到期秒数（剩余秒数≤此值才算「快到期」值得续航；更长=时长充足零分放权，2026-10-20 决策八十四）")]
+        [FormerlySerializedAs("延奏续航临近到期回合")]
+        public int 延奏续航临近到期秒数 = 2;
         [Tooltip("升命投资分（高于延奏增益、低于斩杀/救命——投资档定位，AI-1 批 25→50）")]
         public int 升命投资分 = 50;
 
@@ -124,10 +126,12 @@ namespace GIC.Data
         public float 守势进入战力比 = 0.7f;
         [Tooltip("守势保持阈值（滞回防抖档）")]
         public float 守势保持战力比 = 0.85f;
-        [Tooltip("态势最小驻留回合（仅发育出口受驻留约束）")]
-        public int 态势最小驻留回合 = 3;
-        [Tooltip("发育期回合数（≤此回合恒发育态）")]
-        public int 发育期回合数 = 3;
+        [Tooltip("态势最小驻留秒数（仅发育出口受驻留约束）")]
+        [FormerlySerializedAs("态势最小驻留回合")]
+        public int 态势最小驻留秒数 = 3;
+        [Tooltip("发育期秒数（≤此秒数恒发育态）")]
+        [FormerlySerializedAs("发育期回合数")]
+        public int 发育期秒数 = 3;
         [Tooltip("终局判据：敌核心血量比低于此值")]
         public float 终局核心血量比 = 0.15f;
         [Tooltip("回防激进度乘数（守势+核心受创/血线低=伙伴脑斩杀加成×此值）")]
@@ -142,8 +146,9 @@ namespace GIC.Data
         // ==================== 对手档案（OpponentProfiler 遗忘策略） ====================
 
         [Header("对手档案·遗忘策略")]
-        [Tooltip("习惯计数每回合衰减系数（半衰期≈7 回合，与样本环「近 8 回合加倍」同节奏）")]
-        public float 习惯衰减每回合 = 0.9f;
+        [Tooltip("习惯计数每秒衰减系数（半衰期≈7 秒，与样本环「近 8 秒加倍」同节奏）")]
+        [FormerlySerializedAs("习惯衰减每回合")]
+        public float 习惯衰减每秒 = 0.9f;
         [Tooltip("习惯计数剪枝阈值（低于即移除，防长期对局长尾膨胀）")]
         public float 习惯剪枝阈值 = 0.05f;
 
@@ -156,18 +161,19 @@ namespace GIC.Data
         public int 无敌环境推进分 = 8;
         [Tooltip("锚点滞回门槛（格）（凌晨批议题③，docs/11 hysteresis 挂账）：E-3 移动锚延续/眷属核心锚定的换锚距离门槛"
                  + "——新锚须比现锚严格近此格数才接管（TPS CurrentHidepoint 惯性复核+ItB 反重复负权的门槛化表达）；"
-                 + "现锚每回合廉价复核（存活+可感知）通过即延续")]
+                 + "现锚每拍廉价复核（存活+可感知）通过即延续")]
         public int 锚点滞回门槛 = 2;
 
         [Header("AI 强化批·开局与难度")]
-        [Tooltip("开局策略窗口回合（凌晨批议题④）：≤此回合部署桶序走 per-局开局原型（seed 派生确定性抽选），"
+        [Tooltip("开局策略窗口秒数（凌晨批议题④）：≤此秒数部署桶序走 per-局开局原型（seed 派生确定性抽选），"
                  + "窗口后回归态势桶序（议题⑦）；ZK 开局策略原型加权抽选先例")]
-        public int 开局策略窗口回合 = 4;
+        [FormerlySerializedAs("开局策略窗口回合")]
+        public int 开局策略窗口秒数 = 4;
         [Tooltip("劲敌次优分差比（凌晨批议题⑥，0~1）：劲敌档次优注入——评分榜首与次名分差占比小于此值时取次名"
                  + "（GameAIPro ch04 hustling 三招之一「次优选择仅在分差<20% 内启用」；确定性零 roll）")]
         public float 劲敌次优分差比 = 0.2f;
         [Tooltip("天理摩拉收入百分比（凌晨批议题⑥，100=无作弊）：天理档=经济作弊型（SC2 CheatMoney/petra 经济倍率表先例）"
-                 + "——回合末摩拉发放+建筑摩拉收入两消费点乘此倍率（仅对天理 AI 生效；其余档恒 100）")]
+                 + "——效果拍（每 2 秒）摩拉发放+建筑摩拉收入两消费点乘此倍率（仅对天理 AI 生效；其余档恒 100）")]
         public int 天理摩拉收入百分比 = 130;
 
         // ==================== 资源点采集档（docs/47 拍板⑦，2026-10-27） ====================

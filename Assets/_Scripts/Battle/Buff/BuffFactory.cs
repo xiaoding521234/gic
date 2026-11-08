@@ -10,7 +10,7 @@ namespace GIC.Battle
     /// value 通道（B-S1b）：技能参数经 ApplyBuffEffect.BuffValue 单源传入（寒冰之棱的初始层数），
     /// 与技能配置同源、勿在各 Buff 内硬编码默认值以外的取值来源。
     /// 参数型 Buff（StatBuff 族，2026-10-07 返修三 决策五十六「技能资产剥离 buff 配置」）：
-    /// 数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续回合）——零注入（延奏 ApplyBuff
+    /// 数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续秒数）——零注入（延奏 ApplyBuff
     /// paramKey 已剥离；冰棱减防 2026-10-08 同步剥离）合法走资产默认；注入通道非零仍覆写
     /// （「技能实参＞模板」保留）；注入与资产双零才 Warn+null。
     /// 2026-10-08 决策五十七「资产即身份」：Create 优先按 buffKey（BuffConfig 资产名）查具名资产
@@ -59,16 +59,16 @@ namespace GIC.Battle
                     // 视野暴露（安柏变奏「全面侦查」，追拍七）：标记型——持续=资产单源
                     //（value/stackLimit 参数通道不适用）；0=配置错误 Warn+null
                     if (cfg is not VisionExposureBuffConfig exposureCfg) return FamilyMismatch(type, cfg);
-                    if (exposureCfg.持续回合 == 0)
+                    if (exposureCfg.持续秒数 == 0)
                     {
-                        GICLog.Warn($"[BuffFactory] 视野暴露 {cfg.name} 持续回合未配置（0）");
+                        GICLog.Warn($"[BuffFactory] 视野暴露 {cfg.name} 持续秒数未配置（0）");
                         return null;
                     }
                     return new VisionExposureBuff(exposureCfg) { source = source };
                 case BuffType.AttackUp:
                 case BuffType.MoveSpeedUp:
                 case BuffType.DefenseDown:
-                    // StatBuff 族数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续回合）——
+                    // StatBuff 族数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续秒数）——
                     // 延奏与冰棱减防（2026-10-08 C2 注入退役）全零注入走资产默认；注入通道非零
                     // 仍覆写优先（「技能实参＞模板」决策五十四语义保留——将来技能需覆盖时用）；
                     // -1=永久声明（决策五十），注入与资产双零才是配置错误。
@@ -76,11 +76,11 @@ namespace GIC.Battle
                     if (cfg is not StatBuffConfig statCfg) return FamilyMismatch(type, cfg);
                     int bonusPerStack = value != 0 ? value : statCfg.每层加成;
                     int stackLimitResolved = stackLimit != 0 ? stackLimit : statCfg.叠层上限;
-                    int turnsResolved = turns != 0 ? turns : statCfg.持续回合;
+                    int turnsResolved = turns != 0 ? turns : statCfg.持续秒数;
                     if (turnsResolved == 0)
                     {
-                        GICLog.Warn($"[BuffFactory] 参数型 Buff {type} 持续回合未配置" +
-                                    "（注入通道与 StatBuffConfig 持续回合均为 0）");
+                        GICLog.Warn($"[BuffFactory] 参数型 Buff {type} 持续秒数未配置" +
+                                    "（注入通道与 StatBuffConfig 持续秒数均为 0）");
                         return null;
                     }
                     if (type == BuffType.AttackUp)

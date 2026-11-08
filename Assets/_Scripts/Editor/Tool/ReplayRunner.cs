@@ -128,7 +128,7 @@ namespace GIC.Editor
                 if (recording.Header == null)
                     return "FAIL：录制缺 header 行（文件损坏或非录制文件）";
                 if (recording.Header.formatVersion < 2)
-                    return "FAIL：v1 回合格式已归档不迁移（决策九十五拍板 7）——请用即时制版本重新录制（replay on 打一局）";
+                    return "FAIL：v1 旧回合制格式已归档不迁移（决策九十五拍板 7）——请用即时制版本重新录制（replay on 打一局）";
 
                 // —— AI 难度注册（天理档经济作弊=Host 侧结算差异源：回合末摩拉发放/建筑收入乘倍率）——
                 //    重演前注册进 AIPlayerConfig；旧录制缺字段=类默认棋圣（无作弊）零漂移

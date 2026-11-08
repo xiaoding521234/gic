@@ -1819,12 +1819,37 @@ namespace GIC.Battle
                 || direction == (int)Direction2D.Left || direction == (int)Direction2D.DownLeft;
         }
 
+        /// <summary>移动朝向（2026-11-09 修「往左走立牌还朝右」）：Move 命令的 direction 载荷在连续移动下
+        /// 已退化恒为 Right（A* 首路点自 P5-D 起=精确起点 → DirectionOfSegment(start,start) 兜底 Right），
+        /// 故改用**实际位移**判左右：落点(cm) − 权威站位锚点的 x 分量。|dx|&lt;0.25 格（25cm）=中性向
+        /// （正上/正下）保持当前朝向防直上直下抖动；净位移落死区时退回首段格差（L 形先横后竖）。
+        /// 只改表现、不动命令流——回放基线不受影响（旧录制的 direction 也不再用作朝向）。</summary>
+        private bool FaceLeftOfMove(UnitView view, BattleCommand command)
+        {
+            float fromX = view != null ? view.FormationAnchor.x : 0f;
+            float dx;
+            if (command.hitX != 0 || command.hitY != 0)
+                dx = BoardCmToWorld(command.hitX, command.hitY).x - fromX;
+            else if (command.path.Count > 1)
+                dx = command.path[command.path.Count - 1].x - command.path[0].x;
+            else
+                dx = 0f;
+            // 净位移过小（先横后竖/终点逼近）：退回首段格差（格=世界单位，CellSizeCm=100）
+            if (Mathf.Abs(dx) < 0.25f && command.path.Count > 1)
+                dx = command.path[1].x - command.path[0].x;
+            if (Mathf.Abs(dx) < 0.25f)
+                return view != null ? view.FaceLeft : IsLeftFacing(command.direction);
+            return dx < 0f;
+        }
+
         private IEnumerator PlayMoveCoroutine(UnitView view, BattleCommand command, int generation)
         {
             // 移动态动画（B-S4a；2026-10-05 决策四十四 per-skill 统一）：移动片内切登记的移动循环片
             // （SkillCast 片头经 SetMoveVideo 登记）、片末回 待机（含被挡弹回段——弹回也是移动表现）；
             // try/finally 保异常不滞留移动态
-            view.SetFacing(IsLeftFacing(command.direction)); // 立牌朝向随移动方向（拍板③）；行动后保持=待机延续
+            // 立牌朝向随**实际位移**（2026-11-09 修：Move 命令 direction 载荷在连续移动下恒为 Right——
+            // A* 首路点自 P5-D 起=精确起点，DirectionOfSegment 退化兜底 Right）；行动后保持=待机延续
+            view.SetFacing(FaceLeftOfMove(view, command));
             view.SetMoveAnimation(true);
             _meaningfulActionInFlight++; // 在途有意义行动：移动行走（含被挡弹回段）——空等跳过探测源
             try
@@ -2308,7 +2333,8 @@ namespace GIC.Battle
             bool useFullBody = false;
             VideoClip idleVideo = null;
             var prewarmClips = new List<VideoClip>(); // 动作片预热线（决策四十五）：本单位全部技能动作视频（含 Move）
-            float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放）
+            float unitScale = 1f;   // UnitData.额外缩放（2026-09-27 拍板：乘在全身立牌放大倍数之上，1=不缩放；2026-11-09 起=设定身高比例）
+            float idleContentRatio = 1f; // UnitData.立牌主体占比（待机片人物主体占片高；1=不折算画布留白）
             float hoverHeight = 0f; // UnitData.离地高度（2026-09-27 拍板：飞行/悬浮单位纸片人整体上浮）
             float standForward = 0f; // UnitData.立牌前移（2026-10-14 拍板：俯视立牌视觉重心补偿，0=不移动）
             GameObject buildingModel = null; // UnitData.建筑模型（配置后以 3D 替代纸片立牌）
@@ -2338,6 +2364,7 @@ namespace GIC.Battle
                             prewarmClips.Add(d.当前动作片);
                     }
                 unitScale = unitData.额外缩放;
+                idleContentRatio = unitData.立牌主体占比;
                 hoverHeight = unitData.离地高度;
                 standForward = unitData.立牌前移;
                 buildingModel = unitData.建筑模型;

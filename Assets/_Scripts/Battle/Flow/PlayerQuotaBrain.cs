@@ -320,7 +320,7 @@ namespace GIC.Battle
         ///（角→旗→建=先铺战力抢节奏）。抽选=FNV-1a(seed‖playerId) mod 3——**不走 RollChance**
         ///（战斗 RNG 流为暴击专用〔EffectCompiler 唯一消费方〕，决策层消费会破「同 seed+同命令序列
         /// =同战局」回放不变式；哈希抽选同 seed 同战局+回放零漂移目标不变）；开局窗口内生效
-        ///（AITuning.开局策略窗口回合），窗口后回归态势桶序（议题⑦）</summary>
+        ///（AITuning.开局策略窗口秒数），窗口后回归态势桶序（议题⑦）</summary>
         private static int OpeningDeployVariant(int seed, string playerId)
         {
             unchecked
@@ -353,7 +353,7 @@ namespace GIC.Battle
         /// <summary>
         /// 部署候选（确定性，2026-10-23 强化批扩建筑档；凌晨批议题④⑦桶序化）：
         /// 三桶分拣（旗帜首铺/角色/其余建筑）+ **桶序动态决定**——
-        /// ①开局窗口内（≤AITuning.开局策略窗口回合）=per-局开局原型（seed 派生抽选，议题④）；
+        /// ①开局窗口内（≤AITuning.开局策略窗口秒数）=per-局开局原型（seed 派生抽选，议题④）；
         /// ②窗口后=态势桶序（议题⑦，petra 优先级预算队列映射）：发育=经济建筑优先（旗→建→角，
         /// 餐馆提前滚雪球）、守势=防御建筑优先（旗→建〔防御置顶〕→角）、压制/终局/相持=战力
         /// 输出优先（旗→角→建=现状序）；桶③内序含态势分档（经济/防御/军团置顶）。
@@ -401,7 +401,7 @@ namespace GIC.Battle
             // —— 桶序决定（议题④开局原型 × 议题⑦态势预算）——
             var stance = AIStrategist.StanceOf(_playerId);
             DeployBucket[] order;
-            bool openingWindow = turn <= AITuningConfig.Instance.开局策略窗口回合;
+            bool openingWindow = turn <= AITuningConfig.Instance.开局策略窗口秒数;
             if (openingWindow)
             {
                 int variant = OpeningDeployVariant(sim.Seed, _playerId);
@@ -833,7 +833,7 @@ namespace GIC.Battle
         /// false→无变奏、元能 +20 档双倍评分（延奏自身 buff/治疗对任何目标照常生效）。
         /// E-1：threat=威胁图（治疗救命档消费；null=无威胁上下文零加成）
         /// 死水修复（2026-10-20 决策八十四，用户拍板精确语义）：目标该 buff 已满层时降权——
-        /// 限时且快到期（剩余≤延奏续航临近到期回合，断了要重新叠层）=续航分；时长充足或永久=零新收益，
+        /// 限时且快到期（剩余≤延奏续航临近到期秒数，断了要重新叠层）=续航分；时长充足或永久=零新收益，
         /// 且变奏链/元能同步跳过（纯续航不构成行动理由——否则满层延奏恒压放权=自我延奏死水循环，
         /// 双 AI 观察局 T11 起实锤）；治疗原子照常（缺口判定自带过滤）。
         /// 未持有/未满层=全额（叠层+叠时高收益，拍板保留）。
@@ -882,7 +882,7 @@ namespace GIC.Battle
                             // 满层：限时且快到期=续航分（避免断档重新叠层）；时长充足/永久=零
                             buffCappedNoGain = true;
                             if (!existing.IsPermanent
-                                && existing.RemainingSeconds <= AITuningConfig.Instance.延奏续航临近到期回合)
+                                && existing.RemainingSeconds <= AITuningConfig.Instance.延奏续航临近到期秒数)
                                 value += AITuningConfig.Instance.延奏满层续航分;
                             break;
                         }

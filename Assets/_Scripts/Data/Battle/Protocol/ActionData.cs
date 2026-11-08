@@ -47,7 +47,7 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// 行动选择数据（选择阶段上交；字段按类型部分有效）
+    /// 行动数据（即时制：提交即校验即结算；字段按类型部分有效）
     /// </summary>
     [Serializable]
     public class ActionData
@@ -57,7 +57,7 @@ namespace GIC.Data
         public string unitId;
         public ActionType actionType;
 
-        [Header("回合")]
+        [Header("提交时刻（逻辑秒）")]
         public int turnNumber;
 
         [Header("移动参数")]

@@ -51,11 +51,11 @@ namespace GIC.Battle
         private static float DefendRatioEnter => AITuningConfig.Instance.守势进入战力比;
         private static float DefendRatioStay => AITuningConfig.Instance.守势保持战力比;
 
-        /// <summary>最小驻留回合数（防抖动）</summary>
-        private static int MinStanceHoldTurns => AITuningConfig.Instance.态势最小驻留回合;
+        /// <summary>最小驻留秒数（防抖动）</summary>
+        private static int MinStanceHoldTurns => AITuningConfig.Instance.态势最小驻留秒数;
 
-        /// <summary>发育期回合数（开局铺场）</summary>
-        private static int DevelopTurns => AITuningConfig.Instance.发育期回合数;
+        /// <summary>发育期秒数（开局铺场）</summary>
+        private static int DevelopTurns => AITuningConfig.Instance.发育期秒数;
 
         /// <summary>终局判据（1v1 形态）：敌方核心 HP 占比低于此值=全资源转火</summary>
         private static float EndgameCoreHpRatio => AITuningConfig.Instance.终局核心血量比;

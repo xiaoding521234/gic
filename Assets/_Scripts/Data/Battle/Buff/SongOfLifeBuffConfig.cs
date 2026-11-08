@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 namespace GIC.Data
 {
 
@@ -7,17 +8,20 @@ namespace GIC.Data
     [CreateAssetMenu(fileName = "Buff_SongOfLife", menuName = "Game/BuffConfig 歌声之环")]
     public class SongOfLifeBuffConfig : BuffConfig
     {
-        [Header("每回合对半径内敌人的伤害（% 施加者攻击力/层）")]
-        public int 每回合伤害百分比 = 10;
+        [Header("每 2 秒对半径内敌人的伤害（% 施加者攻击力/层）")]
+        [FormerlySerializedAs("每回合伤害百分比")]
+        public int 每拍伤害百分比 = 10;
 
-        [Header("每回合对半径内我方的治疗（% 施加者最大生命值/层——基准=芭芭拉自身）")]
-        public int 每回合治疗百分比 = 5;
+        [Header("每 2 秒对半径内我方的治疗（% 施加者最大生命值/层——基准=芭芭拉自身）")]
+        [FormerlySerializedAs("每回合治疗百分比")]
+        public int 每拍治疗百分比 = 5;
 
         [Header("基础元能获取（0命；2命起=C2EnergyGain 命座技能参数取代——决策七十二调换+复用丽莎同键）")]
         public int 基础元能获取 = 5;
 
-        [Header("每回合理智恢复（每层一枚，命令按目标合并总值）")]
-        public int 每回合理智恢复 = 1;
+        [Header("每 2 秒理智恢复（每层一枚，命令按目标合并总值）")]
+        [FormerlySerializedAs("每回合理智恢复")]
+        public int 每拍理智恢复 = 1;
 
         [Header("作用半径（切比雪夫，格；1命起 +C1Radius 命座技能参数——决策七十二调换+键名随生效层改）")]
         public int 作用半径 = 1;
@@ -36,10 +40,10 @@ namespace GIC.Data
         {
             switch (key)
             {
-                case KeyAuraDamagePercent: return 每回合伤害百分比;
-                case KeyAuraHealPercent: return 每回合治疗百分比;
+                case KeyAuraDamagePercent: return 每拍伤害百分比;
+                case KeyAuraHealPercent: return 每拍治疗百分比;
                 case KeyAuraEnergyGain: return 基础元能获取;
-                case KeyAuraSanityGain: return 每回合理智恢复;
+                case KeyAuraSanityGain: return 每拍理智恢复;
                 case KeyAuraRadius: return 作用半径;
             }
             return null;

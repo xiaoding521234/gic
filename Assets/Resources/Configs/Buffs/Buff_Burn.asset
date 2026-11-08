@@ -14,5 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   buffType: 1
   "\u4E13\u5C5E\u56FE\u6807": {fileID: 0}
-  "\u6BCF\u56DE\u5408\u4F24\u5BB3": 10
-  "\u6BCF\u7EA7\u6301\u7EED\u56DE\u5408": 3
+  "\u5173\u8054\u540D": 
+  "\u6BCF\u62CD\u4F24\u5BB3": 10
+  "\u6BCF\u7EA7\u6301\u7EED\u79D2\u6570": 3

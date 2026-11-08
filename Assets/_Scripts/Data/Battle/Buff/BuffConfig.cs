@@ -29,13 +29,13 @@ namespace GIC.Data
 
         // ==================== 关联描述占位符（2026-10-07 决策五十六：Buff 描述 {Key} 数值=BuffConfig 单源金色高亮） ====================
 
-        /// <summary>每回合伤害百分比（行为族光环通用）</summary>
+        /// <summary>每拍伤害百分比（行为族光环通用——效果拍每 2 秒）</summary>
         public const string KeyAuraDamagePercent = "AuraDamagePercent";
-        /// <summary>每回合治疗百分比（歌声之环）</summary>
+        /// <summary>每拍治疗百分比（歌声之环——效果拍每 2 秒）</summary>
         public const string KeyAuraHealPercent = "AuraHealPercent";
         /// <summary>基础元能获取（歌声之环）</summary>
         public const string KeyAuraEnergyGain = "AuraEnergyGain";
-        /// <summary>每回合理智恢复（歌声之环）</summary>
+        /// <summary>每拍理智恢复（歌声之环——效果拍每 2 秒）</summary>
         public const string KeyAuraSanityGain = "AuraSanityGain";
         /// <summary>作用半径（行为族光环通用）</summary>
         public const string KeyAuraRadius = "AuraRadius";
@@ -49,7 +49,7 @@ namespace GIC.Data
         public const string KeyStatBonus = "BonusPerStack";
         /// <summary>叠层上限（StatBuff 族）</summary>
         public const string KeyStatStackLimit = "StackLimit";
-        /// <summary>持续回合（StatBuff 族；&lt;0 渲染本地化「永久」）</summary>
+        /// <summary>持续秒数（StatBuff 族；&lt;0 渲染本地化「永久」）</summary>
         public const string KeyStatDurationTurns = "DurationTurns";
 
         /// <summary>全部占位符键（SkillDescriptionBuilder.BuildRelated 遍历集——单源防拼写漂移）</summary>

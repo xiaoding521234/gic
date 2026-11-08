@@ -578,7 +578,7 @@ namespace GIC.UI
                 ?.GetRandomClip();
             if (clip == null)
             {
-                GICLog.Warn($"[BattleScreen] 战斗地图 {mapConfig.mapName} 绑定位置 {mapConfig.position} 无 {period} 时段音乐，等待下回合自愈重试");
+                GICLog.Warn($"[BattleScreen] 战斗地图 {mapConfig.mapName} 绑定位置 {mapConfig.position} 无 {period} 时段音乐，等待下一秒拍自愈重试");
                 return;
             }
 

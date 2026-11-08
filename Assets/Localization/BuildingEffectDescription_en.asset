@@ -19,23 +19,23 @@ MonoBehaviour:
     m_Items: []
   m_TableData:
   - m_Id: 3013
-    m_Localized: At the end of each turn, restores {Value} energy to allied non-building
+    m_Localized: Every 2 seconds, restores {Value} energy to allied non-building
       units within a radius of {Radius} (downed characters included).
     m_Metadata:
       m_Items: []
   - m_Id: 3014
-    m_Localized: At the end of each turn, its owner gains {Value} Mora.
+    m_Localized: Every 2 seconds, its owner gains {Value} Mora.
     m_Metadata:
       m_Items: []
   - m_Id: 3015
-    m_Localized: Starts with {InitEnergy} energy and gains {Value} more at the end
-      of each turn. Whenever its energy reaches {Threshold} or above, immediately
-      summons 1 {SummonUnit}, consuming {Threshold} energy.
+    m_Localized: Starts with {InitEnergy} energy and gains {Value} more every 2 seconds.
+      Whenever its energy reaches {Threshold} or above, immediately summons 1 {SummonUnit},
+      consuming {Threshold} energy.
     m_Metadata:
       m_Items: []
   - m_Id: 3016
-    m_Localized: At the end of each turn, heals allied living units below {Threshold}%
-      HP for an amount equal to {Value}% of this building's ATK.
+    m_Localized: Every 2 seconds, heals allied living units below {Threshold}% HP
+      for an amount equal to {Value}% of this building's ATK.
     m_Metadata:
       m_Items: []
   references:

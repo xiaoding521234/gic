@@ -28,7 +28,7 @@ namespace GIC.Battle
         /// <summary>叠层上限通道（AttackUp 用=StackLimit 参数；协议命令不携带）</summary>
         public int StackLimit;
 
-        /// <summary>持续回合通道（AttackUp 用=Duration 参数——工厂按此构造初始计时）</summary>
+        /// <summary>持续秒数通道（AttackUp 用=Duration 参数——工厂按此构造初始计时）</summary>
         public int DurationTurns;
 
         /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff〔燃烧/冻结/超导减防〕由

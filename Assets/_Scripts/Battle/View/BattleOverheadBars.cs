@@ -58,7 +58,7 @@ namespace GIC.Battle
         [SerializeField] private float Buff图标间距 = 8f;
         [Tooltip("能量条底边到 Buff 图标上缘的间隙（像素）——图标不遮血条/能量条（2026-10-07 报障返修：原「到图标中心」10px 让 36px 图标上盖能量条/血条）")]
         [SerializeField] private float Buff行距 = 3f;
-        [Tooltip("层数/剩余回合角标字号")]
+        [Tooltip("层数/剩余秒数角标字号")]
         [SerializeField] private float Buff角标字号 = 16f;
 
         [Header("装备图标行（装备批 2026-10-18 拍板：血条右边，参考 Buff 图标方式）")]
@@ -439,7 +439,7 @@ namespace GIC.Battle
                 }
 
                 // 角标（行空间绝对摆位——勿挂 tile 内：tile 带 36/64 缩放会连带缩字号）
-                // 层数=右下（StatBuff 族 Level=叠层数；单层=1 不显示防噪）；剩余回合=左上
+                // 层数=右下（StatBuff 族 Level=叠层数；单层=1 不显示防噪）；剩余秒数=左上
                 // （永久 Buff remainingTurns<0 如歌声之环/寒冰之棱不计时——既有拍板口径）
                 if (buff.level >= 2)
                     NewNumber(item.BuffRow, "Stacks", new Vector2(x + cornerOffset, -cornerOffset),

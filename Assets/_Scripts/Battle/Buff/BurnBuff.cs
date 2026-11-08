@@ -5,8 +5,8 @@ using GIC.Data;
 namespace GIC.Battle
 {
     /// <summary>
-    /// 燃烧（docs/06 元素与反应系统）：每回合结束受到〔Buff_Burn.asset 每回合伤害〕点火伤，
-    /// 持续〔每级持续回合〕× 级别（数值单源=BuffConfig 资产，docs/39——调平衡改 Inspector 零代码）。
+    /// 燃烧（docs/06 元素与反应系统）：每 2 秒受到〔Buff_Burn.asset 每拍伤害〕点火伤，
+    /// 持续〔每级持续秒数〕× 级别（数值单源=BuffConfig 资产，docs/39——调平衡改 Inspector 零代码）。
     /// 来源=火+草反应（B4 接）；B2 由调试技能附带施加验证 DoT 链路。
     /// 草元素延长机制（附着草→消耗草→延长 3 回合 × 层数）B4 随元素反应落地。
     /// **0 层终点语义（2026-10-15 决策七十四修订决策二十三）**：燃烧火伤 tick=0 层火伤——
@@ -25,7 +25,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = Mathf.Max(1, level);
-            RemainingSeconds = Cfg.每级持续回合 * Level;
+            RemainingSeconds = Cfg.每级持续秒数 * Level;
         }
 
         public override List<BattleEffect> OnTurnEnd()
@@ -46,7 +46,7 @@ namespace GIC.Battle
                     Attacker = attacker,
                     Target = owner,
                     Element = (int)ElementType.Pyro,
-                    FlatDamage = Cfg.每回合伤害,
+                    FlatDamage = Cfg.每拍伤害,
                 }, 0f, attach: true, layers: 0));
             return effects;
         }

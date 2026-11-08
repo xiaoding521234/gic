@@ -32,34 +32,34 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 26802933513924608
-    m_Localized: "\xB7Stacks up to {BaseStackLimit}\n\xB7At each turn end, deals
-      {AuraDamagePercent} Cryo DMG to enemies within {AuraRadius} cm of the holder\n\xB7Shatters
-      when the holder's Energy exceeds {ShatterEnergyThreshold}, healing the holder
-      for {ShatterHealPercent} per shard\n\xB7When recast at max stacks, overflowing
+    m_Localized: "\xB7Stacks up to {BaseStackLimit}\n\xB7Every 2 seconds, deals {AuraDamagePercent}
+      Cryo DMG to enemies within {AuraRadius} cm of the holder\n\xB7Shatters when
+      the holder's Energy exceeds {ShatterEnergyThreshold}, healing the holder for
+      {ShatterHealPercent} per shard\n\xB7When recast at max stacks, overflowing
       shards shatter immediately, healing the holder for {ShatterHealPercent} each\n\xB7Persists
       even if the holder is downed; shattering while downed grants no healing"
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256256
-    m_Localized: "\xB7Single stack\n\xB7At each turn end, deals {AuraDamagePercent}
-      Hydro DMG to enemies within {AuraRadius} cm of the holder\n\xB7At each turn
-      end, heals allies within {AuraRadius} cm for {AuraHealPercent} of the applier,
-      grants them {AuraEnergyGain} Energy, restores {AuraSanityGain} Sanity and applies
+    m_Localized: "\xB7Single stack\n\xB7Every 2 seconds, deals {AuraDamagePercent}
+      Hydro DMG to enemies within {AuraRadius} cm of the holder\n\xB7Every 2 seconds,
+      heals allies within {AuraRadius} cm for {AuraHealPercent} of the applier, grants
+      them {AuraEnergyGain} Energy, restores {AuraSanityGain} Sanity and applies
       Hydro to them\n\xB7Vanishes when the holder is downed"
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256257
     m_Localized: Only one may exist at a time; initially marks Lisa herself. When
       the holder takes enemy DMG, lightning strikes the attacker's position, dealing
-      30% of the holder's ATK as Electro DMG to enemies within 1 tile, once per turn.
-      Lisa's Enso transfers it to the coordinated ally; returns to Lisa if the holder
-      vanishes.
+      30% of the holder's ATK as Electro DMG to enemies within 1 tile, once every
+      2 seconds. Lisa's Enso transfers it to the coordinated ally; returns to Lisa
+      if the holder vanishes.
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256258
-    m_Localized: At each turn end, pulls enemies within 3 tiles 1 tile toward the
+    m_Localized: Every 2 seconds, pulls enemies within 3 tiles 1 tile toward the
       field and deals 50% ATK Anemo DMG; grants allied characters a shield of 20%
-      ATK and 5 Tenacity. Extends Dandelion Wind duration by 1 turn. Lasts 3 turns.
+      ATK and 5 Tenacity. Extends Dandelion Wind duration by 1 second. Lasts 3 seconds.
     m_Metadata:
       m_Items: []
   - m_Id: 26802933564256259
@@ -76,7 +76,7 @@ MonoBehaviour:
   - m_Id: 37301200819400704
     m_Localized: "\xB7The holder's Move SPD is increased by {BonusPerStack}\n\xB7Stacks
       up to {StackLimit} times, duration extends with each stack\n\xB7Lasts {DurationTurns}
-      turns"
+      seconds"
     m_Metadata:
       m_Items: []
   - m_Id: 37631287712362496
@@ -96,7 +96,7 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 40904311723077632
     m_Localized: "\xB7Removes and prevents stealth\n\xB7Fog on its tile is broken
-      for the applier's side only\n\xB7Lasts {DurationTurns} turns"
+      for the applier's side only\n\xB7Lasts {DurationTurns} seconds"
     m_Metadata:
       m_Items: []
   references:

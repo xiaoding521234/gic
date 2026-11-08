@@ -31,7 +31,7 @@ namespace GIC.Battle
     /// 〔碎裂元能阈值百分比〕上限 → 每层治疗〔碎裂治疗百分比〕施加者攻击力并移除
     /// （碎裂后当回合末自然不再 tick）；**倒下同判**（2026-10-15 拍板「凯亚尸体的寒冰之棱会因此
     /// 碎裂」——倒下碎裂不治疗 healPerShard=0〔血量恒 0 铁律〕，仅移除=尸体停止 tick）。
-    /// tick：每回合结束对持有者切比雪夫〔作用半径〕内敌人造成〔每回合伤害百分比〕施加者攻击力
+    /// tick：每 2 秒对持有者切比雪夫〔作用半径〕内敌人造成〔每拍伤害百分比〕施加者攻击力
     /// 冰伤（含尸体——鞭尸同 Burn/歌声之环先例；**走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01
     /// 现场取证返修：平直值口径致减防乘区对 tick 无效报障〕、不经反应预览=不触发反应/不附着）。
     /// 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者——BurnBuff 归属同款兜底）。
@@ -123,7 +123,7 @@ namespace GIC.Battle
                             Attacker = attacker,
                             Target = unit,
                             Element = (int)ElementType.Cryo,
-                            AttackPercent = Cfg.每回合伤害百分比,
+                            AttackPercent = Cfg.每拍伤害百分比,
                         }, BattleMetrics.LayerBeatSeconds(layer)));
                     if (applyDefDown)
                         // 2命：冰棱减防（决策五十七具名 buff）——**零注入**：每层加成/叠层上限/持续

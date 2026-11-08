@@ -6,7 +6,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 冻结（docs/06：水 + 冰 → 冰冻〔Buff_Freeze.asset 每级持续回合〕× 级别 回合，重复冰冻取时间更长者
+    /// 冻结（docs/06：水 + 冰 → 冰冻〔Buff_Freeze.asset 每级持续秒数〕× 级别 秒，重复冰冻取时间更长者
     /// ——数值单源=BuffConfig 资产，docs/39）。
     /// 硬控：挂载即写入 UnitStatus.Frozen（不可行动，docs/05 §5.5），到期解除。
     /// 冻结反应本身不是元素伤害（docs/06 §6.3"不涉及附着"），命中伤害正常结算。
@@ -22,7 +22,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = Mathf.Max(1, level);
-            RemainingSeconds = Cfg.每级持续回合 * Level;
+            RemainingSeconds = Cfg.每级持续秒数 * Level;
         }
 
         public override List<BattleEffect> OnTurnEnd()

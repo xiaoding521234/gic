@@ -764,11 +764,14 @@ namespace GIC.Battle
         /// <param name="standForward">立牌前移（格；UnitData.立牌前移，2026-10-14 拍板新增）：倾斜组沿
         /// billboard local -z（朝相机方向）平移——俯视视角立牌（协议核心塔）画面重心偏画布上部，
         /// 格心摆放时俯角观察视觉偏格深处，正值拉近相机补偿；底座圆盘/判定恒留格心不动</param>
+        /// <param name="idleContentRatio">待机片主体占比（UnitData.立牌主体占比，2026-11-09 新增）：
+        /// 人物主体像素高 ÷ 片高；视频 quad 高按它折算放大（底边仍贴地），把画布留白折掉——
+        /// 各角色主体真实同高；0/1=不折算（旧行为）；头顶条锚点不受影响（恒=0.55×额外缩放）</param>
         public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color ownerColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, VideoClip idleVideo = null,
             float hoverHeight = 0f, float cylinderDiameter = 0f, float standForward = 0f,
-            GameObject buildingModel = null, float buildingModelWidth = 1f)
+            GameObject buildingModel = null, float buildingModelWidth = 1f, float idleContentRatio = 1f)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -833,7 +836,12 @@ namespace GIC.Battle
             if (buildingModel == null && idleVideo != null && BattleViewFactory.ChromaKeyShader != null)
             {
                 view._spriteVisible = false; // 视频路径建立：兜底 sprite 意图关（意图态，迷雾批单出口落地）
-                float videoDisplayHeight = AvatarHeight * avatarScale;
+                // 主体占比折算（2026-11-09 尺寸归一化）：quad 高按「人物主体像素高 ÷ 片高」放大、底边仍贴地——
+                // 画布里的空白留白不再让角色白矮（安柏待机片留白 0.759 vs 凯亚/芭芭拉 0.973）；
+                // 折算后各片主体屏上高 = AvatarHeight×avatarScale×（该片主体占片比 ÷ comp 归一），
+                // 头顶条锚点仍用 0.55×额外缩放（=真实身高），色条不随留白飘高
+                float contentRatio = idleContentRatio > 0.05f ? Mathf.Min(idleContentRatio, 1.2f) : 1f;
+                float videoDisplayHeight = AvatarHeight * avatarScale / contentRatio;
                 float videoAspect = idleVideo.height > 0 ? idleVideo.width / (float)idleVideo.height : 1f;
                 view._videoRt = new RenderTexture((int)idleVideo.width, (int)idleVideo.height, 0,
                     RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);

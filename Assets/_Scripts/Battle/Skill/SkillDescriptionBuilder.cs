@@ -39,7 +39,7 @@ namespace GIC.Battle
                 string rendered;
                 if (key == GIC.Data.BuffConfig.KeyStatDurationTurns && value.Value < 0)
                 {
-                    // 永久声明（持续回合<0 与技能参数 Duration<0 同口径：本地化「永久」金色单源）
+                    // 永久声明（持续秒数<0 与技能参数 Duration<0 同口径：本地化「永久」金色单源）
                     rendered = GIC.Data.SkillParam.LocalizedPermanentDisplay();
                 }
                 else

@@ -112,7 +112,7 @@ MonoBehaviour:
       Ring</link></u></color>\n\xB7[C1] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color> radius +{C1Radius}, no longer applies elements to allies\n\xB7[C2]
       <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song Ring</link></u></color>
-      per-turn Energy gain increased to {C2EnergyGain}\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
+      Energy gained every 2 seconds increases to {C2EnergyGain}\n\xB7[C3] <color=#FFD700><u><link=\"Buff:\u6B4C\u58F0\u4E4B\u73AF\">Song
       Ring</link></u></color> stack limit +{C3StackLimit}"
     m_Metadata:
       m_Items: []
@@ -136,7 +136,7 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 4001003
     m_Localized: "\xB7While the contract lasts, the signee's Move SPD is reduced
-      by {MoveSpeedReduction}, but they gain 10/15/20 Energy at each turn end\n\xB7The
+      by {MoveSpeedReduction}, but they gain 10/15/20 Energy every 2 seconds\n\xB7The
       contract ends automatically after the signee has moved {ContractBreakMoveCount}
       times\n\xB7Refusal: the signee loses 30/45/60 Energy; if Energy is insufficient,
       the shortfall is converted to Mora at {PlunderRate} and plundered by the contractor\n\xB7Costs
@@ -160,7 +160,7 @@ MonoBehaviour:
     m_Localized: "\xB7Teleport to an empty tile within {CastRadius} cm, striking
       lightning at both the start and end points\n\xB7The lightning deals {Damage}
       Electro DMG to enemies within {EffectRadius} cm\n\xB7Enemies hit by lightning
-      at both points are Stunned for {Duration} turns"
+      at both points are Stunned for {Duration} seconds"
     m_Metadata:
       m_Items: []
   - m_Id: 3004002
@@ -178,7 +178,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3004004
-    m_Localized: "\xB7Stun enemies within {EffectRadius} cm for {Duration} turns\n\xB7If
+    m_Localized: "\xB7Stun enemies within {EffectRadius} cm for {Duration} seconds\n\xB7If
       the <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose Thorn</link></u></color>
       holder is a Mondstadt character (excluding Lisa), trigger their Henka; otherwise
       grant them {EnergyGain} Energy"
@@ -191,7 +191,7 @@ MonoBehaviour:
       hits of {C1NeedleDamage} Electro DMG to the nearest enemy within {C1NeedleRadius}
       cm of the holder\n\xB7[C2] Henka also grants {C2EnergyGain} Energy to allies
       in range; the Rose Thorn lightning triggers at most {C2TriggerLimit} times
-      per turn\n\xB7[C3] Units carrying <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
+      every 2 seconds\n\xB7[C3] Units carrying <color=#FFD700><u><link=\"Buff:\u8537\u8587\u4E4B\u523A\">Rose
       Thorn</link></u></color> gain {C3DamageBonus} DMG Bonus"
     m_Metadata:
       m_Items: []
@@ -209,7 +209,7 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3011003
     m_Localized: "\xB7Create a <color=#FFD700><u><link=\"Buff:\u84B2\u516C\u82F1\u9886\u57DF\">Dandelion
-      Field</link></u></color> for {Duration} turns"
+      Field</link></u></color> for {Duration} seconds"
     m_Metadata:
       m_Items: []
   - m_Id: 3011004
@@ -220,7 +220,7 @@ MonoBehaviour:
   - m_Id: 3011005
     m_Localized: "\xB7If Jean is on a Dandelion Wind, dash along its direction\n\xB7After
       leaving the wind, dash up to {DashRange} more tiles\n\xB7Passing other Dandelion
-      Winds while dashing: Move SPD +{MoveSpeedBonus} for {MoveSpeedDuration} turns;
+      Winds while dashing: Move SPD +{MoveSpeedBonus} for {MoveSpeedDuration} seconds;
       dash direction becomes that wind's direction and dash range refreshes (each
       wind counts once)\n\xB7When the dash is blocked by an enemy, deal {Damage}+{MoveSpeedDamage}
       DMG to it, counted as Skill DMG\n\xB7If Jean is not on a wind, teleport to
@@ -231,16 +231,16 @@ MonoBehaviour:
     m_Localized: "\xB7[C0] When Jean enters battle, all allied units gain a {C0Shield}
       shield\n\xB7[C1] Gale Blade can hit allied characters (dealing no DMG), max
       range +{C1RangeBonus}\n\xB7[C2] Dandelion Wind lasts {C2DurationBonus} more
-      turns, and each time it pulls an enemy it also deals {C2ThornDamage} Anemo
+      seconds, and each time it pulls an enemy it also deals {C2ThornDamage} Anemo
       DMG to it\n\xB7[C3] Dandelion Winds created by Jean's movement blow opposite
       to her movement direction"
     m_Metadata:
       m_Items: []
   - m_Id: 3012001
     m_Localized: "\xB7Choose one of the four cardinal directions and enter a charging
-      state\n\xB7After charging for {ChargeTurns} turns, deal {Damage} Geo DMG to
-      all enemies in the 3\xD73 area ahead\n\xB7While charging: Move SPD -10, Skills
-      disabled, can be interrupted by hard CC"
+      state\n\xB7After charging for {ChargeTurns} seconds, deal {Damage} Geo DMG
+      to all enemies in the 3\xD73 area ahead\n\xB7While charging: Move SPD -10,
+      Skills disabled, can be interrupted by hard CC"
     m_Metadata:
       m_Items: []
   - m_Id: 3012002
@@ -258,7 +258,7 @@ MonoBehaviour:
   - m_Id: 3012005
     m_Localized: "\xB7[C1] When Noelle loses shield, she gains Energy equal to {C1ShieldToEnergyRate}
       of the shield lost\n\xB7[C2] When her Skill hits an enemy, it also Stuns for
-      {C2StunDuration} turns and she gains a {C2Shield} shield\n\xB7[C3] Noelle's
+      {C2StunDuration} seconds and she gains a {C2Shield} shield\n\xB7[C3] Noelle's
       weapon takes the element of her current shield; with no elemental shield, it
       takes Geo"
     m_Metadata:
@@ -275,6 +275,10 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3002006
+    m_Localized: "\xB7Sprint in one of the four cardinal directions"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3003006
     m_Localized: "\xB7Sprint in one of the four cardinal directions"
     m_Metadata:
       m_Items: []

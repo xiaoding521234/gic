@@ -11,7 +11,7 @@ namespace GIC.Battle
     /// 豁免；客户端=BattleFog 强制现身+IsUnitVisible 规划期同享），所在格迷雾被施加者阵营破除
     /// （Host=RevealFog 暴露段+客户端 EvaluateReveal 随行揭雾 trail；**非全队公开**——施加者阵营
     /// 独享，2v2 队友共享/敌方无感）。无属性修改、无回合末结算；时长=Buff_VisionExposure 资产
-    /// （持续回合 3）。重施加=Merge 时长取大（冻结同款刷新语义，非累加）。
+    /// （持续秒数 3）。重施加=Merge 时长取大（冻结同款刷新语义，非累加）。
     /// </summary>
     public class VisionExposureBuff : BaseBuff
     {
@@ -23,7 +23,7 @@ namespace GIC.Battle
         {
             Config = config;
             Level = 1;
-            RemainingSeconds = Cfg.持续回合;
+            RemainingSeconds = Cfg.持续秒数;
         }
 
         private static readonly List<BattleEffect> _empty = new List<BattleEffect>();
