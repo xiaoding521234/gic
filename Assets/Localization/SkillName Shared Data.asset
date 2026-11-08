@@ -259,6 +259,10 @@ MonoBehaviour:
     m_Key: Kaeya_Move
     m_Metadata:
       m_Items: []
+  - m_Id: 3003006
+    m_Key: Barbara_Move
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

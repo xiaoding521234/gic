@@ -91,6 +91,9 @@ namespace GIC.Data
 
         [InspectorName("芭芭拉命座")]
         Barbara_Constellation = 3003005,
+
+        [InspectorName("疾行")]
+        Barbara_Move = 3003006,
         #endregion
 
         #region 丽莎 (3004)
