@@ -190,9 +190,9 @@ namespace GIC.Battle
         // 1 格=1 米=100 厘米=1 世界单位（CellSizeCm 常量真源=GIC.Data.CellMetrics，BattleCell 同址）；
         // 单位连续位置=厘米定点整数（确定性纪律）；碰撞圆=受击圆柱统一 0.5 格（CylinderDiameterOf 同源）。
 
-        /// <summary>默认移速基线（厘米/秒——蓝图 §3.3：全员统一 100=1 格/s；资产迁移〔UnitConfig
-        /// 移速 30/50→100〕随 P3 数值批，本常量=新轨默认回落+P3 迁移对照值）</summary>
-        public const int DefaultMoveSpeedCm = 100;
+        /// <summary>默认移速基线（厘米/秒）——2026-11-07 拍板「默认 50」（0.5 格/s；原 P3 全员 100 基线
+        /// 作废）。与 UnitConfig.GetEffectiveMoveSpeed 的资产回落值必须同值，单源语义见那里。</summary>
+        public const int DefaultMoveSpeedCm = 50;
 
         /// <summary>多层 Buff 第 i 层拍时刻（秒，相对段播放起点）——逐层错峰单源
         /// （第 i 层=i×BuffLayerStaggerSeconds；消费方=光环 Buff OnTurnEnd 声明 PendingAuraHit/Heal/

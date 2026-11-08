@@ -446,7 +446,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 100
+    baseMoveSpeed: 60
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
@@ -1302,7 +1302,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 100
+    baseMoveSpeed: -64
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
@@ -2886,7 +2886,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 100
+    baseMoveSpeed: -64
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64
@@ -3374,7 +3374,7 @@ MonoBehaviour:
     baseAttack: -64
     baseDefense: -64
     baseAttackSpeed: -64
-    baseMoveSpeed: 100
+    baseMoveSpeed: -64
     baseLuck: -64
     baseTenacity: -64
     baseMastery: -64

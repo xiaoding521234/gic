@@ -230,8 +230,8 @@ namespace GIC.Data
             public int GetEffectiveAttack() => IsSpecified(baseAttack) ? baseAttack : GetAttackByWeaponType();
             public int GetEffectiveAttackSpeed() => IsSpecified(baseAttackSpeed) ? baseAttackSpeed : GetAttackSpeedByWeaponType();
             public int GetEffectiveDefense() => IsSpecified(baseDefense) ? baseDefense : 0;
-            // 移速回落 100（决策九十五 P3，蓝图 §3.3「全员统一 100cm/s=1 格/s」；显式覆写资产批同步迁 100）
-            public int GetEffectiveMoveSpeed() => IsSpecified(baseMoveSpeed) ? baseMoveSpeed : 100;
+            // 移速回落 50（2026-11-07 拍板「默认移速改为 50」——原 P3 全员 100 基线作废；安柏显式 60）
+            public int GetEffectiveMoveSpeed() => IsSpecified(baseMoveSpeed) ? baseMoveSpeed : 50;
             public int GetEffectiveLuck() => IsSpecified(baseLuck) ? baseLuck : 0;
             public int GetEffectiveTenacity() => IsSpecified(baseTenacity) ? baseTenacity : 0;
             public int GetEffectiveMastery() => IsSpecified(baseMastery) ? baseMastery : 0;

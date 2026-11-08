@@ -30,7 +30,8 @@ namespace GIC.Battle
         /// <summary>
         /// 移动步数上限（Host 权威收口）：移动技能 MoveDistance 按基准换算（2026-09-23 用户拍板
         /// 「拼接后为10%移速」——BasedOnMoveSpeed=百分比×当前移速，SkillData.ResolveMoveDistance；
-        /// 安柏 50 移速→5 格、凯亚 30→3 格）；移速读 UnitStats 当前值（含 Buff——减速缩短移动距离）。
+        /// 2026-11-07 移速基线改 50 后：安柏 60→6 格、其余 50→5 格）；移速读 UnitStats 当前值
+        /// （含 Buff——减速缩短移动距离）。
         /// </summary>
         public static int MaxMoveDistance(Unit unit)
         {
@@ -39,7 +40,7 @@ namespace GIC.Battle
                 foreach (var skill in unit.Skills)
                 {
                     if (skill?.RawData?.skillType != SkillType.Move) continue;
-                    int moveSpeed = unit.GetUnitComponent<UnitStats>()?.MoveSpeed ?? 30;
+                    int moveSpeed = unit.GetUnitComponent<UnitStats>()?.MoveSpeed ?? BattleMetrics.DefaultMoveSpeedCm;
                     return skill.RawData.ResolveMoveDistance(moveSpeed);
                 }
             }

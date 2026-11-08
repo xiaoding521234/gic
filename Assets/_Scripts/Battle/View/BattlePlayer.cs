@@ -30,9 +30,6 @@ namespace GIC.Battle
         [Tooltip("播放速率倍率（1=按公式实时；压缩片间等待用）")]
         [SerializeField] private float _playbackSpeed = 1f;
 
-        [Tooltip("被挡撞墙探出幅度（格距比例；移动被挡=向被挡方向探出再弹回，逻辑位置不变，2026-09-21）")]
-        [SerializeField, Range(0.05f, 0.9f)] private float 被挡撞墙探出幅度 = 0.45f;
-
         [Header("立牌视觉")]
         [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
         [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
@@ -231,10 +228,6 @@ namespace GIC.Battle
         /// 逐段+逐帧自检发现失配即自废（防双补间同帧双写 jitter——玩家连点重定目标/AI 0.5s 重决策）</summary>
         private readonly Dictionary<string, int> _moveGeneration = new Dictionary<string, int>();
 
-        /// <summary>被挡弹回冷却（逐单位，unscaledTime）：即时制拥挤近战里停点每 0.5 秒微变——
-        /// 只靠「已停在停点」判据仍会每拍弹一次；冷却把反馈收敛到 ~1 秒一次（2026-11-05 闪烁修复）</summary>
-        private readonly Dictionary<string, float> _lastBlockedBumpTime = new Dictionary<string, float>();
-
         /// <summary>移动播放中的单位集（世代开始加入、finally 世代匹配才移除）——OnSnapshot 位置自愈
         /// 的让位表（移动中不回拉：补间与模拟同速推进，1s 滞后快照回拉会抖）</summary>
         private readonly HashSet<string> _activeMovePlayback = new HashSet<string>();
@@ -285,15 +278,10 @@ namespace GIC.Battle
         /// <summary>注入单位显示色解析器（HUD Bind 调用——先于 BattleStart 建场）</summary>
         public void SetPlayerColorOf(Func<string, Color> resolver) => _playerColorOf = resolver;
 
-        /// <summary>当前立牌布局态：true=散开（选择阶段展开布局）/ false=收拢（执行阶段重叠格心）——两态模型（docs/22 §11）</summary>
-        private bool _spreadFormations;
-
         private const float MoveStepSeconds = BattleMetrics.MoveStepSeconds;
         // #10 审查批：段播放 pacing 常量收口 BattleMetrics（Host/客户端契约单源——原为客户端内联字面量）
         private const float CommandStaggerSeconds = BattleMetrics.CommandStaggerSeconds;
         private const float TurnEndDelaySeconds = BattleMetrics.TurnEndDelaySeconds; // 回合结束段固定节拍（不按攻速排程）
-        private const float BlockedBumpOutSecondsFactor = 0.75f;  // 撞墙探出时长 = 步进节奏 × 0.75（缓出）
-        private const float BlockedBumpBackSecondsFactor = 0.55f; // 撞墙弹回时长 = 步进节奏 × 0.55（快出缓停）
 
         /// <summary>同段直击节拍配对状态（§107 追记，2026-10-02 单表化收口：原双表中
         /// _segmentLastDirectDamageDelay 恒为 beats 末项的镜像冗余，合一）。beats=该攻击者本段
@@ -359,10 +347,10 @@ namespace GIC.Battle
 
         private void OnPhaseChangedForFormations(BattlePhase phase, int turn)
         {
-            // 两态模型（docs/18 决策二 2026-09-17 修订）：执行阶段收拢重叠格心（特效锚=锚全部单位）；
-            // 选择阶段自动散开展示（复用旧队形偏移为展开布局），无需悬停/选中触发
-            _spreadFormations = phase == BattlePhase.Selecting;
-            RefreshAllFormations(_spreadFormations);
+            // 2026-11-07 拍板：同格多单位不再散开站队（「自然即可」）——原选择阶段散开/执行阶段收拢的
+            // 两态模型退役，任何阶段都贴各自权威站位（重叠显示）。相位变化仍做一次归零重放，
+            // 用于收敛历史上可能残留的队形偏移。
+            RefreshAllFormations();
         }
 
         // P6 残留审计 D5（docs/active/49）：SetPlaybackSpeed 无调用方（回放倍率语义随回合机退役），
@@ -662,8 +650,7 @@ namespace GIC.Battle
             foreach (var state in message.initialSnapshot.units)
                 CreateView(state);
 
-            _spreadFormations = true; // 开局即散开（StartBattle 随即进选择阶段，事件驱动的散开为幂等重排）
-            RefreshAllFormations(_spreadFormations);
+            RefreshAllFormations(); // 开局归位（同格重叠=预期，2026-11-07 拍板）
             LatestSnapshot = message.initialSnapshot;
             SnapshotUpdated?.Invoke(LatestSnapshot);
             _fog?.OnBattleBuilt(); // 迷雾批 2026-10-17：新战斗探索集归零+初始揭雾（模式 None 时 _fog=null 直通）
@@ -1356,28 +1343,14 @@ namespace GIC.Battle
                                 _moveGeneration[command.actorUnitId] =
                                     (_moveGeneration.TryGetValue(command.actorUnitId, out var prevGen) ? prevGen : 0) + 1;
                                 _activeMovePlayback.Remove(command.actorUnitId);
-                                Vector3 beforeStop = mover.transform.position;
                                 var stopWorld = BoardCmToWorld(command.hitX, command.hitY);
                                 mover.ApplyPosition(stopWorld);
-                                mover.Cell = BattleCell.FromCm(command.hitX, command.hitY); // 停点格（离开移动态后
-                                // 队形重排/被挡弹回兜底按真实停点分组，勿留旧的路径终点格）
+                                mover.Cell = BattleCell.FromCm(command.hitX, command.hitY); // 停点格（勿留旧的路径终点格：
+                                // 迷雾/命中判定等按 Cell 消费）
                                 mover.SetMoveAnimation(false);
-                                // 被挡弹回仅在「确实朝墙推进了一段」时播放（2026-11-05 闪烁修复）：即时制下
-                                // AI 每 0.5 秒重决策，单位持续顶墙会每拍收到一条停点相同的校正命令——旧实现
-                                // 每次重播探出/弹回，表现为角色原地高频抖动；已停在停点（<15cm）＝重复顶墙，
-                                // 静默落位即可
-                                bool advanced = new Vector2(beforeStop.x - stopWorld.x, beforeStop.z - stopWorld.z)
-                                    .magnitude > 0.15f;
-                                _lastBlockedBumpTime.TryGetValue(command.actorUnitId, out var lastBump);
-                                bool bumpReady = Time.unscaledTime - lastBump > 0.9f;
-                                if (command.metadata == BattleCommand.MoveBlocked && advanced && bumpReady)
-                                {
-                                    _lastBlockedBumpTime[command.actorUnitId] = Time.unscaledTime;
-                                    playbacks.Add(StartCoroutine(PlayBlockedBumpCoroutine(mover,
-                                        stopWorld, command.direction, 0.25f,
-                                        _moveGeneration.TryGetValue(command.actorUnitId, out var bumpGen) ? bumpGen : 0,
-                                        command.actorUnitId)));
-                                }
+                                // 被挡=直接停在停点（2026-11-07 拍板「不需要弹回，就和大多数游戏一样」）：
+                                // 原「探出→弹回」表现已整体移除——连续空间下 AI 每 0.5s 重决策会对同一点反复
+                                // 下发校正命令，任何顶墙反馈都会退化成原地高频抖动。
                             }
                             else
                             {
@@ -1696,7 +1669,7 @@ namespace GIC.Battle
                             // 新登场立即按当前布局态入位（两态模型：执行阶段=收拢重叠格心）
                             if (_views.TryGetValue(command.summonUnit.unitId, out var summoned))
                                 summoned.ApplyPosition(_board.CellToWorld(command.summonUnit.position));
-                            RefreshAllFormations(_spreadFormations);
+                            RefreshAllFormations();
                             // 迷雾追拍七：视野缓存预热（召唤单位不在当前快照——防部署先揭回落半径）
                             // +敌方立即隐藏（不等下一帧评估——「闪一下才隐藏」报障根因）
                             _fog?.OnUnitSummoned(command.summonUnit);
@@ -1775,7 +1748,7 @@ namespace GIC.Battle
                 yield return playback;
 
             // 按当前布局态收拢/散开重排（执行阶段=收拢重叠格心；阶段切换事件负责切态）
-            RefreshAllFormations(_spreadFormations);
+            RefreshAllFormations();
 
             // P6 退役件清理：片播放完成确认（SegmentAck）随 ack 门控退役——Host 已无监听
             //（旧「等全体 ack 才结算下一片」语义随回合机退役；死发送=每段刷
@@ -1821,7 +1794,6 @@ namespace GIC.Battle
                 // speedCm=施放时刻实际移速含 Buff，0=回落默认；_playbackSpeed 回放倍率沿用）
                 float speedWorldPerSec = (command.speedCm > 0 ? command.speedCm : BattleMetrics.DefaultMoveSpeedCm)
                     / (float)CellMetrics.CellSizeCm;
-                float lastStepSeconds = 0.25f;
                 // 连续移动（2026-11-05「角色闪烁/瞬移」修复）：起点=立牌当前视觉位，并跳过已经走过的
                 // 路径点。AI 每 0.5 秒重决策、摇杆变向都会换发 Move 命令；旧实现恒从 path[0] 格心起步，
                 // 已推进的立牌被拉回格心（≤半格回退），与片尾队形重排叠加即每帧在起点/终点间瞬移。
@@ -1835,7 +1807,6 @@ namespace GIC.Battle
                         Vector3.Distance(sameCellFrom, sameCellTo) / (speedWorldPerSec * _playbackSpeed));
                     if ((sameCellTo - sameCellFrom).sqrMagnitude > 0.0001f)
                     {
-                        lastStepSeconds = sameCellSec;
                         var segFromSame = sameCellFrom;
                         yield return BattleViewTween.Over(sameCellSec, t =>
                         {
@@ -1870,7 +1841,6 @@ namespace GIC.Battle
                         Vector3 to = points[i];
                         float stepSeconds = Mathf.Max(0.05f,
                             Vector3.Distance(from, to) / (speedWorldPerSec * _playbackSpeed));
-                        lastStepSeconds = stepSeconds;
                         var segFrom = from; // 逐段闭包快照（startPos 每段推进，lambda 不得读到新值）
                         yield return BattleViewTween.Over(stepSeconds, t =>
                         {
@@ -1886,12 +1856,6 @@ namespace GIC.Battle
                     view.ApplyPosition(command.hitX != 0 || command.hitY != 0
                         ? BoardCmToWorld(command.hitX, command.hitY)
                         : _board.CellToWorld(path[path.Count - 1]));
-
-                // 被挡撞墙弹回（启动命令恒 blocked=0——P4-E 被挡改走空 path 校正命令；保留防御位）
-                if (command.metadata == BattleCommand.MoveBlocked)
-                    yield return PlayBlockedBumpCoroutine(view,
-                        _board.CellToWorld(path.Count > 0 ? path[path.Count - 1] : view.Cell),
-                        command.direction, lastStepSeconds);
             }
             finally
             {
@@ -1904,42 +1868,6 @@ namespace GIC.Battle
                 }
                 _meaningfulActionInFlight--; // 移动结算（正常/中断同收）
             }
-        }
-
-        /// <summary>
-        /// 被挡撞墙弹回（2026-09-21）：向被挡方向探出后弹回原位——纯表现层反馈，逻辑位置不变。
-        /// 探出缓出挤向被挡格、弹回快出缓停；
-        /// 方向换算用 MovementResolver.StepVector（8 向与 Host 步进同源，斜向=朝下一格格心等比例 45%）。
-        /// P4-E：home 改世界坐标入参（被挡停点=连续 cm 位非格心——校正命令直传停点）
-        /// </summary>
-        private IEnumerator PlayBlockedBumpCoroutine(UnitView view, Vector3 home, int blockedDirection,
-            float stepSeconds, int generation = -1, string unitId = null)
-        {
-            // 世代守卫（2026-11-05 闪烁修复）：弹回表现与移动补间是同一 transform 的两个写者——弹回期间
-            // 若单位收到新的移动命令（世代递增），必须立刻让位，否则两边交替写位置=原地抖/回拉。
-            // generation<0 = 无世代语义（历史调用面/防御位）不设门。
-            // 勿用 SkillHitResolver.DirectionToDelta——十字归一映射会把斜向弹回归一到主轴（首版教训）
-            var step = MovementResolver.StepVector((Direction2D)blockedDirection);
-            var dir = new Vector3(step.x, 0f, step.y);
-            if (dir.sqrMagnitude < 0.001f) yield break;
-
-            Vector3 peak = home + dir * 被挡撞墙探出幅度;
-            // 探出：缓出减速（挤向被挡格的"尝试"感）；补间期间目标可能被拆件——lambda 内守卫（守卫族）
-            bool GenerationAlive()
-                => unitId == null || generation < 0
-                   || !_moveGeneration.TryGetValue(unitId, out var cur) || cur == generation;
-            yield return BattleViewTween.Over(stepSeconds * BlockedBumpOutSecondsFactor, t =>
-            {
-                if (view != null && GenerationAlive())
-                    view.ApplyPosition(Vector3.Lerp(home, peak, 1f - (1f - t) * (1f - t)));
-            });
-            if (!GenerationAlive()) yield break;
-            // 弹回：快速离开、临原位缓停（末帧保证 t=1 精确归位）
-            yield return BattleViewTween.Over(stepSeconds * BlockedBumpBackSecondsFactor, t =>
-            {
-                if (view != null && GenerationAlive())
-                    view.ApplyPosition(Vector3.Lerp(peak, home, 1f - (1f - t) * (1f - t)));
-            });
         }
 
         /// <summary>反应子类型 → 本地化反应名（短命数字对象直接求值当前语言，不挂 TextCombiner）。
@@ -2433,58 +2361,21 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 同格立牌布局（两态模型，docs/22 §11）：spread=true 散开展示（1 居中/2 并排/3 三角展开布局，
-        /// 选择阶段）/ false 收拢重叠格心（执行阶段，特效锚格心=锚全部单位）；占据数变化实时重排
+        /// 立牌归位（2026-11-07 拍板「同格多单位不需要额外站队，自然即可」）：
+        /// 原两态队形（选择阶段散开 / 执行阶段收拢）整体退役——任何阶段都贴各自权威站位，
+        /// 同格多单位自然重叠。本方法只做一次幂等归零重放（收敛历史残留偏移）。
         /// </summary>
-        private void RefreshAllFormations(bool spread)
+        private void RefreshAllFormations()
         {
-            var byCell = new Dictionary<BattleCell, List<UnitView>>();
             foreach (var view in _views.Values)
             {
-                if (view.IsSoulView) continue; // 灵魂不参与同格队形偏移（决策九十一：恒钉格心浮于尸体上——幽灵语义）
-                // 移动补间独占位置（2026-11-05「角色闪烁/瞬移」修复）：片尾每段都会重排全场立牌，
+                if (view.IsSoulView) continue; // 灵魂不参与队形（决策九十一：恒钉自身位置浮于尸体上——幽灵语义）
+                // 移动补间独占位置（2026-11-05「角色闪烁/瞬移」修复）：片尾每段都会重放全场立牌，
                 // 而移动中的 view.Cell 是「出发时登记的路径终点格心」——重排会把已推进的立牌拽到终点
                 // 格心，下一帧补间又写回近起点，多段并发下每帧来回瞬移。移动中单位的位置一律由
-                // PlayMoveCoroutine 单源写入，移动结束（活动表移除）后才重新纳入队形重排。
+                // PlayMoveCoroutine 单源写入，移动结束（活动表移除）后才重新纳入。
                 if (_activeMovePlayback.Contains(view.UnitId)) continue;
-                if (!byCell.TryGetValue(view.Cell, out var list))
-                {
-                    list = new List<UnitView>();
-                    byCell[view.Cell] = list;
-                }
-                list.Add(view);
-            }
-
-            foreach (var kv in byCell)
-            {
-                var occupants = kv.Value;
-                occupants.Sort((a, b) => string.CompareOrdinal(a.UnitId, b.UnitId));
-
-                for (int i = 0; i < occupants.Count; i++)
-                {
-                    Vector3 offset = spread ? GetFormationOffset(occupants.Count, i) : Vector3.zero;
-                    occupants[i].ApplyFormationOffset(offset);
-                }
-            }
-        }
-
-        /// <summary>散开态的同格偏移（原队形布局复用为展开形态，docs/18 决策二）</summary>
-        private static Vector3 GetFormationOffset(int count, int index)
-        {
-            switch (count)
-            {
-                case 1: return Vector3.zero;
-                case 2: return index == 0 ? new Vector3(-0.2f, 0f, 0.1f) : new Vector3(0.2f, 0f, 0.1f);
-                default:
-                    // 3 单位：2 前 1 后三角（多余单位叠加保持三角外扩）
-                    return index switch
-                    {
-                        0 => new Vector3(-0.2f, 0f, 0.12f),
-                        1 => new Vector3(0.2f, 0f, 0.12f),
-                        2 => new Vector3(0f, 0f, -0.14f),
-                        3 => new Vector3(-0.4f, 0f, -0.14f),
-                        _ => new Vector3(0.4f, 0f, -0.14f),
-                    };
+                view.ApplyFormationOffset(Vector3.zero);
             }
         }
     }

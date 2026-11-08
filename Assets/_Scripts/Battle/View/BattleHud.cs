@@ -126,14 +126,14 @@ namespace GIC.Battle
         // （2026-10-15 拍板「瞄准显示的距离应当和射出飞行物距离一致」，旧常量 8 对全员失真）
 
         /// <summary>移动瞄准步数上限=移动技能 MoveDistance 按基准换算（「拼接后为10%移速」2026-09-23
-        /// 用户拍板：BasedOnMoveSpeed=10%×移速——安柏 50→5 格、凯亚 30→3 格；读快照 moveSpeed 与 Host 同源）；
+        /// 用户拍板：BasedOnMoveSpeed=10%×移速——安柏 60→6 格、其余 50→5 格；读快照 moveSpeed 与 Host 同源）；
         /// 无数据回落按 10% 移速</summary>
         private int 移动技能步数上限()
         {
             var moveData = GetSelectedSkillData(_aimDef); // IsMove 键 def.type=Move → 按 skillType 分拣命中
             var snapshot = _session?.Player?.LatestSnapshot;
             var sel = snapshot?.units.FirstOrDefault(u => u.unitId == _selectedUnitId);
-            int moveSpeed = sel != null ? sel.moveSpeed : 30;
+            int moveSpeed = sel != null ? sel.moveSpeed : BattleMetrics.DefaultMoveSpeedCm;
             return moveData != null ? moveData.ResolveMoveDistance(moveSpeed) : moveSpeed * 10 / 100;
         }
 

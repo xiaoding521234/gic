@@ -31,7 +31,7 @@ namespace GIC.Battle
         { StatType.Attack, new RangedInt(-500, 500, 40) },
         { StatType.Defense, new RangedInt(-300, 300, 0) },
         { StatType.AttackSpeed, new RangedInt(-100, 100, 40) },
-        { StatType.MoveSpeed, new RangedInt(-100, 600, 100) }, // 决策九十五：移速=厘米/秒（全员 100=1 格/s，蓝图 §3.3「数值域扩展」——旧 (-100,100) 装不下 100 基线+Buff ±10/层叠层，P3 漏项 P5 补
+        { StatType.MoveSpeed, new RangedInt(-100, 600, 50) }, // 移速=厘米/秒（2026-11-07 拍板默认 50=0.5 格/s；数值域 (-100,600) 容纳 Buff ±10/层叠层
         { StatType.Luck, new RangedInt(-100, 100, 0) },
         { StatType.Tenacity, new RangedInt(-100, 100, 0) },
         { StatType.Mastery, new RangedInt(-300, 300, 0) },
