@@ -2675,3 +2675,10 @@ for (int i = 0; i < _sortBuffer.Count; i++)
 **坑⑦Assets 下 mp4 被外部句柄占用时无法覆盖，但可以改名**
 - 症状：`ffmpeg -y` 与 `File.Copy`（含编辑器内）均报 `Permission denied` / `being used by another process`，持续数十秒不释放（非 Unity 持有：编辑器内拷贝同样失败）。
 - 修法：`Rename-Item` 旧文件（rename 需要 delete 共享位，通常允许）→ 写新文件到原名 → 删除旧文件+旧 meta。验证：`Get-Item` 长度与导入后 `VideoClip.length` 双确认。
+
+## §192 批量改写 Unity Localization 文案两坑：折叠标量解析吞字段 / 子串替换误伤单词（2026-11-08 即时制文案清扫批）
+
+- 症状：①自写脚本逐行解析 `*_en.asset` / `*_ru.asset` 读出的值尾部多出 `m_Metadata: m_Items: []`（把后续 YAML 片段当成本地化文本，进而误判「值里有 metadata」）；②英文 `turns → seconds` 替换后出现 `reseconds to Lisa`（`returns` 被拆）；中文先替换「每回合→每 2 秒」再兜底「回合→秒」会产出「每个秒」。
+- 根因：①Unity Localization 的 en/ru 值是 **YAML 折叠普通标量**（无引号、续行缩进 ≥4 空格），只取首行/无终止条件即把后面的 `m_Metadata:` 一起折进值；②子串替换无词边界，且长短片段顺序错误。
+- 修法：①解析折叠标量时遇到下一行以 `m_` 开头或 `- m_Id:` 必须终止；更稳的读法是走 `StringTable` API 而非解析文本；②英文先替换带占位符/短语的长片段，最后兜底用词边界 `\bturns?\b`（或不用通用兜底），改完立刻全表复扫 `回合`/`ターン`/`\bturns?\b`/`\bход`。
+- 取证教训：改完必须 refresh 域重载后再按 keyId 重新导出复验（同域读回不算数）；替换脚本对每条命中打印 before/after，并对「未命中」逐条确认是否真的无需改（本批英文 3015 因大小写漏网一条，靠终扫发现）。
