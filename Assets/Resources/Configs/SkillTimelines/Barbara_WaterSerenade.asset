@@ -16,8 +16,8 @@ MonoBehaviour:
   aimMode: 0
   clips:
   - trackType: 2
-    startTime: 0
-    endTime: 0.5
+    startTime: 0.8
+    endTime: 0.9
     kind: 1
     hitInterval: 0
     projectileSpeed: 0

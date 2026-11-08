@@ -149,7 +149,8 @@ namespace GIC.Editor
                 var transport = new CollectingTransport();
                 var resolver = new TurnResolver(sim, transport, new FakeResolverHost());
 
-                // —— 录制流索引：AI 批按 tick 建索引（一节拍至多一批）；submit 按行序（file 序=时间序）——
+                // —— 录制流索引：AI 批按**录制 tick** 建索引（伙伴脑=节拍 tick；眷属摊平波=节拍后
+                // 1..FamiliarDecisionSlices tick，2026-11-06 起批不再恒落 %10）；submit 按行序（file 序=时间序）——
                 var aiBatchByTick = new Dictionary<int, List<ActionData>>();
                 foreach (var batch in recording.AiBatches)
                 {
@@ -157,8 +158,6 @@ namespace GIC.Editor
                     int batchTick = batch.actions[0].submitTick;
                     if (batchTick <= 0)
                         batchTick = batch.turn * BattleMetrics.TicksPerSecond; // 未盖章兜底（理论不可达：RunAiBeat 必盖章）
-                    if (batchTick % BattleMetrics.AiBeatTicks != 0)
-                        return $"FAIL：AI 行动批 tick {batchTick} 不在节拍窗（%{BattleMetrics.AiBeatTicks}）——录制异常";
                     if (aiBatchByTick.ContainsKey(batchTick))
                         return $"FAIL：tick {batchTick} 出现多批 AI 行动——录制异常";
                     aiBatchByTick[batchTick] = batch.actions;
@@ -209,13 +208,16 @@ namespace GIC.Editor
                             resolver.EmitSeparationCorrections();
                     }
 
-                    // ② AI 节拍窗（%10）——live RunAiBeat 同点位（RevealFog=决策时态账本同步；批不重跑脑）
-                    if (!over.Ended && tick % BattleMetrics.AiBeatTicks == 0)
+                    // ② AI 批（按录制 tick 精确应用；伙伴脑批=节拍 tick，眷属摊平波批=节拍后 1~4 tick。
+                    //    RevealFog 仍只在节拍 tick 同步——与 live RunAiBeat 同点位）
+                    if (!over.Ended)
                     {
-                        sim.RevealFog();
-                        if (aiBatchByTick.TryGetValue(tick, out var batch) && batch != null && batch.Count > 0)
-                            resolver.ResolveAiActions(batch);
-                        over.Check(sim, tick);
+                        bool beatTick = tick % BattleMetrics.AiBeatTicks == 0;
+                        if (beatTick) sim.RevealFog();
+                        bool hasBatch = aiBatchByTick.TryGetValue(tick, out var batch)
+                                        && batch != null && batch.Count > 0;
+                        if (hasBatch) resolver.ResolveAiActions(batch);
+                        if (beatTick || hasBatch) over.Check(sim, tick);
                     }
 
                     // ③ 秒拍（%20：秒拍族+效果拍 %40）

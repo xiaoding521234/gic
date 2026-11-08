@@ -2682,3 +2682,23 @@ for (int i = 0; i < _sortBuffer.Count; i++)
 - 根因：①Unity Localization 的 en/ru 值是 **YAML 折叠普通标量**（无引号、续行缩进 ≥4 空格），只取首行/无终止条件即把后面的 `m_Metadata:` 一起折进值；②子串替换无词边界，且长短片段顺序错误。
 - 修法：①解析折叠标量时遇到下一行以 `m_` 开头或 `- m_Id:` 必须终止；更稳的读法是走 `StringTable` API 而非解析文本；②英文先替换带占位符/短语的长片段，最后兜底用词边界 `\bturns?\b`（或不用通用兜底），改完立刻全表复扫 `回合`/`ターン`/`\bturns?\b`/`\bход`。
 - 取证教训：改完必须 refresh 域重载后再按 keyId 重新导出复验（同域读回不算数）；替换脚本对每条命中打印 before/after，并对「未命中」逐条确认是否真的无需改（本批英文 3015 因大小写漏网一条，靠终扫发现）。
+
+## §193 立牌朝向双病灶 / 立牌尺寸主体占比 / 回放 harness 批 tick 口径（2026-11-09 报障三连修）
+
+**① 朝向「往左走仍朝右」= 两处叠加，且都源于 direction 载荷退化**
+- `Move` 命令的 `direction` 由 `RTSMovementSystem.BuildCmMover` 用「起点→首路点」算；2026-11-05 P5-D 把 A* 首路点改成**精确起点**（修 AI 零推进）后，`DirectionOfSegment(start,start)` 走 `dx==dz==0` 兜底 → **恒返回 Right**。
+- 移动技能（`Kaeya_Move`/`Barbara_Move`/`Common_Walk`）也走 `BattleCommandType.SkillCast` 分支，其 `direction` 同样恒 Right，且命令序在 Move **之后**（日志实锤 `[Facing] U6 … LEFT` 紧接 `技能施放：U6 → Kaeya_Move 方向 Right`）——刚翻好的朝向又被改回右。
+- 修：`PlayMoveCoroutine` 改按**实际位移**判左右（落点 `hitX/hitY` − `FormationAnchor`；无落点退 path 首末格），判据=`|dx|≥5cm 且 |dx|≥0.35|dz|`（横向占优才翻，纯上下恒不翻）；`SkillCast` 分支**跳过 SkillType.Move**。移动小步每拍只剩十几厘米，阈值取大（曾用 25cm）会永远不翻——这是第一版修完仍 4.4% 的原因。
+- 量化：观察局 2v2 四 AI，移动帧朝向正确率 **4.4% → 87.2%**（向右 89.5%）；残差=施法朝 aim 合法覆盖。
+
+**② 立牌尺寸不能拿 bbox 主体高当尺度锚**
+- 立牌动画的「主体像素高÷片高」随**姿势**变（跑动屈腿、抬手都会缩短/拉高 bbox），拿它推 comp 会得出「凯亚跑动片小 20%」的错误结论——等高等比对照图目检可见其头身反而更大（该片 comp 0.864 已按头宽压过）。
+- 头宽也不稳（双马尾/帽檐/披风会被并入顶部带）。判尺度一律用**等高等比对照图**（裁剪主体→同高缩放→并排）目检，不要用单帧 bbox 数字下结论。
+- 本次只做跨角色身高归一：`UnitData.额外缩放`=设定身高÷185（安柏 0.854/凯亚 1.0/芭芭拉 0.865），新增 `UnitData.立牌主体占比`=待机片主体占片高（安柏 0.809/凯亚 0.973/芭芭拉 0.973），视频 quad 高=0.55×额外缩放÷主体占比（底边仍贴地），头顶条锚点继续用 0.55×额外缩放。实测 quad：凯亚 1.131 / 芭芭拉 0.978 / 安柏 1.161，各自 × 主体占比 ≈ disp（=真实身高）✓。
+
+**③ 回放 harness「AI 批不在节拍窗」= 校验口径过期（非录像坏）**
+- `ReplayRunner` 原要求每批 `submitTick % AiBeatTicks == 0`，但 2026-11-06 起的**眷属摊平波**（`RunFamiliarBrainWave`，节拍后 1~4 tick 各一片）本来就落在 81/82/91…；多 AI 玩家时伙伴脑批也会 +1/+2。
+- 修：索引校验只保留「同一 tick 不得多批」，主循环改为**按录制 tick 精确应用**批（`RevealFog` 仍只在节拍 tick），原先只在 `%10` 窗口消费会让这些批永不应用。
+- 复验：1v1 双 AI 完整局（seed=20261109，65s/1303 tick）回放 **PASS 1363 段 / 7520 命令 / hash 65 拍 / 终局一致**，双跑一致。
+
+**④ 附带实证**：芭芭拉战技时轮 `startTime` 0→0.8 后，录制里她的投射物 `Damage.launchMs=800`（4 个单位共多条），凯亚仍 260/910——时轮→`RateSeconds`→`ProjectileEffect.LaunchSeconds`→`Damage.launchMs` 链路口径无误。

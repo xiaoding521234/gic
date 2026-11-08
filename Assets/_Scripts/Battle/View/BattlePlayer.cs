@@ -1726,13 +1726,15 @@ namespace GIC.Battle
                                     $" 方向 {(Direction2D)command.direction}");
                         if (_views.TryGetValue(command.actorUnitId, out var caster))
                         {
-                            // P3 自由角朝向：aimX/aimZ 千分向量优先（x 符号定左右——任意角）、
-                            // 0=旧 direction 十字口径（P4 HUD 接线前 AI/HUD 上交恒十字=行为不变）
-                            caster.SetFacing(command.aimX != 0 ? command.aimX < 0 : IsLeftFacing(command.direction));
                             // 动作轨（B-S4c）：技能资产 动作视频≠null → 立牌从头播一次性动作片（拉弓-释放-收势，
                             // 时长≈时轮 totalTime）、播完自动回待机循环（UnitView.PlayActionVideo 双 RT+缩放补偿
                             // ——宽幅 16:9 动作片原生尺寸独立 RT 渲染+主体视觉大小恒等补偿）；null=待机照播
                             var skillData = LoadSkillData(command.value);
+                            // 施法朝向：aim 向量优先（x 符号定左右）；**移动技能不参与**——移动的朝向由
+                            // Move 命令按实际位移判定（2026-11-09 报障：移动 SkillCast 的 direction 恒 Right
+                            // 且命令序在 Move 之后，把刚翻好的朝向又改回右）
+                            if (skillData == null || skillData.skillType != SkillType.Move)
+                                caster.SetFacing(command.aimX != 0 ? command.aimX < 0 : IsLeftFacing(command.direction));
                             // P4-D CD 转圈即时起点（决策九十五）：cdTicks>0=新施放——HUD 记就绪时刻
                             //（战技/爆发两槽）；移动施放 cdTicks=0 与技能缺载不发
                             if (skillData != null && command.cdTicks > 0)
@@ -1821,23 +1823,38 @@ namespace GIC.Battle
 
         /// <summary>移动朝向（2026-11-09 修「往左走立牌还朝右」）：Move 命令的 direction 载荷在连续移动下
         /// 已退化恒为 Right（A* 首路点自 P5-D 起=精确起点 → DirectionOfSegment(start,start) 兜底 Right），
-        /// 故改用**实际位移**判左右：落点(cm) − 权威站位锚点的 x 分量。|dx|&lt;0.25 格（25cm）=中性向
-        /// （正上/正下）保持当前朝向防直上直下抖动；净位移落死区时退回首段格差（L 形先横后竖）。
+        /// 故改用**实际位移**判左右：落点(cm) − 权威站位锚点。
+        /// 判据=「横向占优」而不是绝对阈值：|dx|≥5cm 且 |dx|≥0.35|dz| 才翻（连续小步移动每拍只剩十几厘米，
+        /// 阈值一大就永远不翻；纯上下走动 |dx|≈0 恒不翻，防抖）。无精确落点时退回首段格差（L 形先横后竖）。
         /// 只改表现、不动命令流——回放基线不受影响（旧录制的 direction 也不再用作朝向）。</summary>
         private bool FaceLeftOfMove(UnitView view, BattleCommand command)
         {
             float fromX = view != null ? view.FormationAnchor.x : 0f;
-            float dx;
+            float fromZ = view != null ? view.FormationAnchor.z : 0f;
+            float dx, dz;
             if (command.hitX != 0 || command.hitY != 0)
-                dx = BoardCmToWorld(command.hitX, command.hitY).x - fromX;
+            {
+                var to = BoardCmToWorld(command.hitX, command.hitY);
+                dx = to.x - fromX;
+                dz = to.z - fromZ;
+            }
             else if (command.path.Count > 1)
+            {
                 dx = command.path[command.path.Count - 1].x - command.path[0].x;
+                dz = command.path[command.path.Count - 1].y - command.path[0].y;
+            }
             else
+            {
                 dx = 0f;
+                dz = 0f;
+            }
             // 净位移过小（先横后竖/终点逼近）：退回首段格差（格=世界单位，CellSizeCm=100）
-            if (Mathf.Abs(dx) < 0.25f && command.path.Count > 1)
+            if (Mathf.Abs(dx) < 0.05f && command.path.Count > 1)
+            {
                 dx = command.path[1].x - command.path[0].x;
-            if (Mathf.Abs(dx) < 0.25f)
+                dz = command.path[1].y - command.path[0].y;
+            }
+            if (Mathf.Abs(dx) < 0.05f || Mathf.Abs(dx) < 0.35f * Mathf.Abs(dz))
                 return view != null ? view.FaceLeft : IsLeftFacing(command.direction);
             return dx < 0f;
         }
@@ -2383,7 +2400,8 @@ namespace GIC.Battle
             var view = UnitView.Create(_viewRoot, state.unitId, avatar, unitColor,
                 _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
                 (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
-                state.cylinderDiameter, standForward, buildingModel, buildingModelWidth); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）
+                state.cylinderDiameter, standForward, buildingModel, buildingModelWidth,
+                idleContentRatio); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）；主体占比（2026-11-09 尺寸归一化）
             view.OwnerPlayerId = state.playerId; // 归属身份（2026-10-15 血条三色批：三色模式按自己/队友/敌分档判定）
             view.OwnerTeam = (TeamType)state.team;
             // 维度渲染层（2026-10-25 泄漏修复拍板 A）：单位渲染件整树挂维度层——相机 cullingMask
