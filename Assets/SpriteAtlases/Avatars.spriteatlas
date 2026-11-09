@@ -48,6 +48,7 @@ SpriteAtlas:
     - b23cd64a6c48fca4c8801a062e52f54b: 21300000
     - 988b7d5a1aa48d540816f80c030dffbc: 21300000
     - 6bbff8fa0d7aa404c9e5a79c37eda8ce: 21300000
+    - c64f125b98fae884a9331bf98b32e96f: 21300000
     - cb3c0b7c53b96db4fb9725ea901b999c: 21300000
     - c21fa61ea6d74b24693c5264b1737f31: 21300000
     - 1cd1426e7d039a64e838b6531d0f040d: 21300000
@@ -64,6 +65,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: b23cd64a6c48fca4c8801a062e52f54b, type: 3}
   - {fileID: 21300000, guid: 988b7d5a1aa48d540816f80c030dffbc, type: 3}
   - {fileID: 21300000, guid: 6bbff8fa0d7aa404c9e5a79c37eda8ce, type: 3}
+  - {fileID: 21300000, guid: c64f125b98fae884a9331bf98b32e96f, type: 3}
   - {fileID: 21300000, guid: cb3c0b7c53b96db4fb9725ea901b999c, type: 3}
   - {fileID: 21300000, guid: c21fa61ea6d74b24693c5264b1737f31, type: 3}
   - {fileID: 21300000, guid: 1cd1426e7d039a64e838b6531d0f040d, type: 3}
@@ -79,6 +81,7 @@ SpriteAtlas:
   - rounded_chess_frame
   - bottom_bar
   - amber
+  - favonius_knight
   - null
   - xingqiu
   - kaeya

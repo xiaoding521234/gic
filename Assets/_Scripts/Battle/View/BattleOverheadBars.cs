@@ -40,6 +40,10 @@ namespace GIC.Battle
         [SerializeField] private float 条间距 = 0f;
         [SerializeField] private float 附着图标宽 = 16f;
         [SerializeField] private float 分隔线宽 = 2f;
+        [Tooltip("眷属头顶条整体缩放（2026-11-09 用户拍板「眷属单位要缩小为 70%……血条能量条更简化更小，无需刻度」）——" +
+                 "眷属条簇整块缩放（血条/元能条/Buff 行/装备行/附着图标同步），且眷属不出刻度线；" +
+                 "1=不缩（全尺寸）；判定圆柱另有 BattleMetrics.FamiliarCylinderDiameter")]
+        [SerializeField, Range(0.3f, 1f)] private float 眷属条整体缩放 = 0.7f;
 
         [Header("命座徽章（2026-10-06 拍板「血条上不再显示名字，改为显示命座数字」）")]
         [Tooltip("命座数字字号（黑描边+原神白）")]
@@ -139,6 +143,7 @@ namespace GIC.Battle
             public bool AnchorInit;              // 首帧强制投影一次
             public float LastZoom = -1f;         // 已应用的整簇缩放
             public int LastAttachElement = -1;   // 附着图标元素缓存（不变跳过配置查表）
+            public float SizeScale = 1f;         // 条目自身缩放（眷属=眷属条整体缩放，2026-11-09 眷属批）
         }
 
         private readonly List<Item> _items = new List<Item>();
@@ -279,7 +284,7 @@ namespace GIC.Battle
                 // #13 审查批静态门控：锚点未变+相机未动+抬高已收敛+缩放未变时整块跳过
                 // （WorldToScreenPoint/位置写/平滑全免；相机跟随/缩放/单位移动期间照常逐帧，观感零损）
                 float liftTarget = item.View.Buffs.Count > 0
-                    ? BuffBelowExtent() * zoomScale * scaleFactor : 0f;
+                    ? BuffBelowExtent() * zoomScale * item.SizeScale * scaleFactor : 0f;
                 bool liftSettled = Mathf.Approximately(item.LiftCurrent, liftTarget);
                 var anchor = item.View.OverheadBarAnchor;
                 bool anchorMoved = !item.AnchorInit || anchor != item.LastAnchor;
@@ -293,8 +298,10 @@ namespace GIC.Battle
                     var projected = cam.WorldToScreenPoint(anchor);
                     item.Rect.position = new Vector3(projected.x, projected.y + item.LiftCurrent, projected.z);
 
-                    if (item.Rect.localScale.x != zoomScale)
-                        item.Rect.localScale = Vector3.one * zoomScale;
+                    // 整簇缩放=相机跟随缩放 × 条目自身缩放（眷属条整体 0.7，2026-11-09 眷属批）
+                    float itemScale = zoomScale * item.SizeScale;
+                    if (!Mathf.Approximately(item.Rect.localScale.x, itemScale))
+                        item.Rect.localScale = Vector3.one * itemScale;
                 }
 
                 item.HpFill.fillAmount = item.View.MaxHp > 0
@@ -699,9 +706,13 @@ namespace GIC.Battle
                 血条宽, 元能条高, Palette.血条底, Palette.元能条色, out var enFill);
 
             // 量子刻度（2026-09-26 拍板「每 50 段，上限 10 段」）：刻度线落在 每段值×k/总量 处——
-            // 血条每 50 点血一格（MaxHp 非 50 倍数时末段不满，线位仍=50 的整数倍血）；元能=每 10 点一格
-            BuildTicks(hpBar, 血条宽, 血条高, 血条每段血量, view.MaxHp, 血条分隔段数上限);
-            BuildTicks(enBar, 血条宽, 元能条高, 元能分隔量子, view.EnergyMax, 元能分隔段数上限);
+            // 血条每 50 点血一格（MaxHp 非 50 倍数时末段不满，线位仍=50 的整数倍血）；元能=每 10 点一格。
+            // **眷属不出刻度（2026-11-09 用户拍板「血条能量条更简化更小，无需刻度」）**——廉价单位只读大概
+            if (!view.IsFamiliar)
+            {
+                BuildTicks(hpBar, 血条宽, 血条高, 血条每段血量, view.MaxHp, 血条分隔段数上限);
+                BuildTicks(enBar, 血条宽, 元能条高, 元能分隔量子, view.EnergyMax, 元能分隔段数上限);
+            }
 
             // 命座徽章（2026-10-06 拍板「血条上不再显示名字，改为显示命座数字」）：血条正上方贴齐居中；
             // 背景=#39444F 80% 圆角小片（BarFill 药丸图元复用免新素材），数字=黑描边原神白；
@@ -758,6 +769,8 @@ namespace GIC.Battle
                 HpFill = hpFill, EnFill = enFill, EnBarRoot = enBar.gameObject, AttachIcon = iconImage,
                 ConstGo = constGo, ConstBg = constBg, ConstText = constText, BuffRow = buffRow,
                 EquipRow = equipRow,
+                // 眷属整簇缩到 0.7（2026-11-09 眷属批）：配合无刻度，一眼区分「廉价的眷属」
+                SizeScale = view.IsFamiliar ? 眷属条整体缩放 : 1f,
             };
         }
 

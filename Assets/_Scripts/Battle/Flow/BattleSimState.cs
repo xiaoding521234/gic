@@ -1389,7 +1389,9 @@ namespace GIC.Battle
                 energy = stats?.Energy ?? 0,
                 maxEnergy = stats?.GetStatStruct(StatType.Energy).Max ?? 0,
                 sanity = stats?.Sanity ?? 0,
-                cylinderDiameter = unit.RawData?.受击圆柱直径 ?? 0f,
+                // 受击圆柱直径：走单出口解析（显式配置优先；未配的眷属 1~2★ 回落 0.35，其余 0.5）
+                // ——2026-11-09 眷属批：客户端盘径/命中预判读的是本快照值，故解析必须发生在 Host
+                cylinderDiameter = BattleMetrics.CylinderDiameterOf(unit),
                 constellation = unit.ConstellationLevel, // 命座（B8 批：展示/升命门控真源）
                 tier = (int)BattleHeuristics.TierOf(unit), // 操控层级单源（TierOverrideStars 覆盖随此进快照——客户端门控同源）
                 exploreVision = stats?.VisionRange ?? 0, // 探索视野真源（迷雾批追拍六：stats 终值=config 基值+1命 StatBoost；0=未填→客户端回落 config 链）

@@ -2362,14 +2362,21 @@ namespace GIC.Battle
         }
 
         /// <summary>层级→眷属判定（命座徽章门控数据，2026-10-06）：快照 tier 优先（0=未填回落星级换算，
-        /// 与 BattleHud.TierOfUnit 同口径——沙盒 TierOverrideStars 覆盖随快照 tier 生效）</summary>
+        /// 与 BattleHud.TierOfUnit 同口径——沙盒 TierOverrideStars 覆盖随快照 tier 生效）。
+        /// **2026-11-09 眷属批：建筑一律不算眷属**——本判定同时驱动「立牌缩到 70% / 头顶条 0.7 无刻度」，
+        /// 低星建筑（西风旗帜/猎鹿人餐馆）不该被当小兵缩小</summary>
         private bool ResolveIsFamiliar(UnitState state)
         {
             if (state == null) return false;
-            if (state.tier != 0) return (UnitTier)state.tier == UnitTier.Familiar;
-            return _unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var name)
-                && _unitConfig.TryGetUnitData(name, out var d)
-                && UnitTierHelper.FromStars(d.starLevel) == UnitTier.Familiar;
+            bool tierFamiliar = state.tier != 0
+                ? (UnitTier)state.tier == UnitTier.Familiar
+                : _unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var n)
+                  && _unitConfig.TryGetUnitData(n, out var d0)
+                  && UnitTierHelper.FromStars(d0.starLevel) == UnitTier.Familiar;
+            if (!tierFamiliar) return false;
+            if (_unitConfig == null || !Enum.TryParse<UnitName>(state.unitName, out var name)
+                || !_unitConfig.TryGetUnitData(name, out var d)) return true; // 无配置=按 tier 结果
+            return d.unitType != UnitType.Building;
         }
 
         private void CreateView(UnitState state)
@@ -2433,6 +2440,10 @@ namespace GIC.Battle
             }
 
             var team = (TeamType)state.team;
+            // 眷属档（2026-11-09 眷属批）：立牌整体 70% + 头顶条整体 0.7 且无刻度（体现「比伙伴低廉」）。
+            // 一次解析两处复用（建场缩放 / 命座徽章显隐同源），避免重复查配置
+            bool familiarTier = ResolveIsFamiliar(state);
+            float tierVisualScale = familiarTier ? BattleMetrics.FamiliarVisualScale : 1f;
             // 单位显示色=归属玩家色（2026-10-12 拍板取代旧「队伍主色」口径——2v2 同队无法区分彼此单位；
             // 底座圆盘/选中描边/血条填充全链同源；HUD 未绑解析器时回落旧队伍主色兜底）
             var unitColor = _playerColorOf != null
@@ -2440,9 +2451,11 @@ namespace GIC.Battle
                 : (team == TeamType.B ? Palette.敌方主色 : Palette.我方主色);
             var view = UnitView.Create(_viewRoot, state.unitId, avatar, unitColor,
                 _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
-                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
+                // 眷属立牌整体缩到 70%（2026-11-09 用户拍板「眷属单位要缩小为 70%」）——判定圆柱另有
+                // FamiliarCylinderDiameter=0.35（BattleMetrics 单源，随快照下发），两者互相独立
+                (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale * tierVisualScale, idleVideo, hoverHeight,
                 state.cylinderDiameter, standForward, buildingModel, buildingModelWidth,
-                idleContentRatio, attackStand, paperdollAction); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）；主体占比（2026-11-09 尺寸归一化）；攻击立牌图+程序化动作（2026-11-09 低成本眷属表现）
+                idleContentRatio, attackStand, paperdollAction); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源——眷属快照已解析为 0.35）；立牌前移（俯视立牌格心视觉补偿）；主体占比（2026-11-09 尺寸归一化）；攻击立牌图+程序化动作（2026-11-09 低成本眷属表现）
             view.OwnerPlayerId = state.playerId; // 归属身份（2026-10-15 血条三色批：三色模式按自己/队友/敌分档判定）
             view.OwnerTeam = (TeamType)state.team;
             // 维度渲染层（2026-10-25 泄漏修复拍板 A）：单位渲染件整树挂维度层——相机 cullingMask

@@ -37,23 +37,51 @@ namespace GIC.Battle
         /// 底座圆盘视觉随常量自动放大）</summary>
         public const float UnitCylinderDiameter = 0.5f;
 
+        /// <summary>眷属（1~2★）碰撞/受击圆柱直径（2026-11-09 用户拍板「体积也从 50 改为 35」）：
+        /// 与立牌缩到 70% 的视觉体量配套——眷属要「一眼看出比伙伴低廉」，挤在一起也用更小的圆；
+        /// 未显式配 受击圆柱直径 的眷属统一取本值（显式值仍优先，协议核心 0.8 不受影响）。
+        /// 消费方=碰撞圆半径（移动/弹性分离）、投射物与线段命中判定、部署重叠校验、AI 驻位接触钳、
+        /// 底座圆盘与选中弧光视觉——全部经 CylinderDiameterOf 三重载，改这一处即全链生效</summary>
+        public const float FamiliarCylinderDiameter = 0.35f;
+
+        /// <summary>眷属立牌整体缩放（2026-11-09 用户拍板「眷属单位要缩小为 70%」）：
+        /// 与伙伴/魔神拉开体量差（配合头顶条整体 0.7 缩放 + 无刻度，见 BattleOverheadBars.眷属条整体缩放）。
+        /// 只乘在立牌显示高（UnitData.额外缩放）之上，不影响判定圆柱（圆柱走 FamiliarCylinderDiameter）</summary>
+        public const float FamiliarVisualScale = 0.7f;
+
         /// <summary>per-unit 受击圆柱直径单出口（协议核心批 2026-09-29）：声明值>0 用声明值（协议核心=0.8，
-        /// 大目标易命中=攻城手感），0=回落全局 0.42。四消费方同源：ProjectileResolver 接触判定（Host 权威）、
-        /// EffectCompiler.WouldHitProjectile 命中预判（推荐色口径）、UnitView 底座圆盘视觉（视觉即判定）、
-        /// OrbitBeamsWorld 选中弧光贴紧折算</summary>
+        /// 大目标易命中=攻城手感），0=回落全局 0.5（眷属回落 0.35）。四消费方同源：ProjectileResolver 接触判定
+        /// （Host 权威）、EffectCompiler.WouldHitProjectile 命中预判（推荐色口径）、UnitView 底座圆盘视觉
+        /// （视觉即判定）、OrbitBeamsWorld 选中弧光贴紧折算</summary>
         public static float CylinderDiameterOf(UnitState state)
             => state != null && state.cylinderDiameter > 0f ? state.cylinderDiameter : UnitCylinderDiameter;
 
         /// <summary>per-unit 受击圆柱直径——活体 Unit 直读重载（P3：取代 RTSMovementSystem 旧
-        /// UnitState 哑实例传参〔P2 断裂面〕；UnitState 版消费方照旧）</summary>
+        /// UnitState 哑实例传参〔P2 断裂面〕；UnitState 版消费方照旧）。未显式配置时按层级回落：
+        /// 眷属 1~2★=FamiliarCylinderDiameter、其余=UnitCylinderDiameter（2026-11-09 眷属批）</summary>
         public static float CylinderDiameterOf(Unit unit)
-            => unit != null && unit.RawData != null && unit.RawData.受击圆柱直径 > 0f
-                ? unit.RawData.受击圆柱直径 : UnitCylinderDiameter;
+        {
+            if (unit == null || unit.RawData == null) return UnitCylinderDiameter;
+            if (unit.RawData.受击圆柱直径 > 0f) return unit.RawData.受击圆柱直径;
+            return IsFamiliarLowCost(unit.RawData.unitType, unit.RawData.starLevel)
+                ? FamiliarCylinderDiameter : UnitCylinderDiameter;
+        }
 
         /// <summary>per-unit 受击圆柱直径——UnitData 直读重载（P3 部署自由落点：部署单位尚未生成，
-        /// 从配置直读；三重载同口径=声明值优先、回落全局）</summary>
+        /// 从配置直读；三重载同口径=声明值优先、眷属回落 0.35、其余回落全局 0.5）</summary>
         public static float CylinderDiameterOf(GIC.Data.UnitConfig.UnitData data)
-            => data != null && data.受击圆柱直径 > 0f ? data.受击圆柱直径 : UnitCylinderDiameter;
+        {
+            if (data == null) return UnitCylinderDiameter;
+            if (data.受击圆柱直径 > 0f) return data.受击圆柱直径;
+            return IsFamiliarLowCost(data.unitType, data.starLevel)
+                ? FamiliarCylinderDiameter : UnitCylinderDiameter;
+        }
+
+        /// <summary>「廉价小兵」口径（2026-11-09 眷属批）：1~2★ 且**非建筑**——建筑不参与减小
+        /// （西风旗帜/猎鹿人餐馆等低星建筑保持 0.5 圆柱与全尺寸立牌）</summary>
+        private static bool IsFamiliarLowCost(GIC.Data.UnitType unitType, int starLevel)
+            => unitType != GIC.Data.UnitType.Building
+               && GIC.Data.UnitTierHelper.FromStars(starLevel) == GIC.Data.UnitTier.Familiar;
 
         // ==================== 元能（B6a；获取端拍板 2026-09-22） ====================
 
