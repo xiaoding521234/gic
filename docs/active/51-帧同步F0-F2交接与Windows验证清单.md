@@ -35,7 +35,7 @@ LAN Client（IsNetworked=true, IsHost=false）：
   收到 BattleStart → 建 Sim（同 seed/map/roster）→ 建单位 → Flow.StartBattle()
   每个 tick：ApplyDueInputs（按 Host 批内序）→ 本地结算
   每秒：ClientSend(HashReport)
-  View：本地 TurnResolver 产出的 Segment/Snapshot 直喂 BattlePlayer（F2）
+  View：本地 BattleResolver 产出的 Segment/Snapshot 直喂 BattlePlayer（F2）
 ```
 
 **唯一允许的分叉**：AI 只在 Host 跑；客户端不跑脑、不定序。

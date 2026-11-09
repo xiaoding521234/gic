@@ -100,11 +100,8 @@ namespace GIC.Battle
         /// <summary>开局体力（=玩家体力物品牌「原粹树脂」的初始持有数）</summary>
         public const int InitialStamina = 60;
 
-        /// <summary>每回合结束发放摩拉（docs/04 §4.3：与体力统一时机；2026-09-29 拍板 5→10）</summary>
-        public const int MoraGainPerTurn = 10;
-
-        /// <summary>每回合结束发放体力（2026-09-29 拍板 5→10）</summary>
-        public const int StaminaGainPerTurn = 10;
+        // （MoraGainPerTurn/StaminaGainPerTurn 每回合发放常量已删除——2026-11-09 残留清理批：
+        //  零消费死常量，生产单源=MoraGainPerSecond/StaminaGainPerSecond，见秒拍 tick 机节）
 
         /// <summary>配额行动消耗体力（docs/05 §5.1：移动/战技/爆发各 10；
         /// 低级单位 1~2 星自主行动豁免，延奏/契约等特殊技能 0）</summary>
@@ -112,19 +109,19 @@ namespace GIC.Battle
 
         // ==================== 地脉维度与灵魂（决策九十一，2026-10-25） ====================
 
-        /// <summary>灵魂每回合末衰减百分比（占最大生命——10%×10 回合整好归零=「完整 10 回合复苏窗」；
+        /// <summary>灵魂每秒拍衰减百分比（占最大生命——10%×10 秒整好归零=「完整 10 秒复苏窗」；
         /// 末点截断：⌊10%×MaxHp⌋）</summary>
-        public const int SoulDecayPercentPerTurn = 10;
+        public const int SoulDecayPercentPerSecond = 10;
 
         /// <summary>灵魂治疗效率（拍板「灵魂的治疗效率-50%」=绝对 50——协议核心 50 同款语义：
         /// 受疗者效率乘区单出口（EffectCompiler.ApplyHealEfficiency）对一切治疗自动减半；
         /// 角色/命座自有效率不继承（灵魂只继承基础属性））</summary>
         public const int SoulHealEfficiency = 50;
 
-        /// <summary>地脉驻留理智代价（拍板「在地脉维度的单位（不包括灵魂），每回合结束减少3点理智」——
-        /// 地脉专属维度规则；当前地脉仅灵魂=预留自动生效，胡桃/丽莎相位技能批上线即激活；
-        /// 霜月等未来维度的驻留规则另立常量勿复用本值）</summary>
-        public const int LeyLineSanityCostPerTurn = 3;
+        /// <summary>地脉驻留理智代价（拍板「在地脉维度的单位（不包括灵魂），每回合结束减少3点理智」
+        /// ——即时制直译=每秒拍 −3；地脉专属维度规则；当前地脉仅灵魂=预留自动生效，
+        /// 胡桃/丽莎相位技能批上线即激活；霜月等未来维度的驻留规则另立常量勿复用本值）</summary>
+        public const int LeyLineSanityCostPerSecond = 3;
 
         // ==================== 世界/画布 sortingOrder 层级表（2026-09-28 批6 收口：8 处散布字面量单源） ====================
         // 完整层序自下而上：水面/薄冰 -3（2026-10-17 迷雾批自 -2 下移）→ 迷雾面 -2（迷雾批新增）→ 底座盘 -1 →
@@ -202,17 +199,11 @@ namespace GIC.Battle
         /// （2026-10-23 拍板 0.12→0.05：回合末级联在 B1 出槽后仍嫌弹字拖沓，再压错峰密度）</summary>
         public const float CommandStaggerSeconds = 0.05f;
 
-        /// <summary>回合结束段固定节拍（秒，不按攻速排程）</summary>
-        public const float TurnEndDelaySeconds = 0.25f;
+        /// <summary>秒拍结束段固定节拍（秒，不按攻速排程）</summary>
+        public const float SecondBeatDelaySeconds = 0.25f;
 
-        /// <summary>单格体积绝对层上限（docs/05 §5.3 旧回合制规则）——**决策九十五退役中**
-        /// （蓝图 §3.2：单格体积上限随格制退役，密度由碰撞圆自然限制）：常量保留仅供旧格移动
-        /// 兜底轨（MovementResolver.PassesVolumeLimit，AI 三脑 P5 移植前）消费；即时制新轨
-        /// （RTSMovementSystem 圆碰撞）不读本值；P5 旧轨退役后本常量随批删除</summary>
-        // P6 残留审计 B1/B2（docs/active/49）：格体积上限已退役——部署/召唤/客户端推荐全链改
-        // 碰撞圆重叠判定；本常量仅 MovementResolver.CanEnter 旧格原语内部兜底（无生产调用方），
-        // 后续整理批可随 MovementResolver 旧轨一并删除。
-        public const int MaxTileVolume = 3;
+        // （MaxTileVolume 单格体积上限已删除——2026-11-09 残留清理批：随 MovementResolver 旧轨
+        //  一并退役（docs/active/49 B1/B2），密度由碰撞圆自然限制）
 
         // ==================== 连续坐标与碰撞圆（决策九十五 P2，蓝图 §3） ====================
         // 1 格=1 米=100 厘米=1 世界单位（CellSizeCm 常量真源=GIC.Data.CellMetrics，BattleCell 同址）；
@@ -223,8 +214,8 @@ namespace GIC.Battle
         public const int DefaultMoveSpeedCm = 50;
 
         /// <summary>多层 Buff 第 i 层拍时刻（秒，相对段播放起点）——逐层错峰单源
-        /// （第 i 层=i×BuffLayerStaggerSeconds；消费方=光环 Buff OnTurnEnd 声明 PendingAuraHit/Heal/
-        /// Energy 的 HitSeconds 与 TurnResolver 碎裂回血错峰，勿再散抄公式）</summary>
+        /// （第 i 层=i×BuffLayerStaggerSeconds；消费方=光环 Buff OnEffectBeat 声明 PendingAuraHit/Heal/
+        /// Energy 的 HitSeconds 与 BattleResolver 碎裂回血错峰，勿再散抄公式）</summary>
         public static float LayerBeatSeconds(int layer) => layer * BuffLayerStaggerSeconds;
 
         // ==================== 即时制 tick 机（决策九十五，docs/active/48 §2） ====================
@@ -275,7 +266,7 @@ namespace GIC.Battle
         public const int HashReportIntervalTicks = 1 * TicksPerSecond;
 
         /// <summary>效果拍节拍（tick 数——2026-11-04 拍板「效果触发时间翻倍，现在太频繁」：Buff tick
-        /// 效果〔歌声之环/冰棱/燃烧等 OnTurnEnd 产出〕+建筑效果〔教堂治疗/旗帜元能/餐馆摩拉/骑士团
+        /// 效果〔歌声之环/冰棱/燃烧等 OnEffectBeat 产出〕+建筑效果〔教堂治疗/旗帜元能/餐馆摩拉/骑士团
         /// 引擎〕自每秒整拍改**每 2 秒一拍**——单次数值不动（DPS/产出随之减半，属拍板预期，嫌伤害低
         /// 再单独调数值）；**战技/爆发 CD 不受影响**（3s/5s 拍板保持）；Buff 持续计时仍按秒（Duration
         /// 语义不变）；资源发放/泡湿/站立采集保持每秒整拍（经济与判定窗口不随本拍板变动）；

@@ -8,7 +8,7 @@ namespace GIC.Battle
     /// 燃烧（docs/06 元素与反应系统）：每 2 秒受到〔Buff_Burn.asset 每拍伤害〕点火伤，
     /// 持续〔每级持续秒数〕× 级别（数值单源=BuffConfig 资产，docs/39——调平衡改 Inspector 零代码）。
     /// 来源=火+草反应（B4 接）；B2 由调试技能附带施加验证 DoT 链路。
-    /// 草元素延长机制（附着草→消耗草→延长 3 回合 × 层数）B4 随元素反应落地。
+    /// 草元素延长机制（附着草→消耗草→延长 3 秒 × 层数）B4 随元素反应落地。
     /// **0 层终点语义（2026-10-15 决策七十四修订决策二十三）**：燃烧火伤 tick=0 层火伤——
     /// 不反应、不附着（docs/06 §6.2「0层=纯伤害无附着、不反应」），但**仍视为火伤**：吃
     /// 防御/易伤/增伤乘区、可暴击、触发「造成火伤」类效果（区别只在反应与附着）。
@@ -28,7 +28,7 @@ namespace GIC.Battle
             RemainingSeconds = Cfg.每级持续秒数 * Level;
         }
 
-        public override List<BattleEffect> OnTurnEnd()
+        public override List<BattleEffect> OnEffectBeat()
         {
             var effects = new List<BattleEffect>();
             if (owner == null || Sim == null) return effects;
@@ -38,7 +38,7 @@ namespace GIC.Battle
             // 伤害归属=施加者（快照/命令流的 attacker），无施加者信息时归目标自身——AttackerOf 单源
             var attacker = AttackerOf();
             string sourceId = AttackerIdOf(ownerId);
-            // 只声明命中（PendingAuraHit，拍 0）：回合末交错管道统一结算——火伤平直值走
+            // 只声明命中（PendingAuraHit，拍 0）：效果拍交错管道统一结算——火伤平直值走
             // DamagePipeline（吃目标防御/易伤），**Layers=0 层=不反应不附着**（决策七十四 0 层终点语义）
             effects.Add(new PendingAuraHit(sourceId, ownerId, attacker, owner, ElementType.Pyro,
                 new DamageRequest

@@ -55,7 +55,7 @@ namespace GIC.Battle
         {
             // 服务器侧：收客户端上行（行动上交/ack/即时行动）
             NetworkServer.ReplaceHandler<BattleNetMessage>(OnServerMessage, false);
-            // 客户端侧：收 Host 下行（开局/快照/片/回合结束）
+            // 客户端侧：收 Host 下行（开局/快照/片命令块/秒拍结束段）
             NetworkClient.ReplaceHandler<BattleNetMessage>(OnClientMessage, false);
         }
 

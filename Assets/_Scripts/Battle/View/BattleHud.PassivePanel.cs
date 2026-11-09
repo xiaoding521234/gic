@@ -67,7 +67,7 @@ namespace GIC.Battle
             _passiveContent = def.content;
         }
 
-        /// <summary>被动技能盘刷新（RefreshSkillButtons 调；快照每回合多次驱动——签名比对防抖）：
+        /// <summary>被动技能盘刷新（RefreshSkillButtons 调；快照每秒拍多次驱动——签名比对防抖）：
         /// 建筑纯查看/无被动 → 清空（空容器不可见）；有被动 → 签名变化才重建图标列</summary>
         private void RefreshPassivePanel(UnitConfig.UnitData unitData)
         {

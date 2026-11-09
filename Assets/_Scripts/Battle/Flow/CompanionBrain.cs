@@ -14,10 +14,10 @@ namespace GIC.Battle
     ///
     /// 感知输入（docs/32 §3「意图可见性边界」）：
     /// - **己方玩家已提交选择**（号令/部署/魔神操作等）——①已被号令的单位跳过自主决策
-    ///   （玩家上交该单位势力技能=其本回合行动，无白决策）；②体力预留：同池需求总先于执行可知
+    ///   （玩家上交该单位势力技能=占用其本拍行动权，无白决策）；②体力预留：同池需求总先于执行可知
     ///   （池只减不增，总需求≤池则任意攻速序全部成立），伙伴决策按「实池−己方已提交消耗−
     ///   已定伙伴消耗」的虚拟池判定——不出现「选了落空」（§5.2）；
-    /// - 敌方玩家选择不可见（同时回合制信息隐藏）；己方眷属意图 v1 不可见（信息口径统一）。
+    /// - 敌方玩家选择不可见（同时拍信息隐藏）；己方眷属意图 v1 不可见（信息口径统一）。
     ///
     /// 动作空间=移动/战技/爆发（**势力技能选项剥离**——延奏/契约=玩家域，自主单位永不自用）；
     /// 无好行动=缺席（站桩；评分制「有好行动才动」=体力经济上界低于理论值）。
@@ -68,7 +68,7 @@ namespace GIC.Battle
         /// <summary>近敌接敌加分上限（离最近敌越近越优先动该单位）</summary>
         public static int MoveEngageBonusMax => AITuningConfig.Instance.接敌加分上限;
 
-        /// <summary>走位进射击线加分（移动落点即有可开火攻击线=下回合可输出）</summary>
+        /// <summary>走位进射击线加分（移动落点即有可开火攻击线=下拍可输出）</summary>
         public static int MoveLineUpScore => AITuningConfig.Instance.射线对齐分;
 
         /// <summary>治疗候选门槛：有效治疗 ≥ 治疗量一半才值得占行动（勿为挠痒花行动）</summary>
@@ -88,11 +88,11 @@ namespace GIC.Battle
         public static int SelfCastBurstBuffScore => AITuningConfig.Instance.自施放增益分;
 
         /// <summary>J-2 自施放爆发语境评分（2026-10-04 拍板）：即将施加的光环半径内每个存活敌的
-        /// 加分——贴敌群施放=每回合 tick 逐层吃满（优先于常规攻击先放），空场施放=预载（Buff 永久
+        /// 加分——贴敌群施放=每效果拍 tick 逐层吃满（优先于常规攻击先放），空场施放=预载（Buff 永久
         /// 非浪费，维持基础分照常放）</summary>
         public static int SelfCastBurstPerEnemyScore => AITuningConfig.Instance.自施放每敌分;
 
-        /// <summary>J-1 冻结协同分（2026-10-04 拍板）：反应预览命中冻结（控制反应——目标冰冻 2 回合
+        /// <summary>J-1 冻结协同分（2026-10-04 拍板）：反应预览命中冻结（控制反应——目标冰冻 2 秒
         /// 跳过行动）的 flat 加分——旧口径冻结无增伤乘区恒 0 分，凯亚对「打哪个敌人」无偏好；
         /// 芭芭拉光环挂水后霜袭打水附着目标=冻结联动主链；量级低于斩杀 80、高于常规集火每档 3</summary>
         public static int FreezeControlScore => AITuningConfig.Instance.冻结控制分;
@@ -108,7 +108,7 @@ namespace GIC.Battle
         /// （反威胁优先于平打、不优先于斩杀）。伙伴脑 threat=null 不消费=零行为变化</summary>
         public static int ThreatResponseScoreCap => AITuningConfig.Instance.反威胁分上限;
 
-        /// <summary>落点受威胁扣分（E-1）：候选落点在敌方预测火线格集合内=下回合白挨打，避险
+        /// <summary>落点受威胁扣分（E-1）：候选落点在敌方预测火线格集合内=下拍白挨打，避险
         /// 走位；与走位进射击线加分（8）同量级正负抵偿——有开火线但在火线上=平手倾向、纯避险
         /// 换位为负倾向。扣后钳 1 保底 Offer（危险落点排后不缺席——挂机防线语义）</summary>
         public static int ThreatenedCellPenalty => AITuningConfig.Instance.火线格惩罚;
@@ -133,7 +133,7 @@ namespace GIC.Battle
         /// 2026-10-04 观察局返修（W1）：伙伴流 threat=null 时血线门补「近敌存在」条件——
         /// 无近敌+低血线=安全区（低血不构成危险，随军照常、光环途中自愈）；有近敌+低血线
         /// 才保险后撤（G-2 语义保持）。观察局实证：她在 (2,13) 周围 7+ 格无敌却因 49% 血
-        /// 保险驻场 15+ 回合，先锋前排单打至死无奶</summary>
+        /// 保险驻场 15+ 秒，先锋前排单打至死无奶</summary>
         public static int SupportStanceRetreatHpPercent => AITuningConfig.Instance.保险血线百分比;
 
         /// <summary>保险形态近敌半径（2026-10-04 W1 返修）：血线门降级判定的「威胁可及域」——
@@ -141,7 +141,7 @@ namespace GIC.Battle
         public static int InsuranceDangerRadius => AITuningConfig.Instance.保险近敌半径;
 
         /// <summary>支援形态切换预警门（G-2）：威胁图预期承伤 ≥ hp×此百分比=保险形态——
-        /// 提前一回合后撤（不等到掉血才反应；E-1 威胁图基建复用零新感知；threat=null 时仅血线门）</summary>
+        /// 提前一拍后撤（不等到掉血才反应；E-1 威胁图基建复用零新感知；threat=null 时仅血线门）</summary>
         public static int SupportStanceRetreatThreatPercent => AITuningConfig.Instance.保险预警承伤百分比;
 
         /// <summary>保险形态自保倍率（G-2）：自保负分 ×3=贴敌格扣 45 分——后撤位（远离敌仍在
@@ -218,17 +218,17 @@ namespace GIC.Battle
         /// <summary>中性档案（无配置/魔神档兜底：全 1 权重=评分制 v2 原口径）</summary>
         private static readonly UnitConfig.CompanionProfile NeutralProfile = new UnitConfig.CompanionProfile();
 
-        /// <summary>移动锚延续槽（E-3 意图延续槽，docs/archive/33 §4）：unitId → 上回合移动锚 unitId。
-        /// static 生命周期=进程——DecideAll 里 turn≤1 自清（每次 StartBattle 恒从回合 1 起=新战斗
-        /// 自动清零，TurnFlow 零接线）；记录=评分期锚循环现场（RememberMoveAnchor 只记敌方锚）；
+        /// <summary>移动锚延续槽（E-3 意图延续槽，docs/archive/33 §4）：unitId → 上拍移动锚 unitId。
+        /// static 生命周期=进程——DecideAll 里 turn≤1 自清（每次 StartBattle 恒从秒 1 起=新战斗
+        /// 自动清零，Flow 零接线）；记录=评分期锚循环现场（RememberMoveAnchor 只记敌方锚）；
         /// 消费=ScoreMoveCandidate 锚序锁定插队（CR 式 target lock，治多锚贪心抖动）</summary>
         private static readonly Dictionary<string, string> _lastMoveAnchors = new Dictionary<string, string>();
 
         /// <summary>追随外推槽（H-4，docs/archive/36 §7——2026-10-04 拍板「不在先锋 1 格内就立刻跟上，
-        /// 治同速追逐恒滞后」）：跟随者 unitId → (先锋 unitId, 上回合先锋位置, 回合号)。static 生命
+        /// 治同速追逐恒滞后」）：跟随者 unitId → (先锋 unitId, 上拍先锋位置, 秒号)。static 生命
         /// 周期=进程——DecideAll 里 turn≤1 自清（与 _lastMoveAnchors 同款零接线）；消费=伴随分支
-        /// 按先锋上回合位移向量外推本回合追逐目标=当前位置+位移（迎头追逐——同速追逐〔双方皆
-        /// 2 格/回合〕物理上永不收敛，先锋驻位她才贴上=「凯亚走了四格远才跟」的根因）；先锋换人
+        /// 按先锋上拍位移向量外推本拍追逐目标=当前位置+位移（迎头追逐——同速追逐〔双方皆
+        /// 2 格/拍〕物理上永不收敛，先锋驻位她才贴上=「凯亚走了四格远才跟」的根因）；先锋换人
         /// （死亡换先锋）=记录失配按真实位置追逐（位移向量不可信）</summary>
         private static readonly Dictionary<string, (string vanguardId, BattleCell pos, int turn)> _vanguardTrack =
             new Dictionary<string, (string, BattleCell, int)>();
@@ -244,7 +244,7 @@ namespace GIC.Battle
         // ==================== 决策主入口（伙伴决策阶段） ====================
 
         /// <summary>
-        /// 全部伙伴单位的本回合自主行动（存活的；不可动/已被号令/无好行动=缺席）。
+        /// 全部伙伴单位的本拍自主行动（存活的；不可动/已被号令/无好行动=缺席）。
         /// playerActions=各玩家已提交选择（Host 收齐后传入——号令跳过+体力预留的感知源）。
         /// </summary>
         public static List<ActionData> DecideAll(BattleSimState sim, int turnNumber, List<ActionData> playerActions)
@@ -268,7 +268,7 @@ namespace GIC.Battle
                 foreach (var action in playerActions)
                 {
                     if (action == null || string.IsNullOrEmpty(action.unitId)) continue;
-                    commanded.Add(action.unitId); // 任何玩家上交的单位级行动=该单位本回合已被指令占用
+                    commanded.Add(action.unitId); // 任何玩家上交的单位级行动=该单位本拍已被指令占用
                     var actor = sim.GetUnit(action.unitId);
                     if (actor == null) continue;
                     var identity = actor.GetUnitComponent<UnitIdentity>();
@@ -288,7 +288,7 @@ namespace GIC.Battle
 
             // E-2 本方意图板（决策序内登记-消费，docs/archive/33 §3）：前位已定行动入板，后位评分
             // 消费（伤害溢出去重/治疗去重/集火跟随）——与 committed 虚拟池同构；配额脑无此机制
-            //（每回合仅 1 配额行动，无跨单位声明域）
+            //（每秒拍仅 1 配额行动，无跨单位声明域）
             var board = new TeamIntentBoard();
 
             // I-B 全玩家行动入板（docs/archive/37 §3，2026-10-04 拍板「玩家做出的选择伙伴脑需要
@@ -326,7 +326,7 @@ namespace GIC.Battle
 
             // 对手档案采集（AI-2 批，docs/active/42 §4/§11）：各玩家已提交配额行动 → 攻击性占比
             // 样本（已交选择=非隐私，信息红线①合规；消费侧随 AI-3 外交层激活）
-            OpponentProfiler.ObserveTurnActions(sim, playerActions, turnNumber);
+            OpponentProfiler.ObserveSecondActions(sim, playerActions, turnNumber);
 
             // 威胁图接伙伴脑（AI-2 批消费点扩展，docs/active/42 §11）：**全伙伴**（输出型+支援型）
             // 走位避险接线——移动落点避火线 −12（ThreatPenaltyAt 既有原语）+攻击反威胁分
@@ -353,7 +353,7 @@ namespace GIC.Battle
                 if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
                 var id0 = u0.GetUnitComponent<UnitIdentity>();
                 if (id0 == null || threatByTeam.ContainsKey(id0.Team) || !feedTeams.Contains(id0.Team)) continue;
-                threatByTeam[id0.Team] = OpponentThreatModel.BuildCached(sim, snapshot, id0.Team, turnNumber); // #2 审查批：回合级缓存
+                threatByTeam[id0.Team] = OpponentThreatModel.BuildCached(sim, snapshot, id0.Team, turnNumber); // #2 审查批：秒级缓存
             }
 
             // I-A 申报遍（docs/archive/37 §2.1，2026-10-04 拍板「伙伴们会讨论分配」）：全员裸分
@@ -362,7 +362,7 @@ namespace GIC.Battle
             // 声明——「没承诺不记槽」，未获名额伙伴零脏写）。
             // I 返修 2（2026-10-04 实测「凯亚走了 3 格芭芭拉没立刻跟上」）：申报遍拆两轮——
             // **输出型先申报**（纯独立视角 board=null），**支援型后申报且消费「申报落点板」**
-            //（bidBoard=输出型申报中的移动落点预广播——跟随者的追逐锚当回合即读到先锋申报
+            //（bidBoard=输出型申报中的移动落点预广播——跟随者的追逐锚当拍即读到先锋申报
             // 落点，治 T1 申报死角：快照视角下她与凯亚同在出生区=「已贴伴」驻位无候选→无
             // 名额→结算后凯亚冲出 3 格她原地不动。支援型=天然响应者，独立视角原则对跟随者
             // 修正为「消费先锋申报」）。执行序同构修复见 grants 重排（先锋先正式声明）
@@ -436,8 +436,8 @@ namespace GIC.Battle
             // 执行序支援型殿后（I 返修 3），芭芭拉（Hydro）的挂水意图若只在执行遍声明，先决策的
             // 安柏永远看不到=跨单位元素连招（挂水→蒸发/冻结）在决策层不可预判。申报遍全员广播=
             // WEGO 版 WorldState 顺序模拟（Gears Tactics 映射）：「讨论时各自亮牌」，先位/后位
-            // 同回合都能预判连招。声明=估值口径（未获名额者可能落空），消费端只用于反应预期分
-            //（软信号 ±半伤），下回合重决策自然吸收
+            // 同拍都能预判连招。声明=估值口径（未获名额者可能落空），消费端只用于反应预期分
+            //（软信号 ±半伤），下一拍重决策自然吸收
             foreach (var b in bids)
                 DeclareElementIntent(sim, snapshot, b.unit, b.unitId, b.bid, board, false);
 
@@ -462,7 +462,7 @@ namespace GIC.Battle
 
             // I 返修 3（docs/archive/37 §2.1 追记）：执行序=同队内支援型**稳定殿后**——先锋/输出型
             // 先正式声明移动落点，跟随者后重评分消费正式声明（「凯亚宣告、芭芭拉响应」的顺序
-            // 保证：追逐锚读到的声明落点=先锋本回合真实决策位）。OrderBy 稳定排序保持装包
+            // 保证：追逐锚读到的声明落点=先锋本拍真实决策位）。OrderBy 稳定排序保持装包
             // 价值序；无支援型队伍=恒等重排零变化；支援型后决策同时获得更多板信息（输出型
             // 集火/伤害声明）=决策质量只增不减
             grants = grants.GroupBy(g => g.team).OrderBy(g => (int)g.Key)
@@ -471,7 +471,7 @@ namespace GIC.Battle
 
             // I-A 执行遍：获名额者按（Team 升序→队内装包序）带正式板重评分定稿——名额分配依据
             //（裸分）与执行依据（板后协调分）分离：E-2 去重/集火/预治疗语义全保留；重评与申报
-            // 不同=正常重定向（前位声明改变后位最优），null=名额浪费（罕见，下回合自愈）
+            // 不同=正常重定向（前位声明改变后位最优），null=名额浪费（罕见，下一拍自愈）
             foreach (var g in grants)
             {
                 var identity = g.unit.GetUnitComponent<UnitIdentity>();
@@ -495,7 +495,7 @@ namespace GIC.Battle
                 if (tracker.Best == null) continue;
                 DeclareIntent(sim, snapshot, g.unit, g.team, tracker.Best, board); // E-2：意图入板
                 actions.Add(tracker.Best);
-                // I-D 移动意图占位：移动定稿落点入板（乐观口径——执行层停格偏差保守向，下回合吸收）
+                // I-D 移动意图占位：移动定稿落点入板（乐观口径——执行层停格偏差保守向，下一拍吸收）
                 if (tracker.Best.actionType == ActionType.Move)
                     board.DeclareMovement(g.unitId, DeclaredLandingCell(sim, tracker.Best, g.unit)); // P5：targetX 直读
                 int cost = ActionStaminaCost(sim, tracker.Best, g.unit);
@@ -536,7 +536,7 @@ namespace GIC.Battle
         /// ①方向攻击技能：PreviewLineTargets 逐命中目标声明估伤（溢出去重消费）+入集火集；
         /// ②治疗原子：逐受治者声明 per-ally 有效治疗（治疗去重消费，EnumerateSkillHeals 单源——
         /// 声明端 board=null 全量口径）；③移动/Pass/自增益/单位指向增益：零伤害声明。
-        /// 声明口径=估值（与评分同源）——结算偏差（防御/反应/被挡落空）由下回合重决策自然吸收</summary>
+        /// 声明口径=估值（与评分同源）——结算偏差（防御/反应/被挡落空）由下一拍重决策自然吸收</summary>
         private static void DeclareIntent(BattleSimState sim, BattleSnapshot snapshot, Unit unit,
             TeamType team, ActionData action, TeamIntentBoard board)
         {
@@ -659,7 +659,7 @@ namespace GIC.Battle
             return 0;
         }
 
-        /// <summary>该格是否存活资源点（收获档落点 +1=回合末站立采集估值）</summary>
+        /// <summary>该格是否存活资源点（收获档落点 +1=秒拍末站立采集估值）</summary>
         private static bool LivePileAt(BattleSimState sim, BattleCell cell)
         {
             foreach (var node in sim.SortedResourceNodes())
@@ -784,13 +784,13 @@ namespace GIC.Battle
                             // 预判——增伤反应（蒸发/融化 级别×50% 乘区）按折减伤害一半计；冻结
                             // 控制反应无增伤乘区不计分。跨单位连招基础：凯亚挂冰→安柏跟火自动蒸发
                             // **冻结层兜底（决策七十四拍板「AI 一并接入」）**：附着为空且目标冻结时
-                            // 冻结 Buff=第二冰源——火技能预判到融化（每回合=1层、同片逐发消耗）：
+                            // 冻结 Buff=第二冰源——火技能预判到融化（每秒=1层、同片逐发消耗）：
                             // 芭芭拉挂水→凯亚冻结→安柏跟火=融化收益可估（超导减防属间接收益不接，
                             // J-1 冻结协同分既有）
                             var reaction = ElementReactionResolver.Preview(
                                 (ElementType)target.dyedElement, target.dyedLayers, skillElement, 1);
                             // 议题⑤：声明附着消费（凌晨批）——快照附着为空时读意图板「他人已声明的
-                            // 附着意图」预判反应（芭芭拉申报挂水→安柏同回合即预判蒸发：比快照预判准，
+                            // 附着意图」预判反应（芭芭拉申报挂水→安柏同拍即预判蒸发：比快照预判准，
                             // WEGO 版顺序模拟；board=null=零变化；与下方冻结层兜底同=附着为空才走）
                             if (!reaction.HasReaction && (ElementType)target.dyedElement == ElementType.Physical
                                 && board != null)
@@ -804,18 +804,18 @@ namespace GIC.Battle
                                 && (ElementType)target.dyedElement == ElementType.Physical
                                 && target.isFrozen == 1)
                             {
-                                int freezeTurns = 0;
+                                int freezeSeconds = 0;
                                 foreach (var b in target.buffs)
-                                    if (b.type == (int)BuffType.Freeze) freezeTurns = b.remainingTurns;
-                                if (freezeTurns > 0)
-                                    reaction = ElementReactionResolver.PreviewFreezeLayer(skillElement, 1, freezeTurns);
+                                    if (b.type == (int)BuffType.Freeze) freezeSeconds = b.remainingTurns;
+                                if (freezeSeconds > 0)
+                                    reaction = ElementReactionResolver.PreviewFreezeLayer(skillElement, 1, freezeSeconds);
                             }
                             if (reactionPreview
                                 && reaction.HasReaction
                                 && reaction.DamageBonusDelta + reaction.VulnerabilityBonus > 0)
                                 score += effPerTarget / 2;
                             // J-1 冻结协同分（2026-10-04 拍板）：冻结控制反应无增伤乘区（旧口径恒 0 分）
-                            // ——目标跳过 2 回合行动的 flat 控制值；芭芭拉挂水→霜袭/冰棱 tick 冻结联动主链
+                            // ——目标跳过 2 秒行动的 flat 控制值；芭芭拉挂水→霜袭/冰棱 tick 冻结联动主链
                             else if (reaction.HasReaction
                                 && reaction.ReactionType == BattleCommand.ReactionKindFreeze)
                                 score += FreezeControlScore;
@@ -924,7 +924,7 @@ namespace GIC.Battle
         /// 无增益）不占行动；评分=增益常量乘爆发优先权重（伙伴脑/配额脑操魔神档共享骨架同分支）。
         /// J-2 语境评分（2026-10-04 拍板）：即将施加的光环半径内每存活敌 +SelfCastBurstPerEnemyScore
         ///（半径=BuffType 直查 AuraRadiusOfBuffType——施放前 Buff 未在身上 AuraRadiusOf 查不到）——
-        /// 贴敌群施放=每回合 tick 逐层吃满（优先于常规攻击先放）；空场施放=预载（Buff 永久非浪费）。
+        /// 贴敌群施放=每效果拍 tick 逐层吃满（优先于常规攻击先放）；空场施放=预载（Buff 永久非浪费）。
         /// 返回=是否产生候选（挂机修复的驻位判定消费）</summary>
         private static bool ScoreSelfCastBurst(BattleSimState sim, Unit unit, string playerId, int turn, int skillIndex,
             SkillConfig.SkillData data, CandidateTracker tracker, UnitConfig.CompanionProfile profile)
@@ -1000,7 +1000,7 @@ namespace GIC.Battle
             bool passCollector = collect.count > 0;
 
             // 纯 tag 型采集者已站上存活资源点：站桩即其采集上限——返回 true 让移动候选让位
-            //（回合末/秒拍自动采），攻击候选照常
+            //（秒拍末自动采），攻击候选照常
             if (!passCollector)
             {
                 foreach (var node in sim.SortedResourceNodes())
@@ -1719,7 +1719,7 @@ namespace GIC.Battle
         /// <summary>支援形态因子（G-2 形态切换，docs/archive/35 §2）：1=前线形态（光环贴敌满效）/
         /// SupportStanceSafeFactor(3)=保险形态（贴敌分归零+自保×3 后撤）。双门控纯函数判据：
         /// ①血线门=hp% &lt; SupportStanceRetreatHpPercent(60)；②预警门（threatThreat 非 null 时）=
-        /// 威胁图预期承伤 ≥ hp × SupportStanceRetreatThreatPercent(50)%——提前一回合后撤。
+        /// 威胁图预期承伤 ≥ hp × SupportStanceRetreatThreatPercent(50)%——提前一拍后撤。
         /// 她（光环载体+复苏持有者）活着=复活保险与光环引擎都在——形态切换承担「前线战斗」与
         /// 「稳定复活」两诉求的动态权衡</summary>
         private static int SupportStanceOf(BattleSimState sim, Unit unit, TeamType team,
@@ -2026,9 +2026,9 @@ namespace GIC.Battle
         /// 本方意图板（E-2 协调层，docs/archive/33 §3）：伙伴决策序内（unitId 升序）前位伙伴已定
         /// 行动的声明载体——与 staminaReserve/committed 虚拟池同构的「决策序内登记-消费」模式。
         /// 后位伙伴评分时消费：伤害溢出去重（DeclaredDamageOnEnemy）/治疗去重（DeclaredHealOnAlly）/
-        /// 集火跟随（FocusedEnemies）。配额脑不使用（每回合仅 1 配额行动，无跨单位声明域）。
+        /// 集火跟随（FocusedEnemies）。配额脑不使用（每秒拍仅 1 配额行动，无跨单位声明域）。
         /// 声明与消费同基于决策快照（DecideAll 头 TakeSnapshot 单源），伤害/治疗均为估值口径
-        /// （与评分同源，非结算精确值）——结算偏差由下回合重决策自然吸收。决策序铁律不变=确定性零损。
+        /// （与评分同源，非结算精确值）——结算偏差由下一拍重决策自然吸收。决策序铁律不变=确定性零损。
         /// </summary>
         public sealed class TeamIntentBoard
         {
@@ -2047,7 +2047,7 @@ namespace GIC.Battle
 
             /// <summary>移动意图落点（单位 id → 决策落点——I-D 移动意图占位：伙伴移动定稿/玩家
             /// Move/DeployUnit 预载声明；后位 BFS 视作占位避让，集团推进不互撞。声明口径=乐观
-            /// 落点，结算偏差保守向，下回合重算吸收）</summary>
+            /// 落点，结算偏差保守向，下一拍重算吸收）</summary>
             public readonly Dictionary<string, BattleCell> DeclaredMovement = new Dictionary<string, BattleCell>();
 
             /// <summary>已声明的元素附着意图（凌晨批议题⑤，WEGO 版 WorldState 顺序模拟）：敌方 unitId
@@ -2057,7 +2057,7 @@ namespace GIC.Battle
             /// 声明者申报期旧声明=最新意图权威）。消费=反应预期分（快照附着为空时读声明附着预判
             /// 蒸发/冻结连招——ItB 先动者危险格标记/Gears Tactics WorldState 顺序模拟的映射）。
             /// 声明口径=估值（OnHit 原子×预览命中集），未获名额者声明可能落空=评分层软信号，
-            /// 下回合重决策自然吸收</summary>
+            /// 下一拍重决策自然吸收</summary>
             public readonly Dictionary<string, List<(string declarerId, int element, int layers)>> DeclaredElementOnEnemy =
                 new Dictionary<string, List<(string, int, int)>>();
 

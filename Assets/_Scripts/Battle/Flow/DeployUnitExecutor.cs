@@ -12,7 +12,8 @@ namespace GIC.Battle
     /// 其它建筑锚=建筑 2/角色 1〔2026-10-23 拍板「任何自己的建筑即可为锚，部署角色比建筑减 1」〕
     /// + 碰撞判定链——2026-09-25 拍板
     /// 「根据碰撞决定」：体积绝对层最高级不可绕过、与格内单位互不阻挡才可部署、地形按常态移动类型
-    /// 通行，与 MovementResolver 进入判定同构）→ 摩拉够 → 生成单位登场。卡不消耗留手牌（可重复出战）；
+    /// 通行，进入判定原语本执行器自持〔原与 MovementResolver 同构，该类已随 2026-11-09 残留清理批删除〕）
+    /// → 摩拉够 → 生成单位登场。卡不消耗留手牌（可重复出战）；
     /// 1~2 星角色直接铺场，3 星+角色重复出战升命座（命座 B8）。
     /// 直产命令（Summon+StatChange(Mora)），不走 BattleEffect 效应链（资源/召唤不是单位效应）。
     /// </summary>
@@ -314,8 +315,8 @@ namespace GIC.Battle
             if (deployXCm > 0 || deployZCm > 0)
                 sim.SetPosCm(unit, deployXCm, deployZCm); // 自由落点连续位置（RegisterUnit 落格心，覆写为 cm 落点——半格自由站位）
 
-            // 全量 UnitState 单一出口（2026-09-23 审查 Y3：与快照同构——登场回合附着/元能/防御
-            // 等字段不缺，客户端建 view 与下回合快照零偏差）
+            // 全量 UnitState 单一出口（2026-09-23 审查 Y3：与快照同构——登场拍附着/元能/防御
+            // 等字段不缺，客户端建 view 与下一拍快照零偏差）
             var state = sim.BuildUnitState(unitId, unit);
 
             // sliceIndex/indexInSlice 传 0 占位——ResolveDeploySegment 产出时统一回填真实值（2026-09-23：
@@ -424,7 +425,8 @@ namespace GIC.Battle
         }
 
         /// <summary>BFS 距离场最近合法格（origin 自身优先；固定方向序+距离升序=确定性——
-        /// 同距平局按扩散序先到先得；与 MovementResolver 原语同源的格内合法性，无核心半径约束）</summary>
+        /// 同距平局按扩散序先到先得；格内合法性原语自持〔原与 MovementResolver 同源，该类已随
+        /// 2026-11-09 残留清理批删除〕，无核心半径约束）</summary>
         private static bool TryFindNearestValidCell(BattleSimState sim, string playerId, BattleCell origin,
             UnitConfig.UnitData data, out BattleCell cell)
         {

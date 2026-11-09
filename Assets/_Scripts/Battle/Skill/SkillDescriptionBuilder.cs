@@ -16,7 +16,7 @@ namespace GIC.Battle
         /// 关联面板描述构建（2026-10-07 决策五十六）：Buff/Concept 类 link 的 RelatedDescription 模板替换——
         /// 先走技能参数通道（Build 同链：{SkillParamKey} 占位+永久声明渲染），残余 {Key} 再按
         /// BuffConfig.关联名 反查资产解析——延奏类与行为族 buff 数值均=BuffConfig 单源
-        /// （2026-10-07 返修三：延奏技能资产已剥离 buff 参数，{BonusPerStack}/{StackLimit}/{DurationTurns}
+        /// （2026-10-07 返修三：延奏技能资产已剥离 buff 参数，{BonusPerStack}/{StackLimit}/{DurationSeconds}
         /// 由 StatBuffConfig 供值），数值统一金色高亮，与技能描述同观感。
         /// 2026-10-07 返修四：占位符与技能参数**同构渲染**（value+baseType 二元组）——%与基底名随数值
         /// **整体金色**（如「100%攻击力」全金），模板不再自带 %/基底名措辞；baseType 由家族覆写
@@ -37,7 +37,7 @@ namespace GIC.Battle
                 if (!value.HasValue) continue;
 
                 string rendered;
-                if (key == GIC.Data.BuffConfig.KeyStatDurationTurns && value.Value < 0)
+                if (key == GIC.Data.BuffConfig.KeyStatDurationSeconds && value.Value < 0)
                 {
                     // 永久声明（持续秒数<0 与技能参数 Duration<0 同口径：本地化「永久」金色单源）
                     rendered = GIC.Data.SkillParam.LocalizedPermanentDisplay();

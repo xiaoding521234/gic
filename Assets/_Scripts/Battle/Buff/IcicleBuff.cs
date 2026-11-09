@@ -25,18 +25,18 @@ namespace GIC.Battle
     /// 永久不计时〔2026-10-07 拍板「持续时间改为无限」，同 StatBuff 永久保护〕，逐层各施加；
     /// 2026-10-08 晚返拍「减防仍然留在2命」——重构批首版曾误整体退役，当晚恢复）。
     /// 碎裂（2026-10-01 复测拍板「元能&gt;50% 时立刻触发，而非回合结束才判定」）：**每笔元能增益
-    /// 落地后即时判定**（TurnResolver 元能增益段调 TryShatter——含溢出转移接收方）；**元能消耗
+    /// 落地后即时判定**（BattleResolver 元能增益段调 TryShatter——含溢出转移接收方）；**元能消耗
     /// 落地后同拍判定**（2026-10-15 拍板「施放冰棱若立刻过阈应当立刻破碎」——3命满能施放扣除 40
     /// 残留 60 仍 >50% 上限，刚挂上的冰棱立即碎裂勿等下一笔获能），持有者元能严格大于
     /// 〔碎裂元能阈值百分比〕上限 → 每层治疗〔碎裂治疗百分比〕施加者攻击力并移除
-    /// （碎裂后当回合末自然不再 tick）；**倒下同判**（2026-10-15 拍板「凯亚尸体的寒冰之棱会因此
+    /// （碎裂后当效果拍末自然不再 tick）；**倒下同判**（2026-10-15 拍板「凯亚尸体的寒冰之棱会因此
     /// 碎裂」——倒下碎裂不治疗 healPerShard=0〔血量恒 0 铁律〕，仅移除=尸体停止 tick）。
     /// tick：每 2 秒对持有者切比雪夫〔作用半径〕内敌人造成〔每拍伤害百分比〕施加者攻击力
     /// 冰伤（含尸体——鞭尸同 Burn/歌声之环先例；**走 DamagePipeline 吃目标防御/易伤乘区**〔2026-10-01
     /// 现场取证返修：平直值口径致减防乘区对 tick 无效报障〕、不经反应预览=不触发反应/不附着）。
     /// 数值基准=施加者（自施放=凯亚自身；无施加者回落持有者——BurnBuff 归属同款兜底）。
     /// **溢出层碎裂（2026-10-15 拍板「溢出的层数立刻破碎」）**：满层再施放时未被上限吸收的召唤层
-    /// 立即碎裂——逐枚治疗〔碎裂治疗百分比〕施加者攻击力（TurnResolver ApplyBuff 分支收口，
+    /// 立即碎裂——逐枚治疗〔碎裂治疗百分比〕施加者攻击力（BattleResolver ApplyBuff 分支收口，
     /// 错峰拍同碎裂路径；场上限内的层保留继续 tick）。
     /// </summary>
     public class IcicleBuff : BaseBuff
@@ -66,7 +66,7 @@ namespace GIC.Battle
         }
 
         /// <summary>同类重复施加：叠层（钳资产常驻上限）+刷新施加者（数值基准随之更新）。
-        /// 溢出层（超上限吸收不了的召唤层）不再静默消失——TurnResolver ApplyBuff 分支按碎裂口径
+        /// 溢出层（超上限吸收不了的召唤层）不再静默消失——BattleResolver ApplyBuff 分支按碎裂口径
         /// 逐枚弹治疗（2026-10-15 拍板「溢出的层数立刻破碎」；状态与命令均在应用点收口）</summary>
         public override void Merge(BaseBuff newer)
         {
@@ -75,7 +75,7 @@ namespace GIC.Battle
             Level = Mathf.Min(Level + Mathf.Max(1, newer.Level), StackLimit());
         }
 
-        public override List<BattleEffect> OnTurnEnd()
+        public override List<BattleEffect> OnEffectBeat()
         {
             var effects = new List<BattleEffect>();
             if (owner == null || Sim == null) return effects;
@@ -94,7 +94,7 @@ namespace GIC.Battle
             // 独立 buff 实例；第 i 层时刻=i×BuffLayerStaggerSeconds 错峰避免同拍弹出，Host 状态恒即时
             // 结算、错峰纯表现层）。每层对半径内敌方 % 施加者攻冰伤（含尸体——鞭尸同 Burn/歌声之环
             // 先例）；2命起每层命中额外施加冰棱减防（逐层各一次——2026-10-08 晚返拍「减防仍然留在2命」）。
-            // 碎裂不在此判定（复测拍板①「元能>50% 立刻触发」——移除后本回合末自然无 tick）
+            // 碎裂不在此判定（复测拍板①「元能>50% 立刻触发」——移除后本效果拍末自然无 tick）
             var (cLevel, talent) = SourceConstellation();
             // #6 审查批单源：半径=基础+命座加成全走 BuffConfig 虚方法（IcicleBuffConfig 覆写——
             // 与客户端 BattleHud.SelfCastAuraRadiusOf 预估同一条口径）
@@ -111,7 +111,7 @@ namespace GIC.Battle
                 if (Sim.GetPosition(unit).SquaredEuclideanCmTo(holderPos) > auraR * auraR)
                     continue; // 出半径
 
-                // 每层伤害=% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：回合末
+                // 每层伤害=% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：效果拍
                 // 交错管道统一结算（反应预判+消耗+每层附着=决策二十四终版；伤害走 DamagePipeline 全
                 // 乘区——目标防御/易伤乘区对 tick 生效〔现场取证返修口径延续〕）。凯亚 1命吸血随一切
                 // DamageEffect 统一结算（ApplyEffects）——tick 命中也吸血=预期
@@ -163,7 +163,7 @@ namespace GIC.Battle
 
         // ==================== 碎裂（2026-10-01 复测拍板：元能>50% 立刻触发，非回合末延迟） ====================
 
-        /// <summary>碎裂判定+状态应用：每笔元能增益落地后由 TurnResolver 元能段调用（含溢出转移
+        /// <summary>碎裂判定+状态应用：每笔元能增益落地后由 BattleResolver 元能段调用（含溢出转移
         /// 接收方——其元能在 ApplyEnergy 内联写入）；元能消耗落地后同拍调用（2026-10-15 拍板
         /// 「施放冰棱若立刻过阈应当立刻破碎」——扣除后仍过阈即碎，勿等下一笔获能）。持有者元能**严格大于**〔碎裂元能阈值百分比〕
         /// 上限 → **逐层**治疗〔碎裂治疗百分比〕施加者攻击力（2026-10-01 拍板「包括碎裂回血等效果

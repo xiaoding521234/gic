@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**gic** — 基于 Tuanjie 引擎的多人联机回合制战棋游戏。使用 Mirror 实现网络同步，Unity Localization 实现多语言。
+**gic** — 基于 Tuanjie 引擎的多人联机即时制卡牌战术战棋游戏（2026-11-03 决策九十五由回合制改造，蓝图=docs/active/48）。使用 Mirror 实现网络同步，Unity Localization 实现多语言。
 
 ## Engine & Key Packages
 

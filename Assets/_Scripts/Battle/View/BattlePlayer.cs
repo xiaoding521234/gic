@@ -138,19 +138,10 @@ namespace GIC.Battle
         /// <summary>快照更新通知（选择阶段头 + 开局）</summary>
         public event Action<BattleSnapshot> SnapshotUpdated;
 
-        /// <summary>片开始播放（参数=本片攻速；执行预览推进行用）。2026-09-29 语义收紧：只对
-        /// **攻速行动片**发（部署段/回合结束段/即时行动块不发——它们不按攻速排程，行进推进语义
-        /// 只属攻速片；旧消费方=攻速队列高亮已随队列退役）</summary>
-        public event Action<int> OnSegmentPlaying;
-
-        /// <summary>片到达（2026-10-26 底部进度线批）：**全类型**（部署/攻速/回合末/即时段均含、
+        /// <summary>片到达（2026-10-26 底部进度线批）：**全类型**（部署/攻速/秒拍/即时段均含、
         /// 购买迷你段 sliceIndex=-1 亦含——消费方自行过滤），到达即发不等播放——本地 host 视图与
-        /// LAN 客户端经 OnSegment 同源；与 OnSegmentPlaying（只攻速片、播到才发）互补勿混用</summary>
+        /// LAN 客户端经 OnSegment 同源</summary>
         public event Action<Segment> SegmentReceived;
-
-        /// <summary>行动预告到达（2026-09-29 执行预览：Host 分桶后、首片推送前下发——
-        /// 订阅方=执行预览建行；载荷自含攻速/归属/技能索引。命名同 SnapshotUpdated 模式）</summary>
-        public event Action<TurnPlanMessage> TurnPlanUpdated;
 
         /// <summary>玩家资源增量（B6d 经济闭环：摩拉/体力 StatChange 命令消费点——
         /// 参数=玩家ID / 属性子类型（StatKindMora/StatKindStamina）/ 变化量；HUD 订阅即时刷新，
@@ -182,8 +173,8 @@ namespace GIC.Battle
         public event Action<string, SkillType, int> SkillCasted;
 
         // ===== B7 LAN 客户端相位派生（2026-10-11 联机批；_flow==null 的端=LAN 客户端） =====
-        // 客户端无 TurnFlowController——阶段/倒计时从消息流派生（Snapshot→Selecting、Segment→Resolving、
-        // BattleOver→Finished）；host/本地端 _flow!=null 恒走 Flow 权威相位，本派生段零生效（各入口守卫）。
+        // 客户端无 Flow 控制器——阶段从消息流派生（Snapshot→Selecting、BattleOver→Finished）；
+        // host/本地端 _flow!=null 恒走 Flow 权威相位，本派生段零生效（各入口守卫）。
 
         /// <summary>客户端派生相位变化（BattleSession 相位门面转发，HUD 订阅单源）</summary>
         public event Action<BattlePhase, int> ClientPhaseChanged;
@@ -199,7 +190,7 @@ namespace GIC.Battle
         public bool ClientPhasePaused { get; set; }
 
         private BattlePhase _clientPhase = BattlePhase.Idle;
-        private int _clientTurn;
+        private int _clientSecond;
         private float _clientSelectRemaining = -1f; // 即时制恒 -1（无选择倒计时；保留字段供 BattleSession 门面读取）
 
         /// <summary>消息流派生相位（客户端专用；**仅相位真变化**时广播+驱动两态立牌模型——
@@ -207,7 +198,7 @@ namespace GIC.Battle
         /// 「换回合」当相位切换，导致每秒全场立牌重排一次）</summary>
         private void DeriveClientPhase(BattlePhase phase, int turn, int selectLimitSeconds = -1)
         {
-            _clientTurn = turn;
+            _clientSecond = turn;
 
             if (phase == BattlePhase.Selecting)
                 _clientSelectRemaining = selectLimitSeconds > 0 ? selectLimitSeconds : -1f;
@@ -292,7 +283,7 @@ namespace GIC.Battle
         private const float MoveStepSeconds = BattleMetrics.MoveStepSeconds;
         // #10 审查批：段播放 pacing 常量收口 BattleMetrics（Host/客户端契约单源——原为客户端内联字面量）
         private const float CommandStaggerSeconds = BattleMetrics.CommandStaggerSeconds;
-        private const float TurnEndDelaySeconds = BattleMetrics.TurnEndDelaySeconds; // 回合结束段固定节拍（不按攻速排程）
+        private const float SecondBeatDelaySeconds = BattleMetrics.SecondBeatDelaySeconds; // 秒拍结束段固定节拍（不按攻速排程）
 
         /// <summary>同段直击节拍配对状态（§107 追记，2026-10-02 单表化收口：原双表中
         /// _segmentLastDirectDamageDelay 恒为 beats 末项的镜像冗余，合一）。beats=该攻击者本段
@@ -694,7 +685,7 @@ namespace GIC.Battle
                 }
             }
 
-            // 资源点权威态自愈（docs/47）：回合头快照整表覆盖（采集时刻变化走 ResourceHarvest 命令
+            // 资源点权威态自愈（docs/47）：秒拍头快照整表覆盖（采集时刻变化走 ResourceHarvest 命令
             // 增量；重连/漏命令场景由本口兜底对齐）
             if (_board != null)
                 _board.RebuildResourceNodes(message.snapshot.resourceNodes);
@@ -725,23 +716,11 @@ namespace GIC.Battle
             StartCoroutine(PlaySegmentCoroutine(message.segment));
         }
 
-        public void OnTurnEnd(TurnEndMessage message)
-        {
-            GICLog.Info($"[BattlePlayer] 回合 {message.turnNumber} 结束");
-        }
-
-        /// <summary>行动预告到达（2026-09-29 执行预览）：转发事件——订阅方（执行预览）在执行相位
-        /// 侧消费建行</summary>
-        public void OnTurnPlan(TurnPlanMessage message)
-        {
-            TurnPlanUpdated?.Invoke(message);
-        }
-
         /// <summary>战斗结束（S10 轻量全灭软停）：一方全灭——HUD 胜负提示消费；结算画面=B8</summary>
         public void OnBattleOver(BattleOverMessage message)
         {
             GICLog.Info($"[BattlePlayer] 战斗结束：胜方队伍 {(TeamType)message.winnerTeam}");
-            DeriveClientPhase(BattlePhase.Finished, _clientTurn); // 终局相位派生（唯一非 Selecting 相位）
+            DeriveClientPhase(BattlePhase.Finished, _clientSecond); // 终局相位派生（唯一非 Selecting 相位）
             BattleOver?.Invoke(message);
         }
 
@@ -1334,10 +1313,10 @@ namespace GIC.Battle
         private IEnumerator PlaySegmentCoroutine(Segment segment)
         {
             // 片开始时刻 =（全场最高攻速 − 自身攻速）÷ 10 秒（连续换算）；
-            // 即时行动块/部署段 = 短节拍；回合结束段 = 固定节拍（不按攻速排程）
+            // 即时行动块/部署段 = 短节拍；秒拍结束段 = 固定节拍（不按攻速排程）
             float delay;
             if (segment.turnEnd != 0)
-                delay = TurnEndDelaySeconds;
+                delay = SecondBeatDelaySeconds;
             else if (segment.insertedInstantAction != 0 || segment.deploy != 0)
                 delay = BattleMetrics.DeploySegmentBeatSeconds;
             else
@@ -1348,17 +1327,12 @@ namespace GIC.Battle
                 // 空等跳过（2026-09-30 拍板「凯亚行动完后芭芭拉空等 3 秒，应当跳过空等时间——只要
                 // 这期间已经没有任何正在进行的行动（含箭矢飞行等）才可跳过」——docs/18 L44 既有
                 ///「衍生事件提早完成即跳过剩余等待」语义的落地）：攻速片片头等待逐帧探测在途有意义
-                // 行动，无在途即提前进片；部署/回合结束/即时块固定短拍不参与跳过
+                // 行动，无在途即提前进片；部署/秒拍结束/即时块固定短拍不参与跳过
                 if (segment.turnEnd == 0 && segment.deploy == 0 && segment.insertedInstantAction == 0)
                     yield return WaitSliceDelaySkippingDeadAir(delay / _playbackSpeed);
                 else
                     yield return new WaitForSeconds(delay / _playbackSpeed);
             }
-
-            // 只对攻速行动片发（2026-09-29 语义收紧：部署/回合结束/即时行动块不按攻速排程——
-            // 执行预览的行进推进只属攻速片；旧消费方攻速队列已随队列退役）
-            if (segment.turnEnd == 0 && segment.deploy == 0 && segment.insertedInstantAction == 0)
-                OnSegmentPlaying?.Invoke(segment.sliceAttackSpeed);
 
             var playbacks = new List<Coroutine>();
             float stagger = 0f;
@@ -1465,7 +1439,7 @@ namespace GIC.Battle
                         if (_views.TryGetValue(command.targetUnitId, out var healed))
                         {
                             // 命中时刻（2026-09-25「命中时才给」）：OnHit 治疗（水之浅唱）到命中毫秒再弹 +N
-                            //（与投射物落地同时刻）；0=立即（OnCast 治疗/回合结束段，保持命令 stagger 节拍）。
+                            //（与投射物落地同时刻）；0=立即（OnCast 治疗/秒拍结束段，保持命令 stagger 节拍）。
                             // 吸血自疗同拍（2026-10-01 实战报障「伤害 40 先出、+30 慢一拍才出」）：
                             // source==target 且本段该攻击者有 launchMs=0 直击（stagger 旧节拍、Host 无从
                             // 携带该时刻）——绑定其直击节拍同帧弹，勿再吃治疗命令自己的 stagger 槽。
@@ -1563,7 +1537,7 @@ namespace GIC.Battle
                     case BattleCommandType.ElementAttach:
                         // 附着即时刷新（2026-09-22 接线：此前靠下回合快照自愈，反应当片不可见）；
                         // **命中时刻到点应用（决策七十六复测返修 WYSIWYG）**：箭在飞时目标不提前挂
-                        // 附着图标——launchMs>0 延迟到点（投射物/整线段时刻），0=立即（OnCast/回合末）
+                        // 附着图标——launchMs>0 延迟到点（投射物/整线段时刻），0=立即（OnCast/效果拍末）
                         if (_views.TryGetValue(command.targetUnitId, out var attached))
                         {
                             var attachedView = attached;
@@ -1580,7 +1554,7 @@ namespace GIC.Battle
                         // 元素×地形（决策七十六）：本地 map 真值+薄冰面板刷新——后续瞄准预览/箭落
                         // 判地形即时正确（移动 BFS 客户端侧不跑、只 HUD 预览读图）；
                         // **命中时刻到点应用（决策七十六复测返修 WYSIWYG「箭矢还未飞到薄冰就融化」）**：
-                        // launchMs>0 延迟到点（箭雨多波按波融化），0=立即（冰棱回合末冻结/泡湿类）
+                        // launchMs>0 延迟到点（箭雨多波按波融化），0=立即（冰棱效果拍冻结/泡湿类）
                         if (_board != null)
                         {
                             var terrainCell = command.cell;
@@ -1601,7 +1575,7 @@ namespace GIC.Battle
                         // **命中时刻到点应用（2026-10-28 返修「表现对齐动画」）**：途经采集
                         // launchMs=行走到达堆格时刻（Host 按 i×MoveStepSeconds+k×CommandStaggerSeconds
                         // 同源计算）——到点再减件/弹字（段首即减=安柏还没走到堆顶件就没了）；
-                        // 0=立即（回合末站立采集）。
+                        // 0=立即（秒拍末站立采集）。
                         // 迷雾口径（2026-10-28 返修「摩拉堆在迷雾中应当隐藏」）：堆格对本端未探索=
                         // 零飘字（堆件已隐藏，凭空浮字会泄露位置；我方采集者途经格必然已揭雾，
                         // 本门实际只拦敌方迷雾内采集）
@@ -1660,7 +1634,7 @@ namespace GIC.Battle
                             if (command.metadata == BattleCommand.StatKindEnergy)
                             {
                                 // 命中时刻（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒——
-                                // 到点再跳元能（与投射物命中表现同时刻）；0=立即（移动获能/协奏/消耗/回合发放）。
+                                // 到点再跳元能（与投射物命中表现同时刻）；0=立即（移动获能/协奏/消耗/秒拍发放）。
                                 // 获取类随跳弹「+N」元能数字（2026-10-01 拍板④「目前少了元能数字弹出」
                                 // ——白=元能条色单源，消耗不弹）
                                 if (command.launchMs > 0)
@@ -1690,7 +1664,7 @@ namespace GIC.Battle
 
                     case BattleCommandType.ItemConsume:
                         // 物品消耗（统一消耗模型 C-1）：先扣本地 handCards 镜像（按 (物品,实例耐久) 条目
-                        // 匹配——决策八十一；减尽移除条目），再广播 HUD 刷新角标；下回合快照权威兜底
+                        // 匹配——决策八十一；减尽移除条目），再广播 HUD 刷新角标；下一拍快照权威兜底
                         ApplyItemConsumeToLocalHand(command.targetUnitId, (ItemName)command.metadata,
                             command.value, command.buffLevel);
                         OnItemConsumed?.Invoke(command.targetUnitId, command.metadata, command.value, command.buffLevel);
@@ -1698,7 +1672,7 @@ namespace GIC.Battle
 
                     case BattleCommandType.EquipItem:
                         // 装备/耐久刷新（装备批 2026-10-18）：血条右侧图标行增改——value=物品名、
-                        // metadata=槽位种类、direction=槽位序号、buffLevel=剩余耐久；下回合快照权威自愈
+                        // metadata=槽位种类、direction=槽位序号、buffLevel=剩余耐久；下一拍快照权威自愈
                         if (_views.TryGetValue(command.targetUnitId, out var equippedView))
                             equippedView.ApplyEquipBadge(command.value, command.metadata, command.direction,
                                 command.buffLevel);
@@ -1713,7 +1687,7 @@ namespace GIC.Battle
                     case BattleCommandType.ItemGain:
                         // 获得物品卡（命座授予/死亡掠夺）：本地手牌镜像新增（GainCard 对偶——按 (物品,
                         // 实例耐久) 条目合并/新建，掠夺物耐久保留）；HUD 重建手牌（新实例=新槽位）；
-                        // 下回合快照权威自愈
+                        // 下一拍快照权威自愈
                         ApplyItemGainToLocalHand(command.targetUnitId, (ItemName)command.metadata,
                             command.value, command.buffLevel);
                         OnItemGained?.Invoke(command.targetUnitId, command.metadata, command.value, command.buffLevel);
@@ -1721,7 +1695,7 @@ namespace GIC.Battle
 
                     case BattleCommandType.CardGain:
                         // 获得单位卡（购买批 2026-10-22，决策八十六：购买角色/建筑卡入手牌）：
-                        // 本地手牌镜像新增（count 合并/新建）+HUD 重建手牌；下回合快照权威自愈
+                        // 本地手牌镜像新增（count 合并/新建）+HUD 重建手牌；下一拍快照权威自愈
                         ApplyCardGainToLocalHand(command.targetUnitId, command.metadata, command.value);
                         OnUnitCardGained?.Invoke(command.targetUnitId, command.metadata, command.value);
                         break;
@@ -2193,7 +2167,7 @@ namespace GIC.Battle
         }
 
         /// <summary>玩家资源命令命中时刻应用（B-3 摩拉掠夺，同元能「命中时才给」）：到点再发资源事件；
-        /// 0=立即不走本协程（部署扣费/回合发放/体力恒立即）</summary>
+        /// 0=立即不走本协程（部署扣费/秒拍发放/体力恒立即）</summary>
         private IEnumerator PlayResourceDeltaCoroutine(BattleCommand command)
         {
             yield return new WaitForSeconds(LaunchDelayOf(command));
@@ -2202,7 +2176,7 @@ namespace GIC.Battle
 
         /// <summary>物品消耗命令扣本地手牌镜像（统一消耗模型 C-1）：LatestSnapshot.resources 内该玩家
         /// handCards 条目数量减/减尽移除——片内即时反映（HUD 角标刷新走 OnItemConsumed 事件）；
-        /// 非我方玩家命令仅镜像维护（HUD 只刷我方手牌），下回合快照权威兜底</summary>
+        /// 非我方玩家命令仅镜像维护（HUD 只刷我方手牌），下一拍快照权威兜底</summary>
         private void ApplyItemConsumeToLocalHand(string playerId, ItemName item, int amount, int durability)
         {
             var snapshot = LatestSnapshot;
@@ -2232,7 +2206,7 @@ namespace GIC.Battle
         /// <summary>获得物品卡命令并本地手牌镜像（命座授予/死亡掠夺）：LatestSnapshot.resources 内
         /// 该玩家 handCards 条目按 (物品,实例耐久) 匹配——有则加数量/无则新建携带耐久条目（GainCard
         /// 对偶——装备按耐久分实例，掠夺物耐久不变保留；货币卡走资源池不在此列）；
-        /// HUD 重建走 OnItemGained 事件；下回合快照权威兜底</summary>
+        /// HUD 重建走 OnItemGained 事件；下一拍快照权威兜底</summary>
         private void ApplyItemGainToLocalHand(string playerId, ItemName item, int amount, int durability)
         {
             var snapshot = LatestSnapshot;
@@ -2259,7 +2233,7 @@ namespace GIC.Battle
 
         /// <summary>获得单位卡的本地手牌镜像（购买批 2026-10-22）：按 (Unit, value) 条目合并数量/
         /// 新建条目（单位卡无耐久实例语义——同种角色多张合并 count）；镜像后 HUD 经 OnUnitCardGained
-        /// 重建手牌，下回合快照权威自愈</summary>
+        /// 重建手牌，下一拍快照权威自愈</summary>
         private void ApplyCardGainToLocalHand(string playerId, int unitName, int amount)
         {
             var snapshot = LatestSnapshot;

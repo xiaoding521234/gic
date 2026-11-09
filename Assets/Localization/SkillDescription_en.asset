@@ -238,7 +238,7 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3012001
     m_Localized: "\xB7Choose one of the four cardinal directions and enter a charging
-      state\n\xB7After charging for {ChargeTurns} seconds, deal {Damage} Geo DMG
+      state\n\xB7After charging for {ChargeSeconds} seconds, deal {Damage} Geo DMG
       to all enemies in the 3\xD73 area ahead\n\xB7While charging: Move SPD -10,
       Skills disabled, can be interrupted by hard CC"
     m_Metadata:

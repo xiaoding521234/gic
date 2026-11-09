@@ -7,9 +7,9 @@ namespace GIC.Battle
 
     /// <summary>
     /// Buff 基类（B2 实体化，docs/22 §10）。
-    /// 回合制计时（docs/04 §4.4）：只在每次回合结束时计数减一，上 buff 的当回合结束即减——
+    /// 计时（docs/04 §4.4 原回合制口径，2026-11-09 秒化）：只在每次秒拍结束时计数减一，上 buff 的当秒拍结束即减——
     /// 现实秒计时（连携窗等）只走执行阶段时轴，与本类无关。
-    /// 回合结束效果按**注册序**结算（docs/22 §2）：ApplicationIndex 由 BattleSimState 分配。
+    /// 效果拍效果按**注册序**结算（docs/22 §2）：ApplicationIndex 由 BattleSimState 分配。
     /// </summary>
     public abstract class BaseBuff
     {
@@ -28,12 +28,12 @@ namespace GIC.Battle
         /// BuffState.sourceSkillId 透传；Merge 不换源（沿用首挂，与 source 字段同口径）</summary>
         public int SourceSkillId;
 
-        /// <summary>所属战场门面（BattleSimState.ApplyBuff 注册时注入；回合结束效果需要战场查询的
+        /// <summary>所属战场门面（BattleSimState.ApplyBuff 注册时注入；效果拍效果需要战场查询的
         /// Buff 消费——如歌声之环按持有者位置枚举半径内单位。单局生命周期，勿跨对局复用）</summary>
         public BattleSimState Sim;
 
         /// <summary>永久 Buff（RemainingSeconds&lt;0 标记——歌声之环/寒冰之棱类：不计时）；
-        /// 回合递减与到期收集均跳过（TurnResolver/CollectExpiredBuffs 同判据），
+        /// 秒递减与到期收集均跳过（BattleResolver/CollectExpiredBuffs 同判据），
         /// 消失通道=持有者倒下（RemoveOnHolderDeath）或碎裂/驱散即时移除（BattleSimState.RemoveBuff）</summary>
         public bool IsPermanent => RemainingSeconds < 0;
 
@@ -48,19 +48,19 @@ namespace GIC.Battle
         /// <summary>协议类型标识（命令流/快照/客户端图标映射）</summary>
         public abstract BuffType Type { get; }
 
-        /// <summary>级别（如燃烧持续 3 回合 × 级别，docs/06）</summary>
+        /// <summary>级别（如燃烧持续 3 秒 × 级别，docs/06）</summary>
         public int Level = 1;
 
-        /// <summary>回合制剩余回合数（回合结束减一，含上 buff 当回合）</summary>
+        /// <summary>剩余秒数（秒拍末减一，含上 buff 当秒拍）</summary>
         public int RemainingSeconds = 1;
 
-        /// <summary>全局注册序（回合结束效果结算顺序）</summary>
+        /// <summary>全局注册序（效果拍结算顺序）</summary>
         public int ApplicationIndex;
 
         /// <summary>
-        /// 回合结束效果（按注册序调用；返回效应由 TurnResolver 统一应用并产出命令）
+        /// 效果拍效果（按注册序调用；返回效应由 BattleResolver 统一应用并产出命令）
         /// </summary>
-        public abstract List<BattleEffect> OnTurnEnd();
+        public abstract List<BattleEffect> OnEffectBeat();
 
         /// <summary>挂载回调（BattleSimState.ApplyBuff 注册后调用；如冻结写入 UnitStatus）</summary>
         public virtual void OnApplied() { }
@@ -70,7 +70,7 @@ namespace GIC.Battle
 
         /// <summary>
         /// 同类重复施加的合并规则。默认 = 时长累加 + 级别取大
-        /// （与燃烧"被附着草延长 3 回合 × 层数"同构，docs/06；B4 反应批次按需覆写）。
+        /// （与燃烧"被附着草延长 3 秒 × 层数"同构，docs/06；B4 反应批次按需覆写）。
         /// </summary>
         public virtual void Merge(BaseBuff newer)
         {
@@ -95,7 +95,7 @@ namespace GIC.Battle
         }
 
         // ==================== 数值基准/几何原语（2026-10-02 执行阶段复审收口） ====================
-        // 光环/DoT 族 OnTurnEnd 的样板件单源——Burn/歌声之环/寒冰之棱三处逐字重复的
+        // 光环/DoT 族 OnEffectBeat 的样板件单源——Burn/歌声之环/寒冰之棱三处逐字重复的
         // 施加者回落与 id 推导收拢；新光环/DoT Buff（火环/岩环等）落地时勿再手抄。
 
         /// <summary>数值基准单位（施加者优先——跨命座语义+亡佚兜底；无施加者回落持有者）。

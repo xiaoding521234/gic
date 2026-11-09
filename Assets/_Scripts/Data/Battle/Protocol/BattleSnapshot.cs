@@ -32,7 +32,7 @@ namespace GIC.Data
         public int isFrozen;
 
         /// <summary>灵魂标记（决策九十一，2026-10-25）：死亡伙伴/魔神的灵魂驻留地脉维度——同位生成、
-        /// 每回合末 −10% 最大生命衰减、扣完灵魂与尸体双双消散、尸体复苏时灵魂归体消散；无行动不可上交；
+        /// 每秒拍末 −10% 最大生命衰减、扣完灵魂与尸体双双消散、尸体复苏时灵魂归体消散；无行动不可上交；
         /// 只继承基础属性（无装备/无 Buff/无命座加成、满血）+治疗效率 50（受疗者效率乘区单出口自动减半
         /// 一切治疗）；可被地脉内单位按标准单位交互（未来胡桃/丽莎相位技能入地脉清理灵魂）。
         /// 客户端建幽灵立牌（半透明冰蓝立牌图）+地脉视角专属显示</summary>
@@ -192,9 +192,9 @@ namespace GIC.Data
         public List<UnitState> units = new List<UnitState>();
         public List<PlayerResourceState> resources = new List<PlayerResourceState>();
 
-        /// <summary>回合头资源点权威态（docs/47 资源点批，2026-10-27）：客户端表现层对齐与 AI
+        /// <summary>秒拍头资源点权威态（docs/47 资源点批，2026-10-27）：客户端表现层对齐与 AI
         /// 采集候选消费域——剩余次数/在场集合以此为准（采集时刻变化走 ResourceHarvest 命令增量，
-        /// 回合头快照整表覆盖自愈）</summary>
+        /// 秒拍头快照整表覆盖自愈）</summary>
         public List<ResourceNodeState> resourceNodes = new List<ResourceNodeState>();
 
         /// <summary>主世界单位视图单源查询（决策九十一隔离纪律的结构件，2026-10-25 复审批 T1）：

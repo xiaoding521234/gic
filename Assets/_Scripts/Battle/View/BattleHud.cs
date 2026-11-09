@@ -242,11 +242,11 @@ namespace GIC.Battle
         /// <summary>手牌卡 prefab（项目唯一卡牌形态 Card.prefab=Resources/Prefabs/Backpack/；懒加载）</summary>
         private GameObject _handCardPrefab;
 
-        /// <summary>手牌签名（卡列表恒定时跳过重建——手牌不消耗，回合间签名不变，免每回合 Instantiate GC）</summary>
+        /// <summary>手牌签名（卡列表恒定时跳过重建——手牌不消耗，跨拍签名不变，免每拍重建 Instantiate GC）</summary>
         private string _handSignature;
 
         /// <summary>手牌货币物品牌卡（B6d：体力/摩拉=手牌（物品牌）拍板——恒占卡组投影末两位，
-        /// 数量=局内持有非备战数/存档数，随回合发放与行动消耗经资源刷新链动态更新）</summary>
+        /// 数量=局内持有非备战数/存档数，随秒拍发放与行动消耗经资源刷新链动态更新）</summary>
         private Card _moraHandCard;
         private Card _staminaHandCard;
 
@@ -426,9 +426,9 @@ namespace GIC.Battle
         /// <summary>HUD 画布 RectTransform（盘位换算用；Overlay 画布世界坐标=屏幕像素）</summary>
         private RectTransform CanvasRect => _canvas != null ? (RectTransform)_canvas.transform : null;
 
-        /// <summary>本回合完成选择已定死（2026-09-26 拍板「确认行动后就应当定死了」）：
-        /// 点过完成选择（或超时自动按下）并成功上交后为 true——按钮置灰、再按/超时自动按下
-        /// 均为无操作（完全统一：按已定死的按钮=无事发生）；新回合选择阶段复位。
+        /// <summary>本秒拍完成选择已定死（2026-09-26 拍板「确认行动后就应当定死了」）：
+        /// 点过完成选择并成功上交后为 true——按钮置灰、再按
+        /// 均为无操作（完全统一：按已定死的按钮=无事发生）；新秒拍复位。
         /// 旧「后交覆盖先交、可再瞄准再确认改行动」语义随之废除，Host 侧同拒绝双保险</summary>
         private bool _actionConfirmed;
         /// <summary>P6 残留审计（docs/active/49 A1）：即时制下 RTSFlowController 每 0.5 秒广播
@@ -498,7 +498,7 @@ namespace GIC.Battle
             // 血条填色解析器注入（2026-10-15 拍板「设置·战斗·血条颜色」玩家色/三色双模式——**只影响血条
             // 填充色**，底座/描边/弧光链路不动）：先于建场注入（OverheadBars 懒建时透传）
             _session.Player.SetHpBarColorOf(HpBarColorOf);
-            // 相位/计时经 BattleSession 门面（2026-10-11 联机批）：host/本地=TurnFlowController、
+            // 相位/计时经 BattleSession 门面（2026-10-11 联机批）：host/本地=RTSFlowController、
             // LAN client=消息派生——HUD 不再直接触 Flow（客户端 Flow=null）。
             // P4 即时制（2026-11-04）：选择倒计时已退役（RTSFlowController 无倒计时语义）——
             // OnSelectTimerExpired 订阅随超时自动确认链一并退役
@@ -627,8 +627,8 @@ namespace GIC.Battle
         }
 
         /// <summary>物品消耗命令（统一消耗模型 C-1）：我方技能吃物品（酒/苹果等）——按 BattlePlayer 已扣的
-        /// 本地 handCards 镜像重 Init 对应卡（数量角标即时刷新；条目减尽=下回合快照重建移除，
-        /// 本帧卡残留一回合属可接受——Host 权威镜像已在，签名比对到点自然重建）。
+        /// 本地 handCards 镜像重 Init 对应卡（数量角标即时刷新；条目减尽=下一拍快照重建移除，
+        /// 本帧卡残留一拍属可接受——Host 权威镜像已在，签名比对到点自然重建）。
         /// durability=装备实例耐久（决策八十一——装备条目按耐久分实例，同物异耐久=不同卡）</summary>
         private void OnItemConsumedHandler(string playerId, int itemName, int amount, int durability)
         {
@@ -662,7 +662,7 @@ namespace GIC.Battle
 
         /// <summary>获得物品卡命令（命座授予/死亡掠夺）：已有实例卡=刷数量角标（镜像已并，同
         /// OnItemConsumedHandler 模式读本地快照条目——按 (物品,实例耐久) 匹配，掠夺物新耐久=新实例）；
-        /// **新实例=全量重建**（卡列表签名已变——新槽位长出来，下回合快照自然对账）</summary>
+        /// **新实例=全量重建**（卡列表签名已变——新槽位长出来，下一拍快照自然对账）</summary>
         private void OnItemGainedHandler(string playerId, int itemName, int amount, int durability)
         {
             if (playerId != _myPlayerId) return;
@@ -712,14 +712,15 @@ namespace GIC.Battle
 
             if (phase != BattlePhase.Selecting)
             {
-                // 执行阶段：清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
+                // 终局收口（原执行阶段分支——即时制 Selecting=Running 兼容常驻，本分支仅 Finished 走到一次）：
+                // 清瞄准/清选中回手牌态（技能盘收起=决策六执行阶段变化首版）
                 ExitAiming();
                 DeselectUnit();
                 CloseBuildingShop(); // 购买面板随阶段收口（选择阶段专属交互，docs/45 §7.4）
                 CancelHandCardDrag(); // 手牌拖拽中断收口（决策五十四：卡瞬回原槽防悬空在拖拽层）
-                CloseHandCardDetail(); // 手牌卡详情随阶段收口（执行阶段棋盘视线让位给预览；统计面板随卡详情联动收）
+                CloseHandCardDetail(); // 手牌卡详情随阶段收口（原执行阶段棋盘视线让位给预览；统计面板随卡详情联动收）
                 if (_camera != null) _camera.EndDragFollowSession(); // 阶段流转=会话正常终结（相机留位、清快照防误重置）
-                if (!_layoutEditing) SetTip("Battle_TipResolving"); // 编辑期提示条保持编辑提示不抢写
+                if (!_layoutEditing) SetTip("Battle_Finished"); // 原 Battle_TipResolving 随执行相位退役改指终局（2026-11-09 残留清理批）；编辑期提示条保持编辑提示不抢写
                 // 2026-09-29 执行预览拍板「隐藏掉玩家之前打开的技能或手牌」：技能盘已随 DeselectUnit
                 // 收起，手牌随相位隐藏让位中下方预览（CanvasGroup 渐隐勿 SetActive——滚动壳/热区
                 // 探测逻辑常驻零中断）；回选择阶段恢复
@@ -727,7 +728,7 @@ namespace GIC.Battle
             }
             else
             {
-                _actionConfirmed = false; // 新回合选择阶段开：完成选择定死复位（编辑期也要复位——编辑不挡阶段推进）
+                _actionConfirmed = false; // 新秒拍开：完成选择定死复位（编辑期也要复位——编辑不挡节拍推进）
                 if (!_layoutEditing)
                     SetTip("Battle_TipSelect");
                 SetHandVisible(true);
@@ -904,7 +905,7 @@ namespace GIC.Battle
         {
             if (snapshot == null || _clockCombiner == null) return;
 
-            // 战斗时钟（独立时钟；host=TurnFlowController 权威、LAN client=按快照回合推导——session 门面）
+            // 战斗时钟（独立时钟；host=RTSFlowController 权威、LAN client=按快照逻辑秒推导——session 门面）
             // P4（2026-11-04）：回合数显示退役=时钟为主显示（蓝图 §2.3「回合数显示退役」）——
             // 回合中枢文本件随 turn 布局槽退役（时钟件存在性=本方法守卫）
             int minutes = _session.BattleTimeMinutes;
@@ -942,7 +943,7 @@ namespace GIC.Battle
                 }
                 else
                 {
-                    // 存续：重刷技能盘置灰态（B6a 爆发/延奏键的元能门槛随快照刷新——上回合攒满本回合即亮起）
+                    // 存续：重刷技能盘置灰态（B6a 爆发/延奏键的元能门槛随快照刷新——上拍攒满本拍即亮起）
                     RefreshSkillButtons();
                 }
             }
@@ -961,7 +962,7 @@ namespace GIC.Battle
         {
             if (_handContent == null) return; // 壳未寻到（prefab 缺 HandCards），手牌不显示
 
-            // 卡列表签名比对（卡 id 列表，不含数量——货币数量每回合变化不触发重建，
+            // 卡列表签名比对（卡 id 列表，不含数量——货币数量每秒拍变化不触发重建，
             // 角标经 RefreshHandCurrencyCards 随资源链动态刷；条目存亡变化（货币空堆移除/复活）自然反映。
             // **键含装备实例耐久**（决策八十一）——同物异耐久条目=不同卡，掠夺新实例触发重建）
             var signature = myRes == null ? ""
@@ -1821,7 +1822,7 @@ namespace GIC.Battle
         }
 
         /// <summary>提交时刻待定目标解析（2026-10-05）：_pendingTargetUnitId 仍在待定格上才有效
-        /// （目标当回合死亡/换格残留由快照对账拦下），有效则优先于格上按域找（FindUnitAt 旧行为回落）</summary>
+        /// （目标当拍死亡/换格残留由快照对账拦下），有效则优先于格上按域找（FindUnitAt 旧行为回落）</summary>
         private UnitState ResolvePendingTarget(BattleSnapshot snapshot, BattleCell cell)
         {
             if (string.IsNullOrEmpty(_pendingTargetUnitId) || !IsCurrentAimUnitTargeted()) return null;
@@ -2374,7 +2375,7 @@ namespace GIC.Battle
         /// 返回值（完成选择定死拍板）：true=已成功上交（调用方置定死）；false=防线拦截未上交（勿定死）</summary>
         private bool SubmitAim(BattleCell cell, UnitState enemyAtCell)
         {
-            // 部署瞄准分支（B6c）：点可选格=出战上交（玩家级行动，占本回合行动配额）
+            // 部署瞄准分支（B6c）：点可选格=出战上交（玩家级行动，占本秒拍行动配额）
             if (_deployAimUnit != 0)
             {
                 var deployAction = new ActionData
@@ -2405,7 +2406,7 @@ namespace GIC.Battle
                     drinker = null; // 建筑防线（域已排除，防回落残留态）
                 if (drinker == null)
                 {
-                    // 待定格在确认时已失效（同回合先手被杀/残留目标已离开）——不提交保持瞄准态，换格/取消
+                    // 待定格在确认时已失效（同拍先手被杀/残留目标已离开）——不提交保持瞄准态，换格/取消
                     GICLog.Info($"[BattleHud] 使用物品目标格 {cell} 无我方存活可饮用单位，未提交");
                     return false;
                 }
@@ -2437,7 +2438,7 @@ namespace GIC.Battle
                     equipTarget = null; // 建筑防线（域已排除，防回落残留态）
                 if (equipTarget != null && !EquipTargetQualifies(equipTarget, _equipAimItem))
                 {
-                    // 合格性防线（域已排除，防回落残留态——同回合竞态：先手装备把槽占满/补满耐久）。
+                    // 合格性防线（域已排除，防回落残留态——同拍竞态：先手装备把槽占满/补满耐久）。
                     // 提示分流：持有该物品必然满耐久（未满会在合格判定入选）→「耐久已满」；否则=无空槽
                     var rejected = equipTarget;
                     equipTarget = null;
@@ -3527,19 +3528,16 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>顶部「完成选择」按钮（2026-09-26 拍板；同日追加拍板「确认行动后就应当定死了」）：
-        /// ① 瞄准态有待定金格=确认提交该行动（SubmitAim 内非己方/低级防线拦截时弹 toast 保持瞄准态、
-        /// 不算完成选择）；② 其余情况（未选单位/已选未瞄准/瞄准未定格）无论是否已选=以 Pass 完成
-        /// 本回合选择。**成功上交即定死**——按钮置灰、再按/超时自动按下均无操作（按已定死的按钮=
-        /// 无事发生，超时与手动零差异）；Host 侧同拒绝重复上交双保险。
-        /// 多人提前开演口径：真人玩家的「完成选择」=各交一份行动（含 Pass），全员交齐即提前开演
-        /// （AI 由脑自动上交，与既有 TryBeginResolve 收齐判定天然契合，无需新协议）</summary>
+        /// <summary>顶部「完成选择」按钮（2026-09-26 拍板；同日追加拍板「确认行动后就应当定死了」；
+        /// 2026-11-04 决策九十五 P4 即时制收窄，蓝图 §2.4「Pass 按钮、完成选择按钮退役」——下述旧
+        /// ①②/定死/提前开演语义已随之退役）：现役职责=升命待确认（EnterUpgradePending）专用
+        /// 确认载体；非升命待确认态=无操作（详见方法体 P4 收窄注记）</summary>
         private void OnConfirmButtonClicked()
         {
             if (_layoutEditing) return;
             if (_session == null) return;
             if (_session.Phase != BattlePhase.Selecting) return;
-            if (_actionConfirmed) return; // 已定死（按钮置灰，本条=超时自动按下的同款守卫）
+            if (_actionConfirmed) return; // 已定死守卫（按钮置灰幂等直返——旧超时自动按下链路已随回合机退役）
 
             // 升命待确认（决策五十五返拍「拖入出牌区，不应该直接上交」）：升命卡打出=卡悬浮待确认态，
             // 「完成选择」=确认上交（超时自动按下同链路=自动确认升命，与部署金格待定同语义）
@@ -3613,7 +3611,7 @@ namespace GIC.Battle
         /// <summary>自施放技能的光环提示半径：技能 effects 中 ApplyBuff 的 buff 资产经
         /// BuffConfig.AuraRadius/ConstellationAuraBonus 虚方法单源解析（2026-10-20 审查批#6：
         /// 原 IcicleBuffConfig 硬编码分支退役——任何光环族自动生效），客户端按快照 constellation
-        /// 预估与 IcicleBuff.OnTurnEnd 服务端同口径（0命 3×3/3命 5×5）；无光环 buff=0 不显示。
+        /// 预估与 IcicleBuff.OnEffectBeat 服务端同口径（0命 3×3/3命 5×5）；无光环 buff=0 不显示。
         /// 命座参数载体=该单位 Talent 技能（SourceConstellation 客户端镜像）</summary>
         private int SelfCastAuraRadiusOf(SkillConfig.SkillData skillData, UnitState sel)
         {

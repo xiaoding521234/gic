@@ -19,7 +19,7 @@ namespace GIC.Battle
     ///   （BaseFlat 区），耐久归零停效/跨 0 恢复重挂（ReplenishAccessory 内联）；
     /// - 伤害抵挡（兔兔伯爵）：ItemData.customParams 的 BlockThreshold/Durability 键
     ///   （描述占位符/参数表/格挡真源三方单源，食物批 SanityCost 先例）——受到 ≥阈值 的伤害时
-    ///   完全抵挡并消耗 1 点耐久（TryConsumeBlock 单出口，TurnResolver.ApplyEffects 消费）。
+    ///   完全抵挡并消耗 1 点耐久（TryConsumeBlock 单出口，BattleResolver.ApplyEffects 消费）。
     ///
     /// 耐久统一方案（2026-10-18 决策八十一，用户拍板「舍弃堆叠数量，统一采用耐久方案」；
     /// 同日追记勘正——**双方案并存**：勾玉/魔法箭矢类回归堆叠）：
@@ -31,7 +31,7 @@ namespace GIC.Battle
     ///   掠夺按层数拆 N 枚单卡；
     /// - 槽位计数器单字段承载双语义（_accessoryDurability：耐久件=剩余耐久/堆叠件=当前层数），
     ///   统一上限原语=SlotCapOf（两参数互斥取大）、单次安装量=SingleInstallCount（堆叠件恒 1 层）；
-    /// - 阵亡装备被击杀方掠夺（TurnResolver 死亡命令发射处收集，耐久不变/堆叠按层拆枚入其手牌）。
+    /// - 阵亡装备被击杀方掠夺（BattleResolver 死亡命令发射处收集，耐久不变/堆叠按层拆枚入其手牌）。
     ///
     /// 战场外（大地图探索）如需装备另有系统，勿跨层复用本组件。
     /// </summary>
@@ -315,7 +315,7 @@ namespace GIC.Battle
             return false;
         }
 
-        // ==================== 伤害抵挡（兔兔伯爵；TurnResolver.ApplyEffects 消费单出口） ====================
+        // ==================== 伤害抵挡（兔兔伯爵；BattleResolver.ApplyEffects 消费单出口） ====================
 
         /// <summary>格挡结果（TryConsumeBlock 出参载体——槽位/耐久供命令层发 EquipItem 同槽重发刷角标）</summary>
         public struct BlockResult

@@ -7,7 +7,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// 效应→命令对账机制（2026-09-22，docs/11 协议与命令流登记项）：Host 产出段命令后校验
-    /// "每种已结算效应必有对应命令"——漏发命令=客户端不可见、双端靠下回合快照自愈背离
+    /// "每种已结算效应必有对应命令"——漏发命令=客户端不可见、双端靠下一拍快照自愈背离
     /// （首个产物=片内 Heal 漏发，2026-09-19 已单独修，本类为系统性安全网）。
     /// B6 扩效应种类（治疗技能/StatChange/Summon/手牌）前，新 BattleEffect 子类必须在此登记映射，
     /// 未登记类型默认报警——这正是机制目的（新效应漏接命令即被发现）。
@@ -21,11 +21,11 @@ namespace GIC.Battle
         /// <summary>
         /// 对账：effects 中每种效应在 commands 中有对应命令。调用时机=段命令全部产出后、推送前。
         /// </summary>
-        /// <param name="context">对账上下文（片/即时段/回合结束段，用于报警定位）</param>
+        /// <param name="context">对账上下文（片/即时段/秒拍结束段，用于报警定位）</param>
         /// <param name="effects">本段全部已结算效应（ProjectileEffect 待判定中间态豁免——
         /// 命中后已被替换为 Hit 全套产物，未命中由 ProjectileResolver 产消散 Effect 命令）</param>
         /// <param name="appliedBuffs">应用成功的施加 Buff 效应（BuffFactory 构建失败被跳过的不算漏发；
-        /// 命令产出以本列表为准，与 TurnResolver 产出循环同源）</param>
+        /// 命令产出以本列表为准，与 BattleResolver 产出循环同源）</param>
         /// <param name="commands">本段产出的全部命令</param>
         public static void Assert(string context, List<BattleEffect> effects, List<ApplyBuffEffect> appliedBuffs,
             List<BattleCommand> commands, List<BattleEffect> extraFacts = null)
@@ -207,8 +207,8 @@ namespace GIC.Battle
                 }
                 else if (effect is ConsumeFreezeEffect consumeFreeze)
                 {
-                    // 冻结层消耗（决策七十四）：未归零=零命令非漏发（冻结徽章回合数下回合快照自愈）；
-                    // AppliedTurns=0（编译后冻结被外部移除的防御路径）同零命令非漏发；
+                    // 冻结层消耗（决策七十四）：未归零=零命令非漏发（冻结徽章秒数下一拍快照自愈）；
+                    // AppliedSeconds=0（编译后冻结被外部移除的防御路径）同零命令非漏发；
                     // 归零（Depleted）=RemoveBuff 命令（客户端徽章+霜化即时退场）
                     if (consumeFreeze.Depleted && !removeBuffKeys.Contains(consumeFreeze.TargetUnitId))
                         Report(context, effect, BattleCommandType.RemoveBuff);
@@ -264,7 +264,7 @@ namespace GIC.Battle
         private static void Report(string context, BattleEffect effect, BattleCommandType expectedCommand)
         {
             GICLog.Warn($"[EffectAudit] {context}：效应 {effect.GetType().Name}（target={effect.TargetUnitId}）" +
-                        $"漏发 {expectedCommand} 命令——客户端将看不到该结算，靠下回合快照自愈（双端背离源）");
+                        $"漏发 {expectedCommand} 命令——客户端将看不到该结算，靠下一拍快照自愈（双端背离源）");
         }
     }
 }

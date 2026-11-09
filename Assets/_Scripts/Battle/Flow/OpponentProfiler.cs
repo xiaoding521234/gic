@@ -23,7 +23,7 @@ namespace GIC.Battle
         /// <summary>习惯计数每秒衰减系数（§4 遗忘策略「指数滑动平均」族——半衰期≈7 秒，
         /// 与样本环「近 8 秒加倍」同节奏：允许对手变招但需持续证据）——#4 审查批资产化：
         /// 真源=AITuningConfig.习惯衰减每秒</summary>
-        private static float HabitDecayPerTurn => AITuningConfig.Instance.习惯衰减每秒;
+        private static float HabitDecayPerSecond => AITuningConfig.Instance.习惯衰减每秒;
 
         /// <summary>习惯计数剪枝阈值（低于即移除，防长期对局长尾膨胀）——真源=AITuningConfig.习惯剪枝阈值</summary>
         private static float HabitPruneThreshold => AITuningConfig.Instance.习惯剪枝阈值;
@@ -64,9 +64,9 @@ namespace GIC.Battle
             {
                 DecayDictionary(ElementHabit);
                 DecayDictionary(FavoriteTarget);
-                ContractRefuseCount *= HabitDecayPerTurn;
-                ContractBreakCount *= HabitDecayPerTurn;
-                ContractSweetenerCount *= HabitDecayPerTurn;
+                ContractRefuseCount *= HabitDecayPerSecond;
+                ContractBreakCount *= HabitDecayPerSecond;
+                ContractSweetenerCount *= HabitDecayPerSecond;
             }
 
             /// <summary>衰减＋剪枝（2026-10-12 观察局实锤返修：Dictionary 枚举中**值写入**同样 bump
@@ -78,7 +78,7 @@ namespace GIC.Battle
                 var prune = new List<TKey>();
                 foreach (var key in keys)
                 {
-                    map[key] = map[key] * HabitDecayPerTurn;
+                    map[key] = map[key] * HabitDecayPerSecond;
                     if (map[key] < HabitPruneThreshold) prune.Add(key);
                 }
                 foreach (var key in prune) map.Remove(key);
@@ -86,8 +86,8 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 数值画像滚动样本环（§4 遗忘策略：指数滑动平均——**近 8 回合样本权重×2**、更早样本权重×1，
-        /// 容量 16 回合窗口）。查询=按当前回合加权平均（允许对手变招但需持续证据）。
+        /// 数值画像滚动样本环（§4 遗忘策略：指数滑动平均——**近 8 秒样本权重×2**、更早样本权重×1，
+        /// 容量 16 秒窗口）。查询=按当前秒加权平均（允许对手变招但需持续证据）。
         /// </summary>
         public sealed class SampleRing
         {
@@ -99,7 +99,7 @@ namespace GIC.Battle
                 if (_samples.Count > 16) _samples.RemoveAt(0); // 环形窗口（超容量丢最旧）
             }
 
-            /// <summary>近 8 回合加权的滚动平均值（无样本=0）</summary>
+            /// <summary>近 8 秒加权的滚动平均值（无样本=0）</summary>
             public float WeightedValue(int currentTurn)
             {
                 if (_samples.Count == 0) return 0f;
@@ -122,7 +122,7 @@ namespace GIC.Battle
         // ==================== 状态（进程级＋新战斗自清） ====================
 
         private static readonly Dictionary<string, OpponentProfile> _profiles = new();
-        private static int _lastObservedTurn = -1; // 回合推进衰减游标（同回合多次观察只衰减一次）
+        private static int _lastObservedSecond = -1; // 秒推进衰减游标（同秒多次观察只衰减一次）
         private static int _lastSimInstance;       // 新战斗自清判据=对局实例号（2026-10-15 审查修正）
 
         /// <summary>全量档案只读视图（harness/调试 dump 用）</summary>
@@ -147,11 +147,11 @@ namespace GIC.Battle
         // ==================== 观察点 1：配额行动（CompanionBrain.DecideAll 调） ====================
 
         /// <summary>
-        /// 各玩家本回合已提交配额行动分类 → 攻击性占比样本。玩家域口径：Skill(Normal/Burst)=攻击
+        /// 各玩家本秒拍已提交配额行动分类 → 攻击性占比样本。玩家域口径：Skill(Normal/Burst)=攻击
         /// （战技/爆发=战斗行动）；Henka/Enso/Contract/Move/DeployUnit/Pass=非攻击（部署/走位/
         /// 号令/空过=经营与支援）。
         /// </summary>
-        public static void ObserveTurnActions(BattleSimState sim, List<ActionData> playerActions, int turnNumber)
+        public static void ObserveSecondActions(BattleSimState sim, List<ActionData> playerActions, int turnNumber)
         {
             if (playerActions == null || playerActions.Count == 0) return;
             // 采集侧防御（2026-10-12 观察局实锤返修）：本观察点在 DecideAll 主链上——任何异常都会
@@ -183,11 +183,11 @@ namespace GIC.Battle
             }
             catch (Exception ex)
             {
-                GICLog.Warn($"[对手档案] 配额行动观察异常 T{turnNumber}（跳过本回合，不阻塞主流程）: {ex.Message}");
+                GICLog.Warn($"[对手档案] 配额行动观察异常 T{turnNumber}（跳过本拍，不阻塞主流程）: {ex.Message}");
             }
         }
 
-        // ==================== 观察点 2：命令流（TurnResolver.PushSegmentAndWaitAck 调） ====================
+        // ==================== 观察点 2：命令流（BattleResolver.PushSegmentAndWaitAck 调） ====================
 
         /// <summary>
         /// 段命令流观察（Host 侧、Segment 完整构建后、广播前）：
@@ -197,7 +197,7 @@ namespace GIC.Battle
         public static void ObserveCommands(BattleSimState sim, List<BattleCommand> commands, int turnNumber)
         {
             if (sim == null || commands == null || commands.Count == 0) return;
-            // 采集侧防御（同 ObserveTurnActions）：段广播主链上的观察点——异常绝不阻塞推段
+            // 采集侧防御（同 ObserveSecondActions）：段广播主链上的观察点——异常绝不阻塞推段
             try
             {
                 EnsureFresh(sim, turnNumber);
@@ -230,7 +230,7 @@ namespace GIC.Battle
                             var victim = sim.GetUnit(cmd.targetUnitId);
                             if (victim == null || !BattleHeuristics.IsCore(victim)) break;
                             // 死亡归因单源（2026-10-20 审查批#7）：KillCredit.LastDamagerBefore 与装备掠夺
-                            // （TurnResolver.KillerPlayerOf）同一条「同段最近 Damage」口径——两份旧实现的
+                            // （BattleResolver.KillerPlayerOf）同一条「同段最近 Damage」口径——两份旧实现的
                             // 暗差（本类原跳过无主伤害不记 vs 掠夺按最近直取）统一为决策八十一口径：
                             // 最近 Damage 直取，归属解析后无主=不记账
                             var killerId = KillCredit.LastDamagerBefore(commands, i, cmd.targetUnitId);
@@ -261,7 +261,7 @@ namespace GIC.Battle
             return unit?.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID;
         }
 
-        /// <summary>新战斗自清＋回合推进衰减（双观察点共用；同回合多次观察只衰减一次）。
+        /// <summary>新战斗自清＋秒推进衰减（双观察点共用；同秒多次观察只衰减一次）。
         /// 自清判据=sim 实例号（2026-10-15 审查修正——每局新 BattleSimState 恒新值；旧「T1 重入」
         /// 判据对「上局仅观测到回合 1」的秒弃调试局失效〔T1==T1 不触发〕→陈旧画像跨局泄漏；
         /// sim 为 null 的防御观察点回落旧回合判据）</summary>
@@ -271,20 +271,20 @@ namespace GIC.Battle
             {
                 _profiles.Clear();
                 _lastSimInstance = sim.InstanceId;
-                _lastObservedTurn = turnNumber;
+                _lastObservedSecond = turnNumber;
                 return;
             }
-            if (sim == null && turnNumber <= 1 && _lastObservedTurn != 1)
+            if (sim == null && turnNumber <= 1 && _lastObservedSecond != 1)
             {
                 _profiles.Clear();
-                _lastObservedTurn = 1;
+                _lastObservedSecond = 1;
                 return;
             }
-            if (turnNumber > _lastObservedTurn)
+            if (turnNumber > _lastObservedSecond)
             {
                 foreach (var profile in _profiles.Values)
                     profile.DecayHabits();
-                _lastObservedTurn = turnNumber;
+                _lastObservedSecond = turnNumber;
             }
         }
     }

@@ -16,17 +16,17 @@ namespace GIC.Battle
     /// 驱动方=RTSFlowController tick 循环（20Hz accumulator 累加器）；攻速分桶/行动预告/
     /// Segment+ack 门控/片边界即时队列已退役（清单见 docs/active/48 §2.4，勿再当 bug 修）。
     /// </summary>
-    public class TurnResolver
+    public class BattleResolver
     {
         private readonly BattleSimState _sim;
         private readonly IBattleTransport _transport;
-        private readonly ITurnResolverHost _flow;
+        private readonly IBattleResolverHost _flow;
 
-        /// <summary>建筑效果系统（2026-10-26 fix-batch2 ③收口：内联建筑段迁出——回合末效果收集/
+        /// <summary>建筑效果系统（2026-10-26 fix-batch2 ③收口：内联建筑段迁出——效果拍效果收集/
         /// 元能引擎过阈收集与发射全走本实例；每局随 resolver 创建，无静态跨局状态）</summary>
         private readonly BuildingEffectsSystem _buildingEffects;
 
-        public TurnResolver(BattleSimState sim, IBattleTransport transport, ITurnResolverHost flow)
+        public BattleResolver(BattleSimState sim, IBattleTransport transport, IBattleResolverHost flow)
         {
             _sim = sim;
             _transport = transport;
@@ -70,7 +70,7 @@ namespace GIC.Battle
                     segment = ResolveSlice(action.turnNumber, slice, speed, speed, new List<ActionData> { action });
                     break;
                 default:
-                    GICLog.Warn($"[TurnResolver] 即时制不支持行动类型 {action.actionType}，丢弃");
+                    GICLog.Warn($"[BattleResolver] 即时制不支持行动类型 {action.actionType}，丢弃");
                     return;
             }
             if (segment != null && segment.commands.Count > 0)
@@ -175,7 +175,7 @@ namespace GIC.Battle
                 segment.commands.Add(correct);
             }
             EmitSliceCommands($"tick{_sim.CurrentTick}移动收尾", segment, slice,
-                effects, appliedBuffs, null, null, newlyDead, expired: null, skillCasts: null,
+                effects, appliedBuffs, null, newlyDead, expired: null, skillCasts: null,
                 shattered: shatters);
             if (segment.commands.Count > 0) PushSegment(segment);
         }
@@ -217,7 +217,7 @@ namespace GIC.Battle
                 segment.commands.Add(command);
             }
             EmitSliceCommands($"tick{_sim.CurrentTick}推挤", segment, slice,
-                new List<BattleEffect>(), new List<ApplyBuffEffect>(), null, null, new List<Unit>(),
+                new List<BattleEffect>(), new List<ApplyBuffEffect>(), null, new List<Unit>(),
                 expired: null, skillCasts: null, shattered: null);
             if (segment.commands.Count > 0) PushSegment(segment);
         }
@@ -245,7 +245,6 @@ namespace GIC.Battle
             _sim.BeginCompileDyeView();
 
             var effects = new List<BattleEffect>();
-            var movers = new List<MoveActionState>();
             var casts = new List<BattleCommand>(); // 时轮施放事件（B-S1）
 
             // 枚举序：unitId 升序（命令排列与写-写冲突合并依据；不影响结算结果）
@@ -280,10 +279,11 @@ namespace GIC.Battle
                             break;
                         }
                         // **2026-11-04 拍板「100 移速=走完一米要 1 秒」**：移动统一新轨——旧格式上交
-                        //（AI 三脑〔P5 移植前〕与玩家 HUD 的 direction+magnitude）在 Host 侧桥为目标点
+                        //（AI 三脑与玩家 HUD 的 direction+magnitude）在 Host 侧桥为目标点
                         // cm（当前格+方向×步数→格心），与 targetX 直填同走 RTSMovementSystem
                         //（100cm/s tick 推进+圆碰撞+1 米/秒节奏）。旧格轨移动执行退役（0.18s/格
-                        //≈5.5 米/秒观感被否）；MovementResolver 保留（部署碰撞原语消费方，移动执行不再走它）
+                        //≈5.5 米/秒观感被否）；MovementResolver 已随 2026-11-09 残留清理批整体删除
+                        //（部署碰撞原语由 DeployUnitExecutor 自持同构实现，移动执行早已不走它）
                         if (action.targetX <= 0 && action.targetZ <= 0 && action.moveMagnitude > 0)
                         {
                             var delta = SkillHitResolver.DirectionToDelta(action.direction);
@@ -317,23 +317,19 @@ namespace GIC.Battle
                         break;
 
                     default:
-                        GICLog.Warn($"[TurnResolver] B1 未实现的行动类型 {action.actionType}，跳过");
+                        GICLog.Warn($"[BattleResolver] B1 未实现的行动类型 {action.actionType}，跳过");
                         break;
                 }
             }
 
-            // 旧格轨移动执行已退役（2026-11-04 拍板「1 米/秒」：Move 分支全部桥入新轨——
-            // MovementResolver.Resolve/旧轨途经采集随移动执行链停用；movers 保留传参形态恒空集，
-            // ProjectileResolver 的 legacyMovers 轨迹源保留 P5 前防御性兼容）
-
-            // 途经采集=新轨唯一路径：RTSMovementSystem 收尾（到达/被挡）→ResolveMoveArrivals
-            //（PathCells 全量逐格+per-堆 CollectCount 连采+耐久钩子——docs/47 §5；本段为旧轨
-            // 执行链的采集残留，移动执行新轨化后恒空转，保留注释存档语义）
+            // （旧格轨移动执行链已整体退役删除——2026-11-04 拍板「1 米/秒」Move 分支全部桥入
+            // RTSMovementSystem tick 新轨；MovementResolver/MoveActionState/legacyMovers 随
+            // 2026-11-09 残留清理批删除。途经采集=新轨唯一路径：收尾见 ResolveMoveArrivals）
 
             // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整轨迹
             //——即时制新轨 mover/静止快照，docs/22 §11；命中点/消散点随命令毫米定点下发）
             var vanishes = new List<BattleCommand>();
-            ProjectileResolver.Resolve(_sim, snapshot, effects, movers, vanishes);
+            ProjectileResolver.Resolve(_sim, snapshot, effects, vanishes);
             _sim.EndCompileDyeView(); // 命中编译全部完成（此后效应应用/命令发射不再读附着）
 
             // 效应统一应用（伤害/治疗合并 HP 天然成立；Buff 施加记入注册表）；碎裂记录=寒冰之棱
@@ -346,16 +342,16 @@ namespace GIC.Battle
             var newlyDead = _sim.ResolveDeaths(damagedUnits);
 
             // 产出片命令块（三段唯一出口 EmitSliceCommands——命令发射序与对账见其内注释）
-            EmitSliceCommands($"回合{turnNumber}片{sliceIndex}", segment, sliceIndex,
-                effects, appliedBuffs, movers, vanishes, newlyDead, expired: null, skillCasts: casts,
+            EmitSliceCommands($"秒{turnNumber}片{sliceIndex}", segment, sliceIndex,
+                effects, appliedBuffs, vanishes, newlyDead, expired: null, skillCasts: casts,
                 shattered: shatters);
 
-            GICLog.Info($"[TurnResolver] {segment}");
+            GICLog.Info($"[BattleResolver] {segment}");
             return segment;
         }
 
         /// <summary>
-        /// 部署段（B6c）：回合开始先于攻速分桶结算全部出战行动（每玩家每回合最多 1 条，配额已保证）。
+        /// 部署段（B6c）：秒拍先于攻速分桶结算全部出战行动（每玩家每秒拍最多 1 条，配额已保证）。
         /// 直产命令（Summon+StatChange），无效应链、无死亡判定；播放侧短节拍（deploy 标记段）。
         /// </summary>
         private Segment ResolveDeploySegment(int turnNumber, int sliceIndex, List<ActionData> deploys)
@@ -400,7 +396,7 @@ namespace GIC.Battle
                     }
                     // 骑士团部署即召（决策八十六批D，docs/45 §1.1 拍板 #10「部署时就立刻召唤
                     // 1 个」）：周期召唤建筑落位后当场召 1 名 召唤单位（最近可部署格顺延）——不等
-                    // 回合末周期；召唤单位缺省（Amber=字段默认未配置）不召防误配
+                    // 效果拍周期；召唤单位缺省（Amber=字段默认未配置）不召防误配
                     var summonData = Wargame.Instance?.Context?.Get<UnitConfig>()?
                         .GetUnitData((UnitName)action.deployUnitName);
                     if (summonData != null && summonData.unitType == UnitType.Building
@@ -422,12 +418,12 @@ namespace GIC.Battle
                 }
             }
 
-            GICLog.Info($"[TurnResolver] 部署段 {segment}");
+            GICLog.Info($"[BattleResolver] 部署段 {segment}");
             return segment;
         }
 
         /// <summary>
-        /// 物品行动段（2026-10-16 首个可打出物品批；2026-10-18 装备批并 EquipItem）：回合前部署段
+        /// 物品行动段（2026-10-16 首个可打出物品批；2026-10-18 装备批并 EquipItem）：同秒拍部署段
         /// 之后的玩家级即时段——不进攻速分桶（UseItem/EquipItem 均无单位归属，同部署段口径）。
         /// 快照→逐行动校验+效果编译（UseItemExecutor/EquipItemExecutor：手牌持有/目标我方存活/
         /// 消耗 1 张）→效应统一应用→死亡判定→命令发射（Heal/StatChange(Sanity)/ItemConsume/
@@ -463,18 +459,18 @@ namespace GIC.Battle
             var damagedUnits = CollectDamagedTargets(effects);
             var newlyDead = _sim.ResolveDeaths(damagedUnits);
 
-            EmitSliceCommands($"回合{turnNumber}片{sliceIndex}", segment, sliceIndex,
-                effects, appliedBuffs, movers: null, vanishes: null, newlyDead, expired: null, skillCasts: null,
+            EmitSliceCommands($"秒{turnNumber}片{sliceIndex}", segment, sliceIndex,
+                effects, appliedBuffs, vanishes: null, newlyDead, expired: null, skillCasts: null,
                 shattered: shatters);
 
-            GICLog.Info($"[TurnResolver] 物品行动段 {segment}");
+            GICLog.Info($"[BattleResolver] 物品行动段 {segment}");
             return segment;
         }
 
         /// <summary>
         /// 每秒整拍结算段（决策九十五「每秒整拍」拍板 4——原回合结束段秒化，docs/active/48 §2.3/§9；
         /// **2026-11-04 追拍「效果触发时间翻倍」**：拆秒拍/效果拍两档——秒拍=发放 1摩拉+1体力/Buff 计时
-        /// 递减/泡湿/资源点站立采集/快照；**效果拍（每 EffectBeatTicks=2 秒）=Buff tick 效果〔OnTurnEnd
+        /// 递减/泡湿/资源点站立采集/快照；**效果拍（每 EffectBeatTicks=2 秒）=Buff tick 效果〔OnEffectBeat
         /// 产出——歌声之环/冰棱/燃烧〕+建筑效果〔教堂/旗帜/餐馆/骑士引擎〕**，单次数值不动=触发频率
         /// 减半；战技/爆发 CD 不受影响（独立 3s/5s 拍板））：
         /// ①每玩家发放 → ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingSeconds 语义改秒）
@@ -483,9 +479,9 @@ namespace GIC.Battle
         /// </summary>
         public void ResolveSecondBeat(int second, bool effectBeat)
         {
-            // 逻辑秒真源写入（即时制：CurrentTurn 语义=逻辑秒——周期类建筑效果/灵魂 DeployedTurn
+            // 逻辑秒真源写入（即时制：BattleSecond 语义=逻辑秒——周期类建筑效果/灵魂 DeployedSecond
             // 相对计数零改动兼容：每 1 秒走 1 拍=旧「每回合走 1」等价节拍）
-            _sim.CurrentTurn = second;
+            _sim.BattleSecond = second;
             int sliceIndex = _sliceCounter++;
             var segment = new Segment
             {
@@ -516,15 +512,15 @@ namespace GIC.Battle
 
             var effects = new List<BattleEffect>();
 
-            // 按注册序结算回合结束效果，随后计时减一（到期收集；永久 Buff（RemainingSeconds<0）不计时——歌声之环类）
-            // **回合末=同时结算（决策二十四终版「逐拍交错」）**：buff 的 OnTurnEnd 只产出声明（元素
+            // 按注册序结算效果拍效果，随后计时减一（到期收集；永久 Buff（RemainingSeconds<0）不计时——歌声之环类）
+            // **效果拍末=同时结算（决策二十四终版「逐拍交错」）**：buff 的 OnEffectBeat 只产出声明（元素
             // 伤害走 PendingAuraHit），循环后统一按 (拍时刻, 施法者, 目标) 排序逐个过共享编译视图结算
             // ——双异元素光环同拍交错、每层附着、每拍可触发反应（对齐原神双光环同开互融）
-            // **2026-11-04 追拍**：OnTurnEnd 产出只在效果拍（每 2 秒）执行——「太频繁」节奏翻倍；
+            // **2026-11-04 追拍**：OnEffectBeat 产出只在效果拍（每 2 秒）执行——「太频繁」节奏翻倍；
             // 计时递减仍每秒（Duration 秒语义不变：冻结 2 秒仍 2 秒，只少一次无产出的空转调用）
             foreach (var buff in _sim.ActiveBuffs) // DETERMINISM-ALLOW: ActiveBuffs 是 List（注册序确定，非字典）
             {
-                if (effectBeat) effects.AddRange(buff.OnTurnEnd());
+                if (effectBeat) effects.AddRange(buff.OnEffectBeat());
                 if (!buff.IsPermanent) buff.RemainingSeconds--;
             }
             if (effectBeat)
@@ -534,7 +530,7 @@ namespace GIC.Battle
             // 泡湿附着（决策七十六拍板②「在水面上，且不为飞行或两栖移动的单位，每个回合结束时
             // 附着 1 层水」）：地形判据=WaterTerrain 标签（水面/沼泽；**薄冰不带该标签=站薄冰不挂**），
             // 豁免=移动类型飞行/两栖，存活单位才附着（尸体不挂——复活不带附着语义接近）。
-            // 覆盖语义=挂 1 层水覆盖旧附着（泡在水里火挂不住）；放 tick/到期之后=回合末收尾。
+            // 覆盖语义=挂 1 层水覆盖旧附着（泡在水里火挂不住）；放 tick/到期之后=秒拍末收尾。
             // 元素联动：泡湿单位天然带水附着——凯亚冰打=冻结反应、安柏火箭=蒸发（战术意义自洽）
             foreach (var kv in _sim.SortedUnits())
             {
@@ -549,19 +545,19 @@ namespace GIC.Battle
                     effects.Add(new AttachElementEffect(kv.Key, kv.Key, (int)ElementType.Hydro, 1));
             }
 
-            // 地脉维度回合末规则（决策九十一，2026-10-25）：①灵魂衰减（每回合末 −⌊10%×MaxHp⌋，
-            // 死亡当回合末豁免=完整 10 回合驻留）——SoulDecayEffect 走标准效应管道（应用层扣 HP、
+            // 地脉维度秒拍末规则（决策九十一，2026-10-25）：①灵魂衰减（每秒拍末 −⌊10%×MaxHp⌋，
+            // 死亡当秒拍末豁免=完整 10 秒驻留）——SoulDecayEffect 走标准效应管道（应用层扣 HP、
             // 命令层 StatChange(StatKindHp)、HP≤0 经死亡循环「灵魂+尸体双双消散」分支）；
-            // ②地脉驻留理智代价（非灵魂地脉单位 −3 理智/回合末——当前地脉仅灵魂=预留自动生效，
-            // 胡桃/丽莎相位技能批上线即激活）。位置=泡湿之后（同为回合末收尾类环境规则）
-            CollectLeyLineTurnEndEffects(effects);
+            // ②地脉驻留理智代价（非灵魂地脉单位 −3 理智/秒拍末——当前地脉仅灵魂=预留自动生效，
+            // 胡桃/丽莎相位技能批上线即激活）。位置=泡湿之后（同为秒拍末收尾类环境规则）
+            CollectLeyLineEffectBeatEffects(effects);
 
-            // 资源点回合末站立采集（docs/47 拍板③，2026-10-27）：存活单位站资源点格=采集 1 次
-            // （中立无主谁站谁采，拍板②——含敌方单位）；同格多单位=整格该回合至多 1 次、
+            // 资源点秒拍末站立采集（docs/47 拍板③，2026-10-27）：存活单位站资源点格=采集 1 次
+            // （中立无主谁站谁采，拍板②——含敌方单位）；同格多单位=整格该秒拍至多 1 次、
             // unitId 升序首个（拍板①——Dictionary 枚举序不保证，显式升序遍历确定「首个」）。
             // 产出=资源点定义收益（MoraPerHarvest 摩拉）走标准效应链（MoraGainEffect 应用+命令
             // 发射单源）；采集事实 ResourceHarvestEffect 供命令发射（余量已在 TryHarvest 扣减）；
-            // 位置=泡湿/地脉之后（同为回合末收尾族环境规则——按单位位置结算）
+            // 位置=泡湿/地脉之后（同为秒拍末收尾族环境规则——按单位位置结算）
             var harvestedCells = new HashSet<BattleCell>();
             var standHarvestOrder = new List<(string id, Unit unit)>();
             foreach (var kv in _sim.SortedUnits())
@@ -586,20 +582,20 @@ namespace GIC.Battle
             }
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
-            // 建筑回合末效果段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——回合末
+            // 建筑效果拍段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——秒拍末
             // 收尾位）：旗帜元能/教堂治疗并入 effects（命令发射+死亡收集复用既有管道）；餐馆摩拉/
-            // 骑士团周期召唤直产命令（回合发放/部署段先例——资源/召唤不是单位效应）。
+            // 骑士团周期召唤直产命令（秒拍发放/部署段先例——资源/召唤不是单位效应）。
             // **2026-11-04 追拍**：建筑效果只在效果拍（每 2 秒）结算——教堂治疗/旗帜/餐馆/骑士引擎
             // 触发频率翻倍拍板；周期类字段（效果周期）按拍计数=时长自然翻倍
             var buildingExtras = new List<BattleCommand>();
             if (effectBeat)
-                _buildingEffects.CollectTurnEndEffects(_sim.CurrentTurn, effects, buildingExtras);
+                _buildingEffects.CollectEffectBeatEffects(_sim.BattleSecond, effects, buildingExtras);
             var appliedBuffs = ApplyEffects(effects, shatters);
             var newlyDead = _sim.ResolveDeaths(CollectDamagedTargets(effects));
 
-            // 产出回合结束段命令（三段唯一出口；到期 Buff 的 RemoveBuff 发射+注册表注销在出口尾部）
-            EmitSliceCommands($"回合{_sim.CurrentTurn}结束段", segment, sliceIndex,
-                effects, appliedBuffs, null, null, newlyDead, expired, shattered: shatters);
+            // 产出秒拍结束段命令（三段唯一出口；到期 Buff 的 RemoveBuff 发射+注册表注销在出口尾部）
+            EmitSliceCommands($"秒拍{_sim.BattleSecond}结束段", segment, sliceIndex,
+                effects, appliedBuffs, null, newlyDead, expired, shattered: shatters);
 
             // 建筑效果直产命令（餐馆摩拉/骑士团召唤）段尾发射——indexInSlice 接续既有条数
             foreach (var extra in buildingExtras)
@@ -609,13 +605,13 @@ namespace GIC.Battle
                 segment.commands.Add(extra);
             }
 
-            GICLog.Info($"[TurnResolver] {segment}");
+            GICLog.Info($"[BattleResolver] {segment}");
             PushSegment(segment); // 秒拍发放恒非空段必推（决策九十五：直发无 ack）
         }
 
         /// <summary>
-        /// 回合末光环命中交错结算管道（决策二十四终版「同时进行」=逐拍交错）：从 effects 收集全部
-        /// PendingAuraHit（buff 的 OnTurnEnd 只声明），按 (拍时刻, 施法者 unitId, 目标 unitId) 排序后
+        /// 效果拍光环命中交错结算管道（决策二十四终版「同时进行」=逐拍交错）：从 effects 收集全部
+        /// PendingAuraHit（buff 的 OnEffectBeat 只声明），按 (拍时刻, 施法者 unitId, 目标 unitId) 排序后
         /// 共享编译视图逐个结算——同拍并列枚举序铁律（unitId 升序）；每层命中都是一次完整元素应用
         /// （反应预判+1:1 消耗+附着，CompileElementalDamage 统一出口）——双异元素光环每拍交错、
         /// 反应在应用序列里自然发生（火环 L0 挂火→冰环 L0 融化挂冰→火环 L1 融化挂火…）。
@@ -643,7 +639,7 @@ namespace GIC.Battle
                 return string.CompareOrdinal(a.TargetUnitId, b.TargetUnitId);
             });
 
-            _sim.BeginCompileDyeView(); // 共享视图：初值回落活态=回合末开始态；交错序列全程接力
+            _sim.BeginCompileDyeView(); // 共享视图：初值回落活态=秒拍末段开始态；交错序列全程接力
             foreach (var hit in hits)
             {
                 // 元素×地形（决策七十六泛化拍板）：火元素 tick（燃烧 DoT 等）命中站在薄冰上的单位
@@ -694,15 +690,15 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 段命令统一发射：片/即时段/回合结束段三处原为复制粘贴（曾致 turnEnd 段 Damage 漏带命中点/
+        /// 段命令统一发射：片/即时段/秒拍结束段三处原为复制粘贴（曾致 turnEnd 段 Damage 漏带命中点/
         /// 反应标记的漂移）——收口后新效应→命令映射只加一处，BattleEffectCommandAudit 对账随发射统一覆盖三段。
-        /// 发射序：SkillCast（时轮 B-S1）→ Move → Damage → 消散Effect → 附着 → 反应 → 元能 → 体力（B6d）
-        /// → 治疗 → 施加Buff → 死亡 → 到期移除Buff。段首已有直产命令（回合结束段发放）时 indexInSlice 接续。
+        /// 发射序：SkillCast（时轮 B-S1）→ Damage → 消散Effect → 附着 → 反应 → 元能 → 体力（B6d）
+        /// → 治疗 → 施加Buff → 死亡 → 到期移除Buff。段首已有直产命令（秒拍段发放）时 indexInSlice 接续。
         /// 与旧回合结束段序的差异：治疗从 Damage 后移至元能后（客户端 stagger 约 +0.36s，纯视觉节拍）。
         /// </summary>
         private void EmitSliceCommands(string context, Segment segment, int sliceIndex,
             List<BattleEffect> effects, List<ApplyBuffEffect> appliedBuffs,
-            List<MoveActionState> movers, List<BattleCommand> vanishes, List<Unit> newlyDead,
+            List<BattleCommand> vanishes, List<Unit> newlyDead,
             List<BaseBuff> expired = null, List<BattleCommand> skillCasts = null,
             List<(string holderId, string sourceId, BaseBuff buff)> shattered = null)
         {
@@ -719,18 +715,8 @@ namespace GIC.Battle
                 }
             }
 
-            // Move：被挡也发命令（全挡 path=[原格] / 部分挡 path=已走段），携带 MoveBlocked 标记+方向
-            // 供客户端播"撞墙弹回"表现（2026-09-21）；direction 恒传真实移动方向（2026-09-29 拍板③：
-            // 立牌朝向随移动方向镜像——此前成功移动传 0，客户端把朝向重置回右，移动转向失效根因）
-            if (movers != null)
-            {
-                foreach (var mover in movers)
-                {
-                    if (mover.Path.Count > 1 || mover.Blocked)
-                        segment.commands.Add(BattleCommand.Move(mover.UnitId, sliceIndex, indexInSlice++, new List<BattleCell>(mover.Path),
-                            mover.Blocked ? BattleCommand.MoveBlocked : 0, (int)mover.Direction));
-                }
-            }
+            // （旧格轨 Move 命令发射块已删除——2026-11-09 残留清理批：movers 恒空集死代码；
+            //  移动命令改由 RTSMovementSystem 收尾事件驱动，BattleCommand.Move 保留供回放旧谱）
 
             foreach (var effect in MergeDamageEffects(effects))
             {
@@ -781,7 +767,7 @@ namespace GIC.Battle
                 var energyCommand = BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
                     BattleCommand.StatKindEnergy, effect.Delta);
                 // 命中时刻（2026-09-25 拍板「命中时才给」）：战技获能命令带命中毫秒，客户端到点跳元能；
-                // launchMs 字段复用为"应用时刻"（union 载荷；0=立即——移动获能/协奏/消耗/回合发放无命中时刻）
+                // launchMs 字段复用为"应用时刻"（union 载荷；0=立即——移动获能/协奏/消耗/秒拍发放无命中时刻）
                 ApplyHitMs(energyCommand, effect.HitSeconds);
                 segment.commands.Add(energyCommand);
             }
@@ -840,7 +826,7 @@ namespace GIC.Battle
             // 摩拉获取（docs/47 资源点批，2026-10-27——MoraSpend 获取侧对偶）：采集产出（站立/途经
             // 两路径共用）→StatChange(StatKindMora)——玩家池入账唯一出口单源（HUD 资源 chips/
             // 手牌货币卡既有消费链零改动自动跟随）；途经采集带命中时刻到点入账（行走到达堆格再跳
-            // chips，「表现对齐动画」返修）；回合末站立采集恒 0 立即（泡湿同族）
+            // chips，「表现对齐动画」返修）；秒拍末站立采集恒 0 立即（泡湿同族）
             foreach (var effect in EnumerateEffects<MoraGainEffect>(effects))
             {
                 var moraGainCommand = BattleCommand.StatChange(effect.TargetUnitId, sliceIndex, indexInSlice++,
@@ -902,7 +888,7 @@ namespace GIC.Battle
                 }
             }
             // 冻结层消耗归零（决策七十四「消耗到 0 立即解冻」）：RemoveBuff 命令（客户端徽章+霜化
-            // 即时退场，随碎裂先例立即应用）；未归零=零命令（冻结徽章回合数下回合快照自愈）
+            // 即时退场，随碎裂先例立即应用）；未归零=零命令（冻结徽章秒数下一拍快照自愈）
             foreach (var effect in EnumerateEffects<ConsumeFreezeEffect>(effects))
             {
                 if (!effect.Depleted) continue;
@@ -931,10 +917,10 @@ namespace GIC.Battle
             foreach (var applied in MergeAppliedBuffs(appliedBuffs))
             {
                 var applyBuffCommand = BattleCommand.ApplyBuff(applied.SourceUnitId, applied.TargetUnitId,
-                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Turns,
+                    sliceIndex, indexInSlice++, applied.BuffType, applied.Level, applied.Seconds,
                     applied.SourceSkillId, applied.BuffKey); // 具名 key（决策五十七——异资产同族各一条命令）
                 // 命中时刻到点挂徽章（决策七十六复测返修 WYSIWYG：箭在飞时目标不提前结冰/挂减防；
-                // 合并取首条时刻=徽章首现拍；OnCast 施放/回合末光环 BeatSeconds 语义不变）
+                // 合并取首条时刻=徽章首现拍；OnCast 施放/效果拍光环 BeatSeconds 语义不变）
                 ApplyHitMs(applyBuffCommand, applied.HitSeconds);
                 segment.commands.Add(applyBuffCommand);
             }
@@ -960,7 +946,7 @@ namespace GIC.Battle
                             _sim.RemoveBuff(corpse, corpseBuff); // OnRemoved 回调（冻结解状态等幂等无害）+注册表注销
                         }
                         _sim.RemoveUnit(corpse);
-                        GICLog.Info($"[TurnResolver] 地脉灵魂耗尽：灵魂 {deadId} 与尸体 {corpseId} 双双消散");
+                        GICLog.Info($"[BattleResolver] 地脉灵魂耗尽：灵魂 {deadId} 与尸体 {corpseId} 双双消散");
                     }
                     _sim.RemoveSoul(dead);
                     continue;
@@ -978,7 +964,7 @@ namespace GIC.Battle
                 // 消散分支（建筑+眷属，拍板 #5）：装备掠夺先行（上方已跑）→ 全部 Buff 注销（注册表
                 // 同步清——「死亡不清理」通则对消散单位作废：鞭尸 tick 天然停）→ 移除+销毁（格子/
                 // 碰撞/同名查找/复苏目标域随之消失）。RemoveBuff 命令不发——客户端整单位走消散
-                // 退场，徽章随 view 同殁（下回合快照消失路径天然自洽）
+                // 退场，徽章随 view 同殁（下一拍快照消失路径天然自洽）
                 if (dissolve)
                 {
                     for (int i = dead.Buffs.Count - 1; i >= 0; i--)
@@ -1008,12 +994,12 @@ namespace GIC.Battle
                 // 地脉灵魂生成（决策九十一）：走到本尾=非消散存活分支（留尸体=伙伴/魔神）→ 倒下即
                 // 同位生成灵魂（「当主世界有伙伴倒下，留下尸体，其灵魂会脱离肉体，出现于地脉维度
                 // 相同位置」）。基础属性+满血+治疗效率 50；Summon 命令复用（UnitState.isSoul 客户端
-                // 建幽灵立牌）；死亡当回合末不衰减（RegisterSoul 写 DeployedTurn，完整 10 回合驻留）
+                // 建幽灵立牌）；死亡当秒拍末不衰减（RegisterSoul 写 DeployedSecond，完整 10 秒驻留）
                 if (hasId)
                     SpawnSoul(dead, deadId, segment, sliceIndex, ref indexInSlice);
             }
 
-            // 到期 Buff：发射 RemoveBuff 后注销注册表（仅回合结束段传入）
+            // 到期 Buff：发射 RemoveBuff 后注销注册表（仅秒拍结束段传入）
             if (expired != null)
             {
                 foreach (var buff in expired)
@@ -1136,12 +1122,12 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// 效应统一应用（伤害/治疗/Buff 施加）；返回已施 Buff 列表（含合并后的级别与剩余回合，供命令产出）。
+        /// 效应统一应用（伤害/治疗/Buff 施加）；返回已施 Buff 列表（含合并后的级别与剩余秒，供命令产出）。
         /// 元能两段应用（2026-09-25 用户拍板「先扣除，再加」）：同段多来源元能效应先消耗后获取——
         /// 获取先应用会被 baseEnergy 上限钳位吞掉（30+10→40 钳 30，再 −20=10 ≠ 期望 30−20+10=20）。
         /// shatters=寒冰之棱碎裂记录（2026-10-01 复测拍板「元能&gt;50% 立刻触发」）：每笔元能增益
         /// 落地后即时判定（IcicleBuff.TryShatter 内联应用治疗+移除），事实经本列表传给命令出口
-        /// 补发 RemoveBuff——由调用方创建传入（片/回合结束/即时段三处各自持有）。
+        /// 补发 RemoveBuff——由调用方创建传入（片/秒拍结束/即时段三处各自持有）。
         /// 2026-10-15 追加：元能消耗落地后同拍判定（拍板「施放冰棱若立刻过阈应当立刻破碎」——
         /// 3命满能施放残留 60 > 50% 时刚挂上的冰棱立即碎裂，勿等下一笔获能）。
         /// </summary>
@@ -1190,13 +1176,13 @@ namespace GIC.Battle
                 }
 
                 // 摩拉消耗（统一消耗模型 C-1，玩家级）：TrySpendMora 池写——不足理论不可达（门槛先行+
-                // 每玩家每回合单行动），防御性钳制 Warn 记账（AppliedAmount=0 零命令，对账按 0 非漏发）
+                // 每玩家每秒拍单行动），防御性钳制 Warn 记账（AppliedAmount=0 零命令，对账按 0 非漏发）
                 if (effect is MoraSpendEffect moraSpend)
                 {
                     int applied = _sim.GetMora(moraSpend.TargetUnitId) >= moraSpend.Amount
                         ? moraSpend.Amount : _sim.GetMora(moraSpend.TargetUnitId);
                     if (applied < moraSpend.Amount)
-                        GICLog.Warn($"[TurnResolver] 摩拉消耗效应不足额（{moraSpend.TargetUnitId} 池" +
+                        GICLog.Warn($"[BattleResolver] 摩拉消耗效应不足额（{moraSpend.TargetUnitId} 池" +
                                     $"{_sim.GetMora(moraSpend.TargetUnitId)}/{moraSpend.Amount}）——实际扣 {applied}");
                     moraSpend.AppliedAmount = applied;
                     if (applied > 0)
@@ -1214,7 +1200,7 @@ namespace GIC.Battle
                 }
 
                 // 物品消耗（统一消耗模型 C-1，玩家级）：LoseCard 手牌条目真源扣减（减尽移除）——
-                // 不足理论不可达（门槛先行+每玩家每回合单行动）；指定模式=单条 LoseCard；
+                // 不足理论不可达（门槛先行+每玩家每秒拍单行动）；指定模式=单条 LoseCard；
                 // 同类任意模式=按手牌列表序逐条凑量（零随机，ResourceGate 原语）。
                 // **原子性**：防御路径未足额=GainCard 回滚已扣部分（获得/失去对偶）→零命令（语义=支付要么全额要么不支付）
                 if (effect is ItemConsumeEffect itemConsume)
@@ -1274,7 +1260,7 @@ namespace GIC.Battle
                             }
                             if (dumpHand.Length == 0) dumpHand.Append("空手牌");
                         }
-                        GICLog.Warn($"[TurnResolver] 物品消耗效应未足额（{itemConsume.TargetUnitId} " +
+                        GICLog.Warn($"[BattleResolver] 物品消耗效应未足额（{itemConsume.TargetUnitId} " +
                                     $"{(itemConsume.AnyOfSubType ? ((ItemSubType)itemConsume.SubType).ToString() : ((ItemName)itemConsume.Item).ToString())}" +
                                     $"×{itemConsume.Amount}，差 {remaining}）——原子回滚零命令（手牌形态：{dumpHand}）");
                     }
@@ -1418,7 +1404,7 @@ namespace GIC.Battle
                     var itemData = Wargame.Instance?.Context?.Get<ItemConfig>()?.GetItemData((ItemName)equip.Item);
                     if (equipment == null || itemData == null)
                     {
-                        GICLog.Warn($"[TurnResolver] 装备效应落空（{effect.TargetUnitId} 缺组件或物品 {(ItemName)equip.Item} 无配置）");
+                        GICLog.Warn($"[BattleResolver] 装备效应落空（{effect.TargetUnitId} 缺组件或物品 {(ItemName)equip.Item} 无配置）");
                         continue;
                     }
                     int incoming = equip.IncomingDurability;
@@ -1472,7 +1458,7 @@ namespace GIC.Battle
                     // 决策五十七「资产即身份」：buffKey 优先（具名 buff 构造+同族异名共存）；空=族首资产回落
                     BaseBuff buff = BuffFactory.Create((BuffType)applyBuff.BuffType, applyBuff.Level,
                         _sim.GetUnit(applyBuff.SourceUnitId), applyBuff.BuffValue, applyBuff.StackLimit,
-                        applyBuff.DurationTurns, applyBuff.BuffKey);
+                        applyBuff.DurationSeconds, applyBuff.BuffKey);
                     if (buff == null) continue;
                     buff.SourceSkillId = applyBuff.SourceSkillId; // 来源技能随 Buff 实体进注册表（快照透传）
 
@@ -1489,13 +1475,13 @@ namespace GIC.Battle
 
                     _sim.ApplyBuff(target, buff, _sim.GetUnit(applyBuff.SourceUnitId));
 
-                    // 回填合并后的真实状态（同身份叠层时 Level/Turns 以注册表为准——按 buffKey 匹配
+                    // 回填合并后的真实状态（同身份叠层时 Level/Seconds 以注册表为准——按 buffKey 匹配
                     // 应用到的实例；key 空（防御）回落 type 匹配）
                     var state = !string.IsNullOrEmpty(applyBuff.BuffKey)
                         ? target.Buffs.Find(b => b.Config != null && b.Config.name == applyBuff.BuffKey)
                         : target.Buffs.Find(b => b.Type == (BuffType)applyBuff.BuffType);
                     applyBuff.Level = state != null ? state.Level : applyBuff.Level;
-                    applyBuff.Turns = state != null ? state.RemainingSeconds : 0;
+                    applyBuff.Seconds = state != null ? state.RemainingSeconds : 0;
                     appliedBuffs.Add(applyBuff);
 
                     // 溢出层立即碎裂：未吸收层逐枚弹治疗（LayerBeatSeconds 错峰同碎裂路径）；
@@ -1552,20 +1538,20 @@ namespace GIC.Battle
                 }
                 else if (effect is ConsumeFreezeEffect consumeFreeze)
                 {
-                    // 冻结层消耗（决策七十四「冻结 Buff 可作为冰元素参与反应」——每个回合相当于 1 层冰）：
-                    // 融化/超导按反应级别消耗冻结回合；**归零立即解冻**（拍板：_sim.RemoveBuff 注销+清
+                    // 冻结层消耗（决策七十四「冻结 Buff 可作为冰元素参与反应」——每秒相当于 1 层冰）：
+                    // 融化/超导按反应级别消耗冻结秒；**归零立即解冻**（拍板：_sim.RemoveBuff 注销+清
                     // Frozen 状态〔OnRemoved〕→命令层发 RemoveBuff=霜化即时退场）；未归零=零命令
-                    //（冻结徽章回合数靠下回合快照自愈，Frost 表现由 Frozen 状态驱动仍正确）
+                    //（冻结徽章秒数靠下一拍快照自愈，Frost 表现由 Frozen 状态驱动仍正确）
                     var freeze = _sim.GetFreezeBuff(consumeFreeze.TargetUnitId);
                     if (freeze == null)
                     {
-                        consumeFreeze.AppliedTurns = 0; // 编译后冻结已被外部移除的防御路径（零命令零动作）
+                        consumeFreeze.AppliedSeconds = 0; // 编译后冻结已被外部移除的防御路径（零命令零动作）
                     }
                     else
                     {
-                        consumeFreeze.AppliedTurns = Mathf.Min(consumeFreeze.Turns,
+                        consumeFreeze.AppliedSeconds = Mathf.Min(consumeFreeze.Seconds,
                             Mathf.Max(0, freeze.RemainingSeconds));
-                        freeze.RemainingSeconds -= consumeFreeze.AppliedTurns;
+                        freeze.RemainingSeconds -= consumeFreeze.AppliedSeconds;
                         if (freeze.RemainingSeconds <= 0)
                         {
                             consumeFreeze.AppliedKey = freeze.Config?.name; // 具名身份（决策五十七）——RemoveBuff 命令载荷
@@ -1699,12 +1685,12 @@ namespace GIC.Battle
         // | Sanity          | 逐层各 +1 效应；命令按目标合并总值   | 环 tick 逐层（拍板②）；RangedInt 钳 -300~300 |
         // | Stamina         | (目标=玩家 ID) 防御性去重             | 配额行动理论唯一；重复条目丢弃                  |
         // | MoraPlunder     | (被掠方, 掠夺方) 双命令               | AppliedGain=0 零命令；按应用后实际量+命中时刻发 |
-        // | ApplyBuff       | (目标, BuffType)                     | 级别取大、回合取后施合并态；命令数以合并态为准  |
+        // | ApplyBuff       | (目标, BuffType)                     | 级别取大、秒取后施合并态；命令数以合并态为准  |
         // | Attach/Reaction | 不合并（一一对应）                    | 覆盖语义后到者胜属预期                          |
         // 注：永久 Buff（RemainingSeconds<0，歌声之环）不走到期收集——倒下即失走死亡循环 RemoveBuff
         // =================================================================================
 
-        /// <summary>同片同 (目标,类型) 的多次施加合并为一条命令（回合数以最终合并态为准）</summary>
+        /// <summary>同片同 (目标,类型) 的多次施加合并为一条命令（秒数以最终合并态为准）</summary>
         private static List<ApplyBuffEffect> MergeAppliedBuffs(List<ApplyBuffEffect> applied)
         {
             var merged = new Dictionary<string, ApplyBuffEffect>();
@@ -1721,7 +1707,7 @@ namespace GIC.Battle
                 else
                 {
                     merged[key].Level = Mathf.Max(merged[key].Level, buff.Level);
-                    merged[key].Turns = buff.Turns; // 后施合并态覆盖
+                    merged[key].Seconds = buff.Seconds; // 后施合并态覆盖
                 }
             }
             return result;
@@ -1750,15 +1736,15 @@ namespace GIC.Battle
                 _sim.GetPosition(dead), deadId);
             segment.commands.Add(BattleCommand.Summon(identity.OwnerPlayerID, sliceIndex, indexInSlice++,
                 _sim.BuildUnitState(soulId, soul)));
-            GICLog.Info($"[TurnResolver] 地脉灵魂生成：{dead.RawData.unitName}（{deadId}）→ 灵魂 {soulId}");
+            GICLog.Info($"[BattleResolver] 地脉灵魂生成：{dead.RawData.unitName}（{deadId}）→ 灵魂 {soulId}");
         }
 
         /// <summary>地脉维度秒拍规则（决策九十一；决策九十五拍板 4「每秒整拍」秒化）：①灵魂衰减——
         /// 每秒整拍 −⌊10%×MaxHp⌋（SoulDecayPercentPerSecond 单源，末点截断）=复苏窗直译 10 秒；
-        /// 生成当秒拍豁免（DeployedTurn 判据〔CurrentTurn 语义=逻辑秒〕，骑士团「部署当拍跳过」同构）；
-        /// ②地脉驻留代价——非灵魂地脉单位 −3 理智/秒拍（LeyLineSanityCostPerTurn；当前地脉仅灵魂=
+        /// 生成当秒拍豁免（DeployedSecond 判据〔BattleSecond 语义=逻辑秒〕，骑士团「部署当拍跳过」同构）；
+        /// ②地脉驻留代价——非灵魂地脉单位 −3 理智/秒拍（LeyLineSanityCostPerSecond；当前地脉仅灵魂=
         /// 预留钩子自动生效，相位技能批上线即激活）。霜月等未来维度的驻留规则另立收集器勿并入本方法</summary>
-        private void CollectLeyLineTurnEndEffects(List<BattleEffect> effects)
+        private void CollectLeyLineEffectBeatEffects(List<BattleEffect> effects)
         {
             foreach (var kv in _sim.CrossDimensionUnits)
             {
@@ -1766,7 +1752,7 @@ namespace GIC.Battle
                 if (unit == null || unit.Dimension != BattleDimension.LeyLine) continue;
                 if (unit.IsSoul)
                 {
-                    if (_sim.CurrentTurn <= unit.DeployedTurn) continue; // 生成当回合末不衰减
+                    if (_sim.BattleSecond <= unit.DeployedSecond) continue; // 生成当秒拍末不衰减
                     var stats = unit.GetUnitComponent<UnitStats>();
                     if (stats == null) continue;
                     var hp = stats.GetStatStruct(StatType.HP);
@@ -1777,7 +1763,7 @@ namespace GIC.Battle
                 }
                 else if (!BattleSimState.IsDead(unit))
                 {
-                    effects.Add(new SanityEffect(kv.Key, -BattleMetrics.LeyLineSanityCostPerTurn));
+                    effects.Add(new SanityEffect(kv.Key, -BattleMetrics.LeyLineSanityCostPerSecond));
                 }
             }
         }

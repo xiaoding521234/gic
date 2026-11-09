@@ -11,7 +11,7 @@ namespace GIC.Battle
     ///（targetUnitId；TeamType 口径同延奏——2v2 含队友单位；尸体不可饮用）→ 消耗 1 张
     ///（ItemConsumeEffect 指定物品模式——应用层手牌确定性扣减+ItemConsume 命令客户端镜像）→
     /// EffectCompiler.CompileItemUse 单出口编译物品效果（目标=饮用者；施法者=饮用者——治疗
-    /// 基准/效率乘区按饮用者口径）。玩家级行动（unitId 留空——TurnResolver 先行摘出独立段结算，
+    /// 基准/效率乘区按饮用者口径）。玩家级行动（unitId 留空——BattleResolver 先行摘出独立段结算，
     /// 不进攻速分桶）。首个消费方=蒲公英酒（SanityChange -10〔酒鬼 tag 条件〕+ Heal 40）。
     /// </summary>
     public static class UseItemExecutor

@@ -20,7 +20,7 @@ namespace GIC.Battle
     /// 摩拉够→DeployUnit 同名路径升命，评分入池竞争）**⑥无候选=Pass 空过放权自主军团。
     /// 与真人玩家对等：配额同样可用于号令/魔神/部署/直接操控伙伴。
     /// AI 决策由 Host 生成（docs/18 决策一）——直接读 BattleSimState/BattleSnapshot，不走传输通道；
-    /// 选择阶段开始后延迟提交（给玩家看清回合切换）。
+    /// 每决策节拍延迟提交（原「给玩家看清回合切换」语义已随回合机退役）。
     /// AI-4 批（docs/active/42 §9）：人格原型乘子（军备桶=操魔神/激进度=操控边际/契约桶=号令/
     /// 升命桶=投资——PersonaPack 资产零代码换人格）＋难度档（学徒=失误注入轮转法+对手预测器关闭件）。
     /// 体力感知：配额行动 costs 门槛镜像（ResourceGate.HasAll 同源——体力按施法者层级换算，
@@ -32,7 +32,7 @@ namespace GIC.Battle
     {
         private BattleSession _session;
         private string _playerId;
-        private int _lastSubmittedTurn = -1;
+        private int _lastSubmittedSecond = -1;
         /// <summary>上次尝试购买的逻辑秒（P6 残留审计 C6，docs/active/49）：恢复「每回合（=1 秒）
         /// 至多一次购买」的 1:1 语义——决策节拍本身是 0.5 秒。</summary>
         private int _lastPurchaseSecond = -1;
@@ -128,13 +128,13 @@ namespace GIC.Battle
             yield return new WaitForSeconds(SubmitDelaySeconds);
             _submitRoutine = null;
 
-            // 战斗结束/状态机停止则放弃。P5 同频改造：TurnNumber=逻辑秒（每秒翻号），旧
-            // 「Phase!=Selecting || TurnNumber!=turn」双校验在 0.8s 延迟跨秒界时会 20% 丢拍——
+            // 战斗结束/状态机停止则放弃。P5 同频改造：CurrentSecond=逻辑秒（每秒翻号），旧
+            // 「Phase!=Selecting || CurrentSecond!=turn」双校验在 0.8s 延迟跨秒界时会 20% 丢拍——
             // 改 Phase 单校验+当前秒取值（思考延迟可能跨秒界，决策用当下拍）
             if (_session == null || _session.Flow == null) yield break;
             if (_session.Flow.Phase != BattlePhase.Selecting) yield break;
-            int now = _session.Flow.TurnNumber;
-            if (now == _lastSubmittedTurn) yield break; // 同拍防重复提交（幂等）
+            int now = _session.Flow.CurrentSecond;
+            if (now == _lastSubmittedSecond) yield break; // 同拍防重复提交（幂等）
 
             var action = Decide(now);
             // P5-D：空 unitId 的 Pass（配额=空过放权）不上交——tick 制无配额语义，上交只产
@@ -142,7 +142,7 @@ namespace GIC.Battle
             if (action != null
                 && !(action.actionType == ActionType.Pass && string.IsNullOrEmpty(action.unitId)))
                 _session.SubmitAction(action);
-            _lastSubmittedTurn = now;
+            _lastSubmittedSecond = now;
         }
 
         // ==================== 配额评分制决策（号令/操魔神/空过） ====================
@@ -161,21 +161,21 @@ namespace GIC.Battle
             var sim = _session.Sim;
 
             // 决策快照（纯读，与选择阶段广播同源状态）——预判/目标评估的唯一状态源；
-            // 战略层与评分流共用（战略层回合更新=Decide 头部，docs/active/42 §5 报告链「每回合」：
-            // 部署早退回合也更新——新战斗自清依赖 T1 重入观测，跳过部署回合会让跨局陈旧态漏清
-            // 〔观察局 Match A 实证 T1-3 无 [战略层] 行=UpdateForTurn 未跑〕；T1-3 态势可见性同得）
+            // 战略层与评分流共用（战略层逐拍更新=Decide 头部，docs/active/42 §5 报告链〔原「每回合」措辞〕：
+            // 部署早退拍也更新——新战斗自清依赖 T1 重入观测，跳过部署拍会让跨局陈旧态漏清
+            // 〔观察局 Match A 实证 T1-3 无 [战略层] 行=UpdateForSecond 未跑〕；T1-3 态势可见性同得）
             var snapshot = sim.TakeSnapshot(turn);
 
-            // 战略层回合更新（AI-5 批，docs/active/42 §5）：报告链→态势机（滞回+驻留）→军团倾向→
+            // 战略层逐拍更新（AI-5 批，docs/active/42 §5）：报告链→态势机（滞回+驻留）→军团倾向→
             // 黑板乘子→红线；配额脑消费=乘子合成（人格基线×态势乘子，乘法于消费点）+体力保底门
-            var strat = AIStrategist.UpdateForTurn(sim, snapshot, _playerId, MyTeam, turn);
+            var strat = AIStrategist.UpdateForSecond(sim, snapshot, _playerId, MyTeam, turn);
             GICLog.Info($"[战略层] {_playerId} T{turn} 态势={strat.Stance} 军团={strat.Legion}" +
                 $" 比值={strat.PowerRatio:F2} 乘子[军{strat.armyMul:F2}/契{strat.contractMul:F2}/升{strat.upgradeMul:F2}]" +
                 $" 意图=[{string.Join("，", strat.Intents)}]");
 
             // ⓪-1 购买（2026-10-23 强化批拍板「让 AI 也会购买部署建筑」）：BuyCard 即时通道
-            //    **不占配额**（每回合至多一次；即时同步结算——LocalBattleTransport.ClientSend 直投，
-            //    下位部署分支当回合即可消费新购卡）；旗帜走购买补货、角色补货档待琴实装自然激活
+            //    **不占配额**（每秒至多一次；即时同步结算——LocalBattleTransport.ClientSend 直投，
+            //    下位部署分支当拍即可消费新购卡）；旗帜走购买补货、角色补货档待琴实装自然激活
             TryPurchase(sim, turn);
 
             // ⓪ 部署：手牌角色卡+核心半径内有合法落点+摩拉够 → 出战（DeployUnitExecutor 校验链同源；
@@ -191,10 +191,10 @@ namespace GIC.Battle
             //    E-1 对手建模（docs/archive/33 §2）：威胁图传骨架——魔神攻击候选吃反威胁分、移动
             //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）。
             //    AI-4：per-unit tracker＋人格军备桶乘子；学徒=对手预测器关闭件（威胁图不建）。
-            //    AI-5：人格×态势军备乘子合成+体力保底门（§5.3——保自主军团 2 回合运转量）
+            //    AI-5：人格×态势军备乘子合成+体力保底门（§5.3——保自主军团 2 秒拍运转量）
             var difficulty = AIPlayerConfig.DifficultyOf(_playerId);
             var threat = AIPlayerConfig.QuotaThreatEnabled(difficulty)
-                ? OpponentThreatModel.BuildCached(sim, snapshot, MyTeam, turn) // #2 审查批：回合级缓存
+                ? OpponentThreatModel.BuildCached(sim, snapshot, MyTeam, turn) // #2 审查批：秒级缓存
                 : null;
             float armMul = 军备桶 * strat.armyMul;
             foreach (var entry in CollectArchons(sim))
@@ -217,7 +217,7 @@ namespace GIC.Battle
             //    −自主期望分（基线 pass：同骨架 threat=null=伙伴脑现行感知口径）。原始分直接入池会以
             //    35~284 的伤害分常态饿死升命（25）与号令（~30-45）——观察局 T4~T12 实锤（升命 30 回合
             //    仅赢 4 回合）。边际≤0=放权更好不入池；被操控伙伴跳过自主决策（commanded 集）。
-            //    基线成本口径=isPlayerDirectControl=false（自主付费 5；体力枯竭回合自主无线、操控有
+            //    基线成本口径=isPlayerDirectControl=false（自主付费 5；体力枯竭时自主无线、操控有
             //    线→操控解锁行动=真实边际，docs/05 §5.1「体力吃紧时直接操控本身是账本收益」）
             foreach (var entry in CollectCompanions(sim))
             {
@@ -241,7 +241,7 @@ namespace GIC.Battle
             }
 
             // ② 号令：势力技能（延奏/契约）候选——施法者=己方存活单位（眷属/伙伴/魔神均可，
-            //    眷属技能表本无势力技能条目=天然只有伙伴/魔神当施法者）；对伙伴施法者=本回合号令
+            //    眷属技能表本无势力技能条目=天然只有伙伴/魔神当施法者）；对伙伴施法者=本拍号令
             //    （CompanionBrain 跳过其自主决策），对魔神施法者=直接操控。
             //    E-1：威胁图传号令估值（治疗救命档消费 DoomedAllies，docs/archive/33 §2.3）
             foreach (var entry in CollectFactionCasters(sim))
@@ -307,7 +307,7 @@ namespace GIC.Battle
         /// <summary>部署桶（议题④⑦桶序化的分拣单元——桶内容与校验链不动、只动序）</summary>
         private enum DeployBucket
         {
-            /// <summary>1★ 建筑首铺（旗帜：便宜+每回合滚雪球经济先行；同桶 unitName 升序）</summary>
+            /// <summary>1★ 建筑首铺（旗帜：便宜+每秒滚雪球经济先行；同桶 unitName 升序）</summary>
             Flag = 0,
             /// <summary>角色（战力主力：unitName 升序 × 同名在场〔含尸体〕跳过——规避升命语义烧配额）</summary>
             Characters = 1,
@@ -360,7 +360,7 @@ namespace GIC.Battle
         /// 落点合法性=DeployUnitExecutor.IsDeployCellValid 单源（**自己存活建筑锚并集**〔2026-10-23
         /// 拍板：核心锚建筑 3/角色 2、其它建筑锚各减 1〕+地形+碰撞共享原语）；
         /// 摩拉=GetEffectiveDeployCost 同源（不足的候选入桶前已滤——先攒；红线语义维持）。
-        /// 每回合部署配额一张，逐桶找首个可出战候选。
+        /// 每秒拍部署配额一张，逐桶找首个可出战候选。
         /// </summary>
         private ActionData TryBuildDeploy(BattleSimState sim, int turn)
         {
@@ -524,12 +524,12 @@ namespace GIC.Battle
         /// +角色补货（己方存活建筑可购买列表×手牌无同名卡×仅角色×配置存在×**技能已实装**
         /// 〔任一技能 HasEffects——观察局实锤琴技能全占位，买半成品=浪费；琴技能实装批自然激活〕）；
         /// ②预算=当前摩拉 − 摩拉红线（AITuning.摩拉红线——与升命红线同源的保底语义，购买不掏空
-        /// 部署/升命资金池）；每项另须预留部署价（买来当回合即可部署）；
+        /// 部署/升命资金池）；每项另须预留部署价（买来当拍即可部署）；
         /// ③价值序=旗帜（部署锚+经济使能件）→角色 unitName 升序（购买价值无客观序，枚举序铁律）；
         /// ④循环购入直至清单耗尽/预算不足（手牌守卫在清单构建期一次性评估+同名单去重=无重复购）。
-        /// 购物上限 8 件/回合=防御性护栏（正常对局清单 1~3 件远达不到）。
+        /// 购物上限 8 件/秒=防御性护栏（正常对局清单 1~3 件远达不到）。
         /// 解锁门槛由 Host BuyCardExecutor 权威校验兜底（AI 未解锁角色=购买落空零损失）；
-        /// 失败静默——下回合再试。商店建筑枚举序=unitId 升序（确定性枚举序铁律）。
+        /// 失败静默——下一拍再试。商店建筑枚举序=unitId 升序（确定性枚举序铁律）。
         /// </summary>
         private void TryPurchase(BattleSimState sim, int turn)
         {

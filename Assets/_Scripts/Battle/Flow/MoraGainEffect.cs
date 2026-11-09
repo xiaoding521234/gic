@@ -9,7 +9,7 @@ namespace GIC.Battle
     {
         public int Amount;
 
-        /// <summary>命中时刻（秒，相对片播放起点；0=立即——回合末站立采集/未来产出路径）。
+        /// <summary>命中时刻（秒，相对片播放起点；0=立即——秒拍末站立采集/未来产出路径）。
         /// 途经采集=行走到达资源点格时刻（2026-10-28 返修：客户端到点再入账，与堆减件/采集
         /// 飘字/体力元能同拍——WYSIWYG 三件套效应侧载体）</summary>
         public float HitSeconds;

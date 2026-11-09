@@ -292,7 +292,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 70
-    m_Key: ChargeTurns
+    m_Key: ChargeSeconds
     m_Metadata:
       m_Items: []
   - m_Id: 71

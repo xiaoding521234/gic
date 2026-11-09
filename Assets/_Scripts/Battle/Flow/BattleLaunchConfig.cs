@@ -52,7 +52,7 @@ namespace GIC.Battle
 
         /// <summary>试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A 方=正在编辑时轮的持有单位
         /// （层级覆盖 5★魔神档=玩家全手操全部技能）；B 方=木桩空座（IsAI=false：配额脑不挂=木桩纯站桩，
-        /// 选择阶段经 Sim.SandboxAutoPassPlayerId 即时自动 Pass 不拖节奏）；阵容走沙盒 spawn
+        /// Sim.SandboxAutoPassPlayerId 标记空座——即时制无提交链零行动天然等效 Pass，现役消费=BattleSession 玩家计数扣减）；阵容走沙盒 spawn
         /// （BattleScreen：A 单位出生区偏东 1 格、木桩同行再东 5 格=十字射程内同屏）</summary>
         public bool IsSandbox;
         public UnitName SandboxAllyUnit;
@@ -133,7 +133,7 @@ namespace GIC.Battle
         }
 
         /// <summary>试招沙盒开局配置（时轮编辑器「开一把试招」入口，2026-10-05）：P1 真人手操试探单位、
-        /// P2 空座木桩（IsAI=false=配额脑不挂，站桩挨打；回合推进由沙盒即时自动 Pass 承接）</summary>
+        /// P2 空座木桩（IsAI=false=配额脑不挂，站桩挨打；即时制零行动天然等效 Pass）</summary>
         public static BattleLaunchConfig BuildSandbox(UnitName ally, UnitName dummy)
         {
             return new BattleLaunchConfig

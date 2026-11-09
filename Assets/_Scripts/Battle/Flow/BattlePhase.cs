@@ -10,7 +10,7 @@ namespace GIC.Battle
     {
         Idle,       // 未开战
         Selecting,  // 选择阶段（即时制=Running 兼容映射，战斗全程常驻）
-        Resolving,  // 执行阶段（回合制遗留；即时制不再进入）
+        // Resolving 已删除（2026-11-09 残留清理批：执行相位随回合机退役，即时制不进入；编号不复用）
         Finished,   // 战斗结束
     }
 }

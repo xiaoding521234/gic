@@ -131,7 +131,7 @@ namespace GIC.Battle
 
             ResolveIdentity();
             if (!_identityResolved) return; // 身份未就绪勿用默认队 A 评估（LAN 客户端短暂误判防线）
-            // 快照换代=视野缓存失效（追拍六：升命 1命 C1Vision 当回合快照起生效/新召唤单位次快照补齐）
+            // 快照换代=视野缓存失效（追拍六：升命 1命 C1Vision 当拍快照起生效/新召唤单位次拍快照补齐）
             if (!ReferenceEquals(_player.LatestSnapshot, _lastVisionSnapshot))
             {
                 _lastVisionSnapshot = _player.LatestSnapshot;
@@ -248,7 +248,7 @@ namespace GIC.Battle
 
         /// <summary>召唤登场钩（BattlePlayer Summon 命令位调用，追拍七）：①视野缓存预热——召唤单位
         /// 不在当前快照（次快照才收录），直接吃命令携带的 exploreVision（BuildUnitState 已填），
-        /// 防「部署先揭半径 1（回落值）次回合才扩到半径 2」；②敌方立即隐藏——不等下一帧
+        /// 防「部署先揭半径 1（回落值）次拍才扩到半径 2」；②敌方立即隐藏——不等下一帧
         /// EvaluateUnitHiding（建件到逐帧评估间的渲染帧=「闪一下才隐藏」报障根因）</summary>
         public void OnUnitSummoned(UnitState state)
         {

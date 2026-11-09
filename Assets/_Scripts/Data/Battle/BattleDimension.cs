@@ -14,6 +14,6 @@ namespace GIC.Data
     {
         MainWorld = 0,
         LeyLine = 1,
-        // FrostMoon = 2, // 霜月（预留——未来批接入时追加枚举值+回合末规则+滤镜档案）
+        // FrostMoon = 2, // 霜月（预留——未来批接入时追加枚举值+秒拍末规则+滤镜档案）
     }
 }

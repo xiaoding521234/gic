@@ -81,7 +81,7 @@ namespace GIC.Data
                     if (c == '$')
                     {
                         // '$'=摩拉堆（docs/47）：地形回落草地 + 资源点登记（每格至多一个；
-                        // 采集余量变化走 ResourceHarvest 命令增量+回合头快照自愈）
+                        // 采集余量变化走 ResourceHarvest 命令增量+秒拍头快照自愈）
                         data.tiles.Add((int)TileType.Grassland);
                         data.resourceNodes.Add(new ResourceNodeState
                         {

@@ -18,7 +18,7 @@ namespace GIC.UI
     /// 三形态装配（2026-10-11 联机批）：本地（Host 逻辑 + Client 播放器同进程）/ LAN host（Sim+AI 脑，
     /// 广播开战）/ LAN 客户端（纯表现层，消息驱动建盘）；AI 玩家自动上交行动。
     /// ESC/右键/结束按钮 → 退出确认弹窗（2026-09-12 用户拍板：不应直接退出）。
-    /// 五阶段完整回合流程与正式 HUD 在 B5/B6 落地。
+    /// 五阶段完整回合流程与正式 HUD 在 B5/B6 落地（回合制时代里程碑——回合机已于 2026-11-04 决策九十五退役，现为即时制 RTSFlowController 秒拍流程）。
     /// </summary>
     public class BattleScreen : ScreenBase
     {
@@ -207,10 +207,10 @@ namespace GIC.UI
             }
 
             // 试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A=编辑单位（层级覆盖 5★ 魔神档全手操）、
-            // B=木桩空座（即时自动 Pass，站桩挨打）
+            // B=木桩空座（零行动天然等效 Pass，站桩挨打）
             if (launchConfig != null && launchConfig.IsSandbox)
             {
-                _session.Sim.SandboxAutoPassPlayerId = playerSetups[1].PlayerId; // 空座回合即时 Pass（TurnFlow 消费）
+                _session.Sim.SandboxAutoPassPlayerId = playerSetups[1].PlayerId; // 空座沙盒标记（即时制无选择提交，零行动天然等效 Pass；现役消费=BattleSession 玩家计数扣减）
                 var allyCenter = spawnCells[playerSetups[0].PlayerId];
                 // 试探单位：出生中心东 1 格（中心格已让位协议核心）；木桩同行再东 5 格=十字射程内同屏
                 _session.SpawnSandboxUnit(launchConfig.SandboxAllyUnit, playerSetups[0].PlayerId, TeamType.A,
@@ -264,7 +264,7 @@ namespace GIC.UI
                     (int)(launchConfig?.FogMode ?? BattleFogMode.None), playerSetups, spawnCells, replayHands);
 
             // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/32 §6；
-            // 眷属/伙伴自主脑在 Host 回合流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
+            // 眷属/伙伴自主脑在 Host 秒拍流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
             // 2026-10-12 选择器批：房间 AI 行点选的难度/人格经名册透传——建脑时注入（先于 Bind 登记）；
             // 人格按名换资产（缺资产=脑内回落默认 Persona_经济家，见 PlayerQuotaBrain.Persona）
             foreach (var setup in playerSetups)
@@ -527,10 +527,10 @@ namespace GIC.UI
 
         /// <summary>
         /// 启动战斗地图音乐轮换链：按 BattleMapConfig.position → PositionConfig 昼夜曲池取曲，
-        /// 选池用**战斗独立时钟时段**（TurnFlowController.BattleTimePeriod，全局 TimeUtility 仅
+        /// 选池用**战斗独立时钟时段**（RTSFlowController.BattleTimePeriod，全局 TimeUtility 仅
         /// 未就绪兜底）。链式 PlayMusicWithInterval：播完 → 间隔 10s → 按当前战斗时段重选池 →
-        /// 随机下一首（时段随回合推进自然切换，不打断在播曲目）。另订阅回合状态机阶段变化做
-        /// 自愈重试：链曾因池空静默死亡时，新回合开始且真静默则重新起链。曲池为空仅警告不阻断。
+        /// 随机下一首（时段随战斗独立时钟推进自然切换，不打断在播曲目）。另订阅相位变化事件做
+        /// 自愈重试：链曾因池空静默死亡时，新秒拍相位事件且真静默则重新起链。曲池为空仅警告不阻断。
         /// </summary>
         private void StartBattleMusic(BattleMapConfig mapConfig)
         {
@@ -542,8 +542,8 @@ namespace GIC.UI
                     if (!_battleMusicActive || phase != BattlePhase.Selecting) return;
                     var audio = AudioManager.Instance;
                     if (audio == null) return;
-                    // 时段跨界立即淡切（2026-09-22）：独立时钟在回合结束 +20 分钟，跨界瞬间=片循环
-                    // 完毕进选择阶段——在播曲目若还是旧时段选的，淡出换新池曲（冷却中未在播则留给
+                    // 时段跨界立即淡切（2026-09-22）：独立时钟每秒 +1 分钟（RTSFlowController 战斗时钟），
+                    // 跨界瞬间=秒拍相位事件——在播曲目若还是旧时段选的，淡出换新池曲（冷却中未在播则留给
                     // 下一次选曲自然换池）
                     var battlePeriod = _flow.BattleTimePeriod;
                     if (audio.IsMusicPlaying() &&

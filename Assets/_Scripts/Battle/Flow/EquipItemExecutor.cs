@@ -11,7 +11,7 @@ namespace GIC.Battle
     /// 域=饮用同款——尸体不可装备、建筑不可装备）→ 槽位有空（武器槽恒 1 空闲/配件按层级眷属1·
     /// 伙伴2·魔神3 有空槽）→ 消耗 1 张（ItemConsumeEffect）+ EquipEffect（应用层挂 UnitEquipment
     /// 槽位+词条，命令层产 EquipItem 命令客户端镜像）。**槽位校验读活单位**（snapshot 目标校验后
-    /// 取 sim 单位——同段不可能有第二个装备改同一单位：装备只对己方单位、每玩家每回合 1 行动）。
+    /// 取 sim 单位——同段不可能有第二个装备改同一单位：装备只对己方单位、每玩家每秒拍 1 配额行动）。
     /// </summary>
     public static class EquipItemExecutor
     {

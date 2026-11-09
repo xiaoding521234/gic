@@ -70,33 +70,33 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 37301200798429184
     m_Localized: "\xB7The holder's ATK is increased by {BonusPerStack}\n\xB7Stacks
-      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+      up to {StackLimit} times\n\xB7Lasts {DurationSeconds}"
     m_Metadata:
       m_Items: []
   - m_Id: 37301200819400704
     m_Localized: "\xB7The holder's Move SPD is increased by {BonusPerStack}\n\xB7Stacks
-      up to {StackLimit} times, duration extends with each stack\n\xB7Lasts {DurationTurns}
+      up to {StackLimit} times, duration extends with each stack\n\xB7Lasts {DurationSeconds}
       seconds"
     m_Metadata:
       m_Items: []
   - m_Id: 37631287712362496
     m_Localized: "\xB7The holder's DEF is decreased by {BonusPerStack}\n\xB7Stacks
-      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+      up to {StackLimit} times\n\xB7Lasts {DurationSeconds}"
     m_Metadata:
       m_Items: []
   - m_Id: 37633262277439488
     m_Localized: "\xB7The holder's DEF is decreased by {BonusPerStack}\n\xB7Stacks
-      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+      up to {StackLimit} times\n\xB7Lasts {DurationSeconds}"
     m_Metadata:
       m_Items: []
   - m_Id: 40193071505813504
     m_Localized: "\xB7The holder's DEF is decreased by {BonusPerStack}\n\xB7Stacks
-      up to {StackLimit} times\n\xB7Lasts {DurationTurns}"
+      up to {StackLimit} times\n\xB7Lasts {DurationSeconds}"
     m_Metadata:
       m_Items: []
   - m_Id: 40904311723077632
     m_Localized: "\xB7Removes and prevents stealth\n\xB7Fog on its tile is broken
-      for the applier's side only\n\xB7Lasts {DurationTurns} seconds"
+      for the applier's side only\n\xB7Lasts {DurationSeconds} seconds"
     m_Metadata:
       m_Items: []
   references:

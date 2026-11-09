@@ -44,14 +44,14 @@ namespace GIC.Battle
 
         private readonly BattleMessageRouter _hostRouter = new BattleMessageRouter();
         private readonly BattleMessageRouter _clientRouter = new BattleMessageRouter();
-        /// <summary>F2 本地 Sim 回环路由（客户端 TurnResolver 产出的 Segment/Snapshot → View）</summary>
+        /// <summary>F2 本地 Sim 回环路由（客户端 BattleResolver 产出的 Segment/Snapshot → View）</summary>
         private readonly BattleMessageRouter _localRouter = new BattleMessageRouter();
         private Transform _logicRoot;
 
         // ==================== 相位/计时门面（HUD 唯一订阅口，B7 LAN） ====================
-        // host/本地=TurnFlowController 权威；LAN client=BattlePlayer 消息派生。HUD 不再直接触 Flow。
+        // host/本地=RTSFlowController 权威；LAN client=BattlePlayer 消息派生。HUD 不再直接触 Flow。
 
-        /// <summary>阶段变化（Selecting/Resolving/Finished；参数=阶段、回合数）</summary>
+        /// <summary>阶段变化（Selecting/Finished；参数=阶段、逻辑秒）</summary>
         public event Action<BattlePhase, int> OnPhaseChanged;
 
         public BattlePhase Phase => Flow != null ? Flow.Phase
@@ -202,12 +202,11 @@ namespace GIC.Battle
             sim.FogMode = (BattleFogMode)msg.fogMode;
             BuildClientSimUnits(sim, msg);
 
-            // 本地 Sim 回环：TurnResolver 产出的 Segment/Snapshot/BattleOver 直接喂 View（F2）
+            // 本地 Sim 回环：BattleResolver 产出的 Segment/Snapshot/BattleOver 直接喂 View（F2）
             var loop = new ClientLoopbackTransport(Transport);
             loop.RegisterClientHandler((type, json) => _localRouter.Handle(type, json));
             _localRouter.Register<SegmentMessage>(BattleMessageType.Segment, m => Player.OnSegment(m));
             _localRouter.Register<SnapshotMessage>(BattleMessageType.Snapshot, m => Player.OnSnapshot(m));
-            _localRouter.Register<TurnEndMessage>(BattleMessageType.TurnEnd, m => Player.OnTurnEnd(m));
             _localRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver, m => Player.OnBattleOver(m));
 
             Flow.Bind(sim, loop, isHost: false, isNetworked: true);
@@ -300,7 +299,7 @@ namespace GIC.Battle
                 msg => flow.ReceiveHashReport(msg));
             transport.RegisterHostHandler((type, json, sender) => session._hostRouter.Handle(type, json));
 
-            // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 回合结束）——注册单源化（T6）
+            // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 秒拍结束段）——注册单源化（T6）
             RegisterClientRoutes(session, transport, player);
 
             player.Bind(transport, sim.Map);
@@ -322,19 +321,15 @@ namespace GIC.Battle
                 msg => player.OnSnapshot(msg));
             session._clientRouter.Register<SegmentMessage>(BattleMessageType.Segment,
                 msg => player.OnSegment(msg));
-            session._clientRouter.Register<TurnEndMessage>(BattleMessageType.TurnEnd,
-                msg => player.OnTurnEnd(msg));
             session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver,
                 msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播
-            session._clientRouter.Register<TurnPlanMessage>(BattleMessageType.TurnPlan,
-                msg => player.OnTurnPlan(msg)); // 行动预告（执行预览）
             transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
         }
 
         // ==================== 对局流程 ====================
 
         /// <summary>
-        /// 广播开局（地形全量 + 初始快照）并进入第 1 回合选择阶段
+        /// 广播开局（地形全量 + 初始快照）并进入即时制常驻选择阶段（第 1 秒）
         /// </summary>
         public void StartBattle()
         {
@@ -362,7 +357,7 @@ namespace GIC.Battle
 
         public void SubmitAction(ActionData action)
         {
-            action.turnNumber = Flow != null ? Flow.TurnNumber : (Player?.LatestSnapshot?.turnNumber ?? 1);
+            action.turnNumber = Flow != null ? Flow.CurrentSecond : (Player?.LatestSnapshot?.turnNumber ?? 1);
             action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 决策九十五：上交时刻 tick
             if (!IsHostSide && Flow != null)
             {
@@ -375,7 +370,7 @@ namespace GIC.Battle
 
         public void SubmitInstantAction(ActionData action)
         {
-            action.turnNumber = Flow != null ? Flow.TurnNumber : (Player?.LatestSnapshot?.turnNumber ?? 1);
+            action.turnNumber = Flow != null ? Flow.CurrentSecond : (Player?.LatestSnapshot?.turnNumber ?? 1);
             action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 回放 v2：即时行动（购买）同盖 tick——submit 窗消费锚
             Transport.ClientSend(BattleMessageType.SubmitInstantAction, new SubmitInstantAction { action = action });
         }

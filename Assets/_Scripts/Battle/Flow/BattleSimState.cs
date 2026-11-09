@@ -29,7 +29,7 @@ namespace GIC.Battle
         /// <summary>恢复 RNG 状态（回滚/重连检查点用，F3）</summary>
         public void RestoreRng(uint state) => _rng.Restore(state);
 
-        /// <summary>已注册玩家ID（**注册序保序**——部署核心位置代理按注册序映射 spawnCenters、回合提交完成度判定用。
+        /// <summary>已注册玩家ID（**注册序保序**——部署核心位置代理按注册序映射 spawnCenters、玩家枚举序确定。
         /// 2026-09-23 审查 Y5：原 HashSet 迭代序 .NET 无保证，B7 换注册实现会静默错位部署基准）</summary>
         private readonly List<string> _playerIds = new List<string>();
 
@@ -48,17 +48,17 @@ namespace GIC.Battle
         private readonly Dictionary<string, Unit> _crossDimensionUnits = new Dictionary<string, Unit>();
 
         /// <summary>尸体 unitId → 灵魂 unitId（灵魂↔尸体「同一实体的两半」系统级联动账本：
-        /// 灵魂 HP 扣完→尸体随散；尸体被复苏→灵魂归体消散——TurnResolver 死亡分支/ReviveEffect 消费）</summary>
+        /// 灵魂 HP 扣完→尸体随散；尸体被复苏→灵魂归体消散——BattleResolver 死亡分支/ReviveEffect 消费）</summary>
         private readonly Dictionary<string, string> _corpseSoulIds = new Dictionary<string, string>();
 
-        /// <summary>非主世界维度单位（只读；当前=地脉灵魂。维度感知域/回合末维度规则/快照消费）</summary>
+        /// <summary>非主世界维度单位（只读；当前=地脉灵魂。维度感知域/秒拍末维度规则/快照消费）</summary>
         public IReadOnlyDictionary<string, Unit> CrossDimensionUnits => _crossDimensionUnits;
 
         // ==================== 资源点（docs/47，2026-10-27 拍板「非地形非单位不占体积」） ====================
         // 独立注册表=独立实体拍板的结构实现（灵魂 _crossDimensionUnits 先例）：不进 _units（体积/
         // 阻挡/瞄准域天然零参与）、不进 TileType（docs/11 旧挂账「地形扩展」方向作废）。主世界专属
         // （地脉维度独立地形不演化资源点）。开局态从 Map.resourceNodes 复制（Map=开局协议快照恒
-        // 静态，本注册表=运行时可变真值）；余量变化走 ResourceHarvest 命令镜像+回合头快照自愈。
+        // 静态，本注册表=运行时可变真值）；余量变化走 ResourceHarvest 命令镜像+秒拍头快照自愈。
         private readonly Dictionary<BattleCell, ResourceNodeState> _resourceNodes = new Dictionary<BattleCell, ResourceNodeState>();
 
         /// <summary>主世界资源点运行时视图（AI 采集候选/只读遍历；查询走 GetResourceNodeAt）</summary>
@@ -108,13 +108,13 @@ namespace GIC.Battle
         public readonly int InstanceId = ++_instanceCounter;
         private static int _instanceCounter;
 
-        /// <summary>当前回合数（决策八十六批D，docs/45 §6——回合数真源：TurnResolver 每回合
-        /// 开头写入；周期类效果（骑士团每 5 回合召唤）与 Unit.DeployedTurn 相对计数消费；0=回合开始前
-        /// （开局 RegisterUnit 的单位部署回合计 0）。
+        /// <summary>当前逻辑秒（决策八十六批D 原回合数真源——2026-11-09 残留清理批随语义改名
+        /// BattleSecond：BattleResolver 秒拍（ResolveSecondBeat）写入；周期类效果（骑士团每 5 秒
+        /// 召唤）与 Unit.DeployedSecond 相对计数消费；0=首拍前（开局 RegisterUnit 的单位部署秒计 0）。
         /// 即时制语义（决策九十五，docs/active/48 §2.3）：字段语义随回合机退役改为**逻辑秒**——
-        /// RTSFlowController 每秒整拍同步写 CurrentTurn=CurrentSecond，周期类相对计数零改动兼容
-        /// （每 1 秒走 1 拍=旧「每回合走 1」等价节拍，周期字段值按秒生效，P6 调参批集中校）</summary>
-        public int CurrentTurn { get; set; }
+        /// 周期类相对计数零改动兼容（每 1 秒走 1 拍=旧「每回合走 1」等价节拍，周期字段值按秒生效，
+        /// P6 调参批集中校）</summary>
+        public int BattleSecond { get; set; }
 
         /// <summary>即时制 tick 真源（决策九十五，docs/active/48 §2）——RTSFlowController 每 tick 写入；
         /// 1 秒=20 tick（BattleMetrics.TicksPerSecond）</summary>
@@ -126,7 +126,7 @@ namespace GIC.Battle
         /// <summary>片边界 poll 的即时行动队列（连携/契约类；B1 调试用）</summary>
         private readonly List<ActionData> _instantActionQueue = new List<ActionData>();
 
-        /// <summary>Buff 注册表（全局注册序：回合结束效果按注册序结算，docs/22 §2）</summary>
+        /// <summary>Buff 注册表（全局注册序：效果拍结算按注册序，docs/22 §2）</summary>
         private readonly List<BaseBuff> _activeBuffs = new List<BaseBuff>();
         private int _buffSequence;
 
@@ -251,9 +251,9 @@ namespace GIC.Battle
         /// <summary>逻辑单位隐藏根（装配时设置；部署等运行时生成单位挂此——纯逻辑容器勿落场景根，BattleSession._logicRoot 同源）</summary>
         public UnityEngine.Transform LogicRoot { get; set; }
 
-        /// <summary>试招沙盒空座玩家（2026-10-05 时轮编辑器「开一把试招」）：该玩家每回合选择阶段
-        /// 开始即自动上交 Pass（不等时限超时——木桩空座无真人无配额脑，TurnFlow.BeginSelectPhase 消费；
-        /// null=常规对局零行为）</summary>
+        /// <summary>试招沙盒空座玩家（2026-10-05 时轮编辑器「开一把试招」）：木桩空座无真人无配额脑——
+        /// 即时制无选择提交链，空座零行动天然等效 Pass（原 TurnFlow.BeginSelectPhase 自动上交已随回合机退役；
+        /// 现役消费=BattleSession 玩家计数扣减。null=常规对局零行为）</summary>
         public string SandboxAutoPassPlayerId;
 
         // ==================== 玩家注册 ====================
@@ -336,7 +336,7 @@ namespace GIC.Battle
             return cost <= 0 || GetStamina(playerId) >= cost;
         }
 
-        /// <summary>摩拉增量（货币物品牌堆张数变化：回合结束发放/部署扣费/开局获得共用入口）。
+        /// <summary>摩拉增量（货币物品牌堆张数变化：秒拍发放/部署扣费/开局获得共用入口）。
         /// 池写后自动同步摩拉牌手牌条目存亡（SyncCurrencyEntry——获得与失去对称）</summary>
         public void ApplyMoraDelta(string playerId, int delta)
         {
@@ -345,7 +345,7 @@ namespace GIC.Battle
             SyncCurrencyEntry(playerId, ItemName.Mora, res.mora);
         }
 
-        /// <summary>体力增量（货币物品牌堆张数变化：回合结束发放/行动消耗/开局获得共用入口）。
+        /// <summary>体力增量（货币物品牌堆张数变化：秒拍发放/行动消耗/开局获得共用入口）。
         /// 池写后自动同步体力牌手牌条目存亡（SyncCurrencyEntry——获得与失去对称）</summary>
         public void ApplyStaminaDelta(string playerId, int delta)
         {
@@ -693,9 +693,9 @@ namespace GIC.Battle
             // 改读此账本（批次登记时记 team，供队伍判负口径）；同一玩家多核心=幂等覆写同 team
             if (BattleHeuristics.IsCore(unit))
                 _playerCoreTeam[playerId] = team;
-            // 部署回合计数（决策八十六批D：周期类建筑效果以部署回合为 0 相对计数——骑士团
-            // 「部署后每过 5 回合」；开局单位（RegisterUnit 于回合 0 前）计 0）
-            unit.DeployedTurn = CurrentTurn;
+            // 部署秒计数（决策八十六批D：周期类建筑效果以部署秒为 0 相对计数——骑士团
+            // 「部署后每过 5 回合」（拍板原文照录，现按效果拍计数）；开局单位（RegisterUnit 于秒 0 前）计 0）
+            unit.DeployedSecond = BattleSecond;
             // 命座登场 Buff 授予（B8 批：0命固有被动的 Buff 形态——芭芭拉「获得歌声之环」，
             // OnDeploy[ApplyBuff] 原子；随后的 BuildUnitState 携带 buffs，客户端零额外命令）
             ConstellationApplier.ApplyDeployBuffs(this, unit);
@@ -703,7 +703,7 @@ namespace GIC.Battle
         }
 
         /// <summary>移除逻辑单位（决策八十六批B 消散专用，docs/45 §4）：_units 移除+GameObject
-        /// 销毁——死亡后不留尸体（建筑+眷属）；Buff 注销由调用方（TurnResolver 死亡分支）先行完成，
+        /// 销毁——死亡后不留尸体（建筑+眷属）；Buff 注销由调用方（BattleResolver 死亡分支）先行完成，
         /// 附着/组件状态随 GO 销毁同殁。格子占用/碰撞/升命同名查找/鞭尸 tick 全随之天然消失。
         /// **勿用于其它场景**（现役单位移除无消费者——复活/驱逐等未来需求须另立语义；
         /// 灵魂/非主维度单位移除走 RemoveSoul/RemoveLinkedSoul）</summary>
@@ -732,10 +732,10 @@ namespace GIC.Battle
 
         // ==================== 地脉维度（决策九十一）：灵魂注册/移除/链接 ====================
 
-        /// <summary>注册地脉灵魂（TurnResolver 死亡分支调用——留尸体单位倒下时同位生成）：
+        /// <summary>注册地脉灵魂（BattleResolver 死亡分支调用——留尸体单位倒下时同位生成）：
         /// unitId 与主世界共用同一自增计数器（回放确定性：同输入同命令流=同 unitId 序列）；
         /// 灵魂不进 _units（维度隔离结构实现）、不跑 OnDeploy 登场 Buff（灵魂无 Buff 拍板）。
-        /// DeployedTurn=死亡当回合（回合末衰减首回合豁免判据——完整 10 回合驻留）</summary>
+        /// DeployedSecond=死亡当秒（秒拍末衰减首秒豁免判据——完整 10 秒驻留）</summary>
         public string RegisterSoul(Unit soul, string playerId, TeamType team, BattleCell position, string corpseUnitId)
         {
             string unitId = $"U{_nextUnitId++}";
@@ -746,7 +746,7 @@ namespace GIC.Battle
             soul.Dimension = BattleDimension.LeyLine;
             _crossDimensionUnits[unitId] = soul;
             _corpseSoulIds[corpseUnitId] = unitId;
-            soul.DeployedTurn = CurrentTurn;
+            soul.DeployedSecond = BattleSecond;
             return unitId;
         }
 
@@ -818,7 +818,7 @@ namespace GIC.Battle
         }
 
         /// <summary>该队伍是否还有存活单位（旧全灭软停检测——核心判据落地后仅作装配异常防御回落，
-        /// 正常对局胜负唯一判据=协议核心，TurnFlowController.CheckBattleOver 消费）</summary>
+        /// 正常对局胜负唯一判据=协议核心，RTSFlowController.CheckBattleOver 消费）</summary>
         public bool HasLivingUnits(TeamType team)
         {
             foreach (var kv in SortedUnits())
@@ -911,7 +911,7 @@ namespace GIC.Battle
         /// ⚠️ 勿再用作回合截断/终止判据：多人口径下单玩家战败≠战斗终局（2v2 队友核心仍在），
         /// 且核心一倒它对余生每回合恒真——旧片末检查用它导致「此后每回合只结算首个攻速片、
         /// 速度 30/10 档/即时队列/回合末段全停摆」的跛行态（2026-10-24 实战报障，docs/14 §171；
-        /// TurnResolver 片末检查已改用 IsBattleDecided 队伍口径）。保留作按玩家战败状态查询。</summary>
+        /// BattleResolver 片末检查已改用 IsBattleDecided 队伍口径）。保留作按玩家战败状态查询。</summary>
         public bool AnyCoreDestroyed()
         {
             var seen = new HashSet<string>();
@@ -924,11 +924,11 @@ namespace GIC.Battle
             return false;
         }
 
-        /// <summary>战斗是否已分出胜负（片末检查判据——与 TurnFlowController.CheckBattleOver
+        /// <summary>战斗是否已分出胜负（秒拍后/行动结算后检查判据——与 RTSFlowController.CheckBattleOver
         /// 广播口径严格同构：有登记核心 且 恰好一队仍有存活核心）。1v1 与旧「任一玩家战败」口径
         /// 逐点等价（每队恰一人）；2v2 中单玩家核心倒下≠终局（队友核心仍在=未分胜负→剩余片照常
-        /// 结算）；双方核心同回合互灭=零队存活=未「分出」→不截断（平局回合照常走完，B8 结算口径
-        /// ——避免互灭态再次落入每回合截断）。</summary>
+        /// 结算）；双方核心同秒互灭=零队存活=未「分出」→不截断（平局秒照常走完，B8 结算口径
+        /// ——避免互灭态再次落入每秒拍截断）。</summary>
         public bool IsBattleDecided()
         {
             if (!HasAnyRegisteredCore()) return false;
@@ -1000,7 +1000,7 @@ namespace GIC.Battle
 
         public IReadOnlyList<RTSMoveState> ActiveMovers => _activeMovers;
 
-        /// <summary>tick 移动注册表写入（TurnResolver 启动移动时 Add；推进器内部 Remove）</summary>
+        /// <summary>tick 移动注册表写入（BattleResolver 启动移动时 Add；推进器内部 Remove）</summary>
         public List<RTSMoveState> ActiveMoversInternal => _activeMovers;
 
         // ==================== 弹性分离（2026-11-08 拍板：友军按重量加权挤开） ====================
@@ -1120,7 +1120,7 @@ namespace GIC.Battle
         /// 上限=UnitConfig baseEnergy（GetEffectiveEnergy）+命座容量加成（SetStatRange 直扩）；消耗值=技能条目 EnergyCost。
         /// 溢出转移（B8 命座批，安柏1命）：delta>0 且目标带 EnergyOverflowPassive 且溢出——自身只留
         /// 装得下的部分，溢出转移给切比雪夫最近未满元能我方存活角色（同距 unitId 升序；全满则无效果）；
-        /// 接收方经 out 回传给调用方（TurnResolver 转移效应命令），本层不做二次转移（单跳）。
+        /// 接收方经 out 回传给调用方（BattleResolver 转移效应命令），本层不做二次转移（单跳）。
         /// </summary>
         public void ApplyEnergy(Unit target, int delta)
         {
@@ -1255,14 +1255,14 @@ namespace GIC.Battle
         /// <summary>
         /// 施加 Buff：**同具名 buff（Config 资产相同）已存在 → 合并**（叠层+时长累加，docs/06 燃烧
         /// 延长同构）；**异资产同族共存**（决策五十七「资产即身份」——安柏加攻+班尼特加攻可同时
-        /// 存在，用户拍板「不同名即可叠加」）；新施加 → 记入全局注册表（回合结束效果按注册序，
+        /// 存在，用户拍板「不同名即可叠加」）；新施加 → 记入全局注册表（效果拍结算按注册序，
         /// docs/22 §2）→ OnApplied 生命周期回调
         /// </summary>
         public void ApplyBuff(Unit target, BaseBuff buff, Unit source = null)
         {
             if (target == null || buff == null) return;
             buff.source = source;
-            buff.Sim = this; // 战场门面注入（回合结束效果需战场查询的 Buff 消费——如歌声之环半径枚举）
+            buff.Sim = this; // 战场门面注入（效果拍效果需战场查询的 Buff 消费——如歌声之环半径枚举）
 
             // 身份键=Config 资产引用（决策五十七）；Config 双缺防御回落按类型（理论不可达——工厂全注入）
             var existing = buff.Config != null
@@ -1312,7 +1312,7 @@ namespace GIC.Battle
             else unitElement.ClearDye();
         }
 
-        /// <summary>查冻结 Buff 实例（无=null——冻结层消耗/回合读取共用；冻结判重保证单实例）</summary>
+        /// <summary>查冻结 Buff 实例（无=null——冻结层消耗/秒读取共用；冻结判重保证单实例）</summary>
         public FreezeBuff GetFreezeBuff(string unitId)
         {
             var unit = GetUnit(unitId);
@@ -1472,7 +1472,7 @@ namespace GIC.Battle
                 snapshot.resources.Add(snapshotRes);
             }
 
-            // 资源点权威态（docs/47）：回合头整表覆盖自愈（客户端表现层对齐+AI 采集候选消费域）；
+            // 资源点权威态（docs/47）：秒拍头整表覆盖自愈（客户端表现层对齐+AI 采集候选消费域）；
             // 注册序=BattleMapConfig 解析序（构造时复制保序）——回放确定性同构
             foreach (var node in _resourceNodes.Values)
                 snapshot.resourceNodes.Add(node.Clone());
@@ -1483,18 +1483,18 @@ namespace GIC.Battle
         // ==================== 片内附着编译视图（2026-10-01 双蒸发修复） ====================
         // 病灶：反应预览只读片前快照附着，而消耗/覆盖在效应统一应用才落状态——同片多次命中
         // （安柏一箭双丘丘）后续命中仍见旧附着，一层水双蒸发（docs/06 §6.3 1比1消耗被打破）。
-        // 视图=编译期工作副本：初值回落快照，反应消耗/新附着随编译序即时推进；TurnResolver
+        // 视图=编译期工作副本：初值回落快照，反应消耗/新附着随编译序即时推进；BattleResolver
         // 片/即时段编译期以 Begin/End 包裹（命中编译全部走这两处）。真实状态仍由
         // AttachElementEffect 统一应用写入——视图只服务反应预判，不落任何持久状态。
         // 2026-10-15 决策七十四扩两维：①附着层数（多层 1:1 消耗/剩余层仍附着——值扩 (元素,层数)）；
-        // ②冻结回合视图（冻结 Buff 第二冰源——同片多命中逐发消耗冻结回合，ArrowRain 4 发 vs
-        // 2 回合冻结=发1融2→1/发2融1→0，与双蒸发修复同机制防一发吃穿全部）。
+        // ②冻结秒视图（冻结 Buff 第二冰源——同片多命中逐发消耗冻结秒，ArrowRain 4 发 vs
+        // 2 秒冻结=发1融2→1/发2融1→0，与双蒸发修复同机制防一发吃穿全部）。
 
         /// <summary>片内附着编译视图（unitId → (附着元素, 层数)；null=未开启，读取回落快照=旧行为）</summary>
         private Dictionary<string, (ElementType element, int layers)> _compileDyeView;
 
-        /// <summary>片内冻结回合消耗视图（unitId → 已消耗回合累计；真实剩余=活态冻结回合−累计。
-        /// 只记消耗不记全量：编译期冻结回合无其它写入点〔回合递减在回合结束段〕，活态即初值）</summary>
+        /// <summary>片内冻结秒消耗视图（unitId → 已消耗秒累计；真实剩余=活态冻结秒−累计。
+        /// 只记消耗不记全量：编译期冻结秒无其它写入点〔秒递减在秒拍结束段〕，活态即初值）</summary>
         private Dictionary<string, int> _compileFreezeView;
 
         /// <summary>开启编译视图（片/即时段编译期入口调用，紧跟 TakeSnapshot 之后）</summary>
@@ -1511,7 +1511,7 @@ namespace GIC.Battle
             _compileFreezeView = null;
         }
 
-        /// <summary>编译期附着读取：视图优先，未命中回退片前快照态；无快照（回合结束段 tick——
+        /// <summary>编译期附着读取：视图优先，未命中回退片前快照态；无快照（秒拍结束段 tick——
         /// 2026-10-01 tick 统一拍板）回退**活态**（染色写入仍走效应统一应用，活态在该编译时点=段初真值）</summary>
         public ElementType GetCompileDye(string unitId, UnitState snapshotState)
         {
@@ -1556,25 +1556,25 @@ namespace GIC.Battle
                 _compileDyeView[unitId] = (element, element == ElementType.Physical ? 0 : UnityEngine.Mathf.Max(1, layers));
         }
 
-        // ==================== 冻结回合编译视图（决策七十四「冻结层=第二冰源」） ====================
+        // ==================== 冻结秒编译视图（决策七十四「冻结层=第二冰源」） ====================
 
-        /// <summary>编译期冻结剩余回合读取：活态冻结 Buff 回合 − 本片已消耗累计（视图未开启=活态直读，
-        /// 回合结束段 tick 亦然）；无冻结 Buff=0</summary>
-        public int GetCompileFreezeTurns(string unitId)
+        /// <summary>编译期冻结剩余秒读取：活态冻结 Buff 秒 − 本片已消耗累计（视图未开启=活态直读，
+        /// 秒拍结束段 tick 亦然）；无冻结 Buff=0</summary>
+        public int GetCompileFreezeSeconds(string unitId)
         {
             var freeze = GetFreezeBuff(unitId);
-            int turns = freeze != null ? freeze.RemainingSeconds : 0;
+            int seconds = freeze != null ? freeze.RemainingSeconds : 0;
             if (_compileFreezeView != null && _compileFreezeView.TryGetValue(unitId, out var consumed))
-                turns -= consumed;
-            return UnityEngine.Mathf.Max(0, turns);
+                seconds -= consumed;
+            return UnityEngine.Mathf.Max(0, seconds);
         }
 
-        /// <summary>编译期冻结回合消耗推进（同片后续命中见已扣减的冻结回合）</summary>
-        public void ConsumeCompileFreeze(string unitId, int turns)
+        /// <summary>编译期冻结秒消耗推进（同片后续命中见已扣减的冻结秒）</summary>
+        public void ConsumeCompileFreeze(string unitId, int seconds)
         {
-            if (_compileFreezeView == null || turns <= 0) return;
+            if (_compileFreezeView == null || seconds <= 0) return;
             _compileFreezeView.TryGetValue(unitId, out var consumed);
-            _compileFreezeView[unitId] = consumed + turns;
+            _compileFreezeView[unitId] = consumed + seconds;
         }
     }
 }

@@ -5,7 +5,7 @@ namespace GIC.Data
 
     /// <summary>
     /// 资源点运行时状态（docs/47）：开局态随 BattleMapData 一次下发（对齐 tiles/spawnCenters
-    /// 协议模式）+回合头快照权威自愈（BattleSnapshot.resourceNodes）；采集余量变化走
+    /// 协议模式）+秒拍头快照权威自愈（BattleSnapshot.resourceNodes）；采集余量变化走
     /// ResourceHarvest 命令增量（Host 权威，客户端零采集逻辑只镜像）。每格至多一个资源点
     /// （cell 可作唯一键；摩拉堆不占体积——与单位同格共存是常态而非异常）。
     /// </summary>

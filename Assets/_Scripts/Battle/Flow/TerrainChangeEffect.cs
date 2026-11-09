@@ -21,7 +21,7 @@ namespace GIC.Battle
 
         /// <summary>命中时刻（秒，相对片播放起点；0=立即）——WYSIWYG（决策七十六复测返修
         /// 「箭矢还未飞到薄冰就融化」：Host 状态即时结算维持架构常态，客户端经命令 launchMs 到点
-        /// 应用；回合末光环冻结/泡湿类无命中时刻语义=0 立即）</summary>
+        /// 应用；效果拍光环冻结/泡湿类无命中时刻语义=0 立即）</summary>
         public float HitSeconds;
 
         public TerrainChangeEffect(BattleCell cell, int newTile)

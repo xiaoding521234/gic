@@ -19,7 +19,7 @@ namespace GIC.Battle
         public int Layers = 1;
 
         /// <summary>命中时刻（秒，相对片播放起点；0=立即）——WYSIWYG（决策七十六复测返修：
-        /// 箭矢飞行中目标不提前挂附着图标；OnCast 施放/回合末泡湿类=0 立即）</summary>
+        /// 箭矢飞行中目标不提前挂附着图标；OnCast 施放/效果拍末泡湿类=0 立即）</summary>
         public float HitSeconds;
 
         public AttachElementEffect(string sourceUnitId, string targetUnitId, int element, int layers = 1)

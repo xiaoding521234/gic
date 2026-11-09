@@ -7,7 +7,7 @@ namespace GIC.Battle
     /// <summary>
     /// 眷属决策器（B6b 起，docs/04 §4.1 五阶段第一阶段；D 批次 2026-09-29 术语迁移改名：
     /// 低级单位→眷属、LowUnitBrain→FamiliarBrain，docs/32 §6）：1~2 星眷属单位无论归属
-    /// 都自主决定本回合行动（表现类似 MOBA 小兵），决策先于玩家选择完成、不感知玩家本回合选择；
+    /// 都自主决定行动（表现类似 MOBA 小兵），0.5 秒批演算节拍决策、不感知玩家当拍选择；
     /// 本阶段只决策不结算。
     /// v2（2026-09-25 方向纪律收口）：战技预判/移动方向一律十字四向（docs/18 决策八「十字方向其一」
     /// ——八向上交在技能侧被归一主轴斜向必空放，docs/11 方向纪律①④）；预判走技能实例
@@ -22,7 +22,7 @@ namespace GIC.Battle
     /// 单位指向/无目标自施放型无方向域不消费——眷属现无此类，出现时再扩）。
     /// v6（2026-10-03 报障「移速 20 根本没发挥出来」）：移动步数退役「小兵蠕动 1 步/回合」硬编码
     /// ——改读 MoveExecutor.MaxMoveDistance（MoveDistance×移速单源换算=10%×移速，含 Buff 减速，
-    /// 与玩家移动/HUD 同口径）；遇阻由 MovementResolver 结算截停。
+    /// 与玩家移动/HUD 同口径）；遇阻由移动结算轨（现 RTSMovementSystem）截停。
     /// v6.1（2026-10-03 同日报障「来回左右移动持续多回合」）：步进改走 BFS 最短路「直线前缀」
     /// （FindApproachStraightSteps——只踏距离严格递减格、踏上攻击位即停）；「首步方向×N 直线飞」
     /// 越过拐点/攻击位=振荡根源，每回合距离单调递减后数学上不可能振荡。
@@ -47,17 +47,17 @@ namespace GIC.Battle
         /// <summary>核心锚滞回锁（凌晨批议题③，2026-10-24 2v2 观察挂账「双核心等距线上眷属锚定
         /// 小步游移」）：familiar unitId → 锁定的敌方核心 unitId。static 生命周期=进程——DecideAll
         /// 里 turn≤1 自清（与 CompanionBrain E-3 同款零接线）。根治机制：纯距离序在绕行段
-        /// 「到核 A 距离翻转超过到核 B」时逐回合换核=推进方向反复横跳；锁+门槛（另一核心须严格近
+        /// 「到核 A 距离翻转超过到核 B」时逐拍换核=推进方向反复横跳；锁+门槛（另一核心须严格近
         /// 「锚点滞回门槛」格才接管=TPS CurrentHidepoint 惯性复核先例）使方向在等距邻域内稳定。
         /// 预测器复用（OpponentThreatModel.DecideOne 直跑）：锁定规则为一步收敛不动点（锁内
-        /// 延续/显著更优换锁后，同输入重跑恒同输出）——预测与权威 DecideAll 同回合幂等。</summary>
+        /// 延续/显著更优换锁后，同输入重跑恒同输出）——预测与权威 DecideAll 同拍幂等。</summary>
         private static readonly Dictionary<string, string> _coreLocks = new Dictionary<string, string>();
 
         /// <summary>静态槽跨局自清判据（sim 实例号——2026-10-25 复审批修复，OpponentProfiler.EnsureFresh 同款）</summary>
         private static int _lastSimInstance = -1;
 
         /// <summary>
-        /// 全部眷属单位的本回合行动（存活的；不可动者缺席=无行动——Pass 无结算意义不出命令）。
+        /// 全部眷属单位的本拍行动（存活的；不可动者缺席=无行动——无结算意义不出命令）。
         /// **摊平切片（2026-11-06 后期卡顿修复）**：后期百余眷属在同一个 0.5 秒节拍里全量决策，
         /// 实测单拍 0.7~0.87 秒主线程卡顿。按调用方给的相位/片数只处理「候选序号 % span == phase」
         /// 的候选——每单位仍按节拍决策一次，只是各单位的决策时刻错开（现役调用方=4 片，峰值降为 1/4）。
@@ -98,7 +98,7 @@ namespace GIC.Battle
         /// 单个眷属单位决策：①爆发可命中且消耗门槛过（满槽即放，v5 2026-10-03 拍板）→ 爆发朝敌；
         /// ②战技可命中（十字向预判有存活敌）→ 战技朝敌；
         /// ③否则按距离升序逐敌试 BFS 最短路首步、按移速步进（v3 绕行+v4 换目标巡逻+v6 移速步数
-        /// 单源——某敌贴身已到/不可达即换下一个目标，被挡由 MovementResolver 结算截回——被挡也算
+        /// 单源——某敌贴身已到/不可达即换下一个目标，被挡由 RTSMovementSystem 结算截回——被挡也算
         /// 已使用，眷属无体力配额=层级表 0 档）；
         /// ④无敌人/全场敌都无逼近步 → 缺席。
         /// v8（2026-10-10 拍板「可达性预判」）：移动档先算逼近步再判视野/距离——不可达敌（水上/
@@ -159,7 +159,7 @@ namespace GIC.Battle
                         }
                     }
                     if (sim.TryGetUnitId(core, out var chosenCoreId))
-                        _coreLocks[unitId] = chosenCoreId; // 重锁当前选择（无锁首回合即锁最近）
+                        _coreLocks[unitId] = chosenCoreId; // 重锁当前选择（无锁首批即锁最近）
                 }
             }
             int coreDist = core != null ? BattleHeuristics.DistanceCm(sim, unit, core) : int.MaxValue;

@@ -34,15 +34,16 @@ namespace GIC.Battle
         /// 零资产污染、随战斗销毁自然回收，无需还原。2026-10-05 时轮编辑器「开一把试招」）</summary>
         [NonSerialized] public int TierOverrideStars = -1;
 
-        /// <summary>部署回合（决策八十六批D，docs/45 §6——RegisterUnit 写入〔真源=sim.CurrentTurn〕；
-        /// 周期类建筑效果以「当前回合−部署回合」相对计数：骑士团部署即召 1 个+每过 效果周期 回合再召——
-        /// 部署当回合末不再重复触发（相对差 0 跳过）。开局单位=0；随消散销毁无残留。
-        /// 灵魂复用为衰减首回合豁免判据（RegisterSoul 写入=死亡当回合——回合末不衰减=完整 10 回合驻留）</summary>
-        [NonSerialized] public int DeployedTurn;
+        /// <summary>部署秒（决策八十六批D 原部署回合——2026-11-09 残留清理批改名 DeployedSecond：
+        /// RegisterUnit 写入〔真源=sim.BattleSecond〕；周期类建筑效果以「当前秒−部署秒」相对计数：
+        /// 骑士团部署即召 1 个+每过 效果周期 秒再召——部署当秒拍末不再重复触发（相对差 0 跳过）。
+        /// 开局单位=0；随消散销毁无残留。
+        /// 灵魂复用为衰减首秒豁免判据（RegisterSoul 写入=死亡当秒——秒拍末不衰减=完整 10 秒驻留）</summary>
+        [NonSerialized] public int DeployedSecond;
 
         /// <summary>上次周期召唤成功的逻辑秒（P6 残留审计 C3，docs/active/49）：效果结算只在效果拍
         /// （每 2 秒）发生，旧「当前秒 − 部署秒 % 周期」在奇数周期下对不齐（5 秒变 10 秒）——
-        /// 改单调判定「距上次成功召唤 ≥ 效果周期」；0=尚未召唤过（首次基准=DeployedTurn）。</summary>
+        /// 改单调判定「距上次成功召唤 ≥ 效果周期」；0=尚未召唤过（首次基准=DeployedSecond）。</summary>
         [NonSerialized] public int LastPeriodicSummonSecond;
 
         // ==================== 地脉维度与灵魂（决策九十一，2026-10-25） ====================
@@ -54,7 +55,7 @@ namespace GIC.Battle
         [NonSerialized] public BattleDimension Dimension = BattleDimension.MainWorld;
 
         /// <summary>灵魂标记（决策九十一）：死亡伙伴/魔神同位生成的地脉驻留体——无行动不可上交、
-        /// 每回合末衰减 10%、与尸体同消散（见 LinkedCorpseUnitId）；只继承基础属性（无装备/无
+        /// 每秒拍末衰减 10%、与尸体同消散（见 LinkedCorpseUnitId）；只继承基础属性（无装备/无
         /// Buff/无命座加成、满血）+治疗效率 50。灵魂=地脉注册表成员（不进 _units——主世界
         /// 枚举域结构上不可见）；GetUnit 按 unitId 透明可查（效应应用/命令目标解析需要）</summary>
         [NonSerialized] public bool IsSoul;

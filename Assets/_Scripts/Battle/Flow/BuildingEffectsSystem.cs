@@ -3,11 +3,11 @@ using GIC.Data;
 namespace GIC.Battle
 {
     /// <summary>
-    /// 建筑效果系统（2026-10-26 fix-batch2 ③收口：TurnResolver 内联建筑段迁出——加第 N 种建筑
+    /// 建筑效果系统（2026-10-26 fix-batch2 ③收口：BattleResolver 内联建筑段迁出——加第 N 种建筑
     /// 效果 = BuildingEffectKind 枚举 + UnitData 字段 + 本类一处 switch + BuildingEffectDescription
-    /// 表键；AI 态势分档按 kind 默认兜底、UnitDetailPanel 走描述表，均不用动）。实例随 TurnResolver
+    /// 表键；AI 态势分档按 kind 默认兜底、UnitDetailPanel 走描述表，均不用动）。实例随 BattleResolver
     /// 每局创建——无静态跨局状态。
-    /// 发射序铁律：本类只搬家不改序（回合末效果=泡湿后/ApplyEffects 前收集；元能引擎过阈=加能落地拍
+    /// 发射序铁律：本类只搬家不改序（效果拍效果=泡湿后/ApplyEffects 前收集；元能引擎过阈=加能落地拍
     /// 收集、EmitSliceCommands 尾〔对账前〕发射；命令序与原内联版逐位一致——回放基线 PASS 锚）。
     /// </summary>
     public class BuildingEffectsSystem
@@ -17,21 +17,21 @@ namespace GIC.Battle
         /// <summary>骑士团总部元能引擎过阈待召队列（2026-10-24 决策八十六追记四）：(建筑 unitId, 过阈
         /// 获能命中时刻)——ApplyEffects 加能落地同拍入队（状态层已扣消耗额），DrainPendingSummons
         /// 统一发射消费命令+召唤命令（RegisterUnit 只在发射拍执行，防应用循环内枚举突变——
-        /// CollectTurnEndEffects「先快照再处理」同族纪律）</summary>
+        /// CollectEffectBeatEffects「先快照再处理」同族纪律）</summary>
         private readonly List<(string buildingId, float hitSeconds)> _pendingSummons
             = new List<(string buildingId, float hitSeconds)>();
 
         public BuildingEffectsSystem(BattleSimState sim) { _sim = sim; }
 
-        /// <summary>建筑回合末效果收集（决策八十六批D，docs/45 §1.1/§6）：只结算存活建筑
+        /// <summary>建筑效果拍效果收集（决策八十六批D，docs/45 §1.1/§6）：只结算存活建筑
         /// （消散即移除天然；多座同种独立结算——两座餐馆=+10）。旗帜=半径内我方非建筑单位（含倒下
         /// 角色，拍板 #8）各+元能（EnergyEffect 建筑类别，合并键含来源建筑——两座旗帜对同一目标各
-        /// +1 不互吞）；餐馆=己方玩家+摩拉（StatChange 直产）；骑士团=以部署回合为 0、每过 效果周期
-        /// 回合再召 1 名（最近可部署格顺延；部署当回合末 diff=0 跳过——部署段已即召）；教堂=我方存活
+        /// +1 不互吞）；餐馆=己方玩家+摩拉（StatChange 直产）；骑士团=以部署秒为 0、每过 效果周期
+        /// 拍再召 1 名（最近可部署格顺延；部署当效果拍 diff=0 跳过——部署段已即召）；教堂=我方存活
         /// HP&lt;效果阈值% 单位（含建筑，拍板 #9）治疗 效果数值%×本建筑攻击（末点截断通则）；
-        /// 总部=回合末自充 效果数值 元能（过阈即召由加能落地拍判定）。
+        /// 总部=效果拍自充 效果数值 元能（过阈即召由加能落地拍判定）。
         /// **先快照再处理**：周期召唤会 RegisterUnit 突变 _units，快照后枚举安全</summary>
-        public void CollectTurnEndEffects(int turnNumber, List<BattleEffect> effects, List<BattleCommand> extraCommands)
+        public void CollectEffectBeatEffects(int turnNumber, List<BattleEffect> effects, List<BattleCommand> extraCommands)
         {
             var buildings = new List<(string id, Unit unit, UnitConfig.UnitData data, UnitIdentity identity)>();
             foreach (var kv in _sim.SortedUnits())
@@ -76,7 +76,7 @@ namespace GIC.Battle
                     {
                         if (data.效果数值 <= 0) break;
                         // 凌晨批议题⑥天理经济作弊：建筑摩拉收入同乘难度倍率（MoraIncomePercentOf 单源，
-                        // 与回合末发放同口径；掠夺/卡牌消耗不复用=作弊只在「收入」语义内）
+                        // 与秒拍发放同口径；掠夺/卡牌消耗不复用=作弊只在「收入」语义内）
                         int moraGain = data.效果数值
                             * AIPlayerConfig.MoraIncomePercentOf(building.identity.OwnerPlayerID) / 100;
                         _sim.ApplyMoraDelta(building.identity.OwnerPlayerID, moraGain);
@@ -92,7 +92,7 @@ namespace GIC.Battle
                         // 改为「距上次成功召唤 ≥ 周期」的单调判定（首次=部署时刻），周期语义恢复为秒。
                         int lastSummonSecond = building.unit.LastPeriodicSummonSecond > 0
                             ? building.unit.LastPeriodicSummonSecond
-                            : building.unit.DeployedTurn;
+                            : building.unit.DeployedSecond;
                         if (turnNumber - lastSummonSecond < data.效果周期) break;
                         if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, building.identity.OwnerPlayerID,
                                 data.召唤单位, _sim.GetPosition(building.unit), out var summonCommand))
@@ -104,7 +104,7 @@ namespace GIC.Battle
                     }
                     case BuildingEffectKind.EnergySummon:
                     {
-                        // 元能引擎自充（2026-10-24 追记四，骑士团总部）：回合末自获 效果数值 元能——
+                        // 元能引擎自充（2026-10-24 追记四，骑士团总部）：效果拍自获 效果数值 元能——
                         // EnergyEffect 自身为目标（建筑类别获能，合并键含来源=多座总部各自各跳）；
                         // 过阈即召由 ApplyEffects 落地拍统一判定（外部充能〔歌声之环 tick〕同拍同权）
                         if (data.效果数值 <= 0) break;
@@ -141,7 +141,7 @@ namespace GIC.Battle
         ///（状态层立刻扣 效果阈值，不留「过阈未耗」窗口）+入队待召；消费命令与召唤命令由
         /// EmitSliceCommands 尾统一发射（命令序=全部获能命令之后：客户端能量条先涨后扣再出骑士，
         /// 因果读得懂）。外部充能（歌声之环 tick/自充）与未来中途给能同拍触发——建筑效果不必
-        /// 等回合末（用户拍板「注意建筑的效果不一定是在回合结束才生效了」）</summary>
+        /// 等效果拍（用户拍板「注意建筑的效果不一定是在回合结束才生效了」——拍板原文照录）</summary>
         public void CollectEnergySummon(Unit unit, float hitSeconds)
         {
             if (unit == null) return;
@@ -165,7 +165,7 @@ namespace GIC.Battle
         ///（TrySummonAtNearestCell 锚=建筑自身格，最近可部署格顺延）；同段死亡的建筑=召唤取消；
         /// 落点无合法格（棋盘占满）=召唤落空、能量已耗（边缘自担，与「立刻」语义一致）。
         /// RegisterUnit 只在此发射拍执行——应用循环内不突变 _units（枚举安全，
-        /// CollectTurnEndEffects「先快照再处理」同族纪律）。返回过阈事实供对账（2026-10-25 复审批：
+        /// CollectEffectBeatEffects「先快照再处理」同族纪律）。返回过阈事实供对账（2026-10-25 复审批：
         /// 原排 audit 后=审计失明，现先于对账执行+事实凭据回传）</summary>
         public List<BattleEffect> DrainPendingSummons(Segment segment, int sliceIndex)
         {
@@ -181,7 +181,7 @@ namespace GIC.Battle
                 if (identity == null) continue;
                 var consume = BattleCommand.StatChange(buildingId, sliceIndex, segment.commands.Count,
                     BattleCommand.StatKindEnergy, -data.效果阈值);
-                TurnResolver.ApplyHitMs(consume, hitSeconds);
+                BattleResolver.ApplyHitMs(consume, hitSeconds);
                 segment.commands.Add(consume);
                 facts.Add(new BuildingSummonFactEffect(buildingId)); // 过阈事实（对账凭据——消费命令必产）
                 if (DeployUnitExecutor.TrySummonAtNearestCell(_sim, identity.OwnerPlayerID, data.召唤单位,

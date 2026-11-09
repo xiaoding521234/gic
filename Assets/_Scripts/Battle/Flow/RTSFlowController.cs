@@ -15,16 +15,16 @@ namespace GIC.Battle
     ///   （spiral of death 防护）+双缓冲插值位（UnitView 按段命令插值，护栏三）——确定性护栏四件套；
     /// - **每 0.5 秒 AI 节拍**（AiBeatTicks=10 tick）：眷属脑+伙伴脑静态批演算；配额脑（场景件
     ///   PlayerQuotaBrain）沿用 OnPhaseChanged(Selecting, second) 事件驱动零改动兼容；
-    /// - **每秒整拍**（20 tick）：TurnResolver.ResolveSecondBeat（回合末族秒化：发放/Buff 计时/
+    /// - **每秒整拍**（20 tick）：BattleResolver.ResolveSecondBeat（回合末族秒化：发放/Buff 计时/
     ///   泡湿/灵魂衰减/资源点站立采集/建筑效果）+ 快照广播 + desync hash 落盘（护栏四）+ 战斗时钟 +1 分钟；
     /// - **行动上交即校验即结算**（配额制退役——体力=手动操作唯一节流，蓝图 §5）；
     /// - **胜负判定**：核心摧毁唯一判据不变（CheckBattleOver 队伍口径同构）——每秒拍后+每次行动结算后检查。
     ///
     /// Phase 兼容映射（P1 过渡，P4 批退役 Selecting 语义）：Running=Selecting——HUD 上交链路/
     /// 配额脑触发/门面订阅零改动；HUD 每 0.5 秒收到同值事件=幂等无害（Tip 重设同文本）。
-    /// 回合数显示退役：TurnNumber 属性=逻辑秒（配额脑验证口径），战斗时钟 BattleTimeMinutes 为主显示。
+    /// 回合数显示退役：CurrentSecond 属性=逻辑秒（配额脑验证口径），战斗时钟 BattleTimeMinutes 为主显示。
     /// </summary>
-    public class RTSFlowController : MonoBehaviour, ITurnResolverHost
+    public class RTSFlowController : MonoBehaviour, IBattleResolverHost
     {
         // ==================== 对外状态（View/门面兼容层） ====================
 
@@ -35,7 +35,7 @@ namespace GIC.Battle
         public int CurrentTick { get; private set; }
 
         /// <summary>逻辑秒（tick/20）——配额脑/回放/周期类相对计数的兼容口径（旧「回合数」秒化）</summary>
-        public int TurnNumber => CurrentTick / BattleMetrics.TicksPerSecond;
+        public int CurrentSecond => CurrentTick / BattleMetrics.TicksPerSecond;
 
         // ==================== 战斗独立时间系统（秒化：每秒 +1 分钟，回合数显示退役） ====================
 
@@ -68,7 +68,7 @@ namespace GIC.Battle
 
         private BattleSimState _sim;
         private IBattleTransport _transport;
-        private TurnResolver _resolver;
+        private BattleResolver _resolver;
 
         // ==================== 帧同步输入管线（F1，docs/active/50 §4） ====================
 
@@ -178,7 +178,7 @@ namespace GIC.Battle
         {
             if (Phase != BattlePhase.Selecting) return;
             if (!IsHost) return; // F1：AI 三脑只在 Host 跑；客户端只消费 InputBatch 里的 AI 行动
-            int second = TurnNumber;
+            int second = CurrentSecond;
 
             // Host 探索账本同步（决策七十九 P4 适配：旧「BeginSelectPhase 单钩」随回合机退役——
             // 决策时态同步语义秒化为每 AI 节拍揭雾；客户端表现层逐帧揭雾不受影响）
@@ -213,7 +213,7 @@ namespace GIC.Battle
             }
 
             // 配额脑驱动（PlayerQuotaBrain 场景件零改动兼容：沿用 Selecting 事件触发，
-            // 脑内协程验证 Phase==Selecting && TurnNumber==second 后 Decide→SubmitAction）；
+            // 脑内协程验证 Phase==Selecting && CurrentSecond==second 后 Decide→SubmitAction）；
             // HUD 门面同收本事件=同值幂等刷新（P4 批拆分专用事件）
             OnPhaseChanged?.Invoke(BattlePhase.Selecting, second);
 
@@ -238,7 +238,7 @@ namespace GIC.Battle
             // 眷属切片若从节拍 tick 起会与之叠加成单帧峰值——故从节拍后第 1 个 tick 起算
             int slot = CurrentTick % beat - 1;
             if (slot < 0 || slot >= FamiliarDecisionSlices) return; // 只在节拍后窗口内分摊
-            int second = TurnNumber;
+            int second = CurrentSecond;
             int offset = slot; // 切片相位 0..FamiliarDecisionSlices-1
 
             var actions = FamiliarBrain.DecideAll(_sim, second, offset, FamiliarDecisionSlices);
@@ -267,7 +267,7 @@ namespace GIC.Battle
         private void RunSecondBeat()
         {
             if (Phase != BattlePhase.Selecting) return;
-            int second = TurnNumber;
+            int second = CurrentSecond;
 
             // 效果拍（2026-11-04 拍板「时间翻倍」）：Buff tick 效果+建筑效果每 2 秒一拍
             //（EffectBeatTicks=40）——秒拍族（发放/计时递减/泡湿/采集/快照/时钟）仍每秒
@@ -397,7 +397,7 @@ namespace GIC.Battle
         /// <summary>校验通过：打时刻戳→伙伴脑感知窗→即时演算→胜负自检</summary>
         private void SubmitAndResolve(ActionData action)
         {
-            action.turnNumber = TurnNumber;
+            action.turnNumber = CurrentSecond;
             action.submitTick = CurrentTick;
             BattleRecorder.CaptureSubmittedAction(action); // 回放 v2：玩家/配额脑上交行动录制（校验后=拒绝不上盘）
             _recentPlayerActions.Add(action); // 伙伴脑下一节拍的感知输入（窗口 0.5 秒）
@@ -436,12 +436,12 @@ namespace GIC.Battle
             if (!overWinner.HasValue) return;
 
             Phase = BattlePhase.Finished;
-            OnPhaseChanged?.Invoke(Phase, TurnNumber);
+            OnPhaseChanged?.Invoke(Phase, CurrentSecond);
             _transport.HostSend(BattleMessageType.BattleOver, new BattleOverMessage
             {
                 winnerTeam = (int)overWinner.Value,
             });
-            BattleRecorder.CaptureGameOver((int)overWinner.Value, TurnNumber); // 回放终局对照
+            BattleRecorder.CaptureGameOver((int)overWinner.Value, CurrentSecond); // 回放终局对照
         }
 
         /// <summary>胜负判定（协议核心批拍板，docs/02 §2——与旧 TurnFlowController 逐条同构；回放器
@@ -485,7 +485,7 @@ namespace GIC.Battle
             _transport = transport;
             IsHost = isHost;
             IsNetworked = isNetworked;
-            _resolver = new TurnResolver(sim, transport, this);
+            _resolver = new BattleResolver(sim, transport, this);
         }
 
         // ==================== 帧同步输入管线（F1） ====================
@@ -649,16 +649,16 @@ namespace GIC.Battle
         public void Stop()
         {
             Phase = BattlePhase.Finished;
-            OnPhaseChanged?.Invoke(Phase, TurnNumber);
+            OnPhaseChanged?.Invoke(Phase, CurrentSecond);
         }
 
-        // ==================== ITurnResolverHost（ack 门控退役——no-op 兼容层） ====================
+        // ==================== IBattleResolverHost（ack 门控退役——no-op 兼容层） ====================
 
         /// <summary>ack 门控已随回合机退役（决策九十五）——保留接口空实现（回放宿主兼容）</summary>
         public void NotifySegmentPushed(int turnNumber, int sliceIndex) { }
 
         /// <summary>ack 门控已退役——恒 true（无等待语义）</summary>
-        // P6 残留审计 D2：HasSegmentAck 随 ack 门控退役删除（ITurnResolverHost 已收窄）。
+        // P6 残留审计 D2：HasSegmentAck 随 ack 门控退役删除（IBattleResolverHost 已收窄）。
 
         // ==================== desync hash（确定性护栏四，蓝图 §2.2） ====================
 
@@ -687,7 +687,7 @@ namespace GIC.Battle
                 hash = hash * 31 + posCm.x;
                 hash = hash * 31 + posCm.y;
                 hash = hash * 31 + (int)unit.Dimension;
-                hash = hash * 31 + unit.DeployedTurn;
+                hash = hash * 31 + unit.DeployedSecond;
                 hash = hash * 31 + unit.LastPeriodicSummonSecond;
 
                 // Buff：身份（族×资产名）+ 层数 + 剩余秒——先排序再折叠，列表序差异不致漂

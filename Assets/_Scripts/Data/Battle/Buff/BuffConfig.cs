@@ -50,14 +50,14 @@ namespace GIC.Data
         /// <summary>叠层上限（StatBuff 族）</summary>
         public const string KeyStatStackLimit = "StackLimit";
         /// <summary>持续秒数（StatBuff 族；&lt;0 渲染本地化「永久」）</summary>
-        public const string KeyStatDurationTurns = "DurationTurns";
+        public const string KeyStatDurationSeconds = "DurationSeconds";
 
         /// <summary>全部占位符键（SkillDescriptionBuilder.BuildRelated 遍历集——单源防拼写漂移）</summary>
         public static readonly string[] RelatedPlaceholderKeys =
         {
             KeyAuraDamagePercent, KeyAuraHealPercent, KeyAuraEnergyGain, KeyAuraSanityGain,
             KeyAuraRadius, KeyShatterHealPercent, KeyShatterEnergyThreshold, KeyBaseStackLimit,
-            KeyStatBonus, KeyStatStackLimit, KeyStatDurationTurns,
+            KeyStatBonus, KeyStatStackLimit, KeyStatDurationSeconds,
         };
 
         /// <summary>关联描述占位符解析（家族覆写：键→资产数值；null=未识别键，构建层保留原文便于排查）。

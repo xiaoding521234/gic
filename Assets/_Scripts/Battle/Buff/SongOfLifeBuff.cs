@@ -11,11 +11,11 @@ namespace GIC.Battle
     /// 永久光环（不计时，持有者倒下消失——RemoveOnHolderDeath 覆写 true），叠层上限随施加者命座成长。
     /// 数值单源=Buff_SongOfLife.asset（docs/39 Buff 配置化——光环百分比/基础元能/理智/半径
     /// 全在资产，调平衡改 Inspector 零代码）；命座成长仍走施加者 Talent 技能参数（正交）。
-    /// 每回合结束：①为**半径内我方单位（含持有者，存活与倒下均可获元能——2026-10-15 拍板「尸体
+    /// 每效果拍末：①为**半径内我方单位（含持有者，存活与倒下均可获元能——2026-10-15 拍板「尸体
     /// 可以获得元能」：倒下凯亚的寒冰之棱因此过阈碎裂；倒下获能不治疗/不恢复理智/不附着）**增加元能
     /// （0命=〔基础元能获取〕〔2026-09-30
     /// 用户拍板「0命就可以每回合加5元能」；**2026-10-07 描述勘正拍板：受益人=半径内我方单位非持有者
-    /// 独享——OnTurnEnd 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，2命起=C2EnergyGain
+    /// 独享——OnEffectBeat 代码行为本就如此，旧文案「为持有者增加元能」不准确**〕，2命起=C2EnergyGain
     /// 参数=+10——复用丽莎同键（2026-10-15 决策七十二三次返修拍板「枚举只和显示名对应，两个名称
     /// 刚好一样」；原 C1EnergyGain=32 退役占位；参数载体=施加者命座技能〔调换后2命生效〕）；②对持有者切比雪夫
     /// 〔作用半径〕（1命起 +C1Radius=2〔原2命件，调换后1命生效；键名随生效层改 C2Radius→C1Radius——决策七十二二次返修〕）内敌人造成〔每拍伤害百分比〕施加者攻击力水伤
@@ -56,7 +56,7 @@ namespace GIC.Battle
             Level = Mathf.Min(Level + 1, StackLimit());
         }
 
-        public override List<BattleEffect> OnTurnEnd()
+        public override List<BattleEffect> OnEffectBeat()
         {
             var effects = new List<BattleEffect>();
             if (owner == null || Sim == null) return effects;
@@ -105,7 +105,7 @@ namespace GIC.Battle
                 {
                     // 敌方（含尸体——尸体保留势力归属仍算敌人，鞭尸同 Burn 先例）：逐层各弹一次。
                     // 伤害=% 施加者攻——**只声明命中**（PendingAuraHit，拍时刻=layer×0.15）：
-                    // TurnResolver 回合末交错管道按拍排序过共享编译视图统一结算（反应预判+消耗+
+                    // BattleResolver 效果拍交错管道按拍排序过共享编译视图统一结算（反应预判+消耗+
                     // 每层附着=决策二十四终版「同时进行」——双异元素光环同拍交错互融）
                     for (int layer = 0; layer < stacks; layer++)
                     {
@@ -144,7 +144,7 @@ namespace GIC.Battle
                                 HitSeconds = BattleMetrics.LayerBeatSeconds(layer),
                             });
                     // 理智恢复逐层（2026-10-01 拍板②「+1 应当也是每层的效果」）：每层各一枚
-                    // ——命令层按目标合并总值（TurnResolver 发射，防状态/命令漂移）
+                    // ——命令层按目标合并总值（BattleResolver 发射，防状态/命令漂移）
                     for (int layer = 0; layer < stacks; layer++)
                         effects.Add(new SanityEffect(kv.Key, Cfg.每拍理智恢复));
                     // 附着我方（0~1命）：逐层纯附着声明（Request=null）——同进交错管道，敌方异元素

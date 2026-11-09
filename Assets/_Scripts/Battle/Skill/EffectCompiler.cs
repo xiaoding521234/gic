@@ -9,7 +9,7 @@ namespace GIC.Battle
 
     /// <summary>
     /// 效果原子编译器（B-1，docs/29 + docs/18 决策九）：把 SkillData.effects 效果原子声明
-    /// 编译成 BattleEffect——**只做声明展开，应用/合并/对账/命令发射全链零改动**（回合制片内快照
+    /// 编译成 BattleEffect——**只做声明展开，应用/合并/对账/命令发射全链零改动**（秒拍片内快照
     /// 结算不需要 EGamePlay 式运行时效果实体，编译期展开即确定性等价）。
     /// 分工三真源：时轮=时间与判定规格（WHERE/WHEN）；参数表=数值（HOW MUCH）；本类消费效果原子=WHAT。
     /// 判定编译：LineProjectile→逐发发射声明（ProjectileResolver 求交）、LineBurst→逐段整线即时命中、
@@ -501,7 +501,7 @@ namespace GIC.Battle
                 }
 
                 // 行动者语义（战技获能 B6a，docs/18 决策七）：targetFilter=Caster → 受益者=施法者
-                // （行动者）——命中敌不充能、多次命中只获一次（同片应用层按 目标+类别 去重，TurnResolver）。
+                // （行动者）——命中敌不充能、多次命中只获一次（同片应用层按 目标+类别 去重，BattleResolver）。
                 // 2026-09-25 修复：此前三战技获能原子 targetFilter 误配 Target，+10 元能发给了被命中的敌人
                 if (atom.targetFilter == SkillEffectTargetFilter.Caster)
                 {
@@ -534,7 +534,7 @@ namespace GIC.Battle
         /// 「多余的元素仍然附着」）。无反应命中才由调用方附着〔覆盖〕。正常命中（CompileAtom Damage 原子）、
         /// 光环 tick（歌声之环/寒冰之棱）、反应 DoT（燃烧）、纯附着（环附着我方）共用。
         /// **冻结层兜底（决策七十四「冻结 Buff 可作为冰元素参与反应」）**：附着为空且目标冻结时，
-        /// 冻结 Buff=第二冰源参与融化（火）/超导（雷）——每回合=1 层、消耗=min(层数, 冻结回合)回合、
+        /// 冻结 Buff=第二冰源参与融化（火）/超导（雷）——每秒=1 层、消耗=min(层数, 冻结秒)秒、
         /// 归零立即解冻；水不与冻结层反应（平衡拍板「唯独冰水不反应，正常附着」）。
         /// 级别公式= min(双方层数)（docs/06 §6.3 多层消耗强化反应级别——2层火+2层冰=2级融化）</summary>
         public static bool CompileElementalDamage(BattleSimState sim, string attackerId, string targetUnitId,
@@ -560,10 +560,10 @@ namespace GIC.Battle
             bool viaFreeze = false;
             if (!zeroLayer && !outcome.HasReaction && dyed == ElementType.Physical)
             {
-                int freezeTurns = sim.GetCompileFreezeTurns(targetUnitId);
-                if (freezeTurns > 0)
+                int freezeSeconds = sim.GetCompileFreezeSeconds(targetUnitId);
+                if (freezeSeconds > 0)
                 {
-                    var freezeOutcome = ElementReactionResolver.PreviewFreezeLayer(element, incomingLayers, freezeTurns);
+                    var freezeOutcome = ElementReactionResolver.PreviewFreezeLayer(element, incomingLayers, freezeSeconds);
                     if (freezeOutcome.HasReaction)
                     {
                         outcome = freezeOutcome;
@@ -596,9 +596,9 @@ namespace GIC.Battle
             {
                 if (viaFreeze)
                 {
-                    // 冻结层消耗（决策七十四）：消耗=级别回合；归零立即解冻（应用层 ConsumeFreezeEffect）
+                    // 冻结层消耗（决策七十四）：消耗=级别秒；归零立即解冻（应用层 ConsumeFreezeEffect）
                     effects.Add(new ConsumeFreezeEffect(attackerId, targetUnitId, outcome.FreezeConsumed));
-                    sim.ConsumeCompileFreeze(targetUnitId, outcome.FreezeConsumed); // 后续命中见已扣减的冻结回合
+                    sim.ConsumeCompileFreeze(targetUnitId, outcome.FreezeConsumed); // 后续命中见已扣减的冻结秒
                 }
                 else
                 {
@@ -628,7 +628,7 @@ namespace GIC.Battle
                     });
                 }
                 // 多余的来袭层仍附着（docs/06 §6.3 双向：等层=不附着〔决策二十五〕；2层火 vs 1层冰=
-                // 1级融化+剩1层火附着；2层火 vs 2回合冻结=2级融化清零全耗）
+                // 1级融化+剩1层火附着；2层火 vs 2秒冻结=2级融化清零全耗）
                 int incomingLeft = incomingLayers - outcome.Level;
                 if (incomingLeft > 0)
                 {

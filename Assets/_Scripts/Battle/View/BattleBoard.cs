@@ -105,7 +105,7 @@ namespace GIC.Battle
             Map = map;
             // 维度初始地形快照（2026-10-25 拍板：地脉不与主世界同步地形——开局与主世界一模一样，
             // 此后主世界 TerrainChange〔冻薄冰/融化〕不演化非主世界维度；②c 泛化=每非主世界维度
-            // 一份快照，未来某维度需独立演化时在其回合末规则里写自己的表即可）
+            // 一份快照，未来某维度需独立演化时在其秒拍末规则里写自己的表即可）
             _dimensionInitialTiles.Clear();
             foreach (BattleDimension dim in Enum.GetValues(typeof(BattleDimension)))
             {
@@ -171,8 +171,8 @@ namespace GIC.Battle
         /// <summary>格→资源点表现件（每格至多一个；Build 清空重建/命令增量维护）</summary>
         private readonly Dictionary<BattleCell, GameObject> _resourceNodeViews = new Dictionary<BattleCell, GameObject>();
 
-        /// <summary>堆件迷雾隐藏态缓存（cell→hidden；跨快照重建存续——回合头 RebuildResourceNodes
-        /// 重建件按缓存态落地，防「回合头未探索堆闪现一帧再隐藏」）</summary>
+        /// <summary>堆件迷雾隐藏态缓存（cell→hidden；跨快照重建存续——秒拍头 RebuildResourceNodes
+        /// 重建件按缓存态落地，防「秒拍头未探索堆闪现一帧再隐藏」）</summary>
         private readonly Dictionary<BattleCell, bool> _resourceNodeFogHidden = new Dictionary<BattleCell, bool>();
 
         /// <summary>摩拉件共享材质（OnDestroy 清理实例——_thinIceMaterial 同款纪律）</summary>
@@ -214,7 +214,7 @@ namespace GIC.Battle
             new Vector4( 0.018f, 0.50f, 0.0000f,   4f),
         };
 
-        /// <summary>资源点表现件全量重建（Build 开局态+回合头快照权威自愈同口）</summary>
+        /// <summary>资源点表现件全量重建（Build 开局态+秒拍头快照权威自愈同口）</summary>
         public void RebuildResourceNodes(List<ResourceNodeState> nodes)
         {
             foreach (var view in _resourceNodeViews.Values)
@@ -279,7 +279,7 @@ namespace GIC.Battle
             for (int i = 0; i < count; i++)
                 SpawnMoraChunk(rootGo.transform, i);
             if (_resourceNodeFogHidden.TryGetValue(node.cell, out var fogHidden) && fogHidden)
-                rootGo.SetActive(false); // 迷雾隐藏态跨重建保持（防回合头快照重建未探索堆闪现一帧）
+                rootGo.SetActive(false); // 迷雾隐藏态跨重建保持（防秒拍头快照重建未探索堆闪现一帧）
             return rootGo;
         }
 
@@ -300,7 +300,7 @@ namespace GIC.Battle
         /// 隐藏」）：未探索格堆件整体隐藏（表现层镜像——探索过永久可见同单位口径；采集角色对
         /// 资源点的透视=AI 感知层豁免〔CompanionBrain 采集候选不查探索账本，核心透视 IsUnitVisibleTo
         /// 同构〕，客户端渲染无透视）。幂等：隐藏态未变零开销；写入缓存供重建路径（Create 时落地）
-        /// 消费——防回合头快照重建闪现</summary>
+        /// 消费——防秒拍头快照重建闪现</summary>
         public void ApplyResourceNodeFogVisibility(System.Func<BattleCell, bool> isVisible)
         {
             foreach (var kv in _resourceNodeViews)

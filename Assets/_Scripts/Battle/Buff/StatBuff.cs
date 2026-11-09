@@ -9,7 +9,7 @@ namespace GIC.Battle
     /// 加第三个属性 Buff 勿再复制一份，子类=3 行声明注入 StatType+BuffType 即成）。
     /// 生效载体=UnitStats 修改器（BaseFlat 区，与面板属性同乘区基底）；叠层（上限内）+时长累加，
     /// 层数变化时 Remove+Add 重挂修改器。数值单源=StatBuffConfig 资产（每层加成/叠层上限/持续
-    /// 回合——决策五十六返修三+五十七；注入通道非零仍覆写，「技能实参＞模板」保留）。
+    /// 秒——决策五十六返修三+五十七；注入通道非零仍覆写，「技能实参＞模板」保留）。
     /// **具名共存（决策五十七「资产即身份」）**：同资产实例由 Host 判重合并（BattleSimState.ApplyBuff
     /// 按 Config 引用）；异资产同族（如两个加攻来源）各持实例并存——修改器多条天然叠加。
     /// 注意：BaseBuff.Level 此处语义=当前**层数**（非 BurnBuff 的级别）——同名二字，快照消费时勿混。
@@ -34,7 +34,7 @@ namespace GIC.Battle
             RemainingSeconds = turns;
         }
 
-        public override List<BattleEffect> OnTurnEnd() => new List<BattleEffect>(); // 纯增益：无回合结束效果，仅回合制计时
+        public override List<BattleEffect> OnEffectBeat() => new List<BattleEffect>(); // 纯增益：无效果拍效果，仅计时
 
         /// <summary>满层判定（StatBuff 族，2026-10-20 死水修复补齐：此前仅 IcicleBuff 有 override、
         /// 本族恒 false——配额脑延奏评分与伙伴脑增益候选（CompanionBrain L772/L818）对加攻/加速/减防

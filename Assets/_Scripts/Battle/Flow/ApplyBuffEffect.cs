@@ -18,8 +18,9 @@ namespace GIC.Battle
 
         public int Level;
 
-        /// <summary>应用/合并后的剩余回合数（命令流用；由 Host 在应用后回填）</summary>
-        public int Turns;
+        /// <summary>应用/合并后的剩余秒数（命令流用；由 Host 在应用后回填——值源=RemainingSeconds，
+        /// 2026-11-09 残留清理批随秒化语义改名）</summary>
+        public int Seconds;
 
         /// <summary>技能参数通道（B-S1b：如 AttackUp 每层加成=ATKBonus——数值单源=技能参数表，
         /// 工厂按 Buff 类型解释；协议命令不携带）</summary>
@@ -29,7 +30,7 @@ namespace GIC.Battle
         public int StackLimit;
 
         /// <summary>持续秒数通道（AttackUp 用=Duration 参数——工厂按此构造初始计时）</summary>
-        public int DurationTurns;
+        public int DurationSeconds;
 
         /// <summary>来源技能 id（SkillName 枚举值；0=无来源技能——反应类 Buff〔燃烧/冻结/超导减防〕由
         /// CompileElementalDamage 产出无技能语境）。消费=客户端头顶 Buff 图标（2026-10-06
@@ -37,12 +38,12 @@ namespace GIC.Battle
         public int SourceSkillId;
 
         /// <summary>命中时刻（秒，相对片播放起点；0=立即）——WYSIWYG（决策七十六复测返修：
-        /// 箭矢飞行中目标不提前挂 Buff 徽章〔冻结/超导减防〕；OnCast 施放类/回合末光环逐层
+        /// 箭矢飞行中目标不提前挂 Buff 徽章〔冻结/超导减防〕；OnCast 施放类/效果拍光环逐层
         /// BeatSeconds 错峰维持；合并命令取首条时刻=徽章首现拍）。Host 状态即时结算架构常态不变</summary>
         public float HitSeconds;
 
         public ApplyBuffEffect(string sourceUnitId, string targetUnitId, int buffType, int level,
-            int buffValue = 0, int stackLimit = 0, int durationTurns = 0, int sourceSkillId = 0,
+            int buffValue = 0, int stackLimit = 0, int durationSeconds = 0, int sourceSkillId = 0,
             string buffKey = null)
         {
             SourceUnitId = sourceUnitId;
@@ -52,7 +53,7 @@ namespace GIC.Battle
             Level = level;
             BuffValue = buffValue;
             StackLimit = stackLimit;
-            DurationTurns = durationTurns;
+            DurationSeconds = durationSeconds;
             SourceSkillId = sourceSkillId;
         }
     }

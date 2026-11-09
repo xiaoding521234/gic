@@ -359,7 +359,7 @@ namespace GIC.Battle
         }
 
         /// <summary>拖动跟随会话正常终结（提交成功/阶段流转后 HUD 调）：清快照**不重置**——相机留在
-        /// 拖到的位置（提交后看执行演出/阶段推进相机保持）；防下回合新拖动误用旧快照。
+        /// 拖到的位置（提交后看执行演出/阶段推进相机保持）；防下次新拖动误用旧快照。
         /// 2026-10-06 二返：同 CancelDragFollow 清 _dragFollowWorld——提交帧存在同款喂点先于终结的
         /// 竞态窗口，残留目标会把留位相机拉走（同族隐患一并收口）</summary>
         public void EndDragFollowSession()

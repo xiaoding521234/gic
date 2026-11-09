@@ -1518,7 +1518,7 @@ namespace GIC.Battle
             BuffRevision++;
         }
 
-        /// <summary>命令流增量：施加/刷新（同具名 buff 已存在=更新回合数与层数——命令携带 Host 合并后
+        /// <summary>命令流增量：施加/刷新（同具名 buff 已存在=更新秒数与层数——命令携带 Host 合并后
         /// 回填值；**来源沿用首挂**（镜像 Host Merge 口径：existing.source/SourceSkillId 不换新），新挂带来源）。
         /// 匹配键=buffKey（决策五十七「资产即身份」：同族异名共存各一枚徽章）；key 空=旧回放按 type 匹配</summary>
         public void ApplyBuffBadge(int type, int turns, int level = 1, string sourceUnitId = null,

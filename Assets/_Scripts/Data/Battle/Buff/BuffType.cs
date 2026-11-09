@@ -27,10 +27,10 @@ namespace GIC.Data
         MoveSpeedUp = 4,
 
         [InspectorName("歌声之环")]
-        SongOfLife = 5, // B-3 ②（芭芭拉闪耀奇迹）：多行为永久光环——回合末对持有者半径1内敌人水伤/我方治疗+附着；持有者倒下消失（docs/units/蒙德/芭芭拉.md）
+        SongOfLife = 5, // B-3 ②（芭芭拉闪耀奇迹）：多行为永久光环——效果拍末对持有者半径1内敌人水伤/我方治疗+附着；持有者倒下消失（docs/units/蒙德/芭芭拉.md）
 
         [InspectorName("寒冰之棱")]
-        Icicle = 6, // 凛冽轮舞批（2026-10-01 凯亚爆发=自施放 Buff，拍板「实际并不是召唤，与歌声之环类似」）：永久光环——回合末半径内敌冰伤、持有者元能超50%碎裂回血；持有者倒下仍生效（docs/units/蒙德/凯亚.md）
+        Icicle = 6, // 凛冽轮舞批（2026-10-01 凯亚爆发=自施放 Buff，拍板「实际并不是召唤，与歌声之环类似」）：永久光环——效果拍末半径内敌冰伤、持有者元能超50%碎裂回血；持有者倒下仍生效（docs/units/蒙德/凯亚.md）
 
         [InspectorName("防御减少")]
         DefenseDown = 7, // 防御降低（StatBuff 族负值修改器=减防即增伤；具名资产 Buff_DefenseDown「冰棱减防」——凯亚2命 tick 命中施加，数值全在资产单源）
@@ -40,7 +40,7 @@ namespace GIC.Data
     }
 
     /// <summary>
-    /// Buff 状态条目（快照与命令流的载体：类型 + 级别 + 剩余回合 + 来源）
+    /// Buff 状态条目（快照与命令流的载体：类型 + 级别 + 剩余秒 + 来源）
     /// </summary>
     [Serializable]
     public class BuffState

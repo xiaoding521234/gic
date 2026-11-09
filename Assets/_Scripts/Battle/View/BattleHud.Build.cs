@@ -35,7 +35,7 @@ namespace GIC.Battle
             if (_highlightRoot == null) GICLog.Warn("[BattleHud] prefab 缺 AimHighlightRoot（世界层高亮根）");
 
             ResolveLayoutSlots();  // Layout 分件：15 槽寻址+编辑态附件+默认 UV 捕获（先建槽表，后续寻址全依赖它）
-            ResolveTopBar();       // TopBar 分件：回合中枢/倒计时/时钟/队列/双方信息块/设置钮
+            ResolveTopBar();       // TopBar 分件：时钟/队列/双方信息块/设置钮（回合中枢/倒计时已随回合机退役）
             ResolveSkillButtons(); // 技能盘四键（SkillIconView/点击转发/名称条）
             ResolveMiscWidgets();   // 手牌/提示/取消/布局入口/编辑工具栏
             ResolveQuickPanel();   // 快捷面板（QuickPanel 分件：滚动壳寻址+底板活色，2026-10-06）

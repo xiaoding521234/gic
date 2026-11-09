@@ -94,7 +94,7 @@ namespace GIC.Data
     /// Damage          | 伤害量   | 元素             | 投放形态 delivery | 发射格    | —    | 命中点 | 发射时刻（投射物前摇） | —              | —
     /// Heal            | 治疗量   | —                | —                | —         | —    | —      | 应用时刻（命中类治疗） | —              | —
     /// Death           | —        | —                | —                | —         | —    | —      | —                     | —              | —
-    /// ApplyBuff       | —        | 来源技能ID（0=无——客户端 Buff 图标按来源技能解析） | — | — | — | — | — | 类型/级别/回合 | —
+    /// ApplyBuff       | —        | 来源技能ID（0=无——客户端 Buff 图标按来源技能解析） | — | — | — | — | — | 类型/级别/秒 | —
     /// RemoveBuff      | —        | —                | —                | —         | —    | —      | —                     | buffType       | —
     /// ElementAttach   | —        | 附着元素         | —                | —         | —    | —      | —                     | —              | —
     /// Reaction        | 反应级别 | 反应子类型       | —                | —         | —    | —      | —                     | —              | —
@@ -124,7 +124,7 @@ namespace GIC.Data
         public int indexInSlice;
 
         /// <summary>产生时刻（tick 数，决策九十五即时制 docs/active/48 §8——段推送前由
-        /// TurnResolver 整段回填=Segment.startTick；客户端按绝对时刻播对齐；0=旧回放兼容）</summary>
+        /// BattleResolver 整段回填=Segment.startTick；客户端按绝对时刻播对齐；0=旧回放兼容）</summary>
         public int tick;
 
         [Header("可见性（迷雾预留，切片期恒全可见）")]
@@ -204,10 +204,10 @@ namespace GIC.Data
 
         [Header("属性子类型（StatChange 命令 metadata）")]
         public const int StatKindEnergy = 1; // 元能（value=变化量，正获取负消耗；客户端 UnitView 缓存即时增量，B6a）
-        public const int StatKindMora = 2;   // 摩拉（value=变化量；actorUnitId=归属玩家。B6c 部署扣费直产；B6d 回合结束发放直产+客户端 HUD 消费）
-        public const int StatKindStamina = 3; // 体力（value=变化量；actorUnitId=归属玩家。B6d：配额行动消耗走 StaminaEffect 效应产出+回合结束发放直产）
+        public const int StatKindMora = 2;   // 摩拉（value=变化量；actorUnitId=归属玩家。B6c 部署扣费直产；B6d 秒拍发放直产+客户端 HUD 消费）
+        public const int StatKindStamina = 3; // 体力（value=变化量；actorUnitId=归属玩家。B6d：配额行动消耗走 StaminaEffect 效应产出+秒拍发放直产）
         public const int StatKindSanity = 4; // 理智（value=变化量；2026-09-30 歌声之环批：Buff tick 恢复走 SanityEffect 效应产出+客户端 UnitView 缓存；UnitState.sanity 快照携带）
-        public const int StatKindHp = 5;     // 生命（value=变化量；决策九十一 2026-10-25：地脉灵魂回合末衰减专用——非伤害路径〔无防御/暴击/反应〕，客户端血条衰减+灵魂蓝数字；活体治疗仍走 Heal 命令勿混用）
+        public const int StatKindHp = 5;     // 生命（value=变化量；决策九十一 2026-10-25：地脉灵魂秒拍末衰减专用——非伤害路径〔无防御/暴击/反应〕，客户端血条衰减+灵魂蓝数字；活体治疗仍走 Heal 命令勿混用）
 
         [Header("治疗子类型（Heal 命令 metadata；2026-10-01 拍板 B——吸血自疗带名前缀）")]
         public const int HealKindLifesteal = 1; // 吸血（客户端弹「吸血 +N」名前缀；普通治疗仍裸 +N）
@@ -418,7 +418,7 @@ namespace GIC.Data
         }
 
         /// <summary>元素附着命令工厂。metadata=附着元素（覆盖语义=消耗被反应附着，docs/06）；
-        /// 客户端即时刷新目标附着显示（此前靠下回合快照自愈）</summary>
+        /// 客户端即时刷新目标附着显示（此前靠下一拍快照自愈）</summary>
         public static BattleCommand ElementAttach(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
             int element)
         {
@@ -551,7 +551,7 @@ namespace GIC.Data
 
         /// <summary>元素反应命令工厂。metadata=反应子类型（ReactionKindMelt/Freeze）；value=反应级别。
         /// 融化的伤害并入已由 Damage 命令承载，本命令只播"反应发生"事件；冻结时客户端即时同步立牌冰色
-        /// （此前冰色靠下回合快照，反应当回合不可见）</summary>
+        /// （此前冰色靠下一拍快照，反应当拍不可见）</summary>
         public static BattleCommand Reaction(string actorUnitId, string targetUnitId, int sliceIndex, int indexInSlice,
             int reactionType, int level)
         {
@@ -588,7 +588,7 @@ namespace GIC.Data
         /// <summary>物品消耗命令工厂（统一消耗模型 C-1，docs/30）：技能消耗手牌物品牌（如酒/苹果）
         /// ——targetUnitId=归属玩家、metadata=物品名（ItemName 枚举值）、value=消耗数量、
         /// buffLevel=装备实例耐久（决策八十一：客户端按 (物品,耐久) 条目扣镜像；非装备恒 0）。
-        /// 客户端应用=本地 handCards 镜像条目扣减（减尽移除）+手牌角标即时刷新（不等下回合快照）</summary>
+        /// 客户端应用=本地 handCards 镜像条目扣减（减尽移除）+手牌角标即时刷新（不等下一拍快照）</summary>
         public static BattleCommand ItemConsume(string playerId, int sliceIndex, int indexInSlice,
             int itemName, int amount, int durability = 0)
         {

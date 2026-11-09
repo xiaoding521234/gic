@@ -16,7 +16,7 @@ namespace GIC.Battle
         /// +建筑卡三张（餐馆/骑士团/大教堂——2★+ 走卡组）+体力/摩拉货币牌（数量=开局资源常量同源）。
         /// 卡不消耗可重复出战——角色阵亡后可再部署；出牌逻辑=PlayerQuotaBrain 部署分支（TryBuildDeploy
         /// 三桶：1★ 建筑首铺→角色→其余建筑）。**1★ 旗帜刻意不入卡组**：配额脑 TryPurchase 从协议核心
-        /// 购买补货（10 摩拉）→部署分支同回合出战——购买系统对 AI 负载化（决策八十六批E 即时通道）。
+        /// 购买补货（10 摩拉）→部署分支同拍出战——购买系统对 AI 负载化（决策八十六批E 即时通道）。
         /// </summary>
         public static List<HandCard> BuildAIDefaultDeck()
         {

@@ -15,11 +15,11 @@ namespace GIC.Data
         Segment = 3,           // Host→Client：片命令块推流
         // 4 已退役（P6 残留审计 D2，docs/active/49：SegmentAck 随回合机 ack 门控删除，编号不复用）
         SubmitInstantAction = 5, // Client→Host：即时行动（片边界 poll）
-        TurnEnd = 6,           // Host→Client：回合结束
+        // 6 已退役（2026-11-09 残留清理批：TurnEnd 随回合机退役删除，编号不复用）
         Pause = 7,             // Host↔Client：硬停交互点（B1 占位）
         Resume = 8,            // Host↔Client：硬停恢复（B1 占位）
         BattleOver = 9,        // Host→Client：战斗结束（2026-09-25 三轮审查 S10 轻量全灭软停；结算画面=B8）
-        TurnPlan = 10,         // Host→Client：本回合行动预告（执行预览用，2026-09-29；分桶后、首片推送前下发）
+        // 10 已退役（2026-11-09 残留清理批：TurnPlan 随攻速分桶/执行预览退役删除，编号不复用）
 
         // ===== 帧同步（F1，docs/active/50 §4）=====
         InputCommand = 11,     // Client→Host：单条输入（玩家行动 + seq/submitTick）
@@ -104,8 +104,8 @@ namespace GIC.Data
         public BattleSnapshot snapshot;
 
         /// <summary>本选择阶段时限秒（B7 LAN 批）：host 在选择阶段头随快照下发——
-        /// 客户端无 TurnFlowController，凭此值本地倒数（倒计时显示+归零自动完成选择；
-        /// host 侧仍以自己的计时为准并超时兜底 Pass，双端重复提交由 host 忽略）。
+        /// 客户端无 Flow 控制器，凭此值本地倒数。即时制无选择倒计时：恒 -1（原倒数/
+        /// 归零自动完成选择/host 超时兜底 Pass 链路已随回合机退役，字段保留供既有消息体兼容）。
         /// -1=无时限信息（调试直开/回放等场景，客户端不显示倒计时）</summary>
         public int selectLimitSeconds = -1;
     }
@@ -131,11 +131,8 @@ namespace GIC.Data
         public ActionData action;
     }
 
-    [Serializable]
-    public class TurnEndMessage
-    {
-        public int turnNumber;
-    }
+    // （TurnEndMessage 已随回合机退役删除——2026-11-09 残留清理批：秒拍段即回合结束段，
+    // 无独立消息；重新立项按即时制命令流另立）
 
     [Serializable]
     public class PauseMessage
@@ -150,32 +147,13 @@ namespace GIC.Data
     }
 
     /// <summary>战斗结束消息（S10 轻量软停）：winnerTeam=存活方队伍（TeamType 枚举值）——
-    /// 恰好一队全灭时下发；双方同回合互灭不下发（结算语义 B8 定义）</summary>
+    /// 恰好一队全灭时下发；双方同秒互灭不下发（结算语义 B8 定义）</summary>
     [Serializable]
     public class BattleOverMessage
     {
         public int winnerTeam;
     }
 
-    /// <summary>本回合行动预告（2026-09-29 执行预览拍板）：执行阶段开始前 Host 下发——
-    /// 全部实际行动（玩家上交+低级单位自主+AI 脑；部署段/玩家级 Pass/回合结束段不入表，
-    /// 与片循环的攻速片一一对应）。载荷自含（unitId/playerId/actionType/skillIndex/attackSpeed
-    /// 快照攻速），客户端不依赖快照时序即可建行</summary>
-    [Serializable]
-    public class TurnPlanMessage
-    {
-        public int turnNumber;
-        public List<TurnPlanEntry> entries = new List<TurnPlanEntry>();
-    }
-
-    /// <summary>预告条目：一个即将行动的单位（actionType/skillIndex=图标解析源；attackSpeed=行分区间用）</summary>
-    [Serializable]
-    public class TurnPlanEntry
-    {
-        public string unitId;
-        public string playerId;
-        public int actionType;
-        public int skillIndex;
-        public int attackSpeed;
-    }
+    // （TurnPlanMessage/TurnPlanEntry 已随回合机退役删除——2026-11-09 残留清理批；
+    // 行动预告/执行预览 UI 已随 P4 批退役，重立项按即时制命令流另立消息）
 }

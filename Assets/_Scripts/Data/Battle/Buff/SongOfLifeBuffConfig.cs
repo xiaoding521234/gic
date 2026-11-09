@@ -30,7 +30,7 @@ namespace GIC.Data
         /// BattleHud.SelfCastAuraRadiusOf 三消费方同源读</summary>
         public override int AuraRadius => 作用半径;
 
-        /// <summary>1命起 +C1Radius（决策七十二调换后 1命生效）——SongOfLifeBuff.OnTurnEnd
+        /// <summary>1命起 +C1Radius（决策七十二调换后 1命生效）——SongOfLifeBuff.OnEffectBeat
         /// 与客户端预估共用</summary>
         public override int ConstellationAuraBonus(int constellation, SkillConfig.SkillData talent)
             => constellation >= 1 ? (talent != null ? talent.GetInt(SkillParamKey.C1Radius, 1) : 1) : 0;

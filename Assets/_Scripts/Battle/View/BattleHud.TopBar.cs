@@ -177,7 +177,7 @@ namespace GIC.Battle
         }
 
         /// <summary>我方资源命令增量（B6d；BattlePlayer.OnResourceDelta→主件 OnResourceDeltaHandler 分流至此）：
-        /// 部署扣费/回合结束发放/行动消耗的命令流即时刷新，快照权威兜底校正</summary>
+        /// 部署扣费/秒拍发放/行动消耗的命令流即时刷新，快照权威兜底校正</summary>
         public void ApplyMyResourceDelta(int statKind, int delta)
         {
             if (statKind == BattleCommand.StatKindMora) _myMora = Mathf.Max(0, _myMora + delta);

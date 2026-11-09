@@ -120,7 +120,8 @@ namespace GIC.Data
 
         /// <summary>移动目标点 X（厘米，决策九十五蓝图 §8 Move 双轨）：&gt;0 时走即时制 tick 移动
         /// （tile A* 路径+steering 每步推进+圆碰撞，RTSMovementSystem）；=0 时回落旧
-        /// direction+magnitude 格移动（MovementResolver 旧轨——AI 三脑 P5 移植前兜底）</summary>
+        /// direction+magnitude 格移动（Host 侧桥为目标点 cm 走 RTSMovementSystem——旧格轨
+        /// MovementResolver 已随 2026-11-09 残留清理批删除）</summary>
         public int targetX;
 
         /// <summary>移动目标点 Z（厘米，同上）</summary>

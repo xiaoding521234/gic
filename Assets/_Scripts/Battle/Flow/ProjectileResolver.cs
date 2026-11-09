@@ -43,10 +43,10 @@ namespace GIC.Battle
         /// 把 effects 中的全部 ProjectileEffect（发射声明）替换为命中产物（Damage/Buff/附着全套）；
         /// 无接触（虚空截断或射程上限）时向 vanishes 追加消散 Effect 命令
         /// （sliceIndex/indexInSlice 留空，由调用方回填）。必须在移动展开之后调用
-        /// ——投射物判定读移动者完整轨迹（即时制 tick mover + 旧格轨 mover）。
+        /// ——投射物判定读移动者完整轨迹（即时制 tick mover + 静止单位）。
         /// </summary>
         public static void Resolve(BattleSimState sim, BattleSnapshot sliceSnapshot,
-            List<BattleEffect> effects, List<MoveActionState> legacyMovers, List<BattleCommand> vanishes)
+            List<BattleEffect> effects, List<BattleCommand> vanishes)
         {
             var projectiles = new List<ProjectileEffect>();
             for (int i = effects.Count - 1; i >= 0; i--)
@@ -60,19 +60,14 @@ namespace GIC.Battle
             if (projectiles.Count == 0) return;
             projectiles.Reverse(); // 还原产出序（=行动枚举序）
 
-            // 轨迹索引（unitId → 轨迹段表）：即时制 tick 移动者/旧格轨移动者/静止，三者归一
+            // 轨迹索引（unitId → 轨迹段表）：即时制 tick 移动者/静止，两者归一
             var trajectories = new Dictionary<string, List<TrajSeg>>();
             foreach (var mover in sim.ActiveMovers)
             {
                 if (mover.Unit == null || string.IsNullOrEmpty(mover.UnitId)) continue;
                 trajectories[mover.UnitId] = BuildCmMoverTrajectory(sim, mover);
             }
-            if (legacyMovers != null)
-            {
-                foreach (var mover in legacyMovers)
-                    if (!string.IsNullOrEmpty(mover.UnitId) && !trajectories.ContainsKey(mover.UnitId))
-                        trajectories[mover.UnitId] = BuildLegacyTrajectory(mover);
-            }
+            // （旧格轨 legacyMovers 轨迹源已删除——2026-11-09 残留清理批：P5 已移植、恒空集防御期关闭）
 
             // 两遍法·命中时刻序（2026-10-01 WYSIWYG 拍板，docs/18 决策二十一）：先求交收集全部接触
             // 时刻，排序后逐发编译——双单位多箭按到达顺序消耗附着（A1→G1→A2→G2）。
@@ -225,37 +220,6 @@ namespace GIC.Battle
                 idx++;
             }
             // 终点静止尾段（时长∞→取大值 600 秒封顶）
-            segs.Add(new TrajSeg { tStart = t, tEnd = 600f, px = x, pz = z, vx = 0f, vz = 0f });
-            return segs;
-        }
-
-        /// <summary>旧格轨移动者轨迹（P5 旧轨退役前兜底）：沿格路径逐格心推进（每格
-        /// BattleMetrics.MoveStepSeconds——与旧播放器补间同源节拍）</summary>
-        private static List<TrajSeg> BuildLegacyTrajectory(MoveActionState mover)
-        {
-            var segs = new List<TrajSeg>();
-            if (mover.Path == null || mover.Path.Count == 0) return segs;
-            float stepT = BattleMetrics.MoveStepSeconds;
-            float speed = CellMetrics.CellSizeCm / stepT; // cm/s（1 格/0.18s）
-            var first = mover.Path[0];
-            float x = first.CenterXCm, z = first.CenterYCm;
-            float t = 0f;
-            for (int i = 1; i < mover.Path.Count; i++)
-            {
-                var cell = mover.Path[i];
-                float dx = cell.CenterXCm - x, dz = cell.CenterYCm - z;
-                float dist = Mathf.Sqrt(dx * dx + dz * dz); // DETERMINISM-ALLOW: IEEE-754 同平台确定（跨平台定点化=F4）；整数开方结果精确
-                if (dist < 0.01f) continue;
-                float dur = dist / speed;
-                segs.Add(new TrajSeg
-                {
-                    tStart = t, tEnd = t + dur,
-                    px = x, pz = z,
-                    vx = dx / dur, vz = dz / dur,
-                });
-                t += dur;
-                x = cell.CenterXCm; z = cell.CenterYCm;
-            }
             segs.Add(new TrajSeg { tStart = t, tEnd = 600f, px = x, pz = z, vx = 0f, vz = 0f });
             return segs;
         }

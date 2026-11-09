@@ -83,7 +83,7 @@ namespace GIC.Data
 
         [InspectorName("薄冰")]
         [TileTag(TileTag.AllowWalk, TileTag.AllowFly)]
-        ThinIce = 103, // 决策七十六（2026-10-15）：冰元素冻结水面所得——步行可走（泡湿回合末挂水附着判据=WaterTerrain 标签，薄冰故意不带=站薄冰不挂水）；无寿命持续到被火融化；运行时突变（SetTile+TerrainChange 命令），地图初始配置不使用
+        ThinIce = 103, // 决策七十六（2026-10-15）：冰元素冻结水面所得——步行可走（泡湿秒拍末挂水附着判据=WaterTerrain 标签，薄冰故意不带=站薄冰不挂水）；无寿命持续到被火融化；运行时突变（SetTile+TerrainChange 命令），地图初始配置不使用
         #endregion
     }
 

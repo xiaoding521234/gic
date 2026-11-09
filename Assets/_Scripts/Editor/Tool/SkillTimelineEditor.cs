@@ -56,7 +56,7 @@ namespace GIC.Editor
         // ==================== 开一把试招（战斗沙盒入口，2026-10-05） ====================
         // 时轮校准→实战验证闭环：编辑时轮/校准动作片后一键进战斗手操放技能，所见即所得对齐判定线。
         // 沙盒语义（BattleLaunchConfig.BuildSandbox）：A=编辑单位（层级覆盖 5★魔神档=全手操）、
-        // B=温迪空座木桩（不挂配额脑=站桩；回合经 Sim.SandboxAutoPassPlayerId 即时 Pass）。
+        // B=温迪空座木桩（不挂配额脑=站桩；空座标记 Sim.SandboxAutoPassPlayerId——即时制零行动天然等效 Pass）。
 
         private const string SandboxAllyKey = "TimelineSandboxAllyUnit";
         private const string SandboxDummyKey = "TimelineSandboxDummyUnit";

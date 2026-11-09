@@ -75,7 +75,7 @@ namespace GIC.Battle
             // 号令体力津贴（AI-1 批接线，2026-10-12 拍板口径「玩家操控伙伴势力技能＝0→−5 获得体力」）：
             // 势力技能基 0 体力（docs/07-00「号令不消耗体力」）＋玩家直接操控伙伴减免 5（负值=获得）
             // → 伙伴施法者的延奏/契约号令＝玩家净得 5 体力（StaminaEffect 正值=获得，与减免负值同构）。
-            // 旗标由提交路径统一打（TurnFlowController 对 Companion 层级整体标记——真人/AI 共享同一路径
+            // 旗标由提交路径统一打（RTSFlowController 对 Companion 层级整体标记——真人/AI 共享同一路径
             // 自动对齐）；魔神施法者无伙伴减免（StaminaAmountOf 层级门）＝无津贴。
             // 延奏/契约资产无体力条目＝ChargeAll 恒空转，津贴为唯一体力效果（无双扣）。
             if (action.isPlayerDirectControl

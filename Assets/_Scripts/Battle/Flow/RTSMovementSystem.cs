@@ -14,7 +14,7 @@ namespace GIC.Battle
     ///   speedCm/秒，每 tick 取 Accum/20 为步预算——非整除移速零偏差，全整数确定性）；
     /// - **碰撞**（蓝图 §3.2 语义连续化）：敌方/尸体/核心=硬挡圆（停于接触前=Blocked 收尾）；
     ///   友军=可穿不可停（推进期零阻挡）；地形=ForceType（寻径层已保证，推进期不再判）；
-    /// - **收尾**：到达目标点（Arrived）或被挡（Blocked）→ 由 Flow 交 TurnResolver.ResolveMoveArrivals
+    /// - **收尾**：到达目标点（Arrived）或被挡（Blocked）→ 由 Flow 交 BattleResolver.ResolveMoveArrivals
     ///   产命令段（途经采集保留〔技能参数数据驱动〕、移动获能已删除、SkillCast 启动段已发）。
     /// 客户端表现（P2 中间态）：启动段随 casts 发旧格式 Move 命令（格路径+方向）——旧播放器照播
     /// 行走动画；连续位置插值播放随 P4 客户端批改造。
@@ -100,7 +100,7 @@ namespace GIC.Battle
         // ==================== tick 推进（RTSFlow 每 tick 调） ====================
 
         /// <summary>推进全部活跃移动者一 tick；返回本 tick 收尾者（Arrived/Blocked——Flow 交
-        /// TurnResolver.ResolveMoveArrivals 产命令段）</summary>
+        /// BattleResolver.ResolveMoveArrivals 产命令段）</summary>
         public static List<RTSMoveState> AdvanceTick(BattleSimState sim)
         {
             List<RTSMoveState> finished = null;

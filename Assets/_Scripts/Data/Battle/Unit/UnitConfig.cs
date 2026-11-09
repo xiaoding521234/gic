@@ -135,7 +135,7 @@ namespace GIC.Data
             public bool blockedByEnemies = true;
             /// <summary>与友方互不阻挡（2026-09-26 拍板「只要这个单位 互不阻挡 字段为 true，无论是他穿
             /// 其它友军，还是友军穿他，都不阻挡」——双向豁免单字段：本单位不阻挡友方进入其格 +
-            /// 本单位移动/部署也不被友方阻挡。配置驱动单源：MovementResolver/DeployUnitExecutor/
+            /// 本单位移动/部署也不被友方阻挡。配置驱动单源：RTSMovementSystem/DeployUnitExecutor/
             /// 两客户端预览四处同读，改配置即全链路响应）</summary>
             public bool 与友方互不阻挡 = false;
 
@@ -203,11 +203,11 @@ namespace GIC.Data
             public int 效果半径 = 0;
 
             /// <summary>效果数值——EnergyAura=元能数（旗帜 1）/ MoraIncome=摩拉数（餐馆 5）/
-            /// HealWounded=攻击力百分比（教堂 10）/ EnergySummon=每回合自获元能数（骑士团总部 20）</summary>
+            /// HealWounded=攻击力百分比（教堂 10）/ EnergySummon=每效果拍自获元能数（骑士团总部 20）</summary>
             public int 效果数值 = 0;
 
-            /// <summary>效果周期（回合）——PeriodicSummon 消费（骑士团=5）：以部署回合为 0，
-            /// 当前回合 % 周期 == 0 时回合末再召唤（回合数真源=BattleSimState 当前回合）</summary>
+            /// <summary>效果周期（拍——2026-11-04 追拍：建筑效果按效果拍〔每 2 秒〕计数，周期时长较回合制自然翻倍）——
+            /// PeriodicSummon 消费（骑士团=5）：以部署秒为 0，逢周期倍数拍再召唤（秒数真源=BattleSimState.BattleSecond）</summary>
             public int 效果周期 = 0;
 
             /// <summary>效果阈值（%）——HealWounded 消费（教堂=50）：生命值低于该百分比的我方存活单位才被治疗；

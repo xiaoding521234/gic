@@ -27,7 +27,7 @@ namespace GIC.Editor
     ///      购买走 BuyCardExecutor 即时执行器，其余直喂演算）
     ///
     /// 断言面三件：Segment 命令流逐条 diff（主）+ tick hash 自证（秒拍状态全量）+ 终局对照（胜方+终局拍）。
-    /// 用途：演算层（TurnResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）
+    /// 用途：演算层（BattleResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）
     /// 改动后的回归安全网 + 后置 LAN desync 调试底座。脑层不在断言面——脑改动需重录基线。
     ///
     /// 用法：录制（游戏内 `replay on` 打一局，或观察局 harness）→ 菜单 Tools/TG/回放回归。
@@ -130,7 +130,7 @@ namespace GIC.Editor
                 if (recording.Header.formatVersion < 2)
                     return "FAIL：v1 旧回合制格式已归档不迁移（决策九十五拍板 7）——请用即时制版本重新录制（replay on 打一局）";
 
-                // —— AI 难度注册（天理档经济作弊=Host 侧结算差异源：回合末摩拉发放/建筑收入乘倍率）——
+                // —— AI 难度注册（天理档经济作弊=Host 侧结算差异源：秒拍末摩拉发放/建筑收入乘倍率）——
                 //    重演前注册进 AIPlayerConfig；旧录制缺字段=类默认棋圣（无作弊）零漂移
                 foreach (var pl in recording.Header.players)
                 {
@@ -147,7 +147,7 @@ namespace GIC.Editor
                 logicRoot = new GameObject("ReplayLogicRoot") { hideFlags = HideFlags.HideAndDontSave };
                 var sim = BuildSimFromHeader(recording.Header, logicRoot);
                 var transport = new CollectingTransport();
-                var resolver = new TurnResolver(sim, transport, new FakeResolverHost());
+                var resolver = new BattleResolver(sim, transport, new FakeResolverHost());
 
                 // —— 录制流索引：AI 批按**录制 tick** 建索引（伙伴脑=节拍 tick；眷属摊平波=节拍后
                 // 1..FamiliarDecisionSlices tick，2026-11-06 起批不再恒落 %10）；submit 按行序（file 序=时间序）——
@@ -394,7 +394,7 @@ namespace GIC.Editor
                 logicRoot = new GameObject("SelfTestRecordRoot") { hideFlags = HideFlags.HideAndDontSave };
                 var sim = BuildSimFromHeader(header, logicRoot);
                 var transport = new CollectingTransport();
-                var resolver = new TurnResolver(sim, transport, new FakeResolverHost());
+                var resolver = new BattleResolver(sim, transport, new FakeResolverHost());
                 const int totalTicks = 2 * BattleMetrics.TicksPerSecond;
                 for (int tick = 1; tick <= totalTicks; tick++)
                 {
@@ -824,7 +824,7 @@ namespace GIC.Editor
         }
 
         /// <summary>回放宿主：ack 门控已随回合机退役（接口仅剩推送钩子，docs/active/49 D2）</summary>
-        private class FakeResolverHost : ITurnResolverHost
+        private class FakeResolverHost : IBattleResolverHost
         {
             public void NotifySegmentPushed(int turnNumber, int sliceIndex) { }
         }

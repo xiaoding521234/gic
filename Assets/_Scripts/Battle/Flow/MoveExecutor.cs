@@ -5,28 +5,14 @@ using GIC.Data;
 namespace GIC.Battle
 {
     /// <summary>
-    /// 移动行动执行器：构建移动者状态，实际结算由 MovementResolver 同片同步逐步展开。
+    /// 移动行动执行器：移动距离上限/消耗声明/途经采集参数的数据驱动单源。
     /// 移动是特殊的技能（2026-09-23 B-S1b 拍板）：步数上限=移动技能条目 MoveDistance 参数
     /// （skills[0]·Move 型，数据驱动与 HUD 瞄准同源）；无移动技能/无参数回落 3（旧默认）。
+    /// （旧格轨 BuildMover→MovementResolver 同片展开链已随回合制移动执行退役删除——2026-11-09
+    /// 残留清理批；移动结算现走 RTSMovementSystem tick 新轨）
     /// </summary>
     public static class MoveExecutor
     {
-        public static MoveActionState BuildMover(BattleSimState sim, ActionData action)
-        {
-            var unit = sim.GetUnit(action.unitId);
-            if (unit == null) return null;
-            if (BattleSimState.IsDead(unit) || !BattleSimState.CanAct(unit)) return null;
-
-            var mover = new MoveActionState
-            {
-                UnitId = action.unitId,
-                Unit = unit,
-                Direction = action.direction,
-                RemainingSteps = Math.Min(Math.Max(0, action.moveMagnitude), MaxMoveDistance(unit)),
-            };
-            return mover;
-        }
-
         /// <summary>
         /// 移动步数上限（Host 权威收口）：移动技能 MoveDistance 按基准换算（2026-09-23 用户拍板
         /// 「拼接后为10%移速」——BasedOnMoveSpeed=百分比×当前移速，SkillData.ResolveMoveDistance；

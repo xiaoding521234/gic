@@ -900,20 +900,8 @@ MonoBehaviour:
     m_Localized: Voice Volume
     m_Metadata:
       m_Items: []
-  - m_Id: 12001
-    m_Localized: Selecting
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12002
-    m_Localized: Resolving
-    m_Metadata:
-      m_Items: []
   - m_Id: 12003
     m_Localized: Battle Over
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12004
-    m_Localized: Turn
     m_Metadata:
       m_Items: []
   - m_Id: 12007
@@ -940,10 +928,6 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 12012
     m_Localized: "Action submitted \u2014 awaiting execution"
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12013
-    m_Localized: "Resolving \u2014 executing actions"
     m_Metadata:
       m_Items: []
   - m_Id: 12014

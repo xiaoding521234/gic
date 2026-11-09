@@ -245,7 +245,7 @@ namespace GIC.Data
 
         // 诺艾尔
         [InspectorName("蓄力秒")]
-        ChargeTurns = 70,
+        ChargeSeconds = 70,
 
         [InspectorName("护盾")]
         Shield = 71,
@@ -293,7 +293,7 @@ namespace GIC.Data
 
         // 装备耐久爆炸参数（2026-10-18 决策八十一·兔兔伯爵增强「耐久每次减少，对半径1内敌人
         // 造成100%攻击力火伤」）：ExplodePercent=耐久减少触发的爆炸伤害（%攻击力，0=不触发）；
-        // ExplodeRadius=爆炸半径（格，切比雪夫）——TurnResolver 格挡点编译消费
+        // ExplodeRadius=爆炸半径（格，切比雪夫）——BattleResolver 格挡点编译消费
         [InspectorName("耐久爆炸伤害")]
         ExplodePercent = 83,
 

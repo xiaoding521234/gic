@@ -20,7 +20,7 @@ namespace GIC.Battle
     /// 元能条（白色+圆角黑边+分隔量子 10）→ **Buff 图标行**（能量条下方：**复用 QueueSlot 头像牌**
     /// 〔Plate/AvatarMask/Avatar/Ring〕——Avatar=Buff 来源技能图标〔延奏 AttackUp→延奏图标、寒冰之棱→
     /// 凛冽轮舞爆发图标…；专属图标优先、无来源技能回落元素图标〕、Ring=来源单位所属玩家色、
-    /// 层数右下角+剩余回合左上角〔黑描边数字原神白；永久 Buff 不计时、单层不噪〕）→ 附着小图标在
+    /// 层数右下角+剩余秒左上角〔黑描边数字原神白；永久 Buff 不计时、单层不噪〕）→ 附着小图标在
     /// 血条左缘。底图=真实资产 Resources/UI/Battle/BarBg.png/BarFill.png（2026-09-25 拍板「不要程序化
     /// 生成」——美术出图直接覆盖文件即可）。
     /// **装备图标行**（装备批 2026-10-18 拍板「参考 buff 图标显示方式，但是装备显示在血条右边」）：
@@ -394,9 +394,9 @@ namespace GIC.Battle
         // ==================== Buff 图标行（2026-10-06 拍板：能量条下方） ====================
 
         /// <summary>Buff 图标行重建（UnitView.BuffRevision 变化触发）：每条=QueueSlot 头像牌复用
-        /// （Avatar=来源技能图标/专属图标/元素回退、Ring=来源玩家色）+ 层数右下/剩余回合左上角标。
+        /// （Avatar=来源技能图标/专属图标/元素回退、Ring=来源玩家色）+ 层数右下/剩余秒左上角标。
         /// **恒单行**（2026-10-07 拍板「buff 太多也只在一行显示，不要换行」——横向居中排开不折行）。
-        /// 行级重建（回合/命令粒度低频）——非逐帧拼装</summary>
+        /// 行级重建（秒拍/命令粒度低频）——非逐帧拼装</summary>
         private void RebuildBuffIcons(Item item)
         {
             item.LastBuffRevision = item.View.BuffRevision;
@@ -452,7 +452,7 @@ namespace GIC.Battle
                     NewNumber(item.BuffRow, "Stacks", new Vector2(x + cornerOffset, -cornerOffset),
                         Buff角标字号).text = buff.level.ToString();
                 if (buff.remainingTurns > 0)
-                    NewNumber(item.BuffRow, "Turns", new Vector2(x - cornerOffset, cornerOffset),
+                    NewNumber(item.BuffRow, "Seconds", new Vector2(x - cornerOffset, cornerOffset),
                         Buff角标字号).text = buff.remainingTurns.ToString();
             }
         }
@@ -462,7 +462,7 @@ namespace GIC.Battle
         /// <summary>装备图标行重建（UnitView.EquipRevision 变化触发）：每件=QueueSlot 头像牌复用
         ///（Avatar=物品图标 ItemConfig.icon[0]/缺图 missing_image 兜底、Ring=归属玩家色同 Buff 描环）
         ///+耐久右下角标（&gt;0 才显——兔兔伯爵 3/2/1 递减；无耐久概念武器不显）。行原点=BuildItem
-        /// 摆好的血条右缘位，图标向右排开（行级重建=回合/命令粒度低频，同 Buff 行模式）</summary>
+        /// 摆好的血条右缘位，图标向右排开（行级重建=秒拍/命令粒度低频，同 Buff 行模式）</summary>
         private void RebuildEquipIcons(Item item)
         {
             item.LastEquipRevision = item.View.EquipRevision;

@@ -53,7 +53,7 @@ namespace GIC.Battle
                 json = _serializer.Serialize(message),
             };
             // 双层信封序列化持续验证可序列化性（B7 联机前置保障——Serialize 抛异常即暴露消息缺陷；
-            // 批9 复审①：原每消息 Debug.Log 刷屏已删——命令流每回合几十条×2 方向持续刷、且
+            // 批9 复审①：原每消息 Debug.Log 刷屏已删——命令流每秒几十条×2 方向持续刷、且
             // Debug.Log 不受 GICLog 编译期删除纪律管；验证本质=Serialize 调用本身每条消息都在执行）
             _serializer.Serialize(envelope);
             _clientHandler?.Invoke(envelope.messageType, envelope.json);

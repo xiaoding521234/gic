@@ -19,19 +19,19 @@ namespace GIC.Data
         /// tick 循环写入；客户端按绝对时刻播放对齐；0=旧回放兼容缺省）</summary>
         public int startTick;
 
-        /// <summary>本片攻速（播放侧按 (回合最高攻速 - 本片攻速) / 10 秒排程）</summary>
+        /// <summary>本片攻速（播放侧按 (全场最高攻速 - 本片攻速) / 10 秒排程）</summary>
         public int sliceAttackSpeed;
 
-        /// <summary>本回合全场最高攻速</summary>
+        /// <summary>本秒全场最高攻速</summary>
         public int turnMaxAttackSpeed;
 
         /// <summary>是否为片边界插入的即时行动块（0/1）</summary>
         public int insertedInstantAction;
 
-        /// <summary>是否为部署段（0/1；B6c——回合开始先于攻速分桶结算；播放侧短节拍不驱动攻速排程/高亮，docs/18 决策七：出战占玩家行动配额）</summary>
+        /// <summary>是否为部署段（0/1；B6c——秒拍先于攻速分桶结算；播放侧短节拍不驱动攻速排程/高亮，docs/18 决策七：出战占玩家行动配额）</summary>
         public int deploy;
 
-        /// <summary>是否为回合结束效果块（0/1；B2：Buff 计时与回合结束效果——播放侧短节拍、不驱动攻速排程/执行高亮）</summary>
+        /// <summary>是否为秒拍结束效果块（0/1；B2：Buff 计时与效果拍效果——播放侧短节拍、不驱动攻速排程/执行高亮）</summary>
         public int turnEnd;
 
         [Header("命令流")]

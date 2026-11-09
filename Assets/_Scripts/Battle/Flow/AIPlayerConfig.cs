@@ -28,7 +28,7 @@ namespace GIC.Battle
 
         private static readonly Dictionary<string, AIDifficulty> _difficultyByPlayer = new();
 
-        /// <summary>登记/改设 AI 玩家难度（配额脑 Bind 默认登记；房间 UI/观察 harness 可随时改——下回合生效）</summary>
+        /// <summary>登记/改设 AI 玩家难度（配额脑 Bind 默认登记；房间 UI/观察 harness 可随时改——下拍生效）</summary>
         public static void SetDifficulty(string playerId, AIDifficulty difficulty)
         {
             if (string.IsNullOrEmpty(playerId)) return;
@@ -73,8 +73,8 @@ namespace GIC.Battle
             => difficulty == AIDifficulty.Rival;
 
         /// <summary>摩拉收入百分比（凌晨批议题⑥：天理=经济作弊型难度——SC2 proto CheatMoney/
-        /// petra 经济倍率表先例，决策逻辑不动、收入乘倍率；其余档恒 100）。消费点=TurnResolver
-        /// 回合末发放+建筑摩拉收入（玩家资源发放两单源，掠夺/消耗不复用）；数值真源=AITuning.
+        /// petra 经济倍率表先例，决策逻辑不动、收入乘倍率；其余档恒 100）。消费点=BattleResolver
+        /// 秒拍末发放+建筑摩拉收入（玩家资源发放两单源，掠夺/消耗不复用）；数值真源=AITuning.
         /// 天理摩拉收入百分比。**LAN 边界**：难度注册在配额脑 Bind（本地进程）——远端 AI 玩家
         /// 的天理档对 Host 结算不可见（回落 100%），天理作弊单机/Host 本地 AI 生效</summary>
         public static int MoraIncomePercentOf(string playerId)

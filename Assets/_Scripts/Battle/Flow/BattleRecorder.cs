@@ -15,7 +15,7 @@ namespace GIC.Battle
     /// 「初始配置 + 全部演算输入（AI 节拍批/玩家与配额脑上交/购买）+ Host 演算的 Segment 命令流 +
     /// 每秒状态 hash」逐行落盘 JSONL——回放器（Editor/Tool/ReplayRunner v2）以同 seed/同初始配置
     /// headless 逐 tick 重演：命令流逐条 diff + tick hash 自证 = 演算层
-    /// （TurnResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）回归安全网
+    /// （BattleResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）回归安全网
     /// + 后置 LAN desync 调试底座。
     ///
     /// 录制面语义（v2）：
@@ -23,8 +23,8 @@ namespace GIC.Battle
     ///   （批内行动带 submitTick=节拍 tick）；玩家/配额脑上交+购买=kind=submit 行
     ///   （钩点=RTSFlowController.SubmitAndResolve〔校验通过后〕与 BuyCardExecutor）。
     ///   脑层不在断言面——脑改动后命令流差异属预期，需重录基线；断言只对演算层漂移报警（噪声最小）。
-    /// - 断言面 = Segment（命令流本体，TurnResolver.PushSegment 钩）+ tick hash（RTSFlowController
-    ///   RunSecondBeat 钩，确定性护栏四）；TurnPlan/TurnEnd 派生数据不录。
+    /// - 断言面 = Segment（命令流本体，BattleResolver.PushSegment 钩）+ tick hash（RTSFlowController
+    ///   RunSecondBeat 钩，确定性护栏四）；旧回合机 TurnPlan/TurnEnd 派生数据已随协议退役不录。
     /// - 初始手牌逐条录制（含初始资源卡）——卡组构建/存档变化不影响回放（初始态全量快照式）。
     ///
     /// 开关：调试指令 `replay on/off/status/list`（BattleReplayCommands）；默认关、发布版不落盘。
@@ -74,7 +74,7 @@ namespace GIC.Battle
                     spawnY = spawnCells != null && spawnCells.TryGetValue(p.PlayerId, out var cell2) ? cell2.y : 0,
                     hand = hands != null && hands.TryGetValue(p.PlayerId, out var hand) ? hand : new List<HandCard>(),
                     isAI = p.IsAI ? 1 : 0, // 凌晨批议题⑥：难度回放注册门（天理经济作弊=Host 侧结算差异源）
-                    aiDifficulty = (int)p.AIDifficulty, // 同上：重演前注册，否则回合末发放/建筑收入倍率回落 100% 必 diff
+                    aiDifficulty = (int)p.AIDifficulty, // 同上：重演前注册，否则秒拍发放/建筑收入倍率回落 100% 必 diff
                 };
                 line.players.Add(pl);
             }
@@ -102,14 +102,14 @@ namespace GIC.Battle
             Append(new ReplaySubmitLine { action = action });
         }
 
-        /// <summary>Segment 命令流录制（TurnResolver.PushSegmentAndWaitAck 推送前调）——断言面本体</summary>
+        /// <summary>Segment 命令流录制（BattleResolver.PushSegmentAndWaitAck 推送前调）——断言面本体</summary>
         public static void CaptureSegment(Segment segment)
         {
             if (!Enabled || !_hasHeader || segment == null) return;
             Append(new ReplaySegmentLine { turn = segment.turnNumber, segment = segment });
         }
 
-        /// <summary>终局录制（TurnFlowController 胜负广播处调）；无 over 行=识别未终局录制（回放仍可用）</summary>
+        /// <summary>终局录制（RTSFlowController 胜负判定处调）；无 over 行=识别未终局录制（回放仍可用）</summary>
         public static void CaptureGameOver(int winnerTeam, int finalTurn)
         {
             if (!Enabled || !_hasHeader) return;

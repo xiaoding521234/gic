@@ -52,7 +52,7 @@ namespace GIC.Battle
         /// <summary>
         /// 构建威胁图：对敌方全部存活可动单位逐一预测，仅 Skill 预测产出威胁（Move/Pass/缺席零贡献
         /// ——v1 简化）；构建尾部按快照 hp 收口 DoomedAllies（合计致死）。
-        /// 性能：敌方 3~8 单位 × 预测一遍 ≈ 伙伴脑同量级，毫秒级（配额脑每回合一次）。
+        /// 性能：敌方 3~8 单位 × 预测一遍 ≈ 伙伴脑同量级，毫秒级（配额脑每秒拍一次）。
         /// </summary>
         public static ThreatMap Build(BattleSimState sim, BattleSnapshot snapshot, TeamType myTeam, int turn)
         {
@@ -85,27 +85,27 @@ namespace GIC.Battle
             return map;
         }
 
-        // ==================== 回合级构建缓存（2026-10-20 审查批#2） ====================
-        // 同一 (对局, 回合, 队伍) 的威胁图原先被 AIStrategist/PlayerQuotaBrain/CompanionBrain
+        // ==================== 秒级构建缓存（2026-10-20 审查批#2） ====================
+        // 同一 (对局, 秒, 队伍) 的威胁图原先被 AIStrategist/PlayerQuotaBrain/CompanionBrain
         // 各自重复构建（三处都在 TryBeginResolve 同步决策段内、其间模拟与快照零变化——本类红线
         // 「同快照恒同预测」即缓存正确性依据）；每图 O(可见敌×技能×4向×线目标) 评分数千次，
         // 三图重复=回合提交卡顿主源（30 单位规模估 8-40ms）。键含 sim.InstanceId（进程级静态
-        // 注册表自清判据，2026-10-15 审查定案）；回合翻新即整清（每回合内容本就重建，防累积）。
+        // 注册表自清判据，2026-10-15 审查定案）；秒翻新即整清（每秒内容本就重建，防累积）。
         private static readonly Dictionary<(int, int, TeamType), ThreatMap> _buildCache
             = new Dictionary<(int, int, TeamType), ThreatMap>();
         private static int _cacheInstanceId;
-        private static int _cacheTurn = -1;
+        private static int _cacheSecond = -1;
 
-        /// <summary>带回合缓存的构建口（三个消费方统一改走此口；缓存命中零重算，
+        /// <summary>带秒缓存的构建口（三个消费方统一改走此口；缓存命中零重算，
         /// 未命中回落 Build 首建——null 结果同样入缓存防重复探测空局）</summary>
         public static ThreatMap BuildCached(BattleSimState sim, BattleSnapshot snapshot, TeamType myTeam, int turn)
         {
             if (sim == null) return null;
-            if (sim.InstanceId != _cacheInstanceId || turn != _cacheTurn)
+            if (sim.InstanceId != _cacheInstanceId || turn != _cacheSecond)
             {
                 _buildCache.Clear();
                 _cacheInstanceId = sim.InstanceId;
-                _cacheTurn = turn;
+                _cacheSecond = turn;
             }
             var key = (sim.InstanceId, turn, myTeam);
             if (!_buildCache.TryGetValue(key, out var map))

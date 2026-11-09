@@ -9,7 +9,7 @@ namespace GIC.Battle
     /// 购买执行器（决策八十六批E，docs/45 §7）：选择阶段即时行动通道
     /// （SubmitInstantAction→BattleSession.HandleInstantSubmit 的 BuyCard 分支）——
     /// **即时执行、不占配额、不进执行段**（校验/结算/命令广播即完，不写 _pendingActions——
-    /// 购买后玩家仍可照常上交本回合行动）。
+    /// 购买后玩家仍可照常上交本秒拍配额行动）。
     /// 校验链（Host 权威，客户端预检+灰显为主 UX）：①该玩家存在存活建筑其可购买列表含此卡
     /// （来源建筑不指定=等价校验，防凭空购买）；②（角色卡）玩家已解锁（存档 ownedUnits——
     /// 与祈愿同源，抽到/初始解锁才可买）；③摩拉够（购买价单源=CardIdPurchaseExtensions.PurchaseCostOf：

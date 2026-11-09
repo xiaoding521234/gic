@@ -20,11 +20,11 @@ namespace GIC.Data
         [Header("叠层上限")]
         public int 叠层上限 = 5;
 
-        [Header("持续秒数（-1=永久——关联描述 {DurationTurns} 渲染本地化「永久」）")]
+        [Header("持续秒数（-1=永久——关联描述 {DurationSeconds} 渲染本地化「永久」）")]
         [FormerlySerializedAs("持续回合")]
         public int 持续秒数 = -1;
 
-        /// <summary>关联描述占位符（{BonusPerStack}/{StackLimit}/{DurationTurns}——延奏技能资产已剥离
+        /// <summary>关联描述占位符（{BonusPerStack}/{StackLimit}/{DurationSeconds}——延奏技能资产已剥离
         /// buff 参数，描述数值全部读本资产）</summary>
         public override int? ResolveRelatedPlaceholder(string key)
         {
@@ -32,7 +32,7 @@ namespace GIC.Data
             {
                 case KeyStatBonus: return 每层加成;
                 case KeyStatStackLimit: return 叠层上限;
-                case KeyStatDurationTurns: return 持续秒数;
+                case KeyStatDurationSeconds: return 持续秒数;
             }
             return null;
         }

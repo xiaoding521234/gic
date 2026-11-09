@@ -883,20 +883,8 @@ MonoBehaviour:
     m_Key: PetVoiceVolume
     m_Metadata:
       m_Items: []
-  - m_Id: 12001
-    m_Key: Battle_SelectingPhase
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12002
-    m_Key: Battle_ResolvingPhase
-    m_Metadata:
-      m_Items: []
   - m_Id: 12003
     m_Key: Battle_Finished
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12004
-    m_Key: Battle_Turn
     m_Metadata:
       m_Items: []
   - m_Id: 12007
@@ -921,10 +909,6 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 12012
     m_Key: Battle_TipSubmitted
-    m_Metadata:
-      m_Items: []
-  - m_Id: 12013
-    m_Key: Battle_TipResolving
     m_Metadata:
       m_Items: []
   - m_Id: 12014

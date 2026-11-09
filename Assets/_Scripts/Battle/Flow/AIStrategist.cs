@@ -15,8 +15,8 @@ namespace GIC.Battle
     /// 不直接指定行动；战术不盲从战略（斩杀分恒赢=设计意图）。
     /// 生命周期：进程级 static＋新战斗自清（sim 实例号判据——2026-10-15 审查修正，OpponentProfiler 同款）。
     /// 确定性：全链纯确定性推演（快照/单位表直读，零随机）。
-    /// v1 标定注记：五态阈值=§5.1 示例值（待实测标定）；态势**每回合重估**（§5 报告链的
-    /// 「每 3 回合例行重估」=成本优化预留——驻留+滞回已保稳，每回合重估等价且更简）；
+    /// v1 标定注记：五态阈值=§5.1 示例值（待实测标定）；态势**每秒拍重估**（§5 报告链的
+    /// 「每 3 回合例行重估」〔原措辞引文〕=成本优化预留——驻留+滞回已保稳，每秒拍重估等价且更简）；
     /// 意图黑板 v1=态势派生桶乘子（意图清单随决策日志输出，目标定向加成随 AI-3 外交层）。
     /// </summary>
     public static class AIStrategist
@@ -52,10 +52,10 @@ namespace GIC.Battle
         private static float DefendRatioStay => AITuningConfig.Instance.守势保持战力比;
 
         /// <summary>最小驻留秒数（防抖动）</summary>
-        private static int MinStanceHoldTurns => AITuningConfig.Instance.态势最小驻留秒数;
+        private static int MinStanceHoldSeconds => AITuningConfig.Instance.态势最小驻留秒数;
 
         /// <summary>发育期秒数（开局铺场）</summary>
-        private static int DevelopTurns => AITuningConfig.Instance.发育期秒数;
+        private static int DevelopSeconds => AITuningConfig.Instance.发育期秒数;
 
         /// <summary>终局判据（1v1 形态）：敌方核心 HP 占比低于此值=全资源转火</summary>
         private static float EndgameCoreHpRatio => AITuningConfig.Instance.终局核心血量比;
@@ -74,9 +74,9 @@ namespace GIC.Battle
         {
             public AIStance Stance = AIStance.Develop;
             public AILegionTendency Legion = AILegionTendency.Push;
-            public int StanceSinceTurn = 1; // 现态势进入回合（最小驻留计数）
+            public int StanceSinceSecond = 1; // 现态势进入秒（最小驻留计数）
 
-            /// <summary>ResourceDigest（§3 报告链——每回合更新）</summary>
+            /// <summary>ResourceDigest（§3 报告链——每秒拍更新）</summary>
             public int Mora;
             public int Stamina;
             public int ArmyValue;        // 我方存活非建筑价值（出战费加总=战力代理）
@@ -87,7 +87,7 @@ namespace GIC.Battle
             public bool CoreThreatened;  // 我核心在敌预测火线（守势判据之一）
 
             /// <summary>三账本（§5.3——v1 消费面：体力硬保底门+摩拉/体力红线乘子；元能账=dormant）</summary>
-            public int StaminaFloor;     // 当前伙伴数×5×2（自主军团 2 回合运转量——配额体力支出硬保底）
+            public int StaminaFloor;     // 当前伙伴数×5×2（自主军团 2 秒拍运转量——配额体力支出硬保底）
 
             /// <summary>指挥黑板（§5.2 态势派生桶乘子——1=中性；意图清单随战略层日志输出）。
             /// 英文名=纯逻辑标识符规范（docs/20 §1.1——中文直名例外仅限 Inspector 序列化字段，
@@ -102,7 +102,7 @@ namespace GIC.Battle
         }
 
         private static readonly Dictionary<string, StrategistState> _states = new();
-        private static int _lastSimInstance; // 新战斗自清判据=对局实例号（见 UpdateForTurn 头部）
+        private static int _lastSimInstance; // 新战斗自清判据=对局实例号（见 UpdateForSecond 头部）
 
         /// <summary>态势只读查询（伙伴脑/调试）</summary>
         public static AIStance StanceOf(string playerId)
@@ -114,16 +114,16 @@ namespace GIC.Battle
                 ? RegroupAggressionMul
                 : 1f;
 
-        // ==================== 每回合更新（配额脑 Decide 头部调） ====================
+        // ==================== 每秒拍更新（配额脑 Decide 头部调） ====================
 
         /// <summary>
-        /// 战略层回合更新：报告链→态势机（滞回+驻留）→军团倾向→黑板乘子→红线。
+        /// 战略层秒拍更新：报告链→态势机（滞回+驻留）→军团倾向→黑板乘子→红线。
         /// 人格基线×态势乘子=乘法合成于配额脑消费点（人格只改权重不改规则，§9.1「性格≠刻板」
         /// ——态势判据对人格不可感知，故本层不持人格引用）。
         /// 学徒档「战略层仅发育态」（§9.2 开启件）：跳过态势机与威胁图构建，恒发育乘子
         /// ＋红线/体力保底照常（三账本是硬保底语义非决策质量件，全档生效）。
         /// </summary>
-        public static StrategistState UpdateForTurn(BattleSimState sim, BattleSnapshot snapshot,
+        public static StrategistState UpdateForSecond(BattleSimState sim, BattleSnapshot snapshot,
             string playerId, TeamType team, int turnNumber)
         {
             // 新战斗自清：sim 实例号（2026-10-15 审查修正——每局新 BattleSimState 恒新值；旧「T1 重入＋
@@ -182,7 +182,7 @@ namespace GIC.Battle
             }
             state.EnemyCoreHpRatio = worstEnemyCore;
 
-            // 核心受威胁=我核心格在敌预测火线（§5.1 守势判据；威胁图 ms 级——每 AI 每回合一张）。
+            // 核心受威胁=我核心格在敌预测火线（§5.1 守势判据；威胁图 ms 级——每 AI 每秒拍一张）。
             // 学徒=战略层仅发育态（§9.2）：不建图（CoreThreatened 恒 false——学徒档配额脑本就
             // 无威胁图，战略侧同步零成本）；三账本红线与体力保底非态势机件、全档照常
             bool developOnly = AIPlayerConfig.StrategistDevelopOnly(AIPlayerConfig.DifficultyOf(playerId));
@@ -190,12 +190,12 @@ namespace GIC.Battle
             if (!developOnly)
             {
                 var myCoreCell = sim.GetCorePosition(playerId);
-                var threat = OpponentThreatModel.BuildCached(sim, snapshot, team, turnNumber); // #2 审查批：回合级缓存（三消费方同拍同输入）
+                var threat = OpponentThreatModel.BuildCached(sim, snapshot, team, turnNumber); // #2 审查批：秒级缓存（三消费方同拍同输入）
                 if (threat != null && threat.ThreatenedCells.Contains(myCoreCell))
                     state.CoreThreatened = true;
             }
 
-            // ── 三账本（§5.3）：体力硬保底=当前伙伴数×5×2（自主军团 2 回合运转量）──
+            // ── 三账本（§5.3）：体力硬保底=当前伙伴数×5×2（自主军团 2 秒拍运转量）──
             int companionCount = 0;
             foreach (var kv in sim.SortedUnits())
             {
@@ -225,7 +225,7 @@ namespace GIC.Battle
                 }
             }
 
-            // ── 五态状态机（滞回±0.15＋最小驻留 3 回合）；学徒=恒发育态（§9.2）──
+            // ── 五态状态机（滞回±0.15＋最小驻留 3 秒）；学徒=恒发育态（§9.2）──
             if (developOnly)
             {
                 if (state.Stance != AIStance.Develop) SwitchStance(state, AIStance.Develop, turnNumber);
@@ -265,7 +265,7 @@ namespace GIC.Battle
             return s;
         }
 
-        /// <summary>五态机：终局＞守势＞压制＞发育（回合≤3）＞相持；战力比迁移带滞回＋最小驻留。
+        /// <summary>五态机：终局＞守势＞压制＞发育（秒≤3）＞相持；战力比迁移带滞回＋最小驻留。
         /// 终局/守势=硬判据（保命优先于防抖，不受驻留限制）；1v1 终局=敌方核心濒破，
         /// 多玩家终局=核心存活的敌对**队伍**仅剩一队（2026-10-15 审查修正：队伍聚合防 2v2 提前触发）</summary>
         private static void UpdateStance(StrategistState state, int turnNumber, int enemyCoreTeams, int totalCoreTeams)
@@ -300,12 +300,12 @@ namespace GIC.Battle
             if (state.Stance == AIStance.Push) SwitchStance(state, AIStance.Stalemate, turnNumber);
 
             // 发育期（开局铺场）——在压制/守势之后（硬判据优先）
-            if (turnNumber <= DevelopTurns)
+            if (turnNumber <= DevelopSeconds)
             {
                 if (state.Stance != AIStance.Develop) SwitchStance(state, AIStance.Develop, turnNumber);
                 return;
             }
-            if (state.Stance == AIStance.Develop && turnNumber - state.StanceSinceTurn >= MinStanceHoldTurns)
+            if (state.Stance == AIStance.Develop && turnNumber - state.StanceSinceSecond >= MinStanceHoldSeconds)
                 SwitchStance(state, AIStance.Stalemate, turnNumber); // 驻留期满→相持兜底
             // 其余=维持现态（相持）
         }
@@ -315,7 +315,7 @@ namespace GIC.Battle
             if (state.Stance == next) return;
             GICLog.Info($"[战略层] 态势切换 {state.Stance} → {next}（T{turnNumber}，战力比 {state.PowerRatio:F2}）");
             state.Stance = next;
-            state.StanceSinceTurn = turnNumber;
+            state.StanceSinceSecond = turnNumber;
         }
 
         /// <summary>态势派生桶乘子（§5.2 指挥黑板——权重注入而非指令下达）＋意图清单</summary>

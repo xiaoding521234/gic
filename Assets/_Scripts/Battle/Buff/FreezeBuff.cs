@@ -25,9 +25,9 @@ namespace GIC.Battle
             RemainingSeconds = Cfg.每级持续秒数 * Level;
         }
 
-        public override List<BattleEffect> OnTurnEnd()
+        public override List<BattleEffect> OnEffectBeat()
         {
-            return new List<BattleEffect>(); // 冻结无回合结束效果（纯控制）
+            return new List<BattleEffect>(); // 冻结无效果拍效果（纯控制）
         }
 
         public override void OnApplied()
