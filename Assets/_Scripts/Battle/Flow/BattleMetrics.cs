@@ -246,9 +246,6 @@ namespace GIC.Battle
         /// <summary>战斗时钟步进（分钟/秒——昼夜每秒 +1 分钟，回合数显示退役，蓝图 §2.3）</summary>
         public const int BattleClockMinutesPerSecond = 1;
 
-        /// <summary>灵魂衰减（%/秒——决策九十五拍板 4：−10% 每秒整拍，复苏窗直译 10 秒；P6 调参重点）</summary>
-        public const int SoulDecayPercentPerSecond = 10;
-
         /// <summary>desync hash 落盘节拍（秒——确定性护栏四件套之一：state hash 落 BattleRecorder 行，
         /// 后置 LAN 联机的漂移定位手段，王者荣耀同款）</summary>
         public const int DesyncHashEverySeconds = 1;
