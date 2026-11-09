@@ -271,6 +271,14 @@ namespace GIC.Battle
         private Transform _avatarVideoFlip;       // AvatarVideo quad
         private Vector3 _avatarVideoFlipBaseScale;
         private Vector3 _avatarVideoFlipBasePosition; // 视频 quad 基准位（B-S4c 校准：动作片位置偏移的回退锚点）
+        // 当前在显视频面（quad 比例/位置的唯一真源，2026-11-09 修「移动片被左右压扁」）：
+        // ApplyFacing 旧版翻朝向时直接写回 baseScale（=待机片 448×1074 比例），而移动循环态
+        // SetMoveAnimation 幂等早退（同片）不再重设 → 624×954 的跑步片被按待机片比例压到 63.8% 宽。
+        // 换片/朝向/回待机三条写 quad 的路径统一改走 ApplyVideoQuadSurface()。
+        private VideoClip _surfaceClip;           // null=待机片（用 baseScale 原始比例）
+        private float _surfaceScaleComp = 1f;
+        private Vector2 _surfaceOffset;
+        private bool _surfacePacked;
 
         /// <summary>冻结/尸体停摆守卫（2026-10-25「敌方凯亚冻成长方体冰块」报障修复）：只停「已渲出首帧」
         /// 的播放器（frame≥1=首帧已落 RT，与 WaitForFirstFrameThenShow/大厅视频预热批同判据）。
@@ -562,28 +570,14 @@ namespace GIC.Battle
             // 材质是 per-unit 单实例，按片置位/回待机归零（RestoreIdleVideoSurface）
             if (_videoMaterial.HasProperty("_PackedAlpha"))
                 _videoMaterial.SetFloat("_PackedAlpha", packedAlpha ? 1f : 0f);
-            // quad 缩放补偿：动作片全幅按 comp×基准高显示（主体视觉高=idle 主体视觉高）；宽=片宽高比×同高；
-            // x 分量乘朝向 sign（B-S4c 校准批次修复：旧版覆盖 localScale 丢 sign——向左施放时动作片恒朝右）
-            if (_avatarVideoFlip != null)
-            {
-                float sign = _faceLeft ? -1f : 1f;
-                // 打包片 aspect 修正：clip 含上下两区（打包高=1.5×色彩区高）——色彩区才对 quad 宽负责
-                float aspect = clip.width / (float)clip.height;
-                if (packedAlpha) aspect *= 1.5f;
-                _avatarVideoFlip.localScale = new Vector3(
-                    sign * _avatarVideoFlipBaseScale.y * aspect * scaleCompensation,
-                    _avatarVideoFlipBaseScale.y * scaleCompensation,
-                    _avatarVideoFlipBaseScale.z);
-                // 位置微调（B-S4c 校准）：播放期间偏移基准位，播完/被打断经 RestoreIdleVideoSurface 恢复。
-                // x 分量随朝向 sign（2026-10-11 凯亚霜袭向左刺报障）：宽幅动作片画布内主体常不居中，
-                // 位置偏移本质=把画布内偏置的主体拉回单位锚点——镜像（localScale.x 翻负）沿画布中心轴
-                // 翻转，主体偏置随之换侧，补偿方向必须同步翻转；安柏画布主体近居中（偏 57px≈0.2 格）
-                // 未暴露，凯亚稳定化画布主体偏 301px→朝左刺偏右 ~1.4 格实锤
-                _avatarVideoFlip.localPosition = new Vector3(
-                    _avatarVideoFlipBasePosition.x + sign * 位置偏移.x,
-                    _avatarVideoFlipBasePosition.y + 位置偏移.y,
-                    _avatarVideoFlipBasePosition.z);
-            }
+            // quad 缩放补偿：动作片全幅按 comp×基准高显示（主体视觉高=idle 主体视觉高）；宽=片宽高比×同高。
+            // 2026-11-09：状态登记 + 单出口重算——朝向翻转（ApplyFacing）与回待机都走同一方法，
+            // 不再各自用 baseScale 覆写（旧版朝向翻转会把移动片比例抹回待机片比例=左右压扁）
+            _surfaceClip = clip;
+            _surfaceScaleComp = scaleCompensation;
+            _surfaceOffset = 位置偏移;
+            _surfacePacked = packedAlpha;
+            ApplyVideoQuadSurface();
             // 起始相位：循环态=随机相位（多枚同款单位错开扇翼，B-S3 同语义）；一次性=从头播。
             // 非驻留换片路径在此对 active 设 time；常驻路径已在上方 frame=0 归零
             if (!resident && loop && clip.length > 0.0)
@@ -610,16 +604,49 @@ namespace GIC.Battle
             // 否则动作片播完回待机时 shader 仍按打包布局采样绿幕画面=整幅错乱
             if (_videoMaterial != null && _videoMaterial.HasProperty("_PackedAlpha"))
                 _videoMaterial.SetFloat("_PackedAlpha", 0f);
-            if (_avatarVideoFlip != null)
+            // 回待机面：清「当前在显片」状态 → 单出口按 baseScale 原始比例（含朝向 sign）重算
+            _surfaceClip = null;
+            _surfaceScaleComp = 1f;
+            _surfaceOffset = Vector2.zero;
+            _surfacePacked = false;
+            ApplyVideoQuadSurface();
+        }
+
+        /// <summary>视频 quad 比例/位置单出口（2026-11-09 修「芭芭拉移动片被左右压扁」）：
+        /// 按「当前在显片」（_surfaceClip，null=待机片）重算宽高比、comp 补偿与位置偏移，朝向翻转只改符号。
+        /// 旧版 ApplyFacing 直接写 baseScale（待机片比例）——移动循环态 SetMoveAnimation 幂等早退（同片）
+        /// 不再重设，624×954 的跑步片被按 448×1074 的比例显示，横向压到 63.8%。
+        /// 换片（PlayActionVideo）/朝向（ApplyFacing）/回待机（RestoreIdleVideoSurface）三条路径统一走此方法。</summary>
+        private void ApplyVideoQuadSurface()
+        {
+            if (_avatarVideoFlip == null) return;
+            float sign = _faceLeft ? -1f : 1f;
+            if (_surfaceClip != null && _surfaceClip.height > 0)
             {
-                var facingScale = new Vector3(
-                    (_faceLeft ? -1f : 1f) * _avatarVideoFlipBaseScale.x,
+                // 打包片 aspect 修正：clip 含上下两区（打包高=1.5×色彩区高）——色彩区才对 quad 宽负责
+                float aspect = _surfaceClip.width / (float)_surfaceClip.height;
+                if (_surfacePacked) aspect *= 1.5f;
+                float comp = _surfaceScaleComp > 0f ? _surfaceScaleComp : 1f;
+                _avatarVideoFlip.localScale = new Vector3(
+                    sign * _avatarVideoFlipBaseScale.y * aspect * comp,
+                    _avatarVideoFlipBaseScale.y * comp,
+                    _avatarVideoFlipBaseScale.z);
+                // 位置微调（B-S4c 校准）：播放期间偏移基准位，播完/被打断经 RestoreIdleVideoSurface 恢复。
+                // x 分量随朝向 sign（2026-10-11 凯亚霜袭向左刺报障）：宽幅动作片画布内主体常不居中，
+                // 位置偏移本质=把画布内偏置的主体拉回单位锚点——镜像（localScale.x 翻负）沿画布中心轴
+                // 翻转，主体偏置随之换侧，补偿方向必须同步翻转。
+                _avatarVideoFlip.localPosition = new Vector3(
+                    _avatarVideoFlipBasePosition.x + sign * _surfaceOffset.x,
+                    _avatarVideoFlipBasePosition.y + _surfaceOffset.y,
+                    _avatarVideoFlipBasePosition.z);
+            }
+            else
+            {
+                _avatarVideoFlip.localScale = new Vector3(
+                    sign * _avatarVideoFlipBaseScale.x,
                     _avatarVideoFlipBaseScale.y,
                     _avatarVideoFlipBaseScale.z);
-                if (_avatarVideoFlip.localScale != facingScale)
-                    _avatarVideoFlip.localScale = facingScale;
-                if (_avatarVideoFlip.localPosition != _avatarVideoFlipBasePosition)
-                    _avatarVideoFlip.localPosition = _avatarVideoFlipBasePosition;
+                _avatarVideoFlip.localPosition = _avatarVideoFlipBasePosition;
             }
         }
 
@@ -701,9 +728,9 @@ namespace GIC.Battle
             if (_avatarSpriteFlip != null)
                 _avatarSpriteFlip.localScale = new Vector3(
                     sign * _avatarSpriteFlipBaseScale.x, _avatarSpriteFlipBaseScale.y, _avatarSpriteFlipBaseScale.z);
-            if (_avatarVideoFlip != null)
-                _avatarVideoFlip.localScale = new Vector3(
-                    sign * _avatarVideoFlipBaseScale.x, _avatarVideoFlipBaseScale.y, _avatarVideoFlipBaseScale.z);
+            // 视频 quad 走「当前在显片」单出口（2026-11-09）：旧版直接写 baseScale=待机片比例，
+            // 移动循环态翻朝向后 SetMoveAnimation 幂等早退不再重设 → 跑步片被压扁到 63.8% 宽
+            ApplyVideoQuadSurface();
         }
 
         // 头顶行布局常量（**面内高度**：沿倾斜组 local Y，随立牌后仰；立牌本体 0~_avatarDisplayHeight，

@@ -2702,3 +2702,15 @@ for (int i = 0; i < _sortBuffer.Count; i++)
 - 复验：1v1 双 AI 完整局（seed=20261109，65s/1303 tick）回放 **PASS 1363 段 / 7520 命令 / hash 65 拍 / 终局一致**，双跑一致。
 
 **④ 附带实证**：芭芭拉战技时轮 `startTime` 0→0.8 后，录制里她的投射物 `Damage.launchMs=800`（4 个单位共多条），凯亚仍 260/910——时轮→`RateSeconds`→`ProjectileEffect.LaunchSeconds`→`Damage.launchMs` 链路口径无误。
+
+## §194 视频 quad 比例三处写入口打架：朝向翻转把移动片压扁到 63.8%（2026-11-09 用户报障「选中敌方芭芭拉，动画明显被左右压扁」）
+
+- **症状**：移动中的芭芭拉立牌左右压扁。运行时实测 `AvatarVideo.localScale=(-0.407915, 0.977903)`，宽高比 **0.41713 = 待机片 448×1074 的比例**；而当时实际在播移动片 `barbara_run_loop`（624×954，宽高比 0.65409）——横向被压到 **63.8%**，与上一节刚修的朝向批同属「移动片显示」链路。
+- **根因**：`UnitView` 有三处各自写 `_avatarVideoFlip.localScale` / `localPosition`：
+  ① `PlayActionVideo`（正确）：宽 = `baseScale.y × 当前片纵横比 × comp`；
+  ② `RestoreIdleVideoSurface`（正确）：回待机用 `baseScale`；
+  ③ `ApplyFacing`（错）：翻朝向时**直接写 `baseScale`=待机片比例**，还把动作片的位置偏移一起清零。
+  `PlayMoveCoroutine` 调用序是 `SetFacing()` → `SetMoveAnimation(true)`，但后者在移动循环态对同片**幂等早退**（2026-11-05「角色闪烁」修复，防每 0.5s 重播跳首帧），于是「朝向翻转那一次」被 `ApplyFacing` 写坏的待机比例，此后没有任何路径再纠正 → **整个移动段压扁**。纯上下移动不触发翻朝向，故症状表现为「左右走才压扁」。
+- **修法**：抽单出口 `ApplyVideoQuadSurface()` + 「当前在显片」状态（`_surfaceClip / _surfaceScaleComp / _surfaceOffset / _surfacePacked`，`_surfaceClip=null` 表示待机片）。换片（`PlayActionVideo` 登记）、朝向（`ApplyFacing`）、回待机（`RestoreIdleVideoSurface` 清状态）三条路径统一走此方法，朝向翻转只改符号；位置偏移同源镜像。待机分支仍用 `baseScale.x` 原始比例，零回归。
+- **验证**：编辑模式单元断言（构造 `UnitView`+quad，注入实测 base 值 0.407915×0.977903、移动片 comp=0.961、offset=(-0.021,-0.042)）——A 待机 → 0.41713 ✓；B 移动片朝右 → **(0.61469, 0.93976) = 0.65409** ✓；C 移动中翻朝向左 → `(-0.61469, 0.93976)` 比例仍 0.65409、偏移同步镜像 ✓；D 回待机 → 0.41713 ✓。`unity_editor.refresh` 0 错（仅 `PetTtsClient` 既有 CS0414 警告）。
+- **通则**：**「基准态比例」与「当前播出内容比例」必须分开存**。只要同时存在「换内容」与「改镜像/姿态」两条独立写入口，任何一条用基准值覆写，都会在另一条的重设被幂等早退跳过时把坏状态固化成整段视觉错误。给 Transform 写 scale/position 的路径一律收口到「按当前在显内容重算」的单出口，幂等守卫只允许放在单出口内部。
