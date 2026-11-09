@@ -2714,3 +2714,26 @@ for (int i = 0; i < _sortBuffer.Count; i++)
 - **修法**：抽单出口 `ApplyVideoQuadSurface()` + 「当前在显片」状态（`_surfaceClip / _surfaceScaleComp / _surfaceOffset / _surfacePacked`，`_surfaceClip=null` 表示待机片）。换片（`PlayActionVideo` 登记）、朝向（`ApplyFacing`）、回待机（`RestoreIdleVideoSurface` 清状态）三条路径统一走此方法，朝向翻转只改符号；位置偏移同源镜像。待机分支仍用 `baseScale.x` 原始比例，零回归。
 - **验证**：编辑模式单元断言（构造 `UnitView`+quad，注入实测 base 值 0.407915×0.977903、移动片 comp=0.961、offset=(-0.021,-0.042)）——A 待机 → 0.41713 ✓；B 移动片朝右 → **(0.61469, 0.93976) = 0.65409** ✓；C 移动中翻朝向左 → `(-0.61469, 0.93976)` 比例仍 0.65409、偏移同步镜像 ✓；D 回待机 → 0.41713 ✓。`unity_editor.refresh` 0 错（仅 `PetTtsClient` 既有 CS0414 警告）。
 - **通则**：**「基准态比例」与「当前播出内容比例」必须分开存**。只要同时存在「换内容」与「改镜像/姿态」两条独立写入口，任何一条用基准值覆写，都会在另一条的重设被幂等早退跳过时把坏状态固化成整段视觉错误。给 Transform 写 scale/position 的路径一律收口到「按当前在显内容重算」的单出口，幂等守卫只允许放在单出口内部。
+
+## §195 字典元组 out var 在短路条件里「未明确赋值」= CS0170；投射物自转只许写旋转不许写位置（2026-11-09 芭芭拉水弹批）
+
+- **症状**：`bool has = key != null && dict.TryGetValue(key, out var v);` 之后用 `v.spin` 编译报 **CS0170 Use of possibly unassigned field**。原因=短路求值：`key == null` 时 `TryGetValue` 根本不调用，`out var v` 未赋值；元组是结构体，编译器要求「所有字段明确赋值」才能读。
+- **修法**：先 `var v = default((Sprite sprite, float scale, float spin));` 再 `bool has = key != null && dict.TryGetValue(key, out v);`。
+- **投射物自转实现要点**（`Battle/View/ProjectileSpinner.cs`）：飞行位置由 `BattleViewTween` 逐帧独占写入，自转组件**只写 `transform.rotation`**，两者互不干扰；基座（相机朝布告板四元数）由创建方传入，组件只叠 `Euler(0,0,角度)`；角度 `Mathf.Repeat` 有界（长局不涨成浮点大数）；`OnEnable` 归零 → 箭池复用不复用上一条的相位。
+- **池件开关纪律**：同一对象池件服务「有自转」与「无自转」两类弹射物——自转组件常驻、按本次配置 `enabled` 开关 + `Configure()` 重配；**不要 AddComponent/Destroy 反复增删**，也不要让禁用态组件继续每帧写 rotation（会让落地插土等姿态动画失效）。
+- **自转弹射物不做飞行方向对齐**：圆形/无朝向素材按相机朝向布告板即可；沿用「按飞行方向旋转到四向」会让水球每段飞行都瞬间摆到某个角度，观感像抽搐。
+
+## §196 换姿势立牌：SpriteRenderer 换 sprite 不改缩放（画布必须同高同锚）/ 静态立牌路径的主体占比折算与头顶锚点分离（2026-11-09 西风骑士素材包·决策一百零一）
+
+- **前提**：`SpriteRenderer.sprite = other` **不会重算 transform.localScale**——换图后画面尺寸 =「新 sprite 的像素 × 同一世界/像素比」。由此三条硬约束：
+  ①**两张图必须同画布高**（本例 1088）才是同 px→world 比例，否则换图瞬间人物会跳大小；
+  ②**脚底线必须同位**（本例内容底 y=1074）——否则「突进」会额外叠一层上下位移；
+  ③**画布中心锚必须一致**：SpriteRenderer 恒用 `pivot=(0.5,0.5)`（画布中心）绘制，`SetFacing` 的 `scale.x` 负值也是**绕画布中心**镜像。若攻击图的人物中心不在画布中心（宽幅突刺必然如此），必须在生成后处理时把「人物头心相对画布中心的偏移」做成与待机图**同值**（本例待机 +12px → 攻击图也 +12px），否则左右镜像会让人物横向跳位。
+- **宽幅姿势的画布扩宽公式**（脚本 `.codely-cli/tmp/knight-paperdoll/normalize_attack.py`）：按**头宽锚定**缩放（k=待机头宽/攻击图头宽，本例 153/92=1.663）→ 脚底对齐 → 宽度取「两侧各留 8px」的最小偶数解（本例 1224×1088）。**别用 bbox 高度当锚**：突刺时人体高度天然压缩（本例内容高只有站姿的 71%），按高度对齐会把人物放大成巨汉。
+- **静态立牌路径也开始吃 `立牌主体占比`**：`sprite 画布高 = 0.55 × 额外缩放 ÷ 主体占比`（以前只有视频路径折算，静态立牌留白直接白矮一截）。**但 `_avatarDisplayHeight` 必须恒=主体真实高**（`0.55 × 额外缩放`）——它是头顶血条锚点、纸片半高、投射物出箭原点的基准；把折算后的画布高塞进去，安柏这类留白多的立牌血条会凭空飘高 20%（视频路径早就靠「锚点不折算」避坑，静态路径照抄同一分离）。
+- **程序化立牌动作的三条实现纪律**：
+  ①**位姿单出口**：跳动（移动）与突进/前倾（攻击）都只经 `ApplyPaperdollPose()` 合成后一次写入 `localPosition/localRotation`——两条独立写 transform 的路径必然互相覆盖（同族坑 §194）；
+  ②**绕脚底而非绕中心**：旋转 sprite 后补 `(−h/2·sinθ, −h/2·(1−cosθ))`（h=画布高，θ 已含朝向符号），否则立牌像绕腰折断。推导：绕点 P=C+(0,−h/2) 旋转的等价位姿 `C' = P + R·(C−P)`；
+  ③**朝向符号随镜像翻转**：Unity TRS=T·R·S（先 `scale.x=-1` 镜像再旋转），同一世界旋转角在镜像态视觉反向——「朝行动方向前倾」的角必须乘上手朝向符号，否则往左打时立牌反着倒。
+- **性能**：位姿写入口先比值再写（`localPosition` 差 < 1e-10 且四元数点积 ≈1 则 return）——上百个静态立牌单位逐帧无谓写 transform 会触发整棵子树的矩阵重算。
+- **触发点语义**：移动跳动挂在既有 `SetMoveAnimation(bool)`（BattlePlayer.PlayMoveCoroutine 片起止，零命令流变化）；攻击突进挂在 `SkillCast` 分支的「无动作片」else（时长取 `skillData.timeline.totalTime`，回落 0.42s），**Move 型技能不触发**。视频单位 `_paperdollAction=false` 调用即早退。

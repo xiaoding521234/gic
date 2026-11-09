@@ -266,12 +266,13 @@ namespace GIC.Battle
         /// <summary>单位立牌视图表（unitId → UnitView；HUD 点击拾取/选中描边消费，2026-10-05 拍板）</summary>
         public IReadOnlyDictionary<string, UnitView> Views => _views;
 
-        /// <summary>per-unit 专属弹射物登记（UnitData.专属弹射物/缩放，2026-10-05 拍板「每位伙伴角色
+        /// <summary>per-unit 专属弹射物登记（UnitData.专属弹射物/缩放/自转速度，2026-10-05 拍板「每位伙伴角色
         /// 单独定制弹射物，通用染色箭矢保留给眷属」）：CreateView 建场登记、ClearViews 清空；命中箭/
         /// 消散箭/箭雨落箭三路经 actorUnitId 查此表——命中=专属素材+白染（美术即最终色）、
-        /// 未登记=通用 ArrowBolt+箭矢色板元素染色（眷属路径零回归）</summary>
-        private readonly Dictionary<string, (Sprite sprite, float scale)> _customProjectiles =
-            new Dictionary<string, (Sprite, float)>();
+        /// 未登记=通用 ArrowBolt+箭矢色板元素染色（眷属路径零回归）。
+        /// spin（2026-11-09 芭芭拉水弹批）=面内自转角速度（度/秒，0=不自转）</summary>
+        private readonly Dictionary<string, (Sprite sprite, float scale, float spin)> _customProjectiles =
+            new Dictionary<string, (Sprite, float, float)>();
 
         /// <summary>单位配置（DI 容器 [Bean] 缓存——ConfigManager 产出；2026-09-23 审查 Y10 收口，Bind 时注入）</summary>
         [Autowired] private UnitConfig _unitConfig;
@@ -1056,8 +1057,18 @@ namespace GIC.Battle
 
             // 朝向：先取屏幕平行布告板（面正对视线，与立牌后仰同族），再按飞行方向的屏幕投影
             // 绕视线轴旋转到四向其一（投影走 WorldToScreenPoint，不假设画布/世界轴向映射）
+            // 自转弹射物（水球等，2026-11-09 芭芭拉批）：不做飞行方向对齐（圆形素材无朝向语义），
+            // 世界基座=相机朝向布告板，面内角度由 ProjectileSpinner 逐帧叠加
             var cam = _viewCamera != null ? _viewCamera : CameraContext.Resolve();
-            if (cam != null && (to - from).sqrMagnitude > 1e-8f)
+            // out var 在 actorUnitId==null 的短路分支不会赋值——先给默认值再传 out（元组结构体未赋值即 CS0170）
+            var custom = default((Sprite sprite, float scale, float spin));
+            bool hasCustom = actorUnitId != null && _customProjectiles.TryGetValue(actorUnitId, out custom);
+            bool spinning = hasCustom && custom.spin != 0f;
+            if (spinning)
+            {
+                arrowGo.transform.rotation = cam != null ? cam.transform.rotation : _billboardRotation;
+            }
+            else if (cam != null && (to - from).sqrMagnitude > 1e-8f)
             {
                 var screenFrom = cam.WorldToScreenPoint(from);
                 var screenTo = cam.WorldToScreenPoint(to);
@@ -1076,7 +1087,7 @@ namespace GIC.Battle
             var sprite = ArrowSprite;
             float customScale = 1f;
             var color = tint;
-            if (actorUnitId != null && _customProjectiles.TryGetValue(actorUnitId, out var custom))
+            if (hasCustom)
             {
                 sprite = custom.sprite;   // 专属弹射物：美术即最终色
                 customScale = custom.scale;
@@ -1101,6 +1112,20 @@ namespace GIC.Battle
             if (_fog != null && _fog.Active && actorUnitId != null
                 && _views.TryGetValue(actorUnitId, out var actorView) && actorView != null)
                 _fog.RegisterProjectileVisual(arrowGo, actorView.OwnerTeam);
+
+            // 面内自转（2026-11-09 芭芭拉水弹批）：池件复用——本次单位配了自转则启用组件并按本次速度重配，
+            // 否则禁用（回落到按飞行方向对齐的静态姿态；组件常驻不销毁=池件零反复增删）
+            var spinner = arrowGo.GetComponent<ProjectileSpinner>();
+            if (spinning)
+            {
+                if (spinner == null) spinner = arrowGo.AddComponent<ProjectileSpinner>();
+                spinner.enabled = true;
+                spinner.Configure(cam != null ? cam.transform.rotation : _billboardRotation, custom.spin);
+            }
+            else if (spinner != null)
+            {
+                spinner.enabled = false;
+            }
             return arrowGo;
         }
 
@@ -1764,6 +1789,17 @@ namespace GIC.Battle
                                         packedAlpha: skillData.当前动作片Alpha打包); // 打包片直读 alpha 区跳过运行时抠色
                                 }
                             }
+                            else if (skillData != null && skillData.skillType != SkillType.Move)
+                            {
+                                // 程序化立牌动作（2026-11-09 低成本眷属表现）：该技能没有动作片时，静态立牌
+                                // 单位自己演「倾身+向前突进+收回」（攻击瞬间换 攻击立牌图）；视频单位
+                                // EnablePaperdollAction 未启用=此调用早退，零开销。时长取时轮 totalTime 对齐施放，
+                                // 无时轮回落 0.42 秒
+                                float castSeconds = skillData.timeline != null && skillData.timeline.totalTime > 0.05f
+                                    ? skillData.timeline.totalTime
+                                    : 0.42f;
+                                caster.PlayPaperdollAttack(castSeconds);
+                            }
                         }
                         StartCoroutine(PlaySkillCastVfxCoroutine(command));
                         break;
@@ -2356,6 +2392,8 @@ namespace GIC.Battle
             float standForward = 0f; // UnitData.立牌前移（2026-10-14 拍板：俯视立牌视觉重心补偿，0=不移动）
             GameObject buildingModel = null; // UnitData.建筑模型（配置后以 3D 替代纸片立牌）
             float buildingModelWidth = 1f;
+            Sprite attackStand = null;      // UnitData.攻击立牌图（程序化动作：攻击瞬间换的姿态立牌）
+            bool paperdollAction = false;   // UnitData.立牌程序化动作（低成本眷属表现，2026-11-09）
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
                 _unitConfig.TryGetUnitData(unitName, out var unitData))
             {
@@ -2386,9 +2424,12 @@ namespace GIC.Battle
                 standForward = unitData.立牌前移;
                 buildingModel = unitData.建筑模型;
                 buildingModelWidth = unitData.建筑模型宽度;
+                attackStand = unitData.攻击立牌图;
+                paperdollAction = unitData.立牌程序化动作;
                 if (unitData.专属弹射物 != null && !isSoul) // per-unit 专属弹射物登记（2026-10-05 拍板；命中/消散/箭雨三路消费——灵魂无弹射路径不登记）
                     _customProjectiles[state.unitId] = (unitData.专属弹射物,
-                        unitData.专属弹射物缩放 > 0f ? unitData.专属弹射物缩放 : 1f);
+                        unitData.专属弹射物缩放 > 0f ? unitData.专属弹射物缩放 : 1f,
+                        unitData.专属弹射物旋转速度);
             }
 
             var team = (TeamType)state.team;
@@ -2401,7 +2442,7 @@ namespace GIC.Battle
                 _billboardRotation, 立牌后倾角, state.hp, state.maxHp,
                 (useFullBody ? 全身立牌放大倍数 : 1f) * unitScale, idleVideo, hoverHeight,
                 state.cylinderDiameter, standForward, buildingModel, buildingModelWidth,
-                idleContentRatio); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）；主体占比（2026-11-09 尺寸归一化）
+                idleContentRatio, attackStand, paperdollAction); // per-unit 受击圆柱直径（协议核心批：快照真源与 Host 判定同源，0=回落全局 0.42）；立牌前移（俯视立牌格心视觉补偿）；主体占比（2026-11-09 尺寸归一化）；攻击立牌图+程序化动作（2026-11-09 低成本眷属表现）
             view.OwnerPlayerId = state.playerId; // 归属身份（2026-10-15 血条三色批：三色模式按自己/队友/敌分档判定）
             view.OwnerTeam = (TeamType)state.team;
             // 维度渲染层（2026-10-25 泄漏修复拍板 A）：单位渲染件整树挂维度层——相机 cullingMask

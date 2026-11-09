@@ -280,6 +280,35 @@ namespace GIC.Battle
         private Vector2 _surfaceOffset;
         private bool _surfacePacked;
 
+        // ==================== 程序化立牌动作（2026-11-09 低成本眷属表现，用户拍板） ====================
+        // 「对于眷属单位，不需要为每个动作制作视频，只要一个待机静态立牌即可；移动时让立牌上下跳动，
+        //  攻击时让立牌旋转一点向前突进又收回，攻击时需要一个新的立牌」——无待机视频的静态立牌单位
+        // 启用：移动=正弦跳动、攻击=微倾+突进+换 攻击立牌图。素材统一朝右单份+运行时镜像，突进方向=当前朝向；
+        // 位姿只经 ApplyPaperdollPose 一个出口写 Avatar 子物体（跳动与突进合成，互不覆盖）
+        [Header("程序化立牌动作（低成本眷属表现，2026-11-09）")]
+        [Tooltip("移动时立牌上下跳动的幅度（格；约 0.06=6cm，随单位身高观感微调）")]
+        [SerializeField] private float 跳动幅度 = 0.06f;
+
+        [Tooltip("移动时立牌上下跳动的角速度（弧度/秒；8≈1.3Hz 小跑节奏）")]
+        [SerializeField] private float 跳动角速度 = 8f;
+
+        [Tooltip("攻击时立牌向前突进的距离（格）")]
+        [SerializeField] private float 攻击突进距离 = 0.3f;
+
+        [Tooltip("攻击时立牌前倾角度（度；绕脚底旋转，正值=朝行动方向前倾）")]
+        [SerializeField] private float 攻击倾斜角度 = 9f;
+
+        private bool _paperdollAction;          // 程序化动作已启用（有静态立牌且无待机视频）
+        private Sprite _paperdollIdleSprite;    // 待机立牌（攻击结束换回）
+        private Sprite _paperdollAttackSprite;  // 攻击姿态立牌（null=只倾身突进不换图）
+        private Vector3 _paperdollBaseLocalPos; // Avatar 子物体基准 localPosition（位姿叠加锚点）
+        private bool _paperdollMoving;          // 移动态意图（SetMoveAnimation 驱动）
+        private float _paperdollBobPhase;       // 跳动相位
+        private float _paperdollBobWeight;      // 跳动混合权重 0~1（起步/停步平滑，防跳变）
+        private float _paperdollLungeX;         // 攻击突进位移（未乘朝向；正=朝行动方向）
+        private float _paperdollLungeTilt;      // 攻击前倾角（度，已含朝向符号=最终世界旋转）
+        private Coroutine _paperdollAttackCo;
+
         /// <summary>冻结/尸体停摆守卫（2026-10-25「敌方凯亚冻成长方体冰块」报障修复）：只停「已渲出首帧」
         /// 的播放器（frame≥1=首帧已落 RT，与 WaitForFirstFrameThenShow/大厅视频预热批同判据）。
         /// 并发同片施放的后到方 RT=新分配恒黑（ActionRtPool 私有 RT），若在首帧落地前 Pause：黑帧过不了
@@ -300,6 +329,9 @@ namespace GIC.Battle
 
         private void Update()
         {
+            // 程序化立牌动作（2026-11-09）：移动跳动/攻击突进的位姿合成——静态立牌单位也需逐帧事务
+            UpdatePaperdollAction();
+
             // 灵魂幽浮（决策九十一，2026-10-25）：倾斜组正弦上下漂（含悬浮离地基准 _soulBobBaseY）——
             // 本块先于视频停摆块恒执行（2026-10-26 灵魂待机动画拍板后视频路径建立）；暂停（timeScale=0）自动停
             if (IsSoulView && _tiltGroup != null)
@@ -471,6 +503,9 @@ namespace GIC.Battle
         /// 移动打断一次性动作片=loop 通道整块接管 RT/clip/scale（无需先恢复）；冻结/尸体态 Pause 停摆</summary>
         public void SetMoveAnimation(bool moving)
         {
+            // 程序化立牌动作（2026-11-09）：移动态=立牌上下跳动——视频单位此标志无消费者，
+            // 静态立牌单位的程序化动作模式在 UpdatePaperdollAction 里按它平滑进出
+            _paperdollMoving = moving;
             var vp = _videoPlayer;
             if (vp == null || _videoFailed) return;
             if (moving)
@@ -498,6 +533,115 @@ namespace GIC.Battle
                 if (CanHaltNow(rmove)) rmove.Pause();
             }
             SwitchToIdleLoop(vp);
+        }
+
+        // ==================== 程序化立牌动作（2026-11-09 低成本眷属表现） ====================
+
+        /// <summary>启用程序化立牌动作（BattlePlayer 建场按 UnitData.立牌程序化动作 调用）：
+        /// 移动=立牌上下跳动、攻击=微倾+向前突进再收回（配了 攻击立牌图 则攻击瞬间换姿势）。
+        /// 只在无待机视频的静态立牌路径生效（视频单位走动作片、3D 模型单位忽略）；幂等</summary>
+        public void EnablePaperdollAction(Sprite attackSprite)
+        {
+            if (_avatarSpriteFlip == null) return;
+            if (_paperdollAction) { _paperdollAttackSprite = attackSprite; return; }
+            _paperdollAction = true;
+            _paperdollAttackSprite = attackSprite;
+            _paperdollIdleSprite = _avatarRenderer != null ? _avatarRenderer.sprite : null;
+            _paperdollBaseLocalPos = _avatarSpriteFlip.localPosition;
+        }
+
+        /// <summary>攻击程序化动作（BattlePlayer SkillCast 分支驱动；该技能无可播动作片时调用）：
+        /// 立牌蓄势微退 → 前倾突进（换 攻击立牌图）→ 收回待机姿势。重复触发=从当前进度重新起手
+        /// （连击不叠影：协程先停旧的再起新的）。duration≤0.05=回落 0.42 秒（无时轮时的兜底节奏）</summary>
+        public void PlayPaperdollAttack(float duration)
+        {
+            if (!_paperdollAction || _avatarSpriteFlip == null) return;
+            if (duration <= 0.05f) duration = 0.42f;
+            if (_paperdollAttackCo != null) StopCoroutine(_paperdollAttackCo);
+            _paperdollAttackCo = StartCoroutine(PaperdollAttackRoutine(duration));
+        }
+
+        /// <summary>攻击突进协程：0~0.22 蓄势后撤 / 0.22~0.45 前冲到位 / 0.45~0.95 收回 / 余下归位。
+        /// 期间不写 sprite 其它属性，位姿统一交 ApplyPaperdollPose 合成（跳动同时照常进行）</summary>
+        private System.Collections.IEnumerator PaperdollAttackRoutine(float duration)
+        {
+            // 朝向符号：素材统一朝右、朝左靠 scale.x 负值镜像（Unity TRS=T·R·S=先镜像后旋转，
+            // 故「朝行动方向前倾」的世界旋转符号随朝向翻转）；突进位移在父空间直接乘符号
+            float sign = _faceLeft ? -1f : 1f;
+            float lean = -攻击倾斜角度 * sign; // 朝右=顺时针（负 z）、朝左=逆时针（正 z）
+            if (_paperdollAttackSprite != null && _avatarRenderer != null)
+                _avatarRenderer.sprite = _paperdollAttackSprite;
+
+            float t = 0f;
+            while (t < 1f && _avatarSpriteFlip != null)
+            {
+                t += Time.deltaTime / duration;
+                float tt = Mathf.Min(t, 1f);
+                if (tt < 0.22f)
+                {
+                    float k = Mathf.SmoothStep(0f, 1f, tt / 0.22f);
+                    _paperdollLungeX = -0.2f * 攻击突进距离 * sign * k; // 蓄势微退
+                    _paperdollLungeTilt = 0f;
+                }
+                else if (tt < 0.45f)
+                {
+                    float k = Mathf.SmoothStep(0f, 1f, (tt - 0.22f) / 0.23f);
+                    _paperdollLungeX = Mathf.Lerp(-0.2f * 攻击突进距离, 攻击突进距离, k) * sign;
+                    _paperdollLungeTilt = Mathf.Lerp(0f, lean, k);
+                }
+                else
+                {
+                    float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((tt - 0.45f) / 0.5f));
+                    _paperdollLungeX = Mathf.Lerp(攻击突进距离 * sign, 0f, k);
+                    _paperdollLungeTilt = Mathf.Lerp(lean, 0f, k);
+                }
+                ApplyPaperdollPose();
+                yield return null;
+            }
+
+            // 收尾归位（协程被停/换件时同样走这里：姿势与贴图不残留）
+            _paperdollLungeX = 0f;
+            _paperdollLungeTilt = 0f;
+            if (_paperdollAttackSprite != null && _avatarRenderer != null && _paperdollIdleSprite != null)
+                _avatarRenderer.sprite = _paperdollIdleSprite;
+            ApplyPaperdollPose();
+            _paperdollAttackCo = null;
+        }
+
+        /// <summary>跳动推进（Update 每帧；仅程序化动作单位）。权重 0.15 秒内平滑进/出——起步不瞬间弹起、
+        /// 停步不瞬间落地；正弦取绝对值=「每次落地再弹起」的廉价小跳观感（对称正弦读作上下浮动）。
+        /// 冻结/尸体不跳（保持当前位，解冻/复苏后权重仍在=自然续跳）</summary>
+        private void UpdatePaperdollAction()
+        {
+            if (!_paperdollAction || _avatarSpriteFlip == null) return;
+            float target = _paperdollMoving ? 1f : 0f;
+            if (!Mathf.Approximately(_paperdollBobWeight, target))
+                _paperdollBobWeight = Mathf.MoveTowards(_paperdollBobWeight, target, Time.deltaTime * 6f);
+            if (_paperdollBobWeight > 0f && !IsFrozen && !IsCorpse)
+                _paperdollBobPhase += Time.deltaTime * 跳动角速度;
+            ApplyPaperdollPose();
+        }
+
+        /// <summary>立牌位姿单出口（跳动 + 攻击突进 + 绕脚底前倾合成）：绕脚底旋转=旋转 sprite 后在
+        /// 父空间补 (−h/2·sinθ, −h/2·(1−cosθ)) 位移（h=立牌画布高），立牌底部不离开原地——
+        /// 若绕 sprite 中心转，立牌会像绕腰折断</summary>
+        private void ApplyPaperdollPose()
+        {
+            if (_avatarSpriteFlip == null) return;
+            float bob = Mathf.Abs(Mathf.Sin(_paperdollBobPhase)) * 跳动幅度 * _paperdollBobWeight;
+            float h2 = _paperdollBaseLocalPos.y; // sprite 画布半高（旋转轴=脚底所在的原点）
+            float rad = _paperdollLungeTilt * Mathf.Deg2Rad;
+            // 绕脚底旋转的等价位移：C' = C + (0,−h2) − R·(0,−h2) = (−h2·sinθ, −h2·(1−cosθ))
+            var pivotFix = new Vector2(-h2 * Mathf.Sin(rad), -h2 * (1f - Mathf.Cos(rad)));
+            var pos = _paperdollBaseLocalPos
+                + new Vector3(_paperdollLungeX + pivotFix.x, bob + pivotFix.y, 0f);
+            var rot = Quaternion.Euler(0f, 0f, _paperdollLungeTilt);
+            // 归位态零写入（上百个单位逐帧写 transform=矩阵重算白烧；值相同时直接跳过）
+            if ((_avatarSpriteFlip.localPosition - pos).sqrMagnitude < 1e-10f &&
+                Mathf.Abs(Quaternion.Dot(_avatarSpriteFlip.localRotation, rot)) > 0.9999999f)
+                return;
+            _avatarSpriteFlip.localPosition = pos;
+            _avatarSpriteFlip.localRotation = rot;
         }
 
         // ==================== 技能动作片（B-S4c 战技/爆发动作轨：一次性动作视频，播完自动回待机循环） ====================
@@ -794,11 +938,16 @@ namespace GIC.Battle
         /// <param name="idleContentRatio">待机片主体占比（UnitData.立牌主体占比，2026-11-09 新增）：
         /// 人物主体像素高 ÷ 片高；视频 quad 高按它折算放大（底边仍贴地），把画布留白折掉——
         /// 各角色主体真实同高；0/1=不折算（旧行为）；头顶条锚点不受影响（恒=0.55×额外缩放）</param>
+        /// <param name="attackSprite">攻击姿态立牌（UnitData.攻击立牌图，2026-11-09 低成本眷属表现）：
+        /// 仅 paperdollAction 生效时用于攻击瞬间换姿势；null=攻击只倾身突进不换图</param>
+        /// <param name="paperdollAction">程序化立牌动作（UnitData.立牌程序化动作）：无待机视频的静态立牌
+        /// 单位启用「移动上下跳动 + 攻击倾身突进」——视频单位/3D 建筑模型路径自动忽略</param>
         public static UnitView Create(Transform parent, string unitId, Sprite avatar, Color ownerColor,
             Quaternion billboardRotation, float tiltDegrees = 55f, int hp = 0, int maxHp = 0,
             float avatarScale = 1f, VideoClip idleVideo = null,
             float hoverHeight = 0f, float cylinderDiameter = 0f, float standForward = 0f,
-            GameObject buildingModel = null, float buildingModelWidth = 1f, float idleContentRatio = 1f)
+            GameObject buildingModel = null, float buildingModelWidth = 1f, float idleContentRatio = 1f,
+            Sprite attackSprite = null, bool paperdollAction = false)
         {
             var root = new GameObject($"UnitView_{unitId}");
             root.transform.SetParent(parent, false);
@@ -844,13 +993,19 @@ namespace GIC.Battle
 
             if (baseSprite != null)
             {
-                float displayHeight = AvatarHeight * avatarScale;
+                // 主体占比折算（2026-11-09 尺寸归一化，视频/静态两路同口径）：画布高按「人物主体像素高 ÷
+                // 画布高」放大（底边仍贴地），把立牌图里的空白留白折掉——静态立牌单位才能和视频单位
+                // 主体真正同高（西风骑士立牌留白 4.4% → 不折算就白白矮一截）。0/1=不折算（旧行为）。
+                // 注意：_avatarDisplayHeight 恒=主体真实显示高（头顶条锚点=0.55×额外缩放，不随留白飘高），
+                // 只有 sprite 自身的画布高才折算
+                float spriteContentRatio = idleContentRatio > 0.05f ? Mathf.Min(idleContentRatio, 1.2f) : 1f;
+                float displayHeight = AvatarHeight * avatarScale / spriteContentRatio;
                 float worldHeight = baseSprite.bounds.size.y;
                 float scale = worldHeight > 0f ? displayHeight / worldHeight : 1f;
                 spriteGo.transform.localScale = Vector3.one * scale;
                 // sprite 中心置于半高处（外层原点=底边 → 底边贴地、立牌居中于半高）
                 spriteGo.transform.localPosition = new Vector3(0f, displayHeight * 0.5f, 0f);
-                view._avatarDisplayHeight = displayHeight;
+                view._avatarDisplayHeight = AvatarHeight * avatarScale;
                 // 朝向镜像锚点（拍板③）：记 base scale 供 SetFacing 翻 x（默认朝右=base 不动）
                 view._avatarSpriteFlip = spriteGo.transform;
                 view._avatarSpriteFlipBaseScale = spriteGo.transform.localScale;
@@ -911,6 +1066,11 @@ namespace GIC.Battle
                 view._idleVideoClip = idleVideo; // 待机/回切目标片（B-S4a 移动态接线；移动片=per-skill SetMoveVideo 登记，决策四十四）
                 if (!prewarmed)
                     view.StartCoroutine(view.WaitForFirstFrameThenShow(videoGo));
+            }
+            else if (paperdollAction && buildingModel == null)
+            {
+                // 程序化立牌动作（2026-11-09）：静态立牌单位零素材成本的移动/攻击表现
+                view.EnablePaperdollAction(attackSprite);
             }
 
             // 阵营色底座圆盘（B5 连续判定：受击圆柱的可视化——直径=该单位受击圆柱直径
