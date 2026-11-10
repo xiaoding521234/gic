@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GIC.Framework;
 using GIC.Data;
+using Vector2Int = UnityEngine.Vector2Int;
 namespace GIC.Battle
 {
     /// <summary>
