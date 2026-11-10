@@ -353,6 +353,18 @@ namespace GIC.Battle
         /// （取消/阶段切换）经 ExitAiming 统一收口清零</summary>
         private bool _dragAiming;
 
+        // ==================== 格线可读性（2026-11-10 画面增强批 A 组） ====================
+
+        /// <summary>格线强调过渡时长（秒）：瞄准/拖动/悬停/出牌进入与退出操作态时的平滑时间。
+        /// prefab 未序列化=脚本默认生效（Inspector 可调）</summary>
+        [Tooltip("格线强调过渡时长（秒；0.18≈一眨眼，太长会显得拖沓）")]
+        [SerializeField] private float 格线强调过渡秒 = 0.18f;
+
+        /// <summary>当前格线强调度 0..1（逐帧趋近目标后写入 BattleBoard；0=常态、1=操作态）</summary>
+        private float _gridEmphasis01;
+
+
+
         /// <summary>拖拽自由角瞄准向量 X（千分定点——盘心→小盘位移归一；决策九十五 P4 蓝图 §4.1
         /// 「任意角度」：取代旧十字轴量化；0=非拖拽会话/点击式——上交时 FillAimVector 回落
         /// 施法者→落点推导）</summary>
@@ -773,6 +785,7 @@ namespace GIC.Battle
 
             UpdateHandHover(); // 手牌下沉/接近上移（独立于阶段轮询，自带空守卫）
             UpdateAimHover(); // 点击式瞄准悬停格提亮（2026-10-06 拍板；Aiming+非拖动才有悬停）
+            UpdateGridEmphasis(); // 2026-11-10 画面增强批：格线常态极弱、操作期提亮
             UpdateAimFxAnimation(); // 瞄准增强动画推进（2026-10-15：箭头 chevron 滚动+光柱呼吸）
             UpdateHandCardDrag(); // 手牌拖拽手感主循环（决策五十四：跟随/抖动/让位/出牌区蒙层）
             UpdateSelectMarkerFog(); // 迷雾批 2026-10-17：选中的敌方单位走进迷雾——选中弧光随隐
@@ -4141,6 +4154,24 @@ namespace GIC.Battle
             if (old.HasValue) RefreshCellVisual(old.Value);
             if (hover.HasValue) RefreshCellVisual(hover.Value);
             UpdateAimPreviewFx(); // 悬停变化驱动预计命中描边/自由角指示器（2026-10-15 瞄准预览批+P4-C）
+        }
+
+        /// <summary>
+        /// 格线可读性驱动（2026-11-10 画面增强批 A 组）：瞄准/拖动瞄准/手牌拖拽/悬停可选格=操作态，
+        /// 其余=常态——逐帧平滑趋近后写进棋盘（BattleBoard.SetGridEmphasis01）。纯表现层：
+        /// 不进命令流、不进回放；场上有无格线层均直通（棋盘侧幂等守卫）。
+        /// </summary>
+        private void UpdateGridEmphasis()
+        {
+            if (_board == null) return;
+            bool interacting = _state == HudState.Aiming
+                || _dragAiming
+                || _handDrag != null
+                || _hoverAimCell.HasValue;
+            float target = interacting ? 1f : 0f;
+            float step = Time.unscaledDeltaTime / Mathf.Max(0.02f, 格线强调过渡秒);
+            _gridEmphasis01 = Mathf.MoveTowards(_gridEmphasis01, target, step);
+            _board.SetGridEmphasis01(_gridEmphasis01);
         }
 
         /// <summary>该格材质按三态重算（待定金 > 悬停提亮 > 推荐/不推荐；quad 缺失安全跳过）</summary>

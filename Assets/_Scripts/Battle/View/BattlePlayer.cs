@@ -665,7 +665,8 @@ namespace GIC.Battle
                 UnityEngine.Random.Range(-0.42f, 0.42f), UnityEngine.Random.Range(0.3f, 0.65f),
                 UnityEngine.Random.Range(-0.15f, 0.15f));
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, value.ToString(),
-                Palette.灵魂蓝, value, _playbackSpeed);
+                Palette.灵魂蓝, value, _playbackSpeed,
+                groupKey: $"soul|{view.UnitId}");
         }
 
         /// <summary>采集数字（docs/47 资源点批）：资源点格上弹「+N」摩拉金飘字——锚=资源点世界位
@@ -678,7 +679,8 @@ namespace GIC.Battle
             var palette = Palette != null ? Palette : BattlePalette.Instance;
             if (palette == null) return;
             var pos = _board.CellToWorld(cell) + new Vector3(0f, 0.55f, 0f);
-            EnsureDamageNumbers().Spawn(pos, $"+{moraGain}", palette.采集摩拉色, moraGain, _playbackSpeed);
+            EnsureDamageNumbers().Spawn(pos, $"+{moraGain}", palette.采集摩拉色, moraGain, _playbackSpeed,
+                groupKey: $"mora|{cell.x},{cell.y}", plusSign: true);
         }
 
         // ==================== 消息处理（客户端侧） ====================
@@ -2184,8 +2186,18 @@ namespace GIC.Battle
             // 维度视角门（2026-10-25 泄漏修复：主世界伤害数字只在主世界视角弹、灵魂数字只在地脉
             // 视角弹——Overlay 画布不吃相机 culling，逐弹出点门控；②a 泛化 DimensionView）
             if (view.DimensionView != _currentDimension) yield break;
+            // 高频连击聚合（2026-11-10 拍板）：同目标同类别同反应同暴击态在聚合窗口内并成一个数字持续上涨；
+            // 格挡固定文案不聚合（groupKey=null）。颜色由数字层附加（异色不合并）
+            string groupKey = blocked ? null
+                : isHeal ? $"heal|{view.UnitId}|{(lifestealPrefix ? 1 : 0)}"
+                : $"dmg|{view.UnitId}|{reactionKind}|{element}|{(isCrit ? 1 : 0)}";
+            string numberPrefix = isHeal
+                ? (lifestealPrefix ? $"{LifeStealName()} " : string.Empty)
+                : (reactionName != null ? $"{reactionName} " : string.Empty);
+            string numberSuffix = isHeal ? string.Empty : critSuffix;
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, text,
-                numberColor, value, _playbackSpeed, isHeal, isCrit);
+                numberColor, value, _playbackSpeed, isHeal, isCrit,
+                groupKey: groupKey, prefix: numberPrefix, suffix: numberSuffix, plusSign: isHeal);
         }
 
         /// <summary>受击闪色恢复尾巴（S5：不进 playbacks=不 gate ack——Host 片节拍只等位移/伤害主体）</summary>
@@ -2225,7 +2237,8 @@ namespace GIC.Battle
                 UnityEngine.Random.Range(-0.15f, 0.15f));
             if (view.DimensionView != _currentDimension) return; // 维度视角门（2026-10-25 泄漏修复；②a 泛化）
             EnsureDamageNumbers().Spawn(view.transform.position + randomOffset, $"+{delta}",
-                Palette.元能条色, delta, _playbackSpeed);
+                Palette.元能条色, delta, _playbackSpeed,
+                groupKey: $"energy|{view.UnitId}", plusSign: true);
         }
 
         /// <summary>玩家资源命令命中时刻应用（B-3 摩拉掠夺，同元能「命中时才给」）：到点再发资源事件；

@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,7 +21,11 @@ namespace GIC.Battle
     /// 回血类（吸血/治疗，Spawn isHeal=true）曲线例外（2026-10-02 拍板「不应和伤害一样从大变小，直接以
     /// 最终大小出现+上浮更多+比伤害更小」）：不爆裂——全程恒定停留尺寸；尺寸=同映射×回血尺寸倍率（更小）；
     /// 上浮取回血上浮像素（比伤害更高）。
+    /// 2026-11-10 拍板三件：①全部弹出数字整体尺寸 ×0.5（整体尺寸倍率）；②同一目标同类别同色同反应的高频
+    /// 连击（如 2 秒 25 段）在聚合窗口内并入同一个数字、数值持续上涨并每次并入重播一次小回弹（入场动画），
+    /// 不再刷屏；③新数字在屏幕空间避开已有数字的包围盒（垂直优先、其次对角），避免多个数字堆在一起看不清。
     /// 池化复用；本图层不挂 GraphicRaycaster（Overlay 画布无射线器即不吃射线，勿补——会挡 HUD 按钮）。
+    /// Update 驱动（聚合需要延长存活/重播回弹，协程固定时长表达不了——2026-11-10 从协程改为逐帧状态机）。
     /// </summary>
     public class BattleDamageNumbers : MonoBehaviour
     {
@@ -50,6 +53,33 @@ namespace GIC.Battle
 
         [Tooltip("屏幕边缘夹取留白（屏幕像素）——屏幕外/贴边伤害数字夹到视口内完整显示=战斗方向提醒，2026-09-26 拍板")]
         [SerializeField] private float 屏幕边缘留白 = 12f;
+
+        [Header("整体尺寸（2026-11-10 拍板：伤害/治疗等一切弹出数字整体缩小 50%）")]
+        [Tooltip("尺寸映射结果的整体倍率（1=原尺寸，0.5=缩小一半）——回血/暴击倍率在其后再乘")]
+        [SerializeField] private float 整体尺寸倍率 = 0.5f;
+
+        [Header("高频连击聚合（同目标同类别同色同反应在窗口内合并为一个数字持续上涨）")]
+        [Tooltip("聚合窗口（秒）：与上一次并入的间隔小于本值即并入同一数字（2 秒 25 段连击=0.08s 间隔全并）")]
+        [SerializeField] private float 聚合窗口 = 0.6f;
+
+        [Tooltip("单条聚合数字最长总寿命（秒）：超过后新伤害另起一个数字，避免一条数字永不消失")]
+        [SerializeField] private float 聚合最长总时长 = 3.2f;
+
+        [Tooltip("每次并入时的小回弹峰值倍率（叠加在停留尺寸上的入场动画）")]
+        [SerializeField] private float 聚合脉冲倍率 = 1.28f;
+
+        [Tooltip("小回弹时长（秒）")]
+        [SerializeField] private float 聚合脉冲时长 = 0.14f;
+
+        [Header("数字避让（屏幕空间：新数字避开已有数字包围盒，避免堆积看不清）")]
+        [Tooltip("数字之间的最小屏幕间距（像素）")]
+        [SerializeField] private float 避让间距 = 12f;
+
+        [Tooltip("垂直候选位尝试次数（向上/向下交替）——垂直优先，因为伤害数字天然向上堆叠")]
+        [SerializeField] private int 避让垂直尝试 = 4;
+
+        [Tooltip("垂直步长对「数字高+间距」的倍率（1=紧邻）")]
+        [SerializeField] private float 避让垂直步长 = 1.0f;
 
         [Header("伤害→停留时长映射（2026-09-26 拍板「数值越大，停留时间越长」——与尺寸映射同构，替换旧固定总时长）")]
         [Tooltip("停留时长基准（秒）：total=基准+系数×log10(max(1,|量值|))——小伤害不短于原 0.95s 观感")]
@@ -95,12 +125,37 @@ namespace GIC.Battle
             public TextMeshProUGUI Text;
             public CanvasGroup Group;
             public Material OutlineMat; // SDF 描边材质实例（池条目持有；OnDestroy 统一释放）
-            public Coroutine Co;
+
+            public bool Active;
+            public string GroupKey;     // 聚合键（null=不聚合）
+            public string FixedText;    // 不聚合时的固定文案（如「格挡」）
+            public string Prefix;       // 聚合重建文本：前缀（反应名/吸血名）
+            public string Suffix;       // 聚合重建文本：后缀（暴击「!」）
+            public bool PlusSign;       // 聚合重建文本：治疗/资源类带 +
+            public bool IsHeal;
+            public bool IsCrit;
+            public Vector3 Anchor;      // 世界锚点（固定，不随单位移动）
+            public Vector2 ScreenOffset;// 避让偏移（屏幕像素）
+            public Vector2 PosPx;       // 当前屏幕位置（避让判定用）
+            public Vector2 HalfPx;      // 当前屏幕半尺寸（含留白）
+            public Vector2 HalfRef;     // 文本本地半尺寸（不含缩放）
+            public float Magnitude;     // 累计量值（驱动尺寸/时长映射）
+            public float SettleScale;
+            public float PopScale;
+            public float CurrentScale;
+            public float Speed;
+            public float Age;           // 首次出现至今（上浮进度/聚合寿命）
+            public float SinceAccum;    // 距上次出现/并入
+            public float PulseLeft;     // 聚合回弹剩余时长
         }
 
         private readonly Queue<Entry> _pool = new Queue<Entry>();
         /// <summary>全部池条目（含已回收的——释放时统一销材质）</summary>
         private readonly List<Entry> _allEntries = new List<Entry>();
+        /// <summary>在场（活跃）数字</summary>
+        private readonly List<Entry> _active = new List<Entry>();
+        /// <summary>聚合键 → 在场数字</summary>
+        private readonly Dictionary<string, Entry> _byKey = new Dictionary<string, Entry>();
 
         /// <summary>初始化（确保画布+相机；幂等——重复调用不重建）</summary>
         public void Init(Camera cam)
@@ -121,89 +176,261 @@ namespace GIC.Battle
             scaler.matchWidthOrHeight = 0.5f;
         }
 
-        /// <summary>弹一个数字。worldAnchor=受击点世界坐标（投影为屏幕锚点）；magnitude=量值绝对值（驱动尺寸映射）；speed=播放速率倍率（与 BattlePlayer._playbackSpeed 同语义）；isHeal=回血类（吸血/治疗）——不爆裂、上浮更高、尺寸更小（2026-10-02 拍板「直接以最终大小出现+上浮更多+比伤害更小」）；isCrit=暴击（2026-10-02 幸运暴击批）——停留尺寸×暴击尺寸倍率（爆裂初值随停留尺寸同乘=全程更大），色不变</summary>
-        public void Spawn(Vector3 worldAnchor, string text, Color color, float magnitude, float speed, bool isHeal = false, bool isCrit = false)
+        /// <summary>弹一个数字。worldAnchor=受击点世界坐标（投影为屏幕锚点）；magnitude=量值绝对值（驱动尺寸映射）；
+        /// speed=播放速率倍率（与 BattlePlayer._playbackSpeed 同语义）；isHeal=回血类（吸血/治疗）——不爆裂、
+        /// 上浮更高、尺寸更小（2026-10-02 拍板）；isCrit=暴击（2026-10-02 幸运暴击批）——停留尺寸×暴击尺寸倍率；
+        /// groupKey=聚合键（同一目标的同类高频连击传相同键；null=不聚合，如「格挡」固定文案）——键内应含目标与
+        /// 类别/反应/暴击等语义，颜色由本方法自动附加（异色不合并）；prefix/suffix/plusSign=聚合时重建文本用
+        /// （反应名前缀、暴击后缀、治疗 + 号）。</summary>
+        public void Spawn(Vector3 worldAnchor, string text, Color color, float magnitude, float speed,
+            bool isHeal = false, bool isCrit = false, string groupKey = null,
+            string prefix = null, string suffix = null, bool plusSign = false)
         {
-            if (_canvas == null || text == null || text.Length == 0) return;
+            if (_canvas == null || string.IsNullOrEmpty(text)) return;
+
+            speed = Mathf.Max(0.1f, speed);
+            magnitude = Mathf.Max(0f, magnitude);
+
+            string key = null;
+            if (!string.IsNullOrEmpty(groupKey))
+            {
+                var c = (Color32)color;
+                uint packed = ((uint)c.r << 24) | ((uint)c.g << 16) | ((uint)c.b << 8) | c.a;
+                key = groupKey + "|" + packed;
+            }
+
+            // 高频连击并入（2026-11-10 拍板）：窗口内 + 未超单条最长寿命——数值上涨、重播小回弹
+            if (key != null && _byKey.TryGetValue(key, out var exist) && exist != null && exist.Active
+                && exist.SinceAccum <= 聚合窗口 && exist.Age <= 聚合最长总时长)
+            {
+                Accumulate(exist, magnitude, prefix, suffix, plusSign);
+                return;
+            }
 
             var entry = _pool.Count > 0 ? _pool.Dequeue() : CreateEntry();
-            if (entry.Co != null) StopCoroutine(entry.Co);
+            if (key != null) _byKey[key] = entry;
+
+            entry.Active = true;
+            entry.GroupKey = key;
+            entry.FixedText = key == null ? text : null;
+            entry.Prefix = prefix;
+            entry.Suffix = suffix;
+            entry.PlusSign = plusSign;
+            entry.IsHeal = isHeal;
+            entry.IsCrit = isCrit;
+            entry.Anchor = worldAnchor;
+            entry.Speed = speed;
+            entry.Magnitude = magnitude;
+            entry.Age = 0f;
+            entry.SinceAccum = 0f;
+            entry.PulseLeft = 0f;
+            entry.ScreenOffset = Vector2.zero;
+            entry.SettleScale = ComputeSettleScale(magnitude, isHeal, isCrit);
+            entry.PopScale = isHeal ? entry.SettleScale : entry.SettleScale * 初始停留比;
+            entry.CurrentScale = entry.PopScale;
 
             entry.Text.text = text;
             entry.Text.color = color;
             entry.Group.alpha = 1f;
             entry.Go.SetActive(true);
+            entry.Text.ForceMeshUpdate(); // 避让/尺寸要用本文本的实测包围盒（文本在生命周期内可能再变，见 Accumulate）
+            CacheBounds(entry);
 
-            float settleScale = Mathf.Clamp(
-                尺寸基准 + 尺寸对数系数 * Mathf.Log10(Mathf.Max(1f, magnitude)), 尺寸下限, 尺寸上限);
-            // 回血类尺寸=伤害同映射×回血尺寸倍率（2026-10-02 拍板「比伤害更小」）；
-            // Play 中回血全程恒定该尺寸（不爆裂），伤害爆裂→收缩也回到同一映射基准
-            if (isHeal) settleScale *= 回血尺寸倍率;
-            // 暴击尺寸（2026-10-02 幸运暴击批）：停留尺寸整体×暴击尺寸倍率——爆裂初值=停留×初始停留比
-            // 自然随乘（首帧与停留同步更大），色不变（GI 式暴击=更大同色）
-            if (isCrit) settleScale *= 暴击尺寸倍率;
-            // 停留时长映射（2026-09-26 拍板「数值越大，停留时间越长」）：与尺寸映射同构=对数——
-            // 小伤害≈原 0.95s 观感，大伤害渐长封顶 2.2s；收缩段与淡出比例不变=延长的是停留与渐隐段
-            float totalSeconds = Mathf.Clamp(
-                时长基准 + 时长对数系数 * Mathf.Log10(Mathf.Max(1f, magnitude)), 时长下限, 时长上限);
-            entry.Co = StartCoroutine(Play(entry, worldAnchor, settleScale, Mathf.Max(0.1f, speed), totalSeconds, isHeal));
+            entry.Rect.localScale = Vector3.one * entry.CurrentScale;
+            var cam = _camera != null ? _camera : CameraContext.Resolve();
+            if (cam != null)
+            {
+                entry.PosPx = ScreenPointOf(cam, entry.Anchor, 0f);
+                float sf = _canvas != null ? _canvas.scaleFactor : 1f;
+                // 避让占位按「停留尺寸」而非首帧爆裂尺寸：爆裂只持续 0.35s，按它排位会把数字推得过散
+                entry.HalfPx = new Vector2(
+                    entry.HalfRef.x * entry.SettleScale * sf + 屏幕边缘留白,
+                    entry.HalfRef.y * entry.SettleScale * sf + 屏幕边缘留白);
+                entry.ScreenOffset = ChooseOffset(entry.PosPx, entry.HalfPx);
+                var clamped = ClampToViewport(entry.PosPx + entry.ScreenOffset, entry.HalfPx);
+                entry.PosPx = clamped;
+                entry.Rect.position = new Vector3(clamped.x, clamped.y, 0f);
+            }
+            _active.Add(entry);
         }
 
-        private IEnumerator Play(Entry entry, Vector3 anchor, float settleScale, float speed, float totalSeconds, bool isHeal)
+        /// <summary>并入一次高频伤害/治疗：累计数值、按新量值重算停留尺寸、重播小回弹（入场动画）。
+        /// 位置不变（避免数字在连击途中乱跳）；文本即时上涨。</summary>
+        private void Accumulate(Entry e, float magnitude, string prefix, string suffix, bool plusSign)
         {
-            float total = totalSeconds / speed;
-            float shrink = 收缩时长 / speed;
-            // #14 审查批：文本在数字生命周期内不变——textBounds 每读强制 TMP mesh 重算，旧版逐帧读
-            // =每数字每帧一次冗余重算；首帧读一次缓存（闭包捕获；含长前缀"蒸发 99999"的实测包围）
-            Vector2 boundsHalf = default; bool boundsCached = false;
-            float popScale = settleScale * 初始停留比;
-            float fadeSpan = 1f - 淡出起点比例;
-            float risePixels = isHeal ? 回血上浮像素 : 上浮像素;
+            if (prefix != null) e.Prefix = prefix;
+            if (suffix != null) e.Suffix = suffix;
+            if (plusSign) e.PlusSign = true;
 
-            yield return BattleViewTween.Over(total, t =>
+            e.Magnitude += magnitude;
+
+            float shown = e.CurrentScale;
+            e.SettleScale = ComputeSettleScale(e.Magnitude, e.IsHeal, e.IsCrit);
+            e.PopScale = Mathf.Max(shown, e.SettleScale); // 从当前可见尺寸连续收缩到新停留尺寸（不突跳）
+            e.SinceAccum = 0f;
+            e.PulseLeft = Mathf.Max(0f, 聚合脉冲时长);
+
+            e.Text.text = BuildText(e, e.Magnitude);
+            e.Group.alpha = 1f;
+            e.Text.ForceMeshUpdate();
+            CacheBounds(e);
+        }
+
+        /// <summary>逐帧状态机（聚合需要延长存活/重播回弹，协程固定时长表达不了）</summary>
+        private void Update()
+        {
+            if (_active.Count == 0) return;
+
+            var cam = _camera != null ? _camera : CameraContext.Resolve();
+            float dt = Time.deltaTime;
+            float sf = _canvas != null ? _canvas.scaleFactor : 1f;
+
+            for (int i = _active.Count - 1; i >= 0; i--)
             {
-                var cam = _camera != null ? _camera : CameraContext.Resolve();
-                if (cam == null) return;
+                var e = _active[i];
+                if (e == null || !e.Active) { _active.RemoveAt(i); continue; }
 
-                // 缩放（先算——边缘夹取要用当前帧尺寸）：伤害=首帧爆裂 easeOut 收缩回停留尺寸；
-                // 回血类（吸血/治疗）不爆裂——全程恒定停留尺寸（2026-10-02 拍板「直接以最终大小出现」）
-                float sT = shrink > 0f ? Mathf.Clamp01(t * total / shrink) : 1f;
+                e.Age += dt;
+                e.SinceAccum += dt;
+                if (e.PulseLeft > 0f) e.PulseLeft = Mathf.Max(0f, e.PulseLeft - dt);
+
+                float total = TotalSecondsOf(e.Magnitude) / e.Speed;
+                if (e.SinceAccum >= total) { Recycle(e); _active.RemoveAt(i); continue; }
+
+                // 缩放：伤害=首帧爆裂 easeOut 收缩回停留尺寸；回血类不爆裂（恒定停留尺寸）；
+                // 聚合回弹=叠加的正弦小脉冲（每次并入都是一次「入场」）
+                float shrink = 收缩时长 / e.Speed;
+                float sT = shrink > 0f ? Mathf.Clamp01(e.SinceAccum / shrink) : 1f;
                 float eOut = 1f - (1f - sT) * (1f - sT) * (1f - sT);
-                entry.Rect.localScale = Vector3.one *
-                    (isHeal ? settleScale : Mathf.Lerp(popScale, settleScale, eOut));
+                float scale = e.IsHeal ? e.SettleScale : Mathf.Lerp(e.PopScale, e.SettleScale, eOut);
+                if (e.PulseLeft > 0f && 聚合脉冲时长 > 0f)
+                    scale *= 1f + (聚合脉冲倍率 - 1f) * Mathf.Sin(Mathf.PI * (1f - e.PulseLeft / 聚合脉冲时长));
+                e.CurrentScale = scale;
+                e.Rect.localScale = Vector3.one * scale;
 
-                // 位置：锚点逐帧投影（相机微调/缩放下仍贴住单位）+ 先快后慢上浮（回血类取回血上浮像素=更高）；
-                // 屏幕边缘夹取（2026-09-26 拍板「玩家屏幕里没有该伤害数字时，数字完整显示在屏幕边缘
-                // ——提醒这边有战斗」）：按文本实测半尺寸（TMP textBounds×弹跳缩放×画布缩放+留白）夹到
-                // 视口内——屏外/贴边目标受伤数字在最近边缘完整可见；相机背面投影（z<0）的屏幕坐标是
-                // 镜像的，先绕屏幕中心翻回正确方位再夹取（否则方向指反/误落在视口内）
-                float rise = risePixels * (1f - (1f - t) * (1f - t));
-                var screenPoint = cam.WorldToScreenPoint(anchor);
-                float viewW = Screen.width, viewH = Screen.height;
-                Vector2 p = screenPoint + Vector3.up * rise;
-                if (screenPoint.z < 0f) { p.x = viewW - p.x; p.y = viewH - p.y; }
-                if (!boundsCached)
+                // 位置：锚点逐帧投影 + 先快后慢上浮（上浮进度用「首次出现至今」——聚合不能让它回落）
+                // + 避让偏移；再按文本实测半尺寸夹到视口内
+                if (cam != null)
                 {
-                    boundsCached = true;
-                    var b = entry.Text.textBounds;
-                    boundsHalf = new Vector2(Mathf.Abs(b.extents.x), Mathf.Abs(b.extents.y));
+                    float riseDur = Mathf.Max(0.05f, 时长基准 / e.Speed);
+                    float riseT = Mathf.Clamp01(e.Age / riseDur);
+                    float rise = (e.IsHeal ? 回血上浮像素 : 上浮像素) * (1f - (1f - riseT) * (1f - riseT));
+                    Vector2 p = ScreenPointOf(cam, e.Anchor, rise) + e.ScreenOffset;
+                    var half = new Vector2(
+                        e.HalfRef.x * scale * sf + 屏幕边缘留白,
+                        e.HalfRef.y * scale * sf + 屏幕边缘留白);
+                    e.HalfPx = half;
+                    var clamped = ClampToViewport(p, half);
+                    e.PosPx = clamped;
+                    e.Rect.position = new Vector3(clamped.x, clamped.y, 0f);
                 }
-                float sf = _canvas != null ? _canvas.scaleFactor : 1f;
-                Vector2 half = new Vector2(
-                    (boundsHalf.x * entry.Rect.localScale.x + 屏幕边缘留白) * sf,
-                    (boundsHalf.y * entry.Rect.localScale.y + 屏幕边缘留白) * sf);
-                entry.Rect.position = new Vector3(
-                    Mathf.Clamp(p.x, half.x, Mathf.Max(half.x, viewW - half.x)),
-                    Mathf.Clamp(p.y, half.y, Mathf.Max(half.y, viewH - half.y)),
-                    0f);
 
                 // 渐隐：淡出起点前恒不透明，段尾线性收至 0
-                entry.Group.alpha = t <= 淡出起点比例 ? 1f : 1f - (t - 淡出起点比例) / fadeSpan;
-            });
+                float fadeStart = total * 淡出起点比例;
+                e.Group.alpha = e.SinceAccum <= fadeStart
+                    ? 1f
+                    : 1f - (e.SinceAccum - fadeStart) / Mathf.Max(0.0001f, total - fadeStart);
+            }
+        }
 
-            entry.Go.SetActive(false);
-            entry.Co = null;
-            _pool.Enqueue(entry);
+        private void Recycle(Entry e)
+        {
+            e.Active = false;
+            e.Go.SetActive(false);
+            if (e.GroupKey != null && _byKey.TryGetValue(e.GroupKey, out var cur) && cur == e)
+                _byKey.Remove(e.GroupKey);
+            e.GroupKey = null;
+            _pool.Enqueue(e);
+        }
+
+        /// <summary>文本重建（聚合数值上涨用）：固定文案原样返回；否则 前缀+加号+累计值+后缀</summary>
+        private static string BuildText(Entry e, float value)
+        {
+            if (e.FixedText != null) return e.FixedText;
+            string v = Mathf.RoundToInt(value).ToString();
+            return e.Prefix + (e.PlusSign ? "+" : string.Empty) + v + e.Suffix;
+        }
+
+        /// <summary>尺寸映射（整体尺寸倍率在最后乘——2026-11-10 拍板整体缩小 50%）</summary>
+        private float ComputeSettleScale(float magnitude, bool isHeal, bool isCrit)
+        {
+            float s = Mathf.Clamp(
+                尺寸基准 + 尺寸对数系数 * Mathf.Log10(Mathf.Max(1f, magnitude)), 尺寸下限, 尺寸上限);
+            if (isHeal) s *= 回血尺寸倍率;
+            if (isCrit) s *= 暴击尺寸倍率;
+            return s * 整体尺寸倍率;
+        }
+
+        private float TotalSecondsOf(float magnitude) => Mathf.Clamp(
+            时长基准 + 时长对数系数 * Mathf.Log10(Mathf.Max(1f, magnitude)), 时长下限, 时长上限);
+
+        private void CacheBounds(Entry e)
+        {
+            var b = e.Text.textBounds;
+            var half = new Vector2(Mathf.Abs(b.extents.x), Mathf.Abs(b.extents.y));
+            // 兜底：TMP 尚未完成网格重建时 textBounds 可能为 0——按字号估算，避免避让整体失效
+            if (half.x <= 0.01f || half.y <= 0.01f)
+                half = new Vector2(基础字号 * 0.32f * Mathf.Max(1, e.Text.text.Length), 基础字号 * 0.6f);
+            e.HalfRef = half;
+        }
+
+        /// <summary>世界点→屏幕像素（相机背面投影是镜像的：先绕屏幕中心翻回正确方位，否则避让/夹取会指反）</summary>
+        private static Vector2 ScreenPointOf(Camera cam, Vector3 world, float rise)
+        {
+            var sp = cam.WorldToScreenPoint(world);
+            Vector2 p = sp + Vector3.up * rise;
+            if (sp.z < 0f) { p.x = Screen.width - p.x; p.y = Screen.height - p.y; }
+            return p;
+        }
+
+        private static Vector2 ClampToViewport(Vector2 p, Vector2 half)
+        {
+            float viewW = Screen.width, viewH = Screen.height;
+            return new Vector2(
+                Mathf.Clamp(p.x, half.x, Mathf.Max(half.x, viewW - half.x)),
+                Mathf.Clamp(p.y, half.y, Mathf.Max(half.y, viewH - half.y)));
+        }
+
+        /// <summary>避让（2026-11-10 拍板）：原位被占则向上/向下交替挪一个数字高，再试对角；都占则回原位。
+        /// 只做一次性分配、之后不重排——数字中途挪位比轻微重叠更难受。</summary>
+        private Vector2 ChooseOffset(Vector2 baseP, Vector2 half)
+        {
+            var origin = ClampToViewport(baseP, half);
+            if (!OverlapsAny(origin, half)) return Vector2.zero;
+
+            float stepY = Mathf.Max(4f, (half.y * 2f + 避让间距) * Mathf.Max(1f, 避让垂直步长));
+            float stepX = half.x * 2f + 避让间距;
+            int tries = Mathf.Max(1, 避让垂直尝试);
+
+            for (int i = 1; i <= tries; i++)
+            {
+                var up = ClampToViewport(baseP + new Vector2(0f, stepY * i), half);
+                if (!OverlapsAny(up, half)) return up - baseP;
+                var down = ClampToViewport(baseP - new Vector2(0f, stepY * i), half);
+                if (!OverlapsAny(down, half)) return down - baseP;
+            }
+            for (int i = 1; i <= tries; i++)
+            {
+                var dy = stepY * i;
+                var upRight = ClampToViewport(baseP + new Vector2(stepX, dy), half);
+                if (!OverlapsAny(upRight, half)) return upRight - baseP;
+                var upLeft = ClampToViewport(baseP + new Vector2(-stepX, dy), half);
+                if (!OverlapsAny(upLeft, half)) return upLeft - baseP;
+            }
+            return Vector2.zero;
+        }
+
+        private bool OverlapsAny(Vector2 pos, Vector2 half)
+        {
+            float pad = Mathf.Max(0f, 避让间距);
+            for (int i = 0; i < _active.Count; i++)
+            {
+                var e = _active[i];
+                if (e == null || !e.Active) continue;
+                if (Mathf.Abs(pos.x - e.PosPx.x) < half.x + e.HalfPx.x + pad &&
+                    Mathf.Abs(pos.y - e.PosPx.y) < half.y + e.HalfPx.y + pad) return true;
+            }
+            return false;
         }
 
         /// <summary>NEW 池条目：RectTransform + TextMeshProUGUI + CanvasGroup + 描边（配色一律 BattlePalette，勿写字面量）</summary>
@@ -252,6 +479,8 @@ namespace GIC.Battle
                     Destroy(entry.OutlineMat);
             _allEntries.Clear();
             _pool.Clear();
+            _active.Clear();
+            _byKey.Clear();
         }
     }
 }

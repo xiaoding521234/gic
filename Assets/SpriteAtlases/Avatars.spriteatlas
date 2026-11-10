@@ -40,6 +40,8 @@ SpriteAtlas:
     cachedData: {fileID: 0}
     packedSpriteRenderDataKeys:
     - e1161073f76fbf04686ddbd006617a96: 21300000
+    - 17f83cc4f31556644ada3bcf8a4a5e7e: 21300000
+    - 85f1913565c01914389302c7656b6839: 21300000
     - d5c6d975238881e4bbf7e860b5b88432: 21300000
     - 138b10868f0e6a74ab63dbd44cbab517: 21300000
     - 99a639c711773e4498d87fba7c6438f3: 21300000
@@ -57,6 +59,8 @@ SpriteAtlas:
   m_MasterAtlas: {fileID: 0}
   m_PackedSprites:
   - {fileID: 21300000, guid: e1161073f76fbf04686ddbd006617a96, type: 3}
+  - {fileID: 21300000, guid: 17f83cc4f31556644ada3bcf8a4a5e7e, type: 3}
+  - {fileID: 21300000, guid: 85f1913565c01914389302c7656b6839, type: 3}
   - {fileID: 21300000, guid: d5c6d975238881e4bbf7e860b5b88432, type: 3}
   - {fileID: 21300000, guid: 138b10868f0e6a74ab63dbd44cbab517, type: 3}
   - {fileID: 21300000, guid: 99a639c711773e4498d87fba7c6438f3, type: 3}
@@ -73,6 +77,8 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 5ffbccef8d0829d448e3084ee51ba2c1, type: 3}
   m_PackedSpriteNamesToIndex:
   - barbara
+  - knights_of_favonius
+  - favonius_cathedral
   - hutao
   - fill_bar
   - beidou

@@ -48,6 +48,31 @@ namespace GIC.Data
         [Tooltip("草簇在格内的边缘留白（0.1=距格边 0.1 格）")]
         [Range(0f, 0.45f)] public float 草簇格内留白 = 0.10f;
 
+        [Header("地面贴花（碎石/泥土；2026-11-10 画面增强批：贴地表平铺，cutout 写深度）")]
+        [Tooltip("碎石贴图变体（透明底 PNG，顶视/俯视视角；空=不铺碎石）")]
+        public Texture2D[] 碎石贴图变体;
+
+        [Tooltip("泥土贴图变体（透明底 PNG，顶视/俯视视角；空=不铺泥土）")]
+        public Texture2D[] 泥土贴图变体;
+
+        [Tooltip("每格铺贴概率（0~1；只作用于草地/平原/土地/石路/圆石格）")]
+        [Range(0f, 1f)] public float 贴花每格概率 = 0.12f;
+
+        [Tooltip("碎石占比（0~1；判定铺贴后按本比例在碎石/泥土间二选一，其余为泥土）")]
+        [Range(0f, 1f)] public float 碎石占比 = 0.65f;
+
+        [Tooltip("贴花宽度范围（格=贴图内容宽；高度按贴图宽高比换算）")]
+        public Vector2 贴花尺寸范围 = new Vector2(0.16f, 0.30f);
+
+        [Tooltip("贴花在格内的边缘留白（0.18=距格边 0.18 格，避免跨格压线）")]
+        [Range(0f, 0.45f)] public float 贴花格内留白 = 0.18f;
+
+        [Tooltip("贴花贴地抬升（世界单位，防与地块顶面 z-fight）")]
+        public float 贴花抬升 = 0.004f;
+
+        [Tooltip("贴花 cutout 剔除阈值（低于该 alpha 的像素裁掉；硬边贴图可接受，锯齿明显时调低）")]
+        [Range(0.01f, 0.9f)] public float 贴花剔除阈值 = 0.35f;
+
         /// <summary>
         /// 地形类型 → 顶面材质变体（null=该类型未配置变体，回退 prefab 自带材质）
         /// </summary>

@@ -47,6 +47,32 @@ namespace GIC.Battle
         [Tooltip("薄冰面板相对水面的高度余量（同波场同相位=恒定间隙不穿插）")]
         [SerializeField] private float 薄冰抬升 = 0.006f;
 
+        [Header("岸线过渡（草地↔水面/薄冰；2026-11-10 画面增强批 A 组）")]
+        [Tooltip("岸线带宽度（格；0=关闭岸线层）——沿每个「陆地格与水/沼/薄冰格共享边」在陆地格顶面内铺一条过渡带")]
+        [SerializeField] private float 岸线宽度 = 0.16f;
+        [Tooltip("岸线带贴地抬升（世界单位，防与地块顶面 z-fight）")]
+        [SerializeField] private float 岸线抬升 = 0.005f;
+        [Tooltip("湿润暗边颜色（自水缘向陆内淡出；alpha=起始不透明度——低于 ~0.6 时湿边几乎看不见，只剩一条白泡沫线）")]
+        [SerializeField] private Color 岸线湿边色 = new Color(0.36f, 0.35f, 0.27f, 0.78f);
+        [Tooltip("泡沫线颜色（紧贴水缘的亮边；alpha=水缘处不透明度）")]
+        [SerializeField] private Color 岸线泡沫色 = new Color(0.94f, 0.98f, 1.00f, 0.62f);
+        [Tooltip("泡沫线占岸线带宽度的比例（0.18=最靠水的 18% 是泡沫）")]
+        [Range(0.02f, 0.60f)] [SerializeField] private float 岸线泡沫占比 = 0.18f;
+        [Tooltip("岸线边缘不规则度（0=笔直；越大泡沫/湿边越起伏）")]
+        [Range(0f, 1f)] [SerializeField] private float 岸线边缘抖动 = 0.35f;
+
+        [Header("格线（操作期可读性；2026-11-10 画面增强批 A 组）")]
+        [Tooltip("格线宽度（格；0=关闭整个格线层）")]
+        [SerializeField] private float 格线宽度 = 0.012f;
+        [Tooltip("格线颜色（alpha 由常态/操作态两个不透明度驱动，本字段 alpha 只作整体缩放）")]
+        [SerializeField] private Color 格线颜色 = new Color(0.98f, 0.97f, 0.92f, 1f);
+        [Tooltip("常态不透明度（非操作阶段；0=平时完全不可见）")]
+        [Range(0f, 1f)] [SerializeField] private float 格线常态不透明度 = 0.06f;
+        [Tooltip("操作态不透明度（瞄准/拖动/悬停/出牌时提亮）")]
+        [Range(0f, 1f)] [SerializeField] private float 格线操作不透明度 = 0.34f;
+        [Tooltip("格线贴地抬升（世界单位；须小于瞄准贴片抬升，避免压住交互件）")]
+        [SerializeField] private float 格线抬升 = 0.004f;
+
         [Header("迷雾（2026-10-17 迷雾批，docs/active/44：对战=半透明雾面盖未探索格 / 任务=不透明混沌盖替换地形）")]
         [Tooltip("对战迷雾色（半透明暗雾——RA2 式：地形完整可见，雾面只作「没去过」标记）")]
         [SerializeField] private Color 对战迷雾色 = new Color(0.031f, 0.055f, 0.110f, 0.52f);
@@ -88,6 +114,22 @@ namespace GIC.Battle
         /// <summary>草簇装饰层引用（迷雾批：探索态过滤重建用——未探索格不生成草簇防草尖穿混沌盖）</summary>
         private BattleGrassDecor _grassDecor;
 
+        // ==================== 岸线过渡 / 格线（2026-11-10 画面增强批 A 组） ====================
+
+        /// <summary>岸线带运行时件（Build 全量重建；随 Tiles 子级销毁后字段复位）</summary>
+        private GameObject _shoreGo;
+        private Mesh _shoreMesh;
+        private Material _shoreMaterial;
+        private Texture2D _shoreTexture;
+
+        /// <summary>格线运行时件（Build 全量重建；随 Tiles 子级销毁后字段复位）</summary>
+        private GameObject _gridGo;
+        private Mesh _gridMesh;
+        private Material _gridMaterial;
+
+        /// <summary>格线强调度 0..1（BattleHud 每帧按交互态写入：0=常态、1=操作态）</summary>
+        private float _gridEmphasis01;
+
         private void OnDestroy()
         {
             foreach (var mesh in _runtimeMeshes)
@@ -95,6 +137,9 @@ namespace GIC.Battle
             _runtimeMeshes.Clear();
             if (_thinIceMaterial != null) Destroy(_thinIceMaterial);
             if (_moraPileMaterial != null) Destroy(_moraPileMaterial); // 灰盒材质实例清理（§63 纪律）
+            if (_shoreMaterial != null) Destroy(_shoreMaterial);
+            if (_shoreTexture != null) Destroy(_shoreTexture);
+            if (_gridMaterial != null) Destroy(_gridMaterial);
         }
 
         /// <summary>
@@ -128,6 +173,8 @@ namespace GIC.Battle
             _fogOverlayGo = null;    // #1 审查批：随 Tiles 子级销毁的字段复位（EnsureFogOverlayGO 空则重建）
             _fogOverlayMesh = null;
             _grassDecor = null;      // 同上（草簇层随 Tiles 子级销毁）
+            _shoreGo = null;         // 同上（岸线层随 Tiles 子级销毁）
+            _gridGo = null;          // 同上（格线层随 Tiles 子级销毁）
             for (int i = _tilesRoot.childCount - 1; i >= 0; i--)
                 Destroy(_tilesRoot.GetChild(i).gameObject);
 
@@ -150,6 +197,8 @@ namespace GIC.Battle
             }
 
             BuildWaterSurface(map);
+            BuildShoreTransitions(map); // 岸线过渡带（2026-11-10 画面增强批 A 组）
+            BuildGridLines(map);        // 格线层（同批：操作期提亮）
             RebuildThinIceSurface(); // 幂等（初始地图无薄冰=空面板；防御性支持已含薄冰的重建）
             RebuildResourceNodes(map.resourceNodes); // 资源点表现件（docs/47：开局态；快照/命令增量维护）
         }
@@ -754,6 +803,281 @@ namespace GIC.Battle
             if (waterRenderer == null) return null;
             var materials = waterRenderer.sharedMaterials;
             return materials.Length > 1 ? materials[1] : null;
+        }
+
+        // ==================== 岸线过渡带（2026-11-10 画面增强批 A 组） ====================
+        // 目标：消除「草地块直接接到水面块」的硬拼缝——沿共享边在**陆地格顶面内**铺一条过渡带：
+        // 贴水侧=泡沫亮边，向陆内渐变为湿润暗边（贴图 v 轴 0=水缘、1=陆内）。纯视觉件，
+        // 不改地图真值、不影响移动/瞄准/拾取；水面仍在原高度的焊接面上（岸线带只覆盖陆地一侧）。
+
+        /// <summary>水/沼/薄冰判定（岸线带只贴陆地侧；薄冰=冻住的水，同样算水缘）</summary>
+        private static bool IsWaterLikeTile(TileType t)
+            => t == TileType.Water || t == TileType.Swamp || t == TileType.ThinIce;
+
+        /// <summary>邻格是水/沼/薄冰（图外与虚空=否：地图边缘不铺岸线）</summary>
+        private static bool IsWaterLikeOrOutside(BattleMapData map, int x, int y)
+        {
+            if (map == null || !map.InBounds(x, y)) return false;
+            if (!map.HasTile(x, y)) return false;
+            return IsWaterLikeTile(map.GetTile(x, y));
+        }
+
+        /// <summary>
+        /// 岸线过渡带重建（Build 调用；幂等）：陆地格四邻有水→该侧铺带。四角处沿边内缩一个带宽
+        /// （垂直方向也是水时）——避免两条带在角格重叠双混合（凸角发亮点）；凹角保留重叠（软过渡）。
+        /// 贴图=运行时生成的 128×64 渐变 + 按列噪声（边缘不规则，非直线色带）。
+        /// </summary>
+        private void BuildShoreTransitions(BattleMapData map)
+        {
+            _shoreGo = null;
+            if (map == null || 岸线宽度 <= 0.001f) return;
+
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            float halfW = map.width / 2f, halfH = map.height / 2f;
+            float w = Mathf.Clamp(岸线宽度, 0.01f, 0.45f);
+            float y = _tileTopHeight + 岸线抬升;
+
+            for (int cy = 0; cy < map.height; cy++)
+            {
+                for (int cx = 0; cx < map.width; cx++)
+                {
+                    if (!map.HasTile(cx, cy)) continue;
+                    if (IsWaterLikeTile(map.GetTile(cx, cy))) continue; // 只在陆地格上铺
+                    float x0 = cx - halfW, x1 = x0 + 1f;
+                    float z0 = cy - halfH, z1 = z0 + 1f;
+
+                    bool westWater = IsWaterLikeOrOutside(map, cx - 1, cy);
+                    bool eastWater = IsWaterLikeOrOutside(map, cx + 1, cy);
+                    bool southWater = IsWaterLikeOrOutside(map, cx, cy - 1);
+                    bool northWater = IsWaterLikeOrOutside(map, cx, cy + 1);
+
+                    // 南（-Z 邻）：边 z0，内法线 +Z
+                    if (southWater)
+                    {
+                        float xa = x0 + (westWater ? w : 0f);
+                        float xb = x1 - (eastWater ? w : 0f);
+                        if (xb - xa > 0.02f)
+                            AddGroundStrip(verts, uvs, tris, new Vector3(xa, y, z0), new Vector3(xb, y, z0), Vector3.forward, w);
+                    }
+                    // 北（+Z 邻）：边 z1，内法线 -Z
+                    if (northWater)
+                    {
+                        float xa = x1 - (eastWater ? w : 0f);
+                        float xb = x0 + (westWater ? w : 0f);
+                        if (xa - xb > 0.02f)
+                            AddGroundStrip(verts, uvs, tris, new Vector3(xa, y, z1), new Vector3(xb, y, z1), Vector3.back, w);
+                    }
+                    // 西（-X 邻）：边 x0，内法线 +X
+                    if (westWater)
+                    {
+                        float za = z1 - (northWater ? w : 0f);
+                        float zb = z0 + (southWater ? w : 0f);
+                        if (za - zb > 0.02f)
+                            AddGroundStrip(verts, uvs, tris, new Vector3(x0, y, za), new Vector3(x0, y, zb), Vector3.right, w);
+                    }
+                    // 东（+X 邻）：边 x1，内法线 -X
+                    if (eastWater)
+                    {
+                        float za = z0 + (southWater ? w : 0f);
+                        float zb = z1 - (northWater ? w : 0f);
+                        if (zb - za > 0.02f)
+                            AddGroundStrip(verts, uvs, tris, new Vector3(x1, y, za), new Vector3(x1, y, zb), Vector3.left, w);
+                    }
+                }
+            }
+
+            if (verts.Count == 0) return;
+
+            var mesh = new Mesh { name = "BattleShoreTransitions" };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            _runtimeMeshes.Add(mesh); // 与水面同登记纪律（Build 重建/OnDestroy 显式销毁）
+            _shoreMesh = mesh;
+
+            if (_shoreTexture != null)
+            {
+                // 双域安全（BattleSimState.RemoveUnit 同款纪律）：编辑域 Destroy 报错且静默不销毁
+                if (Application.isPlaying) Destroy(_shoreTexture);
+                else DestroyImmediate(_shoreTexture);
+            }
+            _shoreTexture = BuildShoreTexture();
+            if (_shoreMaterial == null)
+                _shoreMaterial = BattleViewFactory.CreateTransparentUnlitTexturedMaterial(_shoreTexture, Color.white);
+            else
+                _shoreMaterial.mainTexture = _shoreTexture;
+
+            _shoreGo = new GameObject("ShoreTransitions");
+            _shoreGo.transform.SetParent(_tilesRoot, false);
+            _shoreGo.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = _shoreGo.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _shoreMaterial;
+            renderer.sortingOrder = BattleMetrics.ShoreTransitionSortingOrder;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        /// <summary>
+        /// 贴地条带单出口（岸线与格线共用）：a→b 沿边、inward=指向格内的水平法线、width=带宽。
+        /// 顶点序 (a,b,c=b+inward·w,d=a+inward·w) 与水面网格同绕向（法线 +Y）；UV 的 v 轴 0=边线侧、
+        /// 1=格内侧——岸线贴图据此把泡沫放在水缘
+        /// </summary>
+        private static void AddGroundStrip(List<Vector3> verts, List<Vector2> uvs, List<int> tris,
+            Vector3 a, Vector3 b, Vector3 inward, float width)
+        {
+            var c = b + inward * width;
+            var d = a + inward * width;
+            int i0 = verts.Count;
+            verts.Add(a); verts.Add(b); verts.Add(c); verts.Add(d);
+            uvs.Add(new Vector2(0f, 0f)); uvs.Add(new Vector2(1f, 0f));
+            uvs.Add(new Vector2(1f, 1f)); uvs.Add(new Vector2(0f, 1f));
+            tris.Add(i0 + 3); tris.Add(i0 + 2); tris.Add(i0 + 1); // d,c,b
+            tris.Add(i0 + 3); tris.Add(i0 + 1); tris.Add(i0);     // d,b,a
+        }
+
+        /// <summary>岸线渐变贴图（v=0 水缘泡沫亮边 → v=1 陆内全透明湿润暗边；按列噪声扰动边界）</summary>
+        private Texture2D BuildShoreTexture()
+        {
+            const int W = 128, H = 64;
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, false)
+            {
+                name = "BattleShoreTransition",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            float foamEnd = Mathf.Clamp(岸线泡沫占比, 0.02f, 0.6f);
+            var pixels = new Color[W * H];
+            for (int j = 0; j < H; j++)
+            {
+                float v = j / (H - 1f); // 0=水缘
+                for (int i = 0; i < W; i++)
+                {
+                    float n = ShoreHash01(i * 0.31f);
+                    // 边界扰动：泡沫/湿边的分界按列上下浮动（边缘不规则）
+                    float vv = Mathf.Clamp01(v * (1f + 岸线边缘抖动 * 0.6f * (n - 0.5f) * 2f));
+                    Color c;
+                    if (vv <= foamEnd)
+                    {
+                        float k = Mathf.Clamp01(vv / foamEnd);
+                        c = Color.Lerp(岸线泡沫色, 岸线湿边色, k * k * 0.85f);
+                        c.a = Mathf.Lerp(岸线泡沫色.a, 岸线湿边色.a, k);
+                    }
+                    else
+                    {
+                        // 湿边段：**前段保持、末端才淡出**（fade=1−k^1.6）——旧式 (1−k)² 在带宽 60% 处
+                        // alpha 已 <0.1，实机只剩一条白泡沫线（2026-11-10 截图+探针实测返修）
+                        float k = Mathf.Clamp01((vv - foamEnd) / Mathf.Max(0.001f, 1f - foamEnd));
+                        c = 岸线湿边色;
+                        float fade = 1f - Mathf.Pow(k, 1.6f);
+                        c.a = 岸线湿边色.a * fade * (0.86f + 0.28f * n);
+                    }
+                    pixels[j * W + i] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply(false, false);
+            return tex;
+        }
+
+        /// <summary>确定性列噪声 [0,1)（岸线贴图专用；纯表现，不参与逻辑）</summary>
+        private static float ShoreHash01(float x)
+        {
+            float s = Mathf.Sin(x * 127.1f + 311.7f) * 43758.5453f;
+            return s - Mathf.Floor(s);
+        }
+
+        // ==================== 格线层（2026-11-10 画面增强批 A 组） ====================
+        // 现状：地块是 1×1 无缝方块，项目里原本没有任何格线绘制。本层按「常态极弱、操作期提亮」
+        // 提供格线可读性：BattleHud 每帧按 瞄准/拖动/悬停/出牌 状态驱动 SetGridEmphasis01。
+        // 只画陆地格（水格自带水面与岸线的边界语言），共享边去重（每格画南/西边+最外圈补北/东）。
+
+        /// <summary>
+        /// 格线层重建（Build 调用；幂等）：陆地格边界细线合并单 Mesh，贴地抬升略高于地块顶面、
+        /// 低于一切交互贴片（层位见 BattleMetrics.GridLineSortingOrder）。宽度<=0=层不建。
+        /// </summary>
+        private void BuildGridLines(BattleMapData map)
+        {
+            _gridGo = null;
+            if (map == null || 格线宽度 <= 0.0001f) return;
+
+            var verts = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+            float halfW = map.width / 2f, halfH = map.height / 2f;
+            float w = Mathf.Clamp(格线宽度, 0.002f, 0.1f);
+            float y = _tileTopHeight + 格线抬升;
+
+            for (int cy = 0; cy < map.height; cy++)
+            {
+                for (int cx = 0; cx < map.width; cx++)
+                {
+                    if (!map.HasTile(cx, cy)) continue;
+                    if (IsWaterLikeTile(map.GetTile(cx, cy))) continue;
+                    float x0 = cx - halfW, x1 = x0 + 1f;
+                    float z0 = cy - halfH, z1 = z0 + 1f;
+
+                    // 南边（每格恒画；邻格不重复画它自己的北边）——内法线 +Z
+                    AddGroundStrip(verts, uvs, tris,
+                        new Vector3(x0, y, z0), new Vector3(x1, y, z0), Vector3.forward, w);
+                    // 西边（起点内缩一个线宽：与南边在角上对接而非重叠——重叠会在每个交点叠出亮点）
+                    AddGroundStrip(verts, uvs, tris,
+                        new Vector3(x0, y, z0 + w), new Vector3(x0, y, z1), Vector3.right, w);
+                    // 最外圈：补北边与东边（同样内缩，避免与相邻边重叠）
+                    if (cy == map.height - 1)
+                        AddGroundStrip(verts, uvs, tris,
+                            new Vector3(x0 + w, y, z1), new Vector3(x1, y, z1), Vector3.back, w);
+                    if (cx == map.width - 1)
+                        AddGroundStrip(verts, uvs, tris,
+                            new Vector3(x1, y, z0 + w), new Vector3(x1, y, z1), Vector3.left, w);
+                }
+            }
+
+            if (verts.Count == 0) return;
+
+            var mesh = new Mesh { name = "BattleGridLines" };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            _runtimeMeshes.Add(mesh);
+            _gridMesh = mesh;
+
+            if (_gridMaterial == null)
+                _gridMaterial = BattleViewFactory.CreateTransparentUnlitMaterial(格线颜色);
+            ApplyGridColor();
+
+            _gridGo = new GameObject("GridLines");
+            _gridGo.transform.SetParent(_tilesRoot, false);
+            _gridGo.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = _gridGo.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = _gridMaterial;
+            renderer.sortingOrder = BattleMetrics.GridLineSortingOrder;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+
+        /// <summary>
+        /// 格线强调度写入（BattleHud 每帧调）：0=常态不透明度、1=操作态不透明度，中间值为过渡。
+        /// 幂等（相同值零写入）；格线层未建/已关闭=直通。
+        /// </summary>
+        public void SetGridEmphasis01(float t)
+        {
+            t = Mathf.Clamp01(t);
+            if (Mathf.Abs(t - _gridEmphasis01) < 0.001f) return;
+            _gridEmphasis01 = t;
+            ApplyGridColor();
+        }
+
+        /// <summary>格线颜色落地单出口（alpha=颜色 alpha × 常态/操作插值）</summary>
+        private void ApplyGridColor()
+        {
+            if (_gridMaterial == null) return;
+            var c = 格线颜色;
+            c.a *= Mathf.Lerp(格线常态不透明度, 格线操作不透明度, _gridEmphasis01);
+            _gridMaterial.color = c;
         }
 
         private float? _waterWaveMaxHeight;

@@ -40,7 +40,7 @@
       }
     },
     "cn.tuanjie.shadergraph-mcptools": {
-      "version": "file:../.codely-cli/extensions/ShaderGraph-AI/Packages/cn.tuanjie.shadergraph-mcptools",
+      "version": "file:../.codely-cli/extensions/ShaderGraphAI/Packages/cn.tuanjie.shadergraph-mcptools",
       "depth": 0,
       "source": "local",
       "dependencies": {}

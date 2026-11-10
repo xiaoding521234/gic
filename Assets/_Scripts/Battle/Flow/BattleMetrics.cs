@@ -140,6 +140,19 @@ namespace GIC.Battle
         /// 草地格、水面格无堆〕+被雾面（-2）恒罩=未探索格自动雾暗〔透明序通则：雾面后画恒盖〕）</summary>
         public const int MoraPileSortingOrder = -3;
 
+        /// <summary>岸线过渡带（2026-11-10 画面增强批 A 组：草地↔水面/薄冰的湿润边+泡沫线）——
+        /// 带体落在**陆地格顶面**（高于水面 0.36）但层位与水面同 -3：合法同序形态（水陆互斥不叠）、
+        /// 且恒在雾面（-2）之下=未探索格被雾压暗（透明序通则：雾面后画恒盖）</summary>
+        public const int ShoreTransitionSortingOrder = -3;
+
+        /// <summary>格线层（2026-11-10 画面增强批 A 组：非操作期极弱、瞄准/拖动/悬停提亮）——
+        /// 贴地细线同层 -3；刻意低于底座盘（-1）与瞄准贴片（0）：格线是地形辅助件，不得压过任何
+        /// 交互件，也不参与「谁盖谁」的竞争</summary>
+        public const int GridLineSortingOrder = -3;
+
+        /// <summary>地面贴花（碎石/泥土；cutout 写深度=排序由 Z-buffer 承担，层位仅作查层定位）</summary>
+        public const int GroundDecalSortingOrder = -3;
+
         /// <summary>对战迷雾面（2026-10-17 迷雾批：半透明暗雾盖未探索格——水面 -3 之上、底座盘 -1 之下）</summary>
         public const int FogOverlaySortingOrder = -2;
 
