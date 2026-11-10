@@ -186,6 +186,30 @@ MonoBehaviour:
     m_Localized: "\u5B89\u67CF\u547D\u5EA7"
     m_Metadata:
       m_Items: []
+  - m_Id: 3001007
+    m_Localized: "一飞双采集！"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001008
+    m_Localized: "敏锐感知"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001009
+    m_Localized: "迷雾侦查"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001010
+    m_Localized: "是兔兔伯爵！"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001011
+    m_Localized: "弱点侦查"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001012
+    m_Localized: "压制射击"
+    m_Metadata:
+      m_Items: []
   - m_Id: 3003004
     m_Localized: "\u6C34\u4E4B\u6D45\u5531"
     m_Metadata:

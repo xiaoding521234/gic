@@ -31,15 +31,15 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
-    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\uFF0C\u98DB\u884C\n\xB7\u6CBF\u9014\u63A1\u96C6\u7D93\u904E\u7684\u8CC7\u6E90\u9EDE\uFF0C\u81F3\u591A{CollectCount}\u6B21\n\xB7\u6BCF\u6B21\u63A1\u96C6\u7372\u5F97{CollectStaminaGain}\u9AD4\u529B\u548C{CollectEnergyGain}\u5143\u80FD"
+    m_Localized: "·選擇任意方向或目標點飛行\n·移動時{CollectRadius}公分半徑內有資源點，則快速採集{CollectCount}次，每處資源點獨立冷卻{CollectCooldown}秒\n·每次採集獲得{CollectStaminaGain}體力和{CollectEnergyGain}元能"
     m_Metadata:
       m_Items: []
   - m_Id: 3001002
-    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\uFF0C\u5C04\u51FA{DamageCount}\u767C\u7BAD\u77E2\n\xB7\u6BCF\u767C\u9020\u6210{Damage}\u706B\u50B7"
+    m_Localized: "·選擇任意方向，射出{DamageCount}發箭矢\n·每發造成{Damage}火傷"
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Localized: "\xB7\u9078\u64C7\u5341\u5B57\u65B9\u5411\u5176\u4E00\uFF0C\u5C04\u51FA\u5927\u91CF\u7BAD\u77E2\n\xB7\u5C0D\u76F4\u7DDA\u4E0A\u7684\u6240\u6709\u6575\u4EBA\u9020\u6210{DamageCount}\u6B21{Damage}\u706B\u50B7"
+    m_Localized: "·選擇任意方向，射出大量箭矢\n·對直線上的所有敵人造成{DamageCount}次{Damage}火傷"
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
@@ -52,6 +52,30 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001006
     m_Localized: "\xB7\u30101\u547D\u3011\u8996\u91CE\u63D0\u5347{C1Vision}\u3002\u5B89\u67CF\u7372\u5F97\u5143\u80FD\u6642\u82E5\u81EA\u8EAB\u5DF2\u6EFF\uFF0C\u6EA2\u51FA\u90E8\u5206\u8F49\u79FB\u7D66\u8DDD\u96E2\u6700\u8FD1\u7684\u6211\u65B9\u672A\u6EFF\u5143\u80FD\u89D2\u8272\uFF1B\u6211\u65B9\u5168\u6EFF\u5247\u7121\u6548\u679C\n\xB7\u30102\u547D\u3011\u79FB\u901F\u63D0\u5347{C2MoveSpeed}\uFF0C\u5143\u80FD\u4E0A\u9650\u984D\u5916\u589E\u52A0{C2EnergyLimit}\uFF1B\u7206\u767C\u53EF\u4EE5\u7834\u9664\u8FF7\u9727\uFF0C\u6BCF\u7834\u9664{C2FogEnergyThreshold}\u683C\u8FF7\u9727\u7372\u5F97{C2FogEnergyGain}\u5143\u80FD\n\xB7\u30103\u547D\u3011\u7372\u5F97<color=#FFD700><u><link=\"Item:BaronBunny\">\u5154\u5154\u4F2F\u7235</link></u></color>\u4E26\u81EA\u52D5\u88DD\u5099\uFF08\u914D\u4EF6\u69FD\u5DF2\u6EFF\u6642\u52A0\u5165\u624B\u724C\uFF09"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001007
+    m_Localized: "·移動的快速採集提升為{CollectCount}次\n·移速增加{C1MoveSpeed}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001008
+    m_Localized: "·探索視野永久增加{C1Vision}公分\n·半徑{EffectRadius}公分內敵人獲得視野暴露{VisionDuration}秒"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001009
+    m_Localized: "·爆發可以破除迷霧\n·被爆發命中的敵人獲得視野暴露{VisionDuration}秒"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001010
+    m_Localized: "·獲得兔兔伯爵（優先直接裝備，配件槽已滿時加入手牌）"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001011
+    m_Localized: "·我方單位對處於視野暴露的敵人增傷{C3DamageBonus}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001012
+    m_Localized: "·戰技與爆發冷卻減少{C3CooldownReduction}%\n·釋放速度加快{C3ReleaseSpeed}%"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

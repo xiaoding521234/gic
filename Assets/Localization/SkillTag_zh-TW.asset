@@ -98,6 +98,14 @@ MonoBehaviour:
     m_Localized: "\u63A0\u596A"
     m_Metadata:
       m_Items: []
+  - m_Id: 5008
+    m_Localized: "生存"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5009
+    m_Localized: "冷卻"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -21,6 +21,14 @@ namespace GIC.Battle
         /// ——ConstellationApplier 登场/升命时按层幂等重算被动；快照 BuildUnitState 携带）</summary>
         public int ConstellationLevel;
 
+        /// <summary>各级已选分支技能 ID（SkillName；同级互斥，顺序与命座等级一致）</summary>
+        public readonly List<int> ConstellationChoices = new();
+
+        public bool HasConstellationChoice(SkillName skillId)
+        {
+            return ConstellationChoices.Contains((int)skillId);
+        }
+
         /// <summary>命座被动属性修改器（ConstellationApplier 重算时全撤全挂的登记表——升命单调增，
         /// 重算=先 RemoveModifier 全撤再按层重挂；Energy 容量走 SetStatRange 不入此表）</summary>
         public readonly List<StatModifier> ConstellationModifiers = new();

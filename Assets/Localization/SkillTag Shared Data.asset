@@ -95,6 +95,14 @@ MonoBehaviour:
     m_Key: Ransom
     m_Metadata:
       m_Items: []
+  - m_Id: 5008
+    m_Key: Survival
+    m_Metadata:
+      m_Items: []
+  - m_Id: 5009
+    m_Key: Cooldown
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

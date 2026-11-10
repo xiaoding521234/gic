@@ -54,7 +54,10 @@ namespace GIC.Data
         HealEfficiency,
 
         [InspectorName("元能")]
-        Energy
+        Energy,
+
+        [InspectorName("采集效率")]
+        HarvestEfficiency
     }
 
     // StatType 扩展方法

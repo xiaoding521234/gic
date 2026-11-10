@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d32616f6019bec45b6eb2e6a4fe45b7, type: 3}
+  m_Name: Amber_C2A_FogScouting
+  m_EditorClassIdentifier:
+  data:
+    skillID: 3001009
+    icon: {fileID: 21300000, guid: c17fe7ded9f44a04bbee607a9c07ac18, type: 3}
+    skillType: 4
+    "\u6280\u80FD\u6807\u7B7E": 2003
+    customParams:
+    - key: 20
+      value: 6
+      baseType: 0
+    timeline: {fileID: 0}
+    "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
+    "\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
+    "\u624B\u673A\u7AEF\u52A8\u4F5C\u7247Alpha\u6253\u5305": 0
+    "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
+    "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
+    "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
+    effects: []
+    costs: []

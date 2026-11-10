@@ -179,6 +179,30 @@ MonoBehaviour:
     m_Key: Amber_Constellation
     m_Metadata:
       m_Items: []
+  - m_Id: 3001007
+    m_Key: Amber_C1A_DoubleHarvest
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001008
+    m_Key: Amber_C1B_KeenSenses
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001009
+    m_Key: Amber_C2A_FogScouting
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001010
+    m_Key: Amber_C2B_BaronBunny
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001011
+    m_Key: Amber_C3A_WeaknessScouting
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001012
+    m_Key: Amber_C3B_SuppressiveFire
+    m_Metadata:
+      m_Items: []
   - m_Id: 3003004
     m_Key: Barbara_WaterSerenade
     m_Metadata:

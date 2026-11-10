@@ -127,6 +127,13 @@ namespace GIC.Battle
             public Image HpFill;
             public Image EnFill;
             public GameObject EnBarRoot; // 显式引用（曾用 transform.parent.parent 错链到条目根，2026-09-25 修）
+            public GameObject HarvestRoot;
+            public Image HarvestFill;
+            public TextMeshProUGUI HarvestText;
+            public float HarvestStartedAt;
+            public float HarvestDuration;
+            public int HarvestStartTick;
+            public int HarvestFinishTick;
             public Image AttachIcon;
             public GameObject ConstGo;            // 命座徽章（血条上方）
             public Image ConstBg;                // 徽章背景（满命彩色渐变载体）
@@ -244,6 +251,46 @@ namespace GIC.Battle
             _lastSortOrder.Clear(); // #13：参与者集变化强制重排
         }
 
+        public void StartHarvest(string unitId, int startTick, int finishTick, int currentTick)
+        {
+            var item = _items.Find(x => x.View != null && x.View.UnitId == unitId);
+            if (item == null || item.HarvestRoot == null || finishTick <= startTick) return;
+            if (item.HarvestRoot.activeSelf && item.HarvestStartTick == startTick
+                && item.HarvestFinishTick == finishTick) return;
+            item.HarvestStartTick = startTick;
+            item.HarvestFinishTick = finishTick;
+            item.HarvestDuration = (finishTick - startTick) / (float)BattleMetrics.TicksPerSecond;
+            int elapsedTicks = Mathf.Clamp(currentTick - startTick, 0, finishTick - startTick);
+            item.HarvestStartedAt = Time.time - elapsedTicks / (float)BattleMetrics.TicksPerSecond;
+            item.HarvestRoot.SetActive(true);
+            UpdateHarvest(item);
+        }
+
+        public void CancelHarvest(string unitId)
+        {
+            var item = _items.Find(x => x.View != null && x.View.UnitId == unitId);
+            if (item?.HarvestRoot != null) item.HarvestRoot.SetActive(false);
+        }
+
+        public void SyncHarvest(UnitState state, int currentTick)
+        {
+            if (state == null) return;
+            if (state.harvestActive != 0)
+                StartHarvest(state.unitId, state.harvestStartTick, state.harvestFinishTick, currentTick);
+            else CancelHarvest(state.unitId);
+        }
+
+        private static void UpdateHarvest(Item item)
+        {
+            if (item.HarvestRoot == null || !item.HarvestRoot.activeSelf) return;
+            float elapsed = Mathf.Max(0f, Time.time - item.HarvestStartedAt);
+            float progress = item.HarvestDuration > 0f ? Mathf.Clamp01(elapsed / item.HarvestDuration) : 1f;
+            item.HarvestFill.fillAmount = progress;
+            if (item.HarvestText != null)
+                item.HarvestText.text = Mathf.Max(0f, item.HarvestDuration - elapsed).ToString("0.0");
+            if (progress >= 1f) item.HarvestRoot.SetActive(false);
+        }
+
         private void Update()
         {
             var cam = _camera != null ? _camera : CameraContext.Resolve();
@@ -308,6 +355,7 @@ namespace GIC.Battle
                     ? Mathf.Clamp01((float)item.View.Hp / item.View.MaxHp) : 0f;
                 item.EnFill.fillAmount = item.View.EnergyMax > 0
                     ? Mathf.Clamp01((float)item.View.EnergyCurrent / item.View.EnergyMax) : 0f;
+                UpdateHarvest(item);
 
                 var enGo = item.EnBarRoot;
                 // 元能条显隐：EnergyMax>0 即显（2026-10-06 拍板「尸体应当同样显示血条和能量条」
@@ -705,6 +753,13 @@ namespace GIC.Battle
             var enBar = NewBar("EnergyBar", rootRect, new Vector2(0f, -(血条高 * 0.5f + 条间距 + 元能条高 * 0.5f)),
                 血条宽, 元能条高, Palette.血条底, Palette.元能条色, out var enFill);
 
+            // 普通采集读条：元能条下方细金条+剩余秒；增量命令驱动，快照只校准不重复重置。
+            var harvestBar = NewBar("HarvestBar", rootRect,
+                new Vector2(0f, -(血条高 * 0.5f + 条间距 + 元能条高 + 5f)),
+                血条宽, 5f, Palette.血条底, new Color(0.95f, 0.72f, 0.22f, 1f), out var harvestFill);
+            var harvestText = NewNumber(harvestBar, "Seconds", Vector2.zero, 12f);
+            harvestBar.gameObject.SetActive(false);
+
             // 量子刻度（2026-09-26 拍板「每 50 段，上限 10 段」）：刻度线落在 每段值×k/总量 处——
             // 血条每 50 点血一格（MaxHp 非 50 倍数时末段不满，线位仍=50 的整数倍血）；元能=每 10 点一格。
             // **眷属不出刻度（2026-11-09 用户拍板「血条能量条更简化更小，无需刻度」）**——廉价单位只读大概
@@ -767,6 +822,7 @@ namespace GIC.Battle
             {
                 View = view, Go = root, Rect = rootRect,
                 HpFill = hpFill, EnFill = enFill, EnBarRoot = enBar.gameObject, AttachIcon = iconImage,
+                HarvestRoot = harvestBar.gameObject, HarvestFill = harvestFill, HarvestText = harvestText,
                 ConstGo = constGo, ConstBg = constBg, ConstText = constText, BuffRow = buffRow,
                 EquipRow = equipRow,
                 // 眷属整簇缩到 0.7（2026-11-09 眷属批）：配合无刻度，一眼区分「廉价的眷属」

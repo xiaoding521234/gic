@@ -73,6 +73,9 @@ namespace GIC.Data
         /// <summary>出战角色（UnitName 枚举值）</summary>
         public int deployUnitName;
 
+        /// <summary>分支命座选项（SkillName；仅同名重复出战升命时有效，0=旧单体命座）</summary>
+        public int constellationChoice;
+
         /// <summary>部署落点</summary>
         public BattleCell deployCell;
 

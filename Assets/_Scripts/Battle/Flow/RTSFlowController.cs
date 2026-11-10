@@ -152,6 +152,11 @@ namespace GIC.Battle
                     _resolver.EmitSeparationCorrections();
             }
 
+            // —— 普通读条与移动快速采集（主动技能在输入窗取消，硬控/离范围在此逐 tick 复核）——
+            _resolver.ResolveHarvestTick();
+            CheckBattleEnded();
+            if (Phase != BattlePhase.Selecting) return;
+
             // —— AI 三脑节拍（每 0.5 秒）——
             if (CurrentTick % BattleMetrics.AiBeatTicks == 0)
                 RunAiBeat();
@@ -689,6 +694,8 @@ namespace GIC.Battle
                 hash = hash * 31 + (int)unit.Dimension;
                 hash = hash * 31 + unit.DeployedSecond;
                 hash = hash * 31 + unit.LastPeriodicSummonSecond;
+                hash = hash * 31 + unit.ConstellationLevel;
+                foreach (int choice in unit.ConstellationChoices) hash = hash * 31 + choice;
 
                 // Buff：身份（族×资产名）+ 层数 + 剩余秒——先排序再折叠，列表序差异不致漂
                 var buffKeys = new List<string>();
@@ -752,6 +759,21 @@ namespace GIC.Battle
                 hash = hash * 31 + node.cell.x;
                 hash = hash * 31 + node.cell.y;
                 hash = hash * 31 + node.remainingCharges;
+            }
+            foreach (var channel in sim.SortedHarvestChannels())
+            {
+                foreach (char c in channel.unitId) hash = hash * 31 + c;
+                hash = hash * 31 + channel.nodeCell.x;
+                hash = hash * 31 + channel.nodeCell.y;
+                hash = hash * 31 + channel.startTick;
+                hash = hash * 31 + channel.finishTick;
+            }
+            foreach (var cooldown in sim.SortedQuickHarvestCooldowns())
+            {
+                foreach (char c in cooldown.unitId) hash = hash * 31 + c;
+                hash = hash * 31 + cooldown.nodeCell.x;
+                hash = hash * 31 + cooldown.nodeCell.y;
+                hash = hash * 31 + cooldown.readyTick;
             }
 
             // F0-4/F1：RNG 状态纳入 hash——随机序列一旦分叉必须能定位到 tick

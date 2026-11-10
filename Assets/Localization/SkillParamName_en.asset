@@ -362,6 +362,22 @@ MonoBehaviour:
     m_Localized: Equip Stack Limit
     m_Metadata:
       m_Items: []
+  - m_Id: 87
+    m_Localized: C3 Release Speed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 88
+    m_Localized: C3 Cooldown Reduction
+    m_Metadata:
+      m_Items: []
+  - m_Id: 89
+    m_Localized: Gathering Radius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 90
+    m_Localized: Gathering Cooldown
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

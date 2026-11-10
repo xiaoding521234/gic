@@ -678,8 +678,30 @@ namespace GIC.Battle
                 if (BattleSimState.IsDead(existing)) continue; // 尸体升命=烧配额（复苏前置投资后置批次）
                 if (existing.ConstellationLevel >= ConstellationApplier.MaxConstellation) continue; // 已满命
                 if (sim.GetMora(_playerId) < candidate.data.GetEffectiveDeployCost()) continue; // 摩拉不足先攒
+                int constellationChoice = 0;
+                int optionScore = 0;
+                if (candidate.data.HasBranchConstellation)
+                {
+                    int nextLevel = existing.ConstellationLevel + 1;
+                    var tiers = candidate.data.constellationTiers;
+                    if (nextLevel > tiers.Count) continue;
+                    var options = tiers[nextLevel - 1].options;
+                    UnitConfig.ConstellationOption selected = null;
+                    if (options != null)
+                        foreach (var option in options)
+                        {
+                            if (option?.skill?.data == null) continue;
+                            if (selected != null && (option.aiScore < selected.aiScore
+                                || (option.aiScore == selected.aiScore
+                                    && option.skill.data.skillID >= selected.skill.data.skillID))) continue;
+                            selected = option;
+                        }
+                    if (selected == null) continue;
+                    constellationChoice = (int)selected.skill.data.skillID;
+                    optionScore = selected.aiScore;
+                }
                 // AI-4：人格升命桶乘子（经济家/守城者更爱投资）；AI-5：态势升命乘子（upgradeMul=两乘已合成）
-                int upgradeScore = Mathf.RoundToInt(UpgradeConstellationScore * upgradeMul);
+                int upgradeScore = Mathf.RoundToInt(UpgradeConstellationScore * upgradeMul) + optionScore;
                 GICLog.Info($"[配额脑] {_playerId} T{turn} 升命候选 {(UnitName)candidate.unitName}" +
                     $" C{existing.ConstellationLevel}→C{existing.ConstellationLevel + 1}" +
                     $" 分={upgradeScore}（当前最优 {tracker.BestScore}）");
@@ -688,6 +710,7 @@ namespace GIC.Battle
                     playerId = _playerId,
                     actionType = ActionType.DeployUnit,
                     deployUnitName = candidate.unitName,
+                    constellationChoice = constellationChoice,
                     deployCell = sim.GetCorePosition(_playerId),
                     turnNumber = turn,
                 });

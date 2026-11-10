@@ -6,9 +6,8 @@ namespace GIC.Battle
     /// ——同建筑元能引擎「能量落地同拍判定」模式），本效应只承载事实供命令发射（ResourceHarvest
     /// type=23）——客户端 BattleBoard 余量刷新/耗尽移除+采集飘字；**资源点余量变化不进本效应**
     /// （sim 状态真值在判定点已改，命令仅镜像）。TargetUnitId=采集者单位 id。
-    /// 命中时刻（2026-10-28 返修「表现对齐动画」）：站立采集=秒拍末收尾类 HitSeconds 恒 0 立即；
-    /// 途经采集=**行走到达资源点格时刻**（i×MoveStepSeconds+k×CommandStaggerSeconds——移动补间
-    /// 与 PlayMoveCoroutine 同源），客户端到点再减件/弹字（勿在段首即减）。
+    /// 读条采集与移动快速采集均在实际成功 tick 立即产出；HitSeconds 恒 0。
+    /// 旧“移动结束后按路径格补算、按历史补间时刻延迟入账”语义已退役。
     /// </summary>
     public class ResourceHarvestEffect : BattleEffect
     {

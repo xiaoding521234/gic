@@ -84,6 +84,115 @@ namespace GIC.Battle
             return remaining;
         }
 
+        // ==================== 采集读条与快速采集冷却 ====================
+        private readonly Dictionary<string, HarvestChannelState> _harvestChannels = new Dictionary<string, HarvestChannelState>();
+        private readonly Dictionary<string, Dictionary<BattleCell, int>> _quickHarvestReadyTicks = new Dictionary<string, Dictionary<BattleCell, int>>();
+        private readonly List<HarvestChannelState> _pendingHarvestCancels = new List<HarvestChannelState>();
+
+        public HarvestChannelState GetHarvestChannel(string unitId)
+        {
+            return !string.IsNullOrEmpty(unitId) && _harvestChannels.TryGetValue(unitId, out var state) ? state : null;
+        }
+
+        /// <summary>开始或延续普通采集；同节点重复调用幂等，换节点会先登记旧读条取消。</summary>
+        public HarvestChannelState EnsureHarvestChannel(string unitId, BattleCell nodeCell, int startTick,
+            int durationTicks, out bool started)
+        {
+            if (_harvestChannels.TryGetValue(unitId, out var existing) && existing.nodeCell.Equals(nodeCell))
+            {
+                started = false;
+                return existing;
+            }
+            if (existing != null) CancelHarvestChannel(unitId);
+            var state = new HarvestChannelState
+            {
+                unitId = unitId,
+                nodeCell = nodeCell,
+                startTick = startTick,
+                finishTick = startTick + Math.Max(1, durationTicks),
+            };
+            _harvestChannels[unitId] = state;
+            started = true;
+            return state;
+        }
+
+        /// <summary>主动行动/硬控/离范围统一取消入口；取消事实在下一采集 tick 发命令。</summary>
+        public HarvestChannelState CancelHarvestChannel(string unitId)
+        {
+            if (string.IsNullOrEmpty(unitId) || !_harvestChannels.TryGetValue(unitId, out var state)) return null;
+            _harvestChannels.Remove(unitId);
+            var copy = state.Clone();
+            _pendingHarvestCancels.Add(copy);
+            return copy;
+        }
+
+        public List<HarvestChannelState> ConsumePendingHarvestCancels()
+        {
+            if (_pendingHarvestCancels.Count == 0) return null;
+            var result = new List<HarvestChannelState>(_pendingHarvestCancels);
+            _pendingHarvestCancels.Clear();
+            return result;
+        }
+
+        /// <summary>成功完成读条只移除状态，不产生“取消”表现。</summary>
+        public HarvestChannelState CompleteHarvestChannel(string unitId)
+        {
+            if (string.IsNullOrEmpty(unitId) || !_harvestChannels.TryGetValue(unitId, out var state)) return null;
+            _harvestChannels.Remove(unitId);
+            return state;
+        }
+
+        public List<HarvestChannelState> SortedHarvestChannels()
+        {
+            var result = new List<HarvestChannelState>(_harvestChannels.Values);
+            result.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
+            return result;
+        }
+
+        public bool IsUnitMoving(string unitId)
+        {
+            for (int i = 0; i < _activeMovers.Count; i++)
+                if (_activeMovers[i].UnitId == unitId) return true;
+            return false;
+        }
+
+        public int QuickHarvestReadyTick(string unitId, BattleCell nodeCell)
+        {
+            return _quickHarvestReadyTicks.TryGetValue(unitId, out var nodes)
+                   && nodes.TryGetValue(nodeCell, out int readyTick) ? readyTick : 0;
+        }
+
+        public void SetQuickHarvestReadyTick(string unitId, BattleCell nodeCell, int readyTick)
+        {
+            if (!_quickHarvestReadyTicks.TryGetValue(unitId, out var nodes))
+            {
+                nodes = new Dictionary<BattleCell, int>();
+                _quickHarvestReadyTicks[unitId] = nodes;
+            }
+            nodes[nodeCell] = readyTick;
+        }
+
+        public List<QuickHarvestCooldownState> SortedQuickHarvestCooldowns()
+        {
+            var result = new List<QuickHarvestCooldownState>();
+            foreach (var kv in _quickHarvestReadyTicks)
+                foreach (var node in kv.Value)
+                    result.Add(new QuickHarvestCooldownState
+                    {
+                        unitId = kv.Key,
+                        nodeCell = node.Key,
+                        readyTick = node.Value,
+                    });
+            result.Sort((a, b) =>
+            {
+                int unit = string.CompareOrdinal(a.unitId, b.unitId);
+                if (unit != 0) return unit;
+                int x = a.nodeCell.x.CompareTo(b.nodeCell.x);
+                return x != 0 ? x : a.nodeCell.y.CompareTo(b.nodeCell.y);
+            });
+            return result;
+        }
+
         /// <summary>地脉维度单位便捷枚举（Unit.Dimension==LeyLine 过滤——含灵魂与未来入地脉的相位单位）</summary>
         public IEnumerable<Unit> LeyLineUnits
         {
@@ -1053,10 +1162,10 @@ namespace GIC.Battle
         /// <summary>消耗技能 CD（门槛全过后调用——与资源扣减同拍；写就绪 tick 纪元）</summary>
         public void ConsumeSkillCooldown(string unitId, GIC.Data.SkillType skillType)
         {
-            int cdTicks = skillType == GIC.Data.SkillType.Burst
-                ? BattleMetrics.BurstCooldownTicks
-                : BattleMetrics.CasterCooldownTicks;
             if (skillType != GIC.Data.SkillType.Burst && skillType != GIC.Data.SkillType.Normal) return;
+            var caster = GetUnit(unitId);
+            int cdTicks = BattleMetrics.SkillCooldownTicks(skillType, caster?.RawData,
+                caster?.ConstellationChoices);
             var table = skillType == GIC.Data.SkillType.Burst ? _burstCdReadyTick : _attackCdReadyTick;
             table[unitId] = CurrentTick + cdTicks;
         }
@@ -1400,6 +1509,15 @@ namespace GIC.Battle
                 attackCdRemainTicks = SkillCdRemainTicks(unitId, GIC.Data.SkillType.Normal), // 攻击 CD 剩余（HUD CD 转圈 P4 接线）
                 burstCdRemainTicks = SkillCdRemainTicks(unitId, GIC.Data.SkillType.Burst),   // 爆发 CD 剩余
             };
+            state.constellationChoices.AddRange(unit.ConstellationChoices);
+            var harvest = GetHarvestChannel(unitId);
+            if (harvest != null)
+            {
+                state.harvestActive = 1;
+                state.harvestNode = harvest.nodeCell;
+                state.harvestStartTick = harvest.startTick;
+                state.harvestFinishTick = harvest.finishTick;
+            }
             // 装备态（装备批 2026-10-18）：武器+配件槽位表（含耐久）——客户端血条右侧图标行+瞄准域
             //「有空槽」预判的数据源；无 UnitEquipment 组件（异常）=空表
             var equipment = unit.GetUnitComponent<UnitEquipment>();
@@ -1476,6 +1594,8 @@ namespace GIC.Battle
             // 注册序=BattleMapConfig 解析序（构造时复制保序）——回放确定性同构
             foreach (var node in _resourceNodes.Values)
                 snapshot.resourceNodes.Add(node.Clone());
+            foreach (var cooldown in SortedQuickHarvestCooldowns())
+                snapshot.quickHarvestCooldowns.Add(cooldown.Clone());
 
             return snapshot;
         }

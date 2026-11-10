@@ -241,7 +241,8 @@ namespace GIC.Battle
             foreach (var u in snapshot.units)
             {
                 if (u == null || u.unitId != actorUnitId) continue;
-                return u.constellation >= 2;
+                return u.constellationChoices != null
+                    && u.constellationChoices.Contains((int)SkillName.Amber_C2A_FogScouting);
             }
             return false;
         }

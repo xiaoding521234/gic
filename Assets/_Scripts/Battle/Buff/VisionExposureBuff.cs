@@ -19,11 +19,11 @@ namespace GIC.Battle
 
         public override BuffType Type => BuffType.VisionExposed;
 
-        public VisionExposureBuff(VisionExposureBuffConfig config)
+        public VisionExposureBuff(VisionExposureBuffConfig config, int durationSeconds = 0)
         {
             Config = config;
             Level = 1;
-            RemainingSeconds = Cfg.持续秒数;
+            RemainingSeconds = durationSeconds != 0 ? durationSeconds : Cfg.持续秒数;
         }
 
         private static readonly List<BattleEffect> _empty = new List<BattleEffect>();

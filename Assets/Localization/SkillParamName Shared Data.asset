@@ -359,6 +359,22 @@ MonoBehaviour:
     m_Key: EquipStackLimit
     m_Metadata:
       m_Items: []
+  - m_Id: 87
+    m_Key: C3ReleaseSpeed
+    m_Metadata:
+      m_Items: []
+  - m_Id: 88
+    m_Key: C3CooldownReduction
+    m_Metadata:
+      m_Items: []
+  - m_Id: 89
+    m_Key: CollectRadius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 90
+    m_Key: CollectCooldown
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

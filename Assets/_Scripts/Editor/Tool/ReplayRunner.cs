@@ -208,6 +208,13 @@ namespace GIC.Editor
                             resolver.EmitSeparationCorrections();
                     }
 
+                    // ①c 普通读条与移动快速采集——与 live TickAdvance 同点位：分离后、AI 批前。
+                    if (!over.Ended)
+                    {
+                        resolver.ResolveHarvestTick();
+                        over.Check(sim, tick);
+                    }
+
                     // ② AI 批（按录制 tick 精确应用；伙伴脑批=节拍 tick，眷属摊平波批=节拍后 1~4 tick。
                     //    RevealFog 仍只在节拍 tick 同步——与 live RunAiBeat 同点位）
                     if (!over.Ended)
@@ -405,6 +412,7 @@ namespace GIC.Editor
                     UnitSeparationSystem.ResolveTick(sim); // ①b 弹性分离（与 live TickAdvance 同点位）
                     if (tick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
                         resolver.EmitSeparationCorrections();
+                    resolver.ResolveHarvestTick(); // 与 live TickAdvance 同点位：分离后、秒拍前
                     if (tick % BattleMetrics.TicksPerSecond != 0) continue;
                     bool effectBeat = tick % BattleMetrics.EffectBeatTicks == 0;
                     resolver.ResolveSecondBeat(tick / BattleMetrics.TicksPerSecond, effectBeat);

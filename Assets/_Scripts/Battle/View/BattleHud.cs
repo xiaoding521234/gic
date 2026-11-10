@@ -833,7 +833,8 @@ namespace GIC.Battle
             bool confirmShow = _state == HudState.Aiming && _upgradePending;
             SetLayoutWidgetActive("confirm", confirmShow);
             if (_confirmButton != null)
-                _confirmButton.interactable = !_actionConfirmed; // 已定死置灰——再按=无操作（超时自动按下同款）
+                _confirmButton.interactable = !_actionConfirmed
+                    && (!_upgradeHasBranch || _constellationChoice != 0); // 分支命座未选卡不可确认
             UpdateSkillCooldowns(); // P4-D：技能键 CD 转圈+秒数（转圈数据源=SkillCasted 事件+快照校准）
         }
 
@@ -885,6 +886,19 @@ namespace GIC.Battle
         /// 快捷面板行爆发键（P6 挂账销账）同数据源逐帧驱动——_cdReadyAtByUnit 全单位表
         ///（SkillCasted 事件起点+快照每秒校准）天然覆盖面板单位；
         /// 其余键（移动/延奏/契约/势力）无 CD 不参与——HasCooldownVisual 防为无 CD 键空建视觉件</summary>
+        private float CooldownTotalSeconds(string unitId, SkillType type)
+        {
+            float seconds = type == SkillType.Burst
+                ? BattleMetrics.BurstCooldownSeconds : BattleMetrics.CasterCooldownSeconds;
+            var snapshot = _session?.Player?.LatestSnapshot;
+            if (snapshot?.units != null)
+                foreach (var unit in snapshot.units)
+                    if (unit.unitId == unitId)
+                        return BattleMetrics.SkillCooldownTicks(type, TryGetUnitData(unit.unitName),
+                            unit.constellationChoices) / (float)BattleMetrics.TicksPerSecond;
+            return seconds;
+        }
+
         private void UpdateSkillCooldowns()
         {
             float now = Time.realtimeSinceStartup;
@@ -897,7 +911,7 @@ namespace GIC.Battle
                 float remain = _cdReadyAtByUnit.TryGetValue(row.unitId, out var rowSlots)
                     ? rowSlots[1] - now : 0f;
                 if (remain > 0f || row.burstView.HasCooldownVisual)
-                    row.burstView.SetCooldown(remain, BattleMetrics.BurstCooldownSeconds);
+                    row.burstView.SetCooldown(remain, CooldownTotalSeconds(row.unitId, SkillType.Burst));
             }
 
             if (_selectedUnitId == null) return;
@@ -909,8 +923,7 @@ namespace GIC.Battle
                 if (slot < 0) continue;
                 float remain = slots[slot] - now;
                 if (remain > 0f || def.view.HasCooldownVisual)
-                    def.view.SetCooldown(remain, slot == 0
-                        ? BattleMetrics.CasterCooldownSeconds : BattleMetrics.BurstCooldownSeconds);
+                    def.view.SetCooldown(remain, CooldownTotalSeconds(_selectedUnitId, def.type));
             }
         }
 
@@ -2011,6 +2024,7 @@ namespace GIC.Battle
         private void ExitAiming()
         {
             if (_state != HudState.Aiming) return;
+            HideConstellationOptions();
             // P6 真摇杆持续态：拖拽仍按住时会话被外部收口（单位死亡/阶段切换/换技能重瞄/切维度）→
             // 停止信号（远距目标在途不收=单位走穿棋盘）。已松手的常规退出（提交成功/点击路径）此处
             // _dragAiming=false 不触发——移动提交本身即新 mover。已停/终局态被 Host 拒绝均幂等无害

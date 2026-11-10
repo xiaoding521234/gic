@@ -313,6 +313,19 @@ namespace GIC.Data
         // （ProjectileEffect.AoeRadiusCm），ProjectileResolver 消费
         [InspectorName("命中半径")]
         AoERadius = 86,
+
+        [InspectorName("3命释放速度加快")]
+        C3ReleaseSpeed = 87,
+
+        [InspectorName("3命冷却减少")]
+        C3CooldownReduction = 88,
+
+        // 移动快速采集（单位：半径=cm，冷却=秒；技能资产/描述/Host/AI 四方同源）
+        [InspectorName("采集半径")]
+        CollectRadius = 89,
+
+        [InspectorName("采集冷却")]
+        CollectCooldown = 90,
     }
 
     /// <summary>

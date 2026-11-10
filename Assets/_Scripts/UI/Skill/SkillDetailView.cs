@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -42,6 +43,11 @@ namespace GIC.UI
         private SkillConfig.SkillData skillData;
         private UnitConfig.UnitData unitData;
         private SkillIconView sourceSkillIconView;
+        private ConstellationDetailView _constellationDetail;
+        private bool _constellationMode;
+
+        /// <summary>战斗宿主提供当前单位已选分支；背包等静态详情不提供，六卡统一展示。</summary>
+        public Func<IReadOnlyList<int>> ConstellationChoicesProvider;
 
         private RectTransform panelRect;
         private Vector2 panelTargetPosition;
@@ -302,7 +308,7 @@ namespace GIC.UI
         /// 重摆/滑入动画/RuleMode 数值解析全复用）。</summary>
         private void AutoOpenFirstInfoLink()
         {
-            if (skillDescription == null) return;
+            if (_constellationMode || skillDescription == null) return;
             var tmpText = skillDescription.GetComponent<TextMeshProUGUI>();
             if (tmpText == null) return;
 
@@ -386,6 +392,32 @@ namespace GIC.UI
             // 如果关联面板开着，关掉（从 CardMode 内的技能图标跳转过来的场景）
             CloseRelatedPanel();
 
+            _constellationMode = skillData != null && skillData.skillType == SkillType.Talent
+                                 && unitData != null && unitData.HasBranchConstellation;
+            if (_constellationMode)
+            {
+                if (_constellationDetail == null)
+                {
+                    _constellationDetail = skillDetailPanel.GetComponent<ConstellationDetailView>();
+                    if (_constellationDetail == null)
+                        _constellationDetail = skillDetailPanel.AddComponent<ConstellationDetailView>();
+                }
+                if (skillType != null) skillType.gameObject.SetActive(false);
+                if (skillIconView != null) skillIconView.gameObject.SetActive(false);
+                if (skillName != null) skillName.gameObject.SetActive(false);
+                if (content != null) content.SetActive(false);
+                _constellationDetail.Init(unitData, ConstellationChoicesProvider?.Invoke());
+                this.sourceSkillIconView = sourceSkillIconView;
+                RefreshLayout();
+                return;
+            }
+
+            if (_constellationDetail != null) _constellationDetail.Hide();
+            if (skillType != null) skillType.gameObject.SetActive(true);
+            if (skillIconView != null) skillIconView.gameObject.SetActive(true);
+            if (skillName != null) skillName.gameObject.SetActive(true);
+            if (content != null) content.SetActive(true);
+
             // 技能类型
             skillType.ClearAllEntries();
             skillType.AddEntry(skillData.skillType.GetEntry());
@@ -428,6 +460,11 @@ namespace GIC.UI
 
         private void RefreshLayout()
         {
+            if (_constellationMode && _constellationDetail != null)
+            {
+                _constellationDetail.RefreshLayout();
+                return;
+            }
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(content.GetComponent<RectTransform>());
             if (relatedPanel != null)

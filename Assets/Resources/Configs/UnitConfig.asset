@@ -482,6 +482,7 @@ MonoBehaviour:
     baseSanity: -64
     baseLifeSteal: -64
     baseHealEfficiency: -64
+    baseHarvestEfficiency: -64
     baseEnergy: 30
     normalMoveType: 2
     blockAllies: 1
@@ -501,6 +502,22 @@ MonoBehaviour:
     - {fileID: 11400000, guid: a34ff019f01cddd4fac70955b9f78c59, type: 2}
     - {fileID: 11400000, guid: ea2e47ef38fdbba458c888bd90d5ce89, type: 2}
     - {fileID: 11400000, guid: 207b8434b4118b745ad2199f6d6715e9, type: 2}
+    constellationTiers:
+    - options:
+      - skill: {fileID: 11400000, guid: e2ca35c894a74b77a043d7e798471acb, type: 2}
+        aiScore: 10
+      - skill: {fileID: 11400000, guid: 7f78e532ad91430896c5cad625787971, type: 2}
+        aiScore: 5
+    - options:
+      - skill: {fileID: 11400000, guid: 350742ba96dd4584919b868177b2a876, type: 2}
+        aiScore: 5
+      - skill: {fileID: 11400000, guid: 2df86288c3844e3e9d2c948cfb679d2c, type: 2}
+        aiScore: 10
+    - options:
+      - skill: {fileID: 11400000, guid: 686e4366ca1a460b8bceec57ef242841, type: 2}
+        aiScore: 10
+      - skill: {fileID: 11400000, guid: 5c585437e7264bc0bb3f2e0b0ebcc733, type: 2}
+        aiScore: 5
     voices:
       onGoWar:
         clips:

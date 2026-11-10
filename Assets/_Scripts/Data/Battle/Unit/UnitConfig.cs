@@ -17,6 +17,19 @@ namespace GIC.Data
         public const int Unspecified = -64;
 
         [System.Serializable]
+        public class ConstellationOption
+        {
+            public SkillConfig skill;
+            public int aiScore;
+        }
+
+        [System.Serializable]
+        public class ConstellationTier
+        {
+            public ConstellationOption[] options = new ConstellationOption[2];
+        }
+
+        [System.Serializable]
         public class UnitData
         {
             public UnitName unitName = UnitName.Amber;
@@ -124,6 +137,7 @@ namespace GIC.Data
             [Header("战斗属性")]
             public int baseLifeSteal = Unspecified;
             public int baseHealEfficiency = Unspecified;
+            public int baseHarvestEfficiency = Unspecified;
             public int baseEnergy = Unspecified;
 
             [Header("常态移动")]
@@ -179,6 +193,22 @@ namespace GIC.Data
 
             [Header("技能（2026-09-23 独立化：SkillConfig 资产引用列表；顺序=skillIndex 语义勿重排；通用技能共享资产）")]
             public List<SkillConfig> skills = new List<SkillConfig>();
+
+            [Header("分支命座（每级两个 Talent 选项；空=沿用旧单体命座）")]
+            public List<ConstellationTier> constellationTiers = new List<ConstellationTier>();
+
+            public bool HasBranchConstellation => constellationTiers != null && constellationTiers.Count > 0;
+
+            public ConstellationOption GetConstellationOption(int level, int skillId)
+            {
+                if (!HasBranchConstellation || level < 1 || level > constellationTiers.Count) return null;
+                var options = constellationTiers[level - 1].options;
+                if (options == null) return null;
+                foreach (var option in options)
+                    if (option?.skill != null && option.skill.data != null
+                        && (int)option.skill.data.skillID == skillId) return option;
+                return null;
+            }
 
             [Header("语音")]
             public UnitVoiceData voices;
@@ -277,6 +307,7 @@ namespace GIC.Data
             public int GetEffectiveExploreVision() => IsSpecified(探索视野) ? 探索视野 : 100;
             public int GetEffectiveLifeSteal() => IsSpecified(baseLifeSteal) ? baseLifeSteal : 0;
             public int GetEffectiveHealEfficiency() => IsSpecified(baseHealEfficiency) ? baseHealEfficiency : 100;
+            public int GetEffectiveHarvestEfficiency() => baseHarvestEfficiency > 0 ? baseHarvestEfficiency : 100;
             public int GetEffectiveEnergy() => IsSpecified(baseEnergy) ? baseEnergy : 100;
 
             /// <summary>有效重量（2026-11-08 弹性碰撞）：0=未指定按类型/星级推定——建筑 20、

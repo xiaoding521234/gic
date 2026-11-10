@@ -103,11 +103,9 @@ namespace GIC.Battle
         }
 
         /// <summary>
-        /// tick 移动收尾段（决策九十五 P2，蓝图 §3.3）：RTSMovementSystem 推进出的到达/被挡 mover
-        /// 由 RTSFlow 每 tick 交来——途经采集保留（PathCells 全量逐格，docs/47 旧语义：含起终点、
-        /// 同堆连采至多 CollectCount 次）；**移动获能已删除**（蓝图 §4.3「移动 +10 元能来源删除」——
-        /// 旧格轨获能随 P5 旧轨退役消失）。采集耐久钩子（决策八十一）随每笔采集触发。
-        /// 纯到达（无采集）=零命令零段。
+        /// tick 移动收尾段：只处理到达/被挡的位置校正。普通读条与安柏移动快速采集统一在
+        /// ResolveHarvestTick 按逐 tick 实际位置结算，不再于移动结束时按 PathCells 补算。
+        /// 纯到达（无被挡校正）=零命令零段。
         /// </summary>
         public void ResolveMoveArrivals(List<RTSMoveState> arrivals)
         {
@@ -126,26 +124,6 @@ namespace GIC.Battle
                     correct.hitX = stopCm.x;
                     correct.hitY = stopCm.y;
                     corrects.Add(correct);
-                }
-                var collect = MoveExecutor.CollectParamsOf(mover.Unit);
-                if (collect.count <= 0) continue;
-                var identity = mover.Unit.GetUnitComponent<UnitIdentity>();
-                if (identity == null) continue;
-                foreach (var cell in mover.PathCells)
-                {
-                    for (int k = 0; k < collect.count; k++)
-                    {
-                        int remaining = _sim.TryHarvestResourceNode(cell);
-                        if (remaining < 0) break; // 无堆/已耗尽——续走后续途经格
-                        effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest, 0));
-                        if (collect.staminaGain != 0)
-                            effects.Add(new StaminaEffect(identity.OwnerPlayerID, collect.staminaGain, 0));
-                        if (collect.energyGain != 0)
-                            effects.Add(new EnergyEffect(mover.UnitId, collect.energyGain, EnergyEffect.CategoryCollectGain));
-                        effects.Add(new ResourceHarvestEffect(mover.UnitId, cell,
-                            ResourceNodeMetrics.MoraPerHarvest, remaining, 0));
-                        mover.Unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
-                    }
                 }
             }
             if (corrects.Count == 0 && effects.Count == 0) return;
@@ -178,6 +156,194 @@ namespace GIC.Battle
                 effects, appliedBuffs, null, newlyDead, expired: null, skillCasts: null,
                 shattered: shatters);
             if (segment.commands.Count > 0) PushSegment(segment);
+        }
+
+        /// <summary>逐 tick 推进普通读条与移动快速采集。普通受击不进入此中断链；主动行动由执行器显式取消。</summary>
+        public void ResolveHarvestTick()
+        {
+            var effects = new List<BattleEffect>();
+            var startedCommands = new List<BattleCommand>();
+            var nodes = _sim.SortedResourceNodes();
+            AppendAmberKeenSensesEffects(effects);
+
+            foreach (var kv in _sim.SortedUnits())
+            {
+                string unitId = kv.Key;
+                var unit = kv.Value;
+                if (unit == null) continue;
+                var status = unit.GetUnitComponent<UnitStatus>();
+                bool incapacitated = BattleSimState.IsDead(unit)
+                                     || (status != null && (status.IsHardControlled || status.IsSilenced));
+                if (incapacitated)
+                {
+                    _sim.CancelHarvestChannel(unitId);
+                    continue;
+                }
+
+                bool moving = _sim.IsUnitMoving(unitId);
+                if (moving)
+                {
+                    _sim.CancelHarvestChannel(unitId);
+                    var collect = MoveExecutor.CollectParamsOf(unit);
+                    if (collect.count <= 0) continue;
+                    var quickNode = FindHarvestNodeInRange(unit, nodes, collect.radiusCm);
+                    if (quickNode == null
+                        || _sim.QuickHarvestReadyTick(unitId, quickNode.cell) > _sim.CurrentTick) continue;
+                    var identity = unit.GetUnitComponent<UnitIdentity>();
+                    if (identity == null) continue;
+
+                    int completed = 0;
+                    for (int i = 0; i < collect.count; i++)
+                    {
+                        int remaining = _sim.TryHarvestResourceNode(quickNode.cell);
+                        if (remaining < 0) break;
+                        AppendHarvestEffects(effects, unitId, identity.OwnerPlayerID, quickNode.cell, remaining,
+                            collect.staminaGain, collect.energyGain);
+                        unit.GetUnitComponent<UnitEquipment>()?.OnCollect();
+                        completed++;
+                    }
+                    if (completed > 0)
+                        _sim.SetQuickHarvestReadyTick(unitId, quickNode.cell,
+                            _sim.CurrentTick + Math.Max(0, collect.cooldownSeconds) * BattleMetrics.TicksPerSecond);
+                    continue;
+                }
+
+                var node = FindHarvestNodeInRange(unit, nodes, ResourceNodeMetrics.HarvestRadiusCm);
+                if (node == null)
+                {
+                    _sim.CancelHarvestChannel(unitId);
+                    continue;
+                }
+
+                int efficiency = Math.Max(1, unit.GetUnitComponent<UnitStats>()?.HarvestEfficiency ?? 100);
+                int baseTicks = node.EffectiveHarvestSeconds * BattleMetrics.TicksPerSecond;
+                int durationTicks = (baseTicks * 100 + efficiency - 1) / efficiency;
+                var channel = _sim.EnsureHarvestChannel(unitId, node.cell, _sim.CurrentTick,
+                    durationTicks, out bool started);
+                if (started)
+                    startedCommands.Add(BattleCommand.HarvestChannel(BattleCommandType.HarvestChannelStart,
+                        unitId, channel.nodeCell, channel.startTick, channel.finishTick));
+                if (_sim.CurrentTick < channel.finishTick) continue;
+
+                _sim.CompleteHarvestChannel(unitId);
+                int remainingAfterChannel = _sim.TryHarvestResourceNode(node.cell);
+                if (remainingAfterChannel < 0) continue;
+                var channelIdentity = unit.GetUnitComponent<UnitIdentity>();
+                if (channelIdentity == null) continue;
+                AppendHarvestEffects(effects, unitId, channelIdentity.OwnerPlayerID, node.cell,
+                    remainingAfterChannel, 0, 0);
+                unit.GetUnitComponent<UnitEquipment>()?.OnCollect();
+            }
+
+            var controlCommands = new List<BattleCommand>();
+            var cancels = _sim.ConsumePendingHarvestCancels();
+            if (cancels != null)
+                foreach (var cancel in cancels)
+                    controlCommands.Add(BattleCommand.HarvestChannel(BattleCommandType.HarvestChannelCancel,
+                        cancel.unitId, cancel.nodeCell));
+            controlCommands.AddRange(startedCommands);
+            if (controlCommands.Count == 0 && effects.Count == 0) return;
+
+            int slice = _sliceCounter++;
+            var segment = new Segment
+            {
+                turnNumber = _sim.CurrentSecond,
+                sliceIndex = slice,
+                sliceAttackSpeed = 0,
+                turnMaxAttackSpeed = 0,
+                insertedInstantAction = 0,
+                startTick = _sim.CurrentTick,
+            };
+            foreach (var command in controlCommands)
+            {
+                command.sliceIndex = slice;
+                command.indexInSlice = segment.commands.Count;
+                segment.commands.Add(command);
+            }
+
+            var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
+            var appliedBuffs = effects.Count > 0 ? ApplyEffects(effects, shatters) : new List<ApplyBuffEffect>();
+            var newlyDead = effects.Count > 0
+                ? _sim.ResolveDeaths(CollectDamagedTargets(effects)) : new List<Unit>();
+            EmitSliceCommands($"tick{_sim.CurrentTick}采集", segment, slice,
+                effects, appliedBuffs, null, newlyDead, expired: null, skillCasts: null,
+                shattered: shatters);
+            if (segment.commands.Count > 0) PushSegment(segment);
+        }
+
+        private ResourceNodeState FindHarvestNodeInRange(Unit unit, List<ResourceNodeState> nodes, int radiusCm)
+        {
+            if (unit == null || nodes == null || radiusCm < 0) return null;
+            var pos = _sim.GetPosCm(unit);
+            ResourceNodeState best = null;
+            long bestDistance = (long)radiusCm * radiusCm + 1;
+            foreach (var node in nodes)
+            {
+                if (node == null || node.remainingCharges <= 0) continue;
+                long dx = node.cell.CenterXCm - pos.x;
+                long dz = node.cell.CenterYCm - pos.y;
+                long distance = dx * dx + dz * dz;
+                if (distance >= bestDistance) continue;
+                best = node;
+                bestDistance = distance;
+            }
+            return best;
+        }
+
+        private static void AppendHarvestEffects(List<BattleEffect> effects, string unitId, string playerId,
+            BattleCell nodeCell, int remaining, int staminaGain, int energyGain)
+        {
+            effects.Add(new MoraGainEffect(playerId, ResourceNodeMetrics.MoraPerHarvest, 0));
+            if (staminaGain != 0) effects.Add(new StaminaEffect(playerId, staminaGain, 0));
+            if (energyGain != 0)
+                effects.Add(new EnergyEffect(unitId, energyGain, EnergyEffect.CategoryCollectGain));
+            effects.Add(new ResourceHarvestEffect(unitId, nodeCell,
+                ResourceNodeMetrics.MoraPerHarvest, remaining, 0));
+        }
+
+        /// <summary>1B 敏锐感知：半径与持续时间均读已选命座资产；已有更长暴露时不重复刷命令。</summary>
+        private void AppendAmberKeenSensesEffects(List<BattleEffect> effects)
+        {
+            foreach (var kv in _sim.SortedUnits())
+            {
+                var amber = kv.Value;
+                if (amber == null || BattleSimState.IsDead(amber)
+                    || !amber.HasConstellationChoice(SkillName.Amber_C1B_KeenSenses)) continue;
+                var option = amber.RawData?.GetConstellationOption(1,
+                    (int)SkillName.Amber_C1B_KeenSenses);
+                var data = option?.skill?.data;
+                if (data == null) continue;
+                int radiusCm = data.GetInt(SkillParamKey.EffectRadius, 0);
+                int durationSeconds = data.GetInt(SkillParamKey.VisionDuration, 0);
+                if (radiusCm <= 0 || durationSeconds <= 0) continue;
+                var amberIdentity = amber.GetUnitComponent<UnitIdentity>();
+                if (amberIdentity == null) continue;
+                var amberPos = _sim.GetPosCm(amber);
+                foreach (var enemyKv in _sim.SortedUnits())
+                {
+                    var enemy = enemyKv.Value;
+                    if (enemy == null || BattleSimState.IsDead(enemy)) continue;
+                    var enemyIdentity = enemy.GetUnitComponent<UnitIdentity>();
+                    if (enemyIdentity == null || enemyIdentity.Team == amberIdentity.Team) continue;
+                    var enemyPos = _sim.GetPosCm(enemy);
+                    long dx = enemyPos.x - amberPos.x;
+                    long dz = enemyPos.y - amberPos.y;
+                    if (dx * dx + dz * dz > (long)radiusCm * radiusCm) continue;
+
+                    bool alreadyExposed = false;
+                    foreach (var buff in enemy.Buffs)
+                        if (buff != null && buff.Type == BuffType.VisionExposed
+                            && buff.RemainingSeconds >= durationSeconds)
+                        {
+                            alreadyExposed = true;
+                            break;
+                        }
+                    if (alreadyExposed) continue;
+                    effects.Add(new ApplyBuffEffect(kv.Key, enemyKv.Key, (int)BuffType.VisionExposed, 1,
+                        durationSeconds: durationSeconds, sourceSkillId: (int)SkillName.Amber_C1B_KeenSenses,
+                        buffKey: BuffKeys.VisionExposure));
+                }
+            }
         }
 
         /// <summary>弹性分离位移下发（2026-11-08 拍板「友军碰撞有弹性、建筑硬」）：Host 权威推挤按
@@ -266,6 +432,7 @@ namespace GIC.Battle
                         // blocked=0 客户端净停不弹回）；无在途 mover=幂等零命令纯静默（重复停/摇杆回中抖动）
                         if (action.moveContinuous && action.aimX == 0 && action.aimZ == 0)
                         {
+                            _sim.CancelHarvestChannel(action.unitId); // 主动停止也属于主动操作
                             int removed = _sim.ActiveMoversInternal.RemoveAll(m => m.UnitId == action.unitId);
                             if (removed > 0)
                             {
@@ -301,6 +468,7 @@ namespace GIC.Battle
                             var cmMover = RTSMovementSystem.BuildCmMover(_sim, action, out var moveCommand);
                             if (cmMover != null)
                             {
+                                _sim.CancelHarvestChannel(action.unitId);
                                 _sim.ActiveMoversInternal.Add(cmMover);
                                 if (moveCommand != null) casts.Add(moveCommand); // 启动 Move 命令（casts 首发位——客户端按 MoveStepSeconds=1s/格补间）
                                 AddMoveCast(casts, unit, action, snapshot); // 时轮（B-S1b）：移动=特殊技能
@@ -324,7 +492,7 @@ namespace GIC.Battle
 
             // （旧格轨移动执行链已整体退役删除——2026-11-04 拍板「1 米/秒」Move 分支全部桥入
             // RTSMovementSystem tick 新轨；MovementResolver/MoveActionState/legacyMovers 随
-            // 2026-11-09 残留清理批删除。途经采集=新轨唯一路径：收尾见 ResolveMoveArrivals）
+            // 2026-11-09 残留清理批删除。快速采集由 ResolveHarvestTick 按实际连续位置逐 tick 结算）
 
             // 投射物连续命中判定（B5）：移动展开后按执行阶段时间轴模拟接触（读移动者完整轨迹
             //——即时制新轨 mover/静止快照，docs/22 §11；命中点/消散点随命令毫米定点下发）
@@ -551,35 +719,6 @@ namespace GIC.Battle
             // ②地脉驻留理智代价（非灵魂地脉单位 −3 理智/秒拍末——当前地脉仅灵魂=预留自动生效，
             // 胡桃/丽莎相位技能批上线即激活）。位置=泡湿之后（同为秒拍末收尾类环境规则）
             CollectLeyLineEffectBeatEffects(effects);
-
-            // 资源点秒拍末站立采集（docs/47 拍板③，2026-10-27）：存活单位站资源点格=采集 1 次
-            // （中立无主谁站谁采，拍板②——含敌方单位）；同格多单位=整格该秒拍至多 1 次、
-            // unitId 升序首个（拍板①——Dictionary 枚举序不保证，显式升序遍历确定「首个」）。
-            // 产出=资源点定义收益（MoraPerHarvest 摩拉）走标准效应链（MoraGainEffect 应用+命令
-            // 发射单源）；采集事实 ResourceHarvestEffect 供命令发射（余量已在 TryHarvest 扣减）；
-            // 位置=泡湿/地脉之后（同为秒拍末收尾族环境规则——按单位位置结算）
-            var harvestedCells = new HashSet<BattleCell>();
-            var standHarvestOrder = new List<(string id, Unit unit)>();
-            foreach (var kv in _sim.SortedUnits())
-            {
-                if (kv.Value == null || BattleSimState.IsDead(kv.Value)) continue;
-                standHarvestOrder.Add((kv.Key, kv.Value));
-            }
-            standHarvestOrder.Sort((a, b) => string.CompareOrdinal(a.id, b.id));
-            foreach (var stander in standHarvestOrder)
-            {
-                var pos = _sim.GetPosition(stander.unit);
-                if (harvestedCells.Contains(pos)) continue;
-                int remaining = _sim.TryHarvestResourceNode(pos);
-                if (remaining < 0) continue;
-                harvestedCells.Add(pos);
-                var identity = stander.unit.GetUnitComponent<UnitIdentity>();
-                if (identity == null) continue;
-                effects.Add(new MoraGainEffect(identity.OwnerPlayerID, ResourceNodeMetrics.MoraPerHarvest));
-                effects.Add(new ResourceHarvestEffect(stander.id, pos,
-                    ResourceNodeMetrics.MoraPerHarvest, remaining));
-                stander.unit.GetUnitComponent<UnitEquipment>()?.OnCollect(); // 采集耐久钩子（决策八十一）
-            }
 
             var shatters = new List<(string holderId, string sourceId, BaseBuff buff)>();
             // 建筑效果拍段（决策八十六批D，docs/45 §6：泡湿之后、命令发射之前——秒拍末

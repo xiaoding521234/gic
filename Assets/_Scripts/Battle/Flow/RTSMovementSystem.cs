@@ -15,7 +15,7 @@ namespace GIC.Battle
     /// - **碰撞**（蓝图 §3.2 语义连续化）：敌方/尸体/核心=硬挡圆（停于接触前=Blocked 收尾）；
     ///   友军=可穿不可停（推进期零阻挡）；地形=ForceType（寻径层已保证，推进期不再判）；
     /// - **收尾**：到达目标点（Arrived）或被挡（Blocked）→ 由 Flow 交 BattleResolver.ResolveMoveArrivals
-    ///   产命令段（途经采集保留〔技能参数数据驱动〕、移动获能已删除、SkillCast 启动段已发）。
+    ///   产位置校正段；快速采集在 BattleResolver.ResolveHarvestTick 按实际位置逐 tick 检测。
     /// 客户端表现（P2 中间态）：启动段随 casts 发旧格式 Move 命令（格路径+方向）——旧播放器照播
     /// 行走动画；连续位置插值播放随 P4 客户端批改造。
     /// </summary>
@@ -24,7 +24,7 @@ namespace GIC.Battle
         public string UnitId;
         public Unit Unit;
         public List<Vector2IntCm> WaypointsCm;
-        public List<BattleCell> PathCells;      // 格序列（途经采集按格判堆——旧语义保留）
+        public List<BattleCell> PathCells;      // 客户端移动命令的格路径；快速采集按实际连续位置判定
         public int WaypointIndex;
         public int SpeedCmPerSecond;
         public int AccumSpeedCm;                // 整数速度累积器（每 tick 累积，除以 TicksPerSecond 取步）
@@ -82,8 +82,8 @@ namespace GIC.Battle
             return mover;
         }
 
-        /// <summary>格序列（起点格+逐 waypoint 所在格去重——途经采集消费；含起终点语义同旧轨；
-        /// P5 起 CompanionBrain 收获档路径堆值同源复用——脑层估值与执行层途经判定共用格序=单源）</summary>
+        /// <summary>客户端 Move 命令的格序列（起点格+逐 waypoint 所在格去重）；
+        /// 快速采集估值改读连续 waypoint 与 CollectRadius，不再消费本格序列。</summary>
         public static List<BattleCell> BuildPathCells(BattleSimState sim, Vector2Int fromCm, List<Vector2IntCm> waypoints)
         {
             var cells = new List<BattleCell>();

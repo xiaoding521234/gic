@@ -21,6 +21,17 @@ namespace GIC.Data
         public BattleCell center;
     }
 
+    /// <summary>按格覆写资源点普通读条时间；未配置或值≤0时使用全局默认值。</summary>
+    [Serializable]
+    public class ResourceNodeHarvestOverride
+    {
+        [InspectorName("资源点格")]
+        public BattleCell cell;
+
+        [InspectorName("采集秒数")]
+        public int harvestSeconds = ResourceNodeMetrics.DefaultHarvestSeconds;
+    }
+
     /// <summary>
     /// 战场地图配置（字符行布局，可读可手编）
     /// 字符约定：G=草地 W=水 S=石路 P=平原 D=土地 C=圆石 .=虚空（无地形）
@@ -50,6 +61,9 @@ namespace GIC.Data
         [Header("地形布局（每行一个字符串，字符数须等于宽度）")]
         [TextArea]
         public List<string> rows = new List<string>();
+
+        [Header("资源点采集时间覆写（按格；空表=全部默认3秒）")]
+        public List<ResourceNodeHarvestOverride> resourceNodeHarvestOverrides = new List<ResourceNodeHarvestOverride>();
 
         [Header("玩家出生区（3x3 石路中心格）")]
         public List<SpawnZone> spawnZones = new List<SpawnZone>();
@@ -88,6 +102,7 @@ namespace GIC.Data
                             kind = (int)ResourceNodeKind.MoraPile,
                             cell = new BattleCell(x, y),
                             remainingCharges = ResourceNodeMetrics.MoraPileMaxCharges,
+                            harvestSeconds = ResolveHarvestSeconds(x, y),
                         });
                         continue;
                     }
@@ -102,6 +117,15 @@ namespace GIC.Data
             data.faction = (int)faction; // 协议携带势力：客户端 HUD 徽标等表现层取用（B7 客户端无 mapConfig 资产）
 
             return data;
+        }
+
+        private int ResolveHarvestSeconds(int x, int y)
+        {
+            if (resourceNodeHarvestOverrides != null)
+                foreach (var nodeOverride in resourceNodeHarvestOverrides)
+                    if (nodeOverride != null && nodeOverride.cell.x == x && nodeOverride.cell.y == y
+                        && nodeOverride.harvestSeconds > 0) return nodeOverride.harvestSeconds;
+            return ResourceNodeMetrics.DefaultHarvestSeconds;
         }
 
         private static TileType CharToTile(char c)

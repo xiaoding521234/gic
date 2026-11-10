@@ -56,22 +56,25 @@ namespace GIC.Battle
             new SkillCostEntry { kind = CostKind.Stamina, amount = BattleMetrics.StaminaCostPerAction }
         };
 
-        // ==================== 途经采集（docs/47 资源点批，2026-10-27；docs/11 旧挂账销案） ====================
+        // ==================== 移动快速采集（即时制逐 tick 真圆判定） ====================
 
-        /// <summary>途经采集参数（移动技能条目数据驱动——安柏飞行冠军 CollectCount=3/
-        /// CollectStaminaGain=5/CollectEnergyGain=5；0 次=无途经采集〔默认，普通移动零行为变化〕）。
-        /// 参数只配在 Move 条目上=未来采集型移动技能配参即生效零代码</summary>
+        /// <summary>移动快速采集参数单源：次数/半径/冷却/体力/元能均读移动技能资产；
+        /// 1A 仅用自身 CollectCount 覆盖次数。Host 逐 tick 结算与 AI 路径估值共用本对象。</summary>
         public readonly struct CollectParams
         {
-            public readonly int count;          // 每次移动至多采集次数（CollectCount）
-            public readonly int energyGain;     // 每次采集元能（CollectEnergyGain）
-            public readonly int staminaGain;    // 每次采集体力（CollectStaminaGain）
+            public readonly int count;             // 每点每次触发采集次数（CollectCount）
+            public readonly int energyGain;        // 每次采集元能（CollectEnergyGain）
+            public readonly int staminaGain;       // 每次采集体力（CollectStaminaGain）
+            public readonly int radiusCm;          // 触发半径（CollectRadius，cm）
+            public readonly int cooldownSeconds;   // 每单位每资源点独立冷却（CollectCooldown，秒）
 
-            public CollectParams(int count, int energyGain, int staminaGain)
+            public CollectParams(int count, int energyGain, int staminaGain, int radiusCm, int cooldownSeconds)
             {
                 this.count = count;
                 this.energyGain = energyGain;
                 this.staminaGain = staminaGain;
+                this.radiusCm = radiusCm;
+                this.cooldownSeconds = cooldownSeconds;
             }
         }
 
@@ -86,13 +89,57 @@ namespace GIC.Battle
                     var data = skill?.RawData;
                     if (data == null || data.skillType != SkillType.Move) continue;
                     int count = data.GetInt(SkillParamKey.CollectCount, 0);
+                    if (unit.HasConstellationChoice(SkillName.Amber_C1A_DoubleHarvest))
+                    {
+                        var option = unit.RawData?.GetConstellationOption(1,
+                            (int)SkillName.Amber_C1A_DoubleHarvest);
+                        count = option?.skill?.data != null
+                            ? option.skill.data.GetInt(SkillParamKey.CollectCount, count) : count;
+                    }
                     if (count <= 0) return default;
                     return new CollectParams(count,
                         data.GetInt(SkillParamKey.CollectEnergyGain, 0),
-                        data.GetInt(SkillParamKey.CollectStaminaGain, 0));
+                        data.GetInt(SkillParamKey.CollectStaminaGain, 0),
+                        data.GetInt(SkillParamKey.CollectRadius, ResourceNodeMetrics.HarvestRadiusCm),
+                        data.GetInt(SkillParamKey.CollectCooldown,
+                            ResourceNodeMetrics.DefaultQuickHarvestCooldownSeconds));
                 }
             }
             return default;
+        }
+
+        /// <summary>AI 路径估值与 Host 半径参数同源：任一连续路径线段进入资源点真圆即计一次快速采集。</summary>
+        public static bool PathPassesResourceNode(Vector2Int fromCm, List<Vector2IntCm> waypoints,
+            BattleCell nodeCell, int radiusCm)
+        {
+            if (waypoints == null || radiusCm < 0) return false;
+            long radiusSq = (long)radiusCm * radiusCm;
+            int ax = fromCm.x, az = fromCm.y;
+            foreach (var waypoint in waypoints)
+            {
+                if (SegmentWithinRadius(ax, az, waypoint.x, waypoint.z,
+                        nodeCell.CenterXCm, nodeCell.CenterYCm, radiusSq)) return true;
+                ax = waypoint.x;
+                az = waypoint.z;
+            }
+            return false;
+        }
+
+        private static bool SegmentWithinRadius(int ax, int az, int bx, int bz,
+            int px, int pz, long radiusSq)
+        {
+            long abx = bx - ax, abz = bz - az;
+            long apx = px - ax, apz = pz - az;
+            long abSq = abx * abx + abz * abz;
+            long dot = apx * abx + apz * abz;
+            if (dot <= 0) return apx * apx + apz * apz <= radiusSq;
+            if (dot >= abSq)
+            {
+                long bpx = px - bx, bpz = pz - bz;
+                return bpx * bpx + bpz * bpz <= radiusSq;
+            }
+            long cross = abx * apz - abz * apx;
+            return cross * cross <= radiusSq * abSq;
         }
     }
 }

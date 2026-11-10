@@ -10,5 +10,8 @@ namespace GIC.Data
 
         /// <summary>冰棱减防（凯亚寒冰之棱 2命 tick 施加——数值真源=Buff_DefenseDown 资产单源）</summary>
         public const string DefenseDown = "Buff_DefenseDown";
+
+        /// <summary>视野暴露（安柏变奏与分支命座共用资产）</summary>
+        public const string VisionExposure = "Buff_VisionExposure";
     }
 }

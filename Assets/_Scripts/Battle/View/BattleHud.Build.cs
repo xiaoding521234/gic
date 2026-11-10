@@ -187,6 +187,14 @@ namespace GIC.Battle
 
             // 点外自动关闭让位：与按钮点击同帧竞态（docs/14 §64b）——战斗的点外收面板由 OnBoardTap 承接
             _skillDetailView.点外关闭 = false;
+            _skillDetailView.ConstellationChoicesProvider = () =>
+            {
+                var snapshot = _session?.Player?.LatestSnapshot;
+                if (snapshot?.units == null || string.IsNullOrEmpty(_selectedUnitId)) return null;
+                foreach (var unit in snapshot.units)
+                    if (unit.unitId == _selectedUnitId) return unit.constellationChoices;
+                return null;
+            };
 
             // 关联面板开面板回调（2026-10-10 关联面板半遮主面板修复）：link 命中即把关联面板
             // 贴到技能面板左/右不重叠、出画布夹回——烘焙位只是兜底，战斗内实际位由该回调每次重摆

@@ -80,6 +80,12 @@ namespace GIC.Data
 
         [InspectorName("资源点采集")]
         ResourceHarvest = 23, // 资源点批（docs/47，2026-10-27）：站立/途经采集事实——value=获得摩拉、metadata=采集后剩余次数（0=已耗尽）、cell=资源点格、actorUnitId=采集者单位；玩家摩拉入账仍走 StatChange(StatKindMora) 单源（MoraGainEffect 产出——本命令不承载玩家池写）；客户端=BattleBoard 余量刷新/耗尽移除+采集飘字
+
+        [InspectorName("采集读条开始")]
+        HarvestChannelStart = 24,
+
+        [InspectorName("采集读条取消")]
+        HarvestChannelCancel = 25,
     }
 
     /// <summary>
@@ -171,6 +177,10 @@ namespace GIC.Data
 
         /// <summary>释放速度千分（1+攻速/100——客户端动作片播放速率乘数；0=1 倍原速）</summary>
         public int castRate;
+
+        /// <summary>施放起点连续坐标（cm，SkillCast 有效）——自由角线域表现与 Host 共用同一起点；0=旧命令回落 cell 中心</summary>
+        public int originX;
+        public int originZ;
 
         [Header("移动载荷（决策九十五 P4-E 移动实时化——Move 命令有效）")]
         /// <summary>移速（cm/秒，施放时刻实际值含 Buff——客户端逐段补间时长=段距离/速度，修斜向
@@ -303,7 +313,8 @@ namespace GIC.Data
         /// castRate=释放速度千分（客户端动作片播放速率乘数）。</summary>
         public static BattleCommand SkillCast(string unitId, int sliceIndex, int indexInSlice,
             int skillId, int direction, BattleCell fromCell, int element = 0,
-            int aimVecX = 0, int aimVecZ = 0, int cdRemainTicks = 0, int castRatePerMille = 0)
+            int aimVecX = 0, int aimVecZ = 0, int cdRemainTicks = 0, int castRatePerMille = 0,
+            int originXCm = 0, int originZCm = 0)
         {
             return new BattleCommand
             {
@@ -319,6 +330,8 @@ namespace GIC.Data
                 aimZ = aimVecZ,
                 cdTicks = cdRemainTicks,
                 castRate = castRatePerMille,
+                originX = originXCm,
+                originZ = originZCm,
             };
         }
 
@@ -371,7 +384,7 @@ namespace GIC.Data
         /// targetUnitId=升命单位（不生成新单位——DeployUnitExecutor 升命分支产出）；
         /// 客户端弹「命座提升」toast（等级显示待 UI 批）</summary>
         public static BattleCommand UpgradeConstellation(string actorUnitId, string targetUnitId, int sliceIndex,
-            int indexInSlice, int newLevel)
+            int indexInSlice, int newLevel, int choice = 0)
         {
             return new BattleCommand
             {
@@ -381,6 +394,7 @@ namespace GIC.Data
                 sliceIndex = sliceIndex,
                 indexInSlice = indexInSlice,
                 value = newLevel,
+                metadata = choice,
             };
         }
 
@@ -546,6 +560,20 @@ namespace GIC.Data
                 cell = nodeCell,
                 value = moraGain,
                 metadata = remaining,
+            };
+        }
+
+        /// <summary>普通采集读条增量命令。value=startTick、metadata=finishTick；取消命令只使用 actorUnitId/cell。</summary>
+        public static BattleCommand HarvestChannel(BattleCommandType type, string collectorUnitId,
+            BattleCell nodeCell, int startTick = 0, int finishTick = 0)
+        {
+            return new BattleCommand
+            {
+                type = type,
+                actorUnitId = collectorUnitId,
+                cell = nodeCell,
+                value = startTick,
+                metadata = finishTick,
             };
         }
 

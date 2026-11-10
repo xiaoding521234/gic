@@ -54,6 +54,24 @@ namespace GIC.Data
 
         [InspectorName("安柏命座")]
         Amber_Constellation = 3001006,
+
+        [InspectorName("一飞双采集！")]
+        Amber_C1A_DoubleHarvest = 3001007,
+
+        [InspectorName("敏锐感知")]
+        Amber_C1B_KeenSenses = 3001008,
+
+        [InspectorName("迷雾侦查")]
+        Amber_C2A_FogScouting = 3001009,
+
+        [InspectorName("是兔兔伯爵！")]
+        Amber_C2B_BaronBunny = 3001010,
+
+        [InspectorName("弱点侦查")]
+        Amber_C3A_WeaknessScouting = 3001011,
+
+        [InspectorName("压制射击")]
+        Amber_C3B_SuppressiveFire = 3001012,
         #endregion
 
         #region 凯亚 (3002)

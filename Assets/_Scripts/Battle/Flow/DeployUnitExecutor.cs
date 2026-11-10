@@ -240,6 +240,17 @@ namespace GIC.Battle
                     GICLog.Info($"[DeployUnit] {unitName} 已满命（{ConstellationApplier.MaxConstellation}），升命落空");
                     return false;
                 }
+                int nextLevel = existingUnit.ConstellationLevel + 1;
+                UnitConfig.ConstellationOption selectedOption = null;
+                if (data.HasBranchConstellation)
+                {
+                    selectedOption = data.GetConstellationOption(nextLevel, action.constellationChoice);
+                    if (selectedOption == null || existingUnit.ConstellationChoices.Count != existingUnit.ConstellationLevel)
+                    {
+                        GICLog.Info($"[DeployUnit] {unitName} C{nextLevel} 命座选项非法或未选择（{action.constellationChoice}），升命落空");
+                        return false;
+                    }
+                }
                 int upgradeCost = data.GetEffectiveDeployCost();
                 if (!sim.TrySpendMora(action.playerId, upgradeCost))
                 {
@@ -247,12 +258,14 @@ namespace GIC.Battle
                     return false;
                 }
                 existingUnit.ConstellationLevel++;
+                if (selectedOption != null)
+                    existingUnit.ConstellationChoices.Add(action.constellationChoice);
                 ConstellationApplier.ApplyPassives(existingUnit); // 幂等重算（全撤→按新层重挂）
                 sim.TryGetUnitId(existingUnit, out var upgradedId);
                 if (!string.IsNullOrEmpty(upgradedId))
                 {
                     summonCommand = BattleCommand.UpgradeConstellation(action.playerId, upgradedId, 0, 0,
-                        existingUnit.ConstellationLevel);
+                        existingUnit.ConstellationLevel, action.constellationChoice);
                 }
                 moraCommand = BattleCommand.StatChange(action.playerId, 0, 0,
                     BattleCommand.StatKindMora, -upgradeCost);

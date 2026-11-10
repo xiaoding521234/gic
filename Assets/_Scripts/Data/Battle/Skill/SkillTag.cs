@@ -86,6 +86,12 @@ namespace GIC.Data
 
         [InspectorName("掠夺")]
         Ransom = 5007,
+
+        [InspectorName("生存")]
+        Survival = 5008,
+
+        [InspectorName("冷却")]
+        Cooldown = 5009,
         #endregion
     }
 

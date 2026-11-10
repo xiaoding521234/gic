@@ -31,19 +31,15 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
-    m_Localized: "\xB7Fly in one of the four cardinal directions\n\xB7Collect resources
-      along the path, up to {CollectCount} times\n\xB7Each collection grants {CollectStaminaGain}
-      Stamina and {CollectEnergyGain} Energy"
+    m_Localized: "·Fly in any direction or toward a target point\n·Quickly gather {CollectCount} times when moving within {CollectRadius} cm of a resource node; each node has an independent {CollectCooldown} sec cooldown\n·Each collection grants {CollectStaminaGain} Stamina and {CollectEnergyGain} Energy"
     m_Metadata:
       m_Items: []
   - m_Id: 3001002
-    m_Localized: "\xB7Shoot {DamageCount} arrows in one of the four cardinal directions\n\xB7Deal
-      {Damage} Pyro DMG per arrow"
+    m_Localized: "·Shoot {DamageCount} arrows in any direction\n·Deal {Damage} Pyro DMG per arrow"
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Localized: "\xB7Shoot a volley of arrows in one of the four cardinal directions\n\xB7Deal
-      {Damage} Pyro DMG {DamageCount} times to all enemies on the line"
+    m_Localized: "·Shoot a volley of arrows in any direction\n·Deal {Damage} Pyro DMG {DamageCount} times to all enemies on the line"
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
@@ -63,6 +59,30 @@ MonoBehaviour:
       {C2FogEnergyThreshold} tiles dispelled\n\xB7[C3] Obtains <color=#FFD700><u><link=\"Item:BaronBunny\">Baron
       Bunny</link></u></color> and equips it automatically (added to hand if accessory
       slots are full)"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001007
+    m_Localized: "·Quick gathering while moving can now be performed {CollectCount} times\n·Increases Movement Speed by {C1MoveSpeed}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001008
+    m_Localized: "·Permanently increases exploration vision by {C1Vision} cm\n·Enemies within a {EffectRadius} cm radius gain Vision Exposure for {VisionDuration} sec"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001009
+    m_Localized: "·Bursts can dispel fog\n·Enemies hit by a Burst gain Vision Exposure for {VisionDuration} sec"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001010
+    m_Localized: "·Gain Baron Bunny (equip it directly when possible; if all accessory slots are full, add it to your hand instead)"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001011
+    m_Localized: "·Allied units deal {C3DamageBonus} more DMG to enemies with Vision Exposure"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001012
+    m_Localized: "·Reduces Skill and Burst cooldowns by {C3CooldownReduction}%\n·Increases release speed by {C3ReleaseSpeed}%"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

@@ -22,13 +22,19 @@ MonoBehaviour:
       value: 10
       baseType: 9
     - key: 16
-      value: 3
+      value: 1
       baseType: 0
     - key: 34
       value: 5
       baseType: 0
     - key: 35
       value: 5
+      baseType: 0
+    - key: 89
+      value: 50
+      baseType: 0
+    - key: 90
+      value: 6
       baseType: 0
     timeline: {fileID: 11400000, guid: 2be8c522766a7e449bd6c4f9ccd394d5, type: 2}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 32900000, guid: 459b2ecbd7ec1604bac1d16cdda32e00, type: 3}

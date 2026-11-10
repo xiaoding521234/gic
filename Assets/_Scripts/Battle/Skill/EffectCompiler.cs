@@ -255,19 +255,12 @@ namespace GIC.Battle
             float firstHitSeconds, int clipMaxRangeCm, List<BattleEffect> effects)
         {
             if (skillData.skillType != SkillType.Burst) return; // 玩家版口径「爆发」限定（霜袭等 Normal 线技不触发）
-            if (sim.FogMode == BattleFogMode.None) return;      // 无迷雾=无破雾无元能
+            if (sim.FogMode == BattleFogMode.None) return;
             var caster = sim.GetUnit(action.unitId);
-            if (caster == null || caster.ConstellationLevel < 2) return; // 2命起
-            var talent = FindTalentData(caster);
-            int threshold = talent != null ? talent.GetInt(SkillParamKey.C2FogEnergyThreshold, 0) : 0;
-            int gain = talent != null ? talent.GetInt(SkillParamKey.C2FogEnergyGain, 0) : 0;
-            if (threshold <= 0 || gain <= 0) return; // 未配参数=无此被动（数据驱动门）
+            if (caster == null || !caster.HasConstellationChoice(SkillName.Amber_C2A_FogScouting)) return;
 
-            var cells = BurstLineCells(sim, fromXCm, fromZCm, aim, clipMaxRangeCm); // 线域格集（CompileLineBurstSegment 同口径）
-            int newCells = sim.RevealFogCells(sim.GetTeamOf(action.playerId), cells);
-            if (newCells > 0)
-                effects.Add(new EnergyEffect(action.unitId, gain * (newCells / threshold),
-                    EnergyEffect.CategoryFogBreakGain) { HitSeconds = firstHitSeconds });
+            var cells = BurstLineCells(sim.Map, fromXCm, fromZCm, aim, clipMaxRangeCm);
+            sim.RevealFogCells(sim.GetTeamOf(action.playerId), cells); // 2A 只破雾，不再按格数回能
         }
 
         /// <summary>整线迸发单段：线段全长达人（蓝图 §4.2「LineBurst=线段×受击圆求交」——P3 起取代
@@ -287,7 +280,7 @@ namespace GIC.Battle
 
             // 元素×地形：沿线采样格突变（冰冻/火融；物理及其它元素不触发）；HitSeconds=波次段时刻
             // （箭雨多段融冰按波到点融化——WYSIWYG）
-            var cells = BurstLineCells(sim, fromXCm, fromZCm, aim, maxRangeCm);
+            var cells = BurstLineCells(sim.Map, fromXCm, fromZCm, aim, maxRangeCm);
             foreach (var cell in cells)
             {
                 if (skillElement == ElementType.Cryo)
@@ -342,7 +335,7 @@ namespace GIC.Battle
 
         /// <summary>整线迸发线域采样格（CompileLineBurstSegment 地形突变/CompileBurstFogBreak 破雾共用）：
         /// 从发射点沿瞄准向量步进采样（半格 50cm），产出沿途格去重序列；虚空格 break（线终止）</summary>
-        private static List<BattleCell> BurstLineCells(BattleSimState sim, int fromXCm, int fromZCm,
+        public static List<BattleCell> BurstLineCells(BattleMapData map, int fromXCm, int fromZCm,
             Vector2Int aim, int maxRangeCm)
         {
             var cells = new List<BattleCell>();
@@ -358,22 +351,11 @@ namespace GIC.Battle
                 int z = fromZCm + (int)((long)aim.y * dCm / 1000);
                 var cell = BattleCell.FromCm(x, z);
                 if (cell.x == last.x && cell.y == last.y) continue;
-                if (!sim.Map.HasTile(cell.x, cell.y)) break; // 虚空=线终止
+                if (map == null || !map.HasTile(cell.x, cell.y)) break; // 虚空=线终止
                 cells.Add(cell);
                 last = cell;
             }
             return cells;
-        }
-
-        /// <summary>施法者 Talent 命座技能数据（ConstellationApplier 同口径遍历；null=无 Talent 技能）</summary>
-        private static SkillConfig.SkillData FindTalentData(Unit caster)
-        {
-            foreach (var skill in caster.Skills)
-            {
-                var d = skill?.RawData;
-                if (d != null && d.skillType == SkillType.Talent) return d;
-            }
-            return null;
         }
 
         // ==================== OnCast 编译（施放时效果） ====================
@@ -521,6 +503,25 @@ namespace GIC.Battle
                         effects, EnergyEffect.CategorySkillHitGain))
                     reactedHits.Add(targetUnitId);
             }
+
+            // 2A 迷雾侦查：仅爆发命中施加 6 秒暴露，多段通过 Merge 刷新而非累加。
+            var caster = sim.GetUnit(action.unitId);
+            if (skillData.skillType == SkillType.Burst
+                && caster != null && caster.HasConstellationChoice(SkillName.Amber_C2A_FogScouting))
+            {
+                var targetState = SkillHitResolver.FindUnitState(sliceSnapshot, targetUnitId);
+                if (targetState != null && targetState.isCorpse == 0)
+                {
+                    int duration = 6;
+                    var option = caster.RawData?.GetConstellationOption(2,
+                        (int)SkillName.Amber_C2A_FogScouting);
+                    if (option?.skill?.data != null)
+                        duration = option.skill.data.GetInt(SkillParamKey.VisionDuration, duration);
+                    effects.Add(new ApplyBuffEffect(action.unitId, targetUnitId, (int)BuffType.VisionExposed, 1,
+                        durationSeconds: duration, sourceSkillId: (int)SkillName.Amber_C2A_FogScouting,
+                        buffKey: BuffKeys.VisionExposure) { HitSeconds = hitSeconds });
+                }
+            }
             return effects;
         }
 
@@ -584,7 +585,8 @@ namespace GIC.Battle
                 if (isCrit) request.CritBonus = attackerStats.Sanity / 100f;
 
                 request.VulnerabilityBonus = outcome.VulnerabilityBonus;
-                request.DamageBonusDelta = outcome.DamageBonusDelta;
+                request.DamageBonusDelta = outcome.DamageBonusDelta
+                    + ResolveAmberWeaknessBonus(sim, attackerId, targetState) / 100f;
                 var result = DamagePipeline.Calculate(request);
                 if (!result.Cancelled && result.FinalDamage > 0)
                     effects.Add(new DamageEffect(attackerId, targetUnitId, result.FinalDamage, (int)element,
@@ -646,6 +648,37 @@ namespace GIC.Battle
 
         /// <summary>单原子编译（返回=该命中是否触发元素反应——CompileOnHit 据此跳过 AttachElement
         /// 原子：反应双方 1:1 全消耗、等层零残留，docs/06 §6.3/docs/18 决策二十五）</summary>
+        /// <summary>3A 弱点侦查：Host 实际伤害与 AI 估值共用；同队多个同名安柏不叠加。</summary>
+        public static int ResolveAmberWeaknessBonus(BattleSimState sim, string attackerId, UnitState targetState)
+        {
+            if (targetState?.buffs == null) return 0;
+            bool exposed = false;
+            foreach (var buff in targetState.buffs)
+                if (buff != null && buff.type == (int)BuffType.VisionExposed)
+                {
+                    exposed = true;
+                    break;
+                }
+            if (!exposed) return 0;
+
+            var attacker = sim.GetUnit(attackerId);
+            var attackerIdentity = attacker?.GetUnitComponent<UnitIdentity>();
+            if (attackerIdentity == null) return 0;
+            foreach (var kv in sim.SortedUnits())
+            {
+                var amber = kv.Value;
+                if (amber == null || BattleSimState.IsDead(amber)
+                    || !amber.HasConstellationChoice(SkillName.Amber_C3A_WeaknessScouting)) continue;
+                var identity = amber.GetUnitComponent<UnitIdentity>();
+                if (identity == null || identity.Team != attackerIdentity.Team) continue;
+                var option = amber.RawData?.GetConstellationOption(3,
+                    (int)SkillName.Amber_C3A_WeaknessScouting);
+                return option?.skill?.data != null
+                    ? option.skill.data.GetInt(SkillParamKey.C3DamageBonus, 0) : 0;
+            }
+            return 0;
+        }
+
         private static bool CompileAtom(BattleSimState sim, ActionData action, BattleSnapshot snapshot,
             SkillConfig.SkillData skillData, SkillEffectConfig atom, string targetUnitId, UnitState casterState,
             int attackPercent, int delivery, BattleCell fromCell, float hitPointX, float hitPointY,

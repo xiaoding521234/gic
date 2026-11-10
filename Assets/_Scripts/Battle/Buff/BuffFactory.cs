@@ -64,7 +64,7 @@ namespace GIC.Battle
                         GICLog.Warn($"[BuffFactory] 视野暴露 {cfg.name} 持续秒数未配置（0）");
                         return null;
                     }
-                    return new VisionExposureBuff(exposureCfg) { source = source };
+                    return new VisionExposureBuff(exposureCfg, turns) { source = source };
                 case BuffType.AttackUp:
                 case BuffType.MoveSpeedUp:
                 case BuffType.DefenseDown:

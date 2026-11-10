@@ -186,6 +186,30 @@ MonoBehaviour:
     m_Localized: Amber Constellation
     m_Metadata:
       m_Items: []
+  - m_Id: 3001007
+    m_Localized: Double the Gathering!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001008
+    m_Localized: Keen Senses
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001009
+    m_Localized: Fog Recon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001010
+    m_Localized: Baron Bunny!
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001011
+    m_Localized: Weakness Recon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001012
+    m_Localized: Suppressive Fire
+    m_Metadata:
+      m_Items: []
   - m_Id: 3003004
     m_Localized: Water Serenade
     m_Metadata:

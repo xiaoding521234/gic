@@ -918,19 +918,23 @@ namespace GIC.Battle
             _aimRecommendedCells.Clear();
             ApplyStateVisibility(); // Aiming 态：取消钮现、手牌藏（打出卡在拖拽层不受影响）
             SetTip("Battle_TipAimUpgrade"); // UIText 12037：确认/反悔双路提示
+            ShowConstellationOptions(unitNameValue);
         }
 
         /// <summary>升命待确认=确认上交（OnConfirmButtonClicked 升命分支调）：上交+定死+ExitAiming
         /// 统一收口态机——打出卡随收口飞回手牌槽（**卡不消耗**，2026-10-07 返拍「不应该把我的卡销毁」）</summary>
         private void SubmitPlayedUpgrade()
         {
+            if (_upgradeHasBranch && _constellationChoice == 0) return; // 双卡必须先选其一
             int unitValue = _deployAimUnit;
+            int constellationChoice = _constellationChoice;
             _upgradePending = false;
             var action = new ActionData
             {
                 playerId = _myPlayerId,
                 actionType = ActionType.DeployUnit,
                 deployUnitName = unitValue,
+                constellationChoice = constellationChoice,
             };
             _session.SubmitAction(action);
             GICLog.Info($"[BattleHud] {_myPlayerId} 上交：升命 {(UnitName)unitValue}");

@@ -28,6 +28,7 @@ namespace GIC.Battle
         private static readonly HashSet<StatType> PercentPanelStats = new()
         {
             StatType.HealEfficiency,
+            StatType.HarvestEfficiency,
             StatType.LifeSteal,
         };
 
@@ -52,17 +53,11 @@ namespace GIC.Battle
                 stats.SetStatRange(StatType.Energy, max: unit.RawData.GetEffectiveEnergy());
 
             int level = unit.ConstellationLevel;
-            foreach (var skill in unit.Skills)
+            foreach (var entry in EnumerateOnDeployAtoms(unit))
             {
-                var data = skill?.RawData;
-                if (data == null || data.skillType != SkillType.Talent) continue; // 命座=Talent 槽技能
-                if (data.effects == null) continue; // 参数载体型命座（芭芭拉：参数由歌声之环 Buff 消费）合法
-                foreach (var atom in data.effects)
-                {
-                    if (atom == null || atom.trigger != SkillEffectTrigger.OnDeploy) continue;
-                    if (level < atom.minConstellation) continue; // 命座层未到，不生效
-                    ApplyAtom(unit, stats, data, atom);
-                }
+                var atom = entry.atom;
+                if (level < atom.minConstellation) continue; // 命座层未到，不生效
+                ApplyAtom(unit, stats, entry.data, atom);
             }
         }
 
@@ -76,40 +71,63 @@ namespace GIC.Battle
         {
             if (sim == null || unit == null) return;
             int level = unit.ConstellationLevel;
+            foreach (var entry in EnumerateOnDeployAtoms(unit))
+            {
+                var data = entry.data;
+                var atom = entry.atom;
+                if (atom.kind != SkillEffectKind.ApplyBuff) continue;
+                if (level < atom.minConstellation) continue;
+                // 同具名 buff 已存在不重挂（幂等防御口径——决策五十七：buffAsset 引用优先按身份判重，
+                // null 回落按 type 与 EffectCompiler 同口径）
+                bool exists = false;
+                if (atom.buffAsset != null)
+                {
+                    foreach (var b in unit.Buffs)
+                        if (b != null && b.Config == atom.buffAsset) { exists = true; break; }
+                }
+                else
+                {
+                    foreach (var b in unit.Buffs)
+                        if (b != null && b.Type == atom.buffType) { exists = true; break; }
+                }
+                if (exists) continue;
+                var buff = atom.paramKey3 != SkillParamKey.None
+                    ? BuffFactory.Create(atom.buffType, 1, unit,
+                        data.GetInt(atom.paramKey), data.GetInt(atom.paramKey2), data.GetInt(atom.paramKey3),
+                        atom.buffAsset != null ? atom.buffAsset.name : null)
+                    : BuffFactory.Create(atom.buffType, 1, unit, data.GetInt(atom.paramKey),
+                        buffKey: atom.buffAsset != null ? atom.buffAsset.name : null);
+                if (buff == null) continue;
+                buff.SourceSkillId = (int)data.skillID; // 来源技能=Talent 被动本体（图标解析单源同链）
+                sim.ApplyBuff(unit, buff, unit);
+            }
+        }
+
+        /// <summary>旧 Talent 在分支模式下只保留 0 命；1~3 命改为枚举实际已选选项。</summary>
+        private static IEnumerable<(SkillConfig.SkillData data, SkillEffectConfig atom)> EnumerateOnDeployAtoms(Unit unit)
+        {
+            bool branch = unit.RawData != null && unit.RawData.HasBranchConstellation;
             foreach (var skill in unit.Skills)
             {
                 var data = skill?.RawData;
-                if (data == null || data.skillType != SkillType.Talent) continue;
-                if (data.effects == null) continue;
+                if (data == null || data.skillType != SkillType.Talent || data.effects == null) continue;
                 foreach (var atom in data.effects)
                 {
                     if (atom == null || atom.trigger != SkillEffectTrigger.OnDeploy) continue;
-                    if (atom.kind != SkillEffectKind.ApplyBuff) continue;
-                    if (level < atom.minConstellation) continue;
-                    // 同具名 buff 已存在不重挂（幂等防御口径——决策五十七：buffAsset 引用优先按身份判重，
-                    // null 回落按 type 与 EffectCompiler 同口径）
-                    bool exists = false;
-                    if (atom.buffAsset != null)
-                    {
-                        foreach (var b in unit.Buffs)
-                            if (b != null && b.Config == atom.buffAsset) { exists = true; break; }
-                    }
-                    else
-                    {
-                        foreach (var b in unit.Buffs)
-                            if (b != null && b.Type == atom.buffType) { exists = true; break; }
-                    }
-                    if (exists) continue;
-                    var buff = atom.paramKey3 != SkillParamKey.None
-                        ? BuffFactory.Create(atom.buffType, 1, unit,
-                            data.GetInt(atom.paramKey), data.GetInt(atom.paramKey2), data.GetInt(atom.paramKey3),
-                            atom.buffAsset != null ? atom.buffAsset.name : null)
-                        : BuffFactory.Create(atom.buffType, 1, unit, data.GetInt(atom.paramKey),
-                            buffKey: atom.buffAsset != null ? atom.buffAsset.name : null);
-                    if (buff == null) continue;
-                    buff.SourceSkillId = (int)data.skillID; // 来源技能=Talent 被动本体（图标解析单源同链）
-                    sim.ApplyBuff(unit, buff, unit);
+                    if (!branch || atom.minConstellation == 0)
+                        yield return (data, atom);
                 }
+            }
+            if (!branch) yield break;
+
+            for (int i = 0; i < unit.ConstellationChoices.Count; i++)
+            {
+                var option = unit.RawData.GetConstellationOption(i + 1, unit.ConstellationChoices[i]);
+                var data = option?.skill?.data;
+                if (data == null || data.effects == null) continue;
+                foreach (var atom in data.effects)
+                    if (atom != null && atom.trigger == SkillEffectTrigger.OnDeploy)
+                        yield return (data, atom);
             }
         }
 
@@ -206,17 +224,12 @@ namespace GIC.Battle
 
             var itemConfig = Wargame.Instance?.Context?.Get<ItemConfig>();
             var equipment = unit.GetUnitComponent<UnitEquipment>();
-            foreach (var skill in unit.Skills)
+            foreach (var entry in EnumerateOnDeployAtoms(unit))
             {
-                var data = skill?.RawData;
-                if (data == null || data.skillType != SkillType.Talent) continue;
-                if (data.effects == null) continue;
-                foreach (var atom in data.effects)
-                {
-                    if (atom == null || atom.trigger != SkillEffectTrigger.OnDeploy) continue;
-                    if (atom.kind != SkillEffectKind.GrantItem) continue;
-                    if (atom.value <= 0) continue; // 载荷=ItemName 枚举值（0=None 无效）
-                    if (atom.minConstellation <= oldLevel || atom.minConstellation > newLevel) continue;
+                var atom = entry.atom;
+                if (atom.kind != SkillEffectKind.GrantItem) continue;
+                if (atom.value <= 0) continue; // 载荷=ItemName 枚举值（0=None 无效）
+                if (atom.minConstellation <= oldLevel || atom.minConstellation > newLevel) continue;
 
                     var itemName = (ItemName)atom.value;
                     var result = new ItemGrantResult { item = atom.value };
@@ -271,7 +284,6 @@ namespace GIC.Battle
                                 (result.equipped
                                     ? (result.replenished ? "补充耐久（槽 " : "直接装备（槽 ") + result.slotKind + ":" + result.slotIndex + "，耐久 " + result.durabilityLeft + "）"
                                     : "手牌（槽满/已满耐久/非装备物）"));
-                }
             }
             return granted;
         }

@@ -67,6 +67,7 @@ namespace GIC.Battle
             }
             ResourceGate.ChargeAll(sim, attacker, action.playerId, skill.RawData?.costs, effects,
                 isPlayerDirectControl: action.isPlayerDirectControl);
+            sim.CancelHarvestChannel(action.unitId); // 全部门槛通过的真实主动施放才中断读条
             // CD 消耗（门槛全过后与资源扣减同拍——纪元制写就绪 tick）
             sim.ConsumeSkillCooldown(action.unitId, skill.RawData.skillType);
             // AI 施放节流记账（P5-D）：全 gate 通过=实际出招——三脑候选域按「单位×技能槽」判节流
@@ -100,7 +101,8 @@ namespace GIC.Battle
                     (int)skill.RawData.skillID, (int)action.direction,
                     casterState != null ? casterState.position : BattleCell.zero,
                     (int)SkillHitResolver.ResolveProjectileElement(sim, action),
-                    aim.x, aim.y, cdTicks, castRate));
+                    aim.x, aim.y, cdTicks, castRate,
+                    casterState?.posX ?? 0, casterState?.posZ ?? 0));
             }
 
             return effects;

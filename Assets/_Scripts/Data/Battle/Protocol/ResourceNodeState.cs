@@ -21,11 +21,21 @@ namespace GIC.Data
         /// <summary>剩余可采次数（charges 模型——SC2 矿脉同构：逐次扣减、归零即耗尽消失）</summary>
         public int remainingCharges;
 
+        /// <summary>普通采集基础读条时间（秒；0=旧数据回落默认值）</summary>
+        public int harvestSeconds = ResourceNodeMetrics.DefaultHarvestSeconds;
+
         public ResourceNodeKind Kind => (ResourceNodeKind)kind;
+        public int EffectiveHarvestSeconds => harvestSeconds > 0 ? harvestSeconds : ResourceNodeMetrics.DefaultHarvestSeconds;
 
         public ResourceNodeState Clone()
         {
-            return new ResourceNodeState { kind = kind, cell = cell, remainingCharges = remainingCharges };
+            return new ResourceNodeState
+            {
+                kind = kind,
+                cell = cell,
+                remainingCharges = remainingCharges,
+                harvestSeconds = harvestSeconds,
+            };
         }
     }
 }

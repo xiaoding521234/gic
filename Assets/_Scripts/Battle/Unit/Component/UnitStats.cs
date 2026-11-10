@@ -44,6 +44,7 @@ namespace GIC.Battle
         { StatType.DamageBonus, new RangedInt(-300, 300, 0) },
         { StatType.LifeSteal, new RangedInt(0, 100, 0) },
         { StatType.HealEfficiency, new RangedInt(0, 300, 100) },
+        { StatType.HarvestEfficiency, new RangedInt(1, 1000, 100) },
         { StatType.Energy, new RangedInt(0, 1000, 0) },
     };
 
@@ -70,6 +71,7 @@ namespace GIC.Battle
         public float DamageBonus => GetFinalStat(StatType.DamageBonus);
         public int LifeSteal => GetFinalStat(StatType.LifeSteal);
         public int HealEfficiency => GetFinalStat(StatType.HealEfficiency);
+        public int HarvestEfficiency => GetFinalStat(StatType.HarvestEfficiency);
         public int Energy => GetFinalStat(StatType.Energy);
 
         // ==================== 初始化 ====================
@@ -104,6 +106,7 @@ namespace GIC.Battle
                 SetBaseValue(StatType.VisionRange, rawData.GetEffectiveExploreVision());
                 SetBaseValue(StatType.LifeSteal, rawData.GetEffectiveLifeSteal());
                 SetBaseValue(StatType.HealEfficiency, rawData.GetEffectiveHealEfficiency());
+                SetBaseValue(StatType.HarvestEfficiency, rawData.GetEffectiveHarvestEfficiency());
                 // Energy: max=baseEnergy, value=初始元能（默认 0=空蓝登场；2026-10-24 决策八十六追记四：
                 // 骑士团总部元能引擎 80 起步——EnergySummon 建筑「初始自带」数据位，全员既有语义零变化）
                 _stats[StatType.Energy] = new RangedInt(0, rawData.GetEffectiveEnergy(), Mathf.Clamp(rawData.初始元能, 0, rawData.GetEffectiveEnergy()));

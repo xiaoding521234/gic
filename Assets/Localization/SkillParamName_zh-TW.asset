@@ -362,6 +362,22 @@ MonoBehaviour:
     m_Localized: "\u88DD\u5099\u758A\u52A0\u4E0A\u9650"
     m_Metadata:
       m_Items: []
+  - m_Id: 87
+    m_Localized: "3命釋放速度加快"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 88
+    m_Localized: "3命冷卻減少"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 89
+    m_Localized: "採集半徑"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 90
+    m_Localized: "採集冷卻"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

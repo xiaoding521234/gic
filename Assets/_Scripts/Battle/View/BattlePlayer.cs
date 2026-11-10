@@ -730,6 +730,8 @@ namespace GIC.Battle
                     view.SetBuffs(state.buffs); // 头顶 Buff 状态（权威态；含来源——图标/描环解析数据源）
                     view.SetEquipment(state.weaponItem, state.weaponDurability, state.accessoryItems,
                         state.accessoryDurability); // 装备态（权威态；装备批 2026-10-18）
+                    _overheadBars?.SyncHarvest(state,
+                        message.snapshot.turnNumber * BattleMetrics.TicksPerSecond);
                 }
             }
 
@@ -1216,29 +1218,33 @@ namespace GIC.Battle
             var skillData = LoadSkillData(command.value);
             int waves = skillData != null ? skillData.GetInt(SkillParamKey.DamageCount, 1) : 1;
             int maxRange = clip.maxRange > 0 ? clip.maxRange : ProjectileRule.MaxRange;
+            int castRate = command.castRate > 0 ? command.castRate : 1000; // 3B=2000：落箭/破雾与 Host 同步加速
 
-            var cells = new List<BattleCell>(); // 整线格集（Host CompileLineBurstSegment 同口径）
-            var delta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
-            var shotDir = new Vector3(delta.x, 0f, delta.y); // 射向世界向量（落箭斜落沿它、起点向安柏一侧回撤）
-            for (int step = 1; step <= maxRange; step++)
-            {
-                var cell = new BattleCell(command.cell.x + delta.x * step, command.cell.y + delta.y * step);
-                if (_board == null || _board.Map == null || !_board.Map.HasTile(cell.x, cell.y)) break;
-                cells.Add(cell);
-            }
+            if (_board == null || _board.Map == null) yield break;
+            // 与 Host 共用连续起点、千分自由角和 cm 线域采样；旧命令才回落 direction/cell 中心。
+            var legacyDelta = SkillHitResolver.DirectionToDelta((Direction2D)command.direction);
+            var aim = command.aimX != 0 || command.aimZ != 0
+                ? SkillHitResolver.NormalizePerMille(command.aimX, command.aimZ)
+                : SkillHitResolver.NormalizePerMille(legacyDelta.x, legacyDelta.y);
+            int fromXCm = command.originX != 0 || command.originZ != 0 ? command.originX : command.cell.CenterXCm;
+            int fromZCm = command.originX != 0 || command.originZ != 0 ? command.originZ : command.cell.CenterYCm;
+            var cells = EffectCompiler.BurstLineCells(_board.Map, fromXCm, fromZCm, aim, maxRange);
+            var shotDir = new Vector3(aim.x, 0f, aim.y).normalized; // 落箭斜落方向与实际射向一致
             if (cells.Count == 0) yield break;
 
             // 安柏 2命「爆发破雾」客户端表现（docs/active/44 §9-②，与 Host CompileBurstFogBreak 同口径
             // 线域+同首段时刻）：我方/队友施放且快照命座≥2 → 首段命中时刻到点揭雾（WYSIWYG 箭到雾开；
             // fire-and-forget 不 gate 片 ack——与单箭同口径）
             if (_fog != null && _fog.ShouldRevealBurstFog(command.actorUnitId))
-                StartCoroutine(RevealFogDelayedCoroutine(cells, Mathf.Max(0f, clip.startTime) / _playbackSpeed));
+                StartCoroutine(RevealFogDelayedCoroutine(cells,
+                    Mathf.Max(0f, clip.startTime * 1000f / castRate) / _playbackSpeed));
 
             var tint = ResolveArrowTint(command.reactionKind);
             float prevSpawn = 0f;
             for (int wave = 0; wave < waves; wave++)
             {
-                float spawnAt = Mathf.Max(0f, clip.startTime + clip.hitInterval * wave - 箭雨坠落时长);
+                float waveSeconds = (clip.startTime + clip.hitInterval * wave) * 1000f / castRate;
+                float spawnAt = Mathf.Max(0f, waveSeconds - 箭雨坠落时长);
                 if (spawnAt > prevSpawn)
                 {
                     yield return new WaitForSeconds((spawnAt - prevSpawn) / _playbackSpeed);
@@ -1530,6 +1536,22 @@ namespace GIC.Battle
                         GICLog.Info($"[BattlePlayer] 命座提升：{command.targetUnitId} → C{command.value}");
                         if (_views.TryGetValue(command.targetUnitId, out var constellationUpgraded))
                             constellationUpgraded.SetConstellation(command.value, constellationUpgraded.IsFamiliar);
+                        // 分支选择随命令即时写入本地快照，2A/3B 不等下一秒全量快照即可正确表现。
+                        if (LatestSnapshot?.units != null)
+                            foreach (var state in LatestSnapshot.units)
+                            {
+                                if (state.unitId != command.targetUnitId) continue;
+                                state.constellation = command.value;
+                                if (command.metadata == 0) break;
+                                state.constellationChoices ??= new List<int>();
+                                int choiceIndex = command.value - 1;
+                                if (choiceIndex < 0) break;
+                                if (state.constellationChoices.Count == choiceIndex)
+                                    state.constellationChoices.Add(command.metadata);
+                                else if (state.constellationChoices.Count > choiceIndex)
+                                    state.constellationChoices[choiceIndex] = command.metadata;
+                                break;
+                            }
                         if (PopupManager.Instance != null)
                             PopupManager.Instance.ShowToast(
                                 new LocalizedString(TableName.PopupText.ToString(), "Battle_ConstellationUp"));
@@ -1620,7 +1642,17 @@ namespace GIC.Battle
                         }
                         break;
 
+                    case BattleCommandType.HarvestChannelStart:
+                        _overheadBars?.StartHarvest(command.actorUnitId, command.value, command.metadata,
+                            command.value);
+                        break;
+
+                    case BattleCommandType.HarvestChannelCancel:
+                        _overheadBars?.CancelHarvest(command.actorUnitId);
+                        break;
+
                     case BattleCommandType.ResourceHarvest:
+                        _overheadBars?.CancelHarvest(command.actorUnitId);
                         // 资源点采集（docs/47，2026-10-27）：采集事实镜像——BattleBoard 表现件余量/耗尽
                         // 维护+资源点位置弹「+N」摩拉金飘字（采集是玩家可见的主动交互，默认弹——
                         // 与「元能获取弹数字」默认关不同：采集场景少且是资源点核心反馈）。

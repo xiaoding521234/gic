@@ -46,6 +46,9 @@ namespace GIC.Data
         /// ConstellationApplier 结算，本字段=展示/升命门控/B7 联机同源真源）</summary>
         public int constellation;
 
+        /// <summary>各级已选分支命座技能 ID（SkillName；空=旧命座或尚未选择）</summary>
+        public List<int> constellationChoices = new List<int>();
+
         /// <summary>元能当前值/上限（B6a；上限=UnitConfig baseEnergy，爆发门槛=技能条目 EnergyCost）</summary>
         public int energy;
         public int maxEnergy;
@@ -89,6 +92,12 @@ namespace GIC.Data
         /// <summary>爆发 CD 剩余 tick（0=就绪；蓝图 §4.3「爆发 CD=5 秒」+元能门槛双 gate——
         /// 本字段仅 CD 维度，元能门槛仍走 costs 资源链）</summary>
         public int burstCdRemainTicks;
+
+        /// <summary>普通采集读条（Host 权威 tick；0=未采集中）</summary>
+        public int harvestActive;
+        public BattleCell harvestNode;
+        public int harvestStartTick;
+        public int harvestFinishTick;
 
         /// <summary>武器（装备批 2026-10-18）：ItemName 枚举值，0=空槽（武器槽恒 1，docs/05 §5.2）。
         /// Host BuildUnitState 从 UnitEquipment 填充；客户端=血条右侧装备图标行（首个图标）+瞄准域槽位预判</summary>
@@ -196,6 +205,9 @@ namespace GIC.Data
         /// 采集候选消费域——剩余次数/在场集合以此为准（采集时刻变化走 ResourceHarvest 命令增量，
         /// 秒拍头快照整表覆盖自愈）</summary>
         public List<ResourceNodeState> resourceNodes = new List<ResourceNodeState>();
+
+        /// <summary>安柏快速采集独立冷却（单位×资源点；断线/快照自愈与确定性 hash 同源）</summary>
+        public List<QuickHarvestCooldownState> quickHarvestCooldowns = new List<QuickHarvestCooldownState>();
 
         /// <summary>主世界单位视图单源查询（决策九十一隔离纪律的结构件，2026-10-25 复审批 T1）：
         /// 快照含跨维度单位，主世界消费域一律走本口而非手写过滤——判据=dimension（规范判据，

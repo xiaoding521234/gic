@@ -31,15 +31,15 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001001
-    m_Localized: "\xB7\u5341\u5B57\u65B9\u5411\u306E\u3044\u305A\u308C\u304B\u306B\u98DB\u884C\u3059\u308B\n\xB7\u901A\u904E\u3057\u305F\u8CC7\u6E90\u3092\u6700\u5927{CollectCount}\u56DE\u63A1\u96C6\u3059\u308B\n\xB7\u63A1\u96C6\u306E\u305F\u3073\u306B{CollectStaminaGain}\u30B9\u30BF\u30DF\u30CA\u3068{CollectEnergyGain}\u5143\u7D20\u30A8\u30CD\u30EB\u30AE\u30FC\u3092\u7372\u5F97\u3059\u308B"
+    m_Localized: "·任意の方向または目標地点へ飛行する\n·移動中、{CollectRadius}cm以内に資源があると快速採取を{CollectCount}回行う。各資源は独立して{CollectCooldown}秒のクールダウンを持つ\n·採取のたびに{CollectStaminaGain}スタミナと{CollectEnergyGain}元素エネルギーを獲得する"
     m_Metadata:
       m_Items: []
   - m_Id: 3001002
-    m_Localized: "\xB7\u5341\u5B57\u65B9\u5411\u306E\u3044\u305A\u308C\u304B\u306B{DamageCount}\u672C\u306E\u77E2\u3092\u653E\u3064\n\xB71\u672C\u306B\u3064\u304D{Damage}\u708E\u30C0\u30E1\u30FC\u30B8\u3092\u4E0E\u3048\u308B"
+    m_Localized: "·任意の方向に{DamageCount}本の矢を放つ\n·1本につき{Damage}炎ダメージを与える"
     m_Metadata:
       m_Items: []
   - m_Id: 3001003
-    m_Localized: "\xB7\u5341\u5B57\u65B9\u5411\u306E\u3044\u305A\u308C\u304B\u306B\u5927\u91CF\u306E\u77E2\u3092\u653E\u3064\n\xB7\u76F4\u7DDA\u4E0A\u306E\u5168\u3066\u306E\u6575\u306B{DamageCount}\u56DE\u306E{Damage}\u708E\u30C0\u30E1\u30FC\u30B8\u3092\u4E0E\u3048\u308B"
+    m_Localized: "·任意の方向に大量の矢を放つ\n·直線上の全ての敵に{DamageCount}回の{Damage}炎ダメージを与える"
     m_Metadata:
       m_Items: []
   - m_Id: 3001005
@@ -52,6 +52,30 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 3001006
     m_Localized: "\xB7\u30101\u547D\u3011\u8996\u91CE+{C1Vision}\u3002\u30A2\u30F3\u30D0\u30FC\u304C\u6E80\u30BF\u30F3\u306E\u72B6\u614B\u3067\u5143\u7D20\u30A8\u30CD\u30EB\u30AE\u30FC\u3092\u7372\u5F97\u3057\u305F\u5834\u5408\u3001\u6EA2\u308C\u305F\u5206\u306F\u6700\u3082\u8FD1\u3044\u672A\u6E80\u306E\u5473\u65B9\u30AD\u30E3\u30E9\u30AF\u30BF\u30FC\u3078\u79FB\u308B\uFF08\u5168\u54E1\u6E80\u30BF\u30F3\u306A\u3089\u52B9\u679C\u306A\u3057\uFF09\n\xB7\u30102\u547D\u3011\u79FB\u52D5\u901F\u5EA6+{C2MoveSpeed}\u3001\u6700\u5927\u5143\u7D20\u30A8\u30CD\u30EB\u30AE\u30FC+{C2EnergyLimit}\uFF1B\u7206\u767A\u3067\u9727\u3092\u6674\u3089\u305B\u308B\u3001{C2FogEnergyThreshold}\u30DE\u30B9\u3054\u3068\u306B{C2FogEnergyGain}\u5143\u7D20\u30A8\u30CD\u30EB\u30AE\u30FC\u3092\u7372\u5F97\n\xB7\u30103\u547D\u3011<color=#FFD700><u><link=\"Item:BaronBunny\">\u30A6\u30B5\u30AE\u4F2F\u7235</link></u></color>\u3092\u7372\u5F97\u3057\u3001\u81EA\u52D5\u7684\u306B\u88C5\u5099\u3059\u308B\uFF08\u30B9\u30ED\u30C3\u30C8\u304C\u6E80\u676F\u306E\u5834\u5408\u306F\u624B\u672D\u306B\u52A0\u308F\u308B\uFF09"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001007
+    m_Localized: "·移動中の快速採取回数が{CollectCount}回に増加\n·移動速度が{C1MoveSpeed}増加"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001008
+    m_Localized: "·探索視野が永続的に{C1Vision}cm増加\n·半径{EffectRadius}cm以内の敵に{VisionDuration}秒間の視野暴露を付与"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001009
+    m_Localized: "·爆発で霧を晴らせる\n·爆発が命中した敵に{VisionDuration}秒間の視野暴露を付与"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001010
+    m_Localized: "·ウサギ伯爵を獲得（優先して直接装備し、アクセサリースロットが埋まっている場合は手札に加える）"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001011
+    m_Localized: "·味方ユニットが視野暴露状態の敵に与えるダメージが{C3DamageBonus}増加"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 3001012
+    m_Localized: "·戦技と爆発のクールダウンが{C3CooldownReduction}%短縮\n·発動速度が{C3ReleaseSpeed}%上昇"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

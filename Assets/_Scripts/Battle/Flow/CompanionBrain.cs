@@ -555,7 +555,8 @@ namespace GIC.Battle
                     var aim = SkillHitResolver.AimVectorOf(sim, action, snapshot); // P5：行动瞄准向量（aimX 直读/方向桥）
                     var targets = BattleHeuristics.PredictAimTargets(sim, snapshot, team, unit, data, aim.x, aim.y);
                     foreach (var target in targets)
-                        board.DeclareDamage(target.unitId, MitigatedDamage(perTarget, target.defense)); // E-3：折减口径与评分同源（声明不过称高防敌足杀）
+                        board.DeclareDamage(target.unitId,
+                            EstimateMitigatedDamage(sim, action.unitId, perTarget, target)); // 与评分同源
                 }
             }
 
@@ -632,6 +633,8 @@ namespace GIC.Battle
         {
             if (unit == null || tracker == null) return;
             profile ??= NeutralProfile;
+            // 普通采集读条期间不主动提交移动/技能；受击不自动打断，玩家仍可手动接管。
+            if (sim.GetHarvestChannel(UnitIdOf(sim, unit)) != null) return;
             // 采集档（docs/47 拍板⑦，2026-10-27）：采集型角色（IsHarvester——安柏双判据都满足）
             // 有可见资源点时先评采集候选——基准分稳压攻击档（「相比攻击敌人，更主动采集资源点」），
             // 距离衰减保证远资源点不越俎代庖。**保命档（Rescue/复苏）天然在采集之上**——采集候选
@@ -775,7 +778,7 @@ namespace GIC.Battle
                             // E-3 防御折减（估值感知补强，docs/archive/33 §4）：DamagePipeline 易伤乘区
                             // 轻量镜像——修「对高防目标伤害虚高」盲区（骨架级修正：伙伴脑与配额脑操
                             // 魔神档共享受益；眷属脑不消费估值零影响）
-                            int effPerTarget = MitigatedDamage(perTarget, target.defense);
+                            int effPerTarget = EstimateMitigatedDamage(sim, selfBoardId, perTarget, target);
                             score += Math.Min(effPerTarget, remaining); // 过杀截断（E-2 剩余口径+E-3 折减口径）
                             if (effPerTarget >= remaining)
                                 // AI-5 军团软系数：回防态斩杀加成 ×0.7（激进度下调——§3 协作机制 2）
@@ -979,11 +982,9 @@ namespace GIC.Battle
         // ==================== P5 连续空间版重写件（决策九十五蓝图 §6——原十字 BFS/射线/轴对齐族整替） ====================
 
         /// <summary>采集候选档（docs/47 拍板⑦；P5 连续版）：采集型角色朝资源点的移动候选。
-        /// **收获档（途经采集型，安柏）**：对每个存活堆按真实 A* 路径（RTSPathfinder+BuildPathCells——
-        /// 与执行层途经采集同源格序）估采集价值：途经格每命中一堆 +min(配额,余量)（同堆去重=Host
-        /// per-堆配额口径）、落点为存活堆再 +1（站立采集）；取价值最高堆格心为目的地（同值取首个
-        /// 枚举序=确定性）。旧「十字向射线逐格扫可停落点」随 A* 失效——拐弯路径的堆值照常入账
-        ///（两堆一线穿梭收益曲线保留）。
+        /// **快速采集型（安柏）**：对每个存活堆按真实 A* 连续路径估值；路径线段进入
+        /// CollectRadius 真圆且该点独立冷却结束时 +min(CollectCount,余量)，同堆只计一次；
+        /// 落点为存活堆再 +1 普通读条采集。取价值最高堆格心为目的地（同值取注册序首个）。
         /// **逼近档（纯 tag 型）**：目的地=最近未耗尽堆格心；PathReachable 不可达跳过。
         /// **采集角色透视（2026-10-28 返拍）=感知层豁免探索账本**（核心透视同构；客户端堆件在
         /// 未探索格隐藏属渲染层分口径）；**返回 true=纯 tag 型采集者已站在存活资源点上**——上层
@@ -995,7 +996,6 @@ namespace GIC.Battle
         {
             if (!BattleHeuristics.IsHarvester(unit)) return false;
             var from = sim.GetPosCm(unit);
-            var fromCell = BattleCell.FromCm(from.x, from.y);
             var collect = MoveExecutor.CollectParamsOf(unit);
             bool passCollector = collect.count > 0;
 
@@ -1005,7 +1005,8 @@ namespace GIC.Battle
             {
                 foreach (var node in sim.SortedResourceNodes())
                     if (node != null && node.remainingCharges > 0
-                        && node.cell.x == fromCell.x && node.cell.y == fromCell.y)
+                        && BattleHeuristics.DistCm(from.x, from.y, node.cell.CenterXCm, node.cell.CenterYCm)
+                        <= ResourceNodeMetrics.HarvestRadiusCm)
                         return true;
             }
 
@@ -1037,17 +1038,16 @@ namespace GIC.Battle
                     var path = RTSPathfinder.FindPath(sim, from.x, from.y,
                         node.cell.CenterXCm, node.cell.CenterYCm, forceType);
                     if (path == null || path.Count == 0) continue;
-                    var cells = RTSMovementSystem.BuildPathCells(sim, from, path);
                     int value = 0;
                     var seenPiles = new HashSet<string>();
-                    foreach (var c in cells)
-                        foreach (var hit in sim.SortedResourceNodes())
-                        {
-                            if (hit == null || hit.remainingCharges <= 0) continue;
-                            if (hit.cell.x != c.x || hit.cell.y != c.y) continue;
-                            if (!seenPiles.Add(c.x + "," + c.y)) continue; // 同堆只计一次（Host per-堆配额口径）
-                            value += Mathf.Min(collect.count, hit.remainingCharges);
-                        }
+                    foreach (var hit in sim.SortedResourceNodes())
+                    {
+                        if (hit == null || hit.remainingCharges <= 0) continue;
+                        if (sim.QuickHarvestReadyTick(UnitIdOf(sim, unit), hit.cell) > sim.CurrentTick) continue;
+                        if (!seenPiles.Add(hit.cell.x + "," + hit.cell.y)) continue; // 同堆只计一次
+                        if (!MoveExecutor.PathPassesResourceNode(from, path, hit.cell, collect.radiusCm)) continue;
+                        value += Mathf.Min(collect.count, hit.remainingCharges);
+                    }
                     if (LivePileAt(sim, node.cell)) value += 1; // 落点=堆：站立采集估值
                     if (value > bestValue) { bestValue = value; bestPile = node; }
                 }
@@ -1680,6 +1680,15 @@ namespace GIC.Battle
         }
 
         // ==================== E-3 估值与延续原语（伙伴脑规划层，docs/archive/33 §4） ====================
+
+        /// <summary>逐目标估值：3A 增伤与 Host 共用解析，再进入防御折减；评分与意图声明共用。</summary>
+        private static int EstimateMitigatedDamage(BattleSimState sim, string attackerId,
+            int rawDamage, UnitState target)
+        {
+            int bonus = EffectCompiler.ResolveAmberWeaknessBonus(sim, attackerId, target);
+            int boosted = (int)((long)rawDamage * (100 + bonus) / 100);
+            return MitigatedDamage(boosted, target.defense);
+        }
 
         /// <summary>防御折减（E-3 估值感知补强）：DamagePipeline 易伤乘区轻量镜像——正防御
         /// 100/(100+防御) 除法递减、负防御每点 +1% 线性增伤（与 Calculate 同公式口径，不并易伤 buff

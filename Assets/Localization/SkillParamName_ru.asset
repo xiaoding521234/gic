@@ -383,6 +383,22 @@ MonoBehaviour:
     m_Localized: "\u041B\u0438\u043C\u0438\u0442 \u0441\u0442\u0430\u043A\u0430 \u044D\u043A\u0438\u043F\u0438\u0440\u043E\u0432\u043A\u0438"
     m_Metadata:
       m_Items: []
+  - m_Id: 87
+    m_Localized: "Скорость применения C3"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 88
+    m_Localized: "Снижение перезарядки C3"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 89
+    m_Localized: "Радиус сбора"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 90
+    m_Localized: "Перезарядка сбора"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
