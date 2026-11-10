@@ -18,6 +18,10 @@ namespace GIC.Battle
         public bool isEditMode = false;
         public bool skipFadeIn = false;
 
+        /// <summary>浏览模式点卡打开详情前的回调（背包注入=播「选中语音」；未注入=不播，
+        /// 战斗手牌与卡组面板天然不触发）</summary>
+        public System.Action<SaveCardData> onCardClickedDetail;
+
         // 卡组面板内卡牌（点击=移出卡组，纯边沿动作不选）——置位时同步关点按选中
         [SerializeField] private bool _isDeckPanelMode;
         public bool isDeckPanelMode
@@ -199,6 +203,9 @@ namespace GIC.Battle
             }
             else
             {
+                // 背包浏览模式点卡=播该角色的「选中语音」（2026-11-10 用户要求：只在点击时播，
+                // 进背包自动选中的第一张不播；战斗手牌/卡组编辑不挂此回调，零影响）
+                onCardClickedDetail?.Invoke(saveCardData);
                 OpenDetailView();
             }
         }

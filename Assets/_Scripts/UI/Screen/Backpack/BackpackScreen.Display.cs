@@ -100,11 +100,35 @@ namespace GIC.UI
             }
         }
 
+        /// <summary>背包点卡查看详情时的「选中语音」（2026-11-10 用户要求）：优先 choose_high_hp，
+        /// 回落 choose_low_hp / go_war；单通道播放，连点不叠音</summary>
+        private void PlayUnitSelectVoice(SaveCardData cardData)
+        {
+            if (cardData == null || cardData.id.cardType != Data.CardType.Unit) return;
+
+            var unitName = cardData.id.AsUnitName();
+            var unitData = unitConfig.GetUnitData(unitName);
+            var voices = unitData != null ? unitData.voices : null;
+            if (voices == null) return;
+
+            var pool = voices.onChooseHighHP;
+            if (pool == null || pool.Count == 0) pool = voices.onChooseLowHP;
+            if (pool == null || pool.Count == 0) pool = voices.onGoWar;
+            if (pool == null || pool.Count == 0) return;
+
+            var clip = pool.GetRandomClip();
+            if (clip != null)
+                AudioManager.Instance?.PlayVoiceExclusive(clip);
+        }
+
         private void SpawnCard(SaveCardData data)
         {
             Card card = _cardPool.Get(data, cardDetailView);
 
             if (card == null) return;
+
+            // 点卡查看详情时播该角色的「选中语音」（只挂在背包浏览卡上；战斗手牌与卡组面板不挂）
+            card.onCardClickedDetail = PlayUnitSelectVoice;
 
             card.onDeck?.gameObject.SetActive(currentDeckCards.Contains(data));
             if (card.selectButton != null)

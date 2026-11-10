@@ -19,6 +19,7 @@ namespace GIC.Framework
             AudioSource availableSource = GetAvailableVoiceSource();
             if (availableSource != null)
             {
+                availableSource.pitch = 1f; // 复位：一次性语音会改 pitch，复用池源时不残留
                 availableSource.clip = clip;
                 availableSource.volume = volumeScale;
                 availableSource.Play();
@@ -76,6 +77,24 @@ namespace GIC.Framework
                     return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// 一次性语音（战斗语音调度器专用，2026-11-10）：走同一 Voice 池与混音通道，
+        /// 但不登记 unitVoiceMap、不按单位去重——「什么时候播、播谁」由调度器统一裁决，
+        /// 这里只负责出声（含音高微扰）。**不触碰音乐**（用户拍板：语音不影响音乐）。
+        /// </summary>
+        public void PlayVoiceOneShot(AudioClip clip, float volumeScale = 1f, float pitch = 1f)
+        {
+            if (clip == null) return;
+
+            AudioSource source = GetAvailableVoiceSource();
+            if (source == null) return;
+
+            source.clip = clip;
+            source.volume = volumeScale;
+            source.pitch = Mathf.Clamp(pitch, 0.5f, 2f);
+            source.Play();
         }
 
         public void PlayVoiceExclusive(AudioClip clip, float volumeScale = 1f)

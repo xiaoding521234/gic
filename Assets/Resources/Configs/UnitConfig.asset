@@ -967,18 +967,86 @@ MonoBehaviour:
     - {fileID: 11400000, guid: c5fd091cddfadfc42a10628a30fc6672, type: 2}
     voices:
       onGoWar:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: b6e54ba32e42b08458b4d453b875e60d, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: e2ac6e4a56711414e8d4f2dda22b0b15, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 1b438cc1bed1c944c9c4639ecb38861a, type: 3}
+          weight: 1
       onChooseHighHP:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 408dec470c3cb184799409e688dc518f, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 333ab0858a6d1174b9a76e9344c22ef3, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: c7b873ce16ab106449fdebfe8f7e8ac4, type: 3}
+          weight: 1
       onChooseLowHP:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 408a70cbc93be9e47ab30e379d7b088a, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 8b6a4a7821299ba4f8425c00f6b1f0f3, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: ca33fa8ef561c24418c8081ded7b3199, type: 3}
+          weight: 1
       onHitLight:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: d11c3439134a7704ea45716bf964ad39, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 29d1d1ac591dbe848b32d4b237dd373d, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 61000f550f874c64fa153f1c75fed9d8, type: 3}
+          weight: 1
       onHitHeavy:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 9b70b78f93b28934e8f17a5868ebe3b2, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 20135d6a2a0da4b49a3f2bdf07273dc7, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: f96a8b539881d314994ed640030a4a1c, type: 3}
+          weight: 1
       onDie:
-        clips: []
-      skillVoices: []
+        clips:
+        - clip: {fileID: 8300000, guid: 9c2520c60a90c7143b5c7a71549a7086, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 71f3e7a967e89774a875464ecddcf55c, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: c309c9cdda0715045b5e18d409cbb2f9, type: 3}
+          weight: 1
+      skillVoices:
+      - skillName: 1
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 70470249a64d92446bc2dd1658e8e10c, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: d23796e979f0e894ebb40526491ecec4, type: 3}
+            weight: 1
+      - skillName: 3004002
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: a224a2e12a18c74409e0c73d1c0d601b, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 7b7f60757b956cf41a97c9e70eb2f2fd, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: df764fdbf24d8204996cc53cf8a715c1, type: 3}
+            weight: 1
+      - skillName: 3004004
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 1ea210701f3f0234ab42cd08c8583faf, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: cc9fa46971a52e547ac80c2c025aa024, type: 3}
+            weight: 1
+      - skillName: 3004001
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: fca1ab7ccf35e9449a02234bc9d3cd13, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 6e58d939ef802a64b8e8d524e1e1a36f, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: a0b1bbd33c99fff4ea9682c14bfbe7a0, type: 3}
+            weight: 1
     "\u884C\u4E3A\u6863\u6848":
       "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
@@ -1310,18 +1378,81 @@ MonoBehaviour:
     - {fileID: 11400000, guid: ed9e37100fd3651469e29a3ccd9ed3eb, type: 2}
     voices:
       onGoWar:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 55b46c0aadcc3f540a452f0d49637ca6, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 5f31aea1961c5314ca7f0828ad40430f, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 01e18c4642532d44abad72594d6ee658, type: 3}
+          weight: 1
       onChooseHighHP:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 954b0b01d850dc846b030abba5f89945, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 3a900a3dfd449ad49a518f8c2e347ab1, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 82288d230ebfe3b4f9ad3b4f92f43d66, type: 3}
+          weight: 1
       onChooseLowHP:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 3956851d06919c443aead8b37524bcf2, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 23b1ac54d331ff440b02457147ecf975, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 9ebdb5c0e232b7f49a2958da4b153668, type: 3}
+          weight: 1
       onHitLight:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: f353e4e781712a0448f2c5b9d9c345e9, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 0c5978974e1f95b45a53f3bb24232564, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 1645f7a6b1e7e2b41aa830ab6f2b52c3, type: 3}
+          weight: 1
       onHitHeavy:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 038ee88c0b0a9d74295da732f5a0928b, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 0d288b48fe05e704795e834ebf2a253a, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: f0e1585be14b83d4b98d340d7959969b, type: 3}
+          weight: 1
       onDie:
-        clips: []
-      skillVoices: []
+        clips:
+        - clip: {fileID: 8300000, guid: 353e3d6ec315a2b419b1bd1815e837f4, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 4d4495b6e8cd85949887492c4cdb9ef2, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 7f4f13608f24dc24f8baf9c316f45739, type: 3}
+          weight: 1
+      skillVoices:
+      - skillName: 3011002
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 6e290b48d461edd48aeba906e9938a48, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 3e5086bb620ec7e44957430dc7c7dac4, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 0fdccc60367ff0247bcecc6f28e9d0f5, type: 3}
+            weight: 1
+      - skillName: 3011003
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: 3bf920930b0ad6344b3437ed09da29d1, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: cbd36e39b039c3b4ba9bda8d4cf3f8d3, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 1906ff161cf55fb48ade57d4a816f89d, type: 3}
+            weight: 1
+      - skillName: 3011004
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: d2aacda9329f83c4bb336eda788696a9, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 8e33dee37a51b6844aad335332a32133, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 303824b4554d1354c85dca510179b213, type: 3}
+            weight: 1
     "\u884C\u4E3A\u6863\u6848":
       "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1
@@ -1405,12 +1536,42 @@ MonoBehaviour:
       onChooseLowHP:
         clips: []
       onHitLight:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: c95d80a5eb4ad3b44a8c9c27a4a1f10e, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 470c9ab619f6beb47b465011a99a1ab6, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: dcdc72d70d3043148bb5c01675fff3ae, type: 3}
+          weight: 1
       onHitHeavy:
-        clips: []
+        clips:
+        - clip: {fileID: 8300000, guid: 451f03297a457434cb097c473ce66d22, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: f0adf716ee2391c4ca91e6b2c99d85b1, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 43ad098c56798ad4aa77dd9d6d0d7a7e, type: 3}
+          weight: 1
       onDie:
-        clips: []
-      skillVoices: []
+        clips:
+        - clip: {fileID: 8300000, guid: e46e355e373dd344489e3960f6271906, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: 24b196986d821e149ac2edb6780aefb7, type: 3}
+          weight: 1
+        - clip: {fileID: 8300000, guid: b234bce1011d11947b94c01637b093a5, type: 3}
+          weight: 1
+      skillVoices:
+      - skillName: 3012002
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: a38559f7207efbe4bad6868261d7669a, type: 3}
+            weight: 1
+          - clip: {fileID: 8300000, guid: 7e4e4c94d6e6e6c4f811de306d9ddcf8, type: 3}
+            weight: 1
+      - skillName: 3012001
+        voices:
+          clips:
+          - clip: {fileID: 8300000, guid: d3a617a2dc721f343aa2ecf7a6838011, type: 3}
+            weight: 1
     "\u884C\u4E3A\u6863\u6848":
       "\u504F\u597D\u4EA4\u6218\u8DDD\u79BB": 0
       "\u6218\u6280\u4F18\u5148\u6743\u91CD": 1

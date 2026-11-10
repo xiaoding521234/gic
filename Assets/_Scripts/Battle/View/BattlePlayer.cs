@@ -30,6 +30,18 @@ namespace GIC.Battle
         [Tooltip("播放速率倍率（1=按公式实时；压缩片间等待用）")]
         [SerializeField] private float _playbackSpeed = 1f;
 
+        [Header("战斗语音")]
+        [Tooltip("即时制下同屏可能几十个单位同时施法/受击：调度器按「通道节流 → 同窗合并 → 优先级抢占」三层压制，另有主体权重与距离衰减，避免全场一起喊话")]
+        [SerializeField] private BattleVoiceSettings 战斗语音参数 = new BattleVoiceSettings();
+
+        [Tooltip("受击语音按伤害量分轻/重：伤害绝对值 ≥ 该值时播重击语音，否则轻击")]
+        [SerializeField] private int 重伤伤害阈值 = 25;
+
+        private BattleVoiceDirector _voiceDirector;
+        private readonly Dictionary<string, UnitName> _unitNames = new Dictionary<string, UnitName>();
+        private Func<string> _localPlayerIdResolver;
+        private Func<string, TeamType> _teamOfResolver;
+
         [Header("立牌视觉")]
         [Tooltip("立牌后仰角（饥荒式斜插卡片：倾角=俯角 55° 时立牌面正对视线完全消压扁；0=完全垂直；2026-09-18 两轮目检修正：方向=顶部远离相机后仰）")]
         [SerializeField, Range(0f, 80f)] private float 立牌后倾角 = 55f;
@@ -126,6 +138,9 @@ namespace GIC.Battle
             System.Func<string> localPlayerIdResolver, System.Func<string, TeamType> teamOfResolver)
         {
             if (mode == BattleFogMode.None) { if (_fog != null) { Destroy(_fog); _fog = null; } return; }
+            // 身份解析不只迷雾用：战斗语音按「本机/队友/敌方」加权（迷雾关闭时也要保留）
+            _localPlayerIdResolver = localPlayerIdResolver;
+            _teamOfResolver = teamOfResolver;
             if (_fog == null)
             {
                 var go = new GameObject("BattleFog");
@@ -314,6 +329,7 @@ namespace GIC.Battle
         public void Bind(IBattleTransport transport, BattleMapData map)
         {
             Wargame.Instance?.Context?.Inject(this); // [Autowired] UnitConfig（Y10）
+            EnsureVoiceDirector(); // 配置就绪即建语音调度器（首个 Update 早于 Bind 时不建件，见其内注释）
             _transport = transport;
             if (_viewRoot == null)
             {
@@ -358,8 +374,38 @@ namespace GIC.Battle
         // P6 残留审计 D5（docs/active/49）：SetPlaybackSpeed 无调用方（回放倍率语义随回合机退役），
         // 已删除；_playbackSpeed 字段保留=表现层倍率恒 1（伤害数字/弹道时长换算同源）。
 
+        /// <summary>战斗语音调度器（懒建：依赖视图表与身份解析器，建场后才可用；幂等）</summary>
+        private void EnsureVoiceDirector()
+        {
+            if (_voiceDirector != null) return;
+            // 配置未注入前（Bind 之前的第一帧 Update）不得建件：构造时把 _unitConfig 固化进闭包，
+            // 若此刻为 null，整局所有语音都会在 Request 首行被静默丢弃（2026-11-10 首测「完全没声音」根因）
+            if (_unitConfig == null) return;
+            _voiceDirector = new BattleVoiceDirector(
+                战斗语音参数, _unitConfig,
+                id => _unitNames.TryGetValue(id, out var n) ? (UnitName?)n : null,
+                id => _views.TryGetValue(id, out var v) && v != null ? (Vector3?)v.transform.position : null,
+                RelationOfVoiceSubject,
+                () => ViewCamera);
+        }
+
+        /// <summary>语音主体关系：0=本机玩家 1=同队队友 2=敌方——决定同窗抢话与通道占用的权重</summary>
+        private int RelationOfVoiceSubject(string unitId)
+        {
+            if (!_views.TryGetValue(unitId, out var view) || view == null) return 0;
+            string me = _localPlayerIdResolver != null ? _localPlayerIdResolver() : null;
+            if (string.IsNullOrEmpty(me)) return 0;
+            if (view.OwnerPlayerId == me) return 0;
+            if (_teamOfResolver != null && _teamOfResolver(view.OwnerPlayerId) == _teamOfResolver(me)) return 1;
+            return 2;
+        }
+
         private void Update()
         {
+            // 战斗语音调度（表现层，不进命令流）：合并窗口到期后按分数决定播谁的一句
+            EnsureVoiceDirector();
+            _voiceDirector?.Tick();
+
             // 立牌面向战场相机（固定斜俯视，逐帧保持即可；相机不动时开销可忽略）
             var cam = _viewCamera != null ? _viewCamera : CameraContext.Resolve();
             if (cam != null)
@@ -1407,6 +1453,10 @@ namespace GIC.Battle
                     case BattleCommandType.Damage:
                         if (_views.TryGetValue(command.targetUnitId, out var target))
                         {
+                            // 战斗语音：受击按伤害量分轻/重（纯表现，阈值 Inspector 可调）
+                            int hitDamage = Mathf.Abs(command.value);
+                            _voiceDirector?.Request(command.targetUnitId,
+                                hitDamage >= 重伤伤害阈值 ? BattleVoiceKind.HitHeavy : BattleVoiceKind.HitLight);
                             if (command.direction == 1)
                                 // 直线投射物（B5）：与移动同 t=0 起跑（时间轴对齐——命中时刻=接触时刻），
                                 // 不吃命令 stagger；命中点由命令定点下发
@@ -1486,6 +1536,7 @@ namespace GIC.Battle
                     case BattleCommandType.Death:
                         if (_views.TryGetValue(command.actorUnitId, out var dying))
                         {
+                            _voiceDirector?.Request(command.actorUnitId, BattleVoiceKind.Death);
                             // 消散（决策八十六批B，docs/45 §4 拍板 #5）：建筑+眷属死亡不留尸体
                             // ——立牌淡出+视图清理；伙伴/魔神尸体路径维持既有 SetCorpseVisual
                             if (command.metadata == 1)
@@ -1705,6 +1756,7 @@ namespace GIC.Battle
                         if (command.summonUnit != null && !_views.ContainsKey(command.summonUnit.unitId))
                         {
                             CreateView(command.summonUnit);
+                            _voiceDirector?.Request(command.summonUnit.unitId, BattleVoiceKind.Deploy);
                             // 新登场立即按当前布局态入位（两态模型：执行阶段=收拢重叠格心）
                             if (_views.TryGetValue(command.summonUnit.unitId, out var summoned))
                                 summoned.ApplyPosition(_board.CellToWorld(command.summonUnit.position));
@@ -1729,6 +1781,16 @@ namespace GIC.Battle
                             // 时长≈时轮 totalTime）、播完自动回待机循环（UnitView.PlayActionVideo 双 RT+缩放补偿
                             // ——宽幅 16:9 动作片原生尺寸独立 RT 渲染+主体视觉大小恒等补偿）；null=待机照播
                             var skillData = LoadSkillData(command.value);
+                            // 战斗语音：走战技还是爆发通道一律以技能资产 skillType 为准
+                            //（项目技能与原神编号并不一一对应——例如诺艾尔「大扫除」在本项目是战技，
+                            //  而它的语音取自原神爆发台词；语音资产已按技能语义人工配对，这里不做编号映射）
+                            if (skillData != null)
+                            {
+                                if (skillData.skillType == SkillType.Burst)
+                                    _voiceDirector?.Request(command.actorUnitId, BattleVoiceKind.Burst, (SkillName)command.value);
+                                else if (skillData.skillType == SkillType.Normal)
+                                    _voiceDirector?.Request(command.actorUnitId, BattleVoiceKind.Skill, (SkillName)command.value);
+                            }
                             // 施法朝向：aim 向量优先（x 符号定左右）；**移动技能不参与**——移动的朝向由
                             // Move 命令按实际位移判定（2026-11-09 报障：移动 SkillCast 的 direction 恒 Right
                             // 且命令序在 Move 之后，把刚翻好的朝向又改回右）
@@ -2328,6 +2390,8 @@ namespace GIC.Battle
                 if (kv.Value != null)
                     Destroy(kv.Value.gameObject);
             _views.Clear();
+            _unitNames.Clear(); // 战斗语音身份表随场同清（unitId 跨局不复用，残留只会污染下一次抢话权重）
+            _voiceDirector?.Reset(); // 冷却/待播不跨局
             _customProjectiles.Clear(); // per-unit 专属弹射物随场同清（与 _views 同生命周期）
             _overheadBars?.ClearAll(); // 头顶条随单位同清（2026-09-24 屏幕空间层）
             ResidentVideoBudget.ClearAll(); // 常驻解码器注册表随清场清空（2026-10-16 常驻批——单位 OnDestroy 已逐个拆，此处双保险）
@@ -2378,6 +2442,7 @@ namespace GIC.Battle
             if (_unitConfig != null && Enum.TryParse<UnitName>(state.unitName, out var unitName) &&
                 _unitConfig.TryGetUnitData(unitName, out var unitData))
             {
+                _unitNames[state.unitId] = unitName; // 战斗语音：命令只带 unitId，这里登记角色身份
                 // 全身立牌（立牌图）人物占比小，按 Inspector 倍数整体放大；缺立牌图的单位回落头像原尺寸
                 useFullBody = unitData.立牌图 != null;
                 avatar = useFullBody ? unitData.立牌图 : unitData.avatar;

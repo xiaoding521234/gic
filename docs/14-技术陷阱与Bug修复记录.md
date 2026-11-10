@@ -2737,3 +2737,17 @@ for (int i = 0; i < _sortBuffer.Count; i++)
   ③**朝向符号随镜像翻转**：Unity TRS=T·R·S（先 `scale.x=-1` 镜像再旋转），同一世界旋转角在镜像态视觉反向——「朝行动方向前倾」的角必须乘上手朝向符号，否则往左打时立牌反着倒。
 - **性能**：位姿写入口先比值再写（`localPosition` 差 < 1e-10 且四元数点积 ≈1 则 return）——上百个静态立牌单位逐帧无谓写 transform 会触发整棵子树的矩阵重算。
 - **触发点语义**：移动跳动挂在既有 `SetMoveAnimation(bool)`（BattlePlayer.PlayMoveCoroutine 片起止，零命令流变化）；攻击突进挂在 `SkillCast` 分支的「无动作片」else（时长取 `skillData.timeline.totalTime`，回落 0.42s），**Move 型技能不触发**。视频单位 `_paperdollAction=false` 调用即早退。
+
+## §197 懒建对象把「尚未注入的 [Autowired] 依赖」固化进闭包 = 整局静默 / 项目语音与 BGM 同响度听不见（2026-11-10 战斗语音首测）
+
+**症状**：战斗语音系统编译通过、配置齐备，实机却一句都不出。
+
+**病灶 A（逻辑）**：`BattlePlayer` 在 `Update` 首帧调 `EnsureVoiceDirector()` 建件，构造时把 `_unitConfig`（`[Autowired]`，要到 `Bind()` 里的 `Context.Inject(this)` 才有值）作为参数传进 `BattleVoiceDirector`——创建那一刻是 null，之后**永久 null**，`Request` 首行 `if (_config == null) return;` 全部早退。活体探针：`directorNull=False`（确实建了）但 `cooldownEntries` 始终 0。修=建件前判依赖是否就绪（`if (_unitConfig == null) return;`，Update 每帧重试）+ `Bind()` 末尾显式补建一次。
+
+**通则**：凡「懒建 + 构造时捕获注入依赖」的组合（管理器/调度器/缓存器），构造前必须确认依赖非空，否则会把 null 固化；注入点（`Bind`/`Initialize`）要主动补建一次，不能只依赖 `Update` 首次调用。
+
+**病灶 B（响度）**：语音播了也听不出来。实测 `ffmpeg ebur128`：语音 -12.4~-14.2 LUFS、战斗 BGM -13.1 LUFS——两者同级，人声频段被 BGM/音效淹没。而 Voice 混音通道本身正常（-1.9dB、`playingVoiceSources=1`），容易误判成"没播"。
+
+**处置**：曾实现 dialogue ducking（播语音压音乐 -7dB，实测 MusicVolume -8.0→-14.9dB），**用户拍板「语音不要影响音乐」后整体撤除**。语音素材峰值余量只有 -0.9~-3.4 dB（`volumedetect`），**最多 +2~3dB 就削波**——响度问题不能靠 `AudioSource.volume` 加大解决，只能靠素材侧归一或用户调「语音」音量。
+
+**取证法（复用）**：①`exec_runtime_script` 起双 AI 局 → 反射读 `_voiceDirector`/`_unitNames`/`_cooldown`（有冷却条目=确实播过）+ Voice 池 `isPlaying`；②`ffmpeg -i x.wav -filter_complex ebur128 -f null -` 测 LUFS，`-af volumedetect` 测峰值——两者一起才能判断"是该加音量还是该压背景"。
