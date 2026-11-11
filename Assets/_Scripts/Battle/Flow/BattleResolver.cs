@@ -163,6 +163,8 @@ namespace GIC.Battle
         {
             var effects = new List<BattleEffect>();
             var startedCommands = new List<BattleCommand>();
+            var discoveredCommands = new List<BattleCommand>();
+            ResolveAmberTreasureDiscovery(discoveredCommands);
             var nodes = _sim.SortedResourceNodes();
             AppendAmberKeenSensesEffects(effects);
 
@@ -236,6 +238,7 @@ namespace GIC.Battle
             }
 
             var controlCommands = new List<BattleCommand>();
+            controlCommands.AddRange(discoveredCommands);
             var cancels = _sim.ConsumePendingHarvestCancels();
             if (cancels != null)
                 foreach (var cancel in cancels)
@@ -269,6 +272,80 @@ namespace GIC.Battle
                 effects, appliedBuffs, null, newlyDead, expired: null, skillCasts: null,
                 shattered: shatters);
             if (segment.commands.Count > 0) PushSegment(segment);
+        }
+
+        /// <summary>3B 循迹觅宝：每单位独立周期发现资源；死亡/无候选格跳过本轮且不积累补发。</summary>
+        private void ResolveAmberTreasureDiscovery(List<BattleCommand> commands)
+        {
+            foreach (var kv in _sim.SortedUnits())
+            {
+                var amber = kv.Value;
+                if (amber == null || !amber.HasConstellationChoice(SkillName.Amber_C3B_TreasureHunt)) continue;
+                var option = amber.RawData?.GetConstellationOption(3, (int)SkillName.Amber_C3B_TreasureHunt);
+                var data = option?.skill?.data;
+                if (data == null) continue;
+                int intervalSeconds = data.GetInt(SkillParamKey.C3DiscoveryInterval, 0);
+                int radiusCm = data.GetInt(SkillParamKey.C3DiscoveryRadius, 0);
+                int charges = data.GetInt(SkillParamKey.C3DiscoveryCharges, 0);
+                if (intervalSeconds <= 0 || radiusCm <= 0 || charges <= 0) continue;
+
+                int intervalTicks = Math.Max(1, intervalSeconds * BattleMetrics.TicksPerSecond);
+                int nextTick = _sim.ResourceDiscoveryNextTick(kv.Key);
+                if (nextTick <= 0)
+                {
+                    _sim.SetResourceDiscoveryNextTick(kv.Key, _sim.CurrentTick + intervalTicks);
+                    continue;
+                }
+                if (_sim.CurrentTick < nextTick) continue;
+                _sim.SetResourceDiscoveryNextTick(kv.Key, _sim.CurrentTick + intervalTicks);
+                if (BattleSimState.IsDead(amber)) continue;
+
+                var node = BuildAmberDiscoveredNode(amber, radiusCm, charges);
+                if (node == null || !_sim.TryAddResourceNode(node)) continue;
+                commands.Add(BattleCommand.ResourceNodeDiscovered(kv.Key, node));
+            }
+        }
+
+        private ResourceNodeState BuildAmberDiscoveredNode(Unit amber, int radiusCm, int charges)
+        {
+            var pos = _sim.GetPosCm(amber);
+            var center = BattleCell.FromCm(pos.x, pos.y);
+            int cellRange = (radiusCm + CellMetrics.CellSizeCm - 1) / CellMetrics.CellSizeCm;
+            long radiusSq = (long)radiusCm * radiusCm;
+            var candidates = new List<BattleCell>();
+            for (int x = center.x - cellRange; x <= center.x + cellRange; x++)
+                for (int y = center.y - cellRange; y <= center.y + cellRange; y++)
+                {
+                    var cell = new BattleCell(x, y);
+                    if (!_sim.Map.HasTile(x, y) || !_sim.Map.IsPassable(x, y, ForceType.Fly)
+                        || _sim.GetResourceNodeAt(cell) != null) continue;
+                    long dx = cell.CenterXCm - pos.x;
+                    long dz = cell.CenterYCm - pos.y;
+                    if (dx * dx + dz * dz <= radiusSq) candidates.Add(cell);
+                }
+            if (candidates.Count == 0) return null;
+            candidates.Sort((a, b) =>
+            {
+                int distance = DistanceSquaredToCell(a, pos.x, pos.y).CompareTo(
+                    DistanceSquaredToCell(b, pos.x, pos.y));
+                if (distance != 0) return distance;
+                int x = a.x.CompareTo(b.x);
+                return x != 0 ? x : a.y.CompareTo(b.y);
+            });
+            var chosen = candidates[_sim.NextRandomIndex(candidates.Count)];
+            return new ResourceNodeState
+            {
+                kind = (int)ResourceNodeKind.MoraPile,
+                cell = chosen,
+                remainingCharges = charges,
+            };
+        }
+
+        private static long DistanceSquaredToCell(BattleCell cell, int xCm, int zCm)
+        {
+            long dx = cell.CenterXCm - xCm;
+            long dz = cell.CenterYCm - zCm;
+            return dx * dx + dz * dz;
         }
 
         private ResourceNodeState FindHarvestNodeInRange(Unit unit, List<ResourceNodeState> nodes, int radiusCm)
@@ -640,7 +717,7 @@ namespace GIC.Battle
         /// **2026-11-04 追拍「效果触发时间翻倍」**：拆秒拍/效果拍两档——秒拍=发放 1摩拉+1体力/Buff 计时
         /// 递减/泡湿/资源点站立采集/快照；**效果拍（每 EffectBeatTicks=2 秒）=Buff tick 效果〔OnEffectBeat
         /// 产出——歌声之环/冰棱/燃烧〕+建筑效果〔教堂/旗帜/餐馆/骑士引擎〕**，单次数值不动=触发频率
-        /// 减半；战技/爆发 CD 不受影响（独立 3s/5s 拍板））：
+        /// 减半；战技/爆发 CD 不受影响（独立 3s/6s 拍板））：
         /// ①每玩家发放 → ②Buff 整拍效果按注册序结算（docs/22 §2——Buff 计时随 RemainingSeconds 语义改秒）
         /// → ③计时减一（上 buff 当拍结束即减）→ 到期移除 → 产出 turnEnd 段（发放恒非空，段必推）。
         /// 由 RTSFlowController 每秒整拍（tick%20==0）调用；胜负检查归调用方。

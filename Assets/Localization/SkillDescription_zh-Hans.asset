@@ -75,7 +75,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001012
-    m_Localized: "·战技与爆发冷却减少{C3CooldownReduction}%\n·释放速度加快{C3ReleaseSpeed}%"
+    m_Localized: "·每{C3DiscoveryInterval}秒在自身{C3DiscoveryRadius}厘米内发现一处隐藏摩拉堆，每处可采集{C3DiscoveryCharges}次"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

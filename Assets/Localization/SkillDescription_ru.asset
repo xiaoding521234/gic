@@ -103,7 +103,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001012
-    m_Localized: "·Перезарядка боевых навыков и взрыва сокращается на {C3CooldownReduction}%\n·Скорость применения увеличивается на {C3ReleaseSpeed}%"
+    m_Localized: "·Каждые {C3DiscoveryInterval} с обнаруживает скрытую кучу моры в радиусе {C3DiscoveryRadius} см. Каждую кучу можно собрать {C3DiscoveryCharges} раз"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

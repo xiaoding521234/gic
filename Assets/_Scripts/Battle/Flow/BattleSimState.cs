@@ -70,6 +70,15 @@ namespace GIC.Battle
             return _resourceNodes.TryGetValue(cell, out var node) ? node : null;
         }
 
+        /// <summary>运行时新增资源点（3B 发现）：空格且有余量才注册，禁止覆盖既有节点。</summary>
+        public bool TryAddResourceNode(ResourceNodeState node)
+        {
+            if (node == null || node.remainingCharges <= 0 || Map == null
+                || !Map.HasTile(node.cell.x, node.cell.y) || _resourceNodes.ContainsKey(node.cell)) return false;
+            _resourceNodes.Add(node.cell, node.Clone());
+            return true;
+        }
+
         /// <summary>
         /// 采集扣减（Host 权威单点）：余量-1、归零即从注册表移除（SC2 矿脉「耗尽从地图消失」拍板⑤）。
         /// 返回采集后剩余次数（-1=该格无资源点=未采集）。**调用方立即产出采集事实效应**
@@ -190,6 +199,29 @@ namespace GIC.Battle
                 int x = a.nodeCell.x.CompareTo(b.nodeCell.x);
                 return x != 0 ? x : a.nodeCell.y.CompareTo(b.nodeCell.y);
             });
+            return result;
+        }
+
+        // ==================== 3B 循迹觅宝：每单位发现计时 ====================
+        private readonly Dictionary<string, int> _resourceDiscoveryTicks = new Dictionary<string, int>();
+
+        public int ResourceDiscoveryNextTick(string unitId)
+        {
+            return !string.IsNullOrEmpty(unitId) && _resourceDiscoveryTicks.TryGetValue(unitId, out int tick)
+                ? tick : 0;
+        }
+
+        public void SetResourceDiscoveryNextTick(string unitId, int nextTick)
+        {
+            if (!string.IsNullOrEmpty(unitId)) _resourceDiscoveryTicks[unitId] = nextTick;
+        }
+
+        public List<ResourceDiscoveryState> SortedResourceDiscoveryTicks()
+        {
+            var result = new List<ResourceDiscoveryState>();
+            foreach (var kv in _resourceDiscoveryTicks)
+                result.Add(new ResourceDiscoveryState { unitId = kv.Key, nextTick = kv.Value });
+            result.Sort((a, b) => string.CompareOrdinal(a.unitId, b.unitId));
             return result;
         }
 
@@ -356,6 +388,9 @@ namespace GIC.Battle
             if (percent >= 100f) return true;
             return _rng.NextDouble() * 100.0 < percent;
         }
+
+        /// <summary>从已确定性排序的候选集中抽取下标；仅供模拟判定，RNG 状态随快照 hash 校验。</summary>
+        public int NextRandomIndex(int count) => _rng.Next(count);
 
         /// <summary>逻辑单位隐藏根（装配时设置；部署等运行时生成单位挂此——纯逻辑容器勿落场景根，BattleSession._logicRoot 同源）</summary>
         public UnityEngine.Transform LogicRoot { get; set; }
@@ -1128,7 +1163,7 @@ namespace GIC.Battle
         /// 空/地分层 2026-11-08：飞行×地面不参与分离）</summary>
         public bool[] SeparationAirborneScratch;
 
-        // ==================== 攻击冷却（决策九十五 P3，蓝图 §4.3——战技 3 秒/爆发 5 秒） ====================
+        // ==================== 攻击冷却（决策九十五 P3，蓝图 §4.3——战技 3 秒/爆发 6 秒） ====================
         // 纪元制（到期 tick 记账，非逐 tick 递减——零每帧遍历、回放由命令流派生天然确定）：
         // Normal 型（战技+AI 普攻条目同享）→攻击 CD；Burst 型→爆发 CD；其余类型（延奏/契约/势力/
         // 变奏/移动/命座）无 CD。单位死亡不清条目（量=单位数上限，无泄漏面；unitId 不复用）。
@@ -1163,9 +1198,7 @@ namespace GIC.Battle
         public void ConsumeSkillCooldown(string unitId, GIC.Data.SkillType skillType)
         {
             if (skillType != GIC.Data.SkillType.Burst && skillType != GIC.Data.SkillType.Normal) return;
-            var caster = GetUnit(unitId);
-            int cdTicks = BattleMetrics.SkillCooldownTicks(skillType, caster?.RawData,
-                caster?.ConstellationChoices);
+            int cdTicks = BattleMetrics.SkillCooldownTicks(skillType);
             var table = skillType == GIC.Data.SkillType.Burst ? _burstCdReadyTick : _attackCdReadyTick;
             table[unitId] = CurrentTick + cdTicks;
         }
@@ -1592,8 +1625,10 @@ namespace GIC.Battle
 
             // 资源点权威态（docs/47）：秒拍头整表覆盖自愈（客户端表现层对齐+AI 采集候选消费域）；
             // 注册序=BattleMapConfig 解析序（构造时复制保序）——回放确定性同构
-            foreach (var node in _resourceNodes.Values)
+            foreach (var node in SortedResourceNodes())
                 snapshot.resourceNodes.Add(node.Clone());
+            foreach (var discovery in SortedResourceDiscoveryTicks())
+                snapshot.resourceDiscoveryTicks.Add(discovery.Clone());
             foreach (var cooldown in SortedQuickHarvestCooldowns())
                 snapshot.quickHarvestCooldowns.Add(cooldown.Clone());
 

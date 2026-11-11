@@ -75,7 +75,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001012
-    m_Localized: "·戦技と爆発のクールダウンが{C3CooldownReduction}%短縮\n·発動速度が{C3ReleaseSpeed}%上昇"
+    m_Localized: "·{C3DiscoveryInterval}秒ごとに、自身から{C3DiscoveryRadius}cm以内の隠されたモラの山を1つ発見する。各モラの山は{C3DiscoveryCharges}回採取できる"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

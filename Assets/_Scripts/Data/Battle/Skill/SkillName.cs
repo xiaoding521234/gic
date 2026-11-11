@@ -70,8 +70,8 @@ namespace GIC.Data
         [InspectorName("弱点侦查")]
         Amber_C3A_WeaknessScouting = 3001011,
 
-        [InspectorName("压制射击")]
-        Amber_C3B_SuppressiveFire = 3001012,
+        [InspectorName("循迹觅宝")]
+        Amber_C3B_TreasureHunt = 3001012,
         #endregion
 
         #region 凯亚 (3002)

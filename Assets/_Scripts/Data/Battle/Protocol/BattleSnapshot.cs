@@ -89,7 +89,7 @@ namespace GIC.Data
         /// 即时制攻击节流；客户端 HUD CD 转圈（P4 接线）随每秒快照校准+SkillCast 命令即时起点）</summary>
         public int attackCdRemainTicks;
 
-        /// <summary>爆发 CD 剩余 tick（0=就绪；蓝图 §4.3「爆发 CD=5 秒」+元能门槛双 gate——
+        /// <summary>爆发 CD 剩余 tick（0=就绪；蓝图 §4.3「爆发 CD=6 秒」+元能门槛双 gate——
         /// 本字段仅 CD 维度，元能门槛仍走 costs 资源链）</summary>
         public int burstCdRemainTicks;
 
@@ -205,6 +205,9 @@ namespace GIC.Data
         /// 采集候选消费域——剩余次数/在场集合以此为准（采集时刻变化走 ResourceHarvest 命令增量，
         /// 秒拍头快照整表覆盖自愈）</summary>
         public List<ResourceNodeState> resourceNodes = new List<ResourceNodeState>();
+
+        /// <summary>安柏 3B 每单位下次发现资源 tick（快照恢复与确定性 hash 同源）</summary>
+        public List<ResourceDiscoveryState> resourceDiscoveryTicks = new List<ResourceDiscoveryState>();
 
         /// <summary>安柏快速采集独立冷却（单位×资源点；断线/快照自愈与确定性 hash 同源）</summary>
         public List<QuickHarvestCooldownState> quickHarvestCooldowns = new List<QuickHarvestCooldownState>();

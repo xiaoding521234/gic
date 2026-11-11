@@ -278,6 +278,16 @@ namespace GIC.Battle
             }
         }
 
+        /// <summary>发现/更新单个资源点（3B 循迹觅宝）：幂等重建该格表现，快照全量重建仍负责兜底。</summary>
+        public void UpsertResourceNode(ResourceNodeState node)
+        {
+            if (node == null || node.remainingCharges <= 0) return;
+            if (_resourceNodeViews.TryGetValue(node.cell, out var previous) && previous != null)
+                DestroyResourceNodeView(previous);
+            var view = CreateResourceNodeView(node);
+            if (view != null) _resourceNodeViews[node.cell] = view;
+        }
+
         /// <summary>采集增量（ResourceHarvest 命令客户端入口）：**件数=剩余次数**（追拍「数量随采集
         /// 变少」）——remaining>0=隐藏顶部 (N−remaining) 件；=0=表现件整体移除（耗尽消失拍板⑤）。
         /// 幂等：未知格直通</summary>

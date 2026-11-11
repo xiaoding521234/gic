@@ -378,6 +378,18 @@ MonoBehaviour:
     m_Localized: "採集冷卻"
     m_Metadata:
       m_Items: []
+  - m_Id: 91
+    m_Localized: "3命發現資源週期"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 92
+    m_Localized: "3命發現資源半徑"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 93
+    m_Localized: "3命發現資源次數"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

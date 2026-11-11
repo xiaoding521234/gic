@@ -1651,6 +1651,14 @@ namespace GIC.Battle
                         _overheadBars?.CancelHarvest(command.actorUnitId);
                         break;
 
+                    case BattleCommandType.ResourceNodeDiscovered:
+                        if (_board != null && command.resourceNode != null)
+                        {
+                            _board.UpsertResourceNode(command.resourceNode);
+                            if (_fog != null) _board.ApplyResourceNodeFogVisibility(_fog.IsExplored);
+                        }
+                        break;
+
                     case BattleCommandType.ResourceHarvest:
                         _overheadBars?.CancelHarvest(command.actorUnitId);
                         // 资源点采集（docs/47，2026-10-27）：采集事实镜像——BattleBoard 表现件余量/耗尽

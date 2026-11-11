@@ -378,6 +378,18 @@ MonoBehaviour:
     m_Localized: "採取クールダウン"
     m_Metadata:
       m_Items: []
+  - m_Id: 91
+    m_Localized: "3命資源発見周期"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 92
+    m_Localized: "3命資源発見半径"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 93
+    m_Localized: "3命資源採取回数"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

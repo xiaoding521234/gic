@@ -378,6 +378,18 @@ MonoBehaviour:
     m_Localized: "采集冷却"
     m_Metadata:
       m_Items: []
+  - m_Id: 91
+    m_Localized: "3命发现资源周期"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 92
+    m_Localized: "3命发现资源半径"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 93
+    m_Localized: "3命发现资源次数"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

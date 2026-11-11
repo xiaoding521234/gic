@@ -756,9 +756,11 @@ namespace GIC.Battle
             // 资源点余量（耗尽即消失——余量错=采集经济已分叉）
             foreach (var node in sim.SortedResourceNodes())
             {
+                hash = hash * 31 + node.kind;
                 hash = hash * 31 + node.cell.x;
                 hash = hash * 31 + node.cell.y;
                 hash = hash * 31 + node.remainingCharges;
+                hash = hash * 31 + node.harvestSeconds;
             }
             foreach (var channel in sim.SortedHarvestChannels())
             {
@@ -767,6 +769,11 @@ namespace GIC.Battle
                 hash = hash * 31 + channel.nodeCell.y;
                 hash = hash * 31 + channel.startTick;
                 hash = hash * 31 + channel.finishTick;
+            }
+            foreach (var discovery in sim.SortedResourceDiscoveryTicks())
+            {
+                foreach (char c in discovery.unitId) hash = hash * 31 + c;
+                hash = hash * 31 + discovery.nextTick;
             }
             foreach (var cooldown in sim.SortedQuickHarvestCooldowns())
             {

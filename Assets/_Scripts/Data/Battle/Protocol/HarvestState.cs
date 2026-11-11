@@ -22,6 +22,19 @@ namespace GIC.Data
         }
     }
 
+    /// <summary>安柏 3B「循迹觅宝」的每单位下次发现 tick；0=尚未初始化。</summary>
+    [Serializable]
+    public class ResourceDiscoveryState
+    {
+        public string unitId;
+        public int nextTick;
+
+        public ResourceDiscoveryState Clone()
+        {
+            return new ResourceDiscoveryState { unitId = unitId, nextTick = nextTick };
+        }
+    }
+
     /// <summary>安柏移动快速采集的每单位、每资源点独立冷却。</summary>
     [Serializable]
     public class QuickHarvestCooldownState

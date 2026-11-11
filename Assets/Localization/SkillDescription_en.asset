@@ -82,7 +82,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 3001012
-    m_Localized: "·Reduces Skill and Burst cooldowns by {C3CooldownReduction}%\n·Increases release speed by {C3ReleaseSpeed}%"
+    m_Localized: "·Every {C3DiscoveryInterval} sec, discover a hidden Mora Pile within {C3DiscoveryRadius} cm. Each pile can be gathered {C3DiscoveryCharges} times"
     m_Metadata:
       m_Items: []
   - m_Id: 3002001

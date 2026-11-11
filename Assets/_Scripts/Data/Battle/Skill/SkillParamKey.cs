@@ -326,6 +326,15 @@ namespace GIC.Data
 
         [InspectorName("采集冷却")]
         CollectCooldown = 90,
+
+        [InspectorName("3命发现资源周期")]
+        C3DiscoveryInterval = 91,
+
+        [InspectorName("3命发现资源半径")]
+        C3DiscoveryRadius = 92,
+
+        [InspectorName("3命发现资源次数")]
+        C3DiscoveryCharges = 93,
     }
 
     /// <summary>

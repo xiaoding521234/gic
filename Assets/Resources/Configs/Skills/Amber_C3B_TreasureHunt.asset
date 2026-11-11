@@ -10,19 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d32616f6019bec45b6eb2e6a4fe45b7, type: 3}
-  m_Name: Amber_C3B_SuppressiveFire
+  m_Name: Amber_C3B_TreasureHunt
   m_EditorClassIdentifier:
   data:
     skillID: 3001012
-    icon: {fileID: 21300000, guid: 077a9ba1a9d595e40951208fac980c5b, type: 3}
+    icon: {fileID: 21300000, guid: 04b7668990803b74e9e59675da77d209, type: 3}
     skillType: 4
-    "\u6280\u80FD\u6807\u7B7E": 5009
+    "\u6280\u80FD\u6807\u7B7E": 5004
     customParams:
-    - key: 87
-      value: 100
+    - key: 91
+      value: 9
       baseType: 0
-    - key: 88
-      value: 50
+    - key: 92
+      value: 300
+      baseType: 0
+    - key: 93
+      value: 3
       baseType: 0
     timeline: {fileID: 0}
     "\u52A8\u4F5C\u89C6\u9891": {fileID: 0}
@@ -32,23 +35,5 @@ MonoBehaviour:
     "\u52A8\u4F5C\u7247\u7F29\u653E\u8865\u507F": 1
     "\u52A8\u4F5C\u7247\u64AD\u653E\u901F\u5EA6": 1
     "\u52A8\u4F5C\u7247\u4F4D\u7F6E\u504F\u79FB": {x: 0, y: 0}
-    effects:
-    - trigger: 3
-      kind: 9
-      targetFilter: 0
-      condition: 0
-      paramKey: 87
-      paramKey2: 0
-      paramKey3: 0
-      radiusKey: 0
-      value: 0
-      element: 0
-      elementLayers: 1
-      buffType: 1
-      buffAsset: {fileID: 0}
-      targetSkillType: 7
-      statType: 3
-      minConstellation: 3
-      requiredTag: 0
-      subType: 5
+    effects: []
     costs: []

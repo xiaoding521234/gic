@@ -378,6 +378,18 @@ MonoBehaviour:
     m_Localized: Gathering Cooldown
     m_Metadata:
       m_Items: []
+  - m_Id: 91
+    m_Localized: C3 Discovery Interval
+    m_Metadata:
+      m_Items: []
+  - m_Id: 92
+    m_Localized: C3 Discovery Radius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 93
+    m_Localized: C3 Discovery Charges
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

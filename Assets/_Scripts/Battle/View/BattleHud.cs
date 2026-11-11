@@ -888,15 +888,7 @@ namespace GIC.Battle
         /// 其余键（移动/延奏/契约/势力）无 CD 不参与——HasCooldownVisual 防为无 CD 键空建视觉件</summary>
         private float CooldownTotalSeconds(string unitId, SkillType type)
         {
-            float seconds = type == SkillType.Burst
-                ? BattleMetrics.BurstCooldownSeconds : BattleMetrics.CasterCooldownSeconds;
-            var snapshot = _session?.Player?.LatestSnapshot;
-            if (snapshot?.units != null)
-                foreach (var unit in snapshot.units)
-                    if (unit.unitId == unitId)
-                        return BattleMetrics.SkillCooldownTicks(type, TryGetUnitData(unit.unitName),
-                            unit.constellationChoices) / (float)BattleMetrics.TicksPerSecond;
-            return seconds;
+            return BattleMetrics.SkillCooldownTicks(type) / (float)BattleMetrics.TicksPerSecond;
         }
 
         private void UpdateSkillCooldowns()

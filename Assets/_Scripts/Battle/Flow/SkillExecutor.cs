@@ -41,7 +41,7 @@ namespace GIC.Battle
                 return effects;
             }
 
-            // 攻击冷却 gate（决策九十五 P3，蓝图 §4.3：战技〔Normal 型〕3 秒/爆发〔Burst 型〕5 秒——
+            // 攻击冷却 gate（决策九十五 P3，蓝图 §4.3：战技〔Normal 型〕3 秒/爆发〔Burst 型〕6 秒——
             // 即时制攻击节流主闸；延奏/契约/势力/移动/命座无 CD。CD 未就绪=行动落空不扣资源不播施放
             //（与「消耗不足=落空不扣」同口径——CD 属门槛维度；目标失效口径拍板不受影响）
             if (sim.IsSkillOnCooldown(action.unitId, skill.RawData.skillType))

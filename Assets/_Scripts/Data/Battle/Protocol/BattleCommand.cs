@@ -86,6 +86,9 @@ namespace GIC.Data
 
         [InspectorName("采集读条取消")]
         HarvestChannelCancel = 25,
+
+        [InspectorName("发现资源点")]
+        ResourceNodeDiscovered = 26,
     }
 
     /// <summary>
@@ -225,6 +228,9 @@ namespace GIC.Data
         [Header("召唤载荷（Summon 命令有效；B6c 部署）")]
         /// <summary>新登场的单位全量状态（客户端建 view 用；与快照 UnitState 同构）</summary>
         public UnitState summonUnit;
+
+        /// <summary>新发现资源点全量状态（ResourceNodeDiscovered 有效；客户端即时建表现件）</summary>
+        public ResourceNodeState resourceNode;
 
         [Header("移动载荷（Move 命令 metadata；2026-09-21）")]
         /// <summary>被挡标记：移动尝试进入 direction 方向的下一格失败（逻辑已停在被挡格前），
@@ -560,6 +566,18 @@ namespace GIC.Data
                 cell = nodeCell,
                 value = moraGain,
                 metadata = remaining,
+            };
+        }
+
+        /// <summary>3B 发现资源点命令。actorUnitId=发现者，resourceNode=新节点全量态。</summary>
+        public static BattleCommand ResourceNodeDiscovered(string discovererUnitId, ResourceNodeState node)
+        {
+            return new BattleCommand
+            {
+                type = BattleCommandType.ResourceNodeDiscovered,
+                actorUnitId = discovererUnitId,
+                cell = node.cell,
+                resourceNode = node.Clone(),
             };
         }
 

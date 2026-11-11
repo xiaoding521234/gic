@@ -375,6 +375,18 @@ MonoBehaviour:
     m_Key: CollectCooldown
     m_Metadata:
       m_Items: []
+  - m_Id: 91
+    m_Key: C3DiscoveryInterval
+    m_Metadata:
+      m_Items: []
+  - m_Id: 92
+    m_Key: C3DiscoveryRadius
+    m_Metadata:
+      m_Items: []
+  - m_Id: 93
+    m_Key: C3DiscoveryCharges
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:

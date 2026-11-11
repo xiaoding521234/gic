@@ -399,6 +399,18 @@ MonoBehaviour:
     m_Localized: "Перезарядка сбора"
     m_Metadata:
       m_Items: []
+  - m_Id: 91
+    m_Localized: "Период обнаружения C3"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 92
+    m_Localized: "Радиус обнаружения C3"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 93
+    m_Localized: "Число сборов C3"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

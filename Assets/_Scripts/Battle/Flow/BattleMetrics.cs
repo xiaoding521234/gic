@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using GIC.Data;
 namespace GIC.Battle
 {
@@ -280,7 +278,7 @@ namespace GIC.Battle
         /// <summary>效果拍节拍（tick 数——2026-11-04 拍板「效果触发时间翻倍，现在太频繁」：Buff tick
         /// 效果〔歌声之环/冰棱/燃烧等 OnEffectBeat 产出〕+建筑效果〔教堂治疗/旗帜元能/餐馆摩拉/骑士团
         /// 引擎〕自每秒整拍改**每 2 秒一拍**——单次数值不动（DPS/产出随之减半，属拍板预期，嫌伤害低
-        /// 再单独调数值）；**战技/爆发 CD 不受影响**（3s/5s 拍板保持）；Buff 持续计时仍按秒（Duration
+        /// 再单独调数值）；**战技/爆发 CD 不受影响**（战技 3s/爆发 6s）；Buff 持续计时仍按秒（Duration
         /// 语义不变）；资源发放/泡湿保持每秒整拍，普通读条与移动快速采集改由逐 tick 采集系统推进；
         /// P6 调参旋钮=本常量）</summary>
         public const int EffectBeatTicks = 2 * TicksPerSecond;
@@ -291,8 +289,8 @@ namespace GIC.Battle
         /// Normal 无 CD 会被 AI 每 0.5 秒连放，CD=即时制攻击节流主闸；per-skill 覆写后续按需）</summary>
         public const int CasterCooldownSeconds = 3;
 
-        /// <summary>爆发 CD（秒——5 秒+元能门槛双 gate；costs 条目〔安柏 30/凯亚 40/芭芭拉 100〕不变）</summary>
-        public const int BurstCooldownSeconds = 5;
+        /// <summary>爆发 CD（秒——全角色统一 6 秒+元能门槛双 gate；costs 条目不变）</summary>
+        public const int BurstCooldownSeconds = 6;
 
         /// <summary>战技 CD（tick）=CasterCooldownSeconds×TicksPerSecond</summary>
         public const int CasterCooldownTicks = CasterCooldownSeconds * TicksPerSecond;
@@ -300,19 +298,11 @@ namespace GIC.Battle
         /// <summary>爆发 CD（tick）=BurstCooldownSeconds×TicksPerSecond</summary>
         public const int BurstCooldownTicks = BurstCooldownSeconds * TicksPerSecond;
 
-        /// <summary>技能总 CD 单源：Host 写就绪 tick 与 HUD 转圈共用；3B 数值读已选分支资产，不另写倍率。</summary>
-        public static int SkillCooldownTicks(SkillType skillType, UnitConfig.UnitData unitData,
-            IList<int> constellationChoices)
+        /// <summary>技能总 CD 单源：Host 写就绪 tick 与 HUD 转圈共用；安柏 3B 已改资源命座，不再修正 CD。</summary>
+        public static int SkillCooldownTicks(SkillType skillType)
         {
             if (skillType != SkillType.Normal && skillType != SkillType.Burst) return 0;
-            int cdTicks = skillType == SkillType.Burst ? BurstCooldownTicks : CasterCooldownTicks;
-            if (unitData == null || constellationChoices == null
-                || !constellationChoices.Contains((int)SkillName.Amber_C3B_SuppressiveFire)) return cdTicks;
-            var option = unitData.GetConstellationOption(3, (int)SkillName.Amber_C3B_SuppressiveFire);
-            int reduction = option?.skill?.data != null
-                ? option.skill.data.GetInt(SkillParamKey.C3CooldownReduction, 0) : 0;
-            reduction = Math.Max(0, Math.Min(100, reduction));
-            return Math.Max(1, cdTicks * (100 - reduction) / 100);
+            return skillType == SkillType.Burst ? BurstCooldownTicks : CasterCooldownTicks;
         }
 
         /// <summary>释放速度千分基线（蓝图 §4.3「释放速度=1+攻速/100」：攻速全员 0〔资产迁移 40→0〕
