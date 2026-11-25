@@ -24,8 +24,7 @@ namespace GIC.Editor
     ///   ② AI 节拍窗（%10：RevealFog 决策时态账本同步 + 按 tick 喂录制 AI 批——不重跑任何脑）
     ///   ③ 秒拍（%20：ResolveSecondBeat——秒拍族+效果拍 %40）
     ///   ④ hash 自证（录制 tick hash 行同点位比对，确定性护栏四）
-    ///   ⑤ submit 窗（录制的玩家/配额脑上交+购买按 submitTick 依次重演——file 序=时间序；
-    ///      购买走 BuyCardExecutor 即时执行器，其余直喂演算）
+    ///   ⑤ 单机 submit 窗（录制的上交含购买，按 submitTick 和文件序送同一演算入口）
     ///
     /// 断言面三件：Segment 命令流逐条 diff（主）+ tick hash 自证（秒拍状态全量）+ 终局对照（胜方+终局拍）。
     /// 用途：演算层（BattleResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）
@@ -130,6 +129,8 @@ namespace GIC.Editor
                     return "FAIL：录制缺 header 行（文件损坏或非录制文件）";
                 if (recording.Header.formatVersion < 2)
                     return "FAIL：v1 旧回合制格式已归档不迁移（决策九十五拍板 7）——请用即时制版本重新录制（replay on 打一局）";
+                if (recording.Header.isNetworked)
+                    return "FAIL：联机录制仅供诊断（结算拍 inputBatch/命令/状态 hash）；本工具只重演单机 v2。";
 
                 // —— AI 难度注册（天理档经济作弊=Host 侧结算差异源：秒拍末摩拉发放/建筑收入乘倍率）——
                 //    重演前注册进 AIPlayerConfig；旧录制缺字段=类默认棋圣（无作弊）零漂移
@@ -202,12 +203,7 @@ namespace GIC.Editor
                     // ①b 弹性分离（2026-11-08）——与 RTSFlowController.TickAdvance 同点位同序：
                     // 分离（重量加权挤开）+ 5Hz 推挤校正段（MovePushed）；确定性=同输入同位移。
                     // 终局后不再跑：live 的 TickAdvance 在 Phase!=Selecting 即停，多跑会产生回放侧多余段
-                    if (!over.Ended)
-                    {
-                        UnitSeparationSystem.ResolveTick(sim);
-                        if (tick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
-                            resolver.EmitSeparationCorrections();
-                    }
+                    if (!over.Ended) resolver.ResolveSeparationTick();
 
                     // ①c 普通读条与移动快速采集——与 live TickAdvance 同点位：分离后、AI 批前。
                     if (!over.Ended)
@@ -250,16 +246,12 @@ namespace GIC.Editor
                         }
                     }
 
-                    // ⑤ submit 窗（当拍内上交的行动——file 序=时间序；购买走即时执行器，其余直喂演算。
-                    //    录制行动=live 校验通过集（钩点在 SubmitAndResolve）——拒绝行动不上盘，直喂无防线缺口）
+                    // ⑤ 单机 submit 窗；录下来的行动已通过接纳校验，直接使用执行入口。
                     while (!over.Ended && submits.Count > 0 && submits.Peek().action != null
                            && submits.Peek().action.submitTick <= tick)
                     {
                         var sub = submits.Dequeue();
-                        if (sub.action.actionType == ActionType.BuyCard)
-                            BuyCardExecutor.TryResolve(sim, transport, sub.action);
-                        else
-                            resolver.ResolveSubmittedAction(sub.action);
+                        resolver.ResolveSubmittedAction(sub.action);
                         over.Check(sim, tick);
                     }
 
@@ -338,7 +330,7 @@ namespace GIC.Editor
         // ==================== 自测（合成局闭环） ====================
 
         /// <summary>编辑器域自测：合成录制（双核心对峙 2 秒，走 BattleRecorder 真实录制路径：
-        /// header+秒拍资源发放段+tick hash 行）→ Run 回放 diff。验证「录制器写盘 ↔ 回放器读盘重建
+        /// header+购买+秒拍资源发放+tick hash）→ Run 回放 diff。验证「录制器写盘 ↔ 回放器读盘重建
         /// ↔ tick 窗口序」编解码闭环；不覆盖真局装配侧（BattleScreen 接线——交实机/观察局复测）。</summary>
         public static string SelfTest()
         {
@@ -369,9 +361,7 @@ namespace GIC.Editor
                 { BattleDebugPlayerIds.P2, new List<HandCard> { MoraCard(), StaminaCard() } },
             };
 
-            // —— 合成录制局：CaptureSetup 开文件 → BuildSimFromHeader 同段重建 → 手推 2 秒 tick
-            //    （秒拍 2 拍：资源发放段+hash 行——录制侧与回放侧走同一份重建代码，自测验证的
-            //    正是「写盘格式 ↔ 读盘重建 ↔ 窗口序」闭环）
+            // 用真实单机 Flow 录制两秒（含一次购买），再由回放器重演。
             BattleRecorder.Enabled = true;
             BattleRecorder.CaptureSetup(seed, BattleLaunchConfig.DefaultMapName, (int)BattleFogMode.None,
                 setups, spawnCells, hands);
@@ -401,35 +391,26 @@ namespace GIC.Editor
             {
                 logicRoot = new GameObject("SelfTestRecordRoot") { hideFlags = HideFlags.HideAndDontSave };
                 var sim = BuildSimFromHeader(header, logicRoot);
-                var transport = new CollectingTransport();
-                var resolver = new BattleResolver(sim, transport, new FakeResolverHost());
+                var live = logicRoot.AddComponent<RTSFlowController>();
+                live.Bind(sim, new CollectingTransport());
+                live.StartBattle();
                 const int totalTicks = 2 * BattleMetrics.TicksPerSecond;
                 for (int tick = 1; tick <= totalTicks; tick++)
                 {
-                    sim.CurrentTick = tick;
-                    var arrivals = RTSMovementSystem.AdvanceTick(sim);
-                    if (arrivals != null && arrivals.Count > 0)
-                        resolver.ResolveMoveArrivals(arrivals);
-                    UnitSeparationSystem.ResolveTick(sim); // ①b 弹性分离（与 live TickAdvance 同点位）
-                    if (tick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
-                        resolver.EmitSeparationCorrections();
-                    resolver.ResolveHarvestTick(); // 与 live TickAdvance 同点位：分离后、秒拍前
-                    if (tick % BattleMetrics.TicksPerSecond != 0) continue;
-                    bool effectBeat = tick % BattleMetrics.EffectBeatTicks == 0;
-                    resolver.ResolveSecondBeat(tick / BattleMetrics.TicksPerSecond, effectBeat);
-                    // 与 live RunSecondBeat CaptureTickHash 同点位（秒拍后）——合成局自记 hash 行
-                    BattleRecorder.CaptureTickHash(tick, RTSFlowController.ComputeStateHash(sim));
+                    if (!Tick(live)) return $"FAIL：单机录制停在第 {tick} 拍";
+                    if (tick == 1 && !live.OnSubmitAction(BuyUnitInput(BattleDebugPlayerIds.P1, UnitName.FavoniusBanner)))
+                        return "FAIL：单机录制购买旗帜未受理";
                 }
             }
             finally
             {
                 if (logicRoot != null) UnityEngine.Object.DestroyImmediate(logicRoot);
+                BattleRecorder.EndSession();
+                BattleRecorder.Enabled = false;
             }
-            BattleRecorder.EndSession();
-            BattleRecorder.Enabled = false;
 
             if (path == null) return "FAIL：合成录制未产出文件（CaptureSetup 异常？）";
-            return "自测（2 秒合成局：双核心+秒拍发放段+hash 自证）→ " + Run(path);
+            return "自测（2 秒合成局：购买+秒拍发放+hash 自证）→ " + Run(path);
         }
 
         // ==================== sim 重建（Run 与 SelfTest 共用） ====================
@@ -646,9 +627,9 @@ namespace GIC.Editor
 
                 // 目标拍设为 2；即使以后修改输入延迟，本自检仍覆盖相同的封存边界。
                 int submitTick = 2 - BattleMetrics.InputDelayTicks;
-                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P2, seq: 0, submitTick: submitTick));
-                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 1, submitTick: submitTick));
-                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 0, submitTick: submitTick));
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P2, seq: 0, submitTick: submitTick), BattleDebugPlayerIds.P2);
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 1, submitTick: submitTick), BattleDebugPlayerIds.P1);
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 0, submitTick: submitTick), BattleDebugPlayerIds.P1);
                 bool noEarlyPublish = hostTransport.FindBatch(2) == null;
                 bool stepped = Tick(host);
                 var ordered = hostTransport.FindBatch(2);
@@ -662,7 +643,7 @@ namespace GIC.Editor
                     noEarlyPublish && stepped && host.CurrentTick == 1 && orderOk, "");
 
                 var late = InputOf(BattleDebugPlayerIds.P2, seq: 1, submitTick: submitTick);
-                host.ReceiveInputCommand(late); // 仍请求第 2 拍，但已封存，必须顺延到第 3 拍。
+                host.ReceiveInputCommand(late, BattleDebugPlayerIds.P2); // 第 2 拍已封存，顺延到第 3 拍。
                 stepped = Tick(host);
                 var rebased = hostTransport.FindBatch(3);
                 bool movedForward = rebased?.inputs?.Count == 1 && rebased.inputs[0].seq == late.seq;
@@ -772,6 +753,9 @@ namespace GIC.Editor
                 bool hostWinner = Tick(client) && client.CurrentTick == 2 && client.Phase == BattlePhase.Finished
                     && divergentTransport.LastBattleOver?.winnerTeam == (int)TeamType.A;
                 failures += Check(sb, "⑪本地提前判出不同胜方也不抢先结束对局", stillRunning && hostWinner, "");
+
+                failures += CheckPurchases(sb, header, root, host, client);
+                failures += CheckSeparation(sb, header, root, host, client);
             }
             finally
             {
@@ -780,19 +764,162 @@ namespace GIC.Editor
                 if (root != null) UnityEngine.Object.DestroyImmediate(root);
             }
 
-            sb.Append(failures == 0 ? "PASS：11/11" : $"FAIL：{failures} 项不通过");
-            sb.Append("\n注：⑥ 的重复批、⑦ 与 ⑪ 的本地/权威终局分歧会打印预期警告");
+            sb.Append(failures == 0 ? "\nPASS：17/17" : $"\nFAIL：{failures} 项不通过");
+            sb.Append("\n注：重复批、终局分歧、无卡部署和归属不符会打印预期警告");
             return sb.ToString();
         }
 
-        private static ActionData PassInput(string playerId, int submitTick)
+        private static int CheckPurchases(StringBuilder sb, ReplayHeaderLine header, GameObject root,
+            RTSFlowController host, RTSFlowController client)
+        {
+            var p1 = header.players[0];
+            var p2 = header.players[1];
+            var hostSim = BuildSimFromHeader(header, root);
+            var clientSim = BuildSimFromHeader(header, root);
+            var hostShop = SpawnFixture(hostSim, p2, UnitName.KnightsOfFavonius, new BattleCell(p2.spawnX, p2.spawnY));
+            var clientShop = SpawnFixture(clientSim, p2, UnitName.KnightsOfFavonius, new BattleCell(p2.spawnX, p2.spawnY));
+            var hostWire = new BatchRecordingTransport();
+            var clientWire = new BatchRecordingTransport();
+            var collection = new PlayerSaveData();
+            collection.progress.ownedUnits = new List<SaveCardData>
+            {
+                new SaveCardData { id = new CardId(UnitName.Amber), count = 1 },
+                new SaveCardData { id = new CardId(UnitName.Kaeya), count = 0 },
+            };
+            var owned = new HashSet<int>(collection.EnumerateOwnedUnitIds());
+            int failures = Check(sb, "⑫零数量收藏不授予购买许可", owned.SetEquals(new[] { (int)UnitName.Amber }), "");
+            host.Bind(hostSim, hostWire, isNetworked: true, ownsPurchaseUnit: (pid, unitId) =>
+                pid == p2.playerId && owned.Contains(unitId));
+            client.Bind(clientSim, clientWire, isHost: false, isNetworked: true);
+            host.StartBattle();
+            client.StartBattle();
+
+            bool SubmitRemote(UnitName unitName, string owner, string sender)
+                => client.OnSubmitAction(BuyUnitInput(owner, unitName))
+                   && host.ReceiveInputCommand(clientWire.LastInputCommand, sender);
+
+            bool wrongOwner = SubmitRemote(UnitName.FavoniusBanner, p1.playerId, p2.playerId);
+            bool locked = SubmitRemote(UnitName.Kaeya, p2.playerId, p2.playerId);
+            bool noSource = SubmitRemote(UnitName.Amber, p1.playerId, p1.playerId);
+            bool ownAmber = SubmitRemote(UnitName.Amber, p2.playerId, p2.playerId);
+            bool freeOfUnlock = host.OnSubmitAction(BuyUnitInput(p1.playerId, UnitName.FavoniusBanner));
+            failures += Check(sb, "⑬房主验证连接、售卖来源和角色收藏，建筑不受收藏限制",
+                !wrongOwner && !locked && !noSource && ownAmber && freeOfUnlock, "");
+
+            int buyTick = Math.Max(2, BattleMetrics.InputDelayTicks);
+            int initialMora = hostSim.GetMora(p1.playerId);
+            bool before = StepBothTo(host, hostWire, client, buyTick - 1)
+                && hostSim.GetMora(p1.playerId) == initialMora && clientSim.GetMora(p2.playerId) == initialMora
+                && CountHandUnit(hostSim, p1.playerId, UnitName.FavoniusBanner) == 0
+                && CountHandUnit(clientSim, p2.playerId, UnitName.Amber) == 0
+                && hostWire.Segments.Count == 0 && clientWire.Segments.Count == 0;
+            var unitConfig = Wargame.Instance.Context.Get<UnitConfig>();
+            int flagCost = new CardId(UnitName.FavoniusBanner).PurchaseCostOf(unitConfig, null);
+            int amberCost = new CardId(UnitName.Amber).PurchaseCostOf(unitConfig, null);
+            bool after = StepBothTo(host, hostWire, client, buyTick)
+                && hostWire.FindBatch(buyTick)?.inputs?.Count == 2
+                && flagCost > 0 && amberCost > 0
+                && hostSim.GetMora(p1.playerId) == initialMora - flagCost
+                && hostSim.GetMora(p2.playerId) == initialMora - amberCost
+                && CountHandUnit(hostSim, p1.playerId, UnitName.FavoniusBanner) == 1
+                && CountHandUnit(clientSim, p2.playerId, UnitName.Amber) == 1
+                && SameState(hostSim, clientSim)
+                && hostWire.Segments.Count == 2 && DiffSegments(hostWire.Segments, clientWire.Segments).StartsWith("PASS");
+            failures += Check(sb, "⑭购买不提前扣费；目标拍两端手牌、摩拉、hash 与命令一致", before && after, "");
+
+            bool accepted = host.OnSubmitAction(BuyUnitInput(p1.playerId, UnitName.FavoniusBanner))
+                && SubmitRemote(UnitName.Amber, p2.playerId, p2.playerId);
+            hostSim.RemoveUnit(hostShop);
+            clientSim.RemoveUnit(clientShop);
+            foreach (var sim in new[] { hostSim, clientSim })
+                sim.ApplyMoraDelta(p1.playerId, flagCost - 1 - sim.GetMora(p1.playerId));
+            int previousSegments = hostWire.Segments.Count;
+            bool executionRejected = StepBothTo(host, hostWire, client, buyTick * 2)
+                && hostSim.GetMora(p1.playerId) == flagCost - 1
+                && hostSim.GetMora(p2.playerId) == initialMora - amberCost
+                && CountHandUnit(hostSim, p1.playerId, UnitName.FavoniusBanner) == 1
+                && CountHandUnit(hostSim, p2.playerId, UnitName.Amber) == 1
+                && hostWire.Segments.Count == previousSegments && clientWire.Segments.Count == previousSegments
+                && SameState(hostSim, clientSim);
+            failures += Check(sb, "⑮已受理购买若结算拍缺摩拉或失去建筑，不改状态也不产命令",
+                accepted && executionRejected, "");
+
+            var local = BuildSimFromHeader(header, root);
+            var localWire = new BatchRecordingTransport();
+            host.Bind(local, localWire);
+            host.StartBattle();
+            bool instant = host.OnSubmitAction(BuyUnitInput(p1.playerId, UnitName.FavoniusBanner))
+                && host.CurrentTick == 0 && localWire.Batches.Count == 0 && localWire.Segments.Count == 1
+                && local.GetMora(p1.playerId) == initialMora - flagCost
+                && CountHandUnit(local, p1.playerId, UnitName.FavoniusBanner) == 1;
+            return failures + Check(sb, "⑯单机购买同步扣费并入手牌", instant, "");
+        }
+
+        private static int CheckSeparation(StringBuilder sb, ReplayHeaderLine header, GameObject root,
+            RTSFlowController host, RTSFlowController client)
+        {
+            var player = header.players[0];
+            var overlap = new BattleCell(player.spawnX + 1, player.spawnY);
+            var hostSim = BuildSimFromHeader(header, root);
+            var clientSim = BuildSimFromHeader(header, root);
+            var hostWire = new BatchRecordingTransport();
+            var clientWire = new BatchRecordingTransport();
+            var hostA = SpawnFixture(hostSim, player, UnitName.Amber, overlap);
+            var hostB = SpawnFixture(hostSim, player, UnitName.Kaeya, overlap);
+            var clientA = SpawnFixture(clientSim, player, UnitName.Amber, overlap);
+            var clientB = SpawnFixture(clientSim, player, UnitName.Kaeya, overlap);
+            host.Bind(hostSim, hostWire, isNetworked: true);
+            client.Bind(clientSim, clientWire, isHost: false, isNetworked: true);
+            host.StartBattle();
+            client.StartBattle();
+
+            int emitTick = UnitSeparationSystem.PushEmitIntervalTicks;
+            bool early = StepBothTo(host, hostWire, client, emitTick - 1)
+                && hostWire.Segments.Count == 0 && clientWire.Segments.Count == 0;
+            bool reached = StepBothTo(host, hostWire, client, emitTick);
+            var posA = hostSim.GetPosCm(hostA);
+            var posB = hostSim.GetPosCm(hostB);
+            bool pushed = hostWire.Segments.Count == 1 && hostWire.Segments[0].startTick == emitTick
+                && hostWire.Segments[0].commands.Count == 2
+                && hostWire.Segments[0].commands.All(c => c.type == BattleCommandType.Move && c.metadata == BattleCommand.MovePushed);
+            return Check(sb, "⑰重叠单位在双端分离，位置、hash 与 5Hz MovePushed 一致",
+                early && reached && posA != posB && posA == clientSim.GetPosCm(clientA) && posB == clientSim.GetPosCm(clientB)
+                && SameState(hostSim, clientSim) && pushed && DiffSegments(hostWire.Segments, clientWire.Segments).StartsWith("PASS"), "");
+        }
+
+        private static Unit SpawnFixture(BattleSimState sim, ReplayPlayerLine player, UnitName name, BattleCell cell)
+        {
+            var unit = UnitFactory.CreateUnitWithData(Wargame.Instance.Context.Get<UnitConfig>().GetUnitData(name));
+            if (unit == null) throw new InvalidOperationException($"帧同步自检单位创建失败：{name}");
+            unit.transform.SetParent(sim.LogicRoot, false);
+            sim.RegisterUnit(unit, player.playerId, (TeamType)player.team, cell);
+            return unit;
+        }
+
+        private static bool StepBothTo(RTSFlowController host, BatchRecordingTransport hostWire,
+            RTSFlowController client, int tick)
+        {
+            while (host.CurrentTick < tick)
+            {
+                client.ReceiveInputBatch(hostWire.FindBatch(host.CurrentTick + 1));
+                if (!Tick(host) || !Tick(client) || client.CurrentTick != host.CurrentTick) return false;
+            }
+            return host.CurrentTick == tick && client.CurrentTick == tick;
+        }
+
+        private static int CountHandUnit(BattleSimState sim, string playerId, UnitName name)
+            => sim.GetHand(playerId).Where(c => c.IsUnit && c.value == (int)name).Sum(c => c.count);
+
+        private static bool SameState(BattleSimState a, BattleSimState b)
+            => RTSFlowController.ComputeStateHash(a) == RTSFlowController.ComputeStateHash(b);
+
+        private static ActionData BuyUnitInput(string playerId, UnitName unitName)
             => new ActionData
             {
-                actionType = ActionType.Pass,
                 playerId = playerId,
-                unitId = string.Empty,
-                submitTick = submitTick,
-                turnNumber = -1,
+                actionType = ActionType.BuyCard,
+                buyCardType = (int)CardType.Unit,
+                buyCardValue = (int)unitName,
             };
 
         private static InputCommandMessage InputOf(string playerId, int seq, int submitTick)
@@ -801,7 +928,12 @@ namespace GIC.Editor
                 playerId = playerId,
                 seq = seq,
                 submitTick = submitTick,
-                action = PassInput(playerId, submitTick),
+                // 合法的玩家级请求，但自检手牌无此卡，执行时不改变状态。
+                action = new ActionData
+                {
+                    playerId = playerId, actionType = ActionType.DeployUnit, deployUnitName = (int)UnitName.Amber,
+                    submitTick = submitTick, turnNumber = -1,
+                },
             };
 
         private static bool Tick(RTSFlowController flow)
@@ -816,12 +948,14 @@ namespace GIC.Editor
             return ok ? 0 : 1;
         }
 
-        /// <summary>自检用传输：输入批实际经协议序列化；另收终局消息用于断言。</summary>
+        /// <summary>自检用传输：输入批与请求经协议序列化，收集终局、hash 和本地表现命令。</summary>
         private class BatchRecordingTransport : IBattleTransport
         {
             public readonly List<InputBatchMessage> Batches = new List<InputBatchMessage>();
+            public readonly List<Segment> Segments = new List<Segment>();
             public BattleOverMessage LastBattleOver { get; private set; }
             public HashReportMessage LastHashReport { get; private set; }
+            public InputCommandMessage LastInputCommand { get; private set; }
 
             public void HostSend(BattleMessageType type, object message)
             {
@@ -834,12 +968,21 @@ namespace GIC.Editor
                 {
                     LastBattleOver = over;
                 }
+                else if (type == BattleMessageType.Segment && message is SegmentMessage segment)
+                {
+                    Segments.Add(segment.segment);
+                }
             }
 
             public void ClientSend(BattleMessageType type, object message)
             {
                 if (type == BattleMessageType.HashReport && message is HashReportMessage report)
                     LastHashReport = report;
+                else if (type == BattleMessageType.InputCommand && message is InputCommandMessage input)
+                {
+                    var serializer = BattleJsonSerializer.Instance;
+                    LastInputCommand = serializer.Deserialize<InputCommandMessage>(serializer.Serialize(input));
+                }
             }
             public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) { }
             public void RegisterClientHandler(Action<BattleMessageType, string> handler) { }

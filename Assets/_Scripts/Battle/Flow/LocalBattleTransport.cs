@@ -18,8 +18,7 @@ namespace GIC.Battle
         /// <summary>客户端 → Host</summary>
         void ClientSend(BattleMessageType type, object message);
 
-        /// <summary>注册 Host 侧收包回调（客户端上行消息；senderId="local"=同进程/Mirror connectionId，
-        /// B7 LAN SegmentAck 按连接计数门控用）</summary>
+        /// <summary>注册 Host 侧收包回调；senderId 来自传输（同进程为 "local"，远端为连接 ID）。</summary>
         void RegisterHostHandler(Action<BattleMessageType, string, string> handler);
 
         /// <summary>注册客户端收包回调（Host 下行消息）</summary>
@@ -76,22 +75,21 @@ namespace GIC.Battle
     /// </summary>
     public class BattleMessageRouter
     {
-        private readonly Dictionary<BattleMessageType, Action<string>> _handlers = new Dictionary<BattleMessageType, Action<string>>();
+        private readonly Dictionary<BattleMessageType, Action<string, string>> _handlers
+            = new Dictionary<BattleMessageType, Action<string, string>>();
 
         public void Register<T>(BattleMessageType type, Action<T> handler) where T : class
+            => Register<T>(type, (message, _) => handler(message));
+
+        public void Register<T>(BattleMessageType type, Action<T, string> handler) where T : class
         {
-            _handlers[type] = json => handler(BattleJsonSerializer.Instance.Deserialize<T>(json));
+            _handlers[type] = (json, senderId) => handler(BattleJsonSerializer.Instance.Deserialize<T>(json), senderId);
         }
 
-        public void RegisterRaw(BattleMessageType type, Action<string> handler)
-        {
-            _handlers[type] = handler;
-        }
-
-        public void Handle(BattleMessageType type, string json)
+        public void Handle(BattleMessageType type, string json, string senderId = null)
         {
             if (_handlers.TryGetValue(type, out var handler))
-                handler(json);
+                handler(json, senderId);
             else
                 GICLog.Warn($"[BattleMessageRouter] 未注册的消息类型: {type}");
         }

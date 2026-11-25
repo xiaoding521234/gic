@@ -11,10 +11,10 @@ namespace GIC.Data
     {
         BattleStart = 0,        // Host→Client：对局开始（地形全量 + 初始快照）
         Snapshot = 1,          // Host→Client：选择阶段头全量
-        SubmitAction = 2,      // Client→Host：行动选择上交
+        // 2 已退役：统一使用 InputCommand，不复用编号。
         Segment = 3,           // Host→Client：片命令块推流
         // 4 已退役（P6 残留审计 D2，docs/active/49：SegmentAck 随回合机 ack 门控删除，编号不复用）
-        SubmitInstantAction = 5, // Client→Host：即时行动（片边界 poll）
+        // 5 已退役：即时行动不再绕过帧同步，不复用编号。
         // 6 已退役（2026-11-09 残留清理批：TurnEnd 随回合机退役删除，编号不复用）
         Pause = 7,             // Host↔Client：硬停交互点（B1 占位）
         Resume = 8,            // Host↔Client：硬停恢复（B1 占位）
@@ -111,12 +111,6 @@ namespace GIC.Data
     }
 
     [Serializable]
-    public class SubmitActionRequest
-    {
-        public ActionData action;
-    }
-
-    [Serializable]
     public class SegmentMessage
     {
         public Segment segment;
@@ -124,12 +118,6 @@ namespace GIC.Data
 
     // P6 残留审计 D2：SegmentAck 消息类随 ack 门控退役删除（即时制命令流带 startTick，
 // 客户端按绝对时刻播，无需回执；LAN 后置重做时按新协议另立）。
-
-    [Serializable]
-    public class SubmitInstantAction
-    {
-        public ActionData action;
-    }
 
     // （TurnEndMessage 已随回合机退役删除——2026-11-09 残留清理批：秒拍段即回合结束段，
     // 无独立消息；重新立项按即时制命令流另立）

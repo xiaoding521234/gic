@@ -250,13 +250,12 @@ namespace GIC.Data
 
     /// <summary>
     /// 客户端卡组上报（客户端 -> 服务器，OnlyHost）：收到 StartBattleEvent 后各真人客户端
-    /// 回报自己存档当前卡组（host 用它在局内为该玩家构建手牌；AI 玩家用 host 当前卡组）。
-    /// 复用 HandCard 协议结构（cardType/value/count 三元组，JsonUtility 直过——与快照手牌同构）。
+    /// 回报初始卡组和已持有单位 ID。后者仅供房主接纳购买，不是账号认证结果。
     /// </summary>
     public class ClientDeckEvent : BaseEvent
     {
-        public string PlayerID;
         public List<HandCard> Entries = new List<HandCard>();
+        public List<int> OwnedUnitIds = new List<int>();
 
         public ClientDeckEvent()
         {

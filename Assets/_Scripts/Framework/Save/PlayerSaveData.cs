@@ -66,6 +66,15 @@ namespace GIC.Framework
             RebuildOwnedCards();
         }
 
+        /// <summary>收藏中实际持有的单位 ID；不含卡表补齐时创建的零数量占位。</summary>
+        public IEnumerable<int> EnumerateOwnedUnitIds()
+        {
+            if (progress?.ownedUnits == null) yield break;
+            foreach (var card in progress.ownedUnits)
+                if (card != null && card.id.cardType == CardType.Unit && card.count > 0)
+                    yield return card.id.value;
+        }
+
         // ========== 物品数量查询/变更（货币等，统一入口） ==========
 
         /// <summary>查询物品持有数量（不在存档中返回 0）</summary>

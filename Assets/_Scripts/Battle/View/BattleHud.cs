@@ -499,8 +499,7 @@ namespace GIC.Battle
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
             _session.Player.OnItemConsumed += OnItemConsumedHandler;  // C-1：技能吃物品（酒/苹果）手牌角标即时刷新
             _session.Player.OnItemGained += OnItemGainedHandler;      // 装备批：命座授予物品（兔兔伯爵）手牌即时并入
-            _session.Player.OnItemGained += OnShopPurchaseRefreshHandler; // 购买批：物品卡购买后面板灰显/摩拉态刷新
-            _session.Player.OnUnitCardGained += OnShopPurchaseRefreshHandler; // 购买批：角色/建筑卡购买后面板刷新
+            _session.Player.OnUnitCardGained += OnUnitCardGainedHandler;
             _session.Player.BattleOver += OnBattleOverHandler;         // S10 全灭软停：胜负 Tip
             _session.Player.SkillCasted += OnSkillCastedHandler;        // P4-D：新施放=CD 转圈即时起点
             // 单位显示色解析器注入（2026-10-12 拍板「单位显示的颜色应当是玩家色」）：立牌底座/选中描边/
@@ -599,8 +598,7 @@ namespace GIC.Battle
                     _session.Player.OnResourceDelta -= OnResourceDeltaHandler;
                     _session.Player.OnItemConsumed -= OnItemConsumedHandler;
                     _session.Player.OnItemGained -= OnItemGainedHandler;
-                    _session.Player.OnItemGained -= OnShopPurchaseRefreshHandler;
-                    _session.Player.OnUnitCardGained -= OnShopPurchaseRefreshHandler;
+                    _session.Player.OnUnitCardGained -= OnUnitCardGainedHandler;
                     _session.Player.BattleOver -= OnBattleOverHandler;
                     _session.Player.SkillCasted -= OnSkillCastedHandler;       // P4-D CD 转圈
                 }
@@ -3014,7 +3012,7 @@ namespace GIC.Battle
         /// 不被提交终结；松手 OnSkillButtonDragEnd 才收会话）。targetX/Z 双零+aim 双零=停止信号
         /// （Host 移除在途 mover+位置校正命令落位——moveContinuous 标记承载语义，P4-E 校正同协议形态）。
         /// turnNumber/submitTick 由 BattleSession.SubmitAction 盖章；归属/眷属/建筑防线 Host 权威校验
-        ///（回放 v2：随 SubmitAndResolve 钩入 submit 行，重演走同分支）</summary>
+        ///（单机回放 v2：随 Flow 上交写入 submit 行）</summary>
         private void SubmitJoystickMove(int targetX, int targetZ, int aimX, int aimZ)
         {
             if (_session == null || string.IsNullOrEmpty(_selectedUnitId)) return;

@@ -12,15 +12,14 @@ namespace GIC.Battle
     ///
     /// - 每 tick 在移动推进 + 移动收尾之后跑：穿透 &gt; ContactToleranceCm 的两圆沿圆心连线各退；
     /// - **动静一律参与**（2026-11-08 追拍「两个都在走也不许互相穿过」）：移动中的单位同样按质量被推开，
-    ///   位移经 MovePushed 下发，客户端**续跑原目标**（PlayMoveResumeCoroutine）而非另起补间；
+    ///   位移经 MovePushed 送表现，移动中的单位**续跑原目标**（PlayMoveResumeCoroutine）；
     /// - 推进层配合规则=「推不动的敌人才当墙」（RTSMovementSystem.IsHardBlockerForMover：
     ///   敌方重量 ≥ 自身才挡）——重者走过来把轻者挤开，轻者撞重者停于接触前；
     /// - 建筑/核心=硬墙（推进层已挡）、尸体=静态硬挡圆、灵魂=独立注册表——三者都不进分离域；
     /// - 挤开不许把单位挤进尸体/建筑或不可走地形（落点守卫）；
-    /// - 全整数 + SortedUnits 稳定序 + 固定迭代次数（确定性纪律：同 seed 同命令=同结果）。
+    /// - 分离步进用整数 + SortedUnits 稳定序 + 固定迭代次数（确定性纪律：同 seed 同输入=同结果）。
     ///
-    /// 观感链路：Host 权威位移按 5Hz 批量成段下发绝对位（BattleCommand.MovePushed），
-    /// 客户端短补间滑过去——不逐 tick 发命令、不与 1Hz 快照自愈打架。
+    /// 各端模拟按 5Hz 批量生成绝对位校正（BattleCommand.MovePushed），表现层短补间滑过去。
     /// </summary>
     public static class UnitSeparationSystem
     {
@@ -43,7 +42,7 @@ namespace GIC.Battle
         /// <summary>推挤校正下发间隔（tick；4=5Hz）——客户端用短补间吃掉，不逐 tick 发命令</summary>
         public const int PushEmitIntervalTicks = 4;
 
-        /// <summary>推进一 tick 的分离（RTSFlowController / ReplayRunner 每 tick 同一位置调用）</summary>
+        /// <summary>推进一 tick 的分离（BattleResolver 在两端及回放共用）。</summary>
         public static void ResolveTick(BattleSimState sim)
         {
             if (sim == null) return;
@@ -130,7 +129,7 @@ namespace GIC.Battle
                 if (!any) break; // 全分离=本 tick 收敛
             }
 
-            // 待下发绝对位（5Hz 批量；下发侧跳过移动中单位并清表）
+            // 待发绝对位，含移动中单位；表现层收到后接续原目标。
             foreach (var kv in displaced)
             {
                 if (kv.Value <= 0) continue;

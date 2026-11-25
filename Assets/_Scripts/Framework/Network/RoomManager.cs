@@ -227,9 +227,8 @@ namespace GIC.Framework
 
         // ==================== 客户端卡组上报存储（B7 LAN 批） ====================
 
-        // 各真人玩家上报的卡组（ClientDeckEvent 收存；BattleScreen 为远端玩家构建手牌时消费）
-        private readonly Dictionary<string, List<HandCard>> _uploadedDecks
-            = new Dictionary<string, List<HandCard>>();
+        private readonly Dictionary<string, ClientDeckEvent> _uploadedDecks
+            = new Dictionary<string, ClientDeckEvent>();
 
         // 战斗就绪握手（ClientBattleReadyEvent 收存；host 开局广播前等齐判据）
         private readonly HashSet<string> _battleReadyPlayers = new HashSet<string>();
@@ -239,7 +238,11 @@ namespace GIC.Framework
 
         /// <summary>取玩家上报卡组（无上报返回 null——调用方回落 host 卡组）</summary>
         public List<HandCard> GetUploadedDeck(string playerID)
-            => _uploadedDecks.TryGetValue(playerID, out var deck) ? deck : null;
+            => _uploadedDecks.TryGetValue(playerID, out var upload) ? upload.Entries : null;
+
+        /// <summary>取玩家声明的收藏；缺失时不回落到房主收藏。</summary>
+        public IReadOnlyList<int> GetUploadedOwnedUnitIds(string playerID)
+            => _uploadedDecks.TryGetValue(playerID, out var upload) ? upload.OwnedUnitIds : null;
 
         /// <summary>玩家是否已发战斗就绪握手（host 开局等待判据）</summary>
         public bool IsBattleReady(string playerID) => _battleReadyPlayers.Contains(playerID);
@@ -475,13 +478,12 @@ namespace GIC.Framework
         {
             private readonly RoomManager _room;
             public ClientDeckHandler(RoomManager m) => _room = m;
-            public bool CanHandle(ClientDeckEvent e) => NetworkServer.active;
+            public bool CanHandle(ClientDeckEvent e) => NetworkServer.active && e.Source == EventSource.Network;
             public void Handle(ClientDeckEvent e)
             {
                 string pid = e.SourcePlayerID;
-                if (string.IsNullOrEmpty(pid) || pid == PlayerID.Unknown) pid = _room.playerManager.SelfPlayerID;
-                if (string.IsNullOrEmpty(pid)) return;
-                _room._uploadedDecks[pid] = e.Entries ?? new List<HandCard>();
+                if (string.IsNullOrEmpty(pid) || !_room.IsRemoteHuman(pid)) return;
+                _room._uploadedDecks[pid] = e;
                 GICLog.Info($"[RoomManager] 收到玩家 {pid} 卡组上报: {e.Entries?.Count ?? 0} 条");
             }
         }

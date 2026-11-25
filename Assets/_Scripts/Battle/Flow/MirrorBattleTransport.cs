@@ -25,7 +25,7 @@ namespace GIC.Battle
     /// IBattleTransport 的 Mirror 实现：
     /// - HostSend（Host→全部客户端）：逐远端连接 Send + host 本机视图直投（host 也是观众/玩家）；
     /// - ClientSend（客户端→Host）：host 本机=直调（无网络往返）；远端客户端=NetworkClient.Send；
-    /// - RegisterHostHandler 携带发送方标识（SegmentAck 按连接计数用，B7 LAN 多客户端门控）。
+    /// - RegisterHostHandler 携带连接标识，供房主校验远端行动的归属。
     /// Mirror 处理器注册为静态路由（一进程一局）：消息早到（会话未建）先入待发队列，
     /// 客户端路由注册时冲队（握手门控之外的双保险，保序）。
     /// </summary>
@@ -53,7 +53,7 @@ namespace GIC.Battle
 
         private void RegisterMirrorHandlers()
         {
-            // 服务器侧：收客户端上行（行动上交/ack/即时行动）
+            // 服务器侧：收客户端输入和 hash 上报。
             NetworkServer.ReplaceHandler<BattleNetMessage>(OnServerMessage, false);
             // 客户端侧：收 Host 下行（开局/快照/片命令块/秒拍结束段）
             NetworkClient.ReplaceHandler<BattleNetMessage>(OnClientMessage, false);

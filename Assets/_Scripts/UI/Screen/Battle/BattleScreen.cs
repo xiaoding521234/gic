@@ -236,8 +236,13 @@ namespace GIC.UI
             // 初始态终点快照式录制（卡组构建上游不录，卡组/存档变化不影响回放）
             Dictionary<string, List<HandCard>> replayHands = BattleRecorder.Enabled
                 ? new Dictionary<string, List<HandCard>>() : null;
+            var localOwnedUnitIds = _saveManager?.CurrentSave?.EnumerateOwnedUnitIds().ToList();
             foreach (var setup in playerSetups)
             {
+                bool remoteHuman = _session.IsNetworked && !setup.IsAI && setup.PlayerId != PlayerID.Host;
+                _session.SetPurchaseUnlocks(setup.PlayerId, remoteHuman
+                    ? _roomManager?.GetUploadedOwnedUnitIds(setup.PlayerId)
+                    : localOwnedUnitIds);
                 _session.Sim.RegisterHand(setup.PlayerId, new List<HandCard>());
                 var recordHand = new List<HandCard>();
                 foreach (var handCard in BuildHandForPlayer(setup))
@@ -261,7 +266,8 @@ namespace GIC.UI
             if (launchConfig == null || !launchConfig.IsSandbox)
                 BattleRecorder.CaptureSetup(battleSeed,
                     launchConfig != null ? launchConfig.MapConfigName : BattleLaunchConfig.DefaultMapName,
-                    (int)(launchConfig?.FogMode ?? BattleFogMode.None), playerSetups, spawnCells, replayHands);
+                    (int)(launchConfig?.FogMode ?? BattleFogMode.None), playerSetups, spawnCells, replayHands,
+                    isNetworked: _session.IsNetworked);
 
             // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/32 §6；
             // 眷属/伙伴自主脑在 Host 秒拍流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。

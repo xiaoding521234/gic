@@ -14,9 +14,8 @@ namespace GIC.Battle
     /// 我方存活建筑（含协议核心）=选中+购买面板弹出（敌方建筑/执行阶段点击=纯查看不弹）。
     /// 面板=可购买卡横排（Card.prefab 唯一形态复用+购买价角标覆写〔部署费角标字段填 PurchaseCostOf〕
     /// +未解锁/摩拉不足灰显）+**拖卡入手牌区（下方）=购买**（拍板原文「拖入下方」——客户端预检
-    /// 解锁/摩拉→SubmitInstantAction BuyCard 即时通道→Host 结算→CardGain/ItemGain 广播→手牌镜像
-    /// 即时新增；HoverTiltEffect 让位协议=拖起 Suspend/弹回 Resume）；点击卡=无动作（卡详情入口
-    /// 后续批次挂账）。收口=点外/换选/进瞄准（ExitAiming 同路）/阶段流转（OnPhaseChanged）/
+    /// 解锁/摩拉→SubmitAction；单机同步结算，联机到权威拍后经本地 CardGain/ItemGain 更新手牌）。
+    /// 点击卡=无动作。收口=点外/换选/进瞄准（ExitAiming 同路）/阶段流转（OnPhaseChanged）/
     /// 拖起手牌（EnterDeployAim 等 ClosePopup 同族）——全部经 CloseBuildingShop 单出口；
     /// 面板开态计入 BrowseUiOpen 聚合=单人局选择倒计时自动暂停（N0 同口径）。
     /// 卡行无滚动（当前建筑列表 ≤3 项；未来建筑增多时挂账扩展 ScrollRect）。
@@ -25,9 +24,8 @@ namespace GIC.Battle
     {
         private GameObject _shopRoot;
         private RectTransform _shopRow;
-        private readonly List<(GameObject wrapper, Card card, CardId cardId, Image gray)> _shopCards
-            = new List<(GameObject, Card, CardId, Image)>();
-        private CardId _shopDragCard;     // 拖拽购买会话（拖起卡；None=无会话）
+        private readonly List<(GameObject wrapper, ShopCardDragHandler drag, Image gray, int cost, bool locked)> _shopCards
+            = new List<(GameObject, ShopCardDragHandler, Image, int, bool)>();
         private RectTransform _shopDragGhost; // 拖拽中的 wrapper 本体（跟随指针）
 
         [Header("建筑购买面板（结构=BuildingShopPanel.prefab；可调参数此处单源）")]
@@ -65,33 +63,16 @@ namespace GIC.Battle
         private void OpenBuildingShop(UnitConfig.UnitData buildingData)
         {
             if (_shopRoot == null) BuildBuildingShop();
+            if (_shopRoot == null || _shopRow == null) return;
             _shopRoot.SetActive(true);
             RebuildShopCards(buildingData);
             ApplyStateVisibility(); // 面板开态重估（手牌显示）
         }
 
-        /// <summary>购买成功事件桥（OnItemGained/OnUnitCardGained 订阅——签名兼容四参/三参两个事件）；
-        /// 购买单位卡=手牌全量重建（OnItemGainedHandler.RebuildHandCards 同款口径——单位卡无实例
-        /// 条目语义，签名变化直接重建；2026-10-22 报障②返修：首版漏接手牌重建=卡进了镜像不出 UI）+
-        /// 面板灰显/摩拉态刷新</summary>
-        private void OnShopPurchaseRefreshHandler(string playerId, int a, int b, int c)
+        /// <summary>单位卡入手后按已更新的手牌镜像重建；物品卡统一走 OnItemGainedHandler。</summary>
+        private void OnUnitCardGainedHandler(string playerId, int unitName, int amount)
         {
             if (playerId != _myPlayerId) return;
-            RebuildHandCardsForPurchase();
-            RefreshShopAfterPurchase();
-        }
-
-        private void OnShopPurchaseRefreshHandler(string playerId, int a, int b)
-        {
-            if (playerId != _myPlayerId) return;
-            RebuildHandCardsForPurchase();
-            RefreshShopAfterPurchase();
-        }
-
-        /// <summary>购买后手牌重建（读本地快照——ApplyCardGainToLocalHand 已并入条目；
-        /// OnItemGainedHandler 全量重建同款）</summary>
-        private void RebuildHandCardsForPurchase()
-        {
             var snapshot = _session?.Player?.LatestSnapshot;
             if (snapshot == null) return;
             PlayerResourceState myRes = null;
@@ -138,7 +119,7 @@ namespace GIC.Battle
                 GICLog.Warn("[BuildingShop] prefab 缺 ShopRow 槽——卡行不可用");
         }
 
-        /// <summary>重建卡行（开面板/购买成功后刷新共用）</summary>
+        /// <summary>开面板时构建卡行；摩拉变化只更新购买状态。</summary>
         private void RebuildShopCards(UnitConfig.UnitData buildingData)
         {
             foreach (var entry in _shopCards)
@@ -150,17 +131,14 @@ namespace GIC.Battle
             if (_handCardPrefab == null) { GICLog.Warn("[BuildingShop] Card.prefab 未找到"); return; }
 
             var itemConfig = CardConfigResolver.Instance?.ItemConfig;
-            var snapshot = _session?.Player?.LatestSnapshot;
-            int myMora = GetMyMora(snapshot);
             int count = buildingData.可购买卡片.Count;
             const float cardW = 150f, cardH = 225f, gap = 24f;
             float totalW = count * cardW + (count - 1) * gap;
             for (int i = 0; i < count; i++)
             {
                 var cardId = buildingData.可购买卡片[i];
-                int cost = cardId.PurchaseCostOf(_unitConfig, itemConfig);
+                if (!cardId.TryGetPurchaseCost(_unitConfig, itemConfig, out int cost)) continue;
                 bool locked = IsShopCardLocked(cardId);
-                bool noMora = myMora < cost;
 
                 var wrapperGo = new GameObject($"Shop_{cardId}");
                 wrapperGo.transform.SetParent(_shopRow, false);
@@ -204,90 +182,65 @@ namespace GIC.Battle
                 grayRt.offsetMax = Vector2.zero;
                 var gray = grayGo.AddComponent<UnityEngine.UI.Image>();
                 gray.color = 购买灰显遮罩色; // T9：原字面量迁 Inspector（2026-10-26）
-                gray.raycastTarget = locked || noMora; // 可买态不拦射线（拖拽走 wrapper）
 
                 var dragHandler = wrapperGo.AddComponent<ShopCardDragHandler>();
-                dragHandler.Setup(this, cardId, locked || noMora, locked, noMora);
+                dragHandler.Setup(this, cardId);
 
-                _shopCards.Add((wrapperGo, card, cardId, gray));
+                _shopCards.Add((wrapperGo, dragHandler, gray, cost, locked));
             }
+            RefreshShopAffordability();
         }
 
-        /// <summary>客户端解锁预检（购买面板灰显口径；Host BuyCardExecutor 权威兜底同源）</summary>
+        /// <summary>客户端使用自己的收藏预检；房主使用开局为该座位收集的许可。</summary>
         private bool IsShopCardLocked(CardId cardId)
         {
-            if (cardId.cardType != CardType.Unit) return false;
-            var saveManager = Wargame.Instance?.Context?.Get<SaveManager>();
-            var ownedUnits = saveManager?.CurrentSave?.progress?.ownedUnits;
-            if (ownedUnits == null) return false;
-            foreach (var owned in ownedUnits)
-            {
-                if (owned == null || owned.id.cardType != CardType.Unit) continue;
-                if (owned.id.value == cardId.value) return false;
-            }
+            if (!cardId.RequiresPurchaseUnlock(_unitConfig)) return false;
+            var save = _saveManager?.CurrentSave;
+            if (save != null)
+                foreach (int ownedId in save.EnumerateOwnedUnitIds())
+                    if (ownedId == cardId.value) return false;
             return true;
         }
 
-        private int GetMyMora(BattleSnapshot snapshot)
+        private void RefreshShopAffordability()
         {
-            if (snapshot == null) return 0;
-            foreach (var r in snapshot.resources)
-                if (r.playerId == _myPlayerId) return r.mora;
-            return 0;
+            if (!BuildingShopOpen) return;
+            foreach (var entry in _shopCards)
+            {
+                bool noMora = _myMora < entry.cost;
+                entry.gray.enabled = entry.locked || noMora;
+                entry.gray.raycastTarget = entry.gray.enabled;
+                entry.drag.SetAvailability(entry.locked, noMora);
+            }
         }
 
         /// <summary>购买上交（ShopCardDragHandler 拖入手牌区松手调用——客户端预检+toast）</summary>
         private void SubmitShopPurchase(CardId cardId)
         {
             if (_session == null) return;
-            var snapshot = _session.Player?.LatestSnapshot;
             var itemConfig = CardConfigResolver.Instance?.ItemConfig;
-            int cost = cardId.PurchaseCostOf(_unitConfig, itemConfig);
+            if (!cardId.TryGetPurchaseCost(_unitConfig, itemConfig, out int cost)) return;
             if (IsShopCardLocked(cardId))
             {
                 GICLog.Info($"[BuildingShop] 购买拦截（未解锁）：{cardId}");
                 ShowBattleToast("Battle_PurchaseLocked");
                 return;
             }
-            var myMora = GetMyMora(snapshot);
-            if (myMora < cost)
+            if (_myMora < cost)
             {
-                GICLog.Info($"[BuildingShop] 购买拦截（摩拉 {myMora}/{cost}）：{cardId}");
+                GICLog.Info($"[BuildingShop] 购买拦截（摩拉 {_myMora}/{cost}）：{cardId}");
                 ShowBattleToast("Battle_PurchaseNoMora");
                 return;
             }
             GICLog.Info($"[BuildingShop] 购买上交：{cardId}（{cost} 摩拉）");
-            _session.SubmitInstantAction(new ActionData
+            _session.SubmitAction(new ActionData
             {
                 playerId = _myPlayerId,
                 actionType = ActionType.BuyCard,
                 buyCardType = (int)cardId.cardType,
                 buyCardValue = cardId.value,
             });
-            // 购买结果经 CardGain/ItemGain 命令回来（OnItemGained/OnUnitCardGained → 面板灰显/摩拉态刷新）
-        }
-
-        /// <summary>购买成功后刷新面板灰显/摩拉（事件订阅处调；面板未开静默）</summary>
-        private void RefreshShopAfterPurchase()
-        {
-            if (!BuildingShopOpen) return;
-            var snapshot = _session?.Player?.LatestSnapshot;
-            if (snapshot == null) return;
-            // 刷新当前面板：重评灰显（摩拉扣减/已购新卡不影响解锁态；重建=最简刷新口径）
-            var unitData = GetCurrentShopBuilding(snapshot);
-            if (unitData != null) RebuildShopCards(unitData);
-        }
-
-        private UnitConfig.UnitData GetCurrentShopBuilding(BattleSnapshot snapshot)
-        {
-            if (_selectedUnitId == null) return null;
-            foreach (var u in snapshot.units)
-            {
-                if (u.unitId != _selectedUnitId) continue;
-                var data = _unitConfig != null ? _unitConfig.GetUnitData(ResolveUnitName(u.unitName)) : null;
-                return data;
-            }
-            return null;
+            // 不做预测：手牌和摩拉由本地模拟产出的购买段更新。
         }
 
         // ==================== 拖拽（拖入手牌区=购买）====================
@@ -299,7 +252,6 @@ namespace GIC.Battle
                 var handler = _shopDragGhost.GetComponent<ShopCardDragHandler>();
                 if (handler != null) handler.ResetPosition();
             }
-            _shopDragCard = default;
             _shopDragGhost = null;
         }
 
@@ -308,22 +260,24 @@ namespace GIC.Battle
         {
             private BattleHud _hud;
             private CardId _cardId;
-            private bool _blocked; // 灰显（未解锁/摩拉不足）——拖起即拦+toast
             private bool _locked;
             private bool _noMora;
             private Vector2 _homePos;
             private RectTransform _rt;
             private bool _dragging;
 
-            public void Setup(BattleHud hud, CardId cardId, bool blocked, bool locked, bool noMora)
+            public void Setup(BattleHud hud, CardId cardId)
             {
                 _hud = hud;
                 _cardId = cardId;
-                _blocked = blocked;
-                _locked = locked;
-                _noMora = noMora;
                 _rt = (RectTransform)transform;
                 _homePos = _rt.anchoredPosition;
+            }
+
+            public void SetAvailability(bool locked, bool noMora)
+            {
+                _locked = locked;
+                _noMora = noMora;
             }
 
             public void ResetPosition()
@@ -334,13 +288,12 @@ namespace GIC.Battle
 
             public void OnBeginDrag(PointerEventData eventData)
             {
-                if (_blocked)
+                if (_locked || _noMora)
                 {
                     BattleHud.ShowBattleToast(_locked ? "Battle_PurchaseLocked" : "Battle_PurchaseNoMora");
                     return;
                 }
                 _dragging = true;
-                _hud._shopDragCard = _cardId;
                 _hud._shopDragGhost = _rt;
             }
 
@@ -354,7 +307,6 @@ namespace GIC.Battle
             {
                 if (!_dragging) return;
                 _dragging = false;
-                _hud._shopDragCard = default;
                 _hud._shopDragGhost = null;
                 // 手牌热区内松手=购买（IsPointerNearHand 手牌拖拽同源热区）；否则弹回原位
                 bool inHandZone = _hud.IsPointerNearHand(_hud.CanvasRect);

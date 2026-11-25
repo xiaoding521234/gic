@@ -44,13 +44,18 @@ namespace GIC.Battle
 
         /// <summary>
         /// 玩家/配额脑单行动即时结算（RTSFlowController.OnSubmitAction 校验通过后调）：
-        /// DeployUnit→部署段；UseItem/EquipItem→物品段；Move/Skill/Pass→单行动片。
+        /// BuyCard→购买段；DeployUnit→部署段；UseItem/EquipItem→物品段；Move/Skill/Pass→单行动片。
         /// 每段独立即时推送（即时制无攻速排序——行动上交即结算，蓝图 §2.4）。
         /// 胜负检查归调用方（RTSFlow 每段后自检）。
         /// </summary>
         public void ResolveSubmittedAction(ActionData action)
         {
             if (action == null) return;
+            if (action.actionType == ActionType.BuyCard)
+            {
+                if (BuyCardExecutor.TryResolve(_sim, action, out var purchase)) PushSegment(purchase);
+                return;
+            }
             int slice = _sliceCounter++;
             Segment segment;
             switch (action.actionType)
@@ -423,11 +428,15 @@ namespace GIC.Battle
             }
         }
 
-        /// <summary>弹性分离位移下发（2026-11-08 拍板「友军碰撞有弹性、建筑硬」）：Host 权威推挤按
-        /// 5Hz 批量成段——命令=Move + MovePushed 标记 + hitX/hitY 新绝对位 cm。移动中的单位跳过
-        /// （Move 补间权威，避免双写）；与 ResolveMoveArrivals 的被挡校正段同构：段首直产命令 +
-        /// EmitSliceCommands 领 sliceIndex（零效应载荷=纯表现段）。</summary>
-        public void EmitSeparationCorrections()
+        /// <summary>每端及回放共用：逐拍分离，按 5Hz 提交表现校正。</summary>
+        public void ResolveSeparationTick()
+        {
+            UnitSeparationSystem.ResolveTick(_sim);
+            if (_sim.CurrentTick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
+                EmitSeparationCorrections();
+        }
+
+        private void EmitSeparationCorrections()
         {
             var pending = _sim.PushPending;
             if (pending.Count == 0) return;
@@ -888,10 +897,6 @@ namespace GIC.Battle
             }
             _sim.EndCompileDyeView();
         }
-
-        // （即时行动独立结算 ResolveInstantAction 已随片边界即时队列退役删除——决策九十五
-        // docs/active/48 §2.4：即时通道购买分支=BuyCardExecutor 直通；非购买即时行动改走
-        // RTSFlowController.OnSubmitAction 校验+ResolveSubmittedAction 即时结算）
 
         // ==================== 段命令发射（三段唯一出口，2026-09-23 审查 Y1 收口） ====================
 

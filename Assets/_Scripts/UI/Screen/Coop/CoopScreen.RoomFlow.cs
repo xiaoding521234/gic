@@ -349,8 +349,8 @@ namespace GIC.UI
                 var cardManager = Wargame.Instance?.Context?.Get<GIC.Framework.CardManager>();
                 EventBusHub.Instance.Send(new ClientDeckEvent
                 {
-                    PlayerID = _playerManager.SelfPlayerID,
                     Entries = BattleDeckBuilder.BuildCurrentDeck(saveManager, cardManager),
+                    OwnedUnitIds = saveManager?.CurrentSave?.EnumerateOwnedUnitIds().ToList() ?? new List<int>(),
                 });
             }
 

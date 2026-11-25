@@ -21,12 +21,13 @@ namespace GIC.Battle
     /// 录制面语义（v2）：
     /// - **全演算输入录制**：AI 节拍批（RTSFlowController.RunAiBeat 眷属+伙伴脑批）=kind=actions 行
     ///   （批内行动带 submitTick=节拍 tick）；玩家/配额脑上交+购买=kind=submit 行
-    ///   （钩点=RTSFlowController.SubmitAndResolve〔校验通过后〕与 BuyCardExecutor）。
+    ///   （单机校验通过后由 RTSFlowController 记录）。
     ///   脑层不在断言面——脑改动后命令流差异属预期，需重录基线；断言只对演算层漂移报警（噪声最小）。
     /// - 断言面 = Segment（命令流本体，BattleResolver.PushSegment 钩）+ tick hash（RTSFlowController
     ///   RunSecondBeat 钩，确定性护栏四）；旧回合机 TurnPlan/TurnEnd 派生数据已随协议退役不录。
     /// - 初始手牌逐条录制（含初始资源卡）——卡组构建/存档变化不影响回放（初始态全量快照式）。
     ///
+    /// 联机只输出诊断录制：输入按实际消费拍记录为 inputBatch，不冒充单机 v2 的 actions/submit 窗。
     /// 开关：调试指令 `replay on/off/status/list`（BattleReplayCommands）；默认关、发布版不落盘。
     /// </summary>
     public static class BattleRecorder
@@ -48,7 +49,7 @@ namespace GIC.Battle
         /// 参数=演算复现所需的全部初始态（卡组构建上游不录——hands 即初始态终点）</summary>
         public static void CaptureSetup(int seed, string mapConfigName, int fogMode,
             List<BattlePlayerSetup> players, Dictionary<string, BattleCell> spawnCells,
-            Dictionary<string, List<HandCard>> hands)
+            Dictionary<string, List<HandCard>> hands, bool isNetworked = false)
         {
             if (!Enabled) return;
 
@@ -62,6 +63,7 @@ namespace GIC.Battle
                 seed = seed,
                 mapName = mapConfigName,
                 fogMode = fogMode,
+                isNetworked = isNetworked,
                 players = new List<ReplayPlayerLine>(),
             };
             foreach (var p in players)
@@ -92,14 +94,18 @@ namespace GIC.Battle
             Append(new ReplayActionsLine { turn = turn, actions = actions });
         }
 
-        /// <summary>上交行动录制（v2 新增钩点，RTSFlowController.SubmitAndResolve 校验通过后调）——
-        /// 覆盖真人/配额脑/经即时通道回流的非购买行动（玩家级 Deploy/UseItem/Equip 与 Move/Skill/Pass）。
-        /// 行动带 submitTick（BattleSession.SubmitAction 客户端侧盖章、SubmitAndResolve Host 侧兜底盖章）
-        /// ——回放器在「submit 窗」（当拍确定性步骤之后）按 tick 依次消费，file 序=时间序</summary>
+        /// <summary>单机上交（含购买）；回放器在当拍确定性步骤之后按 submitTick 和行序消费。</summary>
         public static void CaptureSubmittedAction(ActionData action)
         {
             if (!Enabled || !_hasHeader || action == null) return;
             Append(new ReplaySubmitLine { action = action });
+        }
+
+        /// <summary>联机诊断只录房主实际消费的非空权威批，包含实际结算拍号。</summary>
+        public static void CaptureInputBatch(InputBatchMessage batch)
+        {
+            if (!Enabled || !_hasHeader || batch.inputs.Count == 0) return;
+            Append(new ReplayInputBatchLine { batch = batch });
         }
 
         /// <summary>Segment 命令流录制（BattleResolver.PushSegmentAndWaitAck 推送前调）——断言面本体</summary>
@@ -159,6 +165,7 @@ namespace GIC.Battle
         public int seed;
         public string mapName;
         public int fogMode;
+        public bool isNetworked;
         public List<ReplayPlayerLine> players;
     }
 
@@ -195,6 +202,13 @@ namespace GIC.Battle
         /// 行序（file 序）=发生时间序，同 tick 内按行序重演</summary>
         public string kind = "submit";
         public ActionData action;
+    }
+
+    [Serializable]
+    public class ReplayInputBatchLine
+    {
+        public string kind = "inputBatch";
+        public InputBatchMessage batch;
     }
 
     [Serializable]

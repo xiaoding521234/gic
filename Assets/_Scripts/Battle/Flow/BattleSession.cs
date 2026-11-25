@@ -20,9 +20,7 @@ namespace GIC.Battle
     /// <summary>
     /// 一场对局的组合根：
     /// - 本地模式（B1-B6）：Host（逻辑）与 Client（表现）同进程，LocalBattleTransport 直通；
-    /// - LAN 模式（B7，2026-10-11 联机批）：Host 端 CreateHosted（Sim/Flow/AI 脑）+ MirrorBattleTransport
-    ///   逐远端下发+本机直投；客户端 CreateClient（仅 BattlePlayer 表现层，Sim/Flow=null），
-    ///   相位/倒计时由消息流派生（PhaseSource 门面）。
+    /// - LAN 模式：Host 封存逐拍输入；客户端也运行 Sim/Flow，各端用本地模拟驱动表现。
     /// 铁律：战斗逻辑不走 EventBusHub，一切消息经 IBattleTransport 专用通道。
     /// Roster（开局名册）双端同构：房间选的队伍/颜色/出生点进局内的单源（颜色解析/队伍判定消费）。
     /// </summary>
@@ -46,6 +44,7 @@ namespace GIC.Battle
         private readonly BattleMessageRouter _clientRouter = new BattleMessageRouter();
         /// <summary>F2 本地 Sim 回环路由（客户端 BattleResolver 产出的 Segment/Snapshot → View）</summary>
         private readonly BattleMessageRouter _localRouter = new BattleMessageRouter();
+        private readonly Dictionary<string, HashSet<int>> _purchaseUnlocks = new Dictionary<string, HashSet<int>>();
         private Transform _logicRoot;
 
         // ==================== 相位/计时门面（HUD 唯一订阅口，B7 LAN） ====================
@@ -266,8 +265,6 @@ namespace GIC.Battle
             List<BattlePlayerSetup> roster, bool isNetworked)
         {
             var sim = new BattleSimState(map, seed);
-            flow.Bind(sim, transport, isHost: true, isNetworked: isNetworked);
-
             var session = new BattleSession
             {
                 Sim = sim,
@@ -279,18 +276,15 @@ namespace GIC.Battle
                 IsNetworked = isNetworked,
                 IsHostSide = true,
             };
+            flow.Bind(sim, transport, isHost: true, isNetworked: isNetworked,
+                ownsPurchaseUnit: session.OwnsPurchaseUnit);
 
-            // Host 侧路由（客户端上行：行动上交/即时行动）——SegmentAck 特判随 ack 门控退役删除
-            session._hostRouter.Register<SubmitActionRequest>(BattleMessageType.SubmitAction,
-                req => flow.OnSubmitAction(req.action));
-            session._hostRouter.Register<SubmitInstantAction>(BattleMessageType.SubmitInstantAction,
-                req => session.HandleInstantSubmit(req.action));
-            // F1 帧同步：客户端输入与 hash 上报
+            // 远端上行输入保留连接身份；同进程行动直接走 Flow。
             session._hostRouter.Register<InputCommandMessage>(BattleMessageType.InputCommand,
-                msg => flow.ReceiveInputCommand(msg));
+                (msg, senderId) => flow.ReceiveInputCommand(msg, senderId));
             session._hostRouter.Register<HashReportMessage>(BattleMessageType.HashReport,
                 msg => flow.ReceiveHashReport(msg));
-            transport.RegisterHostHandler((type, json, sender) => session._hostRouter.Handle(type, json));
+            transport.RegisterHostHandler(session._hostRouter.Handle);
 
             // Client 侧路由（Host 下行：开局 / 快照 / 片命令块 / 秒拍结束段）——注册单源化（T6）
             RegisterClientRoutes(session, transport, player);
@@ -352,47 +346,16 @@ namespace GIC.Battle
 
         // ==================== 客户端入口 ====================
 
-        public void SubmitAction(ActionData action)
+        public bool SubmitAction(ActionData action) => Flow != null && Flow.OnSubmitAction(action);
+
+        /// <summary>开局装配时复制收藏许可，仅供本局房主接纳购买，不进入模拟或开局广播。</summary>
+        internal void SetPurchaseUnlocks(string playerId, IEnumerable<int> ownedUnitIds)
         {
-            action.turnNumber = Flow != null ? Flow.CurrentSecond : (Player?.LatestSnapshot?.turnNumber ?? 1);
-            action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 决策九十五：上交时刻 tick
-            if (!IsHostSide && Flow != null)
-            {
-                // F1 客户端：走 Flow 校验→InputCommand 上报（本地不结算；F3 预测在 View 层）
-                Flow.OnSubmitAction(action);
-                return;
-            }
-            Transport.ClientSend(BattleMessageType.SubmitAction, new SubmitActionRequest { action = action });
+            if (ownedUnitIds != null) _purchaseUnlocks[playerId] = new HashSet<int>(ownedUnitIds);
         }
 
-        public void SubmitInstantAction(ActionData action)
-        {
-            action.turnNumber = Flow != null ? Flow.CurrentSecond : (Player?.LatestSnapshot?.turnNumber ?? 1);
-            action.submitTick = Flow != null ? Flow.CurrentTick : 0; // 回放 v2：即时行动（购买）同盖 tick——submit 窗消费锚
-            Transport.ClientSend(BattleMessageType.SubmitInstantAction, new SubmitInstantAction { action = action });
-        }
-
-        private void HandleInstantSubmit(ActionData action)
-        {
-            if (action == null) return;
-            if (Flow == null || Flow.Phase != BattlePhase.Selecting)
-            {
-                GICLog.Warn("[BattleSession] 战斗未运行/已终局，即时行动丢弃");
-                return;
-            }
-
-            // 购买即时分支（决策八十六批E，docs/45 §7）：玩家级行动——即时即结算
-            // （校验/结算/命令广播全在执行器内完成；失败零命令，客户端预检+灰显为主 UX）
-            if (action.actionType == ActionType.BuyCard)
-            {
-                BuyCardExecutor.TryResolve(Sim, Transport, action);
-                return;
-            }
-
-            // 非购买即时行动（旧片边界队列语义随回合机退役，决策九十五）：
-            // 直接走 RTSFlow 权威校验+即时结算——归属/眷属/建筑/灵魂防线在 OnSubmitAction 内收口
-            Flow.OnSubmitAction(action);
-        }
+        private bool OwnsPurchaseUnit(string playerId, int unitId)
+            => _purchaseUnlocks.TryGetValue(playerId, out var ownedUnits) && ownedUnits.Contains(unitId);
 
         // ==================== 调试单位生成 ====================
 

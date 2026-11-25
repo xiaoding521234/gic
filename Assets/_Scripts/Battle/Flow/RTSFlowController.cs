@@ -69,6 +69,7 @@ namespace GIC.Battle
         private BattleSimState _sim;
         private IBattleTransport _transport;
         private BattleResolver _resolver;
+        private Func<string, int, bool> _ownsPurchaseUnit;
 
         // ==================== 帧同步输入管线（F1，docs/active/50 §4） ====================
 
@@ -153,7 +154,11 @@ namespace GIC.Battle
         private void AdvanceSimulationTick(InputBatchMessage batch)
         {
             if (_localBattleOver != null) return; // 本地已判出胜负，只继续消费权威拍，等待 Host 终局。
-            if (batch != null && ApplyInputBatch(batch.inputs)) return;
+            if (batch != null)
+            {
+                if (IsHost) BattleRecorder.CaptureInputBatch(batch);
+                if (ApplyInputBatch(batch.inputs)) return;
+            }
 
             // —— tick 移动推进（P2 连续空间，蓝图 §3.3：A* 路径+圆碰撞每 tick 步进；收尾段=采集结算）——
             var arrivals = RTSMovementSystem.AdvanceTick(_sim);
@@ -163,15 +168,8 @@ namespace GIC.Battle
                 if (CheckBattleEnded()) return;
             }
 
-            // —— 弹性分离（2026-11-08 拍板「友军碰撞有弹性、建筑硬」）——
-            // 友军重叠按重量加权挤开（移动中的单位当 tick 不可推、建筑/尸体=硬挡圆不进域）；
-            // 位移 5Hz 批量成段下发（MovePushed+绝对位，客户端短补间）。仅 Host：客户端以命令流为准。
-            if (IsHost)
-            {
-                UnitSeparationSystem.ResolveTick(_sim);
-                if (CurrentTick % UnitSeparationSystem.PushEmitIntervalTicks == 0)
-                    _resolver.EmitSeparationCorrections();
-            }
+            // 两端都推进分离；各自的模拟为本地表现生成位置校正。
+            _resolver.ResolveSeparationTick();
 
             // —— 普通读条与移动快速采集（主动技能在输入窗取消，硬控/离范围在此逐 tick 复核）——
             _resolver.ResolveHarvestTick();
@@ -220,8 +218,6 @@ namespace GIC.Battle
                 action.submitTick = CurrentTick;
             }
 
-            // 回放录制（决策九十五：节拍批=旧「回合全量行动」的秒化等价物——回放按批直喂演算）
-            BattleRecorder.CaptureActions(second, actions);
             if (IsNetworked)
             {
                 // F1：AI 行动也作为输入进批（targetTick=下一 tick），客户端同批结算；
@@ -231,6 +227,7 @@ namespace GIC.Battle
             }
             else
             {
+                BattleRecorder.CaptureActions(second, actions);
                 _resolver.ResolveAiActions(actions);
             }
 
@@ -271,7 +268,6 @@ namespace GIC.Battle
                 action.turnNumber = second;
                 action.submitTick = CurrentTick;
             }
-            BattleRecorder.CaptureActions(second, actions);
             if (IsNetworked)
             {
                 foreach (var action in actions)
@@ -279,6 +275,7 @@ namespace GIC.Battle
             }
             else
             {
+                BattleRecorder.CaptureActions(second, actions);
                 _resolver.ResolveAiActions(actions);
             }
             CheckBattleEnded();
@@ -340,65 +337,88 @@ namespace GIC.Battle
 
         // ==================== 行动上交（配额制退役：即交即结算） ====================
 
-        /// <summary>
-        /// 行动上交（本地双开：双端共用一进程都走本入口；BattleSession.SubmitAction 路由至此）——
-        /// 校验链沿用旧 OnSubmitAction 权威防线（灵魂/归属/建筑/眷属防线、伙伴 isPlayerDirectControl
-        /// 标记），配额/回合号/重复上交三道旧门随回合机退役。
-        /// </summary>
-        public void OnSubmitAction(ActionData action)
+        /// <summary>单机同步结算，房主入队，客户端只发请求。客户端返回 true 不代表房主已接纳。</summary>
+        public bool OnSubmitAction(ActionData action)
+        {
+            if (!ValidateSubmittedAction(action)) return false;
+            action.turnNumber = CurrentSecond;
+            action.submitTick = CurrentTick;
+
+            if (!IsHost)
+            {
+                _transport.ClientSend(BattleMessageType.InputCommand, new InputCommandMessage
+                {
+                    playerId = action.playerId,
+                    seq = NextSeq(action.playerId),
+                    submitTick = CurrentTick,
+                    action = action,
+                });
+                return true;
+            }
+
+            if (IsNetworked)
+                return AdmitPlayerInput(action, (long)CurrentTick + BattleMetrics.InputDelayTicks,
+                    NextSeq(action.playerId));
+
+            if (!CanAdmitPurchase(action)) return false;
+            BattleRecorder.CaptureSubmittedAction(action); // 单机 v2：拍末提交窗，不是联机的拍首输入。
+            RememberPlayerAction(action);
+            _resolver.ResolveSubmittedAction(action);
+            CheckBattleEnded();
+            return true;
+        }
+
+        private bool ValidateSubmittedAction(ActionData action)
         {
             if (Phase != BattlePhase.Selecting)
             {
                 GICLog.Warn($"[RTSFlow] 战斗未运行/已终局，忽略 {action}");
-                return;
+                return false;
             }
             if (action == null || !_sim.PlayerIds.Contains(action.playerId))
             {
                 GICLog.Warn($"[RTSFlow] 未知玩家 {action?.playerId}，忽略");
-                return;
+                return false;
             }
 
-            // 玩家级行动（无行动单位）豁免单位校验：部署/物品/装备（目标校验在各自执行器内收口）
+            // 玩家级行动无行动单位；其执行器根据结算时的状态判定是否成功。
             if (action.actionType == ActionType.DeployUnit || action.actionType == ActionType.UseItem
-                || action.actionType == ActionType.EquipItem)
-            {
-                SubmitAndResolve(action);
-                return;
-            }
+                || action.actionType == ActionType.EquipItem || action.actionType == ActionType.BuyCard)
+                return true;
 
             if (action.actionType != ActionType.Move && action.actionType != ActionType.Skill
                 && action.actionType != ActionType.Pass)
             {
                 GICLog.Warn($"[RTSFlow] 不支持行动类型 {action.actionType}，忽略（B1 白名单）");
-                return;
+                return false;
             }
 
             var unit = _sim.GetUnit(action.unitId);
             if (unit == null)
             {
                 GICLog.Warn($"[RTSFlow] 未知单位 {action.unitId}，忽略");
-                return;
+                return false;
             }
 
             // 灵魂无任何行动（决策九十一）：Host 权威防线
             if (unit.IsSoul)
             {
                 GICLog.Warn($"[RTSFlow] 灵魂 {action.unitId} 无任何行动（地脉驻留体），忽略上交");
-                return;
+                return false;
             }
 
             var identity = unit.GetUnitComponent<UnitIdentity>();
             if (identity == null || identity.OwnerPlayerID != action.playerId)
             {
                 GICLog.Warn($"[RTSFlow] 单位 {action.unitId} 不属于玩家 {action.playerId}，忽略");
-                return;
+                return false;
             }
 
             // 建筑防线（协议核心批）：建筑（含协议核心）不参与任何行动
             if (unit.RawData != null && unit.RawData.unitType == UnitType.Building)
             {
                 GICLog.Warn($"[RTSFlow] 建筑 {action.unitId}（含协议核心）不接受任何玩家上交行动，忽略");
-                return;
+                return false;
             }
 
             // 单位级行动域校验（操控分层，docs/32 §1/§4；伙伴技能解锁 2026-10-12）：
@@ -407,44 +427,26 @@ namespace GIC.Battle
             if (tier == UnitTier.Familiar)
             {
                 GICLog.Warn($"[RTSFlow] 眷属 {action.unitId} 不接受玩家上交行动（启发式脑自主决策），忽略");
-                return;
+                return false;
             }
-            if (tier == UnitTier.Companion)
-                action.isPlayerDirectControl = true;
-
-            SubmitAndResolve(action);
+            action.isPlayerDirectControl = tier == UnitTier.Companion;
+            return true;
         }
 
-        /// <summary>校验通过：打时刻戳→伙伴脑感知窗→即时演算→胜负自检</summary>
-        private void SubmitAndResolve(ActionData action)
-        {
-            action.turnNumber = CurrentSecond;
-            action.submitTick = CurrentTick;
-            BattleRecorder.CaptureSubmittedAction(action); // 回放 v2：玩家/配额脑上交行动录制（校验后=拒绝不上盘）
-            _recentPlayerActions.Add(action); // 伙伴脑下一节拍的感知输入（窗口 0.5 秒）
+        private bool CanAdmitPurchase(ActionData action)
+            => action.actionType != ActionType.BuyCard || BuyCardExecutor.CanAccept(_sim, action, _ownsPurchaseUnit);
 
-            if (!IsNetworked)
-            {
-                // 单机：保持即时结算（零手感损失）
-                _resolver.ResolveSubmittedAction(action);
-                CheckBattleEnded();
-                return;
-            }
-            if (IsHost)
-            {
-                // Host：入队到未封存的权威窗口，在该拍结算。
-                EnqueueInput(action, CurrentTick + BattleMetrics.InputDelayTicks,
-                    isAi: false, seq: NextSeq(action.playerId));
-                return;
-            }
-            // 客户端：只上报输入（F3 预测在 View 层）；本地不结算
-            _transport.ClientSend(BattleMessageType.InputCommand, new InputCommandMessage
-            {
-                playerId = action.playerId,
-                seq = NextSeq(action.playerId),
-                submitTick = CurrentTick,
-                action = action,
-            });
+        private void RememberPlayerAction(ActionData action)
+        {
+            if (action.actionType != ActionType.BuyCard)
+                _recentPlayerActions.Add(action); // 伙伴脑下一节拍的感知窗口。
+        }
+
+        private bool AdmitPlayerInput(ActionData action, long targetTick, int seq)
+        {
+            if (!CanAdmitPurchase(action) || !EnqueueInput(action, targetTick, isAi: false, seq: seq)) return false;
+            RememberPlayerAction(action);
+            return true;
         }
 
         // ==================== 胜负判定（核心摧毁唯一判据，口径同旧 CheckBattleOver） ====================
@@ -510,12 +512,13 @@ namespace GIC.Battle
         // ==================== 战斗启停 ====================
 
         public void Bind(BattleSimState sim, IBattleTransport transport,
-            bool isHost = true, bool isNetworked = false)
+            bool isHost = true, bool isNetworked = false, Func<string, int, bool> ownsPurchaseUnit = null)
         {
             _sim = sim;
             _transport = transport;
             IsHost = isHost;
             IsNetworked = isNetworked;
+            _ownsPurchaseUnit = ownsPurchaseUnit;
             _resolver = new BattleResolver(sim, transport, this);
         }
 
@@ -577,13 +580,17 @@ namespace GIC.Battle
             return CheckBattleEnded();
         }
 
-        /// <summary>Host：收到客户端输入（重定基到 targetTick 后入队）。</summary>
-        public void ReceiveInputCommand(InputCommandMessage msg)
+        /// <summary>Host：发送者取自传输层，校验后才允许输入进入权威批。</summary>
+        public bool ReceiveInputCommand(InputCommandMessage msg, string senderId)
         {
-            if (!IsHost || !IsNetworked || Phase != BattlePhase.Selecting || msg?.action == null) return;
-            long target = (long)msg.submitTick + BattleMetrics.InputDelayTicks;
-            if (EnqueueInput(msg.action, target, isAi: false, seq: msg.seq))
-                _recentPlayerActions.Add(msg.action);
+            if (!IsHost || !IsNetworked || msg?.action == null || string.IsNullOrEmpty(senderId)) return false;
+            if (msg.playerId != senderId || msg.action.playerId != senderId)
+            {
+                GICLog.Warn($"[RTSFlow] 输入玩家与发送连接不一致，忽略 sender={senderId}");
+                return false;
+            }
+            return ValidateSubmittedAction(msg.action) && AdmitPlayerInput(msg.action,
+                (long)msg.submitTick + BattleMetrics.InputDelayTicks, msg.seq);
         }
 
         /// <summary>客户端：缓存 Host 的输入批；缺少下一拍时不推进。</summary>

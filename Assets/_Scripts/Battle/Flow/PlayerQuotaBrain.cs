@@ -173,9 +173,7 @@ namespace GIC.Battle
                 $" 比值={strat.PowerRatio:F2} 乘子[军{strat.armyMul:F2}/契{strat.contractMul:F2}/升{strat.upgradeMul:F2}]" +
                 $" 意图=[{string.Join("，", strat.Intents)}]");
 
-            // ⓪-1 购买（2026-10-23 强化批拍板「让 AI 也会购买部署建筑」）：BuyCard 即时通道
-            //    **不占配额**（每秒至多一次；即时同步结算——LocalBattleTransport.ClientSend 直投，
-            //    下位部署分支当拍即可消费新购卡）；旗帜走购买补货、角色补货档待琴实装自然激活
+            // ⓪-1 购买不占配额：单机同步到账，联机到权威拍才到账并供下轮决策使用。
             TryPurchase(sim, turn);
 
             // ⓪ 部署：手牌角色卡+核心半径内有合法落点+摩拉够 → 出战（DeployUnitExecutor 校验链同源；
@@ -518,13 +516,12 @@ namespace GIC.Battle
 
         /// <summary>
         /// AI 购买（凌晨批议题②）：游戏规则购买**无每回合次数限制**（2026-10-24 用户勘正）——
-        /// 旧版「买入即 return」自限一购已拆除，改**购物清单循环**（BuyCard 即时通道不占配额，
-        /// LocalBattleTransport 同步结算——手牌/摩拉即时更新）：
+        /// 用购物清单循环独立提交，不占配额：
         /// ①清单=旗帜补货（协议核心出售；手牌无旗帜卡——卡不消耗=终身部署材料，整局至多触发一次）
         /// +角色补货（己方存活建筑可购买列表×手牌无同名卡×仅角色×配置存在×**技能已实装**
         /// 〔任一技能 HasEffects——观察局实锤琴技能全占位，买半成品=浪费；琴技能实装批自然激活〕）；
         /// ②预算=当前摩拉 − 摩拉红线（AITuning.摩拉红线——与升命红线同源的保底语义，购买不掏空
-        /// 部署/升命资金池）；每项另须预留部署价（买来当拍即可部署）；
+        /// 部署/升命资金池）；每项另须预留部署价，已受理的购买立即从本轮预算扣除；
         /// ③价值序=旗帜（部署锚+经济使能件）→角色 unitName 升序（购买价值无客观序，枚举序铁律）；
         /// ④循环购入直至清单耗尽/预算不足（手牌守卫在清单构建期一次性评估+同名单去重=无重复购）。
         /// 购物上限 8 件/秒=防御性护栏（正常对局清单 1~3 件远达不到）。
@@ -615,24 +612,25 @@ namespace GIC.Battle
             list.Sort((a, b) => a.tier != b.tier ? a.tier.CompareTo(b.tier)
                 : a.unitName.CompareTo(b.unitName)); // 价值序：旗帜→角色 unitName 升序（枚举序铁律）
 
-            // —— 循环购入（预算=摩拉 − 红线；每项预留部署价；预算不足跳下一项——更便宜的可能买得起）——
-            int purchased = 0;
+            // 联机尚未扣费，不能重复按同一余额报价；未受理的购买不占预算。
+            int remainingMora = sim.GetMora(_playerId);
+            int accepted = 0;
             foreach (var item in list)
             {
-                if (purchased >= 8) break; // 防御性护栏（正常对局清单 1~3 件远达不到）
-                int mora = sim.GetMora(_playerId);
-                if (mora - item.cost - item.deployReserve < moraRedLine) continue;
-                _session.SubmitInstantAction(new ActionData
+                if (accepted >= 8) break;
+                if (remainingMora - item.cost - item.deployReserve < moraRedLine) continue;
+                if (!_session.SubmitAction(new ActionData
                 {
                     playerId = _playerId,
                     actionType = ActionType.BuyCard,
                     buyCardType = (int)CardType.Unit,
                     buyCardValue = item.unitName,
                     turnNumber = turn,
-                });
-                purchased++;
-                GICLog.Info($"[配额脑] {_playerId} T{turn} 购买 {(UnitName)item.unitName}" +
-                    $"（{item.cost} 摩拉，预留部署 {item.deployReserve}，红线 {moraRedLine}，本轮已购 {purchased}）");
+                })) continue;
+                remainingMora -= item.cost;
+                accepted++;
+                GICLog.Info($"[配额脑] {_playerId} T{turn} 购买已受理 {(UnitName)item.unitName}" +
+                    $"（{item.cost} 摩拉，预留部署 {item.deployReserve}，红线 {moraRedLine}，本轮已受理 {accepted}）");
             }
         }
 

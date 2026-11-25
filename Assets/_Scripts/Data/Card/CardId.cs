@@ -50,21 +50,36 @@ namespace GIC.Data
     /// - 单位卡（角色/建筑）= GetEffectiveDeployCost() / 2（部署价一半——安柏/凯亚/琴/芭芭拉 3★ 出战 50→25、
     ///   骑士团总部/大教堂 3★ 出战 60→30；2026-10-23 起建筑默认表按单位类型分档，见 UnitConfig.GetDeployCost）；
     /// - 物品卡=摩拉价值星级表 MoraValueOfStar（1★=5 / 2★=15 / 3★=30 / 4★=80 / 5★=200）。
-    /// 消费方=BuyCardExecutor（Host 扣费校验）+ 购买面板角标/灰显（客户端镜像同口径）
+    /// 消费方=BuyCardExecutor、购买面板和 AI 购物预算。
     /// </summary>
     public static class CardIdPurchaseExtensions
     {
-        /// <summary>卡牌购买价（摩拉）。UnitData/ItemData 缺配置=0（上游已过滤，防御口径）</summary>
+        /// <summary>显示和估值用价格；执行时用 TryGetPurchaseCost 拒绝缺失配置。</summary>
         public static int PurchaseCostOf(this CardId cardId, UnitConfig unitConfig, ItemConfig itemConfig)
+            => cardId.TryGetPurchaseCost(unitConfig, itemConfig, out int cost) ? cost : 0;
+
+        public static bool TryGetPurchaseCost(this CardId cardId, UnitConfig unitConfig, ItemConfig itemConfig,
+            out int cost)
         {
+            cost = 0;
+            if (cardId.value <= 0) return false;
             if (cardId.cardType == CardType.Unit)
             {
                 var unitData = unitConfig?.GetUnitData(cardId.AsUnitName());
-                return unitData != null ? unitData.GetEffectiveDeployCost() / 2 : 0;
+                if (unitData == null) return false;
+                cost = unitData.GetEffectiveDeployCost() / 2;
+                return cost >= 0;
             }
+            if (cardId.cardType != CardType.Item) return false;
             var itemData = itemConfig?.GetItemData(cardId.AsItemName());
-            return itemData != null ? MoraValueOfStar(itemData.starLevel) : 0;
+            if (itemData == null) return false;
+            cost = MoraValueOfStar(itemData.starLevel);
+            return true;
         }
+
+        public static bool RequiresPurchaseUnlock(this CardId cardId, UnitConfig unitConfig)
+            => cardId.cardType == CardType.Unit
+                && unitConfig?.GetUnitData(cardId.AsUnitName())?.unitType != UnitType.Building;
 
         /// <summary>物品星级→摩拉价值表（拍板 #11 原需求）：1★=5 / 2★=15 / 3★=30 / 4★=80 / 5★=200</summary>
         public static int MoraValueOfStar(int starLevel)

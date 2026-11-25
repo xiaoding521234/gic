@@ -1367,11 +1367,13 @@ namespace GIC.Battle
         private IEnumerator PlaySegmentCoroutine(Segment segment)
         {
             // 片开始时刻 =（全场最高攻速 − 自身攻速）÷ 10 秒（连续换算）；
-            // 即时行动块/部署段 = 短节拍；秒拍结束段 = 固定节拍（不按攻速排程）
+            // 购买段必须在后续快照之前写入镜像，否则快照已含购买结果，延播会重复应用增量。
             float delay;
-            if (segment.turnEnd != 0)
+            if (segment.insertedInstantAction != 0)
+                delay = 0f;
+            else if (segment.turnEnd != 0)
                 delay = SecondBeatDelaySeconds;
-            else if (segment.insertedInstantAction != 0 || segment.deploy != 0)
+            else if (segment.deploy != 0)
                 delay = BattleMetrics.DeploySegmentBeatSeconds;
             else
                 delay = Mathf.Max(0f, (segment.turnMaxAttackSpeed - segment.sliceAttackSpeed)
@@ -1381,8 +1383,8 @@ namespace GIC.Battle
                 // 空等跳过（2026-09-30 拍板「凯亚行动完后芭芭拉空等 3 秒，应当跳过空等时间——只要
                 // 这期间已经没有任何正在进行的行动（含箭矢飞行等）才可跳过」——docs/18 L44 既有
                 ///「衍生事件提早完成即跳过剩余等待」语义的落地）：攻速片片头等待逐帧探测在途有意义
-                // 行动，无在途即提前进片；部署/秒拍结束/即时块固定短拍不参与跳过
-                if (segment.turnEnd == 0 && segment.deploy == 0 && segment.insertedInstantAction == 0)
+                // 行动，无在途即提前进片；部署/秒拍结束固定短拍不参与跳过
+                if (segment.turnEnd == 0 && segment.deploy == 0)
                     yield return WaitSliceDelaySkippingDeadAir(delay / _playbackSpeed);
                 else
                     yield return new WaitForSeconds(delay / _playbackSpeed);
@@ -1403,7 +1405,7 @@ namespace GIC.Battle
                             {
                                 if (command.metadata == BattleCommand.MovePushed)
                                 {
-                                    // 弹性推挤（2026-11-08）：空 path+MovePushed+hitX/hitY=Host 权威**新绝对位**。
+                                    // 弹性推挤：空 path+MovePushed+hitX/hitY=本地模拟计算的**新绝对位**。
                                     // 该单位正在走=**续跑原目标**（世代替换旧补间后从权威位接着走，
                                     // 「两个都在走也不许互相穿过」）；静止=短补间滑过去即可。
                                     var pushedWorld = BoardCmToWorld(command.hitX, command.hitY);
