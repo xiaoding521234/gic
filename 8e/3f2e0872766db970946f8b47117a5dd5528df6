@@ -1,0 +1,78 @@
+Assets/_Scripts/Battle/Flow/UnitSeparationSystem.cs
+  s_9fff5bdf9f5a18::t_ab023baee05211 15,20,22,45,132
+Assets/_Scripts/Battle/Flow/MirrorBattleTransport.cs
+  s_9fff5bdf9f5a18::t_89c606ef692684 28,56
+Assets/_Scripts/Data/Event/PlayerNetworkEvents.cs
+  s_9fff5bdf9f5a18::t_5db838b940af70 253,258
+Assets/_Scripts/Battle/Flow/BattleDeckBuilder.cs
+  s_9fff5bdf9f5a18::t_f6fb9c403c5987 19
+Assets/_Scripts/Battle/View/BattleHud.TopBar.cs
+  s_9fff5bdf9f5a18::t_041fb38b1d82a2 177
+Assets/_Scripts/UI/Screen/Battle/BattleScreen.cs
+  s_9fff5bdf9f5a18::t_5db838b940af70 239,242-245,269-270
+docs/active/50-帧同步联机架构设计与实施计划.md
+  s_9fff5bdf9f5a18::t_2aea6ab200c0c5 270-273
+Assets/_Scripts/Editor/Tool/ReplayRunner.cs
+  s_9fff5bdf9f5a18::t_cc19d816a935aa 27,132-133,206,249,254
+  s_9fff5bdf9f5a18::t_863ab936d4b570 333,767-768,951
+  s_9fff5bdf9f5a18::t_00104305047511 364,394-396,400-402,408-409,413,630-632,646,756-758,772-916,920-922,931-936,955,958,971-974,981-985
+docs/active/51-帧同步F0-F2交接与Windows验证清单.md
+  s_9fff5bdf9f5a18::t_2aea6ab200c0c5 209-211,227-229
+Assets/_Scripts/Battle/Flow/LocalBattleTransport.cs
+  s_9fff5bdf9f5a18::t_89c606ef692684 21,78-79,82,84,86,89,92
+Assets/_Scripts/Battle/Flow/PlayerQuotaBrain.cs
+  s_9fff5bdf9f5a18::t_f6fb9c403c5987 176,519,524,615-617,620-622,629-633
+Assets/_Scripts/Battle/View/BattleHud.cs
+  s_9fff5bdf9f5a18::t_2aea6ab200c0c5 3015
+  s_9fff5bdf9f5a18::t_041fb38b1d82a2 502,601
+Assets/_Scripts/Framework/Save/PlayerSaveData.cs
+  s_9fff5bdf9f5a18::t_2290ed40a615e9 69-77
+Assets/_Scripts/Battle/Flow/BattleResolver.cs
+  s_9fff5bdf9f5a18::t_ab023baee05211 47,54-58,431-439
+Assets/_Scripts/Battle/View/BattleHud.BuildingShop.cs
+  s_9fff5bdf9f5a18::t_863ab936d4b570 17-18,198
+  s_9fff5bdf9f5a18::t_041fb38b1d82a2 27-28,66,72-73,122,140,187,189,191,194,197,199-201,205,207-214,222,229,231,236,243,269,277-282,291
+Assets/_Scripts/Battle/View/BattlePlayer.cs
+  s_9fff5bdf9f5a18::t_ab023baee05211 1408
+  s_9fff5bdf9f5a18::t_f6fb9c403c5987 1370,1372-1374,1376,1386-1387
+Assets/_Scripts/Data/Battle/Protocol/BattleMessages.cs
+  s_9fff5bdf9f5a18::t_89c606ef692684 14,17
+Assets/_Scripts/Battle/Flow/BuyCardExecutor.cs
+  s_9fff5bdf9f5a18::t_fca71065e53fc9 1,9-10,14,17-18,23-24,26-33,40-41,60-70
+  s_9fff5bdf9f5a18::t_863ab936d4b570 12
+  s_9fff5bdf9f5a18::t_68174b925316c4 71
+Assets/_Scripts/Battle/Flow/BattleSession.cs
+  s_9fff5bdf9f5a18::t_89c606ef692684 23,47,279-280,282,284,287,349,351-352,354,357-358
+Assets/_Scripts/Battle/Flow/RTSFlowController.cs
+  s_9fff5bdf9f5a18::t_cc19d816a935aa 157-161,230,278
+  s_9fff5bdf9f5a18::t_abf58038c51946 72,171-172,341-371,376,381,384,386-387,393,400,407,414,421,430,432-433,436-439,441-443,445-449,515,521,583-584,586-593
+  s_9fff5bdf9f5a18::t_863ab936d4b570 340
+Assets/_Scripts/Data/Card/CardId.cs
+  s_9fff5bdf9f5a18::t_2290ed40a615e9 53,57,59-62,64-65,69-71,73,75-77,80-82
+  s_9fff5bdf9f5a18::t_bdeb19143b3c6f 83
+Assets/_Scripts/UI/Screen/Coop/CoopScreen.RoomFlow.cs
+  s_9fff5bdf9f5a18::t_5db838b940af70 353
+Assets/_Scripts/Framework/Network/RoomManager.cs
+  s_9fff5bdf9f5a18::t_5db838b940af70 230-231,241-245,481,485-486
+docs/45-建筑卡与购买系统技术设计与实施计划.md
+  s_9fff5bdf9f5a18::t_2aea6ab200c0c5 154-157,165,171,188
+Assets/_Scripts/Battle/Flow/BattleRecorder.cs
+  s_9fff5bdf9f5a18::t_cc19d816a935aa 24,30,52,66,97,104-110,168,207-211
+  s_9fff5bdf9f5a18::t_0230ccb7b5c139 212-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8e3f2e0872766db970946f8b47117a5dd5528df6",
+  "prompts": {},
+  "sessions": {
+    "s_9fff5bdf9f5a18": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a211f9-b2e4-73e3-a63e-97536138abb5",
+        "model": "group/gpt-6.2-sol"
+      },
+      "human_author": "xiaoding521234 <2205002727@qq.com>"
+    }
+  }
+}
