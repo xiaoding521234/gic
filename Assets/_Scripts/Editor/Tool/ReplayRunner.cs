@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using UnityEditor;
@@ -582,9 +583,8 @@ namespace GIC.Editor
         // ==================== 帧同步输入管线自检（F1，docs/active/50 §3.3/§4.2） ====================
 
         /// <summary>
-        /// 无头自检：验证 Host 输入批「提前一 tick 广播 / 单批只发一次 / 定序 (playerId,seq) /
-        /// 客户端迟到丢弃」四件。不依赖 Play Mode，也不重跑真实战局（编辑域 AddComponent 不跑 Awake，
-        /// 只走输入管线——AI 节拍在 %10 tick，本自检只推进到 tick≤5，零脑参与）。
+        /// 无头自检：验证提前封存、定序、迟到输入顺延、缺拍等待以及终局和 hash 时序。
+        /// 使用合成双核心局，不用 Play Mode。
         /// </summary>
         [MenuItem("Tools/TG/帧同步管线自检（输入批时序）")]
         public static void FrameSyncPipelineSelfTestMenu()
@@ -641,64 +641,91 @@ namespace GIC.Editor
                 var host = hostGo.AddComponent<RTSFlowController>();
                 host.Bind(hostSim, hostTransport, isHost: true, isNetworked: true);
                 host.StartBattle();
-                hostTransport.Batches.Clear(); // 丢掉开局快照等，只留输入批
+                var opening = hostTransport.FindBatch(1);
+                failures += Check(sb, "①开局发送第 1 拍空批", opening?.inputs?.Count == 0, "");
 
-                // ① 入队当帧不发批（dirty 只在 tick 末尾 flush）
-                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 0, submitTick: host.CurrentTick));
-                failures += Check(sb, "①入队当帧不发批", hostTransport.Batches.Count == 0,
-                    $"batches={hostTransport.Batches.Count}");
-
-                // ② 提前一 tick 广播：target=当前+2，在 tick=1 末尾就发出
-                Tick(host);
-                int target = host.CurrentTick + 1;
-                var early = hostTransport.FindBatch(target);
-                failures += Check(sb, "②提前一 tick 广播", host.CurrentTick == 1 && early != null,
-                    $"nowTick={host.CurrentTick} batch(tick={target})={(early == null ? "无" : "有")}");
-
-                // ③ 应用该 tick 后不再补发（同一批只广播一次）
-                Tick(host);
-                failures += Check(sb, "③单批只发一次", hostTransport.CountBatches(target) == 1,
-                    $"count={hostTransport.CountBatches(target)} nowTick={host.CurrentTick}");
-
-                // ④ 定序：P2 先入队也要广播成 (playerId,seq) 升序
-                int target2 = host.CurrentTick + 2;
-                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P2, seq: 0, submitTick: host.CurrentTick));
-                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 1, submitTick: host.CurrentTick));
-                Tick(host);
-                var ordered = hostTransport.FindBatch(target2);
-                bool orderOk = ordered != null && ordered.inputs != null && ordered.inputs.Count == 2
+                // 目标拍设为 2；即使以后修改输入延迟，本自检仍覆盖相同的封存边界。
+                int submitTick = 2 - BattleMetrics.InputDelayTicks;
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P2, seq: 0, submitTick: submitTick));
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 1, submitTick: submitTick));
+                host.ReceiveInputCommand(InputOf(BattleDebugPlayerIds.P1, seq: 0, submitTick: submitTick));
+                bool noEarlyPublish = hostTransport.FindBatch(2) == null;
+                bool stepped = Tick(host);
+                var ordered = hostTransport.FindBatch(2);
+                bool orderOk = ordered?.inputs?.Count == 3
                     && ordered.inputs[0].playerId == BattleDebugPlayerIds.P1
-                    && ordered.inputs[1].playerId == BattleDebugPlayerIds.P2;
-                failures += Check(sb, "④定序=playerId 升序", orderOk,
-                    ordered == null || ordered.inputs == null ? "无批"
-                        : string.Join("→", ordered.inputs.ConvertAll(i => i.playerId)));
+                    && ordered.inputs[0].seq == 0
+                    && ordered.inputs[1].playerId == BattleDebugPlayerIds.P1
+                    && ordered.inputs[1].seq == 1
+                    && ordered.inputs[2].playerId == BattleDebugPlayerIds.P2;
+                failures += Check(sb, "②第 1 拍末封存第 2 拍并按玩家、序号定序",
+                    noEarlyPublish && stepped && host.CurrentTick == 1 && orderOk, "");
 
-                // ⑤ 客户端：迟到批丢弃 / 未来批入队
+                var late = InputOf(BattleDebugPlayerIds.P2, seq: 1, submitTick: submitTick);
+                host.ReceiveInputCommand(late); // 仍请求第 2 拍，但已封存，必须顺延到第 3 拍。
+                stepped = Tick(host);
+                var rebased = hostTransport.FindBatch(3);
+                bool movedForward = rebased?.inputs?.Count == 1 && rebased.inputs[0].seq == late.seq;
+                failures += Check(sb, "③晚到输入不改已发批，而是顺延到未封存拍",
+                    stepped && hostTransport.CountBatches(2) == 1 && movedForward && late.action.turnNumber == -1, "");
+                stepped = Tick(host);
+                failures += Check(sb, "④顺延输入在第 3 拍执行，第 4 拍仍发送空批",
+                    stepped && late.action.turnNumber == 0 && hostTransport.FindBatch(4)?.inputs?.Count == 0, "");
+
                 var clientSim = BuildSimFromHeader(header, root);
                 var clientTransport = new BatchRecordingTransport();
                 clientGo = new GameObject("FSSelfTestClient") { hideFlags = HideFlags.HideAndDontSave };
                 var client = clientGo.AddComponent<RTSFlowController>();
                 client.Bind(clientSim, clientTransport, isHost: false, isNetworked: true);
                 client.StartBattle();
-                client.ReceiveInputBatch(new InputBatchMessage { tick = 0, inputs = new List<OrderedInput>() });
-                bool dropped = !HasQueuedTick(client, 0);
-                client.ReceiveInputBatch(new InputBatchMessage
-                {
-                    tick = 5,
-                    inputs = new List<OrderedInput>
-                    {
-                        new OrderedInput
-                        {
-                            playerId = BattleDebugPlayerIds.P1, seq = 2, isAi = 0,
-                            action = PassInput(BattleDebugPlayerIds.P1, submitTick: 5),
-                        },
-                    },
-                });
-                bool queued = HasQueuedTick(client, 5);
-                failures += Check(sb, "⑤客户端迟到丢弃/未来入队", dropped && queued,
-                    $"dropped={dropped} queued={queued}");
+                client.ReceiveInputBatch(ordered);
+                bool waitingForStart = !Tick(client) && client.CurrentTick == 0 && clientSim.CurrentTick == 0;
+                failures += Check(sb, "⑤后续批不能跳过缺失拍", waitingForStart, "");
 
-                // ⑥ 双端同构：客户端按 BattleStart（seed/map/roster/初始快照）重建的 Sim 必须与
+                client.ReceiveInputBatch(new InputBatchMessage { tick = 2 }); // 重复批不能替换首份。
+                client.ReceiveInputBatch(opening); // 用经 JsonUtility 往返后的空批解锁。
+                bool tookOpening = Tick(client) && client.CurrentTick == 1;
+                bool tookOrdered = Tick(client) && client.CurrentTick == 2
+                    && orderOk && ordered.inputs[0].action.turnNumber == 0
+                    && ordered.inputs[1].action.turnNumber == 0 && ordered.inputs[2].action.turnNumber == 0;
+                client.ReceiveInputBatch(opening); // 已消费的批也不能重复推进。
+                failures += Check(sb, "⑥空批解锁，原输入批应用，重复批不重放",
+                    tookOpening && tookOrdered && !Tick(client) && client.CurrentTick == 2, "");
+
+                client.ReceiveHostBattleOver(new BattleOverMessage { finalTick = 3, winnerTeam = (int)TeamType.A });
+                bool deferred = client.Phase == BattlePhase.Selecting && clientTransport.LastBattleOver == null;
+                client.ReceiveInputBatch(rebased);
+                bool finished = Tick(client) && client.CurrentTick == 3 && client.Phase == BattlePhase.Finished
+                    && clientTransport.LastBattleOver?.winnerTeam == (int)TeamType.A;
+                failures += Check(sb, "⑦Host 终局在终局拍消费后才生效", deferred && finished && !Tick(client), "");
+
+                // 单机不要求输入批，开局和普通推进都不产生联机确认包。
+                var localTransport = new BatchRecordingTransport();
+                client.Bind(BuildSimFromHeader(header, root), localTransport);
+                client.StartBattle();
+                bool localOk = Tick(client) && client.CurrentTick == 1 && localTransport.Batches.Count == 0;
+                failures += Check(sb, "⑧单机无需等待输入批", localOk, "");
+
+                // Host 预发秒拍批，客户端确实可能先到该拍。hash 只能等 Host 封存后一拍再发。
+                var hashTransport = new BatchRecordingTransport();
+                client.Bind(BuildSimFromHeader(header, root), hashTransport, isHost: false, isNetworked: true);
+                client.StartBattle();
+                int hashTick = BattleMetrics.TicksPerSecond;
+                for (int tick = host.CurrentTick + 1; tick < hashTick; tick++)
+                    if (!Tick(host)) break;
+                for (int tick = 1; tick <= hashTick; tick++)
+                {
+                    client.ReceiveInputBatch(hostTransport.FindBatch(tick));
+                    if (!Tick(client)) break;
+                }
+                bool hashDeferred = host.CurrentTick == hashTick - 1 && client.CurrentTick == hashTick
+                    && hashTransport.LastHashReport == null;
+                stepped = Tick(host);
+                client.ReceiveInputBatch(hostTransport.FindBatch(hashTick + 1));
+                bool hashSent = Tick(client) && hashTransport.LastHashReport?.tick == hashTick;
+                failures += Check(sb, "⑨秒拍 hash 不早于 Host 的对应记录", hashDeferred && stepped && hashSent, "");
+
+                // ⑩ 双端同构：客户端按 BattleStart（seed/map/roster/初始快照）重建的 Sim 必须与
                 //    Host 完全同 hash——覆盖 unitId 分配序、初始手牌、雾模式（交接清单首秒漂移风险）
                 var hostSim2 = BuildSimFromHeader(header, root);
                 var startMsg = new BattleStartMessage
@@ -727,8 +754,24 @@ namespace GIC.Editor
                     ?.Invoke(null, new object[] { clientSim2, startMsg });
                 int hostHash = RTSFlowController.ComputeStateHash(hostSim2);
                 int clientHash = RTSFlowController.ComputeStateHash(clientSim2);
-                failures += Check(sb, "⑥双端 Sim 开局同构（hash 一致）", hostHash == clientHash,
+                failures += Check(sb, "⑩双端 Sim 开局同构（hash 一致）", hostHash == clientHash,
                     $"host={hostHash} client={clientHash} units={hostSim2.Units.Count}/{clientSim2.Units.Count}");
+
+                // 制造客户端先判另一队胜出的漂移，仍以 Host 的拍号和胜方为准。
+                var divergentTransport = new BatchRecordingTransport();
+                var divergentSim = BuildSimFromHeader(header, root);
+                client.Bind(divergentSim, divergentTransport, isHost: false, isNetworked: true);
+                client.StartBattle();
+                divergentSim.RemoveUnit(divergentSim.Units.Values.Single(core =>
+                    core.GetUnitComponent<UnitIdentity>()?.OwnerPlayerID == BattleDebugPlayerIds.P1));
+                client.ReceiveInputBatch(new InputBatchMessage { tick = 1 });
+                bool stillRunning = Tick(client) && RTSFlowController.CheckBattleOver(divergentSim) == TeamType.B
+                    && client.Phase == BattlePhase.Selecting && divergentTransport.LastBattleOver == null;
+                client.ReceiveHostBattleOver(new BattleOverMessage { finalTick = 2, winnerTeam = (int)TeamType.A });
+                client.ReceiveInputBatch(new InputBatchMessage { tick = 2 });
+                bool hostWinner = Tick(client) && client.CurrentTick == 2 && client.Phase == BattlePhase.Finished
+                    && divergentTransport.LastBattleOver?.winnerTeam == (int)TeamType.A;
+                failures += Check(sb, "⑪本地提前判出不同胜方也不抢先结束对局", stillRunning && hostWinner, "");
             }
             finally
             {
@@ -737,8 +780,8 @@ namespace GIC.Editor
                 if (root != null) UnityEngine.Object.DestroyImmediate(root);
             }
 
-            sb.Append(failures == 0 ? "PASS：6/6" : $"FAIL：{failures} 项不通过");
-            sb.Append("\n注：⑤ 的迟到丢弃会打印一条 [RTSFlow] 输入批迟到丢弃警告，属预期");
+            sb.Append(failures == 0 ? "PASS：11/11" : $"FAIL：{failures} 项不通过");
+            sb.Append("\n注：⑥ 的重复批、⑦ 与 ⑪ 的本地/权威终局分歧会打印预期警告");
             return sb.ToString();
         }
 
@@ -749,6 +792,7 @@ namespace GIC.Editor
                 playerId = playerId,
                 unitId = string.Empty,
                 submitTick = submitTick,
+                turnNumber = -1,
             };
 
         private static InputCommandMessage InputOf(string playerId, int seq, int submitTick)
@@ -760,20 +804,10 @@ namespace GIC.Editor
                 action = PassInput(playerId, submitTick),
             };
 
-        private static void Tick(RTSFlowController flow)
-        {
-            typeof(RTSFlowController)
+        private static bool Tick(RTSFlowController flow)
+            => typeof(RTSFlowController)
                 .GetMethod("TickAdvance", BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.Invoke(flow, null);
-        }
-
-        private static bool HasQueuedTick(RTSFlowController flow, int tick)
-        {
-            var field = typeof(RTSFlowController)
-                .GetField("_inputByTick", BindingFlags.Instance | BindingFlags.NonPublic);
-            var dict = field?.GetValue(flow) as SortedDictionary<int, List<OrderedInput>>;
-            return dict != null && dict.ContainsKey(tick);
-        }
+                ?.Invoke(flow, null) is true;
 
         private static int Check(StringBuilder sb, string name, bool ok, string detail)
         {
@@ -782,18 +816,31 @@ namespace GIC.Editor
             return ok ? 0 : 1;
         }
 
-        /// <summary>自检用传输：只收 InputBatch（其余 Host 下行丢弃）。</summary>
+        /// <summary>自检用传输：输入批实际经协议序列化；另收终局消息用于断言。</summary>
         private class BatchRecordingTransport : IBattleTransport
         {
             public readonly List<InputBatchMessage> Batches = new List<InputBatchMessage>();
+            public BattleOverMessage LastBattleOver { get; private set; }
+            public HashReportMessage LastHashReport { get; private set; }
 
             public void HostSend(BattleMessageType type, object message)
             {
-                if (type == BattleMessageType.InputBatch && message is InputBatchMessage batch && batch != null)
-                    Batches.Add(batch);
+                if (type == BattleMessageType.InputBatch && message is InputBatchMessage batch)
+                {
+                    var serializer = BattleJsonSerializer.Instance;
+                    Batches.Add(serializer.Deserialize<InputBatchMessage>(serializer.Serialize(batch)));
+                }
+                else if (type == BattleMessageType.BattleOver && message is BattleOverMessage over)
+                {
+                    LastBattleOver = over;
+                }
             }
 
-            public void ClientSend(BattleMessageType type, object message) { }
+            public void ClientSend(BattleMessageType type, object message)
+            {
+                if (type == BattleMessageType.HashReport && message is HashReportMessage report)
+                    LastHashReport = report;
+            }
             public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) { }
             public void RegisterClientHandler(Action<BattleMessageType, string> handler) { }
 

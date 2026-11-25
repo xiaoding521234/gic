@@ -145,7 +145,7 @@ namespace GIC.Battle
 
         // ==================== 帧同步装配（F1，docs/active/50） ====================
 
-        /// <summary>LAN Host 装配（Mirror 传输；Host 跑 Sim+AI，只广播 InputBatch）</summary>
+        /// <summary>LAN Host 装配（Mirror 传输；Host 运行 Sim 和 AI，并负责封存输入批）。</summary>
         public static BattleSession CreateHosted(BattleMapData map, BattlePlayer player, RTSFlowController flow,
             Transform logicRoot, int seed, List<BattlePlayerSetup> roster)
         {
@@ -178,14 +178,7 @@ namespace GIC.Battle
             // 客户端 View 由本地 Sim 回环驱动——这里显式吞掉，避免每秒刷「未注册的消息类型」警告。
             session._clientRouter.Register<SegmentMessage>(BattleMessageType.Segment, _ => { });
             session._clientRouter.Register<SnapshotMessage>(BattleMessageType.Snapshot, _ => { });
-            // 终局回退：本地 Sim 应自行判定终局；若本地尚未终局（漂移/掉帧），以 Host 广播兜底收尾
-            session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver, msg =>
-            {
-                if (flow.Phase == BattlePhase.Finished) return;
-                GICLog.Warn("[BattleSession] 本地 Sim 未终局但收到 Host BattleOver——按权威终局收尾");
-                flow.Stop();
-                player.OnBattleOver(msg);
-            });
+            session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver, flow.ReceiveHostBattleOver);
             network.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
 
             player.Bind(network, null); // map 随 BattleStart 到达（BattlePlayer.OnBattleStart 自建盘）
@@ -323,7 +316,11 @@ namespace GIC.Battle
                 msg => player.OnSegment(msg));
             session._clientRouter.Register<BattleOverMessage>(BattleMessageType.BattleOver,
                 msg => player.OnBattleOver(msg)); // S10 全灭软停：胜负广播
-            transport.RegisterClientHandler((type, json) => session._clientRouter.Handle(type, json));
+            transport.RegisterClientHandler((type, json) =>
+            {
+                // Host 已持有封存批，本机视图无需接收网络输入批回环。
+                if (type != BattleMessageType.InputBatch) session._clientRouter.Handle(type, json);
+            });
         }
 
         // ==================== 对局流程 ====================

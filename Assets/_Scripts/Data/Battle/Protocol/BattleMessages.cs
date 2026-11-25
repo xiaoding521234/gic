@@ -23,7 +23,7 @@ namespace GIC.Data
 
         // ===== 帧同步（F1，docs/active/50 §4）=====
         InputCommand = 11,     // Client→Host：单条输入（玩家行动 + seq/submitTick）
-        InputBatch = 12,       // Host→All：Host 定序后的输入批（targetTick + OrderedInput[]）
+        InputBatch = 12,       // Host→All：逐拍封存的定序输入批，允许为空
         HashReport = 13,       // Client→Host：本地状态 hash（每秒）
         DesyncAlert = 14,      // Host→Client：hash 失配诊断（F1 只告警）
     }
@@ -61,7 +61,7 @@ namespace GIC.Data
     public class InputCommandMessage
     {
         public string playerId;
-        public int seq;          // 玩家内单调递增（Host 去重/诊断，不参与跨玩家排序）
+        public int seq;          // 输入源单调递增（同一玩家内定序）
         public int submitTick;   // 客户端本地提交 tick（Host 重定基用）
         public ActionData action;
     }
@@ -78,7 +78,7 @@ namespace GIC.Data
     [Serializable]
     public class InputBatchMessage
     {
-        public int tick;         // targetTick：各端在该 tick 应用整批
+        public int tick;         // targetTick：收到这一拍的批后，各端才可推进至该拍。
         public List<OrderedInput> inputs = new List<OrderedInput>();
     }
 
@@ -152,6 +152,7 @@ namespace GIC.Data
     public class BattleOverMessage
     {
         public int winnerTeam;
+        public int finalTick;   // 联机客户端应消费至这一拍，再发布 Host 终局结果。
     }
 
     // （TurnPlanMessage/TurnPlanEntry 已随回合机退役删除——2026-11-09 残留清理批；
