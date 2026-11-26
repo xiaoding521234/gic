@@ -1,9 +1,6 @@
 # 51-帧同步 F0~F2 交接与 Windows 验证清单
 
-> **交接日期**：2026-11-05
-> **分支**：`feature/frame-sync`（基于 master `9ea7475d`）
-> **状态**：F0 完成、F1/F2 核心完成；**F3 本地预测/回滚未实现**
-> **环境限制**：Mac 无 Tuanjie 编译环境，本批 **436+ 行改动全部未编译**；Windows 侧第一件事是编译排错。
+> **当前交接（2026-11-26，master）**：F0~F2 已实现，F3 本地预测/回滚未实现。开局、回放与 Windows 实机的最新验收见 §12；§1、§3~§11 为 `feature/frame-sync` 早期交接和实测记录，不代表本轮已在团结编辑器验证。
 
 ---
 
@@ -25,17 +22,16 @@
 单机（IsNetworked=false）：输入即时结算（与改造前一致，零手感损失）
 
 LAN Host（IsNetworked=true, IsHost=true）：
-  本地输入 → EnqueueInput(targetTick=当前+2)
-  AI 三脑   → EnqueueInput(targetTick=当前+1)
-  每个 tick：ApplyDueInputs → 排序(playerId,seq) → 广播 InputBatch → 本地结算
+  冻结房间名册、种子和收入倍率 → 等本局全部远端的卡组、HUD/路由就绪 → 发送开局与第 1 拍空批
+  真人输入（目标拍=当前+2）；AI 行动由 Host 提交
+  每拍消费已封存批 → 本地结算 → 未终局则定序并封存下一拍 → 广播（包括空批）
   每秒：记录 hostHash，收客户端 HashReport 比对
 
 LAN Client（IsNetworked=true, IsHost=false）：
-  输入 → Flow.OnSubmitAction → 校验 → ClientSend(InputCommand)
-  收到 BattleStart → 建 Sim（同 seed/map/roster）→ 建单位 → Flow.StartBattle()
-  每个 tick：ApplyDueInputs（按 Host 批内序）→ 本地结算
-  每秒：ClientSend(HashReport)
-  View：本地 BattleResolver 产出的 Segment/Snapshot 直喂 BattlePlayer（F2）
+  绑定 HUD 和战斗路由 → 报本局就绪 → 收到 BattleStart 后按名册序重建核心、手牌和模拟规则
+  输入 → ClientSend(InputCommand) → 等相应权威批结算；缺下一拍则等待
+  每秒算 hash，收到下一拍确认后上报；权威终局在消费终局拍后生效
+  View：Segment/Snapshot 均来自本地模拟，不由房主广播
 ```
 
 **唯一允许的分叉**：AI 只在 Host 跑；客户端不跑脑、不定序。
@@ -204,7 +200,7 @@ Unity 菜单：
 
 > 2026-11-06 实测观察：AI 全链正常（购买旗帜/餐馆、部署伙伴、升命至 C3、寒冰之棱碎裂治疗、地脉灵魂生成与耗尽、骑士团总部元能召唤骑士）；`perSummon=0`＝本局无 `PeriodicSummon` 建筑（总部走 `EnergySummon`），C3 周期判定未被本局覆盖，仍建议后续补一局带周期建筑的对局或单元级断言。
 
-### 11.4 已知遗留（建议放进 F2.5 小批）
+### 11.4 当时遗留（当前进展见 §12）
 
 - 现行 `ReceiveInputCommand` 按传输连接校验行动归属，复用房主上交校验后再入队；LAN 收藏仍是玩家声明，未做账号鉴权。
 - LAN 现行录制包含实际消费拍的非空权威批，仅用于诊断；完整 LAN 重演仍未接入。单机回放格式不变。
@@ -227,3 +223,29 @@ Unity 菜单：
 
 上表为 2026-11-06 旧版实测。现行菜单还覆盖逐拍空批、缺拍等待、迟到顺延、终局和 hash 时序，以及购买连接归属、收藏、定拍扣费、执行拍失败与双端弹性分离；单机合成回放也新增购买。需要用 Unity 编辑器复跑，并双机验证手牌显示和移动补间。
 - ~~远端行动不进 `_recentPlayerActions`~~ 已修（本提交）：Host 收远端输入时同步塞入伙伴脑感知窗口，与单机同构。
+
+---
+
+## 12. 当前验收（2026-11-26）
+
+### 12.1 还原构建前置
+
+1. 使用 `ProjectSettings/ProjectVersion.txt` 固定的团结 `2022.3.62t11`（1.9.3）。从已验证的项目副本同步 `Assets/Mirror/` 和 `Assets/AddressableAssetsData/`（含 `.meta`）。这两棵目录仍未入库；不要用任意 Mirror 版本替代，原依赖有 [46 §3](../46-LAN联机三天修复全案.md) 中列出的本地补丁。不要新建空的 Addressables 设置来绕过检查。
+2. 在仓库根目录运行 `python tools/project-preflight.py`（Mac/Linux 可用 `python3`）检查清单、锁文件和本地依赖。可选：在**已跑通**的工作区用 `--write-fingerprint <文件>` 写出依赖指纹，在新检出用 `--check-fingerprint <同一文件>` 比对；仅运行普通预检不证明依赖版本一致。个人 Codely 扩展不再是项目清单的硬依赖；Addressables 包显式固定 `1.22.3`。
+3. 关闭占用本项目的团结编辑器，运行 `tools\verify-project.cmd "D:\Tool\2022.3.62t11\Editor\Tuanjie.exe"`（或设置 `TUANJIE_EDITOR`）。仅当进程退出码为 0 且本次 `Logs/gic-verify-*.log` 有 `[GIC.Verify] PASS` 时才算通过；也可在编辑器运行 `Tools/TG/工程回归检查`。它验证解析后的构建场景、开局交换、事件退订、主档/备份、18 项帧同步断言和单机/联机 v3 合成重演。合成文件用临时目录，不改玩家存档和实际回放。严格确定性扫描仍需运行 `./tools/determinism-audit.sh --strict`。
+
+### 12.2 同版本双端验证
+
+| 场景 | 验收 |
+|---|---|
+| 正常联机开局 | 两端选色、队伍、出生点和手牌正确；客户端 HUD 绑定后才报就绪，房主收齐后开战，不必等超时。房主本机不重复转场。 |
+| 开局中途断线、超时、重开 | 分别在卡组上报前和报就绪后断开远端：房主不能替补卡组强行开战；房主在加载期断开时客户端能回大厅；两端再建房时不接收上场消息，不累加订阅。 |
+| 天理经济、购买、结算 | 带天理 AI，确认猎鹿人餐馆效果拍的摩拉与命令两端一致；再验证购买到账牌面、弹性推挤与移动补间，并打至终局。目标为同平台 10 分钟无 `[Desync]`（记录首个漂移拍号与主客端构建信息）。 |
+| 单机 | 房主+AI 开局拆线后仍控制原房主座位，购买即时到账；直接打开调试场景和试招沙盒也能开局退出。 |
+| 回放 | 房主提前 `replay on`，完整终局后在编辑器运行“回放回归（最新录制）”与“双跑确定性”。检查命令、hash、胜方和终局拍；补录一次 `replay off` 的非整秒尾拍。旧联机 v2 仅诊断；旧单机 v2 尽力兼容，改过规则/资产的基线需重录。 |
+
+### 12.3 性能基线，先测再换算法
+
+- 同地图、同输入量运行一局高密度长局，用 Profiler 的 `GIC.Battle.Tick` 与 `GIC.Battle.Separation` 记录 p50/p95、最慢拍与 GC 分配。当前只是加了采样点，单位两两分离算法与规则未变。
+- 开发构建关闭战斗会打印 `[BattleTransport]` 的发送条数和 JSON 字节数（按接收端计，不含协议头、传输层开销）；`Segment` / `Snapshot` 只在本机消费。需要真实线速时，用同条件的网络采样另测。
+- 本轮 Mac 仅运行独立 C# 替身回归与静态检查；完整编辑器编译、真实 Mirror 双机联调及性能采样尚未执行，不用替身通过替代发行验收。

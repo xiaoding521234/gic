@@ -72,11 +72,7 @@ namespace GIC.Editor
 
             try
             {
-                // 复刻 SaveManager.SavePath 的目录规则（含 ParrelSync clone 独立子目录）
-                string dir = Application.persistentDataPath;
-                string cloneMarker = Path.Combine(Application.dataPath, "..", ".clone");
-                if (File.Exists(cloneMarker)) dir = Path.Combine(dir, "clone");
-                string json = File.ReadAllText(Path.Combine(dir, "gic_save.json"));
+                string json = File.ReadAllText(SaveManager.SavePath);
                 return JsonUtility.FromJson<GIC.Framework.PlayerSaveData>(json)?.pet?.closePetOnExit ?? true;
             }
             catch

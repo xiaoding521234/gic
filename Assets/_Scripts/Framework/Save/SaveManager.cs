@@ -21,18 +21,13 @@ namespace GIC.Framework
         /// <summary>
         /// 存档路径 — Clone 实例使用独立子目录，避免与主实例共用存档
         /// </summary>
-        private static string SavePath
+        public static string SavePath
         {
             get
             {
                 string dir = Application.persistentDataPath;
-                string cloneMarker = Path.Combine(Application.dataPath, "../.clone");
-                if (File.Exists(cloneMarker))
-                {
+                if (File.Exists(Path.Combine(Application.dataPath, "..", ".clone")))
                     dir = Path.Combine(dir, "clone");
-                    if (!Directory.Exists(dir))
-                        Directory.CreateDirectory(dir);
-                }
                 return Path.Combine(dir, SAVE_FILE_NAME);
             }
         }
@@ -42,11 +37,7 @@ namespace GIC.Framework
         // v12（2026-09-13）：无 schema 变化——零迁移政策落定（docs/20 §1.6）后的开发期重置重启，旧档清零重建
         private const int CURRENT_SAVE_VERSION = 12;
 
-        // 快速迭代期存档策略（2026-10-04 用户拍板「无论怎么样，每次启动游戏都直接重建，除非我要求
-        // 快速迭代期结束，才改」）：true=LoadSaveData 跳过读档直接建档——每次启动全新进度，旧档不再
-        // 被读（磁盘文件保留、被建档首存覆盖）。迭代期结束=用户宣布后改回 false 即恢复三级读档链
-        // （读档链/版本门原样保留未动）。pet.json 同款开关在 PetPrefs。
-        // static readonly 而非 const：const=true 会把下方读档链判为不可达代码（CS0162）
+        // 保留迭代期每次启动重建进度的策略；高版本或暂不可读的磁盘存档仍受写入保护。
         public static readonly bool 快速迭代期每次启动重建 = true;
 
         private float lastSaveTime = -999f;
@@ -69,8 +60,10 @@ namespace GIC.Framework
         private const bool IsDeletionTestMode = false;
 #endif
 
-        // 删档测试模式下，旧存档的备份标识（可选，用于调试）
-        private const string BACKUP_SUFFIX = ".backup";
+        private PlayerSaveFile _fileStore;
+        private PlayerSaveFile FileStore => _fileStore ??= new PlayerSaveFile(SavePath, CURRENT_SAVE_VERSION);
+        private bool _writeProtected;
+        private bool _rotateMainOnWrite;
 
         // 配置引用
         private readonly UnitConfig unitConfig;
@@ -89,58 +82,10 @@ namespace GIC.Framework
         {
             GICLog.Info($"存档路径: {SavePath}");
 
-            // 删档测试模式：备份或删除旧存档
-            if (IsDeletionTestMode)
-            {
-                HandleDeletionTestMode();
-            }
-
             LoadSaveData();
         }
 
         public void Start() { }
-
-        /// <summary>
-        /// 处理删档测试模式 - 每次启动都强制使用新存档
-        /// </summary>
-        private void HandleDeletionTestMode()
-        {
-            // 不管存档是否存在，直接删除（不需要备份）
-            if (File.Exists(SavePath))
-            {
-                try
-                {
-                    File.Delete(SavePath);
-                    GICLog.Info("删档测试模式：已删除旧存档，将创建新存档");
-                }
-                catch (Exception e)
-                {
-                    GICLog.Warn($"删档测试模式删除失败: {e.Message}");
-                }
-            }
-
-            // 可选：同时删除备份文件
-            string backupPath = SavePath + BACKUP_SUFFIX;
-            if (File.Exists(backupPath))
-            {
-                try
-                {
-                    File.Delete(backupPath);
-                }
-                catch { }
-            }
-
-            // 残留的半截 .tmp 一并清掉（正常会被下次保存覆盖，这里保证测试环境彻底干净）
-            string tmpPath = SavePath + ".tmp";
-            if (File.Exists(tmpPath))
-            {
-                try
-                {
-                    File.Delete(tmpPath);
-                }
-                catch { }
-            }
-        }
 
         public void Update(float deltaTime)
         {
@@ -155,7 +100,7 @@ namespace GIC.Framework
         /// </summary>
         public void SaveGame()
         {
-            saveDirty = true;
+            if (!_writeProtected) saveDirty = true;
         }
 
         /// <summary>立即写盘（绕过延迟窗）：货币/进度关键路径与进程生命周期兜底用（GameScene.OnApplicationQuit/Pause）</summary>
@@ -185,13 +130,11 @@ namespace GIC.Framework
             SaveGameNow();
         }
 
-        /// <summary>
-        /// 实际写盘。preserveBackup=true 时跳过备份位写入——仅备份恢复路径固化用：
-        /// 此时主档位上是刚判定损坏的坏档，若照常 Replace 会把它滚进 .backup 顶掉刚恢复出来的好备份。
-        /// </summary>
-        private void DoSave(bool preserveBackup = false)
+        private void DoSave()
         {
+            if (_writeProtected) return;
             lastSaveTime = Time.time;
+            saveDirty = true; // 立即写盘也必须在失败后保留重试。
             try
             {
                 CurrentSave.saveVersion = CURRENT_SAVE_VERSION;
@@ -200,19 +143,15 @@ namespace GIC.Framework
 #else
                 string json = JsonUtility.ToJson(CurrentSave, false);  // 构建版关 pretty：序列化更快、文件更小（存档随游戏增长的存量成本优化）
 #endif
-                // 原子写（2026-09-05）：先写 .tmp 再替换正式文件——写盘中途崩溃/断电不留半截损坏档
-                //（旧直写的后果：下次读档 catch → CreateNewSave = 全进度清零）。同卷 File.Replace 为原子替换；
-                // 首存（正式文件尚不存在）走 File.Move；残留 .tmp 无害，下次保存自然覆盖。
-                string tmpPath = SavePath + ".tmp";
-                File.WriteAllText(tmpPath, json, System.Text.Encoding.UTF8);
-                if (File.Exists(SavePath))
+                if (!FileStore.TryWrite(json, _rotateMainOnWrite))
                 {
-                    // 滚动备份（2026-09-05）：把替换下来的旧主档挪进 .backup（上一版已知完好存档）——
-                    // 主档损坏/误删时读档侧可回退，坏档不再等于全进度清零（见 LoadSaveData 三级回退链）。
-                    File.Replace(tmpPath, SavePath, preserveBackup ? null : SavePath + BACKUP_SUFFIX);
+                    _writeProtected = true;
+                    saveDirty = false;
+                    GICLog.Warn("主档或备份已变为高版本或不可读，停止写入");
+                    EventBusHub.Instance?.SendImmediate(new OnSaveFailedEvent());
+                    return;
                 }
-                else
-                    File.Move(tmpPath, SavePath);
+                _rotateMainOnWrite = true;
                 saveDirty = false;   // 仅成功后清脏；失败保持脏=下个间隔自动重试
                 saveFailureNotified = false;   // 连续失败提示复位
                 GICLog.Info($"存档成功: {SavePath}");
@@ -225,96 +164,50 @@ namespace GIC.Framework
                 if (!saveFailureNotified)
                 {
                     saveFailureNotified = true;
-                    EventBusHub.Instance.SendImmediate(new OnSaveFailedEvent());
+                    EventBusHub.Instance?.SendImmediate(new OnSaveFailedEvent());
                 }
             }
         }
 
-        /// <summary>
-        /// 读档三级回退链（2026-09-05）：主档 → 滚动备份 → 新档。
-        /// 主档损坏（半截 JSON/磁盘坏区）不再直接清零全部进度——先回退 .backup（上一版完好存档，最多回退一个存档窗口）；
-        /// 仅当备份也不可用时才建档。版本过旧不回退：备份只会与主档同版或更旧，回退无意义（重置式版本策略）。
-        /// </summary>
+        /// <summary>主档 → 备份 → 新档；高版本或 IO 失败进入不写盘会话。</summary>
         public void LoadSaveData()
         {
-            // 快速迭代期（2026-10-04 拍板）：每次启动直接建档，三级读档链与版本门暂不参与
-            if (快速迭代期每次启动重建)
+            var main = FileStore.Read(backup: false, out var mainData);
+            var backup = FileStore.Read(backup: true, out var backupData);
+            _writeProtected = PlayerSaveFile.ProtectsExistingFile(main) || PlayerSaveFile.ProtectsExistingFile(backup);
+            _rotateMainOnWrite = main == PlayerSaveFile.State.Valid;
+            saveDirty = false;
+            if (_writeProtected)
+                GICLog.Warn($"存档写入已禁用，保留原文件（主档={main}，备份={backup}）");
+
+            if (IsDeletionTestMode || 快速迭代期每次启动重建)
             {
-                GICLog.Info("快速迭代期：跳过读档，每次启动重建新档");
+                if (IsDeletionTestMode && !_writeProtected) DeleteSaveCopiesForTesting();
                 CreateNewSave();
                 return;
             }
 
-            LoadOutcome main = TryLoadFile(SavePath, fromBackup: false);
-            if (main == LoadOutcome.Loaded)
-                return;
-
-            if (main != LoadOutcome.VersionOutdated)
+            if (main == PlayerSaveFile.State.Valid)
             {
-                if (main == LoadOutcome.ParseFailed)
-                    GICLog.Error("主档损坏，尝试从备份回退");
-                else
-                    GICLog.Info("未找到主档，尝试从备份回退");
-
-                if (TryLoadFile(SavePath + BACKUP_SUFFIX, fromBackup: true) == LoadOutcome.Loaded)
-                    return;
+                FinishLoad(mainData);
+                return;
             }
-
-            GICLog.Info("无可用存档，创建新存档");
+            if (main != PlayerSaveFile.State.Older && backup == PlayerSaveFile.State.Valid)
+            {
+                GICLog.Warn($"主档不可用（{main}），从备份恢复");
+                FinishLoad(backupData); // 下一次成功写入前保持 _rotateMainOnWrite=false，包括失败后的重试。
+                return;
+            }
             CreateNewSave();
         }
 
-        /// <summary>单次读档尝试的结果，供 LoadSaveData 决定回退链走向</summary>
-        private enum LoadOutcome { Loaded, FileMissing, ParseFailed, VersionOutdated }
-
-        /// <summary>
-        /// 从指定路径尝试读档，成功则完成全部读档后处理（校验修复 → 补缺 → 排序 → 固化写盘）并返回 Loaded；
-        /// 文件缺失/解析失败/版本过旧各自返回对应结果，不产生副作用（CurrentSave 不动）。
-        /// </summary>
-        private LoadOutcome TryLoadFile(string path, bool fromBackup)
+        private void FinishLoad(PlayerSaveData data)
         {
-            if (!File.Exists(path))
-                return LoadOutcome.FileMissing;
-
-            PlayerSaveData data;
-            try
-            {
-                string json = File.ReadAllText(path, System.Text.Encoding.UTF8);
-                data = JsonUtility.FromJson<PlayerSaveData>(json);
-            }
-            catch (Exception e)
-            {
-                GICLog.Error($"存档解析失败({path}): {e.Message}");
-                return LoadOutcome.ParseFailed;
-            }
-
-            // 0. 版本过低：不迁移，由调用方决定是否回退其它副本（重置式版本策略）
-            if (data == null || data.saveVersion < CURRENT_SAVE_VERSION)
-            {
-                GICLog.Warn($"存档版本 {data?.saveVersion.ToString() ?? "null"} 低于当前版本 {CURRENT_SAVE_VERSION}，不可用({path})");
-                return LoadOutcome.VersionOutdated;
-            }
-
             CurrentSave = data;
             CurrentSave.EnsureValid();
-
-            // 1. 先补充缺失的角色/物品
             SyncMissingCards();
-
-            // 2. 排序
             SortAllCategories();
-
-            // 3. 版本兼容检查（高于当前版本仅警告）
-            ApplySaveCompatibility();
-
-            // 4. 固化一次（立即写）：把补缺/排序结果持久化；备份恢复路径同时把好档写回主档位。
-            //    fromBackup 且主档尚存（=坏档还占着主档位）时 preserveBackup——防 Replace 把坏档滚进备份位。
-            DoSave(preserveBackup: fromBackup && File.Exists(SavePath));
-
-            GICLog.Info($"读档成功{(fromBackup ? "（从备份恢复）" : "")}，当前版本: {CurrentSave.saveVersion}");
-            if (fromBackup)
-                GICLog.Warn($"主档已损坏，进度回退到上一版备份存档: {path}");
-            return LoadOutcome.Loaded;
+            DoSave();
         }
 
         private void CreateNewSave()
@@ -333,8 +226,9 @@ namespace GIC.Framework
             // pet.json 密文——只写主存档不写 pet.json 的话编辑器/桌宠构建版聊天仍报未设置 key。
             // 编辑器与构建共享 persistentDataPath+同机设备指纹=密文互通。构建产物无此代码路径。
             // 分槽（2026-09-13）：DevKey 预填在新档供应商槽位（新档恒 0=DeepSeek），pet.json 同槽。
-            GIC.Pet.PetPrefs.WriteChatCipher(CurrentSave.pet.petChatProvider,
-                CurrentSave.pet.GetChatCipher(CurrentSave.pet.petChatProvider));
+            if (!_writeProtected)
+                GIC.Pet.PetPrefs.WriteChatCipher(CurrentSave.pet.petChatProvider,
+                    CurrentSave.pet.GetChatCipher(CurrentSave.pet.petChatProvider));
 #endif
             SaveGameNow();
         }
@@ -391,54 +285,18 @@ namespace GIC.Framework
             save.progress.currentDeck = initialSaveConfig.defaultDeck;
         }
 
-        /// <summary>
-        /// 手动清除所有存档（删档测试模式专用）
-        /// </summary>
-        public void ClearAllSaveData()
+        private void DeleteSaveCopiesForTesting()
         {
-            if (File.Exists(SavePath))
+            try
             {
-                try
-                {
-                    File.Delete(SavePath);
-                    GICLog.Info($"已删除存档: {SavePath}");
-                }
-                catch (Exception e)
-                {
-                    GICLog.Error($"删除存档失败: {e.Message}");
-                }
+                FileStore.DeleteForTesting();
+                _rotateMainOnWrite = false;
             }
-
-            // 同时删除备份文件与残留 .tmp（与删档测试模式对齐：连带 .backup/.tmp 一并清理）
-            string backupPath = SavePath + BACKUP_SUFFIX;
-            if (File.Exists(backupPath))
+            catch (Exception e)
             {
-                try
-                {
-                    File.Delete(backupPath);
-                    GICLog.Info($"已删除备份存档: {backupPath}");
-                }
-                catch (Exception e)
-                {
-                    GICLog.Error($"删除备份存档失败: {e.Message}");
-                }
+                _writeProtected = true;
+                GICLog.Warn($"测试存档删除失败，结束本次写入：{e.Message}");
             }
-
-            string tmpPath = SavePath + ".tmp";
-            if (File.Exists(tmpPath))
-            {
-                try
-                {
-                    File.Delete(tmpPath);
-                }
-                catch (Exception e)
-                {
-                    GICLog.Error($"删除临时存档失败: {e.Message}");
-                }
-            }
-
-            // 重新创建新存档
-            CreateNewSave();
         }
 
         #region 同步缺失卡片
@@ -598,25 +456,6 @@ namespace GIC.Framework
                     a.ConfigIndex, b.ConfigIndex
                 );
             });
-        }
-
-        #endregion
-
-        #region saveCompat
-
-        /// <summary>
-        /// 存档兼容性检查。
-        /// 低于 CURRENT_SAVE_VERSION 的旧档已在 LoadSaveData 中直接重置（无迁移链），
-        /// 这里只处理"存档版本高于游戏版本"的前向兼容警告。
-        /// </summary>
-        private void ApplySaveCompatibility()
-        {
-            if (CurrentSave == null) return;
-
-            if (CurrentSave.saveVersion > CURRENT_SAVE_VERSION)
-            {
-                GICLog.Warn($"存档版本({CurrentSave.saveVersion})高于游戏版本({CURRENT_SAVE_VERSION})，可能存在兼容性问题");
-            }
         }
 
         #endregion
