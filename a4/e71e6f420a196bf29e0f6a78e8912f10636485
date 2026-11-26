@@ -1,0 +1,108 @@
+Assets/_Scripts/Framework/Network/BattleStartExchange.cs
+  s_9fff5bdf9f5a18::t_76e534c3ac92c9 1-21,23-32,34-77
+  s_9fff5bdf9f5a18::t_bbbaf078e68c67 22,33
+Assets/_Scripts/Battle/View/BattlePlayer.cs
+  s_9fff5bdf9f5a18::t_20ea237b379166 143
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 329-330
+Assets/_Scripts/Battle/Flow/AIStrategist.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 188
+docs/17-代码架构指南.md
+  s_9fff5bdf9f5a18::t_9365c2271a7652 48
+docs/active/50-帧同步联机架构设计与实施计划.md
+  s_9fff5bdf9f5a18::t_7553431a117af2 3-4,194-197,205-207,269,272,310
+  s_9fff5bdf9f5a18::t_9365c2271a7652 271,358
+Assets/_Scripts/Battle/Flow/AIPlayerConfig.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 28-29,31,59-65
+Assets/_Scripts/Battle/Flow/MirrorBattleTransport.cs
+  s_9fff5bdf9f5a18::t_da9af48fd60d76 6,9,12,17-18,22,24-31,33,35-36,38-39,41-44,47,49-53,56,58-60,63-66,68-69,73-75,77,80-85,88-89,94-99,102-103,105-106,108-110,112,114,116-124
+Assets/_Scripts/Battle/Flow/BattleResolver.cs
+  s_9fff5bdf9f5a18::t_e15b1acf728f03 24,2126
+  s_9fff5bdf9f5a18::t_856f83b071abe9 756
+Assets/_Scripts/UI/Screen/Coop/CoopScreen.RoomFlow.cs
+  s_9fff5bdf9f5a18::t_a853dac1ad439e 281,286-287,289,292,326-331,339
+  s_9fff5bdf9f5a18::t_0c94eb2a6a5577 291,295-299,317-324,338,341,351
+  s_9fff5bdf9f5a18::t_5f41fd0c9b62cd 325
+Assets/_Scripts/Battle/View/BattleHud.cs
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 487
+Assets/_Scripts/Battle/Flow/BuildingEffectsSystem.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 78
+Assets/_Scripts/UI/Screen/Coop/CoopScreen.cs
+  s_9fff5bdf9f5a18::t_25fb1cde7a432a 64,163,178,190,199-218,258
+Assets/_Scripts/Battle/Flow/PlayerQuotaBrain.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 187
+Assets/_Scripts/Battle/Flow/BattleSimState.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 405-413,416-422,424-429
+  s_9fff5bdf9f5a18::t_aadacb2d0bda89 414-415,423
+Assets/_Scripts/Battle/Flow/CompanionBrain.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 347,407,488
+Assets/_Scripts/Battle/Flow/BattleLaunchConfig.cs
+  s_9fff5bdf9f5a18::t_856f83b071abe9 23-25,70
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 189
+  s_9fff5bdf9f5a18::t_aadacb2d0bda89 26-37,68-69,74-80
+  s_9fff5bdf9f5a18::t_a853dac1ad439e 71-73,149,159-161
+  s_9fff5bdf9f5a18::t_f23c378075ad39 81
+Assets/_Scripts/UI/Screen/Battle/BattleScreen.cs
+  s_9fff5bdf9f5a18::t_20ea237b379166 139-141,315
+  s_9fff5bdf9f5a18::t_a853dac1ad439e 6,20,35,56-61,89-95,97,119,159,171,175,192,200-204,207,229,450,619,621-625,627
+  s_9fff5bdf9f5a18::t_49af4598a55abb 34,71,79,86,96,98-99,169,179,188-191,193-199,205-206,208-211,214-227,236-237,251-256,274-288,301,306,327,347,356,363,367,373,449,452-453,588-589,616-618,620,626,628-629,637-639,647
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 138,213
+Assets/_Scripts/Editor/Tool/ReplayRunner.cs
+  s_9fff5bdf9f5a18::t_53b1ffacc76322 237-240,242-243,303,328-334,667-668,685,689,717-720,734-744,747-760
+  s_9fff5bdf9f5a18::t_d2e2b09aafceaf 241,244-245,273,275-276,301-302,304,308,310-312,315,317-318,324,665-666,729
+  s_9fff5bdf9f5a18::t_20ea237b379166 375
+  s_9fff5bdf9f5a18::t_7553431a117af2 745-746
+  s_9fff5bdf9f5a18::t_7835bde7393d1b 17,109-110,112-146,148-150,152-153,157,159-163,165,167-170,172-175,177-181,183-184,186-191,194-199,201,204-208,210-211,213,215-218,274,294,356-359,385-389,391-394,397-399,403-404,406,408-411,413-455,458,680,693,696,1002,1008-1009
+  s_9fff5bdf9f5a18::t_4e181a43780b9a 761
+Assets/_Scripts/Data/Event/PlayerNetworkEvents.cs
+  s_9fff5bdf9f5a18::t_c35763be37775f 3
+  s_9fff5bdf9f5a18::t_aadacb2d0bda89 233,238,241,259,273,277-278
+Assets/_Scripts/Battle/Flow/RTSFlowController.cs
+  s_9fff5bdf9f5a18::t_e15b1acf728f03 529,541
+  s_9fff5bdf9f5a18::t_9987c849c633f9 5,74-77,144,157,166,185-199,319-324,330-331,484,530-540,542-558,589
+  s_9fff5bdf9f5a18::t_2b755d20082d87 317,371
+Assets/_Scripts/Battle/Flow/UnitSeparationSystem.cs
+  s_9fff5bdf9f5a18::t_e15b1acf728f03 5,27,53
+Assets/_Scripts/Battle/Flow/BattleSession.cs
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 43-45,290-292
+  s_9fff5bdf9f5a18::t_6c93f6c29f9d22 27,52-55,156,158-159,178-179,193-194,197-200,205-212,230,233-235,237-239,242-244,248,250-253,256,271,312,316-317,344,365-377
+  s_9fff5bdf9f5a18::t_a853dac1ad439e 162,164,174-175,195-196,245-246
+  s_9fff5bdf9f5a18::t_e15b1acf728f03 226,254
+  s_9fff5bdf9f5a18::t_c169f2e822675e 378-379
+Assets/_Scripts/Framework/Network/MyNetworkManager.cs
+  s_9fff5bdf9f5a18::t_630724edfe626a 214,255,258
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 164-171
+  s_9fff5bdf9f5a18::t_a853dac1ad439e 347,354
+Assets/_Scripts/Framework/Network/BattleStartExchange.cs.meta
+  s_9fff5bdf9f5a18::t_76e534c3ac92c9 1-2
+Assets/_Scripts/Framework/EventBus/LocalEventBus.cs
+  s_9fff5bdf9f5a18::t_25fb1cde7a432a 59-60,62,114-115,117,119,126,135,216,218-223,225-226,229-247,307,329,358,400-403,408-409,502,514
+Assets/_Scripts/Battle/Flow/BattleRecorder.cs
+  s_9fff5bdf9f5a18::t_53b1ffacc76322 36,43-45,68-69,74-75,111
+  s_9fff5bdf9f5a18::t_5027dbc079e8b6 13-14,22-23,28,40-42,46-56,77-79,84,92,100,104,107,114,119,121-125,133,137-142,145-147,156,161,164-172,181-182,201,242-249
+Assets/_Scripts/Framework/EventBus/NetworkEventBus.cs
+  s_9fff5bdf9f5a18::t_630724edfe626a 75
+Assets/_Scripts/Framework/Network/RoomManager.cs
+  s_9fff5bdf9f5a18::t_067a5b2a5af382 262,270
+  s_9fff5bdf9f5a18::t_76e534c3ac92c9 230,233,236,240,243,247-250,254,256-258,264-267,271,274,495-496,509-510
+  s_9fff5bdf9f5a18::t_630724edfe626a 232,235,251-253,255,261,273,275,505
+  s_9fff5bdf9f5a18::t_bbbaf078e68c67 245
+  s_9fff5bdf9f5a18::t_fc47de4401cd41 272
+Assets/_Scripts/Battle/BattleReplayCommands.cs
+  s_9fff5bdf9f5a18::t_5027dbc079e8b6 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a4e71e6f420a196bf29e0f6a78e8912f10636485",
+  "prompts": {},
+  "sessions": {
+    "s_9fff5bdf9f5a18": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a211f9-b2e4-73e3-a63e-97536138abb5",
+        "model": "group/gpt-6.2-sol"
+      },
+      "human_author": "xiaoding521234 <2205002727@qq.com>"
+    }
+  }
+}
