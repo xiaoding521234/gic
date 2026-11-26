@@ -185,7 +185,7 @@ namespace GIC.Battle
             // 核心受威胁=我核心格在敌预测火线（§5.1 守势判据；威胁图 ms 级——每 AI 每秒拍一张）。
             // 学徒=战略层仅发育态（§9.2）：不建图（CoreThreatened 恒 false——学徒档配额脑本就
             // 无威胁图，战略侧同步零成本）；三账本红线与体力保底非态势机件、全档照常
-            bool developOnly = AIPlayerConfig.StrategistDevelopOnly(AIPlayerConfig.DifficultyOf(playerId));
+            bool developOnly = AIPlayerConfig.StrategistDevelopOnly(sim.GetAiDifficulty(playerId));
             state.CoreThreatened = false;
             if (!developOnly)
             {

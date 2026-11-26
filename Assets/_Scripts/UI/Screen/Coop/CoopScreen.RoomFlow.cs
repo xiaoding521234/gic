@@ -278,34 +278,31 @@ namespace GIC.UI
 
         void OnStartClick()
         {
-            if (_currentState != RoomState.Host) return;
+            if (_currentState != RoomState.Host || !NetworkServer.active) return;
             if (isClosing) return; // 已在开局转场/关闭中
 
             if (!ValidateStartConditions()) return; // 未通过：轻提示已弹原因
 
-            var players = _playerManager.GetAllPlayers().ToList();
-            bool hasRemote = players.Any(p => _roomManager != null && _roomManager.IsRemoteHuman(p.PlayerID));
+            var config = BattleLaunchConfig.BuildFromRoster(GetSelectedMapConfigName(), _playerManager.GetAllPlayers());
+            var remotePlayers = config.RemotePlayers().ToArray();
 
-            if (hasRemote)
+            if (remotePlayers.Length != 0)
             {
-                // LAN 开战（B7，2026-10-11）：清交换台账 → 广播 StartBattleEvent——各端（含 host 自己，
-                // 经 OnlyHost/All 事件本地回环）统一走 OnStartBattleReceived 转场；网络连接贯穿战斗不拆线
-                _roomManager.ResetBattleExchange();
+                config.MatchId = System.Guid.NewGuid().ToString("N");
+                if (_roomManager?.TryBeginBattleExchange(config.MatchId, remotePlayers) != true) return;
                 EventBusHub.Instance.Send(new StartBattleEvent
                 {
-                    MapConfigName = GetSelectedMapConfigName(),
-                    // 种子用表现层随机（开局壳层，不入模拟流；模拟核心禁该随机源）
-                    Seed = UnityEngine.Random.Range(0, int.MaxValue),
-                    // 迷雾批（2026-10-17）：LAN 对战同步默认对战迷雾（与 BuildFromRoster 口径一致）
-                    FogMode = (int)BattleFogMode.Skirmish,
-                    Players = players,
+                    MatchId = config.MatchId,
+                    MapConfigName = config.MapConfigName,
+                    Seed = config.Seed,
+                    FogMode = (int)config.FogMode,
+                    Players = config.Players,
                 });
             }
             else
             {
                 // 纯本机开局（host + 房间 AI 玩家）：拆线后本地 Prepare（AI 自动补位已退役——
                 // 单人须先「增加AI玩家」，开局门 Coop_NeedTwoTeams 拦空房）
-                var config = BattleLaunchConfig.BuildFromRoster(GetSelectedMapConfigName(), players);
                 StartCoroutine(StartGameTransition(config, stopNetwork: true));
             }
         }
@@ -317,29 +314,31 @@ namespace GIC.UI
         /// </summary>
         private void OnStartBattleReceived(StartBattleEvent evt)
         {
-            if (isClosing) return;
-            if (_currentState == RoomState.DisconnectedClient) return; // 不在房间（防御）
+            if (isClosing || _currentState == RoomState.DisconnectedClient || evt.SourcePlayerID != PlayerID.Host)
+                return;
+            if (string.IsNullOrEmpty(evt.MatchId) || evt.Players == null || evt.Players.Count < 2
+                || evt.Players.Any(p => p == null || string.IsNullOrEmpty(p.PlayerId) || p.MoraIncomePercent <= 0))
+            {
+                GICLog.Warn("[CoopScreen] 开局配置不完整；联机请使用同一版本");
+                return;
+            }
+
+            string localPlayerId = NetworkServer.active ? PlayerID.Host : _playerManager.SelfPlayerID;
+            if (!evt.Players.Any(p => !p.IsAI && p.PlayerId == localPlayerId))
+            {
+                GICLog.Warn("[CoopScreen] 开局名册没有本机座位");
+                return;
+            }
 
             var config = new BattleLaunchConfig
             {
                 MapConfigName = evt.MapConfigName,
                 Seed = evt.Seed,
                 IsNetworked = true,
-                // 迷雾批（2026-10-17）：随开战广播透传，LAN 各端同模式
+                MatchId = evt.MatchId,
+                LocalPlayerId = localPlayerId,
                 FogMode = (BattleFogMode)evt.FogMode,
-                Players = evt.Players != null
-                    ? evt.Players.Select(p => new BattlePlayerSetup
-                    {
-                        PlayerId = p.PlayerID,
-                        DisplayName = p.PlayerName,
-                        IsAI = p.IsAI,
-                        AIDifficulty = p.AIDifficulty,
-                        AIPersona = p.AIPersona,
-                        Team = p.Team,
-                        Color = p.Color,
-                        SpawnPosition = p.SpawnPosition,
-                    }).ToList()
-                    : new List<BattlePlayerSetup>(),
+                Players = evt.Players,
             };
 
             // 客户端先回卡组（本机存档当前卡组——与 BattleScreen 手牌构建同源），再转场
@@ -349,6 +348,7 @@ namespace GIC.UI
                 var cardManager = Wargame.Instance?.Context?.Get<GIC.Framework.CardManager>();
                 EventBusHub.Instance.Send(new ClientDeckEvent
                 {
+                    MatchId = config.MatchId,
                     Entries = BattleDeckBuilder.BuildCurrentDeck(saveManager, cardManager),
                     OwnedUnitIds = saveManager?.CurrentSave?.EnumerateOwnedUnitIds().ToList() ?? new List<int>(),
                 });

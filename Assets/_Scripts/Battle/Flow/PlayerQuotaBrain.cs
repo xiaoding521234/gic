@@ -71,11 +71,6 @@ namespace GIC.Battle
 
         // ==================== AI 玩家配置（AI-4 批，docs/active/42 §9——Inspector/harness 可调） ====================
 
-        /// <summary>难度档（Bind 时登记 AIPlayerConfig；对局中改档走 AIPlayerConfig.SetDifficulty
-        /// 即时生效——§9.2 决策质量阶梯，学徒=失误注入+关闭预测器/反应预期/意图板）</summary>
-        [Header("AI 玩家配置（AI-4）")]
-        public AIDifficulty 难度 = AIDifficulty.Grandmaster;
-
         /// <summary>人格原型包（§9.1 八原型资产 Resources/Configs/AI/Persona_*；null=回落默认
         /// Persona_经济家，资产缺失=中性 1.0——房间 AI 人格选择器=后续 UI 批）</summary>
         public PersonaPack 人格原型;
@@ -103,7 +98,6 @@ namespace GIC.Battle
             _session = session;
             _playerId = playerId;
             session.Flow.OnPhaseChanged += OnPhaseChanged;
-            AIPlayerConfig.SetDifficulty(playerId, 难度); // AI-4：难度登记（伙伴脑按归属查门）
         }
 
         private void OnDestroy()
@@ -190,7 +184,7 @@ namespace GIC.Battle
             //    候选落点吃避险扣分（AI 玩家专属感知；真人玩家对局零影响）。
             //    AI-4：per-unit tracker＋人格军备桶乘子；学徒=对手预测器关闭件（威胁图不建）。
             //    AI-5：人格×态势军备乘子合成+体力保底门（§5.3——保自主军团 2 秒拍运转量）
-            var difficulty = AIPlayerConfig.DifficultyOf(_playerId);
+            var difficulty = sim.GetAiDifficulty(_playerId);
             var threat = AIPlayerConfig.QuotaThreatEnabled(difficulty)
                 ? OpponentThreatModel.BuildCached(sim, snapshot, MyTeam, turn) // #2 审查批：秒级缓存
                 : null;

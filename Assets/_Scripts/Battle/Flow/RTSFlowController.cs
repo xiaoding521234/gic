@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Unity.Profiling;
 using GIC.Framework;
 using GIC.Data;
 using GIC.Tool;
@@ -70,6 +71,10 @@ namespace GIC.Battle
         private IBattleTransport _transport;
         private BattleResolver _resolver;
         private Func<string, int, bool> _ownsPurchaseUnit;
+        private IReadOnlyDictionary<int, List<ActionData>> _replayDecisions;
+        private Action<int, int> _replayHash;
+        private bool IsReplay => _replayDecisions != null;
+        private static readonly ProfilerMarker TickMarker = new ProfilerMarker("GIC.Battle.Tick");
 
         // ==================== 帧同步输入管线（F1，docs/active/50 §4） ====================
 
@@ -136,6 +141,7 @@ namespace GIC.Battle
             if (Phase != BattlePhase.Selecting || SelectTimerPaused) return false;
             InputBatchMessage batch = null;
             if (IsNetworked && !_inputTimeline.TryTakeNext(out batch)) return false;
+            using var tickSample = TickMarker.Auto();
 
             if (_pendingHashReport != null)
             {
@@ -148,6 +154,7 @@ namespace GIC.Battle
             _sim.CurrentTick = CurrentTick;
             AdvanceSimulationTick(batch);
             TryApplyHostBattleOver();
+            if (IsHost && !IsReplay) BattleRecorder.CaptureCompletedTick(CurrentTick);
             return true;
         }
 
@@ -156,7 +163,7 @@ namespace GIC.Battle
             if (_localBattleOver != null) return; // 本地已判出胜负，只继续消费权威拍，等待 Host 终局。
             if (batch != null)
             {
-                if (IsHost) BattleRecorder.CaptureInputBatch(batch);
+                if (IsHost && !IsReplay) BattleRecorder.CaptureInputBatch(batch);
                 if (ApplyInputBatch(batch.inputs)) return;
             }
 
@@ -175,15 +182,21 @@ namespace GIC.Battle
             _resolver.ResolveHarvestTick();
             if (CheckBattleEnded()) return;
 
-            // —— AI 三脑节拍（每 0.5 秒）——
-            if (CurrentTick % BattleMetrics.AiBeatTicks == 0)
-                RunAiBeat();
-
-            // —— 眷属脑摊平波（2026-11-06 后期卡顿修复）——
-            // 每个 0.5 秒节拍只处理 1/FamiliarDecisionSlices 的眷属候选（分 4 个 tick 摊完），
-            // 每单位仍每节拍决策一次——把「百余单位同拍全量」的 0.2~0.7 秒卡顿摊成 1/4 小片。
-            // 不用「全程逐 tick 摊」：tick 追帧时会被乘性放大成螺旋（实测 p50 反而劣化到 375ms）
-            RunFamiliarBrainWave();
+            bool aiBeat = CurrentTick % BattleMetrics.AiBeatTicks == 0;
+            if (IsHost && aiBeat) _sim.RevealFog();
+            if (IsReplay)
+            {
+                if (_replayDecisions.TryGetValue(CurrentTick, out var recordedAi))
+                {
+                    _resolver.ResolveAiActions(recordedAi);
+                    if (CheckBattleEnded()) return;
+                }
+            }
+            else
+            {
+                if (aiBeat) RunAiBeat();
+                RunFamiliarBrainWave();
+            }
 
             // —— 每秒整拍（发放/Buff 计时/泡湿/灵魂/采集/建筑效果 + 快照 + 时钟 + hash）——
             if (CurrentTick % BattleMetrics.TicksPerSecond == 0)
@@ -199,10 +212,6 @@ namespace GIC.Battle
             if (Phase != BattlePhase.Selecting) return;
             if (!IsHost) return; // F1：AI 三脑只在 Host 跑；客户端只消费 InputBatch 里的 AI 行动
             int second = CurrentSecond;
-
-            // Host 探索账本同步（决策七十九 P4 适配：旧「BeginSelectPhase 单钩」随回合机退役——
-            // 决策时态同步语义秒化为每 AI 节拍揭雾；客户端表现层逐帧揭雾不受影响）
-            _sim.RevealFog();
 
             // 眷属脑改按 tick 相位摊平（2026-11-06 后期卡顿修复）：见 RunFamiliarBrainSlice——
             // 百余眷属同拍全量决策=单拍 0.7~0.2 秒卡顿，现每 tick 只决策 1/AiBeatTicks 的候选
@@ -305,23 +314,21 @@ namespace GIC.Battle
             // 战斗时钟：每秒 +1 分钟（昼夜跨界音乐选池链按既有 BattleTimePeriod 消费自动跟随）
             BattleTimeMinutes = (BattleTimeMinutes + BattleMetrics.BattleClockMinutesPerSecond) % (24 * 60);
 
-            // desync hash（确定性护栏四：单机自证断言 + 后置 LAN 漂移定位，王者荣耀同款）
-            // desync hash（确定性护栏四）：Host 记录按 tick 供比对；客户端上报
+            // Host 记账，客户端上报；回放在同一拍读取 hash。
             int stateHash = ComputeStateHash(_sim);
-            BattleRecorder.CaptureTickHash(CurrentTick, stateHash);
+            if (IsReplay)
+            {
+                _replayHash?.Invoke(CurrentTick, stateHash);
+                return;
+            }
+            if (IsHost) BattleRecorder.CaptureTickHash(CurrentTick, stateHash);
             if (IsNetworked)
             {
                 if (IsHost)
                 {
                     _hostHashByTick[CurrentTick] = stateHash;
-                    if (_hostHashByTick.Count > 4 * 60 * BattleMetrics.TicksPerSecond)
-                    {
-                        int minTick = CurrentTick - 4 * 60 * BattleMetrics.TicksPerSecond;
-                        var stale = new List<int>();
-                        foreach (var kv in _hostHashByTick)
-                            if (kv.Key < minTick) stale.Add(kv.Key);
-                        foreach (var k in stale) _hostHashByTick.Remove(k);
-                    }
+                    const int historyTicks = 4 * 60 * BattleMetrics.TicksPerSecond;
+                    if (CurrentTick > historyTicks) _hostHashByTick.Remove(CurrentTick - historyTicks);
                 }
                 else
                 {
@@ -361,7 +368,7 @@ namespace GIC.Battle
                     NextSeq(action.playerId));
 
             if (!CanAdmitPurchase(action)) return false;
-            BattleRecorder.CaptureSubmittedAction(action); // 单机 v2：拍末提交窗，不是联机的拍首输入。
+            BattleRecorder.CaptureSubmittedAction(action); // 单机是拍末提交窗，不是联机的拍首输入。
             RememberPlayerAction(action);
             _resolver.ResolveSubmittedAction(action);
             CheckBattleEnded();
@@ -474,7 +481,7 @@ namespace GIC.Battle
         {
             Stop();
             _transport.HostSend(BattleMessageType.BattleOver, result);
-            BattleRecorder.CaptureGameOver(result.winnerTeam, CurrentSecond);
+            if (IsHost && !IsReplay) BattleRecorder.CaptureGameOver(result.winnerTeam, result.finalTick);
         }
 
         /// <summary>胜负判定（协议核心批拍板，docs/02 §2——与旧 TurnFlowController 逐条同构；回放器
@@ -519,7 +526,36 @@ namespace GIC.Battle
             IsHost = isHost;
             IsNetworked = isNetworked;
             _ownsPurchaseUnit = ownsPurchaseUnit;
-            _resolver = new BattleResolver(sim, transport, this);
+            _resolver = new BattleResolver(sim, transport, this) { RecordSegments = isHost };
+            _replayDecisions = null;
+            _replayHash = null;
+        }
+
+        /// <summary>回放使用正式逐拍推进，但仅执行已录制的决策，不重新运行大脑或向网络发包。</summary>
+        public void BindReplay(BattleSimState sim, IBattleTransport transport, bool isNetworked,
+            IReadOnlyDictionary<int, List<ActionData>> decisions, Action<int, int> onHash)
+        {
+            Bind(sim, transport, isNetworked: isNetworked);
+            _replayDecisions = decisions ?? throw new ArgumentNullException(nameof(decisions));
+            _replayHash = onHash;
+            _resolver.RecordSegments = false;
+        }
+
+        public bool StepReplay(InputBatchMessage batch)
+        {
+            if (!IsReplay || Phase != BattlePhase.Selecting || IsNetworked != (batch != null)) return false;
+            if (batch != null && (batch.tick != CurrentTick + 1 || !_inputTimeline.TryReceive(batch))) return false;
+            return TickAdvance();
+        }
+
+        /// <summary>单机录制的上交已通过接纳，按录制时机执行（含第 0 拍）。</summary>
+        public bool ApplyReplaySubmit(ActionData action)
+        {
+            if (!IsReplay || IsNetworked || Phase != BattlePhase.Selecting || action?.submitTick != CurrentTick)
+                return false;
+            _resolver.ResolveSubmittedAction(action);
+            CheckBattleEnded();
+            return true;
         }
 
         // ==================== 帧同步输入管线（F1） ====================
@@ -550,7 +586,7 @@ namespace GIC.Battle
         /// <summary>Host 在开局及每拍末尾封存下一拍；只定序一次，只发送一次。</summary>
         private void SealAndBroadcastNextTick()
         {
-            if (!IsHost || !IsNetworked || Phase != BattlePhase.Selecting) return;
+            if (!IsHost || !IsNetworked || IsReplay || Phase != BattlePhase.Selecting) return;
             _transport.HostSend(BattleMessageType.InputBatch, _inputTimeline.SealNext());
         }
 

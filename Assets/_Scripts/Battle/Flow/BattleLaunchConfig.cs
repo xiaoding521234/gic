@@ -20,6 +20,21 @@ namespace GIC.Battle
         /// <summary>AI 玩家难度档（2026-10-12 选择器批：房间 AI 行点选→PlayerInfo→BuildFromRoster 透传）</summary>
         public AIDifficulty AIDifficulty = AIDifficulty.Grandmaster;
 
+        /// <summary>房主开局时写入的实际收入倍率；局内规则不依赖是否挂载 AI 脑。</summary>
+        public int MoraIncomePercent;
+
+        /// <summary>本地开局补齐规则；联机客户端只消费房主已写入的数值。</summary>
+        public void ResolveRules()
+        {
+            if (!IsAI) AIDifficulty = AIDifficulty.Grandmaster;
+            if (MoraIncomePercent <= 0)
+                MoraIncomePercent = AIPlayerConfig.ResolveMoraIncomePercent(AIDifficulty);
+        }
+
+        /// <summary>将名册规则交给本局模拟，不读取本地配置资产。</summary>
+        public void RegisterIn(BattleSimState sim)
+            => sim.RegisterPlayer(PlayerId, Team, AIDifficulty, MoraIncomePercent);
+
         /// <summary>AI 玩家人格原型名（Resources/Configs/AI/Persona_{名}——BattleScreen 按名换资产）</summary>
         public string AIPersona = "经济家";
 
@@ -49,6 +64,20 @@ namespace GIC.Battle
         /// 各端据此选装配形态（host=CreateHosted / 客户端=CreateClient），且开局转场不拆网络连接；
         /// 本地直开（调试/沙盒/纯 AI 对战）false=CreateLocal 旧链路</summary>
         public bool IsNetworked;
+
+        /// <summary>标识本次开局，卡组、就绪与战斗消息均需匹配。</summary>
+        public string MatchId;
+
+        /// <summary>接收房间开局时固定的本机座位，不随加载期间的连接状态变化。</summary>
+        public string LocalPlayerId;
+
+        /// <summary>按开局名册查找远端真人，不依赖可能已变化的房间连接表。</summary>
+        public IEnumerable<string> RemotePlayers()
+        {
+            foreach (var player in Players)
+                if (!player.IsAI && player.PlayerId != PlayerID.Host)
+                    yield return player.PlayerId;
+        }
 
         /// <summary>试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A 方=正在编辑时轮的持有单位
         /// （层级覆盖 5★魔神档=玩家全手操全部技能）；B 方=木桩空座（IsAI=false：配额脑不挂=木桩纯站桩，
@@ -117,7 +146,7 @@ namespace GIC.Battle
             };
             foreach (var p in players)
             {
-                config.Players.Add(new BattlePlayerSetup
+                var setup = new BattlePlayerSetup
                 {
                     PlayerId = p.PlayerID,
                     DisplayName = p.PlayerName,
@@ -127,7 +156,9 @@ namespace GIC.Battle
                     Team = p.Team,
                     Color = p.Color,
                     SpawnPosition = p.SpawnPosition,
-                });
+                };
+                setup.ResolveRules();
+                config.Players.Add(setup);
             }
             return config;
         }
@@ -155,6 +186,7 @@ namespace GIC.Battle
                     {
                         PlayerId = BattleDebugPlayerIds.P2,
                         DisplayName = "木桩",
+                        Team = TeamType.B,
                         IsAI = false, // 空座：不挂配额脑=木桩不还手（勿改 true——AI 会操温迪反击）
                     },
                 },

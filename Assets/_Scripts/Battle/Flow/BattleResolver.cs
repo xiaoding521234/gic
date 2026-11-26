@@ -21,6 +21,7 @@ namespace GIC.Battle
         private readonly BattleSimState _sim;
         private readonly IBattleTransport _transport;
         private readonly IBattleResolverHost _flow;
+        internal bool RecordSegments { get; set; }
 
         /// <summary>建筑效果系统（2026-10-26 fix-batch2 ③收口：内联建筑段迁出——效果拍效果收集/
         /// 元能引擎过阈收集与发射全走本实例；每局随 resolver 创建，无静态跨局状态）</summary>
@@ -752,10 +753,7 @@ namespace GIC.Battle
             int grantIndex = 0;
             foreach (var pid in _sim.PlayerIds)
             {
-                // 凌晨批议题⑥天理经济作弊：摩拉发放按难度倍率（AIPlayerConfig.MoraIncomePercentOf
-                // 单源——天理=AITuning.天理摩拉收入百分比、其余档恒 100 零变化；SC2 CheatMoney/petra
-                // 经济倍率表先例：决策逻辑不动、收入作弊）
-                int moraGain = BattleMetrics.MoraGainPerSecond * AIPlayerConfig.MoraIncomePercentOf(pid) / 100;
+                int moraGain = _sim.ScaleMoraIncome(pid, BattleMetrics.MoraGainPerSecond);
                 _sim.ApplyMoraDelta(pid, moraGain);
                 segment.commands.Add(BattleCommand.StatChange(pid, sliceIndex, grantIndex++,
                     BattleCommand.StatKindMora, moraGain));
@@ -2125,7 +2123,7 @@ namespace GIC.Battle
         private void PushSegment(Segment segment)
         {
             // 回放录制（2026-10-20 Replay harness 批）：命令流本体在推送前定稿——断言面单点
-            BattleRecorder.CaptureSegment(segment);
+            if (RecordSegments) BattleRecorder.CaptureSegment(segment);
             // 对手档案采集（AI-2 批，docs/active/42 §4）：段命令流观察——Damage→元素习惯/最爱
             // 目标/交战距离，Death(建筑)→核心摧毁事件账本（公开信息=全体客户端广播态，红线①合规）
             OpponentProfiler.ObserveCommands(_sim, segment.commands, segment.turnNumber);

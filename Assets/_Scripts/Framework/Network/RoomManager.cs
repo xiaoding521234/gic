@@ -227,41 +227,51 @@ namespace GIC.Framework
 
         // ==================== 客户端卡组上报存储（B7 LAN 批） ====================
 
-        private readonly Dictionary<string, ClientDeckEvent> _uploadedDecks
-            = new Dictionary<string, ClientDeckEvent>();
+        private BattleStartExchange _battleExchange;
 
-        // 战斗就绪握手（ClientBattleReadyEvent 收存；host 开局广播前等齐判据）
-        private readonly HashSet<string> _battleReadyPlayers = new HashSet<string>();
+        /// <summary>正式对局从发起开战起不接新连接，直至房间关闭。</summary>
+        public bool IsBattleRoomLocked => _battleExchange != null;
 
-        /// <summary>玩家是否已上报卡组（host 开局装配等待判据）</summary>
-        public bool HasUploadedDeck(string playerID) => _uploadedDecks.ContainsKey(playerID);
-
-        /// <summary>取玩家上报卡组（无上报返回 null——调用方回落 host 卡组）</summary>
-        public List<HandCard> GetUploadedDeck(string playerID)
-            => _uploadedDecks.TryGetValue(playerID, out var upload) ? upload.Entries : null;
+        /// <summary>取玩家上报卡组；空卡组与未上报不是一回事。</summary>
+        public IReadOnlyList<HandCard> GetUploadedDeck(string playerID) => _battleExchange?.GetDeck(playerID)?.Entries;
 
         /// <summary>取玩家声明的收藏；缺失时不回落到房主收藏。</summary>
         public IReadOnlyList<int> GetUploadedOwnedUnitIds(string playerID)
-            => _uploadedDecks.TryGetValue(playerID, out var upload) ? upload.OwnedUnitIds : null;
-
-        /// <summary>玩家是否已发战斗就绪握手（host 开局等待判据）</summary>
-        public bool IsBattleReady(string playerID) => _battleReadyPlayers.Contains(playerID);
+            => _battleExchange?.GetDeck(playerID)?.OwnedUnitIds;
 
         /// <summary>是否远端真人（host 视角：非 AI、有活动网络连接且非本机连接）——就绪/卡组等待名单用</summary>
-        public bool IsRemoteHuman(string playerID)
+        private bool IsRemoteHuman(string playerID)
         {
+            if (string.IsNullOrEmpty(playerID)) return false;
             var info = playerManager.GetPlayerInfo(playerID);
-            return info != null && !info.IsAI
-                && info.connectionToClient != null
-                && !(info.connectionToClient is Mirror.LocalConnectionToClient);
+            var conn = info?.connectionToClient;
+            return info != null && !info.IsAI && conn != null && !(conn is LocalConnectionToClient)
+                && NetworkServer.connections.TryGetValue(conn.connectionId, out var current)
+                && ReferenceEquals(current, conn);
         }
 
-        /// <summary>清空卡组上报+就绪握手（host 每次开局前调用，防跨局残留）</summary>
-        public void ResetBattleExchange()
+        /// <summary>按发起开战时的名册冻结远端名单。</summary>
+        public bool TryBeginBattleExchange(string matchId, IEnumerable<string> remotePlayerIds)
         {
-            _uploadedDecks.Clear();
-            _battleReadyPlayers.Clear();
+            if (!NetworkServer.active || IsBattleRoomLocked) return false;
+            _battleExchange = new BattleStartExchange(matchId, remotePlayerIds);
+            return true;
         }
+
+        /// <summary>仅在本局所有远端依然在线，且卡组和战斗就绪均已收到时放行。</summary>
+        public bool IsBattleExchangeReady(string matchId, out bool failed)
+        {
+            if (NetworkServer.active && _battleExchange != null)
+                return _battleExchange.IsReady(matchId, IsRemoteHuman, out failed);
+            failed = true;
+            return false;
+        }
+
+        public bool TryCompleteBattleExchange(string matchId)
+            => NetworkServer.active && _battleExchange?.TryStart(matchId, IsRemoteHuman) == true;
+
+        /// <summary>关闭房间时清掉交换状态，避免同进程下一场串局。</summary>
+        public void ResetBattleExchange() => _battleExchange = null;
 
         // ==================== 清理 ====================
 
@@ -482,9 +492,8 @@ namespace GIC.Framework
             public void Handle(ClientDeckEvent e)
             {
                 string pid = e.SourcePlayerID;
-                if (string.IsNullOrEmpty(pid) || !_room.IsRemoteHuman(pid)) return;
-                _room._uploadedDecks[pid] = e;
-                GICLog.Info($"[RoomManager] 收到玩家 {pid} 卡组上报: {e.Entries?.Count ?? 0} 条");
+                if (_room._battleExchange != null && _room.IsRemoteHuman(pid) && _room._battleExchange.TryAcceptDeck(e))
+                    GICLog.Info($"[RoomManager] 收到玩家 {pid} 卡组上报: {e.Entries.Count} 条");
             }
         }
 
@@ -493,14 +502,12 @@ namespace GIC.Framework
         {
             private readonly RoomManager _room;
             public ClientBattleReadyHandler(RoomManager m) => _room = m;
-            public bool CanHandle(ClientBattleReadyEvent e) => NetworkServer.active;
+            public bool CanHandle(ClientBattleReadyEvent e) => NetworkServer.active && e.Source == EventSource.Network;
             public void Handle(ClientBattleReadyEvent e)
             {
                 string pid = e.SourcePlayerID;
-                if (string.IsNullOrEmpty(pid) || pid == PlayerID.Unknown) pid = _room.playerManager.SelfPlayerID;
-                if (string.IsNullOrEmpty(pid)) return;
-                _room._battleReadyPlayers.Add(pid);
-                GICLog.Info($"[RoomManager] 玩家 {pid} 战斗就绪握手到达");
+                if (_room._battleExchange != null && _room.IsRemoteHuman(pid) && _room._battleExchange.TryMarkReady(e))
+                    GICLog.Info($"[RoomManager] 玩家 {pid} 战斗就绪握手到达");
             }
         }
     }

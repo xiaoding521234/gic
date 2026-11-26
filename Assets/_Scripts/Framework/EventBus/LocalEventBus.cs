@@ -56,9 +56,10 @@ namespace GIC.Framework
 
             ProcessOneHandler(queued);
 
-            if (queued.State == EventProcessState.Completed || queued.State == EventProcessState.Cancelled)
+            if (firstNode.List == _eventQueue
+                && (queued.State == EventProcessState.Completed || queued.State == EventProcessState.Cancelled))
             {
-                _eventQueue.RemoveFirst();
+                _eventQueue.Remove(firstNode);
             }
         }
 
@@ -99,8 +100,6 @@ namespace GIC.Framework
             var type = eventData.GetType();
 
             queued.State = EventProcessState.Processing;
-            queued.ExecutedHandlers ??= new HashSet<BaseEventHandler>();
-
             if (_processingEvents.Contains(eventData))
             {
                 GICLog.Warn($"[LocalEventBus] 事件循环检测: {type.Name}");
@@ -112,39 +111,19 @@ namespace GIC.Framework
 
             try
             {
-                if (!_handlers.TryGetValue(type, out var list) || list.Count == 0)
+                // 固定本次派发的次序；处理器可关面板并退订，但不移动本次游标。
+                queued.Handlers ??= SnapshotHandlers(type);
+
+                while (queued.CurrentHandlerIndex < queued.Handlers.Length)
                 {
-                    queued.State = EventProcessState.Completed;
-                    return;
-                }
-
-                while (queued.CurrentHandlerIndex < list.Count)
-                {
-                    var handlerInfo = list[queued.CurrentHandlerIndex];
-                    queued.CurrentHandlerIndex++;
-
-                    var eventHandler = handlerInfo.EventHandler;
-
-                    if (queued.ExecutedHandlers.Contains(eventHandler)) continue;
-
+                    var handlerInfo = queued.Handlers[queued.CurrentHandlerIndex++];
                     if (!eventData.Active)
                     {
                         queued.State = EventProcessState.Cancelled;
                         return;
                     }
 
-                    if (!eventHandler.CanHandle(eventData)) continue;
-
-                    queued.ExecutedHandlers.Add(eventHandler);
-
-                    try
-                    {
-                        eventHandler.Handle(eventData);
-                    }
-                    catch (Exception ex)
-                    {
-                        GICLog.Error($"[LocalEventBus] 处理事件出错: {ex.Message}\n{ex.StackTrace}");
-                    }
+                    if (!TryDispatch(handlerInfo, eventData)) continue;
 
                     if (!eventData.Active)
                     {
@@ -153,7 +132,7 @@ namespace GIC.Framework
                     }
 
                     // 没有更多handler了，立即标记完成（不浪费一个tick）
-                    if (queued.CurrentHandlerIndex >= list.Count)
+                    if (queued.CurrentHandlerIndex >= queued.Handlers.Length)
                     {
                         queued.State = EventProcessState.Completed;
                     }
@@ -234,24 +213,38 @@ namespace GIC.Framework
         private void ExecuteImmediate(BaseEvent eventData)
         {
             var type = eventData.GetType();
-            if (!_handlers.TryGetValue(type, out var list)) return;
-
-            foreach (var handlerInfo in list)
+            if (!_processingEvents.Add(eventData))
             {
-                if (!eventData.Active) break;
-
-                var eventHandler = handlerInfo.EventHandler;
-                if (!eventHandler.CanHandle(eventData)) continue;
-
-                try
+                GICLog.Warn($"[LocalEventBus] 事件循环检测: {type.Name}");
+                return;
+            }
+            try
+            {
+                foreach (var handlerInfo in SnapshotHandlers(type))
                 {
-                    eventHandler.Handle(eventData);
-                }
-                catch (Exception ex)
-                {
-                    GICLog.Error($"[LocalEventBus] 立即执行出错: {ex.Message}");
+                    if (!eventData.Active) break;
+                    TryDispatch(handlerInfo, eventData);
                 }
             }
+            finally { _processingEvents.Remove(eventData); }
+        }
+
+        private HandlerInfo[] SnapshotHandlers(Type type)
+            => _handlers.TryGetValue(type, out var list) ? list.ToArray() : Array.Empty<HandlerInfo>();
+
+        private static bool TryDispatch(HandlerInfo handler, BaseEvent eventData)
+        {
+            if (!handler.Subscribed) return false;
+            try
+            {
+                if (!handler.EventHandler.CanHandle(eventData) || !handler.Subscribed || !eventData.Active) return false;
+                handler.EventHandler.Handle(eventData);
+            }
+            catch (Exception ex)
+            {
+                GICLog.Error($"[LocalEventBus] 处理事件出错: {ex.Message}\n{ex.StackTrace}");
+            }
+            return true;
         }
 
         #endregion
@@ -311,6 +304,7 @@ namespace GIC.Framework
                 if (list[i].EventHandler.Equals(eventHandler))
                 {
                     list[i].Priority = priority;
+                    if (owner != null) list[i].Owner = owner;
                     SortHandlersByPriority(list);
                     return;
                 }
@@ -332,6 +326,7 @@ namespace GIC.Framework
                     if (list[i].EventHandler is EventHandlerWrapper<T> wrapper &&
                         wrapper.InnerHandler.Equals(eventHandler))
                     {
+                        list[i].Subscribed = false;
                         list.RemoveAt(i);
                         break;
                     }
@@ -360,6 +355,7 @@ namespace GIC.Framework
                 {
                     if (ReferenceEquals(list[i].Owner, owner))
                     {
+                        list[i].Subscribed = false;
                         list.RemoveAt(i);
                         removed++;
                     }
@@ -401,11 +397,16 @@ namespace GIC.Framework
 
         public void ClearSubscriptions<T>() where T : BaseEvent
         {
-            _handlers.Remove(typeof(T));
+            var type = typeof(T);
+            if (!_handlers.TryGetValue(type, out var list)) return;
+            foreach (var handler in list) handler.Subscribed = false;
+            _handlers.Remove(type);
         }
 
         public void ClearAllSubscriptions()
         {
+            foreach (var list in _handlers.Values)
+                foreach (var handler in list) handler.Subscribed = false;
             _handlers.Clear();
             _subscriptionCounter = 0;
         }
@@ -498,6 +499,7 @@ namespace GIC.Framework
 
         private class HandlerInfo
         {
+            public bool Subscribed = true;
             public BaseEventHandler EventHandler;
             public int Priority;
             public long Order;
@@ -509,7 +511,7 @@ namespace GIC.Framework
             public BaseEvent EventData;
             public EventProcessState State = EventProcessState.Waiting;
             public int CurrentHandlerIndex = 0;
-            public HashSet<BaseEventHandler> ExecutedHandlers;
+            public HandlerInfo[] Handlers;
             public EventSource Source;
         }
 

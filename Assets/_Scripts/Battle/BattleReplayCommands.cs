@@ -31,6 +31,7 @@ namespace GIC.Battle
                     return CommandResult.Ok($"回放录制开（下一局起生效；文件={ReplayDir()}）");
                 case "off":
                     BattleRecorder.Enabled = false;
+                    BattleRecorder.EndSession();
                     return CommandResult.Ok("回放录制关");
                 case "status":
                 {

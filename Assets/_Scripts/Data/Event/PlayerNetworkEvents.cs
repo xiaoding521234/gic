@@ -1,5 +1,6 @@
 ﻿// PlayerNetworkEvents.cs - 玩家网络相关事件
 using System.Collections.Generic;
+using GIC.Battle;
 using GIC.Framework;
 namespace GIC.Data
 {
@@ -229,14 +230,15 @@ namespace GIC.Data
     /// <summary>
     /// 开战广播（服务器 -> 所有客户端）：host 校验通过后下发同一份开局配置（地图名/种子/名册），
     /// 各端转场加载同一战斗场景（docs/18 决策一：Host 权威；同 seed+同命令序列=同战局）。
-    /// 名册 PlayerInfo 含 IsAI/Team/Color/SpawnPosition——颜色/队伍/出生点真实进局内。
+    /// 名册携带房主已解析的规则及颜色/队伍/出生点。
     /// FogMode=迷雾模式（2026-10-17 迷雾批）：host 按 BuildFromRoster 口径置 Skirmish 透传。
     /// </summary>
     public class StartBattleEvent : BaseEvent
     {
+        public string MatchId;
         public string MapConfigName;
         public int Seed;
-        public List<PlayerInfo> Players = new List<PlayerInfo>();
+        public List<BattlePlayerSetup> Players = new List<BattlePlayerSetup>();
 
         /// <summary>迷雾模式（BattleFogMode 的 int 值——事件层枚举一律 int 载荷，JsonUtility 零容错）</summary>
         public int FogMode = (int)BattleFogMode.Skirmish;
@@ -254,6 +256,7 @@ namespace GIC.Data
     /// </summary>
     public class ClientDeckEvent : BaseEvent
     {
+        public string MatchId;
         public List<HandCard> Entries = new List<HandCard>();
         public List<int> OwnedUnitIds = new List<int>();
 
@@ -267,10 +270,12 @@ namespace GIC.Data
     /// <summary>
     /// 客户端战斗就绪握手（客户端 -> 服务器，OnlyHost）：LAN 客户端装配完毕（HUD 绑定完成、
     /// BattleNetMessage 路由就绪）后发出——host 收齐全部远端真人握手才广播开局（BattleStart），
-    /// Host 永不跑在客户端前面（传输层另有早到队列双保险）。
+    /// Host 永不跑在客户端前面。
     /// </summary>
     public class ClientBattleReadyEvent : BaseEvent
     {
+        public string MatchId;
+
         public ClientBattleReadyEvent()
         {
             Type = GIC.Framework.EventType.OnlyHost;

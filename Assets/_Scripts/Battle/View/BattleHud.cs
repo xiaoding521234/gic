@@ -484,7 +484,7 @@ namespace GIC.Battle
             _onCloseBattle = onCloseBattle;
             // 本端玩家身份（2026-10-11 联机批）：联机=房间分配的 PlayerID（connectionId）；
             // 本地双开/调试直开（无房间名册）回落 P1
-            _myPlayerId = ResolveLocalPlayerId();
+            _myPlayerId = session.LocalPlayerId;
 
             ResolveHudReferences(); // prefab 寻址接线（结构=BattleHud.prefab，2026-09-22 prefab 化）
 
@@ -493,7 +493,6 @@ namespace GIC.Battle
             Wargame.Instance.Context.Inject(this);
             InitMyResourceChipIcons(); // B6d：chip 图标走 [Autowired] ItemConfig——必须在注入后初始化（寻址阶段为 null）
             ApplySavedLayoutOnStart();
-            _myPlayerId = ResolveLocalPlayerId(); // 注入后再解析一次（SelfPlayerID 经容器可达；两次同值幂等）
 
             _session.Player.SnapshotUpdated += OnSnapshotUpdated;
             _session.Player.OnResourceDelta += OnResourceDeltaHandler; // B6d：摩拉/体力命令增量（快照权威外的即时刷新）
@@ -536,17 +535,6 @@ namespace GIC.Battle
 
         /// <summary>输入系统快捷键派发（[Autowired] 注入；Bind 注入后订阅，docs/14 §78 寻址/注入分离）</summary>
         [Autowired] private InputManager _inputManager;
-
-        /// <summary>本端玩家身份解析（2026-10-11 联机批）：联机对局=房间分配的 PlayerID
-        /// （PlayerManager.SelfPlayerID——connectionId/AI 恒不指向真人本机）；本地双开/调试直开
-        /// （未连房间=Offline）回落 P1。Bind 注入前后各解析一次（首次兜注入序）</summary>
-        private string ResolveLocalPlayerId()
-        {
-            var pm = Wargame.Instance?.Context?.Get<PlayerManager>();
-            var id = pm?.SelfPlayerID;
-            if (!string.IsNullOrEmpty(id) && id != PlayerID.Offline) return id;
-            return BattleDebugPlayerIds.P1;
-        }
 
         /// <summary>血条填色解析（2026-10-15 拍板「设置·战斗·血条颜色」双模式——**只影响血条填充色**，
         /// 底座圆盘/选中描边/弧光等其余玩家色链路不动）：玩家色=归属玩家色（2026-10-12 现行口径）；

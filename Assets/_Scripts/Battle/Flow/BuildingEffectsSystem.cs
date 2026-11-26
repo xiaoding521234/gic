@@ -75,10 +75,7 @@ namespace GIC.Battle
                     case BuildingEffectKind.MoraIncome:
                     {
                         if (data.效果数值 <= 0) break;
-                        // 凌晨批议题⑥天理经济作弊：建筑摩拉收入同乘难度倍率（MoraIncomePercentOf 单源，
-                        // 与秒拍发放同口径；掠夺/卡牌消耗不复用=作弊只在「收入」语义内）
-                        int moraGain = data.效果数值
-                            * AIPlayerConfig.MoraIncomePercentOf(building.identity.OwnerPlayerID) / 100;
+                        int moraGain = _sim.ScaleMoraIncome(building.identity.OwnerPlayerID, data.效果数值);
                         _sim.ApplyMoraDelta(building.identity.OwnerPlayerID, moraGain);
                         extraCommands.Add(BattleCommand.StatChange(building.identity.OwnerPlayerID, 0, 0,
                             BattleCommand.StatKindMora, moraGain));

@@ -14,25 +14,7 @@ namespace GIC.Editor
 {
 
 
-    /// <summary>
-    /// 回放回归工具 v2（决策九十五 P6 批，docs/active/48 §8 拍板 7——v1 回合格式随回合机归档不迁移；
-    /// v1 原案 2026-10-20=docs/18 决策八十四）：
-    /// 消费 BattleRecorder 的 JSONL 录制（即时制 tick 格式）——编辑器域 headless 重建 BattleSimState
-    /// （同 seed / 同初始配置），按录制的行动流逐 tick 重演，**每拍窗口序与
-    /// RTSFlowController.TickAdvance 逐窗口同构**：
-    ///   ① 移动推进（RTSMovementSystem.AdvanceTick→ResolveMoveArrivals）
-    ///   ② AI 节拍窗（%10：RevealFog 决策时态账本同步 + 按 tick 喂录制 AI 批——不重跑任何脑）
-    ///   ③ 秒拍（%20：ResolveSecondBeat——秒拍族+效果拍 %40）
-    ///   ④ hash 自证（录制 tick hash 行同点位比对，确定性护栏四）
-    ///   ⑤ 单机 submit 窗（录制的上交含购买，按 submitTick 和文件序送同一演算入口）
-    ///
-    /// 断言面三件：Segment 命令流逐条 diff（主）+ tick hash 自证（秒拍状态全量）+ 终局对照（胜方+终局拍）。
-    /// 用途：演算层（BattleResolver/EffectCompiler/BattleSimState/Buff/DamagePipeline/RTSMovementSystem）
-    /// 改动后的回归安全网 + 后置 LAN desync 调试底座。脑层不在断言面——脑改动需重录基线。
-    ///
-    /// 用法：录制（游戏内 `replay on` 打一局，或观察局 harness）→ 菜单 Tools/TG/回放回归。
-    /// 自测=合成录制+回放全链闭环（不进 Play，验证录制器写盘↔回放器读盘重建↔tick 窗口序）。
-    /// </summary>
+    /// <summary>用正式战斗逐拍逻辑重演单机 v2/v3 或联机 v3 录制，并比对命令、状态及终局。</summary>
     public static class ReplayRunner
     {
         private static string ReplayDir => Path.Combine(Application.persistentDataPath, "Replays");
@@ -124,179 +106,116 @@ namespace GIC.Editor
             GameObject logicRoot = null;
             try
             {
+                if (EditorApplication.isPlayingOrWillChangePlaymode || BattleRecorder.CurrentPath != null)
+                    return "FAIL：请退出 Play Mode 并结束当前录制后重演";
                 var recording = ParseFile(jsonlPath);
-                if (recording.Header == null)
-                    return "FAIL：录制缺 header 行（文件损坏或非录制文件）";
-                if (recording.Header.formatVersion < 2)
-                    return "FAIL：v1 旧回合制格式已归档不迁移（决策九十五拍板 7）——请用即时制版本重新录制（replay on 打一局）";
-                if (recording.Header.isNetworked)
-                    return "FAIL：联机录制仅供诊断（结算拍 inputBatch/命令/状态 hash）；本工具只重演单机 v2。";
+                var header = recording.Header;
+                bool hasEndTick = header.formatVersion >= 3;
+                if (header.formatVersion < 2 || header.formatVersion > ReplayHeaderLine.CurrentFormat)
+                    return $"FAIL：不支持的回放格式 v{header.formatVersion}";
+                if (header.isNetworked && !hasEndTick)
+                    return "FAIL：旧联机 v2 录制仅供诊断；联机重演需重新录制 v3";
+                if (hasEndTick && recording.End == null)
+                    return "FAIL：v3 缺少结束拍（录制仍在写入或未正常收笔）";
+                if (header.players == null || header.players.Count < 2
+                    || (hasEndTick && header.players.Any(p => p == null || p.moraIncomePercent <= 0)))
+                    return "FAIL：回放开局名册或玩家规则不完整";
+                if (header.isNetworked && (recording.AiBatches.Count != 0 || recording.Submits.Count != 0)
+                    || !header.isNetworked && recording.Inputs.Count != 0)
+                    return "FAIL：录制包含与对局模式不一致的输入";
 
-                // —— AI 难度注册（天理档经济作弊=Host 侧结算差异源：秒拍末摩拉发放/建筑收入乘倍率）——
-                //    重演前注册进 AIPlayerConfig；旧录制缺字段=类默认棋圣（无作弊）零漂移
-                foreach (var pl in recording.Header.players)
-                {
-                    if (pl.isAI == 0) continue;
-                    AIPlayerConfig.SetDifficulty(pl.playerId, (AIDifficulty)pl.aiDifficulty);
-                }
-
-                // —— 编辑器域配置容器（演算层经 Wargame.Instance?.Context?.Get<ItemConfig>() 读配置；
-                //    编辑器域 Boot 未跑容器为空——最小容器注入：仅 ConfigManager（Bean 链），
-                //    勿跑 Wargame.Init 全家桶〔SaveManager 等有副作用〕）
-                EnsureEditorConfigs();
-
-                // —— 重建初始态（与 BattleScreen 开局装配逐参同构）——
-                logicRoot = new GameObject("ReplayLogicRoot") { hideFlags = HideFlags.HideAndDontSave };
-                var sim = BuildSimFromHeader(recording.Header, logicRoot);
-                var transport = new CollectingTransport();
-                var resolver = new BattleResolver(sim, transport, new FakeResolverHost());
-
-                // —— 录制流索引：AI 批按**录制 tick** 建索引（伙伴脑=节拍 tick；眷属摊平波=节拍后
-                // 1..FamiliarDecisionSlices tick，2026-11-06 起批不再恒落 %10）；submit 按行序（file 序=时间序）——
-                var aiBatchByTick = new Dictionary<int, List<ActionData>>();
+                var decisions = new Dictionary<int, List<ActionData>>();
                 foreach (var batch in recording.AiBatches)
                 {
-                    if (batch.actions == null || batch.actions.Count == 0) continue;
-                    int batchTick = batch.actions[0].submitTick;
-                    if (batchTick <= 0)
-                        batchTick = batch.turn * BattleMetrics.TicksPerSecond; // 未盖章兜底（理论不可达：RunAiBeat 必盖章）
-                    if (aiBatchByTick.ContainsKey(batchTick))
-                        return $"FAIL：tick {batchTick} 出现多批 AI 行动——录制异常";
-                    aiBatchByTick[batchTick] = batch.actions;
+                    int tick = batch.actions[0].submitTick;
+                    if (tick <= 0) tick = batch.turn * BattleMetrics.TicksPerSecond;
+                    if (tick <= 0 || decisions.ContainsKey(tick)) return $"FAIL：无效或重复的 AI 批 tick={tick}";
+                    decisions.Add(tick, batch.actions);
                 }
+                int latestEvidenceTick = Math.Max(recording.LastInputTick,
+                    Math.Max(recording.LastHashTick, recording.LastSubmitTick));
+                if (decisions.Count != 0) latestEvidenceTick = Math.Max(latestEvidenceTick, decisions.Keys.Max());
+                int endTick;
+                if (hasEndTick)
+                {
+                    endTick = recording.End.tick;
+                    if (endTick < latestEvidenceTick || endTick < 0
+                        || (recording.Over != null && recording.Over.finalTick != endTick))
+                        return "FAIL：结束拍与录制输入/终局拍不一致";
+                }
+                else
+                {
+                    // v2 没有精确结束拍，终局只知道秒号；最多演算至该秒的最后一拍。
+                    endTick = recording.Over == null ? latestEvidenceTick
+                        : Math.Max(latestEvidenceTick, checked((recording.Over.finalTurn + 1) * BattleMetrics.TicksPerSecond - 1));
+                }
+                if (endTick == 0 && recording.Submits.Count == 0)
+                    return "FAIL：录制未执行任何行动或拍";
+
+                EnsureEditorConfigs();
+                logicRoot = new GameObject("ReplayLogicRoot") { hideFlags = HideFlags.HideAndDontSave };
+                var sim = BuildSimFromHeader(header, logicRoot);
+                var transport = new CollectingTransport();
+                var flow = logicRoot.AddComponent<RTSFlowController>();
+                var differences = new StringBuilder();
+                int hashesMatched = 0;
+                int hashesChecked = 0;
+                flow.BindReplay(sim, transport, header.isNetworked, decisions, (tick, actual) =>
+                {
+                    if (recording.HashByTick.TryGetValue(tick, out var expected))
+                    {
+                        hashesChecked++;
+                        if (actual == expected) hashesMatched++;
+                        else if (differences.Length == 0)
+                            differences.Append($"\nFAIL：状态 hash 漂移首现 tick {tick}（录制 {expected} vs 回放 {actual}）");
+                    }
+                    else if (hasEndTick && differences.Length == 0)
+                        differences.Append($"\nFAIL：录制缺少 tick {tick} 的状态 hash");
+                });
+                flow.StartBattle();
+
                 var submits = new Queue<ReplaySubmitLine>(recording.Submits);
-
-                int maxTick = 0;
-                foreach (var t in aiBatchByTick.Keys) maxTick = Math.Max(maxTick, t);
-                foreach (var s in recording.Submits)
-                    if (s.action != null) maxTick = Math.Max(maxTick, s.action.submitTick);
-                foreach (var t in recording.HashByTick.Keys) maxTick = Math.Max(maxTick, t);
-                if (recording.Over != null)
-                    maxTick = Math.Max(maxTick, recording.Over.finalTurn * BattleMetrics.TicksPerSecond);
-                if (maxTick <= 0)
-                    return "FAIL：录制无任何行动/hash 行（空局或未开战）";
-                // 尾拍余量：**仅终局录制给**——终局未复现时跑满暴露差异（段 diff/未消费行兜底报警）；
-                // 未终局录制（中途退出）精确跑 maxTick——余量会多产秒拍段=假「段数不一致」
-                //（自测实锤：2 秒合成局+40t 余量多产 2 个 TURN-END 段）
-                if (recording.Over != null)
-                    maxTick += BattleMetrics.TicksPerSecond * 2;
-
-                // —— headless tick 重演（窗口序见类头注释；终局判据与 live 同源 RTSFlowController.CheckBattleOver）——
-                var over = new OverTracker();
-                int hashCompared = 0;
-                int hashMismatchTick = -1;
-                int recordedHash = 0, replayedHash = 0;
-                int tick = 0;
-                while (tick < maxTick)
+                while (true)
                 {
-                    tick++;
-                    sim.CurrentTick = tick;
-
-                    // ① 移动推进（tick 整数速度累积器——确定性原样）
-                    var arrivals = RTSMovementSystem.AdvanceTick(sim);
-                    if (arrivals != null && arrivals.Count > 0)
+                    // 单机含第 0 拍；秒拍中的 hash 在同拍的外部上交之前。
+                    while (submits.Count != 0 && submits.Peek().action.submitTick == flow.CurrentTick)
                     {
-                        resolver.ResolveMoveArrivals(arrivals);
-                        over.Check(sim, tick);
+                        if (!flow.ApplyReplaySubmit(submits.Peek().action)) break;
+                        submits.Dequeue();
                     }
-
-                    // ①b 弹性分离（2026-11-08）——与 RTSFlowController.TickAdvance 同点位同序：
-                    // 分离（重量加权挤开）+ 5Hz 推挤校正段（MovePushed）；确定性=同输入同位移。
-                    // 终局后不再跑：live 的 TickAdvance 在 Phase!=Selecting 即停，多跑会产生回放侧多余段
-                    if (!over.Ended) resolver.ResolveSeparationTick();
-
-                    // ①c 普通读条与移动快速采集——与 live TickAdvance 同点位：分离后、AI 批前。
-                    if (!over.Ended)
-                    {
-                        resolver.ResolveHarvestTick();
-                        over.Check(sim, tick);
-                    }
-
-                    // ② AI 批（按录制 tick 精确应用；伙伴脑批=节拍 tick，眷属摊平波批=节拍后 1~4 tick。
-                    //    RevealFog 仍只在节拍 tick 同步——与 live RunAiBeat 同点位）
-                    if (!over.Ended)
-                    {
-                        bool beatTick = tick % BattleMetrics.AiBeatTicks == 0;
-                        if (beatTick) sim.RevealFog();
-                        bool hasBatch = aiBatchByTick.TryGetValue(tick, out var batch)
-                                        && batch != null && batch.Count > 0;
-                        if (hasBatch) resolver.ResolveAiActions(batch);
-                        if (beatTick || hasBatch) over.Check(sim, tick);
-                    }
-
-                    // ③ 秒拍（%20：秒拍族+效果拍 %40）
-                    if (!over.Ended && tick % BattleMetrics.TicksPerSecond == 0)
-                    {
-                        bool effectBeat = tick % BattleMetrics.EffectBeatTicks == 0;
-                        resolver.ResolveSecondBeat(tick / BattleMetrics.TicksPerSecond, effectBeat);
-                        over.Check(sim, tick);
-                    }
-
-                    // ④ hash 自证（live RunSecondBeat CaptureTickHash 同点位：秒拍后、submit 窗前——
-                    //    录制行存在即比对〔live 在该拍秒后未终局才落 hash 行〕，终局拍错位在此显形）
-                    if (recording.HashByTick.TryGetValue(tick, out var expectedHash))
-                    {
-                        hashCompared++;
-                        int actual = RTSFlowController.ComputeStateHash(sim);
-                        if (actual != expectedHash && hashMismatchTick < 0)
-                        {
-                            hashMismatchTick = tick;
-                            recordedHash = expectedHash;
-                            replayedHash = actual;
-                        }
-                    }
-
-                    // ⑤ 单机 submit 窗；录下来的行动已通过接纳校验，直接使用执行入口。
-                    while (!over.Ended && submits.Count > 0 && submits.Peek().action != null
-                           && submits.Peek().action.submitTick <= tick)
-                    {
-                        var sub = submits.Dequeue();
-                        resolver.ResolveSubmittedAction(sub.action);
-                        over.Check(sim, tick);
-                    }
-
-                    if (over.Ended) break;
+                    if (flow.CurrentTick >= endTick || flow.Phase != BattlePhase.Selecting) break;
+                    int nextTick = flow.CurrentTick + 1;
+                    InputBatchMessage input = null;
+                    if (header.isNetworked && !recording.Inputs.TryGetValue(nextTick, out input))
+                        input = new InputBatchMessage { tick = nextTick };
+                    if (!flow.StepReplay(input)) return $"FAIL：无法推进 tick {nextTick}";
                 }
 
-                // ==================== 断言面三件 ====================
+                var summary = new StringBuilder(DiffSegments(recording.Segments, transport.Segments));
+                summary.Append(differences);
+                if (hashesChecked != recording.HashByTick.Count)
+                    summary.Append("\nFAIL：有状态 hash 尚未比对");
+                else if (differences.Length == 0)
+                    summary.Append($"\nhash 自证 PASS：{hashesMatched} 拍逐拍一致");
 
-                var sb = new StringBuilder();
-
-                // 一：Segment 命令流逐条 diff（主断言面）
-                sb.Append(DiffSegments(recording.Segments, transport.Segments));
-
-                // 二：tick hash 自证（确定性护栏四——秒拍状态全量比对）
-                if (hashMismatchTick >= 0)
-                    sb.Append($"\nFAIL：状态 hash 漂移首现 tick {hashMismatchTick}（录制 {recordedHash} vs 回放 {replayedHash}）");
+                var over = transport.BattleOver;
+                if (recording.Over != null)
+                {
+                    if (over == null || over.winnerTeam != recording.Over.winnerTeam
+                        || (hasEndTick ? over.finalTick != recording.Over.finalTick
+                            : over.finalTick / BattleMetrics.TicksPerSecond != recording.Over.finalTurn))
+                        summary.Append($"\nFAIL：终局不一致（录制胜方 {recording.Over.winnerTeam}，回放胜方 {over?.winnerTeam} / tick {over?.finalTick}）");
+                    else summary.Append($"\n终局一致：胜方队伍 {over.winnerTeam}（回放 tick {over.finalTick}）");
+                }
+                else if (over != null)
+                    summary.Append($"\nFAIL：回放提前终局 tick {over.finalTick}，录制未终局");
                 else
-                    sb.Append($"\nhash 自证 PASS：{hashCompared} 拍逐拍一致");
+                    summary.Append($"\n未终局录制：执行到 tick {flow.CurrentTick}");
 
-                // 三：终局对照（胜方+终局拍）
-                if (recording.Over != null)
-                {
-                    if (!over.Ended)
-                        sb.Append("\nFAIL：录制已终局但回放未终局（命令流/状态先漂移或终局条件未复现）");
-                    else if ((int)over.Winner.Value == recording.Over.winnerTeam)
-                    {
-                        sb.Append($"\n终局一致：胜方队伍 {recording.Over.winnerTeam}（回放 tick {over.Tick}）");
-                        int finalSecond = over.Tick / BattleMetrics.TicksPerSecond;
-                        if (finalSecond != recording.Over.finalTurn)
-                            sb.Append($"\nFAIL：终局拍不一致（录制第 {recording.Over.finalTurn} 秒 vs 回放第 {finalSecond} 秒）");
-                    }
-                    else
-                        sb.Append($"\nFAIL：终局不一致（录制胜方 {recording.Over.winnerTeam} vs 回放 {over.Winner}）");
-                }
-                else
-                {
-                    sb.Append(over.Ended
-                        ? $"\n注：录制无 over 行但回放终局（胜方 {over.Winner}）——录制收笔竞态属预期"
-                        : "\n注：录制未终局（中途退出）——段 diff 与 hash 断言仍有效");
-                }
-
-                if (submits.Count > 0)
-                    sb.Append($"\nFAIL：{submits.Count} 条上交行动未消费（回放提前终局或 submitTick 错位）");
-
-                return sb.ToString();
+                if (submits.Count > 0) summary.Append($"\nFAIL：{submits.Count} 条上交行动未消费");
+                if (flow.CurrentTick < latestEvidenceTick || hasEndTick && flow.CurrentTick != endTick)
+                    summary.Append("\nFAIL：未消费到录制结束拍");
+                return summary.ToString();
             }
             catch (Exception e)
             {
@@ -308,25 +227,6 @@ namespace GIC.Editor
             }
         }
 
-        /// <summary>终局追踪（判据单源=RTSFlowController.CheckBattleOver——与 live CheckBattleEnded 同口径）</summary>
-        private sealed class OverTracker
-        {
-            public TeamType? Winner;
-            public int Tick = -1;
-            public bool Ended => Winner.HasValue;
-
-            public void Check(BattleSimState sim, int tick)
-            {
-                if (Ended) return;
-                var w = RTSFlowController.CheckBattleOver(sim);
-                if (w.HasValue)
-                {
-                    Winner = w;
-                    Tick = tick;
-                }
-            }
-        }
-
         // ==================== 自测（合成局闭环） ====================
 
         /// <summary>编辑器域自测：合成录制（双核心对峙 2 秒，走 BattleRecorder 真实录制路径：
@@ -334,6 +234,15 @@ namespace GIC.Editor
         /// ↔ tick 窗口序」编解码闭环；不覆盖真局装配侧（BattleScreen 接线——交实机/观察局复测）。</summary>
         public static string SelfTest()
         {
+            string directory = Path.Combine(Path.GetTempPath(), "gic-replay-check-" + Guid.NewGuid().ToString("N"));
+            try { return SelfTest(false, directory) + "\n" + SelfTest(true, directory); }
+            finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        }
+
+        private static string SelfTest(bool isNetworked, string directory)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || BattleRecorder.CurrentPath != null)
+                return "FAIL：只能在非播放、非录制状态运行自测";
             EnsureEditorConfigs();
             var unitConfig = Wargame.Instance.Context.Get<UnitConfig>();
             if (unitConfig == null) return "FAIL：编辑器域容器无 UnitConfig（EnsureEditorConfigs 失败）";
@@ -361,11 +270,10 @@ namespace GIC.Editor
                 { BattleDebugPlayerIds.P2, new List<HandCard> { MoraCard(), StaminaCard() } },
             };
 
-            // 用真实单机 Flow 录制两秒（含一次购买），再由回放器重演。
-            BattleRecorder.Enabled = true;
-            BattleRecorder.CaptureSetup(seed, BattleLaunchConfig.DefaultMapName, (int)BattleFogMode.None,
-                setups, spawnCells, hands);
-            var path = BattleRecorder.CurrentPath;
+            // 用真实 Flow 录制一次购买及非整秒尾拍，再由回放器重演。
+            foreach (var setup in setups) setup.ResolveRules();
+            bool previouslyEnabled = BattleRecorder.Enabled;
+            string path = null;
 
             var header = new ReplayHeaderLine
             {
@@ -383,34 +291,47 @@ namespace GIC.Editor
                     spawnX = spawnCells[s.PlayerId].x,
                     spawnY = spawnCells[s.PlayerId].y,
                     hand = hands[s.PlayerId],
+                    moraIncomePercent = s.MoraIncomePercent,
                 });
             }
 
             GameObject logicRoot = null;
             try
             {
+                BattleRecorder.Enabled = true;
+                BattleRecorder.CaptureSetup(seed, BattleLaunchConfig.DefaultMapName, (int)BattleFogMode.None,
+                    setups, spawnCells, hands, isNetworked, directory);
+                path = BattleRecorder.CurrentPath;
                 logicRoot = new GameObject("SelfTestRecordRoot") { hideFlags = HideFlags.HideAndDontSave };
                 var sim = BuildSimFromHeader(header, logicRoot);
                 var live = logicRoot.AddComponent<RTSFlowController>();
-                live.Bind(sim, new CollectingTransport());
+                live.Bind(sim, new CollectingTransport(), isNetworked: isNetworked);
                 live.StartBattle();
-                const int totalTicks = 2 * BattleMetrics.TicksPerSecond;
+                if (!live.OnSubmitAction(BuyUnitInput(BattleDebugPlayerIds.P1, UnitName.FavoniusBanner)))
+                    return "FAIL：录制自测购买旗帜未受理";
+                const int totalTicks = 2 * BattleMetrics.TicksPerSecond + 3;
                 for (int tick = 1; tick <= totalTicks; tick++)
                 {
-                    if (!Tick(live)) return $"FAIL：单机录制停在第 {tick} 拍";
-                    if (tick == 1 && !live.OnSubmitAction(BuyUnitInput(BattleDebugPlayerIds.P1, UnitName.FavoniusBanner)))
-                        return "FAIL：单机录制购买旗帜未受理";
+                    if (!Tick(live)) return $"FAIL：自测录制停在第 {tick} 拍";
                 }
+                if (CountHandUnit(sim, BattleDebugPlayerIds.P1, UnitName.FavoniusBanner) != 1)
+                    return "FAIL：录制自测未实际到账";
             }
             finally
             {
                 if (logicRoot != null) UnityEngine.Object.DestroyImmediate(logicRoot);
                 BattleRecorder.EndSession();
-                BattleRecorder.Enabled = false;
+                BattleRecorder.Enabled = previouslyEnabled;
             }
 
             if (path == null) return "FAIL：合成录制未产出文件（CaptureSetup 异常？）";
-            return "自测（2 秒合成局：购买+秒拍发放+hash 自证）→ " + Run(path);
+            string summary = Run(path);
+            var lines = File.ReadAllLines(path);
+            string truncatedPath = Path.Combine(directory, "missing-end.jsonl");
+            File.WriteAllLines(truncatedPath, lines.Take(lines.Length - 1));
+            if (!Run(truncatedPath).StartsWith("FAIL：v3 缺少结束拍", StringComparison.Ordinal))
+                return "FAIL：v3 缺少收尾行仍被接受";
+            return (isNetworked ? "联机" : "单机") + "回放自测（购买、hash、非整秒尾拍）→ " + summary;
         }
 
         // ==================== sim 重建（Run 与 SelfTest 共用） ====================
@@ -432,8 +353,10 @@ namespace GIC.Editor
             var unitConfig = Wargame.Instance.Context.Get<UnitConfig>();
             foreach (var pl in header.players)
             {
-                sim.RegisterPlayer(pl.playerId);
-                sim.SetPlayerTeam(pl.playerId, (TeamType)pl.team);
+                var difficulty = pl.isAI == 0 ? AIDifficulty.Grandmaster : (AIDifficulty)pl.aiDifficulty;
+                int incomePercent = pl.moraIncomePercent > 0 ? pl.moraIncomePercent
+                    : AIPlayerConfig.ResolveMoraIncomePercent(difficulty); // 旧版 v2 只有难度，按当前资产尽力兼容。
+                sim.RegisterPlayer(pl.playerId, (TeamType)pl.team, difficulty, incomePercent);
             }
             foreach (var pl in header.players)
             {
@@ -449,7 +372,7 @@ namespace GIC.Editor
                 sim.RegisterHand(pl.playerId, new List<HandCard>());
                 if (pl.hand == null) continue;
                 foreach (var h in pl.hand)
-                    sim.GainCard(pl.playerId, h.AsCardId(), h.count);
+                    sim.GainCard(pl.playerId, h.AsCardId(), h.count, header.formatVersion >= 3 ? h.durability : -1);
             }
             return sim;
         }
@@ -459,49 +382,80 @@ namespace GIC.Editor
         private class Recording
         {
             public ReplayHeaderLine Header;
-            public List<ReplayActionsLine> AiBatches = new List<ReplayActionsLine>(); // file 序=时间序
-            public List<ReplaySubmitLine> Submits = new List<ReplaySubmitLine>();       // file 序=时间序
-            public List<Segment> Segments = new List<Segment>();                        // 断言面（命令流本体）
-            public Dictionary<int, int> HashByTick = new Dictionary<int, int>();        // 断言面（秒拍状态）
+            public readonly List<ReplayActionsLine> AiBatches = new List<ReplayActionsLine>();
+            public readonly List<ReplaySubmitLine> Submits = new List<ReplaySubmitLine>();
+            public readonly List<Segment> Segments = new List<Segment>();
+            public readonly Dictionary<int, int> HashByTick = new Dictionary<int, int>();
+            public readonly Dictionary<int, InputBatchMessage> Inputs = new Dictionary<int, InputBatchMessage>();
             public ReplayOverLine Over;
+            public ReplayEndLine End;
+            public int LastHashTick;
+            public int LastInputTick;
+            public int LastSubmitTick;
         }
+
+        [Serializable]
+        private class LineKind { public string kind = null; }
 
         private static Recording ParseFile(string path)
         {
             var rec = new Recording();
-            foreach (var line in File.ReadAllLines(path))
+            int lineNumber = 0;
+            foreach (var line in File.ReadLines(path))
             {
+                lineNumber++;
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                // kind 前缀嗅探（行首字段序固定——kind 是首字段）
-                if (line.StartsWith("{\"kind\":\"actions\""))
+                string kind = JsonUtility.FromJson<LineKind>(line)?.kind;
+                if (rec.End != null || (rec.Header == null && kind != "header"))
+                    throw new FormatException($"第 {lineNumber} 行位于 header/end 边界之外");
+                switch (kind)
                 {
-                    var a = JsonUtility.FromJson<ReplayActionsLine>(line);
-                    if (a != null && a.actions != null && a.actions.Count > 0) rec.AiBatches.Add(a);
-                }
-                else if (line.StartsWith("{\"kind\":\"submit\""))
-                {
-                    var s = JsonUtility.FromJson<ReplaySubmitLine>(line);
-                    if (s != null && s.action != null) rec.Submits.Add(s);
-                }
-                else if (line.StartsWith("{\"kind\":\"segment\""))
-                {
-                    var s = JsonUtility.FromJson<ReplaySegmentLine>(line);
-                    if (s != null && s.segment != null) rec.Segments.Add(s.segment);
-                }
-                else if (line.StartsWith("{\"kind\":\"tick\""))
-                {
-                    var t = JsonUtility.FromJson<ReplayTickLine>(line);
-                    if (t != null) rec.HashByTick[t.tick] = t.hash;
-                }
-                else if (line.StartsWith("{\"kind\":\"over\""))
-                {
-                    rec.Over = JsonUtility.FromJson<ReplayOverLine>(line);
-                }
-                else if (line.StartsWith("{\"kind\":\"header\""))
-                {
-                    rec.Header = JsonUtility.FromJson<ReplayHeaderLine>(line);
+                    case "header" when rec.Header == null:
+                        rec.Header = JsonUtility.FromJson<ReplayHeaderLine>(line);
+                        break;
+                    case "actions":
+                        var actions = JsonUtility.FromJson<ReplayActionsLine>(line);
+                        if (actions?.actions == null || actions.actions.Count == 0 || actions.actions.Any(a => a == null))
+                            throw new FormatException($"第 {lineNumber} 行 AI 批无效");
+                        rec.AiBatches.Add(actions);
+                        break;
+                    case "submit":
+                        var submit = JsonUtility.FromJson<ReplaySubmitLine>(line);
+                        if (submit?.action == null || submit.action.submitTick < rec.LastSubmitTick)
+                            throw new FormatException($"第 {lineNumber} 行上交拍无效");
+                        rec.LastSubmitTick = submit.action.submitTick;
+                        rec.Submits.Add(submit);
+                        break;
+                    case "inputBatch":
+                        var batch = JsonUtility.FromJson<ReplayInputBatchLine>(line)?.batch;
+                        if (batch?.inputs == null || batch.inputs.Count == 0 || batch.tick <= rec.LastInputTick
+                            || batch.inputs.Any(i => i?.action == null))
+                            throw new FormatException($"第 {lineNumber} 行联机输入批为空、乱序或重复");
+                        rec.LastInputTick = batch.tick;
+                        rec.Inputs.Add(batch.tick, batch);
+                        break;
+                    case "segment":
+                        var segment = JsonUtility.FromJson<ReplaySegmentLine>(line)?.segment;
+                        rec.Segments.Add(segment ?? throw new FormatException($"第 {lineNumber} 行缺少命令段"));
+                        break;
+                    case "tick":
+                        var hash = JsonUtility.FromJson<ReplayTickLine>(line);
+                        if (hash == null || hash.tick <= rec.LastHashTick)
+                            throw new FormatException($"第 {lineNumber} 行 hash 拍无效");
+                        rec.LastHashTick = hash.tick;
+                        rec.HashByTick.Add(hash.tick, hash.hash);
+                        break;
+                    case "over" when rec.Over == null:
+                        rec.Over = JsonUtility.FromJson<ReplayOverLine>(line);
+                        break;
+                    case "end":
+                        rec.End = JsonUtility.FromJson<ReplayEndLine>(line);
+                        break;
+                    default:
+                        throw new FormatException($"第 {lineNumber} 行的类型无效或重复：{kind}");
                 }
             }
+            if (rec.Header == null) throw new FormatException("录制缺少 header 行");
             return rec;
         }
 
@@ -708,6 +662,10 @@ namespace GIC.Editor
 
                 // ⑩ 双端同构：客户端按 BattleStart（seed/map/roster/初始快照）重建的 Sim 必须与
                 //    Host 完全同 hash——覆盖 unitId 分配序、初始手牌、雾模式（交接清单首秒漂移风险）
+                header.players[1].isAI = 1;
+                header.players[1].aiDifficulty = (int)AIDifficulty.Providence;
+                const int providenceIncomePercent = 175; // Deliberately differs from the installed tuning asset.
+                header.players[1].moraIncomePercent = providenceIncomePercent;
                 var hostSim2 = BuildSimFromHeader(header, root);
                 var startMsg = new BattleStartMessage
                 {
@@ -719,23 +677,23 @@ namespace GIC.Editor
                     {
                         new BattlePlayerSetup
                         {
-                            PlayerId = BattleDebugPlayerIds.P1, DisplayName = "自测P1", Team = TeamType.A,
+                            PlayerId = BattleDebugPlayerIds.P1, DisplayName = "自测P1", Team = TeamType.A, MoraIncomePercent = 100,
                         },
                         new BattlePlayerSetup
                         {
                             PlayerId = BattleDebugPlayerIds.P2, DisplayName = "自测P2", Team = TeamType.B,
+                            IsAI = true, AIDifficulty = AIDifficulty.Providence, MoraIncomePercent = providenceIncomePercent,
                         },
                     },
                 };
+                startMsg = JsonUtility.FromJson<BattleStartMessage>(JsonUtility.ToJson(startMsg));
                 var clientSim2 = new BattleSimState(startMsg.map, startMsg.seed);
                 clientSim2.LogicRoot = root.transform;
                 clientSim2.FogMode = (BattleFogMode)startMsg.fogMode;
-                typeof(BattleSession)
-                    .GetMethod("BuildClientSimUnits", BindingFlags.NonPublic | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { clientSim2, startMsg });
+                bool clientBuilt = BattleSession.TryBuildClientSimUnits(clientSim2, startMsg);
                 int hostHash = RTSFlowController.ComputeStateHash(hostSim2);
                 int clientHash = RTSFlowController.ComputeStateHash(clientSim2);
-                failures += Check(sb, "⑩双端 Sim 开局同构（hash 一致）", hostHash == clientHash,
+                failures += Check(sb, "⑩双端 Sim 开局同构（hash 一致）", clientBuilt && hostHash == clientHash,
                     $"host={hostHash} client={clientHash} units={hostSim2.Units.Count}/{clientSim2.Units.Count}");
 
                 // 制造客户端先判另一队胜出的漂移，仍以 Host 的拍号和胜方为准。
@@ -756,6 +714,10 @@ namespace GIC.Editor
 
                 failures += CheckPurchases(sb, header, root, host, client);
                 failures += CheckSeparation(sb, header, root, host, client);
+                failures += Check(sb, "⑱猎鹿人餐馆在两端按名册倍率到账，普通座位和独立局不受污染",
+                    clientBuilt && CheckBuildingIncome(hostSim2, clientSim2, header.players)
+                    && clientSim2.GetAiDifficulty(BattleDebugPlayerIds.P2) == AIDifficulty.Providence
+                    && clientSim.ScaleMoraIncome(BattleDebugPlayerIds.P2, 5) == 5, "");
             }
             finally
             {
@@ -764,9 +726,37 @@ namespace GIC.Editor
                 if (root != null) UnityEngine.Object.DestroyImmediate(root);
             }
 
-            sb.Append(failures == 0 ? "\nPASS：17/17" : $"\nFAIL：{failures} 项不通过");
+            sb.Append(failures == 0 ? "\nPASS：18/18" : $"\nFAIL：{failures} 项不通过");
             sb.Append("\n注：重复批、终局分歧、无卡部署和归属不符会打印预期警告");
             return sb.ToString();
+        }
+
+        private static bool CheckBuildingIncome(BattleSimState host, BattleSimState client,
+            IReadOnlyList<ReplayPlayerLine> players)
+        {
+            foreach (var sim in new[] { host, client })
+            {
+                var before = new Dictionary<string, int>();
+                var expected = new Dictionary<string, int>();
+                foreach (var p in players)
+                {
+                    var restaurant = SpawnFixture(sim, p, UnitName.GoodHunter, new BattleCell(p.spawnX + 1, p.spawnY));
+                    before.Add(p.playerId, sim.GetMora(p.playerId));
+                    int percent = p.moraIncomePercent > 0 ? p.moraIncomePercent : 100;
+                    expected.Add(p.playerId, restaurant.RawData.效果数值 * percent / 100);
+                }
+
+                var commands = new List<BattleCommand>();
+                new BuildingEffectsSystem(sim).CollectEffectBeatEffects(2, new List<BattleEffect>(), commands);
+                foreach (var p in players)
+                {
+                    int gain = expected[p.playerId];
+                    if (gain <= 0 || sim.GetMora(p.playerId) != before[p.playerId] + gain
+                        || !commands.Exists(c => c.type == BattleCommandType.StatChange && c.metadata == BattleCommand.StatKindMora
+                            && c.actorUnitId == p.playerId && c.value == gain)) return false;
+                }
+            }
+            return SameState(host, client);
         }
 
         private static int CheckPurchases(StringBuilder sb, ReplayHeaderLine header, GameObject root,
@@ -1009,22 +999,19 @@ namespace GIC.Editor
         private class CollectingTransport : IBattleTransport
         {
             public readonly List<Segment> Segments = new List<Segment>();
+            public BattleOverMessage BattleOver { get; private set; }
 
             public void HostSend(BattleMessageType type, object message)
             {
                 if (type == BattleMessageType.Segment && message is SegmentMessage sm && sm.segment != null)
                     Segments.Add(sm.segment);
+                else if (type == BattleMessageType.BattleOver && message is BattleOverMessage result)
+                    BattleOver = result;
             }
 
             public void ClientSend(BattleMessageType type, object message) { }
             public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) { }
             public void RegisterClientHandler(Action<BattleMessageType, string> handler) { }
-        }
-
-        /// <summary>回放宿主：ack 门控已随回合机退役（接口仅剩推送钩子，docs/active/49 D2）</summary>
-        private class FakeResolverHost : IBattleResolverHost
-        {
-            public void NotifySegmentPushed(int turnNumber, int sliceIndex) { }
         }
 
         private static void ReportResult(string summary, string fileName)

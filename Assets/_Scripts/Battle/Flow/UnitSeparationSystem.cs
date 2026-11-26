@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GIC.Data;
 using UnityEngine;
+using Unity.Profiling;
 
 namespace GIC.Battle
 {
@@ -23,6 +24,7 @@ namespace GIC.Battle
     /// </summary>
     public static class UnitSeparationSystem
     {
+        private static readonly ProfilerMarker ResolveMarker = new ProfilerMarker("GIC.Battle.Separation");
         /// <summary>每 tick 单单位最大分离位移（cm）——多对同时挤时的累计上限（防弹射）</summary>
         public const int MaxDisplacePerTickCm = 6;
 
@@ -48,6 +50,7 @@ namespace GIC.Battle
             if (sim == null) return;
             var units = sim.SortedUnits();
             if (units == null || units.Count < 2) return;
+            using var sample = ResolveMarker.Auto();
 
             var displaced = sim.SeparationDisplacedCm;
             displaced.Clear();

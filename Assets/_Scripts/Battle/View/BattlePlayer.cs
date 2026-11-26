@@ -137,10 +137,10 @@ namespace GIC.Battle
         public void ConfigureFog(BattleFogMode mode,
             System.Func<string> localPlayerIdResolver, System.Func<string, TeamType> teamOfResolver)
         {
-            if (mode == BattleFogMode.None) { if (_fog != null) { Destroy(_fog); _fog = null; } return; }
             // 身份解析不只迷雾用：战斗语音按「本机/队友/敌方」加权（迷雾关闭时也要保留）
             _localPlayerIdResolver = localPlayerIdResolver;
             _teamOfResolver = teamOfResolver;
+            if (mode == BattleFogMode.None) { if (_fog != null) { Destroy(_fog); _fog = null; } return; }
             if (_fog == null)
             {
                 var go = new GameObject("BattleFog");
@@ -325,6 +325,8 @@ namespace GIC.Battle
         /// （2026-10-02 复审收口）：launchMs=0 返回 0=立即；Damage/Heal/Reaction/Energy/Mora/
         /// 投射物起飞各到点消费分支统一走此口，勿散抄公式（新增带时刻命令同走此口）</summary>
         private float LaunchDelayOf(BattleCommand command) => command.launchMs / 1000f / _playbackSpeed;
+
+        public void UseBoard(BattleBoard board) => _board = board;
 
         public void Bind(IBattleTransport transport, BattleMapData map)
         {

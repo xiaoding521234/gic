@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using GIC.Data;
 namespace GIC.Battle
@@ -26,25 +25,10 @@ namespace GIC.Battle
             public bool IntentBoard;
         }
 
-        private static readonly Dictionary<string, AIDifficulty> _difficultyByPlayer = new();
-
-        /// <summary>登记/改设 AI 玩家难度（配额脑 Bind 默认登记；房间 UI/观察 harness 可随时改——下拍生效）</summary>
-        public static void SetDifficulty(string playerId, AIDifficulty difficulty)
+        /// <summary>伙伴脑决策质量门；难度从本局模拟读取。</summary>
+        public static BrainGates GatesFor(AIDifficulty difficulty)
         {
-            if (string.IsNullOrEmpty(playerId)) return;
-            _difficultyByPlayer[playerId] = difficulty;
-        }
-
-        /// <summary>玩家难度查询（未注册=真人/默认 → 棋圣全件）</summary>
-        public static AIDifficulty DifficultyOf(string playerId)
-            => !string.IsNullOrEmpty(playerId) && _difficultyByPlayer.TryGetValue(playerId, out var d)
-                ? d
-                : AIDifficulty.Grandmaster;
-
-        /// <summary>伙伴脑决策质量门（按单位归属；未注册=真人 → 全开）</summary>
-        public static BrainGates GatesFor(string playerId)
-        {
-            switch (DifficultyOf(playerId))
+            switch (difficulty)
             {
                 case AIDifficulty.Apprentice:
                     // 学徒：关对手预测器/反应预期分/意图板去重（失误注入在配额脑侧执行）
@@ -72,15 +56,13 @@ namespace GIC.Battle
         public static bool SecondBestInjectionEnabled(AIDifficulty difficulty)
             => difficulty == AIDifficulty.Rival;
 
-        /// <summary>摩拉收入百分比（凌晨批议题⑥：天理=经济作弊型难度——SC2 proto CheatMoney/
-        /// petra 经济倍率表先例，决策逻辑不动、收入乘倍率；其余档恒 100）。消费点=BattleResolver
-        /// 秒拍末发放+建筑摩拉收入（玩家资源发放两单源，掠夺/消耗不复用）；数值真源=AITuning.
-        /// 天理摩拉收入百分比。**LAN 边界**：难度注册在配额脑 Bind（本地进程）——远端 AI 玩家
-        /// 的天理档对 Host 结算不可见（回落 100%），天理作弊单机/Host 本地 AI 生效</summary>
-        public static int MoraIncomePercentOf(string playerId)
-            => DifficultyOf(playerId) == AIDifficulty.Providence
-                ? AITuningConfig.Instance.天理摩拉收入百分比
-                : 100;
+        public const int DefaultMoraIncomePercent = 100;
+
+        /// <summary>仅房主装配（或旧单机回放）时解析资产；结算不再读取进程内的 AI 配置。</summary>
+        public static int ResolveMoraIncomePercent(AIDifficulty difficulty)
+            => difficulty == AIDifficulty.Providence
+                ? System.Math.Max(1, AITuningConfig.Instance.天理摩拉收入百分比)
+                : DefaultMoraIncomePercent;
 
         /// <summary>战略层门（§9.2 学徒开启件「战略层仅发育态」——AIStrategist 态势机不走、
         /// 恒发育乘子；三账本红线/体力保底=硬保底语义非决策质量件、全档生效）</summary>

@@ -344,7 +344,7 @@ namespace GIC.Battle
                 var u0 = kv0.Value;
                 if (!BattleHeuristics.IsCompanion(u0) || BattleSimState.IsDead(u0)) continue;
                 var id0 = u0.GetUnitComponent<UnitIdentity>();
-                if (id0 == null || !AIPlayerConfig.GatesFor(id0.OwnerPlayerID).ThreatFeed) continue;
+                if (id0 == null || !AIPlayerConfig.GatesFor(sim.GetAiDifficulty(id0.OwnerPlayerID)).ThreatFeed) continue;
                 feedTeams.Add(id0.Team);
             }
             foreach (var kv0 in sim.SortedUnits())
@@ -404,7 +404,7 @@ namespace GIC.Battle
                         // AI-4 难度门（§9.2）：按归属玩家——学徒=关威胁图/意图板/反应预期分；
                         // 真人不注册=门恒全开（其自主军团全件质量），棋圣=AI-2 全件基线。
                         // AI-5 军团软系数：按归属玩家的军团倾向（回防=斩杀加成下调）
-                        var gates = AIPlayerConfig.GatesFor(identity.OwnerPlayerID);
+                        var gates = AIPlayerConfig.GatesFor(sim.GetAiDifficulty(identity.OwnerPlayerID));
                         var unitThreat = gates.ThreatFeed && threatByTeam.TryGetValue(identity.Team, out var tMap)
                             ? tMap
                             : null;
@@ -485,7 +485,7 @@ namespace GIC.Battle
                 var profile = g.unit.RawData?.行为档案;
                 // AI-4 难度门（执行遍同申报遍口径）：按归属玩家门控威胁图/意图板/反应预期分。
                 // AI-5 军团软系数：按归属玩家（回防=斩杀加成下调）
-                var gates2 = AIPlayerConfig.GatesFor(g.owner);
+                var gates2 = AIPlayerConfig.GatesFor(sim.GetAiDifficulty(g.owner));
                 var unitThreat = gates2.ThreatFeed && threatByTeam.TryGetValue(g.team, out var tMap2)
                     ? tMap2
                     : null;

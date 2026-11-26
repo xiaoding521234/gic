@@ -402,6 +402,31 @@ namespace GIC.Battle
 
         // ==================== 玩家注册 ====================
 
+        private readonly Dictionary<string, AIDifficulty> _aiDifficulties = new();
+        private readonly Dictionary<string, int> _moraIncomePercents = new();
+
+        /// <summary>按开局名册注册。收入倍率必须由开局数据提供，而非查询大脑或本机资产。</summary>
+        public void RegisterPlayer(string playerId, TeamType team, AIDifficulty difficulty, int moraIncomePercent)
+        {
+            RegisterPlayer(playerId);
+            SetPlayerTeam(playerId, team);
+            _aiDifficulties[playerId] = difficulty;
+            _moraIncomePercents[playerId] = moraIncomePercent > 0
+                ? moraIncomePercent : AIPlayerConfig.DefaultMoraIncomePercent;
+        }
+
+        public AIDifficulty GetAiDifficulty(string playerId)
+            => playerId != null && _aiDifficulties.TryGetValue(playerId, out var difficulty)
+                ? difficulty : AIDifficulty.Grandmaster;
+
+        public int GetMoraIncomePercent(string playerId)
+            => playerId != null && _moraIncomePercents.TryGetValue(playerId, out var percent)
+                ? percent : AIPlayerConfig.DefaultMoraIncomePercent;
+
+        /// <summary>秒拍基础收入和建筑收入公用的整数缩放口径；不用于掠夺、支出。</summary>
+        public int ScaleMoraIncome(string playerId, int baseIncome)
+            => (int)Math.Min(int.MaxValue, (long)baseIncome * GetMoraIncomePercent(playerId) / 100);
+
         public void RegisterPlayer(string playerId)
         {
             if (!_playerIds.Contains(playerId))

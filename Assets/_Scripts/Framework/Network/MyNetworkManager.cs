@@ -17,7 +17,6 @@ namespace GIC.Framework
 
         private bool _hostStarted = false;
         private bool _isKicked = false;
-        private bool _isIntentionalDisconnect = false;
 
         public MyNetworkDiscovery discovery;
         // 传输端口访问统一走 PortTransport 接口（Telepathy TCP / Kcp UDP 均实现该接口）——
@@ -162,6 +161,14 @@ namespace GIC.Framework
             _isKicked = true;
         }
 
+        /// <summary>战斗主动退出由场景负责回大厅；断线回调只做网络清理。</summary>
+        public void LeaveBattleRoom()
+        {
+            if (!NetworkServer.active && !NetworkClient.active) return;
+            if (NetworkServer.active) StopHost();
+            else StopClient();
+        }
+
         private void SetPort(int port)
         {
             if (_portTransport != null)
@@ -204,6 +211,7 @@ namespace GIC.Framework
         public override void OnStopServer()
         {
             base.OnStopServer();
+            _roomManager?.ResetBattleExchange();
             _hostStarted = false;
 
             if (discovery != null)
@@ -244,10 +252,10 @@ namespace GIC.Framework
         {
             base.OnServerConnect(conn);
 
-            if (numPlayers >= maxPlayers)
+            if (_roomManager?.IsBattleRoomLocked == true || numPlayers >= maxPlayers)
             {
                 conn.Disconnect();
-                GICLog.Info($"[MyNetworkManager] 连接被拒绝：房间已满 ({numPlayers}/{maxPlayers})");
+                GICLog.Info($"[MyNetworkManager] 连接被拒绝：房间已开战或已满 ({numPlayers}/{maxPlayers})");
                 return;
             }
 
@@ -318,8 +326,6 @@ namespace GIC.Framework
             GICLog.Info($"[MyNetworkManager] ========================================");
 
             _isKicked = false;
-            _isIntentionalDisconnect = false;
-
             OnClientConnectedEvent?.Invoke();
         }
 
@@ -338,31 +344,14 @@ namespace GIC.Framework
 
         public override void OnClientDisconnect()
         {
-            LanDebugFileLog.WriteLine($"[OnClientDisconnect] 触发！主动断开={_isIntentionalDisconnect} 被踢={_isKicked} 服务器={NetworkServer.active} 场景={GameScene.Instance?.CurrentScene}");
+            LanDebugFileLog.WriteLine($"[OnClientDisconnect] 触发！被踢={_isKicked} 服务器={NetworkServer.active} 场景={GameScene.Instance?.CurrentScene}");
             GICLog.Info($"[MyNetworkManager] ========================================");
             GICLog.Info($"[MyNetworkManager] 与服务器断开连接");
-            GICLog.Info($"[MyNetworkManager]   主动断开: {_isIntentionalDisconnect}");
             GICLog.Info($"[MyNetworkManager]   被踢: {_isKicked}");
             GICLog.Info($"[MyNetworkManager]   我的ID: {_playerManager?.SelfPlayerID ?? "未设置"}");
             GICLog.Info($"[MyNetworkManager] ========================================");
 
-            // B7 LAN（2026-10-11 联机批）：战斗场景中与 Host 失联（Host 掉线/断网/Host 先退房）——
-            // 对局失去权威端无以为继，客户端直接退回大厅（战斗音乐随场景卸载 OnBattleDestroy 停链；
-            // 勿加载页遮盖——MainHall 无 Reveal 收尾，Cover 会黑屏 15s 等安全网）
-            if (!NetworkServer.active
-                && GameScene.Instance != null
-                && GameScene.Instance.CurrentScene == SceneType.BattleScreen)
-            {
-                GICLog.Warn("[MyNetworkManager] 战斗中与 Host 失联，退回大厅");
-                try
-                {
-                    GIC.UI.PopupManager.Instance.ShowToast(new UnityEngine.Localization.LocalizedString(
-                        GIC.Data.TableName.PopupText.ToString(), "Coop_HostDisconnected"));
-                }
-                catch (Exception) { /* 弹层初始化异常不阻断退场 */ }
-                GIC.Data.SceneType.MainHall.Load();
-            }
-
+            // 战斗场景自行感知离线并在场景切换结束后返回大厅；网络回调只清连接状态。
             // 只清名册，不退订事件：Handler 常驻订阅（CanHandle 有 NetworkServer.active / Source==Network 守卫），
             // 若此处调 RoomManager.Cleanup() 会在首次断线后杀掉全部 Handler，同会话重连/再建房时名册不再同步
             _playerManager?.ClearPlayers();
@@ -370,7 +359,6 @@ namespace GIC.Framework
 
             _hostStarted = false;
             _isKicked = false;
-            _isIntentionalDisconnect = false;
 
             base.OnClientDisconnect();
 

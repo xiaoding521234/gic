@@ -72,7 +72,7 @@ namespace GIC.Framework
         private void OnServerReceive(NetworkConnection conn, NetworkEventMessage msg)
         {
             var eventData = NetworkEventRegistry.Unpack(msg);
-            if (eventData == null) return;
+            if (eventData == null || eventData is StartBattleEvent) return;
 
             // 用 connectionId 修正发送者
             if (conn is NetworkConnectionToClient clientConn)

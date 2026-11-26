@@ -61,6 +61,7 @@ namespace GIC.UI
 
         // 开战广播接收（host 回环+客户端统一入口；2026-10-11 联机批）
         private StartBattleEventHandler _startBattleHandler;
+        private bool _visibleEventsBound;
 
         // ── IClosable 实现 ──
         public override void Close() => OnLeaveRoomClick();
@@ -159,10 +160,7 @@ namespace GIC.UI
 
             SetRoomState(RoomState.DisconnectedClient); // 同态 → RefreshUI 即时刷新，无切换动画
 
-            BindDiscoveryEvents();
-            BindPlayerEvents();
-            BindNetworkEvents();
-            BindRoomEvents();
+            BindVisibleEvents();
 
             Invoke(nameof(InitializeDiscovery), 0.5f);
 
@@ -177,10 +175,7 @@ namespace GIC.UI
         protected override void OnDisable()
         {
             CancelInvoke();
-            UnbindDiscoveryEvents();   // 停广播+停扫描（面板关闭路径均自 DisconnectedClient 态，即空闲态）
-            UnbindPlayerEvents();
-            UnbindNetworkEvents();
-            UnbindRoomEvents();
+            UnbindVisibleEvents();
             base.OnDisable();          // 出栈注销+可关闭注销+PopAll 锁保险丝
         }
 
@@ -192,10 +187,7 @@ namespace GIC.UI
 
         protected override void OnDestroy()
         {
-            UnbindPlayerEvents();
-            UnbindNetworkEvents();
-            UnbindRoomEvents();
-            UnbindDiscoveryEvents();
+            UnbindVisibleEvents();
             CancelInvoke();
 
             // 基类收尾：注销可关闭 + PopAll 输入锁 + 音乐 pop 兜底
@@ -203,6 +195,26 @@ namespace GIC.UI
         }
 
         #region evtBind
+
+        private void BindVisibleEvents()
+        {
+            if (_visibleEventsBound) return;
+            _visibleEventsBound = true;
+            BindDiscoveryEvents();
+            BindPlayerEvents();
+            BindNetworkEvents();
+            BindRoomEvents();
+        }
+
+        private void UnbindVisibleEvents()
+        {
+            if (!_visibleEventsBound) return;
+            _visibleEventsBound = false;
+            UnbindDiscoveryEvents();
+            UnbindPlayerEvents();
+            UnbindNetworkEvents();
+            UnbindRoomEvents();
+        }
 
         private void BindButtonEvents()
         {
@@ -243,8 +255,7 @@ namespace GIC.UI
 
         private void UnbindRoomEvents()
         {
-            if (_startBattleHandler != null)
-                EventBusHub.Instance?.Unsubscribe<StartBattleEvent>(_startBattleHandler);
+            EventBusHub.Instance?.UnsubscribeOwner(this);
             if (_roomManager != null)
                 _roomManager.OnRoomMapChanged -= OnRoomMapChangedHandler;
         }

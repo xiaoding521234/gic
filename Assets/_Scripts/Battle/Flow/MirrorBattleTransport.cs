@@ -1,166 +1,127 @@
-// MirrorBattleTransport.cs - 战斗传输 Mirror 实现（B7 LAN，2026-10-11 联机批）
-// docs/22 §4/§8：B1-B6 本地模式走 LocalBattleTransport；B7 换本实现，上层（BattleSession 路由/
-// 序列化）零改动。铁律保持：战斗消息不走 EventBusHub，走独立 Mirror 消息类型 BattleNetMessage。
 using System;
 using System.Collections.Generic;
 using Mirror;
 using GIC.Framework;
 using GIC.Data;
+
 namespace GIC.Battle
 {
-
-
-    /// <summary>
-    /// 战斗消息的 Mirror 网络信封（独立于房间的 NetworkEventMessage——战斗专用通道）：
-    /// type=BattleMessageType 枚举值 + JSON 载荷（与 LocalBattleTransport 同构：双端反序列化代码不变）。
-    /// struct=Mirror RegisterHandler 泛型约束要求（where T : struct, NetworkMessage）。
-    /// </summary>
+    /// <summary>战斗专用消息；不与房间事件共用路由。</summary>
     public struct BattleNetMessage : NetworkMessage
     {
+        public string matchId;
         public int type;
         public string json;
     }
 
-    /// <summary>
-    /// IBattleTransport 的 Mirror 实现：
-    /// - HostSend（Host→全部客户端）：逐远端连接 Send + host 本机视图直投（host 也是观众/玩家）；
-    /// - ClientSend（客户端→Host）：host 本机=直调（无网络往返）；远端客户端=NetworkClient.Send；
-    /// - RegisterHostHandler 携带连接标识，供房主校验远端行动的归属。
-    /// Mirror 处理器注册为静态路由（一进程一局）：消息早到（会话未建）先入待发队列，
-    /// 客户端路由注册时冲队（握手门控之外的双保险，保序）。
-    /// </summary>
-    public class MirrorBattleTransport : IBattleTransport
+    /// <summary>把权威输入与本机表现分开；客户端完成装配才发就绪，不缓存跨场景消息。</summary>
+    public sealed class MirrorBattleTransport : IBattleTransport, IDisposable
     {
-        // 进程内当前活动传输（Mirror 处理器是全局静态表——路由目标必须是静态可达）
         private static MirrorBattleTransport _current;
 
-        // 早到消息队列（客户端路由未注册前收到的 Host 下行，注册时冲队；容量上限防病态堆积）
-        private static readonly Queue<BattleNetMessage> _earlyClientQueue = new Queue<BattleNetMessage>();
-        private const int EarlyQueueCapacity = 64;
-
-        private Action<BattleMessageType, string, string> _hostHandler;   // (type, json, senderId)
-        private Action<BattleMessageType, string> _clientHandler;
+        private readonly string _matchId;
         private readonly bool _isHost;
+        private readonly HashSet<string> _remotePlayers;
+        private Action<BattleMessageType, string, string> _hostHandler;
+        private Action<BattleMessageType, string> _clientHandler;
 
-        public MirrorBattleTransport(bool isHost)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private long _sentMessages;
+        private long _sentPayloadBytes;
+#endif
+
+        public MirrorBattleTransport(bool isHost, string matchId, IEnumerable<string> remotePlayers = null)
         {
+            if (string.IsNullOrEmpty(matchId)) throw new ArgumentException("联机对局缺少 MatchId", nameof(matchId));
+            _current?.Dispose();
             _isHost = isHost;
+            _matchId = matchId;
+            _remotePlayers = remotePlayers != null ? new HashSet<string>(remotePlayers, StringComparer.Ordinal) : null;
             _current = this;
-            RegisterMirrorHandlers();
+            if (isHost)
+                NetworkServer.ReplaceHandler<BattleNetMessage>(OnServerMessage);
+            else
+                NetworkClient.ReplaceHandler<BattleNetMessage>(OnClientMessage);
         }
 
-        // ==================== Mirror 静态注册（替换语义，再开局重注册不叠加） ====================
-
-        private void RegisterMirrorHandlers()
+        private void OnServerMessage(NetworkConnectionToClient conn, BattleNetMessage msg)
         {
-            // 服务器侧：收客户端输入和 hash 上报。
-            NetworkServer.ReplaceHandler<BattleNetMessage>(OnServerMessage, false);
-            // 客户端侧：收 Host 下行（开局/快照/片命令块/秒拍结束段）
-            NetworkClient.ReplaceHandler<BattleNetMessage>(OnClientMessage, false);
+            var type = (BattleMessageType)msg.type;
+            if (_current != this || conn is LocalConnectionToClient || msg.matchId != _matchId || !IsUplink(type)) return;
+            string playerId = conn.connectionId.ToString();
+            if (_remotePlayers?.Contains(playerId) == true)
+                _hostHandler?.Invoke(type, msg.json, playerId);
         }
 
-        private static void OnServerMessage(NetworkConnectionToClient conn, BattleNetMessage msg)
+        private void OnClientMessage(BattleNetMessage msg)
         {
-            if (_current == null) return;
-            _current._hostHandler?.Invoke((BattleMessageType)msg.type, msg.json,
-                conn is LocalConnectionToClient ? "local" : conn.connectionId.ToString());
+            var type = (BattleMessageType)msg.type;
+            if (_current == this && msg.matchId == _matchId && IsSimulationDownlink(type))
+                _clientHandler?.Invoke(type, msg.json);
         }
 
-        private static void OnClientMessage(BattleNetMessage msg)
-        {
-            if (_current == null || _current._clientHandler == null)
-            {
-                // 会话未建（理论上被开局握手挡住）：入队待冲，超容弃尾告警
-                if (_earlyClientQueue.Count >= EarlyQueueCapacity)
-                {
-                    GICLog.Warn($"[MirrorBattleTransport] 早到消息队列溢出，丢弃 type={msg.type}");
-                    return;
-                }
-                _earlyClientQueue.Enqueue(msg);
-                return;
-            }
-            _current._clientHandler.Invoke((BattleMessageType)msg.type, msg.json);
-        }
+        /// <summary>联机客户端自行演算表现，网络仅传开局、输入、终局与诊断。</summary>
+        private static bool IsSimulationDownlink(BattleMessageType type)
+            => type == BattleMessageType.BattleStart || type == BattleMessageType.InputBatch
+               || type == BattleMessageType.BattleOver || type == BattleMessageType.DesyncAlert;
 
-        // ==================== IBattleTransport ====================
+        private static bool IsUplink(BattleMessageType type)
+            => type == BattleMessageType.InputCommand || type == BattleMessageType.HashReport;
 
         public void HostSend(BattleMessageType type, object message)
         {
-            var envelope = new BattleMessageEnvelope
+            if (_current != this || !_isHost || !NetworkServer.active) return;
+            string json = BattleJsonSerializer.Instance.Serialize(message);
+            if (IsSimulationDownlink(type))
             {
-                messageType = type,
-                json = BattleJsonSerializer.Instance.Serialize(message),
-            };
-            // 双层信封序列化持续验证可序列化性（同 LocalBattleTransport 纪律）
-            BattleJsonSerializer.Instance.Serialize(envelope);
-
-            var netMsg = new BattleNetMessage { type = (int)type, json = envelope.json };
-
-            // 逐远端连接下发（host 本地连接 connectionId=0 直投，不走 Mirror——双投=host 视图双收）
-            if (NetworkServer.active)
-            {
+                var packet = new BattleNetMessage { matchId = _matchId, type = (int)type, json = json };
                 foreach (var conn in NetworkServer.connections.Values)
                 {
-                    if (conn is LocalConnectionToClient) continue;
-                    conn.Send(netMsg);
+                    if (conn is LocalConnectionToClient || _remotePlayers?.Contains(conn.connectionId.ToString()) != true)
+                        continue;
+                    conn.Send(packet);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    CountSend(json);
+#endif
                 }
             }
-            else
-            {
-                GICLog.Warn("[MirrorBattleTransport] 非 Host 端调用 HostSend，忽略");
-            }
-
-            _clientHandler?.Invoke(type, envelope.json); // host 本机客户端视图直投
+            if (type != BattleMessageType.InputBatch && type != BattleMessageType.DesyncAlert)
+                _clientHandler?.Invoke(type, json);
         }
 
         public void ClientSend(BattleMessageType type, object message)
         {
-            var envelope = new BattleMessageEnvelope
-            {
-                messageType = type,
-                json = BattleJsonSerializer.Instance.Serialize(message),
-            };
-            BattleJsonSerializer.Instance.Serialize(envelope);
-
-            if (NetworkServer.active)
-            {
-                // host 本机的客户端视图：上交直投本机 Host 路由（零网络往返）
-                _hostHandler?.Invoke(type, envelope.json, "local");
-            }
-            else if (NetworkClient.active)
-            {
-                NetworkClient.Send(new BattleNetMessage { type = (int)type, json = envelope.json });
-            }
-            else
-            {
-                GICLog.Warn("[MirrorBattleTransport] 无活动连接，ClientSend 丢弃");
-            }
+            if (_current != this || _isHost || !NetworkClient.isConnected || !IsUplink(type)) return;
+            string json = BattleJsonSerializer.Instance.Serialize(message);
+            NetworkClient.Send(new BattleNetMessage { matchId = _matchId, type = (int)type, json = json });
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            CountSend(json);
+#endif
         }
 
-        public void RegisterHostHandler(Action<BattleMessageType, string, string> handler)
-            => _hostHandler = handler;
-
-        public void RegisterClientHandler(Action<BattleMessageType, string> handler)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private void CountSend(string json)
         {
-            _clientHandler = handler;
-            // 冲早到队列（保序：入队即序，先到先投）
-            while (_earlyClientQueue.Count > 0)
-            {
-                var msg = _earlyClientQueue.Dequeue();
-                _clientHandler.Invoke((BattleMessageType)msg.type, msg.json);
-            }
+            _sentMessages++;
+            _sentPayloadBytes += System.Text.Encoding.UTF8.GetByteCount(json);
         }
+#endif
 
-        // ==================== 连接查询（BattleSession 期望 ack 数注入用） ====================
+        public void RegisterHostHandler(Action<BattleMessageType, string, string> handler) => _hostHandler = handler;
 
-        /// <summary>远端真人连接数（剔除 host 本地连接；非服务器端=0）</summary>
-        public static int RemoteClientCount()
+        public void RegisterClientHandler(Action<BattleMessageType, string> handler) => _clientHandler = handler;
+
+        public void Dispose()
         {
-            if (!NetworkServer.active) return 0;
-            int remote = 0;
-            foreach (var conn in NetworkServer.connections.Values)
-                if (conn is not LocalConnectionToClient) remote++;
-            return remote;
+            if (_current != this) return;
+            _current = null;
+            if (_isHost) NetworkServer.UnregisterHandler<BattleNetMessage>();
+            else NetworkClient.UnregisterHandler<BattleNetMessage>();
+            _hostHandler = null;
+            _clientHandler = null;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            GICLog.Info($"[BattleTransport] {(_isHost ? "Host" : "Client")} 发送 {_sentMessages} 条，JSON 载荷 {_sentPayloadBytes} B（未计协议开销）");
+#endif
         }
     }
 }
