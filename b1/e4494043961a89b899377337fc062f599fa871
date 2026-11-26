@@ -1,0 +1,54 @@
+Assets/_Scripts/Editor/Tool/ReplayRunner.cs
+  s_9fff5bdf9f5a18::t_4abfe7d5ff6b47 305,313-314,420-426
+  s_9fff5bdf9f5a18::t_3274024b7dc23d 3,18,114,118,120-125,214-225,486-487
+  s_9fff5bdf9f5a18::t_8186abd917efe1 249,253-262,266,282-284,287-288,291,297,316,324,328-329,333,335-345,358,360-412,427-445
+  s_9fff5bdf9f5a18::t_e76cbbfbb2fd34 413-419
+  s_9fff5bdf9f5a18::t_df68985175ba65 315
+Assets/_Scripts/Framework/Network/BattleStartExchange.cs
+  s_9fff5bdf9f5a18::t_3ed494c1f93336 50
+  s_9fff5bdf9f5a18::t_0fc3dc86aca48c 10-11,19,34,42,47-48,51,53-57,59-61,63-72,78,85
+Assets/_Scripts/Framework/GameScene.cs
+  s_9fff5bdf9f5a18::t_a3b2febdcb7d6f 416,418-427,429-437,439,441-442,444-450,453-455
+Assets/_Scripts/Editor/Tool/ProjectVerification.cs
+  s_9fff5bdf9f5a18::t_a95ca51dbf505d 4,34,65-67,84-93,101-117
+  s_9fff5bdf9f5a18::t_a4591a86d86d49 118-119
+Assets/_Scripts/UI/Screen/Coop/CoopScreen.RoomFlow.cs
+  s_9fff5bdf9f5a18::t_ad3de2441c97e6 283,295,421
+  s_9fff5bdf9f5a18::t_a9a521efacdaf4 284-285,287,304
+  s_9fff5bdf9f5a18::t_c79b03eb9ed835 290-294,308,313-314,323,342-344,346-349,418,432-447,459-467,470-474,522-523
+  s_9fff5bdf9f5a18::t_3ed494c1f93336 35,351,412,417,423,449,468
+  s_9fff5bdf9f5a18::t_83bde7ef36f05e 469
+docs/active/51-帧同步F0-F2交接与Windows验证清单.md
+  s_9fff5bdf9f5a18::t_e76cbbfbb2fd34 235,242-243,246
+Assets/_Scripts/Battle/Flow/RTSFlowController.cs
+  s_9fff5bdf9f5a18::t_3274024b7dc23d 482-483
+Assets/_Scripts/Battle/Flow/BattleLaunchConfig.cs
+  s_9fff5bdf9f5a18::t_9f0171d8f75ea0 123-130
+Assets/_Scripts/UI/Screen/Battle/BattleScreen.cs
+  s_9fff5bdf9f5a18::t_6f7b727a718ae0 175,177-180,211-217,225-226,576,580-583,644
+  s_9fff5bdf9f5a18::t_bedaf86ebaf59e 90,97,103,108,121,147,181-182,241,256,269,343,353,584,605-621,636
+  s_9fff5bdf9f5a18::t_bdb68580f3295d 585
+Assets/_Scripts/UI/Screen/Coop/CoopScreen.cs
+  s_9fff5bdf9f5a18::t_c79b03eb9ed835 62,246,333
+Assets/_Scripts/Battle/Flow/BattleRecorder.cs
+  s_9fff5bdf9f5a18::t_3274024b7dc23d 3,14,28-30,32,122-123,127-133,190-192,254
+Assets/_Scripts/Framework/Network/RoomManager.cs
+  s_9fff5bdf9f5a18::t_9f0171d8f75ea0 174,258-260,264-266
+  s_9fff5bdf9f5a18::t_c18b882d8132ca 267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b1e4494043961a89b899377337fc062f599fa871",
+  "prompts": {},
+  "sessions": {
+    "s_9fff5bdf9f5a18": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a211f9-b2e4-73e3-a63e-97536138abb5",
+        "model": "group/gpt-6.2-sol"
+      },
+      "human_author": "xiaoding521234 <2205002727@qq.com>"
+    }
+  }
+}
