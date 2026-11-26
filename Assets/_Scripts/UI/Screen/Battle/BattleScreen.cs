@@ -87,36 +87,25 @@ namespace GIC.UI
                 };
             }
             _isLanClient = _networkBattle && launchConfig.LocalPlayerId != PlayerID.Host;
-            if (_isLanClient && !Mirror.NetworkClient.isConnected)
-            {
-                CloseDisconnectedBattle();
-                yield break;
-            }
-            if (_networkBattle && !_isLanClient && !Mirror.NetworkServer.active)
-            {
-                AbortBattleStartup("房主服务已经停止");
-                yield break;
-            }
+            if (!CanContinueBattleStartup(launchConfig)) yield break;
 
             // 地图：联机入口按配置名加载；调试直开用默认地图（各端资产本地同构）
             var mapConfig = Resources.Load<BattleMapConfig>("Configs/" +
                 (launchConfig != null ? launchConfig.MapConfigName : BattleLaunchConfig.DefaultMapName));
             if (mapConfig == null)
             {
-                GICLog.Error("[BattleScreen] 未找到战斗地图配置，无法开战");
-                DoClose();
+                AbortBattleStartup("未找到战斗地图配置");
                 yield break;
             }
             var map = mapConfig.BuildData();
             if (map == null)
             {
-                GICLog.Error("[BattleScreen] 战场地图配置非法，无法开战");
-                DoClose();
+                AbortBattleStartup("战场地图配置无效");
                 yield break;
             }
 
             yield return null; // ── 分帧：地图数据就绪/会话创建是重活起点 ──
-            if (isClosing) yield break;
+            if (!CanContinueBattleStartup(launchConfig)) yield break;
 
             // 组件兜底（场景装配缺失时补挂，便于直接打开场景调试）
             if (_player == null) _player = gameObject.AddComponent<BattlePlayer>();
@@ -129,8 +118,7 @@ namespace GIC.UI
                 _board = GetComponentInChildren<BattleBoard>();
                 if (_board == null)
                 {
-                    GICLog.Error("[BattleScreen] 场景缺少 BattleBoard，无法建盘");
-                    DoClose();
+                    AbortBattleStartup("战斗场景缺少棋盘组件");
                     yield break;
                 }
             }
@@ -156,7 +144,7 @@ namespace GIC.UI
             }
 
             yield return null; // ── 分帧：兜底/建会话分开（单帧 304ms 实测拆半，2026-09-13） ──
-            if (isClosing) yield break;
+            if (!CanContinueBattleStartup(launchConfig)) yield break;
 
             // ==================== ①本地 / ②LAN host / ③LAN client 装配（F1 帧同步） ====================
             // 逻辑单位隐藏根（Host 侧逻辑对象；表现层为 UnitView；客户端 Sim 也挂此根）
@@ -184,9 +172,14 @@ namespace GIC.UI
                 _session = BattleSession.CreateLocal(map, _player, _flow, logicGo.transform, battleSeed,
                     launchConfig?.Players); // 调试直开 Players=null（无房间名册——色/队回落旧口径）
             }
+            Dictionary<string, BattleCell> spawnCells = null;
             if (_session.IsHostSide)
-                yield return AssembleHostRoutine(launchConfig, mapConfig, playerSetups, battleSeed);
-            if (isClosing || !BindHud(GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>()))
+            {
+                spawnCells = ResolveSpawnCells(mapConfig, playerSetups);
+                yield return AssembleHostRoutine(launchConfig, playerSetups, spawnCells);
+            }
+            if (!CanContinueBattleStartup(launchConfig)
+                || !BindHud(GameObject.Find("BattleCamera")?.GetComponent<BattleCameraController>()))
                 yield break;
 
             if (_isLanClient)
@@ -215,6 +208,13 @@ namespace GIC.UI
                     AbortBattleStartup("远端在开局装配期间掉线");
                     yield break;
                 }
+                // HUD 与联机开局门都通过后再建录制，避免一次装配失败覆盖“最新录制”的入口。
+                if (BattleRecorder.Enabled && launchConfig?.IsSandbox != true)
+                {
+                    var hands = playerSetups.ToDictionary(s => s.PlayerId, s => _session.Sim.GetHand(s.PlayerId).ToList());
+                    BattleRecorder.CaptureSetup(battleSeed, launchConfig?.MapConfigName ?? BattleLaunchConfig.DefaultMapName,
+                        (int)_session.Sim.FogMode, playerSetups, spawnCells, hands, _session.IsNetworked);
+                }
                 _session.StartBattle();
             }
 
@@ -222,8 +222,8 @@ namespace GIC.UI
             SceneFadeOverlay.Reveal(0.2f);
         }
 
-        private IEnumerator AssembleHostRoutine(BattleLaunchConfig launchConfig, BattleMapConfig mapConfig,
-            List<BattlePlayerSetup> playerSetups, int battleSeed)
+        private IEnumerator AssembleHostRoutine(BattleLaunchConfig launchConfig, List<BattlePlayerSetup> playerSetups,
+            Dictionary<string, BattleCell> spawnCells)
         {
             // 迷雾账本模式注入（2026-10-17 追拍三「AI 也受雾限」）：Host 侧 AI 探索集与表现层同模式
             //（房间对战=Skirmish/任务=Mission/调试直开=None=AI 不受限）；客户端随开局消息注入
@@ -238,9 +238,7 @@ namespace GIC.UI
             }
 
             yield return null; // ── 分帧：会话就绪/立牌是重活起点 ──
-
-            // 出生区分配（2026-10-11 联机批）：指定出生点按区落位、Random 按序自动分配未占用区
-            var spawnCells = ResolveSpawnCells(mapConfig, playerSetups);
+            if (!CanContinueBattleStartup(launchConfig)) yield break;
 
             // 协议核心（2026-09-29 拍板 Unit 化——第一个建筑，也是玩家基地）：每玩家一枚立于
             // 出生区中心格=胜负判据锚点（docs/02 §2：核心摧毁=战败）；SpawnDebugUnit=UnitFactory
@@ -255,6 +253,7 @@ namespace GIC.UI
                     yield break;
                 }
                 yield return null;
+                if (!CanContinueBattleStartup(launchConfig)) yield break;
             }
 
             // 试招沙盒（2026-10-05 时轮编辑器「开一把试招」）：A=编辑单位（层级覆盖 5★ 魔神档全手操）、
@@ -267,6 +266,7 @@ namespace GIC.UI
                 _session.SpawnSandboxUnit(launchConfig.SandboxAllyUnit, playerSetups[0].PlayerId, TeamType.A,
                     allyCenter + new BattleCell(1, 0));
                 yield return null;
+                if (isClosing) yield break;
                 _session.SpawnDebugUnit(launchConfig.SandboxDummyUnit, playerSetups[1].PlayerId, TeamType.B,
                     allyCenter + new BattleCell(6, 0));
             }
@@ -291,10 +291,6 @@ namespace GIC.UI
             // 时 Blit 拷贝零黑窗；池外角色（LAN 客户端不可见的敌方人类卡组）走静态立牌过渡兜底。
             IdleClipPrewarmPool.Clear(); // 上一局残留清空（模板 RT 释放）
             var prewarmUnits = new HashSet<GIC.Data.UnitName>();
-            // 回放录制（2026-10-20 Replay harness 批）：初始手牌全量收集（含初始资源卡）——
-            // 初始态终点快照式录制（卡组构建上游不录，卡组/存档变化不影响回放）
-            Dictionary<string, List<HandCard>> replayHands = BattleRecorder.Enabled
-                ? new Dictionary<string, List<HandCard>>() : null;
             var localOwnedUnitIds = _saveManager?.CurrentSave?.EnumerateOwnedUnitIds().ToList();
             foreach (var setup in playerSetups)
             {
@@ -312,15 +308,8 @@ namespace GIC.UI
                 }
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Mora), BattleMetrics.InitialMora);
                 _session.Sim.GainCard(setup.PlayerId, new CardId(ItemName.Stamina), BattleMetrics.InitialStamina);
-                replayHands?.Add(setup.PlayerId, _session.Sim.GetHand(setup.PlayerId).ToList());
             }
             IdleClipPrewarmPool.Prewarm(this, CollectIdleClips(prewarmUnits));
-            // 回放录制 header（沙盒局不录——沙盒单位生成未入录制面，回放会缺单位）
-            if (launchConfig == null || !launchConfig.IsSandbox)
-                BattleRecorder.CaptureSetup(battleSeed,
-                    launchConfig != null ? launchConfig.MapConfigName : BattleLaunchConfig.DefaultMapName,
-                    (int)(launchConfig?.FogMode ?? BattleFogMode.None), playerSetups, spawnCells, replayHands,
-                    isNetworked: _session.IsNetworked);
 
             // AI 玩家配额脑（B6b 评分制→D 批次操控分层收窄：号令/操魔神/空过，docs/32 §6；
             // 眷属/伙伴自主脑在 Host 秒拍流程内联运行（FamiliarBrain/CompanionBrain），非挂件）。
@@ -351,8 +340,7 @@ namespace GIC.UI
                 var hudPrefab = Resources.Load<GameObject>("Prefabs/Battle/BattleHud");
                 if (hudPrefab == null)
                 {
-                    GICLog.Error("[BattleScreen] BattleHud.prefab 未找到，HUD 不可用");
-                    DoClose();
+                    AbortBattleStartup("战斗 HUD 资源未找到");
                     return false;
                 }
                 var hudGo = Instantiate(hudPrefab, transform, false);
@@ -362,8 +350,7 @@ namespace GIC.UI
             // 批9 复审②：相机守卫补全——原 null 时静默传 HUD.Bind，板面点击/拖动跟随全链静默死
             if (cameraCtrl == null || _hud == null)
             {
-                GICLog.Error("[BattleScreen] 场景缺少 BattleCamera/BattleCameraController，HUD 板面交互链不可用——无法开战");
-                DoClose();
+                AbortBattleStartup("战斗场景缺少相机或 HUD 组件");
                 return false;
             }
             _hud.Bind(_session, _board, cameraCtrl, Close);
@@ -586,9 +573,14 @@ namespace GIC.UI
         protected override void OnDestroy()
         {
             if (_battleMusicActive) StopBattleMusic();
-            _session?.Dispose();
-            BattleRecorder.EndSession(); // 回放录制收笔（Replay harness 批）——中途退出/终局统一兜底
+            DisposeBattleSession();
             base.OnDestroy();
+        }
+
+        private void DisposeBattleSession()
+        {
+            _session?.Dispose();
+            if (_session?.IsHostSide == true) BattleRecorder.EndSession();
         }
 
         /// <summary>
@@ -610,9 +602,23 @@ namespace GIC.UI
             _exitDialog = BattleExitConfirmDialog.Show(transform, DoClose); // 文案=弹窗内部本地化键（2026-09-22 转正）
         }
 
-        /// <summary>
-        /// 真正退出（确认回调/配置异常直退共用）：独立根场景无 GoBack 历史，直接回大厅。
-        /// </summary>
+        private bool CanContinueBattleStartup(BattleLaunchConfig config)
+        {
+            if (isClosing) return false;
+            if (!_networkBattle) return true;
+            if (_isLanClient)
+            {
+                if (Mirror.NetworkClient.isConnected) return true;
+                CloseDisconnectedBattle();
+            }
+            else
+            {
+                if (_roomManager?.CanContinueBattleExchange(config.MatchId) == true) return true;
+                AbortBattleStartup("开局期间房间已关闭或有玩家掉线");
+            }
+            return false;
+        }
+
         private void AbortBattleStartup(string reason)
         {
             GICLog.Error($"[BattleScreen] 开局中止：{reason}");
@@ -627,6 +633,7 @@ namespace GIC.UI
             PopupManager.Instance?.ShowToast(new LocalizedString(TableName.PopupText.ToString(), "Coop_HostDisconnected"));
         }
 
+        /// <summary>独立根场景无返回历史，统一收尾后直接回大厅。</summary>
         private void DoClose()
         {
             if (isClosing) return;
@@ -634,7 +641,7 @@ namespace GIC.UI
             InputLocks.Push(this, InputLockReason.Closing);
             SceneFadeOverlay.Reveal(0.2f); // 地图配置失败直退路径：揭幕加载页（正常退出无黑场=no-op）
             StopBattleMusic(); // 轮换链停播（回大厅后位置曲由 MainHall 激活钩子复活）
-            _session?.Dispose();
+            DisposeBattleSession();
             if (_networkBattle && Mirror.NetworkManager.singleton is MyNetworkManager network)
                 network.LeaveBattleRoom();
             StartCoroutine(CloseToMainHall());

@@ -171,6 +171,7 @@ namespace GIC.Framework
         public void HandleServerDisconnect(NetworkConnectionToClient conn)
         {
             string playerID = conn.connectionId.ToString();
+            _battleExchange?.MarkDisconnected(playerID);
             playerManager.UnregisterPlayer(playerID);
             EventBusHub.Instance.Send(new RemovePlayerEvent { TargetPlayerID = playerID });
         }
@@ -254,9 +255,15 @@ namespace GIC.Framework
         public bool TryBeginBattleExchange(string matchId, IEnumerable<string> remotePlayerIds)
         {
             if (!NetworkServer.active || IsBattleRoomLocked) return false;
-            _battleExchange = new BattleStartExchange(matchId, remotePlayerIds);
+            var exchange = new BattleStartExchange(matchId, remotePlayerIds);
+            if (!exchange.CanContinue(matchId, IsRemoteHuman)) return false;
+            _battleExchange = exchange;
             return true;
         }
+
+        /// <summary>切场景前后都可检查冻结名册；此时不要求远端已完成装配。</summary>
+        public bool CanContinueBattleExchange(string matchId)
+            => NetworkServer.active && _battleExchange?.CanContinue(matchId, IsRemoteHuman) == true;
 
         /// <summary>仅在本局所有远端依然在线，且卡组和战斗就绪均已收到时放行。</summary>
         public bool IsBattleExchangeReady(string matchId, out bool failed)

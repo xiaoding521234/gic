@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using GIC.Battle;
 using GIC.Data;
 using GIC.Framework;
 using UnityEditor;
@@ -30,6 +31,7 @@ namespace GIC.Editor
                 string buildError = GicBuildPreflight.Validate();
                 Require(buildError == null, buildError);
                 VerifyBattleStartExchange();
+                VerifyPendingBattleLaunch();
                 VerifyEventLifecycle();
                 VerifySaveCopies();
                 var frameSync = ReplayRunner.FrameSyncPipelineSelfTest();
@@ -60,6 +62,9 @@ namespace GIC.Editor
             ClientBattleReadyEvent Ready(string id, string matchId = "match")
                 => new ClientBattleReadyEvent { MatchId = matchId, SourcePlayerID = id };
 
+            exchange.MarkDisconnected("3"); // An unlisted connection leaving is not a launch failure.
+            Require(exchange.CanContinue("match", IsOnline) && !exchange.CanContinue("old", IsOnline),
+                "A fresh launch could not enter scene loading with decks and ready messages pending");
             Require(!exchange.TryAcceptDeck(Deck("1", "old")) && !exchange.TryMarkReady(Ready("1", "old"))
                 && !exchange.TryAcceptDeck(Deck("3")) && !exchange.TryMarkReady(Ready("3")),
                 "Stale or unlisted seat advanced the battle exchange");
@@ -76,11 +81,40 @@ namespace GIC.Editor
             online.Remove("2");
             Require(!exchange.IsReady("match", IsOnline, out failed) && failed && !exchange.TryStart("match", IsOnline),
                 "A ready player disconnected before start but was still admitted");
+            online.Add("2");
+            Require(!exchange.CanContinue("match", IsOnline), "A reused seat revived an aborted launch");
+
+            var interrupted = new BattleStartExchange("interrupted", new[] { "2" });
+            interrupted.MarkDisconnected("2");
+            Require(!interrupted.CanContinue("interrupted", IsOnline)
+                && !interrupted.TryMarkReady(Ready("2", "interrupted"))
+                && !interrupted.TryAcceptDeck(Deck("2", "interrupted")),
+                "Disconnect during scene handoff still accepted late deck/ready messages");
+
             var next = new BattleStartExchange("next", new[] { "1" });
             Require(!next.TryMarkReady(Ready("1")) && !next.TryAcceptDeck(Deck("1"))
                 && next.TryMarkReady(Ready("1", "next")) && next.TryAcceptDeck(Deck("1", "next"))
                 && next.TryStart("next", IsOnline) && !next.TryStart("next", IsOnline),
                 "A new launch reused old state or completed twice");
+        }
+
+        public static void VerifyPendingBattleLaunch()
+        {
+            var previous = BattleLaunchConfig.Current;
+            try
+            {
+                var failed = new BattleLaunchConfig();
+                var next = new BattleLaunchConfig();
+                BattleLaunchConfig.Prepare(failed);
+                Require(BattleLaunchConfig.CancelPending(failed) && BattleLaunchConfig.Current == null,
+                    "Failed scene switch left a pending battle launch behind");
+
+                BattleLaunchConfig.Prepare(next);
+                Require(!BattleLaunchConfig.CancelPending(failed) && BattleLaunchConfig.Take() == next
+                    && !BattleLaunchConfig.CancelPending(next) && BattleLaunchConfig.Take() == null,
+                    "Old transition changed the new launch or a config was consumed twice");
+            }
+            finally { BattleLaunchConfig.Prepare(previous); }
         }
 
         public static void VerifyEventLifecycle()

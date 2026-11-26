@@ -32,11 +32,7 @@ namespace GIC.UI
 
         #region connManage
 
-        private void StopCurrentConnection()
-        {
-            if (NetworkServer.active || NetworkClient.isConnected)
-                _netMgr?.StopHost();
-        }
+        private void StopCurrentConnection() => _netMgr?.LeaveBattleRoom();
 
         private void SetRoomState(RoomState newState)
         {
@@ -284,13 +280,19 @@ namespace GIC.UI
             if (!ValidateStartConditions()) return; // 未通过：轻提示已弹原因
 
             var config = BattleLaunchConfig.BuildFromRoster(GetSelectedMapConfigName(), _playerManager.GetAllPlayers());
-            var remotePlayers = config.RemotePlayers().ToArray();
+            var remotePlayers = config.RemotePlayers().ToList();
+            config.IsNetworked = remotePlayers.Count != 0;
+            config.LocalPlayerId = PlayerID.Host;
 
-            if (remotePlayers.Length != 0)
+            if (config.IsNetworked)
             {
                 config.MatchId = System.Guid.NewGuid().ToString("N");
-                if (_roomManager?.TryBeginBattleExchange(config.MatchId, remotePlayers) != true) return;
-                EventBusHub.Instance.Send(new StartBattleEvent
+                if (_roomManager?.TryBeginBattleExchange(config.MatchId, remotePlayers) != true)
+                {
+                    ShowStartBlockedToast("Coop_NotAllReady");
+                    return;
+                }
+                EventBusHub.Instance.SendToPlayers(remotePlayers, new StartBattleEvent
                 {
                     MatchId = config.MatchId,
                     MapConfigName = config.MapConfigName,
@@ -299,22 +301,17 @@ namespace GIC.UI
                     Players = config.Players,
                 });
             }
-            else
-            {
-                // 纯本机开局（host + 房间 AI 玩家）：拆线后本地 Prepare（AI 自动补位已退役——
-                // 单人须先「增加AI玩家」，开局门 Coop_NeedTwoTeams 拦空房）
-                StartCoroutine(StartGameTransition(config, stopNetwork: true));
-            }
+            StartCoroutine(StartGameTransition(config));
         }
 
         /// <summary>
-        /// 开战广播接收（host 回环 + 各客户端统一入口）：由 StartBattleEvent 驱动——
-        /// 客户端先回卡组上报（host 据此为该端建手牌），随后全端同一转场加载战斗场景。
+        /// 开战广播只供远端消费；房主直接使用冻结的配置转场，不依赖事件回环。
         /// 名册（队伍/颜色/出生点/AI 标记）随配置进局内真实生效（2026-10-11 联机批拍板）。
         /// </summary>
         private void OnStartBattleReceived(StartBattleEvent evt)
         {
-            if (isClosing || _currentState == RoomState.DisconnectedClient || evt.SourcePlayerID != PlayerID.Host)
+            if (isClosing || _currentState != RoomState.ConnectedClient || NetworkServer.active
+                || !NetworkClient.isConnected || evt.SourcePlayerID != PlayerID.Host)
                 return;
             if (string.IsNullOrEmpty(evt.MatchId) || evt.Players == null || evt.Players.Count < 2
                 || evt.Players.Any(p => p == null || string.IsNullOrEmpty(p.PlayerId) || p.MoraIncomePercent <= 0))
@@ -323,7 +320,7 @@ namespace GIC.UI
                 return;
             }
 
-            string localPlayerId = NetworkServer.active ? PlayerID.Host : _playerManager.SelfPlayerID;
+            string localPlayerId = _playerManager.SelfPlayerID;
             if (!evt.Players.Any(p => !p.IsAI && p.PlayerId == localPlayerId))
             {
                 GICLog.Warn("[CoopScreen] 开局名册没有本机座位");
@@ -342,19 +339,16 @@ namespace GIC.UI
             };
 
             // 客户端先回卡组（本机存档当前卡组——与 BattleScreen 手牌构建同源），再转场
-            if (!NetworkServer.active)
+            var saveManager = Wargame.Instance?.Context?.Get<GIC.Framework.SaveManager>();
+            var cardManager = Wargame.Instance?.Context?.Get<GIC.Framework.CardManager>();
+            EventBusHub.Instance.Send(new ClientDeckEvent
             {
-                var saveManager = Wargame.Instance?.Context?.Get<GIC.Framework.SaveManager>();
-                var cardManager = Wargame.Instance?.Context?.Get<GIC.Framework.CardManager>();
-                EventBusHub.Instance.Send(new ClientDeckEvent
-                {
-                    MatchId = config.MatchId,
-                    Entries = BattleDeckBuilder.BuildCurrentDeck(saveManager, cardManager),
-                    OwnedUnitIds = saveManager?.CurrentSave?.EnumerateOwnedUnitIds().ToList() ?? new List<int>(),
-                });
-            }
+                MatchId = config.MatchId,
+                Entries = BattleDeckBuilder.BuildCurrentDeck(saveManager, cardManager),
+                OwnedUnitIds = saveManager?.CurrentSave?.EnumerateOwnedUnitIds().ToList() ?? new List<int>(),
+            });
 
-            StartCoroutine(StartGameTransition(config, stopNetwork: false));
+            StartCoroutine(StartGameTransition(config));
         }
 
         /// <summary>
@@ -415,19 +409,18 @@ namespace GIC.UI
             => PopupManager.Instance.ShowToast(new LocalizedString(TableName.PopupText.ToString(), key));
 
         /// <summary>
-        /// 开局转场（host 本机局与 LAN 广播局共用；stopNetwork 区分拆线语义）：
+        /// 开局转场（本机局拆线，联机保留连接）：
         /// 加载页盖住 StopHost 拆除尖峰（0.2s 淡入，按所选地图换势力徽标+随机词条）→
         /// **Additive 根切换**（GameScene.SwitchRootScene：新根 Additive 加载+旧根 UnloadAsync 分帧
         /// 卸载，2026-09-13 用户拍板"Additive 卸载拆分"——激活帧卸载风暴根治，加载页动画全程流畅）→
         /// BattleScreen.Start 装配协程完毕 Reveal 揭幕。
-        /// LAN 对局（stopNetwork=false）连接贯穿战斗——房间→局内的 Mirror 通道（BattleNetMessage）
-        /// 与卡组/就绪交换全靠它；战后回大厅由 CoopScreen.OnShow 统一拆线（v1=房间解散拍板）。
+        /// LAN 对局连接贯穿战斗——房间→局内的 Mirror 通道（BattleNetMessage）
+        /// 与卡组/就绪交换全靠它；开局失败或战后退出均拆线（房间解散，不做重连续局）。
         /// isClosing 同时拦下 StopHost 断连回调触发的切换动画（转场无需面板动画）。
         /// 锁与标志随根切换清栈入池的 OnDisable PopAll / 下次 RaiseShow 自清；
-        /// 本协程宿主（本面板）会在清栈时被禁用——末行之后不得再有依赖代码
-        /// （yield return 的嵌套协程宿主=GameScene，不受本面板禁用影响）。
+        /// 本面板在切换成功时禁用；失败时留在原大厅，由本面板收尾。
         /// </summary>
-        private IEnumerator StartGameTransition(BattleLaunchConfig config, bool stopNetwork)
+        private IEnumerator StartGameTransition(BattleLaunchConfig config)
         {
             isClosing = true;
             InputLocks.Push(this, InputLockReason.Closing);
@@ -436,9 +429,24 @@ namespace GIC.UI
             // ——本屏 PushMusicVolume 的配对 pop 随根切换 OnDisable 自洽
             AudioManager.Instance.StopMusic(0.5f);
             SceneFadeOverlay.Cover(GetSelectedMapConfig(), 0.2f);
-            yield return new WaitForSeconds(0.2f); // 等加载页铺满再拆网络
+            yield return new WaitForSecondsRealtime(0.2f);
 
-            if (stopNetwork)
+            if (config.IsNetworked && (config.LocalPlayerId == PlayerID.Host
+                    ? _roomManager?.CanContinueBattleExchange(config.MatchId) != true
+                    : !NetworkClient.isConnected))
+            {
+                CancelBattleTransition("开局期间有玩家掉线");
+                yield break;
+            }
+
+            var scene = GameScene.Instance;
+            if (scene == null)
+            {
+                CancelBattleTransition("无法切换到战斗场景");
+                yield break;
+            }
+
+            if (!config.IsNetworked)
                 StopCurrentConnection();
             // 只写开局配置（不触发加载）；BattleScreen.Start 激活后 Take() 消费
             BattleLaunchConfig.Prepare(config);
@@ -448,8 +456,22 @@ namespace GIC.UI
             // 协程宿主必须是 GameScene：SwitchRootScene 中途 PoolAllForRootSwitch 会 SetActive(false)
             // 本面板——挂本面板的协程（含 StartCoroutine 嵌套）会被腰斩，旧根卸载+放锁永不执行
             InputLocks.Pop(this, InputLockReason.Closing);
-            yield return GameScene.Instance.StartCoroutine(GameScene.Instance.SwitchRootScene(SceneType.BattleScreen));
-            // 本行仅供断言续行性（正常路径 GameScene 宿主协程自洽完成，本面板协程可能已随禁用终止）
+            yield return scene.StartCoroutine(scene.SwitchRootScene(SceneType.BattleScreen));
+            // 成功时本面板已入池；若仍未交付配置，撤销它，避免污染下一次直开。
+            if (BattleLaunchConfig.CancelPending(config))
+                CancelBattleTransition("无法切换到战斗场景");
+        }
+
+        private void CancelBattleTransition(string reason)
+        {
+            GICLog.Warn($"[CoopScreen] 开局中止：{reason}");
+            StopCurrentConnection(); // isClosing 期间压住同步断线回调，由此处一次性退出房间。
+            InputLocks.Pop(this, InputLockReason.Closing);
+            isClosing = false;
+            ReturnToDiscovery();
+            Wargame.Instance?.Context?.Get<PositionManager>()?.PlayCurrentPositionMusic();
+            SceneFadeOverlay.Reveal(0.2f);
+            PopupManager.Instance?.ShowToast(reason);
         }
 
         void OnLeaveRoomClick()
@@ -497,6 +519,8 @@ namespace GIC.UI
 
         void OnClientDisconnected()
         {
+            if (isClosing) return; // 开局转场负责撤销；手动关面板也无需再播列表动画。
+
             // 加入期断开（kcp 握手超时/丢失，实测手机端典型为 10s 握手超时静默断开）：
             // 自动重试兜间歇性握手丢失（重启两端后一次成功的先例），仍败回列表+失败提示
             if (_joining)

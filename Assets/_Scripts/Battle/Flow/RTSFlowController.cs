@@ -479,9 +479,10 @@ namespace GIC.Battle
 
         private void FinishBattle(BattleOverMessage result)
         {
+            if (IsHost && !IsReplay && BattleRecorder.IsRecording)
+                BattleRecorder.CaptureGameOver(result.winnerTeam, result.finalTick, ComputeStateHash(_sim));
             Stop();
             _transport.HostSend(BattleMessageType.BattleOver, result);
-            if (IsHost && !IsReplay) BattleRecorder.CaptureGameOver(result.winnerTeam, result.finalTick);
         }
 
         /// <summary>胜负判定（协议核心批拍板，docs/02 §2——与旧 TurnFlowController 逐条同构；回放器

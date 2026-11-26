@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -14,7 +15,7 @@ namespace GIC.Editor
 {
 
 
-    /// <summary>用正式战斗逐拍逻辑重演单机 v2/v3 或联机 v3 录制，并比对命令、状态及终局。</summary>
+    /// <summary>用正式逐拍逻辑重演录制，并比对命令、状态及终局；旧版联机 v2 仅供诊断。</summary>
     public static class ReplayRunner
     {
         private static string ReplayDir => Path.Combine(Application.persistentDataPath, "Replays");
@@ -110,13 +111,18 @@ namespace GIC.Editor
                     return "FAIL：请退出 Play Mode 并结束当前录制后重演";
                 var recording = ParseFile(jsonlPath);
                 var header = recording.Header;
-                bool hasEndTick = header.formatVersion >= 3;
+                bool hasEndTick = header.formatVersion >= ReplayHeaderLine.ExactEndTickFormat;
                 if (header.formatVersion < 2 || header.formatVersion > ReplayHeaderLine.CurrentFormat)
                     return $"FAIL：不支持的回放格式 v{header.formatVersion}";
                 if (header.isNetworked && !hasEndTick)
-                    return "FAIL：旧联机 v2 录制仅供诊断；联机重演需重新录制 v3";
+                    return "FAIL：旧联机 v2 录制仅供诊断；请用当前版本重新录制";
                 if (hasEndTick && recording.End == null)
-                    return "FAIL：v3 缺少结束拍（录制仍在写入或未正常收笔）";
+                    return $"FAIL：v{header.formatVersion} 缺少结束拍（录制仍在写入或未正常收笔）";
+                bool checkFinalHash = recording.Over != null && header.formatVersion >= ReplayHeaderLine.FinalStateHashFormat;
+                int expectedFinalHash = 0;
+                if (checkFinalHash && !int.TryParse(recording.Over.finalStateHash, NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out expectedFinalHash))
+                    return "FAIL：缺少或无法读取终局状态 hash";
                 if (header.players == null || header.players.Count < 2
                     || (hasEndTick && header.players.Any(p => p == null || p.moraIncomePercent <= 0)))
                     return "FAIL：回放开局名册或玩家规则不完整";
@@ -205,7 +211,18 @@ namespace GIC.Editor
                         || (hasEndTick ? over.finalTick != recording.Over.finalTick
                             : over.finalTick / BattleMetrics.TicksPerSecond != recording.Over.finalTurn))
                         summary.Append($"\nFAIL：终局不一致（录制胜方 {recording.Over.winnerTeam}，回放胜方 {over?.winnerTeam} / tick {over?.finalTick}）");
-                    else summary.Append($"\n终局一致：胜方队伍 {over.winnerTeam}（回放 tick {over.finalTick}）");
+                    else
+                    {
+                        summary.Append($"\n终局一致：胜方队伍 {over.winnerTeam}（回放 tick {over.finalTick}）");
+                        if (checkFinalHash)
+                        {
+                            int actual = RTSFlowController.ComputeStateHash(sim);
+                            summary.Append(actual == expectedFinalHash
+                                ? "\n终局状态 hash PASS"
+                                : $"\nFAIL：终局状态 hash 不一致（录制 {expectedFinalHash} vs 回放 {actual}）");
+                        }
+                        else summary.Append("\n旧格式未记录终局状态 hash");
+                    }
                 }
                 else if (over != null)
                     summary.Append($"\nFAIL：回放提前终局 tick {over.finalTick}，录制未终局");
@@ -229,23 +246,28 @@ namespace GIC.Editor
 
         // ==================== 自测（合成局闭环） ====================
 
-        /// <summary>编辑器域自测：合成录制（双核心对峙 2 秒，走 BattleRecorder 真实录制路径：
-        /// header+购买+秒拍资源发放+tick hash）→ Run 回放 diff。验证「录制器写盘 ↔ 回放器读盘重建
-        /// ↔ tick 窗口序」编解码闭环；不覆盖真局装配侧（BattleScreen 接线——交实机/观察局复测）。</summary>
+        /// <summary>单机、联机各录一次中途停录及正常终局，使用正式流程重演并检查损坏的收尾。</summary>
         public static string SelfTest()
         {
             string directory = Path.Combine(Path.GetTempPath(), "gic-replay-check-" + Guid.NewGuid().ToString("N"));
-            try { return SelfTest(false, directory) + "\n" + SelfTest(true, directory); }
+            try
+            {
+                var summaries = new List<string>();
+                foreach (bool isNetworked in new[] { false, true })
+                {
+                    summaries.Add(SelfTest(isNetworked, false, directory));
+                    summaries.Add(SelfTest(isNetworked, true, directory));
+                }
+                return string.Join("\n", summaries);
+            }
             finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
         }
 
-        private static string SelfTest(bool isNetworked, string directory)
+        private static string SelfTest(bool isNetworked, bool finishBattle, string directory)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode || BattleRecorder.CurrentPath != null)
                 return "FAIL：只能在非播放、非录制状态运行自测";
             EnsureEditorConfigs();
-            var unitConfig = Wargame.Instance.Context.Get<UnitConfig>();
-            if (unitConfig == null) return "FAIL：编辑器域容器无 UnitConfig（EnsureEditorConfigs 失败）";
 
             var mapConfig = Resources.Load<BattleMapConfig>("Configs/" + BattleLaunchConfig.DefaultMapName);
             if (mapConfig == null || mapConfig.spawnZones == null || mapConfig.spawnZones.Count < 2)
@@ -257,34 +279,30 @@ namespace GIC.Editor
                 new BattlePlayerSetup { PlayerId = BattleDebugPlayerIds.P1, DisplayName = "自测P1", Team = TeamType.A },
                 new BattlePlayerSetup { PlayerId = BattleDebugPlayerIds.P2, DisplayName = "自测P2", Team = TeamType.B },
             };
+            // 终局用同一出生区的三格直线：两端是核心，中间可合法部署凯亚并用霜袭命中右侧核心。
+            var center = mapConfig.spawnZones[0].center;
+            var delta = new BattleCell(1, 0);
             var spawnCells = new Dictionary<string, BattleCell>
             {
-                { BattleDebugPlayerIds.P1, mapConfig.spawnZones[0].center },
-                { BattleDebugPlayerIds.P2, mapConfig.spawnZones[1].center },
+                { BattleDebugPlayerIds.P1, finishBattle ? center - delta : center },
+                { BattleDebugPlayerIds.P2, finishBattle ? center + delta : mapConfig.spawnZones[1].center },
             };
             HandCard MoraCard() => new HandCard(new CardId(ItemName.Mora), 200);
-            HandCard StaminaCard() => new HandCard(new CardId(ItemName.Stamina), 60);
+            HandCard StaminaCard() => new HandCard(new CardId(ItemName.Stamina), finishBattle ? 200 : 60);
             var hands = new Dictionary<string, List<HandCard>>
             {
                 { BattleDebugPlayerIds.P1, new List<HandCard> { MoraCard(), StaminaCard() } },
                 { BattleDebugPlayerIds.P2, new List<HandCard> { MoraCard(), StaminaCard() } },
             };
+            if (finishBattle) hands[BattleDebugPlayerIds.P1].Add(new HandCard(new CardId(UnitName.Kaeya), 1));
 
-            // 用真实 Flow 录制一次购买及非整秒尾拍，再由回放器重演。
             foreach (var setup in setups) setup.ResolveRules();
-            bool previouslyEnabled = BattleRecorder.Enabled;
-            string path = null;
-
             var header = new ReplayHeaderLine
             {
                 seed = seed,
                 mapName = BattleLaunchConfig.DefaultMapName,
                 fogMode = (int)BattleFogMode.None,
-                players = new List<ReplayPlayerLine>(),
-            };
-            foreach (var s in setups)
-            {
-                header.players.Add(new ReplayPlayerLine
+                players = setups.Select(s => new ReplayPlayerLine
                 {
                     playerId = s.PlayerId,
                     team = (int)s.Team,
@@ -292,9 +310,10 @@ namespace GIC.Editor
                     spawnY = spawnCells[s.PlayerId].y,
                     hand = hands[s.PlayerId],
                     moraIncomePercent = s.MoraIncomePercent,
-                });
-            }
-
+                }).ToList(),
+            };
+            bool previouslyEnabled = BattleRecorder.Enabled;
+            string path;
             GameObject logicRoot = null;
             try
             {
@@ -302,17 +321,28 @@ namespace GIC.Editor
                 BattleRecorder.CaptureSetup(seed, BattleLaunchConfig.DefaultMapName, (int)BattleFogMode.None,
                     setups, spawnCells, hands, isNetworked, directory);
                 path = BattleRecorder.CurrentPath;
+                if (path == null) return "FAIL：合成录制未产出文件";
                 logicRoot = new GameObject("SelfTestRecordRoot") { hideFlags = HideFlags.HideAndDontSave };
                 var sim = BuildSimFromHeader(header, logicRoot);
                 var live = logicRoot.AddComponent<RTSFlowController>();
-                live.Bind(sim, new CollectingTransport(), isNetworked: isNetworked);
+                var transport = new CollectingTransport();
+                live.Bind(sim, transport, isNetworked: isNetworked);
                 live.StartBattle();
                 if (!live.OnSubmitAction(BuyUnitInput(BattleDebugPlayerIds.P1, UnitName.FavoniusBanner)))
                     return "FAIL：录制自测购买旗帜未受理";
-                const int totalTicks = 2 * BattleMetrics.TicksPerSecond + 3;
-                for (int tick = 1; tick <= totalTicks; tick++)
+                if (finishBattle)
                 {
-                    if (!Tick(live)) return $"FAIL：自测录制停在第 {tick} 拍";
+                    string failure = PlayTerminalFixture(live, sim, center);
+                    if (failure != null) return failure;
+                    if (transport.BattleOver?.winnerTeam != (int)TeamType.A
+                        || transport.BattleOver.finalTick != live.CurrentTick || BattleRecorder.IsRecording)
+                        return "FAIL：核心终局未发布预期胜方和拍号，或没有自动收笔";
+                }
+                else
+                {
+                    const int totalTicks = 2 * BattleMetrics.TicksPerSecond + 3;
+                    while (live.CurrentTick < totalTicks)
+                        if (!Tick(live)) return $"FAIL：自测录制停在第 {live.CurrentTick} 拍";
                 }
                 if (CountHandUnit(sim, BattleDebugPlayerIds.P1, UnitName.FavoniusBanner) != 1)
                     return "FAIL：录制自测未实际到账";
@@ -324,14 +354,95 @@ namespace GIC.Editor
                 BattleRecorder.Enabled = previouslyEnabled;
             }
 
-            if (path == null) return "FAIL：合成录制未产出文件（CaptureSetup 异常？）";
             string summary = Run(path);
+            if (summary.Contains("FAIL")) return summary;
             var lines = File.ReadAllLines(path);
-            string truncatedPath = Path.Combine(directory, "missing-end.jsonl");
-            File.WriteAllLines(truncatedPath, lines.Take(lines.Length - 1));
-            if (!Run(truncatedPath).StartsWith("FAIL：v3 缺少结束拍", StringComparison.Ordinal))
-                return "FAIL：v3 缺少收尾行仍被接受";
-            return (isNetworked ? "联机" : "单机") + "回放自测（购买、hash、非整秒尾拍）→ " + summary;
+            string variant = Path.Combine(directory, "verification-variant.jsonl");
+            File.WriteAllLines(variant, lines.Take(lines.Length - 1));
+            if (!Run(variant).StartsWith($"FAIL：v{ReplayHeaderLine.CurrentFormat} 缺少结束拍", StringComparison.Ordinal))
+                return "FAIL：缺少收尾行仍被接受";
+
+            if (finishBattle)
+            {
+                if (!summary.Contains("终局状态 hash PASS")) return "FAIL：终局状态未比对";
+                string failure = VerifyTerminalReplayVariants(lines, variant);
+                if (failure != null) return failure;
+            }
+            string title = finishBattle ? "购买、核心摧毁、终局校验" : "购买、hash、非整秒停录";
+            return (isNetworked ? "联机" : "单机") + $"回放自测（{title}）→ " + summary;
+        }
+
+        private static string PlayTerminalFixture(RTSFlowController live, BattleSimState sim, BattleCell deployCell)
+        {
+            const string player = BattleDebugPlayerIds.P1;
+            if (!live.OnSubmitAction(new ActionData { playerId = player, actionType = ActionType.DeployUnit,
+                    deployUnitName = (int)UnitName.Kaeya, deployCell = deployCell }))
+                return "FAIL：终局自测部署未受理";
+            while (live.CurrentTick <= BattleMetrics.InputDelayTicks)
+                if (!Tick(live)) return "FAIL：终局自测部署拍未推进";
+
+            var caster = sim.SortedUnits().FirstOrDefault(p => p.Value.RawData?.unitName == UnitName.Kaeya);
+            int slot = caster.Value?.Skills.FindIndex(s => s.RawData?.skillID == SkillName.Kaeya_Frostgnaw) ?? -1;
+            if (slot < 0) return "FAIL：终局自测未部署凯亚或缺少霜袭";
+
+            int nextCast = live.CurrentTick;
+            const int maxTick = 90 * BattleMetrics.TicksPerSecond;
+            while (live.Phase == BattlePhase.Selecting && live.CurrentTick < maxTick)
+            {
+                if (live.CurrentTick == nextCast)
+                {
+                    if (!live.OnSubmitAction(new ActionData { playerId = player, unitId = caster.Key,
+                            actionType = ActionType.Skill, skillIndex = slot, aimX = 1000 }))
+                        return "FAIL：终局自测霜袭未受理";
+                    nextCast += BattleMetrics.SkillCooldownTicks(SkillType.Normal);
+                }
+                else if (live.CurrentTick % BattleMetrics.AiBeatTicks == BattleMetrics.AiBeatTicks - 1)
+                {
+                    // 以玩家指令占住伙伴脑的决策窗，避免自主移动离开固定测试位置。
+                    if (!live.OnSubmitAction(new ActionData { playerId = player, unitId = caster.Key, actionType = ActionType.Pass }))
+                        return "FAIL：终局自测占位指令未受理";
+                }
+                if (live.Phase == BattlePhase.Selecting && !Tick(live)) return "FAIL：终局自测未推进";
+            }
+            return live.Phase == BattlePhase.Finished ? null : "FAIL：终局自测未在时限内摧毁核心";
+        }
+
+        private static string VerifyTerminalReplayVariants(string[] lines, string variant)
+        {
+            var over = JsonUtility.FromJson<ReplayOverLine>(lines[lines.Length - 2]);
+            over.finalTick++;
+            lines[lines.Length - 2] = JsonUtility.ToJson(over);
+            File.WriteAllLines(variant, lines);
+            if (!Run(variant).StartsWith("FAIL：结束拍与录制输入/终局拍不一致", StringComparison.Ordinal))
+                return "FAIL：错误的终局拍未被检出";
+            over.finalTick--;
+
+            int winner = over.winnerTeam;
+            over.winnerTeam = (int)TeamType.B;
+            lines[lines.Length - 2] = JsonUtility.ToJson(over);
+            File.WriteAllLines(variant, lines);
+            if (!Run(variant).Contains("FAIL：终局不一致")) return "FAIL：错误的胜方未被检出";
+            over.winnerTeam = winner;
+
+            int hash = int.Parse(over.finalStateHash, CultureInfo.InvariantCulture);
+            over.finalStateHash = (hash ^ 1).ToString(CultureInfo.InvariantCulture);
+            lines[lines.Length - 2] = JsonUtility.ToJson(over);
+            File.WriteAllLines(variant, lines);
+            if (!Run(variant).Contains("FAIL：终局状态 hash 不一致")) return "FAIL：错误的终局状态 hash 未被检出";
+
+            over.finalStateHash = null;
+            lines[lines.Length - 2] = JsonUtility.ToJson(over);
+            File.WriteAllLines(variant, lines);
+            if (!Run(variant).StartsWith("FAIL：缺少或无法读取终局状态 hash", StringComparison.Ordinal))
+                return "FAIL：新版录制缺少终局状态 hash 仍被接受";
+
+            var oldHeader = JsonUtility.FromJson<ReplayHeaderLine>(lines[0]);
+            oldHeader.formatVersion = ReplayHeaderLine.ExactEndTickFormat;
+            lines[0] = JsonUtility.ToJson(oldHeader);
+            File.WriteAllLines(variant, lines);
+            string legacy = Run(variant);
+            return !legacy.Contains("FAIL") && legacy.Contains("旧格式未记录终局状态 hash")
+                ? null : "FAIL：旧版 v3 终局回放不兼容";
         }
 
         // ==================== sim 重建（Run 与 SelfTest 共用） ====================
@@ -372,7 +483,8 @@ namespace GIC.Editor
                 sim.RegisterHand(pl.playerId, new List<HandCard>());
                 if (pl.hand == null) continue;
                 foreach (var h in pl.hand)
-                    sim.GainCard(pl.playerId, h.AsCardId(), h.count, header.formatVersion >= 3 ? h.durability : -1);
+                    sim.GainCard(pl.playerId, h.AsCardId(), h.count,
+                        header.formatVersion >= ReplayHeaderLine.ExactEndTickFormat ? h.durability : -1);
             }
             return sim;
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using UnityEngine;
 using GIC.Data;
@@ -10,7 +11,7 @@ namespace GIC.Battle
 
 
     /// <summary>
-    /// 战斗回放 JSONL v3：记录开局规则、演算输入、表现命令、自证 hash 与结束拍号。
+    /// 战斗回放 JSONL v4：记录开局规则、演算输入、表现命令、秒拍和终局 hash、结束拍号。
     /// 单机记录本地决策/上交窗口；联机只记录房主已消费的非空输入批，空拍由结束拍号补齐。
     /// </summary>
     public static class BattleRecorder
@@ -24,8 +25,11 @@ namespace GIC.Battle
 
         private static string ReplayDirectory => Path.Combine(Application.persistentDataPath, "Replays");
 
+        /// <summary>本局确实有已打开的写入流，不等同于下局录制开关。</summary>
+        public static bool IsRecording => _writer != null;
+
         /// <summary>当前录制文件路径（null=未在录制）</summary>
-        public static string CurrentPath => _writer != null ? _path : null;
+        public static string CurrentPath => IsRecording ? _path : null;
 
         // ==================== 录制入口（接线点各一处） ====================
 
@@ -115,13 +119,18 @@ namespace GIC.Battle
             Append(new ReplaySegmentLine { turn = segment.turnNumber, segment = segment });
         }
 
-        /// <summary>终局录制（RTSFlowController 胜负判定处调）；无 over 行=识别未终局录制（回放仍可用）</summary>
-        public static void CaptureGameOver(int winnerTeam, int finalTick)
+        /// <summary>终局独立于秒拍采样，胜负成立时落下精确的状态 hash 和拍号。</summary>
+        public static void CaptureGameOver(int winnerTeam, int finalTick, int stateHash)
         {
             if (_writer == null) return;
             CaptureCompletedTick(finalTick);
-            Append(new ReplayOverLine { winnerTeam = winnerTeam, finalTick = finalTick,
-                finalTurn = finalTick / BattleMetrics.TicksPerSecond });
+            Append(new ReplayOverLine
+            {
+                winnerTeam = winnerTeam,
+                finalTick = finalTick,
+                finalTurn = finalTick / BattleMetrics.TicksPerSecond,
+                finalStateHash = stateHash.ToString(CultureInfo.InvariantCulture),
+            });
             EndSession();
         }
 
@@ -178,7 +187,9 @@ namespace GIC.Battle
     public class ReplayHeaderLine
     {
         public string kind = "header";
-        public const int CurrentFormat = 3;
+        public const int ExactEndTickFormat = 3;
+        public const int FinalStateHashFormat = 4;
+        public const int CurrentFormat = FinalStateHashFormat;
         public int formatVersion = CurrentFormat;
         public int seed;
         public string mapName;
@@ -240,6 +251,7 @@ namespace GIC.Battle
         public int winnerTeam;
         public int finalTurn;
         public int finalTick;
+        public string finalStateHash; // 字符串用于区分字段缺失与合法的 0。
     }
 
     [Serializable]

@@ -120,6 +120,14 @@ namespace GIC.Battle
             Current = config;
         }
 
+        /// <summary>切场景失败时只撤销本次未消费的配置，不清掉后续入口准备的开局。</summary>
+        public static bool CancelPending(BattleLaunchConfig config)
+        {
+            if (config == null || !ReferenceEquals(Current, config)) return false;
+            Current = null;
+            return true;
+        }
+
         /// <summary>
         /// 以指定配置开战（加载战斗场景）
         /// </summary>

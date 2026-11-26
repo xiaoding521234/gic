@@ -59,7 +59,7 @@ namespace GIC.UI
         private TextCombiner _startGameText;
         private TextCombiner _addAIText;
 
-        // 开战广播接收（host 回环+客户端统一入口；2026-10-11 联机批）
+        // 远端开战广播接收（房主直接使用已冻结的开局配置）。
         private StartBattleEventHandler _startBattleHandler;
         private bool _visibleEventsBound;
 
@@ -243,7 +243,7 @@ namespace GIC.UI
             }
         }
 
-        /// <summary>房间正式化事件（2026-10-11 联机批）：开战广播（host 回环+客户端统一转场入口）+
+        /// <summary>房间事件：远端开战广播 +
         /// 权威地图变化（下拉同步+预览刷新）——可见期订阅、OnDisable 对称解绑</summary>
         private void BindRoomEvents()
         {
@@ -330,8 +330,7 @@ namespace GIC.UI
 
         // ==================== 嵌套事件处理器 ====================
 
-        /// <summary>开战广播接收（host 回环+客户端到达双路径，Source==Network 统一成立）：
-        /// 路由到 RoomFlow.OnStartBattleReceived——全端统一转场入口（2026-10-11 联机批）</summary>
+        /// <summary>远端开战广播转交房间流程处理。</summary>
         private class StartBattleEventHandler : IEventHandler<StartBattleEvent>
         {
             private readonly CoopScreen _screen;
